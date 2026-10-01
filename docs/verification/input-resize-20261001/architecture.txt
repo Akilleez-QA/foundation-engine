@@ -1,0 +1,23 @@
+npm notice run foundation-engine@0.1.0 lint:arch
+npm notice run node scripts/lint/architecture.mjs
+Architecture ratchet (STD-LAY-9, STD-LAY-10) — counts outside the owning folder; a count may only fall.
+  rule                        count   files   baseline
+  raf-outside-loop            0       0       0
+  math-random                 0       0       0
+  wall-clock                  0       0       0
+  perf-now                    0       0       0
+  dataset-json                0       0       0
+  custom-event                0       0       0
+  local-storage               0       0       0
+  three-webgpu                0       0       0
+  webgl-renderer              0       0       0
+  context-lost-listener       0       0       0
+  set-interval                0       0       0
+  calm-read                   0       0       0
+  global-keydown              0       0       0
+  texture-loader              0       0       0
+  new-worker                  0       0       0
+  audio-context               0       0       0
+  dev-flag-cast               0       0       0
+  literal-ui-text             0       0       0
+lint:arch: ok

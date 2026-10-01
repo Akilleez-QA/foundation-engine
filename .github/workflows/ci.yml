@@ -1,0 +1,74 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Fork contributions run tests without deployment credentials or repository writes.
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0 # The budget ratchet compares against origin/main.
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install isolated test browser
+        run: npx --no-install playwright-core install --with-deps chromium
+      - name: Optional UI framework browser regressions
+        run: npm run test:ui-browser
+      - name: Optional diagnostic browser regressions
+        run: npm run test:diagnostics-browser
+      - name: Optional capture matrix browser regressions
+        run: npm run test:capture-browser
+      - name: Optional manual authoring browser regressions
+        run: npm run test:authoring-browser
+      - name: Optional appearance browser regressions
+        run: npm run test:appearance-browser
+      - name: Optional staged journal browser regressions
+        run: npm run test:stage-journal-browser
+      - name: Asynchronous model preview browser regressions
+        run: npm run test:model-preview-browser
+      - name: Optional framework browser regressions
+        run: GAME_DIR=templates/expedition/game npm run test:framework-browser
+      - name: Optional regional surface browser regressions
+        run: GAME_DIR=templates/expedition/game npm run test:regional-surface-browser
+      - name: Optional model attachment browser regressions
+        run: GAME_DIR=templates/expedition/game npm run test:model-attachment-browser
+      - name: Optional progression workbench browser regressions
+        run: GAME_DIR=templates/expedition/game npm run test:progression-workbench-browser
+      - name: Optional weighted appearance browser regressions
+        run: GAME_DIR=templates/expedition/game npm run test:weighted-appearance-browser
+      - name: Optional custody composition browser regressions
+        run: GAME_DIR=templates/expedition/game npm run test:custody-composition-browser
+      - name: Optional objective workbench browser regressions
+        run: GAME_DIR=templates/expedition/game npm run test:objective-workbench-browser
+      - name: Optional action workbench browser regressions
+        run: GAME_DIR=templates/expedition/game npm run test:action-workbench-browser
+      - name: Optional crafting workbench browser regressions
+        run: GAME_DIR=templates/expedition/game npm run test:crafting-workbench-browser
+      - name: Optional network workbench browser regressions
+        run: GAME_DIR=templates/expedition/game npm run test:network-workbench-browser
+      - name: Optional scoped replication browser regressions
+        run: GAME_DIR=templates/expedition/game npm run test:replication-workbench-browser
+      - name: Durable authority browser workflow
+        run: GAME_DIR=templates/expedition/game npm run test:authority-workbench-browser
+      - name: Full gates for every template
+        run: npm run gate:templates
+      - name: Phone smoke for every template
+        run: |
+          for t in templates/*/game; do
+            GAME_DIR="$t" npm run -s play:snap -- --mobile || exit 1
+          done

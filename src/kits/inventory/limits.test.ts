@@ -1,0 +1,2 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {createInventoryLedger} from './index';
+test('receipt admission saturates without forgetting retries or mutating stock',()=>{const l=createInventoryLedger({capacities:{bag:5},maxOperations:1});const output=[{container:'bag',batch:{id:'a',material:'a',properties:{}},quantity:1}];l.transact('one',[],output);assert.deepEqual(l.transact('two',[],output),{ok:false,reason:'history-full'});assert.deepEqual(l.transact('one',[],output),{ok:true,duplicate:true});assert.equal(l.quantity('bag','a'),1);});

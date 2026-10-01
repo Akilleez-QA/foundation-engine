@@ -1,0 +1,19 @@
+{
+  "name": "restart",
+  "scene": "play",
+  "seed": 5,
+  "steps": [
+    {"snap": "start"},
+    {"expect": {"path": "world.state.phase", "equals": "playing"}},
+    {"key": "ArrowLeft", "ms": 600},
+    {"wait": 25000},
+    {"expect": {"path": "world.state.phase", "equals": "over"}},
+    {"snap": "game-over"},
+    {"press": " "},
+    {"wait": 800},
+    {"expect": {"path": "world.state.phase", "equals": "playing"}},
+    {"expect": {"path": "world.state.score", "equals": 0}},
+    {"expect": {"path": "world.state.best", "atLeast": 1}},
+    {"snap": "restarted"}
+  ]
+}

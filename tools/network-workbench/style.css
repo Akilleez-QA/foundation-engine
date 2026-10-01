@@ -1,0 +1,58 @@
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  font: 16px system-ui;
+}
+#app {
+  position: absolute;
+  inset: 0;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid #75cabb;
+}
+#summary {
+  position: fixed;
+  z-index: 20;
+  inset: 20px 24px auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: #eaf3f8;
+}
+#controls {
+  position: fixed;
+  z-index: 20;
+  top: 82px;
+  left: 24px;
+  width: 290px;
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 10px;
+  background: #213748;
+  color: #eaf3f8;
+}
+#controls label {
+  display: grid;
+  gap: 4px;
+}
+#controls input,
+#controls select,
+button {
+  padding: 9px;
+  font: inherit;
+}
+#controls output {
+  overflow-wrap: anywhere;
+}
+#legend {
+  position: fixed;
+  z-index: 20;
+  bottom: 24px;
+  left: 24px;
+  color: #eaf3f8;
+}

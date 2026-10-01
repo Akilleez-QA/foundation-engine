@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Foundation · Network workbench</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <main id="app" class="app-root">
+      <header id="summary">
+        <strong>Network workbench</strong><span id="status">Preparing…</span
+        ><button id="exit">Exit scene</button
+        ><button id="return" disabled>Return</button>
+      </header>
+      <section id="controls" aria-label="Connection and command controls">
+        <label
+          >Host endpoint
+          <input id="endpoint" placeholder="ws://127.0.0.1:…/socket"
+        /></label>
+        <label
+          >Operator credential
+          <input id="credential" type="password" autocomplete="off"
+        /></label>
+        <button id="connect">Connect</button
+        ><button id="disconnect">Disconnect</button>
+        <label
+          >Target
+          <select id="target">
+            <option>alpha</option>
+            <option>beta</option>
+          </select></label
+        >
+        <label
+          >Amount <input id="delta" type="number" min="1" max="5" value="1"
+        /></label>
+        <button id="send" disabled>Send command</button>
+        <output id="result" aria-live="polite">No accepted response</output>
+      </section>
+      <aside id="legend">
+        Only this connection’s authorized result is shown. Ephemeral host; no
+        durable save or prediction.
+      </aside>
+    </main>
+    <script type="module" src="./entry.mjs"></script>
+  </body>
+</html>

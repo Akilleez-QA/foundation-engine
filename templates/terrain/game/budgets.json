@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "app": {
+    "firstLoadJsKiB": 704
+  },
+  "largeChunkAllow": [
+    "index"
+  ],
+  "scenes": {
+    "yard": {
+      "scene": "scene.yard",
+      "route": "#scene/yard",
+      "active": true,
+      "budget": {
+        "draws": 10,
+        "triangles": 10000,
+        "shadowCasters": 10,
+        "textureMiB": 8,
+        "canvasMiB": 4,
+        "heapMiB": 5,
+        "contexts": 1
+      },
+      "provenance": {
+        "measured": "f2a709e + terrain surface patch; SwiftShader 1280x800; worst window plus 10% via perf:derive",
+        "run": "templates/terrain/verification/initial-bench.json"
+      }
+    }
+  }
+}

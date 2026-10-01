@@ -1,0 +1,76 @@
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  font: 16px system-ui;
+  color: #eaf3f8;
+}
+#app {
+  position: absolute;
+  inset: 0;
+}
+#summary {
+  position: fixed;
+  z-index: 20;
+  inset: 16px 24px auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+#controls {
+  position: fixed;
+  z-index: 20;
+  top: 75px;
+  left: 24px;
+  width: 310px;
+  max-height: calc(100vh - 150px);
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 10px;
+  background: #213748;
+}
+#controls label:not(:has([type='checkbox'])) {
+  display: grid;
+  gap: 4px;
+}
+input:not([type='checkbox']),
+button {
+  font: inherit;
+  padding: 8px;
+}
+button {
+  margin: 2px;
+}
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid #75cabb;
+}
+#fields {
+  max-height: 180px;
+  overflow: auto;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+#legend {
+  position: fixed;
+  z-index: 20;
+  bottom: 18px;
+  left: 24px;
+  font-size: 14px;
+}
+#cover {
+  position: fixed;
+  z-index: 100;
+  inset: 25%;
+  background: #233b50;
+  border: 2px solid #75cabb;
+  border-radius: 12px;
+  padding: 30px;
+}
+#cover[data-mode='opaque'] {
+  inset: 0;
+}

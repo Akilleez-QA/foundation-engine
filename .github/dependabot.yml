@@ -1,0 +1,17 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-tools:
+        dependency-type: development
+    ignore:
+      # Pinned exactly: the bench and quality guard depend on its browser protocol. Bump by hand.
+      - dependency-name: playwright-core
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

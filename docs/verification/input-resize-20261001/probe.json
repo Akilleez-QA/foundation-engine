@@ -1,0 +1,169 @@
+{
+  "scene": "main",
+  "when": "2026-10-01T07:28:50.997Z",
+  "views": {
+    "desktop": {
+      "screenshot": "/REDACTED_HOME/Work/foundation-input-resize/playtest/latest/main-desktop.png",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "still": {
+        "ms": 618,
+        "renders": 0,
+        "drawsPerFrame": 0,
+        "trisPerFrame": 0,
+        "frameMsP95": 16.8,
+        "fps": 60,
+        "heapMiB": 12.2
+      },
+      "moving": {
+        "ms": 1215,
+        "renders": 0,
+        "drawsPerFrame": 0,
+        "trisPerFrame": 0,
+        "frameMsP95": 16.8,
+        "fps": 60,
+        "heapMiB": 11.8
+      },
+      "state": {
+        "scene": {
+          "scene": "scene.main",
+          "state": "active",
+          "epoch": 1,
+          "hash": "#scene/main"
+        },
+        "world": {
+          "scene": "main",
+          "entities": 2,
+          "state": {
+            "turns": 0
+          },
+          "named": {
+            "floor": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "cube": {
+              "x": 0,
+              "y": 0.6,
+              "z": 0
+            }
+          },
+          "frame": 137
+        },
+        "game": {
+          "id": "blank",
+          "genre": "blank",
+          "policy": "default",
+          "modes": [
+            "play"
+          ],
+          "minimum": "phone"
+        }
+      },
+      "budget": {
+        "scene": "main",
+        "status": "within budget",
+        "rows": [
+          {
+            "metric": "draws",
+            "measured": 0,
+            "budget": 10,
+            "ok": true
+          },
+          {
+            "metric": "triangles",
+            "measured": 0,
+            "budget": 10000,
+            "ok": true
+          }
+        ]
+      }
+    },
+    "mobile": {
+      "screenshot": "/REDACTED_HOME/Work/foundation-input-resize/playtest/latest/main-mobile.png",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "mobile": true
+      },
+      "still": {
+        "ms": 609,
+        "renders": 0,
+        "drawsPerFrame": 0,
+        "trisPerFrame": 0,
+        "frameMsP95": 16.8,
+        "fps": 60,
+        "heapMiB": 12.4
+      },
+      "moving": {
+        "ms": 1216,
+        "renders": 0,
+        "drawsPerFrame": 0,
+        "trisPerFrame": 0,
+        "frameMsP95": 16.8,
+        "fps": 60,
+        "heapMiB": 12
+      },
+      "state": {
+        "scene": {
+          "scene": "scene.main",
+          "state": "active",
+          "epoch": 1,
+          "hash": "#scene/main"
+        },
+        "world": {
+          "scene": "main",
+          "entities": 2,
+          "state": {
+            "turns": 0
+          },
+          "named": {
+            "floor": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "cube": {
+              "x": 0,
+              "y": 0.6,
+              "z": 0
+            }
+          },
+          "frame": 143
+        },
+        "game": {
+          "id": "blank",
+          "genre": "blank",
+          "policy": "default",
+          "modes": [
+            "play"
+          ],
+          "minimum": "phone"
+        }
+      },
+      "budget": {
+        "scene": "main",
+        "status": "within budget",
+        "rows": [
+          {
+            "metric": "draws",
+            "measured": 0,
+            "budget": 10,
+            "ok": true
+          },
+          {
+            "metric": "triangles",
+            "measured": 0,
+            "budget": 10000,
+            "ok": true
+          }
+        ]
+      }
+    }
+  },
+  "errors": [],
+  "console": []
+}

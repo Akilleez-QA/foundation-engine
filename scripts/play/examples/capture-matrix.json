@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "compact-touch",
+      "viewport": {"width": 390, "height": 844},
+      "isMobile": true,
+      "hasTouch": true,
+      "deviceScaleFactor": 2,
+      "inputs": ["touch"],
+      "support": "experimental"
+    },
+    {
+      "id": "windowed-hybrid",
+      "viewport": {"width": 900, "height": 650},
+      "isMobile": false,
+      "hasTouch": true,
+      "deviceScaleFactor": 1,
+      "inputs": ["keyboard", "pointer", "touch"],
+      "support": "experimental"
+    }
+  ],
+  "cases": [
+    {"id": "compact-entry", "profile": "compact-touch", "scene": "main", "task": "Inspect initial scene visibility", "criteria": ["The authored essential world region remains visible"]},
+    {"id": "hybrid-entry", "profile": "windowed-hybrid", "scene": "main", "task": "Inspect windowed scene visibility", "criteria": ["The authored essential world region remains visible"]}
+  ]
+}

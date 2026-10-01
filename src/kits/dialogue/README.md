@@ -1,0 +1,5 @@
+# Dialogue kit
+
+`createDialogue(definition, sessionId, snapshot?)` owns one conversation. Nodes/options have stable IDs and localization keys. Conditions are caller-provided facts; selected effects are returned as intents, not automatically applied to world state. `view(facts)` returns the session, node and revision to echo in `choose`. Stale choices are rejected, conditions are rechecked, and `close` always provides an exit independent of narrative hooks. No index clamping.
+
+Snapshots are plain data for the existing save-section API. Definition versions must use a new definition ID or explicit migration. A successful choice and applying its effects are separate operations; callers needing durable rewards must use a shared transaction/claim record. No distributed or cross-section atomicity is claimed. Graph validation bounds nodes/options and checks that every node has an authored exit route. Conditions can temporarily block all choices; close remains available. No rendering or per-frame cost.

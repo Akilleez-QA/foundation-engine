@@ -1,0 +1,207 @@
+{
+  "scene": "field",
+  "when": "2026-09-30T04:47:45.802Z",
+  "views": {
+    "desktop": {
+      "screenshot": "playtest/latest/field-desktop.png",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "still": {
+        "ms": 613,
+        "renders": 0,
+        "drawsPerFrame": 0,
+        "trisPerFrame": 0,
+        "frameMsP95": 16.8,
+        "fps": 60,
+        "heapMiB": 11.4
+      },
+      "moving": {
+        "ms": 1216,
+        "renders": 0,
+        "drawsPerFrame": 0,
+        "trisPerFrame": 0,
+        "frameMsP95": 16.8,
+        "fps": 60,
+        "heapMiB": 10.7
+      },
+      "state": {
+        "scene": {
+          "scene": "scene.field",
+          "state": "active",
+          "epoch": 1,
+          "hash": "#scene/field"
+        },
+        "world": {
+          "scene": "field",
+          "entities": 5,
+          "state": {
+            "expedition": {
+              "status": "idle",
+              "collected": 0,
+              "badges": 0,
+              "search": null,
+              "pace": 3,
+              "equipment": [
+                "cap-1"
+              ]
+            }
+          },
+          "named": {
+            "player": {
+              "x": 0,
+              "y": 0.719,
+              "z": 5
+            },
+            "station-0": {
+              "x": -5,
+              "y": 1.372,
+              "z": -3
+            },
+            "station-1": {
+              "x": 0,
+              "y": 0.501,
+              "z": -5
+            },
+            "station-2": {
+              "x": 5,
+              "y": 0.36,
+              "z": -2
+            }
+          },
+          "frame": 141
+        },
+        "game": {
+          "id": "expedition",
+          "genre": "expedition",
+          "policy": "default",
+          "modes": [
+            "play"
+          ],
+          "minimum": "phone"
+        }
+      },
+      "budget": {
+        "scene": "field",
+        "status": "within budget",
+        "rows": [
+          {
+            "metric": "draws",
+            "measured": 0,
+            "budget": 10,
+            "ok": true
+          },
+          {
+            "metric": "triangles",
+            "measured": 0,
+            "budget": 10000,
+            "ok": true
+          }
+        ]
+      }
+    },
+    "mobile": {
+      "screenshot": "playtest/latest/field-mobile.png",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "mobile": true
+      },
+      "still": {
+        "ms": 619,
+        "renders": 0,
+        "drawsPerFrame": 0,
+        "trisPerFrame": 0,
+        "frameMsP95": 16.8,
+        "fps": 60,
+        "heapMiB": 11.4
+      },
+      "moving": {
+        "ms": 1216,
+        "renders": 0,
+        "drawsPerFrame": 0,
+        "trisPerFrame": 0,
+        "frameMsP95": 16.8,
+        "fps": 60,
+        "heapMiB": 10.7
+      },
+      "state": {
+        "scene": {
+          "scene": "scene.field",
+          "state": "active",
+          "epoch": 1,
+          "hash": "#scene/field"
+        },
+        "world": {
+          "scene": "field",
+          "entities": 5,
+          "state": {
+            "expedition": {
+              "status": "idle",
+              "collected": 0,
+              "badges": 0,
+              "search": null,
+              "pace": 3,
+              "equipment": [
+                "cap-1"
+              ]
+            }
+          },
+          "named": {
+            "player": {
+              "x": 0,
+              "y": 0.719,
+              "z": 5
+            },
+            "station-0": {
+              "x": -5,
+              "y": 1.372,
+              "z": -3
+            },
+            "station-1": {
+              "x": 0,
+              "y": 0.501,
+              "z": -5
+            },
+            "station-2": {
+              "x": 5,
+              "y": 0.36,
+              "z": -2
+            }
+          },
+          "frame": 144
+        },
+        "game": {
+          "id": "expedition",
+          "genre": "expedition",
+          "policy": "default",
+          "modes": [
+            "play"
+          ],
+          "minimum": "phone"
+        }
+      },
+      "budget": {
+        "scene": "field",
+        "status": "within budget",
+        "rows": [
+          {
+            "metric": "draws",
+            "measured": 0,
+            "budget": 10,
+            "ok": true
+          },
+          {
+            "metric": "triangles",
+            "measured": 0,
+            "budget": 10000,
+            "ok": true
+          }
+        ]
+      }
+    }
+  },
+  "errors": [],
+  "console": []
+}

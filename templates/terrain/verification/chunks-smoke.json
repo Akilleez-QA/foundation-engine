@@ -1,0 +1,1 @@
+{"name":"terrain-chunks","scene":"yard","steps":[{"wait":300},{"expect":{"path":"world.state.terrain.tiles","equals":4}},{"expect":{"path":"world.state.terrain.builds","equals":4}},{"teleport":[-10,-10]},{"wait":300},{"snap":"near-northwest"},{"teleport":[10,10]},{"wait":300},{"expect":{"path":"world.state.terrain.strides","equals":[1,1,1,1]}},{"snap":"near-southeast"}]}

@@ -1,0 +1,35 @@
+{
+  "before": {
+    "stage": "complete",
+    "ore": 2,
+    "plates": 1,
+    "reserve": 4,
+    "revision": 1
+  },
+  "after": {
+    "stage": "complete",
+    "ore": 2,
+    "plates": 1,
+    "reserve": 4,
+    "revision": 1
+  },
+  "active": {
+    "ms": 715,
+    "renders": 27,
+    "drawsPerFrame": 8,
+    "trisPerFrame": 1272,
+    "frameMsP95": 16.7,
+    "fps": 60,
+    "heapMiB": 13.8
+  },
+  "idle": {
+    "ms": 615,
+    "renders": 0,
+    "drawsPerFrame": 0,
+    "trisPerFrame": 0,
+    "frameMsP95": 16.7,
+    "fps": 60,
+    "heapMiB": 14.2
+  },
+  "errors": []
+}

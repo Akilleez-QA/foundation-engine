@@ -1,0 +1,33 @@
+name: Bug report
+description: A reproducible engine, kit, or template defect.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "For suspected vulnerabilities, read SECURITY.md first. Do not post exploits, secrets, private assets, or personal information."
+  - type: textarea
+    id: problem
+    attributes:
+      label: Expected and actual behavior
+      description: Explain what should happen and what happens instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include a small example or template, exact steps/commands, and a seed if relevant. Remove private data.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Version and environment
+      description: Commit/version, selected template or GAME_DIR, OS, Node/npm, browser/version, device and input method. Include GPU and viewport for rendering/performance problems.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Relevant error output, screenshots, or measured performance; distinguish development from production measurements.

@@ -1,0 +1,13 @@
+# Weighted appearance diagnostic
+
+Optional desktop keyboard/pointer consumer, 1440×960 browser acceptance. It does not certify phone, tablet or physical-device performance. Original CC0 two-joint GLBs are produced in memory by `fixtures.mjs`; no external models are used.
+
+The creator-defined appearance document stores one part selection. Existing authoring session owns preview/history, SceneModels owns independently loaded model instances, and SaveStore owns persistence. At most two groups (four model instances) are live: accepted and candidate. Each group contains its own source and weighted module. Replacement compatibility is observed through `modelPoseLinkState`, separately from resource readiness. Commit exchanges presentation only after the current candidate is ready; cancellation despawns the candidate. Undo prepares the previous selection for the same compatibility check before accepting history travel.
+
+Save is explicit and separate from acceptance. A rejected write is unsaved, and reload restores durable data. Corrupt data blocks editing until explicit Reset; schema-valid but incompatible assets keep their selected identity and require a compatible replacement. Reset deliberately removes this diagnostic's saved selection. This single-writer sample does not claim multi-tab transactionality or power-loss guarantees.
+
+The source mesh is transparent so rendered color comes from the independently owned module. Vertex0 is A-only, vertex1 B-only, vertex2 equally weighted. B rotates around (1,0,0), while A stays fixed. The scalar oracle does not use runtime mapping, matrices or bounds. The browser samples actual adopted skinned vertices through the bounded dev inspector without advancing or repairing pose. Reversed-palette fixtures reorder both joint indices and inverse binds; missing joint and altered bind fixtures must refuse.
+
+Run `node --test tools/weighted-appearance/fixtures.test.mjs` for original asset numeric checks. Run `node scripts/play/weighted-appearance-check.mjs` for the serialized browser diagnostic. Generated evidence is under `playtest/weighted-appearance` by default. Browser evidence remains unverified until that command actually passes on the final integrated head.
+
+This diagnostic is single-writer: it has no compare-and-swap wrapper around external edits. A concurrent or same-tab storage writer is outside its supported composition protocol; SaveStore's merge/flush behavior must not be interpreted as preventing all lost updates. Newer, quarantined and unavailable initial saves block accepted presentation and edits. Reset suppresses pending writes from the retiring page so pagehide cannot recreate the removed record.

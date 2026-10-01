@@ -1,0 +1,30 @@
+{
+  "scope": "Only local home-directory prefix redacted for publication; no measurement or outcome changed. Original files preserved in private pre-release mirror.",
+  "files": [
+    {
+      "file": "before.txt",
+      "originalSha256": "e100432560b59f3243e163a7d0f79f032bceb90ab95e70543eab5bb82bd937ec",
+      "redactedSha256": "bfb16d09bb46641ce47fb3f23f18bcd3123f51bc6b4be6c6a29dc1b1b5aa19c2"
+    },
+    {
+      "file": "gate-b9e68-failed.txt",
+      "originalSha256": "e6940015deaae518b2cbe0a474d70545bebb2b9d6a43223633fa0c486a18dc30",
+      "redactedSha256": "4e80adcab88dee156ce0c99473befa5a7077ef16b06c1c8755be13064a46abcd"
+    },
+    {
+      "file": "gate-blank.txt",
+      "originalSha256": "108bc636bea5ee8913cb54ff1b6c599edf991c5d508167cadc836a6ff70f3fb9",
+      "redactedSha256": "c3e253a79852a287d1f78106966645c740930788af23e44eb1b6fed1c8a49ca2"
+    },
+    {
+      "file": "gate-six.txt",
+      "originalSha256": "9d0a705d968886b0c82fb485bfad215d2829032dffcd31caa75866942d993098",
+      "redactedSha256": "06dfbee8f3276b74fd42023dc7b23369448e0aa4ba24c831804c603e288b2cba"
+    },
+    {
+      "file": "probe.json",
+      "originalSha256": "710d2be82ffd5f3134f5ea3a6f346b513689df45490585f8c94831b05853e4af",
+      "redactedSha256": "433828674e11321a415444c4ffd48e57c590af24e82e06f8dc020f0f1634add6"
+    }
+  ]
+}

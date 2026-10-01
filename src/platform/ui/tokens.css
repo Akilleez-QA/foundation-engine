@@ -1,0 +1,27 @@
+/* Engine design tokens and the cascade-layer order (STD-RUN-24). This sheet is imported first (src/app/styles.ts),
+   so the order below is the one the whole app uses. Feature CSS lives in `@layer features`, is scoped under its
+   scene root (`.scene-<id>`) and takes its colours and sizes from the `--engine-*` tokens. A game overrides the
+   palette by redefining tokens in `@layer tokens` of its own sheet; it never edits component rules. */
+@layer reset, tokens, shell, primitives, features, overrides;
+@layer tokens {
+ :root {
+  /* palette (neutral defaults; a game supplies its own) */
+  --engine-ink:#101820; --engine-ink-deep:#0a1016; --engine-paper:#fff; --engine-cream:#f4f1ea;
+  --engine-accent-1:#f2c14e; --engine-accent-2:#5bc0be; --engine-accent-3:#9bc53d; --engine-line:#8a8f98;
+  /* semantic */
+  --engine-surface-card:color-mix(in srgb,var(--engine-ink) 88%,transparent); --engine-text:var(--engine-cream); --engine-text-muted:#c9ced6;
+  --engine-accent:var(--engine-accent-1); --engine-focus-ring:0 0 0 3px var(--engine-accent-3); --engine-scrim:#0008; --engine-shadow:0 12px 40px #0009;
+  /* space */
+  --engine-space-1:4px; --engine-space-1-5:6px; --engine-space-2:8px; --engine-space-2-5:10px; --engine-space-3:12px; --engine-space-4:16px; --engine-space-5:24px; --engine-space-6:32px;
+  /* type */
+  --engine-font:system-ui,sans-serif; --engine-font-mono:ui-monospace,monospace;
+  --engine-text-xs:11px; --engine-text-sm:12px; --engine-text-md:14px; --engine-text-lg:16px; --engine-text-xl:18px; --engine-text-2xl:22px; --engine-text-3xl:clamp(24px,4vw,32px);
+  --engine-radius-sm:6px; --engine-radius-md:10px; --engine-radius-lg:14px; --engine-radius-xl:18px; --engine-radius-pill:999px;
+  /* stacking: the layer kinds of the layer manager (STD-RUN-20) */
+  --engine-z-world:0; --engine-z-scene-ui:10; --engine-z-panel:20; --engine-z-sheet:30; --engine-z-modal:40; --engine-z-toast:50; --engine-z-loading:60; --engine-z-dev:90;
+  --engine-motion-fast:120ms; --engine-motion:220ms;
+ }
+ :root[data-comfort~=large], body.large-type { --engine-text-md:17px; --engine-text-lg:19px; --engine-space-3:14px; }
+ :root[data-calm], body.still-mode { --engine-motion-fast:0ms; --engine-motion:0ms; }
+ @media (prefers-reduced-motion: reduce) { :root { --engine-motion-fast:0ms; --engine-motion:0ms; } }
+}

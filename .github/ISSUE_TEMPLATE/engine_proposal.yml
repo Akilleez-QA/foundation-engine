@@ -1,0 +1,27 @@
+name: Engine proposal
+description: Propose a reusable contract or optional kit improvement.
+title: "[Proposal]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and smallest consumer
+      description: Explain the unmet need and a concrete example. What existing API did you try?
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Proposed contract and placement
+      description: Core, platform, author API, optional kit, or template? Explain why it belongs there and what remains game-specific.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Ownership, limits, compatibility, and validation
+      description: Include disposal/cancellation, finite work or memory bounds, migration impact, and a way to prove the behavior. Unknowns are fine.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and tradeoffs

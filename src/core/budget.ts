@@ -1,0 +1,70 @@
+// core/budget.ts: the performance budget TYPES (ADR 0025, 0029, 0030). Types plus
+// `budgetFor`; the checker is platform/perf/budget-check.ts. They live in core (L0) because SceneDef holds a
+// SceneBudget. Flat fields are the reference preset's values; `ports` holds a lighter preset's overrides once
+// that port is built.
+import type { Ported, PortPreset, QualityPreset } from './tiers';
+
+export interface SceneBudgetValues {
+  /** GL draws per rendered frame, shadow pass included (worst window of the scene). */
+  draws: number;
+  /** Triangles submitted per rendered frame, shadow pass included. */
+  triangles: number;
+  /** Draws in one full shadow pass (casters × shadow lights). */
+  shadowCasters: number;
+  /** Shadow-pass draws per rendered frame while still; 0 = static maps. */
+  shadowDrawsIdle: number;
+  /** Shadow-pass draws per rendered frame during the active script, rebuilds included (ADR 0037). */
+  shadowDrawsActive?: number;
+  /** Share of frames that draw while the scene is still (ADR 0015). */
+  idleRenderRatio: number;
+  /** Live GPU texture bytes. */
+  textureMiB: number;
+  /** Live 2D canvas backing store, page-wide, after GC. */
+  canvasMiB: number;
+  /** JS heap after two forced GCs. */
+  heapMiB: number;
+  /** Live WebGL contexts. */
+  contexts: number;
+  /** p95 at 3840×2160 on the reference GPU. */
+  frameMs: number;
+  /** Enter from the home scene, warm cache, reference GPU. */
+  loadMs: number;
+  /** Bytes transferred to enter from the home scene in the same session. */
+  loadMiB: number;
+  /** The scene's own lazy chunk(s), minified. */
+  chunkKiB: number;
+  /** p95 sim host + readouts per frame, reference run only. */
+  simMs?: number;
+  /** p95 navigation → first presented frame of this scene from the home scene (ADR 0041), reference run. */
+  handoverMs?: number;
+  /** Min accepted/requested world time over the bench route; 1.0 on the reference run (ADR 0049). */
+  worldDilation?: number;
+}
+
+export type SceneBudget = Ported<SceneBudgetValues> & { provenance: { measured: string; run: string } };
+
+/** App-wide numbers that are not per scene. */
+export interface AppBudget {
+  firstLoadJsKiB: number;
+  startupMiB: number;
+  startupHeapMiB: number;
+  appReadyMs: { desktop: number };
+  retainedCanvasMiBAfterTour: number;
+  retainedHeapMiBAfterTour: number;
+}
+
+/** Fallback order for a preset's own values: its port, then each heavier port, then the reference values. */
+const CHAIN: Readonly<Record<QualityPreset, readonly PortPreset[]>> = {
+  reference: [],
+  high: ['high'],
+  medium: ['medium', 'high'],
+  low: ['low', 'medium', 'high'],
+};
+
+/** The values that apply at `preset` (low → medium → high → reference). */
+export function budgetFor<T extends object>(b: Ported<T>, preset: QualityPreset): T {
+  const { ports, ...flat } = b as Ported<T> & Record<string, unknown>;
+  const out: Record<string, unknown> = { ...flat };
+  for (const port of [...CHAIN[preset]].reverse()) Object.assign(out, ports?.[port] ?? {});
+  return out as T;
+}

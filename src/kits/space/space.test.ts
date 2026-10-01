@@ -1,0 +1,6 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {decorativeStars,horizon,environmentTransition} from './index';
+import {defineEnvironment} from '../../author';
+test('quality populations retain stable identity and unit directions',()=>{assert.deepEqual(decorativeStars(7,32).slice(0,8),decorativeStars(7,8));for(const p of decorativeStars(7,32))assert.ok(Math.abs(Math.hypot(...p.direction)-1)<1e-12);assert.throws(()=>decorativeStars(0,4097));});
+test('horizon remains finite and explicitly rejects interior cameras',()=>{assert.equal(horizon(1,1),null);assert.equal(horizon(1,0.5),null);assert.ok(Number.isFinite(horizon(1,1+Number.EPSILON)!.limbRadius));assert.equal(horizon(1,2)!.angularRadius,Math.asin(0.5));});
+test('one transition interpolates linear light colors and validates compatible populations',()=>{const a=defineEnvironment({background:0,ambient:{sky:0,ground:0,intensity:0},directional:{color:0,intensity:0,position:[1,1,1]},haze:null,points:decorativeStars(1,4),pointSize:1});const b={...a,background:0xffffff,ambient:{sky:0xffffff,ground:0xffffff,intensity:2}};const mid=environmentTransition(a,b,.5);assert.equal(mid.background,0xbcbcbc);assert.equal(mid.ambient.intensity,1);assert.deepEqual(environmentTransition(a,b,1),b);assert.throws(()=>environmentTransition(a,{...b,points:[]},.5));});

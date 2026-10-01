@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Foundation · Scoped views</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <main id="app" class="app-root">
+      <header id="summary">
+        <strong>Scoped view workbench</strong><span id="status">Preparing…</span
+        ><button id="exit">Exit scene</button
+        ><button id="return" disabled>Return</button>
+      </header>
+      <section id="controls" aria-label="Connection and view controls">
+        <label
+          >Host endpoint<input
+            id="endpoint"
+            placeholder="ws://127.0.0.1:…/socket"
+        /></label>
+        <label
+          >Operator credential<input
+            id="credential"
+            type="password"
+            autocomplete="off"
+        /></label>
+        <div>
+          <button id="connect">Connect</button
+          ><button id="disconnect">Disconnect</button
+          ><button id="refresh" disabled>Refresh view</button>
+        </div>
+        <label
+          ><input id="hold-credit" type="checkbox" /> Withhold application
+          credit</label
+        ><button id="release-credit">Release credit</button>
+        <label
+          ><input id="fail-projection" type="checkbox" /> Inject partial
+          projection failure</label
+        >
+        <div>
+          <button id="hold-decoration">Hold decoration</button
+          ><button id="release-decoration">Release decoration</button>
+        </div>
+        <div>
+          <button id="cover-scrim">Open scrim</button
+          ><button id="cover-opaque">Open opaque screen</button>
+        </div>
+        <output id="result" aria-live="polite">No baseline</output>
+        <details>
+          <summary>Current disclosed fields</summary>
+          <pre id="fields"></pre>
+        </details>
+      </section>
+      <aside id="legend">
+        Complete views replace omitted fields and entities. Creator policy owns
+        disclosure; no durable state or prediction.
+      </aside>
+    </main>
+    <section
+      id="cover"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Independent covering layer"
+      hidden
+    >
+      <p>
+        Scene access is suspended. Reconnect for a fresh baseline after closing.
+      </p>
+      <button id="close-cover">Close</button>
+    </section>
+    <script type="module" src="./entry.mjs"></script>
+  </body>
+</html>

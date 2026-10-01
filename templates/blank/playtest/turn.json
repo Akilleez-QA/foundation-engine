@@ -1,0 +1,14 @@
+{
+  "name": "turn",
+  "scene": "main",
+  "seed": 1,
+  "steps": [
+    {"snap": "start"},
+    {"expect": {"path": "scene.state", "equals": "active"}},
+    {"expect": {"path": "world.state.turns", "equals": 0}},
+    {"press": " "},
+    {"wait": 600},
+    {"expect": {"path": "world.state.turns", "equals": 1}},
+    {"snap": "turned"}
+  ]
+}

@@ -1,0 +1,1 @@
+{"name":"terrain-revision","scene":"yard","steps":[{"teleport":[-5,-4]},{"wait":100},{"snap":"before"},{"press":"r"},{"waitUntil":{"path":"world.state.terrain.epoch","equals":2},"ms":3000},{"expect":{"path":"world.state.terrain.navigationEpoch","equals":2}},{"snap":"after"}]}

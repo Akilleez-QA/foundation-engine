@@ -1,0 +1,6 @@
+# Maintainers review every change. Add paths and owners as the team grows.
+*                    @Akilleez-QA
+/docs/STANDARD.md    @Akilleez-QA
+/docs/adr/           @Akilleez-QA
+/perf/               @Akilleez-QA
+/.github/            @Akilleez-QA

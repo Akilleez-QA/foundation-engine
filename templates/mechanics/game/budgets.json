@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "app": {
+    "firstLoadJsKiB": 704
+  },
+  "largeChunkAllow": [
+    "index"
+  ],
+  "scenes": {
+    "lab": {
+      "scene": "scene.lab",
+      "route": "#scene/lab",
+      "active": true,
+      "budget": {
+        "draws": 10,
+        "triangles": 10000,
+        "shadowCasters": 10,
+        "textureMiB": 8,
+        "canvasMiB": 4,
+        "heapMiB": 5,
+        "contexts": 1
+      },
+      "provenance": {
+        "measured": "2026-09-30 working tree; SwiftShader 1280x800 baseline + 390x844 full action flow; 5 baseline / 7 peak action draws; 1172 baseline / 1196 peak action triangles; perf:derive 10% headroom",
+        "run": "templates/mechanics/verification/initial-bench.json; templates/mechanics/verification/interaction.json"
+      }
+    }
+  }
+}

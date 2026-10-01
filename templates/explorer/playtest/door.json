@@ -1,0 +1,29 @@
+{
+  "name": "door",
+  "scene": "garden",
+  "seed": 1,
+  "steps": [
+    {"snap": "garden"},
+    {"teleport": [4, -2.6]},
+    {"wait": 300},
+    {"expect": {"path": "world.state.near", "equals": "to-shed"}},
+    {"press": "e"},
+    {"wait": 1500},
+    {"expect": {"path": "scene.scene", "equals": "scene.shed"}},
+    {"expect": {"path": "world.named.player.z", "equals": 2.2}},
+    {"snap": "shed"},
+    {"teleport": [-2.2, -0.9]},
+    {"wait": 300},
+    {"expect": {"path": "world.state.near", "equals": "crate"}},
+    {"press": "e"},
+    {"wait": 300},
+    {"teleport": [0, 2.4]},
+    {"wait": 300},
+    {"expect": {"path": "world.state.near", "equals": "to-garden"}},
+    {"press": "e"},
+    {"wait": 1500},
+    {"expect": {"path": "scene.scene", "equals": "scene.garden"}},
+    {"expect": {"path": "world.named.player.x", "equals": 4}},
+    {"snap": "back-in-garden"}
+  ]
+}

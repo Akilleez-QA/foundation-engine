@@ -1,0 +1,7 @@
+/* Shared in-scene failure card (the router's recovery layer): available before any scene loads. */
+@layer shell {
+.scene-failure-card{position:absolute;inset:auto var(--engine-space-4) var(--engine-space-4);max-width:440px;margin:0 auto;padding:var(--engine-space-4);display:grid;gap:var(--engine-space-2);
+ border:2px solid var(--engine-line);border-radius:var(--engine-radius-xl);box-shadow:var(--engine-shadow);background:var(--engine-surface-card);color:var(--engine-text);font:var(--engine-text-lg) var(--engine-font);z-index:var(--engine-z-loading)}
+.scene-failure-card .scene-failure-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--engine-space-2);margin:0}
+.scene-failure-card button{min-height:44px;padding:var(--engine-space-1-5) var(--engine-space-3)}
+}

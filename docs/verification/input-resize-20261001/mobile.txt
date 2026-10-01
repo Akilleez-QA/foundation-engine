@@ -1,0 +1,7 @@
+npm notice run foundation-engine@0.1.0 play:snap
+npm notice run node scripts/generate.mjs && node scripts/play/snap.mjs --mobile
+strings: wrote src/core/i18n/keys.gen.ts, src/generated/strings/en/narration.json, src/generated/strings/compact-ids.json (25 keys from 6 shards)
+play:snap main: playtest/latest/main-desktop.png, playtest/latest/main-mobile.png
+  world: 2 entities · state {"turns":0}
+  moving: 60 fps (p95 16.8 ms), 0 draws, 0 tris · still: 0 renders · within budget
+  details: playtest/latest/probe.json

@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "app": {
+    "firstLoadJsKiB": 704
+  },
+  "largeChunkAllow": [
+    "index"
+  ],
+  "scenes": {
+    "field": {
+      "scene": "scene.field",
+      "route": "#scene/field",
+      "active": true,
+      "budget": {
+        "draws": 10,
+        "triangles": 10000,
+        "shadowCasters": 10,
+        "textureMiB": 8,
+        "canvasMiB": 4,
+        "heapMiB": 5,
+        "contexts": 1
+      },
+      "provenance": {
+        "measured": "Phase 2 working tree production benchmark: field active8draws1272triangles4.4MiB heap; shelter idle4.3MiB heap; unchanged numeric caps",
+        "run": "templates/expedition/verification/navigation/bench.json"
+      }
+    },
+    "shelter": {
+      "scene": "scene.shelter",
+      "route": "#scene/shelter",
+      "active": true,
+      "budget": {
+        "draws": 10,
+        "triangles": 10000,
+        "shadowCasters": 10,
+        "textureMiB": 8,
+        "canvasMiB": 4,
+        "heapMiB": 5,
+        "contexts": 1
+      },
+      "provenance": {
+        "measured": "Phase 2 working tree production benchmark: field active8draws1272triangles4.4MiB heap; shelter idle4.3MiB heap; unchanged numeric caps",
+        "run": "templates/expedition/verification/navigation/bench.json"
+      }
+    }
+  }
+}

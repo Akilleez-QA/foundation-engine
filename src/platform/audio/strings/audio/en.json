@@ -1,0 +1,7 @@
+{
+  "audio.cue.click": "Soft tap",
+  "audio.cue.success": "Discovery chime",
+  "audio.cue.arrive": "Arrival chime",
+  "audio.cue.count": "Countdown beep",
+  "audio.cue.bump": "Soft bump"
+}

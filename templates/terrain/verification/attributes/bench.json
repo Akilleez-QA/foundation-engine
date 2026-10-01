@@ -1,0 +1,226 @@
+{
+ "schema": 1,
+ "sha": "f05e097405c9484703c0db6b15197fa1ad46bfbb",
+ "dirty": true,
+ "harness": "swiftshader",
+ "viewport": {
+  "width": 1280,
+  "height": 800,
+  "dpr": 1
+ },
+ "gpu": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+ "browser": "Chromium 152.0.7977.82",
+ "when": "2026-09-30T05:55:32.457Z",
+ "loadAverage": 9.47,
+ "descriptor": "6a33d4677d118e08850b303fa5fd718fc29356032bb4abf183509c57c1d41f4e",
+ "experiment": {
+  "schema": 1,
+  "harness": "swiftshader",
+  "browser": "Chromium 152.0.7977.82",
+  "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "viewport": {
+   "width": 1280,
+   "height": 800,
+   "dpr": 1
+  },
+  "quality": "reference (pinned)",
+  "calm": false,
+  "execution": {
+   "launchArguments": [
+    "--mute-audio",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-extensions",
+    "--disable-background-networking",
+    "--enable-automation",
+    "--ignore-gpu-blocklist",
+    "--window-size=1280,800",
+    "--use-angle=swiftshader",
+    "--enable-unsafe-swiftshader"
+   ]
+  },
+  "locale": "en-US",
+  "clock": "wall",
+  "comparisonPolicy": "strict-taxonomy-v1",
+  "route": [
+   "yard"
+  ],
+  "routes": {
+   "yard": "#scene/yard"
+  },
+  "active": [
+   "yard"
+  ],
+  "keys": [
+   "ArrowUp",
+   "ArrowLeft"
+  ],
+  "window": {
+   "resample": 3,
+   "settleMs": 1500,
+   "quietMs": 1000,
+   "quietTimeoutMs": 30000,
+   "minMs": 2000,
+   "maxMs": {
+    "swiftshader": 6000,
+    "gpu": 4000
+   },
+   "frames": 6,
+   "activeMs": 4000,
+   "enterTimeoutMs": 60000
+  },
+  "network": "hermetic",
+  "classificationVersion": 1,
+  "readinessVersion": 1,
+  "helpers": {
+   "scripts/perf/bench-browser.mjs": "742cd9533294b7937aa3d555ce9044ef3f2e52175224fa1da89b712d9e465daf",
+   "scripts/perf/network.mjs": "00c7586bbf61d0b4ac45cf0e0036d630142f5108ca57f239104c0eb5b911f310",
+   "scripts/perf/probe-inject.mjs": "ce89278af30c1aea6392e1063537777639b90452e464e653a52b1ab8d9a8d073",
+   "scripts/perf/bench.mjs": "0bd3fae2ca36ebdf907dc6db1dc6984fb6051022eebdbdd5b412df981812abd9",
+   "scripts/perf/build.mjs": "5bba566ec2798f737937e3808b29ebdc70dde804547e33227823f51c467ea68c",
+   "src/platform/perf/window-class.ts": "dcc6c600dd4d6806b026d1b895348a154e00819a5c176a7b1eda80545d40e5b9"
+  }
+ },
+ "build": {
+  "digest": "f28665fac2f39b265c395d3e503965154eaeac885f3e602e58527baef7207762",
+  "files": 25
+ },
+ "startup": {
+  "appReadyMs": 418,
+  "transferredMB": 0.24,
+  "jsKB": 238,
+  "heapMB": 4.9,
+  "textureMiB": 0,
+  "canvasMiB": 0,
+  "liveContexts": 1,
+  "networkQuiet": 1
+ },
+ "samples": [
+  {
+   "id": "yard",
+   "scene": "yard",
+   "mode": "idle",
+   "hash": "#scene/yard",
+   "classification": {
+    "kind": "steady",
+    "version": 1,
+    "reasons": [
+     "no rendered frame: counts are 0 by observation"
+    ],
+    "comparable": true
+   },
+   "windowMs": 6010,
+   "frames": 361,
+   "renderedFrames": 0,
+   "renderedFrameRatio": 0,
+   "drawsPerRenderedFrame": 0,
+   "drawsMaxFrame": 0,
+   "trisPerRenderedFrame": 0,
+   "offscreenDrawsPerRenderedFrame": 0,
+   "shadowPassDrawsMax": 0,
+   "taskMsPerFrame": 0.22,
+   "frameMsP95": 16.7,
+   "frameMsMax": 16.8,
+   "layouts": 0,
+   "heapMB": 5,
+   "textureMiB": 0,
+   "canvasMiB": 0,
+   "canvases": 0,
+   "liveContexts": 1,
+   "submission": {
+    "useProgram": 0,
+    "programsCreated": 0,
+    "programLookups": null,
+    "uniformCalls": 0,
+    "bindVertexArray": 0,
+    "bufferSubData": 0,
+    "textureUploads": 0,
+    "shadowDueRatio": 0
+   },
+   "uploads": {
+    "initial": 0,
+    "recurring": 0,
+    "firstUse": 0,
+    "unknown": 0,
+    "bytes": 0
+   },
+   "topTextures": [
+    "1x1 x2 = 0.0 MiB"
+   ]
+  },
+  {
+   "id": "yard:active",
+   "scene": "yard",
+   "mode": "active",
+   "hash": "#scene/yard",
+   "classification": {
+    "kind": "steady",
+    "version": 1,
+    "reasons": [],
+    "comparable": true
+   },
+   "windowMs": 4018,
+   "frames": 241,
+   "renderedFrames": 240,
+   "renderedFrameRatio": 1,
+   "drawsPerRenderedFrame": 7,
+   "drawsMaxFrame": 7,
+   "trisPerRenderedFrame": 5092,
+   "offscreenDrawsPerRenderedFrame": 0,
+   "shadowPassDrawsMax": 0,
+   "taskMsPerFrame": 0.61,
+   "frameMsP95": 16.8,
+   "frameMsMax": 16.8,
+   "layouts": 0,
+   "heapMB": 5.4,
+   "textureMiB": 0,
+   "canvasMiB": 0,
+   "canvases": 0,
+   "liveContexts": 1,
+   "submission": {
+    "useProgram": 2,
+    "programsCreated": 0,
+    "programLookups": null,
+    "uniformCalls": 8,
+    "bindVertexArray": 7,
+    "bufferSubData": 0,
+    "textureUploads": 0,
+    "shadowDueRatio": 0
+   },
+   "uploads": {
+    "initial": 0,
+    "recurring": 0,
+    "firstUse": 0,
+    "unknown": 0,
+    "bytes": 0
+   }
+  }
+ ],
+ "afterTour": {
+  "textureMiB": 0,
+  "canvasMiB": 0,
+  "heapMB": 5.4,
+  "liveContexts": 1
+ },
+ "chunks": {
+  "GLTFLoader": 43.3,
+  "boot-failure": 0.4,
+  "decode-image.job": 0.5,
+  "index": 732.8,
+  "lease-cache": 3.5,
+  "meshopt_decoder.module": 28.9,
+  "model-playback": 0.1,
+  "models": 6.5,
+  "patch": 3.6,
+  "patch.job": 2.1,
+  "runtime": 23.5,
+  "shadow-cascades": 26,
+  "shadows": 39,
+  "textures": 1.8,
+  "worker-entry": 1.6
+ },
+ "network": {
+  "mode": "hermetic",
+  "external": {}
+ }
+}

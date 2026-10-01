@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "note": "Budgets only fall. Raising a number needs a commit trailer `Perf-Budget: arcade/<key> <old> -> <new>: <reason>` (scripts/perf/budget-ratchet.mjs). Values are software-GL measurements plus 10 % headroom, rounded up (docs/recipes/add-a-budget.md).",
+  "app": {
+    "firstLoadJsKiB": 704,
+    "startupMiB": 1,
+    "startupHeapMiB": 8,
+    "appReadyMs": {
+      "desktop": 8000
+    },
+    "retainedCanvasMiBAfterTour": 4,
+    "retainedHeapMiBAfterTour": 8
+  },
+  "largeChunkAllow": [
+    "index"
+  ],
+  "scenes": {
+    "play": {
+      "scene": "scene.play",
+      "route": "#scene/play",
+      "active": true,
+      "budget": {
+        "draws": 10,
+        "triangles": 10000,
+        "shadowCasters": 10,
+        "textureMiB": 8,
+        "canvasMiB": 4,
+        "heapMiB": 5,
+        "contexts": 1
+      },
+      "provenance": {
+        "measured": "775e411 + the arcade template, swiftshader@1280x800 (worst window +10 %, rounded up by npm run perf:derive)",
+        "run": "GAME_DIR=templates/arcade/game npm run gate (first-load JS 627.8 KiB; startup heap 3.2 MiB)",
+        "note": "At most about 6 blocks fall at once (spawn every 0.35 s or more, 1.4 s or more to cross the lane), so lane + ball + blocks stays under 10 draws"
+      }
+    }
+  }
+}

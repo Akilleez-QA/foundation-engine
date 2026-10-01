@@ -1,0 +1,233 @@
+{
+  "scene": "yard",
+  "when": "2026-09-30T04:37:26.278Z",
+  "views": {
+    "desktop": {
+      "screenshot": "playtest/latest/yard-desktop.png",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "still": {
+        "ms": 607,
+        "renders": 0,
+        "drawsPerFrame": 0,
+        "trisPerFrame": 0,
+        "frameMsP95": 16.8,
+        "fps": 60,
+        "heapMiB": 12
+      },
+      "moving": {
+        "ms": 1216,
+        "renders": 64,
+        "drawsPerFrame": 6,
+        "trisPerFrame": 5036,
+        "frameMsP95": 16.7,
+        "fps": 60,
+        "heapMiB": 13.8
+      },
+      "state": {
+        "scene": {
+          "scene": "scene.yard",
+          "state": "active",
+          "epoch": 1,
+          "hash": "#scene/yard"
+        },
+        "world": {
+          "scene": "yard",
+          "entities": 7,
+          "state": {
+            "terrain": {
+              "tiles": 4,
+              "builds": 0,
+              "publications": 0,
+              "closed": false,
+              "strides": [
+                1,
+                1,
+                1,
+                1
+              ],
+              "maxError": 0.35
+            }
+          },
+          "named": {
+            "surface-nw": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "surface-ne": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "surface-sw": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "surface-se": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "player": {
+              "x": 0,
+              "y": 1.081,
+              "z": 3.65
+            },
+            "pad-marker": {
+              "x": 3,
+              "y": 0.75,
+              "z": 4
+            }
+          },
+          "frame": 140
+        },
+        "game": {
+          "id": "terrain",
+          "genre": "terrain",
+          "policy": "default",
+          "modes": [
+            "play"
+          ],
+          "minimum": "phone"
+        }
+      },
+      "budget": {
+        "scene": "yard",
+        "status": "within budget",
+        "rows": [
+          {
+            "metric": "draws",
+            "measured": 6,
+            "budget": 10,
+            "ok": true
+          },
+          {
+            "metric": "triangles",
+            "measured": 5036,
+            "budget": 10000,
+            "ok": true
+          }
+        ]
+      }
+    },
+    "mobile": {
+      "screenshot": "playtest/latest/yard-mobile.png",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "mobile": true
+      },
+      "still": {
+        "ms": 603,
+        "renders": 0,
+        "drawsPerFrame": 0,
+        "trisPerFrame": 0,
+        "frameMsP95": 16.7,
+        "fps": 60,
+        "heapMiB": 11.4
+      },
+      "moving": {
+        "ms": 1215,
+        "renders": 66,
+        "drawsPerFrame": 6,
+        "trisPerFrame": 5036,
+        "frameMsP95": 16.7,
+        "fps": 60,
+        "heapMiB": 13.2
+      },
+      "state": {
+        "scene": {
+          "scene": "scene.yard",
+          "state": "active",
+          "epoch": 1,
+          "hash": "#scene/yard"
+        },
+        "world": {
+          "scene": "yard",
+          "entities": 7,
+          "state": {
+            "terrain": {
+              "tiles": 4,
+              "builds": 0,
+              "publications": 0,
+              "closed": false,
+              "strides": [
+                1,
+                1,
+                1,
+                1
+              ],
+              "maxError": 0.35
+            }
+          },
+          "named": {
+            "surface-nw": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "surface-ne": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "surface-sw": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "surface-se": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "player": {
+              "x": 0,
+              "y": 1.081,
+              "z": 3.65
+            },
+            "pad-marker": {
+              "x": 3,
+              "y": 0.75,
+              "z": 4
+            }
+          },
+          "frame": 142
+        },
+        "game": {
+          "id": "terrain",
+          "genre": "terrain",
+          "policy": "default",
+          "modes": [
+            "play"
+          ],
+          "minimum": "phone"
+        }
+      },
+      "budget": {
+        "scene": "yard",
+        "status": "within budget",
+        "rows": [
+          {
+            "metric": "draws",
+            "measured": 6,
+            "budget": 10,
+            "ok": true
+          },
+          {
+            "metric": "triangles",
+            "measured": 5036,
+            "budget": 10000,
+            "ok": true
+          }
+        ]
+      }
+    }
+  },
+  "errors": [],
+  "console": []
+}

@@ -1,0 +1,66 @@
+[
+  {
+    "view": "desktop",
+    "values": {
+      "a": 1.6286327271959768,
+      "b": 1.6986092730948725,
+      "models": {
+        "fetches": {
+          "/models/mechanics/beacon.glb": 1
+        },
+        "parses": 1,
+        "hits": 0,
+        "lateDrops": 0,
+        "disposed": 0,
+        "bytesKeptMiB": 0.002819061279296875,
+        "residentMiB": 0.00091552734375,
+        "instances": 1
+      }
+    },
+    "afterThreeVisits": {
+      "fetches": {
+        "/models/mechanics/beacon.glb": 1
+      },
+      "parses": 4,
+      "hits": 0,
+      "lateDrops": 0,
+      "disposed": 3,
+      "bytesKeptMiB": 0.002819061279296875,
+      "residentMiB": 0.00091552734375,
+      "instances": 1
+    },
+    "errors": []
+  },
+  {
+    "view": "phone",
+    "values": {
+      "a": 2,
+      "b": 1.6686297827973562,
+      "models": {
+        "fetches": {
+          "/models/mechanics/beacon.glb": 1
+        },
+        "parses": 1,
+        "hits": 0,
+        "lateDrops": 0,
+        "disposed": 0,
+        "bytesKeptMiB": 0.002819061279296875,
+        "residentMiB": 0.00091552734375,
+        "instances": 1
+      }
+    },
+    "afterThreeVisits": {
+      "fetches": {
+        "/models/mechanics/beacon.glb": 1
+      },
+      "parses": 4,
+      "hits": 0,
+      "lateDrops": 0,
+      "disposed": 3,
+      "bytesKeptMiB": 0.002819061279296875,
+      "residentMiB": 0.00091552734375,
+      "instances": 1
+    },
+    "errors": []
+  }
+]
