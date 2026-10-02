@@ -609,8 +609,8 @@ New author component `Material` (`texture`, `repeat`, `wrap`, `roughness`, `meta
 `emissive`, `emissiveIntensity`, `opacity`, `transparent`) with `defineMaterial` and
 `validateMaterial`. Bounds: repeat ≤ 1024, emissive intensity ≤ 16, kebab-case texture ids;
 invalid runtime data is reported once and drawn with the original material. Lifetime: one
-texture lease per surface, aborted with the visit; clones are disposed on removal, change or
-exit. Overload: none beyond the texture library's existing admission. Candidate (branch
+lease per (texture, wrap) view shared by the visit's surfaces, aborted with the visit; a
+texture change keeps the old view until the new one arrives. Overload: none beyond the texture library's existing admission. Candidate (branch
 `feat/dx-materials`); not integrated. Follow-ups outside this slice: particles, rigid-body
 physics, a game-facing multiplayer session, normal/roughness maps and `Mesh` texture
 coordinates.

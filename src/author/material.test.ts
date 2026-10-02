@@ -31,3 +31,17 @@ test('the material key changes with every drawn field', () => {
   ] as const).map(change => materialKey({ ...base, ...change } as typeof base))]);
   assert.equal(keys.size, 10);
 });
+
+test('a scene\'s material textures must name texture assets of the game', async () => {
+  const { defineAsset, defineGame, defineScene, Shape, Transform } = await import('./defs');
+  const { defineBuild } = await import('./build');
+  const { compileGame } = await import('./compile');
+  const brief = defineBuild({ goal: 'Draw', pitch: 'Materials', genre: 'custom', coreLoop: ['Look'], devices: { targets: ['desktop'], minimum: 'desktop', input: ['keyboard'] }, success: [{ id: 'S1', check: 'Drawn', how: 'manual' }] });
+  const game = defineGame({ id: 'material-game', title: 'M', version: '1.0.0', firstScene: 'start' });
+  const scene = defineScene({ id: 'start', title: 'Start', entities: [[Transform(), Shape(), defineMaterial({ texture: 'tiles' })]] });
+  const tiles = defineAsset({ id: 'tiles', type: 'texture', url: '/t.png', licence: 'CC0-1.0', author: 'x', source: 'y' });
+  assert.doesNotThrow(() => compileGame({ brief, game, defs: [scene, tiles] }));
+  assert.throws(() => compileGame({ brief, game, defs: [scene] }), /material texture 'tiles' has no defineAsset/);
+  const model = defineAsset({ id: 'tiles', type: 'model', url: '/t.glb', licence: 'CC0-1.0', author: 'x', source: 'y' });
+  assert.throws(() => compileGame({ brief, game, defs: [scene, model] }), /material texture 'tiles'/);
+});

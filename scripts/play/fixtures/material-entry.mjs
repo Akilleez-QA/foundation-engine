@@ -19,7 +19,7 @@ T.Scene.prototype.onAfterRender = function (...args) {
   this.traverse(node => {
     if (!node.isMesh) return;
     const m = node.material, map = m.map;
-    meshes.push({name: node.name, type: m.type, color: m.color.getHex(), roughness: m.roughness ?? null, metalness: m.metalness ?? null, emissive: m.emissive?.getHex() ?? null,
+    meshes.push({name: node.name, uuid: m.uuid, type: m.type, color: m.color.getHex(), roughness: m.roughness ?? null, metalness: m.metalness ?? null, emissive: m.emissive?.getHex() ?? null,
       transparent: m.transparent, opacity: m.opacity,
       map: map ? {uuid: map.uuid, source: map.source.uuid, ready: !!map.image?.width, wrapS: map.wrapS, repeat: [map.repeat.x, map.repeat.y], anisotropy: map.anisotropy} : null});
   });
@@ -50,6 +50,8 @@ window.materialCheck = {
   boot: () => boot.then(() => true),
   snapshot: () => ({renders, drawn, disposed: [...disposedTextures], scene: app.probes.read('world')?.scene ?? null, assets: app.services.assets.stats()}),
   /** Change one authored field: the next frame draws the new look. */
+  /** Animate one textured, transparent surface's opacity (the fields change in place). */
+  fade: opacity => { const e = context.named('mirrored'); context.world.get(e, Material).opacity = opacity; context.world.touch(); },
   roughen: () => { const e = context.named('tiled'); context.world.get(e, Material).roughness = 1; context.world.touch(); },
   retexture: () => { const e = context.named('plain'); context.world.add(e, defineMaterial({texture: 'panel'})); context.world.touch(); },
   strip: () => { const e = context.named('tiled'); context.world.remove(e, Material); context.world.touch(); },

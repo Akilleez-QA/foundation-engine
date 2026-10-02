@@ -383,9 +383,10 @@ headless Chromium). Real Pages/itch.io uploads and physical devices are unverifi
 `Material` / `defineMaterial` (author API) give a `Shape` a texture asset with repeat and
 wrap, roughness, metalness, emission and transparency, drawn as a `MeshStandardMaterial`;
 shapes without it keep the original matte material. Owner: the scene visit
-(`author/scene-materials.ts`); textures are leases from the shared texture library, each
-surface draws a disposable clone with its own sampler transform, and anisotropy follows the
-`textures.anisotropy` quality knob capped by the context. See the
+(`author/scene-materials.ts`); textures are leases from the shared texture library, and anisotropy follows the
+`textures.anisotropy` quality knob capped by the context. Wrap is part of the library key
+(counted by residency); one view per (texture, wrap, repeat) is shared per visit, and plain
+fields change in place. See the
 [recipe](../recipes/give-a-shape-a-material.md). Status: implemented, candidate (branch
 `feat/dx-materials`, stacked on the sub-path base change); not integrated. Evidence: unit
 tests and `npm run test:material-browser` (desktop headless Chromium, software GL); the

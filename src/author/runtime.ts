@@ -282,8 +282,8 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
             if (actx.signal.aborted) return;
             if (meshes.get(e) !== m || m.geometry !== replacement) continue;
           }
-          if (m.surface.key !== lookKey) {
-            // A changed look is a new surface (its texture lease is shared); the old one is released after the swap.
+          if (m.surface.key !== lookKey && !m.surface.update(look)) {
+            // Only a change of kind (Material added, removed or made invalid) needs a new surface.
             const previous = m.surface;
             m.surface = surfaces.create(look, sh.color); mesh.material = m.surface.material;
             previous.dispose();

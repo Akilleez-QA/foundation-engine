@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // scripts/play/material-check.mjs (`npm run test:material-browser`): authored `Material` surfaces in a real composed
 // app, in the bench's muted, isolated headless Chromium (`?flags=dev.silent`).
-//   - textured shapes draw a MeshStandardMaterial whose map is a per-surface clone of ONE leased texture (one image
-//     source, one library load), with the authored wrap, repeat, roughness, metalness, emission and transparency;
+//   - textured shapes draw a MeshStandardMaterial with the authored wrap, repeat, roughness, metalness, emission and
+//     transparency; one library texture per wrap (two here: repeat and mirror), one view per (texture, wrap, repeat);
 //   - a shape without Material keeps the original MeshLambertMaterial;
 //   - anisotropy follows the quality preset (reference: the context maximum capped at 16; low: 1);
-//   - nothing redraws when nothing changed; an authored change draws once;
+//   - nothing redraws when nothing changed; an authored change draws once; animating opacity on a textured shape
+//     keeps its material and texture (no new material, lease, load or disposal);
 //   - leaving the scene disposes every surface clone and releases the shared texture (library resident bytes 0).
 // Limitations: desktop Chromium with software GL; no physical device, no visual quality judgement beyond screenshots.
 import assert from 'node:assert/strict';
@@ -44,10 +45,11 @@ try {
     assert.deepEqual([by('tiled').roughness, by('tiled').metalness, by('tiled').map.repeat], [.6, .2, [3, 2]]);
     assert.deepEqual([by('mirrored').map.wrapS, by('mirrored').emissive, by('mirrored').transparent, by('mirrored').opacity], [1002, 0x221100, true, .8]);
     const maps = ['tiled', 'mirrored', 'floor'].map(n => by(n).map);
-    assert.equal(new Set(maps.map(m => m.uuid)).size, 3, 'each surface draws its own clone');
-    assert.equal(new Set(maps.map(m => m.source)).size, 1, 'all clones share one image');
-    assert.equal(loaded.assets.loads, 1, 'one library load for three surfaces');
-    assert.equal(textureRequests.length, 1, 'one network request');
+    assert.equal(new Set(maps.map(m => m.uuid)).size, 3, 'three (texture, wrap, repeat) views');
+    assert.equal(maps[0].source, maps[2].source, 'the two repeating surfaces share one library texture');
+    assert.notEqual(maps[0].source, maps[1].source, 'mirror is a different sampler: its own counted texture');
+    assert.equal(loaded.assets.loads, 2, 'one library load per wrap');
+    assert.ok(textureRequests.length >= 1 && textureRequests.length <= 2, 'at most one request per library texture');
     const anisotropy = maps[0].anisotropy;
     if (quality === 'low') assert.equal(anisotropy, 1); else assert.ok(anisotropy >= 1 && anisotropy <= 16);
     assert.ok(maps.every(m => m.anisotropy === anisotropy));
@@ -56,6 +58,15 @@ try {
     // Idle: nothing changed, nothing drawn.
     const before = (await snap()).renders; await sleep(800); const idle = (await snap()).renders - before;
     assert.equal(idle, 0, 'an idle scene draws no frames'); run.idleRenders = idle;
+    // Animate opacity on a textured surface: changed in place, nothing reloaded or disposed.
+    const fading = by('mirrored');
+    for (const opacity of [.7, .6, .5, .4, .3]) {
+      await p.evaluate(o => window.materialCheck.fade(o), opacity);
+      await p.waitForFunction(o => window.materialCheck.snapshot().drawn.find(m => m.name === 'mirrored')?.opacity === o, opacity);
+    }
+    const faded = await snap(), after = faded.drawn.find(m => m.name === 'mirrored');
+    assert.deepEqual([after.uuid, after.map.uuid], [fading.uuid, fading.map.uuid], 'same material and texture view');
+    assert.equal(faded.assets.loads, 2); assert.ok(!faded.disposed.includes(fading.map.uuid));
     // One authored change draws, then the scene is still again.
     await p.evaluate(() => window.materialCheck.roughen());
     await p.waitForFunction(() => window.materialCheck.snapshot().drawn.find(m => m.name === 'tiled')?.roughness === 1);
@@ -64,7 +75,7 @@ try {
     await p.evaluate(() => window.materialCheck.strip());
     await p.waitForFunction(() => window.materialCheck.snapshot().drawn.find(m => m.name === 'tiled')?.type === 'MeshLambertMaterial');
     const changed = await snap();
-    assert.equal(changed.assets.loads, 1, 'later surfaces reuse the resident texture');
+    assert.equal(changed.assets.loads, 2, 'later surfaces reuse the resident texture');
     const settled = changed.renders; await sleep(800); assert.equal((await snap()).renders - settled, 0, 'still again after the changes');
     const clones = changed.drawn.filter(m => m.map).map(m => m.map.uuid);
     // Leave: every clone disposed, the shared texture released.
@@ -76,7 +87,7 @@ try {
     assert.ok(left.assets.disposed >= 1, 'the shared texture was disposed with its last lease');
     assert.deepEqual(browser.errors, []);
     await browser.close(); browser = null;
-    console.log(`materials (${quality}): 3 textured surfaces from 1 load, anisotropy ${anisotropy}, idle renders 0, released on exit`);
+    console.log(`materials (${quality}): 3 textured surfaces from 2 loads (one per wrap), opacity animated in place, anisotropy ${anisotropy}, idle renders 0, released on exit`);
   }
   report.passed = true;
 } catch (error) { evidence.fail(error); }
