@@ -73,6 +73,7 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | RES-01 | Bounded asset residency (texture/model budgets, pins, LRU eviction) | Implemented, candidate (PR #22); not integrated. Optional `defineGame({ residency })` applies per-preset `warmBytes`/`residentBytes` and pinned asset ids to the existing `LeaseCache` of the texture and model libraries; live and pinned assets are never evicted, over-ceiling pressure is reported once per transition with a creator hook, retained three.js resources are parked through public `dispose` events. Default unchanged (dispose at release). Evidence: focused unit tests, an opt-in native SwiftShader fixture (estimate vs uploaded mip chain, `renderer.info` counts, actual context loss) and a temporary composed probe; see [guide](asset-residency.md). No program-count budget, cross-library ceiling, physical-device memory or traversal-performance claim. |
 | TR-01 | Regional terrain worker and ordinary-surface integration | Integrated in PR #109 at 99e6255. Canonical regional Surface and halo patches, bounded WorkerHost generation/patch adapters, independent geometric oracles and finite coherent render/query consumer passed at 891eb7; all seven template gates passed (1,648 tests, 129 performance checks, zero breaches/regressions, four advisory heap warnings). Combined main tests/build passed. Physical-device performance and unbounded/global streaming are not established. |
 | DV-01 | Supported-device experience and sustained performance evidence | In progress, not integrated: ported to the public `feat/device-acceptance` PR. [Stock matrix](../kits/stock-device-acceptance-matrix.md) covers all seven declarations. The [first receipt](../verification/stock-device-20261001/README.md) records 16 passing emulated target/tap checks and a compact lesson content overlap; lesson visit cleanup and a measured learn layout seam repair it, with a fake-DOM regression and emulated separation checks across board, sim and quiz at four profiles ([layout receipt](../verification/stock-device-20261002/README.md)). Full consumer workflows, in-panel touch scrolling, 200% text, named minimum devices and sustained physical evidence remain open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. No physical-device or accessibility certification. |
+| SC-01 | Bounded spatial index for neighbour, range and interest queries at scale | Implemented, candidate (branch `feat/genre-rts-slice1`); not integrated. Optional `spatial` kit `createSpatialGrid`: preallocated uniform grid, admission before write, `too-wide` refusal before scanning, explicitly `truncated` results, terminal disposal. Checked: 10 focused unit tests (seeded brute-force oracle, refusals without mutation, ECS interest consumer failing closed) and a work-count test of the 1,000/10,000-entry micro-benchmark. Headless Node medians recorded in the [guide](spatial-index.md#measured-cost). No template consumer, browser, worker or physical-device evidence; no budget change. |
 
 ## Goal continuity
 
@@ -305,3 +306,18 @@ Status: candidate (PR #16), building on integrated NW-04 (PR #14); not integrate
 | ID | Contract and required observation | State |
 |---|---|---|
 | PERF-01 | Optional, local-only [sustained-session recorder](session-performance.md) on the one frame loop. It records bounded rolling windows of frame/work p50/p95/p99, long and severe frames, rendered/idle counts, scene/epoch/preset segments and drift, plus a versioned evidence file. It has a zero-cost path when absent and is dev/test-only. | Implemented, candidate (PR #15 on the public repository); not integrated. Focused adversarial tests and an emulated browser run (a 30-second CI check plus a saved 10-minute sample) are recorded in the guide and in [verification](../verification/session-perf-20261002/README.md). This is supporting tooling for DV-01: it supplies the evidence format, not device evidence. DV-01 remains open. |
+
+## Bounded spatial index (SC-01) — implemented, candidate
+
+Status: implemented, candidate on branch `feat/genre-rts-slice1`; not integrated. See the
+[spatial index guide](spatial-index.md) and [recipe](../recipes/use-a-spatial-index.md).
+
+- Runtime-enforced: limit validation and ceilings (1,048,576 entries, 4,194,304 cells);
+  all memory allocated at construction; `saturated`/`out-of-bounds`/`duplicate` refusals
+  change nothing; queries wider than `maxCellsPerQuery` return `too-wide` with zero work;
+  results never exceed the caller buffer and report `truncated` when incomplete;
+  `dispose()` is terminal.
+- Checked: `src/kits/spatial/spatial.test.ts` (10 tests) and
+  `tools/spatial-bench/bench.test.mjs` (per-query work flat from 1,000 to 10,000 entries).
+- Not established: browser frame cost, physical devices, worker offload, a running
+  network-view or fog-of-war consumer, and template integration.

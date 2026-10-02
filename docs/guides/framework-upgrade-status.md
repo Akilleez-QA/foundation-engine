@@ -493,3 +493,12 @@ probe ([record](../verification/asset-residency-20261002/README.md)). No program
 budget, combined ceiling, prefetch, physical-device memory or performance claim.
 See the [guide](asset-residency.md).
 
+## Bounded spatial index (SC-01) — implemented, candidate
+
+The optional `spatial` kit adds [`createSpatialGrid`](spatial-index.md), a preallocated
+uniform-grid index for neighbour, range and per-observer interest queries with explicit
+cell, result and capacity bounds. It is a reusable proximity mechanism for large
+populations, not a visibility, steering or replication policy. Status: implemented,
+candidate (branch `feat/genre-rts-slice1`); not integrated. Evidence is focused unit tests
+and a headless 1,000/10,000-entry CPU micro-benchmark; no template consumer, browser,
+worker or physical-device evidence, and no budget change.
