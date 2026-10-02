@@ -49,10 +49,10 @@ export function gameCatalog(defs: readonly AuthorDef[]): Record<string, string> 
   return out;
 }
 
-/** The input action rows of a definition: one press row for a button, two hold rows for an axis. */
+/** The input action rows of a definition: one press row for a button (a hold row with `hold: true`), two hold rows for an axis. */
 export function actionRows(i: InputDefinition): InputActionDef[] {
   const labelKey = `game.input.${i.id}`;
-  if (!i.axis) return [{ id: actionOf(i.id), label: labelKey, scope: 'global', kind: 'press', defaults: { keys: i.keys, pad: i.pad } } as unknown as InputActionDef];
+  if (!i.axis) return [{ id: actionOf(i.id), label: labelKey, scope: 'global', kind: i.hold ? 'hold' : 'press', defaults: { keys: i.keys, pad: i.pad } } as unknown as InputActionDef];
   return (['negative', 'positive'] as const).map(side => ({ id: actionOf(i.id, side), label: labelKey, scope: 'global', kind: 'hold', defaults: { keys: i.axis![side].keys, pad: i.axis![side].pad } } as unknown as InputActionDef));
 }
 

@@ -509,3 +509,34 @@ plateaus. The saved runs predate it. Open items: client-visible close
 reasons can be lost when a host terminates right after closing. On the network host, a small-reply
 non-reader does not reach the buffered cap within a run. WAN, browsers, multiple machines and
 devices remain unverified.
+
+### MV-01: tunable jump feel — candidate
+
+Status: implemented, candidate (`feat/genre-platformer-slice1`, PR #34); not integrated.
+
+- Runtime-enforced: configuration bounds (`RangeError`), step length within `[0, maxDt]`
+  (at most 0.25 s), boolean facts, finite external velocity within ±1000 m/s, and a
+  ground answer that is finite and not above its query. Rejected steps change no state.
+  At most five integration pieces per step; constant state per actor. The adapter
+  uses presses as the input layer reports them (exactly once per press with the PR #19
+  press latch); its earlier consecutive-tick filter was removed on rebase. Grace
+  windows admit exactly floor(window × rate) ticks; descending landings query from the
+  tick's peak; adapter state is pruned to the current target.
+- Checked: unit tests for exact apex height and identical arcs at 30, 60, 120, 144 and
+  240 Hz ticks (165 Hz within one tick), release cut, coyote and buffer windows at six
+  rates, no re-jump while held, terminal speed, zero-length steps, cancellation and
+  reset; adapter tests for full-height jump and landing, one-way surfaces, a fall of
+  about 1.5 m per tick landing exactly, step-up, snap-down, coyote off a ledge, and
+  identical fixed-step samples at display rates 30–240 Hz with one jump per press through
+  the real press latch (including zero-tick frames at 120–240 Hz); adjacent-tick presses
+  count as two; the
+  hold button through the real action layer (press, no repeat press, release, cancel).
+  Review fixes add a landing test where the apex falls inside a tick above a one-way
+  surface, exact tick counts for coyote and buffer windows at six rates and six window
+  lengths, and despawn pruning. Mutation checks: replacing the exact integration, widening the coyote window,
+  dropping the window tolerance, ignoring the tick peak, not pruning,
+  re-adding a press filter or the swept landing each fails at least one test.
+- Not established: feel on any device, touch hold controls, a template or browser
+  consumer, moving platforms, slopes and lateral swept collision. Verified only on
+  `origin/integration/batch-2`, where the PR #19 press latch is present; the kit relies
+  on it for exactly-once presses.

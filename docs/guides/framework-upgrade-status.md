@@ -607,3 +607,13 @@ runs. Its finding that a queue age shorter than the real queued wait collapsed g
 is resolved by the NW-06 follow-up (PR #33), and queue-age plateaus are now asserted. Loopback/process scope only; WAN, browsers and physical devices remain
 unverified. See the [evidence](../verification/network-overload-20261002/README.md)
 and the [ledger](upgrade-acceptance-ledger.md).
+
+## Tunable jump feel — MV-01 implemented, candidate
+
+`createJumpFeel` and `jumpSystem` (locomotion kit) give creators a frame-rate-independent
+jump mechanism: height and time to apex, release, fall and apex gravity, terminal fall,
+coyote and buffer windows, each bounded and creator-chosen. Author buttons gain an opt-in
+`hold: true` so `ctx.input.held` observes a release; existing buttons are unchanged.
+Implemented as a candidate (`feat/genre-platformer-slice1`, PR #34), not integrated.
+Evidence is focused unit tests only. See the [kit README](../../src/kits/locomotion/README.md#tunable-jump-feel-mv-01),
+the [recipe](../recipes/tune-a-jump.md) and the [ledger](upgrade-acceptance-ledger.md).

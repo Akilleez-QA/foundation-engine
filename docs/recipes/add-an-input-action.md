@@ -19,6 +19,7 @@ export default defineInput({ id: 'steer', label: 'Steer', axis: {
 } });
 ```
 
+- **Hold** (`hold: true`, buttons only): `ctx.input.held(id)` reports the button while it is down, for mechanics that react to its release. The press edge, remaps and cancellation are unchanged; a cancel releases it and it must be released before it presses again. A `tap` presses without holding.
 - **Reach** (STD-RUN-30): every action needs a key and a pad input (`defineInput` refuses one without), so every player can reach it. `tap: true` also presses it on a tap or click on the view.
 - **Keys**: printable keys by `key` in lower case (`'f'`), named keys by name (`'Space'`, `'Enter'`), physical keys by code (`'code:KeyW'`, so AZERTY players steer with the same fingers). Pad inputs are named by position (`a`, `b`, `x`, `y`, `lb`, `rb`, `lt`, `rt`, `dpad-*`, `ls-*`, `rs-*`).
 - The row becomes `game.<id>` in the `inputActions` registry. Boot fails when a default binding clashes with another row; the engine's own rows are `core.back` (Escape, B), `core.pause` (P, Menu), `core.mute` (M), focus (Tab, Shift+Tab, d-pad up/down), confirm (Enter, A), paging (PageUp/PageDown, LB/RB) in panels, and the shell menu (pad X). Panel-only rows (back, focus, confirm, paging) may share an input with a game action; a global or always row may not.
@@ -27,7 +28,7 @@ export default defineInput({ id: 'steer', label: 'Steer', axis: {
 
 ## 2. Read it
 
-In a system: `ctx.input.pressed('jump')`, `ctx.input.held('jump')`, `ctx.input.axis('steer')`, `ctx.input.pointer`.
+In a system: `ctx.input.pressed('jump')`, `ctx.input.held('jump')` (a `hold: true` button), `ctx.input.axis('steer')`, `ctx.input.pointer`.
 
 `pressed` (and `pointer.pressed`) is true in exactly one fixed tick, the first after the press, even when a short
 frame (120 Hz and faster displays) or a resumed `dt = 0` frame ran no tick; a `phase: 'frame'` system sees it in the
