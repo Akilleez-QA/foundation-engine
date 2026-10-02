@@ -107,6 +107,7 @@ export default defineScene({
 - `hud(ctx).prompt(text)` is a hint near the bottom; `null` hides it.
 - Calling these every frame is cheap: the page is only touched when the text changes.
 - The button lives in `ctx.view.overlay`, the layer over the 3D view, and must turn `pointer-events` back on. It sits at the top right, clear of the HUD lines (top left) and the prompt (bottom centre). Make it at least 48 × 48 px for touch, and remove it in `exit`. A click on it does not count as a tap on the view. `ctx.view.overlay` is `null` in node tests, so tests drive the action instead.
+- This reset button changes state on a click. For a game action that a touch should press and hold (a jump, a boost), use the ui kit's `touchButton(ctx, 'jump', { label })` instead: it feeds the action itself, so `ctx.input.pressed`/`held` see it like a key ([input recipe](add-an-input-action.md#touch-buttons)).
 
 Each press reaches exactly one fixed step, even when a slow frame runs several steps or a fast frame runs none, so a toggle in a fixed system flips once per press (the press latch, STD-SIM-12, since v0.2.0). Frame-phase systems see a press in the frame it arrives.
 

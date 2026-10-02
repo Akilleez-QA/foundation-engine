@@ -569,8 +569,12 @@ Status: integrated in v0.2.0 (PR #34; batch PR #46).
   lengths, and despawn pruning. Mutation checks: replacing the exact integration, widening the coyote window,
   dropping the window tolerance, ignoring the tick peak, not pruning,
   re-adding a press filter or the swept landing each fails at least one test.
-- Not established: feel on any device, touch hold controls, a template or browser
-  consumer, moving platforms, slopes and lateral swept collision. Verified only on
+- Touch hold controls: candidate in PR #57 (not integrated). `touchButton` in `@kits/ui`
+  presses and holds an author input from an on-screen touch button through the real
+  dispatcher and press latch; checked by fake-DOM tests and the Chromium touch-emulation
+  `touch-sources-check.mjs` (one press, held across fixed ticks, slide-off release). No
+  physical-device or jump-feel evidence.
+- Not established: feel on any device, a template or browser jump consumer, moving platforms, slopes and lateral swept collision. Verified only on
   `origin/integration/batch-2`, where the PR #19 press latch is present; the kit relies
   on it for exactly-once presses.
 

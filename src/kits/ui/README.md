@@ -9,6 +9,31 @@ detail sheet use the sheet's own background, without plates. A game that wants a
 [data-hud]`, `.hud-prompt` and `.hud-banner` itself. Evidence for the plates is emulated (SwiftShader, 1280×800 and
 390×844); physical-device contrast is unverified.
 
+## Touch buttons for held actions
+
+`touchButton(ctx, input, { label, size?, inset?, show?, signal?, className? })` adds an on-screen button for a game
+input to the visit's overlay. A touch presses the input once (one fixed tick sees `ctx.input.pressed`, through the same
+dispatcher and press latch as a key) and holds a `hold: true` input while that finger stays on the button; lift, cancel,
+sliding off, blur, page hide, a resize, any input cancel (an overlay, pause) and the visit's end release it. Each button
+owns one finger, so several buttons and the view's own gestures work together. Mouse and pen pointers never press it.
+
+- Size is 48 to 240 CSS px (default 72); `inset` offsets it from the view's edges plus the safe area (default bottom right).
+- `show: 'touch'` (default) makes it only where the device reports a touch screen or coarse pointer, decided once when it
+  is made; `show: 'always'` makes it everywhere.
+- It is `aria-hidden`: the input's key and pad bindings remain its accessible path. **Limitation:** a player who uses
+  a screen reader on a touch-only device (no keyboard or controller) has no way to hold the action; the button is not
+  announced and assistive-technology activation does not press it. A game that must serve those players needs its own
+  accessible control or a design without held actions.
+- It carries `data-down` while a press the dispatcher accepted is held, and changes its background then, and only
+  then; a refused press (no consumer, a stale owner) shows nothing.
+- Headless (`testScene`) it makes nothing and returns `{ element: null }`; tests drive the input with `t.press`/`t.hold`.
+- Owner: the input dispatcher (`InputActions`) through `bindPointerControl` (`leave: 'release'`); one owned source per
+  button (the dispatcher's owned-source limit, default 128, applies). No timer or frame work.
+
+Evidence: `touch-button.test.ts` (fake DOM, real dispatcher and press latch) and the Chromium touch-emulation check
+`scripts/play/touch-sources-check.mjs` (two contacts, one held press across fixed ticks, slide-off, fresh press). No
+physical phone or tablet, layout-quality or occlusion acceptance; each creator positions buttons for their own targets.
+
 ## Creator-selected viewport layouts
 
 Layout following is optional. Existing HUDs stay inline until `present(...)` or
