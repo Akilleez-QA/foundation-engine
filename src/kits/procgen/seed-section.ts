@@ -23,7 +23,7 @@ export function parseGenerationSeed(raw: unknown): GenerationSeedRecord {
   const { seed, contentVersion } = raw as { seed: unknown; contentVersion: unknown };
   if (seed !== null && !u32(seed)) throw Error('generation seed: not an unsigned 32-bit integer');
   if (!(typeof contentVersion === 'number' && Number.isSafeInteger(contentVersion) && contentVersion >= 0)) throw Error('generation seed: invalid content version');
-  return { seed, contentVersion };
+  return { seed: seed as number | null, contentVersion };
 }
 
 export interface GenerationSeedSectionOptions {
