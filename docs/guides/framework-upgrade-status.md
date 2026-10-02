@@ -517,3 +517,11 @@ bounded rollback, stall and checksum desync detection over a creator-supplied
 reliable, ordered link, plus a local sync test. Implemented, candidate (PR #25,
 `feat/genre-fighting-slice1`); not integrated. Evidence is focused headless tests
 and one fixed-lane consumer; network, device and multiplayer acceptance are open.
+
+## Deterministic turn log (turns kit, TB-01) — implemented, candidate
+
+Status: implemented, candidate on branch `feat/genre-turnbased-slice1` (PR #24); not integrated. See the [kit README](../../src/kits/turns/README.md) and [recipe](../recipes/add-a-turn-log.md).
+
+- Runtime-enforced: rules id, validator literal-`true` acceptance, JSON capture limits for commands and states, `maxCommands` retention (`full` overload, `checkpoint` recovery), revision-checked mutations (`stale`), reentrancy (`busy`), disposal (`retired`), frozen states, mutations require an exact safe-integer revision, restore never throws for stored data (`invalid`/`foreign`/`diverged`, including throwing creator validators/reducers) with a 64-bit replay kit `hashText` checksum over the whole retained log (redo entries included), authority random keyed by seed, lineage, stream and sequence.
+- Checked: 18 focused headless unit tests (determinism, preview equals submit, undo/redo/replay, real SaveStore round trip across a fresh store, adversarial reducers and inputs, durable-authority composition with an in-memory adapter).
+- Not established: any template or game consumer, browser or device evidence, reducer CPU deadlines, hidden-information safety of a local log (it is not), AI worker budgets, play-by-turn timeouts.

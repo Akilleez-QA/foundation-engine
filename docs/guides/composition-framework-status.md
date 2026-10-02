@@ -300,3 +300,7 @@ The optional [rollback kit](../../src/kits/rollback/README.md) adds
 peers, plus `createRollbackSyncTest` for local determinism checks. It owns no
 transport, clock or rules. Status: implemented, candidate (PR #25); not
 integrated. See the [ledger](upgrade-acceptance-ledger.md#rollback-sessions-rb-01--implemented-candidate).
+
+## Deterministic turn log (turns kit, TB-01) — implemented, candidate
+
+The optional `turns` kit composes existing owners: authored-document/network JSON capture for bounds, the replay kit `hashText` for snapshot checksums, core `createRng`/`hashSeed` for per-position random streams, save sections for snapshots (a `{json}` section, restored with explicit `invalid`/`foreign`/`diverged` outcomes) and `createDurableAuthority` through `turnAuthorityPolicies` for server-authoritative play. It adds no service, scheduler, storage or frame work. Candidate on branch `feat/genre-turnbased-slice1` (PR #24), not integrated; 18 headless unit tests; no consumer template, browser or device evidence. See the [kit README](../../src/kits/turns/README.md).
