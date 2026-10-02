@@ -1,6 +1,6 @@
 # Bounded spatial index (SC-01)
 
-Status: implemented, candidate (branch `feat/genre-rts-slice1`); not integrated.
+Status: implemented, candidate (PR #23); not integrated.
 
 The optional `spatial` kit adds `createSpatialGrid`, a bounded uniform-grid index for
 "which ids are near here" questions over many entities. It is the shared building block
