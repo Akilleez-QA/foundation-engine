@@ -6,7 +6,7 @@
   "description": "Foundation Engine: a genre-neutral TypeScript and Three.js engine for browser games.",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   },
   "scripts": {
     "dev": "node scripts/generate.mjs && vite --host 127.0.0.1",
