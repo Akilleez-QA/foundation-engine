@@ -63,3 +63,16 @@ test('facing turns at a bounded rate, faster for a reversal, and settles on the 
  const r=turnToward(0,0,-1,1/60);assert.ok(Math.abs(r)>1.4*720*Math.PI/180/60,'a reversal pivots faster');
  assert.equal(turnToward(.3,0,0,1/60),.3,'standing still keeps the facing');
 });
+
+test('motion: dmath facing, speed and solids agree with Math within the kit tolerance', async () => {
+  const { dmath } = await import('../../core/dmath');
+  const { insideSolid } = await import('./solids');
+  for (const [dx, dz] of [[1, 0], [0, -1], [-0.3, 0.8], [0.01, -2]] as const) {
+    const a = turnToward(0.4, dx, dz, 1 / 60), b = turnToward(0.4, dx, dz, 1 / 60, undefined, dmath);
+    assert.ok(Math.abs(a - b) < 1e-12, `turnToward ${a} vs ${b}`);
+  }
+  const p = createMotion({ speed: 3 }), q = createMotion({ speed: 3, math: dmath });
+  for (let i = 0; i < 30; i++) { const s = p.step({ x: 0.6, z: -0.8 }, 1 / 60), t = q.step({ x: 0.6, z: -0.8 }, 1 / 60); assert.ok(Math.abs(s.x - t.x) < 1e-12 && Math.abs(s.z - t.z) < 1e-12); }
+  const hex = { id: 'h', kind: 'polygon', x: 0, z: 0, inradius: 1, sides: 6, rotation: 0.2 } as const;
+  for (const pt of [{ x: 0.9, z: 0.1 }, { x: 1.1, z: 0 }, { x: 0.5, z: 0.95 }]) assert.equal(insideSolid(pt, hex, 0, dmath), insideSolid(pt, hex));
+});

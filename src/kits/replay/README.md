@@ -29,5 +29,6 @@ const opened = openReplay(recorder.export(recorded.read()), { ...limits, log: { 
 ```
 
 Floating-point results are not guaranteed identical across devices, browsers or JavaScript engines; this kit detects
-such divergence, it does not prevent it. Typical cost: one creator digest per sampled tick; the recorder is O(1) per
+such divergence, it does not prevent it. To replay a browser log in Node, keep `Math` transcendental functions out of fixed
+systems: use `dmath` from `@engine` and the kits' `math: 'deterministic'` option ([deterministic maths](../../../docs/guides/deterministic-math.md)). Typical cost: one creator digest per sampled tick; the recorder is O(1) per
 tick except a canonical parse of that tick's input.

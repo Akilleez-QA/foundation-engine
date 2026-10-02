@@ -71,6 +71,9 @@
     "test:network-probe": "node --import tsx --test tools/network-probe/probe.regression.mjs",
     "test:subpath-browser": "node -r ./scripts/silent-browser.cjs scripts/play/subpath-check.mjs playtest/subpath",
     "test:material-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/material-check.mjs playtest/material",
+    "test:dmath-browser": "node --import tsx -r ./scripts/silent-browser.cjs scripts/play/dmath-check.mjs playtest/dmath",
+    "bench:dmath": "node --import tsx tools/dmath-bench/bench.mjs",
+    "dmath:golden": "node --import tsx scripts/dmath-golden.mjs",
     "test:sound-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/sound-check.mjs playtest/sound"
   },
   "dependencies": {

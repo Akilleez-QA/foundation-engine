@@ -100,3 +100,10 @@ Run `npm run check`. A test named after the success criterion should cover:
 
 These are finite headless checks. Network conditions, physical devices and
 floating-point agreement across browsers need their own recorded evidence.
+
+Peers on different browsers run the same `step` in different JavaScript engines.
+`+ − × ÷` and `Math.sqrt` agree everywhere, but `Math.sin`, `cos`, `atan2`, `exp`,
+`log`, `pow` and `hypot` do not, and one ulp is enough to fail a confirmed-state
+checksum. Use `dmath` from `@engine` for those functions in `step`, and pass
+`math: 'deterministic'` to the character, locomotion and root-motion kits if the
+simulation uses them. See [deterministic maths](../guides/deterministic-math.md).

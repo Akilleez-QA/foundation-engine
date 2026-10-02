@@ -27,3 +27,25 @@ test('character: a solid blocks, and releasing the input stops within a short co
   const x = pos(t).x; t.run(1);
   assert.ok(pos(t).x - x < 0.3);
 });
+
+test('character: math option — deterministic arithmetic stays within the kit tolerance of Math and repeats exactly; unknown modes are refused', async () => {
+  const solidScene = (math?: 'platform' | 'deterministic') => defineScene({
+    id: 'turning', title: 'Turning', view: { camera: { position: [3, 8, 6], target: [0, 0, 0] } },
+    entities: [[Name({ name: 'player' }), Transform(), Character({ speed: 4 })], [Walls({ minX: -4, maxX: 4, minZ: -4, maxZ: 4 })], [Transform({ x: 2, z: -1, ry: 0.6 }), Solid({ halfX: 0.6, halfZ: 0.4 })], [Transform({ x: -2, z: 1 }), Solid({ r: 0.7 })]],
+    systems: [characterSystem({ math })],
+  });
+  const drive = async (math?: 'platform' | 'deterministic') => {
+    const t = await testScene(solidScene(math));
+    const path: number[] = [];
+    for (const [x, z] of [[1, -1], [0, 1], [-1, 0], [1, 1], [0, -1]] as const) {
+      t.hold('character-x', x); t.hold('character-z', z); t.run(0.7);
+      const p = pos(t); path.push(p.x, p.z, p.ry);
+    }
+    return path;
+  };
+  const platform = await drive(), deterministic = await drive('deterministic'), again = await drive('deterministic');
+  assert.deepEqual(deterministic, again, 'deterministic runs repeat exactly');
+  assert.deepEqual(await drive('platform'), platform, "'platform' is the default");
+  for (let i = 0; i < platform.length; i++) assert.ok(Math.abs(platform[i]! - deterministic[i]!) < 1e-9, `sample ${i}: ${platform[i]} vs ${deterministic[i]}`);
+  assert.throws(() => characterSystem({ math: 'fixed' as never }), RangeError);
+});

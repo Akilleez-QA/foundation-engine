@@ -1,11 +1,16 @@
+import { scalarMath, type ScalarMath, type ScalarMathMode } from '../../core/dmath';
 export interface RootKey { readonly at: number; readonly x: number; readonly z: number; readonly yaw: number }
 export interface RootClip { readonly duration: number; readonly keys: readonly RootKey[] }
 export interface RootDelta { x: number; z: number; yaw: number }
 const identity = (): RootDelta => ({x:0,z:0,yaw:0});
-const compose = (a: RootDelta,b: RootDelta): RootDelta => ({x:a.x+Math.cos(a.yaw)*b.x+Math.sin(a.yaw)*b.z,z:a.z-Math.sin(a.yaw)*b.x+Math.cos(a.yaw)*b.z,yaw:a.yaw+b.yaw});
-const inverse = (a: RootDelta): RootDelta => ({x:-Math.cos(a.yaw)*a.x+Math.sin(a.yaw)*a.z,z:-Math.sin(a.yaw)*a.x-Math.cos(a.yaw)*a.z,yaw:-a.yaw});
-/** Authored planar root motion, independent of skeletal playback. Yaw is unwrapped radians. */
-export function createRootMotion(input: RootClip, loop=false) {
+const composeWith = (m: ScalarMath) => (a: RootDelta,b: RootDelta): RootDelta => {const c=m.cos(a.yaw),s=m.sin(a.yaw);return {x:a.x+c*b.x+s*b.z,z:a.z-s*b.x+c*b.z,yaw:a.yaw+b.yaw};};
+const inverseWith = (m: ScalarMath) => (a: RootDelta): RootDelta => {const c=m.cos(a.yaw),s=m.sin(a.yaw);return {x:-c*a.x+s*a.z,z:-s*a.x-c*a.z,yaw:-a.yaw};};
+/**
+ * Authored planar root motion, independent of skeletal playback. Yaw is unwrapped radians. `math`: 'platform'
+ * (default, Math.*) or 'deterministic' (dmath: the same bits in every JavaScript engine).
+ */
+export function createRootMotion(input: RootClip, loop=false, options: { math?: ScalarMathMode } = {}) {
+  const m=scalarMath(options.math),compose=composeWith(m),inverse=inverseWith(m);
   const clip=structuredClone(input);
   if(!Number.isFinite(clip.duration)||clip.duration<=0||!clip.keys.length||clip.keys.length>4096||clip.keys[0].at!==0||clip.keys.at(-1)!.at!==clip.duration)throw Error('root motion: invalid clip');
   let previous=-1;

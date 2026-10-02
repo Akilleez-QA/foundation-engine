@@ -34,6 +34,8 @@ export type { SpatialAudioOptions } from '../platform/audio/module';
 export { Material, defineMaterial, validateMaterial, MATERIAL_DEFAULTS, MATERIAL_LIMITS, type MaterialData, type MaterialWrap } from './material';
 export { createAudioTimeline, estimateOffset, validateCalibration, MAX_CALIBRATION_MS, NO_CALIBRATION, type AudioTimeline, type AudioTimelineOptions, type AudioTimelineStats, type AudioClockReading, type AudioCalibration, type TimelineEvent, type TimelineSource, type OffsetEstimate } from '../platform/audio/audio-timeline';
 
+export { dmath, platformMath, scalarMath, type ScalarMath, type ScalarMathMode } from '../core/dmath';
+
 export { defineEnvironment, type EnvironmentState } from './environment';
 
 export { Model, validateModel, type ModelData, type ModelSocketPose } from './model';
