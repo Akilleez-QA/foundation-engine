@@ -114,3 +114,21 @@ match these published commits; only documentation differs:
 `1d0d3e0` = `7cdf470`, `86df82e` = `04ca4ea`, `2cdd442` = `4196e16`,
 `724cedf` = `3b66597`, `cc0f1c7` = `113d887`. The submission head was re-checked
 again after this rebase; see the pull request for that exact-head result.
+
+## CI browser-suite failure and fix (`17391f3`)
+
+Remote CI on the rebased PR head failed `npm run test:ui-browser`: the HUD fixture
+waited for more than two system steps and found no HUD lines. Root cause: the
+frame loop already steps a pending run's systems before router arrival, and
+awaiting program/frame readiness lengthened that window, so systems ran several
+frames before the scene's `enter()` hook. Systems now start only after initial
+preparation settles (ready or degraded), restoring the previous order. The
+fixture was not changed; a unit regression fails without the fix.
+
+At `17391f3` on `main` `7d57880`, with Node 22: all 19 CI browser suites from
+`.github/workflows/ci.yml` PASS locally (with their `GAME_DIR` settings);
+`npm run check` PASS; `npm test` 2,048 tests, 0 failures; `npm run lint` PASS;
+the phone smoke `play:snap --mobile` PASS for all seven templates; and
+`npm run gate:templates` PASS for all seven, freshly measured (cache miss):
+129 checks, zero over budget, regressions or inconclusive, and the same four
+advisory heap warnings. Earlier receipts above did not run the CI browser suites.
