@@ -706,3 +706,12 @@ creator-chosen and bounded. Implemented as a candidate (`feat/mv02-moving-platfo
 PR #53), not integrated. Evidence is focused unit tests only. See the
 [kit README](../../src/kits/locomotion/README.md#moving-platforms-mv-02), the
 [recipe](../recipes/add-moving-platforms.md) and the [ledger](upgrade-acceptance-ledger.md).
+
+## Music on the audio clock (AU-02) — implemented, candidate
+
+Optional [`playMusic`](music-on-clock.md) plays a decoded song on the audio context's
+clock: exact start, stop, seek and native loop points, `songTime` for charts, a music
+bus following the music volume and mute, music-sized decode bounds per minimum device,
+and skip-ahead for late decodes. Status: implemented, candidate (PR #54); not
+integrated. Evidence is fake-context unit tests only; no browser, device or audible
+verification.

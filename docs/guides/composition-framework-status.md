@@ -416,3 +416,9 @@ word. The optional [input-history kit](../../src/kits/input-history/README.md) a
 frame-exact edges, buffers, release edges, opposite-direction cleaning and
 sequences that survive rollback. Status: implemented, candidate (PR #52); not
 integrated. See the [ledger](upgrade-acceptance-ledger.md).
+
+## Music on the audio clock (AU-02) — implemented, candidate
+
+`playMusic` composes with the one audio output (its own music store and bus, no second
+context) and the AU-01 timeline (start at `timeline.contextTime(0)`); scenes own their
+music voices. Candidate (PR #54); not integrated. See the [guide](music-on-clock.md).
