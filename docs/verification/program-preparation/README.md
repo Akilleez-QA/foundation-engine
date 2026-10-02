@@ -96,3 +96,11 @@ were unchanged. The native shader fixtures above were not re-run at this head;
 `program-validation.ts`, `program-readiness.ts` and `frame-readiness.ts` are
 unchanged since they were recorded. This remains software-GL and single-backend
 native evidence, not physical-device or sustained-traversal acceptance.
+
+After public PR #6 (documentation only) merged, the branch was rebased onto
+`main` `1b0b846` without conflicts. Exact head `cc0f1c7` repeated `npm run check`,
+`npm test` (2,047 tests, 0 failures), `npm run lint` and all seven template gates:
+PASS, with the same 129 checks and four advisory heap warnings. The built bundles
+were identical to `724cedf`, so each gate re-checked that run's stored complete
+software-GL evidence against current budgets (the gate's identical-build reuse)
+rather than re-measuring; tests, typecheck, lint, snapshot and bundle checks ran anew.
