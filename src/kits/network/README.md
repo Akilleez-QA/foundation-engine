@@ -134,8 +134,8 @@ Without `maxQueuedAgeMs` behaviour is unchanged: commands wait indefinitely and
 - **Output.** `pump` adds `stale` (shed count) only when the limit is configured.
   Shedding consumes one attempt of the pump budget, so overload work stays bounded.
   Aged work is dropped before it costs authorization or dispatch.
-- **Reply.** `stale({peer, principal, command, receivedAt, ageMs})` may call
-  `intake.send` for one bounded reply through the existing reply path. Authorization
+- **Reply.** `stale({peer, principal, command, receivedAt, ageMs})` may reply through
+  `intake.send` (each send bounded by message limits) on the existing reply path. Authorization
   is **not** rechecked for this notice; disclose only correlation (for example a
   command ID and `expired`). Nested pump/receive return busy. A throwing notice
   retires the peer with `stale-error`.

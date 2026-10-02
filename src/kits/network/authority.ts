@@ -158,26 +158,13 @@ export function createDurableAuthority(options: AuthorityOptions) {
       if (status !== 'ready' || !current)
         return result({ status: 'unavailable' });
       let deadline: number | undefined;
-      if (admission !== undefined) {
-        try {
-          deadline = admission.deadlineMs;
-        } catch {
-          deadline = NaN;
-        }
-        if (
-          clock === undefined ||
-          typeof deadline !== 'number' ||
-          !Number.isFinite(deadline)
-        )
-          return result({ status: 'refused', reason: 'deadline' });
-      }
       // Reads the injected clock only while no storage call has started. Non-monotonic
       // readings are compared as given; a later reading may pass after an earlier one.
       const lapsed = (): AuthorityOutcome | null => {
         if (deadline === undefined) return null;
         let time: number;
         try {
-          time = clock!();
+          time = clock!.call(undefined);
         } catch {
           return result({ status: 'refused', reason: 'clock' });
         }
@@ -194,6 +181,22 @@ export function createDurableAuthority(options: AuthorityOptions) {
           sequence = request.sequence,
           inputJson = request.inputJson;
         if (!live()) return result({ status: 'retired' });
+        // Only a plain object is admission policy; other values (such as an Array#map index) are ignored.
+        // Read while the slot is reserved: a reentrant getter sees busy and cannot start storage.
+        if (typeof admission === 'object' && admission !== null) {
+          try {
+            deadline = admission.deadlineMs;
+          } catch {
+            deadline = NaN;
+          }
+          if (!live()) return result({ status: 'retired' });
+          if (
+            clock === undefined ||
+            typeof deadline !== 'number' ||
+            !Number.isFinite(deadline)
+          )
+            return result({ status: 'refused', reason: 'deadline' });
+        }
         // First admission point: shed abandoned work before validation, receipts or reduction.
         const early = lapsed();
         if (!live()) return result({ status: 'retired' });

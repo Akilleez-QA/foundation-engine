@@ -56,6 +56,7 @@ export interface AuthorityCommand {
   readonly inputJson: string;
 }
 /** Optional per-call admission policy. Not part of the command's retry identity. */
+/** Read only when `submit` receives a non-null object; any other second argument is ignored. */
 export interface AuthoritySubmitOptions {
   /**
    * Absolute time on the injected `clock`. When the clock reads at or after this value
@@ -75,7 +76,9 @@ export interface AuthorityOptions extends AuthorityValidation {
   /**
    * Optional injected time source for submit deadlines (any finite millisecond scale shared
    * with the caller's `deadlineMs`). Consulted only when a deadline is supplied, and never
-   * after storage invocation. No wall clock is read by default.
+   * after storage invocation. No wall clock is read by default. Called without a receiver:
+   * pass `() => performance.now()`, not the unbound method `performance.now`, which throws
+   * and makes every deadlined submit `refused` with reason `clock`.
    */
   readonly clock?: () => number;
   /** Access permission, including current permission to disclose historical results. Not domain validation. */

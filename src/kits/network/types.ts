@@ -51,8 +51,8 @@ export interface NetworkPorts {
   /** Synchronous admission to creator logic, not a transaction or durable acknowledgment. */
   dispatch(context: NetworkContext): void;
   /**
-   * Optional notice for a command shed by `maxQueuedAgeMs`. It may send one bounded reply
-   * through `intake.send`; current authorization is not rechecked, so disclose only correlation.
+   * Optional notice for a command shed by `maxQueuedAgeMs`. It may reply through `intake.send`
+   * (each send bounded by message limits); current authorization is not rechecked, so disclose only correlation.
    */
   stale?(context: NetworkStaleContext): void;
   /** true means transport admission only. Caller transport owns outgoing memory and delivery. */

@@ -143,6 +143,13 @@ Creators may supply `clock: () => number` when constructing the authority and pa
 `submit(command, {deadlineMs})`. Without a deadline, the clock is never read and
 behaviour is unchanged. The clock is injected; no wall clock is consulted. Any
 finite millisecond scale works if the caller's `deadlineMs` uses the same one.
+The clock is called without a receiver, so pass `() => performance.now()` rather
+than the unbound `performance.now`, which would refuse every deadlined submit with
+reason `clock`. Only a non-null object second argument is admission policy; other
+values (for example the index passed by `commands.map(owner.submit)`) are ignored.
+The `deadlineMs` property is read after the authority reserves its single slot, so
+a getter that reenters `submit` or `recover` sees `busy`, and one that disposes the
+owner yields `retired` without storage invocation.
 
 - **Owner and checks.** The existing serialized authority owns the check; there is
   no queue or timer. While holding its single reserved slot it reads the clock at
@@ -172,9 +179,10 @@ finite millisecond scale works if the caller's `deadlineMs` uses the same one.
   retires without storage invocation.
 - **Limitations.** A deadline bounds admission, not storage latency or callback CPU
   time. Clock skew between client and host is the creator's protocol concern.
-  Seven focused tests cover the boundary, expiry during callbacks, late completion
+  Nine focused tests cover the boundary, expiry during callbacks, late completion
   as committed/unknown/throw, non-monotonic and invalid clocks, receipt retry
-  interplay, configuration and reentry. No load, WAN or device acceptance is claimed.
+  interplay, configuration, receiver-less clocks, non-object admission, clock
+  reentry and `deadlineMs` getter reentry. No load, WAN or device acceptance is claimed.
 
 ## Composition and acceptance
 

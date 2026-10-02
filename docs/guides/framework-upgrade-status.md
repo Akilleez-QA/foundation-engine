@@ -434,5 +434,5 @@ may shed commands older than an optional `maxQueuedAgeMs` before authorization o
 dispatch, and [durable authority](durable-authority.md#optional-submit-deadlines-nw-06)
 may return `expired` for an optional deadline on an injected clock, only before the
 storage call starts. In-flight writes keep committed/rejected/unknown semantics and
-`expired` consumes no sequence. Both are off by default. Evidence is 6 intake and 7
+`expired` consumes no sequence. Both are off by default. Evidence is 6 intake and 9
 authority focused tests; load, browser composition and devices remain unverified.
