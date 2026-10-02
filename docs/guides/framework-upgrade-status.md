@@ -434,8 +434,16 @@ may shed commands older than an optional `maxQueuedAgeMs` before authorization o
 dispatch, and [durable authority](durable-authority.md#optional-submit-deadlines-nw-06)
 may return `expired` for an optional deadline on an injected clock, only before the
 storage call starts. In-flight writes keep committed/rejected/unknown semantics and
-`expired` consumes no sequence. Both are off by default. Evidence is 6 intake and 9
-authority focused tests; load, browser composition and devices remain unverified.
+`expired` consumes no sequence. Both are off by default. PR #12 evidence was 6 intake and 9
+authority focused tests (9 intake after the follow-up below); load, browser composition and devices remain unverified.
+
+Follow-up (PR #33; candidate, not integrated): the
+NW-07 overload probe showed that charging each age shed to the pump budget collapsed
+goodput once queued wait exceeded the age. Shedding is now uncharged and capped by an
+optional `maxStaleDropsPerPump`. With PR #27's probe (not in this tree), at a 300 ms age saturated final/peak goodput was
+0.253 and 0.229 before and 0.955 and 0.915 after (two loopback runs each, heavily
+loaded host); the deterministic unit regression measured 22.0/s before and 80.4/s
+after against an 80.4/s FIFO plateau. Defaults without `maxQueuedAgeMs` are unchanged.
 
 ## Reconnect/retry pacing — NW-04 implemented, candidate
 
@@ -492,6 +500,59 @@ unit tests, an opt-in native software-renderer fixture and a temporary composed
 probe ([record](../verification/asset-residency-20261002/README.md)). No program
 budget, combined ceiling, prefetch, physical-device memory or performance claim.
 See the [guide](asset-residency.md).
+
+## Zero-step press retention (STD-SIM-12) — fix, candidate
+
+The stock author runtime cleared pressed actions and `pointer.pressed` after every
+frame, so a press arriving before a frame that ran no fixed tick (frame time below
+the 1/60 s step on 120 Hz+ displays, or the `dt = 0` frame after idle, cover or
+`engine.clock.hold()`) was never seen by fixed systems; a frame with several ticks
+showed it to each of them. [`createPressLatch`](../../src/author/press-latch.ts),
+driven by new `beforeStep`/`beforeFrameLane` hooks on `createSystemRunner`, now
+keeps a press pending until the first fixed tick, which alone sees it; frame
+systems keep their per-frame view. Retention is bounded by the visit and by the
+existing cancellation paths (pointer/input cancel, overlay, hidden tab, lost
+ownership, a non-simulating frame, a held SIM-01 replay tap). The latch runs before
+the replay tap's tick sentinel, so a recorded press lands in exactly one tick. Evidence: focused runtime and runner tests;
+browser suites and gates are recorded on the PR. Physical high-refresh devices are
+unverified. Candidate, not integrated.
+
+## Peer rollback sessions (RB-01) — implemented, candidate
+
+Optional `@kits/rollback` ([README](../../src/kits/rollback/README.md),
+[recipe](../recipes/add-rollback-sessions.md)) supplies speculative execution with
+bounded rollback, stall and checksum desync detection over a creator-supplied
+reliable, ordered link, plus a local sync test. Implemented, candidate (PR #25,
+`feat/genre-fighting-slice1`); not integrated. Evidence is focused headless tests
+and one fixed-lane consumer; network, device and multiplayer acceptance are open.
+
+## Deterministic turn log (turns kit, TB-01) — implemented, candidate
+
+Status: implemented, candidate on branch `feat/genre-turnbased-slice1` (PR #24); not integrated. See the [kit README](../../src/kits/turns/README.md) and [recipe](../recipes/add-a-turn-log.md).
+
+- Runtime-enforced: rules id, validator literal-`true` acceptance, JSON capture limits for commands and states, `maxCommands` retention (`full` overload, `checkpoint` recovery), revision-checked mutations (`stale`), reentrancy (`busy`), disposal (`retired`), frozen states, mutations require an exact safe-integer revision, restore never throws for stored data (`invalid`/`foreign`/`diverged`, including throwing creator validators/reducers) with a 64-bit replay kit `hashText` checksum over the whole retained log (redo entries included), authority random keyed by seed, lineage, stream and sequence.
+- Checked: 18 focused headless unit tests (determinism, preview equals submit, undo/redo/replay, real SaveStore round trip across a fresh store, adversarial reducers and inputs, durable-authority composition with an in-memory adapter).
+- Not established: any template or game consumer, browser or device evidence, reducer CPU deadlines, hidden-information safety of a local log (it is not), AI worker budgets, play-by-turn timeouts.
+
+## Seeded fault schedules — NW-09 implemented, candidate
+
+`npm run faults:network` (tools/authority-workbench) replays seeded combined faults
+against the composed authority path and checks invariants after every step against
+independent SQLite readback; failing seeds reproduce exactly by seed and step index
+and can be shrunk. Tools/tests only; the host gains optional, default-preserving
+fault seams. Implemented, candidate (PR #26); not integrated. Process-scope loopback
+evidence only. See the [guide](network-fault-schedule.md) and the
+[ledger](upgrade-acceptance-ledger.md).
+
+## Planned drain and capped lifetime — NW-08 implemented, candidate (PR #21)
+
+`createConnectionDrain` (host) and `createDrainFollower` (client), network kit, let a
+host announce a planned drain with a bounded notice and optionally cap connection
+lifetime with randomized dither, so clients stop new work, settle pending replies
+and reconnect through the existing retry schedule after the announced return. Both
+are optional and pure; drain closes are transient (1012). The network workbench host
+and client opt in. Implemented, candidate (PR #21); not integrated. Unit, host socket
+and loopback browser tests are its only evidence. See the [drain guide](network-drain.md).
 
 ## Bounded spatial index (SC-01) — implemented, candidate
 

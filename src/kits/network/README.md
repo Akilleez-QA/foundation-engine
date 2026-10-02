@@ -128,31 +128,60 @@ Without `maxQueuedAgeMs` behaviour is unchanged: commands wait indefinitely and
 - **Input and owner.** The intake owner records the `now` passed to `receive` with
   each queued command. No clock, timer or scheduler is added; age is measured
   only when the caller drives `pump(now)`.
-- **Rule.** When a command reaches the head of its turn and
-  `now - receivedAt >= maxQueuedAgeMs`, it is shed: removed, its count and bytes
-  released, never passed to `authorize` or `dispatch`. Age equal to the limit is
-  stale. Per-peer receive times are nondecreasing, so a fresh head means the rest
-  of that peer's queue is fresh.
+- **Rule.** On a peer's drain turn, its aged prefix is shed first: every head with
+  `now - receivedAt >= maxQueuedAgeMs` is removed, its count and bytes released,
+  and never passed to `authorize` or `dispatch`. Age equal to the limit is stale.
+  Per-peer receive times are nondecreasing, so the first fresh head ends the prefix
+  and that fresh head is then attempted on the same turn.
 - **Output.** `pump` adds `stale` (shed count) only when the limit is configured.
-  Shedding consumes one attempt of the pump budget, so overload work stays bounded.
-  Aged work is dropped before it costs authorization or dispatch.
+  Shed commands are **not** counted in `attempted` and do not consume the pump
+  budget, so a tight age cannot starve dispatch of fresh work (see below).
+  A zero budget sheds nothing, because no drain turn runs.
+- **Bounds.** Shedding per pump is capped by the optional `maxStaleDropsPerPump`
+  (positive safe integer; default `maxQueuedMessages`, ignored without
+  `maxQueuedAgeMs`). Nothing can be queued during a pump, so the default already
+  bounds drops by the queued backlog. Loop turns are bounded too: the empty-turn
+  scan restarts after each attempt, so the worst case is about drops plus
+  `budget x connections` turns plus one final scan of connections, each turn O(1)
+  apart from creator callbacks. Lower the cap to bound `stale` callback work per pump. Once it is
+  spent, a peer whose head is still stale is skipped for that pump: a stale command
+  is never dispatched. One extra number per queued command, bounded by the existing
+  message-count limits, is retained; it is not added to the UTF-8 byte accounting.
+- **Overload.** Before this rule was uncharged, each shed cost one pump attempt. Once
+  real queued wait exceeded the age, most attempts went to already-stale commands and
+  goodput collapsed. The deterministic regression test (7 peers, about 113 commands/s
+  offered, 4 attempts per 50 ms pump = 80/s) measured goodput 20.6 and 22.0/s at
+  150 and 300 ms ages before the change, against 80.4/s FIFO, and 80.4/s at every age
+  after. The NW-07 loopback probe from PR #27 (not in this tree; run from that branch's
+  tools with and without this change) measured saturated final/peak goodput at a 300 ms
+  age of 0.253 and 0.229 before and 0.955 and 0.915 after (two runs each, heavily
+  loaded host).
+- **Choosing an age.** With round-robin drain, a command at the back of a full
+  per-peer queue waits about `ceil(maxQueuedMessagesPerPeer x activePeers / budget)`
+  pumps, times the caller's pump interval, plus host lag. For example, 8 x 7 / 4 = 14
+  pumps of 50 ms is 700 ms; the full global-queue drain (32 / 4 = 8 pumps, 400 ms) is
+  not the binding bound. The intake cannot compute this in milliseconds, because the
+  pump cadence and active peer count belong to the caller. An age below that bound
+  now sheds the tail of the queue rather than collapsing goodput. Choose the age from
+  how long a client keeps waiting for a reply, and shrink per-peer queues if the
+  shed rate is too high.
 - **Reply.** `stale({peer, principal, command, receivedAt, ageMs})` may reply through
-  `intake.send` (each send bounded by message limits) on the existing reply path. Authorization
-  is **not** rechecked for this notice; disclose only correlation (for example a
-  command ID and `expired`). Nested pump/receive return busy. A throwing notice
-  retires the peer with `stale-error`.
-- **Bounds.** One extra number per queued command, bounded by the existing
-  message-count limits. It is not added to the UTF-8 byte accounting, so
-  configured byte limits keep their meaning.
+  `intake.send` (each send bounded by message limits) on the existing reply path.
+  Authorization is **not** rechecked for this notice; disclose only correlation (for
+  example a command ID and `expired`). Nested pump/receive return busy. A throwing
+  notice retires the peer with `stale-error`, releasing the rest of its queue.
 - **Time and recovery.** Backwards or non-finite time still throws before any work,
   so nothing is shed or dispatched on a bad clock. A shed command never reached
   creator logic; whether the client retries, and how fast, is creator protocol.
   Durable authority does not see it, so no authority sequence is consumed.
-- **Limits.** Stale commands deeper in a queue are only examined when they become
-  head of their turn, so an idle pump does not sweep them. Age measures host
-  queueing only, not client send time, network delay or clock skew between hosts.
-  Unit tests cover the exact boundary, budget accounting, fair drain, backwards time,
-  reply/reentry and configuration. No transport, load or device acceptance is claimed.
+- **Limits.** A peer's stale commands are only examined on that peer's drain turn,
+  so an idle pump with zero budget does not sweep them. Age measures host queueing
+  only, not client send time, network delay or clock skew between hosts. Unit tests
+  cover the exact boundary, uncharged shedding, the drop cap, fair drain, backwards
+  time, reply/reentry, a notice that retires its peer mid-pump, configuration and the
+  sustained-overload goodput regression.
+  The probe numbers are loopback, one machine; no WAN, browser or device acceptance
+  is claimed.
 
 ## Time, reentry and cleanup
 
@@ -354,6 +383,29 @@ means none; at most 32 distinct entries each. Unknown causes are transient. The
 close reason is untrusted remote input: the transport keeps it only as a bounded
 token, and consumers display it only as text. See
 [terminal refusals](../../../docs/guides/network-retry.md#terminal-refusals-and-transient-loss).
+
+## Optional planned drain and capped lifetime (NW-08)
+
+`createConnectionDrain({limits:{maxKeys,maxNoticeMs,maxReconnectAfterMs,maxActionsPerPoll,lifetime?},random?})`
+is a host-side pure state machine. `track(key, now)` on open, `admits(key)` before
+admitting new work, `drain(now, {noticeMs, reconnectAfterMs})` for an operator
+drain (new connections refused until `resume()`), and `poll(now)` from the host's
+existing driver returns at most `maxActionsPerPoll` `notify` then `close`
+instructions, earliest first. An optional `lifetime` caps each connection at
+`maxLifetimeMs`, dithered earlier by up to `jitterMs`, with `noticeMs` warning.
+A drain reaches connections already notified: the close only moves earlier, the
+announced return only lengthens, and a changed notice is re-sent once. The
+lifetime cap bounds the scheduled close; emission waits for the next poll and the
+per-poll cap. It never cancels admitted work.
+`createDrainFollower({limits:{maxNoticeMs,maxReconnectAfterMs}})` is the client
+side: it validates a notice against the client's bounds, stops new work, signals
+one cooperative close and holds the first reconnect until the announced return;
+pacing after that is the caller's `createRetrySchedule`. Drain closes use
+`DRAIN_CLOSE_CODE` (1012) and are transient under the default close policy. Both
+own no timer, socket or random source; time is caller-supplied and nondecreasing.
+See the [drain guide](../../../docs/guides/network-drain.md). Implemented,
+candidate (NW-08); not integrated, and no WAN, process-restart or physical-device
+acceptance.
 
 NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. Clean native acceptance passed at `8317c69` with seven observations; 17 storage/host checks passed on Node 22.13. DV-01 remains open. The [acceptance ledger](../../../docs/guides/upgrade-acceptance-ledger.md)
 records revisions, process evidence and outstanding work. Application credit,

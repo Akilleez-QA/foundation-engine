@@ -98,7 +98,19 @@ try {
     const elapsed = Date.now() - t0;
     if (!stalled && elapsed > totalMs * 0.25) {
       // A deliberate 120 ms main-thread stall inside a frame: it must appear as a severe frame.
-      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => { const end = performance.now() + 120; while (performance.now() < end) { /* stall */ } r(); })));
+      // Resolve only after the loop has ticked twice more: the tick carrying the stalled interval is the first or
+      // second loop frame after the stall (rAF callback order within a frame), and holding the clock before that
+      // tick would reset the loop's interval and silently drop the stall. Bounded so an idle loop fails clearly.
+      await page.evaluate(() => new Promise((r, reject) => requestAnimationFrame(() => {
+        const end = performance.now() + 120; while (performance.now() < end) { /* stall */ }
+        const seen = engine.loop().frames, deadline = performance.now() + 30_000;
+        const wait = () => {
+          if (engine.loop().frames >= seen + 2) r();
+          else if (performance.now() > deadline) reject(new Error(`the frame loop did not tick after the stall (frames ${seen} -> ${engine.loop().frames})`));
+          else requestAnimationFrame(wait);
+        };
+        requestAnimationFrame(wait);
+      })));
       stalled = true;
       // Held, script-stepped frames (engine.clock) must be counted but never timed.
       await page.evaluate(() => { engine.clock.hold(); engine.clock.step(500); engine.clock.resume(); });

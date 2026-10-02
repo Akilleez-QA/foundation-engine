@@ -5,11 +5,18 @@ You describe the game; a coding agent (Claude Code or another) builds it with yo
 ## Start
 
 ```
-npm install
+npm ci
+npx --no-install playwright-core install chromium   # the muted test browser, once
 claude            # or your agent of choice, in this folder
 ```
 
+[Getting started](getting-started.md) covers the same steps by hand.
+
 Say what you want to make ("a game where you guide a paper boat down a stream"). The agent uses the **new-game** skill: a short interview (pitch, genre, audience, devices, how you will know it works), then it proposes a **build brief** (`game/build.brief.ts`, mirrored at the top of `GAME.md`) and a milestone plan with a small vertical slice first. Work proceeds within your agreed scope; existing authorization remains valid and does not need repeated confirmation.
+
+## Your game lives on your branch
+
+When you clone this repository to make a game, `npm run new-game` writes `game/`, `GAME.md` and the template's playtest scripts into the folder you cloned. Ask the agent to commit them on a branch of your own (`git switch -c my-game`) and to keep working there, committing each step that passes `npm run check`. AGENTS.md's worktree, gate-before-merge and production rules are for changes to the engine repository itself: a fresh worktree from `origin/main` has no `game/` folder and would quietly build the blank template, and `npm run deploy:production` releases this repository's `main`, not your game. To share your game, the agent runs `npm run build` and you upload `dist/` to a static host ([share your build](../recipes/share-your-build.md)).
 
 ## The round
 
@@ -30,7 +37,7 @@ Useful things to say:
 | "/budget" | shows each scene against its performance budget |
 | "make it feel better" | runs a polish pass (feedback, readability, phone layout) |
 | "it's slow on my phone" | measures, then simplifies, instances, bakes or adds detail levels |
-| "ship it" | gates, integrates and, only if you ask, deploys |
+| "ship it" | for your game: checks the criteria, commits, and builds `dist/` to share; for engine changes: gates, integrates and, only if you ask, deploys |
 
 ## The brief is the contract
 
@@ -44,6 +51,8 @@ The brief says who the game is for, which devices it must run on (the weakest on
 - Touch your computer's audio: test browsers are always muted.
 
 ## Example round
+
+In a game started from the `arcade` template:
 
 > **You:** Blocks are too easy to dodge. Make them speed up faster.
 >

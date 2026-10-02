@@ -6,6 +6,17 @@ import game from './game';
 import yard from './yard';
 import { region } from './region';
 
+/** Resolves once the terrain revision's off-frame preparation has handed its builder to the frame loop.
+ * Polls the scene state the preparation publishes; fails with the preparation error, or after a generous bound. */
+async function preparedOrFailed(state: Record<string, unknown>, timeoutMs = 60_000): Promise<void> {
+  const start = Date.now();
+  while (state.terrainWorker === undefined) {
+    if (state.terrainPreparationError !== undefined) assert.fail(`terrain preparation failed: ${String(state.terrainPreparationError)}`);
+    if (Date.now() - start > timeoutMs) assert.fail(`terrain preparation did not finish within ${timeoutMs} ms`);
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+}
+
 test('S1: the character follows rendered ground while walking and after teleport', async () => {
   const t = await testScene(yard, { game });
   const tr = t.world.get(t.ctx.named('player')!, Transform)!;
@@ -114,7 +125,10 @@ test('S5: surface revision swaps render, contact and navigation epoch together',
     assert.equal(currentSurface(t.ctx).revision, epoch);
     assert.ok(Math.abs(player.y - currentSurface(t.ctx).sample(player.x, player.z)!.height - 0.7) < 1e-6);
   });
-  t.press('terrain-revise');t.run(1/60);await new Promise(resolve=>setTimeout(resolve,250));
+  t.press('terrain-revise');t.run(1/60);
+  // The patch is prepared on the jobs service (inline slices on timers here); wait for that hand-off itself,
+  // not a fixed wall-clock sleep, so machine load changes only how long this takes, never the outcome.
+  await preparedOrFailed(t.ctx.state);
   for (let frame = 0; frame < 14; frame++) {
     const oldBuilds = (t.ctx.state.terrain as { builds: number }).builds;
     t.run(1 / 60);

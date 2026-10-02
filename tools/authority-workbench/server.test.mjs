@@ -277,3 +277,44 @@ test('NW05: per-peer token bucket keeps a capacity burst open and closes the nex
   b.send(1, 3);
   assert.equal((await result(b, 1)).status, 'committed');
 });
+
+test('NW09: optional fault seams keep host time monotonic, observe frames and recover a faulted authority', async (t) => {
+  const d = await directory(t);
+  await initializeAuthorityWorkbench({ directory: d });
+  await assert.rejects(startAuthorityWorkbench({ directory: d, clock: 1 }), /host-options/);
+  await assert.rejects(startAuthorityWorkbench({ directory: d, observe: 1 }), /host-options/);
+  let time = 1000, fail = null;
+  const events = [];
+  const h = await startAuthorityWorkbench({
+    directory: d,
+    clock: () => time,
+    storageHooks: { beforeCommit() { if (fail === 'before') { fail = null; throw Error('injected'); } } },
+    observe: (e) => events.push(e),
+  });
+  t.after(() => h.close());
+  assert.equal((await h.recoverAuthority()).status, 'ready');
+  const a = await connect(t, h);
+  assert.ok(events.some((e) => e.type === 'open') && events.some((e) => e.type === 'frame'));
+  assert.ok(events.filter((e) => e.type === 'sent').every((e) => typeof e.frame === 'string' && !e.frame.includes(h.credentials.a)));
+  time = 10; // a backwards reading holds the last host time instead of throwing in intake
+  h.pump();
+  fail = 'before';
+  a.send(1, 2);
+  assert.equal((await result(a, 1)).status, 'unavailable');
+  assert.equal(h.read().status, 'unavailable');
+  a.frames.length = 0;
+  a.send(1, 2);
+  assert.equal((await result(a, 1)).status, 'busy');
+  assert.equal((await h.recoverAuthority()).status, 'recovered');
+  assert.equal(h.read().status, 'ready');
+  a.frames.length = 0;
+  a.send(1, 2);
+  assert.equal((await result(a, 1)).status, 'committed');
+  assert.equal(h.read().checkpoint.state, 2);
+  assert.equal(h.read().connections, 1);
+  assert.equal(h.read().intake.connections, 1);
+  time = 1000 + 16000; // forward past the idle timeout closes the quiet peer
+  h.pump();
+  await until(() => a.socket.readyState === WebSocket.CLOSED);
+  assert.ok(events.some((e) => e.type === 'close'));
+});

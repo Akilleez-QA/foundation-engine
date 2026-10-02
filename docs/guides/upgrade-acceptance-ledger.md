@@ -67,10 +67,13 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | NW-01 | Transport/session and authenticated authority boundary | Integrated in PR #120 at `3a97ca6`: pure intake `bd65713`, browser text adapter `540bece`, and ephemeral WebSocket reference host `63730cc`. Reported focused checks pass: 16 intake, 13 injected-socket adapter, 10 real TCP/WebSocket host and 5 reference response-schema tests. Native two-browser/separate-host acceptance passed at `4e51a04`, with inspected rendering and independent host counters. Final `5f871b3` passed all seven template gates (1,917 tests; 129 performance checks; zero enforced breaches/regressions/inconclusive, four advisory software-GL heap warnings); combined main tests/build passed. Measured load remains NW-02 work. No durable or complete multiplayer authority claim. |
 | NW-02 | Interest management and bounded snapshots | Integrated on main by merge `ea48539`, preserving input-resize integration `894fc52`; work tracked in PR #122 in the private development history. Clean rebased browser passed at `508edd9`; final `47a7e6d` passed all seven gates (1,965 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive, four advisory heap warnings). Combined main 1,965 tests/build passed. Four local load cases passed (worst publisher p95 0.321 ms). Historical failure/retry and earlier candidate revisions remain below. Git ancestry proves integration; GitHub PR state was still OPEN immediately after push. Creator scope is explicit; no general spatial policy or delta replication claim. |
 | NW-03 | Prediction/reconciliation, reconnect and server persistence | NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. Clean native two-client acceptance passed at `8317c69` (seven observations); all 53 focused tests and 17 actual Node 22.13 storage/host checks passed. Historical component repairs and limits are recorded below. DV-01 remains open; no physical-device, public-release or unrestricted multiplayer claim. |
-| NW-06 | Maximum queued age and pre-invocation submit deadlines (study N3) | Implemented, candidate (PR #12); not integrated. Optional `maxQueuedAgeMs` sheds aged intake commands before `authorize`/`dispatch` (counted as `stale`, one pump attempt each); optional injected `clock` plus `submit(command, {deadlineMs})` returns `expired` only before storage invocation, consuming no sequence. In-flight writes keep committed/rejected/unknown semantics. Defaults unchanged. 6 intake and 9 authority focused tests; no load, WAN, browser-composition or device acceptance claimed. See [network kit](../../src/kits/network/README.md) and [durable authority](durable-authority.md). |
+| NW-06 | Maximum queued age and pre-invocation submit deadlines (study N3) | Implemented, candidate (PR #12); not integrated. Optional `maxQueuedAgeMs` sheds aged intake commands before `authorize`/`dispatch` (counted as `stale`; originally one pump attempt each, superseded by the follow-up below); optional injected `clock` plus `submit(command, {deadlineMs})` returns `expired` only before storage invocation, consuming no sequence. In-flight writes keep committed/rejected/unknown semantics. Defaults unchanged. 6 intake and 9 authority focused tests in PR #12 (9 intake after the follow-up); no load, WAN, browser-composition or device acceptance claimed. See [network kit](../../src/kits/network/README.md) and [durable authority](durable-authority.md). Follow-up (PR #33, candidate, not integrated): age shedding is no longer charged to the pump budget (optional `maxStaleDropsPerPump` cap), fixing the NW-07 goodput collapse; 300 ms final/peak 0.23-0.25 before, 0.92-0.96 after with PR #27's probe (not in this tree; loopback). |
 | NW-04 | Reconnect/retry pacing: full-jitter backoff and retry budget | Implemented, candidate (PR #14, `feat/nw04-reconnect-schedule`); not integrated. Optional pure `createRetrySchedule` in the network kit, with the network workbench client as an opt-in consumer. Evidence and remaining limits are in the NW-04 section below. No WAN, reconnect-storm-against-a-real-host or physical-device claim. |
 | NW-05 | Shared rate and concurrency admission | Implemented, candidate (PR #13); not integrated. Optional single-process `createRateAdmission` ([guide](rate-admission.md)): per-key token bucket, optional concurrency leases, `maxKeys` with lossless idle reclamation only, explicit `limited`/`refused` results, clock-regression safe, idempotent dispose. Three reference hosts migrated from 1000 ms fixed windows to buckets of equal burst and refill (intended semantic change: no 2x boundary burst; same long-run rate). Focused unit and loopback host tests; no distributed, measured-load or physical-device claim. |
 | RES-01 | Bounded asset residency (texture/model budgets, pins, LRU eviction) | Implemented, candidate (PR #22); not integrated. Optional `defineGame({ residency })` applies per-preset `warmBytes`/`residentBytes` and pinned asset ids to the existing `LeaseCache` of the texture and model libraries; live and pinned assets are never evicted, over-ceiling pressure is reported once per transition with a creator hook, retained three.js resources are parked through public `dispose` events. Default unchanged (dispose at release). Evidence: focused unit tests, an opt-in native SwiftShader fixture (estimate vs uploaded mip chain, `renderer.info` counts, actual context loss) and a temporary composed probe; see [guide](asset-residency.md). No program-count budget, cross-library ceiling, physical-device memory or traversal-performance claim. |
+| RB-01 | Optional peer rollback sessions and local sync test (genre study 2026-10-02, slice 1) | Implemented, candidate (PR #25, `feat/genre-fighting-slice1`); not integrated. Optional `@kits/rollback`: `createRollbackSession` (2–8 peers, `maxPredictionFrames` 0–60, `inputDelay` 0–30, byte-bounded inputs/states, rollback to the earliest contradicted frame, stall at the window, confirmed-state checksums with bounded history/pending reports, fail-closed protocol faults, `AbortSignal` disposal) and `createRollbackSyncTest`. 25 focused tests, including seeded multi-peer convergence against a no-network reference, a sync test that compares every replay with the live step (fixed after review), late-peer pacing on the exposed `frameAdvantage`, and a `testScene` fixed-lane consumer. Requires a reliable, ordered link; there is no built-in time sync. No WAN, unreliable-channel, spectator, cross-browser floating-point or physical-device claim. See the section below and the [kit README](../../src/kits/rollback/README.md). |
+| NW-09 | Seeded fault-schedule harness for the composed authority path (study N6, tools/test only) | Implemented, candidate (PR #26); not integrated. `npm run faults:network` and `tools/authority-workbench/fault-harness.test.mjs` replay seeded combined faults (link delay/reorder/duplicate/drop, connection loss mid-command, controller replacement, held/crashed commits, host restart, SQLite before/after-commit failure with recovery, clock skew, slow consumer, revocation) against the reference host and two scripted clients, checking durable-history, result-semantics, prediction, disclosure, bound and leak invariants after every step against independent SQLite readback; failing seeds print seed + step index and can be shrunk and replayed. Process-scope loopback evidence only: no WAN, power-loss, filesystem, scale or device claim. See the [guide](network-fault-schedule.md). |
+| NW-08 | Planned drain and capped connection lifetime (study N8) | Implemented, candidate (PR #21, `feat/nw08-planned-drain`); not integrated. Optional pure `createConnectionDrain` (host: bounded notice, operator drain/resume, dithered lifetime cap, per-poll instruction cap) and `createDrainFollower` (client: bounded notice, cooperative close, hold until announced return, then the existing retry schedule) in the network kit; the network workbench host (`--drain`) and client (checkbox) opt in. Drain closes are 1012 and transient. Admitted work is never cancelled. Evidence and limits are in the NW-08 section below. No process-restart, WAN or physical-device claim. |
 | TR-01 | Regional terrain worker and ordinary-surface integration | Integrated in PR #109 at 99e6255. Canonical regional Surface and halo patches, bounded WorkerHost generation/patch adapters, independent geometric oracles and finite coherent render/query consumer passed at 891eb7; all seven template gates passed (1,648 tests, 129 performance checks, zero breaches/regressions, four advisory heap warnings). Combined main tests/build passed. Physical-device performance and unbounded/global streaming are not established. |
 | DV-01 | Supported-device experience and sustained performance evidence | In progress, not integrated: ported to the public `feat/device-acceptance` PR. [Stock matrix](../kits/stock-device-acceptance-matrix.md) covers all seven declarations. The [first receipt](../verification/stock-device-20261001/README.md) records 16 passing emulated target/tap checks and a compact lesson content overlap; lesson visit cleanup and a measured learn layout seam repair it, with a fake-DOM regression and emulated separation checks across board, sim and quiz at four profiles ([layout receipt](../verification/stock-device-20261002/README.md)). Full consumer workflows, in-panel touch scrolling, 200% text, named minimum devices and sustained physical evidence remain open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. No physical-device or accessibility certification. |
 | SC-01 | Bounded spatial index for neighbour, range and interest queries at scale | Implemented, candidate (PR #23); not integrated. Optional `spatial` kit `createSpatialGrid`: preallocated uniform grid, admission before write, `too-wide` refusal before scanning, explicitly `truncated` results, terminal disposal. Checked: 12 focused unit tests (seeded brute-force oracle, refusals without mutation, narrow-buffer rejection, ECS interest consumer handling despawn and out-of-bounds and failing closed) and a work-count test of the 1,000/10,000-entry micro-benchmark. Headless Node medians recorded in the [guide](spatial-index.md#measured-cost). No template consumer, browser, worker or physical-device evidence; no budget change. |
@@ -306,6 +309,116 @@ Status: candidate (PR #16), building on integrated NW-04 (PR #14); not integrate
 | ID | Contract and required observation | State |
 |---|---|---|
 | PERF-01 | Optional, local-only [sustained-session recorder](session-performance.md) on the one frame loop. It records bounded rolling windows of frame/work p50/p95/p99, long and severe frames, rendered/idle counts, scene/epoch/preset segments and drift, plus a versioned evidence file. It has a zero-cost path when absent and is dev/test-only. | Implemented, candidate (PR #15 on the public repository); not integrated. Focused adversarial tests and an emulated browser run (a 30-second CI check plus a saved 10-minute sample) are recorded in the guide and in [verification](../verification/session-perf-20261002/README.md). This is supporting tooling for DV-01: it supplies the evidence format, not device evidence. DV-01 remains open. |
+
+## Rollback sessions (RB-01) — implemented, candidate
+
+Status: implemented, candidate (PR #25, `feat/genre-fighting-slice1`); not integrated.
+See the [kit README](../../src/kits/rollback/README.md) and the
+[recipe](../recipes/add-rollback-sessions.md).
+
+- Runtime-enforced: exact-key limit validation and ranges; UTF-8 byte bounds on
+  every input and saved state; contiguous per-player remote frames; a remote lead of
+  at most `maxPredictionFrames + 2 × inputDelay + 2`; no step past the prediction
+  window; at most one `load` and `maxPredictionFrames + 1` steps per `advance`;
+  bounded checksum history and pending reports; `busy` on reentry; immediate
+  disposal, including from a callback or an aborted signal.
+- Checked: 25 focused tests in `src/kits/rollback/`.
+  - Seeded two- and three-peer runs over delayed in-memory links match a
+    no-network replay (delay 0/2/3, windows 0/2/8, links slower than the window).
+  - Injected divergence is reported at the first checksum frame.
+  - The sync test compares every resimulated state with the **live** step's
+    checksum. Review of PR #25 found the first candidate compared replay with
+    replay, which missed every fault at distance 1 and missed one-shot live reads
+    at every distance; this has been fixed. Its tests cover distances 1, 3 and 8:
+    hidden state, unseeded randomness, an incomplete load, a one-shot live value,
+    `-0` lost by JSON, and an outside mutation. The three new regressions fail
+    without the fix.
+  - A 20-tick late start leaves the early peer a full window ahead unless it paces
+    on `frameAdvantage`.
+  - A `testScene` consumer drives two sessions from the fixed lane.
+  - A deliberately disabled rollback trigger fails 7 session tests.
+  - Exact-head check, test, lint and `gate:ci` results are in the PR.
+- Manual measurement, not a budget: a worst-case 8-frame rollback on every tick
+  with a JSON codec took p95 0.19 ms for a state of about 2.5 KB (Node 22,
+  desktop CPU, shared machine).
+- Not established:
+  - resend or redundancy over lossy links (a reliable, ordered transport is required);
+  - WebRTC;
+  - built-in time synchronization (only `frameAdvantage` is exposed; pacing is the host's job);
+  - input during a stall: `local()` returns `full` and keeps nothing, so edges must be carried by the host;
+  - disconnect policy;
+  - spectators;
+  - a saveable engine random generator;
+  - an ECS-world snapshot adapter;
+  - floating-point determinism across browsers;
+  - physical devices;
+  - real multiplayer acceptance.
+
+## Deterministic turn log (turns kit, TB-01) — implemented, candidate
+
+Status: implemented, candidate on branch `feat/genre-turnbased-slice1` (PR #24); not integrated. See the [kit README](../../src/kits/turns/README.md) and [recipe](../recipes/add-a-turn-log.md).
+
+- Runtime-enforced: rules id, validator literal-`true` acceptance, JSON capture limits for commands and states, `maxCommands` retention (`full` overload, `checkpoint` recovery), revision-checked mutations (`stale`), reentrancy (`busy`), disposal (`retired`), frozen states, mutations require an exact safe-integer revision, restore never throws for stored data (`invalid`/`foreign`/`diverged`, including throwing creator validators/reducers) with a 64-bit replay kit `hashText` checksum over the whole retained log (redo entries included), authority random keyed by seed, lineage, stream and sequence.
+- Checked: 18 focused headless unit tests (determinism, preview equals submit, undo/redo/replay, real SaveStore round trip across a fresh store, adversarial reducers and inputs, durable-authority composition with an in-memory adapter).
+- Not established: any template or game consumer, browser or device evidence, reducer CPU deadlines, hidden-information safety of a local log (it is not), AI worker budgets, play-by-turn timeouts.
+
+## Seeded fault-schedule harness (NW-09) — implemented, candidate
+
+Status: implemented, candidate (PR #26, `feat/nw09-seeded-faults`); not integrated.
+Tools/tests only; no engine runtime behaviour changed. See the
+[fault-schedule guide](network-fault-schedule.md).
+
+- Runtime-enforced (harness): per-step invariants on independent SQLite readback
+  (prefix sum equals revision, no rollback, contiguous bounded receipts, one
+  stream/sequence per revision, immutable receipts, state equals committed inputs,
+  committed inputs equal issued inputs), result semantics, storage-fault outcomes,
+  baseline coherence, prediction replay, disclosure only to the current
+  non-revoked controller, host/client bounds, post-heal convergence and release of
+  every socket, server and timer. A loopback wait over 4 s fails as `stuck`.
+- Tool seams: optional `clock`, `storageHooks`, `observe`, `openStorage` options, operator
+  `recoverAuthority()` and `read().connections/intake` on the authority workbench
+  host; defaults keep the reference behaviour. The existing storage/host tests are
+  unchanged and pass; one new host test covers the seams.
+- Checked: 7 tests in `fault-harness.test.mjs` (fixed seeds 1-12 x 300 steps with
+  every fault family exercised, identical replay fingerprint, injected durable
+  corruption failing at its exact step, reproducing and shrinking, and a defective
+  adapter that commits and then reports `rejected` failing `storage-outcome`).
+  Local sweeps on Node 22.23.3: 500 seeds x 300 steps passed; review sweeps of
+  1,000 x 300 and 60 x 2,000 also passed. Six temporary mutations of the host,
+  storage adapter, authority and prediction were caught (see the guide); two more
+  were unreachable through this host. No engine defect was found.
+- Not established: WAN behaviour, real process death inside the harness (the
+  existing SIGKILL storage/host tests remain that evidence), power loss, disk-full
+  or filesystem faults, TCP/OS backpressure, scoped-view publisher faults, scale,
+  browsers and physical devices.
+
+## Planned drain and capped lifetime (NW-08) — implemented, candidate
+
+Status: implemented, candidate on branch `feat/nw08-planned-drain` (PR #21); not integrated. See the [drain guide](network-drain.md).
+
+- Runtime-enforced: limit validation (exact keys, safe integers of at most one day,
+  `noticeMs + jitterMs < maxLifetimeMs`, `maxKeys` at most 65,536); drain requests
+  bounded by `maxNoticeMs`/`maxReconnectAfterMs`; lifetime close *scheduled* no
+  later than `maxLifetimeMs` (emission waits for the next poll and the per-poll cap,
+  so it may lag by a bounded, documented amount); at most `maxActionsPerPoll`
+  instructions per poll, notify before close, a late notice never postpones its
+  close; an operator drain reaches already-notified connections (close only earlier,
+  return only longer, one superseding notice when changed); nondecreasing time;
+  random-port validation; terminal disposal. The client follower refuses notices
+  beyond its own bounds and merges later notices monotonically.
+- Checked: 20 focused unit tests (including an operator drain reaching a
+  lifetime-notified connection, emission lag under the per-poll cap, seeded jitter distribution over 2,000
+  connections, 1,000-connection expiry under a per-poll cap, and reconnect after
+  host return through a real retry schedule with budget and exhaustion honoured);
+  4 host socket tests and 1 client protocol test; the network workbench browser
+  workflow shows a following client holding without opening a transport, an
+  ignoring client closed at the deadline with 1012 `drain` (transient), and both
+  reconnecting with fresh authentication after the operator resumes, with no
+  command resent. Exact-head gate results are in the PR.
+- Not established: a real process restart (reference "host return" is an operator
+  `resume` of the same process), close-frame delivery over lossy links, measured
+  reconnect storms, multi-host or rolling deploys, durable-authority host wiring,
+  physical devices and suitability of the example values for any game.
 
 ## Bounded spatial index (SC-01) — implemented, candidate
 

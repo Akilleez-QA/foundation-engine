@@ -101,3 +101,15 @@ test('runner: throwing diagnostics cannot strand either lane or corrupt subseque
     { id: 'frame-failure', error: frameError },
   ]);
 });
+
+test('runner: lane hooks bracket each fixed step and the per-frame lane, including zero-step frames', () => {
+  const calls: string[] = [];
+  const runner = createSystemRunner([
+    { id: 'fixed', run() { calls.push('fixed'); } },
+    { id: 'frame', phase: 'frame', run() { calls.push('frame'); } },
+  ], { step: 0.25, maxSteps: 2, beforeStep() { calls.push('step'); }, beforeFrameLane() { calls.push('lane'); }, after() { calls.push('after'); } });
+  assert.equal(runner.frame({}, 0.1), 0);
+  assert.deepEqual(calls.splice(0), ['lane', 'frame', 'after']);
+  assert.equal(runner.frame({}, 0.9), 2);
+  assert.deepEqual(calls.splice(0), ['step', 'fixed', 'step', 'fixed', 'lane', 'frame', 'after'], 'dropped steps call no hook');
+});

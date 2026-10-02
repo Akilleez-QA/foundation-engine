@@ -91,8 +91,11 @@ are contextual evidence, not verification of Foundation.
 | Combat and interactions | Sweeps, policy callbacks, action timing and implemented optional action workbench | AC-01 integrated in PR #117 after final native browser and all seven gates. Native target facts and independent presentation compose session-only consequences. Creators choose rules and whether combat exists. |
 | Crafting and resources | Survey fields, reserves, exact slot selection, weighted facts, authored experiment steps, locked manifests, production and materialization | PR #118 integrates selection/reservation/experimentation, historical recipe/batch facts, explicit spawn changes and native recipe/effect inspection. Final desktop browser, independent recovery probes and all seven gates passed at `790aaea`; combined main tests/build passed. No automatic spawn rotation or minigame prescribed. |
 | Multiplayer | NW-01 integrated in PR #120. NW-02 complete scoped views, application credit and optional scene lifecycle hooks are integrated on main at `ea48539` (PR #122 in the private development history). | Rebased clean browser passed at `508edd9`; final `47a7e6d` passed all seven gates (1,965 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive, four heap advisories). Combined main tests/build passed; measured load and earlier failure remain documented below. Git ancestry establishes integration, not the PR API state. NW-03 is integrated as recorded below; DV-01 remains unresolved. No multiplayer-completion claim. |
-| Multiplayer: queue age and deadlines (NW-06) | Optional intake `maxQueuedAgeMs` with `stale` notice; optional authority `clock` and `submit(command, {deadlineMs})` returning `expired` before storage invocation only | Implemented, candidate (PR #12); not integrated. Focused unit tests only; defaults unchanged; no load, browser-composition or device claim. |
+| Multiplayer: queue age and deadlines (NW-06) | Optional intake `maxQueuedAgeMs` with `stale` notice; optional authority `clock` and `submit(command, {deadlineMs})` returning `expired` before storage invocation only | Implemented, candidate (PR #12); not integrated. Focused unit tests only; defaults unchanged; no load, browser-composition or device claim. Follow-up (PR #33, candidate, not integrated): age shedding is no longer charged to the pump budget (optional `maxStaleDropsPerPump` cap), fixing the NW-07 goodput collapse; 300 ms final/peak 0.23-0.25 before, 0.92-0.96 after with PR #27's probe (not in this tree; loopback). |
 | Asset residency (RES-01) | Optional per-preset texture/model byte budgets, pinned asset ids and a pressure hook over the existing lease caches | Implemented, candidate (PR #22); not integrated. Unit tests and a native software-renderer fixture only; defaults unchanged; no template configures it. See [asset residency](asset-residency.md). |
+| Multiplayer: peer rollback (RB-01) | Optional `@kits/rollback` session (prediction window, input delay, rollback/resimulation, confirmed-state checksums) and local sync test, driven from the fixed lane | Implemented, candidate (PR #25); not integrated. Focused headless tests and a `testScene` consumer only; requires a reliable, ordered link; no WAN, time-sync, spectator or device claim. |
+| Multiplayer: seeded fault schedules (NW-09) | Tool-only `npm run faults:network` harness replaying seeded combined faults against the authority workbench host with per-step invariants and exact seed/step repro | Implemented, candidate (PR #26); not integrated. Process-scope loopback evidence only; no WAN, power-loss, scale or device claim. See [guide](network-fault-schedule.md) |
+| Multiplayer: planned drain and lifetime (NW-08) | Optional host `createConnectionDrain` (bounded notice, operator drain/resume, dithered lifetime cap) and client `createDrainFollower` (hold until announced return, then the existing retry schedule) | Implemented, candidate (PR #21); not integrated. Unit, host socket and loopback browser tests; defaults unchanged; no process-restart, WAN or device claim. |
 | Manual tools | Bounded documents, sessions and optional appearance, progression, custody and objective desktop consumers | Integrated tools cover their finite schemas. Action tooling is integrated; recipe/effect inspectors are integrated in PR #118 with focused tests and final desktop workflow acceptance. Device support is selected per tool; desktop tooling does not impose a phone UI. |
 
 Priority is composition correctness before additional feature catalogs. A creator's
@@ -291,6 +294,37 @@ physical-device runs on creator-selected profiles remain open.
 per-preset byte budgets, pin critical asset ids and observe pressure. The existing
 lease caches remain the owner; nothing changes when it is omitted. Candidate
 (PR #22); not integrated. See [asset residency](asset-residency.md).
+
+## Peer rollback sessions (RB-01) — implemented, candidate
+
+The optional [rollback kit](../../src/kits/rollback/README.md) adds
+`createRollbackSession` for deterministic fixed-step simulations shared by 2–8
+peers, plus `createRollbackSyncTest` for local determinism checks. It owns no
+transport, clock or rules. Status: implemented, candidate (PR #25); not
+integrated. See the [ledger](upgrade-acceptance-ledger.md#rollback-sessions-rb-01--implemented-candidate).
+
+## Deterministic turn log (turns kit, TB-01) — implemented, candidate
+
+The optional `turns` kit composes existing owners: authored-document/network JSON capture for bounds, the replay kit `hashText` for snapshot checksums, core `createRng`/`hashSeed` for per-position random streams, save sections for snapshots (a `{json}` section, restored with explicit `invalid`/`foreign`/`diverged` outcomes) and `createDurableAuthority` through `turnAuthorityPolicies` for server-authoritative play. It adds no service, scheduler, storage or frame work. Candidate on branch `feat/genre-turnbased-slice1` (PR #24), not integrated; 18 headless unit tests; no consumer template, browser or device evidence. See the [kit README](../../src/kits/turns/README.md).
+
+## Seeded fault schedules (NW-09) — implemented, candidate
+
+The tool-only [fault-schedule harness](network-fault-schedule.md) drives the
+authority workbench host and two scripted clients through a seeded schedule of
+combined link, connection, host, storage, clock and consumer faults, checking
+durable-history, result, prediction, disclosure, bound and leak invariants after
+every step. A failing seed prints its seed and step index and can be shrunk and
+replayed. Implemented, candidate (PR #26); not integrated. Process-scope loopback
+evidence only; it does not certify WAN, power-loss durability or devices.
+
+## Planned drain and capped lifetime (NW-08) — implemented, candidate
+
+The optional [connection drain](network-drain.md) lets a host give clients a bounded
+notice before a planned close, and rotate long-lived connections across a dithered
+window. Admitted work is never cancelled; clients that follow the notice hold until
+the announced return, then pace through the retry schedule. The network workbench
+uses it only when its host flag and client checkbox are set. Implemented, candidate
+(PR #21); not integrated. See the [ledger](upgrade-acceptance-ledger.md).
 
 ## Bounded spatial index for large populations (SC-01) — implemented, candidate
 

@@ -64,6 +64,7 @@
     "test:authority-workbench-browser": "node scripts/generate.mjs && node --import tsx -r ./scripts/silent-browser.cjs scripts/play/authority-workbench-check.mjs playtest/authority-workbench",
     "test:replication-load": "node --import tsx tools/replication-workbench/load.mjs",
     "test:replay-browser": "GAME_DIR=templates/arcade/game node scripts/generate.mjs && GAME_DIR=templates/arcade/game node --import tsx -r ./scripts/silent-browser.cjs scripts/play/replay-check.mjs playtest/replay",
+    "faults:network": "node --disable-warning=ExperimentalWarning --import tsx tools/authority-workbench/fault-harness.mjs",
     "bench:spatial": "node --import tsx tools/spatial-bench/bench.mjs"
   },
   "dependencies": {

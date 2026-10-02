@@ -137,3 +137,19 @@ test('response text has a UTF-8 bound and malformed JSON cannot become an accept
     assert.throws(() => decodeResponse(raw, context()));
   assert.throws(() => decodeResponse(result(), context()));
 });
+
+test('NW-08 drain notices decode with exact fields and integer windows only', () => {
+  const notice = { v: 1, type: 'drain', cause: 'planned', closeInMs: 500, reconnectAfterMs: 2000 };
+  const accepted = decode(notice);
+  assert.deepEqual(accepted, notice);
+  assert.ok(Object.isFrozen(accepted));
+  assert.deepEqual(decode({ ...notice, cause: 'lifetime' }, { principal: null, pending: new Map() }).cause, 'lifetime');
+  for (const bad of [
+    { ...notice, cause: 'shutdown' },
+    { ...notice, closeInMs: 1.5 },
+    { ...notice, reconnectAfterMs: '1' },
+    { ...notice, extra: true },
+    { v: 1, type: 'drain', cause: 'planned', closeInMs: 1 },
+  ])
+    assert.throws(() => decode(bad), /drain response/, JSON.stringify(bad));
+});

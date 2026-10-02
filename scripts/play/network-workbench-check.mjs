@@ -35,12 +35,13 @@ const report = {
     'Credentials are random operator fixtures supplied through trusted IPC and native password inputs; no production identity-provider claim.',
     'NW04 paced reconnect is exercised against one loopback host with injected send refusal and revoked credentials; no WAN loss, host restart fleet or thundering-herd measurement in a browser.',
     'Terminal close classification is exercised for one loopback auth-rejected close (code 1008); a close frame lost before TCP teardown would surface as code 1006 and be paced as transient.',
+    'NW08 planned drain uses a second loopback host with drain enabled; "host return" is the operator resume of that same process, not a process restart (fixture credentials do not survive a restart). Capped lifetime is covered by host socket tests, not this browser workflow.',
   ],
 };
 const evidence = diagnosticReport(report, resolve(out, 'report.json'));
-let host, server, browser, betaContext;
-function childHost() {
-  const child = fork(resolve(ROOT, 'tools/network-workbench/server.mjs'), [], {
+let host, drainHost, server, browser, betaContext;
+function childHost(args = []) {
+  const child = fork(resolve(ROOT, 'tools/network-workbench/server.mjs'), args, {
     cwd: ROOT,
     execArgv: ['--import', 'tsx'],
     stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
@@ -145,10 +146,10 @@ function childHost() {
     },
   };
 }
-async function untilHost(predicate) {
+async function untilHost(predicate, owner = host) {
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
-    const state = await host.request('read');
+    const state = await owner.request('read');
     if (predicate(state)) return state;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
@@ -512,6 +513,90 @@ try {
   const final = await snapshot('all-connections-released');
   assert.deepEqual(final.counters, { alpha: 3, beta: 6 });
   assert.equal(final.metrics.dispatched, 6);
+  // NW08: planned drain on a separate opt-in host. alpha follows the notice; beta ignores it and is closed at the
+  // deadline. Both reconnect through their retry schedules after the operator ends the drain; no command is resent.
+  drainHost = childHost(['--drain']);
+  const drained = await drainHost.ready;
+  for (const page of Object.values(pages)) {
+    await page.locator('#auto-reconnect').check();
+    await page.locator('#final-refusals').check();
+    await page.locator('#endpoint').fill(drained.url);
+  }
+  await pages.alpha.locator('#follow-drain').check();
+  assert.equal(await pages.beta.locator('#follow-drain').isChecked(), false);
+  const connectTo = async (page, token) => {
+    await page.locator('#credential').fill(token);
+    await click(page, 'connect');
+    assert.equal(await page.locator('#credential').inputValue(), '');
+  };
+  await connectTo(pages.alpha, drained.credentials.alpha);
+  await authenticated(pages.alpha, 'alpha');
+  await connectTo(pages.beta, drained.credentials.beta);
+  await authenticated(pages.beta, 'beta');
+  await command(pages.alpha, 'alpha', 1);
+  assert.equal((await read(pages.alpha)).value, 1);
+  const before = {
+    alpha: (await reconnect(pages.alpha)).transportsOpened,
+    beta: (await reconnect(pages.beta)).transportsOpened,
+  };
+  await drainHost.request('drain', { noticeMs: 1500, reconnectAfterMs: 3000 });
+  await pages.alpha.waitForFunction(
+    () => networkWorkbench.read().drain.state?.state === 'holding',
+  );
+  const holding = await read(pages.alpha);
+  assert.deepEqual(
+    { cause: holding.drain.lastNotice.cause, reconnectAfterMs: holding.drain.lastNotice.reconnectAfterMs },
+    { cause: 'planned', reconnectAfterMs: 3000 },
+  );
+  assert.equal(holding.drain.plannedCloses, 1);
+  assert.match(holding.message, /Closed for planned host drain; host expected back in \d+ ms/);
+  assert.equal(holding.reconnect.transportsOpened, before.alpha, 'no attempt yet');
+  await shot(pages.alpha, 'alpha-drain-hold');
+  await pages.beta.waitForFunction(
+    () => networkWorkbench.read().reconnect.lastClose?.reason === 'drain',
+    undefined,
+    { timeout: 5000 },
+  );
+  assert.deepEqual((await reconnect(pages.beta)).lastClose, {
+    code: 1012,
+    reason: 'drain',
+    class: 'transient',
+  });
+  assert.match((await read(pages.beta)).message, /Connection ended: remote-close: drain/);
+  const hostDrained = await untilHost((s) => s.intake.connections === 0, drainHost);
+  assert.equal(hostDrained.drain.counts.notices, 2);
+  // The hold is honoured: beta's paced attempts may already be refused, but alpha has opened nothing.
+  assert.equal((await reconnect(pages.alpha)).transportsOpened, before.alpha);
+  assert.equal((await read(pages.alpha)).drain.state.state, 'holding');
+  report.observations.push({ label: 'drain-hold', host: hostDrained, alpha: await read(pages.alpha), beta: await read(pages.beta) });
+  await drainHost.request('resume');
+  for (const name of ['alpha', 'beta'])
+    await pages[name].waitForFunction(
+      (name) =>
+        networkWorkbench.read().principal === name &&
+        networkWorkbench.read().reconnect.schedule.state === 'idle',
+      name,
+      { timeout: 20000 },
+    );
+  for (const name of ['alpha', 'beta']) {
+    const state = await read(pages[name]);
+    const opened = state.reconnect.transportsOpened - before[name];
+    assert.ok(opened >= 1 && opened <= state.reconnect.schedule.limits.maxAttempts, `${name}: ${opened} paced attempts`);
+    assert.ok(state.reconnect.schedule.tokens <= state.reconnect.schedule.limits.budget.capacity - 1, `${name}: budget spent`);
+    assert.equal(state.drain.state.state, 'idle');
+  }
+  const returned = await untilHost(
+    (s) => s.intake.connections === 2 && s.peers.every((p) => p.state === 'active'),
+    drainHost,
+  );
+  assert.deepEqual(returned.counters, { alpha: 1, beta: 0 });
+  assert.equal(returned.metrics.dispatched, 1, 'drain and reconnect resent no command');
+  await command(pages.alpha, 'alpha', 2);
+  assert.equal((await read(pages.alpha)).value, 3);
+  await shot(pages.alpha, 'alpha-drain-returned');
+  report.observations.push({ label: 'drain-returned', host: await drainHost.request('read'), alpha: await read(pages.alpha) });
+  for (const page of Object.values(pages)) await click(page, 'disconnect');
+  await untilHost((s) => s.intake.connections === 0, drainHost);
   assert.deepEqual(report.errors, []);
   assert.deepEqual(report.consoleErrors, []);
   report.passed = true;
@@ -523,6 +608,7 @@ try {
     [browser, 'browser close'],
     [server, 'vite close'],
     [host, 'host close'],
+    [drainHost, 'drain host close'],
   ]) {
     try {
       await owner?.close();

@@ -226,3 +226,15 @@ production identity claim follows from this loopback diagnostic.
 Clean native acceptance passed at `8317c69`, with seven observations and no page
 or console errors. [Report and inspected screenshots](../../docs/verification/authority-20261001/README.md)
 record the exact scope. NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. DV-01 remains open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. This is private integration, not a public release or physical-device certification.
+
+## Seeded fault schedules (NW-09)
+
+`fault-schedule.mjs` and `fault-harness.mjs` replay seeded combined faults against
+this host and two scripted Node clients, with invariants checked after every step
+against an independent read-only SQLite connection. Run `npm run faults:network`
+(CI-sized default) or `npm run faults:network -- --seeds N`. For this the host
+accepts optional `clock`, `storageHooks`, `observe` and `openStorage` options and exposes an
+operator `recoverAuthority()`; omitted options keep the behaviour described above.
+See the [fault-schedule guide](../../docs/guides/network-fault-schedule.md) for
+the fault vocabulary, invariants, repro output and limits. Process-scope loopback
+evidence only.
