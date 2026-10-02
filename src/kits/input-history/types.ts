@@ -75,7 +75,7 @@ export interface InputHistory {
   mask(names: readonly string[]): number;
   /** Action ids in a mask, in declaration order. */
   names(mask: number): readonly string[];
-  /** Forget everything. `baseline` is the mask treated as held just before the next recorded frame (default 0). */
+  /** Forget everything. `baseline` is the raw mask held just before the next recorded frame (default 0), cleaned like a frame. */
   reset(baseline?: number): void;
   /**
    * Record the next frame. `held` is the raw held mask; `taps` (default 0) adds actions pressed this frame
@@ -88,12 +88,13 @@ export interface InputHistory {
   oldest(): number;
   /** Cleaned held mask at a retained frame. Throws RangeError for a frame that was recorded and evicted, or never recorded. */
   heldAt(frame: number): number;
+  /** Omitted frame: the latest (false on an empty history). An explicit frame must be retained, else RangeError. */
   held(action: string, frame?: number): boolean;
   pressed(action: string, frame?: number): boolean;
   released(action: string, frame?: number): boolean;
   /**
    * The latest frame in `[at - within + 1, at]` with this edge, or -1. Press edges already consumed are skipped
-   * unless `includeConsumed`. Frames before the first recorded frame count as no edge; a window reaching into
+   * unless `includeConsumed`. Frames before the first recorded frame are outside every window (no edge, no sequence step); a window reaching into
    * evicted history throws RangeError rather than answering from a partial view.
    */
   lastEdge(action: string, edge: EdgeKind, within: number, at?: number, includeConsumed?: boolean): number;

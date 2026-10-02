@@ -226,3 +226,44 @@ test('INPUT-HISTORY snapshots: tampered or foreign data is refused and leaves th
   }
   assert.ok(Object.isFrozen(good) && Object.isFrozen(good.held));
 });
+
+test('INPUT-HISTORY reset baseline is cleaned like a frame: opposites held across a reset report no false edges', () => {
+  for (const policy of ['neutral', 'last', 'first', 'a', 'b'] as const) {
+    const h = make({ opposites: [{ a: 'left', b: 'right', policy }] });
+    const both = h.mask(['left', 'right']);
+    h.reset(both);
+    const r = h.record(0, both);
+    assert.equal(r.status, 'recorded');
+    assert.deepEqual({ pressed: (r as { pressed: number }).pressed, released: (r as { released: number }).released }, { pressed: 0, released: 0 }, policy);
+    // Letting go of one side afterwards is an ordinary change from the cleaned baseline.
+    const after = h.record(1, h.mask(['right']));
+    const expectPress = policy === 'b' ? 0 : h.mask(['right']);
+    assert.equal((after as { pressed: number }).pressed, expectPress, policy);
+  }
+});
+
+test('INPUT-HISTORY frames before the first record are outside every window: no edges and no sequence steps', () => {
+  const h = make();
+  feed(h, [[], ['p']], 5);
+  const idle = h.sequence([{ none: ['p'] }, { pressed: ['p'] }]);
+  const quiet = h.sequence([{ none: ['p'] }]);
+  assert.deepEqual({ ...h.match(idle, { within: 8 })! }, { start: 5, end: 6 }, 'the step before the press can only use recorded frame 5');
+  assert.deepEqual({ ...h.match(quiet, { within: 8, at: 5 })! }, { start: 5, end: 5 }, 'never a frame before the first record');
+  const late = make();
+  feed(late, [['p']], 5);
+  assert.equal(late.match(late.sequence([{ none: ['p'] }, { pressed: ['p'] }]), { within: 8 }), null, 'an unrecorded frame does not satisfy `none`');
+  assert.equal(late.lastEdge('p', 'press', 8), 5);
+});
+
+test('INPUT-HISTORY edge queries: an omitted frame on an empty history is false, an explicit frame must be retained', () => {
+  const h = make();
+  assert.equal(h.held('p'), false);
+  assert.equal(h.pressed('p'), false);
+  assert.equal(h.released('p'), false);
+  for (const query of [() => h.held('p', 0), () => h.pressed('p', 0), () => h.released('p', 3), () => h.heldAt(0)])
+    assert.throws(query, RangeError);
+  assert.throws(() => h.held('jump'), RangeError, 'an unknown action throws even when empty');
+  feed(h, [['p']], 0);
+  assert.equal(h.pressed('p'), true);
+  assert.throws(() => h.pressed('p', 1), RangeError);
+});

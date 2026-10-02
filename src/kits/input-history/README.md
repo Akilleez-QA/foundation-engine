@@ -56,7 +56,8 @@ actions pressed during the tick, so a press released before the tick ended still
 appears as held for one frame (press, then release on the next frame).
 
 The first recorded frame compares against the baseline given to `reset`
-(default: nothing held). Pass the currently held mask as the baseline when input
+(default: nothing held). The baseline is raw input, so it is cleaned with the
+opposite policies like any recorded frame. Pass the currently held mask as the baseline when input
 held before a scene entry must not count as a press.
 
 **Opposites:**
@@ -76,6 +77,7 @@ edges, so the losing action shows a release.
 | Bound | Limit |
 |---|---|
 | Actions | 1–32 |
+| Action id length | 1–64 characters |
 | `capacity` | 1–3600 frames |
 | Opposite pairs | At most 16, disjoint |
 | Sequence steps | 1–16 |
@@ -92,13 +94,16 @@ window the game uses: a rollback simulation saves it every frame.
 
 **Overload behavior:**
 - A configuration error, an unknown action name, a window larger than capacity, a future frame, or a window reaching into **evicted** frames throws `RangeError`. The kit never answers from a partial view.
-- Frames before the first recorded frame count as "no input", deterministically.
+- Frames before the first recorded frame are outside every window, deterministically. They hold no edges for `lastEdge` (-1), and `match` never places a step on them; a `none` step cannot match an unrecorded frame. They are never an error.
 
 ## Cancellation and recovery
 
 The history is a plain owned value with no listeners or timers; drop it with its
-owner. After a pause or a scene change that skips ticks, `record` returns `gap`.
-Call `reset(currentHeldMask)` to start again without inventing frames. Under
+owner. Own one history per scene visit. Call `reset(currentHeldMask)` on enter
+(a restart is a new visit) and on resume after a pause or overlay, so a key held
+across the change is not a new press. Driven by a counter that advances only when
+the fixed lane runs, `record` never sees a skipped frame. A `gap` or `stale`
+result means a caller bug, and the frame is refused rather than invented. Under
 rollback, keep the history inside the simulation state: `save()` it in the save
 port and `load()` it in the load port. A history kept outside the saved state
 refuses replayed frames as `stale`.
@@ -113,7 +118,7 @@ state.
 
 ## Evidence (this candidate)
 
-**Checked (`src/kits/input-history/*.test.ts`, 14 tests):**
+**Checked (`src/kits/input-history/*.test.ts`, 17 tests):**
 - Option bounds.
 - Contiguity refusals, exact edges, taps and baselines.
 - Buffer windows: consumption, the start-of-history rule and refusal of evicted windows.
@@ -127,6 +132,7 @@ state.
   - 13 tampered or foreign snapshots refused, with the history left unchanged.
 - Rollback sync-test integration, with negative controls for an unsaved history and an unsaved random word.
 - A `testScene` fixed-lane consumer showing a one-tick tap recorded once.
+- Review regressions: opposites held across `reset` report no false edges under all five policies; frames before the first record are outside every window; an explicit frame on an empty history throws.
 - Mutation checks each fail the suite: a greedy predecessor, a gap off by one, sequences ignoring consumption, and `last` behaving as `first`.
 
 **Not established:**

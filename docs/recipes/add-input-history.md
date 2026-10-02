@@ -28,13 +28,21 @@ const history = createInputHistory({
   opposites: [{ a: 'left', b: 'right', policy: 'neutral' }, { a: 'up', b: 'down', policy: 'neutral' }],
 });
 let tick = 0;
+/** Start clean at the input held right now, so a key held across the change is not a new press. */
+const restart = (ctx: SceneContext) => { tick = 0; history.reset(sampleActions(ctx.input, history).held); };
+
 export const input = defineSystem({ id: 'my-game-input', run(ctx) {
   const { held, taps } = sampleActions(ctx.input, history);
-  const r = history.record(tick++, held, taps);
-  if (r.status === 'gap') history.reset(held);   // after a pause: start again, never invent frames
+  history.record(tick++, held, taps);
 } });
+export const arena = defineScene({
+  id: 'my-game-arena', title: 'Arena', systems: [input /* , act */],
+  enter: restart,                                    // every visit, including a restart
+  activity: (ctx, facts) => { if (facts.phase === 'active' && facts.coverage === 'top') restart(ctx); },
+});
 ```
 
+- The history belongs to one scene visit. Reset it on enter (a restart is a new visit) and on resume after a pause or overlay, as above. The tick counter here only advances when the fixed lane runs, so it never skips frames by itself and `record` never reports `gap`. `gap` and `stale` show a caller bug, for example two systems recording, or a counter shared across visits.
 - Read actions through `ctx.input` only. Every action keeps its key and pad binding (and a touch control where touch is supported).
 - `taps` keeps a press that was released within the same tick.
 - Use one tick counter for the history. `ctx.time.frame` counts rendered frames, not fixed ticks.

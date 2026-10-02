@@ -73,6 +73,20 @@ export function createInputHistory(options: InputHistoryOptions): InputHistory {
     if (lo < oldest()) throw RangeError('input history: window reaches evicted frames');
     return [lo, end];
   };
+  /** Opposite cleaning of a raw mask, using the latest raw press frames (equal frames, including none, are a tie). */
+  const cleanMask = (raw: number) => {
+    let clean = raw;
+    for (const p of pairs) {
+      const ba = (1 << p.ia) >>> 0, bb = (1 << p.ib) >>> 0;
+      if ((raw & ba) === 0 || (raw & bb) === 0) continue;
+      const ta = lastRawPress[p.ia], tb = lastRawPress[p.ib];
+      const keep = p.policy === 'a' ? ba : p.policy === 'b' ? bb
+        : ta === tb || p.policy === 'neutral' ? 0
+        : p.policy === 'last' ? (ta > tb ? ba : bb) : (ta < tb ? ba : bb);
+      clean = (clean & ~(ba | bb) | keep) >>> 0;
+    }
+    return clean;
+  };
   const maskOf = (names: readonly string[] | undefined) => {
     if (names === undefined) return 0;
     if (!Array.isArray(names)) throw RangeError('input history: names must be an array');
@@ -81,6 +95,12 @@ export function createInputHistory(options: InputHistoryOptions): InputHistory {
     return m;
   };
 
+  /** An omitted frame on an empty history is "nothing yet" (false); an explicit frame must be retained. */
+  const bitAt = (ring: Uint32Array, action: string, frame: number | undefined) => {
+    const b = bitOf(action);
+    if (frame === undefined) { if (latest < 0) return false; frame = latest; }
+    return (ring[slot(frame)] & b) !== 0;
+  };
   const history: InputHistory = {
     actions, capacity,
     mask: names => maskOf(names),
@@ -90,8 +110,11 @@ export function createInputHistory(options: InputHistoryOptions): InputHistory {
     },
     reset(baseline = 0) {
       if (!validMask(baseline)) throw RangeError('input history: invalid baseline');
-      first = -1; latest = -1; prevRaw = baseline; prevHeld = baseline;
+      first = -1; latest = -1;
       held.fill(0); press.fill(0); release.fill(0); consumed.fill(0); lastRawPress.fill(-1);
+      // The baseline is raw input: clean it like a recorded frame, so holding both opposites does not
+      // report a release of a direction the cleaned history never held.
+      prevRaw = baseline; prevHeld = cleanMask(baseline);
     },
     record(frame, heldMask, taps = 0): RecordResult {
       if (!frameNumber(frame) || !validMask(heldMask) || !validMask(taps)) return INVALID;
@@ -102,16 +125,7 @@ export function createInputHistory(options: InputHistoryOptions): InputHistory {
       const raw = (heldMask | taps) >>> 0;
       const rawPressed = (raw & ~prevRaw) >>> 0;
       for (let i = 0; i < actions.length; i++) if ((rawPressed >>> i) & 1) lastRawPress[i] = frame;
-      let clean = raw;
-      for (const p of pairs) {
-        const ba = (1 << p.ia) >>> 0, bb = (1 << p.ib) >>> 0;
-        if ((raw & ba) === 0 || (raw & bb) === 0) continue;
-        const ta = lastRawPress[p.ia], tb = lastRawPress[p.ib];
-        const keep = p.policy === 'a' ? ba : p.policy === 'b' ? bb
-          : ta === tb || p.policy === 'neutral' ? 0
-          : p.policy === 'last' ? (ta > tb ? ba : bb) : (ta < tb ? ba : bb);
-        clean = (clean & ~(ba | bb) | keep) >>> 0;
-      }
+      const clean = cleanMask(raw);
       const s = frame % capacity;
       held[s] = clean; press[s] = (clean & ~prevHeld) >>> 0; release[s] = (prevHeld & ~clean) >>> 0; consumed[s] = 0;
       if (latest < 0) first = frame;
@@ -121,9 +135,9 @@ export function createInputHistory(options: InputHistoryOptions): InputHistory {
     latest: () => latest,
     oldest,
     heldAt: frame => held[slot(frame)],
-    held: (action, frame = latest) => { const b = bitOf(action); return latest >= 0 && (held[slot(frame)] & b) !== 0; },
-    pressed: (action, frame = latest) => { const b = bitOf(action); return latest >= 0 && (press[slot(frame)] & b) !== 0; },
-    released: (action, frame = latest) => { const b = bitOf(action); return latest >= 0 && (release[slot(frame)] & b) !== 0; },
+    held: (action, frame) => bitAt(held, action, frame),
+    pressed: (action, frame) => bitAt(press, action, frame),
+    released: (action, frame) => bitAt(release, action, frame),
     lastEdge(action, edge: EdgeKind, within, at, includeConsumed = false) {
       const b = bitOf(action);
       if (edge !== 'press' && edge !== 'release') throw RangeError('input history: edge must be press or release');
