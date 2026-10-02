@@ -110,6 +110,7 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 | `npm run play:criteria [-- --gate]` | The brief's success criteria, checked and tabled |
 | `npm test` / `npm run lint` | All tests / all lints (layers, arch, css, generic, brief, budgets) |
 | `npm run gate` / `npm run gate:templates` | The integration gate for this game / for every template |
+| `npm run gate:ci [-- --from <step> \| --only <step> \| --list]` | Every `run:` step of `.github/workflows/ci.yml`, in order with its env (browser suites, `gate:templates`, phone smoke); stops at the first failure and tables the steps |
 | `npm run bench`, `npm run perf:derive` | Measure scenes; derive budgets |
 | `npm run quality:guard` | Picture comparison of two builds |
 | `npm run deploy:production` | The only production release path |
@@ -120,7 +121,7 @@ The dev and test builds expose `window.engine` (src/dev/test-api.ts): `state()`,
 
 - **One task, one worktree.** Start each task from the current `origin/main`, in its own named branch and worktree (`git worktree add ../<repo>-<task> -b <task> origin/main`). Never edit the shared main checkout, reuse another task's worktree, or run two tasks in one checkout.
 - **Commit and validate in that worktree.** Before integrating, fetch and rebase onto the current `origin/main`. Keep other tasks' changes; never overwrite them.
-- **The gate before every integration merge.** Integrate only a branch whose `npm run gate` passed on its head, rebased onto the current main. Put the gate's summary in the merge. The gate blocks on per-scene count budgets.
+- **The gate before every integration merge.** Integrate only a branch whose `npm run gate` passed on its head, rebased onto the current main. Put the gate's summary in the merge. The gate blocks on per-scene count budgets. For an engine change, run `npm run gate:ci` on that head: it reads CI's steps from the workflow, so a local pass means CI's checks pass (`gate:templates` alone skips CI's browser suites). Do `npm ci` and the browser install yourself; `gate:ci` does not.
 - **Integrate serially from the main checkout.** Merge one branch at a time, verify the combined build and tests, and push `main` without force.
 - **Production only from a clean main**, through `npm run deploy:production` (branch, cleanliness and sync checks, an exclusive release lock, the bundle check). Never bypass it with a direct provider command; never deploy a feature worktree, a detached checkout, a dirty tree or an old snapshot. Feature worktrees may make explicitly authorised preview deployments.
 - After a production deploy, confirm the live commit and assets through the public UI. If another release is active or `main` has moved, reconcile before releasing.

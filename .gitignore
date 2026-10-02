@@ -21,6 +21,9 @@ playtest/action-hints/
 *.key
 
 # Reproducible local browser evidence (CI logs remain separate).
+playtest/ui/
+playtest/diagnostics/
+playtest/authority-workbench/
 playtest/authoring/
 playtest/framework/
 playtest/appearance/

@@ -49,7 +49,7 @@ npm test
 
 For changed runtime behavior, add tests that demonstrate the failure and intended outcome, including cancellation, retry, or disposal when applicable. For visible changes, capture and inspect desktop and relevant mobile screenshots with `npm run play:snap` and `npm run play:snap -- --mobile`; report page errors and measured counts. Development heap readings do not substitute for production benchmark results.
 
-The integration contract remains `npm run gate` on the proposed head; run it with `GAME_DIR` for each affected template. Broad shared changes may need `npm run gate:templates`. Report commands, results, and any unavailable hardware/browser checks honestly. Never weaken a test, tolerance, or budget to obtain a pass. CI smoke checks do not replace the full integration gate.
+The integration contract remains `npm run gate` on the proposed head; run it with `GAME_DIR` for each affected template. Broad shared changes may need `npm run gate:templates`; before integration, `npm run gate:ci` runs everything CI runs, including its browser suites. Report commands, results, and any unavailable hardware/browser checks honestly. Never weaken a test, tolerance, or budget to obtain a pass. CI smoke checks do not replace the full integration gate.
 
 ## Maintain documentation with the implementation
 

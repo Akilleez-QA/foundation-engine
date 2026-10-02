@@ -1,0 +1,263 @@
+#!/usr/bin/env node
+// scripts/gate-ci.mjs (`npm run gate:ci`): run locally what .github/workflows/ci.yml runs, so "passes locally" means
+// "passes CI". The step list is read from the workflow itself (the single source of truth): every `run:` step, in
+// order, with its `env` (workflow, job and step level, plus GitHub's `CI=true`) and GitHub's default shell
+// (`bash --noprofile --norc -eo pipefail`). `uses:` steps (checkout, setup-node) are the runner's own setup; the
+// `run:` steps listed in SETUP_ONLY are skipped and must be done once by hand (see their reasons). Anything in the
+// workflow this runner cannot mirror (a second job, `if:`, `shell:`, a matrix...) is an error, not a silent skip;
+// scripts/gate-ci.test.mjs fails when the workflow and this runner disagree.
+//
+//   npm run gate:ci                       every step, stops at the first failure
+//   npm run gate:ci -- --list             the plan (ids, names, env) without running it
+//   npm run gate:ci -- --from <step>      resume at a step (id, 1-based number, or name)
+//   npm run gate:ci -- --only <step>[,<step>...]   just these steps (the option may repeat)
+//   npm run gate:ci -- --any-node         run although the local Node major differs from the workflow's
+//
+// Each step runs in its own process group; on Ctrl-C or SIGTERM only that spawned group is signalled (TERM, then
+// KILL after 5 s). Browsers stay muted: the steps' own scripts preload scripts/silent-browser.cjs.
+import {spawn} from 'node:child_process';
+import {readFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+export const ROOT = fileURLToPath(new URL('..', import.meta.url));
+export const WORKFLOW = '.github/workflows/ci.yml';
+
+/** `run:` steps of the workflow that set up the runner rather than check the code, matched on the exact command. */
+export const SETUP_ONLY = {
+  'npm ci': 'dependency install from the lockfile; run `npm ci` yourself whenever package-lock.json changes',
+  'npx --no-install playwright-core install --with-deps chromium': 'one-time test-browser install (`--with-deps` needs root); run it once per machine',
+};
+const STEP_KEYS = new Set(['name', 'id', 'run', 'uses', 'with', 'env']);
+const JOB_KEYS = new Set(['runs-on', 'timeout-minutes', 'steps', 'env', 'permissions']);
+
+// ---------- A small YAML subset: block mappings and sequences, plain/quoted scalars, flow lists, | scalars. ----------
+const stripComment = s => {
+  let q = null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) { if (c === q) q = null; continue; }
+    if (c === '"' || c === "'") q = c;
+    else if (c === '#' && (i === 0 || /\s/.test(s[i - 1]))) return s.slice(0, i).trimEnd();
+  }
+  return s.trimEnd();
+};
+const KEY = /^("[^"]*"|'[^']*'|[^\s"'#:{}[\],&*!|>][^:#]*?):(?:\s+|$)/;
+const scalar = (s, where) => {
+  s = s.trim();
+  if (/^".*"$/.test(s)) return JSON.parse(s);
+  if (/^'.*'$/.test(s)) return s.slice(1, -1).replace(/''/g, "'");
+  if (/^\[.*\]$/.test(s)) return s.slice(1, -1).split(',').map(x => x.trim()).filter(Boolean).map(x => scalar(x, where));
+  if (/^[&*!{]|^\[/.test(s)) throw Error(`${where}: unsupported YAML (${s}); extend scripts/gate-ci.mjs`);
+  return s;
+};
+
+/** Parse the YAML subset GitHub workflows here use. Throws on anything else, so nothing is skipped silently. */
+export function parseYaml(text) {
+  const raw = text.replace(/\r\n?/g, '\n').split('\n');
+  const lines = raw.map((r, n) => {
+    if (/\t/.test(r.match(/^\s*/)[0])) throw Error(`line ${n + 1}: tab indentation`);
+    const t = stripComment(r);
+    return t.trim() ? {n, indent: t.length - t.trimStart().length, text: t.trim()} : null;
+  });
+  let i = 0;
+  const skip = () => { while (i < lines.length && !lines[i]) i++; };
+  const peek = () => (skip(), lines[i]);
+
+  const block = (indent, header) => { // a `|` or `>` scalar of the lines deeper than `indent`
+    const out = []; let base = -1;
+    while (i < raw.length) {
+      const r = raw[i];
+      if (r.trim() && r.length - r.trimStart().length <= indent) break;
+      if (r.trim() && base < 0) base = r.length - r.trimStart().length;
+      out.push(r); i++;
+    }
+    while (out.length && !out[out.length - 1].trim()) out.pop();
+    const joined = out.map(r => r.slice(Math.max(base, 0))).join('\n');
+    return header.endsWith('-') ? joined : joined + '\n';
+  };
+  const value = (rest, indent, line) => {
+    if (/^\|[-+]?$/.test(rest)) { i++; return block(indent, rest); }
+    if (/^>/.test(rest)) throw Error(`line ${line.n + 1}: folded scalars (>) are not supported; use |`);
+    if (rest) { i++; return scalar(rest, `line ${line.n + 1}`); }
+    i++;
+    const next = peek();
+    if (!next || next.indent < indent || (next.indent === indent && !/^-(\s|$)/.test(next.text))) return null;
+    return node(next.indent);
+  };
+  const mapping = indent => {
+    const out = {};
+    for (let line = peek(); line && line.indent === indent && !/^-(\s|$)/.test(line.text); line = peek()) {
+      const m = line.text.match(KEY);
+      if (!m) throw Error(`line ${line.n + 1}: expected "key: value", got ${line.text}`);
+      const key = scalar(m[1], `line ${line.n + 1}`);
+      if (key in out) throw Error(`line ${line.n + 1}: duplicate key ${key}`);
+      out[key] = value(line.text.slice(m[0].length).trim(), indent, line);
+    }
+    return out;
+  };
+  const sequence = indent => {
+    const out = [];
+    for (let line = peek(); line && line.indent === indent && /^-(\s|$)/.test(line.text); line = peek()) {
+      const rest = line.text.slice(1).trim(), col = indent + line.text.length - line.text.slice(1).trimStart().length;
+      if (!rest) { i++; const next = peek(); out.push(next && next.indent > indent ? node(next.indent) : null); }
+      else if (KEY.test(rest)) { lines[i] = {n: line.n, indent: col, text: rest}; out.push(mapping(col)); }
+      else { i++; out.push(scalar(rest, `line ${line.n + 1}`)); }
+    }
+    return out;
+  };
+  const node = indent => /^-(\s|$)/.test(peek().text) ? sequence(indent) : mapping(indent);
+  const first = peek();
+  const doc = first ? node(first.indent) : {};
+  if (peek()) throw Error(`line ${peek().n + 1}: unexpected indentation`);
+  return doc;
+}
+
+// ---------- The plan ----------
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const envMap = (env, where) => {
+  if (env == null) return {};
+  if (typeof env !== 'object' || Array.isArray(env)) throw Error(`${where}: env must be a mapping`);
+  for (const v of Object.values(env)) if (typeof v !== 'string' || /\$\{\{/.test(v)) throw Error(`${where}: env value ${v} needs GitHub expressions; extend scripts/gate-ci.mjs`);
+  return env;
+};
+
+/**
+ * The workflow as a plan: `steps` are the `run:` steps gate:ci executes, in order; `setup` the SETUP_ONLY ones;
+ * `actions` the `uses:` steps; `node` the setup-node version. Each step: {n, id, name, run, env}.
+ */
+export function planFromWorkflow(text) {
+  const wf = parseYaml(text);
+  const jobs = Object.entries(wf.jobs ?? {});
+  if (jobs.length !== 1) throw Error(`${WORKFLOW}: gate:ci mirrors exactly one job, found ${jobs.length}; extend scripts/gate-ci.mjs`);
+  const [jobName, job] = jobs[0];
+  for (const k of Object.keys(job)) if (!JOB_KEYS.has(k)) throw Error(`${WORKFLOW}: job ${jobName} key "${k}" cannot be mirrored locally; extend scripts/gate-ci.mjs`);
+  const base = {...envMap(wf.env, 'workflow'), ...envMap(job.env, `job ${jobName}`)};
+  const steps = [], setup = [], actions = [];
+  let node = null;
+  (job.steps ?? []).forEach((s, k) => {
+    const where = `${WORKFLOW}: step ${k + 1}${s?.name ? ` (${s.name})` : ''}`;
+    if (!s || typeof s !== 'object') throw Error(`${where}: not a mapping`);
+    for (const key of Object.keys(s)) if (!STEP_KEYS.has(key)) throw Error(`${where}: key "${key}" cannot be mirrored locally; extend scripts/gate-ci.mjs`);
+    if (s.uses && s.run) throw Error(`${where}: both uses and run`);
+    if (s.uses) {
+      actions.push(s.uses);
+      if (/^actions\/setup-node@/.test(s.uses)) node = String(s.with?.['node-version'] ?? '');
+      return;
+    }
+    if (typeof s.run !== 'string' || !s.run.trim()) throw Error(`${where}: no run command`);
+    const run = s.run.trim();
+    if (run in SETUP_ONLY) { setup.push({name: s.name ?? run, run, reason: SETUP_ONLY[run]}); return; }
+    const scripts = [...run.matchAll(/\bnpm run(?: -s| --silent)? ([\w:.-]+)/g)].map(m => m[1]);
+    const name = s.name ?? run.split('\n')[0];
+    steps.push({n: steps.length + 1, id: !run.includes('\n') && new Set(scripts).size === 1 ? scripts[0] : slug(name), name, run, env: {...base, ...envMap(s.env, where)}});
+  });
+  const ids = steps.map(s => s.id);
+  for (const s of steps) if (ids.indexOf(s.id) !== ids.lastIndexOf(s.id)) s.id = slug(s.name);
+  if (new Set(steps.map(s => s.id)).size !== steps.length) throw Error(`${WORKFLOW}: two steps share an id; give them distinct names`);
+  return {steps, setup, actions, node};
+}
+
+/** The step a --from/--only argument names: its id, its 1-based number, its name, or its name's slug. */
+export function findStep(steps, ref) {
+  const r = String(ref).trim().toLowerCase();
+  const hit = steps.find(s => s.id.toLowerCase() === r || String(s.n) === r || s.name.toLowerCase() === r || slug(s.name) === slug(r));
+  if (!hit) throw Error(`gate:ci: no step "${ref}"; steps: ${steps.map(s => s.id).join(', ')}`);
+  return hit;
+}
+
+/** Apply --from / --only to the plan. */
+export function selectSteps(steps, {from, only = []}) {
+  if (from && only.length) throw Error('gate:ci: use --from or --only, not both');
+  if (only.length) { const want = new Set(only.map(o => findStep(steps, o))); return steps.filter(s => want.has(s)); }
+  return from ? steps.slice(steps.indexOf(findStep(steps, from))) : steps;
+}
+
+export function parseArgs(argv) {
+  const o = {only: [], list: false, anyNode: false, from: null, workflow: WORKFLOW};
+  for (let k = 0; k < argv.length; k++) {
+    const a = argv[k], next = () => { if (k + 1 >= argv.length) throw Error(`gate:ci: ${a} needs a value`); return argv[++k]; };
+    if (a === '--from') o.from = next();
+    else if (a === '--only') o.only.push(...next().split(',').filter(Boolean));
+    else if (a === '--list') o.list = true;
+    else if (a === '--any-node') o.anyNode = true;
+    else if (a === '--workflow') o.workflow = next();
+    else throw Error(`gate:ci: unknown option ${a}`);
+  }
+  return o;
+}
+
+const fmt = s => s < 60 ? `${s.toFixed(1)} s` : `${Math.floor(s / 60)} min ${Math.round(s % 60)} s`;
+const pad = (s, w) => String(s).padEnd(w);
+
+function table(rows) {
+  const w = [3, Math.max(4, ...rows.map(r => r.id.length)), 7, 4];
+  const line = cells => cells.map((c, k) => pad(c, w[k] ?? 0)).join('  ').trimEnd();
+  console.log('\n' + line(['#', 'step', 'result', 'exit', 'time']));
+  for (const r of rows) console.log(line([r.n, r.id, r.result, r.code ?? '', r.s == null ? '' : fmt(r.s)]));
+}
+
+/** Run one step in its own process group; resolves with its exit status. */
+function runStep(step, state) {
+  return new Promise(done => {
+    const child = spawn('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', step.run], {
+      cwd: ROOT, stdio: 'inherit', detached: process.platform !== 'win32',
+      env: {...process.env, CI: 'true', ...step.env},
+    });
+    state.child = child;
+    child.on('error', e => { state.child = null; console.error(`gate:ci: cannot start bash: ${e.message}`); done({code: 127}); });
+    child.on('exit', (code, signal) => { state.child = null; done({code: code ?? (signal ? 128 + ({SIGINT: 2, SIGKILL: 9, SIGTERM: 15}[signal] ?? 0) : 1), signal}); });
+  });
+}
+
+/** Signal only the process group this runner spawned for the current step. */
+function stopChild(state, signal) {
+  const child = state.child;
+  if (!child?.pid) return;
+  const kill = sig => { try { process.kill(process.platform === 'win32' ? child.pid : -child.pid, sig); } catch { /* already gone */ } };
+  kill(signal);
+  setTimeout(() => { if (state.child === child) kill('SIGKILL'); }, 5000).unref();
+}
+
+export async function main(argv = process.argv.slice(2)) {
+  const o = parseArgs(argv);
+  const plan = planFromWorkflow(readFileSync(resolve(ROOT, o.workflow), 'utf8'));
+  const chosen = selectSteps(plan.steps, o);
+  if (o.list) {
+    for (const s of plan.setup) console.log(`setup (not run): ${s.name}: ${s.reason}`);
+    for (const s of plan.steps) console.log(`${pad(s.n, 3)} ${pad(s.id, 34)} ${s.name}${Object.keys(s.env).length ? '  env ' + JSON.stringify(s.env) : ''}`);
+    return 0;
+  }
+  const major = process.versions.node.split('.')[0];
+  if (plan.node && plan.node.split('.')[0] !== major) {
+    const msg = `gate:ci: CI uses Node ${plan.node}, this is Node ${process.versions.node}`;
+    if (!o.anyNode) { console.error(`${msg}; run it with that Node (or pass --any-node to accept the difference).`); return 2; }
+    console.warn(`${msg} (--any-node: results may differ from CI).`);
+  }
+  console.log(`gate:ci: ${chosen.length} of ${plan.steps.length} step(s) from ${o.workflow}. Not run here (do them once yourself): ${plan.setup.map(s => s.run).join('; ') || 'none'}.`);
+
+  const state = {child: null, stop: null};
+  const onSignal = sig => { state.stop = sig; console.error(`\ngate:ci: ${sig}: stopping the current step`); stopChild(state, 'SIGTERM'); };
+  process.on('SIGINT', onSignal); process.on('SIGTERM', onSignal);
+  const t0 = Date.now(), rows = plan.steps.map(s => ({n: s.n, id: s.id, result: chosen.includes(s) ? 'not run' : 'skipped'}));
+  let failed = null;
+  try {
+    for (const step of chosen) {
+      const row = rows[step.n - 1];
+      console.log(`\n=== gate:ci [${step.n}/${plan.steps.length}] ${step.id}: ${step.name} ===`);
+      const t = Date.now(), r = await runStep(step, state);
+      Object.assign(row, {code: r.code, s: (Date.now() - t) / 1000, result: state.stop ? 'stopped' : r.code === 0 ? 'PASS' : 'FAIL'});
+      if (r.code !== 0 || state.stop) { failed = {step, ...row}; break; }
+    }
+  } finally { process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal); }
+  table(rows);
+  const total = fmt((Date.now() - t0) / 1000);
+  if (!failed) { console.log(`gate:ci: PASS (${chosen.length} step(s)) in ${total}`); return 0; }
+  console.log(`gate:ci: ${failed.result === 'stopped' ? 'STOPPED' : 'FAIL'} at step ${failed.step.n} ${failed.step.id} ("${failed.step.name}"): exit ${failed.code} after ${fmt(failed.s)}; total ${total}`);
+  console.log(`gate:ci: rerun from here: npm run gate:ci -- --from ${failed.step.id}`);
+  return state.stop ? 130 : failed.code || 1;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().then(code => { process.exitCode = code; }, e => { console.error(e.message); process.exitCode = 2; });
+}
