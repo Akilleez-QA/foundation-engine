@@ -605,7 +605,9 @@ jump mechanism: height and time to apex, release, fall and apex gravity, termina
 coyote and buffer windows, each bounded and creator-chosen. Author buttons gain an opt-in
 `hold: true` so `ctx.input.held` observes a release; existing buttons are unchanged.
 Integrated in v0.2.0 (PR #34; batch PR #46).
-Evidence is focused unit tests only. See the [kit README](../../src/kits/locomotion/README.md#tunable-jump-feel-mv-01),
+Evidence is focused unit tests only. A held touch button for such actions (`touchButton` in
+`@kits/ui`) is a candidate in PR #57, not integrated; its evidence is fake-DOM tests and
+Chromium touch emulation. See the [kit README](../../src/kits/locomotion/README.md#tunable-jump-feel-mv-01),
 the [recipe](../recipes/tune-a-jump.md) and the [ledger](upgrade-acceptance-ledger.md).
 
 ## Sub-path asset base — DX P1-8, integrated in v0.2.0
