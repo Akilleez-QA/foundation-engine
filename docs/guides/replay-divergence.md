@@ -257,7 +257,15 @@ and are not observed. Unarmed visits are unchanged.
   engine, and the evidence below is same-browser and same-Node only. A cross-device or
   cross-browser divergence is a finding about the platform or the simulation, not a
   failure of this tool. Cross-machine lockstep needs fixed-point or otherwise
-  platform-independent arithmetic chosen by the creator.
+  platform-independent arithmetic chosen by the creator. A browser log re-simulated
+  in Node (or another browser) replays exactly only if the fixed systems avoid
+  `Math` transcendental functions. Measured: Chromium 152 and Node 22 differ on
+  `Math.sin`, `cos`, `atan2`, `exp` and `pow`. The optional
+  [deterministic maths](deterministic-math.md) (`dmath` from `@engine`, and the
+  character, locomotion and root-motion kits' `math: 'deterministic'` option) gives
+  identical bits in every engine. The browser check below passes on the arcade scene
+  because that scene uses no transcendental functions; it is not evidence for
+  scenes that do.
 - The log holds tick inputs, the seed and identities. It does not hold initial state.
   The replay must start from the same initial state, including save data a scene
   reads on entry (the arcade best score, for example), assets and parameters.

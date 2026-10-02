@@ -16,6 +16,13 @@ Every new framework below is optional: a game that does not use it is unchanged.
   (gain, rate, variant, wait, at, spatial, filter), checked as the audio output checks them
   (`normalizeCueVoiceOptions`, shared with the real `playVoice`). `t.cues` is unchanged; invalid options now throw in tests, as they do
   in the browser.
+- **Deterministic scalar maths (W1-2), optional.** `dmath` from `@engine` gives `sin`,
+  `cos`, `atan`, `atan2`, `exp`, `log`, `pow`, `sqrt` and `hypot` results that are the
+  same bits in every JavaScript engine. It is built only from correctly rounded
+  operations and is within 1 ulp of V8's `Math`. Golden vectors are committed as hex,
+  and `npm run test:dmath-browser` compares Chromium with Node. The character,
+  locomotion and root-motion kits take `math: 'deterministic'`; the default is
+  unchanged. See [deterministic maths](docs/guides/deterministic-math.md).
 
 ## 0.2.0 — 2026-10-03
 

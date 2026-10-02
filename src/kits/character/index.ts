@@ -12,7 +12,7 @@
  *
  * Cost: per fixed step, one pass over characters times solids (fine for tens of solids); no draws of its own.
  */
-import { defineComponent, defineInput, defineKit, defineSystem, pointerOnGround, Transform, type Entity, type KitDefinition, type SystemDefinition, type World } from '../../author';
+import { defineComponent, defineInput, defineKit, defineSystem, platformMath, pointerOnGround, scalarMath, Transform, type Entity, type KitDefinition, type ScalarMath, type ScalarMathMode, type SystemDefinition, type World } from '../../author';
 import { slide, type Area } from './collide';
 import { createMotion, turnToward, type Motion } from './motion';
 import type { Solid as SolidShape } from './solids';
@@ -35,13 +35,13 @@ export const moveZ = defineInput({ id: 'character-z', label: 'Move forward and b
 
 const motions = new WeakMap<World, Map<Entity, Motion>>();
 
-/** The area characters move in: the walls and every solid, as collide.ts reads it. */
-export function areaOf(world: World, body: number): Area {
+/** The area characters move in: the walls and every solid, as collide.ts reads it. `math` evaluates rotated solids. */
+export function areaOf(world: World, body: number, math: ScalarMath = platformMath): Area {
   let walls = { minX: -1e6, maxX: 1e6, minZ: -1e6, maxZ: 1e6 };
   for (const [, w] of world.query(Walls)) { walls = w; break; }
   const solids: SolidShape[] = [];
   for (const [e, tr, s] of world.query(Transform, Solid)) solids.push(s.r > 0 ? { id: `e${e}`, kind: 'circle', x: tr.x, z: tr.z, r: s.r } : { id: `e${e}`, kind: 'box', x: tr.x, z: tr.z, halfX: s.halfX, halfZ: s.halfZ, rotation: tr.ry });
-  return { ...walls, solids, body };
+  return { ...walls, solids, body, math };
 }
 
 /** A world-space surface sample. Null from the query means no walkable surface. */
@@ -61,6 +61,12 @@ export interface CharacterOptions {
   groundOffset?: number;
   /** Custom world-space pointer target. Required for pointer movement when ground is supplied. */
   pointerTarget?: (ctx: Parameters<SystemDefinition['run']>[0]) => { x: number; z: number } | null;
+  /**
+   * Arithmetic for the movement simulation (camera yaw, speed, facing, rotated solids). 'platform' (default) is the
+   * engine's own Math, unchanged; 'deterministic' uses dmath, so results are bit-identical in every JavaScript engine
+   * (a browser replay log re-simulates exactly in Node) at a small cost. See docs/guides/deterministic-math.md.
+   */
+  math?: ScalarMathMode;
   /** Only while this returns true (a paused game, an open dialog). */
   when?: (ctx: Parameters<SystemDefinition['run']>[0]) => boolean;
 }
@@ -68,6 +74,7 @@ export interface CharacterOptions {
 export function characterSystem(o: CharacterOptions = {}): SystemDefinition {
   const groundOffset = o.groundOffset ?? 0;
   if (!Number.isFinite(groundOffset)) throw new RangeError('groundOffset must be finite');
+  const m = scalarMath(o.math);
   return defineSystem({
     id: 'character-move',
     run(ctx, dt) {
@@ -75,36 +82,36 @@ export function characterSystem(o: CharacterOptions = {}): SystemDefinition {
       let byWorld = motions.get(ctx.world);
       if (!byWorld) motions.set(ctx.world, byWorld = new Map());
       const [cx, , cz] = ctx.view.camera.position, [tx, , tz] = ctx.view.camera.target;
-      const yaw = o.relative === 'world' ? 0 : Math.atan2(tx - cx, -(tz - cz));   // 0 when the camera looks along -z
+      const yaw = o.relative === 'world' ? 0 : m.atan2(tx - cx, -(tz - cz));   // 0 when the camera looks along -z
       const ix = ctx.input.axis('character-x'), iz = ctx.input.axis('character-z');
-      const keyed = { x: ix * Math.cos(yaw) - iz * Math.sin(yaw), z: ix * Math.sin(yaw) + iz * Math.cos(yaw) };
+      const cy = m.cos(yaw), sy = m.sin(yaw), keyed = { x: ix * cy - iz * sy, z: ix * sy + iz * cy };
       const ground = (o.pointer ?? true) && ctx.input.pointer.down
         ? o.pointerTarget ? o.pointerTarget(ctx) : o.ground ? null : pointerOnGround(ctx)
         : null;
       for (const [e, tr, ch] of ctx.world.query(Transform, Character)) {
-        let m = byWorld.get(e);
-        if (!m) byWorld.set(e, m = createMotion({ speed: ch.speed }));
+        let motion = byWorld.get(e);
+        if (!motion) byWorld.set(e, motion = createMotion({ speed: ch.speed, math: m }));
         // Ground even an idle or externally teleported actor. Missing surface never means y=0.
         const currentGround = o.ground?.(tr.x, tr.z);
         if (currentGround && Number.isFinite(currentGround.height)) tr.y = currentGround.height + groundOffset;
         let dir = keyed;
         if (ground && Number.isFinite(ground.x) && Number.isFinite(ground.z) && !ix && !iz) {
-          const dx = ground.x - tr.x, dz = ground.z - tr.z, d = Math.hypot(dx, dz);
+          const dx = ground.x - tr.x, dz = ground.z - tr.z, d = m.hypot(dx, dz);
           dir = d < 0.3 ? { x: 0, z: 0 } : { x: dx / d * Math.min(1, d), z: dz / d * Math.min(1, d) };
         }
-        const want = m.step(dir, dt);
+        const want = motion.step(dir, dt);
         if (!want.x && !want.z) continue;
-        const next = slide(areaOf(ctx.world, ch.radius), { x: tr.x, z: tr.z }, want);
+        const next = slide(areaOf(ctx.world, ch.radius, m), { x: tr.x, z: tr.z }, want);
         const nextGround = o.ground?.(next.x, next.z);
         if (o.ground && (!nextGround || !Number.isFinite(nextGround.height))) {
-          m.moved(want, { x: 0, z: 0 }, dt);
+          motion.moved(want, { x: 0, z: 0 }, dt);
           continue;
         }
         const moved = { x: next.x - tr.x, z: next.z - tr.z };
-        m.moved(want, moved, dt);
+        motion.moved(want, moved, dt);
         tr.x = next.x; tr.z = next.z;
         if (nextGround) tr.y = nextGround.height + groundOffset;
-        tr.ry = turnToward(tr.ry, moved.x, moved.z, dt);
+        tr.ry = turnToward(tr.ry, moved.x, moved.z, dt, undefined, m);
       }
     },
   });

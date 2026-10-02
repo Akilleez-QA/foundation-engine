@@ -37,6 +37,8 @@ export { Material, defineMaterial, validateMaterial, MATERIAL_DEFAULTS, MATERIAL
 export { musicBudgets, MUSIC_START_MARGIN, type MusicOptions, type MusicVoice, type MusicState, type MusicStats } from '../platform/audio/music-clock';
 export { createAudioTimeline, estimateOffset, validateCalibration, MAX_CALIBRATION_MS, NO_CALIBRATION, type AudioTimeline, type AudioTimelineOptions, type AudioTimelineStats, type AudioClockReading, type AudioCalibration, type TimelineEvent, type TimelineSource, type OffsetEstimate } from '../platform/audio/audio-timeline';
 
+export { dmath, platformMath, scalarMath, type ScalarMath, type ScalarMathMode } from '../core/dmath';
+
 export { defineEnvironment, type EnvironmentState } from './environment';
 
 export { Model, validateModel, type ModelData, type ModelSocketPose } from './model';

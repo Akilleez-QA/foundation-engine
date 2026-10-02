@@ -117,7 +117,15 @@ with `npm run check`, `npm run lint`, `npm test` and a blank-template build only
 Still open after 0.2.0: DV-01 physical-device acceptance and minimum device
 profiles; multiplayer beyond loopback/LAN; human listening and device cost for
 AUD-01, AU-01 and sound files; SEC-01 slice B; cross-browser floating-point
-determinism for replay, rollback and turn logs.
+determinism for replay, rollback and turn logs. The arithmetic part has a candidate,
+[W1-2](#deterministic-scalar-maths-w1-2--candidate). Consumers and other browsers
+remain open.
+
+## Deterministic scalar maths (W1-2) — candidate
+
+| ID | Contract | State |
+|---|---|---|
+| W1-2 | Optional `dmath` from `@engine` (`src/core/dmath.ts`): `sin`, `cos`, `atan`, `atan2`, `exp`, `log`, `pow`, `sqrt`, `hypot`, built only from correctly rounded operations, so the bits are the same in every engine. `platformMath`/`scalarMath` select it. The character, locomotion and root-motion kits take `math: 'deterministic'` (default `'platform'`, unchanged). Golden vectors are committed as hex (`src/core/dmath.golden.json`). [Guide](deterministic-math.md) | Implemented, candidate (PR #60), not integrated. Checked: focused tests (golden bits, correctly rounded `Math.sqrt` and `hypot` proved in integers, special values, at most 1 ulp to V8 `Math` over 16 ranges, kit options within 10⁻⁹ of `Math` and repeating exactly) and `npm run test:dmath-browser`: 1,075 vectors (including huge `sin`/`cos` arguments up to about 10³⁰⁸) and a 3,000-tick character-kit workload bit-identical in Chromium 152 and Node 22, where `Math` differed. Cost is about 1–2.5× `Math` per call (`pow` up to 4× in Chromium). Not established: Firefox/WebKit, physical devices, a browser-recorded character-scene replay in Node (camera-relative yaw and default pointer picking stay on `Math`), and the RB-01/SEC-01 slice B consumers. |
 
 ## Goal continuity
 

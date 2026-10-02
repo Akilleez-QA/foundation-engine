@@ -237,6 +237,6 @@ Isolated outliers reached 42 ms; garbage collection is likely but not establishe
 - Built-in time synchronization. `frameAdvantage` is exposed and pacing is the host's job; the recipe shows how. Advantage exchange and frame stretching are not supplied.
 - Disconnect timeouts (use the transport's close and retry policy).
 - Spectators.
-- Cross-browser floating-point determinism.
+- Cross-browser floating-point determinism. The kit does not enforce it. A `step` that uses only basic arithmetic, `Math.sqrt` and `dmath` from `@engine` (see [deterministic maths](../../../docs/guides/deterministic-math.md)) gives identical bits in every engine. Physical cross-browser rollback sessions remain unrun.
 - An ECS-world snapshot adapter.
 - Physical-device timing and multiplayer acceptance.
