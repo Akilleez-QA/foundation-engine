@@ -505,3 +505,32 @@ test('NW-08 capped lifetime: each connection is notified then closed within its 
     await shutdown(host, peers);
   }
 });
+
+test('NW07: optional queue age sheds aged commands with a correlated stale refusal before dispatch; default host has none', async () => {
+  await assert.rejects(startNetworkWorkbench({ maxQueuedAgeMs: 0 }), /host options/);
+  const plain = await startNetworkWorkbench({ autoDriver: false });
+  assert.equal(plain.read().maxQueuedAgeMs, null);
+  await plain.close();
+  const host = await startNetworkWorkbench({ autoDriver: false, maxQueuedAgeMs: 50 }),
+    peers = [];
+  try {
+    const a = await connect(host, host.credentials.alpha);
+    peers.push(a);
+    command(a, 'aged', 'alpha');
+    await until(() => host.read().intake.queuedMessages === 1);
+    await delay(80);
+    host.pump();
+    await until(() => a.frames.some((f) => f.type === 'refused'));
+    assert.deepEqual(a.frames.at(-1), { v: 1, type: 'refused', reason: 'stale', id: 'aged' });
+    assert.equal(host.read().counters.alpha, 0, 'a shed command never dispatches');
+    assert.equal(host.read().metrics.stale, 1);
+    command(a, 'fresh', 'alpha');
+    await until(() => host.read().intake.queuedMessages === 1);
+    host.pump();
+    await until(() => a.frames.some((f) => f.type === 'result' && f.id === 'fresh'));
+    assert.equal(host.read().counters.alpha, 1);
+    assert.equal(a.socket.readyState, WebSocket.OPEN);
+  } finally {
+    await shutdown(host, peers);
+  }
+});

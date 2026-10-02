@@ -151,5 +151,19 @@ the accepted shapes and revoked-state clearing. Run
 [guide](../../docs/guides/network-admission.md) and
 [acceptance ledger](../../docs/guides/upgrade-acceptance-ledger.md) for exact scope.
 PR #120 integrated the work after final candidate `5f871b3` passed all seven
-template gates and combined main passed tests/build. Measured network load remains
-unverified; socket tests alone do not establish scalability.
+template gates and combined main passed tests/build. Socket tests alone do not
+establish scalability; loopback load is measured separately by the NW-07 probe below.
+
+## Optional queue age and overload probe (NW-07)
+
+`startNetworkWorkbench({maxQueuedAgeMs})` optionally passes an NW-06 queue age
+(1–60000 ms) to the intake. Absent, the host is unchanged. When set, a command shed
+for age gets a correlated `{v:1,type:'refused',reason:'stale',id}` without
+authorization being rechecked, is never dispatched, and counts in `metrics.stale`.
+`read().closeReasons` tallies retirement reasons (for example `rate-capacity`,
+`auth-rejected`, `send-refused`) and `read().maxQueuedAgeMs` reports the option.
+The [overload probe](../network-probe/README.md) (`npm run probe:network`) drives this
+host past saturation over loopback; see its
+[guide](../../docs/guides/network-overload.md) for measured goodput, the
+queue-age finding resolved by the NW-06 follow-up (PR #33), and the scope of that
+evidence.

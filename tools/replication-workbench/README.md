@@ -77,7 +77,11 @@ need no payload. Replies are
 channel has these controls. The initial identities are `entity-0` through
 `entity-(count-1)`, incarnation zero and value equal to their index. `read()` is
 trusted diagnostic state and contains both principals' policy metadata. It never
-contains credentials. Avoid exposing it as a public endpoint.
+contains credentials. Avoid exposing it as a public endpoint. `read().closeReasons`
+tallies peer retirement reasons (for example `send-refused` when the 131072-byte
+buffered-send cap refuses a view, or `frame-capacity`). The
+[overload probe](../network-probe/README.md) uses it to show a physical non-reading
+peer retired by that cap (NW-07).
 
 ## Evidence and limits
 
