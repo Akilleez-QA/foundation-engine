@@ -59,9 +59,9 @@ export function createSession(ctx: SceneContext) {
       else if (phase === 1) {
         const pose = fleet.pose('player'); if (pose && owner.transition({ owner: 'character', target: 'player', frame: { id: 'lab', generation: 1 } }, () => exitVehicle(ctx, player, fleet, matrix(pose[12], .7, 2), p => Math.abs(p[12]) < 7 && Math.abs(p[14]) < 5))) phase = 2;
       } else if (phase === 2) {
-        if (claim() || bag.quantity('bag', 'probe-batch') === 1) { gear ??= createEquipment(['hand'], 1, { revision: 0, items: [{ id: 'probe-1', definition: 'probe', slots: ['hand'], functional: true }], equipped: [] }); phase = 3; }
+        if (claim() || bag.quantity('bag', 'probe-batch') === 1) { gear ??= createEquipment(['hand'], 1, { revision: 0, items: [{ id: 'probe-1', definition: 'probe', slots: ['hand'], functional: true }], equipped: [] }); phase = 3; ctx.play('lab-chime', { volume: .7, position: [0, .6, 2] }); }
       }
-      else if (phase === 3 && gear) { gear.commit('probe-1', gear.snapshot().revision); abilities.record('equipped'); abilities.grant({ capability: 'probe', reason: 'earned', event: 'lab-equipped' }); phase = 4; }
+      else if (phase === 3 && gear) { gear.commit('probe-1', gear.snapshot().revision); abilities.record('equipped'); abilities.grant({ capability: 'probe', reason: 'earned', event: 'lab-equipped' }); phase = 4; ctx.play('lab-chime', { volume: .5, pitch: 1.5 }); }
       else if (phase === 4 && canProbe() && !track) {
         started = ctx.time.t; shots.launch('probe-shot', 'player', started + 2);
         track = createMarkerTrack({ id: 'probe-use', duration: .5, markers: [{ id: 'contact', at: .25 }] }, { action: 'probe-shot' });

@@ -20,7 +20,7 @@ import { parseMessage, renderMessage } from '../core/i18n/format';
 import type { BuildBrief } from './build';
 import { sceneActionHints, defaultActionHints } from './action-hints';
 import { bodyOf, spawnInto } from './body';
-import { Name, type GameDefinition, type InputDefinition, type InputState, type SceneContext, type SceneDefinition, type SystemDefinition } from './defs';
+import { Name, validatePlayOptions, type GameDefinition, type InputDefinition, type InputState, type PlayOptions, type SceneContext, type SceneDefinition, type SystemDefinition } from './defs';
 
 export interface TestScene {
   readonly activityErrors: readonly unknown[];
@@ -36,8 +36,10 @@ export interface TestScene {
   release(action: string): void;
   /** Where the scene asked to go (`ctx.scene.goto` / `restart`), in order. */
   readonly went: string[];
-  /** Audio cues played. */
+  /** Audio cues and sound ids played. */
   readonly cues: string[];
+  /** Every `ctx.play`, with its options (checked as the runtime checks them). */
+  readonly plays: { id: string; options?: PlayOptions }[];
   /** Exit once and dispose the helper-owned save store. Injected services remain caller-owned. */
   dispose(): void;
 }
@@ -51,7 +53,7 @@ export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief;
   const strings: Record<string, string> = Object.assign(Object.fromEntries((o.inputs ?? []).map(i => [`game.input.${i.id}`, i.label])), ...(o.game?.kits ?? []).map(k => k.strings.en ?? {}), o.game?.strings?.en ?? {});
   const world = new World();
   for (const e of body.entities) spawnInto(world, e);
-  const pressed = new Set<string>(), held = new Map<string, number>(), went: string[] = [], cues: string[] = [];
+  const pressed = new Set<string>(), held = new Map<string, number>(), went: string[] = [], cues: string[] = [], plays: { id: string; options?: PlayOptions }[] = [];
   // No real timers or retained timer callbacks: headless saves flush explicitly.
   const injectedSave = o.services?.save;
   const save = injectedSave ?? createSaveStore({
@@ -74,7 +76,7 @@ export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief;
     named: name => { for (const [e, n] of world.query(Name)) if (n.name === name) return e as Entity; return undefined; },
     save: def => authorSaveHandle(save, def),
     text: (key, vars) => { const m = strings[key]; return m === undefined ? key : renderMessage(parseMessage(m), vars, 'en'); },
-    play: cue => { cues.push(cue); },
+    play: (cue, options) => { validatePlayOptions(options); cues.push(cue); plays.push({ id: cue, ...(options ? { options: structuredClone(options) } : {}) }); },
     modelState: entity => {
       const requested = disposed || !world.has(entity, Transform) ? undefined : world.get(entity, Model);
       return Object.freeze({ status: requested ? 'loading' : 'absent', requestedAsset: requested?.asset ?? null, adoptedAsset: null });
@@ -107,7 +109,7 @@ export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief;
     activityEvents?.start();
   } catch (error) { if (ownsSave) save.dispose(); throw error; }
   return {
-    ctx, world, went, cues, activityErrors,
+    ctx, world, went, cues, plays, activityErrors,
     setActivity(facts) {
       alive();
       const coverage = facts.coverage, documentHidden = facts.documentHidden;

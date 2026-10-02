@@ -63,7 +63,8 @@ import { bindScenePointer } from './scene-pointer';
 import { createPressLatch } from './press-latch';
 import type { LayerHandle, LayerSpec } from '../platform/ui/layers';
 import { viewOwnsInput } from '../platform/input/owner';
-import { Name, Shape, Transform, type InputDefinition, type SceneContext, type SceneDefinition, type ViewState } from './defs';
+import { Name, Shape, Transform, PLAY_LATE_MS, validatePlayOptions, type InputDefinition, type PlayOptions, type SceneContext, type SceneDefinition, type ViewState } from './defs';
+import type { CueVoiceOptions } from '../platform/audio/audio-output';
 
 /** The fixed lane's step (core/ecs/systems.ts default), named so a replay header can record it. */
 const FIXED_STEP = 1 / 60;
@@ -73,11 +74,21 @@ const seedFromAddress = (): number | null => {
   return s !== null && /^\d+$/.test(s) ? Number(s) : null;
 };
 
+/** `ctx.play` options as a voice request: fire and forget, so a file still loading may start a little late. */
+const voiceOptions = (o: PlayOptions | undefined): CueVoiceOptions => ({
+  wait: PLAY_LATE_MS,
+  ...(o?.volume !== undefined ? { gain: o.volume } : {}),
+  ...(o?.pitch !== undefined ? { rate: o.pitch } : {}),
+  ...(o?.position ? { spatial: { position: [...o.position] as [number, number, number] } } : {}),
+});
+
 const json = (v: unknown): Record<string, unknown> => { try { return JSON.parse(JSON.stringify(v ?? {})) as Record<string, unknown>; } catch { return {}; } };
 
 const preparations = new WeakMap<SceneVisit,{body: Awaited<ReturnType<typeof bodyOf>>; state:Record<string,unknown>}>();
 /** CPU/data preflight cannot allocate a second render surface or issue gameplay input. */
 export async function prepareScene(s:Services,scene:SceneDefinition,visit:SceneVisit):Promise<void>{
+  // Sound files start loading with the scene; a failure is reported by the output and never blocks the visit.
+  if(scene.sounds?.length&&s.app.has('platform.audio'))for(const id of scene.sounds)void s.audio.preload(id,visit.signal);
   const body=await bodyOf(scene),state:Record<string,unknown>={};
   if(visit.signal.aborted)return;
   await scene.prepare?.({state,text:(key,vars)=>(appI18n.t as (k:string,v?:unknown)=>string)(key,vars),service:key=>s[key]},visit.signal);
@@ -189,7 +200,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
         named: name => { for (const [e, n] of world.query(Name)) if (n.name === name) return e; return undefined; },
         save: def => authorSaveHandle(s.save, def),
         text: (key, vars) => (appI18n.t as (k: string, v?: unknown) => string)(key, vars),
-        play: cue => { voices.play(cue); },
+        play: (cue, options) => { validatePlayOptions(options); voices.play(cue, voiceOptions(options)); },
         playVoice: (cue, options) => voices.play(cue, options),
         modelState: entity => models.state(entity),
         modelAttachmentState: entity => models.attachmentState(entity),

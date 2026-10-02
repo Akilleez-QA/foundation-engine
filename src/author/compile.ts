@@ -88,6 +88,8 @@ export function compileGame(o: { brief: BuildBrief; game: GameDefinition; defs: 
         throw Error(`scene ${scene.id}: material texture '${texture}' has no defineAsset({ type: 'texture' })`);
     }
   }
+  for (const scene of scenes) for (const sound of scene.sounds ?? [])
+    if (!assets.some(a => a.id === sound && a.type === 'audio')) throw Error(`scene ${scene.id}: sound '${sound}' has no defineAsset({ type: 'audio' })`);
   for (const [locale, catalog] of Object.entries(mergedStrings(game, defs))) appI18n.addCatalog(locale, catalog);
 
   const gameModule = defineModule({

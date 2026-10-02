@@ -68,7 +68,8 @@
     "faults:network": "node --disable-warning=ExperimentalWarning --import tsx tools/authority-workbench/fault-harness.mjs",
     "bench:spatial": "node --import tsx tools/spatial-bench/bench.mjs",
     "test:subpath-browser": "node -r ./scripts/silent-browser.cjs scripts/play/subpath-check.mjs playtest/subpath",
-    "test:material-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/material-check.mjs playtest/material"
+    "test:material-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/material-check.mjs playtest/material",
+    "test:sound-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/sound-check.mjs playtest/sound"
   },
   "dependencies": {
     "three": "^0.186.1"

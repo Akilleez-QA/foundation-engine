@@ -10,9 +10,14 @@
  * Spatial quality is the creator's choice (`defineGame({ audio })`, docs/guides/spatial-audio.md): the HRTF voice limit
  * per quality preset, position smoothing, and whether players see the `sound.headphone-3d` setting. The effective HRTF
  * limit is the preset's value, or 0 while that setting is off; it follows preset and setting changes live.
+ *
+ * Sound files (the composition root's second argument): `sound` resolves a game's sound ids to file URLs, so
+ * `play`/`playVoice` take a sound id as well as a cue id; the output fetches, keeps and decodes files within `files`
+ * bounds (sound-files.ts).
  */
 import { defineModule, type EngineModule } from '../../core/module';
 import type { Registry } from '../../core/registry';
+import type { Services } from '../../core/services';
 import type { SettingDef } from '../../core/settings/settings';
 import { isQualityPreset, QUALITY_PRESETS, type Ported, type QualityPreset } from '../../core/tiers';
 import { budgetFor } from '../../core/budget';
@@ -22,10 +27,11 @@ import type {} from '../../core/settings/features-module';
 import type {} from '../input/module';
 import { publicUrl } from '../assets/public-base';
 import { CORE_CUES, createAudioOutput, type AudioOutput, type AudioStats, type CueDef } from './audio-output';
+import type { SoundFileOptions, SoundFileStats } from './sound-files';
 
 declare module '../../core/registry' { interface Registries { cues: Registry<CueDef> } }
 declare module '../../core/services' { interface Services { readonly audio: AudioOutput } }
-declare module '../../core/probe' { interface EngineProbes { audio: { silent: boolean; headphone3d: boolean | null } & AudioStats } }
+declare module '../../core/probe' { interface EngineProbes { audio: { silent: boolean; headphone3d: boolean | null; sounds: SoundFileStats } & AudioStats } }
 declare module '../../core/settings/settings' { interface SettingValues { 'sound.headphone-3d': boolean } }
 
 export const AUDIO_MODULE_ID = 'platform.audio';
@@ -65,7 +71,16 @@ export const spatialAudioSettings = (options: SpatialAudioOptions | undefined): 
 
 const automated = () => typeof navigator !== 'undefined' && (navigator as { webdriver?: boolean }).webdriver === true;
 
-export function audioModule(spatial?: SpatialAudioOptions): EngineModule {
+/** A game's sound files, wired by the composition root. Both fields optional; omit for cues only. */
+export interface SoundFileModuleOptions {
+  /** Maps a sound id to its file URL (undefined: not a sound). */
+  sound?(services: Services, id: string): string | undefined;
+  /** Sound-file bounds (`soundBudgets(minimum device)` in the app). */
+  files?: Omit<SoundFileOptions, 'report'>;
+}
+
+export function audioModule(spatial?: SpatialAudioOptions, soundFiles: SoundFileModuleOptions = {}): EngineModule {
+  const { sound, files } = soundFiles;
   validateSpatialAudioOptions(spatial);
   return defineModule({
     id: AUDIO_MODULE_ID, version: '1.0.0', requires: ['core.settings', 'core.features'], optional: ['platform.input', 'platform.quality'], serviceKeys: ['audio'],
@@ -86,6 +101,7 @@ export function audioModule(spatial?: SpatialAudioOptions): EngineModule {
         },
         cues: s.registries.cues.all(), report: m => s.log.warn(m),
         maxHrtfVoices: hrtfLimitFor(spatial, 'reference'), smoothing: spatial?.smoothing ?? 0,
+        ...(sound ? { sound: (id: string) => sound(s, id) } : {}), ...(files ? { files } : {}),
       });
       s.provide('audio', audio);
       const quality = s.app.has('platform.quality') ? s.quality : null;
@@ -104,7 +120,7 @@ export function audioModule(spatial?: SpatialAudioOptions): EngineModule {
         document.addEventListener('visibilitychange', () => audio.setHidden(document.hidden), { signal: s.signal });
       }
       s.probes.register('audio', () => ({ silent: silent(), headphone3d: headphone3d(), contexts: audio.stats.contexts, played: audio.stats.played, skipped: audio.stats.skipped,
-        active: audio.stats.active, hrtfActive: audio.stats.hrtfActive, hrtfLimit: audio.stats.hrtfLimit, downgraded: audio.stats.downgraded, culled: audio.stats.culled }), s.signal);
+        active: audio.stats.active, hrtfActive: audio.stats.hrtfActive, hrtfLimit: audio.stats.hrtfLimit, downgraded: audio.stats.downgraded, culled: audio.stats.culled, sounds: { ...audio.sounds } }), s.signal);
       return { dispose: () => audio.dispose() };
     },
   });

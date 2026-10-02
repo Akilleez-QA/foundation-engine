@@ -614,3 +614,14 @@ texture change keeps the old view until the new one arrives. Overload: none beyo
 `feat/dx-materials`); not integrated. Follow-ups outside this slice: particles, rigid-body
 physics, a game-facing multiplayer session, normal/roughness maps and `Mesh` texture
 coordinates.
+
+## Game sound files — DX P1-10, candidate
+
+`ctx.play(id, options?)` accepts a game sound id as well as a cue id (`PlayOptions`:
+`volume` 0…1, `pitch` 0.25…4, `position`); `CueVoiceOptions` gains `rate` and `wait`
+(≤ 5 s); `defineScene({ sounds })` preloads; `AudioOutput.preload` and the `audio` probe's
+`sounds` counters are new. Bounds: 4 MiB per file, 16 MiB encoded and 32 MiB decoded kept
+(LRU), 4 concurrent fetches (queued), 256 files, 10 s per load, waiting plays counted in
+the 64-voice cap. Failures (including an HTML fallback page) are reported once and retried
+on the next preload. Candidate (branch `feat/dx-sound-files`); not integrated. Physical
+listening evidence is missing.

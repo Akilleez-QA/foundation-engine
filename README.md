@@ -64,10 +64,10 @@ The current state as of October 2026; work on several of these is in progress, a
 
 | Not here yet | What exists today | Workaround |
 |---|---|---|
-| Your own sound files | `ctx.play(cue)` plays the engine's synthesised cues (`ui.click`, `ui.success`, `ui.arrive`, `ui.count`, `ui.bump`); the `audio-mixer` kit schedules them | One looping music track from a file: `ctx.service('audio').music('/audio/theme.mp3')` with the file under `public/audio/` (`null` stops it). Not used by any template yet; test browsers are silent, and node tests need an `audio` service passed to `testScene`. Sound effects from files: none yet |
 | Particles | Nothing dedicated | A few short-lived `Shape` entities that a system moves and despawns. Each shape is one draw, so keep the count small and watch `play:snap`'s draw count |
 | Rigid-body physics | Overlap tests in systems; the character kit's kinematic movement with `Walls` and `Solid` blocking | Write simple motion in a fixed-step system (velocity, gravity, stop at the ground); [collision and picking](docs/recipes/collision-and-picking.md) |
 | A multiplayer session you can just run | The optional network kit's admission, transport, scoped views, authority and prediction contracts, and a [reference workbench](docs/guides/network-admission.md) for diagnosis; you supply the server, identity and game rules | Same-device play: give each player their own actions on separate keys |
+
 Each template passes the gate on its own: `npm run gate -- --game templates/<name>/game` (any shell; `GAME_DIR=templates/<name>/game npm run gate` also works in POSIX shells).
 
 ## Start
@@ -108,7 +108,7 @@ Without a `game/` folder the blank template runs. `--game <dir>` selects another
 - [docs/STANDARD.md](docs/STANDARD.md): the twelve laws and every clause.
 - [Device experience policy](docs/policy/DEVICE-EXPERIENCE.md): separate phone, tablet, laptop and desktop UI/UX and quality/performance acceptance.
 - [docs/APPLICATION.md](docs/APPLICATION.md): the template for applying the standard to your game.
-- [docs/recipes/](docs/recipes/README.md): the cookbook (models, HUD and buttons, collision and picking, camera and lighting, sharing a build) and the building blocks (a scene, an entity and component, a system, an input action, a save section, a budget, a kit or a template), plus giving a shape a material and hosting a build under a sub-path.
+- [docs/recipes/](docs/recipes/README.md): the cookbook (models, HUD and buttons, collision and picking, camera and lighting, sharing a build) and the building blocks (a scene, an entity and component, a system, an input action, a save section, a budget, a kit or a template), plus giving a shape a material, playing your own sound files and hosting a build under a sub-path.
 - [docs/adr/](docs/adr/README.md): the decisions behind the design.
 - [docs/policy/KID-SAFE.md](docs/policy/KID-SAFE.md): an opt-in stricter player-protection profile.
 - [docs/PROVENANCE.md](docs/PROVENANCE.md): where this engine came from.

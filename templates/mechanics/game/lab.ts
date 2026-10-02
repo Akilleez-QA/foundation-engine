@@ -24,7 +24,7 @@ const guide = defineSystem({ id: 'lab-guide', run(ctx, dt) {
   if (ctx.input.pressed('lab-next')) s.next(ctx); s.update(ctx, dt); panels.get(ctx.world)?.render();
 } });
 const follow = defineSystem({ id: 'lab-rider', run(ctx, dt) { const s = sessionFor(ctx); if (s) s.riderSystem.run(ctx, dt); } });
-export default defineScene({ id: 'lab', title: 'lab.title', type: 'area',
+export default defineScene({ id: 'lab', title: 'lab.title', type: 'area', sounds: ['lab-chime'],
   view: { background: 0x91bacd, environment: { background: 0x91bacd, cube: { faces: ['lab-sky-px', 'lab-sky-nx', 'lab-sky-py', 'lab-sky-ny', 'lab-sky-pz', 'lab-sky-nz'], screenPx: 64 }, ambient: { sky: 0xffffff, ground: 0x667788, intensity: 2 }, directional: { color: 0xffffff, intensity: 2, position: [3, 8, 5] }, haze: null, points: [], pointSize: 1 }, camera: { position: [0, 12, 15], target: [0, 0, 0], fov: 52, minWidthFov: 70 } },
   entities: [
     // Material: the panel texture tiled across the floor (tinted by the shape colour) and a softly lit kiosk.

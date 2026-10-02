@@ -17,3 +17,7 @@ production sky artwork. Regenerate with `node templates/mechanics/assets/generat
 `generate-panel.mjs` creates `public/textures/mechanics/panel.png`, a 32×32 original CC0
 riveted panel (RGBA) that the lab tiles across its floor and kiosk to demonstrate
 `defineMaterial`. Regenerate with `node templates/mechanics/assets/generate-panel.mjs`.
+
+`generate-chime.mjs` synthesises `public/sounds/mechanics/chime.wav` (0.45 s, 22 050 Hz mono, two soft
+partials, about −10 dBFS peak), an original CC0 sound for the `ctx.play` sound-file demonstration.
+Regenerate with `node templates/mechanics/assets/generate-chime.mjs`.
