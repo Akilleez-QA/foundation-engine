@@ -6,25 +6,67 @@
  * AudioContext is ever created) whenever the `dev.silent` flag is on or the page is driven by automation
  * (`navigator.webdriver`), so a test or bench browser can never reach the speakers; the harness also passes
  * `--mute-audio`. The first pointer gesture (or the mute key) unlocks the context, as browsers require.
+ *
+ * Spatial quality is the creator's choice (`defineGame({ audio })`, docs/guides/spatial-audio.md): the HRTF voice limit
+ * per quality preset, position smoothing, and whether players see the `sound.headphone-3d` setting. The effective HRTF
+ * limit is the preset's value, or 0 while that setting is off; it follows preset and setting changes live.
  */
 import { defineModule, type EngineModule } from '../../core/module';
 import type { Registry } from '../../core/registry';
+import type { SettingDef } from '../../core/settings/settings';
+import { isQualityPreset, QUALITY_PRESETS, type Ported, type QualityPreset } from '../../core/tiers';
 import type {} from '../../core/settings/module';
+import type {} from '../render/quality-module';
 import type {} from '../../core/settings/features-module';
 import type {} from '../input/module';
-import { CORE_CUES, createAudioOutput, type AudioOutput, type CueDef } from './audio-output';
+import { CORE_CUES, createAudioOutput, type AudioOutput, type AudioStats, type CueDef } from './audio-output';
 
 declare module '../../core/registry' { interface Registries { cues: Registry<CueDef> } }
 declare module '../../core/services' { interface Services { readonly audio: AudioOutput } }
-declare module '../../core/probe' { interface EngineProbes { audio: { silent: boolean; contexts: number; played: number; skipped: number } } }
+declare module '../../core/probe' { interface EngineProbes { audio: { silent: boolean; headphone3d: boolean | null } & AudioStats } }
+declare module '../../core/settings/settings' { interface SettingValues { 'sound.headphone-3d': boolean } }
 
 export const AUDIO_MODULE_ID = 'platform.audio';
 
+/** The player-facing "Headphone 3D audio" switch. Registered only when the creator asks (`headphoneSetting: true`). */
+export const HEADPHONE_3D_SETTING: SettingDef<'sound.headphone-3d'> = {
+  id: 'sound.headphone-3d', section: 'sound', type: 'bool', label: 'settings.sound.headphone-3d', help: 'settings.sound.headphone-3d.help', scope: 'device', default: true,
+};
+
+/** The creator's spatial audio choices; every field is optional and the defaults keep the previous behaviour. */
+export interface SpatialAudioOptions {
+  /** HRTF voices allowed at once, per quality preset (flat value = reference; `ports` override lighter presets). Default 8. */
+  hrtf?: Ported<{ maxVoices: number }>;
+  /** Listener and position smoothing time constant in seconds, [0, 1]. Default 0 (instant). */
+  smoothing?: number;
+  /** Register the `sound.headphone-3d` setting so the settings panel shows it. Default false. */
+  headphoneSetting?: boolean;
+}
+
+/** Validated HRTF limit for `preset`. */
+export function hrtfLimitFor(options: SpatialAudioOptions | undefined, preset: QualityPreset, maxVoices = 64): number {
+  const hrtf = options?.hrtf;
+  const value = (preset === 'reference' ? undefined : hrtf?.ports?.[preset]?.maxVoices) ?? hrtf?.maxVoices ?? Math.min(8, maxVoices);
+  if (!Number.isSafeInteger(value) || value < 0 || value > maxVoices) throw Error(`audio: HRTF voice limit for ${preset} must be an integer in [0, ${maxVoices}]`);
+  return value;
+}
+/** Throws on any invalid creator value before a module installs. */
+export function validateSpatialAudioOptions(options: SpatialAudioOptions | undefined): void {
+  if (!options) return;
+  for (const preset of QUALITY_PRESETS) hrtfLimitFor(options, preset);
+  for (const key of Object.keys(options.hrtf?.ports ?? {})) if (!isQualityPreset(key) || key === 'reference') throw Error(`audio: unknown quality preset '${key}'`);
+  const smoothing = options.smoothing ?? 0;
+  if (typeof smoothing !== 'number' || !(smoothing >= 0 && smoothing <= 1)) throw Error('audio: smoothing must be in [0, 1] s');
+}
+/** The settings rows the creator's choice adds (none by default). */
+export const spatialAudioSettings = (options: SpatialAudioOptions | undefined): SettingDef[] => options?.headphoneSetting ? [HEADPHONE_3D_SETTING as SettingDef] : [];
+
 const automated = () => typeof navigator !== 'undefined' && (navigator as { webdriver?: boolean }).webdriver === true;
 
-export function audioModule(): EngineModule {
+export function audioModule(spatial?: SpatialAudioOptions): EngineModule {
+  validateSpatialAudioOptions(spatial);
   return defineModule({
-    id: AUDIO_MODULE_ID, version: '1.0.0', requires: ['core.settings', 'core.features'], optional: ['platform.input'], serviceKeys: ['audio'],
+    id: AUDIO_MODULE_ID, version: '1.0.0', requires: ['core.settings', 'core.features'], optional: ['platform.input', 'platform.quality'], serviceKeys: ['audio'],
     defines: { cues: {
       idForm: /^[a-z][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/,
       validate: c => [...(c.duration > 0 && c.duration <= 10 ? [] : ['duration must be in (0, 10] s']), ...(c.steps.length ? [] : ['has no steps'])],
@@ -39,8 +81,16 @@ export function audioModule(): EngineModule {
           return () => { for (const off of offs) off(); };
         },
         cues: s.registries.cues.all(), report: m => s.log.warn(m),
+        maxHrtfVoices: hrtfLimitFor(spatial, 'reference'), smoothing: spatial?.smoothing ?? 0,
       });
       s.provide('audio', audio);
+      const quality = s.app.has('platform.quality') ? s.quality : null;
+      const headphones = s.settings.defs('sound').some(d => d.id === HEADPHONE_3D_SETTING.id);
+      const headphone3d = () => headphones ? s.settings.get('sound.headphone-3d') : null;
+      const limit = () => { audio.setHrtfLimit(headphone3d() === false ? 0 : hrtfLimitFor(spatial, quality?.preset ?? 'reference')); };
+      limit();
+      quality?.subscribe(limit, s.signal);
+      if (headphones) s.settings.subscribe('sound.headphone-3d', limit, s.signal);
       const unlock = () => audio.unlock();
       if (s.app.has('platform.input')) {
         s.input.onAction('core.mute', e => { unlock(); if (e.phase === 'press') s.settings.set('sound.muted', !s.settings.get('sound.muted')); }, { signal: s.signal });
@@ -49,7 +99,8 @@ export function audioModule(): EngineModule {
         document.addEventListener('pointerdown', unlock, { signal: s.signal, capture: true });
         document.addEventListener('visibilitychange', () => audio.setHidden(document.hidden), { signal: s.signal });
       }
-      s.probes.register('audio', () => ({ silent: silent(), ...audio.stats }), s.signal);
+      s.probes.register('audio', () => ({ silent: silent(), headphone3d: headphone3d(), contexts: audio.stats.contexts, played: audio.stats.played, skipped: audio.stats.skipped,
+        active: audio.stats.active, hrtfActive: audio.stats.hrtfActive, hrtfLimit: audio.stats.hrtfLimit, downgraded: audio.stats.downgraded, culled: audio.stats.culled }), s.signal);
       return { dispose: () => audio.dispose() };
     },
   });

@@ -1,0 +1,75 @@
+# Recipe: 3D sound for shooters
+
+Players of a first-person or third-person shooter locate unseen opponents by sound:
+left/right, front/back, above/below and distance. This recipe uses the platform's
+spatial voice options ([guide](../guides/spatial-audio.md)). It needs no engine change.
+
+## 1. Choose the creator settings
+
+In `game/game.ts`:
+
+```ts
+export default defineGame({
+  id: 'arena', title: 'Arena', version: '0.1.0', firstScene: 'match',
+  audio: {
+    // HRTF voices at once, per quality preset. These are starting points, not measured budgets.
+    hrtf: { maxVoices: 8, ports: { medium: { maxVoices: 2 }, low: { maxVoices: 0 } } },
+    smoothing: .03,          // ramp listener and source moves (no zipper noise on fast turns)
+    headphoneSetting: true,  // players get "Headphone 3D audio" (default on)
+  },
+});
+```
+
+Record the choice in GAME.md (a brief or milestone row). Phone speakers gain nothing
+from HRTF; whether phones get it is the creator's call per preset.
+
+## 2. Give each sound class a distance rule
+
+Keep the numbers together so the same rule can later decide network audibility:
+
+```ts
+const SOUND = {
+  step: { refDistance: 2, rolloffFactor: 1, cutoffDistance: 25, panning: 'HRTF' },
+  shot: { refDistance: 6, rolloffFactor: 1, cutoffDistance: 140, panning: 'HRTF' },
+  ambience: { refDistance: 4, distanceModel: 'linear', maxDistance: 40 },
+} as const;
+```
+
+- `cutoffDistance` is the audible bound for every model. `maxDistance` only matters
+  with `distanceModel: 'linear'`; the default `inverse` model never reaches silence.
+- Use `panning: 'HRTF'` for localisation-critical classes (opponent steps, nearby
+  shots, reloads). Requests beyond the limit play equal-power; they are never refused.
+
+## 3. Play and move voices from a system
+
+```ts
+const voice = ctx.playVoice('enemy.step', { spatial: { ...SOUND.step, position: [x, y, z] }, filter: { cutoffHz: 16000 } });
+// each frame the source moves:
+voice?.setPosition?.([x, y, z]);
+// when the creator's own rule says the path is blocked (a wall between listener and source):
+voice?.setFilter?.({ cutoffHz: blocked ? 900 : 16000, gain: blocked ? .6 : 1 });
+```
+
+`null` means not played (muted, silent test browser, voice limit, or beyond the
+cutoff). Scene exit stops the voices. Deciding *whether* a path is blocked is game
+code here; the engine supplies only the smoothed filter.
+
+## 4. Check it
+
+- `npm run check`, then `npm run play:snap`: the probe's `audio` block shows `active`,
+  `hrtfActive`, `hrtfLimit`, `downgraded` and `culled`. Test browsers are silent, so
+  counts stay zero there; use a unit test with `distanceGain`/`audibleGain` for your
+  class rules.
+- `npm run test:audio-browser` is the engine's offline-render evidence for the
+  mechanism.
+- Listening is manual: on headphones, have several people point to sources placed
+  front, back, left, right, above and below, with the setting on and off. Record
+  results as manual evidence; mark phones, tablets and Bluetooth latency unverified
+  until tried.
+
+## Not covered yet
+
+Occlusion raycasts, sound propagation around corners, reverb, priority/virtual
+voices and networked sound events are later work; recorded sound files are a
+separate change. Do not send sound events a player could not hear: decide
+audibility on the host with the same class rule before disclosure.

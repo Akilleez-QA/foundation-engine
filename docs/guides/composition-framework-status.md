@@ -301,3 +301,9 @@ populations, not a visibility, steering or replication policy. Status: implement
 candidate (PR #23); not integrated. Evidence is focused unit tests
 and a headless 1,000/10,000-entry CPU micro-benchmark; no template consumer, browser,
 worker or physical-device evidence, and no budget change.
+
+## Spatial audio voices (AUD-01) — candidate, not integrated
+
+| ID | Contract | State |
+|---|---|---|
+| AUD-01 | Platform audio output, per voice: `panning` (`'equalpower'` default \| `'HRTF'`), `distanceModel` (`'inverse'` default \| `'linear'` \| `'exponential'`) with bounded `refDistance`/`maxDistance`/`rolloffFactor`, a model-independent `cutoffDistance` (refused start, faded silence beyond), a separate HRTF voice limit with equal-power fallback and diagnostics, an optional smoothed low-pass/gain filter stage, and smoothed position/listener ramps. Creator control through `defineGame({ audio })` (HRTF limit per quality preset, smoothing, optional `sound.headphone-3d` setting). The mechanics template's ineffective `maxDistance: 60` became `cutoffDistance: 60`. [Guide](spatial-audio.md) | Implemented, candidate (public PR #PRNUM). Node unit and boot tests plus `npm run test:audio-browser` (real output rendering into `OfflineAudioContext` in the muted Chromium test browser) pass on the branch. Not integrated. Proves configuration and rendered signal behaviour only: no human localisation trials, no Firefox/WebKit rendering, no device CPU/battery/latency measurement, no iOS evidence. No occlusion queries, propagation, networking or sampled sound. |
