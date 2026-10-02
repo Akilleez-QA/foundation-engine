@@ -104,3 +104,13 @@ PASS, with the same 129 checks and four advisory heap warnings. The built bundle
 were identical to `724cedf`, so each gate re-checked that run's stored complete
 software-GL evidence against current budgets (the gate's identical-build reuse)
 rather than re-measuring; tests, typecheck, lint, snapshot and bundle checks ran anew.
+
+### Revision map
+
+Earlier revisions named above were measured before rebasing and are not reachable
+from the published branch, which is based on `main` `f7619ef` (PR #1 changed only
+the CI workflow after `1b0b846`). Their source trees (`src/`, `scripts/`, templates)
+match these published commits; only documentation differs:
+`1d0d3e0` = `7cdf470`, `86df82e` = `04ca4ea`, `2cdd442` = `4196e16`,
+`724cedf` = `3b66597`, `cc0f1c7` = `113d887`. The submission head was re-checked
+again after this rebase; see the pull request for that exact-head result.
