@@ -32,12 +32,16 @@ export function createNetworkIntake(options: { limits: NetworkLimits; ports: Net
     maxQueuedMessagesPerPeer: input.maxQueuedMessagesPerPeer, maxQueuedBytesPerPeer: input.maxQueuedBytesPerPeer,
     maxQueuedMessages: input.maxQueuedMessages, maxQueuedBytes: input.maxQueuedBytes,
     maxPumpOperations: input.maxPumpOperations, maxQueuedAgeMs: input.maxQueuedAgeMs,
+    maxStaleDropsPerPump: input.maxStaleDropsPerPump,
     message: documentLimits(input.message), principal: documentLimits(input.principal),
   });
   if (!Object.entries(limits).every(([key, value]) => key === 'message' || key === 'principal'
-    || (key === 'maxQueuedAgeMs' && value === undefined) || positive(value as number)))
+    || ((key === 'maxQueuedAgeMs' || key === 'maxStaleDropsPerPump') && value === undefined) || positive(value as number)))
     throw Error('network: invalid limits');
   const maxAge = limits.maxQueuedAgeMs;
+  // Every drop removes a queued message and nothing can be queued during a pump, so the
+  // global queue bound already caps drops; the optional limit can only lower it.
+  const maxDrops = limits.maxStaleDropsPerPump ?? limits.maxQueuedMessages;
   const { authenticate: verify, authorize, dispatch, send: transmit, close: notifyClose, stale: notifyStale } = options.ports;
   if (![verify, authorize, dispatch, transmit, notifyClose].every(fn => typeof fn === 'function')
     || (notifyStale !== undefined && typeof notifyStale !== 'function'))
@@ -153,24 +157,33 @@ export function createNetworkIntake(options: { limits: NetworkLimits; ports: Net
       time(next);
       const expired = expire();
       let attempted = 0, dispatched = 0, denied = 0, stale = 0, empty = 0;
+      const fresh = (slot: Slot): boolean => live.get(slot.peer) === slot && slot.state === 'active'
+        && slot.queue.length > 0 && (maxAge === undefined || now - slot.queue[0]!.received < maxAge);
       busy = true;
       try {
         while (!disposed && order.length && attempted < budget && empty < order.length) {
           const slot = order[cursor]!; cursor = (cursor + 1) % order.length;
           if (live.get(slot.peer) !== slot || slot.state !== 'active' || !slot.queue.length) { empty++; continue; }
+          if (maxAge !== undefined) {
+            // Shed this peer's aged prefix on its turn without charging the dispatch budget. Per-peer
+            // receive times are nondecreasing, so the first fresh head ends the prefix.
+            while (stale < maxDrops && live.get(slot.peer) === slot && slot.queue.length
+              && now - slot.queue[0]!.received >= maxAge) {
+              const aged = slot.queue.shift()!; slot.bytes -= aged.bytes;
+              queuedMessages--; queuedBytes -= aged.bytes; stale++;
+              if (notifyStale) {
+                try { notifyStale(Object.freeze({ peer: slot.peer, principal: slot.principal, command: aged.value,
+                  receivedAt: aged.received, ageMs: now - aged.received })); }
+                catch { close(slot.peer, 'stale-error'); }
+              }
+            }
+            if (disposed) break;
+            // Emptied, retired, or still stale once the drop cap is spent: nothing dispatchable this turn.
+            if (!fresh(slot)) { empty++; continue; }
+          }
           empty = 0;
           const command = slot.queue.shift()!; slot.bytes -= command.bytes;
           queuedMessages--; queuedBytes -= command.bytes; attempted++;
-          if (maxAge !== undefined && now - command.received >= maxAge) {
-            // Per-peer receive times are nondecreasing, so a fresh head means the rest of that queue is fresh.
-            stale++;
-            if (notifyStale) {
-              try { notifyStale(Object.freeze({ peer: slot.peer, principal: slot.principal, command: command.value,
-                receivedAt: command.received, ageMs: now - command.received })); }
-              catch { close(slot.peer, 'stale-error'); }
-            }
-            continue;
-          }
           const context: NetworkContext = Object.freeze({ peer: slot.peer, principal: slot.principal, command: command.value });
           let allowed: boolean;
           try { allowed = authorize(context) === true; }

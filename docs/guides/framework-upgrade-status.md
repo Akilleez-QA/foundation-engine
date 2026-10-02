@@ -437,6 +437,14 @@ storage call starts. In-flight writes keep committed/rejected/unknown semantics 
 `expired` consumes no sequence. Both are off by default. Evidence is 6 intake and 9
 authority focused tests; load, browser composition and devices remain unverified.
 
+Follow-up (PR pending on `fix/nw06-stale-budget`; candidate, not integrated): the
+NW-07 overload probe showed that charging each age shed to the pump budget collapsed
+goodput once queued wait exceeded the age. Shedding is now uncharged and capped by an
+optional `maxStaleDropsPerPump`. At a 300 ms age, saturated final/peak goodput was
+0.253 and 0.229 before and 0.955 and 0.915 after (two loopback runs each, heavily
+loaded host); the deterministic unit regression measured 22.0/s before and 80.4/s
+after against an 80.4/s FIFO plateau. Defaults without `maxQueuedAgeMs` are unchanged.
+
 ## Reconnect/retry pacing — NW-04 implemented, candidate
 
 `createRetrySchedule` (network kit) is an optional, pure pacing helper: full-jitter

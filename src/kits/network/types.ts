@@ -19,6 +19,11 @@ export interface NetworkLimits {
    * its turn comes is shed before `authorize`/`dispatch`.
    */
   maxQueuedAgeMs?: number;
+  /**
+   * Optional cap on age-shed commands per pump (default `maxQueuedMessages`). Shedding does not
+   * consume the dispatch budget. Ignored without `maxQueuedAgeMs`.
+   */
+  maxStaleDropsPerPump?: number;
   message: DocumentLimits;
   principal: DocumentLimits;
 }
@@ -81,7 +86,10 @@ export interface NetworkPumpResult {
   readonly dispatched: number;
   readonly denied: number;
   readonly expired: number;
-  /** Present only when `maxQueuedAgeMs` is configured: queued commands shed for age. */
+  /**
+   * Present only when `maxQueuedAgeMs` is configured: queued commands shed for age. Not counted in
+   * `attempted`, and not charged to the pump budget.
+   */
   readonly stale?: number;
 }
 export interface NetworkIntake {
