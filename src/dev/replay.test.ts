@@ -104,3 +104,88 @@ test('SIM-01 dev replay: recording overflow is explicit and keeps a replayable p
     assert.equal(dev.read().comparison?.status, 'equal');
   } finally { dev.dispose(); }
 });
+
+test('SIM-01 dev replay: an empty recording replays as complete, with no claimed pass', () => {
+  const dev = createReplayDev();
+  try {
+    dev.arm({ mode: 'record' }, 'demo');
+    const a = visit(5, liveInput().input); a.tap!.arrive();
+    dev.stop();                                   // stopped before the first tick
+    const empty = dev.read();
+    assert.deepEqual([empty.status, empty.ticks], ['stopped', 0]);
+    assert.equal(dev.arm({ mode: 'replay', log: empty.log! }, 'demo').status, 'started');
+    const b = visit(5, liveInput().input);
+    assert.ok(b.tap, 'the visit is tapped (the factory did not throw)');
+    b.tap!.arrive();
+    assert.deepEqual([dev.read().status, dev.read().comparison], ['complete', { status: 'incomparable', reason: 'no-overlap' }]);
+  } finally { dev.dispose(); }
+});
+
+test('SIM-01 dev replay: a record request is refused when its log could not be reopened', async () => {
+  const { recordLogBound } = await import('./replay');
+  const log = { maxBytes: 64 << 10, maxNodes: 4096, maxDepth: 8 };
+  const dev = createReplayDev({ log });
+  try {
+    // Largest digest ring that fits beside 8 KiB of input, by bytes and by nodes.
+    const maxBytes = 8 << 10, maxTicks = 600;
+    let maxDigests = 1;
+    while (true) { const b = recordLogBound(maxTicks, maxBytes, maxDigests + 1); if (b.bytes > log.maxBytes || b.nodes > log.maxNodes) break; maxDigests++; }
+    assert.deepEqual(dev.arm({ mode: 'record', maxTicks, maxBytes, maxDigests: maxDigests + 1 }, 'demo'), { status: 'refused', reason: 'log-limit' });
+    const defaults = createReplayDev();   // installs its own tap factory: dispose it before using `dev` again
+    try { assert.deepEqual(defaults.arm({ mode: 'record', maxTicks: 1 << 20 }, 'demo'), { status: 'refused', reason: 'log-limit' },
+      'the default 8 MiB log cannot hold a digest of every one of 2^20 ticks'); } finally { defaults.dispose(); }
+    // At the boundary: fill the input budget with distinct inputs (one run per tick) and every digest, then reopen.
+    assert.equal(dev.arm({ mode: 'record', maxTicks, maxBytes, maxDigests }, 'demo').status, 'started');
+    let n = 0;
+    const quotes: InputState = { describe: () => null, pressed: () => false, held: () => false, axis: () => (++n % 2 ? 1 : -1) * (1 + n / 7), pointer: { x: 0, y: 0, down: false, pressed: false } };
+    const a = visit(1, quotes); a.tap!.arrive();
+    for (let f = 0; f < maxTicks + 10; f++) a.frame(1 / 60);
+    const s = dev.read();
+    assert.ok(['recording', 'truncated'].includes(s.status));
+    assert.ok(new TextEncoder().encode(s.log!).length <= log.maxBytes);
+    dev.arm({ mode: 'replay', log: s.log! }, 'demo');
+    assert.equal(dev.read().status, 'armed', 'the boundary log reopens under the same limits');
+  } finally { dev.dispose(); }
+});
+
+test('SIM-01 dev replay: an oversized log is refused before it is parsed', () => {
+  const dev = createReplayDev({ log: { maxBytes: 1024, maxNodes: 4096, maxDepth: 8 } });
+  try {
+    const big = `{"format":"foundation.replay","version":1,"pad":"${'x'.repeat(2000)}"}`;
+    const parse = JSON.parse;
+    let parsed = 0;
+    JSON.parse = ((...args: Parameters<typeof JSON.parse>) => { parsed++; return parse(...args); }) as typeof JSON.parse;
+    try { assert.deepEqual(dev.arm({ mode: 'replay', log: big }, 'demo'), { status: 'refused', reason: 'corrupt-unreadable-or-over-limit' }); }
+    finally { JSON.parse = parse; }
+    assert.equal(parsed, 0);
+  } finally { dev.dispose(); }
+});
+
+test('SIM-01 dev replay: stopping an armed request disarms it with a reason', () => {
+  const dev = createReplayDev();
+  try {
+    dev.arm({ mode: 'record' }, 'demo');
+    dev.stop('arrival-timeout');
+    assert.deepEqual([dev.read().status, dev.read().reason], ['stopped', 'arrival-timeout']);
+    assert.equal(visit(7, liveInput().input).tap, null, 'the next visit does not consume it');
+    dev.arm({ mode: 'record' }, 'demo');
+    dev.stop();
+    assert.deepEqual([dev.read().status, dev.read().reason], ['stopped', 'stopped-before-arrival']);
+  } finally { dev.dispose(); }
+});
+
+test('SIM-01 dev replay: a checksummed log with an undeclared action or malformed field is refused before replay', async () => {
+  const { encodeReplay } = await import('../kits/replay');
+  const dev = createReplayDev();
+  try {
+    dev.arm({ mode: 'record' }, 'demo');
+    const a = visit(7, liveInput().input); a.tap!.arrive(); a.frame(0.1);
+    const good = JSON.parse(dev.read().log!);
+    for (const [bad, reason] of [['{"p":["fly"]}', 'invalid-tick-input-2'], ['{"x":[0,0,3,0]}', 'invalid-tick-input-2'], ['{"a":{"steer":"left"}}', 'invalid-tick-input-2']] as const) {
+      const log = encodeReplay({ ...good, runs: [[2, '{}'], [1, bad], [good.ticks - 3, '{"a":{"steer":1}}']] });
+      assert.equal(dev.arm({ mode: 'replay', log }, 'demo').status, 'started');
+      assert.equal(visit(7, liveInput().input).tap, null);
+      assert.deepEqual([dev.read().status, dev.read().reason], ['refused', reason]);
+    }
+  } finally { dev.dispose(); }
+});

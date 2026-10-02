@@ -1,8 +1,9 @@
 /**
- * author/scene-tick-tap.ts: a dev/test-only seam around one scene visit's fixed lane. A development tool (the replay
+ * author/scene-tick-tap.ts: a dev/test-only seam around one scene visit's system runner. A development tool (the replay
  * surface in src/dev/replay.ts) installs a factory; the stock runtime asks it once per visit, only when TEST_API is
  * true, so production builds never construct a tap. A tap sees each fixed tick begin and end, supplies the input that
- * fixed systems read during the tick, and may hold the fixed lane (before arrival, or after a replay ends).
+ * fixed systems read during the tick, and may hold the whole runner: fixed and frame-phase systems and the per-frame
+ * clearing of world events stop while held (before arrival, or after a replay ends, until re-entry or stop).
  *
  * The tap does not add a clock: tick k is the k-th fixed step the visit's system runner takes after arrival.
  */
@@ -28,7 +29,7 @@ export interface SceneTickTapContext {
 export interface SceneTickTap {
   /** What `ctx.input` reads for the whole visit. */
   readonly input: InputState;
-  /** May the fixed lane run this frame? False before arrival and after a replay has ended. */
+  /** May the system runner (fixed and frame-phase systems) run this frame? False before arrival and after a replay ends. */
   running(): boolean;
   /** Before the first fixed system of a tick. */
   beforeTick(): void;

@@ -53,3 +53,23 @@ test('entity metadata API remains optional before boot, without a game, and afte
   assert.deepEqual(api.entities({expectedEpoch: 0}), {status: 'unavailable'});
   assert.equal(api.systemTrace(), null);
 });
+
+test('SIM-01: engine.replay.start disarms when navigation fails or the scene never arrives', async () => {
+  const { openSceneTickTap } = await import('../author/scene-tick-tap');
+  const { World } = await import('../core/ecs/world');
+  let fail = true;
+  const app = {
+    services: { router: { go: async () => { if (fail) throw Error('navigation refused'); } } },
+    probes: { read: (name: string) => (name === 'scene' ? { scene: 'scene.demo', state: 'active', epoch: 1, hash: '' } : undefined) },
+  } as unknown as Parameters<typeof createTestApi>[0];
+  const api = createTestApi(app, Promise.resolve({} as never));
+  const tapFor = () => openSceneTickTap({ scene: 'demo', game: { id: 'demo', version: '1' }, inputs: [], seed: 1, step: 1 / 60, world: new World(),
+    live: { describe: () => null, pressed: () => false, held: () => false, axis: () => 0, pointer: { x: 0, y: 0, down: false, pressed: false } }, invalidate() {} });
+  assert.deepEqual(await api.replay.start({ mode: 'record' }), { status: 'refused', reason: 'navigation-failed' });
+  assert.deepEqual([api.replay.read().status, api.replay.read().reason], ['stopped', 'navigation-failed']);
+  assert.equal(tapFor(), null, 'a later visit does not consume the failed request');
+  fail = false;
+  assert.deepEqual(await api.replay.start({ mode: 'record' }, 50), { status: 'refused', reason: 'arrival-timeout' });
+  assert.deepEqual([api.replay.read().status, api.replay.read().reason], ['stopped', 'arrival-timeout']);
+  assert.equal(tapFor(), null);
+});

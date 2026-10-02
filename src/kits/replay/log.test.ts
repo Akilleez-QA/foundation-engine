@@ -154,6 +154,21 @@ test('SIM-01 log: embedded digests are checked and survive the round trip', () =
   const broken = reencode(text, d => { ((d.digests as Record<string, unknown>).entries as unknown[][])[0][0] = 3; });
   assert.equal(openReplay(broken, open, expect).status, 'corrupt', 'an entry off the cadence is refused');
   assert.equal(openReplay(text, { ...open, digests: { maxEntries: 3, maxDigestLength: 16 } }, expect).status, 'corrupt', 'more entries than the reader admits');
+  // A sample removed (or its tick shifted) and re-checksummed no longer passes as a complete trace.
+  const removed = reencode(text, d => { ((d.digests as Record<string, unknown>).entries as unknown[]).splice(1, 1); });
+  assert.deepEqual(openReplay(removed, open, expect), { status: 'corrupt', reason: 'structure' });
+  const hidden = reencode(text, d => { const g = d.digests as Record<string, unknown>; (g.entries as unknown[]).splice(0, 1); g.dropped = 1; });
+  assert.deepEqual(openReplay(hidden, open, expect), { status: 'corrupt', reason: 'structure' }, 'eviction count must match the samples kept');
+  const shifted = reencode(text, d => { const g = d.digests as Record<string, unknown>; g.dropped = 3; });
+  assert.equal(openReplay(shifted, open, expect).status, 'corrupt');
+  const extended = reencode(text, d => { (d.digests as Record<string, unknown>).lastTick = 13; });
+  assert.equal(openReplay(extended, open, expect).status, 'corrupt', 'a range with an unrecorded sample is refused');
+  // Empty and failed traces are still accepted as recorded.
+  const empty = createDigestTrace({ identity: 'x', every: 1, maxEntries: 4, maxDigestLength: 16 });
+  assert.equal(openReplay(recorded(12).export(empty.read()), open, expect).status, 'ready');
+  const failing = createDigestTrace({ identity: 'x', every: 1, maxEntries: 4, maxDigestLength: 16 });
+  failing.observe(0, () => 'a'); failing.observe(1, () => '');
+  assert.equal(openReplay(recorded(12).export(failing.read()), open, expect).status, 'ready');
 });
 
 test('SIM-01 log: encodeReplay output is the canonical text openReplay checks', () => {

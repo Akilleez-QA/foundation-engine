@@ -2,7 +2,7 @@
  * kits/replay/log.ts: the tick-input replay log (STD-SIM-17: replays record the seed and tick inputs, not frame
  * samples). A recorder captures one canonical JSON input per fixed tick into a bounded, run-length encoded segment;
  * `encodeReplay` produces local text with a checksum; `openReplay` refuses unsupported versions, corrupted text and
- * logs made for another build or configuration, and returns a player addressed by tick.
+ * logs whose build or configuration string differs, and returns a player addressed by tick.
  *
  * The log is a prefix: overflow stops recording and marks the log truncated at that tick (never a silent pass). It is
  * not a ring, because inputs without an initial state checkpoint cannot be replayed from the middle.
@@ -18,9 +18,11 @@ export const REPLAY_VERSION = 1;
 export const RUN_OVERHEAD_BYTES = 24;
 
 export interface ReplayHeader {
-  /** Creator build identity, e.g. `<game id>@<version>`. A log made by another build is refused. */
+  /** Caller-chosen build string, compared exactly (the scene helpers use `<game id>@<version>`, so changed code with an
+   *  unchanged version is not detected). A log with a different string is refused. */
   readonly build: string;
-  /** Configuration identity: scene, rules revision, input signature. Another configuration is refused. */
+  /** Caller-chosen configuration string, compared exactly (the scene helpers use the scene id and input signature; add a
+   *  rules revision yourself if you need one). A log with a different string is refused. */
   readonly config: string;
   /** The run's random seed (an unsigned 32-bit integer; the `?seed=` value). */
   readonly seed: number;

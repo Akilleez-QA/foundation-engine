@@ -176,6 +176,15 @@ export function checkDigestSnapshot(value: unknown, maxEntries: number, maxDiges
   };
   const entries = rows(v.entries, maxEntries), details = rows(v.details, Number.MAX_SAFE_INTEGER);
   for (const [t, d] of entries) if (d.length === 0 || d.length > maxDigestLength || t % (v.every as number) !== 0 || t < (first as number) || t > (last as number)) bad('entry range');
+  // The retained entries must be exactly the newest samples the cadence implies: no sample removed or added. A failed
+  // trace may lack its final sample (the digest that failed).
+  const every = v.every as number, f = first as number, l = last as number, dropped = v.dropped as number;
+  const firstSample = f < 0 ? 0 : Math.ceil(f / every) * every;
+  const samples = f < 0 || firstSample > l ? 0 : Math.floor((l - firstSample) / every) + 1;
+  const kept = entries.length + dropped;
+  if (!(kept === samples || (v.status === 'failed' && kept === samples - 1))) bad('sample count');
+  entries.forEach(([t], i) => { if (t !== firstSample + (dropped + i) * every) bad('sample sequence'); });
+  for (const [t] of details) if (t < f || t > l) bad('detail range');
   if (typeof v.detailTruncated !== 'boolean') bad('detailTruncated');
   return Object.freeze({ identity: v.identity as string, every: v.every as number, status: v.status as 'ok' | 'failed', reason: v.reason as string | null,
     firstTick: first as number, lastTick: last as number, dropped: v.dropped as number, entries: Object.freeze(entries), details: Object.freeze(details),

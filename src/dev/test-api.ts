@@ -63,7 +63,7 @@ export interface EngineTestApi {
   replay: {
     start(request: ReplayDevRequest, timeoutMs?: number): Promise<ReplayStart>;
     read(): ReplayDevState;
-    stop(): void;
+    stop(reason?: string): void;
   };
 }
 
@@ -144,18 +144,20 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
         if (!before?.scene || before.state === 'entering') return Object.freeze({ status: 'refused', reason: 'no-active-scene' }) as ReplayStart;
         const armed = replay.arm(request, before.scene.replace(/^scene\./, ''));
         if (armed.status !== 'started') return armed;
-        await app.services.router.go(before.scene as SceneId, { again: 'reenter' });
+        // Disarm on any failure to arrive, so a later visit can never consume this request.
+        try { await app.services.router.go(before.scene as SceneId, { again: 'reenter' }); }
+        catch { replay.stop('navigation-failed'); return Object.freeze({ status: 'refused', reason: 'navigation-failed' }) as ReplayStart; }
         for (const t0 = performance.now(); ;) {
           const state = replay.read();
           // A visit-time refusal (seed, identity, scene) leaves that visit untapped: report it, not a start.
           if (state.status === 'refused' || state.status === 'failed') return Object.freeze({ status: 'refused', reason: state.reason ?? state.status });
           if (state.status !== 'armed') return Object.freeze({ status: 'started', state });
-          if (performance.now() - t0 > timeoutMs) { replay.stop(); return Object.freeze({ status: 'refused', reason: 'arrival-timeout' }); }
+          if (performance.now() - t0 > timeoutMs) { replay.stop('arrival-timeout'); return Object.freeze({ status: 'refused', reason: 'arrival-timeout' }); }
           await sleep(20);
         }
       },
       read: () => replay?.read() ?? idle,
-      stop: () => replay?.stop(),
+      stop: reason => replay?.stop(reason),
     },
   };
 }

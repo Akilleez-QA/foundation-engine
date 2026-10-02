@@ -10,8 +10,9 @@
 import { installSceneTickTap, type SceneTickTap, type SceneTickTapContext } from '../author/scene-tick-tap';
 import {
   compareDigests, createDigestTrace, createReplayRecorder, createSceneInputTap, openReplay, sceneReplayConfig, sceneTraceIdentity,
-  worldDigest, type DigestComparison, type DigestSnapshot, type OpenLimits,
+  RUN_OVERHEAD_BYTES, worldDigest, type DigestComparison, type DigestSnapshot, type OpenLimits,
 } from '../kits/replay';
+import type { JsonLimits } from '../kits/network/captured-json';
 
 export interface ReplayDevRequest {
   readonly mode: 'record' | 'replay';
@@ -45,8 +46,19 @@ export interface ReplayDevState {
 export type ReplayStart = Readonly<{ status: 'started'; state: ReplayDevState }> | Readonly<{ status: 'refused'; reason: string }>;
 
 const INPUT = Object.freeze({ maxBytes: 4096, maxNodes: 256, maxDepth: 4 });
-const LOG = Object.freeze({ maxBytes: 8 << 20, maxNodes: 1 << 20, maxDepth: 8 });
+const LOG: JsonLimits = Object.freeze({ maxBytes: 8 << 20, maxNodes: 1 << 20, maxDepth: 8 });
 const MAX_TICKS = 1 << 20;
+/** Upper bounds of one exported log's text, used to refuse a recording request whose log could not be reopened. */
+const HEADER_BYTES = 2048, HEADER_NODES = 64, DIGEST_ENTRY_BYTES = 40, RUN_ENTRY_BYTES = 24;
+/**
+ * The worst-case size of a log a record request can export: inputs embedded as JSON strings at most double in size
+ * when escaped; each run and digest entry adds its own brackets, count/tick and separators; three nodes per entry.
+ */
+export function recordLogBound(maxTicks: number, maxBytes: number, maxDigests: number): { bytes: number; nodes: number } {
+  const runs = Math.min(maxTicks, Math.floor(maxBytes / (RUN_OVERHEAD_BYTES + 2)));
+  return { bytes: HEADER_BYTES + 2 * maxBytes + runs * RUN_ENTRY_BYTES + maxDigests * DIGEST_ENTRY_BYTES,
+    nodes: HEADER_NODES + 3 * runs + 3 * maxDigests };
+}
 const positive = (n: unknown, max: number): n is number => Number.isSafeInteger(n) && (n as number) > 0 && (n as number) <= max;
 
 interface Session {
@@ -59,19 +71,22 @@ interface Session {
   log: () => string | null;
   digests: () => DigestSnapshot | null;
   comparison: DigestComparison | null;
-  stop: () => void;
+  stop: (reason: string | null) => void;
 }
 
 export interface ReplayDev {
   /** Validate and arm a request for the next scene visit. The caller then re-enters the scene. */
   arm(request: ReplayDevRequest, scene: string): ReplayStart;
   read(): ReplayDevState;
-  /** Stop the current session: recording ends (its log stays readable); a replay hands input back to the player. */
-  stop(): void;
+  /** Stop the current session: recording ends (its log stays readable); a replay hands input back to the player; an
+   *  armed request is disarmed. The status becomes 'stopped' with `reason`. */
+  stop(reason?: string): void;
   dispose(): void;
 }
 
-export function createReplayDev(): ReplayDev {
+/** `log` overrides the log text limits (tests use small ones to reach the boundary); default 8 MiB / 2^20 nodes. */
+export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
+  const logLimits: JsonLimits = options.log ?? LOG;
   let armed: { request: ReplayDevRequest; scene: string; open: OpenLimits } | null = null;
   let session: Session | null = null;
   const refuse = (reason: string): ReplayStart => Object.freeze({ status: 'refused', reason });
@@ -100,10 +115,16 @@ export function createReplayDev(): ReplayDev {
     tap.passThrough(ctx.live);
     let arrived = false, recording = true, tick = 0;
     const end = (status: ReplayDevStatus, reason: string | null) => { if (!recording) return; recording = false; s.status = status; s.reason = reason; tap.passThrough(ctx.live); };
+    // The export changes only when a tick is recorded or recording ends: cache it between polls.
+    let cached: { key: string; log: string | null } | null = null;
     Object.assign(s, {
       ticks: () => tick, digests: () => trace.read(),
-      log: () => (recorder.read().status === 'failed' ? null : recorder.export(trace.read())),
-      stop: () => end('stopped', null),
+      log: () => {
+        const key = `${tick}|${recording}`;
+        if (cached?.key !== key) cached = { key, log: recorder.read().status === 'failed' ? null : recorder.export(trace.read()) };
+        return cached.log;
+      },
+      stop: (reason: string | null) => end('stopped', reason),
     });
     return {
       input: tap.input,
@@ -131,31 +152,46 @@ export function createReplayDev(): ReplayDev {
     const opened = openReplay(request.log!, open, { build, config, step: ctx.step, seed: ctx.seed });
     if (opened.status !== 'ready') return fail('refused', opened.status === 'incompatible' ? `incompatible-${opened.field}` : opened.status === 'corrupt' ? `corrupt-${opened.reason}` : opened.status);
     const player = opened.player, recorded = player.digests;
+    const tap = createSceneInputTap(ctx.inputs, id => ctx.live.describe(id));
+    // Decode every distinct logged input against this scene's declared actions before any tick runs.
+    for (let t = 0, previous: string | undefined; t < player.ticks; t++) {
+      const json = player.json(t);
+      if (json === previous) continue;
+      previous = json;
+      try { tap.load(player.input(t)!); } catch { return fail('refused', `invalid-tick-input-${t}`); }
+    }
+    tap.load({});
     const every = recorded?.every ?? request.every ?? 1;
     const trace = createDigestTrace({ identity: sceneTraceIdentity(build, config, ctx.seed!), every,
       maxEntries: request.maxDigests ?? Math.max(1, Math.ceil(player.ticks / every)), maxDigestLength: 16 });
-    const tap = createSceneInputTap(ctx.inputs, id => ctx.live.describe(id));
     let arrived = false, playing = true, tick = 0;
-    const end = (status: ReplayDevStatus) => {
+    const end = (status: ReplayDevStatus, reason: string | null = null) => {
       if (!playing) return;
-      playing = false; s.status = status;
-      if (status === 'complete' && recorded) s.comparison = compareDigests(recorded, trace.read(), { through: player.ticks - 1 });
+      playing = false; s.status = status; s.reason = reason;
+      if (status !== 'complete' || !recorded) return;
+      // An empty log has nothing to compare: say so rather than claim a pass.
+      s.comparison = player.ticks === 0 ? Object.freeze({ status: 'incomparable', reason: 'no-overlap' })
+        : compareDigests(recorded, trace.read(), { through: player.ticks - 1 });
     };
-    Object.assign(s, { total: player.ticks, ticks: () => tick, digests: () => trace.read(), stop: () => { end('stopped'); tap.passThrough(ctx.live); } });
+    Object.assign(s, { total: player.ticks, ticks: () => tick, digests: () => trace.read(), stop: (reason: string | null) => { end('stopped', reason); tap.passThrough(ctx.live); } });
     if (player.ticks === 0) end('complete');
     return {
       input: tap.input,
-      // The lane holds before arrival and once the log is spent; ticks already due in that last frame keep the last
-      // logged input and are not observed. After stop() the player's live input drives the lane again.
+      // The whole runner holds before arrival and once the log is spent (the scene stays frozen until re-entry or
+      // stop()); ticks already due in that last frame keep the last logged input and are not observed. After stop()
+      // the player's live input drives it again.
       running: () => arrived && (playing ? tick < player.ticks : s.status === 'stopped'),
-      beforeTick() { if (playing) tap.load(player.input(tick)!); },
+      beforeTick() {
+        if (!playing) return;
+        try { tap.load(player.input(tick)!); } catch { end('failed', `invalid-tick-input-${tick}`); }
+      },
       afterTick() {
         if (!playing) return;
-        if (trace.observe(tick, () => worldDigest(ctx.world)) === 'failed') { s.reason = trace.read().reason; end('failed'); return; }
+        if (trace.observe(tick, () => worldDigest(ctx.world)) === 'failed') { end('failed', trace.read().reason); return; }
         if (++tick >= player.ticks) end('complete');
       },
       arrive() { arrived = true; if (playing) s.status = 'replaying'; ctx.invalidate(); },
-      retire() { if (playing) { s.reason = 'visit-ended'; end('stopped'); } },
+      retire() { end('stopped', 'visit-ended'); },
     };
   }
 
@@ -166,23 +202,29 @@ export function createReplayDev(): ReplayDev {
       if (request.maxTicks !== undefined && !positive(request.maxTicks, MAX_TICKS)) return refuse('maxTicks');
       if (request.maxBytes !== undefined && !positive(request.maxBytes, LOG.maxBytes)) return refuse('maxBytes');
       if (request.maxDigests !== undefined && !positive(request.maxDigests, MAX_TICKS)) return refuse('maxDigests');
-      const open: OpenLimits = { maxTicks: MAX_TICKS, maxBytes: LOG.maxBytes, input: INPUT, log: LOG, digests: { maxEntries: MAX_TICKS, maxDigestLength: 16 } };
-      if (request.mode === 'replay') {
+      const open: OpenLimits = { maxTicks: MAX_TICKS, maxBytes: logLimits.maxBytes, input: INPUT, log: logLimits, digests: { maxEntries: MAX_TICKS, maxDigestLength: 16 } };
+      if (request.mode === 'record') {
+        // Refuse a request whose log could exceed the limits it must be reopened under.
+        const maxTicks = request.maxTicks ?? 3600, every = request.every ?? 1;
+        const bound = recordLogBound(maxTicks, request.maxBytes ?? 256 << 10, request.maxDigests ?? Math.ceil(maxTicks / every));
+        if (bound.bytes > logLimits.maxBytes || bound.nodes > logLimits.maxNodes) return refuse('log-limit');
+      } else {
         if (typeof request.log !== 'string') return refuse('log');
-        // Refuse unreadable, unsupported or corrupted logs before re-entering; identity is checked at the visit.
-        let header: { build: string; config: string; step: number } = { build: '?', config: '?', step: 1 };
-        try { header = (JSON.parse(request.log) as { header: typeof header }).header ?? header; } catch { /* openReplay reports it. */ }
-        const checked = openReplay(request.log, open, header);
+        // Refuse unreadable, unsupported or corrupted logs before re-entering. openReplay checks byte, node and depth
+        // limits before parsing; identity is checked at the visit, so any expectation will do here.
+        const checked = openReplay(request.log, open, { build: '-', config: '-', step: 1 });
         if (checked.status === 'unsupported-version') return refuse('unsupported-version');
         if (checked.status === 'corrupt') return refuse(`corrupt-${checked.reason}`);
       }
-      session?.stop();
+      session?.stop('replaced');
       armed = { request: { ...request }, scene, open };
-      session = { mode: request.mode, status: 'armed', reason: null, scene, ticks: () => 0, total: null, log: () => null, digests: () => null, comparison: null, stop: () => { armed = null; } };
+      const placeholder: Session = { mode: request.mode, status: 'armed', reason: null, scene, ticks: () => 0, total: null, log: () => null, digests: () => null, comparison: null,
+        stop: reason => { armed = null; placeholder.status = 'stopped'; placeholder.reason = reason ?? 'stopped-before-arrival'; } };
+      session = placeholder;
       return Object.freeze({ status: 'started', state: read() });
     },
     read,
-    stop() { session?.stop(); },
+    stop(reason) { session?.stop(reason ?? null); },
     dispose() { armed = null; restore(); },
   };
 

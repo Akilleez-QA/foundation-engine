@@ -27,8 +27,12 @@ not integrated. Evidence and limits are listed below.
 All exports come from the optional `@kits/replay` (`src/kits/replay/`).
 
 - **Recorder** `createReplayRecorder({header, limits})`. The header is
-  `{build, config, seed, step}`: the build identity (for scenes `<game id>@<version>`),
-  the configuration identity (for scenes `scene:<id>;inputs:<sorted ids, ~ marks an axis>`),
+  `{build, config, seed, step}`. `build` and `config` are caller-chosen strings, compared
+  exactly. The scene helpers and the dev surface use `<game id>@<version>` as the build,
+  so a code change without a version bump is not detected. They use
+  `scene:<id>;inputs:<sorted ids, ~ marks an axis>` as the configuration, which names no
+  rules revision. A creator who needs one adds it to these strings when calling the kit
+  directly.
   the unsigned 32-bit seed and the fixed step in seconds. `record(tick, inputJson)`
   takes one canonical JSON input per tick, ticks from 0 and contiguous. Identical
   consecutive inputs share a run (run-length encoding). Results: `recorded`,
@@ -92,7 +96,7 @@ stock runtime asks for a tap only when `TEST_API` is true
 | `detail.maxChars` | Digest trace | Later detail is dropped and `detailTruncated` is set. |
 | Log text bytes, nodes, depth | `openReplay` | Checked before parsing; over the limit means `corrupt`. |
 | `maxInputs` | Agreement | Throws before any command is driven. Each owner's own limits still apply. |
-| Dev defaults | `engine.replay` | 3,600 ticks, 256 KiB of input, 4 KiB per tick and an 8 MiB log; requests above the hard caps are refused. |
+| Dev defaults | `engine.replay` | 3,600 ticks, 256 KiB of input, 4 KiB per tick and an 8 MiB / 2^20-node log. A record request is refused (`log-limit`) when its worst-case export could exceed the limits the log is reopened under. A replay decodes every distinct logged input against the scene's declared actions at the visit and refuses the log (`invalid-tick-input-<tick>`) before any tick runs. An empty log completes as `incomparable` (`no-overlap`), never as `equal`. |
 
 Digest cost is the creator's digest function, called once per sampled tick. The
 default world digest serialises resources and transforms, so its cost grows with the
@@ -109,16 +113,21 @@ surface, a visit's retirement ends its session (`stopped`, reason `visit-ended`)
 `stop()` ends recording and keeps the log readable. A new `start` stops the previous
 session. A request refused before re-entry (an invalid option, or an unreadable,
 unsupported or corrupted log) arms nothing and does not re-enter the scene. A log
-refused at the visit (another build, configuration, step or `?seed=`) leaves that
+refused at the visit (a different build string, configuration, step or `?seed=`) leaves that
 re-entered visit untapped, and `start` returns the refusal. A failed
 recorder or trace stays failed. Recovery means recording again; there is no runtime
 repair, because this is a verification tool.
 
-During a replay the fixed lane holds before arrival and once the log is spent.
-Ticks already due in the final frame run with the last logged input and are not
-observed. While a recording or replay is armed, the fixed lane does not run between
-program readiness and the scene's `enter`. That makes tick 0 the first step after
-arrival. Unarmed visits are unchanged.
+The tap holds the visit's whole system runner, not only the fixed lane. While
+held, fixed systems, frame-phase systems (a HUD, for example) and the per-frame
+clearing of world events all stop; drawing continues. The runner is held:
+- in a recording or replay, between program readiness and the scene's `enter`, so
+  tick 0 is the first step after arrival;
+- in a replay, once the log is spent. The scene then stays frozen until it is
+  re-entered or `engine.replay.stop()` hands it back to live input.
+
+Ticks already due in the final frame of a replay run with the last logged input
+and are not observed. Unarmed visits are unchanged.
 
 ## Limitations (read before relying on a result)
 
@@ -169,7 +178,7 @@ Checked by focused tests (`src/kits/replay/*.test.ts`, `src/dev/replay.test.ts`,
   different frame grouping;
 - ring eviction reported as inconclusive, never equal;
 - tick and byte overflow, giving an explicit truncated prefix that replays;
-- refusal of unsupported versions and of logs for another build, configuration,
+- refusal of unsupported versions and of logs with a different build string, configuration,
   step or seed;
 - refusal of corrupted logs (checksum, fields, tick count, unmerged or non-canonical
   runs, malformed input, over-limit text);
