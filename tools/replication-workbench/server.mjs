@@ -22,6 +22,8 @@ export async function startReplicationWorkbench({ port = 0, autoDriver = true, d
     const scopes = { alpha: { ids: null, removed: [], oversize: false }, beta: { ids: null, removed: [], oversize: false } };
     let worldRevision = 0, closed = false, timer, closePromise;
     const timings = [];
+    // Retirement reasons by count; reasons are host-chosen tokens from a closed set.
+    const closeReasons = {};
     const metrics = { rounds: 0, received: 0, sentFrames: 0, sentBytes: 0, closed: 0, refused: 0, projectionCalls: 0, viewAttempts: 0, maxOutstanding: 0, maxOutstandingBytes: 0, maxBufferedBytes: 0 };
     const now = () => performance.now();
     const wss = new WebSocketServer({ host: '127.0.0.1', port, path: '/socket', maxPayload: 1024, perMessageDeflate: false });
@@ -51,8 +53,8 @@ export async function startReplicationWorkbench({ port = 0, autoDriver = true, d
             else
                 pub?.markDirty(); },
             send: transportSend,
-            close(peer) { const s = peers.get(peer); if (!s)
-                return; peers.delete(peer); frameRate.forget(peer); metrics.closed++; s.publisher?.dispose(); s.socket.removeListener('message', s.message); s.socket.terminate(); },
+            close(peer, reason) { const s = peers.get(peer); if (!s)
+                return; peers.delete(peer); frameRate.forget(peer); metrics.closed++; closeReasons[reason] = (closeReasons[reason] ?? 0) + 1; s.publisher?.dispose(); s.socket.removeListener('message', s.message); s.socket.terminate(); },
         } });
     function project(p) {
         metrics.projectionCalls++;
@@ -173,7 +175,7 @@ export async function startReplicationWorkbench({ port = 0, autoDriver = true, d
     function revision() { if (worldRevision === Number.MAX_SAFE_INTEGER)
         throw Error('revision-exhausted'); worldRevision++; }
     const controls = { url: `ws://127.0.0.1:${wss.address().port}/socket`, credentials, pump,
-        read() { return { ephemeral: true, worldRevision, entities: structuredClone(entities), scopes: structuredClone(scopes), metrics: { ...metrics }, timings: { kind: 'publisher pump including projection/capture/send; headless loopback host only', samples: [...timings], capacity: MAX_TIMINGS }, intake: intake.stats(), peers: [...peers].map(([peer, s]) => ({ principal: intake.read(peer)?.principal?.id ?? null, session: s.session, publisher: s.publisher?.read() ?? null, bufferedBytes: s.socket.bufferedAmount, lastSentRound: s.lastSentRound })) }; },
+        read() { return { ephemeral: true, worldRevision, entities: structuredClone(entities), scopes: structuredClone(scopes), metrics: { ...metrics }, closeReasons: { ...closeReasons }, timings: { kind: 'publisher pump including projection/capture/send; headless loopback host only', samples: [...timings], capacity: MAX_TIMINGS }, intake: intake.stats(), peers: [...peers].map(([peer, s]) => ({ principal: intake.read(peer)?.principal?.id ?? null, session: s.session, publisher: s.publisher?.read() ?? null, bufferedBytes: s.socket.bufferedAmount, lastSentRound: s.lastSentRound })) }; },
         changeWorld({ id, value }) { const e = find(id); if (!Number.isSafeInteger(value) || value < 0 || value > 100000)
             throw Error('value'); revision(); e.value = value; changed(); },
         setScope({ principal, ids }) { pcheck(principal); if (ids !== null && (!Array.isArray(ids) || ids.length > 64 || new Set(ids).size !== ids.length))
