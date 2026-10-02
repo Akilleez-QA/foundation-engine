@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { defineScene } from '../../author';
 import { testScene } from '../../author/testing';
-import { installFakeDom } from '../../testing/fake-dom';
+import { installFakeDom, live } from '../../testing/fake-dom';
 import { lessonScene } from './index';
 import type { LessonInput } from './lesson';
 import { directorSystem, disposeLesson } from './runtime';
@@ -25,6 +25,7 @@ test('lessonScene exit retires its lazy runtime UI, including before the first f
   try {
     const scene = lessonScene({ lesson, title: 'Lifetime' });
     const empty = await testScene(scene); empty.dispose(); empty.dispose();
+    const observers = live.observers, frames = live.frames;
     for (let i = 0; i < 2; i++) {
       const h = await testScene(scene), overlay = fake.document.createElement('div');
       fake.document.body.append(overlay);
@@ -36,6 +37,8 @@ test('lessonScene exit retires its lazy runtime UI, including before the first f
       assert.equal(overlay.querySelectorAll('nav').length, 0);
       assert.equal(overlay.querySelectorAll('.explorer-slider').length, 0);
       assert.equal(overlay.querySelectorAll('[aria-live=polite]').length, 0);
+      assert.equal(live.observers, observers, 'the layout ResizeObserver is released on exit');
+      assert.equal(live.frames, frames, 'no layout frame stays scheduled after exit');
       overlay.remove();
     }
   } finally { fake.restore(); }
@@ -51,8 +54,10 @@ test('explicit disposal clears queued controls and stale slider input before a r
     const pause = overlay.querySelector('[data-command=pause]')!, slider = overlay.querySelector('input')!;
     pause.click(); // Queued, deliberately not consumed by a frame.
     slider.value = '9'; slider.dispatchEvent({ type: 'input' });
+    const observing = live.observers;
     disposeLesson(h.ctx); disposeLesson(h.ctx);
     assert.equal(overlay.children.length, 0);
+    assert.equal(live.observers, observing - 1, 'disposeLesson releases the controls\' ResizeObserver exactly once');
     h.run(1 / 60); // A new visit for the same world must not retain queued commands.
     pause.click(); slider.value = '8'; slider.dispatchEvent({ type: 'input' });
     h.run(1 / 60);

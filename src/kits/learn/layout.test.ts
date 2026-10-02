@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { defineScene } from '../../author';
 import { testScene } from '../../author/testing';
-import { installFakeDom } from '../../testing/fake-dom';
+import { installFakeDom, live } from '../../testing/fake-dom';
 import type { LessonInput } from './lesson';
 import { directorSystem, disposeLesson } from './runtime';
 import { CONTROLS_RESERVE, createControls } from './ui';
@@ -11,7 +11,7 @@ import { CONTROLS_RESERVE, createControls } from './ui';
 // not real browser layout. scripts/play/stock-touch-check.mjs measures the same separation in Chromium.
 
 type Rect = { left: number; top: number; width: number; height: number };
-type El = { rect: Rect; style: Record<string, string>; tagName: string; children: El[]; append(...n: El[]): void; prepend?: unknown; querySelector(s: string): El | null; lastElementChild?: El | null };
+type El = { rect: Rect; getAttribute(n: string): string | null; style: Record<string, string>; tagName: string; children: El[]; append(...n: El[]): void; prepend?: unknown; querySelector(s: string): El | null; lastElementChild?: El | null };
 
 function setup() {
   const fake = installFakeDom();
@@ -23,7 +23,8 @@ function setup() {
   const overlay = fake.document.createElement('div') as unknown as El;
   fake.document.body.append(overlay as never);
   Object.assign(overlay, { prepend: (node: El) => overlay.append(node) });
-  const relayout = () => { for (const o of observers) o.trigger(); };
+  // Observers only schedule; the measurement runs on the next animation frame.
+  const relayout = () => { for (const o of observers) o.trigger(); fake.flushFrames(); };
   return { fake, overlay, relayout };
 }
 
@@ -96,16 +97,40 @@ test('a centred panel moves below the top line and scrolls above a wrapped bar o
     assert.equal(panel.style.transform, 'translateX(-50%)');
     assert.equal(panel.style.maxHeight, '191px');                // scrolls within what the bar leaves (341)
     assert.equal(panel.style.overflowY, 'auto');
+    assert.equal(panel.style.pointerEvents, 'auto');              // wheel/touch reach it through the pointer-events:none overlay
+    assert.equal(panel.getAttribute('tabindex'), '0');            // and the keyboard can focus and scroll it
     // Rotated or resized to desktop: room again, so the authored position returns.
     overlay.rect = { left: 0, top: 0, width: 1280, height: 753 };
     nav.rect = { left: 8, top: 693, width: 1264, height: 48 };
     line.rect = { left: 305, top: 56, width: 670, height: 30 };
     panel.rect = { left: 346, top: 248, width: 588, height: 234 };
     relayout();
-    assert.deepEqual([panel.style.top, panel.style.transform, panel.style.maxHeight], ['50%', 'translate(-50%,-55%)', '']);
+    assert.deepEqual([panel.style.top, panel.style.transform, panel.style.maxHeight, panel.style.pointerEvents], ['50%', 'translate(-50%,-55%)', '', '']);
+    assert.equal(panel.getAttribute('tabindex'), null);
     assert.equal(overlay.style['--learn-top-clear'], '0px');
     controls.destroy();
     assert.equal(overlay.style[CONTROLS_RESERVE], '');
     assert.equal(overlay.style['--learn-top-clear'], '');
+  } finally { fake.restore(); }
+});
+
+test('size changes are measured once on the next frame, never inside the observer delivery', () => {
+  const { fake, overlay } = setup();
+  const g = globalThis as unknown as { ResizeObserver: new (fn: () => void) => { trigger(): void } };
+  const observers: { trigger(): void }[] = [];
+  const Base = g.ResizeObserver;
+  g.ResizeObserver = class extends Base { constructor(fn: () => void) { super(fn); observers.push(this); } };
+  try {
+    overlay.rect = { left: 0, top: 0, width: 320, height: 521 };
+    const controls = createControls(overlay as never);
+    overlay.querySelector('nav')!.rect = { left: 8, top: 349, width: 304, height: 160 };
+    for (const o of observers) { o.trigger(); o.trigger(); }
+    assert.equal(overlay.style[CONTROLS_RESERVE], undefined);    // nothing written during delivery
+    assert.equal(live.frames, 1);                                // coalesced into one frame
+    fake.flushFrames();
+    assert.equal(overlay.style[CONTROLS_RESERVE], '180px');
+    for (const o of observers) o.trigger();
+    controls.destroy();
+    assert.equal(live.frames, 0);                                // a pending frame is cancelled with the controls
   } finally { fake.restore(); }
 });

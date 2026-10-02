@@ -64,15 +64,26 @@ export function createControls(overlay: HTMLElement): Controls {
   }
   overlay.append(progress, objectives, finished, bar);
   let last = '', retired = false, reserve = '', top = '';
-  type Fit = { el: HTMLElement; top: string; transform: string; fitted: boolean };
-  const fit = (el: HTMLElement): Fit => ({ el, top: el.style.top, transform: el.style.transform, fitted: false });
+  type Fit = { el: HTMLElement; top: string; transform: string; pointer: string; tab: string | null; fitted: boolean };
+  const fit = (el: HTMLElement): Fit => ({ el, top: el.style.top, transform: el.style.transform, pointer: el.style.pointerEvents ?? '', tab: el.getAttribute('tabindex'), fitted: false });
   let line: HTMLElement | null = null, floorEl: HTMLElement | null = null, quiz: Fit | null = null;
   const own = [fit(objectives), fit(finished)];
-  const sizes = typeof ResizeObserver === 'function' ? new ResizeObserver(() => measure()) : null;
+  // Size changes schedule one measurement on the next frame, never inside the observer's delivery: the measurement
+  // writes the fitted panel's max-height, and writing an observed element's size during delivery makes Chromium
+  // report "ResizeObserver loop completed with undelivered notifications". The refit is idempotent, so the frame
+  // after a fit observes the same sizes and the loop settles.
+  let frame: number | null = null;
+  const schedule = () => {
+    if (retired || frame !== null) return;
+    if (typeof requestAnimationFrame !== 'function') { measure(); return; }
+    frame = requestAnimationFrame(() => { frame = null; measure(); });
+  };
+  const sizes = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
   const unfit = (f: Fit | null) => {
     if (!f?.fitted) return;
     f.fitted = false;
-    Object.assign(f.el.style, { top: f.top, transform: f.transform, maxHeight: '', overflowY: '' });
+    Object.assign(f.el.style, { top: f.top, transform: f.transform, maxHeight: '', overflowY: '', pointerEvents: f.pointer });
+    if (f.tab === null) f.el.removeAttribute('tabindex'); else f.el.setAttribute('tabindex', f.tab);
   };
   const shown = (el: HTMLElement | null) => !!el && el.getClientRects().length > 0;
   /** Keep a centred panel where it was authored unless it would cover the top content or reach the floor. */
@@ -85,7 +96,9 @@ export function createControls(overlay: HTMLElement): Controls {
     const cs = typeof getComputedStyle === 'function' ? getComputedStyle(f.el) : null;   // max-height excludes padding and border
     const chrome = cs && cs.boxSizing !== 'border-box' ? ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'].reduce((n, k) => n + (parseFloat(cs[k as 'paddingTop']) || 0), 0) : 0;
     f.fitted = true;
-    Object.assign(f.el.style, { top: `${y}px`, transform: 'translateX(-50%)', maxHeight: `${Math.max(0, floor - y - chrome)}px`, overflowY: 'auto' });
+    // A fitted panel scrolls: it must receive wheel/touch (the scene overlay is pointer-events:none) and keyboard focus.
+    Object.assign(f.el.style, { top: `${y}px`, transform: 'translateX(-50%)', maxHeight: `${Math.max(0, floor - y - chrome)}px`, overflowY: 'auto', pointerEvents: 'auto' });
+    if (f.tab === null) f.el.setAttribute('tabindex', '0');
   };
   const measure = () => {
     if (retired) return;
@@ -141,7 +154,9 @@ export function createControls(overlay: HTMLElement): Controls {
     destroy() {
       if (retired) return;
       for (const f of [...own, quiz]) unfit(f);
-      retired = true; fn = null; sizes?.disconnect(); line = null; floorEl = null; quiz = null;
+      retired = true; fn = null; sizes?.disconnect();
+      if (frame !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame);
+      frame = null; line = null; floorEl = null; quiz = null;
       if (reserve) overlay.style.setProperty(CONTROLS_RESERVE, '');
       if (top) for (const k of [TOP_CLEAR, TOP_SIDE]) overlay.style.setProperty(k, '');
       for (const el of [progress, objectives, finished, bar]) el.remove();
