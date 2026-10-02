@@ -1,8 +1,10 @@
 # Lesson layout repair: emulated evidence
 
-2026-10-02, branch `feat/device-acceptance` on the public repository, based on
-`origin/main` `1b0b846`. The saved [report](layout-report.json) identifies the clean
-commit `95f8929101127f5896de31581e93acb7afdae9ca` with **workingTreeDirty: false**
+2026-10-02, branch `feat/device-acceptance` on the public repository. The saved
+[report](layout-report.json) identifies the clean commit
+`95f8929101127f5896de31581e93acb7afdae9ca` (on `origin/main` `1b0b846`; after the
+branch was rebased onto `f7619ef` the same change is `91f8754`, differing only by
+that merge's CI action version) with **workingTreeDirty: false**
 and **passed: true**; the screenshots below come from that run. This is Chromium
 touch emulation, not physical-device acceptance. DV-01 remains unresolved.
 
