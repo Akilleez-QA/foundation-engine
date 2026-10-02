@@ -20,7 +20,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
-    "baseUrl": ".",
     "paths": {
       "@engine": [
         "./src/author/index.ts"

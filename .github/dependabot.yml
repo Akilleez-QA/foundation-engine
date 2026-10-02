@@ -12,7 +12,7 @@ updates:
       # Pinned exactly: the bench and quality guard depend on its browser protocol. Bump by hand.
       - dependency-name: playwright-core
       # Major upgrades are deliberate migrations, not automatic bumps:
-      # TypeScript 6 deprecates tsconfig baseUrl; three is read through a
+      # TypeScript majors remove compiler options (6 deprecated baseUrl); three is read through a
       # version-checked adapter over private renderer state; vite majors change
       # the build; @types/node tracks the Node 22 minimum that CI runs.
       - dependency-name: typescript
