@@ -325,3 +325,13 @@ window. Admitted work is never cancelled; clients that follow the notice hold un
 the announced return, then pace through the retry schedule. The network workbench
 uses it only when its host flag and client checkbox are set. Implemented, candidate
 (PR #21); not integrated. See the [ledger](upgrade-acceptance-ledger.md).
+
+## Bounded spatial index for large populations (SC-01) — implemented, candidate
+
+The optional `spatial` kit adds [`createSpatialGrid`](spatial-index.md), a preallocated
+uniform-grid index for neighbour, range and per-observer interest queries with explicit
+cell, result and capacity bounds. It is a reusable proximity mechanism for large
+populations, not a visibility, steering or replication policy. Status: implemented,
+candidate (PR #23); not integrated. Evidence is focused unit tests
+and a headless 1,000/10,000-entry CPU micro-benchmark; no template consumer, browser,
+worker or physical-device evidence, and no budget change.

@@ -553,3 +553,13 @@ and reconnect through the existing retry schedule after the announced return. Bo
 are optional and pure; drain closes are transient (1012). The network workbench host
 and client opt in. Implemented, candidate (PR #21); not integrated. Unit, host socket
 and loopback browser tests are its only evidence. See the [drain guide](network-drain.md).
+
+## Bounded spatial index (SC-01) — implemented, candidate
+
+The optional `spatial` kit adds [`createSpatialGrid`](spatial-index.md), a preallocated
+uniform-grid index for neighbour, range and per-observer interest queries with explicit
+cell, result and capacity bounds. It is a reusable proximity mechanism for large
+populations, not a visibility, steering or replication policy. Status: implemented,
+candidate (PR #23); not integrated. Evidence is focused unit tests
+and a headless 1,000/10,000-entry CPU micro-benchmark; no template consumer, browser,
+worker or physical-device evidence, and no budget change.

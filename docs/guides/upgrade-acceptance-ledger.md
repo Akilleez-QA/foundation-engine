@@ -76,6 +76,7 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | NW-08 | Planned drain and capped connection lifetime (study N8) | Implemented, candidate (PR #21, `feat/nw08-planned-drain`); not integrated. Optional pure `createConnectionDrain` (host: bounded notice, operator drain/resume, dithered lifetime cap, per-poll instruction cap) and `createDrainFollower` (client: bounded notice, cooperative close, hold until announced return, then the existing retry schedule) in the network kit; the network workbench host (`--drain`) and client (checkbox) opt in. Drain closes are 1012 and transient. Admitted work is never cancelled. Evidence and limits are in the NW-08 section below. No process-restart, WAN or physical-device claim. |
 | TR-01 | Regional terrain worker and ordinary-surface integration | Integrated in PR #109 at 99e6255. Canonical regional Surface and halo patches, bounded WorkerHost generation/patch adapters, independent geometric oracles and finite coherent render/query consumer passed at 891eb7; all seven template gates passed (1,648 tests, 129 performance checks, zero breaches/regressions, four advisory heap warnings). Combined main tests/build passed. Physical-device performance and unbounded/global streaming are not established. |
 | DV-01 | Supported-device experience and sustained performance evidence | In progress, not integrated: ported to the public `feat/device-acceptance` PR. [Stock matrix](../kits/stock-device-acceptance-matrix.md) covers all seven declarations. The [first receipt](../verification/stock-device-20261001/README.md) records 16 passing emulated target/tap checks and a compact lesson content overlap; lesson visit cleanup and a measured learn layout seam repair it, with a fake-DOM regression and emulated separation checks across board, sim and quiz at four profiles ([layout receipt](../verification/stock-device-20261002/README.md)). Full consumer workflows, in-panel touch scrolling, 200% text, named minimum devices and sustained physical evidence remain open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. No physical-device or accessibility certification. |
+| SC-01 | Bounded spatial index for neighbour, range and interest queries at scale | Implemented, candidate (PR #23); not integrated. Optional `spatial` kit `createSpatialGrid`: preallocated uniform grid, admission before write, `too-wide` refusal before scanning, explicitly `truncated` results, terminal disposal. Checked: 12 focused unit tests (seeded brute-force oracle, refusals without mutation, narrow-buffer rejection, ECS interest consumer handling despawn and out-of-bounds and failing closed) and a work-count test of the 1,000/10,000-entry micro-benchmark. Headless Node medians recorded in the [guide](spatial-index.md#measured-cost). No template consumer, browser, worker or physical-device evidence; no budget change. |
 
 ## Goal continuity
 
@@ -418,3 +419,19 @@ Status: implemented, candidate on branch `feat/nw08-planned-drain` (PR #21); not
   `resume` of the same process), close-frame delivery over lossy links, measured
   reconnect storms, multi-host or rolling deploys, durable-authority host wiring,
   physical devices and suitability of the example values for any game.
+
+## Bounded spatial index (SC-01) — implemented, candidate
+
+Status: implemented, candidate (PR #23); not integrated. See the
+[spatial index guide](spatial-index.md) and [recipe](../recipes/use-a-spatial-index.md).
+
+- Runtime-enforced: limit validation and ceilings (1,048,576 entries, 4,194,304 cells);
+  all typed arrays (including nearest-query scratch) allocated at construction; only
+  `Float64Array`/`number[]` id buffers accepted; `saturated`/`out-of-bounds`/`duplicate` refusals
+  change nothing; queries wider than `maxCellsPerQuery` return `too-wide` with zero work;
+  results never exceed the caller buffer and report `truncated` when incomplete;
+  `dispose()` is terminal.
+- Checked: `src/kits/spatial/spatial.test.ts` (12 tests) and
+  `tools/spatial-bench/bench.test.mjs` (per-query work flat from 1,000 to 10,000 entries).
+- Not established: browser frame cost, physical devices, worker offload, a running
+  network-view or fog-of-war consumer, and template integration.
