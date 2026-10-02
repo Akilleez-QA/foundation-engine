@@ -59,7 +59,8 @@ or presentation. No fence policy or broad residency scheduler is delivered here.
 ## Verification status
 
 Public source checkpoint `2cdd442` passed all seven template gates and inspected
-desktop/mobile snapshots. Engine-owned native fixtures verify malformed shaders,
+desktop/mobile snapshots; the rebased submission head `724cedf` (with the degraded
+overload fix) passed all seven template gates again. Engine-owned native fixtures verify malformed shaders,
 link-only incompatibility, full diagnostics, a real pixel result and context
 restoration. See [retained evidence](../verification/program-preparation/README.md).
 This does not certify all hardware or sustained traversal performance; integration

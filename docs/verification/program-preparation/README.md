@@ -74,3 +74,25 @@ triangles in this software fixture; this is not a sustained travel guarantee.
 This document-only receipt follows the tested source checkpoint. Integration and
 submission remain separate. Broader scheduling, resource-vector admission and
 residency policies are not completed by this rendering contract.
+
+## Public submission checkpoint `724cedf`
+
+The branch was rebased onto public `main` `9585f3f` (includes PR #5) and reviewed.
+Review fix `724cedf`: a non-link initial preparation failure (program capacity,
+timeout or driver query error) now takes the same reported degraded first-draw
+compilation fallback restoration already used, rather than refusing to open the
+scene. A new regression covers degraded, typed-link and retired cases; the test
+fails without the fix. Local absolute worktree paths in the retained raw logs above
+are redacted as `<worktree>`; no other log content was changed.
+
+On exact head `724cedf7368176cf4074b7507b6c836aa525f652`, with Node 22:
+`npm run check` PASS; `npm test` 2,047 tests, 0 failures; `npm run lint` PASS;
+`npm run gate:templates` PASS for all seven templates (arcade 38 s, blank 39 s,
+expedition 54 s, explorer 58 s, learn 40 s, mechanics 41 s, terrain 43 s):
+129 software-GL performance checks, zero over budget, regressions or inconclusive
+results, and four advisory heap warnings (mechanics 5.4/5.7 MiB and terrain
+5.3/5.7 MiB against nominal 5 MiB), unchanged in kind from `main`. Budgets
+were unchanged. The native shader fixtures above were not re-run at this head;
+`program-validation.ts`, `program-readiness.ts` and `frame-readiness.ts` are
+unchanged since they were recorded. This remains software-GL and single-backend
+native evidence, not physical-device or sustained-traversal acceptance.
