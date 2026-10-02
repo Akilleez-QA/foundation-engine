@@ -9,6 +9,10 @@ export {
   type SpatialGrid, type GridLimits, type GridStats, type IdBuffer, type QueryResult, type QueryStatus,
   type InsertStatus, type MoveStatus, type RemoveStatus,
 } from './grid';
+export {
+  createInterestSets, createInterestResult, INTEREST_CEILING,
+  type InterestSets, type InterestLimits, type InterestResult, type InterestStatus, type InterestStats,
+} from './interest';
 
 /** The kit registration; the grid itself works without it (`createSpatialGrid` is a pure helper). */
 export function spatial(): KitDefinition { return defineKit({ id: 'spatial', requires: [], defs: [], modules: [] }); }

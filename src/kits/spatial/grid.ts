@@ -81,6 +81,8 @@ export interface SpatialGrid {
   has(id: number): boolean;
   /** A detached copy of a live entry's position. */
   position(id: number): { x: number; y: number } | undefined;
+  /** Squared distance from a live entry to a point without allocating; NaN when the id is absent or the grid closed. */
+  distanceSquared(id: number, x: number, y: number): number;
   /**
    * Ids whose position lies in the inclusive rectangle. Every query takes an optional `result` record
    * (see {@link createQueryResult}) that is overwritten and returned; without one a new record is allocated.
@@ -233,6 +235,12 @@ export function createSpatialGrid(input: GridLimits): SpatialGrid {
       return 'removed';
     },
     has(id) { return !!head && slotOf.has(id); },
+    distanceSquared(id, x, y) {
+      const slot = head ? slotOf.get(id) : undefined;
+      if (slot === undefined) return NaN;
+      const dx = xs[slot]! - x, dy = ys[slot]! - y;
+      return dx * dx + dy * dy;
+    },
     position(id) {
       const slot = head ? slotOf.get(id) : undefined;
       return slot === undefined ? undefined : { x: xs[slot]!, y: ys[slot]! };

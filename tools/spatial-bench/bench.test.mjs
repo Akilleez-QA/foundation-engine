@@ -1,7 +1,7 @@
 // Work-count (not timing) checks for the spatial micro-benchmark: query cost follows local density, not population.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runCase } from './bench.mjs';
+import { runCase, runInterestCase } from './bench.mjs';
 
 test('spatial bench: per-query work stays bounded from 1,000 to 10,000 entries', () => {
   const small = runCase({ entries: 1000, ticks: 3 }), large = runCase({ entries: 10000, ticks: 3 });
@@ -15,4 +15,15 @@ test('spatial bench: per-query work stays bounded from 1,000 to 10,000 entries',
   assert.ok(large.perInterestQuery.examined <= small.perInterestQuery.examined * 1.5);
   // And it examines a small fraction of the population a brute-force pass would test.
   assert.ok(large.perNeighbourQuery.examined < 10000 / 100);
+});
+
+test('SC02 bench: per-observer interest work stays bounded from 1,000 to 10,000 entities', () => {
+  const small = runInterestCase({ entries: 1000, ticks: 3, observers: 20 }), large = runInterestCase({ entries: 10000, ticks: 3, observers: 20 });
+  for (const c of [small, large]) {
+    assert.equal(c.incompleteUpdates, 0, 'no scan was truncated or refused');
+    assert.ok(c.perUpdate.relevant <= c.maxRelevant);
+  }
+  // Constant density: candidates per update do not grow with population (allow 50 % noise).
+  assert.ok(large.perUpdate.candidates <= small.perUpdate.candidates * 1.5);
+  assert.ok(large.perUpdate.candidates < 10000 / 20);
 });
