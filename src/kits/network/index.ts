@@ -28,3 +28,10 @@ export { createConnectionDrain, createDrainFollower, DRAIN_CLOSE_CODE, MAX_DRAIN
 export type { ConnectionDrain, ConnectionDrainLimits, ConnectionDrainOptions, ConnectionDrainState,
   ConnectionLifetimeLimits, DrainAction, DrainCause, DrainKey, DrainNotice, DrainStartResult, DrainTrackResult,
   DrainFollower, DrainFollowerLimits, DrainFollowerState, DrainNoticeResult, DrainCloseResult } from './drain';
+export { createIntegrity, integrityOk, integrityReject, integrityFlag, integrityRules, INTEGRITY_CLOSE_REASON,
+  INTEGRITY_AUDIT_FORMAT, MAX_INTEGRITY_RULES, MAX_INTEGRITY_WEIGHT } from './integrity';
+export type { Integrity, IntegrityOptions, IntegrityLimits, IntegrityRule, IntegrityRuleBase, IntegrityInput,
+  IntegrityVerdict, IntegrityFinding, IntegrityAssessment, IntegrityDecision, IntegrityRef, IntegrityMode,
+  IntegrityAuditEntry, IntegrityKeyState, IntegrityStats, IntegrityRefusalReason, IntegrityTickClaim } from './integrity';
+export { assertDisclosure, findDisclosureLeaks, MAX_DISCLOSURE_LEAKS } from './disclosure';
+export type { DisclosureLeak, DisclosurePredicate } from './disclosure';

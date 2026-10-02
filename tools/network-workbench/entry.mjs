@@ -19,6 +19,8 @@ import {
   createClosePolicy,
   createDrainFollower,
   createRetrySchedule,
+  DEFAULT_TERMINAL_CLOSE_REASONS,
+  INTEGRITY_CLOSE_REASON,
 } from '../../src/kits/network/index.ts';
 import { createRng } from '../../src/core/rng.ts';
 import { runRandom } from '../../src/core/run-random.ts';
@@ -52,7 +54,10 @@ const retryLimits = {
 };
 // Which validated host close reasons/codes end reconnecting. The stock default (credential refusal, protocol
 // violation) applies while "Treat host refusals as final" is ticked; unticked, every loss is paced as transient.
-const closePolicy = createClosePolicy();
+// The opt-in integrity example's close reason (SEC-01) is added so a closed client does not reconnect-spam.
+const closePolicy = createClosePolicy({
+  terminalReasons: [...DEFAULT_TERMINAL_CLOSE_REASONS, INTEGRITY_CLOSE_REASON],
+});
 let lastClose = null;
 let retry = null,
   reconnectCredential = null,

@@ -651,3 +651,18 @@ LRU replacement, 10 s per fetch or decode, waiting plays counted in the 64-voice
 files decode on unlock. Failures (including an HTML fallback page) are reported once and
 retried on the next preload. Candidate (branch `feat/dx-sound-files`); not integrated. Physical
 listening evidence is missing.
+
+## Command integrity — SEC-01 slice A implemented, candidate
+
+`createIntegrity` (network kit) separates validity from policy. Pure `assess` rules
+judge `{command, state, tick}` and can run inside the authority reducer, so an invalid
+sequenced command is consumed as a domain rejection and the client's prediction
+reconciles instead of stalling on `gap`. `admit`/`record` apply local policy: decaying
+per-key scores, a tick-rate budget on rate admission, throttle, windowed close with the
+terminal reason `integrity-violation`, per-rule ceilings and observe mode; the key table
+never refuses a new key and the bounded audit log is exportable as local text.
+Tick-addressed generic helpers and an `assertDisclosure` test helper are included. The
+network workbench wires one plausibility rule behind `--integrity`. Slice A implemented,
+candidate (PR #20); not integrated. Evidence is unit and loopback host tests only.
+Slice B (verified runs through the SIM-01 replay kit, merged in PR #17) is a design in the
+[integrity guide](integrity.md#slice-b-verified-runs-planned-not-built), not built.

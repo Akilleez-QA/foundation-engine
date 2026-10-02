@@ -534,3 +534,81 @@ test('NW07: optional queue age sheds aged commands with a correlated stale refus
     await shutdown(host, peers);
   }
 });
+
+test('SEC01: without the integrity option the host keeps its prior behaviour for rapid commands', async () => {
+  const host = await startNetworkWorkbench({ autoDriver: false }),
+    peers = [];
+  try {
+    const a = await connect(host, host.credentials.alpha);
+    peers.push(a);
+    for (let i = 0; i < 4; i++) command(a, `fast-${i}`, 'alpha', 5);
+    await until(() => host.read().intake.queuedMessages === 4);
+    host.pump();
+    await until(() => a.frames.filter((f) => f.type === 'result').length === 4);
+    assert.equal(host.read().counters.alpha, 20);
+    assert.equal(host.read().integrity, null);
+    assert.equal(a.socket.readyState, WebSocket.OPEN);
+  } finally {
+    await shutdown(host, peers);
+  }
+});
+
+test('SEC01: the opt-in plausibility rule rejects implausible commands, then closes with a terminal reason', async () => {
+  const host = await startNetworkWorkbench({ autoDriver: false, integrity: true }),
+    peers = [];
+  try {
+    const a = await connect(host, host.credentials.alpha),
+      b = await connect(host, host.credentials.beta);
+    peers.push(a, b);
+    const closed = once(a.socket, 'close');
+    // Four +5 commands at one instant: the first is plausible, the next two are rejected (score about 1, 2), the
+    // fourth is the third violation within 5 s and reaches the close score (2.5).
+    for (let i = 0; i < 4; i++) command(a, `fast-${i}`, 'alpha', 5);
+    await until(() => host.read().intake.queuedMessages === 4);
+    host.pump();
+    const [code, reason] = await Promise.race([
+      closed,
+      delay(3000).then(() => {
+        throw Error('integrity close timeout');
+      }),
+    ]);
+    assert.equal(code, 1008);
+    assert.equal(reason.toString(), 'integrity-violation');
+    assert.equal(host.read().counters.alpha, 5, 'only the plausible command was applied');
+    const refusals = a.frames.filter((f) => f.type === 'refused');
+    assert.deepEqual(
+      refusals.map((f) => [f.id, f.reason]),
+      [
+        ['fast-1', 'integrity'],
+        ['fast-2', 'integrity'],
+      ],
+      'the client learns no rule name or threshold',
+    );
+    const { stats, audit, export: exported } = host.read().integrity;
+    assert.equal(JSON.parse(exported).entries.length, 4);
+    assert.equal(stats.rejected, 2);
+    assert.equal(stats.closed, 1);
+    assert.deepEqual(
+      audit.map((e) => [e.subject, e.kind, e.rule ?? e.reason]),
+      [
+        ['alpha', 'reject', 'counter-rate'],
+        ['alpha', 'reject', 'counter-rate'],
+        ['alpha', 'reject', 'counter-rate'],
+        ['alpha', 'close', 'integrity-violation'],
+      ],
+    );
+    // A paced peer is unaffected.
+    command(b, 'slow-0', 'beta', 5);
+    await until(() => host.read().intake.queuedMessages === 1);
+    host.pump();
+    await until(() => b.frames.some((f) => f.type === 'result'));
+    await delay(300);
+    command(b, 'slow-1', 'beta', 5);
+    await until(() => host.read().intake.queuedMessages === 1);
+    host.pump();
+    await until(() => b.frames.filter((f) => f.type === 'result').length === 2);
+    assert.equal(host.read().counters.beta, 10);
+  } finally {
+    await shutdown(host, peers);
+  }
+});
