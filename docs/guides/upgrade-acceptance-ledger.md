@@ -491,7 +491,7 @@ Status: implemented, candidate (`feat/genre-platformer-slice1`, PR pending); not
   (at most 0.25 s), boolean facts, finite external velocity within ±1000 m/s, and a
   ground answer that is finite and not above its query. Rejected steps change no state.
   At most five integration pieces per step; constant state per actor. The adapter
-  consumes a press at most once per rendered frame.
+  counts a press reported on consecutive ticks once (a per-tick rule, replay-safe).
 - Checked: unit tests for exact apex height and identical arcs at 30, 60, 120, 144 and
   240 Hz ticks (165 Hz within one tick), release cut, coyote and buffer windows at six
   rates, no re-jump while held, terminal speed, zero-length steps, cancellation and
@@ -500,7 +500,7 @@ Status: implemented, candidate (`feat/genre-platformer-slice1`, PR pending); not
   identical fixed-step samples at display rates 30–240 Hz with one jump per press; the
   hold button through the real action layer (press, no repeat press, release, cancel).
   Mutation checks: replacing the exact integration, widening the coyote window,
-  the per-frame press guard or the swept landing each fails at least one test.
+  the consecutive-tick press guard or the swept landing each fails at least one test.
 - Not established: feel on any device, touch hold controls, a template or browser
   consumer, moving platforms, slopes, lateral swept collision, and interaction with
   the zero-step press retention fix (PR #19, open): on current main a press during a

@@ -114,6 +114,12 @@ test('MV-01: a press visible to several ticks of one frame is consumed once, eve
   const runner = createSystemRunner<SceneContext>([jumpSystem({ action: 'jump', config: short, ground }), { id: 'probe', run() { if (last === 0 && tr.y > 0) rises++; last = tr.y; } }], { step: 1 / 60 });
   for (frame = 1; frame <= 60; frame++) { pressed = frame === 2; runner.frame(ctx, 1 / 30); }
   assert.equal(rises, 1);
+  // A tick-input replay runs one tick per frame with the same per-tick facts: the outcome must not change.
+  for (frame = 61; frame <= 180; frame++) { pressed = frame === 62 || frame === 63; runner.frame(ctx, 1 / 60); }
+  assert.equal(rises, 2, 'consecutive-tick reports of one press jump once under replay framing');
+  // Two separate presses (released in between) are two presses.
+  for (frame = 181; frame <= 240; frame++) { pressed = frame === 182 || frame === 190; runner.frame(ctx, 1 / 60); }
+  assert.equal(rises, 4);
   t.dispose();
 });
 

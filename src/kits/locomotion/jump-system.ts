@@ -27,7 +27,7 @@ export interface JumpSystemOptions {
   when?: (ctx: SceneContext) => boolean;
 }
 
-interface Body { feel: JumpFeel; supported: boolean; pressFrame: number }
+interface Body { feel: JumpFeel; supported: boolean; reported: boolean }
 const bodies = new WeakMap<World, Map<Entity, Body>>();
 const EPS = 1e-9;
 
@@ -39,8 +39,8 @@ function length(name: string, value: number | undefined, max: number): number {
 
 /**
  * Per fixed tick: query support, step the controller, resolve the landing against the same query and publish height.
- * Presses are consumed at most once per rendered frame, so a frame that runs several fixed ticks cannot jump twice from
- * one press. Cost: per target, two support queries per tick; no draws, no allocation beyond the step record.
+ * A press reported on consecutive ticks counts once (a frame that runs several fixed ticks may show one press to each),
+ * so one press cannot jump twice. The rule depends only on per-tick input, so tick-input replays reproduce it. Cost: per target, two support queries per tick; no draws, no allocation beyond the step record.
  */
 export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
   if (!o || typeof o.action !== 'string' || !o.action || typeof o.ground !== 'function') throw new RangeError('jump: action and ground are required');
@@ -60,10 +60,10 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
       const e = ctx.named(o.target ?? 'player'), tr = e === undefined ? undefined : ctx.world.get(e, Transform);
       if (e === undefined || !tr) return;
       let body = byWorld.get(e);
-      if (!body) byWorld.set(e, body = { feel: createJumpFeel(o.config), supported: false, pressFrame: -1 });
+      if (!body) byWorld.set(e, body = { feel: createJumpFeel(o.config), supported: false, reported: false });
+      const reported = ctx.input.pressed(o.action), pressed = reported && !body.reported;
+      body.reported = reported;
       if (o.when && !o.when(ctx)) { body.feel.cancelPress(); return; }
-      const frame = ctx.time.frame, pressed = ctx.input.pressed(o.action) && body.pressFrame !== frame;
-      if (pressed) body.pressFrame = frame;
       const feet = tr.y - offset, rising = body.feel.state.vy > 0;
       // Support: a supported actor may step up or snap down; an airborne one only touches what it already rests on.
       const reach = body.supported && !rising ? stepUp : 0;

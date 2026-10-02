@@ -69,8 +69,9 @@ presses without holding, so touch taps give the released (short) jump.
 **Bounds and overload.** Constant state per actor; at most five integration pieces
 per step; two support queries per adapter tick. Invalid steps, facts or ground answers
 throw before any state changes; a throwing tick is reported by the system runner.
-The adapter consumes a press at most once per rendered frame, so a frame that runs
-several fixed ticks cannot double-jump from one press.
+A press reported on consecutive ticks counts once, so a frame that runs several fixed
+ticks (and shows one press to each, as current main does) cannot double-jump. The rule
+reads only per-tick input, so a tick-input replay (`@kits/replay`) reproduces it.
 
 **Cancellation and recovery.** `cancelPress()` drops a pending press (`when` returning
 false does this). `reset()` clears everything; `resetJump(world, entity?)` does it for
