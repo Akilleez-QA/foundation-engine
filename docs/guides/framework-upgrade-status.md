@@ -671,8 +671,8 @@ no browser output timing, physical-device or audible verification.
 add moving support surfaces described as functions of time. Riders follow each tick's exact
 displacement. Leaving keeps the platform's velocity per a Godot-style `onLeave` policy, and
 platforms are one-way in their own frame. Paths, sizes, speed limits and policies are
-creator-chosen and bounded. Implemented as a candidate (`feat/mv02-moving-platforms`, PR
-pending), not integrated. Evidence is focused unit tests only. See the
+creator-chosen and bounded. Implemented as a candidate (`feat/mv02-moving-platforms`,
+PR #53), not integrated. Evidence is focused unit tests only. See the
 [kit README](../../src/kits/locomotion/README.md#moving-platforms-mv-02), the
 [recipe](../recipes/add-moving-platforms.md) and the [ledger](upgrade-acceptance-ledger.md).
 

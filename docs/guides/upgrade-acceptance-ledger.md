@@ -573,7 +573,7 @@ Status: integrated in v0.2.0 (PR #34; batch PR #46).
 
 ## MV-02: moving platforms — candidate
 
-Status: implemented, candidate (`feat/mv02-moving-platforms`, PR pending); not integrated.
+Status: implemented, candidate (`feat/mv02-moving-platforms`, PR #53); not integrated.
 
 - Runtime-enforced:
   - Registry bounds: `maxPlatforms` [1, 1024]; footprints (0, 1000] m; `maxSpeed`
