@@ -5,7 +5,7 @@ import {cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync} fr
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {ROOT} from './lib/game-dir.mjs';
-import {startGame} from './new-game.mjs';
+import {startGame, withHeading} from './new-game.mjs';
 
 function scratch() {
   const root = mkdtempSync(join(tmpdir(), 'engine-new-game-'));
@@ -45,5 +45,18 @@ test('new-game: a bad template or id is refused before anything is touched', () 
     assert.throws(() => startGame({root, name: 'nope', log: () => {}}), /No template 'nope'/);
     assert.throws(() => startGame({root, name: 'blank', id: 'Bad_Id', log: () => {}}), /kebab-case/);
     assert.equal(existsSync(join(root, 'game')), false);
+  } finally { rmSync(root, {recursive: true, force: true}); }
+});
+
+test('new-game: --title becomes GAME.md\'s heading as well as the game\'s title', () => {
+  const root = scratch();
+  try {
+    startGame({root, name: 'explorer', id: 'orb-run', title: 'Orb Run', log: () => {}});
+    const md = readFileSync(join(root, 'GAME.md'), 'utf8'), template = readFileSync(join(root, 'templates', 'explorer', 'GAME.md'), 'utf8');
+    assert.equal(md.split('\n')[0], '# Orb Run');
+    assert.equal(md.split('\n').slice(1).join('\n'), template.split('\n').slice(1).join('\n'), 'only the heading changes');
+    assert.match(readFileSync(join(root, 'game', 'game.ts'), 'utf8'), /title: 'Orb Run'/);
+    assert.equal(withHeading('# Old\n## Brief\n# Not this', 'A $& b'), '# A $& b\n## Brief\n# Not this', 'first heading only, title taken literally');
+    assert.equal(withHeading('## Brief\n', 'New'), '# New\n\n## Brief\n');
   } finally { rmSync(root, {recursive: true, force: true}); }
 });

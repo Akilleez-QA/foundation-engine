@@ -30,6 +30,8 @@ On Linux, add `--with-deps` if Chromium complains about missing libraries (it as
 npm run new-game -- --template arcade --id my-game --title "My game"
 ```
 
+The id becomes the save namespace, so choose it once. The title goes into `game/game.ts` and becomes the first heading of `GAME.md`.
+
 | Template | Start here if you want | Its README |
 |---|---|---|
 | `blank` | anything else: one scene, one cube, one action | [blank](../../templates/blank/README.md) |
