@@ -491,7 +491,10 @@ Status: implemented, candidate (`feat/genre-platformer-slice1`, PR #34); not int
   (at most 0.25 s), boolean facts, finite external velocity within ±1000 m/s, and a
   ground answer that is finite and not above its query. Rejected steps change no state.
   At most five integration pieces per step; constant state per actor. The adapter
-  counts a press reported on consecutive ticks once (a per-tick rule, replay-safe).
+  counts a press reported on consecutive ticks once (a per-tick rule, replay-safe; it
+  also merges genuine presses on adjacent ticks and is to be removed after PR #19). Grace
+  windows admit exactly floor(window × rate) ticks; descending landings query from the
+  tick's peak; adapter state is pruned to the current target.
 - Checked: unit tests for exact apex height and identical arcs at 30, 60, 120, 144 and
   240 Hz ticks (165 Hz within one tick), release cut, coyote and buffer windows at six
   rates, no re-jump while held, terminal speed, zero-length steps, cancellation and
@@ -499,7 +502,10 @@ Status: implemented, candidate (`feat/genre-platformer-slice1`, PR #34); not int
   about 1.5 m per tick landing exactly, step-up, snap-down, coyote off a ledge, and
   identical fixed-step samples at display rates 30–240 Hz with one jump per press; the
   hold button through the real action layer (press, no repeat press, release, cancel).
-  Mutation checks: replacing the exact integration, widening the coyote window,
+  Review fixes add a landing test where the apex falls inside a tick above a one-way
+  surface, exact tick counts for coyote and buffer windows at six rates and six window
+  lengths, and despawn pruning. Mutation checks: replacing the exact integration, widening the coyote window,
+  dropping the window tolerance, ignoring the tick peak, not pruning,
   the consecutive-tick press guard or the swept landing each fails at least one test.
 - Not established: feel on any device, touch hold controls, a template or browser
   consumer, moving platforms, slopes, lateral swept collision, and interaction with

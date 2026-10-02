@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { defineInput, defineScene, testScene, Name, Transform, type SceneContext, type InputState } from '../../author';
+import { defineEntity, defineInput, defineScene, testScene, Name, Transform, type SceneContext, type InputState } from '../../author';
 import { actionRows } from '../../author/compile';
 import { createSystemRunner } from '../../core/ecs/systems';
 import { InputActions, inputActionRegistry, type KeyEventLike } from '../../platform/input/actions';
-import { jumpSystem, resetJump } from './jump-system';
+import { jumpSystem, jumpStateCount, resetJump } from './jump-system';
 
 const config = { height: 2, timeToApex: 0.4, coyoteTime: 0.1, bufferTime: 0.1 };
 /** Floor at 0 everywhere; a one-way ledge at 1.5 for 2 <= x <= 4. */
@@ -30,6 +30,37 @@ test('MV-01: surfaces above the feet are one-way; a falling actor lands on them 
   // A very fast fall from high above (one tick spans far more than the ledge thickness) still lands.
   tr.y = 100; resetJump(t.world); t.release('jump'); t.run(3);   // ~1.5 m per tick at touchdown
   assert.equal(tr.y, 1.5);
+  t.dispose();
+});
+
+test('MV-01: a one-way surface passed by an apex that falls inside a tick still catches the descent', async () => {
+  // Find where the tick-sampled arc tops out below the true apex, and put a surface between the two.
+  const cfg = { height: 2, timeToApex: 0.4083, coyoteTime: 0, bufferTime: 0 };
+  const probe = await testScene(scene(0, 0), { systems: [jumpSystem({ action: 'jump', config: cfg, ground: (_x, _z, below) => (below >= 0 ? 0 : null) })] });
+  const pr = probe.world.get(probe.ctx.named('player')!, Transform)!;
+  probe.press('jump'); probe.hold('jump');
+  let sampled = 0; for (let i = 0; i < 60; i++) { probe.run(1 / 60); sampled = Math.max(sampled, pr.y); }
+  probe.dispose();
+  assert.ok(2 - sampled > 1e-4, `the apex lies inside a tick (${2 - sampled} m above the last sample)`);
+  const ledge = (sampled + 2) / 2, ground = (_x: number, _z: number, below: number) => (below >= ledge ? ledge : below >= 0 ? 0 : null);
+  const t = await testScene(scene(0, 0), { systems: [jumpSystem({ action: 'jump', config: cfg, ground })] });
+  const tr = t.world.get(t.ctx.named('player')!, Transform)!;
+  t.press('jump'); t.hold('jump'); t.run(2);
+  assert.equal(tr.y, ledge);
+  t.dispose();
+});
+
+test('MV-01: the adapter keeps state only for its current target', async () => {
+  const t = await testScene(scene(0, 0), { systems: [jumpSystem({ action: 'jump', config, ground })] });
+  const first = t.ctx.named('player')!;
+  t.press('jump'); t.hold('jump'); t.run(0.1);
+  assert.equal(jumpStateCount(t.world), 1);
+  t.world.despawn(first);
+  t.run(1 / 60);
+  assert.equal(jumpStateCount(t.world), 0, 'a despawned target leaves no state behind');
+  const second = t.ctx.spawn(defineEntity({ id: 'again', components: [Name({ name: 'player' }), Transform({ x: 0, y: 0 })] }));
+  t.release('jump'); t.run(0.5);
+  assert.equal(t.world.get(second, Transform)!.y, 0, 'a new actor starts from rest, not with the old one\'s velocity');
   t.dispose();
 });
 

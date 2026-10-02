@@ -140,3 +140,35 @@ test('MV-01: a zero-length step records a press without ageing it; reset and can
   assert.equal(again.step(1 / 60, { pressed: false, held: true, grounded: true }).jumped, false);
   assert.deepEqual({ ...again.state, vy: 0 }, { vy: 0, grounded: true, fromJump: false, released: false, sinceSupport: 0, pressAge: null });
 });
+
+/** Ticks after the event at which a press still jumps, scanning offsets 1…n (coyote) or 0…n (buffer). */
+function admittedCoyote(window: number, hz: number) {
+  let last = 0;
+  for (let n = 1; n <= hz; n++) {
+    const feel = createJumpFeel({ height: 1, timeToApex: 0.3, coyoteTime: window, bufferTime: 0 }), dt = 1 / hz;
+    feel.step(dt, { pressed: false, held: false, grounded: true });
+    let jumped = false;
+    for (let k = 1; k <= n; k++) jumped = feel.step(dt, { pressed: k === n, held: true, grounded: false }).jumped || jumped;
+    if (jumped) last = n;
+  }
+  return last;
+}
+function admittedBuffer(window: number, hz: number) {
+  let last = -1;
+  for (let n = 0; n <= hz; n++) {
+    const feel = createJumpFeel({ height: 1, timeToApex: 0.3, coyoteTime: 0, bufferTime: window }), dt = 1 / hz;
+    feel.setVelocity(-1);
+    let jumped = false;
+    for (let k = 0; k <= n; k++) jumped = feel.step(dt, { pressed: k === 0, held: true, grounded: k === n }).jumped || jumped;
+    if (jumped) last = n;
+  }
+  return last;
+}
+
+test('MV-01: coyote and buffer windows admit exactly floor(window × rate) ticks after the event at every rate', () => {
+  for (const hz of [30, 60, 120, 144, 165, 240]) for (const window of [0, 0.05, 0.1, 0.2, 1 / 6, 0.25]) {
+    const want = Math.floor(window * hz + 1e-9);
+    assert.equal(admittedCoyote(window, hz), want, `coyote ${window} at ${hz} Hz`);
+    assert.equal(admittedBuffer(window, hz), want, `buffer ${window} at ${hz} Hz`);
+  }
+});

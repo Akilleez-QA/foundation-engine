@@ -58,23 +58,27 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
       let byWorld = bodies.get(ctx.world);
       if (!byWorld) bodies.set(ctx.world, byWorld = new Map());
       const e = ctx.named(o.target ?? 'player'), tr = e === undefined ? undefined : ctx.world.get(e, Transform);
+      // Only the current target keeps state: a despawned or renamed actor's controller is dropped (at most one entry).
+      for (const key of byWorld.keys()) if (key !== e || !tr) byWorld.delete(key);
       if (e === undefined || !tr) return;
       let body = byWorld.get(e);
       if (!body) byWorld.set(e, body = { feel: createJumpFeel(o.config), supported: false, reported: false });
       const reported = ctx.input.pressed(o.action), pressed = reported && !body.reported;
       body.reported = reported;
       if (o.when && !o.when(ctx)) { body.feel.cancelPress(); return; }
-      const feet = tr.y - offset, rising = body.feel.state.vy > 0;
+      const feet = tr.y - offset, rising = body.feel.vy > 0;
       // Support: a supported actor may step up or snap down; an airborne one only touches what it already rests on.
       const reach = body.supported && !rising ? stepUp : 0;
       const under = support(tr.x, tr.z, feet + reach);
       const grounded = !rising && under !== null && feet - under <= (body.supported ? snap : 0) + EPS;
       const r = body.feel.step(dt, { pressed, held: ctx.input.held(o.action), grounded });
-      let next = (grounded ? under! : feet) + r.dy;
+      const base = grounded ? under! : feet;
+      let next = base + r.dy;
       body.supported = grounded && !r.jumped;
       if (r.vy <= 0) {
-        // Swept against the support query: anything between the start and end of the tick is found, at any speed.
-        const top = grounded ? Math.max(feet, under!) : feet;
+        // Swept against the support query from the highest point of the tick (an apex inside the tick included) down to
+        // its end: anything crossed while descending is found, at any speed.
+        const top = Math.max(grounded ? Math.max(feet, under!) : feet, base + r.peak);
         const land = support(tr.x, tr.z, top);
         if (land !== null && next <= land + EPS) { next = land; body.supported = true; }
       }
@@ -89,3 +93,6 @@ export function resetJump(world: World, entity?: Entity): void {
   const active = bodies.get(world); if (!active) return;
   for (const [e, body] of active) if (entity === undefined || e === entity) { body.feel.reset(); body.supported = false; }
 }
+
+/** Diagnostic: how many actors hold adapter state in this world (0 or 1 per running `jumpSystem` target). */
+export function jumpStateCount(world: World): number { return bodies.get(world)?.size ?? 0; }

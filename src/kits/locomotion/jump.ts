@@ -52,7 +52,7 @@ export interface JumpFeelStep {
 }
 export interface JumpFeelState {
   readonly vy: number; readonly grounded: boolean; readonly fromJump: boolean; readonly released: boolean;
-  /** Seconds since the last supported tick, or null while supported or after a jump consumed the grace. */
+  /** Seconds since the last supported tick (0 on it), or null outside the coyote window or after a jump. */
   readonly sinceSupport: number | null;
   /** Age of the pending press in seconds, or null. */
   readonly pressAge: number | null;
@@ -76,70 +76,93 @@ export function deriveJump(config: JumpFeelConfig): JumpFeelDerived {
   return Object.freeze({ launchSpeed: v0, gravity: g, fallGravity: g * fall, releaseGravity: g * release, apexGravity: g * s, apexSpeed: f * v0, maxFallSpeed: maxFall });
 }
 
+/** Tolerance for comparing accumulated seconds with a window, so window edges do not depend on rounding. */
+const WINDOW_EPS = 1e-9;
+
 /**
- * Create one actor's vertical controller. Bounded constant state; no timers, callbacks or allocation per step beyond
+ * Create one actor's vertical controller. Bounded constant state; no timers or callbacks; per step it allocates only
  * the returned record. Invalid steps throw before any state changes.
+ *
+ * Grace windows share one convention: an event (losing support, a press) is honoured on a later tick while the time
+ * elapsed since the event's tick is at most the window. Losing support counts from the last supported tick, so the
+ * first unsupported tick is already `dt` after it (a zero coyote window admits none); a press is honoured on its own
+ * tick (elapsed 0) whatever the buffer. At a fixed rate this admits exactly floor(window × rate) ticks after the event.
  */
 export function createJumpFeel(config: JumpFeelConfig) {
   const d = deriveJump(config);
   const coyote = bounded('coyoteTime', config.coyoteTime, 0.1, 0, 1), buffer = bounded('bufferTime', config.bufferTime, 0.1, 0, 1);
   const maxDt = bounded('maxDt', config.maxDt, 0.25, 0, 0.25, true);
-  let vy = 0, grounded = false, fromJump = false, released = false, sinceSupport: number | null = null, pressAge: number | null = null;
+  const band = d.apexSpeed, floor = -d.maxFallSpeed;
+  let vy = 0, grounded = false, fromJump = false, released = false;
+  /** Seconds since the last supported tick, or null. */
+  let sinceSupport: number | null = null;
+  /** Seconds since the pending press's tick, or null; `fresh` marks a press recorded by a zero-length step. */
+  let pressAge: number | null = null, fresh = false;
+  // Integration results, written by integrate() to avoid a per-step tuple.
+  let outDy = 0, outPeak = 0;
 
   const gravityAt = (v: number, held: boolean) => {
     // Evaluated for the open interval just below v: velocity only decreases under gravity.
     if (v > 0 && fromJump && released) return d.releaseGravity;
-    if (held && d.apexSpeed > 0 && v <= d.apexSpeed && v > -d.apexSpeed) return d.apexGravity;
+    if (held && band > 0 && v <= band && v > -band) return d.apexGravity;
     return v > 0 ? d.gravity : d.fallGravity;
   };
+  /** The next velocity below v where the regime can change: band, 0, -band, then terminal speed. */
   const nextBreak = (v: number) => {
-    let best = -d.maxFallSpeed;
-    for (const b of [d.apexSpeed, 0, -d.apexSpeed]) if (b < v && b > best) best = b;
-    return best;
+    if (band > 0 && v > band) return band;
+    if (v > 0) return 0;
+    if (band > 0 && v > -band && -band > floor) return -band;
+    return floor;
   };
 
-  /** Integrate `dt` seconds exactly; returns [dy, peak]. Bounded: at most four regime changes per step. */
-  const integrate = (dt: number, held: boolean): [number, number] => {
+  /** Integrate `dt` seconds exactly into outDy/outPeak. Bounded: at most five pieces per step. */
+  const integrate = (dt: number, held: boolean) => {
     let left = dt, y = 0, peak = 0;
-    if (vy < -d.maxFallSpeed) vy = -d.maxFallSpeed;
+    if (vy < floor) vy = floor;
     for (let guard = 0; left > 0 && guard < 6; guard++) {
-      if (vy <= -d.maxFallSpeed) { y += vy * left; left = 0; break; }
+      if (vy <= floor) { y += vy * left; left = 0; break; }
       const g = gravityAt(vy, held), stop = nextBreak(vy), span = (vy - stop) / g;
       const used = Math.min(left, span);
       y += vy * used - 0.5 * g * used * used;
       vy = used === span ? stop : vy - g * used;
       if (vy <= 0 && fromJump) released = false;
-      left -= used; peak = Math.max(peak, y);
+      left -= used; if (y > peak) peak = y;
     }
-    return [y, peak];
+    outDy = y; outPeak = peak;
   };
 
   return {
     derived: d,
+    /** Current vertical velocity (m/s), without building a state snapshot. */
+    get vy() { return vy; },
+    /** A frozen snapshot for diagnostics and tests; allocates, so prefer `vy` in a per-tick loop. */
     get state(): JumpFeelState { return Object.freeze({ vy, grounded, fromJump, released, sinceSupport, pressAge }); },
     /**
-     * Advance one tick. `dt === 0` only records a press (a frame that ran no simulation); timers do not age.
+     * Advance one tick. `dt === 0` only records a press (a frame that ran no simulation); timers do not age, and the
+     * press counts as made on the next positive step.
      * Throws RangeError for a negative, non-finite or over-long step, or non-boolean facts, without changing state.
      */
     step(dt: number, input: JumpFeelInput): JumpFeelStep {
       if (typeof dt !== 'number' || !Number.isFinite(dt) || dt < 0 || dt > maxDt) throw new RangeError(`jump: step must be within [0, ${maxDt}] seconds`);
       if (!input || typeof input.pressed !== 'boolean' || typeof input.held !== 'boolean' || typeof input.grounded !== 'boolean') throw new RangeError('jump: pressed, held and grounded must be booleans');
+      if (dt === 0) { if (input.pressed) { pressAge = 0; fresh = true; } return { dy: 0, vy, peak: 0, jumped: false }; }
+      // Age the pending press and the support window to this tick, then apply this tick's facts.
       if (input.pressed) pressAge = 0;
-      if (dt === 0) return { dy: 0, vy, peak: 0, jumped: false };
+      else if (pressAge !== null && !fresh) pressAge += dt;
+      fresh = false;
+      if (pressAge !== null && pressAge > buffer + WINDOW_EPS) pressAge = null;
       // Support reported while still rising is ignored: the caller resolved last tick's motion before this jump left it.
       grounded = input.grounded && vy <= 0;
       if (grounded) { vy = 0; fromJump = false; released = false; sinceSupport = 0; }
-      const canJump = grounded || (sinceSupport !== null && sinceSupport < coyote);
+      else if (sinceSupport !== null) { sinceSupport += dt; if (sinceSupport > coyote + WINDOW_EPS) sinceSupport = null; }
+      const canJump = grounded || sinceSupport !== null;
       let jumped = false;
-      if (pressAge !== null && pressAge <= buffer && canJump) {
+      if (pressAge !== null && canJump) {
         vy = d.launchSpeed; jumped = true; grounded = false; fromJump = true; released = false; pressAge = null; sinceSupport = null;
       }
       if (fromJump && vy > 0 && !input.held) released = true;
-      const [dy, peak] = integrate(dt, input.held);
-      if (pressAge !== null) { pressAge += dt; if (pressAge > buffer) pressAge = null; }
-      if (sinceSupport !== null && !grounded) { sinceSupport += dt; if (sinceSupport >= coyote) sinceSupport = null; }
-      else if (sinceSupport !== null && grounded) sinceSupport = 0;
-      return { dy, vy, peak, jumped };
+      integrate(dt, input.held);
+      return { dy: outDy, vy, peak: outPeak, jumped };
     },
     /** Caller hit a ceiling: drop upward velocity. */
     ceiling() { if (vy > 0) vy = 0; },
@@ -149,9 +172,9 @@ export function createJumpFeel(config: JumpFeelConfig) {
       vy = v; fromJump = false; released = false; if (v > 0) { grounded = false; sinceSupport = null; }
     },
     /** Drop a pending press (a menu opened, control moved elsewhere). */
-    cancelPress() { pressAge = null; },
+    cancelPress() { pressAge = null; fresh = false; },
     /** Clear everything: an authority change, a teleport, a respawn. */
-    reset() { vy = 0; grounded = false; fromJump = false; released = false; sinceSupport = null; pressAge = null; },
+    reset() { vy = 0; grounded = false; fromJump = false; released = false; sinceSupport = null; pressAge = null; fresh = false; },
   };
 }
 export type JumpFeel = ReturnType<typeof createJumpFeel>;
