@@ -43,6 +43,8 @@ export const RULES = [
   {name: 'custom-event', strict: true, re: /\bnew\s+(?:CustomEvent|HashChangeEvent)\s*[(<]/g, allow: []},
   // Persistent and session storage belong to the save store's storage port.
   {name: 'local-storage', strict: true, re: /\b(?:localStorage|sessionStorage)\b/g, allow: ['core/save/']},
+  // Large-world binary records belong to the chunk port beside it (docs/recipes/store-large-world-records.md).
+  {name: 'indexed-db', strict: true, re: /\bindexedDB\b/g, allow: ['core/save/chunk-port.ts']},
   // One render path (ADR 0034, STD-REN-1): WebGL2 only, contexts created only by the renderer pool.
   {name: 'three-webgpu', strict: true, re: /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"`]three\/(?:webgpu|tsl)['"`]/g, allow: []},
   {name: 'webgl-renderer', strict: true, re: /\bnew\s+(?:[\w$]+\.)?WebGLRenderer\s*\(/g, allow: ['platform/render/renderer-pool.ts']},
