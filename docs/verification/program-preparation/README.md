@@ -108,12 +108,11 @@ rather than re-measuring; tests, typecheck, lint, snapshot and bundle checks ran
 ### Revision map
 
 Earlier revisions named above were measured before rebasing and are not reachable
-from the published branch, which is based on `main` `f7619ef` (PR #1 changed only
-the CI workflow after `1b0b846`). Their source trees (`src/`, `scripts/`, templates)
-match these published commits; only documentation differs:
-`1d0d3e0` = `7cdf470`, `86df82e` = `04ca4ea`, `2cdd442` = `4196e16`,
-`724cedf` = `3b66597`, `cc0f1c7` = `113d887`. The submission head was re-checked
-again after this rebase; see the pull request for that exact-head result.
+from the published branch (GitHub later rebased it onto `main` `7d57880`, which
+changed only CI workflow files after `1b0b846`). Their source trees match these
+published commits; only documentation differs:
+`1d0d3e0` = `2c856f4`, `86df82e` = `f9a7ad4`, `2cdd442` = `f5abb44`,
+`724cedf` = `4357a22`, `cc0f1c7` = `78cab4f`.
 
 ## CI browser-suite failure and fix (`17391f3`)
 
