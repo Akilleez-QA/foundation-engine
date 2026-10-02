@@ -54,7 +54,8 @@ export function parseMessage(message: string): Part[] {
       }
       if (depth >= MESSAGE_LIMITS.maxDepth) fail(`Arguments nested deeper than ${MESSAGE_LIMITS.maxDepth}`);
       const select = type === 'select';
-      const forms: Record<string, Part[]> = {};
+      // Null prototype: a case named `__proto__` (or `constructor`) is an ordinary case, never the prototype.
+      const forms: Record<string, Part[]> = Object.create(null);
       for (;;) {
         const sel = (select ? /^\s*([A-Za-z0-9_][\w-]*)\s*\{/ : /^\s*(=\d+|[a-z]+)\s*\{/).exec(message.slice(i, i + 256));
         if (!sel) break;
@@ -94,14 +95,25 @@ export function messageVars(parts: readonly Part[], into = new Map<string, 'numb
 
 const pluralRules = new Map<string, Intl.PluralRules>();
 const numberFormats = new Map<string, Intl.NumberFormat>();
-/** An unsupported or malformed locale tag falls back to `en` rules instead of throwing while rendering. */
-function cached<T>(map: Map<string, T>, key: string, make: (l: string) => T): T {
-  let v = map.get(key);
-  if (!v) { try { v = make(key.split('\u0000')[0]); } catch { v = make('en'); } map.set(key, v); }
-  return v;
+/**
+ * The tag Intl actually supports for this service, else `en`. Without this, a well-formed but unsupported tag
+ * (`xx`, `tlh`) would silently use the host's default locale, so the same catalogue would render differently on
+ * different machines. A malformed tag also resolves to `en` instead of throwing while rendering.
+ */
+function supported(tag: string, service: { supportedLocalesOf(l: string): string[] }): string {
+  try { return service.supportedLocalesOf(tag)[0] ?? 'en'; } catch { return 'en'; }
 }
-const rulesFor = (l: string, ordinal: boolean) => cached(pluralRules, l + '\u0000' + (ordinal ? 'o' : 'c'), x => new Intl.PluralRules(x, { type: ordinal ? 'ordinal' : 'cardinal' }));
-const numbersFor = (l: string) => cached(numberFormats, l, x => new Intl.NumberFormat(x));
+const rulesFor = (l: string, ordinal: boolean) => {
+  const key = l + '\u0000' + (ordinal ? 'o' : 'c');
+  let v = pluralRules.get(key);
+  if (!v) { v = new Intl.PluralRules(supported(l, Intl.PluralRules), { type: ordinal ? 'ordinal' : 'cardinal' }); pluralRules.set(key, v); }
+  return v;
+};
+const numbersFor = (l: string) => {
+  let v = numberFormats.get(l);
+  if (!v) { v = new Intl.NumberFormat(supported(l, Intl.NumberFormat)); numberFormats.set(l, v); }
+  return v;
+};
 
 /** Render parsed parts. A hole with no value stays visible as `{name}`, so the gap is seen rather than hidden. */
 export function renderMessage(parts: readonly Part[], vars: Vars | undefined, locale: string, count?: number): string {

@@ -29,7 +29,8 @@ English). Other languages use their own categories; write the forms their rules 
 ```
 
 Cases are identifiers matched against the value's text; anything else, or no value, uses `other`. Arguments
-nest: `{who, select, she {She has {n, plural, one {# map} other {# maps}}} other {They have # maps}}`.
+nest: `{who, select, she {She has {n, plural, one {# map} other {# maps}}} other {They have {n, plural, one {# map} other {# maps}}}}`.
+`#` means the number only inside a `plural` or `selectordinal` form; elsewhere it is a literal `#`.
 
 ## Rules the checker enforces
 

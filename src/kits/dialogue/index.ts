@@ -43,6 +43,7 @@ export function createDialogue(definition: DialogueDefinition, session: string, 
   for (const n of d.nodes) {
     if (!validId(n.id) || !validId(n.text) || !Array.isArray(n.options) || n.options.length > DIALOGUE_LIMITS.maxOptions || new Set(n.options.map(o => o.id)).size !== n.options.length) throw Error('dialogue: invalid node');
     for (const o of n.options) {
+      if (o.requires !== undefined && !Array.isArray(o.requires) || o.effects !== undefined && !Array.isArray(o.effects)) throw Error('dialogue: invalid option');
       if (!validId(o.id) || !validId(o.text) || (o.to !== null && !nodes.has(o.to)) || (o.requires ?? []).length > 1024 || (o.effects ?? []).length > 1024 || (o.requires ?? []).some((x: unknown) => !validId(x)) || (o.effects ?? []).some((x: unknown) => !validId(x))) throw Error('dialogue: invalid option');
       checkConditions(o.when, o.set, declared, nodes);
     }
@@ -63,6 +64,7 @@ export function createDialogue(definition: DialogueDefinition, session: string, 
       if (!r.visits || typeof r.visits !== 'object' || Array.isArray(r.visits)) throw Error('dialogue: invalid snapshot visits');
       for (const [k, v] of Object.entries(r.visits)) { if (!nodes.has(k) || !Number.isSafeInteger(v) || v < 0) throw Error('dialogue: invalid snapshot visits'); visits[k] = v; }
     }
+    if (r.node !== null && !(visits[r.node] >= 1)) throw Error('dialogue: invalid snapshot visits');
     state = { definition: d.id, session, node: r.node, revision: r.revision, variables: restoreVariables(declared, r.variables), visits };
   } else {
     const visits: Record<string, number> = Object.create(null); visits[d.start] = 1;
@@ -72,8 +74,8 @@ export function createDialogue(definition: DialogueDefinition, session: string, 
   const allowed = (o: DialogueOption, facts: ReadonlySet<string>) =>
     (o.requires ?? []).every(f => facts.has(f)) && (o.when === undefined || evaluate(o.when, { variables: state.variables, visits: visitsOf, facts }));
   const snapshot = (): DialogueState => {
-    const visits: Record<string, number> = {};
-    for (const k of Object.keys(state.visits).sort()) visits[k] = state.visits[k];
+    // fromEntries defines own properties, so a node id such as `__proto__` keeps its count.
+    const visits: Record<string, number> = Object.fromEntries(Object.keys(state.visits).sort().map(k => [k, state.visits[k]]));
     return { definition: state.definition, session: state.session, node: state.node, revision: state.revision, variables: { ...state.variables }, visits };
   };
   return {

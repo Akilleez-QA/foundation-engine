@@ -128,3 +128,27 @@ test('authored definitions are copied: later edits to conditions or variables ch
   const vars = d.variables() as Record<string, unknown>; vars.coins = 99;
   assert.equal(d.variables().coins, 3);
 });
+
+test('node ids named like Object.prototype members keep their visit counts through a JSON save', () => {
+  const def = JSON.parse('{"id":"p","start":"__proto__","variables":{"__proto__":1},"nodes":[{"id":"__proto__","text":"a","options":[{"id":"loop","text":"l","to":"__proto__","when":{"visits":"__proto__","op":"lt","value":3},"set":[{"var":"__proto__","op":"add","value":1}]},{"id":"x","text":"x","to":null}]}]}') as DialogueDefinition;
+  const d = createDialogue(def, 's');
+  assert.equal(pick(d, 'loop').status, 'applied');
+  assert.equal(d.visits('__proto__'), 2);
+  const saved = JSON.parse(JSON.stringify(d.snapshot()));
+  assert.equal(Object.hasOwn(saved.visits, '__proto__'), true);
+  assert.equal(Object.hasOwn(saved.variables, '__proto__'), true);
+  const r = createDialogue(def, 's', saved);
+  assert.equal(r.visits('__proto__'), 2);
+  assert.equal(r.variables()['__proto__'], 2);
+  assert.equal(pick(r, 'loop').status, 'applied');
+  assert.deepEqual(ids(r), ['x'], 'the visit condition sees the restored count');
+});
+
+test('malformed option lists are invalid options, and a restored current node must have been visited', () => {
+  const def = (extra: object) => ({ id: 'o', start: 'a', nodes: [{ id: 'a', text: 'a', options: [{ id: 'x', text: 'x', to: null, ...extra }] }] }) as DialogueDefinition;
+  for (const extra of [{ requires: 'abc' }, { effects: 'abc' }, { requires: { length: 1 } }]) assert.throws(() => createDialogue(def(extra), 's'), /invalid option/);
+  const base = { definition: 'shop', session: 'run', node: 'hello', revision: 1 };
+  assert.throws(() => createDialogue(shop, 'run', { ...base, visits: {} }), /visits/);
+  assert.throws(() => createDialogue(shop, 'run', { ...base, visits: { hello: 0 } }), /visits/);
+  assert.doesNotThrow(() => createDialogue(shop, 'run', { ...base, node: null, visits: {} }));
+});

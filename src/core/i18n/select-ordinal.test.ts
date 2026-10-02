@@ -83,3 +83,24 @@ test('t() follows the chain per key and pluralises with the locale that supplied
   assert.equal(i.t('x.b'), 'B');
   assert.deepEqual(missing, []);
 });
+
+test('well-formed but unsupported tags use en rules and digits, never the host default locale', () => {
+  const plural = parseMessage('{n, plural, one {# item} other {# items}}');
+  const ordinal = parseMessage('{n, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}');
+  for (const tag of ['xx', 'tlh', 'zz-ZZ', 'not a locale!']) {
+    // French (a common host default) would say "0 item" and "1 200 items".
+    assert.equal(renderMessage(plural, { n: 0 }, tag), '0 items', tag);
+    assert.equal(renderMessage(plural, { n: 1200 }, tag), '1,200 items', tag);
+    assert.equal(renderMessage(ordinal, { n: 22 }, tag), '22nd', tag);
+  }
+  // A supported tag still uses its own rules.
+  assert.equal(renderMessage(plural, { n: 0 }, 'fr'), '0 item');
+});
+
+test('select cases named like Object.prototype members are ordinary cases', () => {
+  const parts = parseMessage('{g, select, __proto__ {P} constructor {C} other {O}}');
+  assert.equal(renderMessage(parts, { g: '__proto__' }, 'en'), 'P');
+  assert.equal(renderMessage(parts, { g: 'constructor' }, 'en'), 'C');
+  assert.equal(renderMessage(parts, { g: 'toString' }, 'en'), 'O');
+  assert.equal(renderMessage(parseMessage('{g, select, other {O}}'), { g: '__proto__' }, 'en'), 'O');
+});
