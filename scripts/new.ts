@@ -40,9 +40,10 @@ export function withChangelogRow(md: string, row: string): string {
   if (h < 0) return md.replace(/\n*$/, '\n') + row + '\n';
   let i = h + 1;
   while (i < lines.length && !lines[i].startsWith('|') && !/^#/.test(lines[i])) i++;
-  if (i >= lines.length || !lines[i].startsWith('|')) i = h + 1;
-  else while (i < lines.length && lines[i].startsWith('|')) i++;
-  lines.splice(i, 0, row);
+  if (i < lines.length && lines[i].startsWith('|')) {
+    while (i < lines.length && lines[i].startsWith('|')) i++;
+    lines.splice(i, 0, row);
+  } else lines.splice(h + 1, 0, '', '| Date | Change | Budgets |', '|---|---|---|', row);   // a heading with no table yet
   return lines.join('\n');
 }
 

@@ -32,7 +32,7 @@ test('brief: an input whose binding overlaps the engine\'s shell menu fails chec
     cpSync(join(ROOT, 'templates', 'blank'), tmp, { recursive: true });
     writeFileSync(join(tmp, 'game', 'jump.ts'), "import { defineInput } from '@engine';\nexport default defineInput({ id: 'jump', label: 'Jump', keys: ['f'], pad: ['x'], tap: true });\n");
     const problems = await checkGame(join(tmp, 'game'));
-    assert.ok(problems.some(p => /input bindings would stop the boot: .*pad x: shell\.menu \(global\) and game\.jump \(global\) overlap/.test(p)), problems.join('\n'));
+    assert.ok(problems.some(p => /input bindings would stop the dev\/test boot .*pad x: shell\.menu \(global\) and game\.jump \(global\) overlap/.test(p)), problems.join('\n'));
     rmSync(join(tmp, 'game', 'jump.ts')); // a new file name: the module cache keeps the first jump.ts
     writeFileSync(join(tmp, 'game', 'jump-free.ts'), "import { defineInput } from '@engine';\nexport default defineInput({ id: 'jump', label: 'Jump', keys: ['f'], pad: ['y'], tap: true });\n");
     const fixed = await checkGame(join(tmp, 'game'));

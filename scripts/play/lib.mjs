@@ -39,16 +39,19 @@ export async function open(b, url, scene, {seed = 1, query = {}} = {}) {
   target.searchParams.set('flags', 'dev.silent');
   target.searchParams.set('seed', String(seed));
   target.hash = `scene/${scene}`;
+  // Stop early (ERROR_GRACE_MS after a fatal sign) only when the page cannot boot: an uncaught exception or the app's own
+  // '[engine] boot failed' report. Ordinary console errors (a 404 on a slow, cold dev server) never start the grace.
+  let fatalAt = null;
+  const fatal = () => { fatalAt ??= Date.now(); };
+  b.page.on('pageerror', fatal);
+  b.page.on('console', m => { if (m.type() === 'error' && m.text().startsWith('[engine] boot failed')) fatal(); });
   await b.goto(target.href);
-  // Wait for the scene; stop early (ERROR_GRACE_MS after the first page error) when the page failed to boot, so a broken
-  // game (a registry problem, an import error) is reported in seconds with its message, not after the whole timeout.
   const active = `!!document.querySelector('#app[data-scene="scene.${scene}"][data-scene-state="active"]') && !!window.engine`;
   let failure = null;
   for (const t0 = Date.now(); ;) {
     if (await b.evaluate(active).catch(() => false)) break;
-    const firstError = b.errors.length ? (b.firstErrorAt ??= Date.now()) : null;
     if (Date.now() - t0 > OPEN_TIMEOUT_MS) { failure = `timeout ${OPEN_TIMEOUT_MS} ms`; break; }
-    if (firstError && Date.now() - firstError > ERROR_GRACE_MS) { failure = 'the page reported errors and the scene did not start'; break; }
+    if (fatalAt !== null && Date.now() - fatalAt > ERROR_GRACE_MS) { failure = 'the app failed to boot (uncaught exception or boot failure report)'; break; }
     await sleep(100);
   }
   if (failure) {
