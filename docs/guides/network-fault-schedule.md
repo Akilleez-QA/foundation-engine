@@ -27,7 +27,8 @@ npm run faults:network -- --seed 42 --shrink      # shrink a failure and save it
 npm run faults:network -- --replay playtest/network-faults/seed-42.json
 ```
 
-The CLI lowers its own process priority. It requires Node 22.13 or newer
+The CLI lowers its own process priority and exits explicitly with status 1 on any
+failure, including a leaked handle. It requires Node 22.13 or newer
 (`node:sqlite`), like the SQLite adapter. The same fixed seeds also run in
 `npm test` through `tools/authority-workbench/fault-harness.test.mjs`; on older
 Node versions those tests skip with a stated reason, and a skip is not evidence.
@@ -72,7 +73,7 @@ invariant still fails (at most 200 reruns), prints the remaining steps and write
 | `hold-commit` | Holds the response after a durable commit (slow storage), then either releases it, drops the requesting client, or crashes the host before the reply. |
 | `restart` | Host restart with 0–3 steps of downtime; clients reconnect with the retry schedule. |
 | `storage` | The SQLite adapter's `beforeCommit` or `afterCommit` test hook fails once. Recovery is the operator's `recoverAuthority()` or a restart after 1–5 steps. |
-| `clock` | Host or client clock skew, backwards up to 2 s, or a 16 s forward jump past the host idle timeout. |
+| `clock` | Host or client clock skew: backwards up to 2 s, or a 16 s forward jump past the host idle timeout. Backwards readings are held at the last value (see Limits). |
 | `slow` | A client stops reading for 2–12 steps; past 16 buffered frames it closes its own connection. |
 | `revoke` | The host revokes a principal for its lifetime. |
 | `input`, `operator`, `idle` | Ordinary predicted commands, operator commands and quiet steps. |
@@ -97,9 +98,11 @@ Facts come from an independent read-only SQLite connection, not from the host:
   result. `result-unavailable` refers to a consumed sequence. A `gap` never names
   a consumed sequence, and `conflict` never occurs, because clients resend exact
   payloads only.
-- A before-commit failure leaves storage unchanged and the authority `unavailable`.
-  An after-commit failure leaves the commit in storage and the authority `unknown`
-  until recovery. A ready authority equals storage. The authority is unavailable
+- A before-commit failure leaves storage at the authority's compare-and-swap base
+  revision and the authority `unavailable`. An after-commit failure leaves exactly
+  one new revision in storage and the authority `unknown` until recovery. The
+  expected revision comes from the authority's last confirmed checkpoint, never
+  from storage itself. A ready authority equals storage. The authority is unavailable
   only for an injected cause.
 - Every baseline a client adopts matches durable state and that stream's prefix
   at its revision. A fresh connection never forgets a confirmed prefix. Predicted
@@ -132,6 +135,8 @@ keep the reference behaviour:
 - `observe(event)`: a trusted diagnostic callback for `open`, `refused`, `frame`,
   `sent` and `close` events, labelled by an untrusted `?label=` query string that
   is used only for observation. It never receives credentials.
+- `openStorage` (default `openAuthorityStorage`): lets the test suite substitute a
+  deliberately defective adapter to prove the checker notices it.
 - `recoverAuthority()`: explicit operator recovery after a storage conflict or
   unknown commit; also the IPC method `recoverAuthority`. Without it, the
   reference host stayed fail-stop until restart, which remains a valid choice.
@@ -147,6 +152,10 @@ defects (reverted, not committed), each over 30 seeds:
 - After-commit failures misreported as `rejected`: caught as `authority-unavailable`.
 - Retained-receipt lookup removed: caught as `gap-for-consumed`.
 - A revoked controller left open: caught as `no-convergence` (stuck peer).
+- Fault hook moved after COMMIT, so a reported before-commit failure had written:
+  caught as `storage-outcome`. The suite keeps this one as a regression test,
+  using the test-only `defect: 'hooks-after-commit-rejected'` adapter, which
+  commits and then reports `rejected`.
 
 The suite also injects durable corruption on purpose (`sabotage` steps, accepted
 only with `allowSabotage`). It requires the failure at the exact step, the same
@@ -167,6 +176,11 @@ can revoke between the two checks. Both stay covered by focused authority tests.
 - Process death is simulated in-process. Durability against power loss, disk-full
   or filesystem faults is not tested; SQLite FULL synchronous mode is configured,
   not certified.
+- Clock skew is bounded by design. The host and the scripted clients both hold
+  time at the last reading when it goes backwards, because the kit's intake and
+  retry schedule require nondecreasing time. So a backwards step only freezes
+  time until real time catches up; it never runs those helpers backwards. Raw
+  non-monotonic time is covered by the kit's own unit tests, not by this harness.
 - Heap growth is reported per run as advisory data, not asserted.
 - Passing seeds are evidence for the schedules run, not a proof over all
   interleavings. Report the seeds and step counts with any result.

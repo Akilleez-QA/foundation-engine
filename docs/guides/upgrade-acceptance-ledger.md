@@ -319,14 +319,16 @@ Tools/tests only; no engine runtime behaviour changed. See the
   baseline coherence, prediction replay, disclosure only to the current
   non-revoked controller, host/client bounds, post-heal convergence and release of
   every socket, server and timer. A loopback wait over 4 s fails as `stuck`.
-- Tool seams: optional `clock`, `storageHooks`, `observe` options, operator
+- Tool seams: optional `clock`, `storageHooks`, `observe`, `openStorage` options, operator
   `recoverAuthority()` and `read().connections/intake` on the authority workbench
   host; defaults keep the reference behaviour. The existing storage/host tests are
   unchanged and pass; one new host test covers the seams.
-- Checked: 6 tests in `fault-harness.test.mjs` (fixed seeds 1-12 x 300 steps with
+- Checked: 7 tests in `fault-harness.test.mjs` (fixed seeds 1-12 x 300 steps with
   every fault family exercised, identical replay fingerprint, injected durable
-  corruption failing at its exact step, reproducing and shrinking). Local sweeps on
-  Node 22.23.3: 500 seeds x 300 steps passed. Five temporary mutations of the host,
+  corruption failing at its exact step, reproducing and shrinking, and a defective
+  adapter that commits and then reports `rejected` failing `storage-outcome`).
+  Local sweeps on Node 22.23.3: 500 seeds x 300 steps passed; review sweeps of
+  1,000 x 300 and 60 x 2,000 also passed. Six temporary mutations of the host,
   storage adapter, authority and prediction were caught (see the guide); two more
   were unreachable through this host. No engine defect was found.
 - Not established: WAN behaviour, real process death inside the harness (the

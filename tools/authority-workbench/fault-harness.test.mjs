@@ -1,6 +1,6 @@
 // NW-09 seeded fault-schedule harness: CI-sized fixed seeds, determinism and repro.
 // Process-scope loopback evidence only; see docs/guides/network-fault-schedule.md.
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateSchedule, createRandom, shrinkSchedule, describeStep } from './fault-schedule.mjs';
 import { runFaultSchedule, DEFAULT_SEEDS, DEFAULT_STEPS } from './fault-harness.mjs';
@@ -9,6 +9,11 @@ const version = process.versions.node.split('.').map(Number);
 const supported = version[0] > 22 || (version[0] === 22 && version[1] >= 13);
 const optional = (name, timeout, fn) =>
   test(name, { skip: supported ? false : 'Optional SQLite reference requires Node >=22.13', timeout }, fn);
+
+// Every run checks that it released its sockets, servers and timers and fails if not. Should
+// one still leak after such a failure, this unref'd guard ends the file's process instead of
+// letting it hang; it never fires when the process exits on its own.
+after(() => { setTimeout(() => process.exit(process.exitCode ?? 1), 5000).unref(); });
 
 test('NW09: a seed yields the same schedule every time and different seeds differ', () => {
   const a = generateSchedule({ seed: 7, steps: 200 });
@@ -83,3 +88,19 @@ for (const kind of ['state', 'receipt']) {
     assert.ok(minimal.some((s) => s.t === 'sabotage'));
   });
 }
+
+optional('NW09: an adapter that commits before its fault hook and reports rejected fails storage-outcome', 60000, async () => {
+  // Expected outcomes come from the authority's own CAS base, never from storage itself.
+  const schedule = generateSchedule({ seed: 2, steps: DEFAULT_STEPS });
+  await assert.rejects(runFaultSchedule({ seed: 2, schedule, defect: 'unknown-defect' }));
+  const first = await runFaultSchedule({ seed: 2, schedule, defect: 'hooks-after-commit-rejected' });
+  assert.equal(first.ok, false);
+  assert.equal(first.failure.invariant, 'storage-outcome', first.failure.detail);
+  assert.match(first.failure.detail, /^before-commit failure: storage r(\d+), expected r(\d+)$/);
+  const [, stored, expected] = first.failure.detail.match(/r(\d+), expected r(\d+)/).map(Number);
+  assert.equal(stored, expected + 1, 'the defective adapter wrote although it reported rejected');
+  const again = await runFaultSchedule({ seed: 2, schedule, defect: 'hooks-after-commit-rejected' });
+  assert.deepEqual(again.failure, first.failure);
+  const healthy = await runFaultSchedule({ seed: 2, schedule });
+  assert.equal(healthy.ok, true, JSON.stringify(healthy.failure));
+});

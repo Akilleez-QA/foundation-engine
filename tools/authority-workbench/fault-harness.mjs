@@ -23,6 +23,7 @@ import { createPrediction } from '../../src/kits/network/prediction.ts';
 import { createRetrySchedule } from '../../src/kits/network/retry-schedule.ts';
 import { createClosePolicy } from '../../src/kits/network/close-policy.ts';
 import { initializeAuthorityWorkbench, startAuthorityWorkbench, authorityLimits } from './server.mjs';
+import { openAuthorityStorage } from './storage.mjs';
 import { generateSchedule, deriveRandom, describeStep, shrinkSchedule, CLIENTS } from './fault-schedule.mjs';
 
 /** Harness bounds. The host's own limits live in server.mjs and are not changed here. */
@@ -31,8 +32,8 @@ export const HARNESS_LIMITS = Object.freeze({
   link: 64, // frames held by one link direction (delay/reorder); exceeding it is a harness failure
   resendMs: 300, // client exact-retry interval for an unconfirmed command
   baselineTimeoutMs: 2000, // client closes a connection that never produced a baseline
-  storageArmSteps: 8,
-  userRetrySteps: 20, // a client that gave up is reconnected by its user after this many steps // an armed storage fault that never fires is disarmed after this many steps
+  storageArmSteps: 8, // an armed storage fault that never fires is disarmed after this many steps
+  userRetrySteps: 20, // a client that gave up is reconnected by its user after this many steps
   healSteps: 500,
   healDt: 100,
   quiesceMs: 4000, // real-time bound for one quiescence wait; exceeding it is a "stuck" failure
@@ -52,6 +53,8 @@ const integer = Number.isSafeInteger;
 /** Default CI-sized run: seeds 1..DEFAULT_SEEDS, DEFAULT_STEPS steps each (a few seconds on loopback). */
 export const DEFAULT_SEEDS = 12;
 export const DEFAULT_STEPS = 300;
+/** Deliberate defects the test suite injects to prove the checker notices them. Never used by the CLI. */
+export const DEFECTS = Object.freeze(['hooks-after-commit-rejected']);
 const exactKeys = (x, keys) => x !== null && typeof x === 'object' && !Array.isArray(x)
   && Object.keys(x).length === keys.length && keys.every((k) => Object.hasOwn(x, k));
 const validInput = (x) => exactKeys(x, ['add']) && integer(x.add) && Math.abs(x.add) <= 10;
@@ -79,12 +82,13 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
  * `failure` is `{step, phase, invariant, detail}` where `step` is the schedule index
  * (or null for the heal/cleanup phases).
  */
-export async function runFaultSchedule({ seed, schedule, allowSabotage = false, limits = HARNESS_LIMITS }) {
-  if (!integer(seed) || seed < 0 || !Array.isArray(schedule)) throw Error('fault harness: options');
+export async function runFaultSchedule({ seed, schedule, allowSabotage = false, defect = null, limits = HARNESS_LIMITS }) {
+  if (!integer(seed) || seed < 0 || !Array.isArray(schedule) || (defect !== null && !DEFECTS.includes(defect)))
+    throw Error('fault harness: options');
   const before = resources();
   const heap = process.memoryUsage().heapUsed;
   const directory = await mkdtemp(join(tmpdir(), 'foundation-nw09-'));
-  const run = createRun({ seed, schedule, allowSabotage, directory, limits });
+  const run = createRun({ seed, schedule, allowSabotage, defect, directory, limits });
   let failure = null;
   try {
     await run.execute();
@@ -116,7 +120,7 @@ export async function runFaultSchedule({ seed, schedule, allowSabotage = false, 
   });
 }
 
-function createRun({ seed, schedule, allowSabotage, directory, limits }) {
+function createRun({ seed, schedule, allowSabotage, defect, directory, limits }) {
   const dbPath = join(directory, 'world.db');
   const trace = [];
   const stats = {
@@ -150,7 +154,12 @@ function createRun({ seed, schedule, allowSabotage, directory, limits }) {
     storageArm.fired = true;
     storageArm.firedStep = step;
     storageArm.gen = hostGen;
-    storageArm.revisionAtHook = readStmt.get().revision;
+    // Expected outcome from the authority's own last confirmed checkpoint (the CAS base),
+    // not from storage: before-commit failure must write nothing (base), after-commit
+    // failure must leave exactly one new revision (base + 1).
+    const base = host?.read().lastConfirmed?.revision;
+    if (!integer(base)) violations.push('storage hook fired without a confirmed authority checkpoint');
+    storageArm.expectedRevision = when === 'before' ? base : base + 1;
     hostStorageFault = when;
     stats.storageFaults++;
     stats[when === 'before' ? 'storageBeforeCommit' : 'storageAfterCommit']++;
@@ -185,6 +194,24 @@ function createRun({ seed, schedule, allowSabotage, directory, limits }) {
     }
   }
 
+  // Test-only checker validation: an adapter that runs its fault hooks after COMMIT and
+  // misreports a hook failure as 'rejected' (a write that claims to have written nothing).
+  async function defectiveStorage(options) {
+    const real = await openAuthorityStorage({ ...options, hooks: {} });
+    return Object.freeze({
+      configuration: real.configuration,
+      settle: () => real.settle(),
+      read: () => real.read(),
+      async compareAndSwap(request) {
+        const out = await real.compareAndSwap(request);
+        if (out !== 'committed') return out;
+        try { hooks.beforeCommit(); hooks.afterCommit(); } catch { return 'rejected'; }
+        return out;
+      },
+      close: () => real.close(),
+    });
+  }
+
   // ---- host lifecycle ----
   async function startHost() {
     const gen = ++hostGen;
@@ -194,6 +221,7 @@ function createRun({ seed, schedule, allowSabotage, directory, limits }) {
     host = await startAuthorityWorkbench({
       directory, autoDriver: false, clock: () => virtual + hostSkew, storageHooks: hooks,
       observe: (event) => onHost(gen, event),
+      ...(defect === 'hooks-after-commit-rejected' ? { openStorage: defectiveStorage } : {}),
     });
     url = host.url;
   }
@@ -567,8 +595,8 @@ function createRun({ seed, schedule, allowSabotage, directory, limits }) {
           || (hostStorageFault === 'after' && st.status === 'unknown'), 'authority-unavailable',
         () => `authority ${st.status} without an injected cause (storage fault: ${hostStorageFault})`);
       if (storageArm?.fired && storageArm.firedStep === step && storageArm.gen === hostGen)
-        check(env.revision === storageArm.revisionAtHook, 'storage-outcome',
-          () => `${storageArm.when}-commit failure: storage r${env.revision}, at hook r${storageArm.revisionAtHook}`);
+        check(env.revision === storageArm.expectedRevision, 'storage-outcome',
+          () => `${storageArm.when}-commit failure: storage r${env.revision}, expected r${storageArm.expectedRevision}`);
     }
   }
 
@@ -903,5 +931,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     log(`faults:network: ${results.length - failed}/${results.length} seeds passed, ${args.steps} steps each, `
       + `${((Date.now() - began) / 1000).toFixed(1)} s. Process-scope loopback evidence only.`);
   }
-  process.exitCode = failed ? 1 : 0;
+  // Exit explicitly: a leaked handle (itself reported as a failure) must not keep the CLI alive.
+  process.exit(failed ? 1 : 0);
 }

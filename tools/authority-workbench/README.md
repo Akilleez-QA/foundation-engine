@@ -233,7 +233,7 @@ record the exact scope. NW-03 is integrated on private `main` by merge `b6fb4a3`
 this host and two scripted Node clients, with invariants checked after every step
 against an independent read-only SQLite connection. Run `npm run faults:network`
 (CI-sized default) or `npm run faults:network -- --seeds N`. For this the host
-accepts optional `clock`, `storageHooks` and `observe` options and exposes an
+accepts optional `clock`, `storageHooks`, `observe` and `openStorage` options and exposes an
 operator `recoverAuthority()`; omitted options keep the behaviour described above.
 See the [fault-schedule guide](../../docs/guides/network-fault-schedule.md) for
 the fault vocabulary, invariants, repro output and limits. Process-scope loopback

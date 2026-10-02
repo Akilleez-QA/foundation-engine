@@ -81,6 +81,7 @@ export async function startAuthorityWorkbench({
   clock = () => performance.now(),
   storageHooks = {},
   observe,
+  openStorage = openAuthorityStorage,
 } = {}) {
   if (
     typeof directory !== 'string' ||
@@ -93,7 +94,8 @@ export async function startAuthorityWorkbench({
     typeof clock !== 'function' ||
     storageHooks === null ||
     typeof storageHooks !== 'object' ||
-    (observe !== undefined && typeof observe !== 'function')
+    (observe !== undefined && typeof observe !== 'function') ||
+    typeof openStorage !== 'function'
   )
     throw Error('host-options');
   // Host time for intake, rate admission and idle checks. The kit helpers require
@@ -121,7 +123,7 @@ export async function startAuthorityWorkbench({
     identity.credentials.a === identity.credentials.b
   )
     throw Error('operator-identity');
-  const db = await openAuthorityStorage({
+  const db = await openStorage({
     path: join(directory, 'world.db'),
     limits: json,
     hooks: storageHooks,
