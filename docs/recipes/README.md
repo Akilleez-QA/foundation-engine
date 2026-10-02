@@ -27,6 +27,7 @@ Short, checked how-tos. Start with [getting started](../guides/getting-started.m
 | write counts, positions (1st, 2nd) and variants in text | [plurals, ordinals and variants](write-plurals-ordinals-and-variants.md) |
 | branch a conversation on variables and visits | [add branching dialogue](add-branching-dialogue.md) |
 | measure or lower a scene's performance budget | [add a budget](add-a-budget.md) |
+| check a scene replays exactly, ignoring cosmetic motion | [replay with your own digest](replay-with-your-own-digest.md) |
 
 ## Extending the engine
 

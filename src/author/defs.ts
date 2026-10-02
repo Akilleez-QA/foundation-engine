@@ -202,6 +202,19 @@ export interface ScenePreparationContext {
   text: SceneContext['text'];
   service: SceneContext['service'];
 }
+/**
+ * The state a replay of this scene must reproduce exactly (SIM-01 replay tools: the dev/test `engine.replay` surface and
+ * the replay kit's headless `replaySceneLog`). Production builds never call it. `@kits/replay`'s `replayDigest()` builds
+ * one from a component selection that leaves cosmetic entities out.
+ */
+export interface SceneReplayDigest {
+  /** Names this digest (1-128 of `A-Za-z0-9._:,;=+-`). It is part of the digest identity: a log recorded under another
+   *  digest is refused, never compared. */
+  readonly id: string;
+  /** A plain JSON value of the replayed state, read after a fixed tick. The tool canonicalises and hashes it. */
+  state(world: World): unknown;
+}
+export const SCENE_REPLAY_DIGEST_ID = /^[A-Za-z0-9._:,;=+-]{1,128}$/;
 export interface SceneActivityFacts { readonly phase: 'active' | 'retired'; readonly coverage: 'top' | 'scrim' | 'opaque' | 'hidden'; readonly documentHidden: boolean }
 export interface SceneInput extends SceneBody {
   /** Optional factual lifecycle notification; coverage does not prescribe gameplay or networking policy. */
@@ -210,6 +223,8 @@ export interface SceneInput extends SceneBody {
   rendered?(ctx: SceneContext): void;
   /** Opt-in weighted-pose preparation and admission. Omit for no rig capture; {} selects documented defaults. */
   modelPoseLinks?: Partial<ModelPoseLinkLimits>;
+  /** Optional replay verification: `digest` replaces the default replay digest (resources and every Transform). */
+  replay?: { readonly digest?: SceneReplayDigest };
   id: string;
   title: string;
   /** Open, game-defined ('level', 'menu', 'world', 'cutscene', …). */
@@ -233,6 +248,9 @@ export function defineScene(s: SceneInput): SceneDefinition {
   const ids = (s.systems ?? []).map(x => x.id);
   need(new Set(ids).size === ids.length, `scene ${s.id}: two systems share an id`);
   for (const sound of s.sounds ?? []) kebab(`scene ${s.id} sound`, sound);
+  const digest = s.replay?.digest;
+  if (digest !== undefined) need(!!digest && typeof digest.id === 'string' && SCENE_REPLAY_DIGEST_ID.test(digest.id) && typeof digest.state === 'function',
+    `scene ${s.id}: replay.digest needs an id (1-128 of A-Za-z0-9._:,;=+-) and a state(world) function`);
   const captured = { ...s };
   if (captured.modelPoseLinks !== undefined) captured.modelPoseLinks = normalizeModelPoseLinkLimits(captured.modelPoseLinks);
   return { ...captured, kind: 'scene', type: captured.type ?? 'scene' };
