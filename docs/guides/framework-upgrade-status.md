@@ -664,3 +664,15 @@ bounded lookahead dispatch with exact start times, late-drop overload, input
 timestamps (`ctx.input.pressedAt`) and a stored calibration. It reuses the one audio
 output (new read-only `clock()`, scheduled `playVoice({ at })`). Status: integrated in v0.2.0 (PR #31; batch PR #47). Evidence is unit and headless scene tests only;
 no browser output timing, physical-device or audible verification.
+
+## Moving platforms — MV-02 implemented, candidate
+
+`createPlatforms`, `platformSystem` and new `jumpSystem` options (locomotion kit) let creators
+add moving support surfaces described as functions of time. Riders follow each tick's exact
+displacement. Leaving keeps the platform's velocity per a Godot-style `onLeave` policy, and
+platforms are one-way in their own frame. Paths, sizes, speed limits and policies are
+creator-chosen and bounded. Implemented as a candidate (`feat/mv02-moving-platforms`, PR
+pending), not integrated. Evidence is focused unit tests only. See the
+[kit README](../../src/kits/locomotion/README.md#moving-platforms-mv-02), the
+[recipe](../recipes/add-moving-platforms.md) and the [ledger](upgrade-acceptance-ledger.md).
+

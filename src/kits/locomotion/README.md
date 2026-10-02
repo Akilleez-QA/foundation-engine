@@ -94,3 +94,72 @@ The adapter never calls `step(0)`; a caller of the pure controller may use `dt =
 record a press during a frame that runs no tick. Evidence: unit tests at 30, 60, 120, 144, 165 and
 240 Hz ticks and display rates, including exact apex and identical fixed-step samples;
 no browser, device or template consumer yet.
+
+## Moving platforms (MV-02)
+
+Recipe: [add moving platforms](../../../docs/recipes/add-moving-platforms.md). Status:
+implemented, candidate.
+
+`createPlatforms({ maxPlatforms?, maxSpeed? })` is a pure, bounded registry of moving
+support surfaces. Each platform is an axis-aligned footprint (`halfX`, `halfZ`) whose
+top-centre pose is a creator function of simulation time, `path(t)`. `platformSystem(platforms,
+{ bind? })` advances it on the fixed lane and, optionally, writes each pose to a named
+entity's Transform for rendering. `jumpSystem({ …, platforms, onLeave?, radius? })` rides,
+leaves and catches platforms.
+
+| Input | Bounds | Default |
+|---|---|---|
+| `maxPlatforms` | integer [1, 1024] | 64 |
+| `maxSpeed` | (0, 1000] m/s | 100 |
+| `halfX`, `halfZ` | (0, 1000] m | required |
+| `path(t)` | finite x, y, z within ±1e7 | required |
+| `onLeave` | `'add-velocity'`, `'add-upward'`, `'none'` | `'add-velocity'` |
+| `radius` (carried motion vs walls) | (0, 10] m | 0.35 |
+
+**Behaviour.**
+- *Ride:* an actor supported by a platform moves by that platform's exact displacement
+  for the tick (the difference of two path samples), so it follows the path exactly at
+  any tick rate. An actor resting exactly on a platform's previous top rides from the
+  next tick it is checked, including one placed there at scene start.
+- *Carry collision:* horizontal carry and inherited motion slide against `Walls` and
+  `Solid`s in sub-steps of at most half the radius (64 at most per tick).
+- *Leave:* jumping off, or no longer being over the footprint, applies `onLeave`, after
+  Godot's `platform_on_leave`. `add-velocity` keeps the platform's mean velocity over its
+  last tick: horizontally while airborne, and vertically as a launch boost or initial
+  velocity. `add-upward` keeps only an upward vertical part; `none` keeps nothing. A
+  removed platform imparts nothing. Landing on any support clears inherited motion.
+- *One-way, in each platform's frame:* a platform catches an actor whose highest foot
+  point in the tick was at or above its previous top and whose feet end at or below its
+  current top. A rising platform therefore picks up an actor it overtakes, and an actor
+  rising from below passes through and can land on it. The catch tick carries no
+  horizontal displacement; riding starts on the next tick.
+- *Controller:* `JumpFeelInput.boost` adds a supporting surface's vertical velocity to the
+  launch; release gravity still applies.
+
+**Overload and failure.** `advance` samples every path before committing. A non-finite
+pose or a speed above `maxSpeed` throws, and no platform moves. Declare an intended
+discontinuity with `cut(id)`: the next advance places that platform without motion or a
+speed check. Invalid ids, footprints, steps and options throw `RangeError`. Platform
+queries cost O(platforms) per call; the adapter makes at most three per tick.
+
+**Cancellation and recovery.** `remove(id)` drops riders without velocity. `restart()`
+puts the timeline at t = 0 without motion. `resetJump` clears carrier and inherited
+motion.
+
+**Limitations.**
+- Footprints are axis-aligned boxes tested at the actor's centre; no rotation, slopes or
+  platform-side pushing.
+- Inherited velocity is the mean over the platform's last tick: exact for linear paths,
+  otherwise within one tick of curvature.
+- Carried actors are not pushed by walls into platforms; a platform is not a `Solid`.
+- No render interpolation between ticks yet; the runner exposes `alpha` for it.
+
+**Evidence.** Unit tests at 30, 60, 120, 144, 165 and 240 Hz ticks cover:
+- exact riding, including a descent faster than gravity
+- identical inherited arcs at aligned times
+- launch boost under each leave policy
+- pick-up by a rising platform, and passing through from below then landing
+- leave policies and removal
+- carried motion stopped by walls
+
+There is no browser, template or device evidence.

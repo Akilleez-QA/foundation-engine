@@ -39,7 +39,11 @@ export interface JumpFeelDerived {
 }
 
 /** One tick of caller-observed facts. `pressed` must be true on exactly one tick per physical press. */
-export interface JumpFeelInput { pressed: boolean; held: boolean; grounded: boolean }
+export interface JumpFeelInput {
+  pressed: boolean; held: boolean; grounded: boolean;
+  /** Vertical velocity (m/s) added to the launch speed if this tick jumps, e.g. a rising platform's: [-1000, 1000]. Default 0. */
+  boost?: number;
+}
 export interface JumpFeelStep {
   /** Vertical displacement this tick (m, +up). */
   readonly dy: number;
@@ -145,6 +149,8 @@ export function createJumpFeel(config: JumpFeelConfig) {
     step(dt: number, input: JumpFeelInput): JumpFeelStep {
       if (typeof dt !== 'number' || !Number.isFinite(dt) || dt < 0 || dt > maxDt) throw new RangeError(`jump: step must be within [0, ${maxDt}] seconds`);
       if (!input || typeof input.pressed !== 'boolean' || typeof input.held !== 'boolean' || typeof input.grounded !== 'boolean') throw new RangeError('jump: pressed, held and grounded must be booleans');
+      const boost = input.boost ?? 0;
+      if (typeof boost !== 'number' || !Number.isFinite(boost) || Math.abs(boost) > 1000) throw new RangeError('jump: boost must be finite and within ±1000 m/s');
       if (dt === 0) { if (input.pressed) { pressAge = 0; fresh = true; } return { dy: 0, vy, peak: 0, jumped: false }; }
       // Age the pending press and the support window to this tick, then apply this tick's facts.
       if (input.pressed) pressAge = 0;
@@ -158,7 +164,7 @@ export function createJumpFeel(config: JumpFeelConfig) {
       const canJump = grounded || sinceSupport !== null;
       let jumped = false;
       if (pressAge !== null && canJump) {
-        vy = d.launchSpeed; jumped = true; grounded = false; fromJump = true; released = false; pressAge = null; sinceSupport = null;
+        vy = d.launchSpeed + boost; jumped = true; grounded = false; fromJump = true; released = false; pressAge = null; sinceSupport = null;
       }
       if (fromJump && vy > 0 && !input.held) released = true;
       integrate(dt, input.held);

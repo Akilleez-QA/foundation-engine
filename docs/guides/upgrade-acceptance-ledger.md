@@ -570,3 +570,34 @@ Status: integrated in v0.2.0 (PR #34; batch PR #46).
   consumer, moving platforms, slopes and lateral swept collision. Verified only on
   `origin/integration/batch-2`, where the PR #19 press latch is present; the kit relies
   on it for exactly-once presses.
+
+## MV-02: moving platforms — candidate
+
+Status: implemented, candidate (`feat/mv02-moving-platforms`, PR pending); not integrated.
+
+- Runtime-enforced:
+  - Registry bounds: `maxPlatforms` [1, 1024]; footprints (0, 1000] m; `maxSpeed`
+    (0, 1000] m/s; path poses finite within ±1e7; `advance` steps (0, 0.25] s.
+  - `advance` samples every path before committing and refuses a non-finite pose or an
+    over-speed move without moving any platform.
+  - `cut` admits one declared discontinuity with zero delta. Ids, `onLeave`, `radius` and
+    the jump `boost` (±1000 m/s) are validated.
+  - Carried and inherited planar motion slides against `Walls` and `Solid`s in at most 64
+    sub-steps per tick.
+- Checked: unit tests at 30, 60, 120, 144, 165 and 240 Hz ticks:
+  - riders follow a sinusoidal path and a 20 m/s descent exactly;
+  - jumps from a linear mover give identical arcs at aligned times, keep its velocity and
+    land back on it;
+  - the launch boost under `add-velocity` and `add-upward`, and none with `'none'`;
+  - a rising platform picks up a standing actor; an actor passes up through a moving
+    platform and lands on it;
+  - the leave policies and removal, and walls stopping carried motion;
+  - registry validation, atomic refusal, cut, restart and catch ordering.
+
+  Mutation checks: removing the carry, the catch, the inherited velocity, the boost, the
+  wall slide or the resting check each fails at least one test.
+- Not established:
+  - feel on any device, and any template or browser consumer;
+  - rotating or sloped platforms, side pushing, and render interpolation between ticks
+    (the next slice).
+
