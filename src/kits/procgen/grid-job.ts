@@ -7,7 +7,7 @@
  * scheduler, registry or publication owner is created: a returned grid never publishes itself.
  */
 import type { WorkerHost } from '../../platform/workers/host';
-import { drainSlices, type JobClass, type JobKind, type JobModule, type JobOwner } from '../../platform/workers/job';
+import { drainSlices, type JobClass, type JobKind, type JobModule, type JobOwner, type JobResult } from '../../platform/workers/job';
 import { createRng, deriveSeed, type Rng, type SeedPart } from '../../core/rng';
 
 export type GridParameter = null | boolean | number | string | readonly GridParameter[] | { readonly [key: string]: GridParameter };
@@ -68,8 +68,15 @@ export interface GridGenerator {
   /** Declared extra working bytes per cell for byte admission (accounting only, not measured). Default 0, max 64. */
   readonly scratchBytesPerCell?: number;
   readonly validate: (parameters: GridParameter) => boolean;
+  /**
+   * Optional upper bound on the yields `generate` makes for these dimensions and parameters. Checked against
+   * `maxSlices` before admission, so a valid but too-large request is refused up front instead of failing late;
+   * it then also becomes the runaway limit for that run. A safe integer ≥ 0.
+   */
+  readonly slices?: (dimensions: GridDimensions, parameters: GridParameter) => number;
   readonly generate: (cells: GridCells, context: GridContext, parameters: GridParameter) => Generator<void, void, void>;
 }
+export interface GridDimensions { readonly cellsX: number; readonly cellsY: number; readonly cellsZ: number }
 export interface GridDescriptor {
   readonly id: string; readonly revision: number; readonly generatorVersion: number; readonly seed: number;
   readonly cellsX: number; readonly cellsY: number; readonly cellsZ: number;
@@ -83,6 +90,25 @@ export interface GeneratedGrid extends GridDescriptor {
   get(x: number, y: number, z: number): number;
 }
 export interface GridJobInput { readonly recipe: GridRecipe }
+/** Which stage refused or failed. `cause` keeps the original error (a `WorkerJobError` for execution failures). */
+export type GridJobStage = 'recipe' | 'execution' | 'output';
+/** The one error type `prepare` and `generateNow` reject/throw with. */
+export class GridJobError extends Error {
+  override readonly name = 'GridJobError';
+  constructor(readonly stage: GridJobStage, cause: unknown) {
+    super(`procgen grid ${stage}: ${cause instanceof Error ? cause.message : String(cause)}`);
+    this.cause = cause;
+  }
+}
+export interface GridPrepareOptions {
+  readonly urgency?: JobClass;
+  /**
+   * Supersession key. Default: the recipe `id`. The host keeps at most `maxKeysPerOwner` (default 4,096) distinct
+   * keys per owner lifetime, without eviction; once full, new keys return `saturated` for the rest of that lifetime.
+   * Pass `false` for one-off requests, or use a bounded key set or an owner per visit.
+   */
+  readonly key?: string | false;
+}
 export type GridPrepareResult =
   | { readonly status: 'done'; readonly grid: GeneratedGrid }
   | { readonly status: 'cancelled' | 'superseded' | 'preempted' | 'saturated' | 'oversized' };
@@ -129,8 +155,8 @@ function cellsOf(cellsX: number, cellsY: number, cellsZ: number, values: Uint16A
 
 /** Registers one generator under one job id. Import the result in the worker file and in the caller (fallback). */
 export function createGridGenerationJob(id: string, generator: GridGenerator, limits: Partial<GridLimits> = {}) {
-  const { version, maxValue, validate, generate } = generator, scratchPerCell = generator.scratchBytesPerCell ?? 0;
-  if (typeof id !== 'string' || !/^job\.[\w.-]{1,200}$/.test(id) || !int(version, 0, Number.MAX_SAFE_INTEGER) || !int(maxValue, 0, 65535) || !int(scratchPerCell, 0, 64) || typeof validate !== 'function' || typeof generate !== 'function') fail('invalid registration');
+  const { version, maxValue, validate, generate, slices: declareSlices } = generator, scratchPerCell = generator.scratchBytesPerCell ?? 0;
+  if (typeof id !== 'string' || !/^job\.[\w.-]{1,200}$/.test(id) || !int(version, 0, Number.MAX_SAFE_INTEGER) || !int(maxValue, 0, 65535) || !int(scratchPerCell, 0, 64) || typeof validate !== 'function' || typeof generate !== 'function' || (declareSlices !== undefined && typeof declareSlices !== 'function')) fail('invalid registration');
   const bounds = captureLimits(limits);
   const capture = (input: GridRecipe): GridRecipe => {
     if (!input || typeof input !== 'object') fail('invalid recipe');
@@ -142,10 +168,22 @@ export function createGridGenerationJob(id: string, generator: GridGenerator, li
     if (typeof parameters !== 'string' || parameters.length > bounds.maxParameterBytes) fail('parameter bytes');
     return Object.freeze({ formatVersion, generatorVersion, id: gridId, revision, seed, cellsX, cellsY, cellsZ, parameters });
   };
+  /** Parameters are parsed (bounded) and validated before admission, so declared slice budgets refuse early. */
+  const plan = (recipe: GridRecipe) => {
+    const parameters = parseGridParameters(recipe.parameters, bounds);
+    if (validate(parameters) !== true) fail('rejected parameters');
+    let budget = bounds.maxSlices;
+    if (declareSlices) {
+      const declared = declareSlices(Object.freeze({ cellsX: recipe.cellsX, cellsY: recipe.cellsY, cellsZ: recipe.cellsZ }), parameters);
+      if (!int(declared, 0, Number.MAX_SAFE_INTEGER)) fail('invalid declared slice count');
+      if (declared > bounds.maxSlices) fail(`declared ${declared} slices exceed maxSlices ${bounds.maxSlices}`);
+      budget = declared;
+    }
+    return { parameters, budget };
+  };
   const descriptorOf = (r: GridRecipe): GridDescriptor => Object.freeze({ id: r.id, revision: r.revision, generatorVersion: r.generatorVersion, seed: r.seed, cellsX: r.cellsX, cellsY: r.cellsY, cellsZ: r.cellsZ });
   const slices = function* (input: GridJobInput): Generator<void, GridWire, void> {
-    const recipe = capture(input.recipe), parameters = parseGridParameters(recipe.parameters, bounds);
-    if (validate(parameters) !== true) fail('rejected parameters');
+    const recipe = capture(input.recipe), { parameters, budget } = plan(recipe);
     const values = new Uint16Array(recipe.cellsX * recipe.cellsY * recipe.cellsZ);
     const cells = cellsOf(recipe.cellsX, recipe.cellsY, recipe.cellsZ, values, maxValue);
     const random = createRng(recipe.seed);
@@ -157,7 +195,7 @@ export function createGridGenerationJob(id: string, generator: GridGenerator, li
       for (;;) {
         const step = work.next();
         if (step.done) break;
-        if (++count > bounds.maxSlices) fail('slice limit exceeded');
+        if (++count > budget) fail(`slice limit exceeded (${budget})`);
         yield;
       }
     } finally { work.return(undefined); }
@@ -165,6 +203,7 @@ export function createGridGenerationJob(id: string, generator: GridGenerator, li
       if (values[i]! > maxValue) fail('cell value out of range');
       if ((i & 0xffff) === 0xffff) yield;
     }
+    scanned.add(values);
     return { descriptor: descriptorOf(recipe), values, slices: count };
   };
   const adopt = (recipe: GridRecipe, wire: GridWire): GeneratedGrid => {
@@ -173,14 +212,19 @@ export function createGridGenerationJob(id: string, generator: GridGenerator, li
     for (const k of Object.keys(expected) as (keyof GridDescriptor)[]) if (d[k] !== expected[k]) fail(`output ${k} mismatch`);
     const { values, slices: used } = wire, count = recipe.cellsX * recipe.cellsY * recipe.cellsZ;
     if (!(values instanceof Uint16Array) || values.length !== count) fail('output length');
+    // the whole backing store must be exactly this grid: no oversized or shared buffer can ride along
+    if (values.byteOffset !== 0 || !(values.buffer instanceof ArrayBuffer) || values.buffer.byteLength !== count * 2) fail('output backing buffer');
     if (!int(used, 0, bounds.maxSlices)) fail('output slice count');
-    for (let i = 0; i < count; i++) if (values[i]! > maxValue) fail('cell value out of range');
+    // Values produced by this module's own slices (main-thread fallback, generateNow) were scanned while yielding;
+    // worker output crosses a trust boundary and is scanned once here, synchronously, O(cells).
+    if (!scanned.has(values)) for (let i = 0; i < count; i++) if (values[i]! > maxValue) fail('cell value out of range');
     const index = (x: number, y: number, z: number) => {
       if (!int(x, 0, recipe.cellsX - 1) || !int(y, 0, recipe.cellsY - 1) || !int(z, 0, recipe.cellsZ - 1)) fail('cell outside grid');
       return (y * recipe.cellsZ + z) * recipe.cellsX + x;
     };
     return Object.freeze({ ...expected, values, slices: used, index, get: (x: number, y: number, z: number) => values[index(x, y, z)]! });
   };
+  const scanned = new WeakSet<Uint16Array>();
   const kind: JobKind<GridJobInput, GridWire> = Object.freeze({ id, cancellation: Object.freeze({ mode: 'sliced', deadlineMs: 100 }), fallback: Object.freeze({ mode: 'main-thread', slices }) });
   const module: JobModule<GridJobInput, GridWire> = {
     async run(input, ctx) {
@@ -195,17 +239,32 @@ export function createGridGenerationJob(id: string, generator: GridGenerator, li
   };
   return Object.freeze({
     kind, module, slices, limits: bounds, reservation: (input: GridRecipe) => reservation(capture(input)),
-    /** Synchronous drain for tests and offline tools; runtime callers use `prepare`. */
+    /** Synchronous drain for tests and offline tools; runtime callers use `prepare`. Throws {@link GridJobError}. */
     generateNow(input: GridRecipe): GeneratedGrid {
-      const recipe = capture(input), it = slices({ recipe });
-      for (;;) { const step = it.next(); if (step.done) return adopt(recipe, step.value); }
+      let recipe: GridRecipe, wire: GridWire;
+      try { recipe = capture(input); plan(recipe); } catch (e) { throw new GridJobError('recipe', e); }
+      try { const it = slices({ recipe }); for (;;) { const step = it.next(); if (step.done) { wire = step.value; break; } } } catch (e) { throw new GridJobError('execution', e); }
+      try { return adopt(recipe, wire); } catch (e) { throw new GridJobError('output', e); }
     },
-    async prepare(host: WorkerHost, owner: JobOwner, input: GridRecipe, signal: AbortSignal, urgency: JobClass = 'foreground'): Promise<GridPrepareResult> {
-      const recipe = capture(input);
-      const result = await host.run({ kind, owner, version: recipe.revision, key: recipe.id, class: urgency, bytes: reservation(recipe), materialise: () => ({ input: { recipe: structuredClone(recipe) } }) }, signal);
+    /**
+     * Rejects only with {@link GridJobError}: `recipe` (refused before admission, nothing reserved), `execution`
+     * (cause is the host's `WorkerJobError`), or `output` (adoption refused the delivered grid).
+     */
+    async prepare(host: WorkerHost, owner: JobOwner, input: GridRecipe, signal: AbortSignal, options: GridPrepareOptions | JobClass = {}): Promise<GridPrepareResult> {
+      const { urgency = 'foreground', key } = typeof options === 'string' ? { urgency: options, key: undefined } : options;
+      let recipe: GridRecipe;
+      try {
+        recipe = capture(input); plan(recipe);
+        if (key !== undefined && key !== false && (typeof key !== 'string' || key.length < 1 || key.length > 256)) fail('invalid key');
+      } catch (e) { throw new GridJobError('recipe', e); }
+      const supersession = key === false ? {} : { key: key ?? recipe.id };
+      let result: JobResult<GridWire>;
+      try {
+        result = await host.run({ kind, owner, version: recipe.revision, ...supersession, class: urgency, bytes: reservation(recipe), materialise: () => ({ input: { recipe: structuredClone(recipe) } }) }, signal);
+      } catch (e) { throw new GridJobError('execution', e); }
       if (result.status !== 'done') return result;
       if (signal.aborted || owner.signal.aborted) return { status: 'cancelled' };
-      return { status: 'done', grid: adopt(recipe, result.output) };
+      try { return { status: 'done', grid: adopt(recipe, result.output) }; } catch (e) { throw new GridJobError('output', e); }
     },
   });
 }

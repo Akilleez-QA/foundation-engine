@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorkerHost } from '../../platform/workers/host';
 import { createFakeTimers, createInProcessWorker, fakeWorkerFactory } from '../../platform/workers/fake-worker';
-import { JobCancelledSignal, type JobModule } from '../../platform/workers/job';
+import { JobCancelledSignal, WorkerJobError, type JobModule } from '../../platform/workers/job';
 import { createRng, deriveSeed } from '../../core/rng';
-import { createGridGenerationJob, GRID_MAX_CELLS, type GridRecipe, type GridJobInput, type GridWire } from './grid-job';
-import { cellularGridJob as job } from './cellular';
+import { createGridGenerationJob, GridJobError, GRID_DEFAULT_LIMITS, GRID_MAX_CELLS, type GridRecipe, type GridJobInput, type GridWire } from './grid-job';
+import { cellularGenerator, cellularGridJob as job, CELLULAR_CELLS_PER_SLICE } from './cellular';
 import registered from './workers/cellular.job';
 
 const recipe: GridRecipe = { formatVersion: 1, generatorVersion: 1, id: 'cave', revision: 1, seed: deriveSeed(42, 'region', 3, -2), cellsX: 24, cellsY: 2, cellsZ: 16, parameters: '[0.45,4,5,4]' };
@@ -192,4 +192,70 @@ test('GEN-01 supersession, owner loss, captured input and corrupt worker output 
       await assert.rejects(pending, /procgen grid/); assert.equal(h.stats().reservedBytes, 0);
     } finally { h.dispose(); }
   }
+});
+
+test('GEN-01 declared slice budgets refuse oversized valid work before admission and bound each run', async () => {
+  // the reviewed case: 64^3 with 16 smoothing steps used to fail late; its exact declared budget now fits
+  const big = { ...recipe, cellsX: 64, cellsY: 64, cellsZ: 64, parameters: '[0.45,16,5,4]' };
+  const declared = cellularGenerator.slices!({ cellsX: 64, cellsY: 64, cellsZ: 64 }, [0.45, 16, 5, 4]);
+  assert.equal(declared, 64 ** 3 * 17 / CELLULAR_CELLS_PER_SLICE);
+  const grid = job.generateNow(big);
+  assert.equal(grid.slices, declared, 'the example declares its slice count exactly');
+  // the worst admissible example request stays inside the default ceiling
+  assert.ok(Math.floor(GRID_DEFAULT_LIMITS.maxCells * 17 / CELLULAR_CELLS_PER_SLICE) <= GRID_DEFAULT_LIMITS.maxSlices);
+  const greedy = createGridGenerationJob('job.test.greedy', { version: 1, maxValue: 1, validate: () => true, slices: () => 1001, *generate() { yield; } }, { maxSlices: 1000 });
+  const fake = fakeWorkerFactory(), host = createWorkerHost({ createWorker: fake.create });
+  try {
+    const refused = await greedy.prepare(host, owner(), { ...recipe, parameters: 'null' }, signal()).catch(e => e);
+    assert.ok(refused instanceof GridJobError); assert.equal(refused.stage, 'recipe'); assert.match(refused.message, /exceed maxSlices/);
+    assert.equal(fake.workers.length, 0); assert.equal(host.stats().reservedBytes, 0);
+  } finally { host.dispose(); }
+  const liar = createGridGenerationJob('job.test.liar', { version: 1, maxValue: 1, validate: () => true, slices: () => 3, *generate() { for (let i = 0; i < 10; i++) yield; } });
+  assert.throws(() => liar.generateNow({ ...recipe, parameters: 'null' }), /slice limit exceeded \(3\)/);
+  for (const bad of [() => NaN, () => -1, () => 1.5])
+    assert.throws(() => createGridGenerationJob('job.test.declare', { version: 1, maxValue: 1, validate: () => true, slices: bad, *generate() {} }).generateNow({ ...recipe, parameters: 'null' }), /invalid declared slice count/);
+  assert.throws(() => createGridGenerationJob('job.test.declare', { version: 1, maxValue: 1, validate: () => true, slices: 5 as never, *generate() {} }), /invalid registration/);
+});
+
+test('GEN-01 unkeyed requests do not consume the owner key history; keys are validated', async () => {
+  const host = createWorkerHost({ createWorker: null, maxKeysPerOwner: 2 }), lifetime = owner();
+  try {
+    const small = { ...recipe, cellsX: 4, cellsY: 1, cellsZ: 4 };
+    assert.equal((await job.prepare(host, lifetime, { ...small, id: 'a' }, signal())).status, 'done');
+    assert.equal((await job.prepare(host, lifetime, { ...small, id: 'b' }, signal())).status, 'done');
+    assert.equal((await job.prepare(host, lifetime, { ...small, id: 'c' }, signal())).status, 'saturated', 'key history full for this owner lifetime');
+    for (const id of ['c', 'd', 'e']) assert.equal((await job.prepare(host, lifetime, { ...small, id }, signal(), { key: false })).status, 'done');
+    assert.equal((await job.prepare(host, lifetime, { ...small, id: 'f' }, signal(), { key: 'a' })).status, 'done', 'a bounded slot key reuses history');
+    assert.equal((await job.prepare(host, owner(), { ...small, id: 'g' }, signal())).status, 'done', 'a new owner has fresh history');
+    await assert.rejects(job.prepare(host, lifetime, small, signal(), { key: '' }), (e: unknown) => e instanceof GridJobError && e.stage === 'recipe');
+    assert.equal((await job.prepare(host, lifetime, { ...small, id: 'h' }, signal(), 'background')).status, 'saturated', 'urgency shorthand still keys by id');
+  } finally { host.dispose(); }
+});
+
+test('GEN-01 adoption refuses oversized, offset or shared backing buffers and reports typed stages', async () => {
+  const count = recipe.cellsX * recipe.cellsY * recipe.cellsZ;
+  const wide = new Uint16Array(new ArrayBuffer(count * 2 + 64)).subarray(0, count);
+  const offset = new Uint16Array(new ArrayBuffer(count * 2 + 2), 2, count);
+  const shared = new Uint16Array(new SharedArrayBuffer(count * 2));
+  for (const values of [wide, offset, shared]) {
+    const workers = fakeWorkerFactory(), h = createWorkerHost({ createWorker: workers.create });
+    try {
+      const pending = job.prepare(h, owner(), recipe, signal());
+      const wire = (await registered.run({ recipe }, context)).output;
+      values.set(wire.values);
+      workers.workers[0]!.complete({ ...wire, values });
+      const error = await pending.catch(e => e);
+      assert.ok(error instanceof GridJobError); assert.equal(error.stage, 'output'); assert.match(error.message, /backing buffer/);
+      assert.equal(h.stats().reservedBytes, 0);
+    } finally { h.dispose(); }
+  }
+  const workers = fakeWorkerFactory(), h = createWorkerHost({ createWorker: workers.create });
+  try {
+    const pending = job.prepare(h, owner(), recipe, signal());
+    workers.workers[0]!.throwInJob('boom');
+    const error = await pending.catch(e => e);
+    assert.ok(error instanceof GridJobError); assert.equal(error.stage, 'execution'); assert.ok(error.cause instanceof WorkerJobError);
+  } finally { h.dispose(); }
+  const thrown = (() => { try { job.generateNow({ ...recipe, cellsX: 0 }); } catch (e) { return e; } })();
+  assert.ok(thrown instanceof GridJobError); assert.equal((thrown as GridJobError).stage, 'recipe');
 });

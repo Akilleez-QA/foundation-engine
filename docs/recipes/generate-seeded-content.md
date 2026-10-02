@@ -53,30 +53,47 @@ export const fillJob = createGridGenerationJob('job.kits.mykit.fill', fillGenera
 Put the job in a kit (`src/kits/<kit>/`) and add `src/kits/<kit>/workers/fill.job.ts`
 exporting `fillJob.module`. The file name is the row id. Rules for the generator:
 
-- Yield at least once per row or layer.
+- Yield every few thousand cell visits, not once per arbitrarily long row. Fallback
+  runs one slice per page task, and a worker only sees `cancel` at a yield.
 - Use only `context.random` and `context.derive`: no `Math.random`, time or module state.
 - Declare `scratchBytesPerCell` if you allocate working buffers.
 
 ## 4. Request it at a boundary, keep the old content until it succeeds
 
 ```ts
-const result = await fillJob.prepare(ctx.service('jobs'), lifetime, recipe, signal);
+// `visit` is an owner whose signal ends with this visit (or streaming epoch)
+const result = await fillJob.prepare(ctx.service('jobs'), { id: 'fill', signal: visit.signal }, recipe, signal);
 if (result.status === 'done') install(result.grid);
-else if (result.status === 'saturated') retryLater();
+else if (result.status === 'saturated') retryLaterOrNewOwner();
 // cancelled / superseded / preempted: nothing to install
 ```
 
-A newer `revision` with the same `id` supersedes older work. Rejected promises are
-failures: validation, a generator exception, a value above `maxValue`, the slice
-limit or a malformed result. Keep the current content in each case.
+A newer `revision` with the same key (default: the recipe `id`) supersedes older work.
+The host remembers at most 4,096 distinct keys per owner lifetime, with no eviction.
+Per-region ids under one long-lived owner eventually make every new key return
+`saturated`, and retrying will not help. Give each visit or streaming epoch its own
+owner, pass a bounded `key` (for example the resident slot), or pass `key: false` for
+one-off requests.
+
+Rejections are always `GridJobError`, and its `stage` says where the work failed:
+- `recipe`: refused before admission;
+- `execution`: a generator exception, the slice limit or a value above `maxValue`;
+- `output`: a malformed result.
+
+Keep the current content in each case. If the generator can declare `slices(dimensions,
+parameters)`, have it do so. A request that is valid but too large is then refused
+before any work runs, instead of failing near the end.
 
 ## 5. Save the root, not the result
 
 ```ts
-export const runSeed = defineGenerationSeedSection('mygame.run');
+export const runSeed = defineGenerationSeedSection('mygame.run', { contentVersion: 2 });
 ```
 
-A corrupt stored record is quarantined and play continues from `{seed: null}`. Ending a
+Bump `contentVersion` whenever the same seed would produce different content, and
+write it with each new seed. On load, compare it with the current number: an older
+save otherwise regenerates different content silently. A corrupt or unversioned stored
+record is quarantined, and play continues from the initial value. Ending a
 run and any permadeath policy are game decisions; clear the seed when your rules end it.
 
 ## 6. Evidence to add

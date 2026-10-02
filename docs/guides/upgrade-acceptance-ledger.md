@@ -337,8 +337,16 @@ See the [procgen kit](../../src/kits/procgen/README.md) and the
   - Adoption: descriptor, length, element type and slice count are checked.
   - Byte reservation is made before materialization. The existing host owns admission, cancellation, supersession and fallback.
 - **Checked:**
-  - Focused tests: 4 GEN-01 seed tests in `src/core/rng.test.ts` (pinned values, order independence, 200,002 collision-free int32 siblings, avalanche/lag, rejection) and 8 kit tests.
-  - The kit tests cover an independent cellular oracle and identical output across runs, fallback, transfer and the real in-process worker runtime. They also cover request-order independence, refusal before admission, runaway and out-of-range generators, cancellation mid-job in all three paths, supersession, owner loss, captured queued input, nine corrupt worker outputs, and a real SaveStore round trip with quarantine of nine corrupt seed records.
+  - Focused tests: 4 GEN-01 seed tests in `src/core/rng.test.ts` (pinned values, order independence, 200,002 collision-free int32 siblings, avalanche/lag, rejection) and 11 kit tests.
+  - The kit tests cover an independent cellular oracle and identical output across runs, fallback, transfer and the real in-process worker runtime. They also cover request-order independence, refusal before admission, runaway and out-of-range generators, cancellation mid-job in all three paths, supersession, owner loss, captured queued input, nine corrupt worker outputs, and a real SaveStore round trip with quarantine of twelve corrupt or unversioned seed records.
   - Desktop Chromium module-worker check (`scripts/play/procgen-worker-check.mjs`, in `test:framework-browser`): worker, fallback and direct drain are bit-identical; cancellation and staleness are named; reservations retire after acknowledgement.
   - Exact-head gate results are in the PR.
+- **Review fixes (PR #38):**
+  - Generators may declare their slice count, which is checked before admission. The cellular example declares an exact count and yields every 4,096 visits.
+  - `prepare` options accept `key` (including `false`), and the 4,096-keys-per-owner limit is documented.
+  - The seed section stores `contentVersion`.
+  - Adoption requires an exact, unshared, zero-offset backing buffer.
+  - Errors are typed as `GridJobError` with a stage.
+  - Locally produced output is not scanned twice. Cancellation wording now covers deadline termination.
+  - Evidence: 3 added kit tests (11 in total), with the seed-section tests updated.
 - **Not established:** physical-device timing, generation quality or aesthetics, determinism of arbitrary creator generators, chunk residency/streaming, runtime edit deltas, meshing, or persistence of large edited worlds. Research and the ranked follow-up slices are outside this repository.

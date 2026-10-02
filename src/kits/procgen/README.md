@@ -9,11 +9,13 @@ when work is requested and what a result means in the game.
 ```ts
 import { deriveSeed, prepareCellularGrid, defineGenerationSeedSection } from '@kits/procgen';
 
-export const runSeed = defineGenerationSeedSection('cavegame.run'); // add to the game's defs
+export const runSeed = defineGenerationSeedSection('cavegame.run', { contentVersion: 1 }); // add to the game's defs
 
 // at a visit boundary, outside the frame:
-const root = ctx.save(runSeed).get().seed ?? Math.floor(ctx.random() * 2 ** 32); // pick once, then store it
-const result = await prepareCellularGrid(ctx.service('jobs'), { id: 'caves', signal: lifetime.signal }, {
+const record = ctx.save(runSeed).get();
+const root = record.seed ?? Math.floor(ctx.random() * 2 ** 32); // pick once, then store it with its contentVersion
+// one owner per visit (its signal ends with the visit), so its supersession-key history ends with it too
+const result = await prepareCellularGrid(ctx.service('jobs'), { id: 'caves', signal: visit.signal }, {
   formatVersion: 1, generatorVersion: 1, id: `region:${cx},${cz}`, revision: 1,
   seed: deriveSeed(root, 'region', cx, cz),
   cellsX: 64, cellsY: 1, cellsZ: 64, parameters: '[0.45,4,5,4]',
@@ -34,8 +36,9 @@ mulberry32 generator (STD-SIM-9) and is re-exported here.
   worker job. It is a pure function. It does not depend on call order, the wall
   clock, the scene's `ctx.random()` stream or any other stream, so a region or level
   regenerates identically whenever it is requested.
-- **Arithmetic:** integer only (`Math.imul`, shifts, xor), through the public-domain
-  lowbias32 mixer. It uses no `Math.sin` and no floating-point step, so results are
+- **Arithmetic:** 32-bit integer operations (`Math.imul`, shifts, xor) through the
+  public-domain lowbias32 mixer, plus one exact power-of-two division that splits
+  integers wider than 32 bits. It uses no `Math.sin` and no rounding step, so results are
   bit-identical across engines, workers and the main thread. The core value-noise
   helpers (`sineHash2`) use `Math.sin`; this function does not.
 - **Separation:** components are type-tagged and length-prefixed. `1` differs from
@@ -50,8 +53,10 @@ mulberry32 generator (STD-SIM-9) and is re-exported here.
 
 A creator registers a `GridGenerator`: a version, a `maxValue` (0–65535), an optional
 `scratchBytesPerCell` accounting declaration (0–64), a parameter validator returning
-literal `true`, and a `generate(cells, context, parameters)` slice generator. The
-returned object has `prepare(host, owner, recipe, signal, urgency?)`, a worker
+literal `true`, an optional `slices(dimensions, parameters)` upper bound on its yields,
+and a `generate(cells, context, parameters)` slice generator. The returned object has
+`prepare(host, owner, recipe, signal, options?)` (`options` is `{urgency?, key?}` or an
+urgency string), a worker
 `module`, the shared `slices` fallback, the captured `limits`, a `reservation(recipe)`
 preview and a synchronous `generateNow(recipe)` for tests and offline tools.
 
@@ -73,10 +78,20 @@ generator code is imported in both the worker and the caller. It is never serial
 - **Input:** `GridRecipe {formatVersion: 1, generatorVersion, id, revision, seed,
   cellsX, cellsY, cellsZ, parameters}`. The recipe is validated and captured before
   admission, so later caller mutation cannot reach queued work. `id` (1–256 code units)
-  is the supersession key and `revision` (a nonnegative safe integer) its version: a
-  newer revision supersedes an older one under the same owner. `seed` is unsigned 32-bit.
-  `parameters` is JSON text. Its UTF-8 bytes are checked first, then node count, depth
-  and finiteness after parsing. The parsed value is frozen.
+  is the default supersession key and `revision` (a nonnegative safe integer) its
+  version: a newer revision supersedes an older one under the same owner. `seed` is
+  unsigned 32-bit. `parameters` is JSON text. Its UTF-8 bytes are checked first, then
+  node count, depth and finiteness after parsing. The parsed value is frozen. Parsing,
+  the validator and the declared slice budget all run before admission (bounded by the
+  parameter limits) and again inside the job.
+- **Supersession keys and their limit:** the host keeps at most `maxKeysPerOwner`
+  (default 4,096) distinct keys per owner lifetime and never evicts them. Once full, a
+  request with a new key returns `saturated` for the rest of that lifetime, and
+  retrying will not help. Per-region ids such as `region:${cx},${cz}` under one
+  long-lived owner can exhaust it. Use one of:
+  - an owner per visit or streaming epoch, so history ends with its signal;
+  - a bounded key set, e.g. the resident slot, via `options.key`;
+  - `key: false` for one-off requests, which then cannot be superseded.
 - **Generator context:** `cells` (`values: Uint16Array`, `index`, `get`, and a checked
   `set`), `context.seed`, `context.random` (one mulberry32 stream from the seed) and
   `context.derive(...path)` for order-independent sub-streams.
@@ -94,20 +109,41 @@ generator code is imported in both the worker and the caller. It is never serial
   - scratch: cells × (2 + `scratchBytesPerCell`) + 8 × the input allowance + 4 KiB.
 
   These are accounting allowances, not measured JavaScript heap.
-- **Overload:** a recipe over its bounds throws before admission, so no worker spawns
-  and nothing is reserved. Host saturation returns `saturated`; the caller keeps its
-  current content and chooses whether to retry. A generator that exceeds `maxSlices`
-  fails with `slice limit exceeded`, which catches runaway retry loops (for example,
-  restart-on-contradiction).
+- **Overload:** a recipe over its bounds, including a declared slice count above
+  `maxSlices`, is refused before admission, so no worker spawns and nothing is reserved.
+  `saturated` means either a full host (capacity may return: retry later) or a full key
+  history (it will not: see above). The caller keeps its current content either way.
+  A generator that yields more than its declared count, or than `maxSlices` when it
+  declares none, fails with `slice limit exceeded`. This catches runaway retry loops
+  (for example, restart-on-contradiction).
+- **Slice size:** a slice is the work between two yields. Keep it to a few thousand cell
+  visits. The fallback runs one slice per task on the page, and a worker sees `cancel`
+  only at a yield, so long slices delay frames and can miss the 100 ms cancel deadline.
+  The cellular example yields every 4,096 visits. The adapter's own value scan yields
+  every 65,536 cells.
 - **Cancellation:** every `yield` is a checkpoint. In a worker, `cancel` is honoured at
   the next checkpoint, and the host terminates the worker if the acknowledgement misses
-  its 100 ms deadline. In fallback, the host stops scheduling slices. In every path the
-  creator generator's `finally` runs exactly once through `return()`. Owner abort and
-  host disposal cancel queued and running work.
-- **Failure and recovery:** these failures reject, and no partial grid is returned:
-  - validation errors, rejected parameters and generator exceptions;
-  - values above `maxValue`, including typed-array wraparound;
-  - adoption mismatches: descriptor, length, element type or slice count.
+  its 100 ms deadline. In fallback, the host stops scheduling slices. When the job stops
+  at a checkpoint, the creator generator's `finally` runs exactly once through
+  `return()`. A worker terminated after missing the deadline runs no `finally` at all,
+  so a generator must not rely on `finally` for anything outside its own job. Owner
+  abort and host disposal cancel queued and running work.
+- **Failure and recovery:** `prepare` rejects, and `generateNow` throws, only with
+  `GridJobError`, and no partial grid is returned. Its `stage` names where it failed,
+  and `cause` keeps the original error:
+  - `recipe`: validation errors, rejected parameters or slice budgets, and invalid
+    keys. Nothing is reserved.
+  - `execution`: generator exceptions, `slice limit exceeded` and values above
+    `maxValue`, including typed-array wraparound. For `prepare` the cause is the host's
+    `WorkerJobError`.
+  - `output`: adoption mismatches in descriptor, length, element type or slice count,
+    or a backing buffer that is not an unshared `ArrayBuffer` of exactly cells × 2
+    bytes at offset 0.
+
+  Worker output is value-scanned once on the main thread, synchronously and in time
+  linear in cells; at 4,194,304 cells that is one uninterrupted pass. Output from this
+  module's own slices (fallback, `generateNow`) was already scanned while yielding and
+  is not scanned again.
 
   The host releases the reservation in each case, and the previous accepted content
   stays with the creator's owner.
@@ -117,17 +153,29 @@ generator code is imported in both the worker and the caller. It is never serial
 `cellularGenerator` / `cellularGridJob` (`job.kits.procgen.cellular`) takes parameters
 `[fill, steps, birth, survive]`. Each y layer gets a random fill from its own sub-stream
 `derive('layer', y)`, then `steps` Moore-neighbourhood smoothing passes; cells outside
-the grid count as solid. Values are 0 (open) and 1 (solid). It yields once per row.
+the grid count as solid. Values are 0 (open) and 1 (solid). It yields every 4,096 cell
+visits and declares exactly `floor(cells × (1 + steps) / 4096)` slices. At most that is
+17,408 slices at 4,194,304 cells, within the default ceiling, so a valid recipe never
+fails late on its slice limit.
 It is one familiar technique for cave-like or blob-like masks, not a required style.
 A creator's BSP, drunkard's walk, template or constraint-solver generator plugs in the
 same way.
 
 ## Seed save section
 
-`defineGenerationSeedSection(id, scope?)` defines a strict `{seed: number | null}`
-section. Store the root seed, not generated output: generated content is re-derived
-from it. A malformed stored value fails `parse`, so the save store quarantines the
-bytes and play continues from `{seed: null}`. Ending a run (`d.seed = null`) and any
+`defineGenerationSeedSection(id, {scope?, contentVersion?})` defines a strict
+`{seed: number | null, contentVersion: number}` section. Store the root seed, not
+generated output: generated content is re-derived from it.
+
+The engine cannot tell when a generator changes. Bump `contentVersion` whenever the same
+seed would produce different content (a new generator version, different parameters or
+a different derivation path), and write it together with the seed. On load, compare
+`record.contentVersion` with the current number, then decide whether to keep the old
+content's generator, start fresh, or migrate. Without that comparison, an old save
+regenerates different content silently.
+
+A malformed stored value, including a record without `contentVersion`, fails `parse`.
+The save store quarantines the bytes, and play continues from the initial value. Ending a run (`d.seed = null`) and any
 permadeath policy are game decisions. Edited-world deltas are not stored here (see
 limitations).
 
@@ -148,8 +196,13 @@ cover:
 - **Cancellation, recovery and saves:**
   - cancellation mid-job in fallback, worker runtime and module checkpoints;
   - supersession, owner loss and captured queued input;
-  - nine corrupt worker outputs;
-  - real SaveStore round trip and quarantine of nine corrupt seed records.
+  - nine corrupt worker outputs, plus oversized, offset and shared backing buffers;
+  - declared slice budgets (the 64³, 16-step example succeeds; over-budget declarations
+    refuse before admission; under-declared generators fail);
+  - unkeyed, slot-keyed and new-owner requests against a full key history;
+  - typed `GridJobError` stages;
+  - real SaveStore round trip with `contentVersion`, and quarantine of twelve corrupt or
+    unversioned seed records.
 - **Browser:** `scripts/play/procgen-worker-check.mjs` checks real worker transport.
 
 ## Limitations

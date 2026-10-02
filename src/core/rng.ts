@@ -56,8 +56,9 @@ const absorb=(h:number,w:number)=>mix32((h^mix32((w+0x9e3779b9)>>>0))>>>0);
  * `deriveSeed(root, 'region', cx, cz)` or `deriveSeed(root, 'floor', 3, 'loot')`.
  *
  * A pure function of its arguments: independent of call order, wall clock and every other stream, so a region or
- * level regenerates identically whenever it is requested. Integer-only arithmetic (no `Math.sin`, no floats) keeps
- * results bit-identical across JavaScript engines, workers and the main thread. Components are type-tagged and
+ * level regenerates identically whenever it is requested. 32-bit integer arithmetic (`Math.imul`, shifts, xor; no
+ * `Math.sin`), plus one exact power-of-two division to split integers wider than 32 bits, keeps results
+ * bit-identical across JavaScript engines, workers and the main thread. Components are type-tagged and
  * length-prefixed: `1` differs from `'1'`, and `('ab')` from `('a','b')`. For the same root and prefix, distinct
  * final 32-bit signed integer components (-2^31..2^31-1) map to distinct seeds (the absorb step is bijective);
  * larger safe integers use a separately tagged two-word encoding.
