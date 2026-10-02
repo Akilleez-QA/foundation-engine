@@ -74,3 +74,8 @@ warnings as the base. Budgets unchanged. No stock template scene creates a depen
 closure, so for that path the gate is a regression check, not a responsiveness
 measurement; worker-runtime checkpoints now default to the same task seam. Downstream comparison, frame-time and
 physical-device acceptance remain unverified.
+
+Revision map: `3361a43` (named above) was measured before later rebases and is not
+published. This branch's own files (task seam, dependency lease, worker runtime,
+oracle) are identical in published `b075a9a`; the base additionally gained the
+program-preparation CI fix `17391f3`. Results at the final head are recorded below.
