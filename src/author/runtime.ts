@@ -370,7 +370,14 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
         programsPrepared=false;view.dataset.programReadiness='preparing';
         if(actx.leaving()||actx.signal.aborted)throw Error('Scene program preparation retired');
         sync();renderer.compile(three,camera);
-        return (surface.programsReady?.(actx.signal)??Promise.resolve('unsupported')).then(async result=>{
+        const programs=(surface.programsReady?.(actx.signal)??Promise.resolve('unsupported')).catch(error=>{
+          if(error instanceof ProgramLinkError||version!==preparationVersion||actx.leaving()||actx.signal.aborted||renderer.getContext().isContextLost())throw error;
+          // Capacity, timeout or a driver query failure is not a link verdict: degrade to the
+          // pre-existing first-draw compilation (which still validates links) instead of refusing the scene.
+          try{s.log.error(`${scene.id}: program preparation unavailable; first-render compilation fallback`,error);}catch{/* Isolated diagnostic. */}
+          return 'degraded' as const;
+        });
+        return programs.then(async result=>{
           if(version!==preparationVersion||result==='retired'||actx.leaving()||actx.signal.aborted)throw Error('Scene program preparation retired');
           // Include a real initial draw: generated passes can create programs absent from compile().
           renderer.render(three,camera);

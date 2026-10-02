@@ -44,8 +44,12 @@ program readiness and submits a real initial draw before resolving `ready`.
 Initial errors therefore use router failure/retry. A later typed shader error
 suspends update/render and shows a visit-owned Retry surface. Synchronous restore
 errors enter the same owned boundary. Superseded owners cannot publish recovery.
-Other renderer exceptions retain their existing policy. Non-link restoration
-preparation failure permits a reported degraded synchronous fallback.
+Other renderer exceptions retain their existing policy. A non-link preparation
+failure (capacity, timeout or a driver query error), initially or on restoration,
+is logged, marks `data-program-readiness="degraded"` and falls back to the
+pre-existing first-draw compilation, which still validates links. A scene is
+therefore never refused only because bounded preparation was unavailable; a typed
+link or fence failure still uses router failure (initial) or the owned Retry surface.
 
 Compile does not submit every generated pass, background or future asset variant.
 Three can query uniforms before native `useProgram`; validation is not a promise

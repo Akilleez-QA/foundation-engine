@@ -50,3 +50,10 @@ test('actual author admission waits for initial GPU completion and refuses a ret
  const retired=fixture(()=>Promise.resolve('retired'));retired.pending[0]!.resolve('ready');await assert.rejects(retired.api.ready,/frame preparation retired/);assert.equal(retired.api.state(),false);
  const failed=fixture(()=>Promise.reject(new FrameReadinessError('fence failed')));failed.pending[0]!.resolve('ready');await assert.rejects(failed.api.ready,FrameReadinessError);
 });
+
+test('bounded initial preparation failure degrades to first-draw compilation instead of refusing the scene',async()=>{
+ const f=fixture();f.pending[0]!.reject(Error('Program readiness capacity exceeded'));await f.api.ready;
+ assert.equal(f.api.state(),true);assert.equal(f.view.dataset.programReadiness,'degraded');assert.equal(f.log.length,1);assert.equal(f.cards.length,0);
+ const link=fixture();link.pending[0]!.reject(new ProgramLinkError('bad link',[]));await assert.rejects(link.api.ready,ProgramLinkError);assert.equal(link.api.state(),false);assert.equal(link.log.length,0);
+ const retired=fixture();retired.owner.abort();retired.pending[0]!.reject(Error('timed out'));await assert.rejects(retired.api.ready,/timed out/);assert.equal(retired.api.state(),false);assert.equal(retired.log.length,0);
+});
