@@ -551,8 +551,8 @@ A game adds its own domain systems (for example an economy or a world model) wit
 
 - **STD-STR-1.** All user-facing text MUST be a typed key lookup that requires exactly the key's variables. New literal UI text fails lint. [ADR 0021]
 - **STD-STR-2.** Strings MUST be shards in the owning folder, merged into generated catalogues and key types. [ADR 0043]
-- **STD-STR-3.** Reading levels are key variants (`standard` and `@detailed`). Plurals use the platform's plural rules. [ADR 0021]
-- **STD-STR-4.** A missing string falls back per key to the base locale. Unknown keys fail in development, and in production they log once.
+- **STD-STR-3.** Reading levels are key variants (`standard` and `@detailed`). Plurals and ordinals use the platform's plural rules (`plural`, `selectordinal`); variants use `select`. [ADR 0021]
+- **STD-STR-4.** A missing string falls back per key along the locale chain (explicit fallbacks, then truncated tags), ending at the base locale. Unknown keys fail in development, and in production they log once.
 - **STD-STR-5.** Keys composed at runtime MUST be declared as families, and validation expands every family.
 
 ---

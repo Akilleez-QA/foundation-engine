@@ -24,6 +24,8 @@ Short, checked how-tos. Start with [getting started](../guides/getting-started.m
 | add a rule that runs every step | [add a system](add-a-system.md) |
 | add a control | [add an input action](add-an-input-action.md) |
 | keep progress across reloads | [add a save section](add-a-save-section.md) |
+| write counts, positions (1st, 2nd) and variants in text | [plurals, ordinals and variants](write-plurals-ordinals-and-variants.md) |
+| branch a conversation on variables and visits | [add branching dialogue](add-branching-dialogue.md) |
 | measure or lower a scene's performance budget | [add a budget](add-a-budget.md) |
 
 ## Extending the engine
