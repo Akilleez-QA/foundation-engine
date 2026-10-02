@@ -434,13 +434,13 @@ may shed commands older than an optional `maxQueuedAgeMs` before authorization o
 dispatch, and [durable authority](durable-authority.md#optional-submit-deadlines-nw-06)
 may return `expired` for an optional deadline on an injected clock, only before the
 storage call starts. In-flight writes keep committed/rejected/unknown semantics and
-`expired` consumes no sequence. Both are off by default. Evidence is 6 intake and 9
-authority focused tests; load, browser composition and devices remain unverified.
+`expired` consumes no sequence. Both are off by default. PR #12 evidence was 6 intake and 9
+authority focused tests (9 intake after the follow-up below); load, browser composition and devices remain unverified.
 
 Follow-up (PR #33; candidate, not integrated): the
 NW-07 overload probe showed that charging each age shed to the pump budget collapsed
 goodput once queued wait exceeded the age. Shedding is now uncharged and capped by an
-optional `maxStaleDropsPerPump`. At a 300 ms age, saturated final/peak goodput was
+optional `maxStaleDropsPerPump`. With PR #27's probe (not in this tree), at a 300 ms age saturated final/peak goodput was
 0.253 and 0.229 before and 0.955 and 0.915 after (two loopback runs each, heavily
 loaded host); the deterministic unit regression measured 22.0/s before and 80.4/s
 after against an 80.4/s FIFO plateau. Defaults without `maxQueuedAgeMs` are unchanged.

@@ -178,7 +178,9 @@ export function createNetworkIntake(options: { limits: NetworkLimits; ports: Net
               }
             }
             if (disposed) break;
-            // Emptied, retired, or still stale once the drop cap is spent: nothing dispatchable this turn.
+            // A throwing notice retired this peer and shortened the rotation; that is not an empty turn.
+            if (live.get(slot.peer) !== slot) continue;
+            // Emptied, or still stale once the drop cap is spent: nothing dispatchable this turn.
             if (!fresh(slot)) { empty++; continue; }
           }
           empty = 0;

@@ -140,8 +140,10 @@ Without `maxQueuedAgeMs` behaviour is unchanged: commands wait indefinitely and
 - **Bounds.** Shedding per pump is capped by the optional `maxStaleDropsPerPump`
   (positive safe integer; default `maxQueuedMessages`, ignored without
   `maxQueuedAgeMs`). Nothing can be queued during a pump, so the default already
-  bounds a pump to the queued backlog plus `budget` attempts plus one empty scan
-  of connections. Lower the cap to bound `stale` callback work per pump. Once it is
+  bounds drops by the queued backlog. Loop turns are bounded too: the empty-turn
+  scan restarts after each attempt, so the worst case is about drops plus
+  `budget x connections` turns plus one final scan of connections, each turn O(1)
+  apart from creator callbacks. Lower the cap to bound `stale` callback work per pump. Once it is
   spent, a peer whose head is still stale is skipped for that pump: a stale command
   is never dispatched. One extra number per queued command, bounded by the existing
   message-count limits, is retained; it is not added to the UTF-8 byte accounting.
@@ -150,8 +152,10 @@ Without `maxQueuedAgeMs` behaviour is unchanged: commands wait indefinitely and
   goodput collapsed. The deterministic regression test (7 peers, about 113 commands/s
   offered, 4 attempts per 50 ms pump = 80/s) measured goodput 20.6 and 22.0/s at
   150 and 300 ms ages before the change, against 80.4/s FIFO, and 80.4/s at every age
-  after. The NW-07 loopback probe measured saturated final/peak goodput at a 300 ms age of
-  0.253 and 0.229 before and 0.955 and 0.915 after (two runs each, heavily loaded host).
+  after. The NW-07 loopback probe from PR #27 (not in this tree; run from that branch's
+  tools with and without this change) measured saturated final/peak goodput at a 300 ms
+  age of 0.253 and 0.229 before and 0.955 and 0.915 after (two runs each, heavily
+  loaded host).
 - **Choosing an age.** With round-robin drain, a command at the back of a full
   per-peer queue waits about `ceil(maxQueuedMessagesPerPeer x activePeers / budget)`
   pumps, times the caller's pump interval, plus host lag. For example, 8 x 7 / 4 = 14
@@ -174,7 +178,8 @@ Without `maxQueuedAgeMs` behaviour is unchanged: commands wait indefinitely and
   so an idle pump with zero budget does not sweep them. Age measures host queueing
   only, not client send time, network delay or clock skew between hosts. Unit tests
   cover the exact boundary, uncharged shedding, the drop cap, fair drain, backwards
-  time, reply/reentry, configuration and the sustained-overload goodput regression.
+  time, reply/reentry, a notice that retires its peer mid-pump, configuration and the
+  sustained-overload goodput regression.
   The probe numbers are loopback, one machine; no WAN, browser or device acceptance
   is claimed.
 

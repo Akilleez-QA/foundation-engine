@@ -279,6 +279,16 @@ test('NW06: the stale notice may reply through send; reentry is busy and a throw
   assert.equal(t.owner.stats().queuedMessages, 0); assert.equal(t.dispatched.length, 0);
 });
 
+test('NW06: a stale notice that retires its peer does not end the pump before other peers are served', () => {
+  const h = harness({ stale: () => { throw Error('notice'); } }, { maxQueuedAgeMs: 5, authTimeoutMs: 1000 });
+  const a = h.active('{"id":"a"}'), b = h.active('{"id":"b"}');
+  h.owner.receive(a, '{"old":1}', 0); h.owner.receive(b, '{"fresh":1}', 4);
+  assert.deepEqual(h.owner.pump(6), { status: 'pumped', attempted: 1, dispatched: 1, denied: 0, expired: 0, stale: 1 });
+  assert.equal(h.owner.read(a)?.reason, 'stale-error');
+  assert.deepEqual(h.dispatched.map(d => d.command), [{ fresh: 1 }]);
+  assert.equal(h.owner.stats().queuedMessages, 0);
+});
+
 test('NW06: maxQueuedAgeMs and the stale port reject invalid configuration', () => {
   for (const maxQueuedAgeMs of [0, -1, 1.5, Infinity, NaN])
     assert.throws(() => harness({}, { maxQueuedAgeMs }), /limits/);
