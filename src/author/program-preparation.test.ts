@@ -11,12 +11,12 @@ const prepare=source.slice(source.indexOf('      let programsPrepared=false,'),s
 const restore=source.slice(source.indexOf('        contextRestored() {'),source.indexOf('\n      };\n    },',source.indexOf('        contextRestored() {')));
 const draw=source.slice(source.indexOf('        render() {'),source.indexOf('        activate() {'));
 const step=source.slice(source.indexOf('        update(f: FrameInfo) {'),source.indexOf('        render() {'));
-function fixture(frameReady?:()=>Promise<string>){
+function fixture(frameReady?:()=>Promise<string>,tap:{running():boolean}|null=null){
  const cards:any[]=[],layers:any[]=[];let compileError:Error|undefined,renderError:Error|undefined;
  const doc={createElement:()=>({children:[] as any[],setAttribute(){},addEventListener(){},append(...nodes:any[]){this.children.push(...nodes);},remove(){}})};
  const pending:{resolve:(result:string)=>void;reject:(error:Error)=>void}[]=[],owner=new AbortController(),view={dataset:{} as Record<string,string>,append:(node:unknown)=>cards.push(node)},log:unknown[]=[];let compiled=0,invalidated=0,lost=false;
  const run=ts.transpile(`let dirty=true,frame=0,t=0,calm=false,steps=0;const pressed=new Set(),pointer={pressed:false},gestures={sync(){}},runner={frame(){steps++;}},ctx={};const three={},camera={},visit={current:()=>true};${prepare}\nreturn {ready,state:()=>programsPrepared,steps:()=>steps,${step}${draw}${restore}};`,{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None});
- const api=new Function('actx','view','renderer','surface','sync','s','scene','ProgramLinkError','doc','failureText','FrameReadinessError',run)({signal:owner.signal,leaving:()=>owner.signal.aborted,invalidate:()=>invalidated++,own:()=>{},layer:(l:unknown)=>layers.push(l),runId:'run-test'},view,{compile:()=>{compiled++;if(compileError)throw compileError;},render:()=>{if(renderError)throw renderError;},getContext:()=>({isContextLost:()=>lost})},{frameReady,programsReady:()=>new Promise<string>((resolve,reject)=>pending.push({resolve,reject}))},()=>{}, {log:{error:(...args:unknown[])=>log.push(args)}},{id:'test'},ProgramLinkError,doc,(key:string)=>key,FrameReadinessError);
+ const api=new Function('actx','view','renderer','surface','sync','s','scene','ProgramLinkError','doc','failureText','FrameReadinessError','tap',run)({signal:owner.signal,leaving:()=>owner.signal.aborted,invalidate:()=>invalidated++,own:()=>{},layer:(l:unknown)=>layers.push(l),runId:'run-test'},view,{compile:()=>{compiled++;if(compileError)throw compileError;},render:()=>{if(renderError)throw renderError;},getContext:()=>({isContextLost:()=>lost})},{frameReady,programsReady:()=>new Promise<string>((resolve,reject)=>pending.push({resolve,reject}))},()=>{}, {log:{error:(...args:unknown[])=>log.push(args)}},{id:'test'},ProgramLinkError,doc,(key:string)=>key,FrameReadinessError,tap);
  return {api,pending,owner,view,log,cards,layers,compileThrows:(e:Error)=>{compileError=e;},renderThrows:(e:Error)=>{renderError=e;},lose:()=>{lost=true;},get compiled(){return compiled;},get invalidated(){return invalidated;}};
 }
 const turn=()=>new Promise<void>(resolve=>setImmediate(resolve));
@@ -64,4 +64,11 @@ test('systems do not step before initial preparation settles, so they cannot run
  f.pending[0]!.resolve('ready');await f.api.ready;f.api.update({dt:.016,calm:false});assert.equal(f.api.steps(),1);
  const degraded=fixture();degraded.pending[0]!.reject(Error('Program readiness timed out'));await degraded.api.ready;degraded.api.update({dt:.016,calm:false});assert.equal(degraded.api.steps(),1);
  const restored=fixture();restored.pending[0]!.resolve('ready');await restored.api.ready;restored.api.contextRestored();restored.api.update({dt:.016,calm:false});assert.equal(restored.api.steps(),1,'restore preparation does not pause started systems');
+});
+
+test('a dev/test tick tap holds the fixed lane until it reports running (SIM-01)',async()=>{
+ let running=false;const f=fixture(undefined,{running:()=>running});f.pending[0]!.resolve('ready');await f.api.ready;
+ f.api.update({dt:.016,calm:false});assert.equal(f.api.steps(),0,'held before arrival');
+ running=true;f.api.update({dt:.016,calm:false});assert.equal(f.api.steps(),1);
+ running=false;f.api.update({dt:.016,calm:false});assert.equal(f.api.steps(),1,'held again after a replay ends');
 });

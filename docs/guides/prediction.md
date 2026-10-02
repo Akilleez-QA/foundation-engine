@@ -124,3 +124,7 @@ delayed, duplicate and reordered baselines, actual scene/control retirement, and
 bounded callback work. Sending inputs and displaying authoritative snapshots alone
 is not prediction evidence. NW-03 in the [acceptance ledger](upgrade-acceptance-ledger.md)
 is integrated through PR #123 with those finite checks recorded. DV-01 remains open; the minimum phone, tablet and laptop/desktop profiles are pending creator selection.
+
+To check that a client reducer and the host reducer agree on the same command
+prefix, the optional `checkPredictionAgreement` in `@kits/replay` drives these owners
+and reports the first differing sequence. See [replay and divergence](replay-divergence.md) (SIM-01, candidate).

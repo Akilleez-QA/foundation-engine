@@ -269,3 +269,9 @@ this slice.
 The browser transport exposes a validated remote close `{code, reason}`; the optional
 network kit `createClosePolicy` classifies it as terminal or transient so the workbench
 stops reconnecting on `auth-rejected`. Candidate (PR #16), building on integrated NW-04 (PR #14); not integrated. See the [retry guide](network-retry.md#terminal-refusals-and-transient-loss).
+
+## Replay log and divergence detector (SIM-01) — candidate, not integrated
+
+| ID | Contract | State |
+|---|---|---|
+| SIM-01 | Optional `@kits/replay`: bounded tick-input log and player (explicit truncation; version, identity and corruption refusal), creator-digest traces with first-divergence comparison, and a prediction-versus-authority agreement check over the existing owners. Dev/test-only `engine.replay` uses the stock scene fixed lane and `?seed=`. [Contract](replay-divergence.md) | Implemented, candidate (public PR #17). Focused tests and the arcade `?seed=` browser replay pass on the branch. Not integrated. No cross-device or cross-browser floating-point determinism, physical-device or multiplayer claim. |
