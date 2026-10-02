@@ -7,7 +7,7 @@ not any supported device. Each file labels itself `evidence: emulated`.
 
 | Item | Value |
 |---|---|
-| Revision | `abe977e`, the recorder code commit on a clean tree. Documentation was added afterwards. Rebasing onto `97288f8` produced `1f3e082`, which has the same patch-id, and the recorder, loop, dev and script files are unchanged between the two |
+| Revision | `abe977e`, the recorder code commit on a clean tree. Documentation was added afterwards. Rebases onto later `main` (`97288f8`, then `4f666a2`) kept the same patch-id (as `60548a1` on the final branch), and the recorder, loop, dev and script files are unchanged since the run |
 | Command | `GAME_DIR=templates/expedition/game node -r ./scripts/silent-browser.cjs scripts/play/session-recorder-check.mjs <out> --minutes 10 --window-ms 30000` |
 | Browser | Playwright-core 1.56.1 Chromium, muted and isolated, `?flags=dev.silent`, 1280×800 at DPR 1, software GL |
 | Workload | The Expedition `field` scene. The script teleports the named player every 100 ms (a test-page driver) so frames render. It then makes a deliberate 120 ms main-thread stall, a synthetic 3 s hidden period (`document.hidden` overridden), and a route to `shelter` and back. |
