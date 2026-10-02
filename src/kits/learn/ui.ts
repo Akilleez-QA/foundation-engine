@@ -4,7 +4,7 @@
  * screen readers reach them; 48 px touch targets). The DOM changes only when the view it shows changes.
  *
  * Layout seam: the control bar wraps onto more rows on narrow screens and the progress line takes the top-left
- * corner, so on phones the lesson's own content (board, caption line, slider, quiz) must make room for them. One
+ * corner, so on phones the lesson's own content (board, caption line, slider, quiz) must stay clear of them. One
  * ResizeObserver, owned by the controls, re-measures only when the bar, the progress line, the overlay or an arranged
  * element changes size, and publishes on the overlay:
  *   - `--learn-controls-reserve`: the space the bar takes from the bottom (bar offset + height + gap). Content uses
@@ -14,7 +14,8 @@
  * The objectives/finished cards and a centred panel registered with `arrange({ line, panel, floor })` (the quiz) keep
  * their authored position unless they would cover the progress or top line, reach the bar, or (cards only) cover the
  * board's caption (`floor`); then they start below the top content and scroll within the space that is left.
- * Wherever there is room (desktop, tablet portrait) nothing moves. The observer and properties retire with the controls.
+ * Wherever there is space (desktop, and any one-row bar for the bottom insets) nothing moves. The observer and the
+ * properties retire with the controls.
  */
 import { showEl } from '../concept-explorer/ui';
 
