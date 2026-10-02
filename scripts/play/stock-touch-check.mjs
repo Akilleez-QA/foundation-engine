@@ -121,7 +121,7 @@ try {
      const host=document.createElement('div');host.style.cssText='position:fixed;left:0;right:0;top:47px;bottom:0;pointer-events:none;z-index:10;';document.body.append(host);
      const controls=createControls(host),labels=Object.fromEntries(['next','back','again','hint','question','pause','play','finished','controls'].map(k=>[k,k]));
      controls.set({progress:'Step 1 of 4',objectivesTitle:'Today you will learn',objectives:Array.from({length:6},(_,i)=>({text:`Objective ${i+1}: a sentence long enough to wrap onto a second line on a phone`,met:false})),can:{next:true,back:true,again:true,hint:true,question:true,pause:true},paused:false,labels,finished:false});
-     for(let i=0;i<3;i++)await new Promise(r=>requestAnimationFrame(r));
+     for(let i=0;i<3;i++){await new Promise(r=>requestAnimationFrame(r));controls.layout();}   // as the lesson frame does
      const card=[...host.querySelectorAll('section')].find(e=>e.getClientRects().length);
      card.dataset.longCard='1';const r=card.getBoundingClientRect();
      return {fitted:card.style.overflowY==='auto',overflow:card.scrollHeight-card.clientHeight,tab:card.tabIndex,x:r.x+r.width/2,y:r.y+r.height/2};

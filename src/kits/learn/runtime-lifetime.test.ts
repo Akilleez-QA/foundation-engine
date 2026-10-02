@@ -25,7 +25,7 @@ test('lessonScene exit retires its lazy runtime UI, including before the first f
   try {
     const scene = lessonScene({ lesson, title: 'Lifetime' });
     const empty = await testScene(scene); empty.dispose(); empty.dispose();
-    const observers = live.observers, frames = live.frames;
+    const observers = live.observers;
     for (let i = 0; i < 2; i++) {
       const h = await testScene(scene), overlay = fake.document.createElement('div');
       fake.document.body.append(overlay);
@@ -38,7 +38,6 @@ test('lessonScene exit retires its lazy runtime UI, including before the first f
       assert.equal(overlay.querySelectorAll('.explorer-slider').length, 0);
       assert.equal(overlay.querySelectorAll('[aria-live=polite]').length, 0);
       assert.equal(live.observers, observers, 'the layout ResizeObserver is released on exit');
-      assert.equal(live.frames, frames, 'no layout frame stays scheduled after exit');
       overlay.remove();
     }
   } finally { fake.restore(); }

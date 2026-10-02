@@ -5,8 +5,9 @@
  *
  * Layout seam: the control bar wraps onto more rows on narrow screens and the progress line takes the top-left
  * corner, so on phones the lesson's own content (board, caption line, slider, quiz) must stay clear of them. One
- * ResizeObserver, owned by the controls, re-measures only when the bar, the progress line, the overlay or an arranged
- * element changes size, and publishes on the overlay:
+ * ResizeObserver, owned by the controls, marks the layout dirty when the bar, the progress line, the overlay or an
+ * arranged element changes size; `layout()` (called once per frame by the lesson) then re-measures and publishes on
+ * the overlay:
  *   - `--learn-controls-reserve`: the space the bar takes from the bottom (bar offset + height + gap). Content uses
  *     `aboveControls(min)`, which keeps its authored inset while the bar fits on one row.
  *   - `--learn-top-clear` / `--learn-top-side`: set only when a centred top line (`topLine()`, at most 640 px wide
@@ -31,7 +32,7 @@ export interface ControlsView {
 }
 /** Lesson content the controls keep clear: a top line, a centred panel (the quiz), and the board's caption (cards stay above it). */
 export interface Arranged { line?: HTMLElement | null; panel?: HTMLElement | null; floor?: HTMLElement | null }
-export interface Controls { set(v: ControlsView): void; onCommand(fn: (c: LessonCommand) => void): void; arrange(o: Arranged): void; destroy(): void }
+export interface Controls { set(v: ControlsView): void; onCommand(fn: (c: LessonCommand) => void): void; arrange(o: Arranged): void; /** Re-measure if anything changed size since the last call; call once per frame. */ layout(): void; destroy(): void }
 
 /** The overlay CSS property holding the space the control bar takes from the bottom of the overlay. */
 export const CONTROLS_RESERVE = '--learn-controls-reserve';
@@ -68,16 +69,12 @@ export function createControls(overlay: HTMLElement): Controls {
   const fit = (el: HTMLElement): Fit => ({ el, top: el.style.top, transform: el.style.transform, pointer: el.style.pointerEvents ?? '', tab: el.getAttribute('tabindex'), fitted: false });
   let line: HTMLElement | null = null, floorEl: HTMLElement | null = null, quiz: Fit | null = null;
   const own = [fit(objectives), fit(finished)];
-  // Size changes schedule one measurement on the next frame, never inside the observer's delivery: the measurement
-  // writes the fitted panel's max-height, and writing an observed element's size during delivery makes Chromium
-  // report "ResizeObserver loop completed with undelivered notifications". The refit is idempotent, so the frame
-  // after a fit observes the same sizes and the loop settles.
-  let frame: number | null = null;
-  const schedule = () => {
-    if (retired || frame !== null) return;
-    if (typeof requestAnimationFrame !== 'function') { measure(); return; }
-    frame = requestAnimationFrame(() => { frame = null; measure(); });
-  };
+  // Size changes only mark the layout dirty; `layout()`, called from the lesson's frame system, measures once. Never
+  // measuring inside the observer's delivery matters: the measurement writes the fitted panel's max-height, and
+  // writing an observed element's size during delivery makes Chromium report "ResizeObserver loop completed with
+  // undelivered notifications". The refit is idempotent, so the frame after a fit observes the same sizes and settles.
+  let dirty = true, shownKey = '';
+  const schedule = () => { dirty = true; };
   const sizes = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
   const unfit = (f: Fit | null) => {
     if (!f?.fitted) return;
@@ -124,12 +121,21 @@ export function createControls(overlay: HTMLElement): Controls {
   for (const el of [bar, progress, overlay, objectives, finished]) watch(el, true);
   return {
     onCommand(f) { if (!retired) fn = f; },
+    layout() {
+      if (retired) return;
+      // Showing, hiding or re-texting arranged content is caught here, in the same frame, without reading layout;
+      // size changes after that arrive through the observer.
+      const k = [...own.map(f => f.el), quiz?.el, line].map(el => el ? `${el.style.display}|${el.textContent?.length ?? 0}` : '-').join(',');
+      if (k !== shownKey) { shownKey = k; dirty = true; }
+      if (!dirty) return;
+      dirty = false; measure();
+    },
     arrange(o) {
       if (retired) return;
-      if (o.line !== undefined && o.line !== line) { watch(line, false); line = o.line; watch(line, true); }
-      if (o.floor !== undefined && o.floor !== floorEl) { watch(floorEl, false); floorEl = o.floor; watch(floorEl, true); }
+      if (o.line !== undefined && o.line !== line) { watch(line, false); line = o.line; watch(line, true); dirty = true; }
+      if (o.floor !== undefined && o.floor !== floorEl) { watch(floorEl, false); floorEl = o.floor; watch(floorEl, true); dirty = true; }
       if (o.panel !== undefined && o.panel !== quiz?.el) {
-        unfit(quiz); watch(quiz?.el ?? null, false); quiz = o.panel ? fit(o.panel) : null; watch(o.panel, true);
+        unfit(quiz); watch(quiz?.el ?? null, false); quiz = o.panel ? fit(o.panel) : null; watch(o.panel, true); dirty = true;
       }
     },
     set(v) {
@@ -155,8 +161,7 @@ export function createControls(overlay: HTMLElement): Controls {
       if (retired) return;
       for (const f of [...own, quiz]) unfit(f);
       retired = true; fn = null; sizes?.disconnect();
-      if (frame !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame);
-      frame = null; line = null; floorEl = null; quiz = null;
+      line = null; floorEl = null; quiz = null;
       if (reserve) overlay.style.setProperty(CONTROLS_RESERVE, '');
       if (top) for (const k of [TOP_CLEAR, TOP_SIDE]) overlay.style.setProperty(k, '');
       for (const el of [progress, objectives, finished, bar]) el.remove();

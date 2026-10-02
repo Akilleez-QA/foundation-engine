@@ -143,6 +143,7 @@ function render(ctx: SceneContext, v: Visit, view: LessonView) {
     labels: { next: say(ctx, 'learn.next'), back: say(ctx, 'learn.back'), again: say(ctx, 'learn.again'), hint: say(ctx, 'learn.hint'), question: say(ctx, 'learn.question'), pause: say(ctx, 'learn.pause'), play: say(ctx, 'learn.play'), finished: say(ctx, 'learn.finished'), controls: say(ctx, 'learn.controls') },
     finished: view.finished,
   });
+  v.controls?.layout();   // fit content to the controls only when something changed size
 }
 
 /** A caption line for scenes without a board (sim, quiz): who speaks, what they say. */

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { defineScene } from '../../author';
 import { testScene } from '../../author/testing';
-import { installFakeDom, live } from '../../testing/fake-dom';
+import { installFakeDom } from '../../testing/fake-dom';
 import type { LessonInput } from './lesson';
 import { directorSystem, disposeLesson } from './runtime';
 import { CONTROLS_RESERVE, createControls } from './ui';
@@ -23,8 +23,8 @@ function setup() {
   const overlay = fake.document.createElement('div') as unknown as El;
   fake.document.body.append(overlay as never);
   Object.assign(overlay, { prepend: (node: El) => overlay.append(node) });
-  // Observers only schedule; the measurement runs on the next animation frame.
-  const relayout = () => { for (const o of observers) o.trigger(); fake.flushFrames(); };
+  // Observers only mark the layout dirty; the measurement runs on the next `layout()` (the lesson's frame).
+  const relayout = () => { for (const o of observers) o.trigger(); };
   return { fake, overlay, relayout };
 }
 
@@ -53,7 +53,7 @@ async function boardLesson(width: number, height: number, barHeight: number) {
   nav.rect = { left: 8, top: height - 12 - barHeight, width: width - 16, height: barHeight };
   const progress = s.overlay.children.find(el => el.tagName === 'P' && el.style.cssText?.includes('left:16px'))!;
   progress.rect = { left: 16, top: 56, width: 90, height: 30 };
-  s.relayout();
+  s.relayout(); h.run(1 / 60);
   return { ...s, h, nav, board };
 }
 
@@ -91,7 +91,7 @@ test('a centred panel moves below the top line and scrolls above a wrapped bar o
     line.rect = { left: 16, top: 94, width: 288, height: 48 };
     panel.rect = { left: 0, top: 118, width: 320, height: 260 };   // centred: covers the line's lower half
     controls.arrange({ line: line as never, panel: panel as never });
-    relayout();
+    relayout(); controls.layout();
     assert.equal(overlay.style['--learn-top-clear'], '94px');   // the line drops below the progress pill
     assert.equal(panel.style.top, '150px');                      // below the line (142) plus the gap
     assert.equal(panel.style.transform, 'translateX(-50%)');
@@ -104,7 +104,7 @@ test('a centred panel moves below the top line and scrolls above a wrapped bar o
     nav.rect = { left: 8, top: 693, width: 1264, height: 48 };
     line.rect = { left: 305, top: 56, width: 670, height: 30 };
     panel.rect = { left: 346, top: 248, width: 588, height: 234 };
-    relayout();
+    relayout(); controls.layout();
     assert.deepEqual([panel.style.top, panel.style.transform, panel.style.maxHeight, panel.style.pointerEvents], ['50%', 'translate(-50%,-55%)', '', '']);
     assert.equal(panel.getAttribute('tabindex'), null);
     assert.equal(overlay.style['--learn-top-clear'], '0px');
@@ -114,7 +114,7 @@ test('a centred panel moves below the top line and scrolls above a wrapped bar o
   } finally { fake.restore(); }
 });
 
-test('size changes are measured once on the next frame, never inside the observer delivery', () => {
+test('size changes are measured on the next layout() call, never inside the observer delivery', () => {
   const { fake, overlay } = setup();
   const g = globalThis as unknown as { ResizeObserver: new (fn: () => void) => { trigger(): void } };
   const observers: { trigger(): void }[] = [];
@@ -126,11 +126,15 @@ test('size changes are measured once on the next frame, never inside the observe
     overlay.querySelector('nav')!.rect = { left: 8, top: 349, width: 304, height: 160 };
     for (const o of observers) { o.trigger(); o.trigger(); }
     assert.equal(overlay.style[CONTROLS_RESERVE], undefined);    // nothing written during delivery
-    assert.equal(live.frames, 1);                                // coalesced into one frame
-    fake.flushFrames();
+    controls.layout();
+    assert.equal(overlay.style[CONTROLS_RESERVE], '180px');
+    overlay.querySelector('nav')!.rect = { left: 8, top: 453, width: 304, height: 48 };
+    controls.layout();                                           // nothing changed size since: no re-measure
     assert.equal(overlay.style[CONTROLS_RESERVE], '180px');
     for (const o of observers) o.trigger();
-    controls.destroy();
-    assert.equal(live.frames, 0);                                // a pending frame is cancelled with the controls
+    controls.layout();
+    assert.equal(overlay.style[CONTROLS_RESERVE], '68px');
+    controls.destroy(); controls.layout();
+    assert.equal(overlay.style[CONTROLS_RESERVE], '');
   } finally { fake.restore(); }
 });
