@@ -39,6 +39,12 @@ Status: integrated in v0.2.0 (PR #17). Two limits catch most first users:
   these functions. The character kit calls `Math.atan2` (camera-relative input, facing), so most character-kit games
   cannot replay a browser log headlessly.
 
+Choosing the replayed state (SIM-02): `replayDigest({components, exclude, resources, count, id})` builds a named digest
+over selected components without excluded (cosmetic) entities; a scene declares one as `defineScene({replay: {digest}})`.
+The digest id joins the trace identity. With a detail window the canonical state text is kept per tick, and
+`explainDivergence` names the first differing entity, component and field. See the guide and
+[the recipe](../../../docs/recipes/replay-with-your-own-digest.md).
+
 Floating-point results are not guaranteed identical across devices, browsers or JavaScript engines; this kit detects
 such divergence, it does not prevent it. Typical cost: one creator digest per sampled tick; the recorder is O(1) per
 tick except a canonical parse of that tick's input.

@@ -133,7 +133,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       const viewState: ViewState = {
         observeSize: sizes.observe,
         camera: { position: [...scene.view?.camera?.position ?? [0, 8, 10]], target: [...scene.view?.camera?.target ?? [0, 0, 0]], fov: scene.view?.camera?.fov ?? 50, mask: scene.view?.camera?.mask ?? 1, ...(scene.view?.camera?.minWidthFov ? { minWidthFov: scene.view.camera.minWidthFov } : {}) },
-        background: scene.view?.background ?? 0x101820, environment: scene.view?.environment, overlay,
+        background: scene.view?.background ?? 0x101820, environment: scene.view?.environment, overlay, signal: actx.signal,
         openReadingSheet: options => readingSheets.open(options),
         get aspect() { return camera.aspect; },
       };
@@ -186,7 +186,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       if (TEST_API) {
         try {
           tap = openSceneTickTap({ scene: scene.id, game: { id: s.play.game.id, version: s.play.game.version }, inputs: o.inputs.map(i => ({ id: i.id, axis: !!i.axis })),
-            seed, step: FIXED_STEP, world, live: liveInput, invalidate: () => actx.invalidate() });
+            seed, step: FIXED_STEP, world, replayDigest: scene.replay?.digest ?? null, live: liveInput, invalidate: () => actx.invalidate() });
         } catch (error) { s.log.error(`${scene.id}: tick tap failed`, error); }
         if (tap) { const owned = tap; actx.own(() => owned.retire()); tapArrive = () => owned.arrive(); }
       }

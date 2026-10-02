@@ -6,6 +6,7 @@
 import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { createQueryResult, createSpatialGrid } from '../../src/kits/spatial/grid.ts';
+import { createInterestResult, createInterestSets } from '../../src/kits/spatial/interest.ts';
 import { mulberry32 } from '../../src/core/rng.ts';
 
 const percentile = (samples, p) => [...samples].sort((a, b) => a - b)[Math.max(0, Math.ceil(samples.length * p) - 1)] ?? 0;
@@ -70,12 +71,60 @@ export function runCase({ entries, ticks = 60, warmup = 10, observers = 64, cell
   };
 }
 
+/**
+ * SC-02 case: the same constant-density motion, plus `observers` interest sets (enter 48, exit 56, one hold
+ * update, a send budget of 64) whose observers follow an entity. Per tick: move every entity and observer, then
+ * update every observer's set. Reports the update pass, per-update work and event counts, and one tick of the
+ * brute-force equivalent (every observer tests every entity).
+ */
+export function runInterestCase({ entries, ticks = 60, warmup = 10, observers = 100, cellSize = 16, enterRadius = 48, exitRadius = 56, maxRelevant = 64, seed = 2 }) {
+  const side = Math.ceil(Math.sqrt(entries * 100)), random = mulberry32(seed), columns = Math.ceil(side / cellSize);
+  const grid = createSpatialGrid({ cellSize, minX: 0, minY: 0, maxX: side, maxY: side, maxEntries: entries, maxCells: columns * columns, maxCellsPerQuery: 100 });
+  const limits = { enterRadius, exitRadius, holdUpdates: 1, maxObservers: observers, maxRelevant, maxCandidates: 1024, maxPrioritized: 1 };
+  const sets = createInterestSets(grid, limits), out = createInterestResult(limits);
+  const xs = new Float64Array(entries), ys = new Float64Array(entries);
+  for (let i = 0; i < entries; i++) { xs[i] = random() * side; ys[i] = random() * side; grid.insert(i, xs[i], ys[i]); }
+  const follow = (o) => (o * 7919) % entries;
+  for (let o = 0; o < observers; o++) sets.addObserver(o, xs[follow(o)], ys[follow(o)], follow(o));
+  const pass = [], work = { updates: 0, candidates: 0, relevant: 0, entered: 0, left: 0, overBudget: 0, incomplete: 0 };
+  for (let t = -warmup; t < ticks; t++) {
+    if (t === 0) { pass.length = 0; for (const k in work) work[k] = 0; }
+    for (let i = 0; i < entries; i++) {
+      xs[i] = Math.min(side, Math.max(0, xs[i] + (random() - 0.5) * 2));
+      ys[i] = Math.min(side, Math.max(0, ys[i] + (random() - 0.5) * 2));
+      grid.move(i, xs[i], ys[i]);
+    }
+    for (let o = 0; o < observers; o++) sets.moveObserver(o, xs[follow(o)], ys[follow(o)]);
+    const start = performance.now();
+    for (let o = 0; o < observers; o++) {
+      const r = sets.update(o, out);
+      work.updates++; work.candidates += r.candidates; work.relevant += r.relevantCount; work.entered += r.enteredCount; work.left += r.leftCount;
+      if (r.status === 'over-budget') work.overBudget++; else if (r.status !== 'complete') work.incomplete++;
+    }
+    pass.push(performance.now() - start);
+  }
+  const start = performance.now(), e2 = enterRadius * enterRadius;
+  let found = 0;
+  for (let o = 0; o < observers; o++) { const x = xs[follow(o)], y = ys[follow(o)]; for (let i = 0; i < entries; i++) if ((xs[i] - x) ** 2 + (ys[i] - y) ** 2 <= e2) found++; }
+  const bruteMs = performance.now() - start;
+  if (found < 0) throw Error('unreachable');
+  sets.dispose(); grid.dispose();
+  const per = k => +(work[k] / work.updates).toFixed(2);
+  return {
+    entries, observers, ticks, enterRadius, exitRadius, maxRelevant,
+    updatePass: { medianMs: +percentile(pass, 0.5).toFixed(3), p95Ms: +percentile(pass, 0.95).toFixed(3), maxMs: +Math.max(...pass).toFixed(3) },
+    perUpdate: { candidates: per('candidates'), relevant: per('relevant'), entered: per('entered'), left: per('left') },
+    overBudgetUpdates: work.overBudget, incompleteUpdates: work.incomplete, bruteForceDistancePassMs: +bruteMs.toFixed(3),
+  };
+}
+
 export function runSpatialBench({ quick = false } = {}) {
   const ticks = quick ? 10 : 60;
   return {
-    scope: 'Node headless CPU micro-benchmark of the spatial grid only; no browser, ECS, rendering, worker or device evidence',
+    scope: 'Node headless CPU micro-benchmark of the spatial grid and interest sets only; no browser, ECS, rendering, worker or device evidence',
     node: process.version,
     cases: [1000, 10000].map(entries => runCase({ entries, ticks })),
+    interestCases: [1000, 10000].map(entries => runInterestCase({ entries, ticks })),
   };
 }
 

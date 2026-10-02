@@ -32,6 +32,9 @@ const mode=new URLSearchParams(location.search).get('layout')??'disclose';
 const present=mode=>hud(context).present(mode==='inline'?{mode:'inline'}:{mode:'disclose',label:context.text('game.hud.label'),closeLabel:context.text('game.hud.close')});
 const action=defineInput({id:'hud-details',label:'Show details',keys:['code:KeyI'],pad:['y']});
 const touchAction=new URLSearchParams(location.search).has('touch-sources') ? defineInput({id:'touch-check',label:'Touch diagnostic action',keys:['code:KeyT'],pad:['lb']}) : null;
+const touchHold=new URLSearchParams(location.search).has('touch-sources') ? defineInput({id:'touch-hold',label:'Touch held action',keys:['code:KeyH'],pad:['rb'],hold:true}) : null;
+// Fixed-tick view of the held touch action: presses per tick and ticks held (the #19 latch's exactly-once contract).
+const holdCount=defineSystem({id:'touch-hold-count',run(ctx){if(!touchHold)return;if(ctx.input.pressed('touch-hold'))ctx.state.holdPresses=(ctx.state.holdPresses??0)+1;ctx.state.holdHeld=ctx.input.held('touch-hold');if(ctx.state.holdHeld)ctx.state.holdTicks=(ctx.state.holdTicks??0)+1;}});
 const move=defineInput({id:'move',label:'Move',axis:{negative:{keys:['code:ArrowLeft'],pad:['dpad-left']},positive:{keys:['code:ArrowRight'],pad:['dpad-right']}}});
 const cube=defineEntity({id:'subject',components:[Name({name:'subject'}),Transform({y:0.5}),Shape({kind:'box',size:[1,1,1],color:0x4f8cff})]});
 const update=defineSystem({id:'animate',phase:'frame',run(ctx,dt){
@@ -41,7 +44,7 @@ const update=defineSystem({id:'animate',phase:'frame',run(ctx,dt){
  ctx.state.move=ctx.input.axis('move');
  for(const [,tr]of ctx.world.query(Transform)){tr.ry+=dt*.2;tr.x+=ctx.state.move*dt;ctx.world.touch();}
 }});
-const sample=defineScene({id:'sample',title:'Reading sheet diagnostic',entities:[cube],systems:[update],
+const sample=defineScene({id:'sample',title:'Reading sheet diagnostic',entities:[cube],systems:[update,holdCount],
  view:{camera:{position:[3,3,5],target:[0,.5,0]},background:0x141a24},enter(ctx){context=ctx;observeView(ctx);
  if(shellMode)return;
  hud(ctx).line('essential',ctx.text('game.hud.essential'));
@@ -51,7 +54,7 @@ const sample=defineScene({id:'sample',title:'Reading sheet diagnostic',entities:
 }});
 const other=defineScene({id:'other',title:'Other',enter(ctx){context=ctx;observeView(ctx);}});
 const savedControls=new URLSearchParams(location.search).get('savedControls')==='player';
-const compiled=compileGame({brief,game,defs:[sample,other,action,move,...(touchAction?[touchAction]:[])]});
+const compiled=compileGame({brief,game,defs:[sample,other,action,move,...(touchAction?[touchAction]:[]),...(touchHold?[touchHold]:[])]});
 export const app=createApp([...layerModules(game,brief).map(module=>shellMode&&module.id==='platform.shell'?shellModule({home:sceneId(game.firstScene),menuPresentation:shellMode==='compact'?'compact':'expanded'}):module),...compiled.modules,...(savedControls?[controlsSettingsModule({id:'diagnostic.controls',scope:'player'})]:[])],{mode:'test',events:appBus,flag:id=>appFeatures().enabled(id),probes:true});
 window.hudCheck={
  state:()=>({observedView:observedView&&{...observedView},world:app.probes.read('world'),layers:appLayers().stack().length,activities:appActivities().running().length,pool:app.probes.read('render.pool'),focus:document.activeElement?.textContent}),

@@ -27,7 +27,10 @@ const voice = ctx.playVoice('door-open', { gain: .5, rate: .8 }); // a handle yo
 | `pitch` | 0.25…4 (default 1) | Playback rate: 2 is an octave up and twice as fast. |
 | `position` | `[x, y, z]` | World position; the listener is the scene camera. Distance model: inverse, reference 1 m, max 100 m. |
 
-Bad options throw (in `testScene` too), naming the field. In tests, `t.plays` lists every play with its options.
+Bad options throw (in `testScene` too), naming the field. In tests, `t.plays` lists every play with its options, and
+`t.voices` lists every `ctx.playVoice` with a copy of its options (`gain`, `rate`, `variant`, `wait`, `at`, the full
+`spatial` block with panning, distance model and cutoff, and `filter`; not `onEnded`), checked as the audio output checks
+them. A headless voice never plays: `playVoice` returns `null` there.
 
 ## What the engine does
 

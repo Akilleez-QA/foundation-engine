@@ -8,9 +8,19 @@ agreeing with host reduction. It adds no runtime feature, clock, scheduler, stor
 or network path. A creator may use it in tests, in the dev/test build's test API,
 or not at all; a production build never contains the dev surface.
 
-State: integrated in v0.2.0 (public PR #17, merged to `main` at `49047ae`). Evidence
-and limits are listed below; read [Limitations](#limitations-read-before-relying-on-a-result)
+State: SIM-01 is integrated in v0.2.0 (public PR #17, merged to `main` at `49047ae`). The
+creator-chosen replay digest and divergence detail (SIM-02, [below](#choose-what-a-replay-must-reproduce-sim-02))
+are implemented on branch `feat/replay-custom-digest`, candidate (PR #58), not integrated.
+Evidence and limits are listed below; read [Limitations](#limitations-read-before-relying-on-a-result)
 before relying on a result.
+
+> **Frame-phase writes break the default digest.** The default digest hashes every
+> entity's `Transform`. A purely visual `phase: 'frame'` system that moves anything
+> (a bobbing pickup, a camera rig, particles) depends on the frame grouping, which is
+> not in the log, so every replay of that scene reports `diverged`, usually from
+> tick 0. Either move that motion to a fixed system, or give the scene a digest that
+> leaves the cosmetic entities out (`replay: { digest: replayDigest({ exclude: [Cosmetic] }) }`,
+> see [the recipe](../recipes/replay-with-your-own-digest.md)).
 
 ## Seams reused
 
@@ -75,11 +85,106 @@ All exports come from the optional `@kits/replay` (`src/kits/replay/`).
   reconciles to that baseline. It returns `agree`, `diverged` (the first sequence where
   the reducers differ, with both states when `detailChars` is set) or `refused` (which
   side, which sequence, why), plus the number of visible corrections.
-- **Dev/test API** `engine.replay.start({mode: 'record' | 'replay', log?, every?, maxTicks?, maxBytes?, maxDigests?})`
+- **Dev/test API** `engine.replay.start({mode: 'record' | 'replay', log?, every?, maxTicks?, maxBytes?, maxDigests?, digest?, detail?})`
   re-enters the current scene and records or replays its fixed ticks from arrival.
   `engine.replay.read()` returns the status, tick counts, the local log text
-  (record), the digests and, once a replay completes, its comparison with the log.
-  `engine.replay.stop()` ends the session.
+  (record), the digests, the named digest in use (`digest`), and, once a replay
+  completes, its comparison with the log and, when it diverged, a `divergence`
+  report. `engine.replay.stop()` ends the session. `digest` and `detail` are below.
+
+## Choose what a replay must reproduce (SIM-02)
+
+Creator requirement (backlog W1-1): a game whose cosmetic presentation moves
+entities must still be able to verify that its simulation replays exactly, and a
+divergence must say what differed, not only when.
+
+| Input | Where | Meaning |
+|---|---|---|
+| `replay: { digest }` on `defineScene` | Scene definition (`@engine`) | The scene's default replay digest: `{id, state(world)}`. `defineScene` refuses a missing `state` function or an id outside 1-128 of `A-Za-z0-9._:,;=+-`. |
+| `replayDigest({components?, exclude?, resources?, count?, id?})` | `@kits/replay` | A digest over selected components (types or ids; default `[Transform]`), without entities that have any `exclude` component, with all, none or the listed resources and, optionally, `world.count`. The default id describes the selection (`select:c=transform,score;x=cosmetic;r=all`), or hashes it when it is long or has other characters. |
+| `selectWorldState(world, selection)` | `@kits/replay` | The selected state as a plain value `{entities: [[id, {componentId: value}]...], resources?, count?}`, entities in id order. |
+| `digest` on `engine.replay.start` | Dev/test API | The same digest, or a selection object with component ids (serialisable, so a browser driver can pass it). Takes precedence over the scene's. |
+| `replayDigest` on `recordSceneRun` / `replaySceneLog` | `@kits/replay` | The same, headless. The existing `digest(ctx)` function option still takes precedence and keeps the old identity. |
+| `detail: true \| {from?, to?, maxChars?}` on a record request | Dev/test API | Keep each sampled tick's canonical state text in the log for ticks `from`..`to` (default the whole run), up to `maxChars` (default 1 MiB). Headless runs use the trace's existing `detail` window. |
+| `explainDivergence(tick, a, b, {limits?, maxValueChars?})` | `@kits/replay` | Names the first difference between two detail texts. |
+
+How it works. A named digest is the 64-bit hash of the canonical JSON of
+`state(world)` (the network kit's canonical v1, under `WORLD_DIGEST_LIMITS`), read
+once per sampled tick after the tick's fixed systems. The canonical text is also the
+tick's detail text, so the digest and the detail never disagree. The digest's id is
+appended to the trace identity (`…|seed:7|digest:<id>`). Without a named digest the
+identity and the digest are unchanged, so existing logs still replay.
+
+Digests see JSON, not JavaScript. `state(world)` (and so every selected component
+value and resource) goes through `JSON.stringify` before it is canonicalised: a `Map`
+or `Set` becomes `{}`, `NaN` and `±Infinity` become `null`, `-0` becomes `0`, and
+`undefined` fields, functions and symbols are dropped. State held that way is not
+covered, and a change between two such values is invisible. Keep digested components
+and resources JSON-plain (numbers, strings, booleans, arrays, plain objects), or
+convert them in your own `state` function. A `state` result that is not JSON at
+all (`undefined`, a cycle, a `BigInt`) fails the trace.
+
+Coverage. For a selection digest, `coverage` (in `engine.replay.read()`, and on
+`recordSceneRun` and `replaySceneLog` results) gives the listed entities and, per
+selected component, how many of them had it at the first sample. `unmatched` lists
+selected components that no listed entity had on any sample so far: a misspelt id
+(`'scroe'`) or a component the scene never uses. Their part of the digest is
+constant, so an `equal` says nothing about them. The run is not failed, because a
+component may legitimately appear only later; check `unmatched` is empty before you
+rely on an `equal`. A digest written as a function has `coverage: null`.
+
+Outputs. On a diverged replay, `divergence` is either
+`{status: 'found', tick, kind, path, entity, component, field, resource, a, b}` or
+`{status: 'unavailable', tick, reason}`:
+- the search is depth first in canonical order (sorted keys, entities by id) and stops
+  at the first difference, so "first" means first in that order, not the most
+  important;
+- `kind` is `value`, `type`, `added` (only in the replay), `removed` (only in the
+  log) or `entity-set` (an entity exists on one side only; `entity` names it);
+- for the selection shape, `entity`, `component` and `field` are filled; for a
+  resource, `resource` and `field`; for any other shape, only `path`;
+- `a` (the log's value) and `b` (the replay's) are JSON previews of at most 160
+  characters;
+- `no-detail`: the log kept no detail for that tick (no `detail` window, outside it,
+  or past `maxChars`); `detail-unreadable`: a detail text is over the parse limits
+  (8 MiB, 2^20 nodes, depth 32) or malformed (the explainer never throws, and a
+  replay's result survives any detail text); `no-difference`: the detail texts match
+  although the digests differ. The built-in paths compute both from the same state
+  (a named digest hashes its detail text; the default detail lists the same count,
+  resources and transforms the default digest hashes), so this means a headless
+  `detail(ctx)` that does not describe the `digest(ctx)` beside it, or a `state()`
+  that is not a pure function of the world (it reads a clock, a counter or
+  `Math.random`, so two calls in one tick differ).
+
+Owner and bounds. The digest is creator code run by the caller's existing tick
+owner: the dev tap after each fixed tick, or the headless `testScene` lane. Nothing
+new is scheduled. Selections hold at most 64 components, 64 exclusions and 256
+resource keys of at most 128 characters each. A record request's `detail.maxChars`
+counts toward the log bound (6 bytes per character for escaping, plus one entry per
+sample), so a request whose log could not be reopened is refused (`log-limit`). The
+replay side keeps one state text only: the replayed state at the first sample that
+differs from the log's.
+
+Overload, failure and recovery. A digest that throws, returns `undefined`, is cyclic
+or exceeds `WORLD_DIGEST_LIMITS` fails the trace (`digest-threw`); the recording or
+replay ends `failed`. Detail past `maxChars` is dropped, and `detailTruncated` is
+set in the log. A malformed digest or detail request is refused before re-entry
+(`digest`, `detail`); `detail` on a replay request is refused too, because a replay
+uses the detail its log was recorded with. An identity over 512 characters (a long
+game id, scene id or digest id) is refused at the visit (`identity-too-long`), and
+any other failure to set up the visit's tap is refused as `tap-setup-failed`, so a
+session never stays armed. A log replayed under another digest is refused at the visit
+(`incompatible-digest`), which leaves that visit untapped; headlessly the comparison
+is `incomparable` (`identity`). Pass the same digest to the replay as to the
+recording. A function digest cannot be carried in the log. Recovery is recording
+again, with a wider `detail` window around the reported tick when the report was
+`no-detail`.
+
+Cost. One `state(world)` call, one canonical serialisation and one hash per sampled
+tick: O(selected entities × selected components). Detail adds the retained text, up
+to `maxChars`. Nothing runs when no replay session is active, and production builds
+never call `replay.digest`. A scene definition's `replay` field and anything the game
+imports from `@kits/replay` are game code and are bundled with it.
 
 ## Owner, bounds and overload
 
@@ -164,7 +269,13 @@ and are not observed. Unarmed visits are unchanged.
   one fixed tick, the first one after it arrives, and a frame with zero fixed ticks
   keeps it pending. The log records exactly what each tick observed.
 - The default world digest covers resources and `Transform` only. Other component
-  state needs a creator digest.
+  state needs a creator digest. A named digest covers only what it selects: state
+  left out (an excluded entity, an unselected component) can change without a
+  divergence, and a fixed system that reads such cosmetic state can make the
+  selected state diverge later, where it is reported.
+- A divergence report names the first difference in canonical order at the first
+  divergent sample. It is not a root cause: the cause may be earlier and elsewhere
+  (outside the digest, or between samples when `every > 1`).
 - The checksum and digests use a 64-bit non-cryptographic hash. They detect
   accidental corruption and change, not deliberate forgery, and a collision, though
   unlikely, would hide a difference.
@@ -209,6 +320,29 @@ Browser regression `npm run test:replay-browser`
 - a teleport between frames is reported at that exact tick;
 - a corrupted log is refused without re-entering the scene;
 - a log for another seed is refused at the visit.
+
+SIM-02 (candidate, not integrated), focused tests (`src/kits/replay/state.test.ts`,
+`src/dev/replay.test.ts`):
+
+- the demo case: a cosmetic orb bobbed by a frame-phase system diverges under the
+  default digest across frame groupings, and the report names the orb's entity,
+  `transform` and `y`; the same run with a digest excluding the cosmetic tag
+  replays exactly (dev surface and headless, from the request and from the scene
+  definition);
+- a gameplay fault under the named digest is still found and named (entity,
+  `score`, `value`), at its exact tick;
+- refusals: a log under another digest (`incompatible-digest`), malformed digests
+  and detail windows, detail over the log bound; throwing, cyclic and `undefined`
+  digests fail the session; a small detail budget truncates and reports
+  `no-detail`;
+- the explainer on values, types, added and removed components, entity sets,
+  resources, other shapes, bounded previews, and over-limit or malformed detail;
+- identities without a named digest are unchanged.
+
+`npm run test:replay-browser` adds: a selected-component digest with detail names
+the teleported player's entity and `transform` field at the exact tick; the log is
+refused under the default digest; a creator digest function passed in the page
+replays exactly.
 
 Not established: physical devices, other browsers, production builds (which do not
 contain the dev surface), multiplayer or WAN, and the creator's own simulations.

@@ -14,7 +14,7 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [terrain](../../src/kits/terrain/README.md) | Canonical surface, exact contact queries, bounded chunks and coherent revisions | terrain, expedition |
 | [procgen](../../src/kits/procgen/README.md) | Hierarchical seed derivation, bounded seeded grid generation on the worker host, a strict root-seed save section | None yet. GEN-01 integrated in v0.2.0 (PR #38) |
 | [navigation](../../src/kits/navigation/README.md) | Incremental bounded route search with cancellation | expedition |
-| [dialogue](../../src/kits/dialogue/README.md) | Stable choices, revision guards and validated graph exits | expedition |
+| [dialogue](../../src/kits/dialogue/README.md) | Stable choices, revision guards and validated graph exits; optional declared variables, visit counts and bounded conditions (TB-02 candidate, PR #50) | expedition |
 | [objectives](../../src/kits/objectives/README.md) | Counted event runs, explicit stage composition and retry-safe completion claims | expedition |
 | [inventory](../../src/kits/inventory/README.md) | Conserved local transactions, reservations and epoch checkpoints | expedition, mechanics |
 | [resources](../../src/kits/resources/README.md) | Deterministic fields and bounded production | expedition |
@@ -32,7 +32,7 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [network](../../src/kits/network/README.md) | Bounded connection/authentication intake, complete scoped views, durable authority and prediction; creator-supplied transport, disclosure and game policy | Admission integrated in PR #120; scoped views integrated on main at `ea48539` (PR #122 in the private development history), after clean rebased browser and all seven gates (1,965 tests, 129 performance checks); see [view guide](../guides/network-views.md). Authority/prediction integrated in PR #123 at `b6fb4a3` after all seven gates (2,018 tests, 129 checks) |
 | [housing](../../src/kits/housing/README.md) | Permission-separated placement and recoverable manifests | mechanics |
 | [turns](../../src/kits/turns/README.md) | Deterministic command logs: seeded per-position random, undo/redo, exact previews, replay, save snapshots with drift detection, durable-authority policies | None yet. Integrated in v0.2.0 (PR #24); headless unit tests only. [Recipe](../recipes/add-a-turn-log.md) |
-| [spatial](../../src/kits/spatial/README.md) | Bounded uniform-grid index for neighbour, range and interest queries | None yet; integrated in v0.2.0 (SC-01, PR #23, [guide](../guides/spatial-index.md)) |
+| [spatial](../../src/kits/spatial/README.md) | Bounded uniform-grid index for neighbour, range and interest queries; per-observer interest sets | No template yet. Grid integrated in v0.2.0 (SC-01, PR #23, [guide](../guides/spatial-index.md)); interest sets implemented, candidate (SC-02, PR #51, [guide](../guides/interest-sets.md)) |
 
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.
 

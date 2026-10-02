@@ -25,17 +25,20 @@ Keep the simulated state in one object you can encode as text. Prefer integers o
 fixed-point numbers: `JSON.stringify` turns `-0` into `0` and `NaN`/`Infinity`
 into `null`. The checksum is taken over that text, so a value that does not round-trip
 makes a peer that loaded a snapshot differ from one that did not. Randomness must
-be part of that object too. `ctx.random()` and `createRng` keep their generator
-state in a closure that cannot be saved or restored, so they cannot be rolled
-back. Keep a 32-bit generator word in the simulation object and advance it there,
-using the same mulberry32 step as `core/rng.ts`. A saveable engine generator is a
-known gap.
+be part of that state too. `ctx.random()` keeps its generator state where a save
+cannot reach it, so use `createSaveableRng(seed)` from `@engine`. Its whole state
+is one 32-bit word: save `rng.state()` and call `rng.restore(word)` on load. Its
+draws are exactly those of `createRng` for the same seed. A frame-exact
+[input history](add-input-history.md) belongs in the saved state as well.
 
 ```ts
+import { createSaveableRng } from '@engine';
+
+const rng = createSaveableRng(matchSeed);
 const ports = {
-  save: () => JSON.stringify(sim),           // complete state, stable key order
-  load: (text: string) => { sim = JSON.parse(text); },
-  step: (inputs: readonly string[], frame: number) => stepSim(sim, inputs, frame),
+  save: () => JSON.stringify({ sim, rng: rng.state() }),   // complete state, stable key order
+  load: (text: string) => { const s = JSON.parse(text); sim = s.sim; rng.restore(s.rng); },
+  step: (inputs: readonly string[], frame: number) => stepSim(sim, rng, inputs, frame),
 };
 ```
 

@@ -475,6 +475,7 @@ loopback browser workflow are its only evidence. See the
 | ID | Contract | State |
 |---|---|---|
 | SIM-01 | Optional `@kits/replay`: bounded tick-input log and player (explicit truncation; version, identity and corruption refusal), creator-digest traces with first-divergence comparison, and a prediction-versus-authority agreement check over the existing owners. Dev/test-only `engine.replay` uses the stock scene fixed lane and `?seed=`. [Contract](replay-divergence.md) | Integrated in v0.2.0 (PR #17, merged to main at `49047ae`). Focused tests and the arcade `?seed=` browser replay passed on the PR head. No cross-device or cross-browser floating-point determinism, physical-device or multiplayer claim. |
+| SIM-02 | Creator-chosen replay digest and divergence detail (backlog W1-1; demo finding F1). Optional `defineScene({replay: {digest}})`, `@kits/replay` `replayDigest`/`selectWorldState` (selected components, excluded tags, chosen resources) and `explainDivergence`; dev/test-only `engine.replay.start({digest, detail})` and a bounded `divergence` report naming the first differing entity, component and field. Default digest and identities unchanged. [Contract](replay-divergence.md#choose-what-a-replay-must-reproduce-sim-02), [recipe](../recipes/replay-with-your-own-digest.md) | Implemented, candidate (PR #58), not integrated. Focused tests (including the demo's frame-phase orb case: default diverges and names the orb, a digest excluding the cosmetic tag replays exactly) and `npm run test:replay-browser` (arcade, desktop Chromium software GL) passed on the branch. No cross-browser floating-point, physical-device, production-build or multiplayer claim. |
 
 ## Sustained-session recorder — PERF-01 integrated in v0.2.0
 
@@ -605,7 +606,9 @@ jump mechanism: height and time to apex, release, fall and apex gravity, termina
 coyote and buffer windows, each bounded and creator-chosen. Author buttons gain an opt-in
 `hold: true` so `ctx.input.held` observes a release; existing buttons are unchanged.
 Integrated in v0.2.0 (PR #34; batch PR #46).
-Evidence is focused unit tests only. See the [kit README](../../src/kits/locomotion/README.md#tunable-jump-feel-mv-01),
+Evidence is focused unit tests only. A held touch button for such actions (`touchButton` in
+`@kits/ui`) is a candidate in PR #57, not integrated; its evidence is fake-DOM tests and
+Chromium touch emulation. See the [kit README](../../src/kits/locomotion/README.md#tunable-jump-feel-mv-01),
 the [recipe](../recipes/tune-a-jump.md) and the [ledger](upgrade-acceptance-ledger.md).
 
 ## Sub-path asset base — DX P1-8, integrated in v0.2.0
@@ -664,3 +667,31 @@ bounded lookahead dispatch with exact start times, late-drop overload, input
 timestamps (`ctx.input.pressedAt`) and a stored calibration. It reuses the one audio
 output (new read-only `clock()`, scheduled `playVoice({ at })`). Status: integrated in v0.2.0 (PR #31; batch PR #47). Evidence is unit and headless scene tests only;
 no browser output timing, physical-device or audible verification.
+
+## Strings select/ordinals/locale chain and dialogue variables (TB-02) — implemented, candidate
+
+Status: implemented, candidate on branch `feat/tb02-strings-dialogue` (PR #50); not integrated. Recipes: [plurals, ordinals and variants](../recipes/write-plurals-ordinals-and-variants.md), [branching dialogue](../recipes/add-branching-dialogue.md); [dialogue kit README](../../src/kits/dialogue/README.md).
+
+- Runtime-enforced: message parsing bounds (16,384 UTF-16 units, argument depth 8, 1,024 parts); CLDR plural categories only; `other` required for `plural`, `selectordinal` and `select`; prototype names never match select cases; locale tags Intl does not support (well-formed or malformed) resolve to `en` rules and digits through `supportedLocalesOf`, never the host default; select and plural form tables have null prototypes; locale chain explicit fallbacks, then truncation, then base, at most 8 entries. Dialogue: declared typed variables (≤256), bounded condition trees (≤64 nodes, depth 8), ≤32 assignments per option, type-checked at construction; atomic assignment with the move; `overflow` without change; visit counts saturating; snapshot validation of variables and visits (the current node must have at least one visit; prototype-named node ids keep their counts); first-version snapshots restore.
+- Checked: focused unit tests (`src/core/i18n/select-ordinal.test.ts`, `src/kits/dialogue/variables.test.ts`, including a real SaveStore round trip across a fresh store); existing i18n, string-generation, dialogue and expedition tests unchanged and passing.
+- Not established: a run-time locale selection author API (the running game stays `en`), translated catalogues for any template, RTL/bidi or CJK line-breaking policy, text speed or typewriter reveal, any browser or device evidence, a template using dialogue variables.
+
+## Interest sets for scoped views (SC-02) — implemented, candidate
+
+The optional `spatial` kit adds [`createInterestSets`](interest-sets.md): per-observer,
+ranked and budgeted relevancy sets over the SC-01 grid, with enter/exit hysteresis, a
+hold, entered/left changes and fail-closed partial scans. A tools-only reference host
+feeds NW-02 complete scoped views from them; with complete scans, no frame or revision
+reveals activity outside a connection's set (an `incomplete` scan can). Status: implemented, candidate (PR #51); not
+integrated. Evidence is unit, reference-host and headless benchmark tests only; no socket,
+browser, device or template evidence and no budget change.
+
+## Saveable random state and input history (RNG-01, INPUT-01) — implemented, candidate
+
+`createSaveableRng` (`@engine`) and the optional `@kits/input-history`
+([README](../../src/kits/input-history/README.md),
+[recipe](../recipes/add-input-history.md)) close two rollback gaps from the
+fighting-game genre study: saving random state, and frame-exact buffered and
+sequence input. Implemented, candidate (PR #52, `feat/rng-state-input-history`);
+not integrated. Evidence is focused headless tests and fixed-lane and rollback
+consumers; controller and feel acceptance are open.

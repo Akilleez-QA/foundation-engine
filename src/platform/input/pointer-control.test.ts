@@ -137,3 +137,65 @@ for (const interruption of ['resize', 'blur', 'pagehide', 'pointercancel']) {
     } finally { w.life.abort(); w.fake.restore(); }
   });
 }
+
+test("leave: 'release' releases a contact that slides off the control; it cannot re-press until a fresh touch", () => {
+  const w = fixture();
+  try {
+    const hold = w.control(), contact: boolean[] = [];
+    bindPointerControl(hold, { input: w.input, actions: ['sample.move'], signal: w.life.signal, leave: 'release', onContact: down => contact.push(down) });
+    w.fire(hold, 'pointerdown', 4);
+    w.fire(hold, 'pointermove', 4, { clientX: 399, clientY: 299 });
+    assert.equal(w.input.held('sample.move'), true, 'inside the bounds keeps the hold');
+    w.fire(hold, 'pointermove', 4, { clientX: 401, clientY: 100 });
+    assert.equal(w.input.held('sample.move'), false, 'outside the bounds releases');
+    assert.equal(hold.hasPointerCapture(4), false);
+    w.fire(hold, 'pointermove', 4, { clientX: 20, clientY: 20 });
+    assert.equal(w.input.held('sample.move'), false, 'sliding back does not re-press');
+    w.fire(hold, 'pointerup', 4);
+    w.fire(hold, 'pointerdown', 5);
+    assert.equal(w.input.held('sample.move'), true, 'a fresh touch presses again');
+    w.fire(hold, 'pointerleave', 5);
+    assert.equal(w.input.held('sample.move'), false, 'a reported leave releases');
+    assert.deepEqual(contact, [true, false, true, false]);
+    assert.deepEqual(w.events.map(e => e.phase), ['press', 'release', 'press', 'release']);
+  } finally { w.life.abort(); w.fake.restore(); }
+});
+
+test('the default leave keeps a captured contact held wherever it moves, and onContact pairs only accepted contacts', () => {
+  const w = fixture();
+  try {
+    const hold = w.control(), contact: boolean[] = [];
+    bindPointerControl(hold, { input: w.input, actions: ['sample.move'], signal: w.life.signal, onContact: down => contact.push(down) });
+    w.fire(hold, 'pointerdown', 1, { pointerType: 'mouse' });
+    w.fire(hold, 'pointerdown', 2);
+    w.fire(hold, 'pointermove', 2, { clientX: 900, clientY: 900 });
+    assert.equal(w.input.held('sample.move'), true);
+    w.input.cancel('overlay');
+    assert.deepEqual(contact, [true, false]);
+    hold.setPointerCapture = () => { throw new Error('capture refused'); };
+    w.fire(hold, 'pointerdown', 3);
+    assert.deepEqual(contact, [true, false], 'a refused capture reports nothing');
+  } finally { w.life.abort(); w.fake.restore(); }
+});
+
+test('onContact reports only a press the dispatcher accepted', () => {
+  const w = fixture();
+  try {
+    const empty = w.control(), stale = w.control(), refused = w.control(), contact: string[] = [];
+    bindPointerControl(empty, { input: w.input, actions: ['sample.move'], signal: w.life.signal, select: () => [], onContact: down => contact.push(`empty:${down}`) });
+    bindPointerControl(stale, { input: w.input, actions: ['sample.move'], signal: w.life.signal, onContact: down => contact.push(`stale:${down}`),
+      select: () => { w.input.cancel('overlay'); return ['sample.move']; } });
+    w.fire(empty, 'pointerdown', 1);
+    w.fire(stale, 'pointerdown', 2);
+    const declined = new InputActions({
+      registry: inputActionRegistry([{ id: 'sample.none', label: 'none', kind: 'hold', scope: 'global', defaults: {} }]),
+      layers: { fromTop: () => [], escape: () => false, cycleFocus: () => false, onChange: () => () => {} }, now: () => 0,
+    });
+    bindPointerControl(refused, { input: declined, actions: ['sample.none'], signal: w.life.signal, onContact: down => contact.push(`refused:${down}`) });
+    w.fire(refused, 'pointerdown', 3);
+    assert.equal(declined.held('sample.none'), false, 'no consumer: the dispatcher refused the press');
+    assert.equal(refused.hasPointerCapture(3), true, 'the contact is still captured');
+    w.fire(refused, 'pointerup', 3); w.fire(empty, 'pointerup', 1);
+    assert.deepEqual(contact, [], 'no pressed look without an accepted press');
+  } finally { w.life.abort(); w.fake.restore(); }
+});

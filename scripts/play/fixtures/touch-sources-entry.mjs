@@ -1,6 +1,7 @@
 import {app, sceneContext} from './hud-entry.mjs';
 import {bindPointerControl} from '../../../src/platform/input/pointer-control.ts';
 import {actionOf} from '../../../src/author/ids.ts';
+import {touchButton} from '../../../src/kits/ui/index.ts';
 await window.hudBoot;
 while (!sceneContext()) await new Promise(requestAnimationFrame);
 const life = new AbortController();
@@ -21,7 +22,10 @@ for (const [name, action, left] of [['movement', actionOf('move', 'positive'), 2
   if (name === 'details') detailsControl = control;
   buttons.push(button);
 }
+// The ui kit's held touch button over the scene overlay (shown here regardless of the emulated pointer media).
+const holdButton = touchButton(sceneContext(), 'touch-hold', {label: 'Hold', show: 'always', inset: {right: 20, top: 120}, signal: life.signal});
 window.touchCheck = {
+  holdState: () => ({presses: sceneContext().state.holdPresses ?? 0, ticks: sceneContext().state.holdTicks ?? 0, held: app.services.input.held(actionOf('touch-hold')), down: holdButton.element?.dataset.down !== undefined}),
   contacts: () => contacts.slice(),
   presses: () => sceneContext().state.touchPresses ?? 0,
   enableModal: () => {

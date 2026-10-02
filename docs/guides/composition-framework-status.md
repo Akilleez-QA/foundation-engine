@@ -94,9 +94,11 @@ are contextual evidence, not verification of Foundation.
 | Multiplayer: queue age and deadlines (NW-06) | Optional intake `maxQueuedAgeMs` with `stale` notice; optional authority `clock` and `submit(command, {deadlineMs})` returning `expired` before storage invocation only | Integrated in v0.2.0 (PR #12, merged to main at `53d549d`). Focused unit tests only; defaults unchanged; no load, browser-composition or device claim. Follow-up (integrated in v0.2.0 (PR #33; batch PR #42)): age shedding is no longer charged to the pump budget (optional `maxStaleDropsPerPump` cap), fixing the NW-07 goodput collapse; 300 ms final/peak 0.23-0.25 before, 0.92-0.96 after with PR #27's probe (loopback). |
 | Asset residency (RES-01) | Optional per-preset texture/model byte budgets, pinned asset ids and a pressure hook over the existing lease caches | Integrated in v0.2.0 (PR #22, merged to main at `9913019`). Unit tests and a native software-renderer fixture only; defaults unchanged; no template configures it. See [asset residency](asset-residency.md). |
 | Multiplayer: peer rollback (RB-01) | Optional `@kits/rollback` session (prediction window, input delay, rollback/resimulation, confirmed-state checksums) and local sync test, driven from the fixed lane | Integrated in v0.2.0 (PR #25; batch PR #42). Focused headless tests and a `testScene` consumer only; requires a reliable, ordered link; no WAN, time-sync, spectator or device claim. See the [kit README](../../src/kits/rollback/README.md). |
+| Determinism: saveable random state (RNG-01) | `createSaveableRng` in `@engine`: `createRng` draws plus `state()`/`restore(word)` | Implemented, candidate (PR #52); not integrated. Focused tests and a rollback sync-test consumer. `ctx.random()` is unchanged. |
+| Input: frame-exact history (INPUT-01) | Optional `@kits/input-history`: per-tick edges, taps, opposite cleaning, buffers with consumption, bounded sequence matching, validated snapshots | Implemented, candidate (PR #52); not integrated. Headless tests, including an exhaustive oracle and a fixed-lane consumer. No per-game windows, controller or feel claim. |
 | Multiplayer: seeded fault schedules (NW-09) | Tool-only `npm run faults:network` harness replaying seeded combined faults against the authority workbench host with per-step invariants and exact seed/step repro | Integrated in v0.2.0 (PR #26; batch PR #42). Process-scope loopback evidence only; no WAN, power-loss, scale or device claim. See [guide](network-fault-schedule.md) |
 | Multiplayer: planned drain and lifetime (NW-08) | Optional host `createConnectionDrain` (bounded notice, operator drain/resume, dithered lifetime cap) and client `createDrainFollower` (hold until announced return, then the existing retry schedule) | Integrated in v0.2.0 (PR #21; batch PR #42). Unit, host socket and loopback browser tests; defaults unchanged; no process-restart, WAN or device claim. See the [drain guide](network-drain.md). |
-| Movement feel: jump (MV-01) | Pure `createJumpFeel` (exact piecewise gravity, coyote, buffer, variable height, apex gravity, terminal fall) and the optional `jumpSystem` adapter in the locomotion kit; opt-in `hold: true` author buttons | Integrated in v0.2.0 (PR #34; batch PR #46). Focused unit tests at 30–240 Hz only; no template consumer, browser or device evidence. Moving-platform carry, slopes, swept lateral collision and vehicles remain separate slices. |
+| Movement feel: jump (MV-01) | Pure `createJumpFeel` (exact piecewise gravity, coyote, buffer, variable height, apex gravity, terminal fall) and the optional `jumpSystem` adapter in the locomotion kit; opt-in `hold: true` author buttons | Integrated in v0.2.0 (PR #34; batch PR #46). Focused unit tests at 30–240 Hz only; no template consumer, browser or device evidence. A held touch button (`touchButton`, `@kits/ui`) is a candidate in PR #57, not integrated: fake-DOM tests and Chromium touch emulation only. Moving-platform carry, slopes, swept lateral collision and vehicles remain separate slices. |
 | Multiplayer: command integrity (SEC-01) | Optional host-side `createIntegrity`: pure validity `assess` for authority reducers, `admit`/`record` policy with decaying scores, tick budget, throttle, windowed close, observe mode and bounded local audit; `assertDisclosure` test helper; network workbench opt-in example | Slice A integrated in v0.2.0 (PR #20; batch PR #47). Unit and loopback host tests only; verified runs (slice B) planned, not built. See the [integrity guide](integrity.md). |
 | Manual tools | Bounded documents, sessions and optional appearance, progression, custody and objective desktop consumers | Integrated tools cover their finite schemas. Action tooling is integrated; recipe/effect inspectors are integrated in PR #118 with focused tests and final desktop workflow acceptance. Device support is selected per tool; desktop tooling does not impose a phone UI. |
 
@@ -276,6 +278,7 @@ stops reconnecting on `auth-rejected`. Integrated in v0.2.0 (PR #16, merged to m
 | ID | Contract | State |
 |---|---|---|
 | SIM-01 | Optional `@kits/replay`: bounded tick-input log and player (explicit truncation; version, identity and corruption refusal), creator-digest traces with first-divergence comparison, and a prediction-versus-authority agreement check over the existing owners. Dev/test-only `engine.replay` uses the stock scene fixed lane and `?seed=`. [Contract](replay-divergence.md) | Integrated in v0.2.0 (PR #17, merged to main at `49047ae`). Focused tests and the arcade `?seed=` browser replay passed on the PR head. No cross-device or cross-browser floating-point determinism, physical-device or multiplayer claim. |
+| SIM-02 | Creator-chosen replay digest and divergence detail (backlog W1-1; demo finding F1). Optional `defineScene({replay: {digest}})`, `@kits/replay` `replayDigest`/`selectWorldState` (selected components, excluded tags, chosen resources) and `explainDivergence`; dev/test-only `engine.replay.start({digest, detail})` and a bounded `divergence` report naming the first differing entity, component and field. Default digest and identities unchanged. [Contract](replay-divergence.md#choose-what-a-replay-must-reproduce-sim-02), [recipe](../recipes/replay-with-your-own-digest.md) | Implemented, candidate (PR #58), not integrated. Focused tests (including the demo's frame-phase orb case: default diverges and names the orb, a digest excluding the cosmetic tag replays exactly) and `npm run test:replay-browser` (arcade, desktop Chromium software GL) passed on the branch. No cross-browser floating-point, physical-device, production-build or multiplayer claim. |
 
 ## Sustained-session recorder — PERF-01 integrated in v0.2.0
 
@@ -376,7 +379,9 @@ apply unchanged. See the [recipe](../recipes/play-your-own-sounds.md). Status: i
 `npm run test:sound-browser` (loading, reporting and silence only: automated browsers never
 decode or play). Audible playback, latency and loudness on physical devices are unverified;
 streaming and looping are out of scope. Sound files share AUD-01's voice chain (HRTF limit,
-distance models, cutoff, filter) through `ctx.playVoice`.
+distance models, cutoff, filter) through `ctx.playVoice`. Candidate in PR #57 (not integrated):
+`testScene` validates `playVoice` options as the output does and records them in `t.voices`,
+so game tests can assert spatial choices; this checks options only, never audible output.
 
 ## Audio-clock timeline (AU-01) — integrated in v0.2.0
 
@@ -384,3 +389,29 @@ Caller-owned `createAudioTimeline` composes with the existing audio output and s
 voices: it adds no context, timer or loop, and is pumped from a scene's frame system.
 Integrated in v0.2.0 (PR #31; batch PR #47). See the [guide](audio-timeline.md) and the
 [recipe](../recipes/sync-gameplay-to-music.md).
+
+## Strings select/ordinals/locale chain and dialogue variables (TB-02) — implemented, candidate
+
+Status: implemented, candidate on branch `feat/tb02-strings-dialogue` (PR #50); not integrated. Recipes: [plurals, ordinals and variants](../recipes/write-plurals-ordinals-and-variants.md), [branching dialogue](../recipes/add-branching-dialogue.md); [dialogue kit README](../../src/kits/dialogue/README.md).
+
+- Runtime-enforced: message parsing bounds (16,384 UTF-16 units, argument depth 8, 1,024 parts); CLDR plural categories only; `other` required for `plural`, `selectordinal` and `select`; prototype names never match select cases; locale tags Intl does not support (well-formed or malformed) resolve to `en` rules and digits through `supportedLocalesOf`, never the host default; select and plural form tables have null prototypes; locale chain explicit fallbacks, then truncation, then base, at most 8 entries. Dialogue: declared typed variables (≤256), bounded condition trees (≤64 nodes, depth 8), ≤32 assignments per option, type-checked at construction; atomic assignment with the move; `overflow` without change; visit counts saturating; snapshot validation of variables and visits (the current node must have at least one visit; prototype-named node ids keep their counts); first-version snapshots restore.
+- Checked: focused unit tests (`src/core/i18n/select-ordinal.test.ts`, `src/kits/dialogue/variables.test.ts`, including a real SaveStore round trip across a fresh store); existing i18n, string-generation, dialogue and expedition tests unchanged and passing.
+- Not established: a run-time locale selection author API (the running game stays `en`), translated catalogues for any template, RTL/bidi or CJK line-breaking policy, text speed or typewriter reveal, any browser or device evidence, a template using dialogue variables.
+
+## Per-observer interest sets (SC-02) — implemented, candidate
+
+The optional `spatial` kit adds [`createInterestSets`](interest-sets.md): per-observer,
+ranked and budgeted relevancy sets over the SC-01 grid, with enter/exit hysteresis, a
+hold, entered/left changes and fail-closed partial scans. A tools-only reference host
+feeds NW-02 complete scoped views from them; with complete scans, no frame or revision
+reveals activity outside a connection's set (an `incomplete` scan can). Status: implemented, candidate (PR #51); not
+integrated. Evidence is unit, reference-host and headless benchmark tests only; no socket,
+browser, device or template evidence and no budget change.
+
+## Saveable random state and input history (RNG-01, INPUT-01) — implemented, candidate
+
+`createSaveableRng` lets a simulation save and restore its random generator as one
+word. The optional [input-history kit](../../src/kits/input-history/README.md) adds
+frame-exact edges, buffers, release edges, opposite-direction cleaning and
+sequences that survive rollback. Status: implemented, candidate (PR #52); not
+integrated. See the [ledger](upgrade-acceptance-ledger.md).

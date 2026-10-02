@@ -23,7 +23,7 @@ The creator needs peers to see their own input with no added delay while still
 ending each match in identical state. The kit reuses existing seams:
 
 - The fixed-step lane (`core/ecs/systems.ts`): call `advance()` once per fixed tick from a system.
-- Seeded randomness (`core/rng.ts`): `createRng` closes over its state, so the simulation must keep its own generator word inside the saved state (a known gap).
+- Seeded randomness: `createSaveableRng` (`@engine`, `core/rng.ts`) exposes its whole state as one word, so `save` stores `rng.state()` and `load` calls `rng.restore(word)` (RNG-01). `ctx.random()` cannot be rolled back. For buffered and sequence inputs inside the simulation, see `@kits/input-history`.
 - The engine FNV-1a hash (`core/rng.ts` `hashSeed`) for checksums.
 - The existing browser transport, or any reliable, ordered link, to carry the facts the session returns.
 - A scene visit's `AbortSignal` for cancellation.

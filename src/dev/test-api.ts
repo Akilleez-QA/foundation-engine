@@ -21,7 +21,7 @@ import type { SceneModelRequest, SceneModelResult } from '../author/model-inspec
  *   engine.currentSession()     that recorder (or the `?session-record` auto-start), or null
  *   engine.save.export()        the active player's profile file
  *   engine.replay.start(request) re-enter the current scene recording or replaying its fixed-tick input (dev/replay.ts)
- *   engine.replay.read()/stop() the replay session's state, local log text and digest comparison
+ *   engine.replay.read()/stop() the replay session's state, local log text, digest comparison and divergence detail
  *
  * Randomness is deterministic with `?seed=<n>` in the address (the game's `ctx.random()`).
  * It is added to the page only by the dev server and `vite build --mode test`; production builds never contain it.
@@ -93,7 +93,7 @@ const codeOf = (key: string) => CODES[key] ?? (/^[a-z]$/i.test(key) ? `Key${key.
 export function createTestApi(app: App, booted: Promise<BootReport>): EngineTestApi {
   let trace: EventTrace | undefined;
   let replay: ReplayDev | undefined;
-  const idle: ReplayDevState = Object.freeze({ status: 'idle', mode: null, reason: null, scene: null, ticks: 0, total: null, log: null, digests: null, comparison: null });
+  const idle: ReplayDevState = Object.freeze({ status: 'idle', mode: null, reason: null, scene: null, ticks: 0, total: null, log: null, digests: null, comparison: null, digest: null, divergence: null, coverage: null });
   const report = () => app.services.app.report();
   const probe = (name: string) => app.probes.read(name as ProbeName);
   const scene = () => probe('scene') as EngineState['scene'];
