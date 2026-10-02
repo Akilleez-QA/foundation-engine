@@ -46,6 +46,8 @@ export interface RenderSurface {
   onRestored(fn: () => void): () => void;
   /** Ends the lease (idempotent). The renderer must not be used afterwards. */
   /** World leases only: readiness of currently tracked programs after compile; no shadow/upload guarantee. */
+  /** Wait for preceding GPU commands after an actual initial draw; never a presentation guarantee. */
+  frameReady?(signal:AbortSignal):Promise<'ready'|'retired'>;
   programsReady?(signal: AbortSignal): Promise<import('./program-readiness').ProgramReadiness>;
   release(): void;
   dispose(): void;

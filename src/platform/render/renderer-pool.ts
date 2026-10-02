@@ -1,3 +1,4 @@
+import {createFrameReadiness} from './frame-readiness';
 import {installProgramValidation, type ProgramValidation} from './program-validation';
 import {TEST_API} from '../../core/env';
 import {waitForPrograms} from './program-readiness';
@@ -221,7 +222,8 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
     let preparationOwner=new AbortController();
     let pendingPreparation:AbortController|undefined;
     const programTracker=slot?.tracker??trackGlObjects(r.getContext() as GL);
-    const retirePreparation=()=>preparationOwner.abort();
+    const frameReadiness=createFrameReadiness(r.getContext() as GL,()=>released);
+    const retirePreparation=()=>{preparationOwner.abort();frameReadiness.retire();};
     lost.add(retirePreparation);
     restored.add(()=>{preparationOwner=new AbortController();});
     const overflowEvents=new AbortController();
@@ -240,6 +242,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
       renderer: r as T.WebGLRenderer, canvas, role: req.role, pooled,
       onLost(fn) { lost.add(fn); return () => lost.delete(fn); },
       onRestored(fn) { restored.add(fn); return () => restored.delete(fn); },
+      frameReady:signal=>frameReadiness.wait(signal),
       programsReady(signal) {
         pendingPreparation?.abort();
         const request=new AbortController();pendingPreparation=request;
@@ -248,7 +251,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
       },
       release() {
         if (released) return;
-        preparationOwner.abort();overflowEvents.abort();
+        preparationOwner.abort();frameReadiness.retire();overflowEvents.abort();
         released = true;
         lost.clear(); restored.clear();
         if (!slot) { r.dispose(); r.forceContextLoss(); programTracker.live.clear();programTracker.validation.clear(); canvas.remove?.(); stats.contexts = Math.max(0, stats.contexts - 1); return; }

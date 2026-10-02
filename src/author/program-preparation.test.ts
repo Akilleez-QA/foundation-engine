@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import ts from 'typescript';
+import {FrameReadinessError} from '../platform/render/frame-readiness';
 import {ProgramLinkError} from '../platform/render/program-validation';
 // Execute the actual runtime preparation/restore blocks with a controllable pool,
 // without creating a GPU context or reimplementing their lifetime logic.
@@ -9,12 +10,12 @@ const source=readFileSync(new URL('./runtime.ts',import.meta.url),'utf8');
 const prepare=source.slice(source.indexOf('      let programsPrepared=false,'),source.indexOf('      return {\n        ready,'));
 const restore=source.slice(source.indexOf('        contextRestored() {'),source.indexOf('\n      };\n    },',source.indexOf('        contextRestored() {')));
 const draw=source.slice(source.indexOf('        render() {'),source.indexOf('        activate() {'));
-function fixture(){
+function fixture(frameReady?:()=>Promise<string>){
  const cards:any[]=[],layers:any[]=[];let compileError:Error|undefined,renderError:Error|undefined;
  const doc={createElement:()=>({children:[] as any[],setAttribute(){},addEventListener(){},append(...nodes:any[]){this.children.push(...nodes);},remove(){}})};
  const pending:{resolve:(result:string)=>void;reject:(error:Error)=>void}[]=[],owner=new AbortController(),view={dataset:{} as Record<string,string>,append:(node:unknown)=>cards.push(node)},log:unknown[]=[];let compiled=0,invalidated=0,lost=false;
  const run=ts.transpile(`let dirty=true;const three={},camera={},visit={current:()=>true};${prepare}\nreturn {ready,state:()=>programsPrepared,${draw}${restore}};`,{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None});
- const api=new Function('actx','view','renderer','surface','sync','s','scene','ProgramLinkError','doc','failureText',run)({signal:owner.signal,leaving:()=>owner.signal.aborted,invalidate:()=>invalidated++,own:()=>{},layer:(l:unknown)=>layers.push(l),runId:'run-test'},view,{compile:()=>{compiled++;if(compileError)throw compileError;},render:()=>{if(renderError)throw renderError;},getContext:()=>({isContextLost:()=>lost})},{programsReady:()=>new Promise<string>((resolve,reject)=>pending.push({resolve,reject}))},()=>{}, {log:{error:(...args:unknown[])=>log.push(args)}},{id:'test'},ProgramLinkError,doc,(key:string)=>key);
+ const api=new Function('actx','view','renderer','surface','sync','s','scene','ProgramLinkError','doc','failureText','FrameReadinessError',run)({signal:owner.signal,leaving:()=>owner.signal.aborted,invalidate:()=>invalidated++,own:()=>{},layer:(l:unknown)=>layers.push(l),runId:'run-test'},view,{compile:()=>{compiled++;if(compileError)throw compileError;},render:()=>{if(renderError)throw renderError;},getContext:()=>({isContextLost:()=>lost})},{frameReady,programsReady:()=>new Promise<string>((resolve,reject)=>pending.push({resolve,reject}))},()=>{}, {log:{error:(...args:unknown[])=>log.push(args)}},{id:'test'},ProgramLinkError,doc,(key:string)=>key,FrameReadinessError);
  return {api,pending,owner,view,log,cards,layers,compileThrows:(e:Error)=>{compileError=e;},renderThrows:(e:Error)=>{renderError=e;},lose:()=>{lost=true;},get compiled(){return compiled;},get invalidated(){return invalidated;}};
 }
 const turn=()=>new Promise<void>(resolve=>setImmediate(resolve));
@@ -42,4 +43,10 @@ test('later generated shader failure stops rendering and surfaces one owned reco
  assert.equal(f.api.render(),false);assert.equal(f.api.state(),false);assert.equal(f.view.dataset.programReadiness,'failed');assert.equal(f.cards.length,1);
  assert.equal(f.api.render(),false);assert.equal(f.cards.length,1);
  const ordinary=fixture();ordinary.pending[0]!.resolve('ready');await ordinary.api.ready;ordinary.renderThrows(Error('unrelated'));assert.throws(()=>ordinary.api.render(),/unrelated/);assert.equal(ordinary.cards.length,0);
+});
+
+test('actual author admission waits for initial GPU completion and refuses a retired frame',async()=>{
+ let resolve!:(value:string)=>void;const f=fixture(()=>new Promise<string>(r=>{resolve=r;}));f.pending[0]!.resolve('ready');await turn();assert.equal(f.api.state(),false);resolve('ready');await f.api.ready;assert.equal(f.api.state(),true);
+ const retired=fixture(()=>Promise.resolve('retired'));retired.pending[0]!.resolve('ready');await assert.rejects(retired.api.ready,/frame preparation retired/);assert.equal(retired.api.state(),false);
+ const failed=fixture(()=>Promise.reject(new FrameReadinessError('fence failed')));failed.pending[0]!.resolve('ready');await assert.rejects(failed.api.ready,FrameReadinessError);
 });

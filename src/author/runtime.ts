@@ -1,3 +1,4 @@
+import {FrameReadinessError} from '../platform/render/frame-readiness';
 import {ProgramLinkError} from '../platform/render/program-validation';
 import {t as failureText} from '../core/i18n/app-i18n';
 import { createSceneActivity } from './scene-activity';
@@ -349,7 +350,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       // Async asset replacements still own their later preparation; this is not a GPU upload/shadow guarantee.
       let programsPrepared=false,preparationVersion=0;
       let programFailed=false;
-      const failPrograms=(error:ProgramLinkError)=>{
+      const failPrograms=(error:ProgramLinkError|FrameReadinessError)=>{
         if(programFailed||actx.leaving()||actx.signal.aborted)return;
         programFailed=true;programsPrepared=false;view.dataset.programReadiness='failed';
         const card=doc.createElement('div');card.className='scene-failure-card';card.setAttribute('role','alert');
@@ -369,10 +370,12 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
         programsPrepared=false;view.dataset.programReadiness='preparing';
         if(actx.leaving()||actx.signal.aborted)throw Error('Scene program preparation retired');
         sync();renderer.compile(three,camera);
-        return (surface.programsReady?.(actx.signal)??Promise.resolve('unsupported')).then(result=>{
+        return (surface.programsReady?.(actx.signal)??Promise.resolve('unsupported')).then(async result=>{
           if(version!==preparationVersion||result==='retired'||actx.leaving()||actx.signal.aborted)throw Error('Scene program preparation retired');
           // Include a real initial draw: generated passes can create programs absent from compile().
           renderer.render(three,camera);
+          const frame=await(surface.frameReady?.(actx.signal)??Promise.resolve('ready'));
+          if(frame==='retired')throw Error('Scene frame preparation retired');
           if(version!==preparationVersion||actx.leaving()||actx.signal.aborted)throw Error('Scene program preparation retired');
           view.dataset.programReadiness=result;programsPrepared=true;actx.invalidate();
         });
@@ -389,7 +392,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
           runner.frame(ctx, f.dt);
           pressed.clear(); pointer.pressed = false;
           sync(f.dt);
-          }catch(error){if(error instanceof ProgramLinkError)failPrograms(error);else throw error;}
+          }catch(error){if(error instanceof ProgramLinkError||error instanceof FrameReadinessError)failPrograms(error);else throw error;}
         },
         render() {
           if(programFailed)return false;
@@ -397,7 +400,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
             sync(); if (actx.leaving() || actx.signal.aborted || !programsPrepared || !dirty) return false;
             renderer.render(three,camera);
           }catch(error){
-            if(!(error instanceof ProgramLinkError))throw error;
+            if(!(error instanceof ProgramLinkError||error instanceof FrameReadinessError))throw error;
             failPrograms(error);return false;
           }
           dirty = false;
@@ -417,7 +420,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
           const version=preparationVersion;
           void pending.catch(error=>{
             if(version!==preparationVersion||actx.leaving()||actx.signal.aborted||renderer.getContext().isContextLost())return;
-            if(error instanceof ProgramLinkError){failPrograms(error);return;}
+            if(error instanceof ProgramLinkError||error instanceof FrameReadinessError){failPrograms(error);return;}
             // Recovery retains the original synchronous render fallback, visibly distinct from readiness.
             view.dataset.programReadiness='degraded';programsPrepared=true;actx.invalidate();
             try{s.log.error(`${scene.id}: program preparation failed; first-render compilation fallback`,error);}catch{/* Isolated diagnostic. */}

@@ -285,3 +285,14 @@ test('world diagnostics policy permits explicit full checks and a failure-only p
  const light=harness({programDiagnostics:'failure-only'}),b=light.pool.lease({role:'world',host:new El('host') as never});
  assert.equal(light.renderers[0]!.debug!.checkShaderErrors,false);b?.release();
 });
+
+test('world frame completion retires synchronously on release and context loss',async()=>{
+ for(const mode of ['release','loss']){
+  const f=harness(),surface=f.pool.lease({role:'world',host:new El('host') as never})!,gl=f.contexts[0]!;
+  let polls=0,deletes=0;Object.assign(gl,{SYNC_GPU_COMMANDS_COMPLETE:1,fenceSync:()=>({}),flush(){},deleteSync(){deletes++;},clientWaitSync(){polls++;return 0;}});
+  const pending=surface.frameReady!(new AbortController().signal);
+  if(mode==='release')surface.release();else {gl.lost=true;gl.canvas.dispatch('webglcontextlost');}
+  assert.equal(await pending,'retired');assert.equal(polls,0);assert.equal(deletes,mode==='release'?1:0);
+  surface.release();
+ }
+});

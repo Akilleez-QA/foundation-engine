@@ -64,5 +64,29 @@ The engine-owned native fixture is
 `--bundle --format=iife --global-name=ProgramValidationOracle`, load the result in
 an isolated muted browser, and evaluate `ProgramValidationOracle.run()`. Record
 the backend and result with the exact source/build identity. This fixture checks
-actual Three rendering and failure diagnostics; it does not certify timing or
-actual context-loss recovery. The pool tests separately exercise loss ownership.
+actual Three rendering, a red center-pixel readback, late shader failures and link-only
+incompatibility. The readback is diagnostic, not a performance measurement.
+For actual context loss, retain `contextLossFixture()` in the browser and invoke
+`lose()`, then `restore()`, then `verify()` in separate browser tasks after the
+corresponding events appear in `read()`. Always `dispose()` or close the isolated
+browser. This proves the named context lifecycle, not whole-scene restoration or
+performance.
+
+## Submitted frame completion
+
+World leases also expose `frameReady(signal)` after a real draw. One pending fence
+per lease observes preceding commands through public `fenceSync`, `flush` and
+`clientWaitSync` with flags and timeout zero. Polling starts in a later browser
+task and yields between checks. The default deadline is 15 seconds; the helper
+permits explicit deadlines up to 60 seconds. It never calls `finish` or blocks on
+a nonzero wait. This is GPU completion, not presentation or future scene readiness.
+
+Loss, release, abort and replacement retire the wait; a live sync is deleted once.
+Cleanup failures reject without skipping other owned cleanup. Injected scheduling
+must enqueue a later task; synchronous callbacks reject. `FrameReadinessError`
+timeouts/failures use author recovery. The author awaits this boundary after its
+initial draw, including restoration, rather than adding a wait to every frame.
+
+`ProgramValidationOracle.frameCompletion()` tests this boundary natively. Its
+isolated context preserves the drawing buffer only for a post-task pixel oracle;
+that diagnostic flag does not change production renderer configuration.
