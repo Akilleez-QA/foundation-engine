@@ -422,4 +422,4 @@ a physical non-reading peer and a host-restart reconnect storm paced by
 optional `maxQueuedAgeMs`: because each aged shed costs a pump attempt, an age shorter
 than the real queued wait collapses goodput instead of letting it plateau. Keep the age
 above the worst wait your queue limits, peer count and pump budget allow. Evidence is
-loopback/process scope only, not WAN or physical devices. Implemented, candidate (PR).
+loopback/process scope only, not WAN or physical devices. Implemented, candidate (PR #27).

@@ -372,7 +372,7 @@ edited-world persistence remain separate work. See the
 `npm run probe:network` ([guide](network-overload.md)) measures the loopback network
 and replication reference hosts past saturation: goodput against offered load,
 rejections by reason, admitted-work latency, high-water marks, a physical non-reading
-peer and a host-restart reconnect storm. Tools only; implemented, candidate (PR); not
+peer and a host-restart reconnect storm. Tools only; implemented, candidate (PR #27); not
 integrated. FIFO goodput plateaued and adversaries were limited without closing
 healthy peers. The replication host's buffered cap retired a paused peer in 2 of 3
 runs. A queue age shorter than the real queued wait collapses goodput (finding, not
