@@ -33,6 +33,7 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [housing](../../src/kits/housing/README.md) | Permission-separated placement and recoverable manifests | mechanics |
 | [turns](../../src/kits/turns/README.md) | Deterministic command logs: seeded per-position random, undo/redo, exact previews, replay, save snapshots with drift detection, durable-authority policies | None yet. Integrated in v0.2.0 (PR #24); headless unit tests only. [Recipe](../recipes/add-a-turn-log.md) |
 | [spatial](../../src/kits/spatial/README.md) | Bounded uniform-grid index for neighbour, range and interest queries; per-observer interest sets | No template yet. Grid integrated in v0.2.0 (SC-01, PR #23, [guide](../guides/spatial-index.md)); interest sets implemented, candidate (SC-02, PR #51, [guide](../guides/interest-sets.md)) |
+| [spatial-audio](../../src/kits/spatial-audio/README.md) | Logical sound sources: virtual tracking, importance ranking with HRTF for the sounds that matter, class distance curves with a hard cutoff, budgeted occlusion driving the smoothed filter | None yet; implemented, candidate (AUD-02, PR #PRNUM, [recipe](../recipes/3d-sound-for-shooters.md)) |
 
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.
 

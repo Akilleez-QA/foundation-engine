@@ -424,3 +424,9 @@ integrated. See the [ledger](upgrade-acceptance-ledger.md).
 `playMusic` composes with the one audio output (its own music store and bus, no second
 context) and the AU-01 timeline (start at `timeline.contextTime(0)`); scenes own their
 music voices. Candidate (PR #54); not integrated. See the [guide](music-on-clock.md).
+
+## Spatial audio sources and occlusion (AUD-02) — candidate, not integrated
+
+| ID | Contract | State |
+|---|---|---|
+| AUD-02 | Optional `@kits/spatial-audio` over the integrated AUD-01 voices: bounded logical sources tracked without voices (virtual) until they rank, importance ranking (class × creator `importance()`) with fade-out stealing under hysteresis and lateness drops, HRTF assigned to `localise` classes within a kit limit, per-class distance curves with a hard cutoff and air low-pass, and occlusion through a creator `(from, to) => distance \| null` query (the camera kit's `obstruction` shape) under `raysPerPump`, stalest first, with aged results, driving the output's smoothed filter. [Kit README](../../src/kits/spatial-audio/README.md) | Implemented, candidate (public PR #PRNUM). Node unit tests and `npm run test:audio-browser` (kit over the real output in `OfflineAudioContext`, muted browser: occlusion ~24 dB at 3 kHz without steps, steal fades without a cut) pass on the branch. Not integrated; no template consumer. No listening trials, real level geometry or query cost, propagation, device cost or networking claim. |

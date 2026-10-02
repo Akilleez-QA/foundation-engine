@@ -2,7 +2,9 @@
 
 Players of a first-person or third-person shooter locate unseen opponents by sound:
 left/right, front/back, above/below and distance. This recipe uses the platform's
-spatial voice options ([guide](../guides/spatial-audio.md)). It needs no engine change.
+spatial voice options ([guide](../guides/spatial-audio.md)) and, for many sources,
+the optional [spatial-audio kit](../../src/kits/spatial-audio/README.md). It needs no
+engine change.
 
 ## 1. Choose the creator settings
 
@@ -54,6 +56,38 @@ voice?.setFilter?.({ cutoffHz: blocked ? 900 : 16000, gain: blocked ? .6 : 1 });
 cutoff). Scene exit stops the voices. Deciding *whether* a path is blocked is game
 code here; the engine supplies only the smoothed filter.
 
+## 3b. Or let the spatial-audio kit manage many sources
+
+With many opponents, let the kit rank sources, keep the rest silent, cull beyond
+earshot and query occlusion under a per-frame budget. Add `spatialAudio()` to
+`defineGame({ kits })`, then in a scene:
+
+```ts
+import { createSpatialAudio } from '@kits/spatial-audio';
+
+const sound = createSpatialAudio({
+  output: ctx,
+  classes: {
+    step: { refDistance: 2, cutoffDistance: 25, localise: true, importance: 2, air: { nearHz: 16000, farHz: 3000 } },
+    shot: { refDistance: 6, cutoffDistance: 140, localise: true, importance: 4 },
+  },
+  limits: { maxVoices: 24, maxHrtfVoices: 6, raysPerPump: 8 },
+  occlusion: { query: (from, to) => level.firstHit(from, to) },   // the camera kit's obstruction shape
+});
+sound.emit({ cue: 'enemy.step', class: 'step', position: () => enemy.feet, every: .45, importance: () => threat(enemy) }, ctx.time.t);
+// every frame, from an existing system:
+sound.pump(ctx.time.t, ctx.camera.position);
+```
+
+- The classes replace the `SOUND` table above; `classGain(class, distance)` is the
+  same rule as a pure function, for tests and host-side audibility.
+- `importance()` is your threat rule (aiming at the player, recently fired, on
+  screen). The kit only ranks; it does not decide what is a threat.
+- `level.firstHit` is your geometry query. Keep `raysPerPump` small: queries rotate
+  stalest first and old results expire to `unknown`.
+- Dispose the kit with the scene (`sound.dispose()`); `sound.stats` shows `voices`,
+  `waiting`, `dropped`, `culled`, `stolen`, `rays` and `raysDeferred`.
+
 ## 4. Check it
 
 - `npm run check`. Then, with `npm run play` open, `engine.probe('audio')` in the
@@ -71,9 +105,9 @@ code here; the engine supplies only the smoothed filter.
 
 ## Not covered yet
 
-Occlusion raycasts, sound propagation around corners, reverb, priority/virtual
-voices and networked sound events are later work. Recorded sound files work with
+Sound propagation around corners (paths through doorways), material transmission,
+reverb and networked sound events are later work. Recorded sound files work with
 these voice options: declare them as shown in
 [play your own sounds](play-your-own-sounds.md) and pass the file's id to
 `ctx.playVoice`. Do not send sound events a player could not hear: decide
-audibility on the host with the same class rule before disclosure.
+audibility on the host with the same class rule (`classGain`) before disclosure.
