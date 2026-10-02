@@ -23,7 +23,7 @@ export {
   shapeParser, Transform, Shape, Name,
   type AuthorDef, type GameDefinition, type SceneDefinition, type EntityDefinition, type SystemDefinition, type InputDefinition,
   type SaveSectionDef, type AssetDefinition, type PlayOptions, validatePlayOptions, PLAY_LATE_MS, type ModeDefinition, type KitDefinition, type SceneContext, type SaveHandle, type InputState, type InputSource, type ActionHint,
-  type ViewState, type ReadingSheet, type ReadingSheetOptions, type ScenePreparationContext, type Vec3, type SceneBody, type SceneInput, type ComponentType, type ComponentInit, type Entity, type World,
+  type ViewState, type ReadingSheet, type ReadingSheetOptions, type ScenePreparationContext, type Vec3, type SceneBody, type SceneInput, type SceneReplayDigest, type ComponentType, type ComponentInit, type Entity, type World,
 } from './defs';
 export { testScene, createTestWorkerHost, type TestScene } from './testing';
 export { effectiveFov, viewRay, pointerOnGround, projectToView } from './view-math';

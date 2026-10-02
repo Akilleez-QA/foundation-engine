@@ -7,11 +7,13 @@
  * The same tap serves the stock browser runtime's dev-only replay surface (src/dev/replay.ts).
  */
 import { defineSystem, testScene, Transform, type GameDefinition, type InputDefinition, type InputState, type InputSource,
-  type SceneContext, type SceneDefinition, type SystemDefinition, type World } from '../../author';
+  type SceneContext, type SceneDefinition, type SceneReplayDigest, type SystemDefinition, type World } from '../../author';
 import type { DocumentValue } from '../authoring/document';
 import type { JsonLimits } from '../network/captured-json';
 import { compareDigests, createDigestTrace, type DigestComparison, type DigestSnapshot, type DigestTraceOptions } from './digest';
-import { digestJson } from './hash';
+import { digestJson, hashText } from './hash';
+import { explainDivergence, type DivergenceExplanation } from './explain';
+import { observeWorld, replayStateText, toReplayDigest, type ReplayDigestInput } from './state';
 import { createReplayRecorder, openReplay, type OpenLimits, type OpenResult, type RecorderState, type ReplayLimits } from './log';
 
 /** The fixed step `testScene` and the stock runtime use for the fixed lane (core/ecs/systems.ts default). */
@@ -159,26 +161,40 @@ export interface SceneRunOptions {
   readonly inputs: readonly InputDefinition[];
   /** Build identity (default `<game id>@<version>`, or 'test' without a game). */
   readonly build?: string;
-  /** Creator digest over their own state (default: worldDigest of ctx.world). */
+  /** Creator digest over their own state, as a function (identity unchanged). Takes precedence over `replayDigest`. */
   readonly digest?: (ctx: SceneContext) => string;
-  /** Optional detail text for the trace's detail window (e.g. worldDigestText). */
+  /**
+   * The replayed state as a named digest or a component selection (`replayDigest`). Default: the scene definition's
+   * `replay.digest`, else worldDigest. Its id joins the trace identity, so it must match the log's.
+   */
+  readonly replayDigest?: ReplayDigestInput;
+  /** Detail text for the trace's detail window. Default with a window: the canonical state text of the digest in use. */
   readonly detail?: (ctx: SceneContext) => string;
   readonly trace: Omit<DigestTraceOptions, 'identity'>;
   /** Extra fixed systems after the scene's own (tests use this to inject faults). */
   readonly systems?: readonly SystemDefinition[];
 }
 const buildOf = (o: SceneRunOptions) => o.build ?? (o.game ? `${o.game.id}@${o.game.version}` : 'test');
-export const sceneTraceIdentity = (build: string, config: string, seed: number) => `${build}|${config}|seed:${seed}`;
+/** The digest trace identity. A named replay digest adds `|digest:<id>`; the default digest adds nothing. */
+export const sceneTraceIdentity = (build: string, config: string, seed: number, digest?: string | null) =>
+  `${build}|${config}|seed:${seed}${digest ? `|digest:${digest}` : ''}`;
+/** The named digest a run uses: the caller's, else the scene's `replay.digest`, else none (the default digest). */
+export function sceneReplayDigest(scene: SceneDefinition, input?: ReplayDigestInput | null): SceneReplayDigest | null {
+  if (input != null) return toReplayDigest(input);
+  return scene.replay?.digest ? toReplayDigest(scene.replay.digest) : null;
+}
 
 async function drive(scene: SceneDefinition, o: SceneRunOptions, seed: number, ticks: number, before: (tick: number, tap: SceneInputTap) => boolean) {
   const config = sceneReplayConfig(scene.id, o.inputs);
-  const trace = createDigestTrace({ ...o.trace, identity: sceneTraceIdentity(buildOf(o), config, seed) });
+  const named = o.digest ? null : sceneReplayDigest(scene, o.replayDigest);
+  const trace = createDigestTrace({ ...o.trace, identity: sceneTraceIdentity(buildOf(o), config, seed, named?.id) });
   const tap = createSceneInputTap(o.inputs);
-  const digest = o.digest ?? ((ctx: SceneContext) => worldDigest(ctx.world));
   let tick = 0, observed = 0;
   const observe = defineSystem({ id: 'replay-kit-observe', run(ctx) {
     observed++;
-    trace.observe(tick, () => digest(ctx), o.detail ? () => o.detail!(ctx) : undefined);
+    if (o.digest) trace.observe(tick, () => o.digest!(ctx), o.detail ? () => o.detail!(ctx) : undefined);
+    else if (o.detail) trace.observe(tick, named ? () => hashText(replayStateText(ctx.world, named, WORLD_DIGEST_LIMITS)) : () => worldDigest(ctx.world), () => o.detail!(ctx));
+    else observeWorld(trace, tick, ctx.world, named, WORLD_DIGEST_LIMITS, worldDigest);
   } });
   const t = await testScene(scene, { game: o.game, inputs: o.inputs, seed, input: tap.input, systems: [...o.systems ?? [], observe] });
   try {
@@ -210,7 +226,9 @@ export async function recordSceneRun(scene: SceneDefinition, o: SceneRunOptions 
 
 export type SceneReplayResult =
   | Exclude<OpenResult, { status: 'ready' }>
-  | Readonly<{ status: 'replayed'; ticks: number; truncatedAt: number | null; digests: DigestSnapshot; comparison: DigestComparison | null }>;
+  | Readonly<{ status: 'replayed'; ticks: number; truncatedAt: number | null; digests: DigestSnapshot; comparison: DigestComparison | null;
+      /** When diverged: the first differing entity, component and field (or path), from both sides' detail text. */
+      divergence: DivergenceExplanation | null }>;
 
 /**
  * Replay a log headlessly: same build, configuration and step (else refused), the log's seed, one logged input per
@@ -222,5 +240,6 @@ export async function replaySceneLog(scene: SceneDefinition, o: SceneRunOptions 
   const player = opened.player;
   const run = await drive(scene, o, player.header.seed, player.ticks, (tick, tap) => { tap.load(player.input(tick)!); return true; });
   const comparison = player.digests ? compareDigests(player.digests, run.trace) : null;
-  return Object.freeze({ status: 'replayed', ticks: run.ticks, truncatedAt: player.truncatedAt, digests: run.trace, comparison });
+  const divergence = comparison?.status === 'diverged' ? explainDivergence(comparison.tick, comparison.detail.a, comparison.detail.b) : null;
+  return Object.freeze({ status: 'replayed', ticks: run.ticks, truncatedAt: player.truncatedAt, digests: run.trace, comparison, divergence });
 }

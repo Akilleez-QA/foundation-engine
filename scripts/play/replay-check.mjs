@@ -2,7 +2,9 @@
 // SIM-01 browser regression (GAME_DIR=templates/arcade/game): the stock arcade scene opened with ?seed= records its
 // fixed-tick input through the dev-only engine.replay surface, replays exactly under a different frame grouping, the
 // same log replays exactly in a separate headless harness (testScene), a state change outside the log is detected at
-// the tick it happens, and a corrupted log is refused without re-entering the scene. Run with `node --import tsx`.
+// the tick it happens, and a corrupted log is refused without re-entering the scene. SIM-02: a selected-component digest
+// with detail names the changed entity, component and field; a log is refused under another digest; a creator digest
+// function supplied in the page replays exactly. Run with `node --import tsx`.
 import assert from 'node:assert/strict';
 import {mkdirSync, writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
@@ -84,6 +86,57 @@ try {
   assert.equal(diverged.status, 'diverged');
   assert.deepEqual([diverged.tick, diverged.after, diverged.exact], [at, at - 1, true]);
   report.states.push({step: 'injected state change', teleportBeforeTick: at, comparison: {status: diverged.status, tick: diverged.tick, after: diverged.after, exact: diverged.exact}});
+
+  // A selected-component digest with detail (SIM-02): the same injected change is named by entity, component and field.
+  const select = {components: ['transform'], resources: true};
+  await engine(b, () => window.engine.clock.resume());
+  assert.equal((await engine(b, d => window.engine.replay.start({mode: 'record', maxTicks: 600, digest: d, detail: true}), select)).status, 'started');
+  await engine(b, () => window.engine.clock.hold());
+  for (const [key, ms] of [['ArrowLeft', 400], [null, 300], ['ArrowRight', 500]]) {
+    if (key) await b.page.keyboard.down(key);
+    await engine(b, m => window.engine.clock.step(m), ms);
+    if (key) await b.page.keyboard.up(key);
+  }
+  const detailed = await engine(b, () => window.engine.replay.read());
+  await engine(b, () => window.engine.replay.stop());
+  assert.equal(detailed.digest, 'select:c=transform;x=;r=all');
+  assert.ok(JSON.parse(detailed.log).digests.details.length > 0, 'the log carries detail text');
+  await engine(b, () => window.engine.clock.resume());
+  assert.deepEqual(await engine(b, log => window.engine.replay.start({mode: 'replay', log}), detailed.log), {status: 'refused', reason: 'incompatible-digest'},
+    'a log recorded under a named digest is refused under the default one');
+  // That refused visit re-entered the scene untapped: wait for it to be active again.
+  await b.page.waitForFunction(() => window.engine.probe('scene')?.state !== 'entering');
+  const withDigest = await engine(b, ([log, d]) => window.engine.replay.start({mode: 'replay', log, digest: d}), [detailed.log, select]);
+  assert.equal(withDigest.status, 'started', JSON.stringify(withDigest));
+  await engine(b, () => window.engine.clock.hold());
+  await stepUntil(b, 17, () => engine(b, () => window.engine.replay.read().ticks >= 40));
+  const at2 = await engine(b, () => window.engine.replay.read().ticks);
+  assert.equal(await engine(b, () => window.engine.teleport(-2.5, 5, 'player')), true);
+  await stepUntil(b, 17, () => engine(b, () => window.engine.replay.read().status !== 'replaying'));
+  const named = await engine(b, () => window.engine.replay.read());
+  assert.deepEqual([named.comparison.status, named.comparison.tick], ['diverged', at2]);
+  assert.equal(named.divergence.status, 'found', JSON.stringify(named.divergence));
+  // The first difference in canonical (sorted-key) order: the teleport moves and turns the player.
+  assert.deepEqual([named.divergence.tick, named.divergence.kind, named.divergence.component], [at2, 'value', 'transform']);
+  assert.ok(['rx', 'ry', 'rz', 'scale', 'x', 'y', 'z'].includes(named.divergence.field), named.divergence.field);
+  assert.ok(Number.isSafeInteger(named.divergence.entity), 'the moved entity is named');
+  report.states.push({step: 'selected digest with detail, injected change', teleportBeforeTick: at2, divergence: named.divergence});
+
+  // A creator digest function supplied in the page replays exactly under its own id.
+  await engine(b, () => window.engine.clock.resume());
+  assert.equal((await engine(b, () => window.engine.replay.start({mode: 'record', maxTicks: 600, digest: {id: 'resources-v1', state: w => w.resources}}))).status, 'started');
+  await engine(b, () => window.engine.clock.hold());
+  await engine(b, () => window.engine.clock.step(500));
+  const own = await engine(b, () => window.engine.replay.read());
+  await engine(b, () => window.engine.replay.stop());
+  await engine(b, () => window.engine.clock.resume());
+  assert.equal((await engine(b, log => window.engine.replay.start({mode: 'replay', log, digest: {id: 'resources-v1', state: w => w.resources}}), own.log)).status, 'started');
+  await engine(b, () => window.engine.clock.hold());
+  await stepUntil(b, 33, () => engine(b, () => window.engine.replay.read().status !== 'replaying'));
+  const ownReplay = await engine(b, () => window.engine.replay.read());
+  assert.equal(ownReplay.digest, 'resources-v1');
+  assert.deepEqual(ownReplay.comparison, {status: 'equal', from: 0, through: own.ticks - 1, samples: own.ticks});
+  report.states.push({step: 'creator digest function', digest: ownReplay.digest, comparison: ownReplay.comparison});
 
   // A corrupted log is refused before re-entry; the visit is unchanged.
   await engine(b, () => window.engine.clock.resume());

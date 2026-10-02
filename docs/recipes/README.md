@@ -25,6 +25,7 @@ Short, checked how-tos. Start with [getting started](../guides/getting-started.m
 | add a control | [add an input action](add-an-input-action.md) |
 | keep progress across reloads | [add a save section](add-a-save-section.md) |
 | measure or lower a scene's performance budget | [add a budget](add-a-budget.md) |
+| check a scene replays exactly, ignoring cosmetic motion | [replay with your own digest](replay-with-your-own-digest.md) |
 
 ## Extending the engine
 

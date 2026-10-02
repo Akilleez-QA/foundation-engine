@@ -9,9 +9,11 @@
  */
 import { installSceneTickTap, type SceneTickTap, type SceneTickTapContext } from '../author/scene-tick-tap';
 import {
-  compareDigests, createDigestTrace, createReplayRecorder, createSceneInputTap, openReplay, sceneReplayConfig, sceneTraceIdentity,
-  RUN_OVERHEAD_BYTES, worldDigest, type DigestComparison, type DigestSnapshot, type OpenLimits,
+  compareDigests, createDigestTrace, createReplayRecorder, createSceneInputTap, explainDivergence, observeWorld, openReplay,
+  replayStateText, sceneReplayConfig, sceneTraceIdentity, toReplayDigest, RUN_OVERHEAD_BYTES, WORLD_DIGEST_LIMITS, worldDigest,
+  type DigestComparison, type DigestDetailWindow, type DigestSnapshot, type DivergenceExplanation, type OpenLimits, type ReplayDigestInput,
 } from '../kits/replay';
+import type { SceneReplayDigest } from '../author/defs';
 import type { JsonLimits } from '../kits/network/captured-json';
 
 export interface ReplayDevRequest {
@@ -26,6 +28,18 @@ export interface ReplayDevRequest {
   readonly maxBytes?: number;
   /** Digest ring capacity (default: every sample of maxTicks). */
   readonly maxDigests?: number;
+  /**
+   * The replayed state: a named digest `{id, state(world)}` or a component selection `{components?, exclude?,
+   * resources?, count?, id?}` (component ids or types). Default: the scene's `replay.digest`, else every Transform and
+   * the resources. A replay must use the digest its log was recorded with, or it is refused (`incompatible-digest`).
+   */
+  readonly digest?: ReplayDigestInput;
+  /**
+   * Record: keep each sampled tick's canonical state text in the log for ticks `from`..`to` (default the whole run), up
+   * to `maxChars` (default 1 MiB, later detail is dropped), so a replay can name the first differing entity, component
+   * and field. `true` takes every default.
+   */
+  readonly detail?: boolean | Readonly<{ from?: number; to?: number; maxChars?: number }>;
 }
 export type ReplayDevStatus = 'idle' | 'armed' | 'recording' | 'truncated' | 'replaying' | 'complete' | 'stopped' | 'refused' | 'failed';
 export interface ReplayDevState {
@@ -42,6 +56,10 @@ export interface ReplayDevState {
   readonly digests: DigestSnapshot | null;
   /** Replay, once complete: this run's digests against the log's. */
   readonly comparison: DigestComparison | null;
+  /** The named digest in use (its id), or null for the default digest. */
+  readonly digest: string | null;
+  /** Replay, once diverged: the first differing entity, component and field (needs a log recorded with `detail`). */
+  readonly divergence: DivergenceExplanation | null;
 }
 export type ReplayStart = Readonly<{ status: 'started'; state: ReplayDevState }> | Readonly<{ status: 'refused'; reason: string }>;
 
@@ -54,12 +72,25 @@ const HEADER_BYTES = 2048, HEADER_NODES = 64, DIGEST_ENTRY_BYTES = 40, RUN_ENTRY
  * The worst-case size of a log a record request can export: inputs embedded as JSON strings at most double in size
  * when escaped; each run and digest entry adds its own brackets, count/tick and separators; three nodes per entry.
  */
-export function recordLogBound(maxTicks: number, maxBytes: number, maxDigests: number): { bytes: number; nodes: number } {
+export function recordLogBound(maxTicks: number, maxBytes: number, maxDigests: number, detailChars = 0): { bytes: number; nodes: number } {
   const runs = Math.min(maxTicks, Math.floor(maxBytes / (RUN_OVERHEAD_BYTES + 2)));
-  return { bytes: HEADER_BYTES + 2 * maxBytes + runs * RUN_ENTRY_BYTES + maxDigests * DIGEST_ENTRY_BYTES,
-    nodes: HEADER_NODES + 3 * runs + 3 * maxDigests };
+  // Detail text is embedded as escaped JSON strings (at most 6 bytes per UTF-16 unit, as \uXXXX) plus one entry per sample.
+  const details = detailChars > 0 ? maxDigests : 0;
+  return { bytes: HEADER_BYTES + 2 * maxBytes + runs * RUN_ENTRY_BYTES + (maxDigests + details) * DIGEST_ENTRY_BYTES + 6 * detailChars,
+    nodes: HEADER_NODES + 3 * runs + 3 * (maxDigests + details) };
 }
 const positive = (n: unknown, max: number): n is number => Number.isSafeInteger(n) && (n as number) > 0 && (n as number) <= max;
+const DETAIL_CHARS = 1 << 20;
+/** The record detail window a request asks for, or null. Throws on a malformed request. */
+function detailWindow(request: ReplayDevRequest, maxTicks: number): DigestDetailWindow | null {
+  const d = request.detail;
+  if (d === undefined || d === false) return null;
+  const o = d === true ? {} : d;
+  if (!o || typeof o !== 'object') throw Error('detail');
+  const from = o.from ?? 0, to = o.to ?? maxTicks - 1, maxChars = o.maxChars ?? DETAIL_CHARS;
+  if (!(Number.isSafeInteger(from) && from >= 0) || !(Number.isSafeInteger(to) && to >= from) || !positive(maxChars, LOG.maxBytes)) throw Error('detail');
+  return { from, to, maxChars };
+}
 
 interface Session {
   mode: 'record' | 'replay';
@@ -71,6 +102,8 @@ interface Session {
   log: () => string | null;
   digests: () => DigestSnapshot | null;
   comparison: DigestComparison | null;
+  digest: string | null;
+  divergence: DivergenceExplanation | null;
   stop: (reason: string | null) => void;
 }
 
@@ -87,30 +120,35 @@ export interface ReplayDev {
 /** `log` overrides the log text limits (tests use small ones to reach the boundary); default 8 MiB / 2^20 nodes. */
 export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
   const logLimits: JsonLimits = options.log ?? LOG;
-  let armed: { request: ReplayDevRequest; scene: string; open: OpenLimits } | null = null;
+  let armed: { request: ReplayDevRequest; scene: string; open: OpenLimits; digest: SceneReplayDigest | null } | null = null;
   let session: Session | null = null;
   const refuse = (reason: string): ReplayStart => Object.freeze({ status: 'refused', reason });
 
   const restore = installSceneTickTap(ctx => {
     if (!armed) return null;
-    const { request, scene, open } = armed;
+    const { request, scene, open, digest: requested } = armed;
     armed = null;
     const s: Session = { mode: request.mode, status: 'armed', reason: null, scene: ctx.scene, ticks: () => 0, total: null,
-      log: () => null, digests: () => null, comparison: null, stop: () => {} };
+      log: () => null, digests: () => null, comparison: null, digest: null, divergence: null, stop: () => {} };
     session = s;
     const fail = (status: 'refused' | 'failed', reason: string) => { s.status = status; s.reason = reason; return null; };
     if (ctx.scene !== scene) return fail('refused', 'scene-changed');
     if (ctx.seed === null) return fail('refused', 'seed-required');
-    return request.mode === 'record' ? record(ctx, request, s) : replay(ctx, request, open, s, fail);
+    // The request's digest, else the scene definition's, else the default.
+    let digest: SceneReplayDigest | null;
+    try { digest = requested ?? (ctx.replayDigest ? toReplayDigest(ctx.replayDigest) : null); } catch { return fail('refused', 'digest'); }
+    s.digest = digest?.id ?? null;
+    return request.mode === 'record' ? record(ctx, request, s, digest) : replay(ctx, request, open, s, fail, digest);
   });
 
-  function record(ctx: SceneTickTapContext, request: ReplayDevRequest, s: Session): SceneTickTap {
+  function record(ctx: SceneTickTapContext, request: ReplayDevRequest, s: Session, digest: SceneReplayDigest | null): SceneTickTap {
     const build = `${ctx.game.id}@${ctx.game.version}`, config = sceneReplayConfig(ctx.scene, ctx.inputs);
     const maxTicks = request.maxTicks ?? 3600, every = request.every ?? 1;
     const recorder = createReplayRecorder({ header: { build, config, seed: ctx.seed!, step: ctx.step },
       limits: { maxTicks, maxBytes: request.maxBytes ?? 256 << 10, input: INPUT } });
-    const trace = createDigestTrace({ identity: sceneTraceIdentity(build, config, ctx.seed!), every,
-      maxEntries: request.maxDigests ?? Math.ceil(maxTicks / every), maxDigestLength: 16 });
+    const detail = detailWindow(request, maxTicks);
+    const trace = createDigestTrace({ identity: sceneTraceIdentity(build, config, ctx.seed!, digest?.id), every,
+      maxEntries: request.maxDigests ?? Math.ceil(maxTicks / every), maxDigestLength: 16, ...(detail ? { detail } : {}) });
     const tap = createSceneInputTap(ctx.inputs, id => ctx.live.describe(id));
     tap.passThrough(ctx.live);
     let arrived = false, recording = true, tick = 0;
@@ -137,7 +175,7 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
       },
       afterTick() {
         if (!recording) return;
-        if (trace.observe(tick, () => worldDigest(ctx.world)) === 'failed') { end('failed', trace.read().reason); return; }
+        if (observeWorld(trace, tick, ctx.world, digest, WORLD_DIGEST_LIMITS, worldDigest) === 'failed') { end('failed', trace.read().reason); return; }
         tick++;
         tap.passThrough(ctx.live);
       },
@@ -147,11 +185,14 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
   }
 
   function replay(ctx: SceneTickTapContext, request: ReplayDevRequest, open: OpenLimits, s: Session,
-    fail: (status: 'refused' | 'failed', reason: string) => null): SceneTickTap | null {
+    fail: (status: 'refused' | 'failed', reason: string) => null, digest: SceneReplayDigest | null): SceneTickTap | null {
     const build = `${ctx.game.id}@${ctx.game.version}`, config = sceneReplayConfig(ctx.scene, ctx.inputs);
     const opened = openReplay(request.log!, open, { build, config, step: ctx.step, seed: ctx.seed });
     if (opened.status !== 'ready') return fail('refused', opened.status === 'incompatible' ? `incompatible-${opened.field}` : opened.status === 'corrupt' ? `corrupt-${opened.reason}` : opened.status);
     const player = opened.player, recorded = player.digests;
+    const identity = sceneTraceIdentity(build, config, ctx.seed!, digest?.id);
+    // Build, configuration and seed were checked by openReplay: a different identity means another digest.
+    if (recorded && recorded.identity !== identity) return fail('refused', 'incompatible-digest');
     const tap = createSceneInputTap(ctx.inputs, id => ctx.live.describe(id));
     // Decode every distinct logged input against this scene's declared actions before any tick runs.
     for (let t = 0, previous: string | undefined; t < player.ticks; t++) {
@@ -162,16 +203,24 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
     }
     tap.load({});
     const every = recorded?.every ?? request.every ?? 1;
-    const trace = createDigestTrace({ identity: sceneTraceIdentity(build, config, ctx.seed!), every,
+    const trace = createDigestTrace({ identity, every,
       maxEntries: request.maxDigests ?? Math.max(1, Math.ceil(player.ticks / every)), maxDigestLength: 16 });
+    // The replayed side's state text, kept once: at the first sample that differs from the log's.
+    let mismatch: { tick: number; text: string | null } | null = null;
+    const expected = (t: number) => {
+      const e = recorded?.entries, first = e?.[0]?.[0];
+      if (!e || first === undefined || t < first || (t - first) % every !== 0) return undefined;
+      return e[(t - first) / every]?.[1];
+    };
     let arrived = false, playing = true, tick = 0;
     const end = (status: ReplayDevStatus, reason: string | null = null) => {
       if (!playing) return;
       playing = false; s.status = status; s.reason = reason;
       if (status !== 'complete' || !recorded) return;
       // An empty log has nothing to compare: say so rather than claim a pass.
-      s.comparison = player.ticks === 0 ? Object.freeze({ status: 'incomparable', reason: 'no-overlap' })
+      const c = s.comparison = player.ticks === 0 ? Object.freeze({ status: 'incomparable', reason: 'no-overlap' } as const)
         : compareDigests(recorded, trace.read(), { through: player.ticks - 1 });
+      if (c.status === 'diverged') s.divergence = explainDivergence(c.tick, c.detail.a, mismatch?.tick === c.tick ? mismatch.text : null);
     };
     Object.assign(s, { total: player.ticks, ticks: () => tick, digests: () => trace.read(), stop: (reason: string | null) => { end('stopped', reason); tap.passThrough(ctx.live); } });
     if (player.ticks === 0) end('complete');
@@ -187,7 +236,16 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
       },
       afterTick() {
         if (!playing) return;
-        if (trace.observe(tick, () => worldDigest(ctx.world)) === 'failed') { end('failed', trace.read().reason); return; }
+        let mine: string | null = null;
+        if (observeWorld(trace, tick, ctx.world, digest, WORLD_DIGEST_LIMITS, worldDigest, d => { mine = d; }) === 'failed') { end('failed', trace.read().reason); return; }
+        if (!mismatch && mine !== null) {
+          const theirs = expected(tick);
+          if (theirs !== undefined && mine !== theirs) {
+            let text: string | null = null;
+            try { text = replayStateText(ctx.world, digest, WORLD_DIGEST_LIMITS); } catch { /* reported as no-detail */ }
+            mismatch = { tick, text };
+          }
+        }
         if (++tick >= player.ticks) end('complete');
       },
       arrive() { arrived = true; if (playing) s.status = 'replaying'; ctx.invalidate(); },
@@ -198,6 +256,8 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
   return {
     arm(request, scene) {
       if (!request || (request.mode !== 'record' && request.mode !== 'replay')) return refuse('mode');
+      let digest: SceneReplayDigest | null = null;
+      if (request.digest !== undefined) { try { digest = toReplayDigest(request.digest); } catch { return refuse('digest'); } }
       if (request.every !== undefined && !positive(request.every, MAX_TICKS)) return refuse('every');
       if (request.maxTicks !== undefined && !positive(request.maxTicks, MAX_TICKS)) return refuse('maxTicks');
       if (request.maxBytes !== undefined && !positive(request.maxBytes, LOG.maxBytes)) return refuse('maxBytes');
@@ -206,7 +266,9 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
       if (request.mode === 'record') {
         // Refuse a request whose log could exceed the limits it must be reopened under.
         const maxTicks = request.maxTicks ?? 3600, every = request.every ?? 1;
-        const bound = recordLogBound(maxTicks, request.maxBytes ?? 256 << 10, request.maxDigests ?? Math.ceil(maxTicks / every));
+        let detail: DigestDetailWindow | null;
+        try { detail = detailWindow(request, maxTicks); } catch { return refuse('detail'); }
+        const bound = recordLogBound(maxTicks, request.maxBytes ?? 256 << 10, request.maxDigests ?? Math.ceil(maxTicks / every), detail?.maxChars ?? 0);
         if (bound.bytes > logLimits.maxBytes || bound.nodes > logLimits.maxNodes) return refuse('log-limit');
       } else {
         if (typeof request.log !== 'string') return refuse('log');
@@ -217,8 +279,9 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
         if (checked.status === 'corrupt') return refuse(`corrupt-${checked.reason}`);
       }
       session?.stop('replaced');
-      armed = { request: { ...request }, scene, open };
+      armed = { request: { ...request }, scene, open, digest };
       const placeholder: Session = { mode: request.mode, status: 'armed', reason: null, scene, ticks: () => 0, total: null, log: () => null, digests: () => null, comparison: null,
+        digest: digest?.id ?? null, divergence: null,
         stop: reason => { armed = null; placeholder.status = 'stopped'; placeholder.reason = reason ?? 'stopped-before-arrival'; } };
       session = placeholder;
       return Object.freeze({ status: 'started', state: read() });
@@ -230,8 +293,8 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
 
   function read(): ReplayDevState {
     const s = session;
-    if (!s) return Object.freeze({ status: 'idle', mode: null, reason: null, scene: null, ticks: 0, total: null, log: null, digests: null, comparison: null });
+    if (!s) return Object.freeze({ status: 'idle', mode: null, reason: null, scene: null, ticks: 0, total: null, log: null, digests: null, comparison: null, digest: null, divergence: null });
     return Object.freeze({ status: s.status, mode: s.mode, reason: s.reason, scene: s.scene, ticks: s.ticks(), total: s.total,
-      log: s.mode === 'record' ? s.log() : null, digests: s.digests(), comparison: s.comparison });
+      log: s.mode === 'record' ? s.log() : null, digests: s.digests(), comparison: s.comparison, digest: s.digest, divergence: s.divergence });
   }
 }

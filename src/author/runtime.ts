@@ -186,7 +186,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       if (TEST_API) {
         try {
           tap = openSceneTickTap({ scene: scene.id, game: { id: s.play.game.id, version: s.play.game.version }, inputs: o.inputs.map(i => ({ id: i.id, axis: !!i.axis })),
-            seed, step: FIXED_STEP, world, live: liveInput, invalidate: () => actx.invalidate() });
+            seed, step: FIXED_STEP, world, replayDigest: scene.replay?.digest ?? null, live: liveInput, invalidate: () => actx.invalidate() });
         } catch (error) { s.log.error(`${scene.id}: tick tap failed`, error); }
         if (tap) { const owned = tap; actx.own(() => owned.retire()); tapArrive = () => owned.arrive(); }
       }
