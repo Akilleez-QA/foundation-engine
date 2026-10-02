@@ -12,7 +12,7 @@ import { deriveSeed, prepareCellularGrid, defineGenerationSeedSection } from '@k
 export const runSeed = defineGenerationSeedSection('cavegame.run'); // add to the game's defs
 
 // at a visit boundary, outside the frame:
-const root = ctx.save(runSeed).get().seed ?? 12345; // the game chooses how a new root is picked
+const root = ctx.save(runSeed).get().seed ?? Math.floor(ctx.random() * 2 ** 32); // pick once, then store it
 const result = await prepareCellularGrid(ctx.service('jobs'), { id: 'caves', signal: lifetime.signal }, {
   formatVersion: 1, generatorVersion: 1, id: `region:${cx},${cz}`, revision: 1,
   seed: deriveSeed(root, 'region', cx, cz),

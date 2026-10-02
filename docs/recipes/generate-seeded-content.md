@@ -17,7 +17,11 @@ exactly" or "region (4,-2) regenerates after reload". The seams this recipe uses
 | Persistence | A save section holding the **root seed**, not the output |
 | Publication | The game's own world owner (or the terrain owner for surfaces) |
 
-## 2. Derive one seed per piece of content
+## 2. Pick a root once, then derive one seed per piece of content
+
+`SceneContext` exposes `ctx.random()`, not its seed. To start a run or a world, pick a
+root once at that boundary, e.g. `Math.floor(ctx.random() * 2 ** 32)` (replayable under
+`?seed=`), and store it (step 5). Reload the stored root afterwards; never re-pick it.
 
 ```ts
 import { deriveSeed } from '@kits/procgen';
@@ -25,7 +29,7 @@ const regionSeed = deriveSeed(root, 'region', cx, cz);
 const lootSeed = deriveSeed(root, 'level', depth, 'loot');
 ```
 
-The path names the content, not the order in which it is requested. Do not chain
+The path names the content, not the order in which it is requested. Beyond the one root pick, do not chain
 `ctx.random()` draws into a generator's seed: that ties the content to visit history.
 Integers must be safe integers, and floats are rejected; quantize coordinates yourself.
 
