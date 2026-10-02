@@ -41,7 +41,7 @@ Each template's README lists what is in it, its controls and what to change firs
 
 ## Start
 
-Requires Git, Node.js 22.18 or newer (CI uses Node.js 22) and npm. This repository is the engine source and tooling; it is not currently published as an npm library. [Getting started](docs/guides/getting-started.md) explains every step.
+Requires Git, Node.js 22.18 or newer (CI uses Node.js 22; `.nvmrc` and `.node-version` select Node 22 for nvm, fnm and similar tools) and npm. The scripts load TypeScript with Node's built-in type stripping, which Node 22 enables from 22.18; older versions stop with a one-line message. This repository is the engine source and tooling; it is not currently published as an npm library. [Getting started](docs/guides/getting-started.md) explains every step.
 
 ```
 npm ci
@@ -56,31 +56,7 @@ npm run build         # dist/: a static site to share (`-- --base ./` to host it
 
 Without a `game/` folder, every command builds `templates/blank/game`. `npm run dev` starts the same dev server as `npm run play`, which also prints your first scene's address (`PORT=5174 npm run play` if 5173 is taken). The [cookbook](docs/recipes/README.md) covers models, HUD and buttons, collision and picking, camera and lighting, and sharing a build. With a coding agent, see [working with your agent](docs/guides/working-with-your-agent.md).
 
-For engine work, `npm test` runs every test and `npm run gate` the full integration gate. The bench and gate drive Chromium through `playwright-core`. They use `ENGINE_CHROMIUM` if it is set, then Playwright's installed Chromium, then `/usr/bin/chromium`. When the bench runs as root (for example in a container), it adds `--no-sandbox`. It always adds `--mute-audio`.
-
-## Not here yet (and workarounds)
-
-The current state as of October 2026; work on several of these is in progress, and this list will link to it as it lands.
-
-| Not here yet | What exists today | Workaround |
-|---|---|---|
-| Particles | Nothing dedicated | A few short-lived `Shape` entities that a system moves and despawns. Each shape is one draw, so keep the count small and watch `play:snap`'s draw count |
-| Rigid-body physics | Overlap tests in systems; the character kit's kinematic movement with `Walls` and `Solid` blocking | Write simple motion in a fixed-step system (velocity, gravity, stop at the ground); [collision and picking](docs/recipes/collision-and-picking.md) |
-| A multiplayer session you can just run | The optional network kit's admission, transport, scoped views, authority and prediction contracts, and a [reference workbench](docs/guides/network-admission.md) for diagnosis; you supply the server, identity and game rules | Same-device play: give each player their own actions on separate keys |
-
-Each template passes the gate on its own: `npm run gate -- --game templates/<name>/game` (any shell; `GAME_DIR=templates/<name>/game npm run gate` also works in POSIX shells).
-
-## Start
-
-Requires Node.js 22.18 or later (`.nvmrc` and `.node-version` select Node 22 for nvm, fnm and similar tools), npm and Git. The scripts load TypeScript with Node's built-in type stripping, which Node 22 enables from 22.18; older versions stop with a one-line message.
-
-```
-npm ci
-npx playwright-core install chromium   # once per machine: the muted test browser for play:snap and the gate
-npm run dev          # http://127.0.0.1:5173/ (the blank template, or your game/)
-npm test
-npm run gate         # the full integration gate (uses the test browser)
-```
+For engine work, `npm test` runs every test and `npm run gate` the full integration gate.
 
 On Linux, Playwright's Chromium may also need system libraries: `npx playwright-core install-deps chromium` (needs root).
 
@@ -93,6 +69,18 @@ Without a `game/` folder the blank template runs. `--game <dir>` selects another
 ### Test on your phone over Wi-Fi
 
 `npm run play -- --host` (or `npm run dev -- --host`) also listens on your local network and prints a `Network:` URL; open it on a phone on the same Wi-Fi. By default both listen on 127.0.0.1 only. With `--host`, anyone on that network can reach the dev server, its source files and the test API while it runs: use it on a network you trust (not public Wi-Fi), and stop it with Ctrl+C when done. `ENGINE_HOST=1` does the same as `--host`; `--host <address>` binds one address. A phone in the browser is still not device acceptance; see the [device experience policy](docs/policy/DEVICE-EXPERIENCE.md).
+
+## Not here yet (and workarounds)
+
+The current state as of October 2026; work on several of these is in progress, and this list will link to it as it lands.
+
+| Not here yet | What exists today | Workaround |
+|---|---|---|
+| Particles | Nothing dedicated | A few short-lived `Shape` entities that a system moves and despawns. Each shape is one draw, so keep the count small and watch `play:snap`'s draw count |
+| Rigid-body physics | Overlap tests in systems; the character kit's kinematic movement with `Walls` and `Solid` blocking | Write simple motion in a fixed-step system (velocity, gravity, stop at the ground); [collision and picking](docs/recipes/collision-and-picking.md) |
+| A multiplayer session you can just run | The optional network kit's admission, transport, scoped views, authority and prediction contracts, and a [reference workbench](docs/guides/network-admission.md) for diagnosis; you supply the server, identity and game rules | Same-device play: give each player their own actions on separate keys |
+
+Each template passes the gate on its own: `npm run gate -- --game templates/<name>/game` (any shell; `GAME_DIR=templates/<name>/game npm run gate` also works in POSIX shells).
 
 ## Read next
 
