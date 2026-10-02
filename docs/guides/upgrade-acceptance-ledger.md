@@ -579,25 +579,26 @@ Status: implemented, candidate (`feat/mv02-moving-platforms`, PR #53); not integ
   - Registry bounds: `maxPlatforms` [1, 1024]; footprints (0, 1000] m; `maxSpeed`
     (0, 1000] m/s; path poses finite within ±1e7; `advance` steps (0, 0.25] s.
   - `advance` samples every path before committing and refuses a non-finite pose or an
-    over-speed move without moving any platform.
-  - `cut` admits one declared discontinuity with zero delta. Ids, `onLeave`, `radius` and
-    the jump `boost` (±1000 m/s) are validated.
-  - Carried and inherited planar motion slides against `Walls` and `Solid`s in at most 64
-    sub-steps per tick.
-- Checked: unit tests at 30, 60, 120, 144, 165 and 240 Hz ticks:
-  - riders follow a sinusoidal path and a 20 m/s descent exactly;
-  - jumps from a linear mover give identical arcs at aligned times, keep its velocity and
-    land back on it;
-  - the launch boost under `add-velocity` and `add-upward`, and none with `'none'`;
-  - a rising platform picks up a standing actor; an actor passes up through a moving
-    platform and lands on it;
-  - the leave policies and removal, and walls stopping carried motion;
-  - registry validation, atomic refusal, cut, restart and catch ordering.
-
-  Mutation checks: removing the carry, the catch, the inherited velocity, the boost, the
-  wall slide or the resting check each fails at least one test.
-- Not established:
-  - feel on any device, and any template or browser consumer;
-  - rotating or sloped platforms, side pushing, and render interpolation between ticks
-    (the next slice).
-
+    over-speed move without moving any platform. `cut` admits one declared discontinuity
+    with zero delta.
+  - Riding requires the platform's pose to be unchanged since the actor last rode, or
+    advanced by exactly its reported delta. Anything else detaches the actor with no
+    velocity.
+  - Boosts are clamped to ±1000 m/s. Carried planar motion slides in sub-steps of at most
+    half the radius, and is refused above 1,024 sub-steps per tick.
+  - Adapter state and the Transform change only after every query of the tick succeeds.
+- Checked:
+  - The regression tests run at 30, 60, 120, 165 and 240 Hz ticks: exact riding including a
+    20 m/s descent; jump apex from vertical, diagonal and descending lifts within g·dt²/8 of
+    (v0 + v)²/2g; leave policies and removal; one-way pick-up and pass-through.
+  - Also at those five rates, for the review fixes: frozen, missing and late platform
+    systems; detaching on cut, restart, re-add and an external lift; `when` pauses;
+    riding-tick sweeps (floor, step, overtaking platform); coyote after moving off; a thin
+    solid, walls, and an atomic failed tick.
+  - Narrower runs: identical arcs at aligned times at 30, 60, 120 and 240 Hz; the boost
+    policy at 120 Hz; the 1000 m/s clamp and the sub-step refusal at 60 Hz.
+  - Mutation checks: reverting each review fix fails its regression test. The fixes are the
+    jump-tick base, the frozen delta, the continuity and attachment checks, riding while
+    paused, the riding sweep, coyote grace, the boost clamp and the sub-step refusal.
+- Not established: feel on any device, any template or browser consumer, rotating or
+  sloped platforms, side pushing, and render interpolation between ticks (the next slice).

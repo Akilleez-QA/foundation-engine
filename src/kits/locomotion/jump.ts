@@ -172,10 +172,13 @@ export function createJumpFeel(config: JumpFeelConfig) {
     },
     /** Caller hit a ceiling: drop upward velocity. */
     ceiling() { if (vy > 0) vy = 0; },
-    /** External vertical velocity (a spring, a knockback). Not a jump: release gravity does not apply. */
-    setVelocity(v: number) {
+    /**
+     * External vertical velocity (a spring, a knockback). Not a jump: release gravity does not apply. An upward launch
+     * ends the coyote window unless `keepGrace` is true (velocity inherited from a support the actor just left).
+     */
+    setVelocity(v: number, keepGrace = false) {
       if (!Number.isFinite(v) || Math.abs(v) > 1000) throw new RangeError('jump: velocity must be finite and within ±1000 m/s');
-      vy = v; fromJump = false; released = false; if (v > 0) { grounded = false; sinceSupport = null; }
+      vy = v; fromJump = false; released = false; if (v > 0) { grounded = false; if (!keepGrace) sinceSupport = null; }
     },
     /** Drop a pending press (a menu opened, control moved elsewhere). */
     cancelPress() { pressAge = null; fresh = false; },

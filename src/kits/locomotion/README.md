@@ -98,14 +98,16 @@ no browser, device or template consumer yet.
 ## Moving platforms (MV-02)
 
 Recipe: [add moving platforms](../../../docs/recipes/add-moving-platforms.md). Status:
-implemented, candidate.
+implemented, candidate (PR #53).
 
 `createPlatforms({ maxPlatforms?, maxSpeed? })` is a pure, bounded registry of moving
-support surfaces. Each platform is an axis-aligned footprint (`halfX`, `halfZ`) whose
-top-centre pose is a creator function of simulation time, `path(t)`. `platformSystem(platforms,
-{ bind? })` advances it on the fixed lane and, optionally, writes each pose to a named
-entity's Transform for rendering. `jumpSystem({ …, platforms, onLeave?, radius? })` rides,
-leaves and catches platforms.
+support surfaces. Each platform is an axis-aligned footprint (`halfX`, `halfZ`). Its
+top-centre pose is a creator function of simulation time, `path(t)`.
+
+`platformSystem(platforms, { bind? })` advances the registry once per fixed tick. It can
+also write each pose to a named entity's Transform for rendering. Run it before
+`jumpSystem` in the same fixed lane. `jumpSystem({ …, platforms, onLeave?, radius? })`
+rides, leaves and catches platforms.
 
 | Input | Bounds | Default |
 |---|---|---|
@@ -116,50 +118,82 @@ leaves and catches platforms.
 | `onLeave` | `'add-velocity'`, `'add-upward'`, `'none'` | `'add-velocity'` |
 | `radius` (carried motion vs walls) | (0, 10] m | 0.35 |
 
-**Behaviour.**
-- *Ride:* an actor supported by a platform moves by that platform's exact displacement
-  for the tick (the difference of two path samples), so it follows the path exactly at
-  any tick rate. An actor resting exactly on a platform's previous top rides from the
-  next tick it is checked, including one placed there at scene start.
-- *Carry collision:* horizontal carry and inherited motion slide against `Walls` and
-  `Solid`s in sub-steps of at most half the radius (64 at most per tick).
-- *Leave:* jumping off, or no longer being over the footprint, applies `onLeave`, after
-  Godot's `platform_on_leave`. `add-velocity` keeps the platform's mean velocity over its
-  last tick: horizontally while airborne, and vertically as a launch boost or initial
-  velocity. `add-upward` keeps only an upward vertical part; `none` keeps nothing. A
-  removed platform imparts nothing. Landing on any support clears inherited motion.
-- *One-way, in each platform's frame:* a platform catches an actor whose highest foot
-  point in the tick was at or above its previous top and whose feet end at or below its
-  current top. A rising platform therefore picks up an actor it overtakes, and an actor
-  rising from below passes through and can land on it. The catch tick carries no
-  horizontal displacement; riding starts on the next tick.
-- *Controller:* `JumpFeelInput.boost` adds a supporting surface's vertical velocity to the
-  launch; release gravity still applies.
+**Riding.**
+- An actor on a platform moves by that platform's exact displacement each tick (the
+  difference of two path samples), so it follows the path exactly at any tick rate.
+- An actor resting exactly on a platform's previous top rides from that tick on,
+  including one placed there at scene start.
+- The adapter remembers the platform pose it last rode with. If the platform has not
+  advanced since (a missing, stopped or later-ordered `platformSystem`), the actor stays
+  put; no stale displacement is replayed. Ordered after `jumpSystem`, riding lags one
+  tick.
+- These all detach the actor with no velocity, so it is neither teleported nor flung:
+  any other change (`cut`, `restart`, a removal and re-add) and an actor moved
+  vertically by another owner.
+- On a riding tick, static ground (with `stepHeight`) and every platform's one-way catch
+  are swept from the old feet to the new top, and the highest surface wins; an exact tie
+  keeps the carrier. A lift descending through a floor therefore leaves its actor on the
+  floor, a carried actor steps onto a low ledge, and an overtaking platform takes over.
+- While `when` returns false, a carried actor keeps riding. Presses are dropped and
+  nothing else simulates.
 
-**Overload and failure.** `advance` samples every path before committing. A non-finite
-pose or a speed above `maxSpeed` throws, and no platform moves. Declare an intended
-discontinuity with `cut(id)`: the next advance places that platform without motion or a
-speed check. Invalid ids, footprints, steps and options throw `RangeError`. Platform
-queries cost O(platforms) per call; the adapter makes at most three per tick.
+**Leaving** (by jumping, or by no longer being over the footprint) applies `onLeave`,
+after Godot's `platform_on_leave`:
+- `add-velocity` keeps the platform's mean velocity over its last tick. Horizontally it
+  continues while airborne, including the jump tick's ride. Vertically it is a launch
+  boost on a jump, or the initial velocity when moving off.
+- `add-upward` keeps only an upward vertical part; `none` keeps nothing.
+- A jump's vertical motion starts from the top the actor stood on at the start of the
+  tick, so the platform's rise during the jump tick is not counted twice.
+- Moving off keeps the coyote window.
+- A removed platform imparts nothing. Landing on any support clears inherited motion.
+- Boosts are clamped to ±1000 m/s.
 
-**Cancellation and recovery.** `remove(id)` drops riders without velocity. `restart()`
-puts the timeline at t = 0 without motion. `resetJump` clears carrier and inherited
-motion.
+**One-way catch**, in each platform's frame: a platform catches an actor whose highest
+foot point in the tick was at or above its previous top, and whose feet end at or below
+its current top.
+- A rising platform therefore picks up an actor it overtakes.
+- An actor rising from below passes through and can land on it.
+- The catch tick carries no horizontal displacement; riding starts on the next tick.
+
+**Overload and failure.**
+- `advance` samples every path before committing. A non-finite pose or a speed above
+  `maxSpeed` throws, and no platform moves. Declare an intended jump with `cut(id)`.
+- Carried and inherited planar motion slides against `Walls` and `Solid`s in sub-steps
+  of at most half the radius. A step that short cannot cross a solid's outline inflated
+  by the radius, which is at least two radii wide.
+- Motion needing more than 1,024 sub-steps (over 512 radii in one tick) throws before
+  anything changes.
+- On a throwing tick the actor's Transform and the adapter's ride state stay unchanged.
+  The jump controller may already have advanced that tick.
+- Platform queries cost O(platforms) per call; the adapter makes at most five per tick.
+
+**Cancellation and recovery.**
+- `remove(id)` drops riders without velocity.
+- `restart()` resets the timeline to t = 0 without motion. Call it on scene enter so
+  replays start from the same poses.
+- `resetJump` clears the carrier and inherited motion.
 
 **Limitations.**
-- Footprints are axis-aligned boxes tested at the actor's centre; no rotation, slopes or
-  platform-side pushing.
-- Inherited velocity is the mean over the platform's last tick: exact for linear paths,
+- Footprints are axis-aligned boxes tested at the actor's centre: no rotation, slopes or
+  side pushing.
+- Inherited velocity is the platform's mean over its last tick: exact for linear paths,
   otherwise within one tick of curvature.
-- Carried actors are not pushed by walls into platforms; a platform is not a `Solid`.
-- No render interpolation between ticks yet; the runner exposes `alpha` for it.
+- A platform is not a `Solid`, and static ground higher than `stepHeight` does not block
+  carried motion sideways.
+- No render interpolation between ticks; the runner exposes `alpha` for it.
 
-**Evidence.** Unit tests at 30, 60, 120, 144, 165 and 240 Hz ticks cover:
-- exact riding, including a descent faster than gravity
-- identical inherited arcs at aligned times
-- launch boost under each leave policy
-- pick-up by a rising platform, and passing through from below then landing
-- leave policies and removal
-- carried motion stopped by walls
+**Evidence.** These unit tests run at 30, 60, 120, 165 and 240 Hz ticks:
+- exact riding, including a 20 m/s descent;
+- jump apex from vertical, diagonal and descending lifts within g·dt²/8 of (v0 + v)²/2g;
+- leave policies and removal;
+- one-way pick-up and pass-through;
+- frozen, missing and late platform systems;
+- detaching on cut, restart, re-add and an external lift;
+- `when` pauses;
+- riding-tick sweeps of floor, step and overtaking platform;
+- coyote after moving off;
+- the speed and sub-step limits, a thin solid, walls, and an atomic failed tick.
 
-There is no browser, template or device evidence.
+Identical arcs at aligned times run at 30, 60, 120 and 240 Hz. The boost policy is
+checked at 120 Hz. There is no browser, template or device evidence.

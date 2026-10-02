@@ -27,9 +27,20 @@ platforms.add('ferry', { halfX: 1.5, halfZ: 1, path: t => ({ x: 3 * Math.sin(0.5
 
 `path(t)` returns the top-centre pose at simulation time `t`. A path that jumps
 discontinuously needs `platforms.cut(id)` before the jump. Otherwise the speed check
-refuses the step.
+refuses the step. Riders of a cut platform detach; they do not jump with it.
+
+A registry created at module level keeps its time across scene visits. Restart it when
+the scene is entered, so every visit and every `?seed=` replay starts from the same poses:
+
+```ts
+defineScene({ id: 'lifts', /* … */ enter() { platforms.restart(); } });
+```
 
 ## 3. Systems, in this order
+
+`platformSystem` must run once per fixed tick before `jumpSystem`. If it runs after,
+riding lags one tick. If it is missing or stops, riders stay put on the frozen
+platforms.
 
 ```ts
 import { jumpSystem, platformSystem } from '@kits/locomotion';
@@ -55,7 +66,8 @@ Model each bound mesh with its top surface at local y = 0. Do not give platforms
 
 ## 5. Reset and remove
 
-- `platforms.restart()` restarts every path at t = 0 without flinging riders.
+- `platforms.restart()` restarts every path at t = 0 without motion. Riders of a platform
+  that moved detach.
 - `platforms.remove(id)` drops riders with no velocity.
 - `resetJump(world, entity)` clears what an actor carried after a teleport or control change.
 

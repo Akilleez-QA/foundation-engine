@@ -57,11 +57,12 @@ export function createPlatforms(o: PlatformsOptions = {}) {
       const p = finitePose(def.path(t), id);
       entries.set(id, { def: { halfX: def.halfX, halfZ: def.halfZ, path: def.path }, order: order++, cut: false, px: p.x, py: p.y, pz: p.z, x: p.x, y: p.y, z: p.z });
     },
-    /** Remove a platform. Riders lose support on their next tick and keep no velocity from it. */
+    /** Remove a platform. Riders lose support on their next tick and keep no velocity from it (a re-added platform
+     *  with the same id is a new platform: riders detach rather than jump to it). */
     remove(id: string): boolean { return entries.delete(id); },
     /**
      * Declare a discontinuity: the next `advance` places this platform at its path pose without motion (no speed
-     * check, zero delta), so a path that jumps does not fling or drag riders. Riders lose support if off the footprint.
+     * check, zero delta). Riders detach with no velocity: they are neither flung nor teleported with it.
      */
     cut(id: string): boolean { const e = entries.get(id); if (!e) return false; e.cut = true; return true; },
     /**
@@ -90,7 +91,8 @@ export function createPlatforms(o: PlatformsOptions = {}) {
     },
     /**
      * The platform an actor was standing on at the start of the last tick: its previous footprint covered (x, z) and
-     * its previous top equals `feet` (within 1e-9 m). The highest such, ties to the earlier-added. Null if none.
+     * its previous top equals `feet` (within 1e-9 m). Every match has that same top, so the earliest-added one is
+     * returned. Null if none.
      */
     standing(x: number, z: number, feet: number): string | null {
       let best: Entry | null = null, id: string | null = null;
@@ -117,7 +119,8 @@ export function createPlatforms(o: PlatformsOptions = {}) {
       }
       return best && { id: best.id, height: best.height };
     },
-    /** Start the timeline again at t = 0 and place every platform there without motion. */
+    /** Start the timeline again at t = 0 and place every platform there without motion; riders of a platform that
+     *  moved detach. Call it when a scene is entered so a `?seed=` replay starts from the same poses. */
     restart(): void {
       const placed: [Entry, PlatformPose][] = [];
       for (const [id, e] of entries) placed.push([e, finitePose(e.def.path(0), id)]);
