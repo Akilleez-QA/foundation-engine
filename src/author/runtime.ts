@@ -350,6 +350,9 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       // Async asset replacements still own their later preparation; this is not a GPU upload/shadow guarantee.
       let programsPrepared=false,preparationVersion=0;
       let programFailed=false;
+      // Systems start only once initial preparation settles, as before this preparation existed:
+      // the router's first-render frames then precede arrival, so systems never run long before enter().
+      let simulating=false;
       const failPrograms=(error:ProgramLinkError|FrameReadinessError)=>{
         if(programFailed||actx.leaving()||actx.signal.aborted)return;
         programFailed=true;programsPrepared=false;view.dataset.programReadiness='failed';
@@ -384,7 +387,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
           const frame=await(surface.frameReady?.(actx.signal)??Promise.resolve('ready'));
           if(frame==='retired')throw Error('Scene frame preparation retired');
           if(version!==preparationVersion||actx.leaving()||actx.signal.aborted)throw Error('Scene program preparation retired');
-          view.dataset.programReadiness=result;programsPrepared=true;actx.invalidate();
+          view.dataset.programReadiness=result;programsPrepared=true;simulating=true;actx.invalidate();
         });
       };
       const ready=preparePrograms();
@@ -393,6 +396,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
         frameMode: live ? 'continuous' : 'on-demand',
         update(f: FrameInfo) {
           if(programFailed)return;
+          if(!simulating){pressed.clear();pointer.pressed=false;return;}
           try{
           frame++; t += f.dt; calm = f.calm;
           gestures.sync();
