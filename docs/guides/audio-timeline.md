@@ -183,10 +183,11 @@ differ; do not copy values across.
 - **Fallback runs.** A `performance` run that later gains audio plays cues at
   dispatch time, up to `lookahead` early, because it has no context time. Restart
   the run to move it onto the audio clock.
-- **Rule conflict.** PR #19 (press retention across zero-step frames) changes how
-  presses are retained per fixed tick. Whichever of the two integrates second must
-  carry the press timestamps through its latch. Read `pressedAt` in a
-  `phase: 'frame'` system to keep both rules simple.
+- **Press lanes.** Timestamps travel through the press latch (PR #19, STD-SIM-12):
+  a fixed tick reports the earliest press it took, including one kept across
+  zero-step frames, and a `phase: 'frame'` system the earliest press of its frame.
+  The recipe pumps and grades in a frame system, so a press is graded in the frame
+  it arrived.
 - **What this is not.** The timeline does not judge timing, store charts or
   measure tempo maps. Those are game or kit policy.
 
