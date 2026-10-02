@@ -485,6 +485,6 @@ loopback browser workflow are its only evidence. See the
 against the composed authority path and checks invariants after every step against
 independent SQLite readback; failing seeds reproduce exactly by seed and step index
 and can be shrunk. Tools/tests only; the host gains optional, default-preserving
-fault seams. Implemented, candidate (PR #NN); not integrated. Process-scope loopback
+fault seams. Implemented, candidate (PR #26); not integrated. Process-scope loopback
 evidence only. See the [guide](network-fault-schedule.md) and the
 [ledger](upgrade-acceptance-ledger.md).
