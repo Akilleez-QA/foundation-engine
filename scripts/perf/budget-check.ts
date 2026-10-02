@@ -10,6 +10,9 @@ import { isQualityPreset, type QualityPreset } from '../../src/core/tiers';
 import { BENCH_BINDINGS, CHECK_BUDGETS } from '../../perf/budgets';
 import { loadBaseline } from './baselines';
 
+/** What to do about an active window that drew no frame (shared with perf:derive). */
+export const NO_FRAME_HINT = 'the active window drew no frame, so the scene had probably ended (game over, frozen run, pause) and its counts are zeros, not measurements. Make the bench meet the scene in play (for example a start scene before it, so it is entered fresh, or no fail state reachable within the window), then bench again. These windows never pass the gate and perf:derive derives no budget from them.';
+
 export interface RunReport { report: CheckReport; text: string; incomparable: string[] }
 
 /** Budgets and (unless disabled) the comparable baseline; SwiftShader runs gate counts only. */
@@ -23,6 +26,8 @@ export function reportRun(run: PerfRun, opts: { baseline?: boolean; tier?: Quali
     formatReport(report),
     '  windows (ADR 0053): ' + [...kinds].map(([k, ids]) => `${k} ${ids.length}${k === 'steady' ? '' : ' [' + ids.join(', ') + ']'}`).join(' · '),
   ];
+  const dead = run.samples.filter(s => !s.error && s.classification?.kind === 'inconclusive').map(s => s.id);
+  if (dead.length) lines.push(`  INCONCLUSIVE window(s) ${dead.join(', ')}: ${NO_FRAME_HINT}`);
   if (incomparable.length) lines.push(`  baseline not comparable (another experiment descriptor) for: ${incomparable.join(', ')}; run npm run perf:baseline on a clean, accepted run`);
   return { report, text: lines.join('\n'), incomparable };
 }

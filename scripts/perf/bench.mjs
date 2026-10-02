@@ -23,6 +23,7 @@ import {PROBE} from './probe-inject.mjs';
 import {ROOT, buildAndServe} from './build.mjs';
 import {observeNetwork} from './network.mjs';
 import {BENCH_SCENES, ACTIVE_SCENES} from '../../perf/budgets.ts';
+import {CLASSIFICATION_VERSION} from '../../src/platform/perf/window-class.ts';
 
 export const PERF_SCHEMA = 1;
 const VIEWPORTS = {desktop: {width: 1280, height: 800}, '4k': {width: 3840, height: 2160}};
@@ -56,7 +57,7 @@ export function experimentDescriptor(o, {browser, gpuString, launchArguments = [
   const route = BENCH_SCENES.map(p => p.id).filter(p => !o.only || o.only.includes(p));
   return {schema: PERF_SCHEMA, harness: o.gpu ? 'gpu' : 'swiftshader', browser, backend: gpuString, viewport: {...o.view, dpr: 1}, quality: PINNED_QUALITY + ' (pinned)', calm: false,
     execution: {launchArguments}, locale: 'en-US', clock: 'wall', comparisonPolicy: 'strict-taxonomy-v1', route, routes: Object.fromEntries(BENCH_SCENES.map(p => [p.id, p.route])),
-    active: o.active.filter(p => route.includes(p)), keys: o.keys, window: {...WINDOW, frames: o.frames}, network: o.liveNetwork ? 'live' : 'hermetic', classificationVersion: 1, readinessVersion: 1, helpers: harness};
+    active: o.active.filter(p => route.includes(p)), keys: o.keys, window: {...WINDOW, frames: o.frames}, network: o.liveNetwork ? 'live' : 'hermetic', classificationVersion: CLASSIFICATION_VERSION, readinessVersion: 1, helpers: harness};
 }
 
 const GPU_STRING = `(()=>{const c=document.createElement('canvas');const g=c.getContext('webgl2');const e=g&&g.getExtension('WEBGL_debug_renderer_info');const r=g?g.getParameter(e?e.UNMASKED_RENDERER_WEBGL:g.RENDERER):'none';g?.getExtension('WEBGL_lose_context')?.loseContext();return r})()`;

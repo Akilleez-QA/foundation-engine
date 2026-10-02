@@ -3,10 +3,15 @@
 // diagnostic. Nothing here drops a slow frame: recurring uploads and program work stay in the cost of play.
 
 /** Bumped whenever the rules below change; part of the ADR 0046 cache key. */
-export const CLASSIFICATION_VERSION = 1;
+export const CLASSIFICATION_VERSION = 2;
 
 export type UploadPurpose = 'initial' | 'recurring' | 'firstUse' | 'unknown';
-export type WindowKind = 'entry' | 'steady' | 'firstUse' | 'unclassified' | 'invalid';
+/**
+ * 'inconclusive': the window ran and was guarded, but what it observed cannot stand for the scene: an active window
+ * (input held) that rendered no frame. The scene most likely ended (the player lost, the run froze, a pause), so its
+ * per-frame counts are 0 by observation, not a measurement of play. Never comparable; never a budget source.
+ */
+export type WindowKind = 'entry' | 'steady' | 'firstUse' | 'unclassified' | 'invalid' | 'inconclusive';
 
 /** One texture's uploads in a window, as the probe records them. */
 export interface UploadFact {
@@ -44,7 +49,7 @@ export interface WindowClassification {
   kind: WindowKind;
   version: number;
   reasons: string[];
-  /** False for 'unclassified' and 'invalid': such a window never compares against a baseline as steady play. */
+  /** False for 'unclassified', 'inconclusive' and 'invalid': such a window never compares against a baseline as steady play. */
   comparable: boolean;
 }
 
@@ -60,6 +65,9 @@ export function uploadPurpose(u: UploadFact, f: Pick<WindowFacts, 'mode' | 'pend
   if (f.pendingAtStart > 0 || f.requestsDuring > 0) return 'initial';
   return f.mode === 'active' ? 'firstUse' : 'unknown';
 }
+
+/** The reason an active window that drew nothing is 'inconclusive' (shared by the bench, the gate and perf:derive). */
+export const NO_FRAME_ACTIVE = 'active window rendered no frame while input was held: the scene probably ended (game over, frozen run or pause), so its counts are 0 by observation, not measured';
 
 export function classifyWindow(f: WindowFacts): { classification: WindowClassification; uploads: ClassifiedUpload[] } {
   const uploads = f.uploads.map(u => ({ ...u, purpose: uploadPurpose(u, f) }));
@@ -86,6 +94,11 @@ export function classifyWindow(f: WindowFacts): { classification: WindowClassifi
     if (count('recurring')) reasons.push(`${count('recurring')} recurring upload(s) kept in the cost`);
     kind = 'steady';
   }
-  if (f.renderedFrames === 0 && kind !== 'invalid') reasons.push('no rendered frame: counts are 0 by observation');
-  return { classification: { kind, version: CLASSIFICATION_VERSION, reasons, comparable: kind !== 'invalid' && kind !== 'unclassified' }, uploads };
+  // A still idle window that renders nothing is the on-demand renderer doing its job. An active window holds the move
+  // keys, so a scene in play draws; one that drew nothing has stopped (game over, frozen run, pause) and measured nothing.
+  if (f.renderedFrames === 0 && kind !== 'invalid' && f.mode === 'active') {
+    reasons.push(NO_FRAME_ACTIVE);
+    kind = 'inconclusive';
+  } else if (f.renderedFrames === 0 && kind !== 'invalid') reasons.push('no rendered frame: counts are 0 by observation');
+  return { classification: { kind, version: CLASSIFICATION_VERSION, reasons, comparable: kind !== 'invalid' && kind !== 'unclassified' && kind !== 'inconclusive' }, uploads };
 }

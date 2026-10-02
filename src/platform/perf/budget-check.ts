@@ -115,6 +115,7 @@ export const DEFAULT_REGRESSION: Readonly<Record<BudgetMetric, Tolerance>> = {
 export const TIMING_METRICS: ReadonlySet<BudgetMetric> = new Set<BudgetMetric>(['frameMs', 'loadMs']);
 
 /** 'inconclusive': the sample would fail or regress, but its window is not comparable (ADR 0053: unknown provenance),
+ *  or its window is itself 'inconclusive' (an active window that drew no frame), whatever the number says,
  *  so it proves nothing either way. It never counts as a failure or a regression; the gate re-samples, then reports it. */
 export type Verdict = 'pass' | 'warn' | 'fail' | 'advisory' | 'missing' | 'inconclusive';
 export interface MetricReport {
@@ -232,8 +233,13 @@ export function checkBudgets(
         const blocking = over(measured, before, reg) && !(TIMING_METRICS.has(metric) && !opts.realHardware);
         row = { ...row, baseline: round(before), regression: { delta: round(d), deltaPct: round(before === 0 ? (d === 0 ? 0 : 100) : (d / before) * 100), blocking } };
       }
-      if (!isComparable(sample!) && (row.verdict === 'fail' || row.regression?.blocking)) {
-        const cls = sample!.classification as { kind?: string; reasons?: string[] } | undefined;
+      const cls = sample!.classification as { kind?: string; reasons?: string[] } | undefined;
+      // A window that observed nothing of play (an active window that drew no frame: the scene ended or froze) is no
+      // evidence either way: even a pass is inconclusive, so a dead scene never passes the gate by measuring zeros.
+      if (cls?.kind === 'inconclusive') {
+        row = { ...row, verdict: 'inconclusive', ...(row.regression ? { regression: { ...row.regression, blocking: false } } : {}),
+          reason: `window inconclusive${cls.reasons?.length ? ': ' + cls.reasons.join('; ') : ''}` };
+      } else if (!isComparable(sample!) && (row.verdict === 'fail' || row.regression?.blocking)) {
         row = { ...row, verdict: 'inconclusive', ...(row.regression ? { regression: { ...row.regression, blocking: false } } : {}),
           reason: `window ${cls?.kind ?? 'not comparable'}${cls?.reasons?.length ? ': ' + cls.reasons.join('; ') : ''}` };
       }

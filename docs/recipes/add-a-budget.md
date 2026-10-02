@@ -23,6 +23,8 @@ npm run perf:derive -- perf/runs/<run>.json
 
 The bench is headless, muted and isolated. By default it uses software GL at 1280×800 with `?quality=reference`. `perf:derive` prints, per scene, the worst of its windows plus 10 % headroom, rounded up to a readable step. The brief's per-scene ceilings (`brief.performance.perScene`, derived from the minimum device) are the most a budget may ever be.
 
+`perf:derive` only derives from evidence. It prints no row for a scene with a rejected or non-comparable window, names the scene and the reason on stderr, and exits 1. The common case is a scene that has ended before its active window: an idle player is hit, the run freezes, and the active window renders no frame (`inconclusive: the active window drew no frame`). Make the bench meet the scene in play, for example by starting the app on a title or menu scene so the bench enters the scene fresh, then bench again. The gate also reports such a window as INCONCLUSIVE, never as a pass. A still scene whose windows draw nothing keeps its other metrics, with `draws` and `triangles` left unmeasured.
+
 ## 3. Write the budget
 
 Paste the derived numbers into the scene's `budget`, and add provenance:

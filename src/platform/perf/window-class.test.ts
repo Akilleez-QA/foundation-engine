@@ -57,3 +57,15 @@ test('an incomplete window or a lost context is invalid', () => {
   assert.equal(still.classification.kind, 'steady', 'a render-on-demand scene that draws nothing is a valid still window');
   assert.match(still.classification.reasons.join(), /no rendered frame/);
 });
+
+test('an active window that drew no frame is inconclusive: the scene ended, it measured nothing', () => {
+  const { classification } = classifyWindow({ ...steady, mode: 'active', renderedFrames: 0 });
+  assert.equal(classification.kind, 'inconclusive');
+  assert.equal(classification.comparable, false);
+  assert.match(classification.reasons.join(), /active window rendered no frame/);
+});
+
+test('an incomplete active window with no frame stays invalid, not inconclusive', () => {
+  const { classification } = classifyWindow({ ...steady, mode: 'active', renderedFrames: 0, complete: false });
+  assert.equal(classification.kind, 'invalid');
+});

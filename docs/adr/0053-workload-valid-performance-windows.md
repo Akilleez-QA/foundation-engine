@@ -17,9 +17,13 @@ A measurement window that caught loading, or that had recurring work switched of
   - steady;
   - first use;
   - unclassified (unknown provenance: not comparable);
+  - inconclusive (an active window, input held, that rendered no frame: the scene had ended, frozen or paused, so its
+    counts are zeros by observation; not comparable, and never a pass or a budget source; classification version 2);
   - invalid.
 - Uploads are recorded with their purpose: initial, recurring, first use or unknown.
 - A non-comparable window never blocks. It is re-sampled, and the gate reports it as inconclusive if it stays so.
+  An inconclusive window is reported as inconclusive even when its numbers would pass, and `perf:derive` derives no
+  budget for its scene. A still idle window that renders nothing stays valid: that is on-demand rendering.
 
 ## Consequences
 
