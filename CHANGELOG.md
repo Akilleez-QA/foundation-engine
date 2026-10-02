@@ -7,7 +7,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
-- **Two players in one world (MP-01, candidate).** `@kits/network` now exports a
+- **Two players in one world (MP-01, candidate, #61).** `@kits/network` now exports a
   game-facing shared session: `defineSessionRules` (one pure rules file shared by the
   page and the host), `createSession` (join, predict, reconcile, paced reconnect, close
   policy) and the transport-neutral `createSessionHost` (intake, scoped views, frame

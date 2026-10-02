@@ -474,6 +474,6 @@ Three exports do that; none is constructed unless a game calls it:
 LAN hosts. See the [shared session guide](../../../docs/guides/multiplayer-session.md)
 for the wire contract, bounds, overload, recovery and evidence, and the
 [recipe](../../../docs/recipes/two-players-one-world.md) for the `shared-world`
-template. Implemented, candidate (MP-01); not integrated. Unit, loopback socket and
+template. Implemented, candidate (MP-01, PR #61); not integrated. Unit, loopback socket and
 desktop headless Chromium evidence only; LAN/loopback only, no accounts, matchmaking,
 NAT traversal or WAN certification.

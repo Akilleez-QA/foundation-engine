@@ -676,7 +676,7 @@ resending lost actions) and `createSessionHost` (transport-neutral authority ove
 intake, one view publisher per connection, a frame token bucket and integrity in
 observe mode). `npm run host` is a development-only loopback/LAN `ws` host that loads a
 game's `session.ts`; the `shared-world` template is the representative consumer. No
-existing owner changed behaviour. Status: implemented, candidate (PR pending); not
+existing owner changed behaviour. Status: implemented, candidate (PR #61); not
 integrated. Evidence is unit, loopback socket and one desktop headless Chromium
 two-context check; see the [guide](multiplayer-session.md) and the
 [ledger](upgrade-acceptance-ledger.md#newcomer-shared-session-mp-01--implemented-candidate).
