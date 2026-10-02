@@ -3,16 +3,18 @@ import type { Services } from '../../core/services';
 import type { AssetDef } from '../../core/asset-def';
 import type { ModelLibrary, ModelLibraryStats } from './models';
 import { assetOwners } from './app-ownership';
+import { publicBase } from './public-base';
 import { bindResidency, type AssetResidencyInput, type AssetResidencyPolicy } from './residency';
 declare module '../../core/services' { interface Services { readonly models: ModelLibrary } }
 declare module '../../core/probe' { interface EngineProbes { models: ModelLibraryStats } }
-/** Composition supplies the author-to-platform asset adapter; the loader stays lazy and shared. `residency`: RES-01. */
+/** Composition supplies the author-to-platform asset adapter; the loader stays lazy and shared. `residency`: RES-01.
+ *  Files come from the build's public base (`vite build --base`). */
 export function modelModule(resolve: (services: Services, id: string) => AssetDef | undefined, residency?: AssetResidencyInput): EngineModule {
   return defineModule({ id: 'platform.models', version: '1.0.0', serviceKeys: ['models'], ...(residency ? { optional: ['platform.quality'] } : {}), install(s) {
     let library: ModelLibrary | undefined, pending: Promise<ModelLibrary> | undefined, closed = false, policy: AssetResidencyPolicy | undefined;
     const get = () => pending ??= import('./models').then(({ createModelLibrary }) => {
       if (closed) throw Error('models: module disposed');
-      return library = createModelLibrary({ def: id => resolve(s, id), residency: policy });
+      return library = createModelLibrary({ def: id => resolve(s, id), residency: policy, base: publicBase() });
     }).catch(error => { pending = undefined; throw error; });
     const facade: ModelLibrary = {
       model: (id, options) => get().then(lib => lib.model(id, options)),
