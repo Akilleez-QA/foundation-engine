@@ -20,6 +20,7 @@ import type { Services } from '../core/services';
 import type { BuildBrief } from './build';
 import type { CueVoice, CueVoiceOptions } from '../platform/audio/audio-output';
 import { validateResidency, type AssetResidencyInput } from '../platform/assets/residency';
+import { validateSpatialAudioOptions, type SpatialAudioOptions } from '../platform/audio/module';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const need = (ok: boolean, message: string) => { if (!ok) throw Error(message); };
@@ -302,6 +303,11 @@ export interface GameInput {
    * critical asset ids and a pressure hook. Omitted: released assets are disposed at once.
    */
   residency?: AssetResidencyInput;
+  /**
+   * Spatial audio choices (docs/guides/spatial-audio.md): the HRTF voice limit per quality preset, position smoothing,
+   * and whether players get the "Headphone 3D audio" setting. Omitted: the previous behaviour.
+   */
+  audio?: SpatialAudioOptions;
 }
 export interface GameDefinition extends GameInput { readonly kind: 'game' }
 export function defineGame(g: GameInput): GameDefinition {
@@ -311,6 +317,7 @@ export function defineGame(g: GameInput): GameDefinition {
   need(new Set(kits).size === kits.length, 'a kit is listed twice');
   for (const k of g.kits ?? []) for (const r of k.requires) need(kits.includes(r), `kit ${k.id} needs kit ${r}; add it to kits`);
   if (g.residency !== undefined) validateResidency(g.residency);
+  validateSpatialAudioOptions(g.audio);
   return { ...g, kind: 'game' };
 }
 

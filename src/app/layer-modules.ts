@@ -17,19 +17,19 @@ import { settingsModule } from '../core/settings/module';
 import features from '../core/settings/features-module';
 import { routerModule } from '../core/router/module';
 import { inputModule } from '../platform/input/module';
-import { audioModule } from '../platform/audio/module';
+import { audioModule, spatialAudioSettings } from '../platform/audio/module';
 import { shellModule } from '../platform/ui/shell-module';
 
 /** The save namespace is the game's id (every stored key starts with it; never renamed). */
 export function layerModules(game: GameDefinition, brief?: Pick<BuildBrief, 'quality'>): EngineModule[] {
   return [
     saveModule({ namespace: game.id, build: `${game.id}@${game.version}` }),
-    settingsModule(),
+    settingsModule({ game: spatialAudioSettings(game.audio) }),
     qualityModule({ initialPreset: brief?.quality.tier ?? 'reference', build: `${game.id}@${game.version}` }),
     features,
     routerModule({ fallbackScene: sceneId(game.firstScene) }),
     inputModule(),
-    audioModule(),
+    audioModule(game.audio),
     workerModule(),
     textureModule((s,id)=>{
       const a=s.registries.assets.get(id);if(!a||a.type!=='texture')return undefined;

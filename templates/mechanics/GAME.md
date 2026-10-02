@@ -31,6 +31,7 @@ This demonstration is local. Delivery stock and debit persist in one versioned s
 | Date | Change | Budgets |
 |---|---|---|
 | 2026-09-30 | Guided ownership and mechanics integration lab | Measured 5 baseline / 7 peak action draws, 1,172 / 1,196 triangles; derived caps in game/budgets.json |
+| 2026-10-02 | Probe hit cue: `maxDistance: 60` replaced by `cutoffDistance: 60`. With the inverse model `maxDistance` was ignored (Web Audio spec) and the cue still played at ~12.5% gain at 60 m; it is now silent beyond 60 m. Gain within 60 m is unchanged | Unchanged (audio only; no draw or triangle change) |
 
 Actor ownership uses the optional control kit: validated ride/exit publishes a
 single controller/frame snapshot, cancels the existing input epoch, and clears

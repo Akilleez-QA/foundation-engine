@@ -110,18 +110,142 @@ export interface AudioOutputOptions {
   maxBuffers?: number;
   /** Decoded mono sample bytes retained in the cache (default 16 MiB). */
   maxBufferBytes?: number;
+  /**
+   * Voices that may use the 'HRTF' panner at once (default min(8, maxVoices); 0 disables HRTF). A request beyond it is
+   * downgraded to 'equalpower' and counted in `stats.downgraded`, never refused. Changed later by `setHrtfLimit`.
+   */
+  maxHrtfVoices?: number;
+  /**
+   * Time constant in seconds for listener and spatial position updates: [0, 1], default 0 (instant writes, the
+   * behaviour before smoothing existed). A positive value ramps each changed parameter with `setTargetAtTime` (~95%
+   * after three time constants), which removes zipper noise from small per-update moves. Camera cuts, 180-degree snaps
+   * and paths through the listener still flip the image, only more slowly. Browsers without listener AudioParams
+   * (Firefox) and panners without position AudioParams still write instantly.
+   */
+  smoothing?: number;
 }
 
 export type AudioVector = readonly [number, number, number];
-export interface SpatialCue { position: AudioVector; refDistance?: number; maxDistance?: number; rolloffFactor?: number }
+/** Panner algorithm (Web Audio `PanningModelType`). 'equalpower' folds front/back and ignores elevation; 'HRTF' does not. */
+export type PanningModel = 'equalpower' | 'HRTF';
+/** Distance attenuation law (Web Audio `DistanceModelType`). Only 'linear' reads `maxDistance`. */
+export type DistanceModel = 'inverse' | 'linear' | 'exponential';
+export const PANNING_MODELS: readonly PanningModel[] = ['equalpower', 'HRTF'];
+export const DISTANCE_MODELS: readonly DistanceModel[] = ['inverse', 'linear', 'exponential'];
+/** The largest distance (world units) any spatial field accepts. */
+export const MAX_SPATIAL_DISTANCE = 1e6;
+/** Time constant (s) of the fade when a playing voice crosses its `cutoffDistance` (silent within ~50 ms). */
+export const CUTOFF_TIME_CONSTANT = .01;
+/** Default and bounds of the filter stage's time constant (s). */
+export const FILTER_TIME_CONSTANT = { default: .03, min: .005, max: 2 } as const;
+
+export interface SpatialCue {
+  position: AudioVector;
+  /** Distance where attenuation starts: (0, 1e6], default 1. */
+  refDistance?: number;
+  /**
+   * [refDistance, 1e6], default 100. Only the 'linear' model reads it (its gain floor is reached here). The 'inverse'
+   * and 'exponential' models ignore it, as the Web Audio spec defines: use `cutoffDistance` for silence.
+   */
+  maxDistance?: number;
+  /** [0, 100], default 1. The 'linear' model clamps it to [0, 1] (spec). */
+  rolloffFactor?: number;
+  /**
+   * Default 'equalpower' (unchanged). 'HRTF' is granted while the output has a free HRTF slot (`maxHrtfVoices`);
+   * otherwise the voice plays with 'equalpower' and `stats.downgraded` counts it. HRTF never refuses playback. A full
+   * limit first reclaims the slot of a voice its cutoff has kept silent for 50 ms or more (that voice stays equal-power).
+   */
+  panning?: PanningModel;
+  /** Default 'inverse' (unchanged). */
+  distanceModel?: DistanceModel;
+  /**
+   * Audible cutoff for any model: [refDistance, 1e6], default none. A start beyond it is refused (`stats.culled`); a
+   * playing voice that moves (or whose listener moves) beyond it fades to silence and returns when back in range.
+   */
+  cutoffDistance?: number;
+  /** Time constant (s) of `setPosition` ramps (small per-update moves; large jumps still flip): [0, 1], default the output's `smoothing`. 0 writes instantly. */
+  smoothing?: number;
+}
+/** The optional per-voice low-pass and gain stage ("muffle"), for occlusion, air absorption or effects. */
+export interface CueFilter {
+  /** Low-pass cutoff: [10, 24000] Hz (the browser clamps it to the Nyquist frequency). */
+  cutoffHz: number;
+  /** Extra gain [0, 1], default 1. */
+  gain?: number;
+}
 export interface CueVoice {
   readonly ended: boolean;
+  /** The panning model in effect (null for a non-spatial voice). Optional so wrappers need not forward it. */
+  readonly panning?: PanningModel | null;
   /** Per-voice gain, multiplied by the user's effects volume. */
   setGain(gain: number): void;
   setPosition?(position: AudioVector): void;
+  /**
+   * Ramp the filter stage (the voice must have been started with `filter`) towards new values with `setTargetAtTime`.
+   * `timeConstant` in seconds: [0.005, 2], default 0.03; there is no instant path, so changes cannot click.
+   */
+  setFilter?(filter: CueFilter, timeConstant?: number): void;
   stop(): void;
 }
-export interface CueVoiceOptions { variant?: number; gain?: number; spatial?: SpatialCue; onEnded?: () => void }
+export interface CueVoiceOptions {
+  variant?: number; gain?: number; spatial?: SpatialCue; onEnded?: () => void;
+  /** Adds the filter stage, starting at these values (no ramp at start). */
+  filter?: CueFilter;
+}
+export interface AudioStats {
+  readonly contexts: number; readonly played: number;
+  /** Starts refused (silent, muted, locked, unknown id, voice limit). */
+  readonly skipped: number;
+  /** Voices playing now. */
+  readonly active: number;
+  /** Voices using the 'HRTF' panner now, and the current limit. */
+  readonly hrtfActive: number; readonly hrtfLimit: number;
+  /** 'HRTF' requests played with 'equalpower', plus HRTF voices moved to 'equalpower' when the limit fell. */
+  readonly downgraded: number;
+  /** Spatial starts refused because the source was beyond its `cutoffDistance` (not counted in `skipped`). */
+  readonly culled: number;
+}
+
+/**
+ * The distance gain of one model, exactly as the Web Audio spec defines it (PannerNode "Distance Effects"), for
+ * tests, tools and host-side audibility rules. The 'linear' model clamps the distance to [ref, max] and the rolloff
+ * to [0, 1]; 'inverse' and 'exponential' clamp only below `refDistance` and never read `maxDistance`.
+ */
+export function distanceGain(model: DistanceModel, distance: number, spatial: Pick<SpatialCue, 'refDistance' | 'maxDistance' | 'rolloffFactor'> = {}): number {
+  const ref = spatial.refDistance ?? 1, max = spatial.maxDistance ?? 100, rolloff = spatial.rolloffFactor ?? 1;
+  if (!(distance >= 0) || !(ref > 0) || !(max >= ref) || !(rolloff >= 0)) throw Error('invalid distance gain input');
+  if (model === 'linear') {
+    const f = Math.min(1, rolloff);
+    return max === ref ? 1 - f : 1 - f * (Math.min(Math.max(distance, ref), max) - ref) / (max - ref);
+  }
+  if (model === 'exponential') return Math.pow(Math.max(distance, ref) / ref, -rolloff);
+  return ref / (ref + rolloff * (Math.max(distance, ref) - ref));
+}
+
+/**
+ * The gain a spatial cue gets from distance at `listener`, including its audible cutoff (0 beyond it). Panning,
+ * cone and filter effects are not included.
+ */
+export function audibleGain(spatial: SpatialCue, listener: AudioVector): number {
+  const d = Math.hypot(spatial.position[0] - listener[0], spatial.position[1] - listener[1], spatial.position[2] - listener[2]);
+  if (spatial.cutoffDistance !== undefined && d > spatial.cutoffDistance) return 0;
+  return distanceGain(spatial.distanceModel ?? 'inverse', d, spatial);
+}
+
+/** Arrays and typed arrays of three finite numbers are accepted (as before); the output keeps its own copy. */
+const vector = (p: ArrayLike<number>) => { if (!p || p.length !== 3 || ![0, 1, 2].every(i => Number.isFinite(p[i]))) throw Error('invalid audio position'); };
+const copy = (p: ArrayLike<number>): AudioVector => [p[0], p[1], p[2]];
+const within = (n: number | undefined, min: number, max: number) => n === undefined || (typeof n === 'number' && n >= min && n <= max);
+function validateSpatial(p: SpatialCue): void {
+  vector(p.position);
+  const ref = p.refDistance ?? 1;
+  if (!within(ref, Number.MIN_VALUE, MAX_SPATIAL_DISTANCE) || !within(p.maxDistance ?? 100, ref, MAX_SPATIAL_DISTANCE) || !within(p.rolloffFactor, 0, 100)
+    || !within(p.cutoffDistance, ref, MAX_SPATIAL_DISTANCE) || !within(p.smoothing, 0, 1)
+    || (p.panning !== undefined && !PANNING_MODELS.includes(p.panning)) || (p.distanceModel !== undefined && !DISTANCE_MODELS.includes(p.distanceModel))) throw Error('invalid spatial cue');
+}
+function validateFilter(f: CueFilter, timeConstant: number = FILTER_TIME_CONSTANT.default): void {
+  if (!f || !within(f.cutoffHz, 10, 24000) || typeof f.cutoffHz !== 'number' || !within(f.gain, 0, 1) || !within(timeConstant, FILTER_TIME_CONSTANT.min, FILTER_TIME_CONSTANT.max)) throw Error('invalid cue filter');
+}
 
 export interface AudioOutput {
   /** An owned cue handle, null if playback was skipped. */
@@ -135,13 +259,22 @@ export interface AudioOutput {
   unlock(): void;
   /** Suspend on a hidden tab, resume when visible. */
   setHidden(hidden: boolean): void;
-  readonly stats: { readonly contexts: number; readonly played: number; readonly skipped: number };
+  /**
+   * Change the HRTF voice limit: [0, maxVoices]. Lowering it moves the newest HRTF voices beyond it to 'equalpower'
+   * (counted in `stats.downgraded`); raising it affects only later starts. 0 disables HRTF (a headphone setting off).
+   */
+  setHrtfLimit(limit: number): void;
+  readonly stats: AudioStats;
   dispose(): void;
 }
 
 export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
   const maxVoices=o.maxVoices??64,maxBuffers=o.maxBuffers??128,maxBufferBytes=o.maxBufferBytes??16*1024*1024;
   if(![maxVoices,maxBuffers,maxBufferBytes].every(n=>Number.isSafeInteger(n)&&n>0))throw Error('invalid audio limits');
+  const hrtfLimitOk=(n:number)=>Number.isSafeInteger(n)&&n>=0&&n<=maxVoices;
+  let hrtfLimit=o.maxHrtfVoices??Math.min(8,maxVoices);
+  const smoothing=o.smoothing??0;
+  if(!hrtfLimitOk(hrtfLimit)||!within(smoothing,0,1))throw Error('invalid audio limits');
   const definitions = o.cues ?? CORE_CUES;
   if (definitions.length > 1024) throw Error('too many audio cues');
   const cues = new Map<string, CueDef>();
@@ -153,7 +286,8 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
   let bufferBytes = 0, hidden = false;
   const buffers = new Map<string, AudioBuffer>();
   const reported = new Set<string>();
-  const stats = { contexts: 0, played: 0, skipped: 0 };
+  const stats = { contexts: 0, played: 0, skipped: 0, downgraded: 0, culled: 0,
+    get active() { return voices.size; }, get hrtfActive() { return hrtf.size; }, get hrtfLimit() { return hrtfLimit; } };
   let ctx: AudioContext | null = null, master: GainNode | null = null, element: HTMLAudioElement | null = null, track: string | null = null, disposed = false;
   const reporter = o.report ?? ((m: string) => console.warn('[audio] ' + m));
   let reporting = false;
@@ -179,28 +313,55 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
   const off = o.onChange?.(apply);
   const context = (): AudioContext | null => {
     if (disposed || o.silent()) return null;
-    if (!ctx) { ctx = makeContext(); stats.contexts++; master = ctx.createGain(); master.connect(ctx.destination); apply(); }
+    if (!ctx) { ctx = makeContext(); stats.contexts++; listenerWritten = null; master = ctx.createGain(); master.connect(ctx.destination); apply(); }
     return ctx;
   };
   const voices = new Set<CueVoice>();
-  const vector=(p:AudioVector)=>{if(p.length!==3||!p.every(Number.isFinite))throw Error('invalid audio position');};
+  /** HRTF voices in start order (oldest first), and the cutoff checks of voices that have a `cutoffDistance`. */
+  const hrtf = new Set<{ downgrade(): void; silentSince: number | null }>();
+  /** Once a cutoff fade has run this long (s), the voice is inaudible and its HRTF slot may be reclaimed silently. */
+  const RECLAIM_AFTER = 5 * CUTOFF_TIME_CONSTANT;
+  const cutoffChecks = new Set<() => void>();
+  // Smoothed writes: one cancel plus one setTargetAtTime per changed parameter (callers skip unchanged ones), so each
+  // update has constant cost.
+  // A parameter that was ever automated is written with setValueAtTime afterwards, so an instant write is not lost.
+  const automated = new WeakSet<AudioParam>();
+  const write = (p: AudioParam, value: number, timeConstant: number) => {
+    const now = ctx?.currentTime ?? 0;
+    if (timeConstant > 0) { p.cancelScheduledValues(now); p.setTargetAtTime(value, now, timeConstant); automated.add(p); }
+    else if (automated.has(p)) { p.cancelScheduledValues(now); p.setValueAtTime(value, now); }
+    else p.value = value;
+  };
   let listener:{position:AudioVector;forward:AudioVector;up:AudioVector}|null=null;
+  /** The listener values last written to this context (null: none yet, so the first write is instant). */
+  let listenerWritten: number[] | null = null;
   const applyListener=()=>{if(!ctx||!listener)return;const l=ctx.listener;
-    if(l.positionX){[l.positionX.value,l.positionY.value,l.positionZ.value]=listener.position;[l.forwardX.value,l.forwardY.value,l.forwardZ.value]=listener.forward;[l.upX.value,l.upY.value,l.upZ.value]=listener.up;}
+    const values=[...listener.position,...listener.forward,...listener.up],last=listenerWritten;
+    if(last&&values.every((v,i)=>v===last[i]))return;
+    const tau=last?smoothing:0;listenerWritten=values;
+    if(l.positionX){const params=[l.positionX,l.positionY,l.positionZ,l.forwardX,l.forwardY,l.forwardZ,l.upX,l.upY,l.upZ];params.forEach((p,i)=>{if(!last||last[i]!==values[i])write(p,values[i],tau);});}
     else {l.setPosition(...listener.position);l.setOrientation(...listener.forward,...listener.up);}
+  };
+  const listenerPosition = (): AudioVector => listener?.position ?? [0, 0, 0];
+  const beyond = (spatial: SpatialCue, at: AudioVector) => {
+    if (spatial.cutoffDistance === undefined) return false;
+    const l = listenerPosition();
+    return Math.hypot(at[0] - l[0], at[1] - l[1], at[2] - l[2]) > spatial.cutoffDistance;
   };
   const validateGain = (gain: number) => { if (!Number.isFinite(gain) || gain < 0 || gain > 1) throw Error('cue gain must be in [0, 1]'); };
   const playVoice = (id: string, options: CueVoiceOptions = {}): CueVoice | null => {
-    options = { ...options, ...(options.spatial ? { spatial: { ...options.spatial, position: [...options.spatial.position] as AudioVector } } : {}) };
+    options = { ...options, ...(options.spatial ? { spatial: { ...options.spatial, position: copy(options.spatial.position) } } : {}), ...(options.filter ? { filter: { ...options.filter } } : {}) };
     validateGain(options.gain ?? 1);
     if(!Number.isSafeInteger(options.variant??0))throw Error('invalid cue variant');
-    if(options.spatial){const p=options.spatial;vector(p.position);if(!Number.isFinite(p.refDistance??1)||(p.refDistance??1)<=0||!Number.isFinite(p.maxDistance??100)||(p.maxDistance??100)<(p.refDistance??1)||!Number.isFinite(p.rolloffFactor??1)||(p.rolloffFactor??1)<0)throw Error('invalid spatial cue');}
+    if(options.spatial)validateSpatial(options.spatial);
+    if(options.filter)validateFilter(options.filter);
     if(voices.size>=maxVoices){stats.skipped++;return null;}
       const cue = cues.get(id);
       if (!cue) { if (!reported.has(id) && reported.size < 1024) { reported.add(id); report(`no cue '${id}'`); } stats.skipped++; return null; }
       if (hidden || o.silent() || o.muted() || o.effects() <= 0) { stats.skipped++; return null; }
       const c = context();
       if (!c || c.state !== 'running' || !master) { stats.skipped++; return null; }
+      if (options.spatial && beyond(options.spatial, options.spatial.position)) { stats.culled++; return null; }
       const variant = options.variant ?? 0;
       const key = `${id}|${variant}|${c.sampleRate}`;
       let buffer = buffers.get(key);
@@ -217,34 +378,67 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
       // Refresh recency; active voices keep their own bounded references after cache eviction.
       buffers.delete(key); buffers.set(key, buffer);
       const source = c.createBufferSource(), level = c.createGain();
-      const panner=options.spatial?c.createPanner():null;
-      const position=(p:AudioVector)=>{vector(p);if(!panner)return;if(panner.positionX){[panner.positionX.value,panner.positionY.value,panner.positionZ.value]=p;}else panner.setPosition(...p);};
-      if(panner&&options.spatial){panner.panningModel='equalpower';panner.distanceModel='inverse';panner.refDistance=options.spatial.refDistance??1;panner.maxDistance=options.spatial.maxDistance??100;panner.rolloffFactor=options.spatial.rolloffFactor??1;position(options.spatial.position);applyListener();}
+      const spatial=options.spatial,panner=spatial?c.createPanner():null;
+      // Optional stages, created only when asked for: filter + muffle gain (CueFilter), then the cutoff gate.
+      const filter=options.filter?c.createBiquadFilter():null,muffle=options.filter?c.createGain():null;
+      const gate=spatial?.cutoffDistance!==undefined?c.createGain():null;
+      let target:AudioVector|null=null,inRange=true;
+      const positionTau=spatial?.smoothing??smoothing;
+      const checkCutoff=()=>{if(!gate||!spatial||!target)return;const next=!beyond(spatial,target);if(next===inRange)return;inRange=next;
+        slot.silentSince=next?null:c.currentTime;write(gate.gain,next?1:0,CUTOFF_TIME_CONSTANT);};
+      const position=(value:AudioVector)=>{vector(value);if(!panner)return;const p=copy(value),last=target,tau=last?positionTau:0;target=p;
+        if(panner.positionX){const params=[panner.positionX,panner.positionY,panner.positionZ];for(let i=0;i<3;i++)if(!last||last[i]!==p[i])write(params[i],p[i],tau);}
+        else if(!last||p.some((v,i)=>v!==last[i]))panner.setPosition(...p);checkCutoff();};
+      let panning:PanningModel|null=null;
+      const slot={silentSince:null as number|null,downgrade(){if(!panner||panning!=='HRTF')return;panner.panningModel=panning='equalpower';hrtf.delete(slot);stats.downgraded++;}};
+      if(panner&&spatial){
+        // A voice silenced by its cutoff for longer than its fade gives up its HRTF slot to a new request (no audible change).
+        if(spatial.panning==='HRTF'&&hrtf.size>=hrtfLimit&&hrtfLimit>0){for(const held of hrtf)if(held.silentSince!==null&&c.currentTime-held.silentSince>=RECLAIM_AFTER){held.downgrade();break;}}
+        panning=spatial.panning==='HRTF'&&hrtf.size<hrtfLimit?'HRTF':'equalpower';
+        if(spatial.panning==='HRTF'&&panning!=='HRTF')stats.downgraded++;
+        panner.panningModel=panning;panner.distanceModel=spatial.distanceModel??'inverse';panner.refDistance=spatial.refDistance??1;panner.maxDistance=spatial.maxDistance??100;panner.rolloffFactor=spatial.rolloffFactor??1;position(spatial.position);applyListener();
+      }
+      if(filter&&muffle&&options.filter){filter.type='lowpass';filter.frequency.value=options.filter.cutoffHz;muffle.gain.value=options.filter.gain??1;}
       let ended = false;
+      const stages=([level,filter,muffle,gate,panner] as (AudioNode|null)[]).filter((n):n is AudioNode=>n!==null);
       const finish = () => {
-        if (ended) return; ended = true; voices.delete(voice);
-        source.onended = null; source.disconnect(); level.disconnect(); panner?.disconnect();
+        if (ended) return; ended = true; voices.delete(voice); hrtf.delete(slot); cutoffChecks.delete(checkCutoff);
+        source.onended = null; source.disconnect(); for (const stage of stages) stage.disconnect();
         try { options.onEnded?.(); } catch (error) { reportFailure('cue completion failed', error); }
       };
       const voice: CueVoice = {
         get ended() { return ended; },
+        get panning() { return panning; },
         setPosition(value){if(!ended)position(value);},
-        setGain(value) { validateGain(value); if (!ended) level.gain.value = value; },
+        setGain(value) { validateGain(value); if (!ended) write(level.gain, value, 0); },
+        setFilter(value, timeConstant = FILTER_TIME_CONSTANT.default) {
+          validateFilter(value, timeConstant);
+          if (ended) return;
+          if (!filter || !muffle) throw Error('voice has no filter stage: pass `filter` to playVoice');
+          { write(filter.frequency, value.cutoffHz, timeConstant); write(muffle.gain, value.gain ?? 1, timeConstant); }
+        },
         stop() { if (ended) return; try { source.stop(); } finally { finish(); } },
       };
       level.gain.value = options.gain ?? 1;
-      source.buffer = buffer; source.connect(level); if(panner){level.connect(panner);panner.connect(master);}else level.connect(master); source.onended = finish;
-      voices.add(voice);
+      source.buffer = buffer; source.connect(level);
+      for (let i = 1; i < stages.length; i++) stages[i - 1].connect(stages[i]);
+      stages[stages.length - 1].connect(master); source.onended = finish;
+      voices.add(voice); if (panning === 'HRTF') hrtf.add(slot); if (gate) cutoffChecks.add(checkCutoff);
       try { source.start(); } catch (error) { finish(); throw error; }
       stats.played++; return voice;
   };
   return {
     playVoice,
     setListener(position,forward,up){vector(position);vector(forward);vector(up);
-      const fn=Math.hypot(...forward),un=Math.hypot(...up);if(!Number.isFinite(fn)||!Number.isFinite(un)||fn===0||un===0)throw Error('invalid audio orientation');
-      const f=forward.map(x=>x/fn) as unknown as AudioVector,u=up.map(x=>x/un) as unknown as AudioVector;
+      const fn=Math.hypot(forward[0],forward[1],forward[2]),un=Math.hypot(up[0],up[1],up[2]);if(!Number.isFinite(fn)||!Number.isFinite(un)||fn===0||un===0)throw Error('invalid audio orientation');
+      const f=copy(forward).map(x=>x/fn) as unknown as AudioVector,u=copy(up).map(x=>x/un) as unknown as AudioVector;
       if(Math.abs(f.reduce((sum,x,i)=>sum+x*u[i],0))>0.999)throw Error('parallel audio orientation');
-      listener={position:[...position],forward:f,up:u};applyListener();
+      listener={position:copy(position),forward:f,up:u};applyListener();
+      for(const check of [...cutoffChecks])check();
+    },
+    setHrtfLimit(limit){
+      if(!hrtfLimitOk(limit))throw Error('invalid HRTF voice limit');
+      hrtfLimit=limit;for(const slot of [...hrtf].slice(limit))slot.downgrade();
     },
     play(id, variant = 0) { return playVoice(id, { variant }) !== null; },
     music(url) {

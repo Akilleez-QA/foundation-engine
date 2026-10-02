@@ -463,3 +463,9 @@ See the [procgen kit](../../src/kits/procgen/README.md) and the
   - Locally produced output is not scanned twice. Cancellation wording now covers deadline termination.
   - Evidence: 3 added kit tests (11 in total), with the seed-section tests updated.
 - **Not established:** physical-device timing, generation quality or aesthetics, determinism of arbitrary creator generators, chunk residency/streaming, runtime edit deltas, meshing, or persistence of large edited worlds. Research and the ranked follow-up slices are outside this repository.
+
+## Spatial audio voices (AUD-01) — candidate, not integrated
+
+| ID | Contract | State |
+|---|---|---|
+| AUD-01 | Platform audio output, per voice: `panning` (`'equalpower'` default \| `'HRTF'`), `distanceModel` (`'inverse'` default \| `'linear'` \| `'exponential'`) with bounded `refDistance`/`maxDistance`/`rolloffFactor`, a model-independent `cutoffDistance` (refused start, faded silence beyond), a separate HRTF voice limit with equal-power fallback and diagnostics, an optional smoothed low-pass/gain filter stage, and smoothed position/listener ramps. Creator control through `defineGame({ audio })` (HRTF limit per quality preset, smoothing, optional `sound.headphone-3d` setting). The mechanics template's ineffective `maxDistance: 60` became `cutoffDistance: 60`. [Guide](spatial-audio.md) | Implemented, candidate (public PR #28). Node unit and boot tests plus `npm run test:audio-browser` (real output rendering into `OfflineAudioContext` in the muted Chromium test browser) pass on the branch. Not integrated. Proves configuration and rendered signal behaviour only: no human localisation trials, no Firefox/WebKit rendering, no device CPU/battery/latency measurement, no iOS evidence. No occlusion queries, propagation, networking or sampled sound. |

@@ -23,6 +23,7 @@ playtest/action-hints/
 # Reproducible local browser evidence (CI logs remain separate).
 playtest/ui/
 playtest/diagnostics/
+playtest/audio/
 playtest/authority-workbench/
 playtest/network-faults/
 playtest/authoring/

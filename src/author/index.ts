@@ -27,7 +27,9 @@ export {
 export { testScene, createTestWorkerHost, type TestScene } from './testing';
 export { effectiveFov, viewRay, pointerOnGround, projectToView } from './view-math';
 export { Mesh, defineMesh, type MeshData, type MeshInput } from './mesh';
-export type { CueVoice, CueVoiceOptions } from '../platform/audio/audio-output';
+export type { CueVoice, CueVoiceOptions, CueFilter, SpatialCue, PanningModel, DistanceModel, AudioVector } from '../platform/audio/audio-output';
+export { distanceGain, audibleGain } from '../platform/audio/audio-output';
+export type { SpatialAudioOptions } from '../platform/audio/module';
 
 export { defineEnvironment, type EnvironmentState } from './environment';
 

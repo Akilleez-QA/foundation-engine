@@ -65,6 +65,8 @@ jobs:
         run: GAME_DIR=templates/expedition/game npm run test:replication-workbench-browser
       - name: Durable authority browser workflow
         run: GAME_DIR=templates/expedition/game npm run test:authority-workbench-browser
+      - name: Spatial audio offline-render regressions
+        run: npm run test:audio-browser
       - name: Optional replay and divergence browser regressions
         run: npm run test:replay-browser
       - name: Full gates for every template
