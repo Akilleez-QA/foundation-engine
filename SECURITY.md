@@ -2,11 +2,11 @@
 
 Do not put exploitable vulnerability details, credentials, personal data, or private application files in a public issue or pull request.
 
-A private reporting channel has not yet been verified for this repository. Until one is confirmed, you may open a minimal issue asking the maintainer to provide a private security-reporting channel. Include **no vulnerability description, affected endpoint, reproduction, or exploit** in that request. Wait for a private channel before sending sensitive details. Do not send a report to an address inferred from commit history.
+Private vulnerability reporting is enabled for this repository (checked through the GitHub API on 2026-10-02). To report a vulnerability privately, open the repository's **Security** tab and choose **Report a vulnerability**, or go directly to <https://github.com/Akilleez-QA/foundation-engine/security/advisories/new>. The report is visible only to you and the maintainers until a fix or advisory is published. Do not send a report to an address inferred from commit history.
 
-If GitHub's “Report a vulnerability” option becomes available in this repository's Security tab, it provides a private channel for a report. This document does not claim that option is currently enabled.
+If that option is ever unavailable, open a minimal public issue asking the maintainer for a private channel, with **no vulnerability description, affected endpoint, reproduction, or exploit**, and wait for that channel before sending details.
 
-Once a private channel is confirmed, useful report information includes:
+Useful report information includes:
 
 - The affected commit or version and the relevant component.
 - A minimal reproduction using synthetic data and an environment you control.
