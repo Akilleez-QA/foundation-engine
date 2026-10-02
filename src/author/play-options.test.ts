@@ -35,3 +35,34 @@ test('testScene records plays with their options and refuses what the runtime re
   assert.deepEqual(t.cues, ['chime', 'ui.click']);
   assert.throws(() => t.ctx.play('chime', { pitch: 9 }), /pitch/);
 });
+
+test('testScene records playVoice with its full options and refuses what the audio output refuses', async () => {
+  const position = new Float32Array([3, 1, -4]) as unknown as [number, number, number];   // any array-like of three, as the output accepts
+  let ended = 0;
+  const t = await testScene(defineScene({ id: 'start', title: 'Start', enter(ctx) {
+    const voice = ctx.playVoice('chime', {
+      variant: 2, gain: .4, rate: 1.5, wait: 250, at: 12.5, onEnded: () => { ended++; },
+      spatial: { position, refDistance: 2, maxDistance: 40, rolloffFactor: 1.5, panning: 'HRTF', distanceModel: 'linear', cutoffDistance: 30, smoothing: .05 },
+      filter: { cutoffHz: 800, gain: .7 },
+    });
+    assert.equal(voice, null, 'a headless voice never plays');
+    ctx.playVoice('ui.click');
+  } }));
+  position[0] = 99;   // the record is a copy, not the caller's buffer
+  assert.deepEqual(t.voices, [
+    { id: 'chime', options: {
+      variant: 2, gain: .4, rate: 1.5, wait: 250, at: 12.5,
+      spatial: { position: [3, 1, -4], refDistance: 2, maxDistance: 40, rolloffFactor: 1.5, panning: 'HRTF', distanceModel: 'linear', cutoffDistance: 30, smoothing: .05 },
+      filter: { cutoffHz: 800, gain: .7 },
+    } },
+    { id: 'ui.click' },
+  ]);
+  assert.deepEqual(t.cues, ['chime', 'ui.click'], 'cues keeps its id-only shape');
+  assert.equal(ended, 0);
+  for (const [bad, message] of [
+    [{ gain: 1.5 }, /gain/], [{ rate: 8 }, /rate/], [{ wait: -1 }, /wait/], [{ at: -2 }, /start time/], [{ variant: .5 }, /variant/],
+    [{ spatial: { position: [0, 0] } }, /position/], [{ spatial: { position: [0, 0, 0], panning: 'binaural' } }, /spatial/],
+    [{ spatial: { position: [0, 0, 0], refDistance: 5, cutoffDistance: 2 } }, /spatial/], [{ filter: { cutoffHz: 2 } }, /filter/],
+  ] as const) assert.throws(() => t.ctx.playVoice('chime', bad as never), message);
+  assert.equal(t.voices.length, 2, 'a refused voice is not recorded');
+});

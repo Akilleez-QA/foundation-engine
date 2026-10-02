@@ -9,6 +9,7 @@ import { createSaveStore } from '../core/save/store';
 import { MemoryBackend } from '../core/save/storage-port';
 import { createWorkerHost } from '../platform/workers/host';
 import type { AudioClockReading } from '../platform/audio/audio-timeline';
+import { validateCueVoiceOptions, type CueVoiceOptions } from '../platform/audio/audio-output';
 /**
  * author/testing.ts: `testScene`, a scene without a browser, for a game's own unit tests. It spawns the scene's
  * entities into a real world and runs its real systems on the real fixed-step runner; input is scripted (`press`,
@@ -23,6 +24,19 @@ import { sceneActionHints, defaultActionHints } from './action-hints';
 import { completeInput } from './scene-input';
 import { bodyOf, spawnInto } from './body';
 import { Name, validatePlayOptions, type GameDefinition, type InputDefinition, type InputState, type InputSource, type PlayOptions, type SceneContext, type SceneDefinition, type SystemDefinition } from './defs';
+
+/** One recorded `ctx.playVoice` of a `testScene`. */
+export interface TestVoice { id: string; options?: Omit<CueVoiceOptions, 'onEnded'> }
+
+/** A comparable copy of voice options: no callback, plain arrays, no shared references with the caller. */
+function voiceRecord(options: CueVoiceOptions): Omit<CueVoiceOptions, 'onEnded'> {
+  const { onEnded: _onEnded, spatial, filter, ...rest } = options;
+  return {
+    ...rest,
+    ...(spatial ? { spatial: { ...spatial, position: [spatial.position[0], spatial.position[1], spatial.position[2]] } } : {}),
+    ...(filter ? { filter: { ...filter } } : {}),
+  };
+}
 
 export interface TestScene {
   readonly activityErrors: readonly unknown[];
@@ -42,6 +56,11 @@ export interface TestScene {
   readonly cues: string[];
   /** Every `ctx.play`, with its options (checked as the runtime checks them). */
   readonly plays: { id: string; options?: PlayOptions }[];
+  /**
+   * Every `ctx.playVoice`, in order, with a copy of its options (checked as the audio output checks them; `onEnded` is
+   * left out, and a spatial position is a plain `[x, y, z]`). Nothing plays: `playVoice` returns null, as a muted page does.
+   */
+  readonly voices: TestVoice[];
   /** Exit once and dispose the helper-owned save store. Injected services remain caller-owned. */
   dispose(): void;
 }
@@ -55,7 +74,7 @@ export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief;
   const strings: Record<string, string> = Object.assign(Object.fromEntries((o.inputs ?? []).map(i => [`game.input.${i.id}`, i.label])), ...(o.game?.kits ?? []).map(k => k.strings.en ?? {}), o.game?.strings?.en ?? {});
   const world = new World();
   for (const e of body.entities) spawnInto(world, e);
-  const pressed = new Map<string, number>(), held = new Map<string, number>(), went: string[] = [], cues: string[] = [], plays: { id: string; options?: PlayOptions }[] = [];
+  const pressed = new Map<string, number>(), held = new Map<string, number>(), went: string[] = [], cues: string[] = [], plays: { id: string; options?: PlayOptions }[] = [], voices: TestVoice[] = [];
   // No real timers or retained timer callbacks: headless saves flush explicitly.
   const injectedSave = o.services?.save;
   const save = injectedSave ?? createSaveStore({
@@ -86,7 +105,7 @@ export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief;
     modelAttachmentState: entity => Object.freeze({ status: disposed || !world.has(entity, Transform) || !world.has(entity, Model) ? 'absent' : world.has(entity, ModelAttachment) ? 'unresolved' : 'unattached', held: false }),
     modelPoseLinkState: entity => Object.freeze({ status: disposed || !world.has(entity, Transform) || !world.has(entity, Model) ? 'absent' : world.has(entity, ModelPoseLink) ? 'unresolved' : 'unlinked', reason: null }),
     modelSocket: () => null,
-    playVoice: cue => { cues.push(cue); return null; },
+    playVoice: (cue, options) => { validateCueVoiceOptions(options); cues.push(cue); voices.push({ id: cue, ...(options ? { options: voiceRecord(options) } : {}) }); return null; },
     audioClock: () => o.audioClock?.(t * 1000) ?? null,
     random: () => { r = (r + 0x6D2B79F5) >>> 0; let x = r; x = Math.imul(x ^ (x >>> 15), x | 1); x ^= x + Math.imul(x ^ (x >>> 7), x | 61); return ((x ^ (x >>> 14)) >>> 0) / 4294967296; },
     service: key => { const v = key === 'save' ? save : o.services?.[key]; if (!v) throw Error(`testScene: no '${String(key)}' service; pass it in services`); return v as Services[typeof key]; },
@@ -112,7 +131,7 @@ export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief;
     activityEvents?.start();
   } catch (error) { if (ownsSave) save.dispose(); throw error; }
   return {
-    ctx, world, went, cues, plays, activityErrors,
+    ctx, world, went, cues, plays, voices, activityErrors,
     setActivity(facts) {
       alive();
       const coverage = facts.coverage, documentHidden = facts.documentHidden;

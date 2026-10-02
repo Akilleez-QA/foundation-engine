@@ -12,6 +12,10 @@ Every new framework below is optional: a game that does not use it is unchanged.
   slide-off, blur or the visit's end; presses keep the exactly-once fixed-tick delivery. Touch only,
   at least 48 CSS px. `bindPointerControl` gains `leave: 'release'` and `onContact`; `ctx.view.signal`
   aborts when the visit ends. Emulated browser evidence only.
+- **`testScene` records `playVoice` options.** `t.voices` lists each voice with a copy of its options
+  (gain, rate, variant, wait, at, spatial, filter), checked as the audio output checks them
+  (`validateCueVoiceOptions`). `t.cues` is unchanged; invalid options now throw in tests, as they do
+  in the browser.
 
 ## 0.2.0 — 2026-10-03
 

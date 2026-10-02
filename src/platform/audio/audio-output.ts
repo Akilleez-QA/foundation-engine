@@ -272,6 +272,19 @@ function validateFilter(f: CueFilter, timeConstant: number = FILTER_TIME_CONSTAN
   if (!f || !within(f.cutoffHz, 10, 24000) || typeof f.cutoffHz !== 'number' || !within(f.gain, 0, 1) || !within(timeConstant, FILTER_TIME_CONSTANT.min, FILTER_TIME_CONSTANT.max)) throw Error('invalid cue filter');
 }
 
+/** The checks `playVoice` applies to its options before playing (shared with headless test doubles). Throws on the first problem. */
+export function validateCueVoiceOptions(options: CueVoiceOptions = {}): void {
+  const gain = options.gain ?? 1;
+  if (!Number.isFinite(gain) || gain < 0 || gain > 1) throw Error('cue gain must be in [0, 1]');
+  if (!Number.isSafeInteger(options.variant ?? 0)) throw Error('invalid cue variant');
+  if (options.spatial) validateSpatial(options.spatial);
+  if (options.filter) validateFilter(options.filter);
+  const rate = options.rate ?? 1, wait = options.wait ?? 0;
+  if (typeof rate !== 'number' || !(rate >= RATE_LIMITS.min && rate <= RATE_LIMITS.max)) throw Error(`playback rate must be in [${RATE_LIMITS.min}, ${RATE_LIMITS.max}]`);
+  if (typeof wait !== 'number' || !(wait >= 0 && wait <= MAX_WAIT_MS)) throw Error(`wait must be in [0, ${MAX_WAIT_MS}] ms`);
+  if (options.at !== undefined && (!Number.isFinite(options.at) || options.at < 0)) throw Error('invalid cue start time');
+}
+
 export interface AudioOutput {
   /** An owned cue handle, null if playback was skipped. */
   playVoice(id: string, options?: CueVoiceOptions): CueVoice | null;
@@ -385,14 +398,8 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
   const validateGain = (gain: number) => { if (!Number.isFinite(gain) || gain < 0 || gain > 1) throw Error('cue gain must be in [0, 1]'); };
   const playVoice = (id: string, options: CueVoiceOptions = {}): CueVoice | null => {
     options = { ...options, ...(options.spatial ? { spatial: { ...options.spatial, position: copy(options.spatial.position) } } : {}), ...(options.filter ? { filter: { ...options.filter } } : {}) };
-    validateGain(options.gain ?? 1);
-    if(!Number.isSafeInteger(options.variant??0))throw Error('invalid cue variant');
-    if(options.spatial)validateSpatial(options.spatial);
-    if(options.filter)validateFilter(options.filter);
-    const rate = options.rate ?? 1, wait = options.wait ?? 0;
-    if (typeof rate !== 'number' || !(rate >= RATE_LIMITS.min && rate <= RATE_LIMITS.max)) throw Error(`playback rate must be in [${RATE_LIMITS.min}, ${RATE_LIMITS.max}]`);
-    if (typeof wait !== 'number' || !(wait >= 0 && wait <= MAX_WAIT_MS)) throw Error(`wait must be in [0, ${MAX_WAIT_MS}] ms`);
-    if(options.at!==undefined&&(!Number.isFinite(options.at)||options.at<0))throw Error('invalid cue start time');
+    validateCueVoiceOptions(options);
+    const wait = options.wait ?? 0;
     if(voices.size>=maxVoices){stats.skipped++;return null;}
       const cue = cues.get(id);
       let url: string | undefined;
