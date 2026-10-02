@@ -11,7 +11,8 @@
  * browser check (`npm run test:dmath-browser`) compares the bits with Node. `dmath.sqrt` is `Math.sqrt`.
  *
  * Optional: nothing in the engine uses it unless a creator opts in (kits take a `math: 'deterministic'` option).
- * Accuracy and cost against Math.* are in docs/guides/deterministic-math.md. Pure, no imports, allocation-free.
+ * Accuracy and cost against Math.* are in docs/guides/deterministic-math.md. Pure, no imports. The fast paths create
+ * no objects or arrays; V8 may still box a returned double in a heap number (see the guide's Cost section).
  *
  * Coefficients were fitted for this file (Chebyshev fits in 60-digit arithmetic, rounded to double); the reductions
  * are the textbook Cody–Waite and argument-halving identities.
@@ -47,15 +48,20 @@ function scale(v: number, n: number): number {
   return v * pow2(n);
 }
 
-// ---- exact products (Veltkamp/Dekker); the error term is left in `prodErr` -----------------------------------
+// ---- secondary results ------------------------------------------------------------------------------------
+// Helpers that produce two doubles return one and leave the other in this scratch array. A module-level `let`
+// holding a double would be boxed into a fresh heap number on every store in V8; a Float64Array slot is not.
+const scratch = new Float64Array(5);
+const PROD_ERR = 0, RED_HI = 1, RED_LO = 2, MANT = 3, LOG_LO = 4;
+
+// ---- exact products (Veltkamp/Dekker); the error term is left in scratch[PROD_ERR] -------------------------
 const SPLIT = 134217729; // 2^27 + 1
-let prodErr = 0;
-/** a·b rounded; `prodErr` receives the exact remainder a·b − result. Valid while |a|,|b| < 2^995. */
+/** a·b rounded; scratch[PROD_ERR] receives the exact remainder a·b − result. Valid while |a|,|b| < 2^995. */
 function twoProd(a: number, b: number): number {
   const p = a * b;
   let t = SPLIT * a; const ah = t - (t - a), al = a - ah;
   t = SPLIT * b; const bh = t - (t - b), bl = b - bh;
-  prodErr = ((ah * bh - p) + ah * bl + al * bh) + al * bl;
+  scratch[PROD_ERR] = ((ah * bh - p) + ah * bl + al * bh) + al * bl;
   return p;
 }
 
@@ -93,17 +99,20 @@ function cosKernel(x: number, y: number): number {
   return w + (((1 - w) - hz) + (r - x * y));
 }
 
-let redHi = 0, redLo = 0;
-/** x − n·π/2 as redHi + redLo (|redHi| ≤ ~π/4); returns n mod 4. Cody–Waite for |x| < 1.6e6, else exact. */
+/**
+ * x − n·π/2 as scratch[RED_HI] + scratch[RED_LO] (|hi| ≤ ~π/4); returns n mod 4. Cody–Waite for |x| < 1.6e6,
+ * else exact.
+ */
 function reduce(x: number): number {
   if (Math.abs(x) >= 1.6e6) return reduceExact(x);
   const n = Math.round(x * INV_PIO2);  // |n| < 2^20, so n·PIO2_1 and n·PIO2_2 are exact
   const a = x - n * PIO2_1, w = n * PIO2_2;
   const hi = a - w, bb = hi - a, err = (a - (hi - bb)) + (-w - bb); // two-sum
   const lo = err - n * PIO2_3;
-  redHi = hi + lo; redLo = lo - (redHi - hi);
+  const rh = hi + lo;
+  scratch[RED_HI] = rh; scratch[RED_LO] = lo - (rh - hi);
   // Within 2^-30 of a multiple of π/2 the 119-bit π/2 above is not enough: use the exact path (rare).
-  if (Math.abs(redHi) < 9.313225746154785e-10 && n !== 0) return reduceExact(x);
+  if (Math.abs(rh) < 9.313225746154785e-10 && n !== 0) return reduceExact(x);
   return n & 3;
 }
 
@@ -131,10 +140,10 @@ function reduceExact(x: number): number {
   const fh = Number(top), fl = Number(top - BigInt(fh));
   const h = fh * TWO_M120, l = fl * TWO_M120;
   // r = (h + l)·π/2 in double-double
-  const rh = twoProd(h, PIO2_HI), rl = prodErr + h * PIO2_LO + l * PIO2_HI;
+  const rh = twoProd(h, PIO2_HI), rl = scratch[PROD_ERR]! + h * PIO2_LO + l * PIO2_HI;
   let hi = rh + rl, lo = rl - (hi - rh);
   if (x < 0) { hi = -hi; lo = -lo; n = -n; }
-  redHi = hi; redLo = lo;
+  scratch[RED_HI] = hi; scratch[RED_LO] = lo;
   return n & 3;
 }
 
@@ -143,11 +152,12 @@ export function sin(x: number): number {
   const ax = Math.abs(x);
   if (!(ax < Infinity)) return NaN;
   if (ax <= PIO4) return ax < 3.725290298461914e-9 ? x : sinKernel(x, 0);
-  switch (reduce(x)) {
-    case 0: return sinKernel(redHi, redLo);
-    case 1: return cosKernel(redHi, redLo);
-    case 2: return -sinKernel(redHi, redLo);
-    default: return -cosKernel(redHi, redLo);
+  const q = reduce(x), hi = scratch[RED_HI]!, lo = scratch[RED_LO]!;
+  switch (q) {
+    case 0: return sinKernel(hi, lo);
+    case 1: return cosKernel(hi, lo);
+    case 2: return -sinKernel(hi, lo);
+    default: return -cosKernel(hi, lo);
   }
 }
 
@@ -156,11 +166,12 @@ export function cos(x: number): number {
   const ax = Math.abs(x);
   if (!(ax < Infinity)) return NaN;
   if (ax <= PIO4) return ax < 3.725290298461914e-9 ? 1 : cosKernel(x, 0);
-  switch (reduce(x)) {
-    case 0: return cosKernel(redHi, redLo);
-    case 1: return -sinKernel(redHi, redLo);
-    case 2: return -cosKernel(redHi, redLo);
-    default: return sinKernel(redHi, redLo);
+  const q = reduce(x), hi = scratch[RED_HI]!, lo = scratch[RED_LO]!;
+  switch (q) {
+    case 0: return cosKernel(hi, lo);
+    case 1: return -sinKernel(hi, lo);
+    case 2: return -cosKernel(hi, lo);
+    default: return sinKernel(hi, lo);
   }
 }
 
@@ -241,8 +252,7 @@ export function exp(x: number): number {
 const L0 = 0.6666666666666666, L1 = 0.4000000000000088, L2 = 0.28571428570803614, L3 = 0.22222222391713917,
   L4 = 0.18181795640132906, L5 = 0.15386239702814658, L6 = 0.13268773138656886, L7 = 0.13086626147840102;
 
-let mant = 0;
-/** For finite x > 0: returns k and leaves m in `mant` with x = m·2^k, m in [√2/2, √2). */
+/** For finite x > 0: returns k and leaves m in scratch[MANT] with x = m·2^k, m in [√2/2, √2). */
 function decompose(x: number): number {
   let k = 0;
   if (x < 2.2250738585072014e-308) { x *= TWO_P54; k = -54; }
@@ -252,7 +262,7 @@ function decompose(x: number): number {
   u32[HI] = (hw & 0xfffff) | 0x3ff00000;
   let m = f64[0]!;
   if (m > SQRT2) { m *= 0.5; k++; }
-  mant = m;
+  scratch[MANT] = m;
   return k;
 }
 
@@ -261,7 +271,7 @@ export function log(x: number): number {
   if (x !== x || x < 0) return NaN;
   if (x === 0) return -Infinity;
   if (x === Infinity) return Infinity;
-  const k = decompose(x), f = mant - 1;
+  const k = decompose(x), f = scratch[MANT]! - 1;
   if (f === 0) return k === 0 ? 0 : k * LN2_HI + k * LN2_LO;
   const s = f / (2 + f), z = s * s, hfsq = 0.5 * f * f;
   const R = z * (L0 + z * (L1 + z * (L2 + z * (L3 + z * (L4 + z * (L5 + z * (L6 + z * L7)))))));
@@ -273,18 +283,17 @@ export function log(x: number): number {
 // |x|^y = e^(y·log|x|) with log|x| carried to about 2^-64 relative (double-double), so the product's error stays
 // below the final exp's rounding for every result in the normal range.
 const C3H = 0.6666666666666666, C3L = 3.700743415417188e-17;
-let logLo = 0;
-/** log x as hi (returned) + logLo, for finite x > 0. */
+/** log x as hi (returned) + scratch[LOG_LO], for finite x > 0. */
 function logExtended(x: number): number {
-  const k = decompose(x), f = mant - 1;
+  const k = decompose(x), f = scratch[MANT]! - 1;
   // s = f/(2+f) in double-double.
   const d = 2 + f, dl = f - (d - 2);
-  const sh = f / d, p = twoProd(sh, d), sl = (((f - p) - prodErr) - sh * dl) / d;
+  const sh = f / d, p = twoProd(sh, d), sl = (((f - p) - scratch[PROD_ERR]!) - sh * dl) / d;
   // s² and s³ in double-double.
-  const s2h = twoProd(sh, sh), s2l = prodErr + 2 * sh * sl;
-  const s3h = twoProd(s2h, sh), s3l = prodErr + s2h * sl + s2l * sh;
+  const s2h = twoProd(sh, sh), s2l = scratch[PROD_ERR]! + 2 * sh * sl;
+  const s3h = twoProd(s2h, sh), s3l = scratch[PROD_ERR]! + s2h * sl + s2l * sh;
   // (2/3)s³ in double-double, the rest (2/5 s⁵ …) in double: Taylor terms 2/(2j+1)·s^(2j+1), j = 2 … 13.
-  const t3h = twoProd(C3H, s3h), t3l = prodErr + C3H * s3l + C3L * s3h;
+  const t3h = twoProd(C3H, s3h), t3l = scratch[PROD_ERR]! + C3H * s3l + C3L * s3h;
   const z = s2h;
   const tail = s3h * z * (2 / 5 + z * (2 / 7 + z * (2 / 9 + z * (2 / 11 + z * (2 / 13 + z * (2 / 15 + z * (2 / 17
     + z * (2 / 19 + z * (2 / 21 + z * (2 / 23 + z * (2 / 25 + z * (2 / 27))))))))))));
@@ -295,7 +304,7 @@ function logExtended(x: number): number {
   const kh = k * LN2_HI42, H = kh + h, cc = H - kh, E = (kh - (H - cc)) + (h - cc);
   const lo = E + (k * LN2_LO42 + l);
   const hi = H + lo;
-  logLo = lo - (hi - H);
+  scratch[LOG_LO] = lo - (hi - H);
   return hi;
 }
 
@@ -331,11 +340,11 @@ export function pow(x: number, y: number): number {
   if (y === -1) return 1 / x;
   if (y === 0.5) return Math.sqrt(x);
   if (ax === 1) return sign;
-  const lh = logExtended(ax), ll = logLo;
+  const lh = logExtended(ax), ll = scratch[LOG_LO]!;
   const est = y * lh;
   if (est > 710) return sign * Infinity;
   if (est < -746) return sign * 0;
-  const ph = twoProd(y, lh), pl = prodErr + y * ll;
+  const ph = twoProd(y, lh), pl = scratch[PROD_ERR]! + y * ll;
   const P = ph + pl, Pl = pl - (P - ph);
   // e^(P + Pl): reduce by n·ln 2 and hand the exact split to the exp kernel.
   const n = Math.round(P * INV_LN2);
@@ -350,9 +359,9 @@ export const sqrt: (x: number) => number = Math.sqrt;
 const TWO_P600 = pow2(600), TWO_M600 = pow2(-600), BIG = pow2(500), SMALL = pow2(-500);
 /** √(a² + b²) for a ≥ b > 0 in a safe range: the rounded root plus one Newton correction from the exact residual. */
 function hypotCore(a: number, b: number): number {
-  const a2 = twoProd(a, a), ea = prodErr, b2 = twoProd(b, b), eb = prodErr;
+  const a2 = twoProd(a, a), ea = scratch[PROD_ERR]!, b2 = twoProd(b, b), eb = scratch[PROD_ERR]!;
   const s = a2 + b2, bb = s - a2, es = (a2 - (s - bb)) + (b2 - bb);
-  const h = Math.sqrt(s), h2 = twoProd(h, h), eh = prodErr;
+  const h = Math.sqrt(s), h2 = twoProd(h, h), eh = scratch[PROD_ERR]!;
   return h + (((s - h2) - eh) + (es + ea + eb)) / (2 * h);
 }
 

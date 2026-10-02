@@ -44,9 +44,14 @@ export function goldenInputs(): Record<GoldenFunction, number[][]> {
   const many = (n: number, f: () => number[]) => Array.from({ length: n }, f);
   const one = (xs: number[]) => xs.map(x => [x]);
   const angles = [PI / 4, -PI / 4, PI / 2, PI, 3 * PI / 2, 2 * PI, 1e-9, 3.7e-9, 0.785, 0.786, 100 * PI, 1e5, 1.6e6, 1e10, 1e22];
+  // Huge sin/cos arguments for the exact reduction: the double nearest a multiple of π/2 (6381956970095103·2^797),
+  // then 20 log-uniform magnitudes in [2^20, 2^1023) ⊂ [1e6, 1e308) with full 53-bit significands and random signs.
+  // They come from their own seeded stream, appended after the original inputs, so no earlier vector moves.
+  const big = stream(797), hardest = 6381956970095103 * twoTo(797);
+  const huge = [hardest, -hardest, ...Array.from({ length: 20 }, () => twoTo(20 + Math.floor(1003 * big())) * (1 + big() + big() / 4294967296) * (big() < 0.5 ? -1 : 1))];
   return {
-    sin: [...one([...SPECIAL, ...angles]), ...many(60, () => [u(-10, 10)]), ...many(30, () => [u(-1e5, 1e5)])],
-    cos: [...one([...SPECIAL, ...angles]), ...many(60, () => [u(-10, 10)]), ...many(30, () => [u(-1e5, 1e5)])],
+    sin: [...one([...SPECIAL, ...angles]), ...many(60, () => [u(-10, 10)]), ...many(30, () => [u(-1e5, 1e5)]), ...one(huge)],
+    cos: [...one([...SPECIAL, ...angles]), ...many(60, () => [u(-10, 10)]), ...many(30, () => [u(-1e5, 1e5)]), ...one(huge)],
     atan: [...one([...SPECIAL, 0.4375, 0.6875, 1.1875, 2.4375, 1e-10, 1e20, 7.4e19]), ...many(60, () => [u(-5, 5)]), ...many(20, () => [logUniform(-60, 60) * (r() < 0.5 ? -1 : 1)])],
     atan2: [
       ...[[0, 0], [-0, 0], [0, -0], [-0, -0], [0, -1], [-0, -1], [1, 0], [-1, -0], [Infinity, Infinity], [-Infinity, Infinity], [Infinity, -Infinity],

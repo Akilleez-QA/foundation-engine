@@ -25,8 +25,8 @@ at tick 56 when re-simulated in Node. The stock character kit calls `Math.atan2`
 for camera-relative input and facing.
 
 On this module's own golden inputs, the browser check below found the same kind of
-difference: 3 `sin`, 5 `cos`, 3 `atan`, 14 `atan2`, 11 `exp`, 2 `log` and 10 `pow`
-results out of 1,031 vectors, and the seeded character workload's digest under
+difference: 5 `sin`, 6 `cos`, 3 `atan`, 14 `atan2`, 11 `exp`, 2 `log` and 10 `pow`
+results out of 1,075 vectors, and the seeded character workload's digest under
 `Math` differed between the two engines. Under `dmath` both were identical.
 
 ## Inputs, outputs and owner
@@ -133,9 +133,20 @@ not the absolute values, as the result. Reproduce the Node figures with
 
 Roughly 1–2.5× `Math` per call, up to 4× for `pow` in Chromium, where `Math.pow` is
 unusually fast. That is tens of nanoseconds. A fixed step that makes a few hundred
-such calls adds microseconds. The fast paths allocate nothing. The exact reduction
-for |x| ≥ 1.6·10⁶ (or within 2⁻³⁰ of a multiple of π/2) allocates a few `BigInt`s
-and costs a few microseconds. Keep simulation angles small, for example by wrapping
+such calls adds microseconds.
+
+Allocation: the fast paths create no objects or arrays. Intermediate pairs pass
+through one module-level `Float64Array`, not module-level variables, which V8
+would box on every store. V8 may still box a returned double in a heap number
+when it does not inline the call. Measured with `node --trace-gc` on Node 22.23.3
+(V8 12.4), 2·10⁷ calls with arguments in [−10, 10] (positive for `log` and
+`pow`), calling through a variable: about 323 minor GCs for `sin` and `cos`
+(609 before the scratch array), 310 for `exp`, `log` and `hypot`, and 621 for
+`pow`, against 0 for `Math.sin`, `Math.exp`, `Math.log` and `Math.pow`. That is
+one 16-byte heap number per call (two for `pow`): short-lived garbage that the
+young-generation collector reclaims, not retained memory. The exact reduction
+for |x| ≥ 1.6·10⁶ (or within 2⁻³⁰ of a multiple of π/2) also allocates a few
+`BigInt`s and costs a few microseconds. Keep simulation angles small, for example by wrapping
 headings, if that matters.
 
 ## Bounds, overload, cancellation and recovery
@@ -192,7 +203,9 @@ Transcendental calls on other paths, not switched:
 ## Evidence (candidate, not integrated)
 
 Implemented: `src/core/dmath.ts`, `src/core/dmath-vectors.ts`, the golden file
-`src/core/dmath.golden.json` (1,031 vectors as 16-digit hex bits) and the kit options
+`src/core/dmath.golden.json` (1,075 vectors as 16-digit hex bits; `sin` and `cos`
+each include 6381956970095103·2^797, the double nearest a multiple of π/2, its
+negation, and 20 seeded log-uniform arguments from about 10⁶ to 10³⁰⁸) and the kit options
 above.
 
 Checked by focused tests:
@@ -211,7 +224,7 @@ Checked by focused tests:
 Browser check `npm run test:dmath-browser` (`scripts/play/dmath-check.mjs`, desktop
 headless Chromium 152.0.7977.82 against Node 22.23.3):
 
-- all 1,031 golden vectors computed in Chromium equal the committed hex and Node's;
+- all 1,075 golden vectors computed in Chromium equal the committed hex and Node's;
 - a 3,000-tick seeded workload has an identical per-tick digest in both engines.
   It runs through the character kit's motion, facing, rotated solids and
   camera-relative yaw, plus root motion and `exp`/`log`/`pow`. The same workload
