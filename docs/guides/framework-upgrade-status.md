@@ -487,7 +487,7 @@ pinned asset ids, least-recently-used eviction of unpinned retained assets, and 
 explicit once-per-transition pressure report and creator hook when live and pinned
 bytes alone exceed the ceiling. Retained resources drop renderer copies through
 three's public `dispose` event and upload again on their next draw, including after
-context restoration. Candidate (PR pending); not integrated. Evidence is focused
+context restoration. Candidate (PR #22); not integrated. Evidence is focused
 unit tests, an opt-in native software-renderer fixture and a temporary composed
 probe ([record](../verification/asset-residency-20261002/README.md)). No program
 budget, combined ceiling, prefetch, physical-device memory or performance claim.
