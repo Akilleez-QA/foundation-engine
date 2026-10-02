@@ -14,7 +14,7 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [terrain](../../src/kits/terrain/README.md) | Canonical surface, exact contact queries, bounded chunks and coherent revisions | terrain, expedition |
 | [procgen](../../src/kits/procgen/README.md) | Hierarchical seed derivation, bounded seeded grid generation on the worker host, a strict root-seed save section | None yet. GEN-01 implemented, candidate (PR), not integrated |
 | [navigation](../../src/kits/navigation/README.md) | Incremental bounded route search with cancellation | expedition |
-| [dialogue](../../src/kits/dialogue/README.md) | Stable choices, revision guards and validated graph exits; optional declared variables, visit counts and bounded conditions (TB-02 candidate) | expedition |
+| [dialogue](../../src/kits/dialogue/README.md) | Stable choices, revision guards and validated graph exits; optional declared variables, visit counts and bounded conditions (TB-02 candidate, PR #50) | expedition |
 | [objectives](../../src/kits/objectives/README.md) | Counted event runs, explicit stage composition and retry-safe completion claims | expedition |
 | [inventory](../../src/kits/inventory/README.md) | Conserved local transactions, reservations and epoch checkpoints | expedition, mechanics |
 | [resources](../../src/kits/resources/README.md) | Deterministic fields and bounded production | expedition |
