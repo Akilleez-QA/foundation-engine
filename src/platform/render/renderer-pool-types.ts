@@ -45,6 +45,8 @@ export interface RenderSurface {
   onLost(fn: () => void): () => void;
   onRestored(fn: () => void): () => void;
   /** Ends the lease (idempotent). The renderer must not be used afterwards. */
+  /** World leases only: readiness of currently tracked programs after compile; no shadow/upload guarantee. */
+  programsReady?(signal: AbortSignal): Promise<import('./program-readiness').ProgramReadiness>;
   release(): void;
   dispose(): void;
 }
@@ -105,6 +107,8 @@ type GL = WebGL2RenderingContext;
 /** The renderer the pool needs (three's WebGLRenderer; a fake in tests). */
 export type PoolRenderer = Pick<T.WebGLRenderer, 'domElement' | 'getContext' | 'dispose' | 'forceContextLoss' | 'resetState' | 'info'> & Partial<T.WebGLRenderer>;
 export interface RendererPoolOptions {
+  /** World renderers: test/dev defaults to full Three diagnostics; production validates links without success logs. */
+  programDiagnostics?: 'full' | 'failure-only';
   /** Make a renderer: on a new canvas (`context` undefined) or on the pooled canvas and context. */
   createRenderer?(canvas?: HTMLCanvasElement, context?: GL): PoolRenderer;
   pixelRatio?(renderer: PoolRenderer, max: number | undefined): void;

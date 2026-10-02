@@ -21,7 +21,7 @@ class El {
 interface FakeGL { lost: boolean; id: number; [k: string]: unknown }
 let glIds = 0;
 function fakeGL(): FakeGL {
-  const gl: FakeGL = { lost: false, id: ++glIds, isContextLost: () => gl.lost, getExtension: () => ({ loseContext() { gl.lost = true; } }) };
+  const gl: FakeGL = { lost: false, id: ++glIds, linkProgram(){},useProgram(){},LINK_STATUS:35714,getProgramParameter:()=>true, isContextLost: () => gl.lost, getExtension: () => ({ loseContext() { gl.lost = true; } }) };
   for (const k of ['Texture', 'Buffer', 'Framebuffer', 'Renderbuffer', 'VertexArray', 'Program', 'Shader', 'Query', 'Sampler']) {
     gl['create' + k] = () => ({ k }); gl['delete' + k] = () => {};
   }

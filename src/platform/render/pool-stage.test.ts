@@ -22,6 +22,7 @@ interface FakeGL { lost: boolean; made: number; deleted: number; canvas: Canvas;
 function fakeGL(canvas: Canvas): FakeGL {
   const gl: FakeGL = {
     lost: false, made: 0, deleted: 0, canvas,
+    LINK_STATUS:35714,linkProgram(){},useProgram(){},getProgramParameter:()=>true,
     isContextLost: () => gl.lost,
     getExtension: () => ({ loseContext() { gl.lost = true; canvas.dispatch('webglcontextlost'); }, restoreContext() { gl.lost = false; canvas.dispatch('webglcontextrestored'); } }),
   };
@@ -197,4 +198,14 @@ test('a world lease (a scene change) retires an idle stage context, never a leas
   held.release();
   pool.lease({ role: 'world', host: new Host() as unknown as HTMLElement });
   assert.ok(contexts[0]!.lost, 'the idle one is not kept across the scene change');
+});
+
+test('shared stage validation survives one view release but retires all old programs on loss',()=>{
+ const {pool,contexts}=harness(),a=pool.lease({role:'stage'})!,b=pool.lease({role:'stage'})!;
+ const gl=contexts[0]! as unknown as WebGL2RenderingContext;
+ const program=gl.createProgram()!;gl.linkProgram(program);gl.useProgram(program);
+ a.release();assert.doesNotThrow(()=>gl.useProgram(program));
+ const fake=contexts[0]!;fake.lost=true;fake.canvas.dispatch('webglcontextlost');fake.lost=false;fake.canvas.dispatch('webglcontextrestored');
+ assert.throws(()=>gl.useProgram(program),/retired/);assert.throws(()=>gl.linkProgram(program),/retired/);
+ const fresh=gl.createProgram()!;gl.linkProgram(fresh);assert.doesNotThrow(()=>gl.useProgram(fresh));b.release();
 });

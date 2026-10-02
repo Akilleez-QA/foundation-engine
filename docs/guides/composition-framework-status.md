@@ -221,3 +221,8 @@ experience: full workflows, text scaling and actual minimum-device performance r
 open, and minimum phone, tablet and laptop/desktop profiles are pending creator
 selection. DV-01 and the overall upgrade goal remain active. See the
 [continuing ledger](upgrade-acceptance-ledger.md) for the authoritative work state.
+
+Program preparation candidate: context-owned link validation, bounded submitted
+program readiness and author recovery are implemented but public-artifact
+acceptance is pending. See [contract](program-preparation.md). No performance,
+quality-budget or engine-wide residency completion claim is made.

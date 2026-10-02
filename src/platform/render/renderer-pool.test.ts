@@ -27,6 +27,7 @@ interface FakeGL { lost: boolean; made: number; deleted: number; canvas: El; [k:
 function fakeGL(canvas: El): FakeGL {
   const gl: FakeGL = {
     lost: false, made: 0, deleted: 0, canvas,
+    LINK_STATUS: 35714, linkProgram() {}, useProgram() {}, getProgramParameter: () => true,
     isContextLost: () => gl.lost,
     getExtension: () => ({ loseContext() { gl.lost = true; canvas.dispatch('webglcontextlost'); }, restoreContext() { gl.lost = false; canvas.dispatch('webglcontextrestored'); } }),
   };
@@ -49,7 +50,7 @@ function harness(extra: Partial<RendererPoolOptions> = {}) {
     const g = gl;
     const r = {
       domElement: c, disposed: false, lostForced: false, toneMappingExposure: 1,
-      shadowMap: { enabled: false, type: 0 }, info: { memory: { textures: 0, geometries: 0 }, programs: [] },
+      debug:{checkShaderErrors:true},shadowMap: { enabled: false, type: 0 }, info: { memory: { textures: 0, geometries: 0 }, programs: [] },
       getContext: () => g, dispose() { r.disposed = true; }, forceContextLoss() { r.lostForced = true; g.lost = true; }, resetState() {},
       /** A scene uploading something and never deleting it. */
       upload() { (g.createTexture as () => unknown)(); r.info.memory.textures++; },
@@ -233,4 +234,54 @@ test('shell handover and probes do not construct a pool, then address the existi
   assert.equal(rendererPoolStats()?.contexts, 0, 'released surface is retired by the original owner');
   assert.equal(contexts[0].lost, true);
   assert.equal(constructions, 1);
+});
+
+test('world program readiness retires on release before context handoff',async()=>{
+ const h=harness(),surface=h.pool.lease({role:'world',host:h.host()})!;
+ const gl=surface.renderer.getContext() as unknown as FakeGL;
+ gl.getExtension=(name:string)=>name==='KHR_parallel_shader_compile'?{COMPLETION_STATUS_KHR:0x91b1}:null;
+ gl.getProgramParameter=()=>false;
+ (gl.createProgram as ()=>object)();
+ const oldRequest=globalThis.requestAnimationFrame,oldCancel=globalThis.cancelAnimationFrame;let scheduled:(()=>void)|undefined;
+ globalThis.requestAnimationFrame=fn=>{scheduled=()=>fn(0);return 1;};globalThis.cancelAnimationFrame=()=>{scheduled=undefined;};
+ try{const ready=surface.programsReady!(new AbortController().signal);surface.release();assert.equal(await ready,'retired');assert.equal(scheduled,undefined);
+  const successor=h.pool.lease({role:'world',host:h.host()})!;assert.equal(await successor.programsReady!(new AbortController().signal),'ready');successor.release();
+ }finally{globalThis.requestAnimationFrame=oldRequest;globalThis.cancelAnimationFrame=oldCancel;}
+});
+
+test('world readiness is one pending operation per lease and context restore gets a fresh lifetime',async()=>{
+ const h=harness(),surface=h.pool.lease({role:'world',host:h.host()})!;
+ const gl=surface.renderer.getContext() as unknown as FakeGL;gl.getExtension=()=>({COMPLETION_STATUS_KHR:0x91b1});const stale=(gl.createProgram as ()=>object)();gl.getProgramParameter=()=>false;
+ const oldRequest=globalThis.requestAnimationFrame,oldCancel=globalThis.cancelAnimationFrame;let serial=0;const frames=new Map<number,FrameRequestCallback>();
+ globalThis.requestAnimationFrame=fn=>{frames.set(++serial,fn);return serial;};globalThis.cancelAnimationFrame=id=>{frames.delete(id);};
+ try{
+  const first=surface.programsReady!(new AbortController().signal),second=surface.programsReady!(new AbortController().signal);assert.equal(await first,'retired');assert.equal(frames.size,1);
+  gl.lost=true;gl.canvas.dispatch('webglcontextlost');assert.equal(await second,'retired');assert.equal(frames.size,0);
+  gl.lost=false;gl.canvas.dispatch('webglcontextrestored');const fresh=(gl.createProgram as ()=>object)();gl.getProgramParameter=(program:object)=>{assert.notEqual(program,stale,'invalid pre-loss handle must not be queried');assert.equal(program,fresh);return true;};assert.equal(await surface.programsReady!(new AbortController().signal),'ready');
+ }finally{surface.release();globalThis.requestAnimationFrame=oldRequest;globalThis.cancelAnimationFrame=oldCancel;}
+});
+
+test('overflow world readiness retires without a frame on loss and restores independently',async()=>{
+ const h=harness(),primary=h.pool.lease({role:'world',host:h.host()})!,overflow=h.pool.lease({role:'world',host:h.host()})!;
+ assert.equal(primary.pooled,true);assert.equal(overflow.pooled,false);
+ const gl=overflow.renderer.getContext() as unknown as FakeGL,primaryGl=primary.renderer.getContext() as unknown as FakeGL;
+ gl.getExtension=()=>({COMPLETION_STATUS_KHR:0x91b1});gl.getProgramParameter=()=>false;const stale=(gl.createProgram as ()=>object)();
+ primaryGl.getExtension=()=>null;let losses=0,restores=0;overflow.onLost(()=>losses++);overflow.onRestored(()=>restores++);
+ const oldRequest=globalThis.requestAnimationFrame,oldCancel=globalThis.cancelAnimationFrame;const frames=new Map<number,FrameRequestCallback>();let serial=0;
+ globalThis.requestAnimationFrame=fn=>{frames.set(++serial,fn);return serial;};globalThis.cancelAnimationFrame=id=>{frames.delete(id);};
+ try{
+  const pending=overflow.programsReady!(new AbortController().signal);assert.equal(frames.size,1);
+  gl.lost=true;gl.canvas.dispatch('webglcontextlost');assert.equal(await pending,'retired');assert.equal(frames.size,0,'no RAF is needed to retire a hidden tab');assert.equal(losses,1);
+  assert.equal(await primary.programsReady!(new AbortController().signal),'unsupported','separate live world owner unaffected');
+  gl.lost=false;gl.canvas.dispatch('webglcontextrestored');assert.equal(restores,1);const fresh=(gl.createProgram as ()=>object)();gl.getProgramParameter=(program:object)=>{assert.notEqual(program,stale);assert.equal(program,fresh);return true;};
+  assert.equal(await overflow.programsReady!(new AbortController().signal),'ready');overflow.release();
+  gl.canvas.dispatch('webglcontextlost');gl.canvas.dispatch('webglcontextrestored');assert.equal(losses,1);assert.equal(restores,1);assert.equal(await overflow.programsReady!(new AbortController().signal),'retired');
+ }finally{overflow.release();primary.release();globalThis.requestAnimationFrame=oldRequest;globalThis.cancelAnimationFrame=oldCancel;}
+});
+
+test('world diagnostics policy permits explicit full checks and a failure-only production policy',()=>{
+ const full=harness({programDiagnostics:'full'}),a=full.pool.lease({role:'world',host:new El('host') as never});
+ assert.equal(full.renderers[0]!.debug!.checkShaderErrors,true);a?.release();
+ const light=harness({programDiagnostics:'failure-only'}),b=light.pool.lease({role:'world',host:new El('host') as never});
+ assert.equal(light.renderers[0]!.debug!.checkShaderErrors,false);b?.release();
 });

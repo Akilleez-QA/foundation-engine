@@ -68,7 +68,7 @@ export interface StagePoolDeps<P> {
   stats: Stats;
   valve: { textures: number; geometries: number };
   /** renderer-pool's GL object tracker (what a context created and has not deleted). */
-  track(gl: GL): { live: Map<object, string> };
+  track(gl: GL): { live: Map<object, string>; validation?: {clear():void} };
   doc(): Document | undefined;
   /** Make the shared context (a detached canvas). Throws when WebGL cannot start. */
   createContext(antialias: boolean): { canvas: HTMLCanvasElement; gl: GL };
@@ -98,7 +98,7 @@ interface StageSlot {
   key: boolean;
   canvas: HTMLCanvasElement;
   gl: GL;
-  tracker: { live: Map<object, string> };
+  tracker: { live: Map<object, string>; validation?: {clear():void} };
   views: Set<View>;
   /** The view whose renderer's state cache matches the context. */
   drawer: View | null;
@@ -118,7 +118,7 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
     if (slots.get(slot.key) === slot) slots.delete(slot.key);
     slot.off.abort();
     if (lose && !slot.lost) (slot.gl.getExtension?.('WEBGL_lose_context') as WEBGL_lose_context | null)?.loseContext();
-    slot.tracker.live.clear();
+    slot.tracker.live.clear();slot.tracker.validation?.clear();
     d.stats.contexts = Math.max(0, d.stats.contexts - 1);
   };
 
@@ -136,7 +136,7 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
     const signal = slot.off.signal;
     canvas.addEventListener('webglcontextlost', e => {
       e.preventDefault();
-      slot.lost = true; slot.pending = null; slot.drawer = null; d.stats.losses++;
+      slot.lost = true;slot.tracker.live.clear();slot.tracker.validation?.clear(); slot.pending = null; slot.drawer = null; d.stats.losses++;
       if (slot.views.size) forward(slot, 'webglcontextlost'); else retire(slot, false);
     }, { signal });
     canvas.addEventListener('webglcontextrestored', () => { slot.lost = false; forward(slot, 'webglcontextrestored'); }, { signal });
@@ -203,7 +203,7 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
     slot.drawer = null; slot.pending = null;
     const g = slot.gl as unknown as Record<string, (o: object) => void>;
     for (const [obj, del] of [...slot.tracker.live]) { audit.glObjects++; try { g[del]!(obj); } catch { /* lost */ } }
-    slot.tracker.live.clear();
+    slot.tracker.live.clear();slot.tracker.validation?.clear();
     if (slot.lost || slot.gl.isContextLost?.()) { retire(slot, false); return; }
     if (audit.textures > d.valve.textures || audit.geometries > d.valve.geometries) { d.stats.recycles++; retire(slot, true); return; }
     // An idle stage keeps its context but not its (possibly large) drawing buffer.

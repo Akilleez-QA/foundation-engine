@@ -59,3 +59,10 @@
 - 2026-09-30: Optional pure crafting contracts for creator-authored material selection, finite deterministic experiments and conserved repeat-manufacturing manifests. Existing dimensional stock and enclosing durable owner remain authoritative. Acceptance: exact slot resolution/overbooking, bounded transcript and output reconstruction, powered repeat output, native packed consumer; Application-specific operational calibration remains separate downstream work. No starter brief or budget changes.
 
 - 2026-09-30: Optional bounded ordered transfer batches extend the existing industrial candidate for the creator's local logistics consumer. Retain finite custody, intermediate capacity/phase limits, atomic failure and external clock/save ownership; measure reachable downstream workload. See [batch contract](../../docs/guides/industry-transfer-batches.md). No starter brief or budget change.
+
+## Program preparation milestone
+
+- 2026-10-01: Validate submitted and later program links through the renderer pool,
+  prepare the author runtime before activation, and retain owned failure recovery.
+  Acceptance requires adversarial tests, native shader failure checks and all
+  template gates. No game-content, device or budget change.
