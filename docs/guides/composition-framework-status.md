@@ -291,3 +291,9 @@ physical-device runs on creator-selected profiles remain open.
 per-preset byte budgets, pin critical asset ids and observe pressure. The existing
 lease caches remain the owner; nothing changes when it is omitted. Candidate
 (PR #22); not integrated. See [asset residency](asset-residency.md).
+
+## Developer-experience checks (DX-01) — candidate, not integrated
+
+| ID | Contract | State |
+|---|---|---|
+| DX-01 | Boot input check and generator: [`src/author/input-registry.ts`](../../src/author/input-registry.ts) rebuilds the boot's `inputActions` table (engine rows, then game and kit inputs) with the registry's own options. `npm run check` (lint:brief) reports every problem; `npm run new -- input` picks bindings that table leaves free. Dev/test `engine.redraw()` ([`SceneHandle.redraw`](../../src/author/play.ts)) asks the running stock scene for one real draw, so `play:snap` judges budgets on rendered frames and reports `not measured` instead of a vacuous pass. [Recipe](../recipes/add-an-input-action.md) | Implemented, candidate (public PR #39); not integrated. Unit and lint regressions plus emulated `play:snap` runs on the branch. A dev/test boot throws on a clash; production drops the row with a warning. `engine.redraw()` covers the stock scene runtime only; the bench's idle windows are unchanged. Forced redraws can make a gate fail where it used to pass vacuously, and `not measured` exits 0. No device claim. |
