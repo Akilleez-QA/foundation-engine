@@ -155,3 +155,4 @@ export function hud(ctx: SceneContext): Hud {
 
 /** The kit: nothing to register; listing it documents that the game uses it. */
 export function ui(): KitDefinition { return defineKit({ id: 'ui' }); }
+export { touchButton, TOUCH_BUTTON_MIN, TOUCH_BUTTON_MAX, type TouchButton, type TouchButtonOptions } from './touch-button';

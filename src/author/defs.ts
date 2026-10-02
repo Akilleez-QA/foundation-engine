@@ -116,6 +116,8 @@ export interface ViewState {
   readonly aspect: number;
   /** An element over the view for HUD text and prompts (the UI kit uses it); null in node tests. */
   readonly overlay: HTMLElement | null;
+  /** Aborts when this scene visit ends, for overlay controls a kit attaches to the visit. Absent in headless contexts. */
+  readonly signal?: AbortSignal;
   /** Scene viewport CSS pixels; immediate delivery and visit-owned cleanup. Absent in headless contexts. */
   readonly observeSize?: (listener: (size: Readonly<{ width: number; height: number }>) => void) => () => void;
   /** Optional reading/pause surface, owned by this visit; null in headless tests. */

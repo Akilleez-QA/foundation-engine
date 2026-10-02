@@ -35,6 +35,34 @@ frame (120 Hz and faster displays) or a resumed `dt = 0` frame ran no tick; a `p
 frame it arrived. Cancellation (an overlay or pause, a hidden tab, lost input ownership, leaving the scene) releases a
 press no tick has seen yet (STD-SIM-12).
 
+## Touch buttons
+
+`tap: true` gives touch players a press anywhere on the view, never a hold. For a held action on touch (a variable
+jump, a boost, a charge), add an on-screen button from the ui kit in the scene's `enter`:
+
+```ts
+import { touchButton } from '@kits/ui';
+enter(ctx) { touchButton(ctx, 'jump', { label: ctx.text('game.input.jump') }); }
+```
+
+- **Semantics.** A touch on the button presses the action once (the same exactly-once delivery as a key: one fixed
+  tick sees `pressed`) and, for a `hold: true` input, `held` stays true while that finger stays on the button. Lifting,
+  `pointercancel`, sliding off the button, window blur, page hide, a resize, an overlay or pause (any input cancel),
+  and the end of the visit release it; a released finger must lift and touch again to press again.
+- **Multi-touch.** Each button owns one finger; a second finger on the same button is ignored, and buttons (and the
+  view's own drag) work at the same time.
+- **Not for mouse or pen.** Only touch pointers press it; keys and pad buttons stay the accessible path, so the element
+  is `aria-hidden`. By default it is made only where the device reports a touch screen or coarse pointer (`show: 'always'`
+  shows it everywhere).
+- **Size and position.** `size` is the side in CSS px, 48 to 240 (default 72); `inset` offsets it from the view's edges
+  plus the safe area (default `{ right: 24, bottom: 24 }`). Give each button its own spot and keep it clear of the HUD
+  and the world's critical subjects. Style it further with `className`; it carries `data-down` while held.
+- **Lifetime.** The visit's end removes it; `signal` (an `AbortSignal`) or the returned `dispose()` removes it sooner.
+  In `testScene` there is no overlay, so it makes nothing: drive the action with `t.press`/`t.hold`/`t.release`.
+
+Evidence: node tests with the input fakes (`src/kits/ui/touch-button.test.ts`) and a Chromium touch-emulation check
+(`scripts/play/touch-sources-check.mjs`); neither is physical-phone or tablet acceptance.
+
 ## 3. Test
 
 `testScene`: `t.press('jump')`, `t.hold('steer', -1)`, `t.release('steer')`. `npm run check` (lint:brief) fails if a new row clashes or is unreachable; `src/app/registries.test.ts` checks the engine's own rows.

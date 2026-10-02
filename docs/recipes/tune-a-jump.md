@@ -19,9 +19,28 @@ import { defineInput } from '@engine';
 export default defineInput({ id: 'jump', label: 'Jump', keys: ['Space'], pad: ['a'], tap: true, hold: true });
 ```
 
-`hold: true` lets `ctx.input.held('jump')` observe the release. A tap presses
-without holding, so it produces the shortest jump; give touch players a held
-on-screen control if the creator wants full height on touch.
+`hold: true` lets `ctx.input.held('jump')` observe the release. A tap on the view
+presses without holding, so it produces the shortest jump. If the creator wants
+full height on touch, add a held on-screen button from the ui kit:
+
+```ts
+// game/level.ts (the scene): a touch button that holds `jump` while the finger stays on it
+import { defineScene } from '@engine';
+import { touchButton } from '@kits/ui';
+
+export default defineScene({
+  id: 'level', title: 'Level',
+  enter(ctx) { touchButton(ctx, 'jump', { label: ctx.text('game.input.jump') }); },
+  // ...
+});
+```
+
+A touch on the button presses `jump` once (one fixed tick sees `pressed`) and
+holds it while that finger stays on the button; lifting, sliding off, a cancel,
+blur or an overlay releases it, so a short touch gives the short jump. It is
+removed when the visit ends. See the [input recipe](add-an-input-action.md#touch-buttons)
+for placement, size and what it does not cover. Drop `tap: true` when the button
+is the touch path, or keep both (a tap anywhere still gives the short jump).
 
 ## 3. The system
 
@@ -74,6 +93,9 @@ test('S1: the held jump peaks at 2 m', async () => {
   // assert on the player's Transform.y
 });
 ```
+
+`testScene` has no overlay, so `touchButton` makes nothing there: test the action
+with `t.press`/`t.hold`/`t.release`, which is what the button feeds.
 
 Then `npm run play:snap` and play it on each supported device: unit tests prove
 the arithmetic and frame-rate independence, not that the jump feels right.

@@ -7,7 +7,11 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
-Nothing yet.
+- **Held touch buttons.** `touchButton(ctx, input, { label })` in `@kits/ui` presses a game input on
+  touch, holds a `hold: true` input while the finger stays on it, and releases on lift, cancel,
+  slide-off, blur or the visit's end; presses keep the exactly-once fixed-tick delivery. Touch only,
+  at least 48 CSS px. `bindPointerControl` gains `leave: 'release'` and `onContact`; `ctx.view.signal`
+  aborts when the visit ends. Emulated browser evidence only.
 
 ## 0.2.0 — 2026-10-03
 
