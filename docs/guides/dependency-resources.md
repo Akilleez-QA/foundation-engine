@@ -28,7 +28,7 @@ A closure reserves the sum of all declared node bytes before starting acquisitio
 
 Closing a closure cancels its signal and immediately hides its values from consumers. Held prerequisite leases and the shared reservation remain owned while any acquisition is outstanding, including one that ignores cancellation. Once all acquisitions settle, held and late values are released in reverse dependency order, then capacity returns. An adapter that never settles deliberately retains its prerequisites and reservation; adapters must settle when cancelled. This avoids releasing data still used by pending operations or admitting new work against its ownership. Cleanup exceptions are counted in closure statistics; callers must still make their release implementations actually release resources.
 
-These bytes describe declared lease ownership, not all decoder allocations, browser heap or GPU memory. Shared admission does not introduce a cross-closure acquisition semaphore, eviction policy, transport or cache. Each underlying resource owner keeps its own limits.
+These bytes describe declared lease ownership, not all decoder allocations, browser heap or GPU memory. Shared admission does not introduce a cross-closure acquisition semaphore, eviction policy, transport or cache. Each underlying resource owner keeps its own limits; the texture and model libraries' optional retention and eviction policy is [asset residency](asset-residency.md).
 
 The expedition diagnostic uses a shared 416-byte allowance for two 208-byte closures. Its tests exercise overlap, denial before acquisition and retry after retirement. These numbers are diagnostic data bounds, not device memory recommendations.
 

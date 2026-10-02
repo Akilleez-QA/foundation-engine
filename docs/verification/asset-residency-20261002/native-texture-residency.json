@@ -1,0 +1,142 @@
+{
+  "revision": "024c24888e1f8f3616fad8de749c28f3075deeb0",
+  "passed": true,
+  "steps": {
+    "setup": {
+      "drawn": {
+        "memory": {
+          "geometries": 3,
+          "textures": 3
+        },
+        "pixel": [
+          255,
+          0,
+          0,
+          255
+        ]
+      },
+      "estimates": [
+        {
+          "id": "hero",
+          "width": 256,
+          "height": 256,
+          "estimate": 349525,
+          "exact": 349524,
+          "ratio": 1.0000028610338632
+        },
+        {
+          "id": "rock",
+          "width": 512,
+          "height": 512,
+          "estimate": 1398101,
+          "exact": 1398100,
+          "ratio": 1.0000007152564194
+        },
+        {
+          "id": "odd",
+          "width": 300,
+          "height": 200,
+          "estimate": 320000,
+          "exact": 319840,
+          "ratio": 1.0005002501250626
+        }
+      ],
+      "liveTextures": 3,
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+    },
+    "exit": {
+      "memory": {
+        "geometries": 0,
+        "textures": 0
+      },
+      "stats": {
+        "residentMiB": 0.33333301544189453,
+        "warmMiB": 0.33333301544189453,
+        "loads": 3,
+        "hits": 0,
+        "uploads": 3,
+        "lateDrops": 0,
+        "disposed": 2,
+        "pinnedMiB": 0.33333301544189453,
+        "evictions": 0,
+        "reloads": 0,
+        "pressure": 0,
+        "cleanupFailures": 0
+      },
+      "heroBytes": 349525
+    },
+    "reacquire": {
+      "memory": {
+        "geometries": 1,
+        "textures": 1
+      },
+      "pixel": [
+        255,
+        0,
+        0,
+        255
+      ],
+      "stats": {
+        "residentMiB": 0.33333301544189453,
+        "warmMiB": 0,
+        "loads": 3,
+        "hits": 1,
+        "uploads": 3,
+        "lateDrops": 0,
+        "disposed": 2,
+        "pinnedMiB": 0,
+        "evictions": 0,
+        "reloads": 0,
+        "pressure": 0,
+        "cleanupFailures": 0
+      }
+    },
+    "restored": {
+      "memory": {
+        "geometries": 1,
+        "textures": 1
+      },
+      "pixel": [
+        255,
+        0,
+        0,
+        255
+      ],
+      "stats": {
+        "residentMiB": 0.33333301544189453,
+        "warmMiB": 0,
+        "loads": 3,
+        "hits": 1,
+        "uploads": 3,
+        "lateDrops": 0,
+        "disposed": 2,
+        "pinnedMiB": 0,
+        "evictions": 0,
+        "reloads": 0,
+        "pressure": 0,
+        "cleanupFailures": 0
+      }
+    },
+    "teardown": {
+      "owned": false,
+      "stats": {
+        "residentMiB": 0,
+        "warmMiB": 0,
+        "loads": 3,
+        "hits": 1,
+        "uploads": 3,
+        "lateDrops": 0,
+        "disposed": 3,
+        "pinnedMiB": 0,
+        "evictions": 1,
+        "reloads": 0,
+        "pressure": 0,
+        "cleanupFailures": 0
+      }
+    }
+  },
+  "limitations": [
+    "Isolated Chromium WebGL2 fixture of the texture library; estimates and counts, not driver memory, device timing or whole-scene restoration"
+  ],
+  "browser": "152.0.7977.82"
+}

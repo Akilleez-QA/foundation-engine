@@ -478,3 +478,18 @@ loopback browser workflow are its only evidence. See the
 | Slice | Capability and actual seam | State | What remains outside the claim |
 |---|---|---|---|
 | PERF-01 | [`FrameLoop.attachSampler`](../../src/core/activity/loop.ts) is a single observational slot. Through it, [`createSessionRecorder`](../../src/platform/perf/session-recorder.ts) records bounded rolling-window percentiles and drift, exposed as `engine.sessionRecorder()` and `?session-record` ([guide](session-performance.md)) | Implemented, candidate (PR #15 on the public repository). Unit tests and an emulated browser run passed on the candidate head; see [verification](../verification/session-perf-20261002/README.md) | No physical-device, thermal, GPU-timer or production telemetry claim. DV-01 remains open |
+
+### Bounded asset residency — RES-01 implemented, candidate
+
+The texture and model libraries' existing `LeaseCache` gains an optional residency
+policy from `defineGame({ residency })`: per-preset `warmBytes` and `residentBytes`,
+pinned asset ids, least-recently-used eviction of unpinned retained assets, and an
+explicit once-per-transition pressure report and creator hook when live and pinned
+bytes alone exceed the ceiling. Retained resources drop renderer copies through
+three's public `dispose` event and upload again on their next draw, including after
+context restoration. Candidate (PR pending); not integrated. Evidence is focused
+unit tests, an opt-in native software-renderer fixture and a temporary composed
+probe ([record](../verification/asset-residency-20261002/README.md)). No program
+budget, combined ceiling, prefetch, physical-device memory or performance claim.
+See the [guide](asset-residency.md).
+
