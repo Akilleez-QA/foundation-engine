@@ -14,33 +14,33 @@ npm run preview          # serves dist/ at http://127.0.0.1:4173/ to try the rea
 
 ## 2. Pick where it will live
 
-Today the build assumes it is served from the **root of a domain or subdomain** (`https://my-game.example/`, not `https://example.com/my-game/`). This decides which hosts work without extra steps:
+A default build is served from the **root of a domain or subdomain** (`https://my-game.example/`). To serve it from a
+folder (`https://example.com/my-game/`), build it for that folder (step 3).
 
-| Host | Address | Works as built? |
+| Host | Address | Build |
 |---|---|---|
-| Netlify (drag `dist/` onto *Deploys*), Cloudflare Pages, Vercel | `https://<name>.netlify.app/` and similar | yes |
-| GitHub Pages, user or organisation site (`<user>.github.io` repository), or any site with a custom domain | `https://<user>.github.io/` | yes |
-| GitHub Pages, project site | `https://<user>.github.io/<repo>/` | only with step 3, and without models or textures |
-| itch.io (*HTML* project, upload a zip of the *contents* of `dist/`) | served from a sub-path on itch's own domain | only with step 3, and without models or textures |
+| Netlify (drag `dist/` onto *Deploys*), Cloudflare Pages, Vercel | `https://<name>.netlify.app/` and similar | `npm run build` |
+| GitHub Pages, user or organisation site (`<user>.github.io` repository), or any site with a custom domain | `https://<user>.github.io/` | `npm run build` |
+| GitHub Pages, project site | `https://<user>.github.io/<repo>/` | step 3 |
+| itch.io (*HTML* project, upload a zip of the *contents* of `dist/`) | served from a sub-path on itch's own domain | step 3 |
 
-## 3. Hosting under a sub-path (current behaviour)
-
-With the default build, a page served from a sub-path shows nothing: `index.html` asks for `/assets/…` at the domain root and gets 404s.
-
-Building with a relative base fixes the scripts and styles:
+## 3. Hosting under a sub-path
 
 ```
-npm run build -- --base ./
+npm run build -- --base ./              # any folder (itch.io, a zip)
+npm run build -- --base /my-repo/       # a known folder (a GitHub Pages project site)
 ```
 
-The game then starts under any sub-path. **Models and textures declared with `defineAsset` are still fetched from the domain root** (`/models/…`), so they fail with a 404 and the console shows `[assets] /models/…: HTTP 404`. Games made only of `Shape`s, `Mesh`es, HUD text and synthesised sound work; games with models or a cube sky need a root-hosted address for now. Sub-path support for assets is being worked on; this page will change when it lands.
+Scripts, styles, workers and every file declared with `defineAsset` (models, textures, cube skies) are then fetched
+from that folder. Open the folder address with its trailing slash. Details, limits and the automated check:
+[host a build under a sub-path](host-under-a-sub-path.md).
 
 ## 4. Check the uploaded copy
 
 Open the public address in a fresh browser window, open the developer console, and look for:
 
 - the first scene appearing, and no red errors;
-- no 404s in the network panel (a 404 for `/assets/…` or `/models/…` is the sub-path problem above);
+- no 404s in the network panel (a 404 for `/assets/…` or `/models/…` at the domain root means the build was not made for its folder: step 3);
 - each scene you link to (`#scene/<id>`) opening directly.
 
 Then try it on the devices your brief names. A phone emulator in a desktop browser is not the same as a phone.

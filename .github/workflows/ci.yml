@@ -71,6 +71,8 @@ jobs:
         run: npm run test:replay-browser
       - name: Network overload probe regression, loopback only (NW-07)
         run: npm run test:network-probe
+      - name: Sub-path production build browser regressions
+        run: npm run test:subpath-browser
       - name: Full gates for every template
         run: npm run gate:templates
       - name: Phone smoke for every template

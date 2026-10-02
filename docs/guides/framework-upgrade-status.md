@@ -617,3 +617,11 @@ coyote and buffer windows, each bounded and creator-chosen. Author buttons gain 
 Implemented as a candidate (`feat/genre-platformer-slice1`, PR #34), not integrated.
 Evidence is focused unit tests only. See the [kit README](../../src/kits/locomotion/README.md#tunable-jump-feel-mv-01),
 the [recipe](../recipes/tune-a-jump.md) and the [ledger](upgrade-acceptance-ledger.md).
+## Sub-path asset base — DX P1-8, candidate
+
+Texture and model URLs now follow Vite's `base` (`import.meta.env.BASE_URL`, exported as
+`PUBLIC_BASE` from `core/env.ts`) through `publicBase()`/`publicUrl()`; the default `/`
+keeps every existing URL unchanged. `npm run test:subpath-browser` (new CI step) fails on
+any request outside the sub-path. Candidate (branch `feat/dx-asset-base-path`); not
+integrated. Local static hosting and desktop Chromium only; see the
+[recipe](../recipes/host-under-a-sub-path.md) for limits.

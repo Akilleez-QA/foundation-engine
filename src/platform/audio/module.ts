@@ -20,6 +20,7 @@ import type {} from '../../core/settings/module';
 import type {} from '../render/quality-module';
 import type {} from '../../core/settings/features-module';
 import type {} from '../input/module';
+import { publicUrl } from '../assets/public-base';
 import { CORE_CUES, createAudioOutput, type AudioOutput, type AudioStats, type CueDef } from './audio-output';
 
 declare module '../../core/registry' { interface Registries { cues: Registry<CueDef> } }
@@ -76,6 +77,8 @@ export function audioModule(spatial?: SpatialAudioOptions): EngineModule {
     install(s) {
       const silent = () => s.features.enabled('dev.silent') || automated();
       const audio = createAudioOutput({
+        // A site path (`/music/theme.m4a`) is a file under public/, served under the build's base; full URLs pass.
+        resolveUrl: url => /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(url) ? url : publicUrl(url),
         silent, muted: () => s.settings.get('sound.muted'), effects: () => s.settings.get('sound.effects'), music: () => s.settings.get('sound.music'),
         onChange: fn => {
           const offs = (['sound.muted', 'sound.effects', 'sound.music'] as const).map(id => s.settings.subscribe(id, fn, s.signal));

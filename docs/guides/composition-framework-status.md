@@ -380,3 +380,14 @@ runs. Its finding that a queue age shorter than the real queued wait collapsed g
 is resolved by the NW-06 follow-up (PR #33), and queue-age plateaus are now asserted. Loopback/process scope only; WAN, browsers and physical devices remain
 unverified. See the [evidence](../verification/network-overload-20261002/README.md)
 and the [ledger](upgrade-acceptance-ledger.md).
+## Sub-path asset base (DX P1-8) — implemented, candidate
+
+Asset files from `defineAsset({ url })` are fetched under the build's public base
+(`npm run build -- --base ./` or `--base /my-game/`), so a production build works from a
+GitHub Pages project site or an itch.io folder. Owner: `platform/assets/public-base.ts`,
+used by the texture and model libraries; a relative base is resolved against the page so
+workers fetch the same file. See the [recipe](../recipes/host-under-a-sub-path.md).
+Status: implemented, candidate (branch `feat/dx-asset-base-path`); not integrated. Evidence
+is unit tests and `npm run test:subpath-browser` (every template built with `--base ./`,
+mechanics also with an absolute sub-path, served by a local static server in desktop
+headless Chromium). Real Pages/itch.io uploads and physical devices are unverified.

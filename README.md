@@ -51,7 +51,7 @@ git switch -c my-game && git add game GAME.md playtest && git commit -m "Start m
 npm run play          # http://127.0.0.1:5173/ with your game; edit game/ and it reloads
 npm run check         # types, lints, the brief, the affected tests
 npm run play:snap     # screenshots and a probe in playtest/latest/
-npm run build         # dist/: a static site to share
+npm run build         # dist/: a static site to share (`-- --base ./` to host it in any folder)
 ```
 
 Without a `game/` folder, every command builds `templates/blank/game`. `npm run dev` starts the same dev server as `npm run play`, which also prints your first scene's address (`PORT=5174 npm run play` if 5173 is taken). The [cookbook](docs/recipes/README.md) covers models, HUD and buttons, collision and picking, camera and lighting, and sharing a build. With a coding agent, see [working with your agent](docs/guides/working-with-your-agent.md).
