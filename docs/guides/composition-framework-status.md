@@ -275,3 +275,11 @@ stops reconnecting on `auth-rejected`. Candidate (PR #16), building on integrate
 | ID | Contract | State |
 |---|---|---|
 | SIM-01 | Optional `@kits/replay`: bounded tick-input log and player (explicit truncation; version, identity and corruption refusal), creator-digest traces with first-divergence comparison, and a prediction-versus-authority agreement check over the existing owners. Dev/test-only `engine.replay` uses the stock scene fixed lane and `?seed=`. [Contract](replay-divergence.md) | Implemented, candidate (public PR #17). Focused tests and the arcade `?seed=` browser replay pass on the branch. Not integrated. No cross-device or cross-browser floating-point determinism, physical-device or multiplayer claim. |
+
+## Sustained-session recorder — PERF-01 candidate
+
+PERF-01 adds an optional dev/test-build [sustained-session recorder](session-performance.md). It is implemented as a
+candidate in PR __PR__ and is not integrated. It reads the one frame loop through a single observational sampler slot.
+It keeps bounded windows and fixed histograms, and produces a local `foundation.session-perf` evidence file. Nothing is
+transmitted. Its only browser evidence is emulated. It gives DV-01 a collectable format, but it does not close DV-01:
+physical-device runs on creator-selected profiles remain open.

@@ -1,0 +1,116 @@
+{
+  "revision": "abe977e62f793f9ed1e2d20750e32ffbcddab4f9",
+  "dirty": false,
+  "game": "templates/expedition/game",
+  "view": {
+    "width": 1280,
+    "height": 800
+  },
+  "minutes": 10,
+  "windowMs": 30000,
+  "profile": "emulated-desktop-swiftshader",
+  "scope": "emulated browser run: recorder mechanics and evidence format only; not physical-device evidence; DV-01 remains open",
+  "errors": [],
+  "externalRequests": [],
+  "phases": {
+    "autoStart": {
+      "segments": [
+        {
+          "index": 0,
+          "scene": null,
+          "epoch": null,
+          "preset": null,
+          "label": null,
+          "startMs": 0
+        },
+        {
+          "index": 1,
+          "scene": "scene.field",
+          "epoch": 1,
+          "preset": "reference",
+          "label": null,
+          "startMs": 733.3
+        }
+      ],
+      "frames": 87,
+      "windows": 2,
+      "downloaded": true
+    },
+    "long": {
+      "state": "stopped",
+      "windows": 21,
+      "complete": 17,
+      "segments": 3,
+      "session": {
+        "records": 35397,
+        "frames": 35391,
+        "renderedFrames": 5970,
+        "idleFrames": 29421,
+        "resumes": 1,
+        "hiddenTransitions": 1,
+        "gaps": 0,
+        "clockAnomalies": 0,
+        "longFrames": 276,
+        "severeFrames": 60,
+        "durationMs": 600009.4,
+        "frameMs": {
+          "count": 35390,
+          "p50": 16.7,
+          "p95": 16.8,
+          "p99": 16.9,
+          "max": 116.7,
+          "mean": 16.866
+        },
+        "workMs": {
+          "count": 35391,
+          "p50": 0.3,
+          "p95": 0.6,
+          "p99": 0.8,
+          "max": 50.7,
+          "mean": 0.22
+        },
+        "windowsClosed": 21,
+        "windowsRetained": 21,
+        "evictedWindows": 0,
+        "discardedWindows": 0,
+        "counterFailures": 0
+      },
+      "drift": [
+        {
+          "group": "scene.field|reference",
+          "windows": 17,
+          "frameP95SlopeMsPerMin": -0.34,
+          "workP95SlopeMsPerMin": -0.018,
+          "early": {
+            "frameP95": 20.12,
+            "workP95": 0.66
+          },
+          "late": {
+            "frameP95": 16.8,
+            "workP95": 0.54
+          },
+          "frameP95Ratio": 0.835,
+          "workP95Ratio": 0.818
+        }
+      ],
+      "loop": {
+        "frames": 35485,
+        "updates": 35491,
+        "renders": 5976,
+        "skipped": 29509
+      },
+      "routed": true,
+      "stalled": true,
+      "hid": true
+    }
+  },
+  "limitations": [
+    "Headless Chromium on the build machine (software GL unless ENGINE_GPU=1): frame times describe this host, not any supported device",
+    "The hidden-tab period is synthetic (document.hidden overridden and visibilitychange dispatched); a real tab switch or screen lock was not exercised",
+    "The stall is a deliberate main-thread busy loop; no thermal throttling was induced or measured",
+    "Draw/triangle counters come from the bench probe wrapping WebGL in this test browser only"
+  ],
+  "passed": true,
+  "failures": [],
+  "workload": "teleport the named player every 100 ms"
+}

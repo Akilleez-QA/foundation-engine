@@ -43,6 +43,7 @@ laptop/desktop profiles are pending creator selection; DV-01 remains unresolved.
 | `src/platform/render/quality.ts` `detectPreset` | Pointer-independent selection now has regression coverage; hardware acceptance remains separate | Measure authored presets on each supported minimum device; do not infer capability from touch |
 | `perf/budgets.ts`, reference bench | Reference counts are checked; software timing is advisory | Each advertised device/preset has cold and sustained measured acceptance; no hardware claims from software rendering |
 | Optional `measureUiOcclusion`, synthetic DOM fixture and composed HUD regression | Synthetic checks cover clipped union geometry and pointer interception; the composed HUD checks one authored projected region, including an overcrowded negative case and disclosure recovery. Neither discovers application critical regions automatically | Application-owned region annotations and task-specific containment, readability, contrast and interaction evidence |
+| Optional PERF-01 [session recorder](session-performance.md) (`engine.sessionRecorder`, `?session-record`) | Implemented, candidate (PR __PR__). Provides a bounded local evidence format: rolling frame/work percentiles, long frames and drift. Its only runs so far are in emulated headless Chromium | Operator-labelled physical runs, cold and sustained, for each creator-selected profile and preset, with declared thresholds. The recorder output alone is not acceptance |
 
 ## Implemented mechanisms and remaining acceptance
 
