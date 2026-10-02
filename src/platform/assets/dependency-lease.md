@@ -60,3 +60,10 @@ not infer hardware headroom, promote intent, change resource byte budgets, or
 certify frame responsiveness. The public native task oracle is
 `scripts/play/fixtures/dependency-preparation.ts`; browser evidence is separate
 from deterministic ownership and Node task-queue tests.
+
+The default task seam prefers feature-detected `scheduler.postTask` at user-visible
+priority, with a per-task AbortController. Unsupported hosts or rejected scheduling
+fall back to a cancellable timer task. This avoids timer nesting clamps where the
+native scheduling API is available; it does not promise a latency bound or task
+ordering across different browser task sources. Native scheduling callbacks must
+still cooperate; an already running callback cannot be cancelled.

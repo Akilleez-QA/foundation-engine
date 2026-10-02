@@ -32,3 +32,19 @@ idling all spare slots. One existing optional cleanup fixture now explicitly pum
 optional work after critical readiness; its disposal assertions remain intact.
 Native browser interleaving, screenshots, full gates and downstream integration
 remain pending. No broad performance, quality, or device acceptance is claimed.
+
+## Prospective postTask comparison
+
+The downstream native consumer measured 12.3 ms for three warm cooperative turns,
+versus 0.1–0.2 ms without cooperation. Before changing the scheduler, predict that
+feature-detected native `scheduler.postTask` keeps actual task interleaving and
+owner cancellation while reducing timer-clamping overhead on supported browsers.
+Retain the timer fallback and original measured result. Rejection must neither
+hang nor leak; synchronous nonconforming adapters must not run the continuation
+inline. The same actual consumer/native resources will be compared again.
+
+Primary API reference inspected 2026-10-01:
+https://wicg.github.io/scheduling-apis/ . PostTask schedules priority-based tasks
+and accepts an AbortSignal; abortion rejects its returned promise. This is not a
+render or presentation guarantee. Installed TypeScript lib.dom has no Scheduler
+interface, so only the used structural signature will be declared locally.

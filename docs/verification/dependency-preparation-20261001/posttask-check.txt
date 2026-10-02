@@ -1,0 +1,10 @@
+npm notice run foundation-engine@0.1.0 check
+npm notice run node scripts/check.mjs
+ok   generate (0.1 s)
+ok   typecheck (4.3 s)
+ok   lint:layers (0.1 s)
+ok   lint:generic (0.1 s)
+ok   lint:brief (0.2 s)
+ok   lint:budgets (0.1 s)
+ok   tests (13 file(s)) (0.4 s)
+check: PASS in 5 s · game templates/blank/game · next: npm run play:snap to see it
