@@ -62,8 +62,9 @@ Commit the tool and what it wrote (`git add game`): the build reads `game/public
 ## Rules and limits
 
 - **Game code never imports a tool.** `npm run lint:layers` reports `game-imports-no-tools` if a scene or system imports from `game/tools/`: a tool's `node:` imports cannot run in a browser. Share data through JSON (both may import it) or through the files in `public/`.
-- **Tools are not checked like game code.** `lint:layers` does not apply the `@engine`-only rule to them, the build ignores them, and the game's definitions never include them. A tool's own tests (`game/tools/*.test.ts`) still run with `npm test`.
-- **Each file in one folder.** The repository's root `public/` is a shared folder that ships with every game built from the checkout; the engine keeps nothing there. A path in both `game/public/` and the root `public/` stops the build with both names; the dev server serves the game's file and warns.
+- **Tools are not checked like game code.** `lint:layers` does not apply the `@engine`-only rule to them, the build ignores them, and the game's definitions never include them. A tool's own tests (`game/tools/*.test.mjs` or `*.test.ts`) still run with `npm test`.
+- **One public folder per build.** `game/public/` is Vite's public folder, so `npm run dev` serves exactly what the build copies, the same way (range requests, `?url`). A game without `game/public/` uses the repository's root `public/` instead (older games kept their files there; the engine keeps nothing there). When `game/public/` exists, files left in the root `public/` would ship with no one, so the dev server and the build both stop and name them: move them into `game/public/`.
+- **Reserved names and links.** The build writes `index.html`, `LICENSE.txt`, `COPYRIGHT.txt` and `THIRD_PARTY_NOTICES.txt` itself, so a file with one of those names at the top of `game/public/` stops the dev server and the build (put it in a subfolder or rename it). Symbolic links stop them too: the dev server would follow a link but the build copies the link itself, so copy the file in.
 - **Provenance is yours to keep.** Name each file's licence, author and source in its `defineAsset`; files made from third-party inputs keep those inputs' licences and notices.
 
 ## Check it
