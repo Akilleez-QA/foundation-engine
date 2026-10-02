@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from 'three';
+import {SunLight} from 'three/addons/lights/SunLight.js';
+import {LightProbeGridWebGL} from 'three/addons/lighting/LightProbeGridWebGL.js';
 import {createColourTracker,createShadowTracker,readBatchState,stillSafe,type Surface} from './change-tracker';
 
 const surface=():Surface=>({domElement:{width:800,height:600},toneMapping:T.ACESFilmicToneMapping,toneMappingExposure:1});
@@ -106,11 +108,13 @@ test('ADR 0057 counterexamples: a hidden-ancestor bone and an inverse-bind-only 
  const r=fixture(),t=trackers(r);t.colourDue();t.shadowDue();
  r.hand.position.x=3;assert.equal(t.colourDue(),true);assert.equal(t.shadowDue(),true);
  r.skinned.skeleton.boneInverses[2].makeTranslation(-2,0,0);assert.equal(t.colourDue(),true);assert.equal(t.shadowDue(),true);
- // setGeometryIdAt changes neither texture version nor _visibilityChanged: only the ordered instance scan sees it.
+ // setGeometryIdAt changes no texture version. r186 also raises the private _visibilityChanged flag (r183 did not);
+ // the trackers never read that flag, so it is cleared again here: only the ordered instance scan can see the change.
  const before=r.batch.getGeometryIdAt(r.pieces[2]),matrices=readBatchState(r.batch)!.matrices.version;
- (r.batch as unknown as {_visibilityChanged:boolean})._visibilityChanged=false;
+ const flags=r.batch as unknown as {_visibilityChanged:boolean};flags._visibilityChanged=false;
  r.batch.setGeometryIdAt(r.pieces[2],before===r.cube?r.ball:r.cube);
- assert.equal(readBatchState(r.batch)!.matrices.version,matrices);assert.equal((r.batch as unknown as {_visibilityChanged:boolean})._visibilityChanged,false);
+ assert.equal(flags._visibilityChanged,true,'three r186 flags the instance change');flags._visibilityChanged=false;
+ assert.equal(readBatchState(r.batch)!.matrices.version,matrices);assert.equal(flags._visibilityChanged,false);
  assert.equal(t.colourDue(),true);assert.equal(t.shadowDue(),true);
 });
 
@@ -131,6 +135,10 @@ test('anything unobservable forces a redraw on every scan (a frame is spent, nev
   ['batch state unreadable',r=>{(r.batch as unknown as {_matricesTexture:null})._matricesTexture=null;},'both'],
   ['object shadow hook',r=>{r.box.onBeforeShadow=()=>{};},'shadow'],
   ['custom depth material',r=>{r.box.customDepthMaterial=new T.MeshDepthMaterial();},'shadow'],
+  // three r186: a SunLight fits its cascades to the view camera inside the depth pass; the shadow scan reads no camera.
+  ['camera-fitted shadow cascades',r=>{const sun=new SunLight('#fff',1);sun.castShadow=true;r.scene.add(sun);},'shadow'],
+  // three r186: a light probe grid's baked atlas is a render target, rebaked by rendering.
+  ['light probe grid atlas',r=>{const grid=new LightProbeGridWebGL(4,2,4);grid.texture=new T.WebGL3DRenderTarget(4,4,4).texture;r.scene.add(grid);},'colour'],
  ];
  for(const [name,change,which] of cases){
   const r=fixture(),t=trackers(r);t.colourDue();t.shadowDue();assert.ok(still(t.colourDue,3)&&still(t.shadowDue,3));
@@ -149,8 +157,20 @@ test('a hook marked still-safe does not force; the exact built-in batch hooks ar
  assert.equal(t.colour.stats.forced,0);assert.equal(t.shadow.stats.forced,0);
 });
 
-test('adapter contract: three 0.183 exposes the private batch state the trackers read',()=>{
- assert.match(T.REVISION,/^183/,'engine upgrade: re-verify readBatchState and every batch mutation above');
+test('light probe grid (three r186): placement, box, resolution and a still-safe atlas are observed without forcing',()=>{
+ const r=fixture(),grid=new LightProbeGridWebGL(4,2,4);grid.texture=stillSafe(new T.WebGL3DRenderTarget(4,4,4).texture);r.scene.add(grid);
+ const t=trackers(r);t.colourDue();assert.ok(still(t.colourDue,5),'a baked grid settles');
+ const changes:[string,()=>void][]=[
+  ['grid box',()=>{grid.boundingBox.max.x+=1;}],['grid resolution',()=>{grid.resolution.x+=1;}],
+  ['grid moved',()=>{grid.position.x+=1;}],['grid hidden',()=>{grid.visible=false;}],['grid shown',()=>{grid.visible=true;}],
+  ['atlas rebaked into another target',()=>{grid.texture=stillSafe(new T.WebGL3DRenderTarget(4,4,4).texture);}],['atlas released',()=>{grid.texture=null;}],
+ ];
+ for(const [name,change] of changes){change();assert.equal(t.colourDue(),true,name);assert.ok(still(t.colourDue,5),name+' settles');}
+ assert.equal(t.colour.stats.forced,0);
+});
+
+test('adapter contract: three 0.186 exposes the private batch state the trackers read',()=>{
+ assert.match(T.REVISION,/^186/,'engine upgrade: re-verify readBatchState and every batch mutation above');
  const b=new T.BatchedMesh(4,100,300,new T.MeshBasicMaterial()),g=b.addGeometry(new T.BoxGeometry()),i=b.addInstance(g);
  const s=readBatchState(b);assert.ok(s);assert.ok(s.matrices.isDataTexture);assert.equal(s.colors,null);
  assert.deepEqual(s.instances.map(x=>[x.active,x.visible,x.geometryIndex]),[[true,true,g]]);

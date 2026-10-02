@@ -3,7 +3,14 @@ import {staticShadowPolicyOf,type StaticShadowPolicy} from './shadow-cache-polic
 import {isReferenceShadowLight} from './shadow-technique';
 import {createShadowCache, type ShadowLight, type ShadowPlan} from './shadow-cache';
 
-/** r183 WebGLShadowMap adapter. Uses the stock depth pass (including material variants,
+/** The only three revision whose private `WebGLShadowMap` behaviour this adapter has been verified against
+ * (target swap, per-face `updateMatrices(light, camera)`, size reconciliation, type-transition disposal and the
+ * restored PCF filter state). Any other revision is refused: every light renders the stock full-quality path. */
+export const SHADOW_GPU_THREE_REVISION='186';
+/** True only for the verified revision; an engine upgrade must re-verify the adapter before moving the pin. */
+export const shadowGPURevisionSupported=(revision:string)=>revision===SHADOW_GPU_THREE_REVISION;
+
+/** r186 WebGLShadowMap adapter. Uses the stock depth pass (including material variants,
  * groups, culling and skinning) for both layers. No engine-private framebuffer access.
  * The temporary caster flags and composite belong only to this synchronous shadow pass;
  * the scene graph seen by the colour pass is restored even when a depth hook throws.
@@ -39,7 +46,7 @@ export function createShadowGPUCache(renderer:T.WebGLRenderer, options:ShadowGPU
  };
  const supported=(scene:T.Scene,light:ShadowLight,camera:T.Camera)=>{
   const policy=staticShadowPolicyOf(scene);
-  if(renderer.shadowMap.enabled===false||(!options.approved&&!policy)||disposed||lost||failed||T.REVISION!=='183'||!(light as T.DirectionalLight).isDirectionalLight)return false;
+  if(renderer.shadowMap.enabled===false||(!options.approved&&!policy)||disposed||lost||failed||!shadowGPURevisionSupported(T.REVISION)||!(light as T.DirectionalLight).isDirectionalLight)return false;
   if(renderer.shadowMap.type!==T.PCFShadowMap&&renderer.shadowMap.type!==T.BasicShadowMap)return false;
   if(renderer.capabilities.reversedDepthBuffer||renderer.capabilities.logarithmicDepthBuffer||renderer.localClippingEnabled||renderer.clippingPlanes.length)return false;
   if(light.shadow.getViewportCount()!==1||light.shadow.getFrameExtents().x!==1||light.shadow.getFrameExtents().y!==1)return false;
@@ -117,7 +124,7 @@ export function createShadowGPUCache(renderer:T.WebGLRenderer, options:ShadowGPU
   release(light:ShadowLight){release(light);},
   contextLost(){
    lost=true;cache.contextLost();
-   // r183 may dispose final attachments on its restored PCF -> Basic transition.
+   // r186 (as r183) may dispose final attachments on its restored PCF -> Basic transition.
    // Release them while the old context is lost, so its retained dispose callbacks
    // never delete old-context handles after restoration. Stock/CSM recreates them.
    for(const light of targets.keys()){light.shadow.map?.dispose();light.shadow.map=null;}
@@ -144,7 +151,7 @@ export function createShadowGPUCache(renderer:T.WebGLRenderer, options:ShadowGPU
    // Keep the conventional multi-light call untouched when no guarded candidate exists.
    const candidates=new Set(lights.filter(l=>{const light=l as ShadowLight;return light.shadow&&supported(scene,light,camera);}));
    if(!candidates.size||typeChanged){for(const light of targets.keys())if(owners.get(light)===scene)release(light);const before=renderer.info?.render?.calls??0;pass(lights,scene,camera);stats.fullDraws+=(renderer.info?.render?.calls??before)-before;if(lights.length)restoredPass=false;return;}
-   // The restored r183 engine starts its internal filter state at PCF. Initialise
+   // The restored r186 engine (as r183) starts its internal filter state at PCF. Initialise
    // it on the real shadow lights, never on an empty background pass, before
    // handing it a private static target (a filter transition replaces targets).
    if(restoredPass&&lights.length){

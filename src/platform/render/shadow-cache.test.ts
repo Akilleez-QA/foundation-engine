@@ -140,7 +140,7 @@ test('alpha-to-coverage observes its effective cutout maps even with alphaTest z
  const alpha=new T.DataTexture(new Uint8Array([255,255,255,255]),1,1);wall.material.alphaMap=alpha;
  frame(cache,scene,light,layer);assert.equal(frame(cache,scene,light,layer).plan.path,'hit');
  (alpha.image.data as Uint8Array)[3]=0;alpha.needsUpdate=true;
- assert.equal(frame(cache,scene,light,layer).plan.path,'rebuild','r183 approximates alphaToCoverage with alphaTest=.5');
+ assert.equal(frame(cache,scene,light,layer).plan.path,'rebuild','r186 (as r183) approximates alphaToCoverage with alphaTest=.5');
  wall.material.map=new T.DataTexture(new Uint8Array([255,255,255,0]),1,1);
  assert.equal(frame(cache,scene,light,layer).plan.path,'rebuild','replacing the colour alpha source changes depth too');
 });

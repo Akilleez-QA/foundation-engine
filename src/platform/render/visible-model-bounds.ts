@@ -1,10 +1,11 @@
 import * as T from 'three';
+import {updateWorldMatrixFromRoot} from './world-matrix';
 
 /** Bounds for what is drawn, excluding released stages and hidden effects.
  * Covers the static meshes, instanced meshes, lines and points used by our toys.
  */
 export function visibleModelBounds(root:T.Object3D,result=new T.Box3()){
- result.makeEmpty();root.updateWorldMatrix(true,true);
+ result.makeEmpty();updateWorldMatrixFromRoot(root,true);
  const part=new T.Box3();
  root.traverseVisible(object=>{
   if(!(object instanceof T.Mesh||object instanceof T.Line||object instanceof T.Points))return;

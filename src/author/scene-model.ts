@@ -6,6 +6,7 @@ import { ModelAttachment, type ModelAttachmentState } from './model-attachment';
 import { reconcileModelAttachments, type AttachmentPresentation } from './scene-model-attachments';
 import { inspectModel, type ModelInspectionRequest } from './model-inspection';
 import * as T from 'three';
+import { updateWorldMatrixFromRoot } from '../platform/render/world-matrix';
 import type { World, Entity } from '../core/ecs/world';
 import type { ModelLibrary, ModelTemplate } from '../platform/assets/models';
 import type { AssetLease } from '../platform/assets/lease-cache';
@@ -215,7 +216,7 @@ export function createSceneModels(o: { world: World; scene: T.Scene; library: Mo
             slot.rest!.set(node, { position: node.position.clone(), quaternion: node.quaternion.clone() });
             if (p.position) node.position.set(...p.position); if (p.rotation) node.quaternion.set(...p.rotation).normalize(); slot.overrides!.add(node);
           }
-          slot.root!.updateWorldMatrix(true, true);
+          updateWorldMatrixFromRoot(slot.root!, true);
           if (o.poseLinks && live(e, slot)) slot.root!.updateMatrixWorld(true);
         }
         for (const e of slots.keys()) if (!seen.has(e)) { retire(e); changed = true; }
@@ -229,7 +230,7 @@ export function createSceneModels(o: { world: World; scene: T.Scene; library: Mo
     },
     socket(entity: Entity, name: string): ModelSocketPose | null {
       const node = slots.get(entity)?.nodes?.get(name); if (!node) return null;
-      node.updateWorldMatrix(true, false);
+      updateWorldMatrixFromRoot(node);
       return Object.freeze({ name, matrix: Object.freeze([...node.matrixWorld.elements]) });
     },
     dispose() {

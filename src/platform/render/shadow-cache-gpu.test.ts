@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from 'three';
-import {createShadowGPUCache,type ShadowPass} from './shadow-cache-gpu';
+import {createShadowGPUCache,shadowGPURevisionSupported,SHADOW_GPU_THREE_REVISION,type ShadowPass} from './shadow-cache-gpu';
 import {scheduleShadows} from './shadows';
 import {adoptStaticShadowCache} from './shadow-cache-policy';
 import {markReferenceShadowLight} from './shadow-technique';
@@ -131,4 +131,9 @@ test('custom moving depth programs withdraw cache approval before reordered dept
  assert.equal(f.gpu.residentBytes(),36,'old static attachment is retired');
  f.moving.customDepthMaterial.dispose();f.moving.customDepthMaterial=undefined;
  f.frame();assert.ok(f.gpu.residentBytes()>36,'standard depth can rebuild safely');f.gpu.dispose();
+});
+test('adapter contract: the private shadow-pass adapter runs only on the verified three revision (0.186)',()=>{
+ assert.equal(T.REVISION,SHADOW_GPU_THREE_REVISION,'engine upgrade: re-verify the WebGLShadowMap adapter, then move the pin');
+ assert.equal(shadowGPURevisionSupported(T.REVISION),true);
+ for(const other of ['183','185','187','186dev',''])assert.equal(shadowGPURevisionSupported(other),false,other+' is refused');
 });
