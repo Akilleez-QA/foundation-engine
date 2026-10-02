@@ -56,6 +56,7 @@ import {sceneInput} from './scene-input';
 import {appLayers} from '../platform/ui/runtime';
 import { sceneActionHints } from './action-hints';
 import { bindScenePointer } from './scene-pointer';
+import { createPressLatch } from './press-latch';
 import type { LayerHandle, LayerSpec } from '../platform/ui/layers';
 import { viewOwnsInput } from '../platform/input/owner';
 import { Name, Shape, Transform, type InputDefinition, type SceneContext, type SceneDefinition, type ViewState } from './defs';
@@ -131,8 +132,9 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       if(prepared)Object.assign(world.resources,prepared.state);
       for (const e of body.entities) spawnInto(world, e);
 
-      // Input: every game action is owned by this visit; presses are kept for the frame that reads them.
-      const pressed = new Set<string>(), input = s.input;
+      // Input: every game action is owned by this visit; a press is kept for the frame that reads it and, across
+      // zero-step frames, for the next fixed tick (press-latch.ts, STD-SIM-12).
+      const pressed = createPressLatch(), input = s.input;
       for (const i of o.inputs) {
         if (i.axis) for (const side of ['negative', 'positive'] as const) input.onAction(actionOf(i.id, side), () => { actx.invalidate(); return true; }, { owner: actx.runId, signal: actx.signal });
         else input.onAction(actionOf(i.id), e => { if (e.phase === 'press') { pressed.add(i.id); actx.invalidate(); } return true; }, { owner: actx.runId, signal: actx.signal });
@@ -141,10 +143,10 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       const gestures = bindScenePointer(surface.canvas, {
         signal: actx.signal,
         owns: ownsInput,
-        press: () => { for (const i of o.inputs) if (i.tap) pressed.add(i.id); },
+        press: () => { pressed.pointerPressed(); for (const i of o.inputs) if (i.tap) pressed.add(i.id); },
         canceled: () => pressed.clear(), blocked: () => input.cancel('overlay'), invalidate: () => actx.invalidate(),
       });
-      const pointer = gestures.pointer;
+      const pointer = pressed.pointer(gestures.pointer);
       input.onCancel(() => gestures.cancel(), actx.signal);
       actx.own(() => gestures.dispose());
       const readingSheets = createReadingSheets(actx, overlay, {
@@ -343,7 +345,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       const timing = TEST_API ? createSystemTiming(body.systems, visit, actx.signal) : undefined;
       const fixedSystems = timing?.systems ?? body.systems;
       const tapped = tap ? [{ id: 'engine-tick-tap-begin', run: () => tap.beforeTick() }, ...fixedSystems, { id: 'engine-tick-tap-end', run: () => tap.afterTick() }] : fixedSystems;
-      const runner = createSystemRunner(tapped, { step: FIXED_STEP, report: (id, error) => s.log.error(`${scene.id}: system ${id} failed`, error), after: () => world.clearEvents() });
+      const runner = createSystemRunner(tapped, { step: FIXED_STEP, report: (id, error) => s.log.error(`${scene.id}: system ${id} failed`, error), after: () => world.clearEvents(), beforeStep: pressed.beginStep, beforeFrameLane: pressed.beginFrameLane });
       const live = body.systems.length > 0 || [...world.query(Model)].length > 0;
       const handle: SceneHandle = {
         state: () => {
@@ -412,12 +414,13 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
         frameMode: live ? 'continuous' : 'on-demand',
         update(f: FrameInfo) {
           if(programFailed)return;
-          if(!simulating){pressed.clear();pointer.pressed=false;return;}
+          if(!simulating){pressed.clear();gestures.pointer.pressed=false;return;}
           try{
           frame++; t += f.dt; calm = f.calm;
           gestures.sync();
-          if (!tap || tap.running()) runner.frame(ctx, f.dt);
-          pressed.clear(); pointer.pressed = false;
+          // A held replay tap runs no tick: release live presses so none surfaces at replay tick 0.
+          if (!tap || tap.running()) runner.frame(ctx, f.dt); else pressed.clear();
+          pressed.endFrame(); gestures.pointer.pressed = false;
           sync(f.dt);
           }catch(error){if(error instanceof ProgramLinkError||error instanceof FrameReadinessError)failPrograms(error);else throw error;}
         },

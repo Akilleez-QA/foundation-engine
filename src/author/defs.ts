@@ -64,13 +64,17 @@ export type ActionHint = ActionDescription;
 export interface InputState {
   /** Known local press action only; unknown IDs and axes return null. Translate labelKey with ctx.text. */
   describe(action: string): ActionHint | null;
-  /** True in the frame the action was pressed. */
+  /**
+   * A fixed system sees a press in exactly one tick: the first fixed tick after it, even when frames in between ran no
+   * tick (STD-SIM-12). A frame system sees it in the frame it arrived. Cancellation (overlay, hidden tab, lost
+   * ownership) releases a press not yet seen.
+   */
   pressed(action: string): boolean;
   /** True while the action is held. */
   held(action: string): boolean;
   /** -1…1 for an axis action (its negative and positive bindings). */
   axis(action: string): number;
-  /** The pointer over the view, in normalised device coordinates (-1…1), and whether it went down this frame. */
+  /** The pointer over the view, in normalised device coordinates (-1…1); `pressed` follows the `pressed()` rules. */
   readonly pointer: { x: number; y: number; down: boolean; pressed: boolean };
 }
 

@@ -493,3 +493,17 @@ probe ([record](../verification/asset-residency-20261002/README.md)). No program
 budget, combined ceiling, prefetch, physical-device memory or performance claim.
 See the [guide](asset-residency.md).
 
+## Zero-step press retention (STD-SIM-12) — fix, candidate
+
+The stock author runtime cleared pressed actions and `pointer.pressed` after every
+frame, so a press arriving before a frame that ran no fixed tick (frame time below
+the 1/60 s step on 120 Hz+ displays, or the `dt = 0` frame after idle, cover or
+`engine.clock.hold()`) was never seen by fixed systems; a frame with several ticks
+showed it to each of them. [`createPressLatch`](../../src/author/press-latch.ts),
+driven by new `beforeStep`/`beforeFrameLane` hooks on `createSystemRunner`, now
+keeps a press pending until the first fixed tick, which alone sees it; frame
+systems keep their per-frame view. Retention is bounded by the visit and by the
+existing cancellation paths (pointer/input cancel, overlay, hidden tab, lost
+ownership, a non-simulating frame). Evidence: focused runtime and runner tests;
+browser suites and gates are recorded on the PR. Physical high-refresh devices are
+unverified. Candidate, not integrated.
