@@ -1,3 +1,4 @@
+import {monotonicNow} from '../../core/clock';
 /** Readiness for programs recorded by the owning context tracker; no renderer-private state. */
 export type ProgramReadiness = 'ready' | 'unsupported' | 'retired';
 export interface ProgramReadinessOptions {
@@ -5,12 +6,12 @@ export interface ProgramReadinessOptions {
   validate?: (program:WebGLProgram)=>void;
   maxWaitMs?: number;
   now?: () => number;
-  request?: (callback: () => void) => number;
-  cancel?: (handle: number) => void;
+  request?: (callback: () => void) => unknown;
+  cancel?: (handle: unknown) => void;
 }
 export function waitForPrograms(gl: Pick<WebGL2RenderingContext, 'getExtension' | 'getProgramParameter' | 'isContextLost'>,
   tracked: ReadonlyMap<object, string>, signal: AbortSignal, options: ProgramReadinessOptions = {}): Promise<ProgramReadiness> {
-  const {validate,maxPrograms=1024,maxWaitMs=15000,now=()=>performance.now(),request=fn=>requestAnimationFrame(fn),cancel=id=>cancelAnimationFrame(id)}=options;
+  const {validate,maxPrograms=1024,maxWaitMs=15000,now=monotonicNow,request=fn=>setTimeout(fn,10),cancel=id=>clearTimeout(id as ReturnType<typeof setTimeout>)}=options;
   if(!Number.isSafeInteger(maxPrograms)||maxPrograms<1||maxPrograms>4096||!Number.isFinite(maxWaitMs)||maxWaitMs<=0||maxWaitMs>60000)throw Error('Invalid program readiness bounds');
   if(signal.aborted||gl.isContextLost())return Promise.resolve('retired');
   const extension=gl.getExtension('KHR_parallel_shader_compile') as {COMPLETION_STATUS_KHR:number}|null;
@@ -26,7 +27,7 @@ export function waitForPrograms(gl: Pick<WebGL2RenderingContext, 'getExtension' 
   }
   const deadline=now()+maxWaitMs;
   return new Promise((resolve,reject)=>{
-    let frame:number|undefined,done=false;
+    let frame:unknown,done=false;
     const finish=(result:ProgramReadiness|Error)=>{
       if(done)return;done=true;if(frame!==undefined)cancel(frame);frame=undefined;signal.removeEventListener('abort',retire);
       if(result instanceof Error)reject(result);else resolve(result);

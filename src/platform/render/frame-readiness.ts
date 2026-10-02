@@ -1,3 +1,4 @@
+import {monotonicNow} from '../../core/clock';
 /** Completion of preceding GPU commands, not display presentation or future work. */
 export class FrameReadinessError extends Error {}
 export interface FrameReadinessOptions {
@@ -8,7 +9,7 @@ export interface FrameReadinessOptions {
  cancel?:(handle:unknown)=>void;
 }
 export function createFrameReadiness(gl:WebGL2RenderingContext,retired:()=>boolean,options:FrameReadinessOptions={}){
- const {maxWaitMs=15000,now=()=>performance.now(),schedule=fn=>setTimeout(fn,10),cancel=handle=>clearTimeout(handle as ReturnType<typeof setTimeout>)}=options;
+ const {maxWaitMs=15000,now=monotonicNow,schedule=fn=>setTimeout(fn,10),cancel=handle=>clearTimeout(handle as ReturnType<typeof setTimeout>)}=options;
  if(!Number.isFinite(maxWaitMs)||maxWaitMs<=0||maxWaitMs>60000)throw Error('Invalid frame readiness bounds');
  let pending:(()=>void)|undefined;
  return {

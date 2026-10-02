@@ -32,3 +32,11 @@ initial diagnostic run used the default discardable buffer and failed with
 failure. Production drawing-buffer settings were not changed. The corrected
 fixture observed completed work, red `[255,0,0,255]`, and immediate cancellation
 reported `retired`. This does not certify display presentation or travel timing.
+
+The first exact-head default gate at `86df82e` failed architecture lint: direct
+animation-frame and monotonic-clock reads were outside sanctioned owners. All
+2046 tests, snapshot, bundle and 11 software-GL checks passed, but the overall
+result remains **FAIL**. [Raw gate](gate-86df82e/gate.txt) is retained. The correction
+uses the existing core monotonic clock and cancellable browser tasks rather than
+adding an animation loop; no ratchet or threshold changed. A new exact-head gate
+is required before acceptance.

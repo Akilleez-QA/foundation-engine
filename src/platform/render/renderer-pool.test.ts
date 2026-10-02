@@ -242,23 +242,23 @@ test('world program readiness retires on release before context handoff',async()
  gl.getExtension=(name:string)=>name==='KHR_parallel_shader_compile'?{COMPLETION_STATUS_KHR:0x91b1}:null;
  gl.getProgramParameter=()=>false;
  (gl.createProgram as ()=>object)();
- const oldRequest=globalThis.requestAnimationFrame,oldCancel=globalThis.cancelAnimationFrame;let scheduled:(()=>void)|undefined;
- globalThis.requestAnimationFrame=fn=>{scheduled=()=>fn(0);return 1;};globalThis.cancelAnimationFrame=()=>{scheduled=undefined;};
+ const oldRequest=globalThis.setTimeout,oldCancel=globalThis.clearTimeout;let scheduled:(()=>void)|undefined;
+ globalThis.setTimeout=((fn:()=>void)=>{scheduled=fn;return 1;}) as unknown as typeof setTimeout;globalThis.clearTimeout=()=>{scheduled=undefined;};
  try{const ready=surface.programsReady!(new AbortController().signal);surface.release();assert.equal(await ready,'retired');assert.equal(scheduled,undefined);
   const successor=h.pool.lease({role:'world',host:h.host()})!;assert.equal(await successor.programsReady!(new AbortController().signal),'ready');successor.release();
- }finally{globalThis.requestAnimationFrame=oldRequest;globalThis.cancelAnimationFrame=oldCancel;}
+ }finally{globalThis.setTimeout=oldRequest;globalThis.clearTimeout=oldCancel;}
 });
 
 test('world readiness is one pending operation per lease and context restore gets a fresh lifetime',async()=>{
  const h=harness(),surface=h.pool.lease({role:'world',host:h.host()})!;
  const gl=surface.renderer.getContext() as unknown as FakeGL;gl.getExtension=()=>({COMPLETION_STATUS_KHR:0x91b1});const stale=(gl.createProgram as ()=>object)();gl.getProgramParameter=()=>false;
- const oldRequest=globalThis.requestAnimationFrame,oldCancel=globalThis.cancelAnimationFrame;let serial=0;const frames=new Map<number,FrameRequestCallback>();
- globalThis.requestAnimationFrame=fn=>{frames.set(++serial,fn);return serial;};globalThis.cancelAnimationFrame=id=>{frames.delete(id);};
+ const oldRequest=globalThis.setTimeout,oldCancel=globalThis.clearTimeout;let serial=0;const frames=new Map<number,()=>void>();
+ globalThis.setTimeout=((fn:()=>void)=>{frames.set(++serial,fn);return serial;}) as unknown as typeof setTimeout;globalThis.clearTimeout=((id:number)=>{frames.delete(id);}) as unknown as typeof clearTimeout;
  try{
   const first=surface.programsReady!(new AbortController().signal),second=surface.programsReady!(new AbortController().signal);assert.equal(await first,'retired');assert.equal(frames.size,1);
   gl.lost=true;gl.canvas.dispatch('webglcontextlost');assert.equal(await second,'retired');assert.equal(frames.size,0);
   gl.lost=false;gl.canvas.dispatch('webglcontextrestored');const fresh=(gl.createProgram as ()=>object)();gl.getProgramParameter=(program:object)=>{assert.notEqual(program,stale,'invalid pre-loss handle must not be queried');assert.equal(program,fresh);return true;};assert.equal(await surface.programsReady!(new AbortController().signal),'ready');
- }finally{surface.release();globalThis.requestAnimationFrame=oldRequest;globalThis.cancelAnimationFrame=oldCancel;}
+ }finally{surface.release();globalThis.setTimeout=oldRequest;globalThis.clearTimeout=oldCancel;}
 });
 
 test('overflow world readiness retires without a frame on loss and restores independently',async()=>{
@@ -267,16 +267,16 @@ test('overflow world readiness retires without a frame on loss and restores inde
  const gl=overflow.renderer.getContext() as unknown as FakeGL,primaryGl=primary.renderer.getContext() as unknown as FakeGL;
  gl.getExtension=()=>({COMPLETION_STATUS_KHR:0x91b1});gl.getProgramParameter=()=>false;const stale=(gl.createProgram as ()=>object)();
  primaryGl.getExtension=()=>null;let losses=0,restores=0;overflow.onLost(()=>losses++);overflow.onRestored(()=>restores++);
- const oldRequest=globalThis.requestAnimationFrame,oldCancel=globalThis.cancelAnimationFrame;const frames=new Map<number,FrameRequestCallback>();let serial=0;
- globalThis.requestAnimationFrame=fn=>{frames.set(++serial,fn);return serial;};globalThis.cancelAnimationFrame=id=>{frames.delete(id);};
+ const oldRequest=globalThis.setTimeout,oldCancel=globalThis.clearTimeout;const frames=new Map<number,()=>void>();let serial=0;
+ globalThis.setTimeout=((fn:()=>void)=>{frames.set(++serial,fn);return serial;}) as unknown as typeof setTimeout;globalThis.clearTimeout=((id:number)=>{frames.delete(id);}) as unknown as typeof clearTimeout;
  try{
   const pending=overflow.programsReady!(new AbortController().signal);assert.equal(frames.size,1);
-  gl.lost=true;gl.canvas.dispatch('webglcontextlost');assert.equal(await pending,'retired');assert.equal(frames.size,0,'no RAF is needed to retire a hidden tab');assert.equal(losses,1);
+  gl.lost=true;gl.canvas.dispatch('webglcontextlost');assert.equal(await pending,'retired');assert.equal(frames.size,0,'no scheduled task is needed to retire a hidden tab');assert.equal(losses,1);
   assert.equal(await primary.programsReady!(new AbortController().signal),'unsupported','separate live world owner unaffected');
   gl.lost=false;gl.canvas.dispatch('webglcontextrestored');assert.equal(restores,1);const fresh=(gl.createProgram as ()=>object)();gl.getProgramParameter=(program:object)=>{assert.notEqual(program,stale);assert.equal(program,fresh);return true;};
   assert.equal(await overflow.programsReady!(new AbortController().signal),'ready');overflow.release();
   gl.canvas.dispatch('webglcontextlost');gl.canvas.dispatch('webglcontextrestored');assert.equal(losses,1);assert.equal(restores,1);assert.equal(await overflow.programsReady!(new AbortController().signal),'retired');
- }finally{overflow.release();primary.release();globalThis.requestAnimationFrame=oldRequest;globalThis.cancelAnimationFrame=oldCancel;}
+ }finally{overflow.release();primary.release();globalThis.setTimeout=oldRequest;globalThis.clearTimeout=oldCancel;}
 });
 
 test('world diagnostics policy permits explicit full checks and a failure-only production policy',()=>{
