@@ -6,10 +6,12 @@
 //      the game folder when anything in it changed, and every test of a changed engine folder
 // "Changed" is the working tree against HEAD, plus untracked files. `--all` runs every test instead.
 // It never builds, benches or opens a browser: that is `npm run play:snap` (see it) and `npm run gate` (integrate).
+import './lib/node-version.mjs';
 import {spawnSync} from 'node:child_process';
 import {existsSync, readdirSync} from 'node:fs';
 import {dirname, join, relative} from 'node:path';
 import {gameDir, ROOT} from './lib/game-dir.mjs';
+import {toolCommand} from './lib/tool.mjs';
 
 const t0 = Date.now();
 const all = process.argv.includes('--all');
@@ -37,8 +39,10 @@ export function affectedTests(changed, game = GAME) {
 }
 
 const results = [];
-const run = (name, cmd, args) => {
-  const t = Date.now(), r = spawnSync(cmd, args, {cwd: ROOT, encoding: 'utf8', env: process.env});
+const run = (name, cmd, args = []) => {
+  // A tool command from scripts/lib/tool.mjs (no npx, no shell: the same on Windows), or a plain `node` script.
+  const c = typeof cmd === 'string' ? {command: cmd === 'node' ? process.execPath : cmd, args, shell: false} : cmd;
+  const t = Date.now(), r = spawnSync(c.command, c.args, {cwd: ROOT, encoding: 'utf8', env: process.env, shell: c.shell});
   const ok = r.status === 0;
   results.push({name, ok, s: (Date.now() - t) / 1000, out: ok ? '' : (r.stdout + r.stderr).trim().split('\n').filter(l => !/^\s*(#|ok |\.\.\.|---|duration_ms|type:)/.test(l)).slice(-40).join('\n')});
   return ok;
@@ -46,13 +50,13 @@ const run = (name, cmd, args) => {
 
 if (process.argv[1] && process.argv[1].endsWith('check.mjs')) {
   run('generate', 'node', ['scripts/generate.mjs']);
-  run('typecheck', 'npx', ['tsc', '--noEmit']);
+  run('typecheck', toolCommand('tsc', ['--noEmit']));
   run('lint:layers', 'node', ['scripts/lint/layers.mjs']);
   run('lint:generic', 'node', ['scripts/lint/genericity.mjs']);
-  run('lint:brief', 'npx', ['tsx', 'scripts/lint/brief.ts', GAME]);
+  run('lint:brief', toolCommand('tsx', ['scripts/lint/brief.ts', GAME]));
   run('lint:budgets', 'node', ['scripts/perf/budget-ratchet.mjs']);
   const tests = all ? ['src/**/*.test.ts', 'templates/*/game/**/*.test.ts', 'scripts/**/*.test.mjs', 'scripts/**/*.test.ts'] : affectedTests(changedFiles());
-  if (tests.length) run(`tests (${all ? 'all' : tests.length + ' file(s)'})`, 'npx', ['tsx', '--test', ...tests]);
+  if (tests.length) run(`tests (${all ? 'all' : tests.length + ' file(s)'})`, toolCommand('tsx', ['--test', ...tests]));
   else results.push({name: 'tests (nothing changed that has tests)', ok: true, s: 0, out: ''});
   for (const r of results) console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${r.name} (${r.s.toFixed(1)} s)${r.ok ? '' : '\n' + r.out.replace(/^/gm, '     ')}`);
   const bad = results.filter(r => !r.ok);

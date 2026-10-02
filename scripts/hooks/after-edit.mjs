@@ -28,7 +28,9 @@ if (/^src\/(core|platform|author|app|dev|features|domain|testing)\//.test(rel) |
   for (const h of hits(text).slice(0, 5)) notes.push(`${rel}:${h.line} uses the genre word "${h.word}" in the engine; move it to a kit or template, or rename`);
 }
 if (gameDirOf && /(budgets\.json|build\.brief\.ts)$/.test(rel)) {
-  const r = spawnSync('npx', ['tsx', 'scripts/lint/brief.ts', gameDirOf], {cwd: ROOT, encoding: 'utf8'});
+  const {toolCommand} = await import('../lib/tool.mjs');
+  const c = toolCommand('tsx', ['scripts/lint/brief.ts', gameDirOf]);
+  const r = spawnSync(c.command, c.args, {cwd: ROOT, encoding: 'utf8', shell: c.shell});
   if (r.status !== 0) notes.push((r.stderr || r.stdout).trim());
 }
 if (notes.length) console.log(JSON.stringify({hookSpecificOutput: {hookEventName: 'PostToolUse', additionalContext: `after-edit checks:\n- ${notes.join('\n- ')}\nRun npm run check for the full picture.`}}));

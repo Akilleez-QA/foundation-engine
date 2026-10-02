@@ -27,6 +27,7 @@ import {cacheKey, loadRun, storeRun} from './cache.ts';
 import {checkBundle} from './bundle-check.ts';
 import {reportRun} from './budget-check.ts';
 import {decide} from './gate-verdict.ts';
+import {npmCommand, toolCommand} from '../lib/tool.mjs';
 import {ACTIVE_SCENES, SCENE_IDS} from '../../perf/budgets.ts';
 
 const argv = process.argv.slice(2);
@@ -36,7 +37,8 @@ const root = fileURLToPath(new URL('../..', import.meta.url));
 const t0 = Date.now(); const fail = [];
 const say = s => console.log(s);
 
-function step(name, cmd, args) { const t = Date.now(); const r = spawnSync(cmd, args, {cwd: root, stdio: 'inherit'}); const ok = r.status === 0; say(`gate: ${name} ${ok ? 'ok' : 'FAILED'} (${((Date.now() - t) / 1000).toFixed(0)} s)`); if (!ok) fail.push(name); return ok; }
+// cmd is `node` (this Node) or a command from scripts/lib/tool.mjs (no npx and no bare npm: the same on Windows).
+function step(name, cmd, args = []) { const c = typeof cmd === 'string' ? {command: cmd === 'node' ? process.execPath : cmd, args, shell: false} : cmd; const t = Date.now(); const r = spawnSync(c.command, c.args, {cwd: root, stdio: 'inherit', shell: c.shell}); const ok = r.status === 0; say(`gate: ${name} ${ok ? 'ok' : 'FAILED'} (${((Date.now() - t) / 1000).toFixed(0)} s)`); if (!ok) fail.push(name); return ok; }
 
 /** The browser's version and backend string (part of the descriptor) without running the bench. */
 async function environment(o) {
@@ -57,9 +59,9 @@ function applySynthetic(run) {
 }
 
 if (!flag('--bench-only')) {
-  if (step('generate', 'node', ['scripts/generate.mjs'])) step('tsc', 'npx', ['tsc', '--noEmit']);
-  step('lint', 'npm', ['run', '--silent', 'lint']);
-  step('npm test', 'npm', ['test', '--silent']);
+  if (step('generate', 'node', ['scripts/generate.mjs'])) step('tsc', toolCommand('tsc', ['--noEmit']));
+  step('lint', npmCommand(['run', '--silent', 'lint']));
+  step('npm test', npmCommand(['test', '--silent']));
   // Smoke: the first scene opens in a muted browser on the dev server with no page errors (scripts/play/snap.mjs).
   step('play:snap', 'node', ['scripts/play/snap.mjs']);
 }
