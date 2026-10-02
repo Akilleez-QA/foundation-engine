@@ -61,7 +61,7 @@ test('fourteen users of one variant share one load and one Texture; the last rel
   owners[13].abort(); // an owner's abort releases its lease too
   assert.equal(disposed, 1);
   assert.equal(library.owns(texture), false);
-  assert.deepEqual({ ...library.stats(), residentMiB: 0 }, { residentMiB: 0, warmMiB: 0, loads: 1, hits: 13, uploads: 1, lateDrops: 0, disposed: 1 });
+  assert.deepEqual({ ...library.stats(), residentMiB: 0 }, { residentMiB: 0, warmMiB: 0, loads: 1, hits: 13, uploads: 1, lateDrops: 0, disposed: 1, pinnedMiB: 0, evictions: 0, reloads: 0, pressure: 0, cleanupFailures: 0 });
 });
 
 test('variants: the site size picks the file; each variant and each sampler is its own texture', async () => {

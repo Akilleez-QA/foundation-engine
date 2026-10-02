@@ -9,6 +9,7 @@
  * `dress-asset.ts` holds its helpers.
  */
 import type { TextureLibrary, TextureLibraryStats } from './textures';
+import type { AssetResidencyPolicy } from './residency';
 import { paintedSurfaces, type PaintedSurfaces } from './painted-surfaces';
 
 export type AppAssetLibrary = TextureLibrary & { readonly painted: PaintedSurfaces };
@@ -17,15 +18,16 @@ declare module '../../core/services' {
   interface Services { assets: AppAssetLibrary }
 }
 
-const NOTHING_YET: TextureLibraryStats = Object.freeze({ residentMiB: 0, warmMiB: 0, loads: 0, hits: 0, uploads: 0, lateDrops: 0, disposed: 0 });
+const NOTHING_YET: TextureLibraryStats = Object.freeze({ residentMiB: 0, warmMiB: 0, loads: 0, hits: 0, uploads: 0, lateDrops: 0, disposed: 0, pinnedMiB: 0, evictions: 0, reloads: 0, pressure: 0, cleanupFailures: 0 });
 
 /**
  * A library whose implementation is fetched on first use. Until then it owns nothing and has loaded nothing; a failed
  * fetch is forgotten, so the next request fetches again.
  */
 export function lazyTextureLibrary(load: () => Promise<TextureLibrary>): AppAssetLibrary {
-  let library: TextureLibrary | undefined, pending: Promise<TextureLibrary> | undefined;
-  const get = () => (pending ??= load().then(l => (library = l), error => { pending = undefined; throw error; }));
+  let library: TextureLibrary | undefined, pending: Promise<TextureLibrary> | undefined, policy: AssetResidencyPolicy | undefined;
+  // The latest residency policy reaches the library when it loads (RES-01).
+  const get = () => (pending ??= load().then(l => { if (policy) l.setResidency(policy); return library = l; }, error => { pending = undefined; throw error; }));
   return {
     painted: paintedSurfaces,
     texture: (id, o) => get().then(l => l.texture(id, o)),
@@ -36,6 +38,7 @@ export function lazyTextureLibrary(load: () => Promise<TextureLibrary>): AppAsse
     },
     owns: resource => !!library?.owns(resource),
     stats: () => library?.stats() ?? NOTHING_YET,
+    setResidency(next) { policy = next; library?.setResidency(next); },
   };
 }
 

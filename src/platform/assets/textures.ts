@@ -30,6 +30,7 @@
 import * as T from 'three';
 import { AbortError, LeaseCache, TEXELS_PER_PIXEL, chooseVariant, isAbortError, type AssetLease } from './lease-cache';
 import type { AssetDef, AssetVariant, QualityTier } from './manifest';
+import type { AssetResidencyPolicy } from './residency';
 
 export interface TextureOptions {
   /** On-screen size in CSS pixels at the reference resolution (the widest the map is drawn). */
@@ -56,6 +57,14 @@ export interface TextureLibraryStats {
   readonly uploads: number;
   readonly lateDrops: number;
   readonly disposed: number;
+  /** Released textures kept because they are pinned (RES-01). */
+  readonly pinnedMiB: number;
+  /** Retained textures disposed by a budget, and later loads of such a key. */
+  readonly evictions: number;
+  readonly reloads: number;
+  /** Transitions into an over-ceiling state that eviction could not relieve. */
+  readonly pressure: number;
+  readonly cleanupFailures: number;
 }
 
 export interface TextureLibrary {
@@ -68,6 +77,8 @@ export interface TextureLibrary {
   /** True for any texture this library holds. Tree disposal must skip these. */
   owns(resource: unknown): boolean;
   stats(): TextureLibraryStats;
+  /** Applies a residency policy (RES-01). Live leases are never evicted; see docs/guides/asset-residency.md. */
+  setResidency(policy: AssetResidencyPolicy): void;
 }
 
 /** Decoded image data a `THREE.Texture` can take. */
@@ -88,6 +99,8 @@ export interface TextureLibraryOptions {
   warmBytes?: number;
   /** Default `reference`. */
   tier?: QualityTier;
+  /** Optional residency policy (RES-01). Its `warmBytes` replaces `warmBytes`. */
+  residency?: AssetResidencyPolicy;
 }
 
 interface Slot {
@@ -105,7 +118,7 @@ const isImageBitmap = (image: unknown): image is ImageBitmap =>
 const defaultLoadImage = (url: string): Promise<TextureImage> => new T.ImageLoader().loadAsync(url);
 
 /** Mipmapped RGBA8: the four bytes per texel plus a third for the mip chain. */
-function textureBytes(texture: T.Texture): number {
+export function textureBytes(texture: T.Texture): number {
   const image = texture.image as { width?: number; height?: number } | undefined;
   return Math.round((image?.width ?? 0) * (image?.height ?? 0) * 4 * (4 / 3));
 }
@@ -154,9 +167,12 @@ export function createTextureLibrary(options: TextureLibraryOptions): TextureLib
         if (isImageBitmap(image)) try { image.close(); } catch (error) { errors.push(error); }
         if (errors.length) throw new AggregateError(errors, 'textures: cleanup failed');
       },
+      // Retained after release: every renderer drops its GPU copy and its listener; the decoded image stays for a
+      // later upload (three's public dispose event, as releaseSharedRendererTextures uses).
+      park: texture => texture.dispose(),
       bytes: textureBytes,
     },
-    { warmBytes: options.warmBytes ?? 0 },
+    { warmBytes: options.residency?.warmBytes ?? options.warmBytes ?? 0, residency: options.residency },
   );
 
   async function resolve(id: string): Promise<AssetDef> {
@@ -194,7 +210,13 @@ export function createTextureLibrary(options: TextureLibraryOptions): TextureLib
       uploads: cache.stats.uploads,
       lateDrops: cache.stats.lateDrops,
       disposed: cache.stats.disposed,
+      pinnedMiB: cache.pinnedBytes() / MIB,
+      evictions: cache.stats.evictions,
+      reloads: cache.stats.reloads,
+      pressure: cache.stats.pressure,
+      cleanupFailures: cache.stats.cleanupFailures,
     }),
+    setResidency: ({ warmBytes, ...residency }) => cache.setResidency(warmBytes, residency),
   };
 }
 

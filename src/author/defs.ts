@@ -19,6 +19,7 @@ import type { EngineModule } from '../core/module';
 import type { Services } from '../core/services';
 import type { BuildBrief } from './build';
 import type { CueVoice, CueVoiceOptions } from '../platform/audio/audio-output';
+import { validateResidency, type AssetResidencyInput } from '../platform/assets/residency';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const need = (ok: boolean, message: string) => { if (!ok) throw Error(message); };
@@ -292,6 +293,11 @@ export interface GameInput {
   kits?: readonly KitDefinition[];
   /** Extra string catalogues: `{ en: { 'game.hud.score': 'Score' } }`. */
   strings?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  /**
+   * Optional asset residency (RES-01, docs/guides/asset-residency.md): per-preset texture/model byte budgets, pinned
+   * critical asset ids and a pressure hook. Omitted: released assets are disposed at once.
+   */
+  residency?: AssetResidencyInput;
 }
 export interface GameDefinition extends GameInput { readonly kind: 'game' }
 export function defineGame(g: GameInput): GameDefinition {
@@ -300,6 +306,7 @@ export function defineGame(g: GameInput): GameDefinition {
   const kits = (g.kits ?? []).map(k => k.id);
   need(new Set(kits).size === kits.length, 'a kit is listed twice');
   for (const k of g.kits ?? []) for (const r of k.requires) need(kits.includes(r), `kit ${k.id} needs kit ${r}; add it to kits`);
+  if (g.residency !== undefined) validateResidency(g.residency);
   return { ...g, kind: 'game' };
 }
 

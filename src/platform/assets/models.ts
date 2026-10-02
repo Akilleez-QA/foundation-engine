@@ -29,6 +29,7 @@ import type * as T from 'three';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { AbortError, LeaseCache, chooseVariant, type AssetLease } from './lease-cache';
 import type { AssetDef, AssetVariant, QualityTier } from './manifest';
+import type { AssetResidencyPolicy } from './residency';
 
 /** A parsed model shared by its leases. Treat `scene` as read-only; draw `instantiate()` copies. */
 export interface ModelTemplate {
@@ -54,6 +55,12 @@ export interface ModelLibraryStats {
   readonly bytesKeptMiB: number;
   readonly residentMiB: number;
   readonly instances: number;
+  /** Released templates kept because they are pinned (RES-01). */
+  readonly pinnedMiB?: number;
+  readonly evictions?: number;
+  readonly reloads?: number;
+  readonly pressure?: number;
+  readonly cleanupFailures?: number;
 }
 
 export interface ModelLibrary {
@@ -63,6 +70,8 @@ export interface ModelLibrary {
   owns(resource: unknown): boolean;
   stats(): ModelLibraryStats;
   dispose(): void;
+  /** Applies a residency policy (RES-01). Live leases are never evicted; `maxResidentBytes` admission is unchanged. */
+  setResidency?(policy: AssetResidencyPolicy): void;
 }
 
 export interface ModelLibraryOptions {
@@ -87,6 +96,8 @@ export interface ModelLibraryOptions {
   /** Estimated admission bytes, not measured physical memory: node allowance plus per-mesh skeleton buffers. */
   maxInstanceBytes?: number;
   maxPending?: number;
+  /** Optional residency policy (RES-01). Its `warmBytes` replaces `warmBytes`. */
+  residency?: AssetResidencyPolicy;
 }
 
 export interface ParsedModel { scene: T.Object3D; animations: readonly T.AnimationClip[] }
@@ -181,7 +192,7 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
   const maxFile = options.maxFileBytes ?? 32 * MIB, maxResident = options.maxResidentBytes ?? 128 * MIB;
   const maxInstanceBytes = options.maxInstanceBytes ?? 32 * MIB;
   const maxInstances = options.maxInstances ?? 128, maxPending = options.maxPending ?? 16;
-  for (const n of [keepLimit, maxFile, maxResident, maxInstanceBytes, maxInstances, maxPending, options.warmBytes ?? 0]) if (!Number.isSafeInteger(n) || n < 0) throw Error('models: invalid budget');
+  for (const n of [keepLimit, maxFile, maxResident, maxInstanceBytes, maxInstances, maxPending, options.warmBytes ?? 0, options.residency?.warmBytes ?? 0]) if (!Number.isSafeInteger(n) || n < 0) throw Error('models: invalid budget');
   if (!maxFile || !maxResident || !maxInstanceBytes || !maxInstances || !maxPending) throw Error('models: zero admission budget');
   let resident = 0, instanceCount = 0, instanceBytes = 0, pendingCount = 0, activeLoads = 0, closed = false;
   const lifetimes = new Set<AbortController>();
@@ -279,7 +290,10 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
         try {
           let bytes = modelBytes(scene);
           for (const clip of parsed.animations) for (const track of clip.tracks) bytes += track.times.byteLength + track.values.byteLength;
-          if (!Number.isSafeInteger(bytes) || bytes + resident > maxResident) throw Error('models: resident budget exceeded');
+          if (!Number.isSafeInteger(bytes)) throw Error('models: resident budget exceeded');
+          // Retained (released, unpinned) templates yield to a new live one before the hard admission (RES-01).
+          if (bytes + resident > maxResident) cache.makeSpace(() => bytes + resident > maxResident);
+          if (bytes + resident > maxResident) throw Error('models: resident budget exceeded');
           resident += bytes;
           reserved = bytes;
           const clips = Object.freeze(parsed.animations.map(clip => clip.clone()));
@@ -341,9 +355,15 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
       },
       discard: parsed => release(parsed.scene),
       dispose: template => { const cleanup = cleanups.get(template); cleanups.delete(template); cleanup?.(); },
+      // Retained after release: renderers drop their GPU copies and listeners; parsed data stays for a later draw.
+      park: template => {
+        const errors: unknown[] = [];
+        for (const resource of modelResources(template.scene)) try { resource.dispose(); } catch (error) { errors.push(error); }
+        if (errors.length) throw new AggregateError(errors, 'models: park failed');
+      },
       bytes: template => templateBytes.get(template) ?? 0,
     },
-    { warmBytes: options.warmBytes ?? 0 },
+    { warmBytes: options.residency?.warmBytes ?? options.warmBytes ?? 0, residency: options.residency },
   );
 
   async function resolve(id: string): Promise<AssetDef> {
@@ -381,6 +401,12 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
       lateDrops: cache.stats.lateDrops,
       disposed: cache.stats.disposed,
       bytesKeptMiB: keptBytes / MIB, residentMiB: resident / MIB, instances: instanceCount,
+      pinnedMiB: cache.pinnedBytes() / MIB, evictions: cache.stats.evictions, reloads: cache.stats.reloads,
+      pressure: cache.stats.pressure, cleanupFailures: cache.stats.cleanupFailures,
     }),
+    setResidency: ({ warmBytes, ...residency }) => {
+      if (!Number.isSafeInteger(warmBytes) || warmBytes < 0) throw Error('models: invalid budget');
+      if (!closed) cache.setResidency(warmBytes, residency);
+    },
   };
 }
