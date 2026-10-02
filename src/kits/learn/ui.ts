@@ -1,7 +1,7 @@
 /**
  * kits/learn/ui: the lesson's controls over the view: a progress line, the objectives card, a control bar (Back,
  * Show again, Hint, I have a question, Pause, Next) and the finished card. Real buttons (keyboard, pad focus and
- * screen readers reach them; 44 px touch targets). The DOM changes only when the view it shows changes.
+ * screen readers reach them; 48 px touch targets). The DOM changes only when the view it shows changes.
  */
 import { showEl } from '../concept-explorer/ui';
 
@@ -18,7 +18,7 @@ export interface ControlsView {
 export interface Controls { set(v: ControlsView): void; onCommand(fn: (c: LessonCommand) => void): void; destroy(): void }
 
 const card = 'background:rgb(10 16 22 / 82%);color:var(--engine-text);border-radius:12px;padding:10px 14px;font:600 var(--engine-text-lg) var(--engine-font);';
-const btn = 'min-height:44px;min-width:44px;padding:8px 14px;border-radius:10px;border:2px solid rgb(255 255 255 / 25%);background:rgb(255 255 255 / 10%);color:var(--engine-text);font:600 var(--engine-text-md) var(--engine-font);cursor:pointer;';
+const btn = 'min-height:48px;min-width:48px;padding:8px 14px;border-radius:10px;border:2px solid rgb(255 255 255 / 25%);background:rgb(255 255 255 / 10%);color:var(--engine-text);font:600 var(--engine-text-lg) var(--engine-font);cursor:pointer;';
 
 export function createControls(overlay: HTMLElement): Controls {
   const doc = overlay.ownerDocument;
@@ -36,10 +36,11 @@ export function createControls(overlay: HTMLElement): Controls {
     buttons.set(c, b); bar.append(b);
   }
   overlay.append(progress, objectives, finished, bar);
-  let last = '';
+  let last = '', retired = false;
   return {
-    onCommand(f) { fn = f; },
+    onCommand(f) { if (!retired) fn = f; },
     set(v) {
+      if (retired) return;
       const key = JSON.stringify(v);
       if (key === last) return; last = key;
       progress.textContent = v.progress; bar.setAttribute('aria-label', v.labels.controls);
@@ -57,6 +58,6 @@ export function createControls(overlay: HTMLElement): Controls {
         showEl(b, !((c === 'question' || c === 'hint') && !v.can[c]));
       }
     },
-    destroy() { for (const el of [progress, objectives, finished, bar]) el.remove(); },
+    destroy() { if (retired) return; retired = true; fn = null; for (const el of [progress, objectives, finished, bar]) el.remove(); },
   };
 }

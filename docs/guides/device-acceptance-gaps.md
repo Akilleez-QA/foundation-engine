@@ -1,12 +1,25 @@
 # Device acceptance: current enforcement gaps
 
-Source and CI configuration reviewed against `f357f17` on 2026-09-30, including
+Historical source and CI configuration review: `f357f17`, 2026-09-30, including
 composed HUD obstruction and acknowledged resize regressions, capture steps and
 their CI command, saved controls and owned touch producers. This source review
 does not certify an uninspected CI run. The
 [device policy](../policy/DEVICE-EXPERIENCE.md) is normative; the following runtime
 and automation limitations remain unverified or require implementation. This
 inventory prevents a standards change from being mistaken for device certification.
+
+## Current candidate update — 2026-10-01
+
+The [stock template matrix](../kits/stock-device-acceptance-matrix.md) inventories all seven
+briefs at integrated `b6fb4a3`. It preserves their declared targets and separates
+existing tests from complete consumer workflows. The subsequent
+[exploratory touch receipt](../verification/stock-device-20261001/README.md) records
+16 target/tap checks on a dirty candidate: minimum sizing passes after a shelter
+font correction, but compact lesson controls visibly cover content. Layout/cleanup
+repairs, full task workflows and physical-device evidence remain open. This does
+not refresh historical CI results or establish an exact-head gate pass.
+
+## Existing mechanisms
 
 | Existing mechanism | Limitation | Required follow-up evidence |
 |---|---|---|

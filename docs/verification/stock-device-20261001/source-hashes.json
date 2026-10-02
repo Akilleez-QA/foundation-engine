@@ -1,0 +1,9 @@
+{
+  "scripts/play/stock-touch-check.mjs": "495405c7cdbf259f9729b9a9c590f0951021e3aafa43fa24ecbbb684c8a2f39f",
+  "src/kits/learn/ui.ts": "ce57194f303cc729833305c3402bbd404ffcb6d0804b5bc5da492fdae673188c",
+  "src/kits/learn/runtime.ts": "d3799c1556b0d0bf0f2fa3ee86cf528fb92b7ae1ea202984a6738663dcd6aeb0",
+  "src/kits/chalkboard/view.ts": "ef2ac8d7922a4a8a767aaa57a968d30924513b2b41f686657d6c2aad92ced155",
+  "templates/mechanics/game/lab.ts": "3e76194035ae81f5691a2c4941c1c605c5ad2ae5cd1d7f95e6035c080a8c2dcf",
+  "templates/expedition/game/field.ts": "8800ebf1700982a024dcfc8f65e0c7eccad34b9748efefa7073e3d39f46d9e40",
+  "templates/expedition/game/shelter.body.mts": "a3d472d359ea8ba60a73edd7a89cf58a414f1e1bb78e98fc0c82003fcccb568c"
+}

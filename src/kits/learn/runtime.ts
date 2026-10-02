@@ -18,8 +18,28 @@ import { learnProgress } from './progress';
 
 const say = (ctx: SceneContext, key: string, vars?: Record<string, string | number>) => ctx.text(key, vars);
 
-interface Visit { director: LessonDirector; board: BoardView | null; boardScene: string; controls: Controls | null; quiz: QuizPanel | null; slider: Slider | null; sliderScene: string; commands: LessonCommand[]; answers: string[]; param: number | null }
+interface Visit { retired: boolean; overlay: HTMLElement | null; director: LessonDirector; board: BoardView | null; boardScene: string; controls: Controls | null; quiz: QuizPanel | null; slider: Slider | null; sliderScene: string; commands: LessonCommand[]; answers: string[]; param: number | null }
 const visits = new WeakMap<object, Visit>();
+
+/** Retire one lesson visit. Direct lessonBody/directorSystem consumers call this from scene.exit. */
+export function disposeLesson(ctx: SceneContext): void {
+  const v = visits.get(ctx.world);
+  if (!v) return;
+  visits.delete(ctx.world);
+  v.retired = true;
+  v.commands.length = 0; v.answers.length = 0; v.param = null;
+  const errors: unknown[] = [];
+  for (const owned of [v.board, v.controls, v.quiz, v.slider]) {
+    try { owned?.destroy(); } catch (error) { errors.push(error); }
+  }
+  v.board = null; v.controls = null; v.quiz = null; v.slider = null;
+  if (v.overlay) {
+    captions.get(v.overlay)?.el.remove();
+    captions.delete(v.overlay);
+  }
+  v.overlay = null;
+  if (errors.length) throw new AggregateError(errors, 'Lesson UI cleanup failed');
+}
 
 export function directorSystem(lesson: Lesson | LessonInput, o: { provider?: DiscussProvider } = {}): SystemDefinition {
   return defineSystem({
@@ -32,13 +52,13 @@ export function directorSystem(lesson: Lesson | LessonInput, o: { provider?: Dis
           text: key => ctx.text(key), reducedMotion: ctx.time.calm, provider: o.provider, kidSafe: ctx.brief?.policy === 'kid-safe', cue: id => ctx.play(id),
           save: { get: () => save.get().lessons[lesson.id], set: p => save.update(d => { d.lessons[lesson.id] = p; }) },
         });
-        v = { director, board: null, boardScene: '', controls: null, quiz: null, slider: null, sliderScene: '', commands: [], answers: [], param: null };
+        v = { retired: false, overlay: ctx.view.overlay, director, board: null, boardScene: '', controls: null, quiz: null, slider: null, sliderScene: '', commands: [], answers: [], param: null };
         visits.set(ctx.world, v);
         if (ctx.view.overlay) {
           v.controls = createControls(ctx.view.overlay);
-          v.controls.onCommand(c => { v!.commands.push(c); });
+          v.controls.onCommand(c => { if (!v!.retired) v!.commands.push(c); });
           v.quiz = createQuizPanel(ctx.view.overlay, { questionOf: (n, total) => say(ctx, 'learn.question-of', { n, total }), hintLabel: say(ctx, 'learn.hint') });
-          v.quiz.onAnswer(id => { v!.answers.push(id); });
+          v.quiz.onAnswer(id => { if (!v!.retired) v!.answers.push(id); });
         }
       }
       const d = v.director, input = ctx.input;
@@ -92,11 +112,12 @@ function render(ctx: SceneContext, v: Visit, view: LessonView) {
   const cap = view.timeline.caption ? { who: who(view.timeline.caption.who).name, text: view.timeline.caption.text, color: who(view.timeline.caption.who).color } : null;
   v.board?.update({ items: view.timeline.items, caption: cap, pointer: view.timeline.pointer });
   if (!v.board) captionLine(overlay, cap);
+  else { captions.get(overlay)?.el.remove(); captions.delete(overlay); }
   if (v.sliderScene !== view.scene.id) {
-    v.slider?.show(false); v.sliderScene = view.scene.id;
+    v.slider?.destroy(); v.slider = null; v.sliderScene = view.scene.id;
     if (view.sim) {
       v.slider = createSlider(overlay, { id: view.sim.id, label: view.sim.label, min: view.sim.min, max: view.sim.max, step: view.sim.step, value: view.sim.value, unit: '°' });
-      v.slider.onInput(x => { v.param = x; });
+      v.slider.onInput(x => { if (!v.retired) v.param = x; });
     } else v.slider = null;
   }
   if (view.sim) v.slider?.set(Math.round(view.sim.value));

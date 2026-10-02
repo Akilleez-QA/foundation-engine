@@ -54,3 +54,26 @@ npm run new -- lesson seasons               # a second lesson: data, scene, test
 ```
 
 Then, with your agent (the new-lesson skill): outline first (objectives, then the ordered items), then one scene at a time, each followed by `npm run play:snap -- --scene <lesson>` to see it and `npm run play:criteria` to check it.
+
+## Visit ownership and cleanup
+
+`lessonScene(...)` loads the runtime lazily and disposes its visit from the existing
+scene exit hook. Each visit owns its controls, board, quiz, current parameter slider,
+caption and pending UI commands. Changing lesson sections destroys the old slider
+instead of retaining hidden inputs. Leaving clears pending commands, retires callbacks
+and removes owned DOM; reentry creates a fresh visit and uses the existing saved
+lesson progress. Cleanup is idempotent and attempts the independent views even if
+one destroy operation throws, then reports aggregate errors.
+
+Consumers composing `lessonBody` or `directorSystem` directly from
+`src/kits/learn/runtime.ts` must compose `disposeLesson(ctx)` into their scene's
+`exit` callback. This is synchronous UI ownership, not cancellation of an external
+provider request. The standalone slider and quiz helpers now expose `destroy()`;
+retired controls ignore setters and callback registration, and retained DOM references
+cannot deliver a new callback. Creators may replace this presentation and retain
+the same lesson data and lifecycle contract.
+
+The current candidate includes focused visit/reentry tests and real Chromium
+retained-node callback checks. These do not fix the separate compact content overlap
+or establish complete touch lesson acceptance. See the
+[device evidence](../verification/stock-device-20261001/README.md).

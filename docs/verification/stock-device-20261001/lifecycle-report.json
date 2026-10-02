@@ -1,0 +1,696 @@
+{
+  "revision": "108b29c4209d2b3ca7bec4598f7c9ea0866511ad",
+  "workingTreeDirty": true,
+  "passed": true,
+  "cases": [
+    {
+      "template": "mechanics",
+      "scene": "lab",
+      "profile": {
+        "id": "compact",
+        "width": 320,
+        "height": 568
+      },
+      "controls": [
+        {
+          "label": "Ride the platform",
+          "font": 16,
+          "x": 24,
+          "y": 496,
+          "width": 145.84375,
+          "height": 48,
+          "right": 169.84375,
+          "bottom": 544,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "mechanics-lab-compact.png"
+    },
+    {
+      "template": "mechanics",
+      "scene": "lab",
+      "profile": {
+        "id": "phone-portrait",
+        "width": 390,
+        "height": 844
+      },
+      "controls": [
+        {
+          "label": "Ride the platform",
+          "font": 16,
+          "x": 24,
+          "y": 772,
+          "width": 145.84375,
+          "height": 48,
+          "right": 169.84375,
+          "bottom": 820,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "mechanics-lab-phone-portrait.png"
+    },
+    {
+      "template": "mechanics",
+      "scene": "lab",
+      "profile": {
+        "id": "phone-landscape",
+        "width": 844,
+        "height": 390
+      },
+      "controls": [
+        {
+          "label": "Ride the platform",
+          "font": 16,
+          "x": 24,
+          "y": 318,
+          "width": 145.84375,
+          "height": 48,
+          "right": 169.84375,
+          "bottom": 366,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "mechanics-lab-phone-landscape.png"
+    },
+    {
+      "template": "mechanics",
+      "scene": "lab",
+      "profile": {
+        "id": "tablet",
+        "width": 820,
+        "height": 1180
+      },
+      "controls": [
+        {
+          "label": "Ride the platform",
+          "font": 16,
+          "x": 24,
+          "y": 1108,
+          "width": 145.84375,
+          "height": 48,
+          "right": 169.84375,
+          "bottom": 1156,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "mechanics-lab-tablet.png"
+    },
+    {
+      "template": "expedition",
+      "scene": "field",
+      "profile": {
+        "id": "compact",
+        "width": 320,
+        "height": 568
+      },
+      "controls": [
+        {
+          "label": "Begin survey",
+          "font": 16,
+          "x": 24,
+          "y": 496,
+          "width": 116.5,
+          "height": 48,
+          "right": 140.5,
+          "bottom": 544,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Guided pace",
+          "font": 16,
+          "x": 148.5,
+          "y": 496,
+          "width": 114.734375,
+          "height": 48,
+          "right": 263.234375,
+          "bottom": 544,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "expedition-field-compact.png"
+    },
+    {
+      "template": "expedition",
+      "scene": "field",
+      "profile": {
+        "id": "phone-portrait",
+        "width": 390,
+        "height": 844
+      },
+      "controls": [
+        {
+          "label": "Begin survey",
+          "font": 16,
+          "x": 24,
+          "y": 772,
+          "width": 116.5,
+          "height": 48,
+          "right": 140.5,
+          "bottom": 820,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Guided pace",
+          "font": 16,
+          "x": 148.5,
+          "y": 772,
+          "width": 114.734375,
+          "height": 48,
+          "right": 263.234375,
+          "bottom": 820,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "expedition-field-phone-portrait.png"
+    },
+    {
+      "template": "expedition",
+      "scene": "field",
+      "profile": {
+        "id": "phone-landscape",
+        "width": 844,
+        "height": 390
+      },
+      "controls": [
+        {
+          "label": "Begin survey",
+          "font": 16,
+          "x": 24,
+          "y": 318,
+          "width": 116.5,
+          "height": 48,
+          "right": 140.5,
+          "bottom": 366,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Guided pace",
+          "font": 16,
+          "x": 148.5,
+          "y": 318,
+          "width": 114.734375,
+          "height": 48,
+          "right": 263.234375,
+          "bottom": 366,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "expedition-field-phone-landscape.png"
+    },
+    {
+      "template": "expedition",
+      "scene": "field",
+      "profile": {
+        "id": "tablet",
+        "width": 820,
+        "height": 1180
+      },
+      "controls": [
+        {
+          "label": "Begin survey",
+          "font": 16,
+          "x": 24,
+          "y": 1108,
+          "width": 116.5,
+          "height": 48,
+          "right": 140.5,
+          "bottom": 1156,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Guided pace",
+          "font": 16,
+          "x": 148.5,
+          "y": 1108,
+          "width": 114.734375,
+          "height": 48,
+          "right": 263.234375,
+          "bottom": 1156,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "expedition-field-tablet.png"
+    },
+    {
+      "template": "expedition",
+      "scene": "shelter",
+      "profile": {
+        "id": "compact",
+        "width": 320,
+        "height": 568
+      },
+      "controls": [
+        {
+          "label": "Return to field",
+          "font": 16,
+          "x": 24,
+          "y": 496,
+          "width": 127.609375,
+          "height": 48,
+          "right": 151.609375,
+          "bottom": 544,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "expedition-shelter-compact.png"
+    },
+    {
+      "template": "expedition",
+      "scene": "shelter",
+      "profile": {
+        "id": "phone-portrait",
+        "width": 390,
+        "height": 844
+      },
+      "controls": [
+        {
+          "label": "Return to field",
+          "font": 16,
+          "x": 24,
+          "y": 772,
+          "width": 127.609375,
+          "height": 48,
+          "right": 151.609375,
+          "bottom": 820,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "expedition-shelter-phone-portrait.png"
+    },
+    {
+      "template": "expedition",
+      "scene": "shelter",
+      "profile": {
+        "id": "phone-landscape",
+        "width": 844,
+        "height": 390
+      },
+      "controls": [
+        {
+          "label": "Return to field",
+          "font": 16,
+          "x": 24,
+          "y": 318,
+          "width": 127.609375,
+          "height": 48,
+          "right": 151.609375,
+          "bottom": 366,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "expedition-shelter-phone-landscape.png"
+    },
+    {
+      "template": "expedition",
+      "scene": "shelter",
+      "profile": {
+        "id": "tablet",
+        "width": 820,
+        "height": 1180
+      },
+      "controls": [
+        {
+          "label": "Return to field",
+          "font": 16,
+          "x": 24,
+          "y": 1108,
+          "width": 127.609375,
+          "height": 48,
+          "right": 151.609375,
+          "bottom": 1156,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "expedition-shelter-tablet.png"
+    },
+    {
+      "template": "learn",
+      "scene": "day-night",
+      "profile": {
+        "id": "compact",
+        "width": 320,
+        "height": 568
+      },
+      "controls": [
+        {
+          "label": "Back",
+          "font": 16,
+          "x": 60.421875,
+          "y": 396,
+          "width": 70.25,
+          "height": 48,
+          "right": 130.671875,
+          "bottom": 444,
+          "hit": true,
+          "disabled": true
+        },
+        {
+          "label": "Show again",
+          "font": 16,
+          "x": 138.671875,
+          "y": 396,
+          "width": 120.90625,
+          "height": 48,
+          "right": 259.578125,
+          "bottom": 444,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "I have a question",
+          "font": 16,
+          "x": 35.515625,
+          "y": 452,
+          "width": 161.8125,
+          "height": 48,
+          "right": 197.328125,
+          "bottom": 500,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Pause",
+          "font": 16,
+          "x": 205.328125,
+          "y": 452,
+          "width": 79.140625,
+          "height": 48,
+          "right": 284.46875,
+          "bottom": 500,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Next",
+          "font": 16,
+          "x": 126.65625,
+          "y": 508,
+          "width": 66.6875,
+          "height": 48,
+          "right": 193.34375,
+          "bottom": 556,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "lifecycle": {
+        "commands": 1,
+        "answers": 1,
+        "changes": 1,
+        "remaining": 0,
+        "retiredValue": 2
+      },
+      "screenshot": "learn-day-night-compact.png"
+    },
+    {
+      "template": "learn",
+      "scene": "day-night",
+      "profile": {
+        "id": "phone-portrait",
+        "width": 390,
+        "height": 844
+      },
+      "controls": [
+        {
+          "label": "Back",
+          "font": 16,
+          "x": 10.515625,
+          "y": 728,
+          "width": 70.25,
+          "height": 48,
+          "right": 80.765625,
+          "bottom": 776,
+          "hit": true,
+          "disabled": true
+        },
+        {
+          "label": "Show again",
+          "font": 16,
+          "x": 88.765625,
+          "y": 728,
+          "width": 120.90625,
+          "height": 48,
+          "right": 209.671875,
+          "bottom": 776,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "I have a question",
+          "font": 16,
+          "x": 217.671875,
+          "y": 728,
+          "width": 161.8125,
+          "height": 48,
+          "right": 379.484375,
+          "bottom": 776,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Pause",
+          "font": 16,
+          "x": 118.078125,
+          "y": 784,
+          "width": 79.140625,
+          "height": 48,
+          "right": 197.21875,
+          "bottom": 832,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Next",
+          "font": 16,
+          "x": 205.21875,
+          "y": 784,
+          "width": 66.6875,
+          "height": 48,
+          "right": 271.90625,
+          "bottom": 832,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "lifecycle": {
+        "commands": 1,
+        "answers": 1,
+        "changes": 1,
+        "remaining": 0,
+        "retiredValue": 2
+      },
+      "screenshot": "learn-day-night-phone-portrait.png"
+    },
+    {
+      "template": "learn",
+      "scene": "day-night",
+      "profile": {
+        "id": "phone-landscape",
+        "width": 844,
+        "height": 390
+      },
+      "controls": [
+        {
+          "label": "Back",
+          "font": 16,
+          "x": 156.59375,
+          "y": 330,
+          "width": 70.25,
+          "height": 48,
+          "right": 226.84375,
+          "bottom": 378,
+          "hit": true,
+          "disabled": true
+        },
+        {
+          "label": "Show again",
+          "font": 16,
+          "x": 234.84375,
+          "y": 330,
+          "width": 120.90625,
+          "height": 48,
+          "right": 355.75,
+          "bottom": 378,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "I have a question",
+          "font": 16,
+          "x": 363.75,
+          "y": 330,
+          "width": 161.8125,
+          "height": 48,
+          "right": 525.5625,
+          "bottom": 378,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Pause",
+          "font": 16,
+          "x": 533.5625,
+          "y": 330,
+          "width": 79.140625,
+          "height": 48,
+          "right": 612.703125,
+          "bottom": 378,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Next",
+          "font": 16,
+          "x": 620.703125,
+          "y": 330,
+          "width": 66.6875,
+          "height": 48,
+          "right": 687.390625,
+          "bottom": 378,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "lifecycle": {
+        "commands": 1,
+        "answers": 1,
+        "changes": 1,
+        "remaining": 0,
+        "retiredValue": 2
+      },
+      "screenshot": "learn-day-night-phone-landscape.png"
+    },
+    {
+      "template": "learn",
+      "scene": "day-night",
+      "profile": {
+        "id": "tablet",
+        "width": 820,
+        "height": 1180
+      },
+      "controls": [
+        {
+          "label": "Back",
+          "font": 16,
+          "x": 144.59375,
+          "y": 1120,
+          "width": 70.25,
+          "height": 48,
+          "right": 214.84375,
+          "bottom": 1168,
+          "hit": true,
+          "disabled": true
+        },
+        {
+          "label": "Show again",
+          "font": 16,
+          "x": 222.84375,
+          "y": 1120,
+          "width": 120.90625,
+          "height": 48,
+          "right": 343.75,
+          "bottom": 1168,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "I have a question",
+          "font": 16,
+          "x": 351.75,
+          "y": 1120,
+          "width": 161.8125,
+          "height": 48,
+          "right": 513.5625,
+          "bottom": 1168,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Pause",
+          "font": 16,
+          "x": 521.5625,
+          "y": 1120,
+          "width": 79.140625,
+          "height": 48,
+          "right": 600.703125,
+          "bottom": 1168,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Next",
+          "font": 16,
+          "x": 608.703125,
+          "y": 1120,
+          "width": 66.6875,
+          "height": 48,
+          "right": 675.390625,
+          "bottom": 1168,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "lifecycle": {
+        "commands": 1,
+        "answers": 1,
+        "changes": 1,
+        "remaining": 0,
+        "retiredValue": 2
+      },
+      "screenshot": "learn-day-night-tablet.png"
+    }
+  ],
+  "limitations": [
+    "Chromium touch emulation, not physical phone/tablet/controller acceptance.",
+    "Only primary controls in these authored routes; no complete accessibility, essential-world visibility or sustained-hardware certification."
+  ],
+  "failures": []
+}

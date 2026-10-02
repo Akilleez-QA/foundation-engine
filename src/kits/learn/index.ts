@@ -9,7 +9,7 @@
  * This file stays small and eager: the kit (inputs, the progress section), the lesson model and `lessonScene`.
  * Design inspired by THU-MAIC OpenMAIC (see docs/guides/learn-mode.md).
  */
-import { defineInput, defineKit, defineScene, type KitDefinition, type SceneBody, type SceneDefinition, type SceneInput } from '../../author';
+import { defineInput, defineKit, defineScene, type KitDefinition, type SceneBody, type SceneDefinition, type SceneInput, type SceneContext } from '../../author';
 import type { LessonInput, Lesson } from './lesson';
 import type { DiscussProvider } from './provider';
 
@@ -46,11 +46,14 @@ export type LessonSceneDefinition = SceneDefinition & { readonly lesson: LessonI
 
 /** A lesson as an engine scene (`scene.<lesson id>`). Its body loads lazily with the learn runtime. */
 export function lessonScene(o: LessonSceneOptions): LessonSceneDefinition {
+  let dispose: ((ctx: SceneContext) => void) | undefined;
   const scene = defineScene({
     id: o.lesson.id, title: o.title, type: 'lesson',
     view: o.view ?? { camera: { position: [0, 3, 8], target: [0, 0, 0], fov: 45, minWidthFov: 50 }, background: 0x0d1420 },
+    exit: ctx => dispose?.(ctx),
     body: async () => {
-      const [{ lessonBody }, sim] = await Promise.all([import('./runtime'), o.sim ? o.sim() : Promise.resolve({})]);
+      const [{ lessonBody, disposeLesson }, sim] = await Promise.all([import('./runtime'), o.sim ? o.sim() : Promise.resolve({})]);
+      dispose = disposeLesson;
       const extra = ('default' in sim ? sim.default : sim) as SceneBody;
       return lessonBody(o.lesson, extra, { provider: o.provider });
     },

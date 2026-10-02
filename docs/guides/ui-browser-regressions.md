@@ -13,6 +13,7 @@ requirements.
 | Compact shell | Opt-in compact portrait/landscape controls and the expanded desktop presentation | `playtest/ui/compact-shell` |
 | Comfort settings | Actual large-text/Calm settings, computed CSS, browser storage/reload/reset, legacy attributes and OS reduced motion | `playtest/ui/comfort` |
 | Owned touch sources | Two simultaneous CDP contacts, held movement plus a separate action, independent release, modal cancellation and neutral restart, owner teardown, keyboard independence | `playtest/ui/touch-sources` |
+| Native controls | Arcade focused Sound buttons keep native Space/Enter activation while scene focus retains its declared Space action | `playtest/ui/native-controls` |
 
 Each script owns its temporary Vite server and isolated, muted Chromium sessions.
 The command stops at the first failed diagnostic and returns a failing exit code.
@@ -69,3 +70,11 @@ failures). A nested change to the same setting invalidates remaining stale outer
 delivery; unrelated setting changes do not suppress valid subscribers. Real
 SaveStore unit regressions cover this callback boundary separately from browser
 comfort styling and physical-device acceptance.
+
+## Stock consumer acceptance is separate
+
+The candidate stock touch-control runner is not currently part of this six-diagnostic
+command or CI. Its [exploratory receipt](../verification/stock-device-20261001/README.md)
+records 16 target/tap checks and an observed lesson content overlap that those checks
+do not detect. Keep that narrower evidence separate from framework regressions and
+from full stock-template device acceptance.
