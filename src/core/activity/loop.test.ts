@@ -296,3 +296,52 @@ test('reporter disposal followed by a throw cannot revive tickers or schedule an
     assert.throws(() => loop.add({ owner: 'late' }), /disposed/);
   } finally { loop.dispose(); console.error = oldError; }
 });
+
+test('PERF-01: without a sampler a frame reads no extra clock; a sampler gets one reused record per frame', () => {
+  let reads = 0, clock = 0;
+  const { frames, loop } = setup({ now: () => { reads++; return clock; } });
+  loop.add({ owner: 'a', mode: 'continuous', render: () => { clock += 3; } });
+  frames.run(0); frames.run(16); frames.run(33);
+  assert.equal(reads, 0, 'the zero-overhead path makes no now() call inside frames');
+  assert.equal(loop.hasSampler, false);
+  const seen: { timeMs: number; intervalMs: number; workMs: number; rendered: boolean; hidden: boolean }[] = [];
+  let record: unknown;
+  const off = loop.attachSampler({ frame(r) { record ??= r; assert.equal(r, record, 'one reused record'); seen.push({ ...r }); } });
+  assert.equal(frames.pending, 1, 'attaching neither schedules nor cancels');
+  frames.run(50); frames.run(66);
+  assert.equal(reads, 4, 'two clock reads per sampled frame');
+  assert.deepEqual(seen.map(s => [s.timeMs, Math.round(s.intervalMs), s.workMs, s.rendered, s.hidden]), [[50, 17, 3, true, false], [66, 16, 3, true, false]]);
+  assert.throws(() => loop.attachSampler({ frame() {} }), /already has a frame sampler/);
+  off(); off();
+  frames.run(83);
+  assert.equal(seen.length, 2, 'detached: no more records');
+  assert.equal(reads, 4);
+});
+
+test('PERF-01: an attached sampler never wakes an idle loop and sees the hidden transition once', () => {
+  let hidden = false; const listeners = new Set<(h: boolean) => void>();
+  const visibility: VisibilityPort = { hidden: () => hidden, onChange(l) { listeners.add(l); return () => listeners.delete(l); } };
+  const { frames, loop } = setup({ visibility });
+  const seen: { hidden: boolean; intervalMs: number }[] = [];
+  loop.add({ owner: 'a', render: () => {} });
+  frames.run(16);
+  assert.equal(frames.pending, 0, 'idle');
+  loop.attachSampler({ frame: r => { seen.push({ hidden: r.hidden, intervalMs: r.intervalMs }); } });
+  assert.equal(frames.pending, 0, 'a sampler keeps nothing awake');
+  hidden = true; for (const l of listeners) l(true);
+  assert.deepEqual(seen, [{ hidden: true, intervalMs: 0 }]);
+});
+
+test('PERF-01: a throwing sampler is detached and reported; tickers keep running', () => {
+  const reports: string[] = [];
+  const { frames, loop } = setup({ report: owner => reports.push(owner) });
+  let renders = 0;
+  loop.add({ owner: 'a', mode: 'continuous', render: () => { renders++; } });
+  loop.attachSampler({ frame() { throw new Error('broken sampler'); } });
+  frames.run(16); frames.run(33);
+  assert.equal(renders, 2);
+  assert.deepEqual(reports, ['frame-sampler']);
+  assert.equal(loop.hasSampler, false);
+  loop.dispose();
+  assert.throws(() => loop.attachSampler({ frame() {} }), /disposed/);
+});
