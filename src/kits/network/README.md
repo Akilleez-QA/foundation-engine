@@ -410,3 +410,16 @@ acceptance.
 NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. Clean native acceptance passed at `8317c69` with seven observations; 17 storage/host checks passed on Node 22.13. DV-01 remains open. The [acceptance ledger](../../../docs/guides/upgrade-acceptance-ledger.md)
 records revisions, process evidence and outstanding work. Application credit,
 command consumption, durable commitment and disclosure permission remain distinct.
+
+## Measured loopback overload (NW-07, tools only)
+
+`npm run probe:network` ([tool](../../../tools/network-probe/README.md),
+[guide](../../../docs/guides/network-overload.md)) drives the network and replication
+reference hosts past saturation over real loopback WebSockets. It reports goodput
+against offered load, rejections by reason, admitted-work latency, high-water marks,
+a physical non-reading peer and a host-restart reconnect storm paced by
+`createRetrySchedule`. It changes nothing in this kit. One finding concerns this kit's
+optional `maxQueuedAgeMs`: because each aged shed costs a pump attempt, an age shorter
+than the real queued wait collapses goodput instead of letting it plateau. Keep the age
+above the worst wait your queue limits, peer count and pump budget allow. Evidence is
+loopback/process scope only, not WAN or physical devices. Implemented, candidate (PR).

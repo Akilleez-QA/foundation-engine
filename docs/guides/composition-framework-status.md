@@ -366,3 +366,16 @@ edited-world persistence remain separate work. See the
 | ID | Contract | State |
 |---|---|---|
 | DX-02 | Learn timeline objectives semantics: [`TimelinePlayer.state().objectives`](../../src/kits/learn/timeline.ts) is true from an `objectives` action until the learner passes the next gate after it, then stays false (it used to stay true for the whole scene, so the card returned over later drawings). The learn runtime shows the card from that flag on the first scene, outside interrupts. ui kit HUD lines and the prompt gain a readability plate ([README](../../src/kits/ui/README.md)). `play:script` gains `holdUntil`. | Implemented, candidate (public PR #40, stacked on #39); not integrated. Timeline unit test, learn `play:script` 9/9 and emulated snaps on the branch. Lessons that relied on the card returning at later gates would see it once; no stock lesson did. No device claim. |
+
+## Overload and goodput probe — NW-07 implemented, candidate
+
+`npm run probe:network` ([guide](network-overload.md)) measures the loopback network
+and replication reference hosts past saturation: goodput against offered load,
+rejections by reason, admitted-work latency, high-water marks, a physical non-reading
+peer and a host-restart reconnect storm. Tools only; implemented, candidate (PR); not
+integrated. FIFO goodput plateaued and adversaries were limited without closing
+healthy peers. The replication host's buffered cap retired a paused peer in 2 of 3
+runs. A queue age shorter than the real queued wait collapses goodput (finding, not
+fixed). Loopback/process scope only; WAN, browsers and physical devices remain
+unverified. See the [evidence](../verification/network-overload-20261002/README.md)
+and the [ledger](upgrade-acceptance-ledger.md).
