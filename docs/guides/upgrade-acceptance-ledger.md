@@ -307,7 +307,7 @@ Status: candidate (PR #16), building on integrated NW-04 (PR #14); not integrate
 
 ## Deterministic turn log (turns kit, TB-01) — implemented, candidate
 
-Status: implemented, candidate on branch `feat/genre-turnbased-slice1` (PR pending); not integrated. See the [kit README](../../src/kits/turns/README.md) and [recipe](../recipes/add-a-turn-log.md).
+Status: implemented, candidate on branch `feat/genre-turnbased-slice1` (PR #24); not integrated. See the [kit README](../../src/kits/turns/README.md) and [recipe](../recipes/add-a-turn-log.md).
 
 - Runtime-enforced: rules id, validator literal-`true` acceptance, JSON capture limits for commands and states, `maxCommands` retention (`full` overload, `checkpoint` recovery), revision-checked mutations (`stale`), reentrancy (`busy`), disposal (`retired`), frozen states, restore outcomes `invalid`/`foreign`/`diverged` with a 64-bit replay checksum (replay kit `hashText`).
 - Checked: 17 focused headless unit tests (determinism, preview equals submit, undo/redo/replay, real SaveStore round trip across a fresh store, adversarial reducers and inputs, durable-authority composition with an in-memory adapter).
