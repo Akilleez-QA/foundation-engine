@@ -7,7 +7,9 @@
  * - Reading levels are key variants (STD-STR-3): `key` is the standard text, `key@detailed` the detailed text (for
  *   example a guardian's or expert's reading). The level comes from the i18n default (set by the layer) or from
  *   `t(key, vars, {level})`.
- * - A key missing in the current locale falls back per key to the base locale (STD-STR-4). A key missing everywhere
+ * - A key missing in the current locale falls back per key along the locale chain, ending at the base locale
+ *   (STD-STR-4): explicit `fallbacks[locale]`, then the tag truncated subtag by subtag (`pt-BR` → `pt`), then the
+ *   base. `localeChain()` reports it; the chain is at most MAX_LOCALE_CHAIN entries. A key missing everywhere
  *   calls `onMissing` (DEV throws, production logs once: the caller decides) and renders the caller's `fallback`, or
  *   the key itself. Never a generic line.
  *
@@ -19,6 +21,33 @@ import { fillNarrationPattern, narrationKey, type NarrationFamilyDef, type Narra
 export type ReadingLevel = 'standard' | 'detailed';
 export type Catalog = Readonly<Record<string, string>>;
 export const DETAILED_SUFFIX = '@detailed';
+/** Longest locale fallback chain, including the base locale. */
+export const MAX_LOCALE_CHAIN = 8;
+
+/**
+ * The lookup chain for `locale`: the tag, then each `fallbacks` entry for it, then each tag truncated one subtag at a
+ * time (RFC 4647 lookup, dropping a lone single-letter subtag with the one after it), then `base`. Duplicates are
+ * removed case-insensitively; the result has at most MAX_LOCALE_CHAIN entries and always ends with `base`.
+ */
+export function localeChain(locale: string, base: string, fallbacks: Readonly<Record<string, readonly string[]>> = {}): string[] {
+  const out: string[] = [], seen = new Set<string>();
+  const add = (tag: string) => {
+    if (typeof tag !== 'string' || !tag || tag.length > 64) return;
+    const k = tag.toLowerCase();
+    if (!seen.has(k) && out.length < MAX_LOCALE_CHAIN - 1 && k !== base.toLowerCase()) { seen.add(k); out.push(tag); }
+  };
+  const truncations = (tag: string) => {
+    const parts = tag.split(/[-_]/);
+    while (parts.length > 1) { parts.pop(); if (parts.length > 1 && parts[parts.length - 1].length === 1) parts.pop(); add(parts.join('-')); }
+  };
+  add(locale);
+  const explicit = Object.hasOwn(fallbacks, locale) ? fallbacks[locale] : [];
+  for (const tag of Array.isArray(explicit) ? explicit : []) add(tag);
+  truncations(locale);
+  for (const tag of Array.isArray(explicit) ? explicit : []) truncations(tag);
+  out.push(base);
+  return out;
+}
 
 /** Per-call options. `fallback` is the owner's text for an unknown key (STD-STR-4). */
 export interface TOptions { level?: ReadingLevel; fallback?: string }
@@ -33,6 +62,8 @@ export interface I18n<P> {
   /** True when the key (standard text) resolves in the current locale or the base locale. */
   has(key: string): boolean;
   locale(): string;
+  /** The current lookup chain, most specific first, ending at the base locale. */
+  localeChain(): readonly string[];
   setLocale(locale: string): void;
   level(): ReadingLevel;
   setLevel(level: ReadingLevel): void;
@@ -50,6 +81,8 @@ export interface I18nOptions {
   locale: string;
   catalogs: Readonly<Record<string, Catalog>>;
   baseLocale?: string;
+  /** Extra per-locale fallbacks tried before truncation, e.g. `{ 'es-MX': ['es-419'] }`. */
+  fallbacks?: Readonly<Record<string, readonly string[]>>;
   level?: ReadingLevel;
   onMissing?: (key: string, locale: string) => void;
   /** A composed narration key outside its family's domain. Throw to fail loudly; return to log and go on. */
@@ -61,7 +94,13 @@ export function createI18n<P>(opts: I18nOptions): I18n<P> {
   let locale = opts.locale, level: ReadingLevel = opts.level ?? 'standard';
   const catalogs = new Map<string, Record<string, string>>(Object.entries(opts.catalogs).map(([l, c]) => [l, { ...c }]));
   const parsed = new Map<string, Part[]>();
-  const chain = () => (locale === base ? [base] : [locale, base]);
+  const fallbacks: Record<string, readonly string[]> = {};
+  for (const [tag, list] of Object.entries(opts.fallbacks ?? {})) fallbacks[tag] = Array.isArray(list) ? list.slice(0, MAX_LOCALE_CHAIN) : [];
+  let chainCache: { locale: string; chain: readonly string[] } | null = null;
+  const chain = (): readonly string[] => {
+    if (chainCache?.locale !== locale) chainCache = { locale, chain: Object.freeze(localeChain(locale, base, fallbacks)) };
+    return chainCache.chain;
+  };
 
   function lookup(key: string, want: ReadingLevel): { text: string; locale: string } | null {
     for (const l of chain()) {
@@ -91,6 +130,7 @@ export function createI18n<P>(opts: I18nOptions): I18n<P> {
     },
     has: key => lookup(key, 'standard') !== null,
     locale: () => locale,
+    localeChain: chain,
     setLocale(l) { locale = l; },
     level: () => level,
     setLevel(l) { level = l; },
