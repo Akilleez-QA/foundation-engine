@@ -424,3 +424,10 @@ sub-path changes); not integrated. Evidence: unit tests with an injected AudioCo
 decode or play). Audible playback, latency and loudness on physical devices are unverified;
 streaming and looping are out of scope. Sound files share AUD-01's voice chain (HRTF limit,
 distance models, cutoff, filter) through `ctx.playVoice`.
+
+## Audio-clock timeline (AU-01) — implemented, candidate
+
+Caller-owned `createAudioTimeline` composes with the existing audio output and scene
+voices: it adds no context, timer or loop, and is pumped from a scene's frame system.
+Candidate (PR #31); not integrated. See the [guide](audio-timeline.md) and the
+[recipe](../recipes/sync-gameplay-to-music.md).

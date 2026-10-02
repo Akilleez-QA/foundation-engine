@@ -62,7 +62,7 @@ test('legacy scripted input works without metadata and covered scene input retai
   assert.equal(t.ctx.input.pressed('inspect'), true);
   assert.equal(t.ctx.input.describe('inspect'), null);
   const hint = Object.freeze({ labelKey: 'game.input.inspect', keys: Object.freeze(['i']), pad: Object.freeze([]), inContext: false });
-  const input = sceneInput(() => false, () => true, new Set(['inspect']), { x: 0, y: 0, down: false, pressed: false }, id => id === 'inspect' ? hint : null);
+  const input = sceneInput(() => false, () => true, new Map([['inspect', 1]]), { x: 0, y: 0, down: false, pressed: false }, id => id === 'inspect' ? hint : null);
   assert.equal(input.pressed('inspect'), false);
   assert.equal(input.describe('inspect'), hint);
 });

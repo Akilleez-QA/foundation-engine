@@ -59,7 +59,9 @@ test('a caller-owned input replaces the scripted input, and scripting it is refu
   const input = { describe: () => null, pressed: () => false, held: () => false, axis: () => axis, pointer: { x: 0, y: 0, down: false, pressed: false } };
   const scene = await testScene(defineScene({ id: 'input-owner', title: 'Input owner', systems: [defineSystem({ id: 'read', run(ctx) { seen.push(ctx.input.axis('steer')); } })] }), { input });
   try {
-    assert.equal(scene.ctx.input, input);
+    // A source without pressedAt is completed (no timestamps) and otherwise read through; a full InputState is used as is.
+    assert.equal(scene.ctx.input.pressedAt('steer'), null);
+    assert.equal(scene.ctx.input.pointer, input.pointer);
     axis = -1; scene.run(1 / 60);
     axis = 1; scene.run(1 / 60);
     assert.deepEqual(seen, [-1, 1]);
@@ -67,4 +69,7 @@ test('a caller-owned input replaces the scripted input, and scripting it is refu
     assert.throws(() => scene.hold('steer'), /caller-owned/);
     assert.throws(() => scene.release('steer'), /caller-owned/);
   } finally { scene.dispose(); }
+  const full = { ...input, pressedAt: (_action: string): number | null => 7 };
+  const owned = await testScene(defineScene({ id: 'input-owner-full', title: 'Input owner', systems: [] }), { input: full });
+  try { assert.equal(owned.ctx.input, full); assert.equal(owned.ctx.input.pressedAt('steer'), 7); } finally { owned.dispose(); }
 });

@@ -666,3 +666,13 @@ network workbench wires one plausibility rule behind `--integrity`. Slice A impl
 candidate (PR #20); not integrated. Evidence is unit and loopback host tests only.
 Slice B (verified runs through the SIM-01 replay kit, merged in PR #17) is a design in the
 [integrity guide](integrity.md#slice-b-verified-runs-planned-not-built), not built.
+## Audio-clock timeline (AU-01) — implemented, candidate
+
+Optional [`createAudioTimeline`](audio-timeline.md) makes the audio context's clock
+the master timeline for timed gameplay: smoothed audio↔page-clock mapping with
+resync on jumps, heard-time latency from `getOutputTimestamp` or reported latencies,
+bounded lookahead dispatch with exact start times, late-drop overload, input
+timestamps (`ctx.input.pressedAt`) and a stored calibration. It reuses the one audio
+output (new read-only `clock()`, scheduled `playVoice({ at })`). Status: implemented,
+candidate (PR #31); not integrated. Evidence is unit and headless scene tests only;
+no browser output timing, physical-device or audible verification.

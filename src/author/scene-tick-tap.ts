@@ -8,7 +8,7 @@
  * The tap does not add a clock: tick k is the k-th fixed step the visit's system runner takes after arrival.
  */
 import type { World } from '../core/ecs/world';
-import type { InputState } from './defs';
+import type { InputSource, InputState } from './defs';
 
 export interface SceneTickTapContext {
   /** The scene id (without the `scene.` prefix). */
@@ -22,7 +22,7 @@ export interface SceneTickTapContext {
   readonly step: number;
   readonly world: World;
   /** The visit's live input. */
-  readonly live: InputState;
+  readonly live: InputSource;
   /** Ask the frame loop for another frame (e.g. after a replay is armed). */
   invalidate(): void;
 }

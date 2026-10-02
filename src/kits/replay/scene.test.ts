@@ -115,6 +115,11 @@ test('SIM-01 scene: tick facts are canonical and limited to declared actions', (
   tap.load({ a: { steer: 1 }, x: [0.5, -0.5, 1, 0] });
   assert.deepEqual([tap.input.axis('steer'), tap.input.pressed('restart'), tap.input.pointer.x, tap.input.pointer.down], [1, false, 0.5, true]);
   assert.equal(sceneReplayConfig('play', inputs), 'scene:play;inputs:restart,steer~');
+  tap.load({ p: ['restart'] });
+  assert.equal(tap.input.pressed('restart'), true);
+  assert.equal(tap.input.pressedAt('restart'), null, 'a logged tick records presses, not their times');
+  tap.passThrough({ describe: () => null, pressed: () => true, pressedAt: () => 42, held: () => false, axis: () => 0, pointer: { x: 0, y: 0, down: false, pressed: false } });
+  assert.equal(tap.input.pressedAt('restart'), 42, 'live reads keep the source timestamp');
 });
 
 // ------------------------------------------------------------------ the fixed-step host (domain/sim)

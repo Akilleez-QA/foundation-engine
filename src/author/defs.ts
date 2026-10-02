@@ -21,6 +21,7 @@ import type { BuildBrief } from './build';
 import type { CueVoice, CueVoiceOptions } from '../platform/audio/audio-output';
 import { validateResidency, type AssetResidencyInput } from '../platform/assets/residency';
 import { validateSpatialAudioOptions, type SpatialAudioOptions } from '../platform/audio/module';
+import type { AudioClockReading } from '../platform/audio/audio-timeline';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const need = (ok: boolean, message: string) => { if (!ok) throw Error(message); };
@@ -71,6 +72,13 @@ export interface InputState {
    * ownership) releases a press not yet seen.
    */
   pressed(action: string): boolean;
+  /** When `pressed(action)` is true, that press's time in page monotonic milliseconds (the event's own timestamp where
+   *  the device reports one; gamepads are stamped when polled), under the same lane rules: a fixed system reads the
+   *  earliest press its tick took, a frame system the earliest press of its frame. Null when not pressed, or when no
+   *  timestamp exists: a tick
+   *  recorded or replayed by the replay kit (its log holds presses, not their times), or an `InputSource` without
+   *  `pressedAt`. Same timebase as `time.now`, including while a test driver holds and steps frames. */
+  pressedAt(action: string): number | null;
   /** True while the action is held. */
   held(action: string): boolean;
   /** -1…1 for an axis action (its negative and positive bindings). */
@@ -78,6 +86,10 @@ export interface InputState {
   /** The pointer over the view, in normalised device coordinates (-1…1); `pressed` follows the `pressed()` rules. Read-only. */
   readonly pointer: { readonly x: number; readonly y: number; readonly down: boolean; readonly pressed: boolean };
 }
+
+/** A caller-built input source (`testScene({ input })`, a replay source): `pressedAt` is optional and reads null when
+ *  absent. `ctx.input` always has it. */
+export type InputSource = Omit<InputState, 'pressedAt'> & Partial<Pick<InputState, 'pressedAt'>>;
 
 /** One visit-owned reading surface. Cancellation resolves ready with an aborted signal; entry failures reject it. */
 export interface ReadingSheet {
@@ -117,7 +129,9 @@ export interface SceneContext {
   readonly scene: { readonly id: string; readonly params: Readonly<Record<string, string>>; goto(scene: string, params?: Record<string, string>): void; restart(): void };
   readonly input: InputState;
   /** Seconds since the visit began, the frame count, and Calm (reduced motion: skip decorative motion). */
-  readonly time: { readonly t: number; readonly frame: number; readonly calm: boolean };
+  readonly time: { readonly t: number; readonly frame: number; readonly calm: boolean;
+    /** This frame's timestamp in page monotonic milliseconds (`performance.now()` timebase; 0-based in testScene). */
+    readonly now: number };
   readonly view: ViewState;
   readonly brief: BuildBrief;
   spawn(prefab: EntityDefinition, ...extra: readonly ComponentInit<object>[]): Entity;
@@ -141,6 +155,9 @@ export interface SceneContext {
   playVoice(cue: string, options?: CueVoiceOptions): CueVoice | null;
   /** Seeded: the same seed (`?seed=` in test builds) gives the same sequence. */
   random(): number;
+  /** One sample of the audio context clock for an audio timeline (`createAudioTimeline`), or null when silent,
+   *  locked, hidden or headless. Never creates or resumes audio. */
+  audioClock(): AudioClockReading | null;
   /** An engine or kit service (`ctx.service('progression')`), for kits' helper functions. */
   service<K extends keyof Services>(key: K): Services[K];
 }

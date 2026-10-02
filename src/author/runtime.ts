@@ -44,6 +44,7 @@ import { enterActivity, type SceneParams } from '../platform/ui/scene-shell';
 import type { BuildBrief } from './build';
 import type { SceneHandle } from './play';
 import { TEST_API } from '../core/env';
+import { monotonicNow } from '../core/clock';
 import { createSystemTiming } from './system-timing';
 import { openSceneTickTap, type SceneTickTap } from './scene-tick-tap';
 import { createSceneEntityInspector } from './entity-inspection';
@@ -148,17 +149,23 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       for (const e of body.entities) spawnInto(world, e);
 
       // Input: every game action is owned by this visit; a press is kept for the frame that reads it and, across
-      // zero-step frames, for the next fixed tick (press-latch.ts, STD-SIM-12).
+      // zero-step frames, for the next fixed tick (press-latch.ts, STD-SIM-12), with its event timestamp (page
+      // monotonic ms) for ctx.input.pressedAt.
       const pressed = createPressLatch(), input = s.input;
+      // A game action press from a key is a user gesture: a keyboard-only player can unlock audio (pointers already do;
+      // browsers may not count a gamepad press, and then unlock() changes nothing).
+      const unlockAudio = () => { if (s.app.has('platform.audio') && !actx.signal.aborted) s.audio.unlock(); };
+      const stampOf = (at: number) => Number.isFinite(at) && at > 0 ? at : monotonicNow();
+      const press = (id: string, at: number) => pressed.add(id, stampOf(at));
       for (const i of o.inputs) {
         if (i.axis) for (const side of ['negative', 'positive'] as const) input.onAction(actionOf(i.id, side), () => { actx.invalidate(); return true; }, { owner: actx.runId, signal: actx.signal });
-        else input.onAction(actionOf(i.id), e => { if (e.phase === 'press') pressed.add(i.id); if (e.phase !== 'repeat') actx.invalidate(); return true; }, { owner: actx.runId, signal: actx.signal });
+        else input.onAction(actionOf(i.id), e => { if (e.phase === 'press') { press(i.id, e.t); unlockAudio(); } if (e.phase !== 'repeat') actx.invalidate(); return true; }, { owner: actx.runId, signal: actx.signal });
       }
       const ownsInput = () => !actx.signal.aborted && actx.coverage() === 'top' && viewOwnsInput(view) && !view.closest('.view-covered');
       const gestures = bindScenePointer(surface.canvas, {
         signal: actx.signal,
         owns: ownsInput,
-        press: () => { pressed.pointerPressed(); for (const i of o.inputs) if (i.tap) pressed.add(i.id); },
+        press: at => { pressed.pointerPressed(stampOf(at)); for (const i of o.inputs) if (i.tap) press(i.id, at); },
         canceled: () => pressed.clear(), blocked: () => input.cancel('overlay'), invalidate: () => actx.invalidate(),
       });
       const pointer = pressed.pointer(gestures.pointer);
@@ -183,7 +190,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
         } catch (error) { s.log.error(`${scene.id}: tick tap failed`, error); }
         if (tap) { const owned = tap; actx.own(() => owned.retire()); tapArrive = () => owned.arrive(); }
       }
-      let frame = 0, t = 0, calm = false;
+      let frame = 0, t = 0, calm = false, frameMs = monotonicNow();
       const voices = createSceneVoices((cue, options) => !s.app.has('platform.audio') || actx.signal.aborted ? null : s.audio.playVoice(cue, options));
       actx.own(() => voices.dispose());
       const ctx: SceneContext = {
@@ -194,7 +201,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
           restart: () => { void s.router.go(sceneId(scene.id), { params: { ...visit.params }, again: 'reenter' }); },
         },
         input: tap ? tap.input : liveInput,
-        get time() { return { t, frame, calm }; },
+        get time() { return { t, frame, calm, now: frameMs }; },
         view: viewState,
         spawn: (prefab, ...extra) => spawnInto(world, prefab, extra),
         named: name => { for (const [e, n] of world.query(Name)) if (n.name === name) return e; return undefined; },
@@ -207,6 +214,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
         modelPoseLinkState: entity => models.poseLinkState(entity),
         modelSocket: (entity, name) => models.socket(entity, name),
         random,
+        audioClock: () => !s.app.has('platform.audio') || actx.signal.aborted ? null : s.audio.clock(),
         service: key => s[key],
       };
       ctxRef = ctx;
@@ -445,7 +453,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
           if(programFailed)return;
           if(!simulating){pressed.clear();gestures.pointer.pressed=false;return;}
           try{
-          frame++; t += f.dt; calm = f.calm;
+          frame++; t += f.dt; calm = f.calm; frameMs = f.t * 1000;
           gestures.sync();
           // A held replay tap runs no tick: release live presses so none surfaces at replay tick 0.
           if (!tap || tap.running()) runner.frame(ctx, f.dt); else pressed.clear();

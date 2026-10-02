@@ -105,7 +105,7 @@ test('MV-01: one press jumps once and the trajectory is identical at display rat
     const tr = t.world.get(t.ctx.named('player')!, Transform)!;
     const latch = createPressLatch();
     let held = false, frame = 0, now = 0;
-    const input: InputState = { describe: () => null, pressed: id => latch.has(id), held: id => id === 'jump' && held, axis: () => 0, pointer: { x: 0, y: 0, down: false, pressed: false } };
+    const input: InputState = { describe: () => null, pressed: id => latch.has(id), pressedAt: id => latch.get(id) ?? null, held: id => id === 'jump' && held, axis: () => 0, pointer: { x: 0, y: 0, down: false, pressed: false } };
     const ctx = Object.create(t.ctx, { input: { value: input }, time: { get: () => ({ t: now, frame, calm: false }) } }) as SceneContext;
     const ys: number[] = [];
     const runner = createSystemRunner<SceneContext>([jumpSystem({ action: 'jump', config, ground }), { id: 'probe', run() { ys.push(tr.y); } }],
@@ -113,7 +113,7 @@ test('MV-01: one press jumps once and the trajectory is identical at display rat
     // Frame i delivers what happened during (previous, now]; events land exactly on frame boundaries here.
     for (let i = 1; now < 2.5; i++) {
       const previous = now; now = i / hz; frame = i;
-      if (previous < PRESS - 1e-9 && now >= PRESS - 1e-9) latch.add('jump');
+      if (previous < PRESS - 1e-9 && now >= PRESS - 1e-9) latch.add('jump', now * 1000);
       held = now >= PRESS - 1e-9 && now < RELEASE - 1e-9;
       runner.frame(ctx, now - previous); latch.endFrame();
     }
@@ -143,7 +143,7 @@ test('MV-01: presses on adjacent ticks are two presses; the adapter adds no filt
   const t = await testScene(scene(), {});
   const tr = t.world.get(t.ctx.named('player')!, Transform)!;
   let pressed = false, frame = 0, rises = 0, last = 0;
-  const input: InputState = { describe: () => null, pressed: id => id === 'jump' && pressed, held: () => false, axis: () => 0, pointer: { x: 0, y: 0, down: false, pressed: false } };
+  const input: InputState = { describe: () => null, pressed: id => id === 'jump' && pressed, pressedAt: () => null, held: () => false, axis: () => 0, pointer: { x: 0, y: 0, down: false, pressed: false } };
   const ctx = Object.create(t.ctx, { input: { value: input }, time: { get: () => ({ t: frame / 60, frame, calm: false }) } }) as SceneContext;
   const short = { height: 0.1, timeToApex: 0.1, bufferTime: 1, releaseGravityScale: 1 };
   const runner = createSystemRunner<SceneContext>([jumpSystem({ action: 'jump', config: short, ground }), { id: 'probe', run() { if (last === 0 && tr.y > 0) rises++; last = tr.y; } }], { step: 1 / 60 });

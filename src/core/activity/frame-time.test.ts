@@ -18,5 +18,5 @@ test('actual loop update and render share its scheduler time, including reentran
  const reads:number[]=[];
  inner.add({owner:'inner',render:f=>{assert.equal(frameNow(),f.t*1000);reads.push(frameNow());}});
  outer.add({owner:'outer',update:f=>{reads.push(frameNow());assert.equal(frameNow(),f.t*1000);inner.stepFrame(.02);reads.push(frameNow());},render:()=>reads.push(frameNow())});
- outer.stepFrame(.01);assert.deepEqual(reads,[10,20,10,10]);outer.dispose();inner.dispose();
+ outer.stepFrame(.01);assert.deepEqual(reads,[10009,10019,10009,10009],'held frames continue from now()');outer.dispose();inner.dispose();
 });
