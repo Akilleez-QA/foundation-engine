@@ -53,3 +53,24 @@ interface, so only the used structural signature will be declared locally.
 ## Public native task oracle follow-up
 
 The native fixture now uses a bounded 0.25ms acquisition workload over 256 nodes so a prequeued timer becomes eligible during preparation. Different browser task sources do not promise FIFO ordering; an otherwise empty short native-priority task chain can complete before a clamped timer becomes eligible. The sustained oracle requires the timer to observe a nonzero strict subset, unfinished. Run `node -r ./scripts/silent-browser.cjs scripts/play/dependency-preparation-check.mjs`; it retains revision, result and failures. No graphics context, application data or external source content is used. Exact-head native/gate evidence follows separately. Upstream fetched and reconciled at c0e73c9; no rebase changes were necessary.
+
+## Public submission checkpoint `3361a43`
+
+Rebased onto public `main` `9585f3f` and stacked on the program preparation
+branch (both append to the same status records; there is no source overlap). The
+review added only the label on the unpublished downstream measurement above.
+
+Native task oracle on exact head `3361a43f3562b553996ff4b763c0cb71439d3400`,
+isolated muted Chromium via `scripts/play/dependency-preparation-check.mjs`:
+PASS, the prequeued timer observed 1 of 256 acquisitions with preparation
+unfinished; all 256 then completed. See [report](native-oracle-3361a43.json).
+
+On the same head with Node 22: `npm run check` PASS; `npm test` 2,060 tests,
+0 failures; `npm run lint` PASS; `npm run gate:templates` PASS for all seven
+templates (arcade 43 s, blank 38 s, expedition 57 s, explorer 55 s, learn 38 s,
+mechanics 40 s, terrain 43 s): 129 software-GL performance checks, zero over
+budget, regressions or inconclusive results, and the same four advisory heap
+warnings as the base. Budgets unchanged. No stock template scene creates a dependency
+closure, so for that path the gate is a regression check, not a responsiveness
+measurement; worker-runtime checkpoints now default to the same task seam. Downstream comparison, frame-time and
+physical-device acceptance remain unverified.
