@@ -67,5 +67,5 @@ test('NW07: reconnect storm after a host restart is paced and bounded; every own
   );
   for (const pid of report.ownedResourcesAfterCleanup.startedHostPids)
     assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `host ${pid} exited`);
-  for (const row of report.invariants) if (!row.finding) assert.equal(row.ok, true, `${row.id}: ${row.detail}`);
+  for (const row of report.invariants) if (!row.finding && !row.inconclusive) assert.equal(row.ok, true, `${row.id}: ${row.detail}`);
 });

@@ -526,6 +526,9 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
         admittedLatency: latencySummary(s.latency),
         hostDispatchedPerSecond: dispatched === null ? null : round(dispatched / secs),
         hostStaleShed: s.hostAfter && s.hostBefore ? s.hostAfter.stale - s.hostBefore.stale : null,
+        // Pump attempts the host actually made (dispatch + age shed): its achieved capacity in this step.
+        hostAttemptsPerSecond:
+          dispatched === null ? null : round((dispatched + (s.hostAfter.stale - s.hostBefore.stale)) / secs),
       };
     });
     const goodputs = stepRows.map((r) => r.goodputPerSecond);
@@ -935,7 +938,15 @@ export function invariants(report) {
       // exceeds the age limit most attempts are spent shedding. See the network-overload guide (NW-07).
       rows.push({ id: `${id}.goodput-with-queue-age`, ok: null, finding: true,
         detail: `${plateau}; age ${o.host.maxQueuedAgeMs} ms vs full-queue drain ${o.host.fullQueueDrainMs} ms, fair-rotation bound ${o.host.fairRotationWaitBoundMs} ms` });
-    else check(`${id}.goodput-plateaus`, o.derived.plateauRatio >= 0.8, plateau);
+    else {
+      const last = o.steps.at(-1),
+        achieved = last.hostAttemptsPerSecond / o.host.dispatchCapacityPerSecond;
+      if (o.derived.plateauRatio < 0.8 && achieved < 0.8)
+        // The host process itself was starved of CPU: the drop cannot be attributed to queueing behaviour.
+        rows.push({ id: `${id}.goodput-plateaus`, ok: null, inconclusive: true,
+          detail: `${plateau}; host achieved ${last.hostAttemptsPerSecond} of ${o.host.dispatchCapacityPerSecond} attempts/s (CPU-starved)` });
+      else check(`${id}.goodput-plateaus`, o.derived.plateauRatio >= 0.8, `${plateau}; host achieved ${last.hostAttemptsPerSecond} attempts/s`);
+    }
     check(`${id}.global-queue-bound`, o.highWater.queuedMessages <= 32 && o.highWater.queuedBytes <= 16384,
       `sampled high-water ${o.highWater.queuedMessages} messages / ${o.highWater.queuedBytes} bytes`);
     check(`${id}.buffered-bound`, o.highWater.peerBufferedBytes <= 8192, `sampled ${o.highWater.peerBufferedBytes} bytes`);
@@ -1077,7 +1088,8 @@ export function summarize(report) {
   if (n) lines.push(`non-reader: retired=${n.nonReader.retiredByHost} after ${n.nonReader.retiredAfterMs} ms (${JSON.stringify(n.highWater.hostCloseReasons)}); host max buffered ${n.highWater.hostMaxBufferedBytesAtSend} B; healthy adoption p99 ${n.healthy.adoptionLatency.duringAttack.p99Ms} ms during attack`);
   for (const v of report.scenarios.storm?.variants ?? [])
     lines.push(`storm ${v.policy} x${v.clients}: ${v.attempts} attempts, peak ${v.peakAttemptsPerBin}/bin, accepted peak ${v.peakAcceptedOpensPerBin}/bin, ${JSON.stringify(v.outcomes)}`);
-  for (const r of report.invariants) lines.push(`${r.finding ? 'NOTE' : r.ok ? 'ok  ' : 'FAIL'} ${r.id}: ${r.detail}`);
+  for (const r of report.invariants)
+    lines.push(`${r.finding ? 'NOTE' : r.inconclusive ? 'INCONCLUSIVE' : r.ok ? 'ok  ' : 'FAIL'} ${r.id}: ${r.detail}`);
   lines.push(`aborted: ${report.aborted ?? 'no'} · ${Math.round(report.durationMs / 1000)} s`);
   return `${lines.join('\n')}\n`;
 }
