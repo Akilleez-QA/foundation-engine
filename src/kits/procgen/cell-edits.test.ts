@@ -4,7 +4,8 @@ import { deriveSeed } from '../../core/rng';
 import { createFakeIdb } from '../../core/save/fake-idb';
 import { openChunkStore } from '../../core/save/chunk-store';
 import { cellularGridJob } from './cellular';
-import { createCellEdits, decodeCellEdits } from './cell-edits';
+import { baselineChecksum, createCellEdits, decodeCellEdits } from './cell-edits';
+import { GRID_MAX_CELLS } from './grid-job';
 import type { GridRecipe } from './grid-job';
 
 const recipeAt = (root: number, cx: number, cz: number): GridRecipe => ({ formatVersion: 1, generatorVersion: 1, id: `region:${cx},${cz}`, revision: 1, seed: deriveSeed(root, 'region', cx, cz), cellsX: 32, cellsY: 2, cellsZ: 32, parameters: '[0.45,4,5,4]' });
@@ -42,12 +43,12 @@ test('GEN-02 edits back to the baseline disappear and the encoding is canonical 
   b.set(299, 0, 299, 65535); b.set(5, 0, 0, 9);
   assert.equal(a.size, 2);
   assert.deepEqual([...a.encode()], [...b.encode()], 'insertion order does not change the bytes');
-  assert.equal(a.encode().length, 12 + (1 + 2) + (3 + 2));
-  const decoded = decodeCellEdits(a.encode(), 90000);
+  assert.equal(a.encode().length, 16 + (1 + 2) + (3 + 2));
+  const decoded = decodeCellEdits(a.encode(), 90000, {}, baselineChecksum(baseline.values));
   assert.deepEqual([...decoded], [[5, 9], [89999, 65535]]);
-  // stored edits equal to a (changed) baseline are dropped on load
+  // edits are bound to the baseline they were made against
   const moved = { ...baseline, values: baseline.values.slice() }; moved.values[5] = 9;
-  assert.equal(createCellEdits(moved, { saved: a.encode() }).size, 1);
+  assert.throws(() => createCellEdits(moved, { saved: a.encode() }), /baseline mismatch/);
 });
 
 test('GEN-02 the edit bound refuses new cells without losing existing edits', () => {
@@ -70,15 +71,42 @@ test('GEN-02 malformed or mismatched edit encodings are refused, never partially
     ['magic', mutate(b => { b[0] = 0; return b; })],
     ['format', mutate(b => { b[3] = 2; return b; })],
     ['grid size', bytes, 65],
-    ['count', mutate(b => { b[8] = 3; return b; })],
+    ['count', mutate(b => { b[12] = 3; return b; })],
     ['truncated', bytes.subarray(0, bytes.length - 1)],
     ['trailing', new Uint8Array([...bytes, 0])],
-    ['zero delta', mutate(b => { b[15] = 0; return b; })],
-    ['range', mutate(b => { b[15] = 100; return b; })],
+    ['zero delta', mutate(b => { b[19] = 0; return b; })],
+    ['range', mutate(b => { b[19] = 100; return b; })],
+    ['overlong varint', (() => { const b = [...bytes]; b.splice(16, 1, 0x82, 0x00); return new Uint8Array(b); })()],
+    ['six-byte varint', (() => { const b = [...bytes]; b.splice(16, 1, 0x82, 0x80, 0x80, 0x80, 0x80, 0x00); return new Uint8Array(b); })()],
     ['header', bytes.subarray(0, 5)],
   ];
   for (const [why, b, cells] of cases) assert.throws(() => decodeCellEdits(b, cells ?? 64), Error, why);
   assert.throws(() => decodeCellEdits(bytes, 64, { maxValue: 5 }), /value out of range/);
   assert.throws(() => decodeCellEdits(bytes, 64, { maxEdits: 1 }), /too many/);
   assert.throws(() => createCellEdits({ cellsX: 8, cellsY: 1, cellsZ: 8, values: new Uint16Array(64) }, { saved: cases[0]![1] }));
+});
+
+test('GEN-02 the largest grid encodes an edit at its last index (five-byte varint) and round-trips', () => {
+  const values = new Uint16Array(GRID_MAX_CELLS);
+  const edits = createCellEdits({ cellsX: 2048, cellsY: 1, cellsZ: 2048, values });
+  assert.equal(edits.set(2047, 0, 2047, 7), 'changed');
+  const encoded = edits.encode();
+  assert.equal(encoded.length, 16 + 4 + 2, 'a 22-bit index delta needs four varint bytes');
+  const loaded = createCellEdits({ cellsX: 2048, cellsY: 1, cellsZ: 2048, values }, { saved: encoded, revision: 1 });
+  assert.equal(loaded.get(2047, 0, 2047), 7);
+  // five-byte varints (index deltas ≥ 2^28) decode without allocating such a grid
+  const cells = 2 ** 29, delta = 2 ** 28 + 1, header = new DataView(new ArrayBuffer(16));
+  [0x46, 0x43, 0x45, 0x01].forEach((b, i) => header.setUint8(i, b));
+  header.setUint32(4, cells, true); header.setUint32(12, 1, true);
+  const varint: number[] = []; for (let d = delta; ; d = Math.floor(d / 128)) { if (d < 128) { varint.push(d); break; } varint.push((d & 0x7f) | 0x80); }
+  assert.equal(varint.length, 5);
+  const crafted = new Uint8Array([...new Uint8Array(header.buffer), ...varint, 9, 0]);
+  assert.deepEqual([...decodeCellEdits(crafted, cells)], [[delta - 1, 9]]);
+});
+
+test('GEN-02 edits made against one seed are refused over content from another seed', async () => {
+  const base = cellularGridJob.generateNow(recipeAt(7, 0, 0)), other = cellularGridJob.generateNow(recipeAt(8, 0, 0));
+  const edits = createCellEdits(base); edits.set(1, 0, 1, 1 - base.get(1, 0, 1));
+  assert.throws(() => createCellEdits(other, { saved: edits.encode(), revision: 1 }), /baseline mismatch/);
+  assert.equal(createCellEdits(cellularGridJob.generateNow(recipeAt(7, 0, 0)), { saved: edits.encode(), revision: 1 }).size, 1);
 });

@@ -2,17 +2,32 @@
  * Sparse runtime edits over a regenerated grid (GEN-02). The baseline is never stored: it is regenerated from the
  * root seed (GEN-01), and only cells that differ from it are kept, encoded compactly for a chunk store record.
  *
- * Encoding (little-endian): magic 'FCE' + format byte 1, u32 cell count, u32 edit count, then per edit a LEB128
- * varint of the index delta (first delta from -1, so every delta is ≥ 1) and a u16 value. Indices are strictly
- * increasing, which makes every grid state have exactly one encoding.
+ * Encoding (little-endian): magic 'FCE' + format byte 1, u32 cell count, u32 CRC-32 of the baseline values
+ * (little-endian u16 bytes), u32 edit count, then per edit a minimal LEB128 varint of the index delta (first delta
+ * from -1, so every delta is ≥ 1) and a u16 value. Indices are strictly increasing and varints minimal, so every
+ * grid state has exactly one encoding. The baseline CRC binds edits to the content they were made against: loading
+ * them over a different baseline (a new seed, generator or parameters) is refused instead of silently applied.
  */
+import { crc32 } from '../../core/save/chunk-store';
 export interface CellEditLimits { readonly maxEdits: number; readonly maxValue: number }
 export const CELL_EDIT_DEFAULT_LIMITS: CellEditLimits = Object.freeze({ maxEdits: 65536, maxValue: 65535 });
 const MAGIC = [0x46, 0x43, 0x45, 0x01];
-const HEADER = 12;
+const HEADER = 16;
+const MAX_VARINT = 5;
+const LITTLE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
+
+/** CRC-32 of a grid's values as little-endian u16 bytes, independent of platform byte order. */
+export function baselineChecksum(values: Uint16Array): number {
+  if (LITTLE) return crc32(new Uint8Array(values.buffer, values.byteOffset, values.byteLength));
+  const out = new Uint8Array(values.length * 2), view = new DataView(out.buffer);
+  for (let i = 0; i < values.length; i++) view.setUint16(i * 2, values[i]!, true);
+  return crc32(out);
+}
 
 export interface CellEditBaseline { readonly cellsX: number; readonly cellsY: number; readonly cellsZ: number; readonly values: Uint16Array }
 export interface CellEdits {
+  /** `baselineChecksum` of the baseline these edits apply to. */
+  readonly baseline: number;
   /** Current value: the edit if any, else the baseline. */
   get(x: number, y: number, z: number): number;
   /** `changed`, `unchanged` (same as the current value), or `full` (would exceed maxEdits; nothing changes). */
@@ -37,23 +52,28 @@ function checkLimits(limits: Partial<CellEditLimits>): CellEditLimits {
   return l;
 }
 
-/** Decodes and validates an encoded edit list for a grid of `cells` cells. Throws on any malformation. */
-export function decodeCellEdits(bytes: Uint8Array, cells: number, limits: Partial<CellEditLimits> = {}): Map<number, number> {
+/**
+ * Decodes and validates an encoded edit list for a grid of `cells` cells. Throws on any malformation, and on a
+ * baseline mismatch when `baseline` (a `baselineChecksum`) is given.
+ */
+export function decodeCellEdits(bytes: Uint8Array, cells: number, limits: Partial<CellEditLimits> = {}, baseline?: number): Map<number, number> {
   const l = checkLimits(limits);
   if (!(bytes instanceof Uint8Array) || bytes.length < HEADER) throw Error('cell edits: truncated header');
   for (let i = 0; i < 4; i++) if (bytes[i] !== MAGIC[i]) throw Error('cell edits: bad magic or format');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (view.getUint32(4, true) !== cells) throw Error('cell edits: grid size mismatch');
-  const count = view.getUint32(8, true);
+  if (baseline !== undefined && view.getUint32(8, true) !== baseline) throw Error('cell edits: baseline mismatch (edits were made against different content)');
+  const count = view.getUint32(12, true);
   if (count > l.maxEdits || count > cells) throw Error('cell edits: too many edits');
   const out = new Map<number, number>();
   let at = HEADER, index = -1;
   for (let n = 0; n < count; n++) {
-    let delta = 0, shift = 0, b: number;
+    let delta = 0, shift = 0, length = 0, b: number;
     do {
       if (at >= bytes.length) throw Error('cell edits: truncated');
+      if (++length > MAX_VARINT) throw Error('cell edits: varint too long');
       b = bytes[at++]!;
-      if (shift > 28) throw Error('cell edits: varint too long');
+      if (b === 0 && length > 1) throw Error('cell edits: overlong varint');
       delta += (b & 0x7f) * 2 ** shift; shift += 7;
     } while (b & 0x80);
     if (delta < 1) throw Error('cell edits: indices not increasing');
@@ -75,17 +95,19 @@ export function decodeCellEdits(bytes: Uint8Array, cells: number, limits: Partia
  */
 export function createCellEdits(baseline: CellEditBaseline, options: { saved?: Uint8Array; revision?: number; limits?: Partial<CellEditLimits> } = {}): CellEdits {
   const { cellsX, cellsY, cellsZ, values } = baseline;
-  if (![cellsX, cellsY, cellsZ].every(n => int(n, 1, 1 << 22)) || !(values instanceof Uint16Array) || values.length !== cellsX * cellsY * cellsZ) throw Error('cell edits: invalid baseline');
+  if (![cellsX, cellsY, cellsZ].every(n => int(n, 1, 1 << 22)) || !(values instanceof Uint16Array) || values.length !== cellsX * cellsY * cellsZ || values.length > 0xffffffff) throw Error('cell edits: invalid baseline');
   const l = checkLimits(options.limits ?? {});
   let revision = options.revision ?? 0, saved = revision;
   if (!int(revision, 0, Number.MAX_SAFE_INTEGER)) throw Error('cell edits: invalid revision');
-  const edits = options.saved ? decodeCellEdits(options.saved, values.length, l) : new Map<number, number>();
+  const checksum = baselineChecksum(values);
+  const edits = options.saved ? decodeCellEdits(options.saved, values.length, l, checksum) : new Map<number, number>();
   for (const [i, v] of edits) if (values[i] === v) edits.delete(i);
   const index = (x: number, y: number, z: number) => {
     if (!int(x, 0, cellsX - 1) || !int(y, 0, cellsY - 1) || !int(z, 0, cellsZ - 1)) throw Error('cell edits: cell outside grid');
     return (y * cellsZ + z) * cellsX + x;
   };
   return {
+    baseline: checksum,
     get: (x, y, z) => { const i = index(x, y, z); return edits.get(i) ?? values[i]!; },
     set(x, y, z, value) {
       const i = index(x, y, z);
@@ -103,10 +125,10 @@ export function createCellEdits(baseline: CellEditBaseline, options: { saved?: U
     materialize() { const out = values.slice(); for (const [i, v] of edits) out[i] = v; return out; },
     encode() {
       const sorted = [...edits].sort((a, b) => a[0] - b[0]);
-      const out = new Uint8Array(HEADER + sorted.length * 5);
+      const out = new Uint8Array(HEADER + sorted.length * (MAX_VARINT + 2));
       out.set(MAGIC, 0);
       const view = new DataView(out.buffer);
-      view.setUint32(4, values.length, true); view.setUint32(8, sorted.length, true);
+      view.setUint32(4, values.length, true); view.setUint32(8, checksum, true); view.setUint32(12, sorted.length, true);
       let at = HEADER, prev = -1;
       for (const [i, v] of sorted) {
         let delta = i - prev; prev = i;

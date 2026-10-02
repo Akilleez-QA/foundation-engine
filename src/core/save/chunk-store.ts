@@ -4,18 +4,22 @@
  * Save sections hold JSON in Web Storage and are capped (262,144 characters each). A world with many edited regions
  * stores each region's bytes here instead, one record per key, through a `ChunkPort` (IndexedDB, or memory when
  * IndexedDB is unavailable). The owner is the object returned by `createChunkStore`/`openChunkStore`; it serializes
- * its operations, bounds what it admits and stores, and never overwrites bytes it could not read.
+ * its operations, bounds what it admits and stores, and never deletes or overwrites bytes it could not read without
+ * first copying them to the quarantine in the same transaction.
  *
  * Contract summary (details in docs/recipes/store-large-world-records.md):
  * - Writes are atomic per call: every record in one `write` call commits in one transaction or none does.
- * - Each record has a revision; a write must be strictly newer than what is stored (`stale` otherwise), which is
- *   compared inside the transaction, so two tabs cannot silently overwrite each other's newer data.
- * - Records carry the creator's schema number. Older schemas are returned for the creator to migrate; newer ones are
- *   read-only (`newer`). Unreadable records (bad envelope, length or CRC-32) are `quarantined`: a write or removal
- *   first copies the unreadable bytes aside in the same transaction, or refuses when the quarantine is full.
+ * - Each record has a revision; a write must be strictly newer than what is stored (`stale` otherwise), compared
+ *   inside the transaction, so two tabs cannot silently overwrite each other's newer data.
+ * - Records carry the creator's schema number and the store's envelope format. Older schemas are returned for the
+ *   creator to migrate; a newer schema or envelope format is `newer`: never overwritten, removed or evicted here.
+ * - Unreadable records (bad envelope, length or CRC-32) are `quarantined`; a write, removal or eviction first copies
+ *   them aside in the same transaction, or refuses when the quarantine is full.
  * - Limits on key length, record bytes, record count, total bytes, batch size, pending operations and quarantine rows
- *   are checked before any storage work. Over a limit, the creator's `evictable` predicate may release least recently
- *   used records it marks as regenerable; without it the write is refused (`full`) and nothing is discarded.
+ *   are checked before storage work. Over a limit, the creator's `evictable` predicate may release records it marks
+ *   as regenerable, least recently used in this session first; without it the write is refused (`full`).
+ * - Results are values. Caller mistakes reject with `ChunkStoreError`; an unexpected error (a throwing `evictable`)
+ *   resolves `{status: 'failed', error}` for that operation only, and later operations keep running.
  */
 import { ChunkPortError, memoryChunkPort, openIndexedDbChunkPort, type ChunkDurability, type ChunkEntry, type ChunkPort } from './chunk-port';
 
@@ -30,34 +34,46 @@ export interface ChunkStoreLimits {
   readonly maxBatch: number;
   /** Queued operations; more return `busy`. */
   readonly maxPending: number;
-  /** Quarantine rows kept; a write over an unreadable record needs one free row. */
+  /**
+   * Quarantine rows kept. A row holds the unreadable entry as found (meta plus record), so its size is that of the
+   * corrupted record, which storage bounded when it was written: roughly maxQuarantine × maxRecordBytes at most.
+   */
   readonly maxQuarantine: number;
 }
 export const CHUNK_STORE_DEFAULT_LIMITS: ChunkStoreLimits = Object.freeze({
   maxKeyLength: 256, maxRecordBytes: 1 << 20, maxRecords: 65536, maxTotalBytes: 256 << 20, maxBatch: 64, maxPending: 64, maxQuarantine: 32,
 });
 const HARD = { maxKeyLength: 1024, maxRecordBytes: 64 << 20, maxRecords: 1 << 24, maxTotalBytes: Number.MAX_SAFE_INTEGER, maxBatch: 1024, maxPending: 1 << 16, maxQuarantine: 4096 };
+/** Extra eviction candidates read beyond the cached estimate, in case some turn out newer or already gone. */
+const EVICTION_SLACK = 8;
 
 export interface ChunkStoreOptions {
   /** The creator's record schema number (≥ 0). Stored with every record. */
   readonly schema: number;
   readonly limits?: Partial<ChunkStoreLimits>;
-  /** Records the store may evict, least recently used first, when a write would exceed a limit. Default: none. */
+  /** Records the store may evict, least recently used in this session first, when a write would exceed a limit. */
   readonly evictable?: (key: string) => boolean;
 }
 
+export type ChunkFailed = { readonly status: 'failed'; readonly error: unknown };
 export type ChunkReadResult =
   | { readonly status: 'found'; readonly schema: number; readonly revision: number; readonly data: Uint8Array }
   | { readonly status: 'missing' | 'quarantined' | 'busy' | 'closed' | 'unavailable' }
-  | { readonly status: 'newer'; readonly schema: number; readonly revision: number };
+  /** Written by a newer schema or envelope format; `schema`/`revision` when readable. Read-only here. */
+  | { readonly status: 'newer'; readonly schema: number | null; readonly revision: number | null }
+  | ChunkFailed;
 export interface ChunkWrite { readonly key: string; readonly revision: number; readonly data: Uint8Array }
 export type ChunkWriteResult =
   | { readonly status: 'saved'; readonly evicted: readonly string[] }
   | { readonly status: 'stale' | 'newer' | 'quarantine-full'; readonly key: string }
-  | { readonly status: 'full' | 'quota' | 'busy' | 'closed' | 'unavailable' };
-export type ChunkRemoveResult = { readonly status: 'removed' | 'missing' | 'quarantine-full' | 'busy' | 'closed' | 'quota' | 'unavailable' };
+  | { readonly status: 'full' | 'quota' | 'busy' | 'closed' | 'unavailable' }
+  | ChunkFailed;
+export type ChunkRemoveResult = { readonly status: 'removed' | 'missing' | 'newer' | 'quarantine-full' | 'busy' | 'closed' | 'quota' | 'unavailable' } | ChunkFailed;
+export type ChunkStatus = { readonly status: 'busy' | 'closed' | 'unavailable' } | ChunkFailed;
 export interface ChunkStoreStats {
   readonly durability: ChunkDurability;
+  /** False once closed, or after another tab's upgrade closed the connection: nothing more will be stored. */
+  readonly available: boolean;
   readonly records: number;
   readonly bytes: number;
   readonly pending: number;
@@ -72,17 +88,28 @@ export interface ChunkStore {
   write(entries: readonly ChunkWrite[]): Promise<ChunkWriteResult>;
   remove(key: string): Promise<ChunkRemoveResult>;
   /** At most `limit` (≤ maxQuarantine) quarantined rows, for support export. */
-  quarantine(limit?: number): Promise<ChunkQuarantineRow[] | { readonly status: 'busy' | 'closed' | 'unavailable' }>;
+  quarantine(limit?: number): Promise<ChunkQuarantineRow[] | ChunkStatus>;
   /** Deletes every quarantine row (explicit, after the creator has offered export). */
-  clearQuarantine(): Promise<{ readonly status: 'cleared' | 'busy' | 'closed' | 'unavailable' }>;
+  clearQuarantine(): Promise<{ readonly status: 'cleared' } | ChunkStatus>;
+  /**
+   * Deletes every record and quarantine row in one transaction (a world reset), including newer and unreadable
+   * ones: this is the creator's explicit decision, not a recovery path.
+   */
+  clear(): Promise<{ readonly status: 'cleared' } | ChunkStatus>;
+  /** Closes the store, then deletes its whole database. `blocked`: another tab still has it open. */
+  destroy(): Promise<{ readonly status: 'destroyed' | 'blocked' } | ChunkStatus>;
   stats(): ChunkStoreStats;
-  /** Queued operations resolve `closed`; an operation already in a transaction completes. Idempotent. */
+  /** Queued operations resolve `closed` and never run; an operation already in a transaction completes. */
   close(): void;
 }
 
-/** Thrown synchronously-in-promise for caller errors (bad key, revision, data type, oversize). */
-export class ChunkStoreError extends Error { override readonly name = 'ChunkStoreError'; }
+/** Rejected for caller errors (bad key, revision, data type, oversize). `reason` is set for open refusals. */
+export class ChunkStoreError extends Error {
+  override readonly name = 'ChunkStoreError';
+  constructor(message: string, readonly reason?: 'newer-format') { super(message); }
+}
 
+const FORMAT = 1;
 interface Meta { format: 1; schema: number; revision: number; bytes: number; crc: number; sequence: number }
 interface StoredRecord { format: 1; key: string; schema: number; revision: number; crc: number; data: Uint8Array }
 
@@ -96,16 +123,20 @@ export function crc32(bytes: Uint8Array): number {
 
 const int = (n: unknown, min: number, max: number): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= min && n <= max;
 
-/** Validates one stored entry; returns why it is unreadable, or null. */
-function unreadable(key: string, entry: ChunkEntry): string | null {
+type Classified = { kind: 'ok'; meta: Meta; record: StoredRecord } | { kind: 'newer'; schema: number | null; revision: number | null } | { kind: 'unreadable'; why: string };
+/** Validates one stored entry against this build's envelope format and schema. */
+function classify(key: string, entry: ChunkEntry, schema: number): Classified {
   const m = entry.meta as Partial<Meta> | undefined, r = entry.record as Partial<StoredRecord> | undefined;
-  if (!m || typeof m !== 'object' || m.format !== 1) return 'meta envelope';
-  if (!r || typeof r !== 'object' || r.format !== 1 || r.key !== key) return 'record envelope';
-  if (!int(m.schema, 0, Number.MAX_SAFE_INTEGER) || !int(m.revision, 0, Number.MAX_SAFE_INTEGER) || !int(m.bytes, 0, HARD.maxRecordBytes) || !int(m.crc, 0, 0xffffffff) || !int(m.sequence, 0, Number.MAX_SAFE_INTEGER)) return 'meta fields';
-  if (r.schema !== m.schema || r.revision !== m.revision || r.crc !== m.crc) return 'meta/record mismatch';
-  if (!(r.data instanceof Uint8Array) || r.data.byteLength !== m.bytes) return 'length';
-  if (crc32(r.data) !== m.crc) return 'checksum';
-  return null;
+  const newerFormat = (x: { format?: unknown } | undefined) => !!x && typeof x === 'object' && int(x.format, FORMAT + 1, Number.MAX_SAFE_INTEGER);
+  if (newerFormat(m) || newerFormat(r)) return { kind: 'newer', schema: null, revision: null };
+  if (!m || typeof m !== 'object' || m.format !== FORMAT) return { kind: 'unreadable', why: 'meta envelope' };
+  if (!r || typeof r !== 'object' || r.format !== FORMAT || r.key !== key) return { kind: 'unreadable', why: 'record envelope' };
+  if (!int(m.schema, 0, Number.MAX_SAFE_INTEGER) || !int(m.revision, 0, Number.MAX_SAFE_INTEGER) || !int(m.bytes, 0, HARD.maxRecordBytes) || !int(m.crc, 0, 0xffffffff) || !int(m.sequence, 0, Number.MAX_SAFE_INTEGER)) return { kind: 'unreadable', why: 'meta fields' };
+  if (r.schema !== m.schema || r.revision !== m.revision || r.crc !== m.crc) return { kind: 'unreadable', why: 'meta/record mismatch' };
+  if (!(r.data instanceof Uint8Array) || r.data.byteLength !== m.bytes) return { kind: 'unreadable', why: 'length' };
+  if (crc32(r.data) !== m.crc) return { kind: 'unreadable', why: 'checksum' };
+  if (m.schema > schema) return { kind: 'newer', schema: m.schema, revision: m.revision };
+  return { kind: 'ok', meta: m as Meta, record: r as StoredRecord };
 }
 
 /** Creates the owner over an open port. Reads every meta row once (small) for totals and eviction order. */
@@ -117,7 +148,8 @@ export async function createChunkStore(port: ChunkPort, options: ChunkStoreOptio
   for (const k of Object.keys(CHUNK_STORE_DEFAULT_LIMITS) as (keyof ChunkStoreLimits)[]) if (!int(merged[k], 1, HARD[k])) throw new ChunkStoreError(`chunk store: invalid limit ${k}`);
   const limits: ChunkStoreLimits = Object.freeze({ ...merged });
 
-  // In-memory index: bytes and last access per key. Corrected from in-transaction rows on every write.
+  // In-memory index: bytes and last access per key. Recency of reads is session-only (not persisted); at open the
+  // order is the persisted write sequence. Totals are corrected from in-transaction rows of the keys a write touches.
   const index = new Map<string, { bytes: number; access: number }>();
   let total = 0, tick = 0, quarantined = await port.quarantineCount();
   for (const [key, raw] of await port.listMeta()) {
@@ -128,50 +160,51 @@ export async function createChunkStore(port: ChunkPort, options: ChunkStoreOptio
   const touch = (key: string) => { const e = index.get(key); if (e) e.access = ++tick; };
   const setIndex = (key: string, bytes: number) => { const old = index.get(key); total += bytes - (old?.bytes ?? 0); index.set(key, { bytes, access: ++tick }); };
   const dropIndex = (key: string) => { const old = index.get(key); if (old) { total -= old.bytes; index.delete(key); } };
+  const refreshQuarantine = async () => { quarantined = await port.quarantineCount().catch(() => quarantined); };
 
-  let closed = false, pending = 0, chain: Promise<unknown> = Promise.resolve();
+  let closed = false, pending = 0, chain: Promise<void> = Promise.resolve();
   const queued = new Set<() => void>();
-  /** FIFO, one operation at a time; bounded by maxPending. */
-  function enqueue<T>(work: () => Promise<T>, busy: T, closedResult: T): Promise<T> {
+  /**
+   * FIFO, one operation at a time, at most maxPending queued. Every outcome resolves: port failures map to statuses,
+   * anything else to `failed`. The internal chain never rejects, so one failure cannot stall later operations.
+   */
+  function enqueue<T>(work: () => Promise<T>, busy: T, closedResult: T, portFailure: (r: 'quota' | 'unavailable') => T): Promise<T> {
     if (closed) return Promise.resolve(closedResult);
     if (pending >= limits.maxPending) return Promise.resolve(busy);
     pending++;
-    let cancel!: () => void;
-    const run = new Promise<T>(resolve => {
-      cancel = () => resolve(closedResult);
+    return new Promise<T>(resolve => {
+      const cancel = () => { if (queued.delete(cancel)) { pending--; resolve(closedResult); } };
       queued.add(cancel);
       chain = chain.then(async () => {
-        if (!queued.delete(cancel)) return;
-        try { resolve(await work()); } finally { pending--; }
-      });
+        if (!queued.delete(cancel)) return; // closed while queued: already resolved
+        try { resolve(await work()); }
+        catch (error) {
+          if (error instanceof ChunkPortError) resolve(portFailure(error.reason === 'quota' ? 'quota' : 'unavailable'));
+          else resolve({ status: 'failed', error } as T);
+        }
+        finally { pending--; }
+      }).catch(() => { /* resolve/finally cannot throw; keep the chain usable regardless */ });
     });
-    return run.finally(() => { if (queued.delete(cancel)) pending--; });
   }
-  const failure = <T>(e: unknown, map: (r: 'quota' | 'unavailable') => T): T => {
-    if (e instanceof ChunkPortError) return map(e.reason);
-    throw e;
-  };
+  const unavailable = () => ({ status: 'unavailable' as const });
   const checkKey = (key: unknown): string => {
     if (typeof key !== 'string' || key.length < 1 || key.length > limits.maxKeyLength) throw new ChunkStoreError('chunk store: invalid key');
     return key;
   };
+  const quarantineRow = (key: string, why: string, entry: ChunkEntry) => ({ key, reason: why, value: entry });
 
   return {
     read(rawKey) {
       let key: string; try { key = checkKey(rawKey); } catch (e) { return Promise.reject(e); }
-      return enqueue<ChunkReadResult>(async () => {
-        try {
-          return await port.update<ChunkReadResult>([key], current => {
-            const entry = current.get(key);
-            if (!entry) { dropIndex(key); return { result: { status: 'missing' } }; }
-            if (unreadable(key, entry)) return { result: { status: 'quarantined' } };
-            const m = entry.meta as Meta, r = entry.record as StoredRecord;
-            touch(key);
-            if (m.schema > schema) return { result: { status: 'newer', schema: m.schema, revision: m.revision } };
-            return { result: { status: 'found', schema: m.schema, revision: m.revision, data: r.data.slice() } };
-          });
-        } catch (e) { return failure(e, () => ({ status: 'unavailable' as const })); }
-      }, { status: 'busy' }, { status: 'closed' });
+      return enqueue<ChunkReadResult>(() => port.update<ChunkReadResult>([key], current => {
+        const entry = current.get(key);
+        if (!entry) { dropIndex(key); return { result: { status: 'missing' } }; }
+        const c = classify(key, entry, schema);
+        if (c.kind === 'unreadable') return { result: { status: 'quarantined' } };
+        touch(key);
+        if (c.kind === 'newer') return { result: { status: 'newer', schema: c.schema, revision: c.revision } };
+        return { result: { status: 'found', schema: c.meta.schema, revision: c.meta.revision, data: c.record.data.slice() } };
+      }), { status: 'busy' }, { status: 'closed' }, unavailable);
     },
 
     write(entries) {
@@ -190,102 +223,121 @@ export async function createChunkStore(port: ChunkPort, options: ChunkStoreOptio
         });
       } catch (e) { return Promise.reject(e); }
       return enqueue<ChunkWriteResult>(async () => {
-        const keys = batch.map(b => b.key);
-        let committed: { evicted: string[]; sizes: [string, number][] } | null = null;
-        try {
-          const result = await port.update<ChunkWriteResult>(keys, (current, quarantineRows) => {
-            const copies: unknown[] = [];
-            let bytes = total, records = index.size;
-            for (const b of batch) {
-              const entry = current.get(b.key);
-              const known = index.get(b.key);
-              if (known) { bytes -= known.bytes; records--; }
-              if (!entry) continue;
-              const why = unreadable(b.key, entry);
-              if (why) { copies.push({ key: b.key, reason: why, value: entry }); continue; }
-              const m = entry.meta as Meta;
-              if (m.schema > schema) return { result: { status: 'newer', key: b.key } };
-              if (b.revision <= m.revision) return { result: { status: 'stale', key: b.key } };
-            }
-            if (copies.length && quarantineRows + copies.length > limits.maxQuarantine) return { result: { status: 'quarantine-full', key: (copies[0] as { key: string }).key } };
-            for (const b of batch) { bytes += b.data.byteLength; records++; }
-            const evicted: string[] = [];
-            if (bytes > limits.maxTotalBytes || records > limits.maxRecords) {
-              if (!evictable) return { result: { status: 'full' } };
-              const inBatch = new Set(keys);
-              const order = [...index].filter(([k]) => !inBatch.has(k) && evictable(k)).sort((a, b) => a[1].access - b[1].access);
-              for (const [k, e] of order) {
-                if (bytes <= limits.maxTotalBytes && records <= limits.maxRecords) break;
-                evicted.push(k); bytes -= e.bytes; records--;
-              }
-              if (bytes > limits.maxTotalBytes || records > limits.maxRecords) return { result: { status: 'full' } };
-            }
-            const put = batch.map(b => {
-              const crc = crc32(b.data), sequence = ++tick;
-              return { key: b.key, meta: { format: 1, schema, revision: b.revision, bytes: b.data.byteLength, crc, sequence } satisfies Meta, record: { format: 1, key: b.key, schema, revision: b.revision, crc, data: b.data } satisfies StoredRecord };
-            });
-            committed = { evicted, sizes: batch.map(b => [b.key, b.data.byteLength]) };
-            return { result: { status: 'saved', evicted }, plan: { put, remove: evicted, quarantine: copies } };
-          });
-          if (result.status === 'saved' && committed) {
-            const c = committed as { evicted: string[]; sizes: [string, number][] };
-            for (const k of c.evicted) dropIndex(k);
-            for (const [k, n] of c.sizes) setIndex(k, n);
-            quarantined = await port.quarantineCount().catch(() => quarantined);
+        const keys = batch.map(b => b.key), inBatch = new Set(keys);
+        // Projected totals from the cache, then eviction candidates (the creator callback runs here, outside any
+        // transaction; if it throws, the operation resolves `failed` and nothing is stored).
+        let bytes = total, records = index.size;
+        for (const b of batch) { const known = index.get(b.key); if (known) { bytes -= known.bytes; records--; } bytes += b.data.byteLength; records++; }
+        const candidates: string[] = [];
+        if ((bytes > limits.maxTotalBytes || records > limits.maxRecords) && evictable) {
+          let b2 = bytes, r2 = records, extra = 0;
+          for (const [k, e] of [...index].sort((x, y) => x[1].access - y[1].access)) {
+            if (inBatch.has(k) || !evictable(k)) continue;
+            if (b2 <= limits.maxTotalBytes && r2 <= limits.maxRecords && ++extra > EVICTION_SLACK) break;
+            candidates.push(k); b2 -= e.bytes; r2--;
           }
-          return result;
-        } catch (e) { return failure(e, r => ({ status: r })); }
-      }, { status: 'busy' }, { status: 'closed' });
+        }
+        let committed: { evicted: string[]; gone: string[] } | null = null;
+        const result = await port.update<ChunkWriteResult>([...keys, ...candidates], (current, quarantineRows) => {
+          const copies: unknown[] = [];
+          for (const b of batch) {
+            const entry = current.get(b.key);
+            if (!entry) continue;
+            const c = classify(b.key, entry, schema);
+            if (c.kind === 'unreadable') { copies.push(quarantineRow(b.key, c.why, entry)); continue; }
+            if (c.kind === 'newer') return { result: { status: 'newer', key: b.key } };
+            if (b.revision <= c.meta.revision) return { result: { status: 'stale', key: b.key } };
+          }
+          let projectedBytes = bytes, projectedRecords = records;
+          const evicted: string[] = [], gone: string[] = [];
+          for (const k of candidates) {
+            if (projectedBytes <= limits.maxTotalBytes && projectedRecords <= limits.maxRecords) break;
+            const entry = current.get(k), cached = index.get(k)?.bytes ?? 0;
+            if (!entry) { gone.push(k); projectedBytes -= cached; projectedRecords--; continue; } // removed elsewhere
+            const c = classify(k, entry, schema);
+            if (c.kind === 'newer') continue; // never evict data this build cannot read
+            if (c.kind === 'unreadable') copies.push(quarantineRow(k, c.why, entry));
+            evicted.push(k); projectedBytes -= cached; projectedRecords--;
+          }
+          if (projectedBytes > limits.maxTotalBytes || projectedRecords > limits.maxRecords) return { result: { status: 'full' } };
+          if (copies.length && quarantineRows + copies.length > limits.maxQuarantine) return { result: { status: 'quarantine-full', key: (copies[0] as { key: string }).key } };
+          const put = batch.map(b => {
+            const crc = crc32(b.data), sequence = ++tick;
+            return { key: b.key, meta: { format: FORMAT, schema, revision: b.revision, bytes: b.data.byteLength, crc, sequence } satisfies Meta, record: { format: FORMAT, key: b.key, schema, revision: b.revision, crc, data: b.data } satisfies StoredRecord };
+          });
+          committed = { evicted, gone };
+          return { result: { status: 'saved', evicted }, plan: { put, remove: evicted, quarantine: copies } };
+        });
+        if (result.status === 'saved' && committed) {
+          const c = committed as { evicted: string[]; gone: string[] };
+          for (const k of [...c.evicted, ...c.gone]) dropIndex(k);
+          for (const b of batch) setIndex(b.key, b.data.byteLength);
+          await refreshQuarantine();
+        }
+        return result;
+      }, { status: 'busy' }, { status: 'closed' }, r => ({ status: r }));
     },
 
     remove(rawKey) {
       let key: string; try { key = checkKey(rawKey); } catch (e) { return Promise.reject(e); }
       return enqueue<ChunkRemoveResult>(async () => {
-        try {
-          const result = await port.update<ChunkRemoveResult>([key], (current, quarantineRows) => {
-            const entry = current.get(key);
-            if (!entry) return { result: { status: 'missing' } };
-            const why = unreadable(key, entry);
-            if (why && quarantineRows + 1 > limits.maxQuarantine) return { result: { status: 'quarantine-full' } };
-            return { result: { status: 'removed' }, plan: { remove: [key], quarantine: why ? [{ key, reason: why, value: entry }] : [] } };
-          });
-          if (result.status === 'removed') { dropIndex(key); quarantined = await port.quarantineCount().catch(() => quarantined); }
-          if (result.status === 'missing') dropIndex(key);
-          return result;
-        } catch (e) { return failure(e, r => ({ status: r })); }
-      }, { status: 'busy' }, { status: 'closed' });
+        const result = await port.update<ChunkRemoveResult>([key], (current, quarantineRows) => {
+          const entry = current.get(key);
+          if (!entry) return { result: { status: 'missing' } };
+          const c = classify(key, entry, schema);
+          if (c.kind === 'newer') return { result: { status: 'newer' } };
+          if (c.kind === 'unreadable' && quarantineRows + 1 > limits.maxQuarantine) return { result: { status: 'quarantine-full' } };
+          return { result: { status: 'removed' }, plan: { remove: [key], quarantine: c.kind === 'unreadable' ? [quarantineRow(key, c.why, entry)] : [] } };
+        });
+        if (result.status === 'removed' || result.status === 'missing') dropIndex(key);
+        if (result.status === 'removed') await refreshQuarantine();
+        return result;
+      }, { status: 'busy' }, { status: 'closed' }, r => ({ status: r }));
     },
 
     quarantine(limit = limits.maxQuarantine) {
       const n = Math.min(int(limit, 0, HARD.maxQuarantine) ? limit : 0, limits.maxQuarantine);
-      return enqueue<ChunkQuarantineRow[] | { status: 'busy' | 'closed' | 'unavailable' }>(async () => {
-        try { return (await port.quarantineRows(n)) as ChunkQuarantineRow[]; }
-        catch (e) { return failure(e, () => ({ status: 'unavailable' as const })); }
-      }, { status: 'busy' }, { status: 'closed' });
+      return enqueue<ChunkQuarantineRow[] | ChunkStatus>(async () => (await port.quarantineRows(n)) as ChunkQuarantineRow[], { status: 'busy' }, { status: 'closed' }, unavailable);
     },
 
     clearQuarantine() {
-      return enqueue<{ status: 'cleared' | 'busy' | 'closed' | 'unavailable' }>(async () => {
-        try {
-          const r = await port.update<{ status: 'cleared' }>([], () => ({ result: { status: 'cleared' }, plan: { clearQuarantine: true } }));
-          quarantined = 0; return r;
-        } catch (e) { return failure(e, () => ({ status: 'unavailable' as const })); }
-      }, { status: 'busy' }, { status: 'closed' });
+      return enqueue<{ status: 'cleared' } | ChunkStatus>(async () => {
+        const r = await port.update<{ status: 'cleared' }>([], () => ({ result: { status: 'cleared' }, plan: { clearQuarantine: true } }));
+        quarantined = 0; return r;
+      }, { status: 'busy' }, { status: 'closed' }, unavailable);
     },
 
-    stats: () => Object.freeze({ durability: port.durability, records: index.size, bytes: total, pending, quarantined, limits }),
+    clear() {
+      return enqueue<{ status: 'cleared' } | ChunkStatus>(async () => {
+        const r = await port.update<{ status: 'cleared' }>([], () => ({ result: { status: 'cleared' }, plan: { clearAll: true } }));
+        index.clear(); total = 0; quarantined = 0; return r;
+      }, { status: 'busy' }, { status: 'closed' }, unavailable);
+    },
+
+    destroy() {
+      const done = enqueue<{ status: 'destroyed' | 'blocked' } | ChunkStatus>(async () => {
+        closed = true;
+        for (const cancel of [...queued]) cancel();
+        const r = await port.destroy();
+        index.clear(); total = 0; quarantined = 0;
+        return { status: r };
+      }, { status: 'busy' }, { status: 'closed' }, unavailable);
+      return done;
+    },
+
+    stats: () => Object.freeze({ durability: port.durability, available: !closed && port.available(), records: index.size, bytes: total, pending, quarantined, limits }),
 
     close() {
       if (closed) return;
       closed = true;
       for (const cancel of [...queued]) cancel();
-      void chain.finally(() => port.close());
+      void chain.then(() => port.close(), () => port.close());
     },
   };
 }
 
 export interface OpenChunkStoreOptions extends ChunkStoreOptions {
-  /** IndexedDB database name; one per world or save slot. */
+  /** World or save-slot name (1–200 code units); the IndexedDB database is `fe-chunks:<name>`. */
   readonly name: string;
   /** Test seam; defaults to `globalThis.indexedDB`. `null` forces the memory fallback. */
   readonly factory?: IDBFactory | null;
@@ -293,14 +345,18 @@ export interface OpenChunkStoreOptions extends ChunkStoreOptions {
 
 /**
  * Opens a durable IndexedDB-backed store, or a session-only memory store when IndexedDB is missing or refuses to
- * open (some private modes). Check `stats().durability`: `session` data is lost when the page closes, so tell the
- * player instead of claiming the world is saved.
+ * open (some private modes). Check `stats().durability`: `session` data is lost when the store closes or the page
+ * unloads, so tell the player instead of claiming the world is saved. A database written by a newer build rejects
+ * with `ChunkStoreError` reason `newer-format` instead of falling back, so newer data is never hidden or replaced.
  */
 export async function openChunkStore(options: OpenChunkStoreOptions): Promise<ChunkStore> {
-  if (typeof options.name !== 'string' || options.name.length < 1 || options.name.length > 256) throw new ChunkStoreError('chunk store: invalid database name');
+  if (typeof options.name !== 'string' || options.name.length < 1 || options.name.length > 200) throw new ChunkStoreError('chunk store: invalid database name');
   let port: ChunkPort;
   try { port = options.factory === null ? memoryChunkPort() : await openIndexedDbChunkPort(options.name, options.factory); }
-  catch (e) { if (e instanceof ChunkPortError) port = memoryChunkPort(); else throw e; }
+  catch (e) {
+    if (e instanceof ChunkPortError && e.reason === 'newer-format') throw new ChunkStoreError('chunk store: database written by a newer build', 'newer-format');
+    if (e instanceof ChunkPortError) port = memoryChunkPort(); else throw e;
+  }
   try { return await createChunkStore(port, options); }
   catch (e) {
     port.close();

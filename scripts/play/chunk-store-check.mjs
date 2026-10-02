@@ -21,7 +21,9 @@ try{
  assert.equal(r.reopened.records,2);assert.ok(r.reopened.bytes>1000);assert.equal(r.roundTrip,true);
  assert.equal(r.tabNewer,'saved');assert.equal(r.tabStale,'stale');
  assert.equal(r.corrupt,'quarantined');assert.equal(r.overwrite,'saved');assert.deepEqual(r.quarantine,['checksum']);
- assert.equal(r.afterVersionChange,'unavailable');assert.equal(r.fallback,'session');
+ assert.equal(r.afterVersionChange,'unavailable');assert.equal(r.availableAfterVersionChange,false);assert.equal(r.fallback,'session');
+ assert.deepEqual(r.concurrent,{both:['saved','saved'],race:['saved','stale'],x:'found',y:'found'});
+ assert.equal(r.newerFormat,'newer-format');assert.equal(r.listed,true);assert.equal(r.destroy,'destroyed');assert.equal(r.listedAfterDestroy,false);
  assert.deepEqual(report.errors,[]);report.passed=true;
 }finally{writeFileSync(resolve(out,'report.json'),JSON.stringify(report,null,2));await browser?.close();await server.close();}
 console.log(`chunk-store: PASS; ${out}`);

@@ -17,17 +17,29 @@ export interface ChunkPlan {
   readonly quarantine?: readonly unknown[];
   /** Clears every quarantine row. */
   readonly clearQuarantine?: boolean;
+  /** Clears every meta, record and quarantine row (applied before the other parts of the plan). */
+  readonly clearAll?: boolean;
 }
 export type ChunkDecision<R> = { readonly result: R; readonly plan?: ChunkPlan };
-export type ChunkPortFailure = 'quota' | 'unavailable';
-/** The one error a port rejects with. `quota`: the browser refused the space; `unavailable`: anything else. */
+export type ChunkPortFailure = 'quota' | 'unavailable' | 'newer-format';
+/**
+ * The one error a port rejects with. `quota`: the browser refused the space; `newer-format`: the database was
+ * created by a newer build (IndexedDB VersionError), so this build must not touch it; `unavailable`: anything else.
+ */
 export class ChunkPortError extends Error {
   override readonly name = 'ChunkPortError';
   constructor(readonly reason: ChunkPortFailure, detail: string) { super(`chunk port ${reason}: ${detail}`); }
 }
 
+/** Every chunk database this engine creates is named with this prefix, so a reset can find and delete them. */
+export const CHUNK_DB_PREFIX = 'fe-chunks:';
+
 export interface ChunkPort {
   readonly durability: ChunkDurability;
+  /** False after `close`, or after another tab's version change closed the connection. */
+  available(): boolean;
+  /** Closes and deletes the whole database. Memory ports clear their contents. */
+  destroy(): Promise<'destroyed' | 'blocked'>;
   /** Every meta row (small), for totals and eviction order at open. */
   listMeta(): Promise<[string, unknown][]>;
   quarantineCount(): Promise<number>;
@@ -58,6 +70,8 @@ export function memoryChunkPort(db = new MemoryChunkDatabase(), durability: Chun
   const live = () => { if (closed) throw new ChunkPortError('unavailable', 'closed'); };
   return {
     durability,
+    available: () => !closed,
+    async destroy() { closed = true; db.meta.clear(); db.records.clear(); db.quarantine.length = 0; return 'destroyed'; },
     async listMeta() { live(); return [...db.meta].map(([k, v]) => [k, structuredClone(v)] as [string, unknown]); },
     async quarantineCount() { live(); return db.quarantine.length; },
     async quarantineRows(limit) { live(); return db.quarantine.slice(0, limit).map(v => structuredClone(v)); },
@@ -71,9 +85,10 @@ export function memoryChunkPort(db = new MemoryChunkDatabase(), durability: Chun
       if (failure) throw new ChunkPortError(failure, 'injected');
       const removed = new Set(plan.remove ?? []);
       let after = 0;
-      for (const [k, r] of db.records) if (!removed.has(k) && !plan.put?.some(p => p.key === k)) after += (r as { data?: Uint8Array })?.data?.byteLength ?? 0;
+      if (!plan.clearAll) for (const [k, r] of db.records) if (!removed.has(k) && !plan.put?.some(p => p.key === k)) after += (r as { data?: Uint8Array })?.data?.byteLength ?? 0;
       for (const p of plan.put ?? []) after += (p.record as { data?: Uint8Array })?.data?.byteLength ?? 0;
       if (after > db.quotaBytes) throw new ChunkPortError('quota', 'memory quota');
+      if (plan.clearAll) { db.meta.clear(); db.records.clear(); db.quarantine.length = 0; }
       if (plan.clearQuarantine) db.quarantine.length = 0;
       for (const q of plan.quarantine ?? []) db.quarantine.push(structuredClone(q));
       for (const k of removed) { db.meta.delete(k); db.records.delete(k); }
@@ -95,17 +110,38 @@ const reason = (error: unknown): ChunkPortFailure => (error as { name?: string }
  * blocked (some private modes) or the open fails. A `versionchange` from another tab closes this port; later
  * operations reject as unavailable rather than blocking the other tab's upgrade.
  */
-export function openIndexedDbChunkPort(name: string, factory: IDBFactory | undefined = (globalThis as { indexedDB?: IDBFactory }).indexedDB): Promise<ChunkPort> {
+const defaultFactory = (): IDBFactory | undefined => (globalThis as { indexedDB?: IDBFactory }).indexedDB;
+
+/** Deletes chunk database `name` (prefix added). `blocked`: another tab still has it open. */
+export function deleteChunkDatabase(name: string, factory: IDBFactory | undefined = defaultFactory()): Promise<'deleted' | 'blocked' | 'unavailable'> {
+  return new Promise(resolve => {
+    if (!factory) { resolve('unavailable'); return; }
+    let request: IDBOpenDBRequest;
+    try { request = factory.deleteDatabase(CHUNK_DB_PREFIX + name); } catch { resolve('unavailable'); return; }
+    request.onsuccess = () => resolve('deleted');
+    request.onerror = () => resolve('unavailable');
+    request.onblocked = () => resolve('blocked');
+  });
+}
+
+/** Names (without prefix) of the chunk databases on this origin, where the browser can list them. */
+export async function listChunkDatabases(factory: IDBFactory | undefined = defaultFactory()): Promise<string[] | 'unsupported'> {
+  if (!factory || typeof factory.databases !== 'function') return 'unsupported';
+  try { return (await factory.databases()).map(d => d.name ?? '').filter(n => n.startsWith(CHUNK_DB_PREFIX)).map(n => n.slice(CHUNK_DB_PREFIX.length)).sort(); }
+  catch { return 'unsupported'; }
+}
+
+export function openIndexedDbChunkPort(name: string, factory: IDBFactory | undefined = defaultFactory()): Promise<ChunkPort> {
   return new Promise((resolve, reject) => {
     if (!factory) { reject(new ChunkPortError('unavailable', 'IndexedDB is not available')); return; }
     let request: IDBOpenDBRequest;
-    try { request = factory.open(name, 1); } catch (e) { reject(new ChunkPortError('unavailable', String((e as Error)?.message ?? e))); return; }
+    try { request = factory.open(CHUNK_DB_PREFIX + name, 1); } catch (e) { reject(new ChunkPortError('unavailable', String((e as Error)?.message ?? e))); return; }
     request.onupgradeneeded = () => {
       const db = request.result;
       for (const s of STORES) if (!db.objectStoreNames.contains(s)) db.createObjectStore(s, s === 'quarantine' ? { autoIncrement: true } : undefined);
     };
     request.onblocked = () => reject(new ChunkPortError('unavailable', 'open blocked by another tab'));
-    request.onerror = () => reject(new ChunkPortError('unavailable', String(request.error?.message ?? 'open failed')));
+    request.onerror = () => reject(new ChunkPortError(request.error?.name === 'VersionError' ? 'newer-format' : 'unavailable', String(request.error?.message ?? 'open failed')));
     request.onsuccess = () => {
       const db = request.result;
       let closed = false;
@@ -123,6 +159,8 @@ export function openIndexedDbChunkPort(name: string, factory: IDBFactory | undef
       });
       resolve({
         durability: 'durable',
+        available: () => !closed,
+        destroy() { closed = true; db.close(); return deleteChunkDatabase(name, factory).then(r => r === 'deleted' ? 'destroyed' : 'blocked'); },
         listMeta: () => readAll('meta', c => [String(c.key), c.value] as [string, unknown]),
         quarantineCount: () => new Promise((ok, fail) => {
           let t: IDBTransaction; try { t = txn('readonly', ['quarantine']); } catch (e) { fail(e); return; }
@@ -144,6 +182,7 @@ export function openIndexedDbChunkPort(name: string, factory: IDBFactory | undef
                 for (const k of keys) { const f = found.get(k)!; current.set(k, f.hasMeta || f.hasRecord ? { meta: f.meta, record: f.record } : undefined); }
                 const { result, plan } = decide(current, quarantined);
                 outcome = { value: result };
+                if (plan?.clearAll) { meta.clear(); records.clear(); quarantine.clear(); }
                 if (plan?.clearQuarantine) quarantine.clear();
                 for (const q of plan?.quarantine ?? []) quarantine.add(q);
                 for (const k of plan?.remove ?? []) { meta.delete(k); records.delete(k); }

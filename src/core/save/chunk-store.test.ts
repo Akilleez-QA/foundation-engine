@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createFakeIdb } from './fake-idb';
-import { MemoryChunkDatabase, memoryChunkPort, openIndexedDbChunkPort } from './chunk-port';
+import { CHUNK_DB_PREFIX, MemoryChunkDatabase, deleteChunkDatabase, listChunkDatabases, memoryChunkPort, openIndexedDbChunkPort, type ChunkPort } from './chunk-port';
 import { createChunkStore, crc32, openChunkStore, ChunkStoreError, type ChunkStore } from './chunk-store';
 
 const bytes = (...v: number[]) => new Uint8Array(v);
@@ -11,7 +11,7 @@ async function idbStore(name = 'world', options: Parameters<typeof createChunkSt
   const open = (o = options) => openChunkStore({ ...o, name, factory: fake.factory });
   return { fake, store: await open(), open };
 }
-const record = (fake: ReturnType<typeof createFakeIdb>, key: string) => fake.controls.databases.get('world')!.get('records')!.get(key) as { data: Uint8Array; key: string; crc: number };
+const record = (fake: ReturnType<typeof createFakeIdb>, key: string) => fake.controls.databases.get(CHUNK_DB_PREFIX + 'world')!.get('records')!.get(key) as { data: Uint8Array; key: string; crc: number };
 
 test('GEN-02 crc32 matches the IEEE reference vector', () => {
   assert.equal(crc32(new TextEncoder().encode('123456789')), 0xcbf43926);
@@ -72,8 +72,8 @@ test('GEN-02 unreadable records are quarantined; their bytes are copied aside be
     ['checksum', f => { record(f, 'k').data[1] ^= 0xff; }],
     ['length', f => { const r = record(f, 'k'); r.data = r.data.subarray(0, 2).slice(); }],
     ['record envelope', f => { record(f, 'k').key = 'other'; }],
-    ['record envelope', f => { f.controls.databases.get('world')!.get('records')!.delete('k'); }],
-    ['meta envelope', f => { f.controls.databases.get('world')!.get('meta')!.set('k', 'garbage'); }],
+    ['record envelope', f => { f.controls.databases.get(CHUNK_DB_PREFIX + 'world')!.get('records')!.delete('k'); }],
+    ['meta envelope', f => { f.controls.databases.get(CHUNK_DB_PREFIX + 'world')!.get('meta')!.set('k', 'garbage'); }],
     ['length', f => { (record(f, 'k') as { data: unknown }).data = [1, 2, 3]; }],
   ];
   for (const [why, corrupt] of corruptions) {
@@ -108,6 +108,7 @@ test('GEN-02 creator schema: older records are returned for migration, newer one
   const old = await v2.read('k'); assert.ok(old.status === 'found' && old.schema === 1);
   assert.equal((await v2.write([{ key: 'k', revision: 2, data: bytes(2) }])).status, 'saved');
   assert.deepEqual(await v1.read('k'), { status: 'newer', schema: 2, revision: 2 });
+  assert.deepEqual(await v1.remove('k'), { status: 'newer' }, 'an older build never deletes newer data');
   assert.deepEqual(await v1.write([{ key: 'k', revision: 3, data: bytes(3) }]), { status: 'newer', key: 'k' });
   const kept = await v2.read('k'); assert.ok(kept.status === 'found' && kept.revision === 2);
 });
@@ -185,4 +186,120 @@ test('GEN-02 unavailable IndexedDB falls back to a session store; a version chan
   assert.deepEqual(await store.read('a'), { status: 'unavailable' });
   assert.deepEqual(await store.write([{ key: 'a', revision: 2, data: bytes(2) }]), { status: 'unavailable' });
   await assert.rejects(openChunkStore({ name: '', schema: 1, factory: null }), ChunkStoreError);
+});
+
+test('GEN-02 a throwing evictable callback fails only its own write; the queue keeps running', async () => {
+  let throwing = false;
+  const store = await createChunkStore(memoryChunkPort(), { schema: 1, limits: { maxRecords: 1 }, evictable: () => { if (throwing) throw new Error('creator bug'); return true; } });
+  assert.equal((await store.write([{ key: 'a', revision: 1, data: bytes(1) }])).status, 'saved');
+  throwing = true;
+  const failed = await store.write([{ key: 'b', revision: 1, data: bytes(2) }]);
+  assert.equal(failed.status, 'failed'); assert.match(String((failed as { error: Error }).error.message), /creator bug/);
+  const a = await store.read('a'); assert.ok(a.status === 'found' && a.data[0] === 1, 'nothing changed');
+  assert.deepEqual(await store.read('b'), { status: 'missing' });
+  throwing = false;
+  assert.deepEqual(await store.write([{ key: 'b', revision: 1, data: bytes(2) }]), { status: 'saved', evicted: ['a'] });
+  assert.equal(store.stats().pending, 0);
+  store.close(); assert.deepEqual(await store.read('b'), { status: 'closed' });
+});
+
+test('GEN-02 eviction validates victims in the transaction: unreadable ones are quarantined, newer ones kept', async () => {
+  for (const room of [1, 0]) {
+    const { fake, store } = await idbStore('world', { schema: 1, limits: { maxRecords: 1, maxQuarantine: 1 }, evictable: () => true });
+    await store.write([{ key: 'a', revision: 1, data: bytes(1, 2, 3) }]);
+    record(fake, 'a').data[0] ^= 0xff;
+    assert.deepEqual(await store.read('a'), { status: 'quarantined' });
+    if (room === 0) {
+      // the single quarantine row is already taken
+      const db = fake.controls.databases.get(CHUNK_DB_PREFIX + 'world')!;
+      db.get('quarantine')!.set(99, { key: 'earlier', reason: 'checksum', value: null });
+      const before = structuredClone(record(fake, 'a'));
+      assert.deepEqual(await store.write([{ key: 'b', revision: 1, data: bytes(9) }]), { status: 'quarantine-full', key: 'a' });
+      assert.deepEqual(record(fake, 'a'), before, 'the unreadable victim is untouched');
+    } else {
+      assert.deepEqual(await store.write([{ key: 'b', revision: 1, data: bytes(9) }]), { status: 'saved', evicted: ['a'] });
+      const rows = await store.quarantine();
+      assert.ok(Array.isArray(rows) && rows.length === 1 && rows[0]!.key === 'a' && rows[0]!.reason === 'checksum', 'evicted unreadable bytes were kept');
+    }
+    store.close();
+  }
+  // a newer-schema record is never evicted by an older build
+  const db = new MemoryChunkDatabase();
+  const newer = await createChunkStore(memoryChunkPort(db), { schema: 2 });
+  await newer.write([{ key: 'n', revision: 1, data: bytes(1) }]);
+  const older = await createChunkStore(memoryChunkPort(db), { schema: 1, limits: { maxRecords: 1 }, evictable: () => true });
+  assert.deepEqual(await older.write([{ key: 'o', revision: 1, data: bytes(1) }]), { status: 'full' });
+  assert.equal((await newer.read('n')).status, 'found');
+});
+
+test('GEN-02 close never reports closed for work that commits, and queued work never reaches the port', async () => {
+  const inner = memoryChunkPort(); let calls = 0, entered!: () => void, release!: () => void;
+  const inside = new Promise<void>(r => { entered = r; }), gate = new Promise<void>(r => { release = r; });
+  const gated: ChunkPort = { ...inner, async update(keys, decide) { calls++; entered(); await gate; return inner.update(keys, decide); } };
+  const store = await createChunkStore(gated, { schema: 1, limits: { maxPending: 4 } });
+  const running = store.write([{ key: 'a', revision: 1, data: bytes(1) }]);
+  const queued = [store.write([{ key: 'b', revision: 1, data: bytes(2) }]), store.read('a'), store.remove('a')];
+  await inside;
+  assert.equal(store.stats().pending, 4);
+  store.close();
+  assert.equal(store.stats().pending, 1, 'queued operations are released at close');
+  for (const q of queued) assert.deepEqual(await q, { status: 'closed' });
+  release();
+  assert.equal((await running).status, 'saved');
+  await new Promise(r => setTimeout(r, 5));
+  assert.equal(calls, 1, 'no queued operation ran after close');
+});
+
+test('GEN-02 concurrent tabs serialize: no lost update, exactly one winner per revision', async () => {
+  const fake = createFakeIdb();
+  const [tabA, tabB] = await Promise.all([1, 2].map(() => openChunkStore({ name: 'world', schema: 1, factory: fake.factory })));
+  const both = await Promise.all([tabA!.write([{ key: 'a', revision: 1, data: bytes(1) }]), tabB!.write([{ key: 'b', revision: 1, data: bytes(2) }])]);
+  assert.deepEqual(both.map(r => r.status), ['saved', 'saved']);
+  const race = await Promise.all([tabA!.write([{ key: 'k', revision: 1, data: bytes(3) }]), tabB!.write([{ key: 'k', revision: 1, data: bytes(4) }])]);
+  assert.deepEqual(race.map(r => r.status).sort(), ['saved', 'stale']);
+  const many = await Promise.all(Array.from({ length: 8 }, (_, i) => (i % 2 ? tabA! : tabB!).write([{ key: `m${i}`, revision: 1, data: bytes(i) }])));
+  assert.ok(many.every(r => r.status === 'saved'));
+  tabA!.close(); tabB!.close();
+  const check = await openChunkStore({ name: 'world', schema: 1, factory: fake.factory });
+  assert.equal(check.stats().records, 11, 'every concurrent write survived');
+  assert.equal(fake.controls.maxConcurrent, 1);
+  check.close();
+});
+
+test('GEN-02 clear, destroy and database listing give creators an explicit world reset', async () => {
+  const fake = createFakeIdb();
+  const store = await openChunkStore({ name: 'slot-1', schema: 1, factory: fake.factory });
+  await store.write([{ key: 'a', revision: 1, data: bytes(1) }, { key: 'b', revision: 1, data: bytes(2) }]);
+  assert.deepEqual(await listChunkDatabases(fake.factory), ['slot-1']);
+  assert.deepEqual(await store.clear(), { status: 'cleared' });
+  assert.equal(store.stats().records, 0); assert.deepEqual(await store.read('a'), { status: 'missing' });
+  await store.write([{ key: 'a', revision: 1, data: bytes(1) }]);
+  const other = await openChunkStore({ name: 'slot-1', schema: 1, factory: fake.factory });
+  assert.deepEqual(await store.destroy(), { status: 'blocked' }, 'another tab still has it open');
+  other.close();
+  assert.equal(await deleteChunkDatabase('slot-1', fake.factory), 'deleted');
+  assert.deepEqual(await listChunkDatabases(fake.factory), []);
+  assert.equal(store.stats().available, false);
+  assert.deepEqual(await store.read('a'), { status: 'closed' });
+  const mem = await openChunkStore({ name: 'x', schema: 1, factory: null });
+  await mem.write([{ key: 'a', revision: 1, data: bytes(1) }]);
+  assert.deepEqual(await mem.destroy(), { status: 'destroyed' });
+  assert.equal(await listChunkDatabases(undefined), 'unsupported');
+});
+
+test('GEN-02 data from a newer build is refused, never hidden behind a session fallback or overwritten', async () => {
+  const fake = createFakeIdb(); fake.controls.newerVersionOnOpen = true;
+  const refused = await openChunkStore({ name: 'world', schema: 1, factory: fake.factory }).catch(e => e);
+  assert.ok(refused instanceof ChunkStoreError && refused.reason === 'newer-format');
+  const { fake: f2, store } = await idbStore();
+  await store.write([{ key: 'k', revision: 1, data: bytes(1) }]);
+  const db = f2.controls.databases.get(CHUNK_DB_PREFIX + 'world')!;
+  (db.get('meta')!.get('k') as { format: number }).format = 2;
+  assert.deepEqual(await store.read('k'), { status: 'newer', schema: null, revision: null });
+  assert.deepEqual(await store.write([{ key: 'k', revision: 9, data: bytes(2) }]), { status: 'newer', key: 'k' });
+  assert.deepEqual(await store.remove('k'), { status: 'newer' });
+  assert.equal(store.stats().available, true);
+  f2.controls.versionChange();
+  assert.equal(store.stats().available, false, 'stats report the connection closed by another tab');
+  store.close();
 });

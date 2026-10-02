@@ -760,9 +760,18 @@ Status: implemented, candidate on `feat/gen02-chunk-store` (PR); not integrated.
   - The store falls back to `session` memory when IndexedDB is unavailable. A version change from another tab closes the connection.
   - Cell edits: at most 65,536 per grid by default, with values bounded, canonical encoding and strict decoding.
 - **Checked:**
-  - 10 core tests over an in-repo IndexedDB fake and the memory port.
-  - 4 cell-edit tests, including a GEN-01 regenerate-and-apply round trip.
+  - 16 core tests over an in-repo IndexedDB fake and the memory port.
+  - 6 cell-edit tests, including a GEN-01 regenerate-and-apply round trip and a refused cross-seed load.
   - A desktop Chromium real-IndexedDB check (`scripts/play/chunk-store-check.mjs`, in `test:framework-browser`): round trip after reopen, a cross-tab stale refusal, checksum quarantine and overwrite, version-change closure and session fallback.
+- **Review fixes (PR #56):**
+  - **Queue:** a throwing `evictable` now resolves `failed` for that operation only, and the queue keeps running. `close` releases queued work before it reaches storage.
+  - **Victims and newer data:** eviction victims are validated inside the transaction (unreadable ones quarantined or refused, newer ones kept). `remove` returns `newer`.
+  - **Newer builds:** a newer database version rejects with `newer-format` instead of falling back to a session store, and a newer envelope format reads as `newer`.
+  - **Reset:** `clear`, `destroy`, `deleteChunkDatabase` and `listChunkDatabases` are added, and databases are prefixed `fe-chunks:`.
+  - **Cell edits:** they carry a baseline CRC-32 and are refused over different content. The encoder buffer is fixed for five-byte varints, and overlong varints are rejected.
+  - **Test fake:** transactions are serialized, so concurrent tabs no longer lose updates there.
+  - **Evidence:** 16 core tests, 6 cell-edit tests, and the browser check passing 3/3 with concurrent, newer-format and destroy cases.
+  - **Reset gap:** the save store's reset and export still do not include chunk databases (documented in the recipe).
 - **Not established:**
   - real quota exhaustion and browser-initiated storage eviction;
   - private-mode behaviour per browser, Safari and Firefox;

@@ -30,9 +30,19 @@ const store = await openChunkStore({
 if (store.stats().durability === 'session') showNotice('worlds.not-saved'); // private mode, or IndexedDB refused
 ```
 
+- The database is named `fe-chunks:<name>`, where `name` is 1–200 code units. Key it by
+  world or save slot, and start a new name when the world's content version changes.
+- **`session` durability** means memory only. Everything is lost when the store closes
+  or the page unloads, so say so to the player.
+- **A database written by a newer build** (a higher IndexedDB version) makes
+  `openChunkStore` reject with `ChunkStoreError` reason `newer-format`. It does not
+  silently fall back to an empty session store that would hide, then overwrite, that
+  data.
+
 - `schema` is your record format number. Older records come back with their `schema`,
-  so you can migrate them. Newer ones are read-only (`newer`), so an old build never
-  destroys a newer save.
+  so you can migrate them. Records with a newer schema, or a newer envelope format from
+  a later engine, are `newer`: never overwritten, removed or evicted here. An old build
+  never destroys a newer save.
 - Open at a boundary (scene preparation or a menu), never inside a frame. `openChunkStore`
   reads every key's small meta row once to learn totals.
 
@@ -54,10 +64,12 @@ if (edits.dirty) {
   inside the IndexedDB transaction, so a second tab cannot silently overwrite newer
   data; the older writer gets `stale`. Re-read and merge, or tell the player.
 - **Results** are values, not exceptions: `saved`, `stale`, `newer`, `full`, `quota`,
-  `quarantine-full`, `busy`, `closed` and `unavailable`. Keep the in-memory edits on
-  any non-`saved` result and keep `dirty` true. Only caller mistakes reject with
-  `ChunkStoreError`: an invalid key or revision, data that is not a `Uint8Array`, an
-  oversized record or batch, or duplicate keys.
+  `quarantine-full`, `busy`, `closed` and `unavailable`. `failed` (with `error`) means
+  an unexpected error, such as your `evictable` callback throwing. It affects only that
+  operation, and later ones keep running. Keep the in-memory edits on any non-`saved`
+  result and keep `dirty` true. Only caller mistakes reject with `ChunkStoreError`: an
+  invalid key or revision, data that is not a `Uint8Array`, an oversized record or
+  batch, or duplicate keys.
 
 ## 4. Load: regenerate, then apply
 
@@ -68,9 +80,12 @@ const stored = await store.read(`region:${cx},${cz}`);
 // newer → read-only here;  busy / closed / unavailable → keep the current content
 ```
 
-The baseline must be the same content the edits were made against. Store the root seed
-with its `contentVersion` and compare it on load, as the seeded content recipe describes.
-Edits over a different baseline still decode, but they describe a different world.
+The baseline must be the same content the edits were made against. The encoding carries
+a CRC-32 of the baseline (`edits.baseline`, `baselineChecksum`), so loading edits over
+different content throws `baseline mismatch` instead of applying them silently. That
+covers a new seed, a changed generator or different parameters. Store the root seed with
+its `contentVersion` and compare it on load, as the seeded content recipe describes, so
+the mismatch is a decision you make up front rather than an error.
 
 ## 5. Bounds, eviction and recovery
 
@@ -84,21 +99,50 @@ Edits over a different baseline still decode, but they describe a different worl
 | Queued operations | 64 | `busy` |
 | Quarantine rows | 32 | `quarantine-full` for writes over unreadable records |
 | Edits per grid (`createCellEdits`) | 65,536 | `full` from `set` |
+| Database name | 200 | rejects |
 
-- **Eviction:** only with `evictable(key)`, least recently used first. Mark only
-  regenerable records, such as caches. Player edits are never evicted unless you mark
-  them. Without the policy, the store refuses with `full`.
+- **Eviction:** only with `evictable(key)`. Records go least recently used first, where
+  recency counts reads and writes in this session only; at open, the order is the
+  persisted write order. Mark only regenerable records, such as caches; player edits
+  are never evicted unless you mark them. Victims are read and validated inside the
+  write's transaction:
+  - unreadable victims are copied to the quarantine first, or the write is refused with
+    `quarantine-full`;
+  - newer victims are never evicted.
+
+  Without the policy, the store refuses with `full`.
 - **Quota:** a browser `QuotaExceededError` aborts the whole transaction and the result
   is `quota`. Stored data is unchanged.
 - **Corruption:** CRC-32 and envelope checks run on every read and before every
-  overwrite. Unreadable bytes are copied to the quarantine in the same transaction as
-  the replacing write. `quarantine()` lists them for support export, and
-  `clearQuarantine()` frees the rows.
+  overwrite, removal or eviction. Unreadable bytes are copied to the quarantine in the
+  same transaction. A row is as large as the corrupted record it holds, so the
+  quarantine is bounded by `maxQuarantine` rows of at most about `maxRecordBytes` each.
+  `quarantine()` lists rows for support export, and `clearQuarantine()` frees them.
 - **Lifetime:** operations run one at a time in order. `close()` resolves queued
-  operations as `closed`; one already inside a transaction finishes. A version change
-  from another tab closes the connection, and later operations return `unavailable`.
+  operations as `closed`, and they never reach storage; one already inside a
+  transaction finishes and reports its real result. A version change from another tab
+  closes the connection: `stats().available` becomes false, and later operations
+  return `unavailable`.
 
-## 6. Evidence to add
+## 6. Reset, export and deletion
+
+The chunk store is a second persistence owner beside the save store. The save store's
+`resetAll`, profile export and import, player switching and the test API's
+`engine.reset` do **not** touch chunk databases: those operations are synchronous
+Web-Storage operations, and IndexedDB deletion is asynchronous and can be blocked by
+another tab. Wire them yourself:
+
+- **Clearing a world in place:** call `store.clear()`. It deletes every record and
+  quarantine row in one transaction.
+- **Deleting a world:** call `store.destroy()`, or `deleteChunkDatabase(name)` when the
+  store is not open. `blocked` means another tab still has it open.
+- **Listing worlds:** `listChunkDatabases()` lists this origin's chunk databases where the
+  browser supports `indexedDB.databases()`, and returns `unsupported` otherwise. Keep
+  your own list of world names in a save section if you need it everywhere.
+- **Export:** there is no whole-world export. A player profile export does not include
+  chunk data.
+
+## 7. Evidence to add
 
 - A test named after the success criterion: edit, write, reopen, regenerate, apply and
   compare to an independent expectation.

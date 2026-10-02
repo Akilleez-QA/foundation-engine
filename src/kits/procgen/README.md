@@ -191,11 +191,15 @@ layer. Recipe: [store large world records](../../../docs/recipes/store-large-wor
   - `revision` increments on each change and is used as the store revision; `dirty`
     and `markSaved` track what has been written.
   - `materialize()` returns the edited copy, and `encode()` returns canonical compact
-    bytes: a 12-byte header, then a varint index delta and a u16 value per edit.
-  - `decodeCellEdits` validates magic, format, grid size, count, ordering, range and
-    trailing bytes. A malformed list throws and nothing is applied.
+    bytes: a 16-byte header with the baseline's CRC-32, then a minimal varint index
+    delta and a u16 value per edit.
+  - `decodeCellEdits` validates magic, format, grid size, baseline checksum, count,
+    ordering, overlong or oversized varints, range and trailing bytes. A malformed list,
+    or edits made against different content, throws and nothing is applied.
 - **`openChunkStore({name, schema, limits?, evictable?, factory?})`** is the owner,
-  implemented in `src/core/save/chunk-store.ts`.
+  implemented in `src/core/save/chunk-store.ts`. It also provides `clear()`, `destroy()`,
+  `deleteChunkDatabase` and `listChunkDatabases` for world resets, which the save
+  store's reset and export do not cover.
   - Storage is durable IndexedDB, or a `session` memory store when IndexedDB is missing
     or refuses to open.
   - Each `write` call is atomic, and a revision is accepted only if strictly newer,
@@ -206,8 +210,12 @@ layer. Recipe: [store large world records](../../../docs/recipes/store-large-wor
     aside before any overwrite, and writes are refused when the quarantine is full.
   - Keys, record bytes, record count, total bytes, batch size, pending operations and
     quarantine rows are bounded.
-  - Eviction is opt-in (`evictable`, least recently used). Operations run one at a
-    time; `close` resolves queued work as `closed`.
+  - Eviction is opt-in (`evictable`; least recently used in this session). Victims
+    are validated in the transaction: unreadable ones are quarantined, newer ones kept.
+  - Operations run one at a time. A throwing callback fails only its own operation
+    (`failed`). `close` resolves queued work as `closed` before it reaches storage.
+  - A newer build's database (VersionError) rejects with `newer-format` instead of
+    falling back.
 
 ## Evidence
 
@@ -244,8 +252,18 @@ cover:
     the pending bound and close;
   - fallback and version change.
 
+  The suite also covers the review regressions:
+  - a throwing `evictable`;
+  - victims quarantined or kept during eviction;
+  - close never reporting `closed` for committed work;
+  - concurrent tabs with a single winner;
+  - clear, destroy and listing;
+  - `newer-format` and newer-envelope refusal.
+
   `cell-edits.test.ts` covers an edit → store → reopen → regenerate → apply round trip
-  over a cellular grid, canonical encoding, the edit bound and nine malformed encodings.
+  over a cellular grid, canonical encoding, the edit bound, eleven malformed encodings,
+  a last-index edit at `GRID_MAX_CELLS`, five-byte varints and a refused cross-seed
+  load.
   `scripts/play/chunk-store-check.mjs`, in `test:framework-browser`, runs the same
   flows against real Chromium IndexedDB.
 
@@ -257,7 +275,10 @@ cover:
   holds only if the generator avoids `Math.random`, time and mutable outside state.
 - Grids are dense `Uint16Array` values. There is no chunk residency, streaming or
   meshing (greedy or surface nets).
-- The chunk store is a single-origin browser store:
+- The chunk store is a single-origin browser store, and a second persistence owner:
+  - The save store's `resetAll`, profile export and import, and `engine.reset` do not
+    touch it; creators call `clear`, `destroy` or `deleteChunkDatabase`.
+  - `session` fallback data is lost on close or unload.
   - Its in-memory totals do not see another tab's growth until reopen, although
     revisions are still compared inside each transaction. Prefer one writer per world.
   - Reads also use a readwrite transaction.
