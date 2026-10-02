@@ -8,6 +8,8 @@ test('--game <dir> and --game=<dir> select the game on any shell; absent means t
   assert.equal(gameArg(['--mobile', '--game', 'templates/arcade/game']), 'templates/arcade/game');
   assert.equal(gameArg(['--game=templates/learn/game', '--scene', 'x']), 'templates/learn/game');
   assert.equal(gameArg(['--scene', 'x']), undefined);
+  assert.equal(gameArg(['--game']), '', 'a flag without a folder is an error, not the default game');
+  assert.equal(gameArg(['--game', '--mobile']), '');
 });
 
 test('a GAME_DIR without game.ts is one line that lists the template game folders', () => {
@@ -30,4 +32,12 @@ test('an entry point given a wrong game stops with that one line and no stack; -
     '--', 'entry.mjs', '--game', 'templates/arcade/game'], {encoding: 'utf8', env: {...process.env, GAME_DIR: ''}});
   assert.equal(good.status, 0, good.stderr);
   assert.equal(good.stdout.trim(), 'templates/arcade/game');
+});
+
+test('--game without a folder stops with one line instead of silently building the default game', () => {
+  const lib = new URL('./game-dir.mjs', import.meta.url).href;
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(lib)})`, '--', 'entry.mjs', '--game'], {encoding: 'utf8', env: {...process.env, GAME_DIR: ''}});
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /^--game needs a folder, e\.g\. --game templates\/blank\/game\. One of: .*templates\/arcade\/game/);
+  assert.equal(r.stderr.trim().split('\n').length, 1);
 });

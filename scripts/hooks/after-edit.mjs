@@ -17,21 +17,28 @@ const file = input.tool_input?.file_path ?? input.tool_input?.path;
 if (!file) process.exit(0);
 const rel = relative(ROOT, resolve(file)).split('\\').join('/');
 const notes = [];
-const gameDirOf = /^(game|templates\/[^/]+\/game)\//.exec(rel)?.[1];
-if (gameDirOf && /\.(ts|mts)$/.test(rel)) {
-  const {checkGame} = await import('../lint/layers.mjs');
-  for (const v of checkGame(join(ROOT, gameDirOf)).filter(v => v.from === rel)) notes.push(`${rel}: imports ${v.to}; game code imports only @engine, @kits/<name>, its own files and JSON`);
-}
-if (/^src\/(core|platform|author|app|dev|features|domain|testing)\//.test(rel) || /^(README|AGENTS)\.md$|^docs\/(?!kits\/)/.test(rel)) {
-  const {hits} = await import('../lint/genericity.mjs');
-  let text = ''; try { text = readFileSync(join(ROOT, rel), 'utf8'); } catch { /* deleted */ }
-  for (const h of hits(text).slice(0, 5)) notes.push(`${rel}:${h.line} uses the genre word "${h.word}" in the engine; move it to a kit or template, or rename`);
-}
-if (gameDirOf && /(budgets\.json|build\.brief\.ts)$/.test(rel)) {
-  const {toolCommand} = await import('../lib/tool.mjs');
-  const c = toolCommand('tsx', ['scripts/lint/brief.ts', gameDirOf]);
-  const r = spawnSync(c.command, c.args, {cwd: ROOT, encoding: 'utf8', shell: c.shell});
-  if (r.status !== 0) notes.push((r.stderr || r.stdout).trim());
+// The checks use the edited file's own game folder; an unrelated (or wrong) GAME_DIR must not stop the hook.
+delete process.env.GAME_DIR;
+// The hook never fails the edit: a check that cannot run (a missing tool, a module that does not resolve) becomes a note.
+try {
+  const gameDirOf = /^(game|templates\/[^/]+\/game)\//.exec(rel)?.[1];
+  if (gameDirOf && /\.(ts|mts)$/.test(rel)) {
+    const {checkGame} = await import('../lint/layers.mjs');
+    for (const v of checkGame(join(ROOT, gameDirOf)).filter(v => v.from === rel)) notes.push(`${rel}: imports ${v.to}; game code imports only @engine, @kits/<name>, its own files and JSON`);
+  }
+  if (/^src\/(core|platform|author|app|dev|features|domain|testing)\//.test(rel) || /^(README|AGENTS)\.md$|^docs\/(?!kits\/)/.test(rel)) {
+    const {hits} = await import('../lint/genericity.mjs');
+    let text = ''; try { text = readFileSync(join(ROOT, rel), 'utf8'); } catch { /* deleted */ }
+    for (const h of hits(text).slice(0, 5)) notes.push(`${rel}:${h.line} uses the genre word "${h.word}" in the engine; move it to a kit or template, or rename`);
+  }
+  if (gameDirOf && /(budgets\.json|build\.brief\.ts)$/.test(rel)) {
+    const {toolCommand} = await import('../lib/tool.mjs');
+    const c = toolCommand('tsx', ['scripts/lint/brief.ts', gameDirOf]);
+    const r = spawnSync(c.command, c.args, {cwd: ROOT, encoding: 'utf8', shell: c.shell});
+    if (r.status !== 0) notes.push((r.stderr || r.stdout).trim());
+  }
+} catch (error) {
+  notes.push(`after-edit: a check could not run (${String(error?.message ?? error).split('\n')[0]}); run npm run check`);
 }
 if (notes.length) console.log(JSON.stringify({hookSpecificOutput: {hookEventName: 'PostToolUse', additionalContext: `after-edit checks:\n- ${notes.join('\n- ')}\nRun npm run check for the full picture.`}}));
 process.exit(0);

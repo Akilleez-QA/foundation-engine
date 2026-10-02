@@ -27,10 +27,14 @@ test('the resolved tool entries actually start under this Node', () => {
   }
 });
 
-test('npm runs as npm\'s own CLI when npm started us, else npm (POSIX) or npm.cmd through the shell (Windows)', () => {
+test('npm runs as npm\'s own CLI when npm started us, else Node\'s bundled npm-cli.js (Windows) or npm (POSIX)', () => {
   const underNpm = npmCommand(['run', 'lint'], {env: {npm_execpath: 'C:\\npm\\bin\\npm-cli.js'}, platform: 'win32', execPath: 'C:\\node.exe'});
   assert.deepEqual(underNpm, {command: 'C:\\node.exe', args: ['C:\\npm\\bin\\npm-cli.js', 'run', 'lint'], shell: false});
-  assert.deepEqual(npmCommand(['test'], {env: {}, platform: 'win32'}), {command: 'npm.cmd', args: ['test'], shell: true});
+  const bundled = 'C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js';
+  assert.deepEqual(npmCommand(['install', 'C:\\Temp Dir\\a.tgz'], {env: {}, platform: 'win32', execPath: 'C:\\Program Files\\nodejs\\node.exe', exists: p => p === bundled}),
+    {command: 'C:\\Program Files\\nodejs\\node.exe', args: [bundled, 'install', 'C:\\Temp Dir\\a.tgz'], shell: false}, 'the installer\'s npm-cli.js, no shell');
+  assert.deepEqual(npmCommand(['install', 'C:\\Temp Dir\\a.tgz'], {env: {}, platform: 'win32', execPath: 'C:\\n\\node.exe', exists: () => false}),
+    {command: 'npm.cmd', args: ['install', '"C:\\Temp Dir\\a.tgz"'], shell: true}, 'last resort quotes arguments for cmd.exe');
   assert.deepEqual(npmCommand(['test'], {env: {}, platform: 'linux'}), {command: 'npm', args: ['test'], shell: false});
   assert.deepEqual(npmCommand(['test'], {env: {npm_execpath: '/usr/bin/npm'}, platform: 'darwin'}), {command: 'npm', args: ['test'], shell: false}, 'a non-JS npm_execpath is not run under node');
 });

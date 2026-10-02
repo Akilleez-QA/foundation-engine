@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {BROWSER_HELP, chromiumExecutable, launch, reportBrowserError, systemChromiums} from './bench-browser.mjs';
+import {BROWSER_HELP, START_HELP, chromiumExecutable, executableMissing, launch, reportBrowserError, systemChromiums} from './bench-browser.mjs';
 
 test('browser options preserve legacy mobile defaults and allow independent touch, mobile and DPR',async()=>{
   for (const [options,expected] of [
@@ -98,4 +98,25 @@ test('a missing or unstartable browser is one actionable message with the instal
     assert.equal(reportBrowserError(Error('other')),false);
     assert.deepEqual(lines,['No test browser found. '+BROWSER_HELP]);
   } finally { console.error=log; process.exitCode=exit; }
+});
+
+test('a browser that exists but fails to start shows the cause lines and start advice, not the install advice',async()=>{
+  const prior=process.env.ENGINE_CHROMIUM;
+  try {
+    process.env.ENGINE_CHROMIUM=process.execPath; // exists on every machine
+    const cause=Error('browserType.launch: \n╔══════╗\n║ Host system is missing dependencies to run browsers. ║\n║ libnss3.so ║\n╚══════╝');
+    await assert.rejects(launch({},async()=>{throw cause;}),error=>{
+      assert.equal(error.code,'ENGINE_NO_BROWSER');
+      assert.equal(error.cause,cause);
+      assert.match(error.message,/Could not start the test browser/);
+      assert.ok(error.message.includes('Host system is missing dependencies')&&error.message.includes('libnss3.so'),'the cause lines are shown');
+      assert.ok(error.message.endsWith(START_HELP));
+      assert.ok(!error.message.includes(BROWSER_HELP),'not told to install a browser that exists');
+      return true;
+    });
+  } finally { if(prior===undefined) delete process.env.ENGINE_CHROMIUM; else process.env.ENGINE_CHROMIUM=prior; }
+  assert.equal(executableMissing({path:null},Error('x')),true);
+  assert.equal(executableMissing({path:'/a'},Error('x'),()=>false),true);
+  assert.equal(executableMissing({path:'/a'},Error("Executable doesn't exist at /a"),()=>true),true);
+  assert.equal(executableMissing({path:'/a'},Error('crashed'),()=>true),false);
 });

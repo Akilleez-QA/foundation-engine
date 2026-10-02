@@ -12,10 +12,10 @@ import {fileURLToPath} from 'node:url';
 export const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 export const DEFAULT_TEMPLATE = 'templates/blank/game';
 
-/** The value of `--game <dir>` or `--game=<dir>` in a command line, or undefined. */
+/** The value of `--game <dir>` or `--game=<dir>` in a command line, '' when the flag has no value, or undefined. */
 export function gameArg(argv = process.argv.slice(2)) {
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--game') return argv[i + 1];
+    if (argv[i] === '--game') return argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : '';
     if (argv[i].startsWith('--game=')) return argv[i].slice('--game='.length);
   }
   return undefined;
@@ -48,6 +48,7 @@ export const gameDirLabel = (dir = gameDir()) => relative(ROOT, dir).split('\\')
 // Command-line entry points import this module, so `--game` and a wrong GAME_DIR are handled once, before any work and
 // before any child process starts (children inherit the environment).
 const fromArg = gameArg();
+if (fromArg === '') { console.error(`--game needs a folder, e.g. --game templates/blank/game. One of: ${templateGameDirs().join(', ')}`); process.exit(2); }
 if (fromArg) process.env.GAME_DIR = fromArg;
 if (process.env.GAME_DIR) {
   const problem = gameDirProblem();

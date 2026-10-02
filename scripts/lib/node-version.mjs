@@ -14,8 +14,8 @@ export function nodeVersionProblem(version = process.versions.node) {
   const [major, minor] = String(version).replace(/^v/, '').split('.').map(Number);
   const ok = major >= 24 || (major === 23 && minor >= 6) || (major === 22 && minor >= 18);
   if (ok) return null;
-  return `Foundation Engine needs Node.js ${MIN_NODE} or later (22.x from 22.18, or 24+); this is Node.js ${version}. ` +
-    'Install a newer Node 22 (for example `nvm install` or `fnm use`, which read .nvmrc / .node-version) and run the command again.';
+  return `Foundation Engine needs Node.js ${MIN_NODE} or later (22.18+, 23.6+ or 24+); this is Node.js ${version}. ` +
+    'Install the latest Node 22 (for example `nvm install 22` or `fnm install 22`) and run the command again.';
 }
 
 /** Print one line and exit when this Node.js cannot run the repository's scripts. */

@@ -3,12 +3,13 @@
 // node_modules/.bin entries are `.cmd` files, and Node refuses to spawn a `.cmd` without a shell. So:
 //   - a package's tool runs as `node <its JS bin entry> …args` (process.execPath plus the `bin` file from the package's
 //     own package.json), with no shell and no npx: the arguments reach the tool unchanged on every platform;
-//   - npm runs as `node <npm-cli.js> …args` when npm started this process (npm sets npm_execpath), else as `npm` on
-//     POSIX and through the shell as `npm.cmd` on Windows (the arguments are fixed words, never user text).
+//   - npm runs as `node <npm-cli.js> …args` when npm started this process (npm sets npm_execpath); else on Windows as
+//     `node <node folder>\node_modules\npm\bin\npm-cli.js` (where the Node installer puts npm), and only when that
+//     is absent through the shell as `npm.cmd` with each argument quoted; on POSIX as `npm`.
 // Usage: const {command, args, shell} = toolCommand('tsc', ['--noEmit']); spawnSync(command, args, {shell, …}).
-import {readFileSync} from 'node:fs';
+import {existsSync, readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
-import {dirname, join} from 'node:path';
+import {dirname, join, win32} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -33,9 +34,14 @@ export function toolCommand(name, args = [], {from = ROOT} = {}) {
 }
 
 /** The command for npm itself: npm's own CLI under this Node when npm started us, else the platform's npm. */
-export function npmCommand(args = [], {env = process.env, platform = process.platform, execPath = process.execPath} = {}) {
+export function npmCommand(args = [], {env = process.env, platform = process.platform, execPath = process.execPath, exists = existsSync} = {}) {
   const cli = env.npm_execpath;
   if (cli && /\.(c|m)?js$/.test(cli)) return {command: execPath, args: [cli, ...args], shell: false};
-  if (platform === 'win32') return {command: 'npm.cmd', args, shell: true};
+  if (platform === 'win32') {
+    const bundled = win32.join(win32.dirname(execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+    if (exists(bundled)) return {command: execPath, args: [bundled, ...args], shell: false};
+    // Last resort: cmd.exe joins the arguments with spaces, so quote each one (paths may contain spaces).
+    return {command: 'npm.cmd', args: args.map(a => /[\s"&|<>^]/.test(a) ? `"${a.replace(/"/g, '""')}"` : a), shell: true};
+  }
   return {command: 'npm', args, shell: false};
 }

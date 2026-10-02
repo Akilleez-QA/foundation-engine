@@ -18,6 +18,7 @@
 //   --bench-only   skip steps 1 to 3
 //   --synthetic    add n to one field of the evidence before checking, e.g. main.drawsPerRenderedFrame+100; the result
 //                  is never cached (proof that a regression blocks)
+import '../lib/node-version.mjs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';

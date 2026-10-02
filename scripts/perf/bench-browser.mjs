@@ -9,7 +9,9 @@
 //   (SYSTEM_CHROMIUM; ENGINE_CHROMIUM_SYSTEM=0 skips them). On Linux the real binary (/usr/lib/chromium/chromium...)
 //   comes before the /usr/bin launcher: distribution launchers such as /usr/bin/chromium read the user's own flag files
 //   (~/.config/chromium-flags.conf, /etc/chromium.d), which would change the measured browser's flags behind the bench.
-//   When no browser is found or it cannot start, launch() throws one actionable message (BROWSER_HELP) with the cause.
+//   When no browser is found, launch() throws one line with the install command (BROWSER_HELP); when one exists but
+//   cannot start (missing system libraries, a broken wrapper...), it throws the first lines of the cause and
+//   START_HELP instead. Both keep the original error as `cause`.
 // - Isolation: a fresh browser process and a throwaway context per launch; the user's browser, profile and storage are
 //   never touched. `--mute-audio` is always passed, and pages start with the `dev.silent` flag, so nothing can reach
 //   the speakers; system and application audio settings are never changed.
@@ -41,7 +43,16 @@ export function systemChromiums(platform = process.platform, env = process.env) 
 export const BROWSER_HELP = 'Install the test browser with `npx playwright-core install chromium` ' +
   '(Linux may also need `npx playwright-core install-deps chromium`), or set ENGINE_CHROMIUM to a Chrome or Chromium executable.';
 
-/** For command-line entries: print a missing-browser error as its one line (no stack) and return true; false otherwise. */
+/** The advice when a browser exists but does not start. */
+export const START_HELP = 'On Linux, missing system libraries are installed with `npx playwright-core install-deps chromium` (needs root); ' +
+  'or set ENGINE_CHROMIUM to a working Chrome or Chromium executable.';
+
+/** True when a launch failure means the executable itself is absent (rather than present but failing). */
+export function executableMissing(exe, cause, exists = existsSync) {
+  return !exe.path || !exists(exe.path) || /executable doesn't exist/i.test(String(cause?.message ?? cause));
+}
+
+/** For command-line entries: print a test-browser error (no stack) and return true; false for any other error. */
 export function reportBrowserError(error) {
   if (error?.code !== 'ENGINE_NO_BROWSER') return false;
   console.error(error.message);
@@ -85,10 +96,12 @@ export async function launch(options = {},
   try {
     browser = await launchBrowser({executablePath: exe.path ?? undefined, headless: true, args, ignoreDefaultArgs: ['--hide-scrollbars']});
   } catch (cause) {
-    const first = String(cause?.message ?? cause).split('\n').find(l => l.trim())?.trim() ?? 'unknown error';
-    const what = exe.path ? `Could not start the test browser ${exe.path} (${exe.source}): ${first}.`
-      : 'No test browser found (looked for ENGINE_CHROMIUM, Playwright\'s Chromium and an installed Chrome or Chromium).';
-    throw Object.assign(Error(`${what} ${BROWSER_HELP}`, {cause}), {code: 'ENGINE_NO_BROWSER'});
+    const lines = String(cause?.message ?? cause).split('\n').map(l => l.trim()).filter(Boolean);
+    let message;
+    if (!exe.path) message = `No test browser found (looked for ENGINE_CHROMIUM, Playwright's Chromium and an installed Chrome or Chromium). ${BROWSER_HELP}`;
+    else if (executableMissing(exe, cause)) message = `The test browser ${exe.path} (${exe.source}) does not exist. ${BROWSER_HELP}`;
+    else message = `Could not start the test browser ${exe.path} (${exe.source}):\n  ${(lines.length ? lines : ['unknown error']).slice(0, 8).join('\n  ')}\n${START_HELP}`;
+    throw Object.assign(Error(message, {cause}), {code: 'ENGINE_NO_BROWSER'});
   }
   try {
     const context = await browser.newContext({viewport: {width, height}, deviceScaleFactor, locale: 'en-US', timezoneId: 'UTC', isMobile, hasTouch});

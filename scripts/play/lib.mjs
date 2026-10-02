@@ -19,6 +19,9 @@ const freePort = () => new Promise((resolve, reject) => { const s = netServer();
  * listens on every network interface, so a phone on the same Wi-Fi can open it; `--host <address>` or
  * ENGINE_HOST=<address> picks one. Anyone on that network can then reach the dev server and its test API.
  */
+/** True for a host that only this machine can reach. */
+export const isLoopback = host => host === 'localhost' || /^127\./.test(String(host)) || host === '::1' || host === '[::1]';
+
 export function listenHost(argv = process.argv.slice(2), env = process.env) {
   const i = argv.findIndex(a => a === '--host' || a.startsWith('--host='));
   const value = i < 0 ? env.ENGINE_HOST : argv[i].startsWith('--host=') ? argv[i].slice(7) : (argv[i + 1] && !argv[i + 1].startsWith('-') ? argv[i + 1] : true);
@@ -31,8 +34,11 @@ export async function serve({port, host = '127.0.0.1'} = {}) {
   const {createServer} = await import('vite');
   const server = await createServer({root: ROOT, logLevel: 'error', server: {host, port: port ?? await freePort(), strictPort: true}});
   await server.listen();
-  const url = server.resolvedUrls.local[0].replace(/\/$/, '');
-  return {url, network: server.resolvedUrls.network.map(u => u.replace(/\/$/, '')), close: () => server.close()};
+  // A specific non-loopback address (`--host 192.168.1.5`) is listed only under `network`, with `local` empty.
+  const {local = [], network = []} = server.resolvedUrls ?? {};
+  const first = local[0] ?? network[0];
+  if (!first) { await server.close(); throw Error(`the dev server reported no URL for host ${host === true ? 'all interfaces' : host}`); }
+  return {url: first.replace(/\/$/, ''), network: network.map(u => u.replace(/\/$/, '')), close: () => server.close()};
 }
 
 export function readJson(file) { return JSON.parse(readFileSync(join(ROOT, file), 'utf8')); }
