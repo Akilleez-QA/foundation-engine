@@ -15,7 +15,7 @@ const profiles=[{id:'compact',width:320,height:568},{id:'phone-portrait',width:3
 const routes=[{template:'mechanics',scene:'lab',selector:'.scene-overlay section button',action:'Ride the platform',after:'Step off safely'},
  {template:'expedition',scene:'field',selector:'.scene-overlay section button',action:'Begin survey',after:'Stop'},
  {template:'expedition',scene:'shelter',selector:'.scene-overlay section button',action:null,after:'Begin survey'},
- {template:'learn',scene:'day-night',selector:'.scene-overlay nav button',action:null,pause:true,walk:true,
+ {template:'learn',scene:'day-night',selector:'.scene-overlay nav button',action:null,pause:true,traverse:true,
   // Lesson content that the wrapped control bar and the progress line must never cover.
   clear:[['.scene-overlay nav','.chalkboard'],['.scene-overlay nav','.explorer-slider'],['.scene-overlay nav','.explorer-quiz'],['.scene-overlay > p','.explorer-quiz']]}];
 let server,browser;
@@ -93,7 +93,7 @@ try {
    }
    row.screenshot=`${route.template}-${route.scene}-${profile.id}.png`;
    await page.screenshot({path:resolve(out,row.screenshot)});
-   if(route.walk){
+   if(route.traverse){
     // Resume, then step the held clock through the board, sim and quiz scenes, tapping Next and turning the slider,
     // and check separation in every state reached. A short sample of the lesson, not a complete playthrough.
     await page.locator('[data-command="pause"]').tap();
@@ -106,8 +106,8 @@ try {
      if(await page.locator('.explorer-slider input').count())await page.locator('.explorer-slider input').fill('360');
      const next=page.locator('[data-command="next"]');if(await next.isEnabled())await next.tap();
     }
-    row.walked=[...seen];
-    for(const part of ['.chalkboard','.explorer-slider','.explorer-quiz'])assert.ok(seen.has(part),`${profile.id}: walk never reached ${part}`);
+    row.traversed=[...seen];
+    for(const part of ['.chalkboard','.explorer-slider','.explorer-quiz'])assert.ok(seen.has(part),`${profile.id}: traversal never reached ${part}`);
     row.quizScreenshot=`${route.template}-${route.scene}-${profile.id}-quiz.png`;
     await page.screenshot({path:resolve(out,row.quizScreenshot)});
     await page.evaluate(()=>window.engine.clock.resume());

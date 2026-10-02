@@ -96,7 +96,7 @@ keep their authored centre unless they would cover the progress or caption line,
 reach the bar, or (cards only) cover the board's caption. Then they start below the
 top content and scroll within the space left (`max-height`, `overflow-y: auto`).
 
-Every value keeps its authored geometry wherever there is room, so desktop and
+Every value keeps its authored geometry wherever there is space, so desktop and
 tablet layouts with a one-row bar do not change; nothing here imposes a phone layout
 on larger screens. When the space is too small for a panel (phone landscape), the
 panel scrolls rather than covering the caption or the controls. The observer
@@ -108,5 +108,5 @@ A creator who replaces the lesson UI can keep these helpers, use their own owner
 or omit them. Regressions: `src/kits/learn/layout.test.ts` (fake DOM geometry: what
 moves, by how much, what stays) and the Learn route of
 `scripts/play/stock-touch-check.mjs` (Chromium touch emulation at four profiles,
-walking board, sim and quiz). Neither is physical-device acceptance; see the
+stepping through board, sim and quiz). Neither is physical-device acceptance; see the
 [layout repair receipt](../verification/stock-device-20261002/README.md).

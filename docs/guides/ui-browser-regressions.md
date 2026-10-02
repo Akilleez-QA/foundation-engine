@@ -77,7 +77,7 @@ The stock touch-control runner (`scripts/play/stock-touch-check.mjs`) is not par
 this six-diagnostic command or CI; run it manually. Its
 [first receipt](../verification/stock-device-20261001/README.md) records 16 target/tap
 checks and a lesson content overlap that those checks did not detect. The runner now
-also asserts lesson content/control separation on a walk through the board, sim and
+also asserts lesson content/control separation while stepping through the board, sim and
 quiz, and fails on the unrepaired layout; the
 [layout repair receipt](../verification/stock-device-20261002/README.md) records a
 clean-commit pass. Keep that narrower evidence separate from framework regressions

@@ -23,7 +23,7 @@ not refresh historical CI results or establish an exact-head gate pass.
 
 The compact lesson overlap is repaired in the learn kit's layout seam: the board,
 caption, slider, cards and quiz stay clear of the wrapped control bar and the
-progress line, and keep their authored geometry where there is room (desktop
+progress line, and keep their authored geometry where there is space (desktop
 unchanged). `src/kits/learn/layout.test.ts` and the runner's new separation checks
 fail on the old layout. The [layout repair receipt](../verification/stock-device-20261002/README.md)
 records a clean-commit emulated pass at 320×568, 390×844, 844×390 and 820×1180 and

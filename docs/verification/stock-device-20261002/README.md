@@ -13,7 +13,7 @@ The [2026-10-01 receipt](../stock-device-20261001/README.md) showed that at
 320×568 the learn kit's control bar wraps to three rows while the chalkboard kept a
 fixed 76px bottom inset, so Back / Show again sat inside the stage and the bar
 covered the board caption ([before](../stock-device-20261001/learn-day-night-compact.png)).
-An exploratory walk of the whole lesson (board, sim, quiz) at five profiles found
+An exploratory pass through the whole lesson (board, sim, quiz) at five profiles found
 the same class of collision elsewhere:
 
 | Profile (CSS px) | Before the repair |
@@ -34,14 +34,14 @@ the bar through `aboveControls(min)`; the caption line drops below the progress 
 only if the two would touch; the objectives/finished cards and the quiz keep their
 authored centre unless they would cover the top content, reach the bar or (cards
 only) cover the board caption, in which case they start below the top content and
-scroll in the space left. Every inset keeps its authored value where there is room.
+scroll in the space left. Every inset keeps its authored value where there is space.
 See [learn mode: layout on narrow screens](../../guides/learn-mode.md#layout-on-narrow-screens).
 
-Desktop (1280×800): in the exploratory walk, the bar, board, board caption, slider,
+Desktop (1280×800): in the exploratory pass, the bar, board, board caption, slider,
 quiz and caption line rectangles at every lesson state matched the measurements
 taken with the original caption, card and quiz code, and the board and slider
 insets resolve to their original 76px / 84px. The opening board also matched the
-fully unrepaired build. The walk script itself was exploratory and is not saved.
+fully unrepaired build. The exploratory script itself was exploratory and is not saved.
 
 ## What ran
 
@@ -54,7 +54,7 @@ at 320×568, 390×844, 844×390 and 820×1180) still assert 48×48 targets, 16px
 viewport containment and center hit testing. For Learn it now also asserts that no
 visible bar rectangle intersects the board, slider or quiz, and that the caption
 line does not intersect the quiz, first at the paused opening board and then on
-every state of a held-clock walk that taps Next and fills the slider until the quiz
+every state of a held-clock traversal that taps Next and fills the slider until the quiz
 appears. Each profile reached the board, slider and quiz. The same runner with the
 learn kit sources reverted fails at the first case:
 `learn/day-night/compact: .scene-overlay nav overlaps .chalkboard`.
@@ -75,7 +75,7 @@ learn kit sources reverted fails at the first case:
 
 - Touch scrolling inside the fitted quiz was not exercised; in phone landscape the
   second and third answers need it (keys 1-3 still answer).
-- The compact board shrinks to about 240px tall to make room; the objectives card
+- The compact board shrinks to about 240px tall to make space; the objectives card
   still covers the board drawing at the opening step (by design, as on desktop).
 - The objectives/quiz cards use content-box widths and reach within 2px of the
   edges on phones; the sim's 3D framing is unchanged, and at 320×568 the slider
