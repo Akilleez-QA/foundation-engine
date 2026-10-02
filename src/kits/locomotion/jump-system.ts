@@ -84,7 +84,7 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
   /**
    * Planar motion through walls and solids, in sub-steps of at most half the radius. A sub-step that short cannot cross
    * a solid's outline inflated by the radius (at least two radii wide), so carried motion does not tunnel. Motion
-   * needing more than 1,024 sub-steps (over 512 radii in one tick) is refused before anything changes.
+   * needing more than 1,024 sub-steps (over 512 radii in one tick) is refused: the tick throws and is rolled back.
    */
   const slideBy = (world: World, from: { x: number; z: number }, dx: number, dz: number) => {
     if (!dx && !dz) return { x: from.x, z: from.z };
@@ -107,101 +107,113 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
       if (e === undefined || !tr) return;
       let body = byWorld.get(e);
       if (!body) byWorld.set(e, body = { feel: createJumpFeel(o.config), supported: false, vx: 0, vz: 0, carrier: null, cx: 0, cy: 0, cz: 0 });
-      const active = !o.when || o.when(ctx);
-      // The stock runtime's press latch shows each press to exactly one fixed tick (STD-SIM-12), even across frames
-      // that run no tick, so the press edge is used as given. An inactive tick drops any pending press.
-      const pressed = active && ctx.input.pressed(o.action);
-      if (!active) body.feel.cancelPress();
-      const feet0 = tr.y - offset;
-      let x = tr.x, z = tr.z, feet = feet0;
-
-      // ---- Ride. Every quantity is computed before any state changes; writes happen at the end of the tick.
-      let ride: { id: string; dx: number; dy: number; dz: number; vx: number; vy: number; vz: number; top: number; px: number; py: number; pz: number } | null = null;
-      let left: { vx: number; vy: number; vz: number } | null = null;   // a carrier left this tick by moving off it
-      if (platforms && body.carrier === null && body.feel.vy <= 0) {
-        // An actor resting exactly on a platform's previous top (placed there, or stepped on) rides from this tick.
-        const id = platforms.standing(x, z, feet);
-        const p = id === null ? null : platforms.pose(id), d = id === null ? null : platforms.delta(id);
-        if (id !== null && p && d) { body.carrier = id; body.cx = p.x - d.dx; body.cy = p.y - d.dy; body.cz = p.z - d.dz; }
+      // The tick is a transaction. Controller and adapter state are saved first and restored if any query (ground,
+      // platforms, the `when` predicate, input) or limit check throws; the Transform is written only by the last
+      // statement of a tick that succeeded. A failed tick therefore leaves the actor exactly as if it had not run.
+      const b = body, { supported, vx, vz, carrier, cx, cy, cz } = b;
+      b.feel.save();
+      try { tick(ctx, dt, tr, b); } catch (error) {
+        b.feel.restore(); b.supported = supported; b.vx = vx; b.vz = vz; b.carrier = carrier; b.cx = cx; b.cy = cy; b.cz = cz;
+        throw error;
       }
-      if (body.carrier !== null) {
-        const id = body.carrier, p = platforms?.pose(id) ?? null, d = platforms?.delta(id) ?? null, v = platforms?.velocity(id) ?? null;
-        // The platform must have moved continuously since the actor last moved with it: frozen (no advance since), or
-        // exactly one advance by `delta`. A cut, a restart, a removal and re-add, or an actor moved vertically by
-        // another owner is a discontinuity, and the actor detaches with no velocity.
-        const still = p !== null && Math.abs(p.x - body.cx) <= EPS && Math.abs(p.y - body.cy) <= EPS && Math.abs(p.z - body.cz) <= EPS;
-        const stepped = p !== null && d !== null && Math.abs(body.cx + d.dx - p.x) <= EPS && Math.abs(body.cy + d.dy - p.y) <= EPS && Math.abs(body.cz + d.dz - p.z) <= EPS;
-        const attached = Math.abs(feet - body.cy) <= EPS;
-        if (p && v && (still || stepped) && attached) {
-          const m = still ? { dx: 0, dy: 0, dz: 0 } : d!, vel = still ? { dx: 0, dy: 0, dz: 0 } : v;
-          const moved = slideBy(ctx.world, { x, z }, m.dx, m.dz), top = platforms!.supportOn(id, moved.x, moved.z);
-          if (top !== null) ride = { id, dx: moved.x - x, dy: m.dy, dz: moved.z - z, vx: vel.dx, vy: vel.dy, vz: vel.dz, top, px: p.x, py: p.y, pz: p.z };
-          else { left = { vx: vel.dx, vy: vel.dy, vz: vel.dz }; x = moved.x; z = moved.z; }
-        }
-      } else if (active && !body.supported && (body.vx || body.vz)) {
-        const moved = slideBy(ctx.world, { x, z }, body.vx * dt, body.vz * dt); x = moved.x; z = moved.z;
-      }
-
-      if (!active) {
-        // Paused movement still rides: the actor stays on its carrier (or drops off it) but nothing else simulates.
-        const carrier = ride;
-        body.carrier = carrier ? carrier.id : null;
-        if (carrier) { x += carrier.dx; z += carrier.dz; feet = carrier.top; body.cx = carrier.px; body.cy = carrier.py; body.cz = carrier.pz; }
-        publish(ctx, tr, x, z, feet);
-        return;
-      }
-
-      // ---- Static support and the controller.
-      const riding = ride !== null, rx = riding ? x + ride!.dx : x, rz = riding ? z + ride!.dz : z, rideTop = riding ? ride!.top : feet;
-      const rising = body.feel.vy > 0;
-      const reach = (body.supported || riding) && !rising ? stepUp : 0;
-      const standFeet = riding ? rideTop : feet;
-      const under = support(rx, rz, standFeet + reach);
-      const onStatic = !riding && !rising && under !== null && feet - under <= (body.supported ? snap : 0) + EPS;
-      if (left && leave !== 'none') {
-        const up = leave === 'add-upward' ? Math.max(0, left.vy) : left.vy;
-        if (up) body.feel.setVelocity(clampBoost(up), true);
-      }
-      const lift = riding && leave !== 'none' ? clampBoost(leave === 'add-upward' ? Math.max(0, ride!.vy) : ride!.vy) : 0;
-      const r = body.feel.step(dt, { pressed, held: ctx.input.held(o.action), grounded: riding || onStatic, boost: lift });
-
-      // ---- Resolve the tick. Queries first; adapter state and the Transform change only after all of them succeed.
-      const carried = riding && !r.jumped;
-      let next: number, top: number, staticSupported = false;
-      if (carried) {
-        // Carried: end on the carrier's top unless static ground, or another platform overtaking it, is higher.
-        x = rx; z = rz; next = rideTop; top = Math.max(feet0, rideTop);
-      } else {
-        // Jumping off a carrier: vertical motion starts from the top the actor stood on at the start of the tick (the
-        // launch boost carries the platform's rise); the tick's horizontal ride is kept only with add-velocity.
-        if (riding && leave === 'add-velocity') { x = rx; z = rz; }
-        const base = onStatic ? under! : feet;
-        next = base + r.dy; top = Math.max(onStatic ? Math.max(feet, under!) : feet, base + r.peak);
-        staticSupported = onStatic && !r.jumped;
-        if (staticSupported) next = Math.max(next, under!);
-      }
-      // Sweep static ground and every platform's one-way catch from the highest point of the tick down to its end.
-      let land: number | null = null;
-      if (carried || r.vy <= 0) { const h = support(x, z, top + (carried ? stepUp : 0)); if (h !== null && next <= h + EPS) land = h; }
-      const caught = platforms?.catch(x, z, top, next) ?? null;
-      const caughtPose = caught ? platforms!.pose(caught.id) : null;
-      const best = Math.max(land ?? -Infinity, caught?.height ?? -Infinity);
-
-      body.carrier = null; body.supported = staticSupported;
-      if (left) { body.vx = leave === 'add-velocity' ? left.vx : 0; body.vz = leave === 'add-velocity' ? left.vz : 0; }
-      if (riding && r.jumped) { body.vx = leave === 'add-velocity' ? ride!.vx : 0; body.vz = leave === 'add-velocity' ? ride!.vz : 0; }
-      if (carried && best <= next) {
-        // Stay on the carrier: only a strictly higher surface takes over (an exact tie keeps it).
-        body.carrier = ride!.id; body.cx = ride!.px; body.cy = ride!.py; body.cz = ride!.pz;
-      } else if (caught && caughtPose && caught.height >= (land ?? -Infinity)) {
-        next = caught.height; body.carrier = caught.id; body.supported = false;
-        body.cx = caughtPose.x; body.cy = caughtPose.y; body.cz = caughtPose.z;
-        if (body.feel.vy > 0) body.feel.setVelocity(0);
-      } else if (land !== null) { next = land; body.supported = true; }
-      if (body.supported || body.carrier !== null) body.vx = body.vz = 0;
-      publish(ctx, tr, x, z, next);
     },
   });
+  function tick(ctx: SceneContext, dt: number, tr: { x: number; y: number; z: number }, body: Body) {
+    const active = !o.when || o.when(ctx);
+    // The stock runtime's press latch shows each press to exactly one fixed tick (STD-SIM-12), even across frames
+    // that run no tick, so the press edge is used as given. An inactive tick drops any pending press.
+    const pressed = active && ctx.input.pressed(o.action);
+    if (!active) body.feel.cancelPress();
+    const feet0 = tr.y - offset;
+    let x = tr.x, z = tr.z, feet = feet0;
+
+    // ---- Ride. State written below before a later query throws is rolled back by the caller's transaction.
+    let ride: { id: string; dx: number; dy: number; dz: number; vx: number; vy: number; vz: number; top: number; px: number; py: number; pz: number } | null = null;
+    let left: { vx: number; vy: number; vz: number } | null = null;   // a carrier left this tick by moving off it
+    if (platforms && body.carrier === null && body.feel.vy <= 0) {
+      // An actor resting exactly on a platform's previous top (placed there, or stepped on) rides from this tick.
+      const id = platforms.standing(x, z, feet);
+      const p = id === null ? null : platforms.pose(id), d = id === null ? null : platforms.delta(id);
+      if (id !== null && p && d) { body.carrier = id; body.cx = p.x - d.dx; body.cy = p.y - d.dy; body.cz = p.z - d.dz; }
+    }
+    if (body.carrier !== null) {
+      const id = body.carrier, p = platforms?.pose(id) ?? null, d = platforms?.delta(id) ?? null, v = platforms?.velocity(id) ?? null;
+      // The platform must have moved continuously since the actor last moved with it: frozen (no advance since), or
+      // exactly one advance by `delta`. A cut, a restart, a removal and re-add, or an actor moved vertically by
+      // another owner is a discontinuity, and the actor detaches with no velocity.
+      const still = p !== null && Math.abs(p.x - body.cx) <= EPS && Math.abs(p.y - body.cy) <= EPS && Math.abs(p.z - body.cz) <= EPS;
+      const stepped = p !== null && d !== null && Math.abs(body.cx + d.dx - p.x) <= EPS && Math.abs(body.cy + d.dy - p.y) <= EPS && Math.abs(body.cz + d.dz - p.z) <= EPS;
+      const attached = Math.abs(feet - body.cy) <= EPS;
+      if (p && v && (still || stepped) && attached) {
+        const m = still ? { dx: 0, dy: 0, dz: 0 } : d!, vel = still ? { dx: 0, dy: 0, dz: 0 } : v;
+        const moved = slideBy(ctx.world, { x, z }, m.dx, m.dz), top = platforms!.supportOn(id, moved.x, moved.z);
+        if (top !== null) ride = { id, dx: moved.x - x, dy: m.dy, dz: moved.z - z, vx: vel.dx, vy: vel.dy, vz: vel.dz, top, px: p.x, py: p.y, pz: p.z };
+        else { left = { vx: vel.dx, vy: vel.dy, vz: vel.dz }; x = moved.x; z = moved.z; }
+      }
+    } else if (active && !body.supported && (body.vx || body.vz)) {
+      const moved = slideBy(ctx.world, { x, z }, body.vx * dt, body.vz * dt); x = moved.x; z = moved.z;
+    }
+
+    if (!active) {
+      // Paused movement still rides: the actor stays on its carrier (or drops off it) but nothing else simulates.
+      const carrier = ride;
+      body.carrier = carrier ? carrier.id : null;
+      if (carrier) { x += carrier.dx; z += carrier.dz; feet = carrier.top; body.cx = carrier.px; body.cy = carrier.py; body.cz = carrier.pz; }
+      publish(ctx, tr, x, z, feet);
+      return;
+    }
+
+    // ---- Static support and the controller.
+    const riding = ride !== null, rx = riding ? x + ride!.dx : x, rz = riding ? z + ride!.dz : z, rideTop = riding ? ride!.top : feet;
+    const rising = body.feel.vy > 0;
+    const reach = (body.supported || riding) && !rising ? stepUp : 0;
+    const standFeet = riding ? rideTop : feet;
+    const under = support(rx, rz, standFeet + reach);
+    const onStatic = !riding && !rising && under !== null && feet - under <= (body.supported ? snap : 0) + EPS;
+    if (left && leave !== 'none') {
+      const up = leave === 'add-upward' ? Math.max(0, left.vy) : left.vy;
+      if (up) body.feel.setVelocity(clampBoost(up), true);
+    }
+    const lift = riding && leave !== 'none' ? clampBoost(leave === 'add-upward' ? Math.max(0, ride!.vy) : ride!.vy) : 0;
+    const r = body.feel.step(dt, { pressed, held: ctx.input.held(o.action), grounded: riding || onStatic, boost: lift });
+
+    // ---- Resolve the tick. The controller has already stepped; if a query below throws, run() restores it and the
+    // adapter state, and the Transform (written only by the final publish) is untouched.
+    const carried = riding && !r.jumped;
+    let next: number, top: number, staticSupported = false;
+    if (carried) {
+      // Carried: end on the carrier's top unless static ground, or another platform overtaking it, is higher.
+      x = rx; z = rz; next = rideTop; top = Math.max(feet0, rideTop);
+    } else {
+      // Jumping off a carrier: vertical motion starts from the top the actor stood on at the start of the tick (the
+      // launch boost carries the platform's rise); the tick's horizontal ride is kept only with add-velocity.
+      if (riding && leave === 'add-velocity') { x = rx; z = rz; }
+      const base = onStatic ? under! : feet;
+      next = base + r.dy; top = Math.max(onStatic ? Math.max(feet, under!) : feet, base + r.peak);
+      staticSupported = onStatic && !r.jumped;
+      if (staticSupported) next = Math.max(next, under!);
+    }
+    // Sweep static ground and every platform's one-way catch from the highest point of the tick down to its end.
+    let land: number | null = null;
+    if (carried || r.vy <= 0) { const h = support(x, z, top + (carried ? stepUp : 0)); if (h !== null && next <= h + EPS) land = h; }
+    const caught = platforms?.catch(x, z, top, next) ?? null;
+    const caughtPose = caught ? platforms!.pose(caught.id) : null;
+    const best = Math.max(land ?? -Infinity, caught?.height ?? -Infinity);
+
+    body.carrier = null; body.supported = staticSupported;
+    if (left) { body.vx = leave === 'add-velocity' ? left.vx : 0; body.vz = leave === 'add-velocity' ? left.vz : 0; }
+    if (riding && r.jumped) { body.vx = leave === 'add-velocity' ? ride!.vx : 0; body.vz = leave === 'add-velocity' ? ride!.vz : 0; }
+    if (carried && best <= next) {
+      // Stay on the carrier: only a strictly higher surface takes over (an exact tie keeps it).
+      body.carrier = ride!.id; body.cx = ride!.px; body.cy = ride!.py; body.cz = ride!.pz;
+    } else if (caught && caughtPose && caught.height >= (land ?? -Infinity)) {
+      next = caught.height; body.carrier = caught.id; body.supported = false;
+      body.cx = caughtPose.x; body.cy = caughtPose.y; body.cz = caughtPose.z;
+      if (body.feel.vy > 0) body.feel.setVelocity(0);
+    } else if (land !== null) { next = land; body.supported = true; }
+    if (body.supported || body.carrier !== null) body.vx = body.vz = 0;
+    publish(ctx, tr, x, z, next);
+  }
   function publish(ctx: SceneContext, tr: { x: number; y: number; z: number }, x: number, z: number, feet: number) {
     const y = feet + offset;
     if (x === tr.x && z === tr.z && y === tr.y) return;

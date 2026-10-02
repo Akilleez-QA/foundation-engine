@@ -586,7 +586,14 @@ Status: implemented, candidate (`feat/mv02-moving-platforms`, PR #53); not integ
     velocity.
   - Boosts are clamped to ±1000 m/s. Carried planar motion slides in sub-steps of at most
     half the radius, and is refused above 1,024 sub-steps per tick.
-  - Adapter state and the Transform change only after every query of the tick succeeds.
+  - Each adapter tick is a transaction: if any query or limit throws, the jump controller
+    and adapter state are restored and the Transform is not written, so the tick has the
+    effect of a skipped tick (regression: a ground query that throws once mid-fall at
+    30 and 60 Hz, before and after the controller steps, mid-fall and on flat and diagonal
+    lifts, matches the skipped-tick run exactly; removing either half of the rollback fails it).
+  - Default `Walls` stop at ±1e6 m while platform poses are accepted to ±1e7; beyond
+    ±1e6 riders are not carried unless the scene has wider `Walls` (documented, not
+    changed).
 - Checked:
   - The regression tests run at 30, 60, 120, 165 and 240 Hz ticks: exact riding including a
     20 m/s descent; jump apex from vertical, diagonal and descending lifts within g·dt²/8 of

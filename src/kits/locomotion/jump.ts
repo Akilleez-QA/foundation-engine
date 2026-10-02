@@ -104,6 +104,8 @@ export function createJumpFeel(config: JumpFeelConfig) {
   let pressAge: number | null = null, fresh = false;
   // Integration results, written by integrate() to avoid a per-step tuple.
   let outDy = 0, outPeak = 0;
+  // One saved copy of the state for save()/restore(), kept in place so a transactional caller allocates nothing.
+  let sVy = 0, sGrounded = false, sFromJump = false, sReleased = false, sSince: number | null = null, sPress: number | null = null, sFresh = false;
 
   const gravityAt = (v: number, held: boolean) => {
     // Evaluated for the open interval just below v: velocity only decreases under gravity.
@@ -182,6 +184,13 @@ export function createJumpFeel(config: JumpFeelConfig) {
     },
     /** Drop a pending press (a menu opened, control moved elsewhere). */
     cancelPress() { pressAge = null; fresh = false; },
+    /**
+     * Remember the whole state in the controller's single save slot (overwriting any earlier save). With `restore()`
+     * a caller can make a tick transactional: save, step, and restore if anything later in the tick fails.
+     */
+    save() { sVy = vy; sGrounded = grounded; sFromJump = fromJump; sReleased = released; sSince = sinceSupport; sPress = pressAge; sFresh = fresh; },
+    /** Return to the state of the last `save()` (the initial state if there was none). */
+    restore() { vy = sVy; grounded = sGrounded; fromJump = sFromJump; released = sReleased; sinceSupport = sSince; pressAge = sPress; fresh = sFresh; },
     /** Clear everything: an authority change, a teleport, a respawn. */
     reset() { vy = 0; grounded = false; fromJump = false; released = false; sinceSupport = null; pressAge = null; fresh = false; },
   };

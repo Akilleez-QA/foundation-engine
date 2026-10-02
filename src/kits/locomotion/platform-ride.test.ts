@@ -252,3 +252,41 @@ test('MV-02: carried motion slides against walls instead of passing through them
     for (const p of s) assert.ok(p.x <= 1 - 0.35 + 1e-9, `${hz} Hz inside the wall at ${p.t}: ${p.x}`);
   }
 });
+
+test('MV-02 re-verification: a tick whose ground query throws once is rolled back like a skipped tick', async () => {
+  /**
+   * Run `n` ticks; on tick `k` either the adapter is skipped, or its ground query throws on its `call`-th use that tick
+   * (1: before the controller steps; 2: the landing sweep after it stepped and after ride state was written).
+   */
+  async function run(hz: number, n: number, k: number, mode: 'throw' | 'skip', lift: 'none' | 'diagonal' | 'flat', call = 2) {
+    const t = await testScene(defineScene({ id: 'tx', title: 'tx', entities: [[Name({ name: 'player' }), Transform(lift !== 'none' ? { x: 0, y: 1, z: 0 } : { x: 0, y: 5, z: 0 })]] }), {});
+    const tr = t.world.get(t.ctx.named('player')!, Transform)!;
+    const platforms = createPlatforms();
+    if (lift !== 'none') platforms.add('deck', { halfX: 2, halfZ: 2, path: s => ({ x: 0.5 * s, y: lift === 'flat' ? 1 : 1 + s, z: 0 }) });
+    let tick = 0, calls = 0;
+    const input: InputState = { describe: () => null, pressed: () => false, pressedAt: () => null, held: () => false, axis: () => 0, pointer: { x: 0, y: 0, down: false, pressed: false } };
+    const ctx = Object.create(t.ctx, { input: { value: input } }) as SceneContext;
+    const ground = (x: number, z: number, below: number) => { if (mode === 'throw' && tick === k && ++calls === call) throw new Error('ground offline'); return floor(x, z, below); };
+    const adapter = jumpSystem({ action: 'jump', config: jump, ground, platforms }), advance = platformSystem(platforms), dt = 1 / hz;
+    const out: { x: number; y: number; z: number }[] = [];
+    try {
+      for (tick = 0; tick < n; tick++) {
+        advance.run(ctx, dt);
+        if (tick === k && mode === 'skip') { out.push({ x: tr.x, y: tr.y, z: tr.z }); continue; }
+        if (tick === k) assert.throws(() => adapter.run(ctx, dt), /ground offline/);
+        else adapter.run(ctx, dt);
+        out.push({ x: tr.x, y: tr.y, z: tr.z });
+      }
+    } finally { t.dispose(); }
+    return out;
+  }
+  for (const hz of [30, 60]) {
+    for (const [lift, k] of [['none', Math.round(0.3 * hz)], ['flat', 0], ['diagonal', 0], ['diagonal', Math.round(0.2 * hz)]] as const) {
+      const skipped = await run(hz, hz, k, 'skip', lift);
+      for (const call of [1, 2]) {
+        const thrown = await run(hz, hz, k, 'throw', lift, call);
+        assert.deepEqual(thrown, skipped, `${hz} Hz ${lift === 'none' ? 'mid-fall' : `${lift} lift`}, query ${call} of tick ${k} threw: the failed tick must equal a skipped tick`);
+      }
+    }
+  }
+});
