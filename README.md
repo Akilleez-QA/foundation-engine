@@ -59,7 +59,7 @@ The bench and gate drive Chromium through `playwright-core`. They use `ENGINE_CH
 - [Upgrade acceptance ledger](docs/guides/upgrade-acceptance-ledger.md): integrated revisions, verification boundaries and unresolved requirements.
 - [Framework upgrade record](docs/guides/framework-upgrade-status.md): implemented contracts and representative consumers.
 - [Complete scoped views](docs/guides/network-views.md): creator-selected disclosure, bounded application credit, replacement and lifecycle recovery; see the acceptance ledger for integration status.
-- [Durable authority](docs/guides/durable-authority.md) and [prediction](docs/guides/prediction.md): optional contracts integrated in [PR #123](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/123) at `b6fb4a3`, after clean native acceptance and all seven gates. Physical-device acceptance remains open; this private integration is not a public release.
+- [Durable authority](docs/guides/durable-authority.md) and [prediction](docs/guides/prediction.md): optional contracts integrated in PR #123 in the private development history at `b6fb4a3`, after clean native acceptance and all seven gates. Physical-device acceptance remains open; this private integration is not a public release.
 - [Optional network admission](docs/guides/network-admission.md): intake, browser transport and the loopback diagnostic; replication and durability remain separate.
 - [AGENTS.md](AGENTS.md): how work is done here (worktrees, the gate, releases).
 - [docs/STANDARD.md](docs/STANDARD.md): the twelve laws and every clause.
