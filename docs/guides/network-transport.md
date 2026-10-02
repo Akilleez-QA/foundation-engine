@@ -30,6 +30,8 @@ There is no browser import of Node `ws`.
 incoming application backpressure unsupported. Reliable transport does not mean
 that a disconnected peer received or applied a particular message. The adapter
 implements no acknowledgment, reconnect, retries, compression control or durability.
+A consumer that wants paced reconnects can drive fresh adapters through the optional
+[retry schedule](network-retry.md); the adapter itself never retries.
 
 ## Explicit admission and draining
 

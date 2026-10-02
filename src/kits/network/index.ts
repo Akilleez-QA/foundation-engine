@@ -14,3 +14,6 @@ export type { AuthorityLimits, AuthorityReceipt, AuthorityStream, AuthorityEnvel
 export { createPrediction } from './prediction';
 export type { Prediction, PredictionBaseline, PredictionInput, PredictionLimits,
   PredictionOptions, PredictionSnapshot, PredictionValue, PredictionRefusal } from './prediction-types';
+export { createRetrySchedule } from './retry-schedule';
+export type { RetrySchedule, RetryScheduleLimits, RetryScheduleOptions, RetryScheduleNext,
+  RetryScheduleState } from './retry-schedule';

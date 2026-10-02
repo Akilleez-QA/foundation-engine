@@ -15,6 +15,9 @@ import {
 } from '../../src/author/index.ts';
 import { createTestApi } from '../../src/dev/test-api.ts';
 import { createBrowserTransport } from '../../src/platform/network/browser-transport.ts';
+import { createRetrySchedule } from '../../src/kits/network/index.ts';
+import { createRng } from '../../src/core/rng.ts';
+import { runRandom } from '../../src/core/run-random.ts';
 
 import { decodeResponse } from './client-protocol.mjs';
 
@@ -36,6 +39,28 @@ let actor = null,
   frames = 0,
   lastFrame = null,
   lastSend = null;
+// Optional paced reconnect (NW-04). Off unless the operator ticks the checkbox; a creator may omit or replace it.
+const retryLimits = {
+  baseMs: 250,
+  capMs: 4000,
+  maxAttempts: 5,
+  budget: { capacity: 8, refillEveryMs: 15000 },
+};
+let retry = null,
+  reconnectCredential = null,
+  reconnectEndpoint = null,
+  budgetRetryAt = null,
+  lastRetry = null,
+  transportsOpened = 0;
+// A dedicated jitter stream: never the scene's gameplay ctx.random(). `?seed=` replays it exactly; otherwise each
+// tab gets an independent stream so separate clients do not retry in lockstep.
+function retryRandom() {
+  const seed = new URLSearchParams(location.search).get('seed');
+  if (seed !== null && /^\d+$/.test(seed))
+    return createRng(`network-workbench.reconnect:${seed}`).next;
+  const stream = runRandom.stream('network-workbench.reconnect');
+  return () => stream.next();
+}
 let message = 'Disconnected',
   lastDisplay = '',
   lastProjection = '';
@@ -83,22 +108,64 @@ function retire(reason) {
   message = reason;
   render();
 }
+/** End any reconnect episode and forget the retained credential. Spent budget tokens are not refunded. */
+function stopReconnect() {
+  reconnectCredential = null;
+  reconnectEndpoint = null;
+  budgetRetryAt = null;
+  retry?.cancel();
+}
+function openTransport(url, token) {
+  try {
+    transport = createBrowserTransport({ url, limits });
+    pendingCredential = token;
+    transportsOpened++;
+    return true;
+  } catch {
+    message = 'Invalid endpoint';
+    return false;
+  }
+}
 function connect() {
   if (!active || !context) return;
   retire('Connecting');
-  const token = el('credential').value;
+  stopReconnect();
+  const token = el('credential').value,
+    url = el('endpoint').value;
   el('credential').value = '';
-  try {
-    transport = createBrowserTransport({ url: el('endpoint').value, limits });
-    pendingCredential = token;
-  } catch {
-    message = 'Invalid endpoint';
+  // Retained in memory only while automatic reconnect is armed; every attempt authenticates afresh.
+  if (openTransport(url, token) && el('auto-reconnect').checked) {
+    reconnectCredential = token;
+    reconnectEndpoint = url;
   }
   render();
 }
-function receive(raw) {
+/** Ask the schedule when to try again; never reconnects synchronously and never resends commands. */
+function scheduleReconnect(now) {
+  if (!active || !retry || reconnectCredential === null) return;
+  const result = retry.next(now);
+  lastRetry = result;
+  if (result.status === 'wait')
+    message = `${message}; reconnect attempt ${result.attempt} in ${result.delayMs} ms`;
+  else if (result.status === 'budget-empty') {
+    budgetRetryAt = result.refillAtMs;
+    message = 'Offline: retry budget empty; waiting for it to refill';
+  } else {
+    stopReconnect();
+    message =
+      result.status === 'exhausted'
+        ? `Offline: ${result.attempts} reconnect attempts failed; connect explicitly`
+        : 'Offline; connect explicitly';
+  }
+}
+function lost(reason, now) {
+  retire(reason);
+  scheduleReconnect(now);
+}
+function receive(raw, now) {
   const frame = decodeResponse(raw, { principal, pending });
   if (frame.type === 'authenticated') {
+    retry?.succeeded(now);
     principal = frame.principal;
     el('target').value = principal;
     message = 'Authenticated; no command result yet';
@@ -115,8 +182,23 @@ function receive(raw) {
 const poll = defineSystem({
   id: 'network-intake',
   phase: 'frame',
-  run() {
+  run(ctx) {
     frames++;
+    // The scene's own monotonic visit time; the schedule owns no timer.
+    const now = ctx.time.t * 1000;
+    const live = ['connecting', 'open'].includes(transport?.read().state);
+    if (!live && reconnectCredential !== null && retry) {
+      if (budgetRetryAt !== null) {
+        if (now >= budgetRetryAt) {
+          budgetRetryAt = null;
+          scheduleReconnect(now);
+        }
+      } else if (retry.due(now)) {
+        if (openTransport(reconnectEndpoint, reconnectCredential))
+          message = 'Reconnecting with fresh authentication';
+        else stopReconnect();
+      }
+    }
     if (!transport) return;
     if (transport.read().state === 'open' && pendingCredential !== null) {
       const credential = pendingCredential;
@@ -125,18 +207,20 @@ const poll = defineSystem({
         JSON.stringify({ v: 1, type: 'auth', token: credential }),
       );
       if (lastSend.status !== 'sent')
-        retire('Authentication transport refused');
+        lost('Authentication transport refused', now);
     }
     for (const raw of transport.drain(4)) {
       try {
-        receive(raw);
+        receive(raw, now);
       } catch {
+        // A protocol failure is not a transport loss: no automatic retry.
         retire('Invalid server response');
+        stopReconnect();
         break;
       }
     }
     if (transport.read().state === 'closed')
-      retire(`Connection ended: ${transport.read().reason}`);
+      lost(`Connection ended: ${transport.read().reason}`, now);
     render();
   },
 });
@@ -151,6 +235,8 @@ const scene = defineScene({
   enter(ctx) {
     active = true;
     context = ctx;
+    // One schedule per scene visit; its budget spans every reconnect episode of this visit.
+    retry = createRetrySchedule({ limits: retryLimits, random: retryRandom() });
     actor = null;
     lastProjection = '';
     lastDisplay = '';
@@ -164,6 +250,9 @@ const scene = defineScene({
   },
   exit() {
     retire('Scene retired');
+    stopReconnect();
+    retry?.dispose();
+    retry = null;
     active = false;
     context = null;
     actor = null;
@@ -186,7 +275,13 @@ const retired = defineScene({
   },
 });
 el('connect').addEventListener('click', connect);
-el('disconnect').addEventListener('click', () => retire('Disconnected'));
+el('disconnect').addEventListener('click', () => {
+  retire('Disconnected');
+  stopReconnect();
+});
+el('auto-reconnect').addEventListener('change', () => {
+  if (!el('auto-reconnect').checked) stopReconnect();
+});
 el('send').addEventListener('click', () => {
   if (
     !active ||
@@ -216,9 +311,14 @@ el('send').addEventListener('click', () => {
 el('exit').addEventListener('click', () => context?.scene.goto('retired'));
 el('return').addEventListener('click', () => context?.scene.goto('sample'));
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) retire('Suspended; reconnect explicitly');
+  if (!document.hidden) return;
+  retire('Suspended; reconnect explicitly');
+  stopReconnect();
 });
-window.addEventListener('pagehide', () => retire('Page retired'));
+window.addEventListener('pagehide', () => {
+  retire('Page retired');
+  stopReconnect();
+});
 const brief = defineBuild({
   goal: 'Exercise authenticated scoped commands over real transport',
   pitch: 'Optional network diagnostic',
@@ -264,6 +364,14 @@ window.networkWorkbench = {
     frames,
     scene: context?.scene.id,
     transport: transport?.read() ?? null,
+    // Never exposes the retained credential, only whether reconnect is armed.
+    reconnect: {
+      armed: reconnectCredential !== null,
+      schedule: retry?.read() ?? null,
+      last: lastRetry,
+      budgetRetryAt,
+      transportsOpened,
+    },
   }),
   world: () =>
     context

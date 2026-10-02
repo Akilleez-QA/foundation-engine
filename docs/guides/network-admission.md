@@ -13,7 +13,7 @@ game entities or an inventory, movement or combat protocol.
 | [Network intake](../../src/kits/network/README.md) | Finite limits, monotonic time, authentication, current authorization, dispatch and transport ports | Exact connection lifetimes, detached bounded JSON, pending-auth admission, fair bounded dispatch, revocation and cleanup | Identity service, remote I/O cancellation, simulation, replication, persistence |
 | [Browser transport](network-transport.md) | Endpoint, optional subprotocols and finite message/queue/buffer limits | One native text WebSocket, bounded application intake, explicit drain/send/dispose and terminal loss | Protocol parsing, incoming native backpressure, acknowledgments, retry or reconnect |
 | [Reference host](../../tools/network-workbench/README.md) | Operator-issued fixture credentials and two sample target policies | Maintained framing, byte/rate limits, independent auth deadline driver and ephemeral authorized consequences | Production account security, public deployment, durable state or exactly-once commands |
-| Reference scene | Existing scene frame system and ordinary ECS shapes | Bounded drain, correlated results, rendering accepted facts and disposal on exit/hidden page | Authority, replicated world state, prediction or automatic recovery |
+| Reference scene | Existing scene frame system and ordinary ECS shapes | Bounded drain, correlated results, rendering accepted facts and disposal on exit/hidden page; opt-in paced reconnect through the [retry schedule](network-retry.md) | Authority, replicated world state, prediction or command resubmission |
 
 The intake can wrap another maintained server framework. The raw browser adapter
 is a platform seam used by reference tooling; ordinary game code still follows the
@@ -39,7 +39,10 @@ the other principal's target refuses without changing either accepted result.
 
 Use separate browser contexts for independent clients. The reference scene closes
 its connection when hidden or retired; bringing it back requires an explicit new
-connection. It does not retain the credential for reconnect. An authentication
+connection. By default it does not retain the credential for reconnect; the
+opt-in "Reconnect automatically" checkbox keeps it in memory only while armed and
+reconnects transport loss with [paced, freshly authenticated attempts](network-retry.md).
+An authentication
 message alone does not carry a counter baseline. The shape appears after this
 client receives a correlated accepted command result, and is cleared when its
 connection retires. Another client's changes to the same principal are not pushed

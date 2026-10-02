@@ -33,6 +33,7 @@ const report = {
     'Two isolated desktop Chromium contexts and one separate loopback host process; no WAN, physical-device, TLS deployment or scalability certification.',
     'NW01 ephemeral authentication and command scopes only; no durable recovery, replicated baseline or prediction acceptance.',
     'Credentials are random operator fixtures supplied through trusted IPC and native password inputs; no production identity-provider claim.',
+    'NW04 paced reconnect is exercised against one loopback host with injected send refusal and revoked credentials; no WAN loss, host restart fleet or thundering-herd measurement in a browser.',
   ],
 };
 const evidence = diagnosticReport(report, resolve(out, 'report.json'));
@@ -352,6 +353,120 @@ try {
     beta: 4,
   });
   await shot(pages.alpha, 'alpha-revoked');
+  // NW04: optional paced reconnect. Transport loss reconnects with fresh authentication; commands are never resent.
+  const reconnect = async (page) => (await read(page)).reconnect;
+  await pages.beta.locator('#auto-reconnect').check();
+  await connect(pages.beta, connection.credentials.beta);
+  await authenticated(pages.beta, 'beta');
+  assert.equal((await reconnect(pages.beta)).armed, true);
+  const opened = (await reconnect(pages.beta)).transportsOpened;
+  await host.request('blockSends', { principal: 'beta', value: true });
+  await click(pages.beta, 'send');
+  await pages.beta.waitForFunction(
+    () => networkWorkbench.read().reconnect.last?.status === 'wait',
+  );
+  assert.equal((await read(pages.beta)).pending, 0);
+  await host.request('blockSends', { principal: 'beta', value: false });
+  await pages.beta.waitForFunction(
+    () =>
+      networkWorkbench.read().principal === 'beta' &&
+      networkWorkbench.read().reconnect.schedule.state === 'idle',
+    undefined,
+    { timeout: 15000 },
+  );
+  const recovered = await reconnect(pages.beta);
+  assert.equal(recovered.schedule.attempt, 0);
+  assert.ok(
+    recovered.transportsOpened > opened &&
+      recovered.transportsOpened <= opened + recovered.schedule.limits.maxAttempts,
+  );
+  const afterDrop = await snapshot('paced-reconnect-recovered');
+  assert.deepEqual(afterDrop.counters, { alpha: 3, beta: 5 });
+  assert.equal(afterDrop.metrics.dispatched, 5, 'reconnect resent no command');
+  await untilHost(
+    (s) => s.intake.connections === 1 && s.peers.every((p) => p.state === 'active'),
+  );
+  await command(pages.beta, 'beta', 1);
+  assert.equal((await read(pages.beta)).value, 6);
+  await shot(pages.beta, 'beta-reconnected');
+  // A revoked credential cannot authenticate: retries stop at maxAttempts, then stay offline without spinning.
+  await pages.alpha.locator('#auto-reconnect').check();
+  const alphaOpened = (await reconnect(pages.alpha)).transportsOpened;
+  await connect(pages.alpha, connection.credentials.alpha);
+  await pages.alpha.waitForFunction(
+    () => networkWorkbench.read().reconnect.last?.status === 'exhausted',
+    undefined,
+    { timeout: 20000 },
+  );
+  const exhausted = await reconnect(pages.alpha);
+  assert.equal(exhausted.armed, false);
+  assert.equal(exhausted.transportsOpened, alphaOpened + 1 + exhausted.last.attempts);
+  assert.equal(exhausted.last.attempts, exhausted.schedule.limits.maxAttempts);
+  assert.match((await read(pages.alpha)).message, /Offline: 5 reconnect attempts failed/);
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  assert.equal((await reconnect(pages.alpha)).transportsOpened, exhausted.transportsOpened);
+  assert.equal((await read(pages.alpha)).principal, null);
+  await shot(pages.alpha, 'alpha-reconnect-exhausted');
+  // Retiring the owner mid-episode cancels the pending wait: no attempt after exit.
+  await connect(pages.alpha, connection.credentials.alpha);
+  await pages.alpha.waitForFunction(
+    () => networkWorkbench.read().reconnect.schedule?.attempt >= 1,
+  );
+  await click(pages.alpha, 'exit');
+  await pages.alpha.waitForFunction(
+    () => networkWorkbench.read().scene === 'retired',
+  );
+  const cancelled = await reconnect(pages.alpha);
+  assert.equal(cancelled.armed, false);
+  assert.equal(cancelled.schedule, null);
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  assert.equal((await reconnect(pages.alpha)).transportsOpened, cancelled.transportsOpened);
+  await untilHost((s) => s.intake.connections === 1);
+  await click(pages.alpha, 'return');
+  await active(pages.alpha);
+  // Every other documented stop path drops the retained credential and opens no further transport.
+  const stopsReconnecting = async (label, stop) => {
+    await pages.alpha.locator('#auto-reconnect').check();
+    await connect(pages.alpha, connection.credentials.alpha);
+    await pages.alpha.waitForFunction(
+      () =>
+        networkWorkbench.read().reconnect.armed &&
+        networkWorkbench.read().reconnect.schedule?.attempt >= 1,
+    );
+    await stop();
+    const stopped = await reconnect(pages.alpha);
+    assert.equal(stopped.armed, false, `${label}: credential released`);
+    assert.equal(stopped.budgetRetryAt, null, `${label}: no budget wait`);
+    assert.equal(stopped.schedule.state, 'idle', `${label}: episode ended`);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const later = await reconnect(pages.alpha);
+    assert.equal(
+      later.transportsOpened,
+      stopped.transportsOpened,
+      `${label}: no transport after stop`,
+    );
+    assert.equal(later.armed, false, `${label}: stays disarmed`);
+    report.observations.push({ label: `reconnect-stop-${label}`, reconnect: later });
+  };
+  await stopsReconnecting('disconnect', () => click(pages.alpha, 'disconnect'));
+  await stopsReconnecting('untick', () =>
+    pages.alpha.locator('#auto-reconnect').uncheck(),
+  );
+  await stopsReconnecting('hidden', () =>
+    pages.alpha.evaluate(() => {
+      // Simulate a hidden tab, then restore it so frames keep running during the no-attempt window.
+      for (const [key, value] of [['hidden', true], ['visibilityState', 'hidden']])
+        Object.defineProperty(document, key, { configurable: true, get: () => value });
+      document.dispatchEvent(new Event('visibilitychange'));
+      delete document.hidden;
+      delete document.visibilityState;
+      document.dispatchEvent(new Event('visibilitychange'));
+    }),
+  );
+  await stopsReconnecting('pagehide', () =>
+    pages.alpha.evaluate(() => window.dispatchEvent(new Event('pagehide'))),
+  );
+  await untilHost((s) => s.intake.connections === 1);
   for (const [name, wire] of Object.entries(report.wire))
     for (const text of wire.received) {
       const frame = JSON.parse(text);
@@ -367,8 +482,8 @@ try {
       s.intake.pendingAuth === 0,
   );
   const final = await snapshot('all-connections-released');
-  assert.deepEqual(final.counters, { alpha: 3, beta: 4 });
-  assert.equal(final.metrics.dispatched, 4);
+  assert.deepEqual(final.counters, { alpha: 3, beta: 6 });
+  assert.equal(final.metrics.dispatched, 6);
   assert.deepEqual(report.errors, []);
   assert.deepEqual(report.consoleErrors, []);
   report.passed = true;

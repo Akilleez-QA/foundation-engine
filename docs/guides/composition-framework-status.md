@@ -243,3 +243,11 @@ caller-owned. See the [contract](../../src/platform/assets/dependency-lease.md) 
 Native task oracle, all seven template gates and the CI browser suites passed (see the
 evidence README and public PR #11);
 integration, frame-time and downstream acceptance remain pending; no resource budget changes.
+
+## Reconnect/retry pacing (NW-04) — implemented, candidate
+
+The optional [retry schedule](network-retry.md) paces reconnects with capped
+exponential backoff, full jitter and a retry budget. It owns no timer, socket or
+credential; the network workbench client uses it only when its checkbox is ticked.
+Implemented as a candidate (PR #14, `feat/nw04-reconnect-schedule`), not integrated. No WAN
+or physical-device acceptance; see the [ledger](upgrade-acceptance-ledger.md).
