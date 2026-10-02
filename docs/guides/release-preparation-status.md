@@ -63,4 +63,4 @@ visibility change, package publication, deployment or Discord posting had occurr
   0.186 updates also fail for real and need deliberate upgrades.
 - Not included in the public source: the device-acceptance branch (DV-01 work,
   including unintegrated lesson cleanup and touch sizing). DV-01 remains unresolved.
-- The [Discord draft](publication-announcement.md) has not been posted.
+- The author posted the [announcement](publication-announcement.md) on Discord.

@@ -1,9 +1,8 @@
 # Discord announcement draft
 
 The repository is public at the link below (first public commit `c0e73c9`).
-Post the text only with the author's go-ahead, and only after public `main` CI
-is green. This draft has not been posted. Replace the link if the public
-destination changes.
+The author has posted the announcement on Discord; this file keeps the
+draft text for reference.
 
 ---
 
