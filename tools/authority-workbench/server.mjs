@@ -78,6 +78,9 @@ export async function startAuthorityWorkbench({
   port = 0,
   autoDriver = true,
   driverMs = 10,
+  clock = () => performance.now(),
+  storageHooks = {},
+  observe,
 } = {}) {
   if (
     typeof directory !== 'string' ||
@@ -86,9 +89,23 @@ export async function startAuthorityWorkbench({
     port > 65535 ||
     !integer(driverMs) ||
     driverMs < 1 ||
-    driverMs > 1000
+    driverMs > 1000 ||
+    typeof clock !== 'function' ||
+    storageHooks === null ||
+    typeof storageHooks !== 'object' ||
+    (observe !== undefined && typeof observe !== 'function')
   )
     throw Error('host-options');
+  // Host time for intake, rate admission and idle checks. The kit helpers require
+  // nondecreasing time, so a backwards or invalid reading holds the last value.
+  let hostTime = 0;
+  const now = () => {
+    const t = clock();
+    if (typeof t === 'number' && Number.isFinite(t) && t > hostTime) hostTime = t;
+    return hostTime;
+  };
+  // Trusted diagnostic observer (fault harness); never sees credentials.
+  const note = observe ? (event) => observe(Object.freeze(event)) : null;
   const raw = await readFile(join(directory, 'principals.json'), 'utf8');
   if (Buffer.byteLength(raw) > 2048) throw Error('operator-identity');
   const identity = JSON.parse(raw);
@@ -107,6 +124,7 @@ export async function startAuthorityWorkbench({
   const db = await openAuthorityStorage({
     path: join(directory, 'world.db'),
     limits: json,
+    hooks: storageHooks,
   });
   const peers = new Map(),
     controllers = new Map(),
@@ -189,6 +207,7 @@ export async function startAuthorityWorkbench({
       if (error) intake.close(s.peer, 'send-failed');
     });
     metrics.sent++;
+    note?.({ type: 'sent', label: s.label, frame: raw });
     return true;
   }
   function baseline(s) {
@@ -296,6 +315,7 @@ export async function startAuthorityWorkbench({
         if (controllers.get(s.principal) === s) controllers.delete(s.principal);
         s.socket.removeListener('message', s.message);
         s.socket.terminate();
+        note?.({ type: 'close', label: s.label });
       },
     },
   });
@@ -320,42 +340,50 @@ export async function startAuthorityWorkbench({
   }
   function pump() {
     if (closed) return;
-    const now = performance.now();
+    const time = now();
     for (const s of peers.values())
-      if (now - s.lastFrame > 15000) intake.close(s.peer, 'idle');
-    intake.pump(now);
+      if (time - s.lastFrame > 15000) intake.close(s.peer, 'idle');
+    intake.pump(time);
     for (const s of peers.values()) {
       announce(s);
       if (s.dirty && !held.has(s.principal)) publish(s);
     }
   }
-  wss.on('connection', (socket) => {
-    const admission = intake.open(performance.now());
+  wss.on('connection', (socket, request) => {
+    // Diagnostic connection label for the observer only; never trusted for identity.
+    const label = note
+      ? (new URL(request.url ?? '/', 'http://host').searchParams.get('label') ?? '').slice(0, 64)
+      : null;
+    const admission = intake.open(now());
     if (admission.status !== 'opened') {
       socket.terminate();
+      note?.({ type: 'refused', label });
       return;
     }
     const s = {
       peer: admission.peer,
       socket,
+      label,
       principal: null,
       session: null,
       epoch: null,
-      lastFrame: performance.now(),
+      lastFrame: now(),
       dirty: false,
     };
     peers.set(s.peer, s);
+    note?.({ type: 'open', label });
     s.message = (bytes, binary) => {
-      const now = performance.now();
+      const time = now();
+      note?.({ type: 'frame', label });
       if (
         binary ||
         bytes.length > 1024 ||
-        frameRate.admit(s.peer, now).status !== 'admitted'
+        frameRate.admit(s.peer, time).status !== 'admitted'
       ) {
         intake.close(s.peer, 'frame-limit');
         return;
       }
-      s.lastFrame = now;
+      s.lastFrame = time;
       let c;
       try {
         c = JSON.parse(bytes.toString());
@@ -370,7 +398,7 @@ export async function startAuthorityWorkbench({
         typeof c.token === 'string' &&
         c.token.length <= 64
       ) {
-        intake.authenticate(s.peer, JSON.stringify({ token: c.token }), now);
+        intake.authenticate(s.peer, JSON.stringify({ token: c.token }), time);
         announce(s);
         return;
       }
@@ -390,7 +418,7 @@ export async function startAuthorityWorkbench({
         intake.close(s.peer, 'command-shape');
         return;
       }
-      if (intake.receive(s.peer, JSON.stringify(c), now).status !== 'queued') {
+      if (intake.receive(s.peer, JSON.stringify(c), time).status !== 'queued') {
         metrics.refused++;
         send(s, {
           v: 1,
@@ -423,6 +451,8 @@ export async function startAuthorityWorkbench({
         lastConfirmed: state.lastConfirmed?.envelope ?? null,
         metrics: { ...metrics },
         commitResponseHeld: releaseCommit !== null,
+        connections: peers.size,
+        intake: intake.stats(),
         peers: [...controllers.values()].map((s) => ({
           principal: s.principal,
           session: s.session,
@@ -430,6 +460,16 @@ export async function startAuthorityWorkbench({
           dirty: s.dirty,
         })),
       };
+    },
+    /** Explicit operator recovery after a storage conflict or unknown commit outcome. */
+    async recoverAuthority() {
+      if (closed) return { status: 'retired' };
+      if (inFlight || operator) return { status: 'busy' };
+      const status = owner.read().status;
+      if (status === 'ready') return { status: 'ready' };
+      const out = await owner.recover();
+      if (out.status === 'recovered') publishAll();
+      return out;
     },
     revoke(principal) {
       if (!['a', 'b'].includes(principal)) throw Error('principal');
@@ -545,6 +585,9 @@ if (
           break;
         case 'revoke':
           value = host.revoke(request.principal);
+          break;
+        case 'recoverAuthority':
+          value = await host.recoverAuthority();
           break;
         case 'operatorAdd':
           value = await host.operatorAdd(

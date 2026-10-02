@@ -478,3 +478,13 @@ loopback browser workflow are its only evidence. See the
 | Slice | Capability and actual seam | State | What remains outside the claim |
 |---|---|---|---|
 | PERF-01 | [`FrameLoop.attachSampler`](../../src/core/activity/loop.ts) is a single observational slot. Through it, [`createSessionRecorder`](../../src/platform/perf/session-recorder.ts) records bounded rolling-window percentiles and drift, exposed as `engine.sessionRecorder()` and `?session-record` ([guide](session-performance.md)) | Implemented, candidate (PR #15 on the public repository). Unit tests and an emulated browser run passed on the candidate head; see [verification](../verification/session-perf-20261002/README.md) | No physical-device, thermal, GPU-timer or production telemetry claim. DV-01 remains open |
+
+## Seeded fault schedules — NW-09 implemented, candidate
+
+`npm run faults:network` (tools/authority-workbench) replays seeded combined faults
+against the composed authority path and checks invariants after every step against
+independent SQLite readback; failing seeds reproduce exactly by seed and step index
+and can be shrunk. Tools/tests only; the host gains optional, default-preserving
+fault seams. Implemented, candidate (PR #NN); not integrated. Process-scope loopback
+evidence only. See the [guide](network-fault-schedule.md) and the
+[ledger](upgrade-acceptance-ledger.md).

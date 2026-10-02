@@ -186,6 +186,11 @@ owner yields `retired` without storage invocation.
 
 ## Composition and acceptance
 
+The optional [seeded fault-schedule harness](network-fault-schedule.md) (NW-09,
+tools only) replays combined faults, including before/after-commit storage
+failure and recovery, against this composition and checks receipt, prefix and
+result invariants after every step. It is process-scope loopback evidence only.
+
 Existing [network admission](network-admission.md) is a synchronous bounded ingress
 owner. Its dispatch counter is not a commit acknowledgment. Hand off explicitly to
 the authority's single reserved slot; do not hide an unbounded Promise queue behind

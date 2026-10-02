@@ -70,6 +70,7 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | NW-06 | Maximum queued age and pre-invocation submit deadlines (study N3) | Implemented, candidate (PR #12); not integrated. Optional `maxQueuedAgeMs` sheds aged intake commands before `authorize`/`dispatch` (counted as `stale`, one pump attempt each); optional injected `clock` plus `submit(command, {deadlineMs})` returns `expired` only before storage invocation, consuming no sequence. In-flight writes keep committed/rejected/unknown semantics. Defaults unchanged. 6 intake and 9 authority focused tests; no load, WAN, browser-composition or device acceptance claimed. See [network kit](../../src/kits/network/README.md) and [durable authority](durable-authority.md). |
 | NW-04 | Reconnect/retry pacing: full-jitter backoff and retry budget | Implemented, candidate (PR #14, `feat/nw04-reconnect-schedule`); not integrated. Optional pure `createRetrySchedule` in the network kit, with the network workbench client as an opt-in consumer. Evidence and remaining limits are in the NW-04 section below. No WAN, reconnect-storm-against-a-real-host or physical-device claim. |
 | NW-05 | Shared rate and concurrency admission | Implemented, candidate (PR #13); not integrated. Optional single-process `createRateAdmission` ([guide](rate-admission.md)): per-key token bucket, optional concurrency leases, `maxKeys` with lossless idle reclamation only, explicit `limited`/`refused` results, clock-regression safe, idempotent dispose. Three reference hosts migrated from 1000 ms fixed windows to buckets of equal burst and refill (intended semantic change: no 2x boundary burst; same long-run rate). Focused unit and loopback host tests; no distributed, measured-load or physical-device claim. |
+| NW-09 | Seeded fault-schedule harness for the composed authority path (study N6, tools/test only) | Implemented, candidate (PR #NN); not integrated. `npm run faults:network` and `tools/authority-workbench/fault-harness.test.mjs` replay seeded combined faults (link delay/reorder/duplicate/drop, connection loss mid-command, controller replacement, held/crashed commits, host restart, SQLite before/after-commit failure with recovery, clock skew, slow consumer, revocation) against the reference host and two scripted clients, checking durable-history, result-semantics, prediction, disclosure, bound and leak invariants after every step against independent SQLite readback; failing seeds print seed + step index and can be shrunk and replayed. Process-scope loopback evidence only: no WAN, power-loss, filesystem, scale or device claim. See the [guide](network-fault-schedule.md). |
 | TR-01 | Regional terrain worker and ordinary-surface integration | Integrated in PR #109 at 99e6255. Canonical regional Surface and halo patches, bounded WorkerHost generation/patch adapters, independent geometric oracles and finite coherent render/query consumer passed at 891eb7; all seven template gates passed (1,648 tests, 129 performance checks, zero breaches/regressions, four advisory heap warnings). Combined main tests/build passed. Physical-device performance and unbounded/global streaming are not established. |
 | DV-01 | Supported-device experience and sustained performance evidence | In progress, not integrated: ported to the public `feat/device-acceptance` PR. [Stock matrix](../kits/stock-device-acceptance-matrix.md) covers all seven declarations. The [first receipt](../verification/stock-device-20261001/README.md) records 16 passing emulated target/tap checks and a compact lesson content overlap; lesson visit cleanup and a measured learn layout seam repair it, with a fake-DOM regression and emulated separation checks across board, sim and quiz at four profiles ([layout receipt](../verification/stock-device-20261002/README.md)). Full consumer workflows, in-panel touch scrolling, 200% text, named minimum devices and sustained physical evidence remain open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. No physical-device or accessibility certification. |
 
@@ -304,3 +305,31 @@ Status: candidate (PR #16), building on integrated NW-04 (PR #14); not integrate
 | ID | Contract and required observation | State |
 |---|---|---|
 | PERF-01 | Optional, local-only [sustained-session recorder](session-performance.md) on the one frame loop. It records bounded rolling windows of frame/work p50/p95/p99, long and severe frames, rendered/idle counts, scene/epoch/preset segments and drift, plus a versioned evidence file. It has a zero-cost path when absent and is dev/test-only. | Implemented, candidate (PR #15 on the public repository); not integrated. Focused adversarial tests and an emulated browser run (a 30-second CI check plus a saved 10-minute sample) are recorded in the guide and in [verification](../verification/session-perf-20261002/README.md). This is supporting tooling for DV-01: it supplies the evidence format, not device evidence. DV-01 remains open. |
+
+## Seeded fault-schedule harness (NW-09) — implemented, candidate
+
+Status: implemented, candidate (PR #NN, `feat/nw09-seeded-faults`); not integrated.
+Tools/tests only; no engine runtime behaviour changed. See the
+[fault-schedule guide](network-fault-schedule.md).
+
+- Runtime-enforced (harness): per-step invariants on independent SQLite readback
+  (prefix sum equals revision, no rollback, contiguous bounded receipts, one
+  stream/sequence per revision, immutable receipts, state equals committed inputs,
+  committed inputs equal issued inputs), result semantics, storage-fault outcomes,
+  baseline coherence, prediction replay, disclosure only to the current
+  non-revoked controller, host/client bounds, post-heal convergence and release of
+  every socket, server and timer. A loopback wait over 4 s fails as `stuck`.
+- Tool seams: optional `clock`, `storageHooks`, `observe` options, operator
+  `recoverAuthority()` and `read().connections/intake` on the authority workbench
+  host; defaults keep the reference behaviour. The existing storage/host tests are
+  unchanged and pass; one new host test covers the seams.
+- Checked: 6 tests in `fault-harness.test.mjs` (fixed seeds 1-12 x 300 steps with
+  every fault family exercised, identical replay fingerprint, injected durable
+  corruption failing at its exact step, reproducing and shrinking). Local sweeps on
+  Node 22.23.3: 500 seeds x 300 steps passed. Five temporary mutations of the host,
+  storage adapter, authority and prediction were caught (see the guide); two more
+  were unreachable through this host. No engine defect was found.
+- Not established: WAN behaviour, real process death inside the harness (the
+  existing SIGKILL storage/host tests remain that evidence), power loss, disk-full
+  or filesystem faults, TCP/OS backpressure, scoped-view publisher faults, scale,
+  browsers and physical devices.

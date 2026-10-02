@@ -92,6 +92,7 @@ are contextual evidence, not verification of Foundation.
 | Crafting and resources | Survey fields, reserves, exact slot selection, weighted facts, authored experiment steps, locked manifests, production and materialization | PR #118 integrates selection/reservation/experimentation, historical recipe/batch facts, explicit spawn changes and native recipe/effect inspection. Final desktop browser, independent recovery probes and all seven gates passed at `790aaea`; combined main tests/build passed. No automatic spawn rotation or minigame prescribed. |
 | Multiplayer | NW-01 integrated in PR #120. NW-02 complete scoped views, application credit and optional scene lifecycle hooks are integrated on main at `ea48539` (PR #122 in the private development history). | Rebased clean browser passed at `508edd9`; final `47a7e6d` passed all seven gates (1,965 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive, four heap advisories). Combined main tests/build passed; measured load and earlier failure remain documented below. Git ancestry establishes integration, not the PR API state. NW-03 is integrated as recorded below; DV-01 remains unresolved. No multiplayer-completion claim. |
 | Multiplayer: queue age and deadlines (NW-06) | Optional intake `maxQueuedAgeMs` with `stale` notice; optional authority `clock` and `submit(command, {deadlineMs})` returning `expired` before storage invocation only | Implemented, candidate (PR #12); not integrated. Focused unit tests only; defaults unchanged; no load, browser-composition or device claim. |
+| Multiplayer: seeded fault schedules (NW-09) | Tool-only `npm run faults:network` harness replaying seeded combined faults against the authority workbench host with per-step invariants and exact seed/step repro | Implemented, candidate (PR #NN); not integrated. Process-scope loopback evidence only; no WAN, power-loss, scale or device claim. See [guide](network-fault-schedule.md) |
 | Manual tools | Bounded documents, sessions and optional appearance, progression, custody and objective desktop consumers | Integrated tools cover their finite schemas. Action tooling is integrated; recipe/effect inspectors are integrated in PR #118 with focused tests and final desktop workflow acceptance. Device support is selected per tool; desktop tooling does not impose a phone UI. |
 
 Priority is composition correctness before additional feature catalogs. A creator's
@@ -283,3 +284,13 @@ candidate in PR #15 on the public repository and is not integrated. It reads the
 It keeps bounded windows and fixed histograms, and produces a local `foundation.session-perf` evidence file. Nothing is
 transmitted. Its only browser evidence is emulated. It gives DV-01 a collectable format, but it does not close DV-01:
 physical-device runs on creator-selected profiles remain open.
+
+## Seeded fault schedules (NW-09) — implemented, candidate
+
+The tool-only [fault-schedule harness](network-fault-schedule.md) drives the
+authority workbench host and two scripted clients through a seeded schedule of
+combined link, connection, host, storage, clock and consumer faults, checking
+durable-history, result, prediction, disclosure, bound and leak invariants after
+every step. A failing seed prints its seed and step index and can be shrunk and
+replayed. Implemented, candidate (PR #NN); not integrated. Process-scope loopback
+evidence only; it does not certify WAN, power-loss durability or devices.
