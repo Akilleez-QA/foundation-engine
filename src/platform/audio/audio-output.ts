@@ -20,7 +20,7 @@
 import { monotonicNow } from '../../core/clock';
 import { createSoundFiles, type SoundFileOptions, type SoundFileStats } from './sound-files';
 import type { AudioClockReading } from './audio-timeline';
-import { createMusicPlayer, musicBudgets, type MusicOptions, type MusicStats, type MusicVoice } from './music-clock';
+import { createMusicPlayer, musicBudgets, musicTimeoutMs, type MusicOptions, type MusicStats, type MusicVoice } from './music-clock';
 
 /** One synthesis step: a tone sweep (sine, `hz` → `end`) or a burst of low-passed noise ("air"). Times in seconds. */
 export type CueStep =
@@ -365,7 +365,10 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
   };
   const voices = new Set<CueVoice>();
   const files = createSoundFiles({ ...o.files, report: m => report(m) });
-  const musicFiles = createSoundFiles({ ...musicBudgets(), maxDecodes: 1, maxFiles: 16, ...o.musicFiles, report: m => report(m) });
+  // Music-sized store: its own budgets, one decode at a time, and a timeout scaled to the file budget (a whole song
+  // takes longer to fetch and decode than a sound effect's 10 s allows on a slow link).
+  const musicLimits = { ...musicBudgets(), maxDecodes: 1, maxFiles: 16, ...o.musicFiles };
+  const musicFiles = createSoundFiles({ ...musicLimits, timeoutMs: o.musicFiles?.timeoutMs ?? musicTimeoutMs(musicLimits.maxFileBytes), report: m => report(m) });
   const songs = createMusicPlayer({
     running: () => !disposed && !hidden && !o.silent() && ctx && ctx.state === 'running' ? ctx : null,
     existing: () => !disposed && !o.silent() ? ctx : null,

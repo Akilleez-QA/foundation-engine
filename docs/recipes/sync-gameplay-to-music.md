@@ -158,8 +158,9 @@ success criterion depends on timing, name its test after the criterion id
 ## Limits
 
 - `ctx.playMusic` decodes the whole song: its length is bounded by the music
-  budget of the brief's minimum device (about 2 minutes 11 seconds of 48 kHz stereo
-  on a phone). Background music through the older `music(url)` element path is not
+  budget of the brief's minimum device. A 128 kbps compressed song can run about
+  2 min 11 s on a phone and 4 min 22 s on a laptop; a WAV is capped far sooner by
+  the file budget (about 11 s on a phone). The guide has the per-format table. Background music through the older `music(url)` element path is not
   on the context clock.
 - Gamepad presses are quantised to the frame.
 - Timeline-derived state is outside SIM-01 replay determinism.

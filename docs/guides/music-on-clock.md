@@ -16,8 +16,8 @@ Status: implemented, candidate (PR #54); not integrated. Evidence is listed unde
 
 | | |
 |---|---|
-| Inputs | A song id: a `defineAsset({ type: 'audio' })` row, resolved like sound files. `MusicOptions`: `at` (context seconds, default now plus a 20 ms start margin), `offset` (song seconds), `loop: { start, end? }`, `gain` [0, 1], `late: 'skip-ahead' \| 'drop'`, `onEnded`. |
-| Outputs | A `MusicVoice` or null. The voice has `state` (`loading`, `scheduled`, `playing`, `ended`), `ready` (true once scheduled on the clock), `duration`, `songTime(contextTime)`, `seek(offset, at?)`, `stop(at?)` and `setGain`. `ctx.loadMusic(id)` fetches and decodes ahead. `AudioOutput.musicStats` and the `audio` probe's `music` report the counts. |
+| Inputs | A song id: a `defineAsset({ type: 'audio' })` row, resolved like sound files. `MusicOptions`: `at` (context seconds, default now plus `MUSIC_START_MARGIN`, 20 ms; an earlier time counts as late), `offset` (song seconds), `loop: { start, end? }`, `gain` [0, 1], `late: 'skip-ahead' \| 'drop'`, `onEnded`. |
+| Outputs | A `MusicVoice` or null. The voice has `state` (`loading`, `scheduled`, `playing`, `ended`), `ready` (true once scheduled on the clock), `duration`, `songTime(contextTime)`, `seek(offset, at?)`, `stop(at?)` and `setGain`. `ctx.loadMusic(id)` fetches and decodes ahead. `AudioOutput.musicStats` and the `audio` probe's `music` report the counts: `active` (voices held: loading, scheduled or playing), `played`, `skipped`, `dropped` and the store's file stats. |
 | Owner | `AudioOutput` owns the only context. It has a music bus that follows the `sound.music` volume and mute, and its own `sound-files.ts` store for music. A scene owns its voices, and leaving the scene stops them. `testScene` records `scene.music` and stays silent. |
 
 The older `music(url)` path is unchanged. It still streams background music
@@ -33,15 +33,22 @@ either path, or both.
   `start(at, offset)`. Loops use the node's native `loop`, `loopStart` and
   `loopEnd`, so they repeat sample-accurately.
 - **`songTime(t)`.** It maps a context time to song seconds, through loops, seeks
-  and a scheduled stop. Before the start it is negative (the lead-in). Start a
-  song at `timeline.contextTime(0)` and, until a loop or seek, song seconds equal
-  timeline seconds.
-- **Seeks.** `seek(offset, at)` starts a new source at `at` and stops the old one
-  at the same instant. `songTime` follows the old source until the hand-off. A
-  seek while an earlier hand-off is still pending cuts that hand-off short.
+  and a scheduled stop. Before the start it is the start offset minus the
+  remaining lead-in, so it is negative for a song started from 0. After the voice
+  ends it stays frozen where it ended. Start a song at `timeline.contextTime(0)`
+  and, until a loop or seek, song seconds equal timeline seconds.
+- **Seeks.** `seek(offset, at)` starts a new source at `at` and stops the
+  audible one at the same instant. `songTime` follows the audible source until
+  the hand-off. A second seek before the first hand-off replaces that hand-off:
+  the audible source keeps playing and now hands over at the new time.
+- **Seeks and stops together.** A seek cannot pass a scheduled stop (it throws),
+  and a seek before the stop carries the stop to the new source. `stop(at)` during
+  a pending seek stops both sources by `at`.
 - **Muting.** Muting or a zero music volume sets the music bus to 0. The song
   keeps playing silently, so the run stays in sync. A hidden tab suspends the
-  context, so the song and the timeline pause together.
+  context, so the song and the timeline pause together. A song that finishes
+  decoding while the tab is hidden is scheduled on the suspended (frozen) clock
+  and plays when the tab returns; only a disposed or silenced output drops it.
 
 ## Bounds and overload
 
@@ -49,9 +56,10 @@ either path, or both.
 |---|---|---|
 | Music voices at once (`maxMusicVoices`) | 2, range 1–16 | `playMusic` returns null; counted as skipped |
 | Start horizon | The output's `maxStartAhead`, 10 s | null and reported once; a seek throws |
-| File size | `musicBudgets(device).maxFileBytes`: phone 4 MiB, tablet 6, laptop/desktop 10 | Refused while streaming (running cap) |
-| Encoded bytes kept | phone 8 MiB, tablet 12, laptop/desktop 20 | Least recently used first out |
-| Decoded PCM bytes | phone 48 MiB (about 2 min 11 s of 48 kHz stereo), tablet 64, laptop/desktop 96 | Refused before decoding, on an estimate |
+| File size | `musicBudgets(device).maxFileBytes` = decoded budget ÷ 24: phone 2 MiB, tablet 3, laptop/desktop 4 | Refused while streaming (running cap) |
+| Encoded bytes kept | Twice the file budget: phone 4 MiB, tablet 6, laptop/desktop 8 | Least recently used first out |
+| Decoded PCM bytes | Phone 48 MiB, tablet 72, laptop/desktop 96 | Refused before decoding, on an estimate |
+| Fetch or decode time | `musicTimeoutMs(maxFileBytes)`: 10 s, or 1 s per 128 KiB if longer (phone 16 s, tablet 24, laptop/desktop 32) | The load fails and is reported once |
 | Decodes at once | 1 | Further decodes wait in order |
 | Files tracked | 16 | An idle entry, then the least recently used held file, is dropped |
 
@@ -61,10 +69,26 @@ bounds through `audioModule(…, { musicFiles })`.
 The decoded size is estimated before decoding:
 
 - **PCM WAV** is estimated exactly from its header.
-- **Other formats** are estimated as 48 × the file size, which matches 64 kbps
-  stereo. A 128 kbps file is over-estimated by about 2×, so it is refused
-  conservatively; raise `compressedRatio` deliberately if needed.
+- **Other formats** are estimated as `compressedRatio` × the file size. Music
+  uses 24 (`MUSIC_COMPRESSED_RATIO`), which matches 128 kbps stereo decoded to
+  float32 at 48 kHz. The ratio is decoded bytes per encoded byte, so a
+  lower-bitrate file decodes to more than its estimate: 64 kbps decodes to twice
+  as much. For such files set `compressedRatio` higher (48 for 64 kbps). With the
+  default, a 64 kbps file can briefly allocate up to twice its estimate before the
+  after-decode check refuses it.
 - **After decoding** the real size is checked again.
+
+Because the file budget is the decoded budget ÷ 24, a 128 kbps song that
+downloads in full also fits when decoded. Real limits per format (48 kHz stereo):
+
+| Minimum device | Compressed, 128 kbps | Compressed, 64 kbps | 16-bit WAV |
+|---|---|---|---|
+| Phone | about 2 min 11 s | about 2 min 11 s (decoded budget; file 2 MiB holds 4 min 22 s) | about 11 s (file budget) |
+| Tablet | about 3 min 16 s | about 3 min 16 s | about 16 s |
+| Laptop, desktop | about 4 min 22 s | about 4 min 22 s | about 22 s |
+
+A context running at 44.1 kHz decodes about 8% smaller, so songs can be
+correspondingly longer.
 
 A playing voice keeps its own buffer reference. Peak decoded music memory is
 therefore at most (1 + maxMusicVoices) × the decoded budget.
@@ -76,7 +100,12 @@ therefore at most (1 + maxMusicVoices) × the decoded budget.
   chart stay in sync. With `late: 'drop'` the voice ends instead and is counted as
   dropped. `loadMusic` before starting avoids both.
 - **Stopping.** `stop(at)` stops at a context time, and `songTime` freezes there.
-  `stop()` ends at once. Both are idempotent.
+  `stop()` ends at once. Both are idempotent. A future `stop(at)` asked for while
+  the song is still loading applies once it is scheduled; a stop at or before the
+  start means nothing plays.
+- **Start margin.** An `at` earlier than `currentTime + MUSIC_START_MARGIN`
+  counts as late: with `late: 'drop'` an `at` of exactly `currentTime` is
+  dropped, and with skip-ahead the song starts 20 ms in.
 - **Scene exit and disposal.** Leaving the scene and the output's `dispose()`
   stop every voice.
 - **Failures.** A failed fetch or decode is reported once and remembered; that
@@ -90,8 +119,12 @@ therefore at most (1 + maxMusicVoices) × the decoded budget.
 ## Limitations
 
 - **Whole-song decode.** There is no segmented streaming, so a song longer than
-  the decoded budget is refused. A phone budget holds about two minutes of 48 kHz
-  stereo. Gapless playback of segmented songs is not implemented.
+  the decoded budget is refused (see the per-format table above). Gapless
+  playback of segmented songs is not implemented.
+- **Two stores.** Music has its own store, separate from sound files, so an id
+  played both as a sound and as music is fetched and decoded twice.
+- **Memory after the end.** An ended voice releases its buffer reference; the
+  music store keeps its decoded copy within its budget for the next play.
 - **Seamless loop points.** These need sample-exact audio. Compressed formats add
   encoder padding (MP3 especially), so use WAV, or check the loop by ear.
 - **Playback rate.** Only rate 1 is supported, so tempo changes and time stretching

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createMusicPlayer, musicBudgets, MUSIC_START_MARGIN, type MusicHost } from './music-clock';
+import { createMusicPlayer, musicBudgets, musicTimeoutMs, MUSIC_COMPRESSED_RATIO, MUSIC_START_MARGIN, type MusicHost } from './music-clock';
 import { createAudioOutput } from './audio-output';
 import { createAudioTimeline } from './audio-timeline';
 import type { SoundFiles } from './sound-files';
@@ -95,9 +95,10 @@ test('a song decoded after its start time skips ahead to stay in sync, or is dro
 });
 
 test('seek hands over sample-accurately; songTime follows the old source until the hand-off', async () => {
-  const { player, sources } = rig();
+  const { player, ctx, sources } = rig();
   const voice = player.play('song', { at: 10 })!;
   await voice.ready;
+  ctx.currentTime = 11; // playing
   voice.seek(60, 15);
   assert.deepEqual(sources[0].stops, [15], 'the old source stops exactly at the hand-off');
   assert.deepEqual([sources[1].when, sources[1].offset], [15, 60]);
@@ -119,7 +120,7 @@ test('stop at a future time freezes songTime there and ends on the source end; s
   voice.stop(); assert.equal(ended, 1, 'idempotent');
   const other = player.play('song', { at: 10 })!; await other.ready;
   other.stop(); assert.equal(other.ended, true); assert.equal(sources[1].disconnected, true);
-  assert.equal(player.stats.playing, 0);
+  assert.equal(player.stats.active, 0);
 });
 
 test('bounds: voice limit, start horizon, invalid options, out-of-range offsets and loops', async () => {
@@ -190,12 +191,71 @@ test('the output: silent never creates a context; the music bus follows music vo
   assert.equal(await voice.ready, true); assert.equal(sources[0].when, 11);
   muted = true; listeners.forEach(f => f());
   assert.equal(bus.gain.value, 0); assert.equal(voice.ended, false, 'muting silences without stopping, so sync holds');
-  assert.equal(out.musicStats.playing, 1); assert.equal(out.musicStats.played, 1);
+  assert.equal(out.musicStats.active, 1); assert.equal(out.musicStats.played, 1);
   out.dispose(); assert.equal(voice.ended, true); assert.equal(out.playMusic('song'), null);
 });
 
-test('music budgets scale with the minimum device', () => {
-  const phone = musicBudgets('phone'), laptop = musicBudgets();
-  assert.ok(phone.maxDecodedBytes < laptop.maxDecodedBytes && phone.maxFileBytes < laptop.maxFileBytes);
-  assert.ok(phone.maxDecodedBytes >= 120 * 48000 * 2 * 4 * .9, 'a phone keeps about two minutes of 48 kHz stereo');
+test('music budgets: a compressed file that downloads in full also fits decoded; the timeout scales with the file', () => {
+  for (const device of ['phone', 'tablet', 'laptop', 'desktop'] as const) {
+    const b = musicBudgets(device);
+    assert.ok(b.maxFileBytes * MUSIC_COMPRESSED_RATIO <= b.maxDecodedBytes, device + ': no full download refused at decode by its estimate');
+    assert.equal(b.timeoutMs, musicTimeoutMs(b.maxFileBytes)); assert.ok(b.timeoutMs >= 10_000);
+  }
+  const seconds = (bytes: number) => bytes / (48000 * 2 * 4);
+  assert.ok(Math.abs(seconds(musicBudgets('phone').maxDecodedBytes) - 131) < 1, 'a phone keeps about 2 min 11 s of 48 kHz stereo');
+  assert.ok(musicTimeoutMs(4 * 1024 * 1024) === 32_000, '1 s per 128 KiB');
+});
+
+test('review: a second seek before the first hand-off keeps the audible source playing and re-times its hand-off', async () => {
+  const { player, ctx, sources } = rig();
+  const voice = player.play('song', { at: 10 })!; await voice.ready;
+  ctx.currentTime = 11;
+  voice.seek(60, 15); voice.seek(30, 14);
+  assert.deepEqual(sources[0].stops, [15, 14], 'the playing source now hands over at 14, not at once');
+  assert.equal(sources[1].disconnected, true, 'the unstarted hand-off is released');
+  assert.deepEqual([sources[2].when, sources[2].offset], [14, 30]);
+  assert.equal(voice.songTime(12), 2, 'still playing the original between 11 and 14');
+  assert.equal(voice.songTime(14.5), 30.5);
+  assert.equal(voice.state, 'playing');
+});
+
+test('review: stop during a pending seek also stops the audible source; a seek cannot pass a scheduled stop', async () => {
+  const { player, ctx, sources } = rig();
+  const voice = player.play('song', { at: 10 })!; await voice.ready;
+  ctx.currentTime = 11;
+  voice.seek(60, 15); voice.stop(13);
+  assert.deepEqual(sources[0].stops, [15, 13], 'the original stops at 13, before its hand-off');
+  assert.deepEqual(sources[1].stops, [13], 'the hand-off target never plays past the stop');
+  assert.equal(voice.songTime(14), 3, 'frozen at the stop');
+  assert.throws(() => voice.seek(20, 13.5), /after the scheduled stop/);
+  const other = rig(); const kept = other.player.play('song', { at: 10 })!; await kept.ready;
+  other.ctx.currentTime = 11; kept.stop(20); kept.seek(50, 12);
+  assert.deepEqual(other.sources[1].stops, [20], 'a seek before the stop carries the stop to the new source');
+  assert.equal(kept.songTime(25), 58);
+});
+
+test('review: a decode finishing while the tab is hidden schedules on the suspended clock instead of dropping', async () => {
+  const { player, ctx, sources, store, setRunning } = rig({ ready: {} });
+  const voice = player.play('song', { at: 10.5 })!;
+  setRunning(false); // hidden: the context is suspended, its clock frozen at 10
+  store.waiting.get('song')!.resolve(song(120));
+  assert.equal(await voice.ready, true); assert.equal(player.stats.dropped, 0);
+  assert.deepEqual([sources[0].when, sources[0].offset], [10.5, 0], 'scheduled as asked on the frozen clock');
+  ctx.currentTime = 10.6; setRunning(true); assert.equal(voice.state, 'playing');
+});
+
+test('review: songTime freezes after the end; an ended voice keeps no PCM; a stop asked while loading applies later', async () => {
+  const { player, ctx, sources, store } = rig({ ready: {} });
+  const voice = player.play('song', { at: 10.5 })!;
+  voice.stop(12);
+  assert.equal(voice.ended, false, 'a future stop while loading waits for the schedule');
+  store.waiting.get('song')!.resolve(song(120)); await voice.ready;
+  assert.deepEqual(sources[0].stops, [12]);
+  ctx.currentTime = 12; sources[0].onended?.();
+  assert.equal(voice.ended, true);
+  assert.equal(voice.songTime(30), 1.5, 'frozen where it ended');
+  assert.equal(voice.duration, 120);
+  const early = rig({ ready: {} }); const gone = early.player.play('song', { at: 10.5 })!;
+  gone.stop(10.2); early.store.waiting.get('song')!.resolve(song(120));
+  assert.equal(await gone.ready, false); assert.equal(early.sources.length, 0, 'a stop before the start: nothing plays');
 });
