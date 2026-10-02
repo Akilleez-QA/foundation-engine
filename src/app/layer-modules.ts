@@ -36,12 +36,12 @@ export function layerModules(game: GameDefinition, brief?: Pick<BuildBrief, 'qua
       const format=a.url.match(/\.(png|jpg|webp)$/)?.[1] as 'png'|'jpg'|'webp'|undefined;
       if(!format||!/^\/?[a-zA-Z0-9_./-]+$/.test(a.url)||a.url.includes('..')||a.url.startsWith('//'))throw Error('assets: expected local texture');
       return {id:a.id,kind:'texture',title:a.id,licence:a.licence==='original'?'original':`other:${a.licence}`,provenance:{author:a.author,credit:a.licence+': '+a.source},colorSpace:'srgb',variants:[{path:a.url.replace(/^\//,''),format,width:a.width,height:a.height}]};
-    }),
+    },game.residency),
     modelModule((s, id) => {
       const a = s.registries.assets.get(id); if (!a || a.type !== 'model') return undefined;
       if (!/^\/?[a-zA-Z0-9_./-]+\.glb$/.test(a.url) || a.url.includes('..') || a.url.startsWith('//')) throw Error('models: expected local GLB');
       return { id: a.id, kind: 'model', title: a.id, licence: a.licence === 'original' ? 'original' : `other:${a.licence}`, provenance: { author: a.author, credit: a.licence + ': ' + a.source }, variants: [{ path: a.url.replace(/^\//, ''), format: 'glb' }] };
-    }),
+    }, game.residency),
     shellModule({ home: sceneId(game.firstScene) }),
   ];
 }

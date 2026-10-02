@@ -35,6 +35,7 @@ export { Model, validateModel, type ModelData, type ModelSocketPose } from './mo
 export { RenderMask, validateRenderMask } from './render-mask';
 export { createDependencyLease, type DependencyNode, type DependencyValue, type DependencyOptions } from '../platform/assets/dependency-lease';
 export { createDependencyBudget, type DependencyBudget, type DependencyReservation } from '../platform/assets/dependency-budget';
+export type { AssetResidencyInput, AssetResidencyBudget, AssetResidencyPressure } from '../platform/assets/residency';
 
 export { measureUiOcclusion, UI_OCCLUSION_LIMITS, type OcclusionRect, type OcclusionMeasure, type UiOcclusionReport } from '../platform/ui/occlusion';
 

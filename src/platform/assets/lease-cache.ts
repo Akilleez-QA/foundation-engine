@@ -64,11 +64,39 @@ export interface LeaseLoader<D, R extends object> {
   dispose(resource: R): void;
   /** Resident bytes of an uploaded resource, for the warm budget. */
   bytes(resource: R): number;
+  /**
+   * Optional. Called when a released resource is retained (warm or pinned) after trimming: drop per-context GPU copies
+   * while keeping the decoded source, so a later draw uploads it again and no released renderer stays reachable.
+   */
+  park?(resource: R): void;
+}
+
+/** What a cache reports when live and pinned bytes alone exceed its resident ceiling (RES-01). */
+export interface ResidencyPressure {
+  readonly residentBytes: number;
+  readonly limitBytes: number;
+  readonly liveBytes: number;
+  readonly pinnedBytes: number;
+  /** Unpinned released bytes still kept (normally 0 under pressure). */
+  readonly warmBytes: number;
+}
+
+/** Optional residency policy (RES-01). Omitted: no ceiling, no pins, the warm budget alone applies. */
+export interface LeaseResidency {
+  /** Ceiling on every byte the cache owns (live, pinned and warm). Over it, unpinned released entries are evicted LRU. */
+  residentBytes?: number;
+  /** Released entries whose key this accepts are retained past the warm budget and never evicted for a budget. */
+  pinned?(key: string): boolean;
+  /** Called once per transition into a state where live and pinned bytes alone exceed `residentBytes`. */
+  onPressure?(report: ResidencyPressure): void;
+  /** An eviction triggered by a publication or a policy change failed; such failures never fail that operation. */
+  onCleanupError?(error: unknown): void;
 }
 
 export interface LeaseCacheOptions {
   /** Bytes of released-but-kept resources; set per quality tier. */
   warmBytes: number;
+  residency?: LeaseResidency;
 }
 
 export interface LeaseCacheStats {
@@ -82,7 +110,18 @@ export interface LeaseCacheStats {
   /** Uploaded resources disposed by eviction. */
   disposed: number;
   failures: number;
+  /** Retained resources later disposed by a budget (warm or resident ceiling), excluding teardown and disposal at release. */
+  evictions: number;
+  /** Loads of a key this cache had evicted (bounded memory of the most recent 1024 evicted keys). */
+  reloads: number;
+  /** Transitions into resident-ceiling pressure that eviction could not relieve. */
+  pressure: number;
+  /** Eviction or park failures reported through `onCleanupError` instead of failing an unrelated operation. */
+  cleanupFailures: number;
 }
+
+/** Recently evicted keys remembered for the `reloads` counter. */
+const EVICTED_MEMORY = 1024;
 
 type EntryState = 'pending' | 'ready';
 
@@ -93,6 +132,10 @@ interface Entry<R> {
   resource?: R;
   bytes: number;
   lastUsed: number;
+  /** Pin status, evaluated at publication and at each policy change. */
+  pinned: boolean;
+  /** Released and kept past its release's trim; a later disposal of it is an eviction. */
+  retained: boolean;
   readonly controller: AbortController;
   ready: Promise<R>;
 }
@@ -111,10 +154,19 @@ export class LeaseCache<D, R extends object> {
   private warmTotal = 0;
   private trimming = false;
   private trimAll = false;
-  readonly stats: LeaseCacheStats = { loads: 0, hits: 0, uploads: 0, lateDrops: 0, disposed: 0, failures: 0 };
+  private residency: LeaseResidency = {};
+  /** Every published byte the cache owns, and the released share of it that is pinned. */
+  private residentTotal = 0;
+  private pinnedWarm = 0;
+  private pressured = false;
+  private readonly evicted = new Set<string>();
+  readonly stats: LeaseCacheStats = {
+    loads: 0, hits: 0, uploads: 0, lateDrops: 0, disposed: 0, failures: 0, evictions: 0, reloads: 0, pressure: 0, cleanupFailures: 0,
+  };
 
   constructor(private readonly loader: LeaseLoader<D, R>, options: LeaseCacheOptions) {
     this.warmLimit = options.warmBytes;
+    if (options.residency) this.residency = checkResidency(options.residency);
   }
 
   /**
@@ -129,7 +181,11 @@ export class LeaseCache<D, R extends object> {
     if (entry) this.stats.hits++;
     else { const pending = this.start(key); entry = pending.entry; begin = pending.begin; }
     const held = entry;
-    if (held.state === 'ready' && held.refs === 0) this.warmTotal -= held.bytes;
+    if (held.state === 'ready' && held.refs === 0) {
+      this.warmTotal -= held.bytes;
+      if (held.pinned) this.pinnedWarm -= held.bytes;
+      held.retained = false;
+    }
     held.refs++;
     held.lastUsed = ++this.tick;
     const result = new Promise<Lease<R>>((resolve, reject) => {
@@ -191,13 +247,13 @@ export class LeaseCache<D, R extends object> {
     return this.entries.get(key)?.refs ?? 0;
   }
 
-  residentBytes(): number {
-    let n = 0;
-    for (const e of this.entries.values()) n += e.bytes;
-    return n;
-  }
+  residentBytes(): number { return this.residentTotal; }
 
+  /** Released bytes kept, pinned included. */
   warmBytes(): number { return this.warmTotal; }
+
+  /** Released bytes kept because they are pinned. */
+  pinnedBytes(): number { return this.pinnedWarm; }
 
   /** Changes the warm budget (a tier change). Live leases are untouched; warm entries over budget are evicted. */
   setWarmBytes(bytes: number): void {
@@ -205,17 +261,49 @@ export class LeaseCache<D, R extends object> {
     this.trim();
   }
 
+  /**
+   * Changes the warm budget and residency policy together (a preset change, RES-01). Live leases and pending loads are
+   * untouched; retained entries are re-pinned, then trimmed. Eviction failures go to `onCleanupError`.
+   */
+  setResidency(warmBytes: number, residency: LeaseResidency = {}): void {
+    const next = checkResidency(residency);
+    if (!Number.isSafeInteger(warmBytes) || warmBytes < 0) throw new RangeError('lease cache: warm bytes must be a nonnegative safe integer');
+    this.warmLimit = warmBytes;
+    this.residency = next;
+    this.pinnedWarm = 0;
+    for (const e of this.entries.values()) {
+      if (e.state !== 'ready') continue;
+      e.pinned = this.isPinned(e.key);
+      if (e.pinned && e.refs === 0) this.pinnedWarm += e.bytes;
+    }
+    this.pressured = false;
+    this.trimQuietly();
+  }
+
   /** Disposes every released resource (for example before a context recycle). Live leases are untouched. */
   evictWarm(): void { this.trim(true); }
+
+  private isPinned(key: string): boolean {
+    return this.residency.pinned?.(key) === true;
+  }
+
+  /** Trims without letting a third party's cleanup failure fail the caller's unrelated operation. */
+  private trimQuietly(): void {
+    try { this.trim(); } catch (error) {
+      this.stats.cleanupFailures++;
+      this.residency.onCleanupError?.(error);
+    }
+  }
 
   private start(key: string): { entry: Entry<R>; begin(): void } {
     const controller = new AbortController();
     let resolve!: (resource: R) => void, reject!: (error: unknown) => void;
     const ready = new Promise<R>((yes, no) => { resolve = yes; reject = no; });
-    const entry: Entry<R> = { key, state: 'pending', refs: 0, bytes: 0, lastUsed: 0, controller, ready };
+    const entry: Entry<R> = { key, state: 'pending', refs: 0, bytes: 0, lastUsed: 0, pinned: false, retained: false, controller, ready };
     ready.catch(() => {});
     this.entries.set(key, entry);
     this.stats.loads++;
+    if (this.evicted.delete(key)) this.stats.reloads++;
     return { entry, begin: () => { void this.load(entry).then(resolve, reject); } };
   }
 
@@ -252,7 +340,11 @@ export class LeaseCache<D, R extends object> {
       entry.state = 'ready';
       entry.resource = resource;
       entry.bytes = bytes;
+      entry.pinned = this.isPinned(key);
+      this.residentTotal += bytes;
       this.byResource.set(resource, entry);
+      // A new live entry may need space: evict retained ones under the ceiling, never this load's own failure path.
+      if (this.residency.residentBytes !== undefined) this.trimQuietly();
       return resource;
     } catch (error) {
       if (this.entries.get(key) === entry) this.entries.delete(key);
@@ -276,7 +368,16 @@ export class LeaseCache<D, R extends object> {
     }
     entry.lastUsed = ++this.tick;
     this.warmTotal += entry.bytes;
-    this.trim();
+    if (entry.pinned) this.pinnedWarm += entry.bytes;
+    const errors: unknown[] = [];
+    try { this.trim(); } catch (error) { errors.push(error); }
+    // Still retained after trimming (and not re-acquired by a disposer): release its per-context GPU copies.
+    if (entry.resource !== undefined && this.entries.get(entry.key) === entry && entry.refs === 0) {
+      entry.retained = true;
+      if (this.loader.park) try { this.loader.park(entry.resource); } catch (error) { errors.push(error); }
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length) throw new AggregateError(errors, 'lease cache: cleanup failed');
   }
 
   private trim(all = false): void {
@@ -288,7 +389,9 @@ export class LeaseCache<D, R extends object> {
     try {
       const idle = [...this.entries.values()].filter(e => e.state === 'ready');
       const remaining = new Set(idle);
-      const over = () => this.trimAll || this.warmLimit <= 0 || this.warmTotal > this.warmLimit;
+      const limit = this.residency.residentBytes;
+      const over = () => this.trimAll || this.warmLimit <= 0 || this.warmTotal - this.pinnedWarm > this.warmLimit
+        || (limit !== undefined && this.residentTotal > limit);
       // Ordinary eviction sorts once. Reentrant release of an already visited live entry needs a further pass;
       // each extra pass must retire an original candidate, so callback-generated loads cannot extend this drain.
       while (remaining.size && over()) {
@@ -297,10 +400,20 @@ export class LeaseCache<D, R extends object> {
           if (!over()) break;
           if (this.entries.get(e.key) !== e || e.state !== 'ready') { remaining.delete(e); continue; }
           if (e.refs !== 0) continue;
+          // A pin outlives every budget; only teardown (`evictWarm`) retires it.
+          if (e.pinned && !this.trimAll) { remaining.delete(e); continue; }
           remaining.delete(e);
           this.entries.delete(e.key);
           this.warmTotal -= e.bytes;
+          if (e.pinned) this.pinnedWarm -= e.bytes;
+          this.residentTotal -= e.bytes;
           retired = true;
+          if (!this.trimAll && e.retained) {
+            this.stats.evictions++;
+            this.evicted.delete(e.key);
+            this.evicted.add(e.key);
+            if (this.evicted.size > EVICTED_MEMORY) this.evicted.delete(this.evicted.values().next().value!);
+          }
           if (e.resource !== undefined) {
             this.byResource.delete(e.resource);
             this.stats.disposed++;
@@ -310,9 +423,33 @@ export class LeaseCache<D, R extends object> {
         if (!retired) break;
       }
     } finally { this.trimming = false; this.trimAll = false; }
+    this.notePressure(errors);
     if (errors.length) throw new AggregateError(errors, 'lease cache: cleanup failed');
   }
 
+  /** Edge-triggered: reports once when eviction can no longer bring the cache under its ceiling. */
+  private notePressure(errors: unknown[]): void {
+    const limit = this.residency.residentBytes;
+    const over = limit !== undefined && this.residentTotal > limit;
+    if (!over) { this.pressured = false; return; }
+    if (this.pressured) return;
+    this.pressured = true;
+    this.stats.pressure++;
+    const warm = this.warmTotal - this.pinnedWarm;
+    const report: ResidencyPressure = {
+      residentBytes: this.residentTotal, limitBytes: limit, liveBytes: this.residentTotal - this.warmTotal,
+      pinnedBytes: this.pinnedWarm, warmBytes: warm,
+    };
+    try { this.residency.onPressure?.(report); } catch (error) { errors.push(error); }
+  }
+
+}
+
+function checkResidency(r: LeaseResidency): LeaseResidency {
+  if (r.residentBytes !== undefined && (!Number.isSafeInteger(r.residentBytes) || r.residentBytes < 0)) {
+    throw new RangeError('lease cache: resident bytes must be a nonnegative safe integer');
+  }
+  return { ...r };
 }
 
 /**

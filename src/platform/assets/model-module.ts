@@ -3,23 +3,26 @@ import type { Services } from '../../core/services';
 import type { AssetDef } from '../../core/asset-def';
 import type { ModelLibrary, ModelLibraryStats } from './models';
 import { assetOwners } from './app-ownership';
+import { bindResidency, type AssetResidencyInput, type AssetResidencyPolicy } from './residency';
 declare module '../../core/services' { interface Services { readonly models: ModelLibrary } }
 declare module '../../core/probe' { interface EngineProbes { models: ModelLibraryStats } }
-/** Composition supplies the author-to-platform asset adapter; the loader stays lazy and shared. */
-export function modelModule(resolve: (services: Services, id: string) => AssetDef | undefined): EngineModule {
-  return defineModule({ id: 'platform.models', version: '1.0.0', serviceKeys: ['models'], install(s) {
-    let library: ModelLibrary | undefined, pending: Promise<ModelLibrary> | undefined, closed = false;
+/** Composition supplies the author-to-platform asset adapter; the loader stays lazy and shared. `residency`: RES-01. */
+export function modelModule(resolve: (services: Services, id: string) => AssetDef | undefined, residency?: AssetResidencyInput): EngineModule {
+  return defineModule({ id: 'platform.models', version: '1.0.0', serviceKeys: ['models'], ...(residency ? { optional: ['platform.quality'] } : {}), install(s) {
+    let library: ModelLibrary | undefined, pending: Promise<ModelLibrary> | undefined, closed = false, policy: AssetResidencyPolicy | undefined;
     const get = () => pending ??= import('./models').then(({ createModelLibrary }) => {
       if (closed) throw Error('models: module disposed');
-      return library = createModelLibrary({ def: id => resolve(s, id) });
+      return library = createModelLibrary({ def: id => resolve(s, id), residency: policy });
     }).catch(error => { pending = undefined; throw error; });
     const facade: ModelLibrary = {
       model: (id, options) => get().then(lib => lib.model(id, options)),
       owns: resource => library?.owns(resource) ?? false,
       stats: () => library?.stats() ?? { fetches: {}, parses: 0, hits: 0, lateDrops: 0, disposed: 0, bytesKeptMiB: 0, residentMiB: 0, instances: 0 },
       dispose() { if (closed) return; closed = true; library?.dispose(); },
+      setResidency(next) { policy = next; library?.setResidency?.(next); },
     };
     const unregister = assetOwners.register(facade); s.provide('models', facade); s.probes.register('models', () => facade.stats(), s.signal);
+    if (residency) bindResidency({ kind: 'models', input: residency, quality: s.app.has('platform.quality') ? s.quality : undefined, signal: s.signal, log: s.log, apply: p => facade.setResidency!(p) });
     return { dispose() { try { facade.dispose(); } finally { unregister(); } } };
   } });
 }
