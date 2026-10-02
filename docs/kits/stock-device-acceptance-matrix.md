@@ -135,3 +135,16 @@ controllers and assistive paths require those devices. Browser emulation and
 render-return timing do not certify physical touch, thermal behavior or photon
 latency. Record unavailable measurements as unverified and retain DV-01 open;
 continue the automated task cases above without changing promised requirements.
+
+## 2026-10-02 template polish (emulated evidence only)
+
+Candidate PR #40, not integrated. Evidence is emulated SwiftShader `play:snap` at 1280×800 and 390×844, plus the learn
+`play:script`; every screenshot was inspected. No physical phone, tablet, landscape, 200% text or zoom evidence is
+claimed; each row's open acceptance above remains open.
+
+| Template | Change | Profiles affected | Evidence |
+|---|---|---|---|
+| Arcade, Explorer (ui kit) | HUD lines and the prompt sit on a translucent plate; banner and prompt start hidden | Phone, tablet, laptop, desktop (layout and readability only; input unchanged) | Emulated desktop and 390×844: "Found 0 of 3" readable over the light sky; Score/Best plates inside the HUD region. `test:ui-browser` HUD lifecycle passes |
+| Learn | Objectives card shown from the start until the first Next, never over step 1's drawings; scripted playtest waits for each press | Tablet (minimum), phone, laptop, desktop | Emulated desktop and 390×844 snaps; script 9/9 snaps including `02-sun-drawn` with the Sun drawn. The card is wider than the board at 390×844 (unchanged, recorded) |
+| Mechanics | 64×64 seamless gradient sky with small orientation glyph (was 16×16) | All targets (graphics quality) | Emulated desktop and 390×844: no magnified glyph blur; draws/triangles unchanged (7 / 1,208); texture about 0.1 MiB within the 8 MiB cap |
+

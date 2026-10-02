@@ -25,7 +25,7 @@ const guide = defineSystem({ id: 'lab-guide', run(ctx, dt) {
 } });
 const follow = defineSystem({ id: 'lab-rider', run(ctx, dt) { const s = sessionFor(ctx); if (s) s.riderSystem.run(ctx, dt); } });
 export default defineScene({ id: 'lab', title: 'lab.title', type: 'area',
-  view: { background: 0x91bacd, environment: { background: 0x91bacd, cube: { faces: ['lab-sky-px', 'lab-sky-nx', 'lab-sky-py', 'lab-sky-ny', 'lab-sky-pz', 'lab-sky-nz'], screenPx: 16 }, ambient: { sky: 0xffffff, ground: 0x667788, intensity: 2 }, directional: { color: 0xffffff, intensity: 2, position: [3, 8, 5] }, haze: null, points: [], pointSize: 1 }, camera: { position: [0, 12, 15], target: [0, 0, 0], fov: 52, minWidthFov: 70 } },
+  view: { background: 0x91bacd, environment: { background: 0x91bacd, cube: { faces: ['lab-sky-px', 'lab-sky-nx', 'lab-sky-py', 'lab-sky-ny', 'lab-sky-pz', 'lab-sky-nz'], screenPx: 64 }, ambient: { sky: 0xffffff, ground: 0x667788, intensity: 2 }, directional: { color: 0xffffff, intensity: 2, position: [3, 8, 5] }, haze: null, points: [], pointSize: 1 }, camera: { position: [0, 12, 15], target: [0, 0, 0], fov: 52, minWidthFov: 70 } },
   entities: [
     [Name({ name: 'floor' }), Transform({ y: -.12 }), Shape({ kind: 'box', size: [16, .2, 12], color: 0x314e63 })],
     [Walls({ minX: -7, maxX: 7, minZ: -5, maxZ: 5 })],

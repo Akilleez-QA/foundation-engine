@@ -7,6 +7,9 @@ No downloaded artwork, external buffers, textures, or copyrighted model data is 
 
 Regenerate with `node templates/mechanics/assets/generate-fixture.mjs`.
 
-`generate-cube.mjs` creates six 16×16 original CC0 PNGs in +X, −X, +Y, −Y, +Z,
-−Z order. Each has an orientation glyph and a distinct pale color. These are
-small ownership/orientation fixtures, not production sky artwork.
+`generate-cube.mjs` creates six 64×64 original CC0 PNGs in +X, −X, +Y, −Y, +Z,
+−Z order: one seamless vertical sky gradient (flat +Y and −Y caps that match the
+side faces' edges) with a small, low-contrast orientation glyph per face. 64 px
+keeps the cube near 0.1 MiB and smooth when a phone magnifies it (16 px faces with
+large glyphs looked blurry). These are small ownership/orientation fixtures, not
+production sky artwork. Regenerate with `node templates/mechanics/assets/generate-cube.mjs`.

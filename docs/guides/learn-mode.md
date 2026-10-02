@@ -1,6 +1,6 @@
 # Learn mode
 
-Learn mode turns a game into a short, interactive lesson: a teacher and one or two classmates at a chalkboard, things the learner turns and taps, and questions with hints and kind feedback. It is built from three kits on the ordinary author API, and a game pays nothing for it until a lesson opens (the learn runtime loads lazily; `scripts/perf/learn-isolation.test.ts` proves it stays out of the first-load bundle).
+Learn mode turns a game into a short, interactive lesson: a chalkboard with the lines of a teacher and one or two classmates shown as named captions (the cast has names and colours, not drawn figures), things the learner turns and taps, and questions with hints and kind feedback. It is built from three kits on the ordinary author API, and a game pays nothing for it until a lesson opens (the learn runtime loads lazily; `scripts/perf/learn-isolation.test.ts` proves it stays out of the first-load bundle).
 
 Design inspired by THU-MAIC OpenMAIC.
 
