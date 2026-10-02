@@ -4,7 +4,7 @@
  * The caller owns identities (nonnegative safe integers, e.g. ECS entity numbers), positions and the meaning
  * of every query. The grid owns only its preallocated typed arrays: admission is decided before any write,
  * capacity never grows, and no callback is ever invoked, so there is no reentrancy and nothing to cancel.
- * Queries write ids into a caller buffer and report a status; a query that would scan more cells than the
+ * Queries write ids into a caller Float64Array or number[] and report a status (optionally into a reused record); a query that would scan more cells than the
  * configured bound is refused before any work.
  */
 
@@ -40,19 +40,27 @@ export type RemoveStatus = 'removed' | 'absent' | 'closed';
 export type QueryStatus = 'complete' | 'truncated' | 'too-wide' | 'closed';
 
 export interface QueryResult {
-  readonly status: QueryStatus;
+  status: QueryStatus;
   /** Ids written to the front of the buffer. */
-  readonly count: number;
+  count: number;
   /** Cells scanned (work accounting, not a time bound). */
-  readonly cellsVisited: number;
+  cellsVisited: number;
   /** Entries distance-/rectangle-tested. */
-  readonly entriesExamined: number;
+  entriesExamined: number;
   /** The grid revision the result describes. */
-  readonly revision: number;
+  revision: number;
 }
 
-/** A writable id buffer: a typed array (Float64Array holds any safe integer) or a pre-sized number[]. */
-export interface IdBuffer { readonly length: number; [index: number]: number }
+/** A reusable result record for the optional last argument of every query (no allocation per query). */
+export function createQueryResult(): QueryResult {
+  return { status: 'complete', count: 0, cellsVisited: 0, entriesExamined: 0, revision: 0 };
+}
+
+/**
+ * A writable id buffer. Only `Float64Array` (holds every safe integer exactly) or a pre-sized `number[]`:
+ * narrower typed arrays would silently wrap ids into a different, real entity, so they are rejected.
+ */
+export type IdBuffer = Float64Array | number[];
 
 export interface GridStats {
   readonly size: number;
@@ -73,15 +81,19 @@ export interface SpatialGrid {
   has(id: number): boolean;
   /** A detached copy of a live entry's position. */
   position(id: number): { x: number; y: number } | undefined;
-  /** Ids whose position lies in the inclusive rectangle. */
-  queryRect(minX: number, minY: number, maxX: number, maxY: number, out: IdBuffer): QueryResult;
+  /**
+   * Ids whose position lies in the inclusive rectangle. Every query takes an optional `result` record
+   * (see {@link createQueryResult}) that is overwritten and returned; without one a new record is allocated.
+   */
+  queryRect(minX: number, minY: number, maxX: number, maxY: number, out: IdBuffer, result?: QueryResult): QueryResult;
   /** Ids within `radius` (inclusive) of a point. */
-  queryCircle(x: number, y: number, radius: number, out: IdBuffer): QueryResult;
+  queryCircle(x: number, y: number, radius: number, out: IdBuffer, result?: QueryResult): QueryResult;
   /**
    * Up to `out.length` nearest ids within `maxDistance`, nearest first; equal distances order by ascending id,
    * so the result does not depend on insertion history. `exclude` (e.g. the querying entity) is skipped.
+   * Work is O(entries examined x k): keep k small (steering typically uses 4 to 10).
    */
-  queryNearest(x: number, y: number, maxDistance: number, out: IdBuffer, exclude?: number): QueryResult;
+  queryNearest(x: number, y: number, maxDistance: number, out: IdBuffer, exclude?: number, result?: QueryResult): QueryResult;
   /** Remove every entry; capacity and limits are kept. */
   clear(): void;
   /** Terminal and idempotent: releases the arrays; later mutations and queries report `closed`. */
@@ -99,7 +111,10 @@ function checkPoint(x: number, y: number): void {
   if (!finite(x) || !finite(y)) throw new TypeError('spatial grid: coordinates must be finite numbers');
 }
 function checkBuffer(out: IdBuffer): void {
-  if (out === null || typeof out !== 'object' || !Number.isSafeInteger(out.length) || out.length < 0) throw new TypeError('spatial grid: out must be a writable id buffer');
+  if (!(out instanceof Float64Array) && !Array.isArray(out)) throw new TypeError('spatial grid: out must be a Float64Array or number[] (narrower typed arrays would wrap ids)');
+}
+function checkResult(result: QueryResult | undefined): void {
+  if (result !== undefined && (result === null || typeof result !== 'object' || Object.isFrozen(result))) throw new TypeError('spatial grid: result must be a writable record');
 }
 
 const KEYS = ['cellSize', 'minX', 'minY', 'maxX', 'maxY', 'maxEntries', 'maxCells', 'maxCellsPerQuery'] as const;
@@ -128,8 +143,8 @@ export function createSpatialGrid(input: GridLimits): SpatialGrid {
   let ids = new Float64Array(maxEntries), xs = new Float64Array(maxEntries), ys = new Float64Array(maxEntries);
   let free = new Int32Array(maxEntries);
   const slotOf = new Map<number, number>();
-  // Scratch distances for queryNearest, grown on demand up to maxEntries (the k bound).
-  let scratch = new Float64Array(0);
+  // Scratch distances for queryNearest, sized to the largest possible k (maxEntries) once, here.
+  let scratch = new Float64Array(maxEntries);
   let freeTop = 0, revision = 0;
   const resetFree = () => { for (let i = 0; i < maxEntries; i++) free[i] = maxEntries - 1 - i; freeTop = maxEntries; };
   resetFree();
@@ -147,7 +162,11 @@ export function createSpatialGrid(input: GridLimits): SpatialGrid {
     if (p >= 0) next[p] = n; else head![cellOf[slot]!] = n;
     if (n >= 0) prev[n] = p;
   };
-  const closedResult = (): QueryResult => ({ status: 'closed', count: 0, cellsVisited: 0, entriesExamined: 0, revision });
+  const finish = (r: QueryResult | undefined, status: QueryStatus, count: number, cellsVisited: number, entriesExamined: number): QueryResult => {
+    if (!r) return { status, count, cellsVisited, entriesExamined, revision };
+    r.status = status; r.count = count; r.cellsVisited = cellsVisited; r.entriesExamined = entriesExamined; r.revision = revision;
+    return r;
+  };
 
   /** Clamp a query box to cell indices; null when it misses the grid entirely. */
   function cellRange(x0: number, y0: number, x1: number, y1: number): [number, number, number, number] | null {
@@ -157,10 +176,10 @@ export function createSpatialGrid(input: GridLimits): SpatialGrid {
   const tooWide = (r: [number, number, number, number]) => (r[2] - r[0] + 1) * (r[3] - r[1] + 1) > maxCellsPerQuery;
 
   /** Shared scan for rectangle and circle tests. `circle` uses (cx, cy, r2); otherwise the box is the test. */
-  function scan(x0: number, y0: number, x1: number, y1: number, circle: boolean, cx: number, cy: number, r2: number, out: IdBuffer): QueryResult {
+  function scan(x0: number, y0: number, x1: number, y1: number, circle: boolean, cx: number, cy: number, r2: number, out: IdBuffer, res: QueryResult | undefined): QueryResult {
     const range = cellRange(x0, y0, x1, y1);
-    if (!range) return { status: 'complete', count: 0, cellsVisited: 0, entriesExamined: 0, revision };
-    if (tooWide(range)) return { status: 'too-wide', count: 0, cellsVisited: 0, entriesExamined: 0, revision };
+    if (!range) return finish(res, 'complete', 0, 0, 0);
+    if (tooWide(range)) return finish(res, 'too-wide', 0, 0, 0);
     const cap = out.length, h = head!;
     let count = 0, cells = 0, examined = 0;
     for (let row = range[1]; row <= range[3]; row++) {
@@ -171,12 +190,12 @@ export function createSpatialGrid(input: GridLimits): SpatialGrid {
           const px = xs[s]!, py = ys[s]!;
           const hit = circle ? (px - cx) * (px - cx) + (py - cy) * (py - cy) <= r2 : px >= x0 && px <= x1 && py >= y0 && py <= y1;
           if (!hit) continue;
-          if (count === cap) return { status: 'truncated', count, cellsVisited: cells, entriesExamined: examined, revision };
+          if (count === cap) return finish(res, 'truncated', count, cells, examined);
           out[count++] = ids[s]!;
         }
       }
     }
-    return { status: 'complete', count, cellsVisited: cells, entriesExamined: examined, revision };
+    return finish(res, 'complete', count, cells, examined);
   }
 
   const grid: SpatialGrid = {
@@ -218,28 +237,27 @@ export function createSpatialGrid(input: GridLimits): SpatialGrid {
       const slot = head ? slotOf.get(id) : undefined;
       return slot === undefined ? undefined : { x: xs[slot]!, y: ys[slot]! };
     },
-    queryRect(x0, y0, x1, y1, out) {
-      checkPoint(x0, y0); checkPoint(x1, y1); checkBuffer(out);
+    queryRect(x0, y0, x1, y1, out, result) {
+      checkPoint(x0, y0); checkPoint(x1, y1); checkBuffer(out); checkResult(result);
       if (x0 > x1 || y0 > y1) throw new RangeError('spatial grid: rectangle min must not exceed max');
-      if (!head) return closedResult();
-      return scan(x0, y0, x1, y1, false, 0, 0, 0, out);
+      if (!head) return finish(result, 'closed', 0, 0, 0);
+      return scan(x0, y0, x1, y1, false, 0, 0, 0, out, result);
     },
-    queryCircle(x, y, radius, out) {
-      checkPoint(x, y); checkBuffer(out);
+    queryCircle(x, y, radius, out, result) {
+      checkPoint(x, y); checkBuffer(out); checkResult(result);
       if (!finite(radius) || radius < 0) throw new RangeError('spatial grid: radius must be finite and nonnegative');
-      if (!head) return closedResult();
-      return scan(x - radius, y - radius, x + radius, y + radius, true, x, y, radius * radius, out);
+      if (!head) return finish(result, 'closed', 0, 0, 0);
+      return scan(x - radius, y - radius, x + radius, y + radius, true, x, y, radius * radius, out, result);
     },
-    queryNearest(x, y, maxDistance, out, exclude) {
-      checkPoint(x, y); checkBuffer(out);
+    queryNearest(x, y, maxDistance, out, exclude, result) {
+      checkPoint(x, y); checkBuffer(out); checkResult(result);
       if (!finite(maxDistance) || maxDistance < 0) throw new RangeError('spatial grid: maxDistance must be finite and nonnegative');
       if (exclude !== undefined) checkId(exclude);
-      if (!head) return closedResult();
+      if (!head) return finish(result, 'closed', 0, 0, 0);
       const range = cellRange(x - maxDistance, y - maxDistance, x + maxDistance, y + maxDistance);
-      if (!range) return { status: 'complete', count: 0, cellsVisited: 0, entriesExamined: 0, revision };
-      if (tooWide(range)) return { status: 'too-wide', count: 0, cellsVisited: 0, entriesExamined: 0, revision };
+      if (!range) return finish(result, 'complete', 0, 0, 0);
+      if (tooWide(range)) return finish(result, 'too-wide', 0, 0, 0);
       const k = Math.min(out.length, maxEntries), r2 = maxDistance * maxDistance;
-      if (scratch.length < k) scratch = new Float64Array(k);
       const d = scratch, h = head;
       let count = 0, cells = 0, examined = 0;
       for (let row = range[1]; row <= range[3]; row++) {
@@ -259,7 +277,7 @@ export function createSpatialGrid(input: GridLimits): SpatialGrid {
           }
         }
       }
-      return { status: 'complete', count, cellsVisited: cells, entriesExamined: examined, revision };
+      return finish(result, 'complete', count, cells, examined);
     },
     clear() {
       if (!head) return;

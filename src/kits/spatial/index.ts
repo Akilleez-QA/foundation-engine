@@ -5,7 +5,7 @@
  */
 import { defineKit, type KitDefinition } from '../../author';
 export {
-  createSpatialGrid, GRID_CEILING,
+  createSpatialGrid, createQueryResult, GRID_CEILING,
   type SpatialGrid, type GridLimits, type GridStats, type IdBuffer, type QueryResult, type QueryStatus,
   type InsertStatus, type MoveStatus, type RemoveStatus,
 } from './grid';

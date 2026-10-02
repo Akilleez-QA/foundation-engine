@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defineComponent, defineScene, defineSystem, testScene, Transform } from '../../author';
 import { mulberry32 } from '../../core/rng';
-import { createSpatialGrid, spatial, GRID_CEILING, type GridLimits, type SpatialGrid } from './index';
+import { createQueryResult, createSpatialGrid, spatial, GRID_CEILING, type GridLimits, type SpatialGrid } from './index';
 
 const base: GridLimits = { cellSize: 10, minX: 0, minY: 0, maxX: 100, maxY: 100, maxEntries: 64, maxCells: 100, maxCellsPerQuery: 100 };
 const grid = (o: Partial<GridLimits> = {}) => createSpatialGrid({ ...base, ...o });
@@ -39,6 +39,12 @@ test('malformed arguments throw without changing state; refusals are named and c
     () => g.queryCircle(0, 0, -1, new Float64Array(4)), () => g.queryCircle(0, 0, Infinity, new Float64Array(4)),
     () => g.queryNearest(0, 0, NaN, new Float64Array(4)), () => g.queryNearest(0, 0, 1, new Float64Array(4), -2),
     () => g.queryRect(0, 0, 1, 1, null as never)]) assert.throws(f);
+  // Narrow typed arrays would wrap ids into other, real entities (70000 -> 4464 in a Uint16Array): rejected.
+  for (const narrow of [new Uint16Array(4), new Int32Array(4), new Uint32Array(4), new Float32Array(4)]) {
+    assert.throws(() => g.queryCircle(5, 5, 1, narrow as never), TypeError);
+    assert.throws(() => g.queryNearest(5, 5, 1, narrow as never), TypeError);
+  }
+  assert.throws(() => g.queryRect(0, 0, 1, 1, new Float64Array(1), Object.freeze(createQueryResult())), TypeError);
   assert.deepEqual(g.stats, before);
   assert.equal(g.insert(1, 50, 50), 'duplicate');
   assert.equal(g.insert(2, -0.001, 50), 'out-of-bounds');
@@ -153,11 +159,19 @@ test('ECS consumer: per-observer interest sets follow moving entities and fail c
   const Unit = defineComponent('spatial-test-unit', { team: 0 });
   const Observer = defineComponent('spatial-test-observer', { radius: 0, visible: [] as number[], complete: true });
   const g: SpatialGrid = createSpatialGrid({ cellSize: 8, minX: -64, minY: -64, maxX: 64, maxY: 64, maxEntries: 32, maxCells: 256, maxCellsPerQuery: 16 });
-  const buffer = new Float64Array(8);
+  const buffer = new Float64Array(8), result = createQueryResult(), indexed = new Set<number>();
   const interest = defineSystem({ id: 'spatial-test-interest', run(ctx) {
-    for (const [e, , tr] of ctx.world.query(Unit, Transform)) if (g.move(e, tr.x, tr.z) === 'absent') g.insert(e, tr.x, tr.z);
+    // Despawned entities leave the index; an entity outside the grid is removed, never left at a stale position.
+    for (const e of indexed) if (!ctx.world.exists(e)) { g.remove(e); indexed.delete(e); }
+    for (const [e, , tr] of ctx.world.query(Unit, Transform)) {
+      let status: string = g.move(e, tr.x, tr.z);
+      if (status === 'absent') status = g.insert(e, tr.x, tr.z);
+      if (status === 'moved' || status === 'inserted') indexed.add(e);
+      else { g.remove(e); indexed.delete(e); }
+    }
     for (const [e, obs, tr] of ctx.world.query(Observer, Transform)) {
-      const r = g.queryCircle(tr.x, tr.z, obs.radius, buffer);
+      const r = g.queryCircle(tr.x, tr.z, obs.radius, buffer, result);
+      assert.equal(r, result, 'the reused record is returned');
       obs.complete = r.status === 'complete';
       obs.visible = obs.complete ? ids(buffer, r.count).filter(id => id !== e) : [];
     }
@@ -175,8 +189,27 @@ test('ECS consumer: per-observer interest sets follow moving entities and fail c
   assert.deepEqual(observer![1].visible, [2]);
   s.run(0.5); // the team-1 unit crosses into range
   assert.deepEqual(observer![1].visible, [2, 3]);
+  s.world.despawn(2); s.run(1 / 60);
+  assert.deepEqual(observer![1].visible, [3], 'a despawned entity is no longer disclosed'); assert.equal(g.has(2), false);
+  const far = [...s.world.query(Unit, Transform)].find(([e]) => e === 3)![2];
+  far.x = 500; far.z = 0; s.run(1 / 60); // leaves the grid rectangle: removed, not left at its last position
+  assert.equal(g.has(3), false); assert.deepEqual(observer![1].visible, []);
+  far.x = 0; far.z = 2; s.run(1 / 60); // and is indexed again when it returns
+  assert.deepEqual(observer![1].visible, [3]);
   for (let i = 0; i < 12; i++) s.world.spawn(Transform({ x: 1, z: 1 }), Unit({ team: 0 }));
   s.run(1 / 60);
   assert.equal(observer![1].complete, false); assert.deepEqual(observer![1].visible, [], 'an incomplete set discloses nothing');
   s.dispose(); g.dispose();
+});
+
+test('ids beyond 32 bits round-trip exactly; a reused result record avoids per-query allocation', () => {
+  const g = grid(), big = 2 ** 40 + 3, out = new Float64Array(2), arr = [0, 0], r = createQueryResult();
+  g.insert(big, 5, 5); g.insert(70000, 6, 5);
+  assert.equal(g.queryNearest(5, 5, 5, out, undefined, r), r);
+  assert.deepEqual([...out], [big, 70000]);
+  assert.equal(g.queryCircle(5, 5, 5, arr, r).count, 2); assert.deepEqual(arr.sort((a, b) => a - b), [70000, big]);
+  assert.equal(g.queryRect(0, 0, 10, 10, out, r), r);
+  assert.deepEqual({ ...r }, { status: 'complete', count: 2, cellsVisited: 4, entriesExamined: 2, revision: 2 });
+  g.dispose();
+  assert.equal(g.queryCircle(5, 5, 5, out, r).status, 'closed'); assert.equal(r.count, 0);
 });

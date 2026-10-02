@@ -22,19 +22,25 @@ query radii, and what an incomplete answer must do. Then choose:
 
 ```ts
 import { defineScene, defineSystem, Transform } from '@engine';
-import { createSpatialGrid, type SpatialGrid } from '@kits/spatial';
+import { createQueryResult, createSpatialGrid, type SpatialGrid } from '@kits/spatial';
 import { Agent } from './agent';
 
 let grid: SpatialGrid | null = null;                // one owner: the current visit
-const near = new Float64Array(6);                   // allocated once, outside the frame
+const indexed = new Set<number>();                  // ids currently in the grid
+const near = new Float64Array(6);                   // Float64Array or number[]; allocated once
+const res = createQueryResult();                    // reused: no allocation per query
 
 const proximity = defineSystem({ id: 'game-proximity', run(ctx) {
   if (!grid) return;
+  for (const e of indexed) if (!ctx.world.exists(e)) { grid.remove(e); indexed.delete(e); }   // despawned
   for (const [e, , tr] of ctx.world.query(Agent, Transform)) {
-    if (grid.move(e, tr.x, tr.z) === 'absent') grid.insert(e, tr.x, tr.z);
+    let status: string = grid.move(e, tr.x, tr.z);
+    if (status === 'absent') status = grid.insert(e, tr.x, tr.z);
+    if (status === 'moved' || status === 'inserted') indexed.add(e);
+    else { grid.remove(e); indexed.delete(e); }     // out-of-bounds or saturated: never stale
   }
   for (const [e, agent, tr] of ctx.world.query(Agent, Transform)) {
-    const r = grid.queryNearest(tr.x, tr.z, agent.senseRadius, near, e);
+    const r = grid.queryNearest(tr.x, tr.z, agent.senseRadius, near, e, res);
     // near[0 .. r.count) are the closest ids, nearest first; ties by ascending id.
   }
 } });
@@ -42,12 +48,14 @@ const proximity = defineSystem({ id: 'game-proximity', run(ctx) {
 export default defineScene({ id: 'field', title: 'field.title', systems: [proximity],
   enter() { grid = createSpatialGrid({ cellSize: 8, minX: -256, minY: -256, maxX: 256, maxY: 256,
     maxEntries: 4000, maxCells: 4096, maxCellsPerQuery: 16 }); },
-  exit() { grid?.dispose(); grid = null; },
+  exit() { grid?.dispose(); grid = null; indexed.clear(); },
 });
 ```
 
-Remove ids when entities despawn (`grid.remove(e)`). Check the `insert` status: a
-`saturated` or `out-of-bounds` entity is not indexed and will not be found.
+An `out-of-bounds` move leaves the entry at its old position, so remove it as above rather
+than ignoring the status; otherwise a stale position keeps being found (and, for disclosure,
+keeps being sent). A `saturated` or `out-of-bounds` insert means the entity is not indexed.
+Keep `k` (the `near` length) small: `queryNearest` costs O(entries examined x k).
 
 ## 3. Treat incomplete results deliberately
 

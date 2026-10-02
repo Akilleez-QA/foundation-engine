@@ -5,7 +5,7 @@
 //   node --import tsx tools/spatial-bench/bench.mjs --quick    (fewer ticks)
 import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
-import { createSpatialGrid } from '../../src/kits/spatial/grid.ts';
+import { createQueryResult, createSpatialGrid } from '../../src/kits/spatial/grid.ts';
 import { mulberry32 } from '../../src/core/rng.ts';
 
 const percentile = (samples, p) => [...samples].sort((a, b) => a - b)[Math.max(0, Math.ceil(samples.length * p) - 1)] ?? 0;
@@ -22,7 +22,7 @@ export function runCase({ entries, ticks = 60, warmup = 10, observers = 64, cell
   const grid = createSpatialGrid({ cellSize, minX: 0, minY: 0, maxX: side, maxY: side, maxEntries: entries, maxCells: columns * columns, maxCellsPerQuery: 100 });
   const xs = new Float64Array(entries), ys = new Float64Array(entries);
   for (let i = 0; i < entries; i++) { xs[i] = random() * side; ys[i] = random() * side; if (grid.insert(i, xs[i], ys[i]) !== 'inserted') throw Error('insert refused'); }
-  const near = new Float64Array(neighbours), seen = new Float64Array(4096);
+  const near = new Float64Array(neighbours), seen = new Float64Array(4096), res = createQueryResult();
   const tick = { move: [], neighbours: [], interest: [] };
   const work = { neighbourCells: 0, neighbourExamined: 0, neighbourFound: 0, interestCells: 0, interestExamined: 0, interestFound: 0, refused: 0 };
   for (let t = -warmup; t < ticks; t++) {
@@ -36,14 +36,14 @@ export function runCase({ entries, ticks = 60, warmup = 10, observers = 64, cell
     tick.move.push(performance.now() - start);
     start = performance.now();
     for (let i = 0; i < entries; i++) {
-      const r = grid.queryNearest(xs[i], ys[i], neighbourRadius, near, i);
+      const r = grid.queryNearest(xs[i], ys[i], neighbourRadius, near, i, res);
       work.neighbourCells += r.cellsVisited; work.neighbourExamined += r.entriesExamined; work.neighbourFound += r.count;
       if (r.status !== 'complete') work.refused++;
     }
     tick.neighbours.push(performance.now() - start);
     start = performance.now();
     for (let o = 0; o < observers; o++) {
-      const i = (o * 7919) % entries, r = grid.queryCircle(xs[i], ys[i], interestRadius, seen);
+      const i = (o * 7919) % entries, r = grid.queryCircle(xs[i], ys[i], interestRadius, seen, res);
       work.interestCells += r.cellsVisited; work.interestExamined += r.entriesExamined; work.interestFound += r.count;
       if (r.status !== 'complete') work.refused++;
     }
