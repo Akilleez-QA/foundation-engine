@@ -78,8 +78,10 @@ for(const phase of ['beforeCommit','afterCommit'])optional(`SQLite actual parent
 optional('SQLite separate processes with the same expected revision cannot both commit',async t=>{
   const {dir,path}=await fixture(t),a=await childWorker(dir,path,'race'),b=await childWorker(dir,path,'race');
   t.after(()=>{for(const c of[a,b])if(c.exitCode===null)c.kill('SIGKILL');});
-  await Promise.all([once(a,'message'),once(b,'message')]);const results=[once(a,'message'),once(b,'message')];a.send('go');b.send('go');
-  const outcomes=(await Promise.all(results)).map(([r])=>r.outcome).sort();assert.deepEqual(outcomes,['committed','rejected']);assert.equal((await inspect(path)).revision,1);
+  await Promise.all([once(a,'message'),once(b,'message')]);const exits=[a,b].map(c=>once(c,'exit')),results=[once(a,'message'),once(b,'message')];a.send('go');b.send('go');
+  const outcomes=(await Promise.all(results)).map(([r])=>r.outcome).sort();assert.deepEqual(outcomes,['committed','rejected']);
+  // Read back only after both writers exit: closing the last WAL connection checkpoints under a lock, and readers also use zero busy timeout.
+  await Promise.all(exits);assert.equal((await inspect(path)).revision,1);
 });
 
 optional('SQLite refuses corruption introduced after open without overwriting the physical bytes',async t=>{

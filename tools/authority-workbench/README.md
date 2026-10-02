@@ -102,7 +102,9 @@ Every writer sets and verifies effective WAL journal mode, FULL synchronous mode
 (numeric value 2), zero busy timeout, foreign keys enabled, and trusted schema
 disabled. `configuration` is a frozen report of those actual values and the
 SQLite version. A conflicting writer is refused promptly; there is no automatic
-retry. The schema stores one checkpoint row. Reads use a SQL byte-length guard
+retry. Opening or reading also uses zero busy timeout, so it can fail with
+`database is locked` while another process holds a write lock or checkpoints the
+WAL as it closes its last connection. The caller decides whether and when to retry. The schema stores one checkpoint row. Reads use a SQL byte-length guard
 before transferring an oversized envelope into a JavaScript string.
 
 CAS outcomes mean:
