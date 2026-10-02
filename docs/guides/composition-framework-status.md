@@ -289,5 +289,5 @@ physical-device runs on creator-selected profiles remain open.
 
 `defineGame({ residency })` lets a creator keep released textures and models within
 per-preset byte budgets, pin critical asset ids and observe pressure. The existing
-lease caches remain the owner; nothing changes when it is omitted. Candidate (PR
-pending); not integrated. See [asset residency](asset-residency.md).
+lease caches remain the owner; nothing changes when it is omitted. Candidate
+(PR #22); not integrated. See [asset residency](asset-residency.md).

@@ -183,3 +183,52 @@ test('RES-01: a retained model parks its geometry, materials and textures withou
   assert.equal(image.closed, 1, 'teardown retires the pinned model once');
   await settle();
 });
+
+function sizedModels(residency?: AssetResidencyPolicy) {
+  const scenes = new Map<string, T.Object3D>();
+  const library = createModelLibrary({
+    def: id => ({ id, kind: 'model', title: id, licence: 'original', provenance: {}, variants: [{ path: `${id}.glb`, format: 'glb' }] }),
+    fetchBytes: async () => new ArrayBuffer(8),
+    // 150 float32 positions: 600 resident bytes per model.
+    parse: async (_bytes, url) => {
+      const geometry = new T.BufferGeometry();
+      geometry.setAttribute('position', new T.BufferAttribute(new Float32Array(150), 3));
+      const scene = new T.Group().add(new T.Mesh(geometry, new T.MeshBasicMaterial()));
+      scenes.set(url, scene);
+      return scene;
+    },
+    maxResidentBytes: 1000,
+    residency,
+  });
+  return { library, scenes };
+}
+
+test('RES-01: a retained model yields to a new live one before the model admission limit', async () => {
+  const off = sizedModels();
+  (await off.library.model('a', { signal: new AbortController().signal })).release();
+  const b0 = await off.library.model('b', { signal: new AbortController().signal });
+  b0.release();
+
+  const { library } = sizedModels({ warmBytes: 100_000, residentBytes: 1000 });
+  (await library.model('a', { signal: new AbortController().signal })).release();
+  assert.equal(library.stats().residentMiB * MiB, 600, 'a is retained');
+  const b = await library.model('b', { signal: new AbortController().signal });
+  assert.equal(library.stats().residentMiB * MiB, 600, 'a was evicted to admit b (A + B > maxResidentBytes)');
+  assert.equal(library.stats().evictions, 1);
+  b.release();
+  library.dispose();
+});
+
+test('RES-01: pinned models reduce model admission headroom; the refusal is explicit and unpinning restores it', async () => {
+  const { library } = sizedModels({ warmBytes: 0, pinned: key => assetIdOfKey(key) === 'a' });
+  (await library.model('a', { signal: new AbortController().signal })).release();
+  await assert.rejects(library.model('b', { signal: new AbortController().signal }), /resident budget exceeded/);
+  const again = await library.model('a', { signal: new AbortController().signal });
+  assert.ok(again.value.scene, 'the pinned model stays usable after the refusal');
+  again.release();
+  library.setResidency!({ warmBytes: 0 });
+  const b = await library.model('b', { signal: new AbortController().signal });
+  assert.ok(b.value.scene);
+  b.release();
+  library.dispose();
+});

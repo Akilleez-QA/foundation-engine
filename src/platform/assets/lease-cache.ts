@@ -287,11 +287,21 @@ export class LeaseCache<D, R extends object> {
     return this.residency.pinned?.(key) === true;
   }
 
+  /**
+   * Evicts unpinned retained entries, least recently used first, while `needsSpace()` is true: for an owner whose own
+   * hard admission (for example a model library's resident limit) counts retained bytes. Live, pending and pinned
+   * entries are never evicted. Cleanup failures are counted and reported, never thrown.
+   */
+  makeSpace(needsSpace: () => boolean): void {
+    this.trimQuietly(needsSpace);
+  }
+
   /** Trims without letting a third party's cleanup failure fail the caller's unrelated operation. */
-  private trimQuietly(): void {
-    try { this.trim(); } catch (error) {
+  private trimQuietly(needsSpace?: () => boolean): void {
+    try { this.trim(false, needsSpace); } catch (error) {
       this.stats.cleanupFailures++;
-      this.residency.onCleanupError?.(error);
+      // The report is advisory: a throwing reporter must not unwind the caller's accounting either.
+      try { this.residency.onCleanupError?.(error); } catch { /* contained */ }
     }
   }
 
@@ -380,7 +390,7 @@ export class LeaseCache<D, R extends object> {
     if (errors.length) throw new AggregateError(errors, 'lease cache: cleanup failed');
   }
 
-  private trim(all = false): void {
+  private trim(all = false, needsSpace?: () => boolean): void {
     // A disposer can reenter cache operations. The outer pass revalidates its finite candidate snapshot.
     if (this.trimming) { this.trimAll ||= all; return; }
     this.trimming = true;
@@ -391,7 +401,7 @@ export class LeaseCache<D, R extends object> {
       const remaining = new Set(idle);
       const limit = this.residency.residentBytes;
       const over = () => this.trimAll || this.warmLimit <= 0 || this.warmTotal - this.pinnedWarm > this.warmLimit
-        || (limit !== undefined && this.residentTotal > limit);
+        || (limit !== undefined && this.residentTotal > limit) || needsSpace?.() === true;
       // Ordinary eviction sorts once. Reentrant release of an already visited live entry needs a further pass;
       // each extra pass must retire an original candidate, so callback-generated loads cannot extend this drain.
       while (remaining.size && over()) {

@@ -290,7 +290,10 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
         try {
           let bytes = modelBytes(scene);
           for (const clip of parsed.animations) for (const track of clip.tracks) bytes += track.times.byteLength + track.values.byteLength;
-          if (!Number.isSafeInteger(bytes) || bytes + resident > maxResident) throw Error('models: resident budget exceeded');
+          if (!Number.isSafeInteger(bytes)) throw Error('models: resident budget exceeded');
+          // Retained (released, unpinned) templates yield to a new live one before the hard admission (RES-01).
+          if (bytes + resident > maxResident) cache.makeSpace(() => bytes + resident > maxResident);
+          if (bytes + resident > maxResident) throw Error('models: resident budget exceeded');
           resident += bytes;
           reserved = bytes;
           const clips = Object.freeze(parsed.animations.map(clip => clip.clone()));

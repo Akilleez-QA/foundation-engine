@@ -225,3 +225,34 @@ test('RES-01: eviction failures caused by a publication are reported, not thrown
   assert.equal(c.info('a'), undefined, 'the failed entry is still retired from accounting');
   b.release();
 });
+
+test('RES-01: a throwing cleanup reporter cannot unwind a publication or its accounting', async () => {
+  const m = loader();
+  m.loader.dispose = r => { if (r.key === 'a') throw Error('driver'); };
+  const c = new LeaseCache(m.loader, { warmBytes: 1024, residency: { residentBytes: 64, onCleanupError: () => { throw Error('reporter'); } } });
+  await use(c, 'a');
+  const b = await c.acquire('b', owner().signal);
+  assert.equal(b.value.key, 'b');
+  assert.equal(c.stats.cleanupFailures, 1);
+  assert.equal(c.residentBytes(), 64, 'only the live entry is counted');
+  b.release();
+  assert.deepEqual(c.info('b'), { state: 'ready', refs: 0, bytes: 64 }, 'retained within the budget');
+  assert.equal(c.residentBytes(), 64);
+  c.evictWarm();
+  assert.equal(c.residentBytes(), 0, 'accounting matches the entries');
+});
+
+test('RES-01: makeSpace evicts unpinned retained entries LRU for an owner admission, never live or pinned ones', async () => {
+  const { c, m } = cache(1024, { pinned: key => key === 'pin' });
+  await use(c, 'pin');
+  await use(c, 'a');
+  await use(c, 'b');
+  const live = await c.acquire('live', owner().signal);
+  c.makeSpace(() => c.residentBytes() > 192);
+  assert.deepEqual(m.log.disposed, ['a'], 'one retained entry, least recent first');
+  c.makeSpace(() => true);
+  assert.deepEqual(m.log.disposed, ['a', 'b'], 'an unsatisfiable need stops when nothing evictable remains');
+  assert.equal(c.refs('live'), 1);
+  assert.equal(c.pinnedBytes(), 64);
+  live.release();
+});
