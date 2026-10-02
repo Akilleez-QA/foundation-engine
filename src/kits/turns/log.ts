@@ -36,7 +36,7 @@ export interface TurnLogLimits {
   readonly command: JsonLimits;
 }
 
-/** Plain JSON for a save section. `checksum` is the replay kit's 64-bit `hashText` of the head state: a drift detector, not a security hash. */
+/** Plain JSON for a save section. `checksum` is the replay kit's 64-bit `hashText` over seed, base, cursor, initial and head states and every retained command: a drift detector, not a security hash. */
 export interface TurnLogSnapshot {
   readonly format: 'turns/1';
   readonly rules: string;
@@ -70,7 +70,8 @@ export type TurnSubmitResult<S extends DocumentValue> =
   | { readonly status: 'full' }
   | Blocked;
 export type TurnPreviewResult<S extends DocumentValue> =
-  | { readonly status: 'accepted'; readonly state: S; readonly stateJson: string }
+  /** `full`: the log is at capacity, so submit would return `full` until `checkpoint` (or undo) frees room. */
+  | { readonly status: 'accepted'; readonly state: S; readonly stateJson: string; readonly full: boolean }
   | { readonly status: 'rejected'; readonly reason: string }
   | { readonly status: 'invalid'; readonly reason: string }
   | { readonly status: 'busy' | 'retired' };
@@ -168,18 +169,22 @@ function openTurnLog<S extends DocumentValue, C extends DocumentValue>(
       || !Number.isSafeInteger(snap.cursor) || snap.cursor! < 0 || snap.cursor! > snap.commands.length
       || typeof snap.checksum !== 'string' || !/^[0-9a-f]{16}$/.test(snap.checksum) || snap.base! > Number.MAX_SAFE_INTEGER - snap.commands.length) return { status: 'invalid', reason: 'malformed snapshot' };
     seed = snap.seed!; base = snap.base!; cursor = snap.cursor!; expectChecksum = snap.checksum!;
+    // Stored data is untrusted: creator validator exceptions become `invalid`, never a throw.
+    const accepts = (check: (v: DocumentValue) => boolean, v: DocumentValue) => { try { return check(v) === true; } catch { return false; } };
     const c = capture(snap.initial, limits.state);
-    if (typeof c === 'string' || validateState(c.value) !== true) return { status: 'invalid', reason: 'initial state rejected' };
+    if (typeof c === 'string' || !accepts(validateState, c.value)) return { status: 'invalid', reason: 'initial state rejected' };
     initial = c;
     for (const raw of snap.commands) {
       const cc = capture(raw, limits.command);
-      if (typeof cc === 'string' || validateCommand(cc.value) !== true) return { status: 'invalid', reason: 'command rejected' };
+      if (typeof cc === 'string' || !accepts(validateCommand, cc.value)) return { status: 'invalid', reason: 'command rejected' };
       commands.push(cc);
     }
   }
 
   let busy = false, retired = false, revision = 0;
   let head: Captured;
+  /** Covers the replayed head and every retained entry (including redo), base and seed. */
+  const checksumOf = () => hashText(JSON.stringify([seed, base, cursor, initial.json, head.json, commands.map(c => c.json)]));
 
   /** Apply one captured command at absolute position. Returns the captured next state or a reason. */
   const step = (state: Captured, command: Captured, position: number): Captured | { reason: string; rejected: boolean } => {
@@ -201,21 +206,25 @@ function openTurnLog<S extends DocumentValue, C extends DocumentValue>(
     return state;
   };
 
-  {
-    const restored = replayTo(cursor);
-    if ('reason' in restored) { if (snapshot === FRESH) throw Error(`turns: ${restored.reason}`); return { status: 'diverged', reason: restored.reason }; }
+  if (snapshot === FRESH) head = initial;
+  else {
+    // Restore replays creator code over stored commands: a throw there is reported as divergence.
+    let restored: Captured | { reason: string };
+    try { restored = replayTo(cursor); } catch (e) { return { status: 'diverged', reason: `replay threw: ${reasonOf(e instanceof Error ? e.message : String(e))}` }; }
+    if ('reason' in restored) return { status: 'diverged', reason: restored.reason };
     head = restored;
-    if (expectChecksum !== null && hashText(head.json) !== expectChecksum) return { status: 'diverged', reason: 'replayed state differs from the saved checksum' };
+    if (checksumOf() !== expectChecksum) return { status: 'diverged', reason: 'replayed log differs from the saved checksum' };
   }
 
   const view = (): TurnLogView<S> => Object.freeze({
     rules: rulesId, revision, position: base + cursor, cursor, length: commands.length,
     state: head.value as S, stateJson: head.json, canUndo: cursor > 0, canRedo: cursor < commands.length,
   });
-  const guard = (expected?: number): Blocked | null => {
+  const guard = (mutation: boolean, expected?: unknown): Blocked | null => {
     if (retired) return { status: 'retired' };
     if (busy) return { status: 'busy' };
-    if (expected !== undefined && expected !== revision) return { status: 'stale' };
+    // Every mutation must echo an exact revision; a missing or malformed one is stale, never a bypass.
+    if (mutation && (!Number.isSafeInteger(expected) || expected !== revision)) return { status: 'stale' };
     return null;
   };
   /** Run creator code under the busy guard; disposal during the callback prevents publication. */
@@ -233,17 +242,17 @@ function openTurnLog<S extends DocumentValue, C extends DocumentValue>(
   const log: TurnLog<S, C> = {
     read: view,
     preview(command) {
-      const blocked = guard(); if (blocked) return blocked as { status: 'busy' | 'retired' };
+      const blocked = guard(false); if (blocked) return blocked as { status: 'busy' | 'retired' };
       return guarded((): TurnPreviewResult<S> => {
         const c = admit(command);
         if (typeof c === 'string') return { status: 'invalid', reason: c };
         const next = step(head, c, base + cursor);
         if ('reason' in next) return next.rejected ? { status: 'rejected', reason: next.reason } : { status: 'invalid', reason: next.reason };
-        return { status: 'accepted', state: next.value as S, stateJson: next.json };
+        return { status: 'accepted', state: next.value as S, stateJson: next.json, full: cursor >= limits.maxCommands || base + cursor >= Number.MAX_SAFE_INTEGER };
       });
     },
     submit(expectedRevision, command) {
-      const blocked = guard(expectedRevision); if (blocked) return blocked;
+      const blocked = guard(true, expectedRevision); if (blocked) return blocked;
       // Submitting discards redo entries, so capacity counts only the kept prefix.
       if (cursor >= limits.maxCommands) return { status: 'full' };
       if (base + cursor >= Number.MAX_SAFE_INTEGER) return { status: 'full' };
@@ -259,7 +268,7 @@ function openTurnLog<S extends DocumentValue, C extends DocumentValue>(
       });
     },
     undo(expectedRevision) {
-      const blocked = guard(expectedRevision); if (blocked) return blocked;
+      const blocked = guard(true, expectedRevision); if (blocked) return blocked;
       if (cursor === 0) return { status: 'empty' };
       return guarded((): TurnMoveResult<S> => {
         const prev = replayTo(cursor - 1);
@@ -270,7 +279,7 @@ function openTurnLog<S extends DocumentValue, C extends DocumentValue>(
       });
     },
     redo(expectedRevision) {
-      const blocked = guard(expectedRevision); if (blocked) return blocked;
+      const blocked = guard(true, expectedRevision); if (blocked) return blocked;
       if (cursor >= commands.length) return { status: 'empty' };
       return guarded((): TurnMoveResult<S> => {
         const next = step(head, commands[cursor], base + cursor);
@@ -281,7 +290,7 @@ function openTurnLog<S extends DocumentValue, C extends DocumentValue>(
       });
     },
     replay(k) {
-      const blocked = guard(); if (blocked) return blocked as { status: 'busy' | 'retired' };
+      const blocked = guard(false); if (blocked) return blocked as { status: 'busy' | 'retired' };
       if (!Number.isSafeInteger(k) || k < 0 || k > commands.length) return { status: 'out-of-range' };
       return guarded(() => {
         const s = replayTo(k);
@@ -290,13 +299,13 @@ function openTurnLog<S extends DocumentValue, C extends DocumentValue>(
       });
     },
     checkpoint(expectedRevision) {
-      const blocked = guard(expectedRevision); if (blocked) return blocked;
+      const blocked = guard(true, expectedRevision); if (blocked) return blocked;
       bump(); base += cursor; initial = head; commands = []; cursor = 0;
       return { status: 'applied', view: view() };
     },
     snapshot: () => structuredClone({
       format: 'turns/1' as const, rules: rulesId, seed, base, initial: initial.value,
-      commands: commands.map(c => c.value), cursor, checksum: hashText(head.json),
+      commands: commands.map(c => c.value), cursor, checksum: checksumOf(),
     }),
     commands: () => Object.freeze(commands.map(c => c.value as C)),
     dispose() { retired = true; },

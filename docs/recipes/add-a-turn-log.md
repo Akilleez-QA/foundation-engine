@@ -45,7 +45,7 @@ const log = createTurnLog({
             command: { maxBytes: 512, maxNodes: 16, maxDepth: 3 } },
 });
 const view = log.read();
-const preview = log.preview({ type: 'scramble' });   // the exact outcome, nothing changes
+const preview = log.preview({ type: 'scramble' });   // the exact outcome, nothing changes; preview.full warns at capacity
 const result = log.submit(view.revision, { type: 'scramble' });
 log.undo(log.read().revision); log.redo(log.read().revision);
 log.replay(0);                                       // state at any retained step, for a replay view
@@ -53,7 +53,7 @@ log.dispose();                                       // when the match ends
 ```
 
 Handle every status: `rejected` (rules said no), `invalid` (shape or limits), `stale`
-(an older `revision`), `full` (capacity: `checkpoint` folds history to continue),
+(an older, missing or malformed `revision`), `full` (capacity: `checkpoint` folds history to continue),
 `busy`, `retired`. Systems turn input actions into commands; render from `read().state`
 only when `revision` changes.
 
@@ -66,7 +66,9 @@ export const match = defineSaveSection({ id: 'game.match', initial: { json: '' }
 
 ctx.save(match).update(d => { d.json = JSON.stringify(log.snapshot()); });
 const saved = ctx.save(match).get().json;
-const restored = saved ? restoreTurnLog({ rules, limits }, JSON.parse(saved)) : null;
+let stored: unknown = null;
+try { stored = saved ? JSON.parse(saved) : null; } catch { stored = undefined; } // corrupt text: treat as invalid
+const restored = stored === null ? null : restoreTurnLog({ rules, limits }, stored);
 // 'invalid' | 'foreign' | 'diverged': keep the saved value, tell the player, start a new run explicitly.
 ```
 
@@ -81,10 +83,12 @@ rules under the network kit's durable authority:
 ```ts
 import { createDurableAuthority } from '@kits/network';
 import { turnAuthorityPolicies } from '@kits/turns';
-const owner = createDurableAuthority({ lineage, schema: rules.id, limits, storage, authorize,
-  ...turnAuthorityPolicies(rules, { seed: serverSecretSeed }) });
+const owner = createDurableAuthority({ schema: rules.id, limits, storage, authorize,
+  ...turnAuthorityPolicies(rules, { seed: freshSecretSeedForThisMatch, lineage: matchId }) });
 ```
 
+The policies carry `lineage` into the authority and mix it into every random stream, so two
+matches never share draws even with one seed; still choose a fresh secret seed per match.
 Keep the seed on the server, and publish what each player may see through scoped views.
 
 ## 5. Test it

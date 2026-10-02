@@ -22,8 +22,9 @@ function memory(raw: string): AuthorityStorage & { raw: string } {
 }
 
 test('the same rules run under the durable authority: rejections are consumed, recovery reproduces state', async () => {
-  const rules = cardRules(), policies = turnAuthorityPolicies(rules, { seed: 7 });
-  const config = { lineage: 'match-1', schema: rules.id, limits, ...policies };
+  const rules = cardRules(), policies = turnAuthorityPolicies(rules, { seed: 7, lineage: 'match-1' });
+  const config = { schema: rules.id, limits, ...policies };
+  assert.equal(config.lineage, 'match-1');
   const storage = memory(createAuthorityGenesis({ ...config, stateJson: JSON.stringify(table) }));
   const owner = createDurableAuthority({ ...config, storage, authorize: () => true });
   assert.equal((await owner.recover()).status, 'recovered');
@@ -56,9 +57,27 @@ test('the same rules run under the durable authority: rejections are consumed, r
   owner.dispose(); again.dispose(); other.dispose();
 });
 
-test('authority policies reject an invalid seed and malformed results', () => {
-  assert.throws(() => turnAuthorityPolicies(cardRules(), { seed: -1 }));
-  const p = turnAuthorityPolicies(cardRules(), { seed: 1 });
+test('matches sharing one server seed draw independently because the lineage is mixed in', async () => {
+  const rules = cardRules();
+  const shuffle = async (lineage: string) => {
+    const config = { schema: rules.id, limits, ...turnAuthorityPolicies(rules, { seed: 7, lineage }) };
+    const owner = createDurableAuthority({ ...config, storage: memory(createAuthorityGenesis({ ...config, stateJson: JSON.stringify(table) })), authorize: () => true });
+    await owner.recover();
+    assert.equal((await owner.submit({ stream: 'p1', sequence: 1, inputJson: JSON.stringify({ type: 'shuffle' }) })).status, 'committed');
+    const deck = (owner.read().snapshot!.envelope.state as typeof table).deck.join();
+    owner.dispose();
+    return deck;
+  };
+  const a = await shuffle('match-a'), again = await shuffle('match-a'), b = await shuffle('match-b');
+  assert.equal(a, again);
+  assert.notEqual(a, b);
+});
+
+test('authority policies reject an invalid seed or lineage and malformed results', () => {
+  assert.throws(() => turnAuthorityPolicies(cardRules(), { seed: -1, lineage: 'm' }));
+  assert.throws(() => turnAuthorityPolicies(cardRules(), { seed: 1, lineage: '' }));
+  assert.throws(() => turnAuthorityPolicies(cardRules(), { seed: 1 } as unknown as { seed: number; lineage: string }));
+  const p = turnAuthorityPolicies(cardRules(), { seed: 1, lineage: 'm' });
   assert.equal(p.validateResult({ accepted: true }), true);
   assert.equal(p.validateResult({ accepted: true, extra: 1 }), false);
   assert.equal(p.validateResult({ accepted: false }), false);

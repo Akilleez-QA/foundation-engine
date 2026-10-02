@@ -38,6 +38,7 @@ test('preview predicts exactly what submit applies and changes nothing (telegrap
   assert.equal(applied.status, 'applied');
   assert.equal(applied.status === 'applied' && applied.view.stateJson, preview.status === 'accepted' && preview.stateJson);
   assert.deepEqual(log.preview({ type: 'play', card: 99 }), { status: 'rejected', reason: 'card not in hand' });
+  assert.equal(preview.status === 'accepted' && preview.full, false);
 });
 
 test('undo and redo restore exact states, including random draws; a new command discards redo', () => {
@@ -70,6 +71,13 @@ test('a domain rejection records nothing; stale revisions are refused', () => {
   assert.equal(log.submit(view.revision, { type: 'draw' }).status, 'applied');
   assert.equal(log.submit(view.revision, { type: 'draw' }).status, 'stale');
   assert.equal(log.undo(view.revision).status, 'stale');
+  // A missing or malformed revision is stale, never a bypass of the check.
+  for (const bad of [undefined, null, '1', 1.5, NaN] as unknown as number[]) {
+    assert.equal(log.submit(bad, { type: 'draw' }).status, 'stale');
+    assert.equal(log.undo(bad).status, 'stale');
+    assert.equal(log.redo(bad).status, 'stale');
+    assert.equal(log.checkpoint(bad).status, 'stale');
+  }
   assert.equal(log.read().length, 1);
 });
 
@@ -105,6 +113,16 @@ test('restore refuses foreign, malformed, tampered and rules-drifted snapshots w
   // Same rules id, changed behaviour: detected rather than silently loading another game.
   const drifted = play([{ type: 'draw' }, { type: 'play', card: 1 }]).snapshot();
   assert.equal(restoreTurnLog({ rules: cardRules('test-cards@1', 5), limits }, drifted).status, 'diverged');
+  // Edited redo entries are covered by the checksum, not only the head state.
+  const withRedo = play(moves); withRedo.undo(withRedo.read().revision);
+  const redoSnap = withRedo.snapshot();
+  assert.equal(restoreTurnLog({ rules: cardRules(), limits }, redoSnap).status, 'restored');
+  assert.equal(restoreTurnLog({ rules: cardRules(), limits }, { ...redoSnap, commands: [...redoSnap.commands.slice(0, 2), { type: 'shuffle' }] }).status, 'diverged');
+  // Throwing creator validators or reducers over stored data are reported, never thrown.
+  const boom = () => { throw Error('boom'); };
+  assert.equal(restoreTurnLog({ rules: { ...cardRules(), validateState: boom as never }, limits }, snap).status, 'invalid');
+  assert.equal(restoreTurnLog({ rules: { ...cardRules(), validateCommand: boom as never }, limits }, snap).status, 'invalid');
+  assert.equal(restoreTurnLog({ rules: { ...cardRules(), reduce: boom }, limits }, snap).status, 'diverged');
   // Commands the changed rules now reject also diverge.
   assert.equal(restoreTurnLog({ rules: { ...cardRules(), reduce: () => ({ accept: false, reason: 'no' }) }, limits }, drifted).status, 'diverged');
 });
@@ -113,6 +131,8 @@ test('bounded history: full log refuses, checkpoint folds history and keeps abso
   const log = open();
   for (let i = 0; i < limits.maxCommands; i++) assert.equal(log.submit(log.read().revision, { type: 'shuffle' }).status, 'applied');
   assert.equal(log.submit(log.read().revision, { type: 'shuffle' }).status, 'full');
+  const atCapacity = log.preview({ type: 'shuffle' });
+  assert.equal(atCapacity.status === 'accepted' && atCapacity.full, true, 'preview reports that submit would be full');
   const full = log.read();
   // Undo frees capacity because submit discards redo entries.
   log.undo(full.revision);
