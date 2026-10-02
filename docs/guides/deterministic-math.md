@@ -8,7 +8,7 @@ re-simulated in Node (SIM-01 replay, SEC-01 verified runs), and rollback peers
 (RB-01) on different browsers stay in agreement. Nothing uses it unless a creator
 opts in. Rendering, cameras, audio and other presentation code keep using `Math`.
 
-State: implemented on branch `feat/deterministic-math`, candidate (public PR; see the
+State: implemented on branch `feat/deterministic-math`, candidate (public PR #60; see the
 [acceptance ledger](upgrade-acceptance-ledger.md#deterministic-scalar-maths-w1-2--candidate)),
 not integrated. Backlog item W1-2.
 
