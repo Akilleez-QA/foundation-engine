@@ -3,8 +3,9 @@
 Three full runs of `npm run probe:network -- --out <file>` with the default
 configuration (seed 7), recorded at probe commit `0744509` on branch
 `feat/nw07-overload-probe`, before it was rebased for PR #27. The rebased commit `8bca1bc`
-has byte-identical `tools/` and `src/kits/network/` trees; only main's unrelated changes and one
-`package.json` script line from main differ. Later review fixes in PR #27 changed the probe:
+has byte-identical `tools/network-probe/`, `tools/network-workbench/`,
+`tools/replication-workbench/` and `src/kits/network/` trees. Only main's unrelated changes
+(including other tools) and `package.json` script lines from main differ. Later review fixes in PR #27 changed the probe:
 the storm's retries now wait for the restarted host's credentials, and observation
 starts at host readiness. Invariants were added (connection bound, retry budget,
 per-peer credit, storm outcomes), socket closure is measured, and the ready timeout is
