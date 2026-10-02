@@ -504,6 +504,7 @@ driven by new `beforeStep`/`beforeFrameLane` hooks on `createSystemRunner`, now
 keeps a press pending until the first fixed tick, which alone sees it; frame
 systems keep their per-frame view. Retention is bounded by the visit and by the
 existing cancellation paths (pointer/input cancel, overlay, hidden tab, lost
-ownership, a non-simulating frame). Evidence: focused runtime and runner tests;
+ownership, a non-simulating frame, a held SIM-01 replay tap). The latch runs before
+the replay tap's tick sentinel, so a recorded press lands in exactly one tick. Evidence: focused runtime and runner tests;
 browser suites and gates are recorded on the PR. Physical high-refresh devices are
 unverified. Candidate, not integrated.

@@ -11,29 +11,31 @@ import * as latch from './press-latch';
 const source=readFileSync(new URL('./runtime.ts',import.meta.url),'utf8');
 const slice=(from:string,to:string)=>{const a=source.indexOf(from),b=source.indexOf(to,a);assert.ok(a>=0&&b>a,`runtime.ts slice ${from.trim()}`);return source.slice(a,b);};
 const wiring=slice('      const pressed = ','      input.onCancel(');
-const runnerLine=slice('      const runner = createSystemRunner(','\n');
-const inputLine=slice('        input: sceneInput(','\n');
+const runnerLine=slice('      const fixedSystems = ','\n      const live = ');
+const liveInputLine=slice('      const liveInput = sceneInput(','\n');
+const inputLine=slice('        input: tap ? tap.input : liveInput,','\n');
 const update=slice('        update(f: FrameInfo) {','        render() {');
 const STEP=1/60;
 type Seen={tick:number;frame:number;lane:'fixed'|'frame';jump:boolean;tap:boolean};
-function fixture(){
+function fixture(tapRunning?:()=>boolean){
  const handlers=new Map<string,(e:{phase:string})=>boolean>(),seen:Seen[]=[];let gestureOptions:any,tick=0,frameNo=0;
  const rawPointer={x:0,y:0,down:false,pressed:false};
  const bindScenePointer=(_canvas:unknown,options:any)=>{gestureOptions=options;return {pointer:rawPointer,sync(){},cancel(){options.canceled();},dispose(){}};};
  const read=(lane:'fixed'|'frame')=>(ctx:any)=>{const jump=ctx.input.pressed('jump'),tap=ctx.input.pointer.pressed;if(jump||tap)seen.push({tick,frame:frameNo,lane,jump,tap});};
  const systems=[{id:'fixed-reader',run:(ctx:any)=>{tick++;read('fixed')(ctx);}},{id:'frame-reader',phase:'frame' as const,run:read('frame')}];
- const run=ts.transpile(`let programFailed=false,simulating=true,frame=0,t=0,calm=false;const timing=undefined,body={systems},world={clearEvents(){}},scene={id:'test'};
+ const run=ts.transpile(`let programFailed=false,simulating=true,frame=0,t=0,calm=false;const FIXED_STEP=1/60,tap=tapRunning?{running:tapRunning,beforeTick(){},afterTick(){},get input(){return liveInput;}}:null;const timing=undefined,body={systems},world={clearEvents(){}},scene={id:'test'};
 ${wiring}
 ${runnerLine}
+${liveInputLine}
 const ctx={
 ${inputLine}
 };
 return {setSimulating:v=>{simulating=v;},${update}};`,{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None});
  const actx={invalidate(){},runId:'run-test',signal:new AbortController().signal,own(){},coverage:()=>'top',leaving:()=>false};
  const sceneActionHints=()=>()=>null;
- const api=new Function('s','o','actx','surface','view','bindScenePointer','actionOf','viewOwnsInput','createSystemRunner','sceneInput','createPressLatch','sceneActionHints','systems','sync','failPrograms','ProgramLinkError','FrameReadinessError',run)(
+ const api=new Function('s','o','actx','surface','view','bindScenePointer','actionOf','viewOwnsInput','createSystemRunner','sceneInput','createPressLatch','sceneActionHints','systems','tapRunning','sync','failPrograms','ProgramLinkError','FrameReadinessError',run)(
   {input:{onAction:(action:string,fn:any)=>{handlers.set(action,fn);},cancel(){},held:()=>false,describeAction:()=>null},log:{error(){}}},{inputs:[{id:'jump'},{id:'tap',tap:true}]},actx,{canvas:{}},{closest:()=>null},
-  bindScenePointer,actionOf,()=>true,createSystemRunner,sceneInput,(latch as any).createPressLatch,sceneActionHints,systems,()=>{},()=>{},class extends Error{},class extends Error{});
+  bindScenePointer,actionOf,()=>true,createSystemRunner,sceneInput,(latch as any).createPressLatch,sceneActionHints,systems,tapRunning,()=>{},()=>{},class extends Error{},class extends Error{});
  return {
   seen,
   press:()=>handlers.get(actionOf('jump'))!({phase:'press'}),
@@ -99,4 +101,13 @@ test('ctx.input.pointer is read-only at compile time, matching the runtime gette
  // @ts-expect-error A system cannot clear the pointer press; the runtime view has getters only.
  const write=()=>{state.pointer.pressed=false;};
  assert.throws(write,TypeError);
+});
+
+test('a held replay tap releases live presses, so none surfaces at replay tick 0 (SIM-01)', () => {
+ let running=false;const f=fixture(()=>running);
+ f.press();f.tap();f.frame(STEP);
+ assert.equal(f.ticks,0,'the held tap runs no tick');
+ running=true;f.frame(STEP);f.frame(STEP);
+ assert.equal(f.ticks,2);
+ assert.deepEqual(f.seen.filter(s=>s.lane==='fixed'),[]);
 });
