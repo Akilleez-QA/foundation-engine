@@ -204,12 +204,12 @@ test('GEN-02 a throwing evictable callback fails only its own write; the queue k
 });
 
 test('GEN-02 eviction validates victims in the transaction: unreadable ones are quarantined, newer ones kept', async () => {
-  for (const room of [1, 0]) {
+  for (const free of [1, 0]) {
     const { fake, store } = await idbStore('world', { schema: 1, limits: { maxRecords: 1, maxQuarantine: 1 }, evictable: () => true });
     await store.write([{ key: 'a', revision: 1, data: bytes(1, 2, 3) }]);
     record(fake, 'a').data[0] ^= 0xff;
     assert.deepEqual(await store.read('a'), { status: 'quarantined' });
-    if (room === 0) {
+    if (free === 0) {
       // the single quarantine row is already taken
       const db = fake.controls.databases.get(CHUNK_DB_PREFIX + 'world')!;
       db.get('quarantine')!.set(99, { key: 'earlier', reason: 'checksum', value: null });
