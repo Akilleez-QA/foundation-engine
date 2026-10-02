@@ -436,3 +436,13 @@ may return `expired` for an optional deadline on an injected clock, only before 
 storage call starts. In-flight writes keep committed/rejected/unknown semantics and
 `expired` consumes no sequence. Both are off by default. Evidence is 6 intake and 9
 authority focused tests; load, browser composition and devices remain unverified.
+
+## Reconnect/retry pacing — NW-04 implemented, candidate
+
+`createRetrySchedule` (network kit) is an optional, pure pacing helper: full-jitter
+exponential backoff per episode and a token-bucket budget across episodes, driven
+by caller time and an injected random stream. The network workbench client wires it
+behind an opt-in checkbox. Implemented as a candidate (PR #14, `feat/nw04-reconnect-schedule`),
+not integrated; unit tests and the loopback browser workflow are its only evidence.
+See the [retry pacing guide](network-retry.md) and the
+[ledger](upgrade-acceptance-ledger.md).

@@ -73,6 +73,20 @@ and releases its queue. Held test authentication callbacks cannot activate a clo
 or replacement connection. Revocation also rejects future use of that principal's
 fixture credential for this host lifetime.
 
+## Optional paced reconnect (NW-04)
+
+The browser client has a "Reconnect automatically" checkbox, off by default. When
+checked, an unexpected close (including an injected send refusal or a rejected
+authentication) asks one per-visit [retry schedule](../../docs/guides/network-retry.md)
+for a jittered wait: base 250 ms, cap 4,000 ms, five attempts per episode, and a
+budget of eight retries refilling one per 15 s. When due, it opens a fresh transport
+and authenticates again; on `authenticated` the episode ends. It never resends a
+command: pending correlation IDs are cleared on loss, and a dispatched command whose
+reply was lost stays applied once. Protocol errors, Disconnect, unticking the box,
+hidden page, page exit and scene exit stop reconnecting and drop the retained
+credential. Time is the scene's frame time; jitter uses a dedicated stream that
+`?seed=` replays. These are example limits, not recommendations for any game.
+
 ## Trusted harness controls and evidence
 
 `startNetworkWorkbench({port:0,autoDriver:true,driverMs:10})` returns `url`,

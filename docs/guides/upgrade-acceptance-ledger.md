@@ -68,6 +68,7 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | NW-02 | Interest management and bounded snapshots | Integrated on main by merge `ea48539`, preserving input-resize integration `894fc52`; work tracked in PR #122 in the private development history. Clean rebased browser passed at `508edd9`; final `47a7e6d` passed all seven gates (1,965 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive, four advisory heap warnings). Combined main 1,965 tests/build passed. Four local load cases passed (worst publisher p95 0.321 ms). Historical failure/retry and earlier candidate revisions remain below. Git ancestry proves integration; GitHub PR state was still OPEN immediately after push. Creator scope is explicit; no general spatial policy or delta replication claim. |
 | NW-03 | Prediction/reconciliation, reconnect and server persistence | NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. Clean native two-client acceptance passed at `8317c69` (seven observations); all 53 focused tests and 17 actual Node 22.13 storage/host checks passed. Historical component repairs and limits are recorded below. DV-01 remains open; no physical-device, public-release or unrestricted multiplayer claim. |
 | NW-06 | Maximum queued age and pre-invocation submit deadlines (study N3) | Implemented, candidate (PR #12); not integrated. Optional `maxQueuedAgeMs` sheds aged intake commands before `authorize`/`dispatch` (counted as `stale`, one pump attempt each); optional injected `clock` plus `submit(command, {deadlineMs})` returns `expired` only before storage invocation, consuming no sequence. In-flight writes keep committed/rejected/unknown semantics. Defaults unchanged. 6 intake and 9 authority focused tests; no load, WAN, browser-composition or device acceptance claimed. See [network kit](../../src/kits/network/README.md) and [durable authority](durable-authority.md). |
+| NW-04 | Reconnect/retry pacing: full-jitter backoff and retry budget | Implemented, candidate (PR #14, `feat/nw04-reconnect-schedule`); not integrated. Optional pure `createRetrySchedule` in the network kit, with the network workbench client as an opt-in consumer. Evidence and remaining limits are in the NW-04 section below. No WAN, reconnect-storm-against-a-real-host or physical-device claim. |
 | TR-01 | Regional terrain worker and ordinary-surface integration | Integrated in PR #109 at 99e6255. Canonical regional Surface and halo patches, bounded WorkerHost generation/patch adapters, independent geometric oracles and finite coherent render/query consumer passed at 891eb7; all seven template gates passed (1,648 tests, 129 performance checks, zero breaches/regressions, four advisory heap warnings). Combined main tests/build passed. Physical-device performance and unbounded/global streaming are not established. |
 | DV-01 | Supported-device experience and sustained performance evidence | In progress, not integrated: ported to the public `feat/device-acceptance` PR. [Stock matrix](../kits/stock-device-acceptance-matrix.md) covers all seven declarations. The [first receipt](../verification/stock-device-20261001/README.md) records 16 passing emulated target/tap checks and a compact lesson content overlap; lesson visit cleanup and a measured learn layout seam repair it, with a fake-DOM regression and emulated separation checks across board, sim and quiz at four profiles ([layout receipt](../verification/stock-device-20261002/README.md)). Full consumer workflows, in-panel touch scrolling, 200% text, named minimum devices and sustained physical evidence remain open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. No physical-device or accessibility certification. |
 
@@ -260,3 +261,18 @@ caller-owned. See the [contract](../../src/platform/assets/dependency-lease.md) 
 Native task oracle, all seven template gates and the CI browser suites passed (see the
 evidence README and public PR #11);
 integration, frame-time and downstream acceptance remain pending; no resource budget changes.
+
+## Reconnect/retry pacing (NW-04) — implemented, candidate
+
+Status: implemented, candidate on branch `feat/nw04-reconnect-schedule` (PR #14); not integrated. See the [retry pacing guide](network-retry.md).
+
+- Runtime-enforced: limit validation (positive safe integers, `baseMs <= capMs`, exact
+  keys), monotonic time, at most `maxAttempts` per episode, budget of
+  `capacity + floor(T / refillEveryMs)` retries in any window `T`, random-port
+  validation and terminal disposal.
+- Checked: 11 focused unit tests, including a seeded 1,000-client restart
+  simulation; the network workbench native browser workflow covers paced recovery,
+  bounded exhaustion and exit during an episode. Exact-head gate results are in the PR.
+- Not established: WAN loss, a measured reconnect storm against a real host,
+  physical devices and suitability of the example limits for any game. The browser
+  transport still never retries by itself.

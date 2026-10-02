@@ -40,6 +40,11 @@ select:focus-visible {
   display: grid;
   gap: 4px;
 }
+#controls label.inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 #controls input,
 #controls select,
 button {
