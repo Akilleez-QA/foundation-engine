@@ -16,7 +16,7 @@ This README stays with the template; your copy lives in `game/` and `GAME.md`.
 | `game/garden.ts`, `game/shed.ts` | the two scenes: ground, `Walls`, `Solid` obstacles, `Interactable` things and doors |
 | `game/world.ts` | shared parts: the player, the list of things to find, the HUD, and every scene's systems |
 | `game/garden.test.ts` | the criteria's tests |
-| `playtest/door.json` | a scripted browser playtest through the door |
+| `game/playtest/door.json` | a scripted browser playtest through the door |
 
 ## Controls
 

@@ -34,7 +34,7 @@ workflow rules do not prescribe the design or tooling of every independent game.
 
 Most people clone this repository to make a game, not to change the engine. Then:
 
-- **Work in the checkout you cloned, on a branch of your own.** `npm run new-game` writes `game/`, `GAME.md` and the template's `playtest/*.json` into the current checkout, untracked. Right after it, `git switch -c <game-id>` and commit `game/`, `GAME.md` and those playtest scripts there; commit each step that passes `npm run check`.
+- **Work in the checkout you cloned, on a branch of your own.** `npm run new-game` writes `game/` (its scripted playtests in `game/playtest/`) and `GAME.md` into the current checkout, untracked. Right after it, `git switch -c <game-id>` and commit `game/` and `GAME.md` there (`git add game GAME.md`); commit each step that passes `npm run check`.
 - **Do not start game work in a new worktree from `origin/main`.** It has no `game/`, so every command silently builds `templates/blank/game`. If you want worktrees for your game, branch them from your game branch.
 - **The loop, the brief, the short rules, the teaching rules and device acceptance all apply.** `npm run gate` is recommended before sharing a build; it is not a merge requirement for a game branch.
 - **Worktree per task, serial integration into `main` and `npm run deploy:production` are for contributions to this engine repository.** A game branch is not merged into this repository's `main`, and the production guard (which requires a clean `main` equal to `origin/main` and a provider hook) is not how a game is shared. Build with `npm run build` and upload `dist/` to any static host ([share your build](docs/recipes/share-your-build.md)).

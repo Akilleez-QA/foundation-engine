@@ -29,7 +29,7 @@ Run it in the checkout the author is working in (never a fresh worktree from `or
 
 ```
 git switch -c <game-id>
-git add game GAME.md playtest
+git add game GAME.md
 git commit -m "Start <Title> from the <genre> template"
 ```
 

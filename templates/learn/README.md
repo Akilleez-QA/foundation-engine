@@ -17,7 +17,7 @@ This README stays with the template; your copy lives in `game/` and `GAME.md`. R
 | `game/strings.en.json` | every word of the lesson |
 | `game/learn-mode.ts` | the `learn` mode (kid-safe policy) |
 | `game/day-night.test.ts` | the criteria's tests (pacing, coverage, kind feedback) |
-| `playtest/lesson.json` | the whole lesson played with keys in a browser |
+| `game/playtest/lesson.json` | the whole lesson played with keys in a browser |
 
 ## Controls
 

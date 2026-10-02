@@ -42,13 +42,13 @@ The id becomes the save namespace, so choose it once. The title goes into `game/
 | `expedition` | routes, objectives, inventory: many kits together | [expedition](../../templates/expedition/README.md) |
 | `mechanics` | riding, equipment, a loaded model: many kits together | [mechanics](../../templates/mechanics/README.md) |
 
-`--id` is your game's save namespace; choose it once. The command writes `game/`, `GAME.md` and the template's `playtest/*.json` scripts into this checkout. Every command now builds your `game/` (without one, they build `templates/blank/game`).
+`--id` is your game's save namespace; choose it once. The command writes `game/` (with the template's scripted playtests in `game/playtest/`) and `GAME.md` into this checkout. Every command now builds your `game/` (without one, they build `templates/blank/game`).
 
 Commit them on a branch of your own straight away:
 
 ```
 git switch -c my-game
-git add game GAME.md playtest
+git add game GAME.md
 git commit -m "Start my game from the arcade template"
 ```
 
@@ -88,7 +88,7 @@ Screenshots and `probe.json` land in `playtest/latest/`: open the pictures, and 
 Commit when it looks right:
 
 ```
-git add game GAME.md playtest/*.json
+git add game GAME.md
 git commit -m "Faster blocks"
 ```
 

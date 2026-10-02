@@ -18,7 +18,7 @@ This README stays with the template; your copy lives in `game/` and `GAME.md`.
 | `game/steer.ts`, `game/restart.ts` | the two actions |
 | `game/best.ts` | the saved best score (a save section; never rename its id) |
 | `game/play.test.ts` | criteria S1, S2 and S4, and a same-seed replay check |
-| `playtest/restart.json` | a scripted browser playtest |
+| `game/playtest/restart.json` | a scripted browser playtest |
 
 ## Controls
 

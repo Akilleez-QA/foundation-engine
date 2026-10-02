@@ -58,7 +58,7 @@ Requires Git, Node.js 22.18 or newer (CI uses Node.js 22; `.nvmrc` and `.node-ve
 npm ci
 npx --no-install playwright-core install chromium     # the muted test browser, once
 npm run new-game -- --template arcade --id my-game --title "My game"
-git switch -c my-game && git add game GAME.md playtest && git commit -m "Start my game"
+git switch -c my-game && git add game GAME.md && git commit -m "Start my game"
 npm run play          # http://127.0.0.1:5173/ with your game; edit game/ and it reloads
 npm run check         # types, lints, the brief, the affected tests
 npm run play:snap     # screenshots and a probe in playtest/latest/
