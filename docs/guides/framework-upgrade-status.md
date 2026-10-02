@@ -437,7 +437,7 @@ storage call starts. In-flight writes keep committed/rejected/unknown semantics 
 `expired` consumes no sequence. Both are off by default. Evidence is 6 intake and 9
 authority focused tests; load, browser composition and devices remain unverified.
 
-Follow-up (PR pending on `fix/nw06-stale-budget`; candidate, not integrated): the
+Follow-up (PR #33; candidate, not integrated): the
 NW-07 overload probe showed that charging each age shed to the pump budget collapsed
 goodput once queued wait exceeded the age. Shedding is now uncharged and capped by an
 optional `maxStaleDropsPerPump`. At a 300 ms age, saturated final/peak goodput was
