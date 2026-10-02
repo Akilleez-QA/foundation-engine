@@ -4,7 +4,7 @@
 (exported from the network kit) let a host announce a planned shutdown or restart
 with a bounded notice, and optionally rotate long-lived connections gradually
 instead of all at once. Ledger ID NW-08 (proposal N8 of the scalability study).
-Status: implemented, candidate (PR #21); not integrated.
+Status: integrated in v0.2.0 (PR #21; batch PR #42).
 
 Both are optional, replaceable, pure state machines. They own no timer, socket,
 clock, random source, credential or wire format, and nothing in the engine

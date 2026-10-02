@@ -2,7 +2,7 @@
 // scripts/new-game.mjs (`npm run new-game -- --template <name> [--id <game-id>] [--title "<Title>"] [--force]`):
 // start a game from a template. Copies templates/<name>/game to ./game (its scripted playtests come with it, in
 // game/playtest/) and its GAME.md to ./GAME.md, then renames the game (its id is the save namespace, so choose it
-// once). Without --template it lists templates.
+// once). --title also becomes GAME.md's first heading. Without --template it lists templates.
 //
 // --force replaces an existing game: it prints what will be replaced, then removes ./game and ./GAME.md before copying,
 // so no file of the old game (a scene, a test, an input) is left mixed into the new one. The engine's root playtest/
@@ -21,8 +21,16 @@ export function replaced(root) {
   return out;
 }
 
+/** GAME.md with its first `# ` heading replaced by `title` (one line; a missing heading is added at the top). */
+export function withHeading(md, title) {
+  const heading = `# ${title.replace(/\s+/g, ' ').trim()}`;
+  return /^# .*$/m.test(md) ? md.replace(/^# .*$/m, () => heading) : `${heading}\n\n${md}`;
+}
+
 /** Starts a game in `root` from template `name`. Throws with a message for the author on a bad request. */
-export function startGame({root = ROOT, name, id = 'my-game', title = 'My game', force = false, log = console.log}) {
+export function startGame({root = ROOT, name, id = 'my-game', title, force = false, log = console.log}) {
+  const named = title !== undefined;
+  title ??= 'My game';
   const templates = templatesIn(root);
   if (!templates.includes(name)) throw Error(`No template '${name}'. Templates: ${templates.join(', ')}`);
   if (!/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(id)) throw Error('--id must be lowercase kebab-case (it becomes the save namespace)');
@@ -35,6 +43,7 @@ export function startGame({root = ROOT, name, id = 'my-game', title = 'My game',
   }
   cpSync(join(root, 'templates', name, 'game'), join(root, 'game'), {recursive: true});
   cpSync(join(root, 'templates', name, 'GAME.md'), join(root, 'GAME.md'));
+  if (named) { const md = join(root, 'GAME.md'); writeFileSync(md, withHeading(readFileSync(md, 'utf8'), title)); }
   const gameTs = join(root, 'game', 'game.ts');
   writeFileSync(gameTs, readFileSync(gameTs, 'utf8').replace(/id: '[^']*'/, `id: '${id}'`).replace(/title: '[^']*'/, `title: '${title.replace(/'/g, "\\'")}'`));
   const scripts = existsSync(join(root, 'game', 'playtest')) ? readdirSync(join(root, 'game', 'playtest')).filter(f => f.endsWith('.json')) : [];

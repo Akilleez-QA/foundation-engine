@@ -16,7 +16,7 @@ Say what you want to make ("a game where you guide a paper boat down a stream").
 
 ## Your game lives on your branch
 
-When you clone this repository to make a game, `npm run new-game` writes `game/`, `GAME.md` and the template's playtest scripts into the folder you cloned. Ask the agent to commit them on a branch of your own (`git switch -c my-game`) and to keep working there, committing each step that passes `npm run check`. AGENTS.md's worktree, gate-before-merge and production rules are for changes to the engine repository itself: a fresh worktree from `origin/main` has no `game/` folder and would quietly build the blank template, and `npm run deploy:production` releases this repository's `main`, not your game. To share your game, the agent runs `npm run build` and you upload `dist/` to a static host ([share your build](../recipes/share-your-build.md)).
+When you clone this repository to make a game, `npm run new-game` writes `game/` (with its playtest scripts in `game/playtest/`) and `GAME.md` into the folder you cloned. Ask the agent to commit them on a branch of your own (`git switch -c my-game`) and to keep working there, committing each step that passes `npm run check`. AGENTS.md's worktree, gate-before-merge and production rules are for changes to the engine repository itself: a fresh worktree from `origin/main` has no `game/` folder and would quietly build the blank template, and `npm run deploy:production` releases this repository's `main`, not your game. To share your game, the agent runs `npm run build` and you upload `dist/` to a static host ([share your build](../recipes/share-your-build.md)).
 
 ## The round
 

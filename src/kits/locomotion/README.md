@@ -29,7 +29,7 @@ Recipe: [add and tune a jump](../../../docs/recipes/tune-a-jump.md).
 `createJumpFeel(config)` is a pure vertical controller for one actor. The creator
 chooses every value; the defaults are a starting point, not a prescribed feel.
 `jumpSystem(options)` is an optional fixed-step adapter that drives it from a game
-action and a creator-supplied support query. Status: implemented, candidate.
+action and a creator-supplied support query. Status: integrated in v0.2.0 (MV-01, PR #34).
 
 **Inputs.** Per fixed tick: `pressed` (true on exactly one tick per physical press),
 `held`, and `grounded` (the caller's support result for the previous motion).

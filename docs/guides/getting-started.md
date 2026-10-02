@@ -30,6 +30,8 @@ On Linux, add `--with-deps` if Chromium complains about missing libraries (it as
 npm run new-game -- --template arcade --id my-game --title "My game"
 ```
 
+The id becomes the save namespace, so choose it once. The title goes into `game/game.ts` and becomes the first heading of `GAME.md`.
+
 | Template | Start here if you want | Its README |
 |---|---|---|
 | `blank` | anything else: one scene, one cube, one action | [blank](../../templates/blank/README.md) |
@@ -40,13 +42,13 @@ npm run new-game -- --template arcade --id my-game --title "My game"
 | `expedition` | routes, objectives, inventory: many kits together | [expedition](../../templates/expedition/README.md) |
 | `mechanics` | riding, equipment, a loaded model: many kits together | [mechanics](../../templates/mechanics/README.md) |
 
-`--id` is your game's save namespace; choose it once. The command writes `game/`, `GAME.md` and the template's `playtest/*.json` scripts into this checkout. Every command now builds your `game/` (without one, they build `templates/blank/game`).
+`--id` is your game's save namespace; choose it once. The command writes `game/` (with the template's scripted playtests in `game/playtest/`) and `GAME.md` into this checkout. Every command now builds your `game/` (without one, they build `templates/blank/game`).
 
 Commit them on a branch of your own straight away:
 
 ```
 git switch -c my-game
-git add game GAME.md playtest
+git add game GAME.md
 git commit -m "Start my game from the arcade template"
 ```
 
@@ -86,7 +88,7 @@ Screenshots and `probe.json` land in `playtest/latest/`: open the pictures, and 
 Commit when it looks right:
 
 ```
-git add game GAME.md playtest/*.json
+git add game GAME.md
 git commit -m "Faster blocks"
 ```
 
@@ -114,6 +116,5 @@ Run Claude Code, Codex or another agent in the repository folder. It reads [AGEN
 | the page stays empty and the console shows `boot failed` | read the listed problems; overlapping key or pad bindings are the usual cause |
 | commands show the blue cube, not your game | there is no `game/` folder in this checkout (see step 3) |
 | `play:snap` says OVER BUDGET | the scene draws more than `game/budgets.json` allows; see the fix-budget skill |
-| one key press counts twice on a slow machine | a known engine issue with slow frames; a fix is in review ([HUD text and buttons](../recipes/hud-and-buttons.md)) |
 | `npm run play` says the port is in use | another server has 5173: `PORT=5174 npm run play` |
 | `./game already exists` | you already started a game; `--force` replaces it, so commit or copy it first |

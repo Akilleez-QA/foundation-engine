@@ -152,8 +152,8 @@ Without `maxQueuedAgeMs` behaviour is unchanged: commands wait indefinitely and
   goodput collapsed. The deterministic regression test (7 peers, about 113 commands/s
   offered, 4 attempts per 50 ms pump = 80/s) measured goodput 20.6 and 22.0/s at
   150 and 300 ms ages before the change, against 80.4/s FIFO, and 80.4/s at every age
-  after. The NW-07 loopback probe from PR #27 (not in this tree; run from that branch's
-  tools with and without this change) measured saturated final/peak goodput at a 300 ms
+  after. The NW-07 loopback probe from PR #27 (`npm run probe:network`, integrated in v0.2.0;
+  these runs used that branch's tools with and without this change) measured saturated final/peak goodput at a 300 ms
   age of 0.253 and 0.229 before and 0.955 and 0.915 after (two runs each, heavily
   loaded host).
 - **Choosing an age.** With round-robin drain, a command at the back of a full
@@ -372,8 +372,8 @@ freshly authenticated attempt and calls `succeeded(now)` or reports the next fai
 cancels an outstanding wait. Time must be finite, nonnegative and nondecreasing.
 Inject a seeded per-owner random stream, not gameplay `ctx.random()`. Retry belongs
 at one layer; reconnecting does not make an unknown command outcome safe to resend.
-See the [retry pacing guide](../../../docs/guides/network-retry.md). Implemented as a
-candidate (NW-04); not integrated, and no WAN or physical-device acceptance.
+See the [retry pacing guide](../../../docs/guides/network-retry.md). Integrated in v0.2.0
+(NW-04, PR #14); no WAN or physical-device acceptance.
 
 `createClosePolicy({terminalReasons?, terminalCodes?})` classifies the browser
 transport's validated `remoteClose` (`{code, reason}` or `null`) as `terminal` or
@@ -403,8 +403,8 @@ one cooperative close and holds the first reconnect until the announced return;
 pacing after that is the caller's `createRetrySchedule`. Drain closes use
 `DRAIN_CLOSE_CODE` (1012) and are transient under the default close policy. Both
 own no timer, socket or random source; time is caller-supplied and nondecreasing.
-See the [drain guide](../../../docs/guides/network-drain.md). Implemented,
-candidate (NW-08); not integrated, and no WAN, process-restart or physical-device
+See the [drain guide](../../../docs/guides/network-drain.md). Integrated in
+v0.2.0 (NW-08, PR #21); no WAN, process-restart or physical-device
 acceptance.
 
 ## Optional command integrity (SEC-01)
@@ -427,8 +427,8 @@ local and exportable (`exportAudit()`). Pure tick-addressed helpers in
 `cooldown`, `claimedTickInBand`. `assertDisclosure`/`findDisclosureLeaks` check a
 view projection against what an observer may know, in tests. See the
 [integrity guide](../../../docs/guides/integrity.md) and the
-[five-minute recipe](../../../docs/recipes/add-command-integrity.md). Implemented,
-candidate (PR #20); not integrated. Unit and loopback host tests only.
+[five-minute recipe](../../../docs/recipes/add-command-integrity.md). Slice A
+integrated in v0.2.0 (PR #20). Unit and loopback host tests only.
 
 NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. Clean native acceptance passed at `8317c69` with seven observations; 17 storage/host checks passed on Node 22.13. DV-01 remains open. The [acceptance ledger](../../../docs/guides/upgrade-acceptance-ledger.md)
 records revisions, process evidence and outstanding work. Application credit,
@@ -445,4 +445,4 @@ a physical non-reading peer and a host-restart reconnect storm paced by
 optional `maxQueuedAgeMs` (an age shorter than the real queued wait collapsed goodput,
 because each aged shed cost a pump attempt) is resolved by the NW-06 follow-up above.
 The probe now asserts that queue-age variants plateau, like FIFO. Evidence is
-loopback/process scope only, not WAN or physical devices. Implemented, candidate (PR #27).
+loopback/process scope only, not WAN or physical devices. Integrated in v0.2.0 (PR #27).

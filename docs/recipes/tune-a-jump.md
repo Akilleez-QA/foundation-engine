@@ -1,7 +1,7 @@
 # Recipe: add and tune a jump
 
 Use this when the creator wants an actor to jump. The locomotion kit supplies a
-mechanism with creator-chosen values (MV-01, candidate); it does not choose the feel.
+mechanism with creator-chosen values (MV-01, integrated in v0.2.0); it does not choose the feel.
 Full contract: [locomotion kit](../../src/kits/locomotion/README.md#tunable-jump-feel-mv-01).
 
 ## 1. Record the requirement

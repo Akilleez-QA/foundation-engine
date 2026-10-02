@@ -6,8 +6,9 @@ spatial options, the HRTF voice limit, the optional filter stage, smoothed updat
 and the creator and player controls. Every option is optional: a game that passes
 none sounds as it did before (equal-power, inverse distance, instant updates).
 
-Status: implemented, candidate (public PR #28, branch `feat/audio-spatial-hrtf`); not
-integrated. See [Evidence](#evidence) for what is and is not established.
+Status: integrated in v0.2.0 (public PR #28; batch PR #45). Game sound files (PR #37)
+play through the same voice chain. See [Evidence](#evidence) for what is and is not
+established; nothing here has been verified by ear or on a physical device.
 
 ## Owner and lifecycle
 

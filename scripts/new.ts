@@ -62,8 +62,11 @@ function addBudgetRow(dir: string, id: string, brief: Brief, made: string[]) {
   const c = brief.performance.perScene;
   data.scenes[id] = {
     scene: `scene.${id}`, route: `#scene/${id}`, active: true,
-    budget: { draws: c.draws, triangles: c.triangles, textureMiB: c.textureMiB, heapMiB: c.heapMiB, contexts: 1, loadMiB: 1 },
-    provenance: { measured: `unmeasured: the brief's ceiling for a ${brief.devices.minimum}`, run: 'measure with npm run bench -- --only <first>,' + id + ', then npm run perf:derive, and lower these numbers' },
+    // No loadMiB: a missing metric is unmeasured and the gate skips it (docs/recipes/add-a-budget.md). The bench never
+    // measures the start scene's entry cost, so a guessed number would fail the gate, and removing it would count as a
+    // raise. perf:derive supplies a measured loadMiB later; adding a metric is not a raise.
+    budget: { draws: c.draws, triangles: c.triangles, textureMiB: c.textureMiB, heapMiB: c.heapMiB, contexts: 1 },
+    provenance: { measured: `unmeasured: the brief's ceiling for a ${brief.devices.minimum}`, run: 'measure with npm run bench -- --only <first>,' + id + ', then npm run perf:derive, lower these numbers and add loadMiB unless this is the start scene' },
   };
   writeFileSync(file, JSON.stringify(data, null, 2) + '\n');
   made.push(relative(ROOT, file).split('\\').join('/') + ` (row ${id})`);

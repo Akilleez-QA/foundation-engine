@@ -108,7 +108,7 @@ export default defineScene({
 - Calling these every frame is cheap: the page is only touched when the text changes.
 - The button lives in `ctx.view.overlay`, the layer over the 3D view, and must turn `pointer-events` back on. It sits at the top right, clear of the HUD lines (top left) and the prompt (bottom centre). Make it at least 48 × 48 px for touch, and remove it in `exit`. A click on it does not count as a tap on the view. `ctx.view.overlay` is `null` in node tests, so tests drive the action instead.
 
-Known issue: today a slow frame that runs several fixed steps shows one press to each of those steps, so on a struggling machine one press can count twice (a toggle may flip back). A fix that delivers each press to exactly one fixed step is in review. Tests are not affected: `testScene` runs one step per frame.
+Each press reaches exactly one fixed step, even when a slow frame runs several steps or a fast frame runs none, so a toggle in a fixed system flips once per press (the press latch, STD-SIM-12, since v0.2.0). Frame-phase systems see a press in the frame it arrives.
 
 Colours and fonts come from the engine's `--engine-*` CSS tokens (`src/platform/ui/tokens.css`), so the button matches the shell and the large-text setting.
 

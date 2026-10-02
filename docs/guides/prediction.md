@@ -127,4 +127,4 @@ is integrated through PR #123 with those finite checks recorded. DV-01 remains o
 
 To check that a client reducer and the host reducer agree on the same command
 prefix, the optional `checkPredictionAgreement` in `@kits/replay` drives these owners
-and reports the first differing sequence. See [replay and divergence](replay-divergence.md) (SIM-01, candidate).
+and reports the first differing sequence. See [replay and divergence](replay-divergence.md) (SIM-01, integrated in v0.2.0).

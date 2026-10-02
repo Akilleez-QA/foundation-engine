@@ -46,6 +46,7 @@ test('new: every game generator writes files that load, compile and keep the bri
     assert.ok(compiled.scenes.some(s => s.id === 'cellar') && compiled.scenes.some(s => s.id === 'meadow'));
     const budgets = JSON.parse(readFileSync(join(dir, 'budgets.json'), 'utf8'));
     assert.equal(budgets.scenes.cellar.budget.draws, brief.performance.perScene.draws, 'an unmeasured scene starts at the brief\'s ceiling');
+    assert.equal('loadMiB' in budgets.scenes.cellar.budget, false, 'no invented entry cost: an absent metric is unmeasured');
     assert.match(readFileSync(join(tmp, 'GAME.md'), 'utf8'), /Added scene `cellar`/);
     assert.match(readFileSync(join(dir, 'jump.ts'), 'utf8'), /tap: true/, 'the brief lists touch, so a button also answers a tap');
     assert.deepEqual(gameInputProblems(game, defs), [], 'generated bindings pass the boot\'s inputActions validation');
@@ -114,4 +115,25 @@ test('new: the free-key choice never picks a letter already bound by code (f whe
   assert.throws(() => freeButtonBinding(game, defs, 'jump'), /no free key/);
   const some = [defineInput({ id: 'one', label: 'One', keys: ['code:KeyF'], pad: ['y'] })];
   assert.notEqual(keyIdentity(freeButtonBinding(game, some, 'jump').keys[0]), 'f');
+});
+
+test('new: a generated scene row passes the budget check when it becomes the start scene', async () => {
+  // The bench never measures the start scene's entry cost; a generated loadMiB would be reported missing and fail the gate.
+  const tmp = mkdtempSync(join(tmpdir(), 'engine-gen-budget-'));
+  try {
+    cpSync(join(ROOT, 'templates', 'arcade'), tmp, { recursive: true });
+    const dir = join(tmp, 'game');
+    await generate('scene', 'arena', {}, dir);
+    const row = JSON.parse(readFileSync(join(dir, 'budgets.json'), 'utf8')).scenes.arena;
+    assert.equal(row.budget.loadMiB, undefined);
+    assert.match(row.provenance.measured, /^unmeasured/);
+    const { checkBudgets, toCheckBudget } = await import('../src/platform/perf/budget-check');
+    // A start-scene window: counts measured, no enterMB (the bench does not enter the first scene).
+    const sample = { drawsPerRenderedFrame: 3, trisPerRenderedFrame: 100, textureMiB: 0, heapMB: 1, liveContexts: 1 };
+    const metrics = ['draws', 'triangles', 'textureMiB', 'heapMiB', 'contexts', 'loadMiB'] as const;
+    const report = checkBudgets({ 'arena:active': sample }, { arena: toCheckBudget(row.budget) },
+      [{ scene: 'arena', sample: 'arena:active', metrics }], { tier: 'reference' });
+    assert.deepEqual(report.rows.filter(r => r.verdict !== 'pass').map(r => `${r.metric} ${r.verdict}`), [], 'nothing reported missing or over');
+    assert.equal(report.rows.length, metrics.length - 1, 'loadMiB is skipped as unmeasured, not checked');
+  } finally { rmSync(tmp, { recursive: true, force: true }); }
 });

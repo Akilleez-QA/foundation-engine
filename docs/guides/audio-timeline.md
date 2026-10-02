@@ -6,7 +6,7 @@ keeps timed gameplay on the audio clock. It is optional and genre-neutral: use i
 when a game's events, sounds or input grading must line up with what the player
 hears. The [recipe](../recipes/sync-gameplay-to-music.md) shows a scene using it.
 
-Status: implemented, candidate (PR #31); not integrated. Evidence is listed under
+Status: integrated in v0.2.0 (PR #31; batch PR #47). Evidence is listed under
 [Evidence](#evidence).
 
 ## Why the audio clock is the master

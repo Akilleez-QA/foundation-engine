@@ -1,7 +1,7 @@
 # Asset residency (RES-01) evidence
 
 Runtime revision: `024c24888e1f8f3616fad8de749c28f3075deeb0` (branch
-`feat/res01-asset-residency`). Candidate only; not integrated.
+`feat/res01-asset-residency`). Candidate at that revision; later integrated in v0.2.0 (PR #22).
 
 ## Native texture fixture
 

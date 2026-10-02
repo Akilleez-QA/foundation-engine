@@ -1,6 +1,6 @@
 # Optional command integrity (anti-cheat)
 
-Ledger ID: SEC-01. Status: slice A implemented, candidate (PR #20); not integrated.
+Ledger ID: SEC-01. Status: slice A integrated in v0.2.0 (PR #20; batch PR #47).
 Slice B (verified runs) is planned and not built. See the
 [acceptance ledger](upgrade-acceptance-ledger.md).
 

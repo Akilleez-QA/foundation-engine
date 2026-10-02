@@ -7,8 +7,8 @@ clock, socket, scheduler or global service, and nothing constructs it implicitly
 It contains no transport or game nouns: a key can be an intake connection handle,
 a principal string or any other identity the creator chooses.
 
-Ledger ID: NW-05 (proposal N2 of the scalability study). Status: implemented,
-candidate (PR #13); see the [acceptance ledger](upgrade-acceptance-ledger.md).
+Ledger ID: NW-05 (proposal N2 of the scalability study). Status: integrated in v0.2.0
+(PR #13, merged to `main` at `cc2ef79`); see the [acceptance ledger](upgrade-acceptance-ledger.md).
 
 ## Requirement and seam
 
