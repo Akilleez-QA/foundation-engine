@@ -103,7 +103,7 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 |---|---|
 | `npm run new-game -- --template <name>` | Start a game from a template (blank, arcade, explorer, learn) |
 | `npm run new -- <kind> <id>` | Generators: scene, entity, component, system, input, save-section, kit; interactable, area (explore); lesson (learn) |
-| `npm run play` | Dev server with the test API; prints the URL |
+| `npm run play [-- --host] [--game <dir>]` | Dev server with the test API; prints the URL (`--host`: also on the local network, for a phone) |
 | `npm run check` | Focused check: typecheck, lints, brief, affected tests; duration depends on the checkout and hardware |
 | `npm run play:snap [-- --scene <id>] [--mobile]` | Muted, isolated browser: screenshots and `playtest/latest/probe.json` |
 | `npm run play:script -- <file.json>` | A scripted playtest (goto, key, press, teleport, wait, snap, expect) |

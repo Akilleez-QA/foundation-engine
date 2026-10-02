@@ -37,20 +37,31 @@ A game lives outside the engine, in `game/` (or any folder named by `GAME_DIR`).
 | `expedition` | guided routes, persistent completion and bounded production | navigation, objectives, inventory and supporting kits |
 | `mechanics` | ownership, attachments, local transactions and action results | frames, vehicles, control and supporting kits |
 
-Each template passes the gate on its own: `GAME_DIR=templates/<name>/game npm run gate`.
+Each template passes the gate on its own: `npm run gate -- --game templates/<name>/game` (any shell; `GAME_DIR=templates/<name>/game npm run gate` also works in POSIX shells).
 
 ## Start
 
-Requires Node.js 22 or later and npm. This repository is the engine source and tooling; it is not currently published as an npm library.
+Requires Node.js 22.18 or later (`.nvmrc` and `.node-version` select Node 22 for nvm, fnm and similar tools), npm and Git. The scripts load TypeScript with Node's built-in type stripping, which Node 22 enables from 22.18; older versions stop with a one-line message.
 
 ```
 npm ci
+npx playwright-core install chromium   # once per machine: the muted test browser for play:snap and the gate
 npm run dev          # http://127.0.0.1:5173/ (the blank template, or your game/)
 npm test
-npm run gate         # the full integration gate (needs Chromium; see below)
+npm run gate         # the full integration gate (uses the test browser)
 ```
 
-The bench and gate drive Chromium through `playwright-core`. They use `ENGINE_CHROMIUM` if it is set, then Playwright's installed Chromium, then `/usr/bin/chromium`. When the bench runs as root (for example in a container), it adds `--no-sandbox`. It always adds `--mute-audio`.
+On Linux, Playwright's Chromium may also need system libraries: `npx playwright-core install-deps chromium` (needs root).
+
+The bench, `play:snap` and the gate drive Chromium through `playwright-core`. They use `ENGINE_CHROMIUM` if it is set (any Chrome or Chromium executable or wrapper script), then Playwright's installed Chromium, then an installed Chrome or Chromium in its usual folder for the OS (Linux: the real `/usr/lib/chromium/chromium` and similar binaries before `/usr/bin` launchers, because distribution launchers apply the user's own flag files; macOS: `/Applications`; Windows: Program Files and the user's AppData). `ENGINE_CHROMIUM_SYSTEM=0` skips installed browsers. With no browser they stop with one line naming the install command. When the bench runs as root (for example in a container), it adds `--no-sandbox`. It always adds `--mute-audio`.
+
+### Choosing a game on any shell
+
+Without a `game/` folder the blank template runs. `--game <dir>` selects another game for `npm run play`, `play:snap`, `play:criteria`, `check` and `gate`, for example `npm run play -- --game templates/arcade/game`. Setting `GAME_DIR` works too: `GAME_DIR=templates/arcade/game npm run dev` (bash, zsh, WSL), `$env:GAME_DIR="templates/arcade/game"; npm run dev` (PowerShell) or `set GAME_DIR=templates/arcade/game&& npm run dev` (cmd.exe). A folder without a `game.ts` stops with a list of the template folders. The `test:*-browser` scripts are written for CI's bash; on Windows run them from WSL or Git Bash.
+
+### Test on your phone over Wi-Fi
+
+`npm run play -- --host` (or `npm run dev -- --host`) also listens on your local network and prints a `Network:` URL; open it on a phone on the same Wi-Fi. By default both listen on 127.0.0.1 only. With `--host`, anyone on that network can reach the dev server, its source files and the test API while it runs: use it on a network you trust (not public Wi-Fi), and stop it with Ctrl+C when done. `ENGINE_HOST=1` does the same as `--host`; `--host <address>` binds one address. A phone in the browser is still not device acceptance; see the [device experience policy](docs/policy/DEVICE-EXPERIENCE.md).
 
 ## Read next
 
