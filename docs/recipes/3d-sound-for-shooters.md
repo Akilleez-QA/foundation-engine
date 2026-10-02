@@ -91,7 +91,9 @@ sound.pump(ctx.time.t, ctx.camera.position);
   refresh every playing voice within `maxAge`.
 - Dispose the kit with the scene (`sound.dispose()`); `sound.stats` shows `voices`,
   `waiting`, `dropped`, `culled`, `stolen`, `rotated`, `rays`, `raysDeferred` and `stale`.
-  Equal sounds take turns; give a sound that must not be cut a higher `importance`.
+  Equal sounds take turns through free slots. For a shooter's short, frequent cues, opt in to
+  `limits.rotateAfter` (0.25 to 1 s) so newer equal shots get turns against older voices; leave it
+  off for ambience and loops. Keep `raysPerPump` at 2 or more when sounds start every frame.
 
 ## 4. Check it
 
