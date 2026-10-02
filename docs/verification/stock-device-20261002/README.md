@@ -1,11 +1,11 @@
 # Lesson layout repair: emulated evidence
 
-2026-10-02, branch `feat/device-acceptance` on the public repository. The saved
-[report](layout-report.json) identifies the clean commit
-`95f8929101127f5896de31581e93acb7afdae9ca` (on `origin/main` `1b0b846`; after the
-branch was rebased onto `f7619ef` the same change is `91f8754`, differing only by
-that merge's CI action version) with **workingTreeDirty: false**
-and **passed: true**; the screenshots below come from that run. This is Chromium
+2026-10-02, branch `feat/device-acceptance` on the public repository, on
+`origin/main` `f7619ef`. The saved [report](layout-report.json) identifies the clean
+commit `b593583cb694d397b4d50fe4d6b1bf0ef1033c35` (after the PR #9 review fixes) with
+**workingTreeDirty: false** and **passed: true**; the screenshots below come from that
+run. An earlier clean run at `95f8929` (before the review fixes) also passed; this
+report replaces it. This is Chromium
 touch emulation, not physical-device acceptance. DV-01 remains unresolved.
 
 ## The defect
@@ -35,7 +35,12 @@ the bar through `aboveControls(min)`; the caption line drops below the progress 
 only if the two would touch; the objectives/finished cards and the quiz keep their
 authored centre unless they would cover the top content, reach the bar or (cards
 only) cover the board caption, in which case they start below the top content and
-scroll in the space left. Every inset keeps its authored value where there is space.
+scroll in the space left. A fitted panel takes `pointer-events: auto` (the scene
+overlay is `pointer-events: none`) and, if it has none, `tabindex="0"`, so wheel,
+touch and keyboard can scroll it; both are restored when it no longer needs fitting.
+The observer only marks the layout dirty; `controls.layout()`, called once per frame
+by the lesson runtime, measures and writes, so no size is written during observer
+delivery. Every inset keeps its authored value where there is space.
 See [learn mode: layout on narrow screens](../../guides/learn-mode.md#layout-on-narrow-screens).
 
 Desktop (1280×800): in the exploratory pass, the bar, board, board caption, slider,
@@ -56,9 +61,25 @@ viewport containment and center hit testing. For Learn it now also asserts that 
 visible bar rectangle intersects the board, slider or quiz, and that the caption
 line does not intersect the quiz, first at the paused opening board and then on
 every state of a held-clock traversal that taps Next and fills the slider until the quiz
-appears. Each profile reached the board, slider and quiz. The same runner with the
-learn kit sources reverted fails at the first case:
-`learn/day-night/compact: .scene-overlay nav overlaps .chalkboard`.
+appears. Each profile reached the board, slider and quiz. Every fitted panel that
+overflows must be hit-testable at its centre, focusable and actually scrolled by a
+wheel event; a six-objective card is also checked in a `pointer-events: none` host.
+Results in this report: the fitted quiz scrolled by 7px at 320×568 and 85px at
+844×390; the six-objective card scrolled by 82px and 96px there and did not need
+fitting at 390×844 or 820×1180. The runner also records window `error` events
+(not reported as page errors) and fails on them; none were recorded.
+
+Negative checks (same runner, learn kit sources altered, not saved):
+- learn kit sources reverted to before the repair:
+  `learn/day-night/compact: .scene-overlay nav overlaps .chalkboard`;
+- the first repair, before the review fixes: `compact: fitted panel covered at its
+  centre`;
+- that first repair with measurement inside the observer callback:
+  `ResizeObserver loop completed with undelivered notifications.`;
+- the final code without `pointer-events: auto` on fitted panels: the wheel did not
+  scroll the long card (timeout). With the final frame-time layout, measuring inside
+  the observer callback no longer reproduces the loop error, because a newly shown
+  panel is fitted before the observer runs; the deferral remains as a guard.
 
 ## Inspected screenshots
 
@@ -74,8 +95,9 @@ learn kit sources reverted fails at the first case:
 
 ## Still open
 
-- Touch scrolling inside the fitted quiz was not exercised; in phone landscape the
-  second and third answers need it (keys 1-3 still answer).
+- Scrolling a fitted panel was checked with emulated wheel events only; touch-drag
+  scrolling was not exercised. In phone landscape the second and third answers need
+  it (keys 1-3 still answer).
 - The compact board shrinks to about 240px tall to make space; the objectives card
   still covers the board drawing at the opening step (by design, as on desktop).
 - The objectives/quiz cards use content-box widths and reach within 2px of the

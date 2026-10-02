@@ -1,5 +1,5 @@
 {
-  "revision": "95f8929101127f5896de31581e93acb7afdae9ca",
+  "revision": "b593583cb694d397b4d50fe4d6b1bf0ef1033c35",
   "workingTreeDirty": false,
   "passed": true,
   "cases": [
@@ -476,11 +476,26 @@
         "remaining": 0,
         "retiredValue": 2
       },
+      "longCard": {
+        "fitted": true,
+        "overflow": 82,
+        "tab": 0,
+        "x": 160,
+        "y": 289.5,
+        "scrolled": 82
+      },
       "screenshot": "learn-day-night-compact.png",
       "traversed": [
         ".chalkboard",
         ".explorer-slider",
         ".explorer-quiz"
+      ],
+      "scrolledPanels": [
+        {
+          "profile": "compact",
+          "overflow": 7,
+          "scrolled": 7
+        }
       ],
       "quizScreenshot": "learn-day-night-compact-quiz.png"
     },
@@ -597,12 +612,20 @@
         "remaining": 0,
         "retiredValue": 2
       },
+      "longCard": {
+        "fitted": false,
+        "overflow": 0,
+        "tab": -1,
+        "x": 195,
+        "y": 417.20001220703125
+      },
       "screenshot": "learn-day-night-phone-portrait.png",
       "traversed": [
         ".chalkboard",
         ".explorer-slider",
         ".explorer-quiz"
       ],
+      "scrolledPanels": [],
       "quizScreenshot": "learn-day-night-phone-portrait-quiz.png"
     },
     {
@@ -718,11 +741,26 @@
         "remaining": 0,
         "retiredValue": 2
       },
+      "longCard": {
+        "fitted": true,
+        "overflow": 96,
+        "tab": 0,
+        "x": 422,
+        "y": 228.5,
+        "scrolled": 96
+      },
       "screenshot": "learn-day-night-phone-landscape.png",
       "traversed": [
         ".chalkboard",
         ".explorer-slider",
         ".explorer-quiz"
+      ],
+      "scrolledPanels": [
+        {
+          "profile": "phone-landscape",
+          "overflow": 85,
+          "scrolled": 85
+        }
       ],
       "quizScreenshot": "learn-day-night-phone-landscape-quiz.png"
     },
@@ -839,12 +877,20 @@
         "remaining": 0,
         "retiredValue": 2
       },
+      "longCard": {
+        "fitted": false,
+        "overflow": 0,
+        "tab": -1,
+        "x": 410,
+        "y": 585.2000122070312
+      },
       "screenshot": "learn-day-night-tablet.png",
       "traversed": [
         ".chalkboard",
         ".explorer-slider",
         ".explorer-quiz"
       ],
+      "scrolledPanels": [],
       "quizScreenshot": "learn-day-night-tablet-quiz.png"
     }
   ],

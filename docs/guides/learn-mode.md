@@ -82,8 +82,11 @@ this lifecycle. They do not establish complete touch lesson acceptance. See the
 The control bar wraps onto two or three rows on phones, and the progress line takes
 the top-left corner. The controls (`src/kits/learn/ui.ts`) own one `ResizeObserver`
 over the bar, the progress line, the overlay and lesson content registered with
-`controls.arrange({ line, panel, floor })`. It runs only when one of those changes
-size (wrapping, rotation, text or visibility changes), never per frame, and it
+`controls.arrange({ line, panel, floor })`. The observer only marks the layout dirty;
+`controls.layout()`, which the lesson runtime calls once per frame after setting the
+view, re-measures when something changed size or when arranged content was shown,
+hidden or re-texted (compared without reading layout). Sizes are never written during
+observer delivery, which would make Chromium report a ResizeObserver loop error. It
 publishes on the overlay:
 
 | Property | Value | Used by |
@@ -94,19 +97,26 @@ publishes on the overlay:
 The objectives and finished cards, and the panel passed to `arrange` (the quiz),
 keep their authored centre unless they would cover the progress or caption line,
 reach the bar, or (cards only) cover the board's caption. Then they start below the
-top content and scroll within the space left (`max-height`, `overflow-y: auto`).
+top content and scroll within the space left (`max-height`, `overflow-y: auto`). A
+fitted panel takes `pointer-events: auto`, because the scene overlay passes pointers
+through, and `tabindex="0"` if it has none, so wheel, touch and keyboard reach its
+overflow; both are restored when it no longer needs fitting.
 
 Every value keeps its authored geometry wherever there is space, so desktop and
 tablet layouts with a one-row bar do not change; nothing here imposes a phone layout
 on larger screens. When the space is too small for a panel (phone landscape), the
 panel scrolls rather than covering the caption or the controls. The observer
 disconnects and the properties are cleared when the controls are destroyed (scene
-exit through `disposeLesson`). Without `ResizeObserver` (non-browser hosts) the
-authored insets apply unchanged.
+exit through `disposeLesson`). Without `ResizeObserver` the layout is still measured
+on the first frame and whenever arranged content is shown or hidden, but not on later
+size changes. A replacement UI that composes `createControls` directly must call
+`layout()` from its own frame loop.
 
 A creator who replaces the lesson UI can keep these helpers, use their own owner,
 or omit them. Regressions: `src/kits/learn/layout.test.ts` (fake DOM geometry: what
 moves, by how much, what stays) and the Learn route of
 `scripts/play/stock-touch-check.mjs` (Chromium touch emulation at four profiles,
-stepping through board, sim and quiz). Neither is physical-device acceptance; see the
+stepping through board, sim and quiz, wheel-scrolling fitted panels and failing on
+window `error` events). `runtime-lifetime.test.ts` asserts the observer is released
+on exit. Neither is physical-device acceptance; see the
 [layout repair receipt](../verification/stock-device-20261002/README.md).
