@@ -1,0 +1,189 @@
+{
+  "schema": "foundation.session-perf",
+  "version": 1,
+  "meta": {
+    "profile": "emulated-desktop-swiftshader",
+    "evidence": "emulated",
+    "build": "abe977e62f79",
+    "notes": null
+  },
+  "recorder": {
+    "windowMs": 1000,
+    "maxWindows": 120,
+    "maxSegments": 256,
+    "overflow": "stop",
+    "budgetMs": 16.667,
+    "longFrameMs": 25,
+    "severeFrameMs": 50,
+    "gapMs": 1000,
+    "counters": false,
+    "histogram": {
+      "bins": 776,
+      "resolution": "0.1 ms < 50 ms; 1 ms < 250 ms; 10 ms < 1000 ms; overflow",
+      "percentile": "nearest rank, bin upper edge clamped to observed min/max"
+    }
+  },
+  "state": "recording",
+  "truncated": null,
+  "session": {
+    "records": 88,
+    "frames": 88,
+    "renderedFrames": 2,
+    "idleFrames": 86,
+    "resumes": 1,
+    "hiddenTransitions": 0,
+    "gaps": 0,
+    "clockAnomalies": 0,
+    "longFrames": 3,
+    "severeFrames": 2,
+    "durationMs": 2733.2,
+    "frameMs": {
+      "count": 87,
+      "p50": 16.7,
+      "p95": 16.8,
+      "p99": 716.7,
+      "max": 716.7,
+      "mean": 31.416
+    },
+    "workMs": {
+      "count": 88,
+      "p50": 0.3,
+      "p95": 1.9,
+      "p99": 78.9,
+      "max": 78.9,
+      "mean": 1.364
+    },
+    "windowsClosed": 2,
+    "windowsRetained": 2,
+    "evictedWindows": 0,
+    "discardedWindows": 0,
+    "counterFailures": 0
+  },
+  "segments": [
+    {
+      "index": 0,
+      "scene": null,
+      "epoch": null,
+      "preset": null,
+      "label": null,
+      "startMs": 0
+    },
+    {
+      "index": 1,
+      "scene": "scene.field",
+      "epoch": 1,
+      "preset": "reference",
+      "label": null,
+      "startMs": 733.3
+    }
+  ],
+  "windows": [
+    {
+      "index": 0,
+      "segment": 0,
+      "startMs": 0,
+      "endMs": 716.7,
+      "startMinute": 0,
+      "activeMs": 716.7,
+      "complete": false,
+      "end": "segment",
+      "frames": 2,
+      "renderedFrames": 2,
+      "idleFrames": 0,
+      "resumes": 1,
+      "gaps": 0,
+      "longFrames": 1,
+      "severeFrames": 1,
+      "frameMs": {
+        "count": 1,
+        "p50": 716.7,
+        "p95": 716.7,
+        "p99": 716.7,
+        "max": 716.7,
+        "mean": 716.7
+      },
+      "workMs": {
+        "count": 2,
+        "p50": 1.9,
+        "p95": 78.9,
+        "p99": 78.9,
+        "max": 78.9,
+        "mean": 40.4
+      },
+      "drawsPerRenderedFrame": null,
+      "trianglesPerRenderedFrame": null,
+      "classification": {
+        "kind": "invalid",
+        "version": 1,
+        "reasons": [
+          "epoch: the segment changed or paused",
+          "incomplete: ended by segment after 716.7 of 1000 active ms"
+        ],
+        "comparable": false
+      }
+    },
+    {
+      "index": 1,
+      "segment": 1,
+      "startMs": 716.7,
+      "endMs": 1733.3,
+      "startMinute": 0.012,
+      "activeMs": 1016.6,
+      "complete": true,
+      "end": "full",
+      "frames": 26,
+      "renderedFrames": 0,
+      "idleFrames": 26,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 2,
+      "severeFrames": 1,
+      "frameMs": {
+        "count": 26,
+        "p50": 16.7,
+        "p95": 33.4,
+        "p99": 583.3,
+        "max": 583.3,
+        "mean": 39.1
+      },
+      "workMs": {
+        "count": 26,
+        "p50": 0.5,
+        "p95": 1.4,
+        "p99": 2.5,
+        "max": 2.5,
+        "mean": 0.558
+      },
+      "drawsPerRenderedFrame": null,
+      "trianglesPerRenderedFrame": null,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    }
+  ],
+  "drift": [
+    {
+      "group": "scene.field|reference",
+      "windows": 1,
+      "frameP95SlopeMsPerMin": null,
+      "workP95SlopeMsPerMin": null,
+      "early": null,
+      "late": null,
+      "frameP95Ratio": null,
+      "workP95Ratio": null
+    }
+  ],
+  "limitations": [
+    "Frame interval is the difference of the one frame loop's requestAnimationFrame timestamps; it reflects display pacing, not GPU time.",
+    "Work time is main-thread elapsed time around the loop's tickers; it excludes compositor, GPU, worker and browser work.",
+    "Percentiles come from fixed bins: each is at most one bin width (0.1 ms below 50 ms) above the exact nearest-rank value.",
+    "Drift is a regression over window p95 against session minutes: a proxy that may reflect throttling, content or background load.",
+    "The evidence class and device profile are operator labels; the recorder cannot verify the device.",
+    "This file is supporting evidence only; it does not by itself satisfy any device acceptance requirement (DV-01)."
+  ]
+}

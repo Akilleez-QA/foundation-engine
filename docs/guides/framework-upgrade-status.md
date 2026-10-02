@@ -472,3 +472,9 @@ loopback browser workflow are its only evidence. See the
 | ID | Contract | State |
 |---|---|---|
 | SIM-01 | Optional `@kits/replay`: bounded tick-input log and player (explicit truncation; version, identity and corruption refusal), creator-digest traces with first-divergence comparison, and a prediction-versus-authority agreement check over the existing owners. Dev/test-only `engine.replay` uses the stock scene fixed lane and `?seed=`. [Contract](replay-divergence.md) | Implemented, candidate (public PR #17). Focused tests and the arcade `?seed=` browser replay pass on the branch. Not integrated. No cross-device or cross-browser floating-point determinism, physical-device or multiplayer claim. |
+
+## Sustained-session recorder — PERF-01 candidate
+
+| Slice | Capability and actual seam | State | What remains outside the claim |
+|---|---|---|---|
+| PERF-01 | [`FrameLoop.attachSampler`](../../src/core/activity/loop.ts) is a single observational slot. Through it, [`createSessionRecorder`](../../src/platform/perf/session-recorder.ts) records bounded rolling-window percentiles and drift, exposed as `engine.sessionRecorder()` and `?session-record` ([guide](session-performance.md)) | Implemented, candidate (PR #15 on the public repository). Unit tests and an emulated browser run passed on the candidate head; see [verification](../verification/session-perf-20261002/README.md) | No physical-device, thermal, GPU-timer or production telemetry claim. DV-01 remains open |

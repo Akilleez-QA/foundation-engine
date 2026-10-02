@@ -1,0 +1,1021 @@
+{
+  "schema": "foundation.session-perf",
+  "version": 1,
+  "meta": {
+    "profile": "emulated-desktop-swiftshader",
+    "evidence": "emulated",
+    "build": "abe977e62f79",
+    "notes": "emulated browser run: recorder mechanics and evidence format only; not physical-device evidence; DV-01 remains open"
+  },
+  "recorder": {
+    "windowMs": 30000,
+    "maxWindows": 28,
+    "maxSegments": 256,
+    "overflow": "stop",
+    "budgetMs": 16.667,
+    "longFrameMs": 25,
+    "severeFrameMs": 50,
+    "gapMs": 1000,
+    "counters": true,
+    "histogram": {
+      "bins": 776,
+      "resolution": "0.1 ms < 50 ms; 1 ms < 250 ms; 10 ms < 1000 ms; overflow",
+      "percentile": "nearest rank, bin upper edge clamped to observed min/max"
+    }
+  },
+  "state": "stopped",
+  "truncated": null,
+  "session": {
+    "records": 35397,
+    "frames": 35391,
+    "renderedFrames": 5970,
+    "idleFrames": 29421,
+    "resumes": 1,
+    "hiddenTransitions": 1,
+    "gaps": 0,
+    "clockAnomalies": 0,
+    "longFrames": 276,
+    "severeFrames": 60,
+    "durationMs": 600009.4,
+    "frameMs": {
+      "count": 35390,
+      "p50": 16.7,
+      "p95": 16.8,
+      "p99": 16.9,
+      "max": 116.7,
+      "mean": 16.866
+    },
+    "workMs": {
+      "count": 35391,
+      "p50": 0.3,
+      "p95": 0.6,
+      "p99": 0.8,
+      "max": 50.7,
+      "mean": 0.22
+    },
+    "windowsClosed": 21,
+    "windowsRetained": 21,
+    "evictedWindows": 0,
+    "discardedWindows": 0,
+    "counterFailures": 0
+  },
+  "segments": [
+    {
+      "index": 0,
+      "scene": "scene.field",
+      "epoch": 1,
+      "preset": "reference",
+      "label": null,
+      "startMs": 16.7
+    },
+    {
+      "index": 1,
+      "scene": "scene.shelter",
+      "epoch": 2,
+      "preset": "reference",
+      "label": null,
+      "startMs": 361252.2
+    },
+    {
+      "index": 2,
+      "scene": "scene.field",
+      "epoch": 3,
+      "preset": "reference",
+      "label": null,
+      "startMs": 371301.9
+    }
+  ],
+  "windows": [
+    {
+      "index": 0,
+      "segment": 0,
+      "startMs": 0,
+      "endMs": 30015.5,
+      "startMinute": 0,
+      "activeMs": 30015.5,
+      "complete": true,
+      "end": "full",
+      "frames": 1750,
+      "renderedFrames": 300,
+      "idleFrames": 1450,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 36,
+      "severeFrames": 8,
+      "frameMs": {
+        "count": 1750,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 33.5,
+        "max": 66.6,
+        "mean": 17.152
+      },
+      "workMs": {
+        "count": 1750,
+        "p50": 0.3,
+        "p95": 0.8,
+        "p99": 2.1,
+        "max": 3.4,
+        "mean": 0.306
+      },
+      "drawsPerRenderedFrame": 7.973,
+      "trianglesPerRenderedFrame": 1267.76,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 1,
+      "segment": 0,
+      "startMs": 30015.5,
+      "endMs": 60030.9,
+      "startMinute": 0.5,
+      "activeMs": 30015.4,
+      "complete": true,
+      "end": "full",
+      "frames": 1768,
+      "renderedFrames": 301,
+      "idleFrames": 1467,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 29,
+      "severeFrames": 2,
+      "frameMs": {
+        "count": 1768,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 33.3,
+        "max": 50.1,
+        "mean": 16.977
+      },
+      "workMs": {
+        "count": 1768,
+        "p50": 0.3,
+        "p95": 0.6,
+        "p99": 1.8,
+        "max": 4.6,
+        "mean": 0.285
+      },
+      "drawsPerRenderedFrame": 7.973,
+      "trianglesPerRenderedFrame": 1267.774,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "segment": 0,
+      "startMs": 60030.9,
+      "endMs": 90046.5,
+      "startMinute": 1.001,
+      "activeMs": 30015.6,
+      "complete": true,
+      "end": "full",
+      "frames": 1772,
+      "renderedFrames": 300,
+      "idleFrames": 1472,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 19,
+      "severeFrames": 3,
+      "frameMs": {
+        "count": 1772,
+        "p50": 16.8,
+        "p95": 16.9,
+        "p99": 33.3,
+        "max": 83.4,
+        "mean": 16.939
+      },
+      "workMs": {
+        "count": 1772,
+        "p50": 0.3,
+        "p95": 0.7,
+        "p99": 1.1,
+        "max": 3.6,
+        "mean": 0.27
+      },
+      "drawsPerRenderedFrame": 8,
+      "trianglesPerRenderedFrame": 1272,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "segment": 0,
+      "startMs": 90046.5,
+      "endMs": 120078.6,
+      "startMinute": 1.501,
+      "activeMs": 30032.1,
+      "complete": true,
+      "end": "full",
+      "frames": 1647,
+      "renderedFrames": 300,
+      "idleFrames": 1347,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 91,
+      "severeFrames": 21,
+      "frameMs": {
+        "count": 1647,
+        "p50": 16.8,
+        "p95": 33.3,
+        "p99": 51,
+        "max": 83.4,
+        "mean": 18.234
+      },
+      "workMs": {
+        "count": 1647,
+        "p50": 0.3,
+        "p95": 0.6,
+        "p99": 1.4,
+        "max": 2.6,
+        "mean": 0.265
+      },
+      "drawsPerRenderedFrame": 8,
+      "trianglesPerRenderedFrame": 1272,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "segment": 0,
+      "startMs": 120078.6,
+      "endMs": 150160.7,
+      "startMinute": 2.001,
+      "activeMs": 30082.1,
+      "complete": true,
+      "end": "full",
+      "frames": 1775,
+      "renderedFrames": 301,
+      "idleFrames": 1474,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 20,
+      "severeFrames": 2,
+      "frameMs": {
+        "count": 1775,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 33.3,
+        "max": 116.7,
+        "mean": 16.948
+      },
+      "workMs": {
+        "count": 1775,
+        "p50": 0.3,
+        "p95": 0.6,
+        "p99": 0.8,
+        "max": 3.3,
+        "mean": 0.223
+      },
+      "drawsPerRenderedFrame": 8,
+      "trianglesPerRenderedFrame": 1272,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "segment": 0,
+      "startMs": 150160.7,
+      "endMs": 180176.2,
+      "startMinute": 2.503,
+      "activeMs": 30015.5,
+      "complete": true,
+      "end": "full",
+      "frames": 1762,
+      "renderedFrames": 300,
+      "idleFrames": 1462,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 25,
+      "severeFrames": 7,
+      "frameMs": {
+        "count": 1762,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 33.4,
+        "max": 66.7,
+        "mean": 17.035
+      },
+      "workMs": {
+        "count": 1762,
+        "p50": 0.3,
+        "p95": 0.6,
+        "p99": 0.8,
+        "max": 2.2,
+        "mean": 0.228
+      },
+      "drawsPerRenderedFrame": 8,
+      "trianglesPerRenderedFrame": 1272,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "segment": 0,
+      "startMs": 180176.2,
+      "endMs": 210191.7,
+      "startMinute": 3.003,
+      "activeMs": 30015.5,
+      "complete": true,
+      "end": "full",
+      "frames": 1744,
+      "renderedFrames": 300,
+      "idleFrames": 1444,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 30,
+      "severeFrames": 13,
+      "frameMs": {
+        "count": 1744,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 33.5,
+        "max": 83.4,
+        "mean": 17.211
+      },
+      "workMs": {
+        "count": 1744,
+        "p50": 0.3,
+        "p95": 0.6,
+        "p99": 1.3,
+        "max": 3.1,
+        "mean": 0.264
+      },
+      "drawsPerRenderedFrame": 8,
+      "trianglesPerRenderedFrame": 1272,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "segment": 0,
+      "startMs": 210191.7,
+      "endMs": 240207,
+      "startMinute": 3.503,
+      "activeMs": 30015.3,
+      "complete": true,
+      "end": "full",
+      "frames": 1796,
+      "renderedFrames": 300,
+      "idleFrames": 1496,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 4,
+      "severeFrames": 1,
+      "frameMs": {
+        "count": 1796,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 16.9,
+        "max": 50.1,
+        "mean": 16.712
+      },
+      "workMs": {
+        "count": 1796,
+        "p50": 0.3,
+        "p95": 0.5,
+        "p99": 0.7,
+        "max": 5,
+        "mean": 0.215
+      },
+      "drawsPerRenderedFrame": 8,
+      "trianglesPerRenderedFrame": 1272,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "segment": 0,
+      "startMs": 240207,
+      "endMs": 270172.6,
+      "startMinute": 4.003,
+      "activeMs": 29965.6,
+      "complete": false,
+      "end": "hidden",
+      "frames": 1798,
+      "renderedFrames": 300,
+      "idleFrames": 1498,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 0,
+      "severeFrames": 0,
+      "frameMs": {
+        "count": 1798,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 16.8,
+        "max": 16.8,
+        "mean": 16.666
+      },
+      "workMs": {
+        "count": 1798,
+        "p50": 0.2,
+        "p95": 0.4,
+        "p99": 0.5,
+        "max": 0.6,
+        "mean": 0.174
+      },
+      "drawsPerRenderedFrame": 7.973,
+      "trianglesPerRenderedFrame": 1267.76,
+      "classification": {
+        "kind": "invalid",
+        "version": 1,
+        "reasons": [
+          "incomplete: ended by hidden after 29965.6 of 30000 active ms"
+        ],
+        "comparable": false
+      }
+    },
+    {
+      "index": 9,
+      "segment": 0,
+      "startMs": 273189.1,
+      "endMs": 303204.5,
+      "startMinute": 4.553,
+      "activeMs": 30015.4,
+      "complete": true,
+      "end": "full",
+      "frames": 1802,
+      "renderedFrames": 301,
+      "idleFrames": 1501,
+      "resumes": 1,
+      "gaps": 0,
+      "longFrames": 0,
+      "severeFrames": 0,
+      "frameMs": {
+        "count": 1801,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 16.8,
+        "max": 16.8,
+        "mean": 16.666
+      },
+      "workMs": {
+        "count": 1802,
+        "p50": 0.3,
+        "p95": 0.5,
+        "p99": 0.6,
+        "max": 1.2,
+        "mean": 0.197
+      },
+      "drawsPerRenderedFrame": 7.973,
+      "trianglesPerRenderedFrame": 1267.774,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "segment": 0,
+      "startMs": 303204.5,
+      "endMs": 333220.1,
+      "startMinute": 5.053,
+      "activeMs": 30015.6,
+      "complete": true,
+      "end": "full",
+      "frames": 1801,
+      "renderedFrames": 301,
+      "idleFrames": 1500,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 0,
+      "severeFrames": 0,
+      "frameMs": {
+        "count": 1801,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 16.8,
+        "max": 16.8,
+        "mean": 16.666
+      },
+      "workMs": {
+        "count": 1801,
+        "p50": 0.2,
+        "p95": 0.4,
+        "p99": 0.5,
+        "max": 0.5,
+        "mean": 0.168
+      },
+      "drawsPerRenderedFrame": 7.973,
+      "trianglesPerRenderedFrame": 1267.774,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 11,
+      "segment": 0,
+      "startMs": 333220.1,
+      "endMs": 361168.9,
+      "startMinute": 5.554,
+      "activeMs": 27948.8,
+      "complete": false,
+      "end": "paused",
+      "frames": 1677,
+      "renderedFrames": 279,
+      "idleFrames": 1398,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 0,
+      "severeFrames": 0,
+      "frameMs": {
+        "count": 1677,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 16.8,
+        "max": 16.8,
+        "mean": 16.666
+      },
+      "workMs": {
+        "count": 1677,
+        "p50": 0.2,
+        "p95": 0.4,
+        "p99": 0.5,
+        "max": 0.8,
+        "mean": 0.174
+      },
+      "drawsPerRenderedFrame": 8,
+      "trianglesPerRenderedFrame": 1272,
+      "classification": {
+        "kind": "invalid",
+        "version": 1,
+        "reasons": [
+          "epoch: the segment changed or paused",
+          "incomplete: ended by paused after 27948.8 of 30000 active ms"
+        ],
+        "comparable": false
+      }
+    },
+    {
+      "index": 12,
+      "segment": 1,
+      "startMs": 361235.6,
+      "endMs": 371251.9,
+      "startMinute": 6.021,
+      "activeMs": 10016.3,
+      "complete": false,
+      "end": "paused",
+      "frames": 601,
+      "renderedFrames": 100,
+      "idleFrames": 501,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 0,
+      "severeFrames": 0,
+      "frameMs": {
+        "count": 601,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 16.8,
+        "max": 16.8,
+        "mean": 16.666
+      },
+      "workMs": {
+        "count": 601,
+        "p50": 0.2,
+        "p95": 0.4,
+        "p99": 0.6,
+        "max": 2.5,
+        "mean": 0.175
+      },
+      "drawsPerRenderedFrame": 2,
+      "trianglesPerRenderedFrame": 428,
+      "classification": {
+        "kind": "invalid",
+        "version": 1,
+        "reasons": [
+          "epoch: the segment changed or paused",
+          "incomplete: ended by paused after 10016.3 of 30000 active ms"
+        ],
+        "comparable": false
+      }
+    },
+    {
+      "index": 13,
+      "segment": 2,
+      "startMs": 371285.1,
+      "endMs": 401300.6,
+      "startMinute": 6.188,
+      "activeMs": 30015.5,
+      "complete": true,
+      "end": "full",
+      "frames": 1801,
+      "renderedFrames": 300,
+      "idleFrames": 1501,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 0,
+      "severeFrames": 0,
+      "frameMs": {
+        "count": 1801,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 16.8,
+        "max": 16.8,
+        "mean": 16.666
+      },
+      "workMs": {
+        "count": 1801,
+        "p50": 0.3,
+        "p95": 0.6,
+        "p99": 0.6,
+        "max": 0.9,
+        "mean": 0.218
+      },
+      "drawsPerRenderedFrame": 8,
+      "trianglesPerRenderedFrame": 1272,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "segment": 2,
+      "startMs": 401300.6,
+      "endMs": 431316.1,
+      "startMinute": 6.688,
+      "activeMs": 30015.5,
+      "complete": true,
+      "end": "full",
+      "frames": 1801,
+      "renderedFrames": 301,
+      "idleFrames": 1500,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 0,
+      "severeFrames": 0,
+      "frameMs": {
+        "count": 1801,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 16.8,
+        "max": 16.8,
+        "mean": 16.666
+      },
+      "workMs": {
+        "count": 1801,
+        "p50": 0.3,
+        "p95": 0.5,
+        "p99": 0.6,
+        "max": 1.2,
+        "mean": 0.197
+      },
+      "drawsPerRenderedFrame": 7.973,
+      "trianglesPerRenderedFrame": 1267.774,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 15,
+      "segment": 2,
+      "startMs": 431316.1,
+      "endMs": 461331.6,
+      "startMinute": 7.189,
+      "activeMs": 30015.5,
+      "complete": true,
+      "end": "full",
+      "frames": 1775,
+      "renderedFrames": 300,
+      "idleFrames": 1475,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 22,
+      "severeFrames": 3,
+      "frameMs": {
+        "count": 1775,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 33.3,
+        "max": 66.6,
+        "mean": 16.91
+      },
+      "workMs": {
+        "count": 1775,
+        "p50": 0.3,
+        "p95": 0.6,
+        "p99": 0.8,
+        "max": 50.7,
+        "mean": 0.262
+      },
+      "drawsPerRenderedFrame": 8,
+      "trianglesPerRenderedFrame": 1272,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 16,
+      "segment": 2,
+      "startMs": 461331.6,
+      "endMs": 491347,
+      "startMinute": 7.689,
+      "activeMs": 30015.4,
+      "complete": true,
+      "end": "full",
+      "frames": 1801,
+      "renderedFrames": 300,
+      "idleFrames": 1501,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 0,
+      "severeFrames": 0,
+      "frameMs": {
+        "count": 1801,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 16.8,
+        "max": 16.8,
+        "mean": 16.666
+      },
+      "workMs": {
+        "count": 1801,
+        "p50": 0.3,
+        "p95": 0.6,
+        "p99": 0.7,
+        "max": 1.4,
+        "mean": 0.222
+      },
+      "drawsPerRenderedFrame": 8,
+      "trianglesPerRenderedFrame": 1272,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "segment": 2,
+      "startMs": 491347,
+      "endMs": 521362.5,
+      "startMinute": 8.189,
+      "activeMs": 30015.5,
+      "complete": true,
+      "end": "full",
+      "frames": 1801,
+      "renderedFrames": 300,
+      "idleFrames": 1501,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 0,
+      "severeFrames": 0,
+      "frameMs": {
+        "count": 1801,
+        "p50": 16.8,
+        "p95": 16.8,
+        "p99": 16.8,
+        "max": 16.8,
+        "mean": 16.666
+      },
+      "workMs": {
+        "count": 1801,
+        "p50": 0.3,
+        "p95": 0.5,
+        "p99": 0.6,
+        "max": 1,
+        "mean": 0.195
+      },
+      "drawsPerRenderedFrame": 8,
+      "trianglesPerRenderedFrame": 1272,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "segment": 2,
+      "startMs": 521362.5,
+      "endMs": 551378,
+      "startMinute": 8.689,
+      "activeMs": 30015.5,
+      "complete": true,
+      "end": "full",
+      "frames": 1801,
+      "renderedFrames": 300,
+      "idleFrames": 1501,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 0,
+      "severeFrames": 0,
+      "frameMs": {
+        "count": 1801,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 16.8,
+        "max": 16.8,
+        "mean": 16.666
+      },
+      "workMs": {
+        "count": 1801,
+        "p50": 0.2,
+        "p95": 0.5,
+        "p99": 0.6,
+        "max": 0.6,
+        "mean": 0.19
+      },
+      "drawsPerRenderedFrame": 8,
+      "trianglesPerRenderedFrame": 1272,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 19,
+      "segment": 2,
+      "startMs": 551378,
+      "endMs": 581393.5,
+      "startMinute": 9.19,
+      "activeMs": 30015.5,
+      "complete": true,
+      "end": "full",
+      "frames": 1801,
+      "renderedFrames": 300,
+      "idleFrames": 1501,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 0,
+      "severeFrames": 0,
+      "frameMs": {
+        "count": 1801,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 16.8,
+        "max": 16.8,
+        "mean": 16.666
+      },
+      "workMs": {
+        "count": 1801,
+        "p50": 0.2,
+        "p95": 0.5,
+        "p99": 0.6,
+        "max": 0.8,
+        "mean": 0.178
+      },
+      "drawsPerRenderedFrame": 8,
+      "trianglesPerRenderedFrame": 1272,
+      "classification": {
+        "kind": "unclassified",
+        "version": 1,
+        "comparable": false,
+        "reasons": [
+          "complete window; the recorder has no upload or request facts, so ADR 0053 entry/firstUse/steady is not decided"
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "segment": 2,
+      "startMs": 581393.5,
+      "endMs": 600009.4,
+      "startMinute": 9.69,
+      "activeMs": 18615.9,
+      "complete": false,
+      "end": "stopped",
+      "frames": 1117,
+      "renderedFrames": 186,
+      "idleFrames": 931,
+      "resumes": 0,
+      "gaps": 0,
+      "longFrames": 0,
+      "severeFrames": 0,
+      "frameMs": {
+        "count": 1117,
+        "p50": 16.7,
+        "p95": 16.8,
+        "p99": 16.8,
+        "max": 16.8,
+        "mean": 16.666
+      },
+      "workMs": {
+        "count": 1117,
+        "p50": 0.2,
+        "p95": 0.4,
+        "p99": 0.5,
+        "max": 0.5,
+        "mean": 0.167
+      },
+      "drawsPerRenderedFrame": 8,
+      "trianglesPerRenderedFrame": 1272,
+      "classification": {
+        "kind": "invalid",
+        "version": 1,
+        "reasons": [
+          "incomplete: ended by stopped after 18615.9 of 30000 active ms"
+        ],
+        "comparable": false
+      }
+    }
+  ],
+  "drift": [
+    {
+      "group": "scene.field|reference",
+      "windows": 17,
+      "frameP95SlopeMsPerMin": -0.34,
+      "workP95SlopeMsPerMin": -0.018,
+      "early": {
+        "frameP95": 20.12,
+        "workP95": 0.66
+      },
+      "late": {
+        "frameP95": 16.8,
+        "workP95": 0.54
+      },
+      "frameP95Ratio": 0.835,
+      "workP95Ratio": 0.818
+    }
+  ],
+  "limitations": [
+    "Frame interval is the difference of the one frame loop's requestAnimationFrame timestamps; it reflects display pacing, not GPU time.",
+    "Work time is main-thread elapsed time around the loop's tickers; it excludes compositor, GPU, worker and browser work.",
+    "Percentiles come from fixed bins: each is at most one bin width (0.1 ms below 50 ms) above the exact nearest-rank value.",
+    "Drift is a regression over window p95 against session minutes: a proxy that may reflect throttling, content or background load.",
+    "The evidence class and device profile are operator labels; the recorder cannot verify the device.",
+    "This file is supporting evidence only; it does not by itself satisfy any device acceptance requirement (DV-01)."
+  ]
+}

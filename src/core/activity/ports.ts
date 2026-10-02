@@ -99,6 +99,25 @@ export interface QualityPort {
   frame(sample: LoopFrameSample): void;
 }
 
+/**
+ * One frame record for an optional, observational sampler (STD-SYS-18). The loop reuses ONE object for every call:
+ * a sampler copies the fields it needs and never retains the record.
+ */
+export interface FrameRecord extends LoopFrameSample {
+  /** The frame timestamp in ms on the scheduler's timebase; for a hidden record, the loop's `now()`. */
+  timeMs: number;
+  /** Elapsed ms around this frame's tickers, from the loop's `now()` (0 for a hidden record). Main-thread wall time
+   *  including the clock call itself: not CPU time, GPU time or worker time. */
+  workMs: number;
+  /** True for a frame a test driver stepped while frames were held (`stepFrame`): its timestamp and interval are
+   *  script-chosen, not display timing. Samplers count it and never treat it as measured time. */
+  stepped: boolean;
+}
+/** At most one per loop (`FrameLoop.attachSampler`). When none is attached the loop reads no extra clock. */
+export interface FrameSamplerPort {
+  frame(record: Readonly<FrameRecord>): void;
+}
+
 /** The injected frame source: `requestAnimationFrame` in the app, a fake in tests. */
 export interface FrameScheduler {
   request(callback: (timeMs: number) => void): number;

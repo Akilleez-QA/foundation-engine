@@ -15,6 +15,8 @@ import type { SceneModelRequest, SceneModelResult } from '../author/model-inspec
  *   engine.clock.hold()/step(ms)/resume()   freeze the one frame loop and step it deterministically
  *   engine.loop()               the loop's frame, update and render counters
  *   engine.events(fn)           tap every bus event (returns an unsubscribe)
+ *   engine.sessionRecorder(o?)  start the local sustained-session recorder on the one loop (PERF-01); replaces the last
+ *   engine.currentSession()     that recorder (or the `?session-record` auto-start), or null
  *   engine.save.export()        the active player's profile file
  *   engine.replay.start(request) re-enter the current scene recording or replaying its fixed-tick input (dev/replay.ts)
  *   engine.replay.read()/stop() the replay session's state, local log text and digest comparison
@@ -30,6 +32,8 @@ import { appLoop } from '../platform/ui/runtime';
 import type {SceneEntitiesRequest, SceneEntitiesResult} from '../author/play';
 import { createEventTrace, type EventTrace, type EventTraceOptions } from './event-trace';
 import type { ReplayDev, ReplayDevRequest, ReplayDevState, ReplayStart } from './replay';
+import { createSessionRecorder, type SessionRecorderOptions } from '../platform/perf/session-recorder';
+import { startSessionRecording, type SessionRecording } from './session-recording';
 
 export interface EngineState {
   scene: { scene: string | null; state: string | null; epoch: number; hash: string } | undefined;
@@ -58,6 +62,12 @@ export interface EngineTestApi {
   systemTrace(options?: SystemTimingOptions): SystemTimingCapture | null;
   /** Start a bounded scalar capture; replaces this API instance's previous capture. Caller disposes when finished. */
   eventTrace(options?: EventTraceOptions): EventTrace;
+  /** Start the local sustained-session recorder (PERF-01) on the one frame loop; disposes the page's previous one.
+   *  The active recorder is kept on a page global, so an API recreated by a hot reload can still find and replace it.
+   *  Invalid options throw and leave the previous recorder running. Nothing leaves the device. */
+  sessionRecorder(options?: SessionRecorderOptions): SessionRecording;
+  /** The recorder started last by any test API instance on this page (including `?session-record`), or null. */
+  currentSession(): SessionRecording | null;
   save: { export(): unknown };
   /** Record or replay the current scene's fixed-tick input from its next arrival (needs `?seed=`). Loaded on first use. */
   replay: {
@@ -66,6 +76,11 @@ export interface EngineTestApi {
     stop(reason?: string): void;
   };
 }
+
+/** The page's active recorder survives a hot-reloaded test API module: the loop's one sampler slot outlives it. */
+const SESSION_KEY = Symbol.for('foundation.dev.session-recording');
+type SessionHolder = { [SESSION_KEY]?: SessionRecording };
+const activeSession = () => (globalThis as SessionHolder)[SESSION_KEY];
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const CODES: Record<string, string> = { ' ': 'Space', Enter: 'Enter', Escape: 'Escape', Tab: 'Tab' };
@@ -135,6 +150,19 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
       trace = next;
       return next;
     },
+    sessionRecorder(options) {
+      createSessionRecorder(options).dispose(); // validate first: invalid options leave the running recorder in place
+      activeSession()?.dispose();
+      const quality = app.services.app.has('platform.quality') ? app.services.quality : undefined;
+      const session = startSessionRecording({
+        loop: appLoop(), events: app.events, scene,
+        preset: () => quality?.preset ?? null,
+        onQuality: quality ? (fn, signal) => { quality.subscribe(() => fn(), signal); } : undefined,
+      }, options);
+      (globalThis as SessionHolder)[SESSION_KEY] = session;
+      return session;
+    },
+    currentSession: () => activeSession() ?? null,
     save: { export: () => app.services.save.exportPlayer() },
     replay: {
       async start(request, timeoutMs = 30000) {

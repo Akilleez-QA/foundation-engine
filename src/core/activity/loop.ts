@@ -13,10 +13,16 @@ import {withFrameTime} from './frame-time';
  * - The loop is the only holder of the clock driver and feeds the quality port one sample per frame, with
  *   `rendered: false` for frames in which nothing drew (STD-RUN-5).
  *
+ * - An optional observational sampler (`attachSampler`, at most one) receives one reused `FrameRecord` per frame and
+ *   per hidden transition. Without one, a frame reads no extra clock and builds no record (STD-SYS-18). A sampler
+ *   never schedules, wakes or keeps the loop awake; one that throws is detached and reported.
+ *   Frames stepped by a test driver while held are marked `stepped`: their timing is script-chosen.
+ *
  * The frame source and the time source are injected; the defaults are the browser's.
  */
 import type {
-  ClockDriverPort, Coverage, FrameMode, FrameScheduler, LayerPort, QualityPort, QualityPreset, VisibilityPort, WhenCovered,
+  ClockDriverPort, Coverage, FrameMode, FrameRecord, FrameSamplerPort, FrameScheduler, LayerPort, QualityPort, QualityPreset,
+  VisibilityPort, WhenCovered,
 } from './ports';
 
 export interface FrameInfo {
@@ -71,7 +77,8 @@ export interface FrameLoopOptions {
   layers: Pick<LayerPort, 'coverage' | 'onChange'> & Partial<Pick<LayerPort, 'previewing'>>;
   calm: () => boolean;
   scheduler?: FrameScheduler;
-  /** Milliseconds on the same timebase as the scheduler's timestamps. Used outside frames only. */
+  /** Milliseconds on the same timebase as the scheduler's timestamps. Used outside frames, and inside a frame only
+   *  while a sampler is attached (two reads around the tickers). */
   now?: () => number;
   clock?: ClockDriverPort;
   quality?: QualityPort;
@@ -121,6 +128,8 @@ export class FrameLoop {
   private readonly scheduler: FrameScheduler;
   private readonly now: () => number;
   private readonly unsubscribe: (() => void)[] = [];
+  private sampler: FrameSamplerPort | undefined;
+  private readonly record: FrameRecord = { intervalMs: 0, rendered: false, hidden: false, sinceEnterMs: 0, timeMs: 0, workMs: 0, stepped: false };
 
   constructor(private readonly opts: FrameLoopOptions) {
     this.clock = opts.clock;
@@ -141,6 +150,18 @@ export class FrameLoop {
     this.clock = clock; this.lastTick = null;
     return () => { if (this.clock === clock) { this.clock = undefined; this.lastTick = null; } };
   }
+
+  /**
+   * Attach the one observational frame sampler (a session recorder, a dev overlay). It neither wakes nor schedules the
+   * loop: an idle or hidden loop produces no records. Returns the detach; detaching twice, or after a replacement, is a no-op.
+   */
+  attachSampler(sampler: FrameSamplerPort): () => void {
+    if (this.disposed) throw new Error('FrameLoop is disposed');
+    if (this.sampler) throw new Error('FrameLoop already has a frame sampler');
+    this.sampler = sampler;
+    return () => { if (this.sampler === sampler) this.sampler = undefined; };
+  }
+  get hasSampler(): boolean { return this.sampler !== undefined; }
 
   /** True while a frame is requested from the scheduler. */
   get scheduled(): boolean { return this.handle !== null; }
@@ -190,6 +211,7 @@ export class FrameLoop {
     if (hidden) {
       this.cancel();
       this.opts.quality?.frame({ intervalMs: 0, rendered: false, hidden: true, sinceEnterMs });
+      if (this.sampler) this.sample(this.now(), 0, false, true, sinceEnterMs, 0);
     } else {
       this.clock?.resumeFromAway('visible');
       this.wake();
@@ -207,6 +229,7 @@ export class FrameLoop {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.sampler = undefined;
     this.cancel();
     for (const off of this.unsubscribe.splice(0)) off();
     for (const t of this.tickers) t.removed = true;
@@ -259,15 +282,33 @@ export class FrameLoop {
     this.stats.frames++;
     this.inTick = true;
     let rendered = false;
+    const sampling = this.sampler !== undefined, started = sampling ? this.now() : 0;
     try {
       rendered = withFrameTime(timeMs,()=>this.runTickers(timeMs, ut, this.opts.calm(), this.opts.quality?.preset() ?? 'reference'));
     } finally {
       this.inTick = false;
     }
+    const workMs = sampling ? this.now() - started : 0;
     if (!rendered) this.stats.skipped++;
-    this.opts.quality?.frame({ intervalMs: realDt * 1000, rendered, hidden: false, sinceEnterMs: Math.max(0, (now - wokeAt) * 1000) });
+    const sinceEnterMs = Math.max(0, (now - wokeAt) * 1000);
+    this.opts.quality?.frame({ intervalMs: realDt * 1000, rendered, hidden: false, sinceEnterMs });
+    if (sampling && this.sampler) this.sample(timeMs, realDt * 1000, rendered, false, sinceEnterMs, workMs);
     this.wake();
   };
+
+  /** Fill the one reused record and hand it to the sampler. A throwing sampler is detached; the loop continues. */
+  private sample(timeMs: number, intervalMs: number, rendered: boolean, hidden: boolean, sinceEnterMs: number, workMs: number): void {
+    const sampler = this.sampler!, r = this.record;
+    r.timeMs = timeMs; r.intervalMs = intervalMs; r.rendered = rendered; r.hidden = hidden; r.sinceEnterMs = sinceEnterMs;
+    r.workMs = Number.isFinite(workMs) && workMs > 0 ? workMs : 0;
+    r.stepped = this.held && !hidden;
+    try { sampler.frame(r); }
+    catch (error) {
+      if (this.sampler === sampler) this.sampler = undefined;
+      try { (this.opts.report ?? ((owner, e) => console.error(`${owner} threw and was detached`, e)))('frame-sampler', error); }
+      catch { /* A broken diagnostic sink cannot stop the shared frame. */ }
+    }
+  }
 
   /** Runs every ticker due this frame, in priority order. Returns whether anything rendered. */
   private runTickers(nowMs: number, ut: number, calm: boolean, preset: QualityPreset): boolean {
