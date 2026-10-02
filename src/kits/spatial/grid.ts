@@ -81,6 +81,8 @@ export interface SpatialGrid {
   has(id: number): boolean;
   /** A detached copy of a live entry's position. */
   position(id: number): { x: number; y: number } | undefined;
+  /** Squared distance from a live entry to a point without allocating; NaN when the id is absent or the grid closed. */
+  distanceSquared(id: number, x: number, y: number): number;
   /**
    * Ids whose position lies in the inclusive rectangle. Every query takes an optional `result` record
    * (see {@link createQueryResult}) that is overwritten and returned; without one a new record is allocated.
@@ -168,12 +170,15 @@ export function createSpatialGrid(input: GridLimits): SpatialGrid {
     return r;
   };
 
-  /** Clamp a query box to cell indices; null when it misses the grid entirely. */
-  function cellRange(x0: number, y0: number, x1: number, y1: number): [number, number, number, number] | null {
+  // Reused cell range [col0, row0, col1, row1]: queries are synchronous and never nest, so one buffer suffices.
+  const span = new Int32Array(4);
+  /** Clamp a query box to cell indices in `span`; null when it misses the grid entirely. Allocates nothing. */
+  function cellRange(x0: number, y0: number, x1: number, y1: number): Int32Array | null {
     if (x1 < minX || y1 < minY || x0 > maxX || y0 > maxY) return null;
-    return [colOf(Math.max(x0, minX)), rowOf(Math.max(y0, minY)), colOf(Math.min(x1, maxX)), rowOf(Math.min(y1, maxY))];
+    span[0] = colOf(Math.max(x0, minX)); span[1] = rowOf(Math.max(y0, minY)); span[2] = colOf(Math.min(x1, maxX)); span[3] = rowOf(Math.min(y1, maxY));
+    return span;
   }
-  const tooWide = (r: [number, number, number, number]) => (r[2] - r[0] + 1) * (r[3] - r[1] + 1) > maxCellsPerQuery;
+  const tooWide = (r: Int32Array) => (r[2]! - r[0]! + 1) * (r[3]! - r[1]! + 1) > maxCellsPerQuery;
 
   /** Shared scan for rectangle and circle tests. `circle` uses (cx, cy, r2); otherwise the box is the test. */
   function scan(x0: number, y0: number, x1: number, y1: number, circle: boolean, cx: number, cy: number, r2: number, out: IdBuffer, res: QueryResult | undefined): QueryResult {
@@ -233,6 +238,12 @@ export function createSpatialGrid(input: GridLimits): SpatialGrid {
       return 'removed';
     },
     has(id) { return !!head && slotOf.has(id); },
+    distanceSquared(id, x, y) {
+      const slot = head ? slotOf.get(id) : undefined;
+      if (slot === undefined) return NaN;
+      const dx = xs[slot]! - x, dy = ys[slot]! - y;
+      return dx * dx + dy * dy;
+    },
     position(id) {
       const slot = head ? slotOf.get(id) : undefined;
       return slot === undefined ? undefined : { x: xs[slot]!, y: ys[slot]! };

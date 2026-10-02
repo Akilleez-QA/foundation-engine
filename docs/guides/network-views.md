@@ -7,6 +7,7 @@ kit does not choose a spatial policy, reflect ECS components, grant command
 permissions, or require every game to use networking. A maintained replication
 framework remains an alternative when its delta encoding, scheduling or other
 facilities better fit the game.
+For an optional distance-based policy, see [interest sets](interest-sets.md) (SC-02).
 
 See [network admission](network-admission.md) for authentication and command
 ownership, and the [kit contract](../../src/kits/network/README.md#optional-complete-scoped-views)

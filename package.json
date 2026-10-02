@@ -67,6 +67,7 @@
     "test:replay-browser": "GAME_DIR=templates/arcade/game node scripts/generate.mjs && GAME_DIR=templates/arcade/game node --import tsx -r ./scripts/silent-browser.cjs scripts/play/replay-check.mjs playtest/replay",
     "faults:network": "node --disable-warning=ExperimentalWarning --import tsx tools/authority-workbench/fault-harness.mjs",
     "bench:spatial": "node --import tsx tools/spatial-bench/bench.mjs",
+    "host:interest": "node --import tsx tools/interest-host/host.mjs",
     "probe:network": "node --import tsx tools/network-probe/probe.mjs",
     "test:network-probe": "node --import tsx --test tools/network-probe/probe.regression.mjs",
     "test:subpath-browser": "node -r ./scripts/silent-browser.cjs scripts/play/subpath-check.mjs playtest/subpath",

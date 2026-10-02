@@ -47,3 +47,36 @@ constant density (about one per 100 square units), cell 16. Each tick moves ever
 k = 6 nearest query (radius 8) per agent, and 64 interest circles (radius 64). The recorded run is in
 the [spatial index guide](../../../docs/guides/spatial-index.md#measured-cost). Medians
 are the meaningful figures; tails depend on machine load and garbage collection.
+
+## Interest sets (SC-02)
+
+`createInterestSets(grid, limits)` keeps a bounded, ranked set of relevant entity ids per observer
+(a connection, a team view, a sensor) over a grid the caller already maintains. It is the spatial
+policy that [complete scoped views](../../../docs/guides/network-views.md) leave to the creator;
+the reference composition is [`tools/interest-host`](../../../tools/interest-host/host.mjs).
+
+```ts
+import { createInterestResult, createInterestSets } from '@kits/spatial';
+const limits = { enterRadius: 40, exitRadius: 48, holdUpdates: 1, maxObservers: 64, maxRelevant: 64,
+  maxCandidates: 512, maxPrioritized: 256 };
+const interest = createInterestSets(grid, limits);   // the grid stays caller-owned
+const out = createInterestResult(limits);            // reusable: relevant / entered / left buffers
+interest.addObserver(connectionId, x, y, avatarId);  // avatarId is never reported to itself
+interest.setPriority(flagId, 1);                     // higher tiers rank first (default 0)
+const r = interest.update(connectionId, out);        // 'complete' | 'over-budget' | 'incomplete' | ...
+// out.relevant[0 .. r.relevantCount): ranked by tier desc, distance asc, id asc
+// out.entered / out.left: changes since this observer's previous update
+```
+
+| Contract | Definition |
+|---|---|
+| Creator-owned semantics | Radii, hold, budget and tiers; what an observer is; what a relevant id discloses; when to update; what an over-budget or incomplete set means for the game |
+| Inputs and outputs | Observer ids and positions (nonnegative safe integers, finite numbers); entity ids are the grid's. `update` writes the ranked set, entered ids (rank order) and left ids (previous rank order) into a caller record, plus `status`, `dropped`, `candidates` and the grid revision it saw |
+| Owner | The caller owns the grid, the interest sets and every observer. Nothing is scheduled, sent or called back. `dispose()` does not dispose the borrowed grid |
+| Bounds | `maxObservers x maxRelevant` member slots (ceiling 4,194,304), `maxCandidates` per scan, `maxPrioritized` tiers, all allocated at construction. Construction refuses an `exitRadius` whose worst-case scan exceeds the grid's `maxCellsPerQuery`. An update scans one circle and ranks by bounded insertion: O(candidates x maxRelevant) |
+| Hysteresis | Enter at `<= enterRadius`; stay while `<= exitRadius`; a member beyond `exitRadius` that is still in the grid stays for `holdUpdates` more updates, with no distance cap (keep it small). An id removed from the grid leaves at once; an id reused while between the radii keeps its membership without an `entered` event (carry an incarnation) |
+| Overload | More qualifying ids than `maxRelevant`: `over-budget`, the lowest-ranked are `dropped` (they may enter later). A truncated or refused scan: `incomplete`, fail closed: no new id enters, unseen members leave, seen members stay. A closed grid: `unavailable`, every member leaves. Full observer/priority tables: `saturated` |
+| Cancellation and replacement | Synchronous only. `removeObserver` forgets the set (the caller retires what it disclosed); `dispose()` is terminal and idempotent; later calls report `closed` |
+| Failure and recovery | Malformed input or an undersized, frozen or non-`Float64Array` result throws before any change |
+| Evidence | `interest.test.ts` (9 tests, including a 3,000-step randomised comparison with an independent reference model covering tiers, hold, budget, observer motion and removal); `tools/interest-host/host.test.mjs` (6 tests: real NW-02 receivers, per-connection disclosure, no frames for hidden activity while scans are complete, hysteresis, credit coalescing, budget, despawn, no leaked observer slots on duplicate sessions or refused publishers); `tools/spatial-bench` interest cases at 1,000 and 10,000 entities with a work-count test |
+| Limits | Distance only: no occlusion, line of sight or team sharing (compose those in the creator's projection). No priority accumulation or starvation rotation for dropped ids, no per-entity update frequency, no delta encoding. Ranking is deterministic, but which ids an `incomplete` scan saw depends on grid history. Entity id reuse is the creator's: carry an incarnation in the view, as the reference host does. No browser, worker or physical-device evidence |
