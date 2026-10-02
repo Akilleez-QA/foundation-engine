@@ -29,6 +29,7 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [market](../../src/kits/market/README.md) | Local settlement and durable delivery claims | mechanics |
 | [network](../../src/kits/network/README.md) | Bounded connection/authentication intake, complete scoped views, durable authority and prediction; creator-supplied transport, disclosure and game policy | Admission integrated in PR #120; scoped views integrated on main at `ea48539` (PR #122 in the private development history), after clean rebased browser and all seven gates (1,965 tests, 129 performance checks); see [view guide](../guides/network-views.md). Authority/prediction integrated in PR #123 at `b6fb4a3` after all seven gates (2,018 tests, 129 checks) |
 | [housing](../../src/kits/housing/README.md) | Permission-separated placement and recoverable manifests | mechanics |
+| [turns](../../src/kits/turns/README.md) | Deterministic command logs: seeded per-position random, undo/redo, exact previews, replay, save snapshots with drift detection, durable-authority policies | None yet. Implemented, candidate (PR pending); headless unit tests only. [Recipe](../recipes/add-a-turn-log.md) |
 
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.
 

@@ -283,3 +283,7 @@ candidate in PR #15 on the public repository and is not integrated. It reads the
 It keeps bounded windows and fixed histograms, and produces a local `foundation.session-perf` evidence file. Nothing is
 transmitted. Its only browser evidence is emulated. It gives DV-01 a collectable format, but it does not close DV-01:
 physical-device runs on creator-selected profiles remain open.
+
+## Deterministic turn log (turns kit, TB-01) — implemented, candidate
+
+The optional `turns` kit composes existing owners: authored-document/network JSON capture for bounds, core `createRng`/`hashSeed` for per-position random streams, save sections for snapshots (a `{json}` section, restored with explicit `invalid`/`foreign`/`diverged` outcomes) and `createDurableAuthority` through `turnAuthorityPolicies` for server-authoritative play. It adds no service, scheduler, storage or frame work. Candidate on branch `feat/genre-turnbased-slice1` (PR pending), not integrated; 17 headless unit tests; no consumer template, browser or device evidence. See the [kit README](../../src/kits/turns/README.md).

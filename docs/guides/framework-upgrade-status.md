@@ -478,3 +478,11 @@ loopback browser workflow are its only evidence. See the
 | Slice | Capability and actual seam | State | What remains outside the claim |
 |---|---|---|---|
 | PERF-01 | [`FrameLoop.attachSampler`](../../src/core/activity/loop.ts) is a single observational slot. Through it, [`createSessionRecorder`](../../src/platform/perf/session-recorder.ts) records bounded rolling-window percentiles and drift, exposed as `engine.sessionRecorder()` and `?session-record` ([guide](session-performance.md)) | Implemented, candidate (PR #15 on the public repository). Unit tests and an emulated browser run passed on the candidate head; see [verification](../verification/session-perf-20261002/README.md) | No physical-device, thermal, GPU-timer or production telemetry claim. DV-01 remains open |
+
+## Deterministic turn log (turns kit, TB-01) — implemented, candidate
+
+Status: implemented, candidate on branch `feat/genre-turnbased-slice1` (PR pending); not integrated. See the [kit README](../../src/kits/turns/README.md) and [recipe](../recipes/add-a-turn-log.md).
+
+- Runtime-enforced: rules id, validator literal-`true` acceptance, JSON capture limits for commands and states, `maxCommands` retention (`full` overload, `checkpoint` recovery), revision-checked mutations (`stale`), reentrancy (`busy`), disposal (`retired`), frozen states, restore outcomes `invalid`/`foreign`/`diverged` with a 32-bit replay checksum.
+- Checked: 17 focused headless unit tests (determinism, preview equals submit, undo/redo/replay, real SaveStore round trip across a fresh store, adversarial reducers and inputs, durable-authority composition with an in-memory adapter).
+- Not established: any template or game consumer, browser or device evidence, reducer CPU deadlines, hidden-information safety of a local log (it is not), AI worker budgets, play-by-turn timeouts.
