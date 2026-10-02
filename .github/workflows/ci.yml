@@ -69,6 +69,8 @@ jobs:
         run: npm run test:audio-browser
       - name: Optional replay and divergence browser regressions
         run: npm run test:replay-browser
+      - name: Network overload probe regression, loopback only (NW-07)
+        run: npm run test:network-probe
       - name: Full gates for every template
         run: npm run gate:templates
       - name: Phone smoke for every template

@@ -42,18 +42,32 @@ The report contains, per scenario:
   host RSS/heap and event-loop lag (RSS is an observation, not a guarantee);
 - invariants with `ok: true/false`, plus `finding` rows (measured behaviour reported
   rather than asserted) and `inconclusive` rows (the host process was CPU-starved, so
-  the probe cannot attribute a drop).
+  the probe cannot attribute a drop). Asserted: the intake global queue bound and the
+  per-peer buffered caps (sampled), the per-peer token bucket (host `rate-capacity`
+  retirements match the flooders), the connection bound (sampled host connections at
+  most 8, over-bound attempts closed, storm reconnects at most 8), one application
+  credit per peer (a deliberately slow acknowledger never receives a view while its
+  acknowledgement is pending, sequences are consecutive, and the non-reader gets at
+  most one view beyond its acknowledgements), retry attempts per episode and the retry
+  budget per client. Storm checks are load-independent. No client ends `terminal` or
+  unresolved. When the clients fit the connection bound, no capacity refusal occurs,
+  and every client that attempts after the host reports ready reconnects. Any other
+  client must have stopped by its own bound before that.
 
 ## Bounds, overload, cancellation and recovery
 
 - **Bounded:** every count, rate and duration is capped; total runtime has a 180 s
   guard that sets `aborted`. The probe stops early when host RSS passes
-  `abort.rssMb` or a host read times out.
+  `abort.rssMb` or a host read times out. A child host must report ready within
+  `abort.readyTimeoutMs` (default 30 s; module loading on a loaded machine), and the
+  storm observes `observeMs` from host readiness, which must cover a full episode of
+  backoff ceilings (validated).
 - **Cleanup:** `finally` terminates every socket the probe opened and closes every
   host it forked: graceful IPC close, then `SIGKILL` to that exact child PID only if
   it has not exited within 2 s. It never kills by name or pattern. A host whose
   parent disappears closes itself on IPC disconnect. The report lists the started
-  host PIDs and the owned resources left after cleanup (zero).
+  host PIDs, the sockets started and the sockets whose close event had not fired
+  after cleanup (measured, expected zero).
 - **Priority:** the CLI raises its own niceness to at least 15 (`os.setPriority` on
   its own PID); forked hosts inherit it.
 - **Determinism:** client pacing, retry jitter and command identities derive from
@@ -81,8 +95,8 @@ threads) and the probe ran at niceness 15, so these are conservative observation
   the paused peer for `send-refused` when its buffered-send cap engaged: after 18.9 s
   and 14.8 s, at about 533 views of 5,527 bytes (about 2.95 MB absorbed by loopback
   kernel buffers first), with host `bufferedAmount` at most 127,213 of 131,072
-  bytes. In the third run the window ended (20 s, 497 views, about 2.75 MB) before
-  the kernel buffers filled; the host buffered nothing. Healthy peers kept receiving
+  bytes (runs 2 and 3). In run 1 the window ended (20 s, 497 views, about 2.75 MB)
+  before the kernel buffers filled; the host buffered nothing. Healthy peers kept receiving
   every view in all runs, at most one credit outstanding per peer, and adoption p99
   stayed within 62.8 to 179 ms under attack (loaded-machine baseline p99 9.4 to 25 ms).
 - **Small-reply non-reader (network host).** Replies of about 80 bytes at 8/s never
@@ -138,6 +152,17 @@ threads) and the probe ran at niceness 15, so these are conservative observation
 - The non-reader's acknowledgements use the trusted operator view of its outstanding
   sequence. That is the worst case: an attacker that guesses sequences perfectly.
 - The storm hands each client the restarted host's fresh fixture credential (the
-  fixture issues credentials per lifetime), so authentication is not under test.
-- The regression test (`tools/network-probe/probe.test.mjs`, tests named `NW07:`)
-  runs a short scenario with loose floors; it guards the invariants, not the numbers.
+  fixture issues credentials per lifetime), so authentication is not under test. A
+  retry that reaches the new port before the new host's ready message is handled
+  waits for it before authenticating.
+- Tests: `tools/network-probe/probe.test.mjs` (fast, no sockets: configuration caps
+  and invariant classification) runs with `npm test`. The host-driving regression
+  `tools/network-probe/probe.regression.mjs` (`npm run test:network-probe`, tests named
+  `NW07:`) runs once in CI as its own step, not in every per-template `npm test`. It
+  drives the replication non-reader to the buffered-send cap (operator changes every
+  5 ms) and asserts the `send-refused` retirement, plus the overload, credit and storm
+  invariants with loose floors. It guards the invariants, not the numbers.
+- The three saved runs predate the review fixes in PR #27 (storm credential wait,
+  observation from host readiness, the added invariants and measured socket closure).
+  Their measurements remain valid for the code they ran; their invariant lists are the
+  smaller earlier set.

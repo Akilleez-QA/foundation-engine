@@ -58,7 +58,8 @@ export const DEFAULTS = Object.freeze({
     observeMs: 9000,
     retry: { baseMs: 250, capMs: 2000, maxAttempts: 6, budget: { capacity: 8, refillEveryMs: 15000 } },
   },
-  abort: { rssMb: 1024, readTimeoutMs: 3000 },
+  // readyTimeoutMs bounds a child host's start (module load under a loaded machine), not anything measured.
+  abort: { rssMb: 1024, readTimeoutMs: 3000, readyTimeoutMs: 30000 },
 });
 
 /** Hard caps on any configuration, whatever the caller asks for. */
@@ -159,8 +160,18 @@ export function resolveConfig(options = {}) {
   capInt(s.downtimeMs, 0, 5000, 'storm.downtimeMs');
   capInt(s.binMs, 10, 1000, 'storm.binMs');
   capInt(s.observeMs, 500, CAPS.observeMs, 'storm.observeMs');
+  // The window after the host is ready must cover a full episode of backoff ceilings, or a still-waiting client
+  // would be reported as unresolved merely because observation stopped.
+  capInt(s.retry.baseMs, 1, 10000, 'storm.retry.baseMs');
+  capInt(s.retry.capMs, s.retry.baseMs, 60000, 'storm.retry.capMs');
+  capInt(s.retry.maxAttempts, 1, 20, 'storm.retry.maxAttempts');
+  let ceilings = 0;
+  for (let k = 1; k <= s.retry.maxAttempts; k++) ceilings += Math.min(s.retry.capMs, s.retry.baseMs * 2 ** (k - 1));
+  if (s.observeMs < ceilings)
+    throw RangeError(`probe config: storm.observeMs ${s.observeMs} < worst-case episode backoff ${ceilings}`);
   capInt(c.abort.rssMb, 64, CAPS.rssMb, 'abort.rssMb');
   capInt(c.abort.readTimeoutMs, 100, 10000, 'abort.readTimeoutMs');
+  capInt(c.abort.readyTimeoutMs, 1000, 120000, 'abort.readyTimeoutMs');
   return c;
 }
 
@@ -171,20 +182,28 @@ function createOwner() {
   const children = new Set(),
     sockets = new Set(),
     pids = [];
+  let started = 0;
   return {
     children,
     pids,
     sockets,
+    started: () => started,
     socket(url) {
       const socket = new WebSocket(url, { perMessageDeflate: false });
+      started++;
       sockets.add(socket);
       socket.on('error', () => {});
       socket.once('close', () => sockets.delete(socket));
       return socket;
     },
+    /** Terminate every socket and wait (bounded) for its close event, then close every owned host. */
     async cleanup() {
-      for (const socket of sockets) socket.terminate();
-      sockets.clear();
+      const open = [...sockets];
+      for (const socket of open) socket.terminate();
+      await Promise.race([
+        Promise.all(open.map((socket) => (socket.readyState === WebSocket.CLOSED ? null : once(socket, 'close')))),
+        delay(2000),
+      ]);
       await Promise.all([...children].map((h) => h.close()));
     },
   };
@@ -250,6 +269,7 @@ async function startHost(owner, kind, options, abort) {
   };
   owner.children.add(handle);
   owner.pids.push(child.pid);
+  let readyTimer;
   const ready = await Promise.race([
     new Promise((resolve) => {
       const listen = (m) => {
@@ -263,13 +283,15 @@ async function startHost(owner, kind, options, abort) {
     exited.then((e) => {
       throw Error(`probe host exited before ready (${e.code ?? e.signal}): ${stderr.trim()}`);
     }),
-    delay(15000).then(() => {
-      throw Error('probe host ready timeout');
+    new Promise((_, reject) => {
+      readyTimer = setTimeout(() => reject(Error(`probe host ready timeout (${abort.readyTimeoutMs} ms)`)), abort.readyTimeoutMs);
     }),
-  ]).catch(async (error) => {
-    await handle.close();
-    throw error;
-  });
+  ])
+    .catch(async (error) => {
+      await handle.close();
+      throw error;
+    })
+    .finally(() => clearTimeout(readyTimer));
   handle.url = ready.url;
   handle.credentials = ready.credentials;
   handle.port = Number(new URL(ready.url).port);
@@ -488,7 +510,9 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
         c.rate = step.ratePerClient;
         c.start();
       }
-      const adv = o.adversaries ? adversaryRound(step.index).catch((e) => ({ error: e.message })) : null;
+      const adv = o.adversaries
+        ? adversaryRound(step.index).catch((e) => adversaries.push({ step: step.index, kind: 'round-error', error: String(e?.message ?? e) }))
+        : null;
       const end = now() + o.stepMs;
       while (now() < end && !state.abort) await delay(20);
       await adv;
@@ -611,7 +635,11 @@ async function runNonReader(cfg, owner, state) {
     for (let i = 0; i < n.healthyClients; i++) {
       const principal = i % 2 ? 'beta' : 'alpha';
       const socket = owner.socket(host.url),
-        c = { socket, session: null, views: 0, viewsByPhase: { baseline: 0, attack: 0, after: 0 }, adopted: 0, maxBytes: 0 };
+        // Client 0 (when there are two or more) acknowledges after a delay, so the credit check below is not trivial:
+        // a view that arrives while its acknowledgement is still pending means the host sent past its one credit.
+        slow = n.healthyClients >= 2 && i === 0,
+        c = { socket, session: null, views: 0, viewsByPhase: { baseline: 0, attack: 0, after: 0 }, adopted: 0, maxBytes: 0,
+          slow, ackPending: false, lastSequence: 0, creditViolations: 0, sequenceGaps: 0 };
       socket.on('message', (data) => {
         const f = JSON.parse(data.toString());
         if (f.type === 'authenticated') c.session = f.session;
@@ -619,13 +647,25 @@ async function runNonReader(cfg, owner, state) {
           c.views++;
           c.viewsByPhase[phase]++;
           c.maxBytes = Math.max(c.maxBytes, data.length);
+          if (c.ackPending) c.creditViolations++;
+          if (f.sequence !== c.lastSequence + 1) c.sequenceGaps++;
+          c.lastSequence = f.sequence;
           const value = f.entities.find((e) => e.id === 'entity-0')?.fields.value;
           // Adoption latency: from the operator change to the first view that carries it (or a later value).
+          // The deliberately slow acknowledger is excluded so its delay does not distort the percentiles.
           while (c.adopted < changes.length && changes[c.adopted].value <= value) {
-            phases[changes[c.adopted].phase].push(now() - changes[c.adopted].at);
+            if (!c.slow) phases[changes[c.adopted].phase].push(now() - changes[c.adopted].at);
             c.adopted++;
           }
-          socket.send(JSON.stringify({ v: 1, type: 'view-ack', session: c.session, sequence: f.sequence }));
+          const ack = () => {
+            c.ackPending = false;
+            if (socket.readyState === WebSocket.OPEN)
+              socket.send(JSON.stringify({ v: 1, type: 'view-ack', session: c.session, sequence: f.sequence }));
+          };
+          if (c.slow) {
+            c.ackPending = true;
+            setTimeout(ack, 30);
+          } else ack();
         }
       });
       socket.once('close', (code, reason) => {
@@ -713,6 +753,8 @@ async function runNonReader(cfg, owner, state) {
         retiredByHost: attacker.retiredAfterMs !== null,
         retiredAfterMs: attacker.retiredAfterMs,
         acknowledgementsSent: attacker.acks,
+        // The host may send at most one view beyond the acknowledgements it has received.
+        creditRespected: attacker.lastSequence <= attacker.acks + 1,
         viewsSentBeforeRetire: attacker.lastSequence,
         approxBytesAbsorbedByKernelBeforeRetire: attacker.lastSequence * viewMaxBytes,
         maxSampledHostBufferedBytes: attacker.maxBuffered,
@@ -722,6 +764,9 @@ async function runNonReader(cfg, owner, state) {
       healthy: {
         clients: n.healthyClients,
         viewsByPhase: healthy.map((c) => c.viewsByPhase),
+        slowAcknowledgerMs: healthy.some((c) => c.slow) ? 30 : null,
+        creditViolations: healthy.reduce((k, c) => k + c.creditViolations, 0),
+        sequenceGaps: healthy.reduce((k, c) => k + c.sequenceGaps, 0),
         adoptionLatency: {
           baseline: latencySummary(phases.baseline),
           duringAttack: latencySummary(phases.attack),
@@ -770,15 +815,20 @@ async function runStormVariant(cfg, owner, state, variant, index) {
   let t0 = 0,
     hostReadyAfterMs = null,
     driver = null,
-    hostDown = true;
+    // Resolved once the current host has reported ready. A retry can reach the restarted host's port before its
+    // ready message is handled; it must wait for the new host's credentials instead of sending the old ones.
+    hostReady = Promise.resolve(),
+    releaseHostReady = () => {};
   try {
     const connectOnce = (c) => {
       const socket = owner.socket(host.url);
       c.socket = socket;
       c.authed = false;
-      socket.on('open', () => {
-        if (t0 && !hostDown) accepted.push(now() - t0);
-        socket.send(JSON.stringify({ v: 1, type: 'auth', token: host.credentials[c.principal] }));
+      socket.on('open', async () => {
+        if (t0) accepted.push(now() - t0);
+        await hostReady;
+        if (socket.readyState === WebSocket.OPEN && c.socket === socket)
+          socket.send(JSON.stringify({ v: 1, type: 'auth', token: host.credentials[c.principal] }));
       });
       socket.on('message', (data) => {
         if (JSON.parse(data.toString()).type === 'authenticated') {
@@ -797,11 +847,15 @@ async function runStormVariant(cfg, owner, state, variant, index) {
         if (!t0) return;
         if (why.class === 'terminal') {
           c.state = 'terminal';
+          c.stoppedAt = now() - t0;
           return;
         }
         const r = c.schedule.next(now() - t0 + 1e6);
         if (r.status === 'wait') c.state = 'waiting';
-        else c.state = r.status;
+        else {
+          c.state = r.status;
+          c.stoppedAt = now() - t0;
+        }
       });
     };
     for (let i = 0; i < variant.clients; i++) {
@@ -810,7 +864,6 @@ async function runStormVariant(cfg, owner, state, variant, index) {
       clients.push(c);
       connectOnce(c);
     }
-    hostDown = false;
     // Initial phase: up to the host's connection bound authenticate; the rest are refused (bounded), as in a full host.
     await delay(500);
     const initiallyConnected = clients.filter((c) => c.authed).length;
@@ -819,7 +872,9 @@ async function runStormVariant(cfg, owner, state, variant, index) {
 
     // Restart: close the host (terminates every socket), wait the downtime, start a fresh host on the same port.
     t0 = now();
-    hostDown = true;
+    hostReady = new Promise((resolve) => {
+      releaseHostReady = resolve;
+    });
     // Every client wants a session after the restart; the ones the full host never admitted start an episode too.
     for (const c of clients)
       if (c.state === 'never-admitted') {
@@ -834,15 +889,17 @@ async function runStormVariant(cfg, owner, state, variant, index) {
         if (c.state === 'waiting' && c.schedule.due(t)) {
           c.state = 'attempting';
           c.attempts = (c.attempts ?? 0) + 1;
+          c.lastAttemptAt = now() - t0;
           attempts.push(now() - t0);
           connectOnce(c);
         }
     }, 2);
     await delay(s.downtimeMs);
     host = await startHost(owner, 'network', { port }, cfg.abort);
-    hostDown = false;
     hostReadyAfterMs = round(now() - t0);
-    const end = t0 + s.observeMs;
+    releaseHostReady();
+    // Observe from host readiness, so a slow host start cannot cut short a client's remaining bounded schedule.
+    const end = now() + s.observeMs;
     while (now() < end && !state.abort && participants.some((c) => c.state === 'waiting' || c.state === 'attempting'))
       await delay(20);
     clearInterval(driver);
@@ -881,12 +938,23 @@ async function runStormVariant(cfg, owner, state, variant, index) {
         last: round(reconnect.length ? Math.max(...reconnect) : null),
       },
       maxAttemptsPerClient: Math.max(0, ...participants.map((c) => c.attempts ?? 0)),
+      // Load-independent accounting: a client that attempts after the host reported ready must reconnect when the
+      // clients fit the connection bound; every other client must have stopped by its own bound before that.
+      attemptedAfterReady: participants.filter((c) => (c.lastAttemptAt ?? -1) >= hostReadyAfterMs).length,
+      attemptedAfterReadyReconnected: participants.filter((c) => (c.lastAttemptAt ?? -1) >= hostReadyAfterMs && c.state === 'connected').length,
+      // Stopped by its own attempt bound or budget with its last attempt made before the host reported ready
+      // (judged by attempt time, not by when the refusal's close event happened to be processed).
+      stoppedBeforeReady: participants.filter(
+        (c) => (c.state === 'exhausted' || c.state === 'budget-empty') && (c.lastAttemptAt ?? -1) < hostReadyAfterMs,
+      ).length,
+      retryBudgetBoundPerClient: s.retry.budget.capacity + Math.floor(s.observeMs / s.retry.budget.refillEveryMs),
       attemptBoundPerClient: s.retry.maxAttempts,
       attemptBoundNote: 'per episode; a client that reconnects and loses again starts a new episode, still within the budget',
       hostConnectionsAtEnd: final.host.intake.connections,
     };
   } finally {
     clearInterval(driver);
+    releaseHostReady();
     state.stopping = true;
     for (const c of clients) c.socket?.terminate();
     for (const c of clients) c.schedule.dispose();
@@ -950,25 +1018,54 @@ export function invariants(report) {
     check(`${id}.global-queue-bound`, o.highWater.queuedMessages <= 32 && o.highWater.queuedBytes <= 16384,
       `sampled high-water ${o.highWater.queuedMessages} messages / ${o.highWater.queuedBytes} bytes`);
     check(`${id}.buffered-bound`, o.highWater.peerBufferedBytes <= 8192, `sampled ${o.highWater.peerBufferedBytes} bytes`);
+    const over = o.adversaries.filter((a) => a.kind === 'over-connection-bound');
+    check(`${id}.connection-bound`, o.highWater.connections <= 8 && over.every((a) => a.code !== null),
+      `sampled high-water ${o.highWater.connections} connections; over-bound attempts closed ${over.map((a) => a.code).join(',')}`);
+    const errors = o.adversaries.filter((a) => a.kind === 'round-error');
+    if (o.adversaries.length || errors.length)
+      check(`${id}.adversary-rounds-complete`, errors.length === 0 && floods.length === o.steps.length,
+        errors.length ? errors.map((e) => `step ${e.step}: ${e.error}`).join('; ') : `${floods.length} of ${o.steps.length} rounds`);
     check(`${id}.host-rss-below-abort`, o.highWater.hostRssBytes <= report.config.abort.rssMb * 1048576,
       `${Math.round(o.highWater.hostRssBytes / 1048576)} MiB`);
   }
   const n = report.scenarios.nonReader;
   if (n) {
-    check('non-reader.retired-or-bounded', n.nonReader.retiredByHost || n.highWater.hostMaxBufferedBytesAtSend <= 131072,
-      n.nonReader.retiredByHost ? `retired after ${n.nonReader.retiredAfterMs} ms (${JSON.stringify(n.highWater.hostCloseReasons)})` : 'not retired; buffered within bound');
+    if (n.nonReader.retiredByHost)
+      check('non-reader.retired-by-buffered-cap', (n.highWater.hostCloseReasons['send-refused'] ?? 0) === 1,
+        `retired after ${n.nonReader.retiredAfterMs} ms; host close reasons ${JSON.stringify(n.highWater.hostCloseReasons)}`);
+    else
+      rows.push({ id: 'non-reader.window-ended-before-cap', ok: null, finding: true,
+        detail: `${n.nonReader.viewsSentBeforeRetire} views (~${n.nonReader.approxBytesAbsorbedByKernelBeforeRetire} bytes) did not fill kernel buffers within the attack window` });
     check('non-reader.buffered-bound', n.highWater.hostMaxBufferedBytesAtSend <= 131072, `${n.highWater.hostMaxBufferedBytesAtSend} bytes`);
     check('non-reader.healthy-never-closed', n.healthy.unexpectedCloses.length === 0, `${n.healthy.unexpectedCloses.length}`);
     check('non-reader.healthy-served-during-attack', n.healthy.viewsByPhase.every((v) => v.attack > 0),
       n.healthy.viewsByPhase.map((v) => v.attack).join(','));
-    check('non-reader.one-credit-per-peer', n.highWater.hostMaxOutstanding <= n.healthy.clients + 1, `${n.highWater.hostMaxOutstanding}`);
+    check('non-reader.one-credit-per-peer',
+      n.healthy.creditViolations === 0 && n.healthy.sequenceGaps === 0 && n.nonReader.creditRespected,
+      `slow acknowledger violations ${n.healthy.creditViolations}, sequence gaps ${n.healthy.sequenceGaps}; non-reader ` +
+        `${n.nonReader.viewsSentBeforeRetire} views for ${n.nonReader.acknowledgementsSent} acknowledgements`);
   }
   const s = report.scenarios.storm;
   if (s)
     for (const v of s.variants)
-      check(`storm.${v.policy}.${v.clients}.attempts-bounded`,
+    {
+      const id = `storm.${v.policy}.${v.clients}`;
+      check(`${id}.attempts-bounded`,
         v.maxAttemptsPerClient <= v.attemptBoundPerClient && v.attempts <= v.clients * v.attemptBoundPerClient,
         `${v.attempts} attempts, max ${v.maxAttemptsPerClient} per client`);
+      check(`${id}.retry-budget`, v.maxAttemptsPerClient <= v.retryBudgetBoundPerClient,
+        `max ${v.maxAttemptsPerClient} per client, budget bound ${v.retryBudgetBoundPerClient}`);
+      check(`${id}.connection-bound`, v.hostConnectionsAtEnd <= v.hostConnectionBound && v.outcomes.reconnected <= v.hostConnectionBound,
+        `${v.hostConnectionsAtEnd} connections at end, ${v.outcomes.reconnected} reconnected`);
+      check(`${id}.no-terminal-or-stuck-client`, v.outcomes.terminal === 0 && v.outcomes.unresolved === 0, JSON.stringify(v.outcomes));
+      if (v.clients <= v.hostConnectionBound) {
+        check(`${id}.no-capacity-refusal`, !v.closesDuringStorm['1013 connection-capacity'], JSON.stringify(v.closesDuringStorm));
+        check(`${id}.retrying-clients-reconnect`,
+          v.attemptedAfterReadyReconnected === v.attemptedAfterReady && v.outcomes.reconnected + v.stoppedBeforeReady === v.clients,
+          `${v.attemptedAfterReadyReconnected}/${v.attemptedAfterReady} that attempted after ready reconnected; ` +
+            `${v.stoppedBeforeReady} stopped before ready (host ready after ${v.hostReadyAfterMs} ms)`);
+      }
+    }
   if (n)
     check('non-reader.host-rss-below-abort', n.highWater.hostRssBytes <= report.config.abort.rssMb * 1048576,
       `${Math.round(n.highWater.hostRssBytes / 1048576)} MiB`);
@@ -1041,7 +1138,14 @@ export async function runNetworkProbe(options = {}) {
   report.aborted = state.abort;
   report.durationMs = round(now() - started);
   report.invariants = invariants(report);
-  report.ownedResourcesAfterCleanup = { children: owner.children.size, sockets: owner.sockets.size, startedHostPids: owner.pids };
+  // `socketsNotClosed` counts sockets whose close event has not fired after cleanup (set membership is removed only
+  // by that event), so it measures real handles rather than a cleared list.
+  report.ownedResourcesAfterCleanup = {
+    children: owner.children.size,
+    socketsStarted: owner.started(),
+    socketsNotClosed: owner.sockets.size,
+    startedHostPids: owner.pids,
+  };
   return report;
 }
 

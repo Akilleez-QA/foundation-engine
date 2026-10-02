@@ -1,81 +1,45 @@
-// NW-07 regression-sized overload probe: real loopback WebSockets against child-process reference hosts.
-// Evidence scope: loopback/process only; not WAN, not physical devices. Floors are deliberately loose so a
-// loaded developer machine does not flake, while still failing if a flooder or non-reader harms healthy peers.
-import test, { before } from 'node:test';
+// NW-07 fast checks (no sockets, no hosts): configuration caps and the invariant classification.
+// The host-driving regression is tools/network-probe/probe.regression.mjs, run once in CI by
+// `npm run test:network-probe`, not by every per-template `npm test`.
+import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runNetworkProbe, resolveConfig, CAPS } from './probe.mjs';
-
-let report;
-before(async () => {
-  report = await runNetworkProbe({
-    seed: 11,
-    overload: { queueAgeVariants: [null], rampPerClient: [8, 24], stepMs: 1000, drainMs: 400 },
-    nonReader: { healthyClients: 2, settleMs: 300, maxAttackMs: 2000 },
-    // Enough attempts (cumulative backoff up to 11.75 s) and observation that every client resolves even when a
-    // loaded machine delays the restarted host.
-    storm: {
-      variants: [{ policy: 'jitter', clients: 8 }],
-      observeMs: 15000,
-      retry: { baseMs: 250, capMs: 2000, maxAttempts: 8, budget: { capacity: 10, refillEveryMs: 15000 } },
-    },
-  });
-});
+import { resolveConfig, invariants, CAPS } from './probe.mjs';
 
 test('NW07: probe configuration is capped and validated', () => {
   assert.throws(() => resolveConfig({ overload: { healthyClients: CAPS.healthyClients + 1 } }), RangeError);
   assert.throws(() => resolveConfig({ overload: { rampPerClient: [CAPS.ratePerClient + 1] } }), RangeError);
+  assert.throws(() => resolveConfig({ overload: { queueAgeVariants: [0] } }), RangeError);
   assert.throws(() => resolveConfig({ storm: { variants: [{ policy: 'jitter', clients: CAPS.stormClients + 1 }] } }), RangeError);
+  assert.throws(() => resolveConfig({ storm: { variants: [{ policy: 'other', clients: 2 }] } }), RangeError);
   assert.throws(() => resolveConfig({ nonReader: { maxAttackMs: CAPS.attackMs + 1 } }), RangeError);
+  assert.throws(() => resolveConfig({ abort: { rssMb: CAPS.rssMb + 1 } }), RangeError);
   assert.throws(() => resolveConfig({ scenarios: ['unknown'] }), RangeError);
-  assert.equal(resolveConfig().seed, 7);
+  assert.throws(() => resolveConfig({ storm: { observeMs: 7000 } }), /worst-case episode backoff 7750/);
+  const c = resolveConfig();
+  assert.equal(c.seed, 7);
+  assert.deepEqual(c.scenarios, ['overload', 'non-reader', 'storm']);
 });
 
-test('NW07: healthy goodput stays above a floor past saturation while a flooder is rate-limited', () => {
-  assert.equal(report.aborted, null);
-  const [o] = report.scenarios.overload.variants;
-  assert.equal(o.unexpectedHealthyCloses.length, 0, 'no healthy peer is closed');
-  const floods = o.adversaries.filter((a) => a.kind === 'flooder');
-  assert.ok(floods.length > 0);
-  // Host-side retirement reason is authoritative; a loaded machine can lose the client-visible close frame.
-  assert.equal(o.highWater.hostCloseReasons['rate-capacity'], floods.length);
-  for (const f of floods) assert.ok(f.code === 1006 || (f.code === 1013 && f.reason === 'rate-capacity'), `${f.code} ${f.reason}`);
-  const wrong = o.adversaries.filter((a) => a.kind === 'wrong-credential');
-  assert.equal(o.highWater.hostCloseReasons['auth-rejected'], wrong.length);
-  for (const a of wrong)
-    assert.ok(a.code === 1006 || (a.code === 1008 && a.reason === 'auth-rejected' && a.class === 'terminal'), `${a.code} ${a.reason}`);
-  const saturated = o.steps.at(-1);
-  assert.ok(saturated.offeredPerSecond > saturated.goodputPerSecond, 'the last step is past saturation');
-  // Nominal capacity is 80 dispatches/s; a quarter of it is a floor that only a real regression breaks.
-  assert.ok(saturated.goodputPerSecond >= o.host.dispatchCapacityPerSecond / 4, `goodput ${saturated.goodputPerSecond}/s`);
-  assert.ok(o.derived.plateauRatio >= 0.5, `final/peak goodput ${o.derived.plateauRatio}`);
-  assert.ok(o.highWater.queuedMessages <= 32 && o.highWater.queuedBytes <= 16384);
-  assert.ok(o.highWater.peerBufferedBytes <= 8192);
+const stormVariant = (over) => ({
+  policy: 'jitter', clients: 8, hostConnectionBound: 8, hostReadyAfterMs: 700, attempts: 20, maxAttemptsPerClient: 4,
+  attemptBoundPerClient: 6, retryBudgetBoundPerClient: 8, hostConnectionsAtEnd: 8, closesDuringStorm: { 1006: 12 },
+  outcomes: { reconnected: 8, exhausted: 0, 'budget-empty': 0, terminal: 0, unresolved: 0 },
+  attemptedAfterReady: 5, attemptedAfterReadyReconnected: 5, stoppedBeforeReady: 0, ...over,
 });
+const failing = (variant) =>
+  invariants({ config: { abort: { rssMb: 1024 } }, scenarios: { storm: { variants: [variant] } } })
+    .filter((r) => r.ok === false)
+    .map((r) => r.id.split('.').at(-1));
 
-test('NW07: a physical non-reading peer stays bounded or is retired; healthy peers keep current views', () => {
-  const n = report.scenarios.nonReader;
-  assert.ok(n.highWater.hostMaxBufferedBytesAtSend <= 131072, `${n.highWater.hostMaxBufferedBytesAtSend}`);
-  if (n.nonReader.retiredByHost) assert.deepEqual(n.highWater.hostCloseReasons, { 'send-refused': 1 });
-  assert.equal(n.healthy.unexpectedCloses.length, 0);
-  for (const v of n.healthy.viewsByPhase) assert.ok(v.attack > 0, 'healthy peers receive views during the attack');
-  assert.ok(n.highWater.hostMaxOutstanding <= n.healthy.clients + 1, 'one application credit per peer');
-  assert.ok(n.highWater.hostRssBytes < 512 * 1048576, 'host memory high-water bounded');
-});
-
-test('NW07: reconnect storm after a host restart is paced and bounded; every owned resource is released', () => {
-  const [v] = report.scenarios.storm.variants;
-  const detail = `host ready after ${v.hostReadyAfterMs} ms; ${JSON.stringify(v.outcomes)}`;
-  // Every client ends in a bounded outcome: reconnected, or stopped by its attempt bound or budget. None is stuck.
-  assert.equal(v.outcomes.unresolved, 0, detail);
-  assert.equal(v.outcomes.reconnected + v.outcomes.exhausted + v.outcomes['budget-empty'], v.clients, detail);
-  assert.ok(v.outcomes.reconnected >= 1, detail);
-  assert.ok(v.maxAttemptsPerClient <= v.attemptBoundPerClient);
-  assert.ok(v.attempts <= v.clients * v.attemptBoundPerClient);
-  assert.deepEqual(
-    { children: report.ownedResourcesAfterCleanup.children, sockets: report.ownedResourcesAfterCleanup.sockets },
-    { children: 0, sockets: 0 },
-  );
-  for (const pid of report.ownedResourcesAfterCleanup.startedHostPids)
-    assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `host ${pid} exited`);
-  for (const row of report.invariants) if (!row.finding && !row.inconclusive) assert.equal(row.ok, true, `${row.id}: ${row.detail}`);
+test('NW07: storm invariants reject terminal, stuck, capacity-refused and missed reconnects', () => {
+  assert.deepEqual(failing(stormVariant({})), []);
+  assert.deepEqual(failing(stormVariant({ outcomes: { reconnected: 7, exhausted: 0, 'budget-empty': 0, terminal: 1, unresolved: 0 } })),
+    ['no-terminal-or-stuck-client', 'retrying-clients-reconnect']);
+  assert.deepEqual(failing(stormVariant({ closesDuringStorm: { '1013 connection-capacity': 1 } })), ['no-capacity-refusal']);
+  assert.deepEqual(failing(stormVariant({ attemptedAfterReadyReconnected: 4, outcomes: { reconnected: 7, exhausted: 1, 'budget-empty': 0, terminal: 0, unresolved: 0 } })),
+    ['retrying-clients-reconnect']);
+  assert.deepEqual(failing(stormVariant({ maxAttemptsPerClient: 7 })), ['attempts-bounded']);
+  // Over the connection bound, capacity refusals are expected and not every client can reconnect.
+  assert.deepEqual(failing(stormVariant({ clients: 16, closesDuringStorm: { '1013 connection-capacity': 20 },
+    outcomes: { reconnected: 8, exhausted: 8, 'budget-empty': 0, terminal: 0, unresolved: 0 } })), []);
 });

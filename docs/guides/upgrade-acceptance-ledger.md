@@ -494,12 +494,16 @@ change. Two optional reference-host additions keep their defaults: the network w
 
 Addressed statements: "measured network load unverified" and "non-reading peer
 untested". They are now measured on loopback for the network and replication reference hosts.
-The authority workbench was not driven. Runtime-enforced limits checked as invariants
-are the intake queue bounds, the per-peer token buckets, the buffered-send caps, the
-connection bound, and retry attempts and budget. The measured numbers are observations under heavy
+The authority workbench was not driven. Runtime-enforced limits asserted as probe
+invariants are the intake global queue bound and buffered-send caps (sampled), the
+per-peer token buckets (host retirement reasons), the connection bound, one
+application credit per peer, and retry attempts per episode and budget per client.
+The saved runs predate several of these assertions (see the evidence README). The measured numbers are observations under heavy
 contention, listed in the [guide](network-overload.md#measured-results-three-runs-loopback-2026-10-02).
-Manual and physical-device evidence: none. Regression test: `tools/network-probe/probe.test.mjs`
-(`NW07:`), plus an `NW07:` host test for the stale refusal.
+Manual and physical-device evidence: none. Regression: `tools/network-probe/probe.regression.mjs`
+(`npm run test:network-probe`, one CI step, `NW07:`). It includes the non-reader's
+`send-refused` retirement at the cap. There are also fast `probe.test.mjs` checks
+and an `NW07:` host test for the stale refusal.
 
 Open items: the queue-age goodput finding (an engine follow-up, if wanted, would be
 admission-time shedding or not charging aged sheds to the pump budget). Client-visible close
