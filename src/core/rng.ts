@@ -7,8 +7,10 @@
 /** The raw mulberry32 stream: uniform numbers in [0, 1). The seed is taken as an unsigned 32-bit integer. */
 export function mulberry32(seed:number):()=>number{
  let a=seed>>>0;
- return ()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};
+ return ()=>{a=(a+0x6D2B79F5)>>>0;return mulberry32Output(a);};
 }
+/** The mulberry32 output for an already advanced state word. */
+function mulberry32Output(a:number):number{let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;}
 
 /** 32-bit FNV-1a over UTF-16 code units, so a named stream ('kepler-ellipses') always gets the same seed. */
 export function hashSeed(name:string):number{
@@ -30,13 +32,39 @@ export interface Rng{
 
 /** A seeded stream. A number seed gives exactly mulberry32(seed); a string names a stream and is hashed with hashSeed. */
 export function createRng(seed:string|number):Rng{
- const next=mulberry32(typeof seed==='number'?seed:hashSeed(seed));
+ return helpers(mulberry32(typeof seed==='number'?seed:hashSeed(seed)));
+}
+function helpers(next:()=>number):Rng{
  return {
   next,
   range:(lo,hi)=>lo+(hi-lo)*next(),
   int:(lo,hi)=>lo+Math.floor((hi-lo+1)*next()),
   pick:<T>(arr:readonly T[]):T=>{if(arr.length===0)throw new RangeError('rng.pick: empty array');return arr[Math.floor(arr.length*next())];},
  };
+}
+
+/**
+ * A seeded stream whose whole generator state is one unsigned 32-bit word, so it can be saved with a simulation and
+ * restored on rollback, reload or replay. Draws are exactly {@link createRng}'s for the same seed.
+ */
+export interface SaveableRng extends Rng{
+ /** The generator word, an integer in 0..2^32-1. Restoring it reproduces every later draw exactly. */
+ state():number;
+ /** Replace the generator word. Throws RangeError unless it is a safe integer in 0..2^32-1 (no coercion). */
+ restore(word:number):void;
+}
+/** Like {@link createRng}, plus `state()`/`restore(word)`. Allocation-free per draw; no clock, no Math.random. */
+export function createSaveableRng(seed:string|number):SaveableRng{
+ let a=(typeof seed==='number'?seed:hashSeed(seed))>>>0;
+ const rng=helpers(()=>{a=(a+0x6D2B79F5)>>>0;return mulberry32Output(a);});
+ return Object.freeze({
+  ...rng,
+  state:()=>a,
+  restore(word:number){
+   if(!Number.isSafeInteger(word)||word<0||word>0xffffffff)throw new RangeError('rng.restore: the state must be an integer in 0..2^32-1');
+   a=word;
+  },
+ });
 }
 
 /** A seed path component: a safe integer (negative allowed) or a short string. Floats are rejected, not rounded. */

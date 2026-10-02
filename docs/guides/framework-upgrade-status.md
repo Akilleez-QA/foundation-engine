@@ -682,3 +682,13 @@ feeds NW-02 complete scoped views from them; with complete scans, no frame or re
 reveals activity outside a connection's set (an `incomplete` scan can). Status: implemented, candidate (PR #51); not
 integrated. Evidence is unit, reference-host and headless benchmark tests only; no socket,
 browser, device or template evidence and no budget change.
+
+## Saveable random state and input history (RNG-01, INPUT-01) — implemented, candidate
+
+`createSaveableRng` (`@engine`) and the optional `@kits/input-history`
+([README](../../src/kits/input-history/README.md),
+[recipe](../recipes/add-input-history.md)) close two rollback gaps from the
+fighting-game genre study: saving random state, and frame-exact buffered and
+sequence input. Implemented, candidate (PR #52, `feat/rng-state-input-history`);
+not integrated. Evidence is focused headless tests and fixed-lane and rollback
+consumers; controller and feel acceptance are open.

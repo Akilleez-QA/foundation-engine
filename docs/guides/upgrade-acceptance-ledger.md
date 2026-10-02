@@ -83,6 +83,8 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | SC-01 | Bounded spatial index for neighbour, range and interest queries at scale | Integrated in v0.2.0 (PR #23, merged to main at `2c87e3b`). Optional `spatial` kit `createSpatialGrid`: preallocated uniform grid, admission before write, `too-wide` refusal before scanning, explicitly `truncated` results, terminal disposal. Checked: 12 focused unit tests (seeded brute-force oracle, refusals without mutation, narrow-buffer rejection, ECS interest consumer handling despawn and out-of-bounds and failing closed) and a work-count test of the 1,000/10,000-entry micro-benchmark. Headless Node medians recorded in the [guide](spatial-index.md#measured-cost). No template consumer, browser, worker or physical-device evidence; no budget change. |
 | SC-02 | Per-observer interest sets feeding scoped views | Implemented, candidate (PR #51); not integrated. Optional `spatial` kit `createInterestSets` over the SC-01 grid: ranked (tier, distance, id), budgeted, enter/exit hysteresis with hold, entered/left events, fail-closed partial scans; reference host composes NW-02 view publishers so that, while scans are complete, no frame or revision reveals activity outside a connection's set (an `incomplete` scan can; size `maxCandidates` above the densest exit circle). Checked: 9 unit tests (incl. a 3,000-step reference-model comparison), 6 reference-host tests with real view receivers, a 1,000/10,000-entity bench work-count test. No socket, browser, device or template evidence; no budget change. |
 | DEP-01 | three.js 0.183 → 0.186 deliberate migration (Dependabot keeps ignoring three minors) | Integrated in v0.2.0 (PR #29; batch PR #45). Private-state adapters re-verified against r186 source and pinned: batch state (`readBatchState`, contract test), the static shadow GPU cache (exported revision predicate; other revisions render the stock full path). Trackers force on camera-fitted `SunLight` cascades and observe `LightProbeGridWebGL`; `Texture.normalized` is classified as upload state. Engine ancestor-dependent world-matrix reads keep r183 results under r185's `updateWorldMatrix` change (regression test with a moved container). Exact head `bde17ad`: `npm run gate:ci` passed all 21 steps (19 browser suites, all seven template gates with 2,130 tests and 129 performance checks, zero enforced breaches/regressions/inconclusive, the four known advisory software-GL heap warnings; phone smoke for every template). Quality guard against the 0.183 build: 5 still views pixel-identical; the 3 animated start views compared under a held clock were identical (arcade, explorer) or within the scene's own run-to-run variance (mechanics). JS grows ~27 KiB raw / ~6 KiB gzip per template, inside every first-load budget. Software-GL frame times were measured under heavy host load and are inconclusive, not device evidence; no physical-device or GPU timing claim. |
+| RNG-01 | Saveable seeded random state for rollback, reload and replay (genre study 2026-10-02, slice 3) | Implemented, candidate (PR #52, `feat/rng-state-input-history`); not integrated. `createSaveableRng(seed)` in `core/rng.ts`, exported from `@engine`: draws exactly equal `createRng`, `state()` returns the whole generator as one unsigned 32-bit word, and `restore(word)` refuses anything else without changing state. 3 focused tests and a rollback sync-test consumer with an unsaved-word negative control. `ctx.random()` itself is unchanged and still cannot be rolled back. |
+| INPUT-01 | Frame-exact input history: per-tick edges, buffers, release edges, opposite cleaning and sequences (genre study 2026-10-02, slice 4) | Implemented, candidate (PR #52); not integrated. Optional `@kits/input-history`: up to 32 actions in typed-array rings (capacity 1–3600), contiguous `record` with `stale`/`gap`/`invalid` refusals, taps, five opposite policies, `lastEdge` buffers with consumption, bounded `match` (1–16 steps, steps × within work), and a validated snapshot. 17 tests, including an exhaustive-oracle comparison, tamper refusal, rollback sync-test integration and a `testScene` consumer. No per-game window values, physical controller or feel claim. |
 
 ## v0.2.0 integration (2026-10-03)
 
@@ -382,7 +384,7 @@ See the [kit README](../../src/kits/rollback/README.md) and the
   - input during a stall: `local()` returns `full` and keeps nothing, so edges must be carried by the host;
   - disconnect policy;
   - spectators;
-  - a saveable engine random generator;
+  - a saveable engine random generator (addressed afterwards by RNG-01, candidate PR #52);
   - an ECS-world snapshot adapter;
   - floating-point determinism across browsers;
   - physical devices;
@@ -593,3 +595,36 @@ Status: implemented, candidate (PR #51); not integrated. See the
   (6 tests with real NW-02 receivers), `tools/spatial-bench/bench.test.mjs`.
 - Not established: socket or browser hosts, WAN, priority accumulation for dropped ids,
   occlusion or shared vision, physical devices, template integration.
+
+## Saveable random state (RNG-01) and input history (INPUT-01) — implemented, candidate
+
+Status: implemented, candidate (PR #52, `feat/rng-state-input-history`); not
+integrated. These are slices 3 and 4 of the fighting-game genre study. See the
+[input-history README](../../src/kits/input-history/README.md), the
+[input-history recipe](../recipes/add-input-history.md) and the
+[rollback recipe](../recipes/add-rollback-sessions.md).
+
+- **RNG-01, runtime-enforced:** `restore` accepts only a safe integer in 0..2^32-1, with no coercion; a refusal leaves the state unchanged. Streams share no state, and the returned object is frozen.
+- **RNG-01, checked:**
+  - draws are identical to `createRng` for number and named seeds (500 draws each);
+  - a word saved through JSON replays 200 later draws exactly, in the same or another stream;
+  - a refused restore leaves the state unchanged;
+  - a rollback sync test passes only while the word is in the saved state.
+- **INPUT-01, runtime-enforced:**
+  - option bounds (actions 1–32, capacity 1–3600, at most 16 disjoint opposite pairs, steps 1–16);
+  - contiguous frames only;
+  - masks limited to declared bits;
+  - `within` at most capacity and `maxGap` at most `within`;
+  - a window reaching evicted frames throws rather than answering partially;
+  - a snapshot loads only with an identical configuration, consistent edges and consumption, and it is applied all at once.
+- **INPUT-01, checked:** 17 tests. Review fixes on PR #52: the `reset` baseline is cleaned with the opposite policies (previously a held opposite pair reported false releases), and an explicit frame on an empty history throws instead of returning false. Both regressions fail on the earlier head.
+  - `match` agrees with exhaustive search on 300 seeded random histories.
+  - Mutations each fail the suite: a greedy predecessor, a gap off by one, sequences ignoring consumption, and `last` behaving as `first`.
+  - 13 tampered snapshots are refused.
+  - A buffered motion with a saveable damage roll passes `createRollbackSyncTest`. Leaving the history or the random word out of the saved state fails it (`step-failed`, `checksum-mismatch`).
+  - A `testScene` consumer records a one-tick tap exactly once.
+- **Not established:**
+  - per-game window values (creator data);
+  - charge-input helpers;
+  - ordering of several actions inside one tick (`ctx.input.pressedAt` timestamps are not consumed by this kit);
+  - physical controllers, arcade sticks and feel.

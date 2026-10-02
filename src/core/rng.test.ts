@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createRng,mulberry32,hashSeed,deriveSeed,SEED_PATH_LIMITS} from './rng';
+import {createRng,createSaveableRng,mulberry32,hashSeed,deriveSeed,SEED_PATH_LIMITS} from './rng';
 
 test('a number seed is exactly the mulberry32 stream (the private copies it replaced)',()=>{
  assert.deepEqual([0,1,42].map(s=>{const r=mulberry32(s);return [r(),r()];}),[[0.26642920868471265,0.0003297457005828619],[0.6270739405881613,0.002735721180215478],[0.6011037519201636,0.44829055899754167]]);
@@ -68,4 +68,40 @@ test('GEN-01 deriveSeed rejects ambiguous or unbounded input instead of rounding
  assert.doesNotThrow(()=>deriveSeed(1,'x'.repeat(SEED_PATH_LIMITS.maxStringLength)));
  assert.throws(()=>deriveSeed(1,...new Array(SEED_PATH_LIMITS.maxParts+1).fill(0)),RangeError);
  assert.doesNotThrow(()=>deriveSeed(1,...new Array(SEED_PATH_LIMITS.maxParts).fill(0)));
+});
+
+test('RNG-01 a saveable stream draws exactly the createRng stream for number and named seeds',()=>{
+ for(const seed of [0,7,123456789,0xffffffff,-7,2.5,'kepler-ellipses','']){
+  const a=createRng(seed),b=createSaveableRng(seed);
+  for(let i=0;i<500;i++){assert.equal(b.next(),a.next());assert.equal(b.int(1,6),a.int(1,6));assert.equal(b.range(-3,4),a.range(-3,4));}
+  assert.equal(b.pick(['x','y','z']),a.pick(['x','y','z']));
+ }
+ assert.equal(createSaveableRng(42).state(),42);
+ assert.equal(createSaveableRng(-1).state(),0xffffffff,'seeds are taken as unsigned 32-bit, as mulberry32 does');
+ assert.equal(createSaveableRng('kepler-ellipses').state(),hashSeed('kepler-ellipses'));
+});
+
+test('RNG-01 restoring a saved word replays every later draw exactly, including through JSON, and is per stream',()=>{
+ const r=createSaveableRng('rollback');
+ for(let i=0;i<37;i++)r.next();
+ const word=r.state(),saved=JSON.parse(JSON.stringify({word})).word as number;
+ const first=Array.from({length:200},()=>r.int(0,1000));
+ r.restore(saved);
+ assert.deepEqual(Array.from({length:200},()=>r.int(0,1000)),first);
+ const other=createSaveableRng('rollback');
+ other.restore(word);
+ assert.deepEqual(Array.from({length:200},()=>other.int(0,1000)),first,'another stream restored to the word continues identically');
+ r.restore(0);other.next();
+ assert.notEqual(r.state(),other.state(),'streams do not share state');
+ // Full wrap of the word space is valid: 0 and 2^32-1 are ordinary states.
+ r.restore(0xffffffff);r.next();assert.equal(r.state(),(0xffffffff+0x6D2B79F5)>>>0);
+});
+
+test('RNG-01 restore refuses anything but an integer word in 0..2^32-1 without changing the state',()=>{
+ const r=createSaveableRng(5);r.next();
+ const before=r.state();
+ for(const bad of [-1,2**32,1.5,NaN,Infinity,'5',null,undefined,2**53,{valueOf:()=>3}])
+  assert.throws(()=>r.restore(bad as unknown as number),RangeError);
+ assert.equal(r.state(),before);
+ assert.ok(Object.isFrozen(r));
 });
