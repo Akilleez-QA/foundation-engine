@@ -22,8 +22,9 @@ its trailing slash (`/my-game/`, or `/my-game/index.html`); without the slash th
 - **Asset URLs stay as you wrote them:** keep writing `url: '/models/my-game/ship.glb'` (or without the leading `/`).
   The URL names a file under `public/`; the build's base decides where `public/` is served.
 - **Bounds and failure:** nothing new is admitted or retried; a missing file fails as before (the library reports it
-  and the scene draws its fallback). A base on another site (`https://cdn…`, `//cdn…`) is refused at startup: assets
+  and the scene draws its fallback). A base on another site (`https://cdn…`, `//cdn…`) fails the boot when the texture and model modules install: assets
   are served with the game.
+- **Music:** `music('/music/theme.m4a')` on the audio service resolves the same way; full URLs pass unchanged.
 - **Not covered:** the scene address is a hash (`#scene/<id>`), so no server rewrite rules are needed. The dev server
   (`npm run dev`, `npm run play`) always serves at `/`.
 

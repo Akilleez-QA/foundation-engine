@@ -98,6 +98,8 @@ export interface AudioOutputOptions {
   effects(): number;
   /** Music volume 0–1. */
   music(): number;
+  /** Turns a music URL as given into the one the element loads (the composition root: the build's public base). */
+  resolveUrl?(url: string): string;
   /** Subscribe to changes of muted/volumes (the settings service). Returns an unsubscribe. */
   onChange?(fn: () => void): () => void;
   cues?: readonly CueDef[];
@@ -447,7 +449,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
       if (!url) { element?.pause(); return; }
       if (o.silent() || disposed) return;
       element ??= (o.createElement ?? (() => new Audio()))();
-      element.loop = true; element.src = url; apply();
+      element.loop = true; element.src = o.resolveUrl ? o.resolveUrl(url) : url; apply();
       if (!hidden) void element.play().catch(() => { /* locked until a gesture: unlock() retries */ });
     },
     unlock() {

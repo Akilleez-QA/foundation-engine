@@ -11,10 +11,12 @@ declare module '../../core/probe' { interface EngineProbes { models: ModelLibrar
  *  Files come from the build's public base (`vite build --base`). */
 export function modelModule(resolve: (services: Services, id: string) => AssetDef | undefined, residency?: AssetResidencyInput): EngineModule {
   return defineModule({ id: 'platform.models', version: '1.0.0', serviceKeys: ['models'], ...(residency ? { optional: ['platform.quality'] } : {}), install(s) {
+    // Resolved at install, so a base this library cannot serve from (another site) fails the boot, not a later load.
+    const base = publicBase();
     let library: ModelLibrary | undefined, pending: Promise<ModelLibrary> | undefined, closed = false, policy: AssetResidencyPolicy | undefined;
     const get = () => pending ??= import('./models').then(({ createModelLibrary }) => {
       if (closed) throw Error('models: module disposed');
-      return library = createModelLibrary({ def: id => resolve(s, id), residency: policy, base: publicBase() });
+      return library = createModelLibrary({ def: id => resolve(s, id), residency: policy, base });
     }).catch(error => { pending = undefined; throw error; });
     const facade: ModelLibrary = {
       model: (id, options) => get().then(lib => lib.model(id, options)),

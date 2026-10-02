@@ -12,10 +12,12 @@ declare module '../../core/probe' { interface EngineProbes { textures: TextureLi
 export function textureModule(resolve:(s:Services,id:string)=>AssetDef|undefined,residency?:AssetResidencyInput):EngineModule{
   return defineModule({id:'platform.assets',version:'1.0.0',serviceKeys:['assets'],...(residency?{optional:['platform.quality']}:{}),install(s){
     const life=new AbortController();
+    // Resolved at install, so a base this library cannot serve from (another site) fails the boot, not a later load.
+    const base=publicBase();
     const library=lazyTextureLibrary(async()=>{
       const {createTextureLibrary}=await import('./textures');
       if(life.signal.aborted)throw Error('assets: module disposed');
-      return createTextureLibrary({def:id=>resolve(s,id),base:publicBase()});
+      return createTextureLibrary({def:id=>resolve(s,id),base});
     });
     const facade={...library,texture:(id:string,o:Parameters<typeof library.texture>[1])=>library.texture(id,{...o,signal:AbortSignal.any([life.signal,o.signal])})};
     s.provide('assets',facade);const unregister=assetOwners.register(facade);
