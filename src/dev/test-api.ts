@@ -14,6 +14,8 @@ import type { SceneModelRequest, SceneModelResult } from '../author/model-inspec
  *   engine.key(key, ms?)        press a key (held for `ms`, default one tap) through the real input dispatcher
  *   engine.clock.hold()/step(ms)/resume()   freeze the one frame loop and step it deterministically
  *   engine.loop()               the loop's frame, update and render counters
+ *   engine.redraw()             the running scene draws its unchanged picture once (measure a still scene); false
+ *                               when no scene is running
  *   engine.events(fn)           tap every bus event (returns an unsubscribe)
  *   engine.sessionRecorder(o?)  start the local sustained-session recorder on the one loop (PERF-01); replaces the last
  *   engine.currentSession()     that recorder (or the `?session-record` auto-start), or null
@@ -57,6 +59,8 @@ export interface EngineTestApi {
   clock: { hold(): void; step(ms: number): void; resume(): void };
   /** The frame loop's counters: frames run, updates, renders and frames skipped (render on demand). */
   loop(): { frames: number; updates: number; renders: number; skipped: number };
+  /** The running scene draws its current picture once (render on demand stays on afterwards); false without one. */
+  redraw(): boolean;
   events(fn: (name: string, payload: unknown) => void): () => void;
   /** Start a bounded current-visit system capture; replaces that visit's capture and ends on visit abort. */
   systemTrace(options?: SystemTimingOptions): SystemTimingCapture | null;
@@ -139,6 +143,10 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
       resume: () => appLoop().holdFrames(false),
     },
     loop: () => ({ ...appLoop().stats }),
+    redraw() {
+      const running = app.services.app.has('feature.game') ? app.services.play?.current() : null;
+      return running?.redraw?.() ?? false;
+    },
     events: fn => app.events.tap((k, p) => fn(k, p)),
     systemTrace(options) {
       const running = app.services.app.has('feature.game') ? app.services.play?.current() : null;

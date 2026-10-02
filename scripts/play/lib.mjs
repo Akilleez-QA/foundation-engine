@@ -11,6 +11,7 @@ export const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 export const OUT = join(ROOT, 'playtest', 'latest');
 export const VIEWS = {desktop: {width: 1280, height: 800}, mobile: {width: 390, height: 844, mobile: true}};
 export const sleep = ms => new Promise(r => setTimeout(r, ms));
+const OPEN_TIMEOUT_MS = 60000, ERROR_GRACE_MS = 5000;
 
 const freePort = () => new Promise((resolve, reject) => { const s = netServer(); s.once('error', reject); s.listen(0, '127.0.0.1', () => { const {port} = s.address(); s.close(() => resolve(port)); }); });
 
@@ -39,10 +40,20 @@ export async function open(b, url, scene, {seed = 1, query = {}} = {}) {
   target.searchParams.set('seed', String(seed));
   target.hash = `scene/${scene}`;
   await b.goto(target.href);
-  try { await b.wait(`!!document.querySelector('#app[data-scene="scene.${scene}"][data-scene-state="active"]') && !!window.engine`, 60000); }
-  catch (error) {
+  // Wait for the scene; stop early (ERROR_GRACE_MS after the first page error) when the page failed to boot, so a broken
+  // game (a registry problem, an import error) is reported in seconds with its message, not after the whole timeout.
+  const active = `!!document.querySelector('#app[data-scene="scene.${scene}"][data-scene-state="active"]') && !!window.engine`;
+  let failure = null;
+  for (const t0 = Date.now(); ;) {
+    if (await b.evaluate(active).catch(() => false)) break;
+    const firstError = b.errors.length ? (b.firstErrorAt ??= Date.now()) : null;
+    if (Date.now() - t0 > OPEN_TIMEOUT_MS) { failure = `timeout ${OPEN_TIMEOUT_MS} ms`; break; }
+    if (firstError && Date.now() - firstError > ERROR_GRACE_MS) { failure = 'the page reported errors and the scene did not start'; break; }
+    await sleep(100);
+  }
+  if (failure) {
     const state = await b.evaluate(`({hash: location.hash, scene: document.querySelector('#app')?.getAttribute('data-scene'), state: document.querySelector('#app')?.getAttribute('data-scene-state')})`).catch(() => null);
-    throw Error(`scene.${scene} did not become active (${JSON.stringify(state)}). Page errors: ${[...b.errors, ...pageErrors.filter(l => /^(error|warning)/.test(l))].join(' | ') || 'none'}`, {cause: error});
+    throw Error(`scene.${scene} did not become active: ${failure} (${JSON.stringify(state)}). Page errors: ${[...b.errors, ...pageErrors.filter(l => /^(error|warning)/.test(l))].join(' | ') || 'none'}. Run npm run check: it reports boot problems such as input binding clashes.`);
   }
   await sleep(400);
   return pageErrors;
@@ -62,15 +73,27 @@ export async function measure(b, during, ms = 1200) {
     frameMsP95: p95 === null ? null : +p95.toFixed(1), fps: p95 ? Math.min(60, Math.round(1000 / p95)) : null, heapMiB: after.heap === null ? null : +after.heap.toFixed(1)};
 }
 
-/** Budget status of a measured window against the game's budgets.json. */
+export const NOT_MEASURED = 'not measured (no frames rendered)';
+/**
+ * Budget status of a measured window against the game's budgets.json. A window with no rendered frame proves nothing
+ * (render on demand draws nothing while a scene is still), so it is NOT_MEASURED, never 'within budget'.
+ */
 export function budgetStatus(scene, m) {
   const b = budgets().scenes?.[scene]?.budget;
   if (!b) return {scene, status: 'no budget', rows: []};
+  if (!m?.renders) return {scene, status: NOT_MEASURED, rows: []};
   // Heap here is the dev server's whole page (unbundled modules included), so it is reported, not judged: the bench
   // measures the budgeted heap on a production build.
   const rows = [['draws', m.drawsPerFrame], ['triangles', m.trisPerFrame]].filter(([k, v]) => b[k] !== undefined && v !== null)
     .map(([k, v]) => ({metric: k, measured: v, budget: b[k], ok: v <= b[k]}));
   return {scene, status: rows.every(r => r.ok) ? 'within budget' : 'OVER BUDGET', rows};
+}
+
+/** One line for a budget status: what was over and by how much, and where the recovery steps are. */
+export function budgetLine(status) {
+  if (status.status !== 'OVER BUDGET') return status.status;
+  const over = status.rows.filter(r => !r.ok).map(r => `${r.metric} ${r.measured} > ${r.budget}`).join(', ');
+  return `OVER BUDGET (${over} per rendered frame, budgets.json scenes.${status.scene}): recover with .claude/skills/fix-budget/SKILL.md (simplify, instance, bake, LOD); never raise a budget without the author`;
 }
 
 export function freshOut(dir = OUT) { rmSync(dir, {recursive: true, force: true}); mkdirSync(dir, {recursive: true}); return dir; }

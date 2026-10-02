@@ -68,7 +68,7 @@ export async function runScript(script, url) {
 
 if (process.argv[1] && process.argv[1].endsWith('script.mjs')) {
   const file = process.argv[2];
-  if (!file) { console.error('usage: npm run play:script -- <templates/<name>/playtest/file.json>'); process.exit(64); }
+  if (!file) { console.error('usage: npm run play:script -- <game/playtest/file.json> or templates/<name>/game/playtest/file.json'); process.exit(64); }
   const script = JSON.parse(readFileSync(resolve(file), 'utf8'));
   const server = await serve();
   try {

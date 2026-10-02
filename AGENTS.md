@@ -101,12 +101,12 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 
 | Command | What it does |
 |---|---|
-| `npm run new-game -- --template <name>` | Start a game from a template (blank, arcade, explorer, learn) |
+| `npm run new-game -- --template <name>` | Start a game from a template (blank, arcade, explorer, learn); `--force` removes the existing `game/` and `GAME.md` first |
 | `npm run new -- <kind> <id>` | Generators: scene, entity, component, system, input, save-section, kit; interactable, area (explore); lesson (learn) |
 | `npm run play` | Dev server with the test API; prints the URL |
 | `npm run check` | Focused check: typecheck, lints, brief, affected tests; duration depends on the checkout and hardware |
-| `npm run play:snap [-- --scene <id>] [--mobile]` | Muted, isolated browser: screenshots and `playtest/latest/probe.json` |
-| `npm run play:script -- <file.json>` | A scripted playtest (goto, key, press, teleport, wait, snap, expect) |
+| `npm run play:snap [-- --scene <id>] [--mobile]` | Muted, isolated browser: screenshots and `playtest/latest/probe.json`; the budget verdict is judged on rendered frames (a still scene is redrawn on request) and says `not measured` when none rendered |
+| `npm run play:script -- <file.json>` | A scripted playtest (goto, key, press, teleport, wait, snap, expect); a game keeps its scripts in `game/playtest/`, evidence goes to `playtest/latest/` |
 | `npm run play:criteria [-- --gate]` | The brief's success criteria, checked and tabled |
 | `npm test` / `npm run lint` | All tests / all lints (layers, arch, css, generic, brief, budgets) |
 | `npm run gate` / `npm run gate:templates` | The integration gate for this game / for every template |
@@ -115,7 +115,7 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 | `npm run quality:guard` | Picture comparison of two builds |
 | `npm run deploy:production` | The only production release path |
 
-The dev and test builds expose `window.engine` (src/dev/test-api.ts): `state()`, `goto(scene, params)`, `teleport(x, z, name)`, `key(key, ms)`, `clock.hold/step/resume`, `probe(name)`, `events(fn)`. Production builds never contain it.
+The dev and test builds expose `window.engine` (src/dev/test-api.ts): `state()`, `goto(scene, params)`, `teleport(x, z, name)`, `key(key, ms)`, `clock.hold/step/resume`, `loop()`, `redraw()`, `probe(name)`, `events(fn)`. Production builds never contain it.
 
 ## Worktree per task, gate before integration, production only from a clean main
 

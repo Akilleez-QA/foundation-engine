@@ -6,10 +6,11 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } 
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { generate } from './new';
+import { generate, withChangelogRow } from './new';
 import { ROOT } from './lib/game-dir.mjs';
 import { loadGame } from '../src/app/game-files';
 import { compileGame } from '../src/author/compile';
+import { gameInputProblems } from '../src/author/input-registry';
 
 test('new: a lesson is generated outline-first into the learn template and passes the pedagogy rules', async () => {
   const tmp = mkdtempSync(join(tmpdir(), 'engine-gen-learn-'));
@@ -47,6 +48,7 @@ test('new: every game generator writes files that load, compile and keep the bri
     assert.equal(budgets.scenes.cellar.budget.draws, brief.performance.perScene.draws, 'an unmeasured scene starts at the brief\'s ceiling');
     assert.match(readFileSync(join(tmp, 'GAME.md'), 'utf8'), /Added scene `cellar`/);
     assert.match(readFileSync(join(dir, 'jump.ts'), 'utf8'), /tap: true/, 'the brief lists touch, so a button also answers a tap');
+    assert.deepEqual(gameInputProblems(game, defs), [], 'generated bindings pass the boot\'s inputActions validation');
   } finally { rmSync(tmp, { recursive: true, force: true }); }
 });
 
@@ -75,4 +77,28 @@ test('new: opt-in lazy scene body loads through SceneBody and refuses partial ov
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
+});
+
+test('new: generated inputs take free bindings from the boot table and never clash with the engine or each other', async () => {
+  // Regression: `new input` always wrote keys ['f'], pad ['x']; pad x is shell.menu's, so the game did not boot.
+  for (const template of ['blank', 'arcade', 'explorer', 'learn']) {
+    const tmp = mkdtempSync(join(tmpdir(), `engine-gen-input-${template}-`));
+    try {
+      cpSync(join(ROOT, 'templates', template), tmp, { recursive: true });
+      const dir = join(tmp, 'game');
+      for (const id of ['jump', 'dash', 'crouch', 'throw']) await generate('input', id, {}, dir);
+      await generate('input', 'lean', { axis: true }, dir);
+      await generate('input', 'tilt', { axis: true }, dir);
+      const { game, defs } = await loadGame(dir);
+      assert.deepEqual(gameInputProblems(game, defs), [], `${template}: generated inputs pass the boot check`);
+      const jump = readFileSync(join(dir, 'jump.ts'), 'utf8');
+      assert.doesNotMatch(jump, /pad: \['x'\]/, `${template}: pad x belongs to shell.menu`);
+    } finally { rmSync(tmp, { recursive: true, force: true }); }
+  }
+});
+
+test('new: a changelog row lands at the end of the Changelog table, not after later sections', () => {
+  const md = '# Game\n\n## Changelog\n\n| Date | Change | Budgets |\n|---|---|---|\n| 1 | first | |\n\n## Milestone\n\n- notes\n';
+  assert.equal(withChangelogRow(md, '| 2 | second | |'), '# Game\n\n## Changelog\n\n| Date | Change | Budgets |\n|---|---|---|\n| 1 | first | |\n| 2 | second | |\n\n## Milestone\n\n- notes\n');
+  assert.equal(withChangelogRow('# Game\n', '| 2 | x | |'), '# Game\n| 2 | x | |\n');
 });
