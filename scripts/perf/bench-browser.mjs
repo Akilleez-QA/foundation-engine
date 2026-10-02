@@ -4,7 +4,12 @@
 // still change this hash and require fresh evidence, not a budget/baseline rewrite.
 //
 // - Browser: Chromium through Playwright (playwright-core; no browser download is ever triggered). The executable is
-//   ENGINE_CHROMIUM when set (e.g. a GPU wrapper script), else Playwright's installed Chromium, else /usr/bin/chromium.
+//   ENGINE_CHROMIUM when set (e.g. a GPU wrapper script), else Playwright's installed Chromium
+//   (`npx playwright-core install chromium`), else an installed Chrome or Chromium in its usual folder for the OS
+//   (SYSTEM_CHROMIUM; ENGINE_CHROMIUM_SYSTEM=0 skips them). On Linux the real binary (/usr/lib/chromium/chromium...)
+//   comes before the /usr/bin launcher: distribution launchers such as /usr/bin/chromium read the user's own flag files
+//   (~/.config/chromium-flags.conf, /etc/chromium.d), which would change the measured browser's flags behind the bench.
+//   When no browser is found or it cannot start, launch() throws one actionable message (BROWSER_HELP) with the cause.
 // - Isolation: a fresh browser process and a throwaway context per launch; the user's browser, profile and storage are
 //   never touched. `--mute-audio` is always passed, and pages start with the `dev.silent` flag, so nothing can reach
 //   the speakers; system and application audio settings are never changed.
@@ -16,12 +21,41 @@ import {createRequire} from 'node:module';
 
 export const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-/** The Chromium the bench drives, and where that choice came from. */
-export function chromiumExecutable(env = process.env, exists = existsSync, bundled = defaultBundled) {
+/** Installed Chrome/Chromium executables per OS, in preference order (real binaries before launcher scripts). */
+export function systemChromiums(platform = process.platform, env = process.env) {
+  if (platform === 'darwin') return [
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Chromium.app/Contents/MacOS/Chromium',
+    ...(env.HOME ? [`${env.HOME}/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`, `${env.HOME}/Applications/Chromium.app/Contents/MacOS/Chromium`] : []),
+  ];
+  if (platform === 'win32') return [env.PROGRAMFILES, env['PROGRAMFILES(X86)'], env.LOCALAPPDATA].filter(Boolean)
+    .flatMap(base => [`${base}\\Google\\Chrome\\Application\\chrome.exe`, `${base}\\Chromium\\Application\\chrome.exe`]);
+  return [
+    '/usr/lib/chromium/chromium', '/usr/lib64/chromium-browser/chromium-browser', '/usr/lib/chromium-browser/chromium-browser',
+    '/opt/google/chrome/chrome',
+    '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome-stable', '/usr/bin/google-chrome', '/snap/bin/chromium',
+  ];
+}
+
+/** The one message for a missing or unstartable test browser. */
+export const BROWSER_HELP = 'Install the test browser with `npx playwright-core install chromium` ' +
+  '(Linux may also need `npx playwright-core install-deps chromium`), or set ENGINE_CHROMIUM to a Chrome or Chromium executable.';
+
+/** For command-line entries: print a missing-browser error as its one line (no stack) and return true; false otherwise. */
+export function reportBrowserError(error) {
+  if (error?.code !== 'ENGINE_NO_BROWSER') return false;
+  console.error(error.message);
+  process.exitCode = 1;
+  return true;
+}
+
+/** The Chromium the bench drives, and where that choice came from (path null when none is found). */
+export function chromiumExecutable(env = process.env, exists = existsSync, bundled = defaultBundled, platform = process.platform) {
   if (env.ENGINE_CHROMIUM) return {path: env.ENGINE_CHROMIUM, source: 'ENGINE_CHROMIUM'};
   const own = bundled();
   if (own && exists(own)) return {path: own, source: 'playwright'};
-  return {path: '/usr/bin/chromium', source: 'system'};
+  if (env.ENGINE_CHROMIUM_SYSTEM !== '0') for (const path of systemChromiums(platform, env)) if (exists(path)) return {path, source: 'system'};
+  return {path: null, source: 'none'};
 }
 function defaultBundled() {
   try { return createRequire(import.meta.url)('playwright-core').chromium.executablePath(); } catch { return null; }
@@ -47,7 +81,15 @@ export async function launch(options = {},
     isMobile = mobile, hasTouch = mobile, deviceScaleFactor = 1, strictClose = false} = options;
   const exe = chromiumExecutable();
   const args = chromiumArgs({width, height, gpu});
-  const browser = await launchBrowser({executablePath: exe.path, headless: true, args, ignoreDefaultArgs: ['--hide-scrollbars']});
+  let browser;
+  try {
+    browser = await launchBrowser({executablePath: exe.path ?? undefined, headless: true, args, ignoreDefaultArgs: ['--hide-scrollbars']});
+  } catch (cause) {
+    const first = String(cause?.message ?? cause).split('\n').find(l => l.trim())?.trim() ?? 'unknown error';
+    const what = exe.path ? `Could not start the test browser ${exe.path} (${exe.source}): ${first}.`
+      : 'No test browser found (looked for ENGINE_CHROMIUM, Playwright\'s Chromium and an installed Chrome or Chromium).';
+    throw Object.assign(Error(`${what} ${BROWSER_HELP}`, {cause}), {code: 'ENGINE_NO_BROWSER'});
+  }
   try {
     const context = await browser.newContext({viewport: {width, height}, deviceScaleFactor, locale: 'en-US', timezoneId: 'UTC', isMobile, hasTouch});
     const page = await context.newPage();

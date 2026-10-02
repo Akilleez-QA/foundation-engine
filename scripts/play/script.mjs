@@ -77,5 +77,6 @@ if (process.argv[1] && process.argv[1].endsWith('script.mjs')) {
     if (r.errors?.length) console.log('  page errors: ' + r.errors.join(' | '));
     console.log(`play:script ${r.name}: ${r.pass ? 'PASS' : 'FAIL'} (playtest/latest/${r.name}/report.json)`);
     process.exitCode = r.pass ? 0 : 1;
-  } finally { await server.close(); }
+  } catch (error) { if (!(await import('../perf/bench-browser.mjs')).reportBrowserError(error)) throw error; }
+  finally { await server.close(); }
 }
