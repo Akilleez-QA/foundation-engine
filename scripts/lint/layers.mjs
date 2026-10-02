@@ -156,7 +156,8 @@ const KIT = /^@kits\/([a-z][a-z0-9-]*)$/;
 export function checkGame(dir, read = f => readFileSync(f, 'utf8')) {
   const out = [];
   if (!existsSync(dir)) return out;
-  const walk = d => { for (const e of readdirSync(d, {withFileTypes: true})) { const p = join(d, e.name); if (e.isDirectory()) walk(p); else if (/\.[cm]?[jt]s$/.test(e.name)) check1(p); } };
+  // <game>/public/ holds files the game serves as they are (a decoder's .js included), never game code.
+  const walk = d => { for (const e of readdirSync(d, {withFileTypes: true})) { const p = join(d, e.name); if (e.isDirectory()) { if (!(d === dir && e.name === 'public')) walk(p); } else if (/\.[cm]?[jt]s$/.test(e.name)) check1(p); } };
   const check1 = file => {
     const rel = relative(ROOT, file).split(sep).join('/');
     for (const {spec} of importsOf(read(file))) {

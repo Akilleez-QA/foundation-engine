@@ -10,7 +10,7 @@ npm run build            # writes dist/
 npm run preview          # serves dist/ at http://127.0.0.1:4173/ to try the real build
 ```
 
-`dist/` holds `index.html`, `assets/` (scripts, styles, workers), everything from `public/` (models, images), and `LICENSE.txt`, `COPYRIGHT.txt` and `THIRD_PARTY_NOTICES.txt`. Production builds leave out the test API (`window.engine`). Scenes are addressed by the hash (`#scene/<id>`), so the host needs no rewrite rules.
+`dist/` holds `index.html`, `assets/` (scripts, styles, workers), your game's own static files from `game/public/` (models, images, sounds) at the same paths, anything in the repository's shared root `public/` folder (the engine keeps nothing there), and `LICENSE.txt`, `COPYRIGHT.txt` and `THIRD_PARTY_NOTICES.txt`. Production builds leave out the test API (`window.engine`). Scenes are addressed by the hash (`#scene/<id>`), so the host needs no rewrite rules.
 
 ## 2. Pick where it will live
 

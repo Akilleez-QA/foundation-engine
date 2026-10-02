@@ -40,7 +40,7 @@ node -r ./scripts/silent-browser.cjs scripts/play/model-inspect-check.mjs /tmp/f
 The runner starts an isolated, muted 1280×800 Chromium with the existing helper.
 Its custom diagnostic page imports the stock app composition and authored runtime.
 Both registered asset paths serve the repository's original
-`public/models/mechanics/beacon.glb` through the real asset service and GLB parser;
+`templates/mechanics/game/public/models/mechanics/beacon.glb` through the real asset service and GLB parser;
 the second HTTP path deliberately contains identical bytes. No loader is mocked,
 and changing variants is not claimed to change the picture.
 

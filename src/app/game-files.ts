@@ -15,7 +15,7 @@ export const GAME_DIR = gameDir();
 export function gameFiles(dir = GAME_DIR): string[] {
   return (readdirSync(dir, { recursive: true }) as string[])
     .map(f => f.split('\\').join('/'))
-    .filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts') && f !== 'build.brief.ts' && f !== 'game.ts')
+    .filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts') && f !== 'build.brief.ts' && f !== 'game.ts' && !f.startsWith('public/'))
     .map(f => join(dir, f)).sort();
 }
 

@@ -231,10 +231,10 @@ for preserving the notices accompanying the actual distributed material.
 
 | Files | Origin | License |
 |---|---|---|
-| `public/models/mechanics/beacon.glb` | Locally generated two-link skinned cuboid and pulse clip, `templates/mechanics/assets/generate-fixture.mjs` | CC0-1.0 |
-| `public/models/mechanics/sky-{px,nx,py,ny,pz,nz}.png` | Six locally generated 16×16 orientation glyph textures, `templates/mechanics/assets/generate-cube.mjs` | CC0-1.0 |
-| `public/textures/mechanics/panel.png` | Locally generated 32×32 riveted panel texture, `templates/mechanics/assets/generate-panel.mjs` | CC0-1.0 |
-| `public/sounds/mechanics/chime.wav` | Locally synthesised 0.45 s two-partial chime, `templates/mechanics/assets/generate-chime.mjs` | CC0-1.0 |
+| `templates/mechanics/game/public/models/mechanics/beacon.glb` | Locally generated two-link skinned cuboid and pulse clip, `templates/mechanics/assets/generate-fixture.mjs` | CC0-1.0 |
+| `templates/mechanics/game/public/models/mechanics/sky-{px,nx,py,ny,pz,nz}.png` | Six locally generated 16×16 orientation glyph textures, `templates/mechanics/assets/generate-cube.mjs` | CC0-1.0 |
+| `templates/mechanics/game/public/textures/mechanics/panel.png` | Locally generated 32×32 riveted panel texture, `templates/mechanics/assets/generate-panel.mjs` | CC0-1.0 |
+| `templates/mechanics/game/public/sounds/mechanics/chime.wav` | Locally synthesised 0.45 s two-partial chime, `templates/mechanics/assets/generate-chime.mjs` | CC0-1.0 |
 
 These fixtures were generated for Foundation Engine by its contributors, with no
 external mesh, texture, photograph, recording, or downloaded art input. Of their

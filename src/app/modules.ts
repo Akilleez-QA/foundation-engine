@@ -15,7 +15,7 @@ import { brief, game } from './game';
 
 // Whole modules, not `import: 'default'`: a helper file (shared components, constants) has no default export.
 const definitions = Object.values(import.meta.glob<{ default?: AuthorDef }>(
-  ['@game/**/*.ts', '!@game/**/*.test.ts', '!@game/build.brief.ts', '!@game/game.ts'], { eager: true })).map(m => m.default);
+  ['@game/**/*.ts', '!@game/**/*.test.ts', '!@game/build.brief.ts', '!@game/game.ts', '!@game/public/**'], { eager: true })).map(m => m.default);
 export const compiled = compileGame({ brief, game, defs: definitions });
 const layers = layerModules(game, brief);
 

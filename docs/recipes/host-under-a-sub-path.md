@@ -20,7 +20,7 @@ its trailing slash (`/my-game/`, or `/my-game/index.html`); without the slash th
   `/my-game/`) is used as it is; a relative base (`./`) is made absolute against the page, so a decode worker, the
   model fetch and the image loader all ask for the same file.
 - **Asset URLs stay as you wrote them:** keep writing `url: '/models/my-game/ship.glb'` (or without the leading `/`).
-  The URL names a file under `public/`; the build's base decides where `public/` is served.
+  The URL names a file under the game's `public/` folder (`game/public/`); the build's base decides where it is served.
 - **Bounds and failure:** nothing new is admitted or retried; a missing file fails as before (the library reports it
   and the scene draws its fallback). A base on another site (`https://cdn…`, `//cdn…`) fails the boot when the texture and model modules install: assets
   are served with the game.
