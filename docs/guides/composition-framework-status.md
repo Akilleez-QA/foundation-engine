@@ -93,6 +93,7 @@ are contextual evidence, not verification of Foundation.
 | Multiplayer | NW-01 integrated in PR #120. NW-02 complete scoped views, application credit and optional scene lifecycle hooks are integrated on main at `ea48539` (PR #122 in the private development history). | Rebased clean browser passed at `508edd9`; final `47a7e6d` passed all seven gates (1,965 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive, four heap advisories). Combined main tests/build passed; measured load and earlier failure remain documented below. Git ancestry establishes integration, not the PR API state. NW-03 is integrated as recorded below; DV-01 remains unresolved. No multiplayer-completion claim. |
 | Multiplayer: queue age and deadlines (NW-06) | Optional intake `maxQueuedAgeMs` with `stale` notice; optional authority `clock` and `submit(command, {deadlineMs})` returning `expired` before storage invocation only | Implemented, candidate (PR #12); not integrated. Focused unit tests only; defaults unchanged; no load, browser-composition or device claim. |
 | Asset residency (RES-01) | Optional per-preset texture/model byte budgets, pinned asset ids and a pressure hook over the existing lease caches | Implemented, candidate (PR #22); not integrated. Unit tests and a native software-renderer fixture only; defaults unchanged; no template configures it. See [asset residency](asset-residency.md). |
+| Multiplayer: peer rollback (RB-01) | Optional `@kits/rollback` session (prediction window, input delay, rollback/resimulation, confirmed-state checksums) and local sync test, driven from the fixed lane | Implemented, candidate (PR #25); not integrated. Focused headless tests and a `testScene` consumer only; requires a reliable, ordered link; no WAN, time-sync, spectator or device claim. |
 | Manual tools | Bounded documents, sessions and optional appearance, progression, custody and objective desktop consumers | Integrated tools cover their finite schemas. Action tooling is integrated; recipe/effect inspectors are integrated in PR #118 with focused tests and final desktop workflow acceptance. Device support is selected per tool; desktop tooling does not impose a phone UI. |
 
 Priority is composition correctness before additional feature catalogs. A creator's
@@ -291,3 +292,11 @@ physical-device runs on creator-selected profiles remain open.
 per-preset byte budgets, pin critical asset ids and observe pressure. The existing
 lease caches remain the owner; nothing changes when it is omitted. Candidate
 (PR #22); not integrated. See [asset residency](asset-residency.md).
+
+## Peer rollback sessions (RB-01) — implemented, candidate
+
+The optional [rollback kit](../../src/kits/rollback/README.md) adds
+`createRollbackSession` for deterministic fixed-step simulations shared by 2–8
+peers, plus `createRollbackSyncTest` for local determinism checks. It owns no
+transport, clock or rules. Status: implemented, candidate (PR #25); not
+integrated. See the [ledger](upgrade-acceptance-ledger.md#rollback-sessions-rb-01--implemented-candidate).

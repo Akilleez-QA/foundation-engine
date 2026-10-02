@@ -493,3 +493,11 @@ probe ([record](../verification/asset-residency-20261002/README.md)). No program
 budget, combined ceiling, prefetch, physical-device memory or performance claim.
 See the [guide](asset-residency.md).
 
+## Peer rollback sessions (RB-01) — implemented, candidate
+
+Optional `@kits/rollback` ([README](../../src/kits/rollback/README.md),
+[recipe](../recipes/add-rollback-sessions.md)) supplies speculative execution with
+bounded rollback, stall and checksum desync detection over a creator-supplied
+reliable, ordered link, plus a local sync test. Implemented, candidate (PR #25,
+`feat/genre-fighting-slice1`); not integrated. Evidence is focused headless tests
+and one fixed-lane consumer; network, device and multiplayer acceptance are open.
