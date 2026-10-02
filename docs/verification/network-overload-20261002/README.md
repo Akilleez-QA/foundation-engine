@@ -2,9 +2,10 @@
 
 Three full runs of `npm run probe:network -- --out <file>` with the default
 configuration (seed 7), recorded at probe commit `0744509` on branch
-`feat/nw07-overload-probe`, before it was rebased for PR #27. The rebased commit `40d0167`
+`feat/nw07-overload-probe`, before it was rebased for PR #27. The rebased commit `b5a8f23`
 has byte-identical `tools/` and `src/kits/network/` trees; only main's unrelated changes and one
-`package.json` script line from main differ. Interpretation, findings and limits are in the
+`package.json` script line from main differ. Later commits on the branch change only the
+regression test (`probe.test.mjs`) and documentation, not the probe or the hosts. Interpretation, findings and limits are in the
 [guide](../../guides/network-overload.md).
 
 | File | Load average at start (1/5/15 min) | Duration | Invariants |
