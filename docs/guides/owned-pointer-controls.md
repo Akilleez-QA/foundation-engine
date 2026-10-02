@@ -95,7 +95,8 @@ bindings; it does not implement mouse clicks or assistive-technology activation.
 
 `ownActionSource(input, actionIds, device, signal?)` from the optional
 `src/platform/input/owned-action-source.ts` module returns an `OwnedActionSource`
-with `set(downActionIds)` and idempotent `dispose()`. The declaration snapshots
+with `set(downActionIds)`, `accepted()` (true while one of its presses is accepted
+in the current owner epoch and still down) and idempotent `dispose()`. The declaration snapshots
 registered digital action IDs; unknown actions and analog rows are rejected.
 `set([])` is neutral. Repeated identical states produce no repeated presses.
 Each source is independent, even when several sources select the same action.
@@ -111,7 +112,7 @@ become dispatcher keys. Identity exhaustion throws rather than reusing an ID.
 These are configurable infrastructure bounds, not limits on authored game content.
 
 The optional module also exports the lower-level
-`openActionSource(input, declaredActionIds, device)`, returning a fixed-slot port with `press(actionId, ownerEpoch, stillValid?)`,
+`openActionSource(input, declaredActionIds, device)`, returning a fixed-slot port with `press(actionId, ownerEpoch, stillValid?)`, `accepted(actionId)`,
 `release(actionId)` and `dispose()`. Its slots are fixed at acquisition: arbitrary
 action IDs are rejected, repeated accepted presses are ignored, and cancelled
 slots remain blocked until released. A stale epoch cannot deliver. The validity
@@ -136,8 +137,9 @@ Without `select`, all declared actions are down while the contact is held.
 `leave: 'release'` releases a contact that moves outside the element's bounds (or
 reports `pointerleave`), as a lift would; that contact cannot press again until a
 fresh touch. The default `'hold'` keeps a captured contact wherever it moves.
-`onContact(down)` is a presentation hook: `true` once a contact is captured, then
-`false` when it is released for any reason; a refused capture reports nothing.
+`onContact(down)` is a presentation hook: `true` once a captured contact's press is
+accepted by the dispatcher (`OwnedActionSource.accepted()`), then `false` when it is
+released for any reason; a refused capture or a refused or stale press reports nothing.
 
 The creator sets `touch-action: none` on these explicit control surfaces before
 a gesture begins, and may set `user-select: none`. The adapter does not change

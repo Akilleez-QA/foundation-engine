@@ -3,6 +3,8 @@ import type { ActionId, DeviceFamily, InputActions } from './actions';
 export interface OwnedActionSource {
   /** Physical pressed state, limited to the declared actions. Empty means neutral. */
   set(actions: readonly ActionId[]): void;
+  /** True while at least one of its actions was accepted by the dispatcher in the current owner epoch and is down. */
+  accepted(): boolean;
   dispose(): void;
 }
 
@@ -34,6 +36,7 @@ export function ownActionSource(input: InputActions, actions: readonly ActionId[
         if (disposed || revision !== update) return;
       }
     },
+    accepted: () => !disposed && ids.some(id => port.accepted(id)),
     dispose,
   };
 }
@@ -41,6 +44,8 @@ export function ownActionSource(input: InputActions, actions: readonly ActionId[
 /** Fixed-slot primitive for trusted platform integrations. Prefer ownActionSource for physical edges. */
 export function openActionSource(input: InputActions, actions: readonly ActionId[], device: DeviceFamily): {
   isDown(action: ActionId): boolean;
+  /** The slot's press was accepted in the current owner epoch and is still down (false after cancel or release). */
+  accepted(action: ActionId): boolean;
   press(action: ActionId, epoch: number, valid?: () => boolean): void;
   release(action: ActionId): void;
   dispose(): void;
@@ -69,6 +74,7 @@ export function openActionSource(input: InputActions, actions: readonly ActionId
   let disposed = false;
   return {
     isDown: id => !disposed && physical.has(slot(id)),
+    accepted: id => !disposed && bridge.accepted(sources[slot(id)]),
     press: (id, epoch, valid = () => true) => {
       if (disposed) return;
       const index = slot(id), revision = revisions[index];

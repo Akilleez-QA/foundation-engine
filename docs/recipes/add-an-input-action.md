@@ -52,7 +52,9 @@ enter(ctx) { touchButton(ctx, 'jump', { label: ctx.text('game.input.jump') }); }
 - **Multi-touch.** Each button owns one finger; a second finger on the same button is ignored, and buttons (and the
   view's own drag) work at the same time.
 - **Not for mouse or pen.** Only touch pointers press it; keys and pad buttons stay the accessible path, so the element
-  is `aria-hidden`. By default it is made only where the device reports a touch screen or coarse pointer (`show: 'always'`
+  is `aria-hidden`. **Limitation:** a screen-reader player on a touch-only device (no keyboard or controller) has no
+  path to a held action at all: the button is not announced and assistive activation does not press it. Serve those
+  players with your own accessible control, or avoid making a held action essential. By default it is made only where the device reports a touch screen or coarse pointer (`show: 'always'`
   shows it everywhere).
 - **Size and position.** `size` is the side in CSS px, 48 to 240 (default 72); `inset` offsets it from the view's edges
   plus the safe area (default `{ right: 24, bottom: 24 }`). Give each button its own spot and keep it clear of the HUD

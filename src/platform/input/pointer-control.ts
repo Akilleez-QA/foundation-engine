@@ -12,7 +12,10 @@ export function bindPointerControl(element: HTMLElement, options: {
    * the element's bounds is released, as a lift would; that contact cannot re-press until a fresh touch.
    */
   leave?: 'hold' | 'release';
-  /** Presentation hook: true once a contact is captured, false when it is released for any reason. */
+  /**
+   * Presentation hook: true once a captured contact's press was accepted by the dispatcher (a refused or stale press
+   * reports nothing), false when that contact is released for any reason.
+   */
   onContact?: (down: boolean) => void;
   signal: AbortSignal;
 }): { dispose(): void } {
@@ -53,7 +56,7 @@ export function bindPointerControl(element: HTMLElement, options: {
     active = e.pointerId;
     try { element.setPointerCapture(e.pointerId); } catch { reset(); return; }
     try { sample(e); } catch (error) { reset(); throw error; }
-    if (active === e.pointerId && !shown) { shown = true; onContact?.(true); }
+    if (active === e.pointerId && !shown && source.accepted()) { shown = true; onContact?.(true); }
   }, listener);
   const outside = (e: PointerEvent) => {
     const b = element.getBoundingClientRect();

@@ -461,6 +461,8 @@ export class InputActions {
       admission: this.sourceAdmission ??= { count: 0, serial: 0 },
       press: (row: InputActionDef, source: string, device: DeviceFamily, valid: () => boolean) => this.input([row], source, device, false, false, valid),
       release: (source: string) => this.release(source),
+      /** The source's press was accepted in the current epoch and is still down. */
+      accepted: (source: string) => { const d = this.down.get(source); return d !== undefined && d.epoch === this.epochValue; },
     };
   }
 

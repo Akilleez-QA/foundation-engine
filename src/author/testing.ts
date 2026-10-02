@@ -9,7 +9,7 @@ import { createSaveStore } from '../core/save/store';
 import { MemoryBackend } from '../core/save/storage-port';
 import { createWorkerHost } from '../platform/workers/host';
 import type { AudioClockReading } from '../platform/audio/audio-timeline';
-import { validateCueVoiceOptions, type CueVoiceOptions } from '../platform/audio/audio-output';
+import { normalizeCueVoiceOptions, type CueVoiceOptions } from '../platform/audio/audio-output';
 /**
  * author/testing.ts: `testScene`, a scene without a browser, for a game's own unit tests. It spawns the scene's
  * entities into a real world and runs its real systems on the real fixed-step runner; input is scripted (`press`,
@@ -28,14 +28,14 @@ import { Name, validatePlayOptions, type GameDefinition, type InputDefinition, t
 /** One recorded `ctx.playVoice` of a `testScene`. */
 export interface TestVoice { id: string; options?: Omit<CueVoiceOptions, 'onEnded'> }
 
-/** A comparable copy of voice options: no callback, plain arrays, no shared references with the caller. */
+const defined = <T extends object>(o: T): T => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
+/**
+ * A comparable record of options already normalised as the audio output normalises them: no callback, and no field
+ * whose value is `undefined` (a wrapper passing `variant: undefined` records as if it were absent).
+ */
 function voiceRecord(options: CueVoiceOptions): Omit<CueVoiceOptions, 'onEnded'> {
   const { onEnded: _onEnded, spatial, filter, ...rest } = options;
-  return {
-    ...rest,
-    ...(spatial ? { spatial: { ...spatial, position: [spatial.position[0], spatial.position[1], spatial.position[2]] } } : {}),
-    ...(filter ? { filter: { ...filter } } : {}),
-  };
+  return defined({ ...rest, ...(spatial ? { spatial: defined(spatial) } : {}), ...(filter ? { filter: defined(filter) } : {}) });
 }
 
 export interface TestScene {
@@ -57,8 +57,8 @@ export interface TestScene {
   /** Every `ctx.play`, with its options (checked as the runtime checks them). */
   readonly plays: { id: string; options?: PlayOptions }[];
   /**
-   * Every `ctx.playVoice`, in order, with a copy of its options (checked as the audio output checks them; `onEnded` is
-   * left out, and a spatial position is a plain `[x, y, z]`). Nothing plays: `playVoice` returns null, as a muted page does.
+   * Every `ctx.playVoice`, in order, with a copy of its options, normalised and checked by the audio output's own
+   * `normalizeCueVoiceOptions` (a spatial position is a plain `[x, y, z]`); `onEnded` and `undefined` fields are left out. Nothing plays: `playVoice` returns null, as a muted page does.
    */
   readonly voices: TestVoice[];
   /** Exit once and dispose the helper-owned save store. Injected services remain caller-owned. */
@@ -105,7 +105,7 @@ export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief;
     modelAttachmentState: entity => Object.freeze({ status: disposed || !world.has(entity, Transform) || !world.has(entity, Model) ? 'absent' : world.has(entity, ModelAttachment) ? 'unresolved' : 'unattached', held: false }),
     modelPoseLinkState: entity => Object.freeze({ status: disposed || !world.has(entity, Transform) || !world.has(entity, Model) ? 'absent' : world.has(entity, ModelPoseLink) ? 'unresolved' : 'unlinked', reason: null }),
     modelSocket: () => null,
-    playVoice: (cue, options) => { validateCueVoiceOptions(options); cues.push(cue); voices.push({ id: cue, ...(options ? { options: voiceRecord(options) } : {}) }); return null; },
+    playVoice: (cue, options) => { const normal = normalizeCueVoiceOptions(options); cues.push(cue); voices.push({ id: cue, ...(options ? { options: voiceRecord(normal) } : {}) }); return null; },
     audioClock: () => o.audioClock?.(t * 1000) ?? null,
     random: () => { r = (r + 0x6D2B79F5) >>> 0; let x = r; x = Math.imul(x ^ (x >>> 15), x | 1); x ^= x + Math.imul(x ^ (x >>> 7), x | 61); return ((x ^ (x >>> 14)) >>> 0) / 4294967296; },
     service: key => { const v = key === 'save' ? save : o.services?.[key]; if (!v) throw Error(`testScene: no '${String(key)}' service; pass it in services`); return v as Services[typeof key]; },

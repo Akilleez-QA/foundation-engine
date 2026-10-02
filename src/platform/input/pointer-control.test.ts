@@ -177,3 +177,25 @@ test('the default leave keeps a captured contact held wherever it moves, and onC
     assert.deepEqual(contact, [true, false], 'a refused capture reports nothing');
   } finally { w.life.abort(); w.fake.restore(); }
 });
+
+test('onContact reports only a press the dispatcher accepted', () => {
+  const w = fixture();
+  try {
+    const empty = w.control(), stale = w.control(), refused = w.control(), contact: string[] = [];
+    bindPointerControl(empty, { input: w.input, actions: ['sample.move'], signal: w.life.signal, select: () => [], onContact: down => contact.push(`empty:${down}`) });
+    bindPointerControl(stale, { input: w.input, actions: ['sample.move'], signal: w.life.signal, onContact: down => contact.push(`stale:${down}`),
+      select: () => { w.input.cancel('overlay'); return ['sample.move']; } });
+    w.fire(empty, 'pointerdown', 1);
+    w.fire(stale, 'pointerdown', 2);
+    const declined = new InputActions({
+      registry: inputActionRegistry([{ id: 'sample.none', label: 'none', kind: 'hold', scope: 'global', defaults: {} }]),
+      layers: { fromTop: () => [], escape: () => false, cycleFocus: () => false, onChange: () => () => {} }, now: () => 0,
+    });
+    bindPointerControl(refused, { input: declined, actions: ['sample.none'], signal: w.life.signal, onContact: down => contact.push(`refused:${down}`) });
+    w.fire(refused, 'pointerdown', 3);
+    assert.equal(declined.held('sample.none'), false, 'no consumer: the dispatcher refused the press');
+    assert.equal(refused.hasPointerCapture(3), true, 'the contact is still captured');
+    w.fire(refused, 'pointerup', 3); w.fire(empty, 'pointerup', 1);
+    assert.deepEqual(contact, [], 'no pressed look without an accepted press');
+  } finally { w.life.abort(); w.fake.restore(); }
+});

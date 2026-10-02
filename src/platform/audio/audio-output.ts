@@ -272,7 +272,18 @@ function validateFilter(f: CueFilter, timeConstant: number = FILTER_TIME_CONSTAN
   if (!f || !within(f.cutoffHz, 10, 24000) || typeof f.cutoffHz !== 'number' || !within(f.gain, 0, 1) || !within(timeConstant, FILTER_TIME_CONSTANT.min, FILTER_TIME_CONSTANT.max)) throw Error('invalid cue filter');
 }
 
-/** The checks `playVoice` applies to its options before playing (shared with headless test doubles). Throws on the first problem. */
+/**
+ * What `playVoice` does to its options before playing, shared with headless test doubles: a copy that owns its
+ * spatial block (position as a plain `[x, y, z]` of the first three entries) and filter, then validated. Throws on the
+ * first problem.
+ */
+export function normalizeCueVoiceOptions(options: CueVoiceOptions = {}): CueVoiceOptions {
+  const copied: CueVoiceOptions = { ...options, ...(options.spatial ? { spatial: { ...options.spatial, position: copy(options.spatial.position) } } : {}), ...(options.filter ? { filter: { ...options.filter } } : {}) };
+  validateCueVoiceOptions(copied);
+  return copied;
+}
+
+/** The checks `playVoice` applies to its (normalised) options. Throws on the first problem. */
 export function validateCueVoiceOptions(options: CueVoiceOptions = {}): void {
   const gain = options.gain ?? 1;
   if (!Number.isFinite(gain) || gain < 0 || gain > 1) throw Error('cue gain must be in [0, 1]');
@@ -397,8 +408,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
   };
   const validateGain = (gain: number) => { if (!Number.isFinite(gain) || gain < 0 || gain > 1) throw Error('cue gain must be in [0, 1]'); };
   const playVoice = (id: string, options: CueVoiceOptions = {}): CueVoice | null => {
-    options = { ...options, ...(options.spatial ? { spatial: { ...options.spatial, position: copy(options.spatial.position) } } : {}), ...(options.filter ? { filter: { ...options.filter } } : {}) };
-    validateCueVoiceOptions(options);
+    options = normalizeCueVoiceOptions(options);
     const wait = options.wait ?? 0;
     if(voices.size>=maxVoices){stats.skipped++;return null;}
       const cue = cues.get(id);

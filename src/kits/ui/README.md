@@ -20,8 +20,12 @@ owns one finger, so several buttons and the view's own gestures work together. M
 - Size is 48 to 240 CSS px (default 72); `inset` offsets it from the view's edges plus the safe area (default bottom right).
 - `show: 'touch'` (default) makes it only where the device reports a touch screen or coarse pointer, decided once when it
   is made; `show: 'always'` makes it everywhere.
-- It is `aria-hidden`: the input's key and pad bindings remain its accessible path. It carries `data-down` while held
-  and changes its background then, and only then.
+- It is `aria-hidden`: the input's key and pad bindings remain its accessible path. **Limitation:** a player who uses
+  a screen reader on a touch-only device (no keyboard or controller) has no way to hold the action; the button is not
+  announced and assistive-technology activation does not press it. A game that must serve those players needs its own
+  accessible control or a design without held actions.
+- It carries `data-down` while a press the dispatcher accepted is held, and changes its background then, and only
+  then; a refused press (no consumer, a stale owner) shows nothing.
 - Headless (`testScene`) it makes nothing and returns `{ element: null }`; tests drive the input with `t.press`/`t.hold`.
 - Owner: the input dispatcher (`InputActions`) through `bindPointerControl` (`leave: 'release'`); one owned source per
   button (the dispatcher's owned-source limit, default 128, applies). No timer or frame work.

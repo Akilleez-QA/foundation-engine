@@ -65,4 +65,8 @@ test('testScene records playVoice with its full options and refuses what the aud
     [{ spatial: { position: [0, 0, 0], refDistance: 5, cutoffDistance: 2 } }, /spatial/], [{ filter: { cutoffHz: 2 } }, /filter/],
   ] as const) assert.throws(() => t.ctx.playVoice('chime', bad as never), message);
   assert.equal(t.voices.length, 2, 'a refused voice is not recorded');
+  // Normalised as the audio output normalises: the first three entries of an array-like; undefined fields dropped.
+  t.ctx.playVoice('chime', { variant: undefined, gain: .5, spatial: { position: [1, 2, 3, 4] as unknown as [number, number, number], panning: undefined } });
+  assert.deepEqual(t.voices[2], { id: 'chime', options: { gain: .5, spatial: { position: [1, 2, 3] } } });
+  assert.deepEqual(Object.keys(t.voices[2].options!), ['gain', 'spatial']);
 });
