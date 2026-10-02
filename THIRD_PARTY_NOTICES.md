@@ -31,10 +31,13 @@ WebSocket acceleration package is required by this integration.
   Its header identifies meshoptimizer 1.1. This is distinct from the 1.1.1
   development dependency in the lockfile.
   [Source](https://github.com/zeux/meshoptimizer).
-- Vite can generate browser preload helpers. Keep relevant Vite notices when
-  redistributing those helpers; its installed `LICENSE.md` also contains bundled
-  dependency notices. Do not infer browser-bundle contents from `devDependency`
-  classification alone.
+- Vite can generate browser preload helpers, and its Rolldown bundler (Vite 8)
+  emits small module-namespace runtime helpers into browser chunks. Keep the
+  relevant Vite and Rolldown (MIT) notices when redistributing those helpers;
+  Vite's installed `LICENSE.md` and Rolldown's `THIRD-PARTY-LICENSE` also contain
+  bundled dependency notices. Lightning CSS minifies the project's own CSS at
+  build time; no Lightning CSS code is emitted. Do not infer browser-bundle
+  contents from `devDependency` classification alone.
 
 The runtime uses one engine-owned model loader and does not register a Draco
 loader. A release with additional decoders or asset providers must extend this
@@ -95,8 +98,9 @@ SOFTWARE.
 
 ## Locked dependency inventory
 
-The lockfile contains 78 dependency entries. Its declared licenses are 73 MIT,
-three Apache-2.0, one BSD-3-Clause, and one ISC. These include transitive tools,
+The lockfile contains 81 dependency entries. Its declared licenses are 63 MIT,
+12 MPL-2.0 (Lightning CSS and its platform binaries), four Apache-2.0, one
+BSD-3-Clause, and one ISC. These include transitive tools,
 types, and optional platform binaries; the table is not a statement that all
 packages ship in a browser build. The original 2026-09-30 audit installed 29 packages on its
 host; the separately documented network-host addition followed on 2026-10-01. Optional binaries for other operating systems were inspected through
@@ -131,66 +135,73 @@ lockfile metadata only.
 | `@esbuild/win32-arm64` | 0.28.2 | MIT | Optional |
 | `@esbuild/win32-ia32` | 0.28.2 | MIT | Optional |
 | `@esbuild/win32-x64` | 0.28.2 | MIT | Optional |
-| `@napi-rs/lzma-linux-x64-gnu` | 1.5.1 | MIT | Optional |
-| `@rollup/rollup-android-arm-eabi` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-android-arm64` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-darwin-arm64` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-darwin-x64` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-freebsd-arm64` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-freebsd-x64` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-linux-arm-gnueabihf` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-linux-arm-musleabihf` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-linux-arm64-gnu` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-linux-arm64-musl` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-linux-loong64-gnu` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-linux-loong64-musl` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-linux-ppc64-gnu` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-linux-ppc64-musl` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-linux-riscv64-gnu` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-linux-riscv64-musl` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-linux-s390x-gnu` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-linux-x64-gnu` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-linux-x64-musl` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-openbsd-x64` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-openharmony-arm64` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-win32-arm64-msvc` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-win32-ia32-msvc` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-win32-x64-gnu` | 4.63.5 | MIT | Optional |
-| `@rollup/rollup-win32-x64-msvc` | 4.63.5 | MIT | Optional |
+| `@oxc-project/types` | 0.152.0 | MIT | Required by dependency graph |
+| `@rolldown/binding-android-arm-eabi` | 1.2.12 | MIT | Optional |
+| `@rolldown/binding-android-arm64` | 1.2.12 | MIT | Optional |
+| `@rolldown/binding-darwin-arm64` | 1.2.12 | MIT | Optional |
+| `@rolldown/binding-darwin-x64` | 1.2.12 | MIT | Optional |
+| `@rolldown/binding-freebsd-x64` | 1.2.12 | MIT | Optional |
+| `@rolldown/binding-linux-arm-gnueabihf` | 1.2.12 | MIT | Optional |
+| `@rolldown/binding-linux-arm64-gnu` | 1.2.12 | MIT | Optional |
+| `@rolldown/binding-linux-arm64-musl` | 1.2.12 | MIT | Optional |
+| `@rolldown/binding-linux-ppc64-gnu` | 1.2.12 | MIT | Optional |
+| `@rolldown/binding-linux-s390x-gnu` | 1.2.12 | MIT | Optional |
+| `@rolldown/binding-linux-x64-gnu` | 1.2.12 | MIT | Optional |
+| `@rolldown/binding-linux-x64-musl` | 1.2.12 | MIT | Optional |
+| `@rolldown/binding-openharmony-arm64` | 1.2.12 | MIT | Optional |
+| `@rolldown/binding-win32-arm64-msvc` | 1.2.12 | MIT | Optional |
+| `@rolldown/binding-win32-x64-msvc` | 1.2.12 | MIT | Optional |
+| `@rolldown/pluginutils` | 1.0.1 | MIT | Required by dependency graph |
 | `@tweenjs/tween.js` | 23.1.3 | MIT | Required by dependency graph |
-| `@types/estree` | 1.0.9 | MIT | Required by dependency graph |
 | `@types/node` | 22.20.4 | MIT | Required by dependency graph |
 | `@types/stats.js` | 0.17.4 | MIT | Required by dependency graph |
 | `@types/three` | 0.186.0 | MIT | Required by dependency graph |
 | `@types/webxr` | 0.5.24 | MIT | Required by dependency graph |
+| `detect-libc` | 2.1.2 | Apache-2.0 | Required by dependency graph |
 | `esbuild` | 0.28.2 | MIT | Required by dependency graph |
 | `fdir` | 6.5.0 | MIT | Required by dependency graph |
 | `fflate` | 0.8.3 | MIT | Required by dependency graph |
 | `fsevents` | 2.3.3 | MIT | Optional |
+| `lightningcss` | 1.33.0 | MPL-2.0 | Required by dependency graph |
+| `lightningcss-android-arm64` | 1.33.0 | MPL-2.0 | Optional |
+| `lightningcss-darwin-arm64` | 1.33.0 | MPL-2.0 | Optional |
+| `lightningcss-darwin-x64` | 1.33.0 | MPL-2.0 | Optional |
+| `lightningcss-freebsd-x64` | 1.33.0 | MPL-2.0 | Optional |
+| `lightningcss-linux-arm-gnueabihf` | 1.33.0 | MPL-2.0 | Optional |
+| `lightningcss-linux-arm64-gnu` | 1.33.0 | MPL-2.0 | Optional |
+| `lightningcss-linux-arm64-musl` | 1.33.0 | MPL-2.0 | Optional |
+| `lightningcss-linux-x64-gnu` | 1.33.0 | MPL-2.0 | Optional |
+| `lightningcss-linux-x64-musl` | 1.33.0 | MPL-2.0 | Optional |
+| `lightningcss-win32-arm64-msvc` | 1.33.0 | MPL-2.0 | Optional |
+| `lightningcss-win32-x64-msvc` | 1.33.0 | MPL-2.0 | Optional |
 | `meshoptimizer` | 1.1.1 | MIT | Required by dependency graph |
 | `nanoid` | 3.3.19 | MIT | Required by dependency graph |
 | `picocolors` | 1.1.1 | ISC | Required by dependency graph |
 | `picomatch` | 4.0.7 | MIT | Required by dependency graph |
 | `playwright-core` | 1.56.1 | Apache-2.0 | Required by dependency graph |
 | `postcss` | 8.5.28 | MIT | Required by dependency graph |
-| `rollup` | 4.63.5 | MIT | Required by dependency graph |
+| `rolldown` | 1.2.12 | MIT | Required by dependency graph |
 | `source-map-js` | 1.2.1 | BSD-3-Clause | Required by dependency graph |
 | `three` | 0.186.1 | MIT | Required by dependency graph |
 | `tinyglobby` | 0.2.17 | MIT | Required by dependency graph |
 | `tsx` | 4.23.15 | MIT | Required by dependency graph |
 | `typescript` | 6.0.3 | Apache-2.0 | Required by dependency graph |
 | `undici-types` | 6.21.0 | MIT | Required by dependency graph |
-| `vite` | 7.3.6 | MIT | Required by dependency graph |
+| `vite` | 8.3.2 | MIT | Required by dependency graph |
 | `ws` | 8.22.0 | MIT | Optional reference host; installed by the locked development graph |
 
 Retain each distributed package's license files and copyright notices. Relevant
 installed notice paths include:
 
 - `node_modules/three/LICENSE` and `node_modules/meshoptimizer/LICENSE.md`.
-- `node_modules/vite/LICENSE.md`, `node_modules/rollup/LICENSE.md`, and
-  `node_modules/esbuild/LICENSE.md` (including their bundled notices).
-- `node_modules/typescript/LICENSE.txt` and
-  `node_modules/@dimforge/rapier3d-compat/LICENSE` (Apache-2.0).
+- `node_modules/vite/LICENSE.md`, `node_modules/rolldown/LICENSE` and
+  `THIRD-PARTY-LICENSE`, and `node_modules/esbuild/LICENSE.md` (including their
+  bundled notices).
+- `node_modules/typescript/LICENSE.txt`,
+  `node_modules/@dimforge/rapier3d-compat/LICENSE` and
+  `node_modules/detect-libc/LICENSE` (Apache-2.0).
+- `node_modules/lightningcss/LICENSE` (MPL-2.0, a build-time CSS minifier; its
+  native `lightningcss-<platform>` subpackages carry the same license).
 - `node_modules/playwright-core/LICENSE` and `NOTICE` (Apache-2.0).
 - `node_modules/source-map-js/LICENSE` (BSD-3-Clause).
 - `node_modules/picocolors/LICENSE` (ISC).
@@ -206,6 +217,10 @@ review the actual binary distribution before shipping native tooling.
 The declared license families are compatible with GPLv3 combinations according
 to the [GNU compatibility guidance](https://www.gnu.org/licenses/license-compatibility.en.html)
 and [Apache's GPL compatibility explanation](https://apache.org/licenses/GPL-compatibility.html).
+MPL-2.0 (Lightning CSS, a build tool that is not distributed in browser builds)
+is GPL-compatible through its secondary-license provision, as the GNU list notes;
+the installed `lightningcss` license does not mark it Incompatible With Secondary
+Licenses.
 This does not relicense upstream packages, establish ownership, or certify every
 embedded binary component. Package metadata is an inventory aid, not a substitute
 for preserving the notices accompanying the actual distributed material.

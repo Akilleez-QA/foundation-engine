@@ -9,3 +9,8 @@ test('check: a changed file brings its own test, its game\'s tests, or its folde
   assert.deepEqual(affectedTests(['docs/STANDARD.md'], 'templates/blank/game'), []);
   assert.ok(affectedTests(['src/core/ecs/world.ts'], 'templates/blank/game').includes('src/core/ecs/ecs.test.ts'));
 });
+
+test('check: changing the @engine barrel or the Vite config runs the barrel side-effect guard', () => {
+  for (const f of ['src/author/index.ts', 'vite.config.ts']) assert.ok(affectedTests([f], 'templates/blank/game').includes('scripts/vite-config.test.mjs'), f);
+  assert.ok(!affectedTests(['src/author/testing.ts'], 'templates/blank/game').includes('scripts/vite-config.test.mjs'));
+});

@@ -79,7 +79,7 @@
     "playwright-core": "1.56.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
-    "vite": "^7.3.1",
+    "vite": "^8.3.2",
     "ws": "8.22.0"
   },
   "repository": {

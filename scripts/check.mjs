@@ -34,6 +34,8 @@ export function affectedTests(changed, game = GAME) {
     if (f.startsWith(game + '/') || f === join(game, '..', 'GAME.md').split('\\').join('/')) for (const t of testsIn(game)) out.add(t);
     else if (/^src\/.+\.(ts|css)$/.test(f)) for (const t of testsIn(dirname(f)).filter(t => dirname(t) === dirname(f))) out.add(t);
     if (/^src\/(author|app)\//.test(f) || /^templates\/[^/]+\/game\//.test(f)) out.add('src/app/templates.test.ts');
+    // The build declares the @engine barrel free of side effects; its guard runs when either side changes.
+    if (f === 'src/author/index.ts' || f === 'vite.config.ts') out.add('scripts/vite-config.test.mjs');
   }
   return [...out].filter(t => existsSync(join(ROOT, t))).sort();
 }
