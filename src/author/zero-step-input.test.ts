@@ -23,7 +23,7 @@ function fixture(tapRunning?:()=>boolean){
  const bindScenePointer=(_canvas:unknown,options:any)=>{gestureOptions=options;return {pointer:rawPointer,sync(){},cancel(){options.canceled();},dispose(){}};};
  const read=(lane:'fixed'|'frame')=>(ctx:any)=>{const jump=ctx.input.pressed('jump'),tap=ctx.input.pointer.pressed;if(jump||tap)seen.push({tick,frame:frameNo,lane,jump,tap});};
  const systems=[{id:'fixed-reader',run:(ctx:any)=>{tick++;read('fixed')(ctx);}},{id:'frame-reader',phase:'frame' as const,run:read('frame')}];
- const run=ts.transpile(`let programFailed=false,simulating=true,frame=0,t=0,calm=false;const FIXED_STEP=1/60,tap=tapRunning?{running:tapRunning,beforeTick(){},afterTick(){},get input(){return liveInput;}}:null;const timing=undefined,body={systems},world={clearEvents(){}},scene={id:'test'};
+ const run=ts.transpile(`let programFailed=false,simulating=true,frame=0,t=0,calm=false,frameMs=0;const FIXED_STEP=1/60,tap=tapRunning?{running:tapRunning,beforeTick(){},afterTick(){},get input(){return liveInput;}}:null;const timing=undefined,body={systems},world={clearEvents(){}},scene={id:'test'};
 ${wiring}
 ${runnerLine}
 ${liveInputLine}
@@ -33,9 +33,9 @@ ${inputLine}
 return {setSimulating:v=>{simulating=v;},${update}};`,{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None});
  const actx={invalidate(){},runId:'run-test',signal:new AbortController().signal,own(){},coverage:()=>'top',leaving:()=>false};
  const sceneActionHints=()=>()=>null;
- const api=new Function('s','o','actx','surface','view','bindScenePointer','actionOf','viewOwnsInput','createSystemRunner','sceneInput','createPressLatch','sceneActionHints','systems','tapRunning','sync','failPrograms','ProgramLinkError','FrameReadinessError',run)(
-  {input:{onAction:(action:string,fn:any)=>{handlers.set(action,fn);},cancel(){},held:()=>false,describeAction:()=>null},log:{error(){}}},{inputs:[{id:'jump'},{id:'tap',tap:true}]},actx,{canvas:{}},{closest:()=>null},
-  bindScenePointer,actionOf,()=>true,createSystemRunner,sceneInput,(latch as any).createPressLatch,sceneActionHints,systems,tapRunning,()=>{},()=>{},class extends Error{},class extends Error{});
+ const api=new Function('s','o','actx','surface','view','bindScenePointer','actionOf','viewOwnsInput','createSystemRunner','sceneInput','createPressLatch','sceneActionHints','systems','tapRunning','sync','failPrograms','ProgramLinkError','FrameReadinessError','monotonicNow',run)(
+  {app:{has:()=>false},input:{onAction:(action:string,fn:any)=>{handlers.set(action,fn);},cancel(){},held:()=>false,describeAction:()=>null},log:{error(){}}},{inputs:[{id:'jump'},{id:'tap',tap:true}]},actx,{canvas:{}},{closest:()=>null},
+  bindScenePointer,actionOf,()=>true,createSystemRunner,sceneInput,(latch as any).createPressLatch,sceneActionHints,systems,tapRunning,()=>{},()=>{},class extends Error{},class extends Error{},()=>1);
  return {
   seen,
   press:()=>handlers.get(actionOf('jump'))!({phase:'press'}),
@@ -84,20 +84,37 @@ test('retention is bounded: cancellation and a non-simulating frame release a pe
  assert.equal(held.seen.filter(s=>s.lane==='fixed').length,0,'a frame that does not simulate releases the press');
 });
 
-test('the per-tick latch hooks touch no empty Set (no per-tick allocation when idle)', () => {
- const l=latch.createPressLatch(),proto=Set.prototype as any,calls:string[]=[];
- const saved={clear:proto.clear,values:proto.values,iterator:proto[Symbol.iterator]};
- proto.clear=function(this:Set<unknown>){calls.push('clear');return saved.clear.call(this);};
- proto.values=proto[Symbol.iterator]=function(this:Set<unknown>){calls.push('iterate');return saved.values.call(this);};
+test('the per-tick latch hooks touch no empty Set or Map (no per-tick allocation when idle)', () => {
+ // The latch keeps press timestamps in Maps (AU-01); guard both collection types so the check cannot pass vacuously.
+ const l=latch.createPressLatch(),calls:string[]=[];
+ const protos=[Set.prototype,Map.prototype] as any[];
+ const saved=protos.map(proto=>({clear:proto.clear,values:proto.values,entries:proto.entries,iterator:proto[Symbol.iterator]}));
+ protos.forEach((proto,i)=>{
+  proto.clear=function(this:unknown){calls.push('clear');return saved[i].clear.call(this);};
+  proto.values=function(this:unknown){calls.push('iterate');return saved[i].values.call(this);};
+  proto.entries=function(this:unknown){calls.push('iterate');return saved[i].entries.call(this);};
+  proto[Symbol.iterator]=function(this:unknown){calls.push('iterate');return saved[i].iterator.call(this);};
+ });
  try{for(let i=0;i<3;i++){l.beginStep();l.beginStep();l.beginFrameLane();l.endFrame();}}
- finally{proto.clear=saved.clear;proto.values=saved.values;proto[Symbol.iterator]=saved.iterator;}
+ finally{protos.forEach((proto,i)=>{proto.clear=saved[i].clear;proto.values=saved[i].values;proto.entries=saved[i].entries;proto[Symbol.iterator]=saved[i].iterator;});}
  assert.deepEqual(calls,[]);
- l.add('jump');l.beginStep();assert.equal(l.has('jump'),true);l.beginStep();assert.equal(l.has('jump'),false);
+ l.add('jump',5);l.beginStep();assert.equal(l.has('jump'),true);l.beginStep();assert.equal(l.has('jump'),false);
+});
+
+test('press timestamps follow the latch lanes: the earliest press per tick or frame, kept across zero-step frames', () => {
+ const l=latch.createPressLatch();
+ l.add('jump',100);l.add('jump',110);
+ l.beginFrameLane();assert.equal(l.get('jump'),100,'the frame lane sees its earliest press');
+ l.endFrame();
+ l.beginFrameLane();assert.equal(l.get('jump'),undefined,'a later frame does not');l.endFrame();
+ l.beginStep();assert.equal(l.get('jump'),100,'a zero-step frame kept the press and its time for the next tick');
+ l.beginStep();assert.equal(l.get('jump'),undefined,'later ticks do not see it');
+ l.endFrame();l.add('jump',200);l.clear();l.beginStep();assert.equal(l.get('jump'),undefined,'cancellation drops the time with the press');
 });
 
 test('ctx.input.pointer is read-only at compile time, matching the runtime getter view', () => {
  const view=latch.createPressLatch().pointer({x:0,y:0,down:false,pressed:false});
- const state=sceneInput(()=>true,()=>false,new Set(),view);
+ const state=sceneInput(()=>true,()=>false,new Map<string,number>(),view);
  // @ts-expect-error A system cannot clear the pointer press; the runtime view has getters only.
  const write=()=>{state.pointer.pressed=false;};
  assert.throws(write,TypeError);
