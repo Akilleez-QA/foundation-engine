@@ -1,0 +1,9 @@
+{
+  "events": [
+    "lost",
+    "restored"
+  ],
+  "freshLink": true,
+  "oldHandleQueries": 0,
+  "scope": "actual native loss/restore correctness, not timing"
+}

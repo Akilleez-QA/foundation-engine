@@ -1,3 +1,7 @@
+import {createFrameReadiness} from './frame-readiness';
+import {installProgramValidation, type ProgramValidation} from './program-validation';
+import {TEST_API} from '../../core/env';
+import {waitForPrograms} from './program-readiness';
 /**
  * platform/render/renderer-pool.ts: the renderer pool (ADRs 0016, 0040, 0041, 0045;
  * STD-REN-3, STD-REN-4, STD-REN-5, STD-REN-34, STD-RUN-17). the `world` role.
@@ -64,7 +68,7 @@ const GL_KINDS = [
  * Wraps the pooled context's own create/delete calls (instance properties; the prototype is untouched) so a release
  * can delete what its lease left behind. The context's own startup objects (made before the wrap) are never deleted.
  */
-function trackGlObjects(gl: GL): { live: Map<object, string> } {
+function trackGlObjects(gl: GL): { live: Map<object, string>; validation: ProgramValidation } {
   const live = new Map<object, string>();
   const g = gl as unknown as Record<string, (...a: unknown[]) => unknown>;
   for (const [create, del] of GL_KINDS) {
@@ -73,7 +77,7 @@ function trackGlObjects(gl: GL): { live: Map<object, string> } {
     g[create] = function (this: unknown, ...a: unknown[]) { const o = c.apply(gl, a); if (o && typeof o === 'object') live.set(o, del); return o; };
     g[del] = function (this: unknown, o: unknown) { if (o && typeof o === 'object') live.delete(o); return d.call(gl, o); };
   }
-  return { live };
+  return { live, validation: installProgramValidation(gl) };
 }
 
 interface Slot { canvas: HTMLCanvasElement; gl: GL; tracker: ReturnType<typeof trackGlObjects>; leased: boolean; uses: number; lost: boolean; off: AbortController; renderer?: PoolRenderer | null }
@@ -129,7 +133,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
     if (world === slot) world = null;
     slot.off.abort();
     if (lose && !slot.lost) (slot.gl.getExtension?.('WEBGL_lose_context') as WEBGL_lose_context | null)?.loseContext();
-    slot.tracker.live.clear();
+    slot.tracker.live.clear(); slot.tracker.validation.clear();
     slot.canvas.remove?.();
     stats.contexts = Math.max(0, stats.contexts - 1);
   };
@@ -139,7 +143,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
     slot.canvas.addEventListener('webglcontextlost', e => {
       // three calls preventDefault for a leased context; a parked one needs it too so it may be restored.
       e.preventDefault();
-      slot.lost = true; stats.losses++;
+      slot.lost = true; slot.tracker.live.clear(); slot.tracker.validation.clear(); stats.losses++;
       if (current?.canvas === slot.canvas) for (const f of [...current.lost]) f();
       else if (!slot.leased) retire(slot, false);
     }, { signal });
@@ -176,7 +180,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
     r.dispose();
     const g = slot.gl as unknown as Record<string, (x: object) => void>;
     for (const [obj, del] of [...slot.tracker.live]) { audit.glObjects++; try { g[del]!(obj); } catch { /* lost */ } }
-    slot.tracker.live.clear();
+    slot.tracker.live.clear(); slot.tracker.validation.clear();
     return audit;
   };
 
@@ -212,17 +216,45 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
     pixelRatio(r, req.maxPixelRatio);
     shadows(r, req.shadows ?? 'reference');
     applyProfile(r, req.profile);
+    if(r.debug)r.debug.checkShaderErrors=(o.programDiagnostics??(TEST_API?'full':'failure-only'))==='full';
     if (req.insert === 'prepend') req.host.prepend(canvas); else req.host.append(canvas);
     let released = false;
+    let preparationOwner=new AbortController();
+    let pendingPreparation:AbortController|undefined;
+    const programTracker=slot?.tracker??trackGlObjects(r.getContext() as GL);
+    const frameReadiness=createFrameReadiness(r.getContext() as GL,()=>released);
+    const retirePreparation=()=>{preparationOwner.abort();frameReadiness.retire();};
+    lost.add(retirePreparation);
+    restored.add(()=>{preparationOwner=new AbortController();});
+    const overflowEvents=new AbortController();
+    if(!slot){
+      canvas.addEventListener('webglcontextlost',event=>{
+        if(released)return;
+        event.preventDefault();programTracker.live.clear();programTracker.validation.clear();stats.losses++;
+        for(const fn of [...lost])fn();
+      },{signal:overflowEvents.signal});
+      canvas.addEventListener('webglcontextrestored',()=>{
+        if(released)return;
+        for(const fn of [...restored])fn();
+      },{signal:overflowEvents.signal});
+    }
     const surface: RenderSurface = {
       renderer: r as T.WebGLRenderer, canvas, role: req.role, pooled,
       onLost(fn) { lost.add(fn); return () => lost.delete(fn); },
       onRestored(fn) { restored.add(fn); return () => restored.delete(fn); },
+      frameReady:signal=>frameReadiness.wait(signal),
+      programsReady(signal) {
+        pendingPreparation?.abort();
+        const request=new AbortController();pendingPreparation=request;
+        return waitForPrograms(r.getContext() as GL,programTracker.live,AbortSignal.any([signal,preparationOwner.signal,request.signal]),{validate:programTracker.validation.validate})
+          .finally(()=>{if(pendingPreparation===request)pendingPreparation=undefined;});
+      },
       release() {
         if (released) return;
+        preparationOwner.abort();frameReadiness.retire();overflowEvents.abort();
         released = true;
         lost.clear(); restored.clear();
-        if (!slot) { r.dispose(); r.forceContextLoss(); canvas.remove?.(); stats.contexts = Math.max(0, stats.contexts - 1); return; }
+        if (!slot) { r.dispose(); r.forceContextLoss(); programTracker.live.clear();programTracker.validation.clear(); canvas.remove?.(); stats.contexts = Math.max(0, stats.contexts - 1); return; }
         if (current?.canvas === canvas) current = null;
         worldChanged();
         const audit = stats.lastRelease = scrub(slot, r);

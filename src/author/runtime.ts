@@ -1,3 +1,6 @@
+import {FrameReadinessError} from '../platform/render/frame-readiness';
+import {ProgramLinkError} from '../platform/render/program-validation';
+import {t as failureText} from '../core/i18n/app-i18n';
 import { createSceneActivity } from './scene-activity';
 import { normalizeModelPoseLinkLimits } from './model-pose-link';
 import { createSceneModelInspector } from './model-inspection';
@@ -343,18 +346,75 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       if (TEST_API) handle.entities = createSceneEntityInspector(world, visit, actx.signal);
       s.play.attach(handle, actx.signal);
 
+      // Prepare authored resident materials before router activation/first render.
+      // Async asset replacements still own their later preparation; this is not a GPU upload/shadow guarantee.
+      let programsPrepared=false,preparationVersion=0;
+      let programFailed=false;
+      // Systems start only once initial preparation settles, as before this preparation existed:
+      // the router's first-render frames then precede arrival, so systems never run long before enter().
+      let simulating=false;
+      const failPrograms=(error:ProgramLinkError|FrameReadinessError)=>{
+        if(programFailed||actx.leaving()||actx.signal.aborted)return;
+        programFailed=true;programsPrepared=false;view.dataset.programReadiness='failed';
+        const card=doc.createElement('div');card.className='scene-failure-card';card.setAttribute('role','alert');
+        const message=doc.createElement('p');message.textContent=failureText('engine.scene-loading.could-not-open',{scene:scene.id});
+        const retry=doc.createElement('button');retry.type='button';retry.textContent=failureText('engine.scene-loading.try-again');
+        retry.addEventListener('click',()=>{
+          if(actx.signal.aborted||actx.leaving())return;
+          void s.router.reenter('graphics').catch(reason=>{try{s.log.error('Shader recovery failed',reason);}catch{/* Isolated diagnostic. */}});
+        },{signal:actx.signal});
+        card.append(message,retry);view.append(card);actx.own(()=>card.remove());
+        const failureLayer:LayerSpec={id:`${actx.runId}:program-failure`,kind:'modal',element:card,cover:'opaque',modal:'scope',initialFocus:()=>retry,onEscape:()=>false};
+        actx.layer(failureLayer);
+        try{s.log.error(`${scene.id}: shader link failed`,error);}catch{/* Isolated diagnostic. */}
+      };
+      const preparePrograms=()=>{
+        const version=++preparationVersion;
+        programsPrepared=false;view.dataset.programReadiness='preparing';
+        if(actx.leaving()||actx.signal.aborted)throw Error('Scene program preparation retired');
+        sync();renderer.compile(three,camera);
+        const programs=(surface.programsReady?.(actx.signal)??Promise.resolve('unsupported')).catch(error=>{
+          if(error instanceof ProgramLinkError||version!==preparationVersion||actx.leaving()||actx.signal.aborted||renderer.getContext().isContextLost())throw error;
+          // Capacity, timeout or a driver query failure is not a link verdict: degrade to the
+          // pre-existing first-draw compilation (which still validates links) instead of refusing the scene.
+          try{s.log.error(`${scene.id}: program preparation unavailable; first-render compilation fallback`,error);}catch{/* Isolated diagnostic. */}
+          return 'degraded' as const;
+        });
+        return programs.then(async result=>{
+          if(version!==preparationVersion||result==='retired'||actx.leaving()||actx.signal.aborted)throw Error('Scene program preparation retired');
+          // Include a real initial draw: generated passes can create programs absent from compile().
+          renderer.render(three,camera);
+          const frame=await(surface.frameReady?.(actx.signal)??Promise.resolve('ready'));
+          if(frame==='retired')throw Error('Scene frame preparation retired');
+          if(version!==preparationVersion||actx.leaving()||actx.signal.aborted)throw Error('Scene program preparation retired');
+          view.dataset.programReadiness=result;programsPrepared=true;simulating=true;actx.invalidate();
+        });
+      };
+      const ready=preparePrograms();
       return {
+        ready,
         frameMode: live ? 'continuous' : 'on-demand',
         update(f: FrameInfo) {
+          if(programFailed)return;
+          if(!simulating){pressed.clear();pointer.pressed=false;return;}
+          try{
           frame++; t += f.dt; calm = f.calm;
           gestures.sync();
           runner.frame(ctx, f.dt);
           pressed.clear(); pointer.pressed = false;
           sync(f.dt);
+          }catch(error){if(error instanceof ProgramLinkError||error instanceof FrameReadinessError)failPrograms(error);else throw error;}
         },
         render() {
-          sync(); if (actx.leaving() || actx.signal.aborted || !dirty) return false;
-          renderer.render(three, camera); dirty = false;
+          if(programFailed)return false;
+          try{
+            sync(); if (actx.leaving() || actx.signal.aborted || !programsPrepared || !dirty) return false;
+            renderer.render(three,camera);
+          }catch(error){
+            if(!(error instanceof ProgramLinkError||error instanceof FrameReadinessError))throw error;
+            failPrograms(error);return false;
+          }
+          dirty = false;
           if (!actx.leaving() && !actx.signal.aborted && visit.current()) {
             try { scene.rendered?.(ctx); }
             catch (error) {
@@ -365,7 +425,18 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
         },
         activate() { sceneLayer.activate(); view.focus({ preventScroll: true }); syncListener(); },
         leave() { activityEvents?.retire(); scene.exit?.(ctx); },
-        contextRestored() { dirty = true; actx.invalidate(); },
+        contextRestored() {
+          dirty=true;
+          let pending:Promise<void>;try{pending=preparePrograms();}catch(error){pending=Promise.reject(error);}
+          const version=preparationVersion;
+          void pending.catch(error=>{
+            if(version!==preparationVersion||actx.leaving()||actx.signal.aborted||renderer.getContext().isContextLost())return;
+            if(error instanceof ProgramLinkError||error instanceof FrameReadinessError){failPrograms(error);return;}
+            // Recovery retains the original synchronous render fallback, visibly distinct from readiness.
+            view.dataset.programReadiness='degraded';programsPrepared=true;actx.invalidate();
+            try{s.log.error(`${scene.id}: program preparation failed; first-render compilation fallback`,error);}catch{/* Isolated diagnostic. */}
+          });
+        },
       };
     },
   };
