@@ -26,7 +26,7 @@ export function createPin(overlay: HTMLElement): Pin {
   } };
 }
 
-export interface Slider { readonly value: number; set(v: number): void; show(on: boolean): void; onInput(fn: (v: number) => void): void; destroy(): void }
+export interface Slider { readonly root: HTMLElement; readonly value: number; set(v: number): void; show(on: boolean): void; onInput(fn: (v: number) => void): void; destroy(): void }
 export function createSlider(overlay: HTMLElement, o: { id: string; label: string; min: number; max: number; step: number; value: number; unit?: string }): Slider {
   const doc = overlay.ownerDocument, wrap = doc.createElement('label');
   wrap.className = 'explorer-slider';
@@ -42,6 +42,7 @@ export function createSlider(overlay: HTMLElement, o: { id: string; label: strin
   const onInput = () => { if (retired) return; value = Number(input.value); show(); fn?.(value); };
   input.addEventListener('input', onInput);
   return {
+    root: wrap,
     get value() { return value; },
     set(v) { if (retired || v === value) return; value = v; input.value = String(v); show(); },
     show(on) { if (!retired) showEl(wrap, on); },
@@ -65,7 +66,7 @@ export function createLayerToggles(overlay: HTMLElement, layers: { id: string; l
 }
 
 export interface QuizPanelView { prompt: string; options: { id: string; text: string }[]; hints: string[]; feedback: string | null; state: 'asking' | 'right' | 'revealed'; chosen: string | null; answer?: string; index: number; count: number }
-export interface QuizPanel { set(v: QuizPanelView | null): void; onAnswer(fn: (id: string) => void): void; destroy(): void }
+export interface QuizPanel { readonly root: HTMLElement; set(v: QuizPanelView | null): void; onAnswer(fn: (id: string) => void): void; destroy(): void }
 export function createQuizPanel(overlay: HTMLElement, o: { questionOf: (i: number, n: number) => string; hintLabel: string }): QuizPanel {
   const doc = overlay.ownerDocument, box = doc.createElement('section');
   box.className = 'explorer-quiz'; box.setAttribute('aria-live', 'polite');
@@ -74,6 +75,7 @@ export function createQuizPanel(overlay: HTMLElement, o: { questionOf: (i: numbe
   let retired = false;
   let last = '', fn: ((id: string) => void) | null = null;
   return {
+    root: box,
     onAnswer(f) { if (!retired) fn = f; },
     destroy() { if (retired) return; retired = true; fn = null; box.replaceChildren(); box.remove(); },
     set(v) {

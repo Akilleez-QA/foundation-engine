@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Stock consumer sizing and real emulated-touch routes, not physical-device acceptance.
+// Stock consumer sizing, emulated-touch routes and lesson content/control separation; not physical-device acceptance.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {mkdirSync} from 'node:fs';
@@ -15,7 +15,9 @@ const profiles=[{id:'compact',width:320,height:568},{id:'phone-portrait',width:3
 const routes=[{template:'mechanics',scene:'lab',selector:'.scene-overlay section button',action:'Ride the platform',after:'Step off safely'},
  {template:'expedition',scene:'field',selector:'.scene-overlay section button',action:'Begin survey',after:'Stop'},
  {template:'expedition',scene:'shelter',selector:'.scene-overlay section button',action:null,after:'Begin survey'},
- {template:'learn',scene:'day-night',selector:'.scene-overlay nav button',action:null,pause:true}];
+ {template:'learn',scene:'day-night',selector:'.scene-overlay nav button',action:null,pause:true,walk:true,
+  // Lesson content that the wrapped control bar and the progress line must never cover.
+  clear:[['.scene-overlay nav','.chalkboard'],['.scene-overlay nav','.explorer-slider'],['.scene-overlay nav','.explorer-quiz'],['.scene-overlay > p','.explorer-quiz']]}];
 let server,browser;
 try {
  for(const route of routes){
@@ -38,6 +40,22 @@ try {
     assert.ok(control.font>=16,`${route.template}/${route.scene}/${profile.id}: primary text below 16 CSS px`);
     assert.ok(control.x>=0&&control.y>=0&&control.right<=profile.width&&control.bottom<=profile.height,'target outside viewport');
     assert.ok(control.hit,'target covered at center');
+   }
+   const separation=async()=>{
+    const result=await page.evaluate(pairs=>pairs.map(([a,b])=>{
+     const rect=s=>[...document.querySelectorAll(s)].filter(e=>e.getClientRects().length&&getComputedStyle(e).display!=='none').map(e=>e.getBoundingClientRect());
+     const overlaps=[];for(const x of rect(a))for(const y of rect(b))if(x.left<y.right&&y.left<x.right&&x.top<y.bottom&&y.top<x.bottom)overlaps.push({[a]:[x.top,x.bottom],[b]:[y.top,y.bottom]});
+     return {pair:[a,b],present:rect(a).length>0&&rect(b).length>0,overlaps};
+    }),route.clear);
+    for(const s of result)assert.deepEqual(s.overlaps,[],`${route.template}/${route.scene}/${profile.id}: ${s.pair.join(' overlaps ')}`);
+    return result;
+   };
+   if(route.clear){
+    // Wait until the bar has wrapped and the layout observer has published its reserve.
+    await page.waitForFunction(()=>getComputedStyle(document.querySelector('.scene-overlay')).getPropertyValue('--learn-controls-reserve')!=='',null,{timeout:2000}).catch(()=>{});
+    await page.waitForTimeout(100);
+    row.separation=await separation();
+    assert.ok(row.separation.some(s=>s.present),'no lesson content measured against the bar');
    }
    if(route.pause){
     const pause=page.locator('[data-command="pause"]'),before=await pause.innerText();await pause.tap();
@@ -74,7 +92,28 @@ try {
     assert.deepEqual(row.lifecycle,{commands:1,answers:1,changes:1,remaining:0,retiredValue:2});
    }
    row.screenshot=`${route.template}-${route.scene}-${profile.id}.png`;
-   await page.screenshot({path:resolve(out,row.screenshot)});row.passed=true;
+   await page.screenshot({path:resolve(out,row.screenshot)});
+   if(route.walk){
+    // Resume, then step the held clock through the board, sim and quiz scenes, tapping Next and turning the slider,
+    // and check separation in every state reached. A short sample of the lesson, not a complete playthrough.
+    await page.locator('[data-command="pause"]').tap();
+    await page.evaluate(()=>window.engine.clock.hold());
+    const seen=new Set();
+    for(let i=0;i<30&&!seen.has('.explorer-quiz');i++){
+     await page.evaluate(()=>{for(let k=0;k<40;k++)window.engine.clock.step(250);});
+     await page.waitForTimeout(100);
+     for(const s of await separation())if(s.present)seen.add(s.pair[1]);
+     if(await page.locator('.explorer-slider input').count())await page.locator('.explorer-slider input').fill('360');
+     const next=page.locator('[data-command="next"]');if(await next.isEnabled())await next.tap();
+    }
+    row.walked=[...seen];
+    for(const part of ['.chalkboard','.explorer-slider','.explorer-quiz'])assert.ok(seen.has(part),`${profile.id}: walk never reached ${part}`);
+    row.quizScreenshot=`${route.template}-${route.scene}-${profile.id}-quiz.png`;
+    await page.screenshot({path:resolve(out,row.quizScreenshot)});
+    await page.evaluate(()=>window.engine.clock.resume());
+    assert.deepEqual([...browser.errors],[]);
+   }
+   row.passed=true;
    await browser.close();browser=null;
   }
   await server.close();server=null;
