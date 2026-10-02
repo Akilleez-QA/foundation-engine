@@ -201,3 +201,31 @@ test('real forked IPC separates correlation IDs from entity mutation payloads', 
     const stopped = await request('close');
     assert.equal(stopped.value.closed, true);
 });
+test('NW05: per-peer token bucket closes a sustained flood after its burst while a healthy peer stays connected', async (t) => {
+    const h = await setup(t), a = await client(h), b = await client(h, 'beta');
+    await initial(h, a);
+    await initial(h, b);
+    await new Promise(r => setTimeout(r, 100)); // refill the token spent on authentication
+    const refused = h.read().metrics.refused, closed = h.read().metrics.closed;
+    let sent = 0, openAfterBurst = false;
+    // Batches of eight stay within the per-peer queue, so only the rate bound can close this peer.
+    while (a.socket.readyState === WebSocket.OPEN && sent < 4096) {
+        const received = h.read().metrics.received;
+        for (let i = 0; i < 8; i++)
+            a.send({ v: 1, type: 'view-refresh', session: a.session });
+        sent += 8;
+        await until(() => h.read().metrics.received >= received + 8 || a.socket.readyState !== WebSocket.OPEN);
+        h.pump();
+        if (sent === 256)
+            openAfterBurst = a.socket.readyState === WebSocket.OPEN;
+    }
+    await until(() => a.socket.readyState === WebSocket.CLOSED);
+    assert.equal(openAfterBurst, true, 'a burst of the capacity is admitted');
+    assert.ok(sent > 256, `closed after ${sent} frames`);
+    assert.equal(h.read().metrics.refused, refused, 'closure came from the rate bound, not schema or queue refusal');
+    assert.equal(h.read().metrics.closed, closed + 1);
+    assert.equal(h.read().peers.length, 1);
+    h.changeWorld({ id: 'entity-0', value: 9 });
+    await drain(h);
+    assert.equal(b.socket.readyState, WebSocket.OPEN);
+});

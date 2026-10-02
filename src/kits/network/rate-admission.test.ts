@@ -182,8 +182,79 @@ test('NW05: costs and limits are validated; construction errors throw, overload 
   for (const limits of [
     { maxKeys: 0, capacity: 1, refillPerSecond: 1 }, { maxKeys: 1, capacity: 1.5, refillPerSecond: 1 },
     { maxKeys: 1, capacity: 1, refillPerSecond: 0 }, { maxKeys: 1, capacity: 1, refillPerSecond: Infinity },
-    { maxKeys: 1, capacity: 1, refillPerSecond: 2e9 }, { maxKeys: 1, capacity: 1, refillPerSecond: 1, maxInFlight: 0 },
+    { maxKeys: 1, capacity: 1, refillPerSecond: 2e9 }, { maxKeys: 1, capacity: 1, refillPerSecond: 1e6 + 1 },
+    { maxKeys: 1, capacity: 1e9 + 1, refillPerSecond: 1 }, { maxKeys: 1, capacity: 1, refillPerSecond: 1, maxInFlight: 0 },
     { maxKeys: 1, capacity: 1, refillPerSecond: 1, maxKeyLength: -1 },
   ]) assert.throws(() => createRateAdmission(limits));
   assert.ok(Object.isFrozen(owner) && Object.isFrozen(owner.stats()) && Object.isFrozen(owner.admit('k', 9000)));
+});
+
+test('NW05: epoch-magnitude timestamps with a non-dyadic interval keep exact burst and refill', () => {
+  const t0 = 1.7e12;
+  for (const rate of [7, 11, 13, 1e5]) {
+    const single = createRateAdmission({ maxKeys: 1, capacity: 1, refillPerSecond: rate });
+    let count = 0;
+    for (let i = 0; i < 1000; i++) if (admitted(single.admit('k', t0 + i * 997))) count++;
+    assert.equal(count, 1000, `capacity 1 at rate ${rate}, arrivals slower than refill`);
+  }
+  for (let i = 0; i < 200; i++) {
+    const owner = createRateAdmission({ maxKeys: 1, capacity: 256, refillPerSecond: 7 });
+    const t = t0 + i * 0.37;
+    assert.equal(burst(owner, 'k', t, 300), 256, `burst at ${t}`);
+    assert.equal(owner.read('k')?.tokens, 0);
+    // Arrivals exactly at refill instants are always admitted; one extra per instant never is.
+    for (let n = 1; n <= 50; n++) {
+      assert.equal(owner.admit('k', t + (n * 1000) / 7).status, 'admitted');
+      assert.equal(owner.admit('k', t + (n * 1000) / 7).status, 'limited');
+    }
+  }
+  // Uptime-scale performance.now() readings (~28 hours and more) with the reference host configurations.
+  for (const base of [1e8, 3e8, 1e9]) for (const c of [13, 32, 128, 256]) {
+    const owner = createRateAdmission({ maxKeys: 1, capacity: c, refillPerSecond: c });
+    assert.equal(burst(owner, 'k', base + 1.234567, c + 5), c, `capacity ${c} at ${base}`);
+  }
+});
+
+test('NW05: the maximum refill rate cannot fail open', () => {
+  for (const capacity of [1, 4, 256]) {
+    const owner = createRateAdmission({ maxKeys: 1, capacity, refillPerSecond: 1e6 });
+    for (const t of [0, 123456.789, 1.7e12]) assert.equal(burst(owner, `k${t}`, t, 5000) <= capacity, true);
+    const fresh = createRateAdmission({ maxKeys: 1, capacity, refillPerSecond: 1e6 });
+    assert.equal(burst(fresh, 'k', 1.7e12, 5000), capacity);
+    // Offered at 2x the rate for 50 ms (timestamps quantized at this magnitude): never above capacity + rate * T.
+    let count = 0;
+    for (let i = 1; i <= 100000; i++) if (admitted(fresh.admit('k', 1.7e12 + i * 0.0005))) count++;
+    assert.ok(count <= 50000 + capacity, `admitted ${count}`);
+  }
+});
+
+test('NW05: timestamps near 2^53 stay exact; beyond the safe-integer range time is refused', () => {
+  for (const t of [2 ** 52, Number.MAX_SAFE_INTEGER - 2000]) {
+    const owner = createRateAdmission({ maxKeys: 1, capacity: 4, refillPerSecond: 7 });
+    assert.equal(burst(owner, 'k', t, 100), 4, `burst at ${t}`);
+    assert.equal(owner.admit('k', t + 142).status, 'limited');
+    assert.equal(owner.admit('k', t + 143).status, 'admitted');
+    assert.equal(owner.admit('k', t + 143).status, 'limited');
+  }
+  const owner = createRateAdmission({ maxKeys: 1, capacity: 2, refillPerSecond: 128 });
+  for (const bad of [Number.MAX_SAFE_INTEGER + 2, 2 ** 60, 1e300])
+    assert.deepEqual(owner.admit('k', bad), { status: 'refused', reason: 'invalid-time' });
+  assert.equal(owner.stats().keys, 0);
+});
+
+test('NW05: one far-future reading grants at most a full bucket and then fails closed, never open', () => {
+  const owner = createRateAdmission({ maxKeys: 4, capacity: 8, refillPerSecond: 128 });
+  assert.equal(burst(owner, 'k', 5, 100), 8);
+  // A bogus reading inside the valid range repays at most the whole backlog: one more bucket, not unlimited.
+  assert.equal(burst(owner, 'k', Number.MAX_SAFE_INTEGER, 100), 8);
+  assert.equal(burst(owner, 'other', Number.MAX_SAFE_INTEGER, 100), 8, 'a new key also starts with one bucket only');
+  // Later normal readings are regressions below the high-water mark: no refill, so limiting stays in force.
+  let later = 0;
+  for (let i = 0; i < 1000; i++) if (admitted(owner.admit('k', 10 + i * 100))) later++;
+  assert.equal(later, 0);
+  assert.equal(owner.stats().clockRegressions, 1000);
+  // Recovery is explicit: the owner disposes and constructs a new admission object.
+  owner.dispose();
+  const replacement = createRateAdmission({ maxKeys: 4, capacity: 8, refillPerSecond: 128 });
+  assert.equal(burst(replacement, 'k', 100000, 100), 8);
 });

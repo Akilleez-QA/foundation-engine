@@ -304,7 +304,9 @@ recovery, see [the complete scoped-view guide](../../../docs/guides/network-view
 
 `createRateAdmission({maxKeys, capacity, refillPerSecond, maxInFlight?, maxKeyLength?})`
 is a pure, caller-owned token bucket with an optional per-key concurrency gate. It
-constructs no timer or clock; time is supplied on each call. `admit(key, now, cost?)`
+constructs no timer or clock; time is supplied on each call (finite, nonnegative, at most
+`Number.MAX_SAFE_INTEGER` ms; a backwards reading grants no refill). `refillPerSecond`
+is at most 1e6 and `capacity` at most 1e9. `admit(key, now, cost?)`
 returns `admitted` (with a lease when `maxInFlight` is set), `limited` (`rate` with
 `retryAfterMs`, or `concurrency`) or `refused` (`key-capacity`, `invalid-key`,
 `invalid-time`, `invalid-cost`, `disposed`); overload never throws and a limited call

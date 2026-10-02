@@ -8,7 +8,7 @@ It contains no transport or game nouns: a key can be an intake connection handle
 a principal string or any other identity the creator chooses.
 
 Ledger ID: NW-05 (proposal N2 of the scalability study). Status: implemented,
-candidate (PR); see the [acceptance ledger](upgrade-acceptance-ledger.md).
+candidate (PR #13); see the [acceptance ledger](upgrade-acceptance-ledger.md).
 
 ## Requirement and seam
 
@@ -26,8 +26,8 @@ import { createRateAdmission } from '@kits/network';
 
 const frames = createRateAdmission({
   maxKeys: 8,            // tracked identities (positive safe integer)
-  capacity: 32,          // burst size in tokens (positive safe integer)
-  refillPerSecond: 32,   // sustained tokens per second (positive finite, at most 1e9)
+  capacity: 32,          // burst size in tokens (positive safe integer, at most 1e9)
+  refillPerSecond: 32,   // sustained tokens per second (positive finite, at most 1e6)
   maxInFlight: 2,        // optional per-key concurrency bound
   maxKeyLength: 256,     // optional; UTF-16 length bound for string keys (default 256)
 });
@@ -65,34 +65,51 @@ peer. The reference hosts keep their prior close-on-excess policy.
 ## Bounds
 
 - **Keys:** at most `maxKeys` buckets. A new key at the bound examines only the
-  least-recently-admitted key and reclaims it if, and only if, its bucket is full
+  least-recently-attempted key (every `admit` call with a valid key, admitted or
+  not, marks it recent) and reclaims it if, and only if, its bucket is full
   at the current time and it holds no lease. A full idle bucket is identical to a
   fresh one, so reclamation is lossless: key churn cannot reset anyone's limit.
   Otherwise the new key is refused with `key-capacity` (no eviction of active
   state). Strings must be nonempty and at most `maxKeyLength`; objects are compared
   by identity. Keys are held strongly until `forget` or `dispose`.
-- **Time per call:** O(1). Each key stores one number (theoretical arrival time)
-  and one in-flight count; there are no per-event arrays.
+- **Time per call:** O(1). Each key stores its owed refill time, the time of its
+  last update and one in-flight count; there are no per-event arrays.
 - **Burst:** at any instant at most `capacity` tokens are admitted; over any
   interval of length T, at most `capacity + refillPerSecond * T / 1000` tokens.
-  There is no 2x boundary burst.
+  There is no 2x boundary burst. This holds for any valid timestamp magnitude,
+  from zero to `Number.MAX_SAFE_INTEGER` milliseconds, up to the 1e-6 token
+  tolerance below.
 
 ## Algorithm and time
 
-The bucket uses the cell-rate (virtual scheduling) form: admitting `cost` advances
-the key's theoretical arrival time by `cost * 1000 / refillPerSecond` ms, and
-admission requires the resulting backlog to be at most `capacity` intervals. This
-is equivalent to a token bucket and avoids per-call refill drift. A boundary
-tolerance of 1e-6 ms absorbs floating-point rounding; a backlog within that
-tolerance counts as empty, so rounding cannot accumulate across admissions.
+Each key stores a backlog: the refill time, in milliseconds, it still owes as of
+its last update. Elapsed time repays the backlog (never below zero, which is the
+full bucket); admitting `cost` adds `cost * 1000 / refillPerSecond` ms; admission
+requires the result to be at most `capacity` intervals. This is a token bucket.
+Only small relative quantities are compared (the backlog is at most
+`capacity` intervals, and elapsed time is the exact difference of two caller
+readings), so precision does not degrade with absolute timestamps such as
+epoch milliseconds or days of `performance.now()` uptime.
+
+The boundary tolerance is relative: one millionth of a token's refill interval. It
+absorbs rounding in non-binary intervals (for example 1000/7 ms) and cannot
+accumulate, because an admission leaves the backlog at most that fraction above
+`capacity` intervals. `refillPerSecond` is bounded to 1e6 and `capacity` to 1e9 so
+the interval and the bucket span stay far from floating-point resolution limits.
+Configurations above those bounds throw at construction.
 
 Time is caller supplied (inject a fake clock in tests by passing numbers). It must
-be finite and nonnegative, otherwise the call is refused `invalid-time`. Time is
+be finite, nonnegative and at most `Number.MAX_SAFE_INTEGER`, otherwise the call
+is refused `invalid-time` (beyond 2^53 adjacent readings collapse and elapsed time
+cannot be measured). Time is
 the high-water mark of all readings: a reading earlier than the latest one is
 counted in `clockRegressions` and grants no refill, so a backwards clock can only
 make admission stricter, never looser, and never throws. Use a monotonic source
-such as `performance.now()`; a wall clock that jumps forward grants at most a
-full bucket.
+such as `performance.now()`. A forward jump, however large, repays at most the
+backlog, so it grants at most one full bucket per key. A single far-future reading
+then becomes the high-water mark, and later ordinary readings are regressions that
+grant no refill: the owner fails closed (keys drain and stay limited), never open.
+Recovery from a bad clock is explicit: dispose the object and construct a new one.
 
 ## Overload, failure policy, cancellation and recovery
 
@@ -125,7 +142,8 @@ interval length (it removes the 2x boundary burst), and the long-run rate is the
 same. A particular sequence can still differ: a peer that idled part of a window
 regains tokens before that window would have reset, so the bucket can admit a
 frame that the old window would have closed, and vice versa. Host tests named
-`NW05:` show that a capacity burst stays open and the next burst closes.
+`NW05:` in all three hosts show that a capacity burst stays open and further
+excess closes the peer.
 
 ## Evidence
 
@@ -135,10 +153,19 @@ frame that the old window would have closed, and vice versa. Host tests named
   agreement with an integer reference model over 20,000 random arrivals and costs;
   clock regression; key-cardinality bound, lossless reclamation and invalid keys;
   concurrency release on failed work; double release; stale leases after
-  `forget`/`dispose`; invalid costs and limits.
+  `forget`/`dispose`; invalid costs and limits. Numeric robustness: epoch-scale
+  timestamps (1.7e12) with non-binary intervals (rates 7, 11, 13, 1e5) at
+  capacities 1 and 256; uptime-scale timestamps (1e8 to 1e9 ms) with the host
+  configurations; the maximum refill rate at one instant and at 2x offered load;
+  timestamps near 2^53 and refusal beyond it; one far-future reading followed by
+  ordinary readings (one extra bucket at most, then fail-closed).
 - `tools/network-workbench/server.test.mjs` and
   `tools/authority-workbench/server.test.mjs`: real sockets, a capacity burst stays
   open, the next burst closes, a healthy peer is still served.
+- `tools/replication-workbench/server.test.mjs`: real sockets, a sustained flood in
+  queue-sized batches stays open through the 256-frame burst and is then closed by
+  the rate bound (no schema or queue refusal counted); the healthy peer stays
+  connected.
 
 These are unit and loopback host tests. They do not establish behaviour under
 measured network load, WAN conditions, physical devices or multiple processes.
@@ -151,5 +178,5 @@ measured network load, WAN conditions, physical devices or multiple processes.
   for coarse weighting.
 - It does not identify clients. Per-connection keys do not stop many connections;
   the intake connection bound and any upstream limits remain necessary.
-- Only the least-recently-admitted key is examined for reclamation, so a full table
+- Only the least-recently-attempted key is examined for reclamation, so a full table
   whose oldest key holds a lease refuses new keys even if another key is idle.
