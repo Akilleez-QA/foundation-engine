@@ -79,3 +79,13 @@ Revision map: `3361a43` (named above) was measured before later rebases and is n
 published. This branch's own files (task seam, dependency lease, worker runtime,
 oracle) are identical in published `b075a9a`; the base additionally gained the
 program-preparation CI fix `17391f3`. Results at the final head are recorded below.
+
+## Final head `dc0ba5c` (stacked on program preparation, `main` `7d57880`)
+
+With Node 22: all 19 CI browser suites from `.github/workflows/ci.yml` PASS locally
+(with their `GAME_DIR` settings); `npm run check` PASS; `npm test` 2,061 tests,
+0 failures; `npm run lint` PASS; phone smoke `play:snap --mobile` PASS for all seven
+templates; `npm run gate:templates` PASS for all seven, freshly measured: 129 checks,
+zero over budget, regressions or inconclusive, four advisory heap warnings. Native
+task oracle PASS again (1 of 256 observed, unfinished; all 256 completed); see
+[report](native-oracle-dc0ba5c.json).
