@@ -30,7 +30,7 @@ T.Scene.prototype.onAfterRender = function (...args) {
 const brief = defineBuild({goal: 'Exercise authored materials.', genre: 'diagnostic', pitch: 'Textured, lit shapes with shared leases.', coreLoop: ['Look', 'Change', 'Leave'],
   devices: {targets: ['desktop'], minimum: 'desktop', input: ['keyboard', 'pointer']}, success: [{id: 'S1', check: 'Textures load once, draw on change and release on exit', how: 'playtest', by: 'scripts/play/material-check.mjs'}]});
 const game = defineGame({id: 'material-check', version: '0.1.0', title: 'Material diagnostic', firstScene: 'sample'});
-const panel = defineAsset({id: 'panel', type: 'texture', url: '/textures/mechanics/panel.png', width: 32, height: 32, licence: 'CC0-1.0', author: 'Foundation Engine contributors', source: 'templates/mechanics/assets/generate-panel.mjs'});
+const panel = defineAsset({id: 'panel', type: 'texture', url: '/textures/mechanics/panel.png', width: 32, height: 32, licence: 'CC0-1.0', author: 'Foundation Engine contributors', source: 'templates/mechanics/game/tools/generate-panel.mjs'});
 let context;
 // A system keeps the loop ticking so outside edits are seen; frames still draw only when something changed.
 const idle = defineSystem({id: 'idle', phase: 'frame', run() {}});

@@ -5,7 +5,7 @@
 import {writeFileSync,mkdirSync} from 'node:fs';
 import {deflateSync} from 'node:zlib';
 export const SIZE=64;
-const out=new URL('../game/public/models/mechanics/',import.meta.url);mkdirSync(out,{recursive:true});
+const out=new URL('../public/models/mechanics/',import.meta.url);mkdirSync(out,{recursive:true});
 const crc=b=>{let n=0xffffffff;for(const x of b){n^=x;for(let i=0;i<8;i++)n=(n>>>1)^((n&1)?0xedb88320:0);}return (n^0xffffffff)>>>0;};
 const chunk=(name,bytes)=>{const type=Buffer.from(name),h=Buffer.alloc(4),tail=Buffer.alloc(4);h.writeUInt32BE(bytes.length);tail.writeUInt32BE(crc(Buffer.concat([type,bytes])));return Buffer.concat([h,type,bytes,tail]);};
 const glyphs={x:['101','101','010','101','101'],y:['101','101','010','010','010'],z:['111','001','010','100','111']};

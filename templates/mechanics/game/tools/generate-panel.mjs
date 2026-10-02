@@ -2,7 +2,7 @@
 // 32×32 RGBA: a light plate with a darker seam and four rivets; it tiles seamlessly with `repeat`.
 import {writeFileSync,mkdirSync} from 'node:fs';
 import {deflateSync} from 'node:zlib';
-const out=new URL('../game/public/textures/mechanics/',import.meta.url);mkdirSync(out,{recursive:true});
+const out=new URL('../public/textures/mechanics/',import.meta.url);mkdirSync(out,{recursive:true});
 const crc=b=>{let n=0xffffffff;for(const x of b){n^=x;for(let i=0;i<8;i++)n=(n>>>1)^((n&1)?0xedb88320:0);}return (n^0xffffffff)>>>0;};
 const chunk=(name,bytes)=>{const type=Buffer.from(name),h=Buffer.alloc(4),tail=Buffer.alloc(4);h.writeUInt32BE(bytes.length);tail.writeUInt32BE(crc(Buffer.concat([type,bytes])));return Buffer.concat([h,type,bytes,tail]);};
 const S=32,pixels=Buffer.alloc(S*(S*4+1));

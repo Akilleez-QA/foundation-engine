@@ -77,6 +77,7 @@ notes outside publishable documentation.
 ## Where code goes
 
 - **Game code only in the game folder** (`game/`, or the folder `GAME_DIR` names; the engine's own templates live in `templates/<name>/game`). It imports only `@engine`, `@kits/<name>`, its own files and JSON (`npm run lint:layers`).
+- **A game's other files stay in its folder too** ([recipe](docs/recipes/your-game-files.md)): static files it serves in `game/public/` (built with that game only), build-time Node scripts such as asset generators in `game/tools/` (may import `node:`; game code never imports them). The root `public/` is shared by every game in the checkout; keep it empty.
 - **The engine (`src/`) is read-only** unless the author asks to extend it. An engine change follows the STANDARD and its recipe, and keeps genre words out of core, platform and author (`npm run lint:generic`).
 - A genre pattern more than one game would want is a kit (`src/kits/<name>`, [recipe](docs/recipes/add-a-kit.md)); a starting game is a template ([recipe](docs/recipes/add-a-template.md)).
 

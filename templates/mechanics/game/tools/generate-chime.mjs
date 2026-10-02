@@ -2,7 +2,7 @@
 // 0.45 s, 22 050 Hz mono 16-bit PCM WAV: two soft partials (E5, B5) with a gentle attack and exponential decay,
 // peak about -10 dBFS, starting and ending at silence.
 import {writeFileSync,mkdirSync} from 'node:fs';
-const out=new URL('../game/public/sounds/mechanics/',import.meta.url);mkdirSync(out,{recursive:true});
+const out=new URL('../public/sounds/mechanics/',import.meta.url);mkdirSync(out,{recursive:true});
 const rate=22050,n=Math.round(rate*.45),pcm=Buffer.alloc(n*2);
 for(let i=0;i<n;i++){
  const t=i/rate,env=Math.min(1,t/.008)*Math.exp(-t*7)*Math.min(1,(n-1-i)/(rate*.01));

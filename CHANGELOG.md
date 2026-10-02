@@ -31,6 +31,20 @@ Every new framework below is optional: a game that does not use it is unchanged.
   development loopback/LAN WebSocket host, and the `shared-world` template plus the
   [recipe](docs/recipes/two-players-one-world.md) put two browser tabs in one world.
   LAN/loopback only: no accounts, matchmaking, NAT traversal or WAN certification.
+- **Each game ships only its own static files.** A game keeps its models, textures and
+  sounds in `game/public/` (served and built at the same paths); a build no longer
+  carries the mechanics template's files. The mechanics fixtures moved to
+  `templates/mechanics/game/public/`. The repository's root `public/` stays a shared
+  folder that the engine leaves empty; a file in both places stops the build (W1-5).
+- **A home for a game's asset-making scripts.** Build-time Node scripts go in
+  `game/tools/`: `lint:layers` lets them import `node:` modules, game code may not
+  import them (`game-imports-no-tools`), and neither the build nor the game's
+  definitions include them. The mechanics generators moved to
+  `templates/mechanics/game/tools/`. New recipe: [where your game's files
+  go](docs/recipes/your-game-files.md) (W1-6).
+- **The bench no longer measures a scene that has ended.** An active window that renders
+  no frame is classified `inconclusive`: the gate reports it as INCONCLUSIVE even when
+  its zeros would pass, and `perf:derive` derives no budget for that scene (W1-4).
 
 ## 0.2.0 — 2026-10-03
 

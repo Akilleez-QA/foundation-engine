@@ -37,3 +37,16 @@ test('discovery preserves legacy definitions and helpers without evaluating opt-
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('a game\'s tools/ (build-time Node scripts) and public/ (static files) are never loaded as definitions', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'foundation-game-tools-'));
+  try {
+    for (const path of ['tools', 'tools/lib', 'public/data', 'levels/tools']) mkdirSync(join(dir, path), { recursive: true });
+    for (const path of ['tools/make-tile.ts', 'tools/lib/png.ts', 'public/data/table.ts']) writeFileSync(join(dir, path), `throw Error('not game code');`);
+    writeFileSync(join(dir, 'scene.ts'), 'export default {};');
+    writeFileSync(join(dir, 'levels/tools/row.ts'), 'export default {};');
+    assert.deepEqual(gameFiles(dir).map(file => relative(dir, file).split('\\').join('/')), ['levels/tools/row.ts', 'scene.ts']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

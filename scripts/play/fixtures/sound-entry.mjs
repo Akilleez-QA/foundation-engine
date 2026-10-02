@@ -10,7 +10,7 @@ import {defineBuild,defineGame,defineScene,defineAsset,Name,Transform,Shape} fro
 const brief = defineBuild({goal: 'Exercise sound files.', genre: 'diagnostic', pitch: 'A scene that preloads and plays its own sounds.', coreLoop: ['Enter', 'Play', 'Leave'],
   devices: {targets: ['desktop'], minimum: 'desktop', input: ['keyboard', 'pointer']}, success: [{id: 'S1', check: 'Sound files load with the scene and never play in tests', how: 'playtest', by: 'scripts/play/sound-check.mjs'}]});
 const game = defineGame({id: 'sound-check', version: '0.1.0', title: 'Sound diagnostic', firstScene: 'sample'});
-const asset = (id, url) => defineAsset({id, type: 'audio', url, licence: 'CC0-1.0', author: 'Foundation Engine contributors', source: 'templates/mechanics/assets/generate-chime.mjs'});
+const asset = (id, url) => defineAsset({id, type: 'audio', url, licence: 'CC0-1.0', author: 'Foundation Engine contributors', source: 'templates/mechanics/game/tools/generate-chime.mjs'});
 let context;
 const sample = defineScene({id: 'sample', title: 'Sounds', sounds: ['chime', 'missing'], view: {camera: {position: [0, 3, 6], target: [0, 0, 0]}},
   entities: [[Name({name: 'subject'}), Transform(), Shape({kind: 'box'})]], enter(ctx) { context = ctx; }});

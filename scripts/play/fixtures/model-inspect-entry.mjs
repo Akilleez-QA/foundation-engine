@@ -8,7 +8,7 @@ import {defineBuild, defineGame, defineScene, defineSystem, defineAsset, Name, T
 import {createTestApi} from '../../../src/dev/test-api.ts';
 const brief = defineBuild({goal:'Inspect the actually adopted model through optional diagnostics.',genre:'diagnostic',pitch:'Bounded model inspection.',coreLoop:['Play','Inspect','Replace'],devices:{targets:['desktop'],minimum:'desktop',input:['keyboard','pointer']},success:[{id:'S1',check:'Actual model playback, adoption and incomplete geometry remain distinguishable.',how:'playtest',by:'scripts/play/model-inspect-check.mjs'}]});
 const game = defineGame({id:'model-inspect',version:'0.1.0',title:'Model inspection',firstScene:'sample'});
-const assets = ['first','second'].map((id,i) => defineAsset({id,type:'model',url:i ? '/__model-inspect/beacon.glb' : '/models/mechanics/beacon.glb',licence:'CC0-1.0',author:'Foundation Engine contributors',source:'templates/mechanics/assets/generate-fixture.mjs'}));
+const assets = ['first','second'].map((id,i) => defineAsset({id,type:'model',url:i ? '/__model-inspect/beacon.glb' : '/models/mechanics/beacon.glb',licence:'CC0-1.0',author:'Foundation Engine contributors',source:'templates/mechanics/game/tools/generate-fixture.mjs'}));
 const frame = defineSystem({id:'diagnostic-frame',phase:'frame',run(){}});
 let entity, ctx, last, prior;
 const sample = defineScene({id:'sample',title:'Original beacon',systems:[frame],view:{camera:{position:[3,2.5,4],target:[0,.6,0],fov:42},background:0x243347},enter(context){ctx=context;entity=ctx.world.spawn(Name({name:'beacon'}),Transform(),Model({asset:'first',clip:'pulse',playing:false}));},exit(){ctx=undefined;}});
