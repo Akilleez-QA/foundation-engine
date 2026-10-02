@@ -13,6 +13,7 @@
  *   defineMode         a way to play (play, practice, learn) and where it starts
  *   defineKit          (for kits) a kit's modules and definitions
  *   Transform, Shape, Name   the built-in components the renderer and tools read
+ *   Material, defineMaterial a shape's texture, repeat/wrap, roughness, metalness, emission and transparency
  *
  * Budgets are data in game/budgets.json (the ratchet compares them across revisions without running code).
  */
@@ -21,7 +22,7 @@ export {
   defineGame, defineScene, defineComponent, defineEntity, defineSystem, defineInput, defineSaveSection, defineAsset, defineMode, defineKit,
   shapeParser, Transform, Shape, Name,
   type AuthorDef, type GameDefinition, type SceneDefinition, type EntityDefinition, type SystemDefinition, type InputDefinition,
-  type SaveSectionDef, type AssetDefinition, type ModeDefinition, type KitDefinition, type SceneContext, type SaveHandle, type InputState, type ActionHint,
+  type SaveSectionDef, type AssetDefinition, type PlayOptions, validatePlayOptions, PLAY_LATE_MS, type ModeDefinition, type KitDefinition, type SceneContext, type SaveHandle, type InputState, type ActionHint,
   type ViewState, type ReadingSheet, type ReadingSheetOptions, type ScenePreparationContext, type Vec3, type SceneBody, type SceneInput, type ComponentType, type ComponentInit, type Entity, type World,
 } from './defs';
 export { testScene, createTestWorkerHost, type TestScene } from './testing';
@@ -30,6 +31,7 @@ export { Mesh, defineMesh, type MeshData, type MeshInput } from './mesh';
 export type { CueVoice, CueVoiceOptions, CueFilter, SpatialCue, PanningModel, DistanceModel, AudioVector } from '../platform/audio/audio-output';
 export { distanceGain, audibleGain } from '../platform/audio/audio-output';
 export type { SpatialAudioOptions } from '../platform/audio/module';
+export { Material, defineMaterial, validateMaterial, MATERIAL_DEFAULTS, MATERIAL_LIMITS, type MaterialData, type MaterialWrap } from './material';
 
 export { defineEnvironment, type EnvironmentState } from './environment';
 

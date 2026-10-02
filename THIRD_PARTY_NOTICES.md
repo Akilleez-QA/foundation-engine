@@ -6,7 +6,7 @@ does not replace those notices. The original generated diagnostic assets listed
 below are separately dedicated under **CC0-1.0**.
 
 This inventory was checked against `package-lock.json` and installed package
-license files on 2026-09-30. It records pinned versions, not semver ranges.
+license files on 2026-10-02. It records pinned versions, not semver ranges.
 Update it when the dependency graph or shipped assets change.
 
 ## Optional network reference host dependency
@@ -178,7 +178,7 @@ lockfile metadata only.
 | `three` | 0.186.1 | MIT | Required by dependency graph |
 | `tinyglobby` | 0.2.17 | MIT | Required by dependency graph |
 | `tsx` | 4.23.15 | MIT | Required by dependency graph |
-| `typescript` | 5.9.3 | Apache-2.0 | Required by dependency graph |
+| `typescript` | 6.0.3 | Apache-2.0 | Required by dependency graph |
 | `undici-types` | 6.21.0 | MIT | Required by dependency graph |
 | `vite` | 7.3.6 | MIT | Required by dependency graph |
 | `ws` | 8.22.0 | MIT | Optional reference host; installed by the locked development graph |
@@ -218,10 +218,12 @@ for preserving the notices accompanying the actual distributed material.
 |---|---|---|
 | `public/models/mechanics/beacon.glb` | Locally generated two-link skinned cuboid and pulse clip, `templates/mechanics/assets/generate-fixture.mjs` | CC0-1.0 |
 | `public/models/mechanics/sky-{px,nx,py,ny,pz,nz}.png` | Six locally generated 16×16 orientation glyph textures, `templates/mechanics/assets/generate-cube.mjs` | CC0-1.0 |
+| `public/textures/mechanics/panel.png` | Locally generated 32×32 riveted panel texture, `templates/mechanics/assets/generate-panel.mjs` | CC0-1.0 |
+| `public/sounds/mechanics/chime.wav` | Locally synthesised 0.45 s two-partial chime, `templates/mechanics/assets/generate-chime.mjs` | CC0-1.0 |
 
 These fixtures were generated for Foundation Engine by its contributors, with no
-external mesh, texture, photograph, or downloaded art input. Their seven files
-are individually under 3 KiB. The generators remain project source under the
+external mesh, texture, photograph, recording, or downloaded art input. Of their
+nine files, eight are individually under 3 KiB and the chime is about 20 KiB. The generators remain project source under the
 project license; the generated asset dedication is independent. Template
 verification screenshots capture locally rendered diagnostic scenes and UI.
 See the [CC0 dedication](https://creativecommons.org/publicdomain/zero/1.0/).

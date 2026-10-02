@@ -139,3 +139,8 @@ for (const fallbackThrows of [false, true]) {
   }finally{console.error=previous;output.dispose();}
  });
 }
+test('music URLs go through the composition root\'s resolver (the public base)',()=>{
+ const element={paused:true,src:'',play(){return Promise.resolve();},pause(){}} as unknown as HTMLAudioElement;
+ const output=createAudioOutput({silent:()=>false,muted:()=>false,effects:()=>1,music:()=>1,createElement:()=>element,createContext:()=>fakeContext().ctx,resolveUrl:url=>'https://host/sub/'+url.replace(/^\//,'')});
+ output.music('/music/theme.m4a');assert.equal(element.src,'https://host/sub/music/theme.m4a');output.dispose();
+});

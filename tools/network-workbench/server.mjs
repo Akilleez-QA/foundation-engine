@@ -44,8 +44,13 @@ export async function startNetworkWorkbench({
   autoDriver = true,
   driverMs = 10,
   drain: drainOptions,
+  maxQueuedAgeMs,
 } = {}) {
   if (
+    (maxQueuedAgeMs !== undefined &&
+      (!Number.isSafeInteger(maxQueuedAgeMs) ||
+        maxQueuedAgeMs < 1 ||
+        maxQueuedAgeMs > 60000)) ||
     !Number.isSafeInteger(port) ||
     port < 0 ||
     port > 65535 ||
@@ -79,7 +84,10 @@ export async function startNetworkWorkbench({
       transportRefusals: 0,
       drainNotices: 0,
       drainRefusals: 0,
+      stale: 0,
     };
+  // Retirement reasons by count (bounded: the intake reason set is closed).
+  const closeReasons = {};
   const wss = new WebSocketServer({
     host: '127.0.0.1',
     port,
@@ -107,8 +115,13 @@ export async function startNetworkWorkbench({
     capacity: MAX_FRAMES_PER_SECOND,
     refillPerSecond: MAX_FRAMES_PER_SECOND,
   });
+  // Optional NW-06 queue age (off by default): aged commands are shed before authorize/dispatch.
+  const limits =
+    maxQueuedAgeMs === undefined
+      ? hostLimits
+      : { ...hostLimits, maxQueuedAgeMs };
   const intake = createNetworkIntake({
-    limits: hostLimits,
+    limits,
     ports: {
       authenticate({ peer, credential, complete }) {
         const finish = () => {
@@ -143,6 +156,15 @@ export async function startNetworkWorkbench({
           applied: true,
         });
       },
+      ...(maxQueuedAgeMs === undefined
+        ? {}
+        : {
+            stale({ peer, command }) {
+              // Correlation only: authorization is not rechecked for this notice.
+              metrics.stale++;
+              refuse(peer, 'stale', command.id);
+            },
+          }),
       send: transportSend,
       close(peer, reason) {
         const state = peers.get(peer);
@@ -152,6 +174,7 @@ export async function startNetworkWorkbench({
         frameRate.forget(peer);
         drainPlan?.forget(peer);
         metrics.closed++;
+        closeReasons[reason] = (closeReasons[reason] ?? 0) + 1;
         state.socket.removeListener('message', state.message);
         if (state.socket.readyState === WebSocket.OPEN)
           state.socket.close(
@@ -364,8 +387,10 @@ export async function startNetworkWorkbench({
     read() {
       return {
         ephemeral: true,
+        maxQueuedAgeMs: maxQueuedAgeMs ?? null,
         counters: { ...counters },
         metrics: { ...metrics },
+        closeReasons: { ...closeReasons },
         intake: intake.stats(),
         peers: [...peers].map(([peer, state]) => ({
           state: intake.read(peer)?.state,

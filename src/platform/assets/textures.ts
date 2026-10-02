@@ -13,7 +13,7 @@
  * - Leased textures carry `userData.shared`, the repo's module-lifetime flag, so `disposeOwnedTree` and the other
  *   existing guards spare them, and `owns()` answers for the new code (D11: `owns` replaces the flag as the
  *   remaining guards migrate).
- * - The sampler is part of the key: an anisotropy other than three.js's default is a separate texture (one more
+ * - The sampler is part of the key: an anisotropy or wrap other than three.js's default is a separate texture (one more
  *   upload), never a mutation of a shared one.
  *
  * Deliberate limits in this step (verbatim looks, STD-REN-27):
@@ -39,6 +39,8 @@ export interface TextureOptions {
   signal: AbortSignal;
   /** Sampler anisotropy. Default 1, three.js's default. */
   anisotropy?: number;
+  /** Sampler wrap on both axes. Default 'clamp', three.js's default; another wrap is a separate (counted) texture. */
+  wrap?: TextureWrap;
   /** Overrides the def's colour space, e.g. `linear` for a map used as an alpha mask. */
   colorSpace?: 'srgb' | 'linear';
 }
@@ -103,11 +105,15 @@ export interface TextureLibraryOptions {
   residency?: AssetResidencyPolicy;
 }
 
+export type TextureWrap = 'clamp' | 'repeat' | 'mirror';
+const WRAPS = { clamp: T.ClampToEdgeWrapping, repeat: T.RepeatWrapping, mirror: T.MirroredRepeatWrapping } as const;
+
 interface Slot {
   readonly def: AssetDef;
   readonly variant: AssetVariant;
   readonly anisotropy: number;
   readonly colorSpace: 'srgb' | 'linear';
+  readonly wrap: TextureWrap;
 }
 
 const MIB = 1024 * 1024;
@@ -124,8 +130,8 @@ export function textureBytes(texture: T.Texture): number {
 }
 
 /** The cache key: asset id and variant, plus the sampler and colour space when they are not the defaults. */
-export function textureKey(id: string, variant: AssetVariant, anisotropy = 1, colorSpace?: 'srgb' | 'linear'): string {
-  return `${id}|${variant.path}${anisotropy === 1 ? '' : `|a${anisotropy}`}${colorSpace ? `|${colorSpace}` : ''}`;
+export function textureKey(id: string, variant: AssetVariant, anisotropy = 1, colorSpace?: 'srgb' | 'linear', wrap: TextureWrap = 'clamp'): string {
+  return `${id}|${variant.path}${anisotropy === 1 ? '' : `|a${anisotropy}`}${colorSpace ? `|${colorSpace}` : ''}${wrap === 'clamp' ? '' : `|w${wrap}`}`;
 }
 
 export function createTextureLibrary(options: TextureLibraryOptions): TextureLibrary {
@@ -148,6 +154,7 @@ export function createTextureLibrary(options: TextureLibraryOptions): TextureLib
         texture.name = key;
         texture.colorSpace = slot.colorSpace === 'srgb' ? T.SRGBColorSpace : T.NoColorSpace;
         texture.anisotropy = slot.anisotropy;
+        if (slot.wrap !== 'clamp') texture.wrapS = texture.wrapT = WRAPS[slot.wrap];
         // A bitmap is decoded already flipped (IMAGE_BITMAP_OPTIONS); WebGL ignores flipY for one and WebGPU would
         // flip it a second time.
         if (isImageBitmap(image)) texture.flipY = false;
@@ -192,8 +199,10 @@ export function createTextureLibrary(options: TextureLibraryOptions): TextureLib
       const variant = pick(def, o.screenPx);
       const anisotropy = o.anisotropy ?? 1;
       const colorSpace = o.colorSpace ?? def.colorSpace ?? 'linear';
-      const key = textureKey(id, variant, anisotropy, colorSpace === (def.colorSpace ?? 'linear') ? undefined : colorSpace);
-      if (!slots.has(key)) slots.set(key, { def, variant, anisotropy, colorSpace });
+      const wrap = o.wrap ?? 'clamp';
+      if (!(wrap in WRAPS)) throw new Error(`[assets] ${id}: unknown wrap ${String(wrap)}`);
+      const key = textureKey(id, variant, anisotropy, colorSpace === (def.colorSpace ?? 'linear') ? undefined : colorSpace, wrap);
+      if (!slots.has(key)) slots.set(key, { def, variant, anisotropy, colorSpace, wrap });
       const lease = await cache.acquire(key, o.signal);
       return { value: lease.value, key: lease.key, id, variant, release: lease.release };
     },

@@ -49,10 +49,10 @@ export function gameCatalog(defs: readonly AuthorDef[]): Record<string, string> 
   return out;
 }
 
-/** The input action rows of a definition: one press row for a button, two hold rows for an axis. */
+/** The input action rows of a definition: one press row for a button (a hold row with `hold: true`), two hold rows for an axis. */
 export function actionRows(i: InputDefinition): InputActionDef[] {
   const labelKey = `game.input.${i.id}`;
-  if (!i.axis) return [{ id: actionOf(i.id), label: labelKey, scope: 'global', kind: 'press', defaults: { keys: i.keys, pad: i.pad } } as unknown as InputActionDef];
+  if (!i.axis) return [{ id: actionOf(i.id), label: labelKey, scope: 'global', kind: i.hold ? 'hold' : 'press', defaults: { keys: i.keys, pad: i.pad } } as unknown as InputActionDef];
   return (['negative', 'positive'] as const).map(side => ({ id: actionOf(i.id, side), label: labelKey, scope: 'global', kind: 'hold', defaults: { keys: i.axis![side].keys, pad: i.axis![side].pad } } as unknown as InputActionDef));
 }
 
@@ -79,6 +79,17 @@ export function compileGame(o: { brief: BuildBrief; game: GameDefinition; defs: 
   const ids = scenes.map(s => s.id);
   const twice = ids.find((id, i) => ids.indexOf(id) !== i);
   if (twice) throw Error(`game: two scenes are called '${twice}'`);
+  // Materials named in a scene's own entities must name texture assets (lazy bodies and runtime edits are reported
+  // when the texture fails to load).
+  for (const scene of scenes) for (const entity of scene.entities ?? []) {
+    for (const init of 'kind' in entity ? entity.components : entity) {
+      const texture = init.type.id === 'material' ? (init.value as { texture?: unknown }).texture : '';
+      if (typeof texture === 'string' && texture && !assets.some(a => a.id === texture && a.type === 'texture'))
+        throw Error(`scene ${scene.id}: material texture '${texture}' has no defineAsset({ type: 'texture' })`);
+    }
+  }
+  for (const scene of scenes) for (const sound of scene.sounds ?? [])
+    if (!assets.some(a => a.id === sound && a.type === 'audio')) throw Error(`scene ${scene.id}: sound '${sound}' has no defineAsset({ type: 'audio' })`);
   for (const [locale, catalog] of Object.entries(mergedStrings(game, defs))) appI18n.addCatalog(locale, catalog);
 
   const gameModule = defineModule({

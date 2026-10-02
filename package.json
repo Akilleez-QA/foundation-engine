@@ -66,7 +66,12 @@
     "test:audio-browser": "node -r ./scripts/silent-browser.cjs scripts/play/spatial-audio-check.mjs playtest/audio/spatial",
     "test:replay-browser": "GAME_DIR=templates/arcade/game node scripts/generate.mjs && GAME_DIR=templates/arcade/game node --import tsx -r ./scripts/silent-browser.cjs scripts/play/replay-check.mjs playtest/replay",
     "faults:network": "node --disable-warning=ExperimentalWarning --import tsx tools/authority-workbench/fault-harness.mjs",
-    "bench:spatial": "node --import tsx tools/spatial-bench/bench.mjs"
+    "bench:spatial": "node --import tsx tools/spatial-bench/bench.mjs",
+    "probe:network": "node --import tsx tools/network-probe/probe.mjs",
+    "test:network-probe": "node --import tsx --test tools/network-probe/probe.regression.mjs",
+    "test:subpath-browser": "node -r ./scripts/silent-browser.cjs scripts/play/subpath-check.mjs playtest/subpath",
+    "test:material-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/material-check.mjs playtest/material",
+    "test:sound-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/sound-check.mjs playtest/sound"
   },
   "dependencies": {
     "three": "^0.186.1"
@@ -76,7 +81,7 @@
     "@types/three": "^0.186.0",
     "playwright-core": "1.56.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "vite": "^7.3.1",
     "ws": "8.22.0"
   },

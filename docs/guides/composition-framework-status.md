@@ -96,6 +96,7 @@ are contextual evidence, not verification of Foundation.
 | Multiplayer: peer rollback (RB-01) | Optional `@kits/rollback` session (prediction window, input delay, rollback/resimulation, confirmed-state checksums) and local sync test, driven from the fixed lane | Implemented, candidate (PR #25); not integrated. Focused headless tests and a `testScene` consumer only; requires a reliable, ordered link; no WAN, time-sync, spectator or device claim. |
 | Multiplayer: seeded fault schedules (NW-09) | Tool-only `npm run faults:network` harness replaying seeded combined faults against the authority workbench host with per-step invariants and exact seed/step repro | Implemented, candidate (PR #26); not integrated. Process-scope loopback evidence only; no WAN, power-loss, scale or device claim. See [guide](network-fault-schedule.md) |
 | Multiplayer: planned drain and lifetime (NW-08) | Optional host `createConnectionDrain` (bounded notice, operator drain/resume, dithered lifetime cap) and client `createDrainFollower` (hold until announced return, then the existing retry schedule) | Implemented, candidate (PR #21); not integrated. Unit, host socket and loopback browser tests; defaults unchanged; no process-restart, WAN or device claim. |
+| Movement feel: jump (MV-01) | Pure `createJumpFeel` (exact piecewise gravity, coyote, buffer, variable height, apex gravity, terminal fall) and the optional `jumpSystem` adapter in the locomotion kit; opt-in `hold: true` author buttons | Implemented, candidate (PR #34); not integrated. Focused unit tests at 30–240 Hz only; no template consumer, browser or device evidence. Moving-platform carry, slopes, swept lateral collision and vehicles remain separate slices. |
 | Manual tools | Bounded documents, sessions and optional appearance, progression, custody and objective desktop consumers | Integrated tools cover their finite schemas. Action tooling is integrated; recipe/effect inspectors are integrated in PR #118 with focused tests and final desktop workflow acceptance. Device support is selected per tool; desktop tooling does not impose a phone UI. |
 
 Priority is composition correctness before additional feature catalogs. A creator's
@@ -366,3 +367,57 @@ edited-world persistence remain separate work. See the
 | ID | Contract | State |
 |---|---|---|
 | DX-02 | Learn timeline objectives semantics: [`TimelinePlayer.state().objectives`](../../src/kits/learn/timeline.ts) is true from an `objectives` action until the learner passes the next gate after it, then stays false (it used to stay true for the whole scene, so the card returned over later drawings). The learn runtime shows the card from that flag on the first scene, outside interrupts. ui kit HUD lines and the prompt gain a readability plate ([README](../../src/kits/ui/README.md)). `play:script` gains `holdUntil`. | Implemented, candidate (public PR #40, stacked on #39); not integrated. Timeline unit test, learn `play:script` 9/9 and emulated snaps on the branch. Lessons that relied on the card returning at later gates would see it once; no stock lesson did. No device claim. |
+
+## Overload and goodput probe — NW-07 implemented, candidate
+
+`npm run probe:network` ([guide](network-overload.md)) measures the loopback network
+and replication reference hosts past saturation: goodput against offered load,
+rejections by reason, admitted-work latency, high-water marks, a physical non-reading
+peer and a host-restart reconnect storm. Tools only; implemented, candidate (PR #27); not
+integrated. FIFO goodput plateaued and adversaries were limited without closing
+healthy peers. The replication host's buffered cap retired a paused peer in 2 of 3
+runs. Its finding that a queue age shorter than the real queued wait collapsed goodput
+is resolved by the NW-06 follow-up (PR #33), and queue-age plateaus are now asserted. Loopback/process scope only; WAN, browsers and physical devices remain
+unverified. See the [evidence](../verification/network-overload-20261002/README.md)
+and the [ledger](upgrade-acceptance-ledger.md).
+## Sub-path asset base (DX P1-8) — implemented, candidate
+
+Asset files from `defineAsset({ url })` are fetched under the build's public base
+(`npm run build -- --base ./` or `--base /my-game/`), so a production build works from a
+GitHub Pages project site or an itch.io folder. Owner: `platform/assets/public-base.ts`,
+used by the texture and model libraries; a relative base is resolved against the page so
+workers fetch the same file. See the [recipe](../recipes/host-under-a-sub-path.md).
+Status: implemented, candidate (branch `feat/dx-asset-base-path`); not integrated. Evidence
+is unit tests and `npm run test:subpath-browser` (every template built with `--base ./`,
+mechanics also with an absolute sub-path, served by a local static server in desktop
+headless Chromium). Real Pages/itch.io uploads and physical devices are unverified.
+
+## Authored materials (DX P1-10) — implemented, candidate
+
+`Material` / `defineMaterial` (author API) give a `Shape` a texture asset with repeat and
+wrap, roughness, metalness, emission and transparency, drawn as a `MeshStandardMaterial`;
+shapes without it keep the original matte material. Owner: the scene visit
+(`author/scene-materials.ts`); textures are leases from the shared texture library, and anisotropy follows the
+`textures.anisotropy` quality knob capped by the context. Wrap is part of the library key
+(counted by residency); one view per (texture, wrap, repeat) is shared per visit, and plain
+fields change in place. See the
+[recipe](../recipes/give-a-shape-a-material.md). Status: implemented, candidate (branch
+`feat/dx-materials`, stacked on the sub-path base change); not integrated. Evidence: unit
+tests and `npm run test:material-browser` (desktop headless Chromium, software GL); the
+mechanics template demonstrates it with draws and triangles unchanged. No physical-device
+or visual-quality acceptance; `Mesh`/`Model` and texture maps beyond the colour map are out
+of scope.
+
+## Game sound files (DX P1-10) — implemented, candidate
+
+`defineAsset({ type: 'audio' })` files play through `ctx.play(id, { volume, pitch,
+position })` and `ctx.playVoice`, with a scene's `sounds` fetched while it loads. Owner:
+the one audio output (`platform.audio`) with `platform/audio/sound-files.ts` keeping and
+decoding files; mute, effects volume, autoplay unlock, hidden tabs and automation silence
+apply unchanged. See the [recipe](../recipes/play-your-own-sounds.md). Status:
+implemented, candidate (branch `feat/dx-sound-files`, stacked on the materials and
+sub-path changes); not integrated. Evidence: unit tests with an injected AudioContext and
+`npm run test:sound-browser` (loading, reporting and silence only: automated browsers never
+decode or play). Audible playback, latency and loudness on physical devices are unverified;
+streaming and looping are out of scope. Sound files share AUD-01's voice chain (HRTF limit,
+distance models, cutoff, filter) through `ctx.playVoice`.

@@ -1,0 +1,1127 @@
+{
+  "probe": "NW-07 network overload and goodput probe (study N4)",
+  "scope": {
+    "evidence": "loopback-process",
+    "statement": "Single machine, loopback TCP (127.0.0.1), Node ws clients against reference hosts in child processes. Not WAN, not physical devices, not browsers, not multi-machine. Host RSS is an observation, not a guarantee."
+  },
+  "environment": {
+    "node": "v22.23.3",
+    "platform": "linux 7.2.5-3-omarchy x64",
+    "cpu": "32 x AMD Ryzen 9 7950X 16-Core Processor",
+    "totalMemoryMiB": 128444,
+    "loadAverageAtStart": [
+      111.53,
+      106.34,
+      73.65
+    ],
+    "niceness": 15,
+    "ws": "8.22.0",
+    "commit": "0744509cb724413fa541ead635080384420a9fb9",
+    "dirtyTree": false,
+    "startedAt": "2026-10-02T17:30:44.748Z"
+  },
+  "config": {
+    "seed": 7,
+    "overload": {
+      "healthyClients": 5,
+      "rampPerClient": [
+        8,
+        16,
+        24
+      ],
+      "stepMs": 1500,
+      "driverMs": 50,
+      "queueAgeVariants": [
+        null,
+        300,
+        600
+      ],
+      "onTimeMs": 500,
+      "adversaries": true,
+      "flooderPerSecond": 200,
+      "nonReaderPerSecond": 8,
+      "drainMs": 600
+    },
+    "nonReader": {
+      "entityCount": 64,
+      "healthyClients": 3,
+      "changeEveryMs": 20,
+      "settleMs": 1000,
+      "maxAttackMs": 20000
+    },
+    "storm": {
+      "variants": [
+        {
+          "policy": "jitter",
+          "clients": 8
+        },
+        {
+          "policy": "no-jitter",
+          "clients": 8
+        },
+        {
+          "policy": "jitter",
+          "clients": 16
+        }
+      ],
+      "downtimeMs": 400,
+      "binMs": 100,
+      "observeMs": 9000,
+      "retry": {
+        "baseMs": 250,
+        "capMs": 2000,
+        "maxAttempts": 6,
+        "budget": {
+          "capacity": 8,
+          "refillEveryMs": 15000
+        }
+      }
+    },
+    "abort": {
+      "rssMb": 1024,
+      "readTimeoutMs": 3000
+    },
+    "scenarios": [
+      "overload",
+      "non-reader",
+      "storm"
+    ]
+  },
+  "scenarios": {
+    "overload": {
+      "variants": [
+        {
+          "host": {
+            "kind": "tools/network-workbench (child process)",
+            "driverMs": 50,
+            "dispatchCapacityPerSecond": 80,
+            "maxQueuedAgeMs": null,
+            "fullQueueDrainMs": 400,
+            "fairRotationWaitBoundMs": 700,
+            "note": "Both wait bounds assume the nominal pump cadence; host event-loop lag lengthens real waits.",
+            "limits": {
+              "maxConnections": 8,
+              "perPeerQueue": "8 messages / 4096 bytes",
+              "globalQueue": "32 messages / 16384 bytes",
+              "perPeerFrameBucket": "burst 32, 32/s",
+              "maxBufferedBytesPerPeer": 8192
+            }
+          },
+          "steps": [
+            {
+              "step": 0,
+              "ratePerHealthyClient": 8,
+              "offeredPerSecond": 40.77,
+              "goodputPerSecond": 40.77,
+              "onTimeGoodputPerSecond": 40.77,
+              "sent": 62,
+              "results": 62,
+              "refusedByReason": {},
+              "admittedLatency": {
+                "samples": 62,
+                "p50Ms": 26.01,
+                "p95Ms": 49.57,
+                "p99Ms": 91.22,
+                "maxMs": 91.22
+              },
+              "hostDispatchedPerSecond": 49.98,
+              "hostStaleShed": 0,
+              "hostAttemptsPerSecond": 49.98
+            },
+            {
+              "step": 1,
+              "ratePerHealthyClient": 16,
+              "offeredPerSecond": 77.29,
+              "goodputPerSecond": 77.29,
+              "onTimeGoodputPerSecond": 77.29,
+              "sent": 117,
+              "results": 117,
+              "refusedByReason": {},
+              "admittedLatency": {
+                "samples": 117,
+                "p50Ms": 121.84,
+                "p95Ms": 235.15,
+                "p99Ms": 301.44,
+                "maxMs": 331.01
+              },
+              "hostDispatchedPerSecond": 78.61,
+              "hostStaleShed": 0,
+              "hostAttemptsPerSecond": 78.61
+            },
+            {
+              "step": 2,
+              "ratePerHealthyClient": 24,
+              "offeredPerSecond": 118.33,
+              "goodputPerSecond": 84.14,
+              "onTimeGoodputPerSecond": 78.88,
+              "sent": 180,
+              "results": 128,
+              "refusedByReason": {
+                "queue-limit": 52
+              },
+              "admittedLatency": {
+                "samples": 128,
+                "p50Ms": 385.92,
+                "p95Ms": 503.02,
+                "p99Ms": 533.28,
+                "maxMs": 544.2
+              },
+              "hostDispatchedPerSecond": 78.88,
+              "hostStaleShed": 0,
+              "hostAttemptsPerSecond": 78.88
+            }
+          ],
+          "adversaries": [
+            {
+              "step": 0,
+              "kind": "flooder",
+              "sentBeforeClose": 39,
+              "closeAfterMs": 198.61,
+              "achievedPerSecond": 196.35,
+              "code": 1013,
+              "reason": "rate-capacity",
+              "class": "transient"
+            },
+            {
+              "step": 0,
+              "kind": "wrong-credential",
+              "code": 1008,
+              "reason": "auth-rejected",
+              "class": "terminal"
+            },
+            {
+              "step": 0,
+              "kind": "over-connection-bound",
+              "transportOpened": true,
+              "code": 1013,
+              "reason": "connection-capacity",
+              "class": "transient"
+            },
+            {
+              "step": 1,
+              "kind": "flooder",
+              "sentBeforeClose": 38,
+              "closeAfterMs": 194.22,
+              "achievedPerSecond": 195.64,
+              "code": 1013,
+              "reason": "rate-capacity",
+              "class": "transient"
+            },
+            {
+              "step": 1,
+              "kind": "wrong-credential",
+              "code": 1008,
+              "reason": "auth-rejected",
+              "class": "terminal"
+            },
+            {
+              "step": 1,
+              "kind": "over-connection-bound",
+              "transportOpened": true,
+              "code": 1013,
+              "reason": "connection-capacity",
+              "class": "transient"
+            },
+            {
+              "step": 2,
+              "kind": "flooder",
+              "sentBeforeClose": 38,
+              "closeAfterMs": 195.96,
+              "achievedPerSecond": 193.9,
+              "code": 1013,
+              "reason": "rate-capacity",
+              "class": "transient"
+            },
+            {
+              "step": 2,
+              "kind": "wrong-credential",
+              "code": 1008,
+              "reason": "auth-rejected",
+              "class": "terminal"
+            },
+            {
+              "step": 2,
+              "kind": "over-connection-bound",
+              "transportOpened": true,
+              "code": 1013,
+              "reason": "connection-capacity",
+              "class": "transient"
+            }
+          ],
+          "unexpectedHealthyCloses": [],
+          "healthyUnansweredAtEnd": 0,
+          "nonReader": {
+            "sentCommands": 36,
+            "maxHostBufferedBytesAmongBetaPeersAtEnd": 0,
+            "backlogFramesDeliveredOnResume": 36,
+            "backlogBytesDeliveredOnResume": 2676,
+            "note": "Replies of about 80 bytes at this rate fit in loopback kernel buffers, so the host-side 8192-byte buffered cap is not reached within the run; the backlog is delivered once the peer reads again."
+          },
+          "highWater": {
+            "sampledEveryMs": 50,
+            "queuedMessages": 31,
+            "queuedBytes": 1260,
+            "peerBufferedBytes": 0,
+            "connections": 7,
+            "samples": 109,
+            "hostDispatched": 347,
+            "hostTransportRefusals": 0,
+            "hostClosed": 6,
+            "hostCloseReasons": {
+              "auth-rejected": 3,
+              "rate-capacity": 3
+            },
+            "hostRssBytes": 89354240,
+            "hostHeapUsedBytes": 13776856,
+            "hostEventLoopLagMaxMs": 12.44
+          },
+          "derived": {
+            "peakGoodputPerSecond": 84.14,
+            "finalGoodputPerSecond": 84.14,
+            "plateauRatio": 1
+          }
+        },
+        {
+          "host": {
+            "kind": "tools/network-workbench (child process)",
+            "driverMs": 50,
+            "dispatchCapacityPerSecond": 80,
+            "maxQueuedAgeMs": 300,
+            "fullQueueDrainMs": 400,
+            "fairRotationWaitBoundMs": 700,
+            "note": "Both wait bounds assume the nominal pump cadence; host event-loop lag lengthens real waits.",
+            "limits": {
+              "maxConnections": 8,
+              "perPeerQueue": "8 messages / 4096 bytes",
+              "globalQueue": "32 messages / 16384 bytes",
+              "perPeerFrameBucket": "burst 32, 32/s",
+              "maxBufferedBytesPerPeer": 8192
+            }
+          },
+          "steps": [
+            {
+              "step": 0,
+              "ratePerHealthyClient": 8,
+              "offeredPerSecond": 40.48,
+              "goodputPerSecond": 40.48,
+              "onTimeGoodputPerSecond": 40.48,
+              "sent": 61,
+              "results": 61,
+              "refusedByReason": {},
+              "admittedLatency": {
+                "samples": 61,
+                "p50Ms": 27.66,
+                "p95Ms": 46.69,
+                "p99Ms": 52.77,
+                "maxMs": 52.77
+              },
+              "hostDispatchedPerSecond": 51.76,
+              "hostStaleShed": 0,
+              "hostAttemptsPerSecond": 51.76
+            },
+            {
+              "step": 1,
+              "ratePerHealthyClient": 16,
+              "offeredPerSecond": 77.57,
+              "goodputPerSecond": 76.25,
+              "onTimeGoodputPerSecond": 76.25,
+              "sent": 118,
+              "results": 116,
+              "refusedByReason": {
+                "stale": 2
+              },
+              "admittedLatency": {
+                "samples": 116,
+                "p50Ms": 112.97,
+                "p95Ms": 228.11,
+                "p99Ms": 272.47,
+                "maxMs": 284.51
+              },
+              "hostDispatchedPerSecond": 80.2,
+              "hostStaleShed": 0,
+              "hostAttemptsPerSecond": 80.2
+            },
+            {
+              "step": 2,
+              "ratePerHealthyClient": 24,
+              "offeredPerSecond": 117.63,
+              "goodputPerSecond": 20.49,
+              "onTimeGoodputPerSecond": 20.49,
+              "sent": 178,
+              "results": 31,
+              "refusedByReason": {
+                "queue-limit": 53,
+                "stale": 94
+              },
+              "admittedLatency": {
+                "samples": 31,
+                "p50Ms": 240.37,
+                "p95Ms": 299.29,
+                "p99Ms": 303.26,
+                "maxMs": 303.26
+              },
+              "hostDispatchedPerSecond": 30.4,
+              "hostStaleShed": 70,
+              "hostAttemptsPerSecond": 76.66
+            }
+          ],
+          "adversaries": [
+            {
+              "step": 0,
+              "kind": "flooder",
+              "sentBeforeClose": 38,
+              "closeAfterMs": 201.85,
+              "achievedPerSecond": 188.24,
+              "code": 1013,
+              "reason": "rate-capacity",
+              "class": "transient"
+            },
+            {
+              "step": 0,
+              "kind": "wrong-credential",
+              "code": 1008,
+              "reason": "auth-rejected",
+              "class": "terminal"
+            },
+            {
+              "step": 0,
+              "kind": "over-connection-bound",
+              "transportOpened": true,
+              "code": 1013,
+              "reason": "connection-capacity",
+              "class": "transient"
+            },
+            {
+              "step": 1,
+              "kind": "flooder",
+              "sentBeforeClose": 38,
+              "closeAfterMs": 195.51,
+              "achievedPerSecond": 194.36,
+              "code": 1013,
+              "reason": "rate-capacity",
+              "class": "transient"
+            },
+            {
+              "step": 1,
+              "kind": "wrong-credential",
+              "code": 1008,
+              "reason": "auth-rejected",
+              "class": "terminal"
+            },
+            {
+              "step": 1,
+              "kind": "over-connection-bound",
+              "transportOpened": true,
+              "code": 1013,
+              "reason": "connection-capacity",
+              "class": "transient"
+            },
+            {
+              "step": 2,
+              "kind": "flooder",
+              "sentBeforeClose": 39,
+              "closeAfterMs": 201.06,
+              "achievedPerSecond": 193.96,
+              "code": 1013,
+              "reason": "rate-capacity",
+              "class": "transient"
+            },
+            {
+              "step": 2,
+              "kind": "wrong-credential",
+              "code": 1008,
+              "reason": "auth-rejected",
+              "class": "terminal"
+            },
+            {
+              "step": 2,
+              "kind": "over-connection-bound",
+              "transportOpened": true,
+              "code": 1013,
+              "reason": "connection-capacity",
+              "class": "transient"
+            }
+          ],
+          "unexpectedHealthyCloses": [],
+          "healthyUnansweredAtEnd": 0,
+          "nonReader": {
+            "sentCommands": 36,
+            "maxHostBufferedBytesAmongBetaPeersAtEnd": 0,
+            "backlogFramesDeliveredOnResume": 36,
+            "backlogBytesDeliveredOnResume": 2694,
+            "note": "Replies of about 80 bytes at this rate fit in loopback kernel buffers, so the host-side 8192-byte buffered cap is not reached within the run; the backlog is delivered once the peer reads again."
+          },
+          "highWater": {
+            "sampledEveryMs": 50,
+            "queuedMessages": 32,
+            "queuedBytes": 1300,
+            "peerBufferedBytes": 0,
+            "connections": 7,
+            "samples": 108,
+            "hostDispatched": 252,
+            "hostTransportRefusals": 0,
+            "hostClosed": 6,
+            "hostCloseReasons": {
+              "auth-rejected": 3,
+              "rate-capacity": 3
+            },
+            "hostRssBytes": 95252480,
+            "hostHeapUsedBytes": 13770144,
+            "hostEventLoopLagMaxMs": 11.19
+          },
+          "derived": {
+            "peakGoodputPerSecond": 76.25,
+            "finalGoodputPerSecond": 20.49,
+            "plateauRatio": 0.269
+          }
+        },
+        {
+          "host": {
+            "kind": "tools/network-workbench (child process)",
+            "driverMs": 50,
+            "dispatchCapacityPerSecond": 80,
+            "maxQueuedAgeMs": 600,
+            "fullQueueDrainMs": 400,
+            "fairRotationWaitBoundMs": 700,
+            "note": "Both wait bounds assume the nominal pump cadence; host event-loop lag lengthens real waits.",
+            "limits": {
+              "maxConnections": 8,
+              "perPeerQueue": "8 messages / 4096 bytes",
+              "globalQueue": "32 messages / 16384 bytes",
+              "perPeerFrameBucket": "burst 32, 32/s",
+              "maxBufferedBytesPerPeer": 8192
+            }
+          },
+          "steps": [
+            {
+              "step": 0,
+              "ratePerHealthyClient": 8,
+              "offeredPerSecond": 40.99,
+              "goodputPerSecond": 40.99,
+              "onTimeGoodputPerSecond": 40.99,
+              "sent": 62,
+              "results": 62,
+              "refusedByReason": {},
+              "admittedLatency": {
+                "samples": 62,
+                "p50Ms": 29.52,
+                "p95Ms": 52.43,
+                "p99Ms": 74.59,
+                "maxMs": 74.59
+              },
+              "hostDispatchedPerSecond": 50.91,
+              "hostStaleShed": 0,
+              "hostAttemptsPerSecond": 50.91
+            },
+            {
+              "step": 1,
+              "ratePerHealthyClient": 16,
+              "offeredPerSecond": 77.07,
+              "goodputPerSecond": 77.07,
+              "onTimeGoodputPerSecond": 77.07,
+              "sent": 117,
+              "results": 117,
+              "refusedByReason": {},
+              "admittedLatency": {
+                "samples": 117,
+                "p50Ms": 123.21,
+                "p95Ms": 275.84,
+                "p99Ms": 325.71,
+                "maxMs": 346.89
+              },
+              "hostDispatchedPerSecond": 78.39,
+              "hostStaleShed": 0,
+              "hostAttemptsPerSecond": 78.39
+            },
+            {
+              "step": 2,
+              "ratePerHealthyClient": 24,
+              "offeredPerSecond": 107.26,
+              "goodputPerSecond": 81.6,
+              "onTimeGoodputPerSecond": 74.36,
+              "sent": 163,
+              "results": 124,
+              "refusedByReason": {
+                "queue-limit": 39
+              },
+              "admittedLatency": {
+                "samples": 124,
+                "p50Ms": 377.32,
+                "p95Ms": 512.31,
+                "p99Ms": 575.1,
+                "maxMs": 615.1
+              },
+              "hostDispatchedPerSecond": 78.97,
+              "hostStaleShed": 0,
+              "hostAttemptsPerSecond": 78.97
+            }
+          ],
+          "adversaries": [
+            {
+              "step": 0,
+              "kind": "flooder",
+              "sentBeforeClose": 39,
+              "closeAfterMs": 200.79,
+              "achievedPerSecond": 194.22,
+              "code": 1013,
+              "reason": "rate-capacity",
+              "class": "transient"
+            },
+            {
+              "step": 0,
+              "kind": "wrong-credential",
+              "code": 1008,
+              "reason": "auth-rejected",
+              "class": "terminal"
+            },
+            {
+              "step": 0,
+              "kind": "over-connection-bound",
+              "transportOpened": true,
+              "code": 1013,
+              "reason": "connection-capacity",
+              "class": "transient"
+            },
+            {
+              "step": 1,
+              "kind": "flooder",
+              "sentBeforeClose": 39,
+              "closeAfterMs": 199.38,
+              "achievedPerSecond": 195.59,
+              "code": 1013,
+              "reason": "rate-capacity",
+              "class": "transient"
+            },
+            {
+              "step": 1,
+              "kind": "wrong-credential",
+              "code": 1008,
+              "reason": "auth-rejected",
+              "class": "terminal"
+            },
+            {
+              "step": 1,
+              "kind": "over-connection-bound",
+              "transportOpened": true,
+              "code": 1013,
+              "reason": "connection-capacity",
+              "class": "transient"
+            },
+            {
+              "step": 2,
+              "kind": "flooder",
+              "sentBeforeClose": 39,
+              "closeAfterMs": 197.62,
+              "achievedPerSecond": 197.34,
+              "code": 1013,
+              "reason": "rate-capacity",
+              "class": "transient"
+            },
+            {
+              "step": 2,
+              "kind": "wrong-credential",
+              "code": 1008,
+              "reason": "auth-rejected",
+              "class": "terminal"
+            },
+            {
+              "step": 2,
+              "kind": "over-connection-bound",
+              "transportOpened": true,
+              "code": 1013,
+              "reason": "connection-capacity",
+              "class": "transient"
+            }
+          ],
+          "unexpectedHealthyCloses": [],
+          "healthyUnansweredAtEnd": 0,
+          "nonReader": {
+            "sentCommands": 35,
+            "maxHostBufferedBytesAmongBetaPeersAtEnd": 0,
+            "backlogFramesDeliveredOnResume": 35,
+            "backlogBytesDeliveredOnResume": 2580,
+            "note": "Replies of about 80 bytes at this rate fit in loopback kernel buffers, so the host-side 8192-byte buffered cap is not reached within the run; the backlog is delivered once the peer reads again."
+          },
+          "highWater": {
+            "sampledEveryMs": 50,
+            "queuedMessages": 32,
+            "queuedBytes": 1299,
+            "peerBufferedBytes": 0,
+            "connections": 7,
+            "samples": 105,
+            "hostDispatched": 343,
+            "hostTransportRefusals": 0,
+            "hostClosed": 6,
+            "hostCloseReasons": {
+              "auth-rejected": 3,
+              "rate-capacity": 3
+            },
+            "hostRssBytes": 89243648,
+            "hostHeapUsedBytes": 13776312,
+            "hostEventLoopLagMaxMs": 43.03
+          },
+          "derived": {
+            "peakGoodputPerSecond": 81.6,
+            "finalGoodputPerSecond": 81.6,
+            "plateauRatio": 1
+          }
+        }
+      ]
+    },
+    "nonReader": {
+      "host": {
+        "kind": "tools/replication-workbench (child process)",
+        "entityCount": 64,
+        "driverMs": 10,
+        "maxBufferedBytesPerPeer": 131072,
+        "perPeerFrameBucket": "burst 256, 256/s",
+        "viewFrameBytes": 5527
+      },
+      "operatorChangeEveryMs": 20,
+      "nonReader": {
+        "model": "reads its authentication frame, pauses the socket, acknowledges every outstanding view unread",
+        "retiredByHost": false,
+        "retiredAfterMs": null,
+        "acknowledgementsSent": 497,
+        "viewsSentBeforeRetire": 497,
+        "approxBytesAbsorbedByKernelBeforeRetire": 2746919,
+        "maxSampledHostBufferedBytes": 0,
+        "clientObservedClose": false,
+        "note": "A paused socket cannot observe the close until it reads; the host terminates the transport (no close frame)."
+      },
+      "healthy": {
+        "clients": 3,
+        "viewsByPhase": [
+          {
+            "baseline": 35,
+            "attack": 502,
+            "after": 37
+          },
+          {
+            "baseline": 35,
+            "attack": 502,
+            "after": 37
+          },
+          {
+            "baseline": 34,
+            "attack": 502,
+            "after": 37
+          }
+        ],
+        "adoptionLatency": {
+          "baseline": {
+            "samples": 102,
+            "p50Ms": 4.16,
+            "p95Ms": 23.26,
+            "p99Ms": 25.28,
+            "maxMs": 26.05
+          },
+          "duringAttack": {
+            "samples": 1515,
+            "p50Ms": 3.25,
+            "p95Ms": 76.07,
+            "p99Ms": 179.14,
+            "maxMs": 369.51
+          },
+          "afterRetire": {
+            "samples": 111,
+            "p50Ms": 3.11,
+            "p95Ms": 12.89,
+            "p99Ms": 29.5,
+            "maxMs": 29.62
+          }
+        },
+        "adoptionRoundsP99": {
+          "baseline": 3,
+          "duringAttack": 18,
+          "afterRetire": 3
+        },
+        "unexpectedCloses": []
+      },
+      "highWater": {
+        "sampledEveryMs": 50,
+        "queuedMessages": 4,
+        "queuedBytes": 340,
+        "peerBufferedBytes": 0,
+        "connections": 4,
+        "samples": 362,
+        "hostMaxBufferedBytesAtSend": 0,
+        "hostMaxOutstanding": 4,
+        "hostMaxOutstandingBytes": 22044,
+        "hostClosed": 1,
+        "hostCloseReasons": {
+          "transport-closed": 1
+        },
+        "hostRssBytes": 99323904,
+        "hostHeapUsedBytes": 14680520,
+        "hostEventLoopLagMaxMs": 306.77
+      }
+    },
+    "storm": {
+      "host": "tools/network-workbench (child process), restarted on the same loopback port",
+      "credentialNote": "The fixture host issues fresh credentials per lifetime; the trusted harness hands each client the current credential at attempt time (a credential refresh), so authentication is not the variable under test.",
+      "retry": {
+        "baseMs": 250,
+        "capMs": 2000,
+        "maxAttempts": 6,
+        "budget": {
+          "capacity": 8,
+          "refillEveryMs": 15000
+        }
+      },
+      "binMs": 100,
+      "variants": [
+        {
+          "policy": "jitter",
+          "randomPort": "seeded mulberry32 stream per client",
+          "clients": 8,
+          "hostConnectionBound": 8,
+          "initiallyConnected": 8,
+          "configuredDowntimeMs": 400,
+          "hostReadyAfterMs": 753.78,
+          "note": "Attempts before the host is ready fail fast with ECONNREFUSED in the kernel; accepted opens are what the host sees.",
+          "attempts": 28,
+          "attemptsPerBin": {
+            "0": 2,
+            "100": 6,
+            "200": 5,
+            "300": 2,
+            "500": 2,
+            "600": 3,
+            "800": 1,
+            "1000": 2,
+            "1200": 1,
+            "1400": 1,
+            "1600": 1,
+            "2200": 1,
+            "2300": 1
+          },
+          "peakAttemptsPerBin": 6,
+          "acceptedTransportOpensPerBin": {
+            "800": 1,
+            "1000": 2,
+            "1200": 1,
+            "1400": 1,
+            "1600": 1,
+            "2200": 1,
+            "2300": 1
+          },
+          "peakAcceptedOpensPerBin": 2,
+          "distinctAttemptBins": 13,
+          "closesDuringStorm": {
+            "1006": 20,
+            "1008 disposed": 8
+          },
+          "outcomes": {
+            "reconnected": 8,
+            "exhausted": 0,
+            "budget-empty": 0,
+            "terminal": 0,
+            "unresolved": 0
+          },
+          "reconnectMs": {
+            "first": 818.28,
+            "p50": 1233.12,
+            "p95": 2303.76,
+            "last": 2303.76
+          },
+          "maxAttemptsPerClient": 4,
+          "attemptBoundPerClient": 6,
+          "attemptBoundNote": "per episode; a client that reconnects and loses again starts a new episode, still within the budget",
+          "hostConnectionsAtEnd": 8
+        },
+        {
+          "policy": "no-jitter",
+          "randomPort": "constant 0.9999 (no jitter, same helper)",
+          "clients": 8,
+          "hostConnectionBound": 8,
+          "initiallyConnected": 8,
+          "configuredDowntimeMs": 400,
+          "hostReadyAfterMs": 699.45,
+          "note": "Attempts before the host is ready fail fast with ECONNREFUSED in the kernel; accepted opens are what the host sees.",
+          "attempts": 16,
+          "attemptsPerBin": {
+            "200": 8,
+            "700": 8
+          },
+          "peakAttemptsPerBin": 8,
+          "acceptedTransportOpensPerBin": {
+            "700": 8
+          },
+          "peakAcceptedOpensPerBin": 8,
+          "distinctAttemptBins": 2,
+          "closesDuringStorm": {
+            "1006": 8,
+            "1008 disposed": 8
+          },
+          "outcomes": {
+            "reconnected": 8,
+            "exhausted": 0,
+            "budget-empty": 0,
+            "terminal": 0,
+            "unresolved": 0
+          },
+          "reconnectMs": {
+            "first": 765.39,
+            "p50": 769.92,
+            "p95": 771.09,
+            "last": 771.09
+          },
+          "maxAttemptsPerClient": 2,
+          "attemptBoundPerClient": 6,
+          "attemptBoundNote": "per episode; a client that reconnects and loses again starts a new episode, still within the budget",
+          "hostConnectionsAtEnd": 8
+        },
+        {
+          "policy": "jitter",
+          "randomPort": "seeded mulberry32 stream per client",
+          "clients": 16,
+          "hostConnectionBound": 8,
+          "initiallyConnected": 8,
+          "configuredDowntimeMs": 400,
+          "hostReadyAfterMs": 646.54,
+          "note": "Attempts before the host is ready fail fast with ECONNREFUSED in the kernel; accepted opens are what the host sees.",
+          "attempts": 73,
+          "attemptsPerBin": {
+            "0": 6,
+            "100": 7,
+            "200": 5,
+            "300": 5,
+            "400": 6,
+            "500": 6,
+            "600": 2,
+            "700": 1,
+            "900": 1,
+            "1000": 2,
+            "1100": 5,
+            "1200": 3,
+            "1300": 1,
+            "1400": 2,
+            "1500": 2,
+            "1600": 1,
+            "1800": 1,
+            "1900": 1,
+            "2100": 1,
+            "2800": 2,
+            "3100": 2,
+            "3200": 3,
+            "3500": 1,
+            "3600": 1,
+            "3800": 1,
+            "4200": 2,
+            "5100": 1,
+            "5200": 1,
+            "5300": 1
+          },
+          "peakAttemptsPerBin": 7,
+          "acceptedTransportOpensPerBin": {
+            "600": 1,
+            "700": 1,
+            "900": 1,
+            "1000": 2,
+            "1100": 5,
+            "1200": 3,
+            "1300": 1,
+            "1400": 2,
+            "1500": 2,
+            "1600": 1,
+            "1800": 1,
+            "1900": 1,
+            "2100": 1,
+            "2800": 2,
+            "3100": 2,
+            "3200": 3,
+            "3500": 1,
+            "3600": 1,
+            "3800": 1,
+            "4200": 2,
+            "5100": 1,
+            "5200": 1,
+            "5300": 1
+          },
+          "peakAcceptedOpensPerBin": 5,
+          "distinctAttemptBins": 29,
+          "closesDuringStorm": {
+            "1006": 36,
+            "1008 disposed": 8,
+            "1013 connection-capacity": 29
+          },
+          "outcomes": {
+            "reconnected": 8,
+            "exhausted": 8,
+            "budget-empty": 0,
+            "terminal": 0,
+            "unresolved": 0
+          },
+          "reconnectMs": {
+            "first": 694.28,
+            "p50": 1033.05,
+            "p95": 1170.92,
+            "last": 1170.92
+          },
+          "maxAttemptsPerClient": 6,
+          "attemptBoundPerClient": 6,
+          "attemptBoundNote": "per episode; a client that reconnects and loses again starts a new episode, still within the budget",
+          "hostConnectionsAtEnd": 8
+        }
+      ]
+    }
+  },
+  "aborted": null,
+  "durationMs": 50623.96,
+  "invariants": [
+    {
+      "id": "overload[age=none].healthy-never-closed",
+      "ok": true,
+      "detail": "0 unexpected closes"
+    },
+    {
+      "id": "overload[age=none].flooder-rate-limited",
+      "ok": true,
+      "detail": "host rate-capacity closes 3/3; client saw 1013 rate-capacity after 39 frames at 196.35/s; 1013 rate-capacity after 38 frames at 195.64/s; 1013 rate-capacity after 38 frames at 193.9/s"
+    },
+    {
+      "id": "overload[age=none].goodput-plateaus",
+      "ok": true,
+      "detail": "final/peak goodput = 1; host achieved 78.88 attempts/s"
+    },
+    {
+      "id": "overload[age=none].global-queue-bound",
+      "ok": true,
+      "detail": "sampled high-water 31 messages / 1260 bytes"
+    },
+    {
+      "id": "overload[age=none].buffered-bound",
+      "ok": true,
+      "detail": "sampled 0 bytes"
+    },
+    {
+      "id": "overload[age=none].host-rss-below-abort",
+      "ok": true,
+      "detail": "85 MiB"
+    },
+    {
+      "id": "overload[age=300].healthy-never-closed",
+      "ok": true,
+      "detail": "0 unexpected closes"
+    },
+    {
+      "id": "overload[age=300].flooder-rate-limited",
+      "ok": true,
+      "detail": "host rate-capacity closes 3/3; client saw 1013 rate-capacity after 38 frames at 188.24/s; 1013 rate-capacity after 38 frames at 194.36/s; 1013 rate-capacity after 39 frames at 193.96/s"
+    },
+    {
+      "id": "overload[age=300].goodput-with-queue-age",
+      "ok": null,
+      "finding": true,
+      "detail": "final/peak goodput = 0.269; age 300 ms vs full-queue drain 400 ms, fair-rotation bound 700 ms"
+    },
+    {
+      "id": "overload[age=300].global-queue-bound",
+      "ok": true,
+      "detail": "sampled high-water 32 messages / 1300 bytes"
+    },
+    {
+      "id": "overload[age=300].buffered-bound",
+      "ok": true,
+      "detail": "sampled 0 bytes"
+    },
+    {
+      "id": "overload[age=300].host-rss-below-abort",
+      "ok": true,
+      "detail": "91 MiB"
+    },
+    {
+      "id": "overload[age=600].healthy-never-closed",
+      "ok": true,
+      "detail": "0 unexpected closes"
+    },
+    {
+      "id": "overload[age=600].flooder-rate-limited",
+      "ok": true,
+      "detail": "host rate-capacity closes 3/3; client saw 1013 rate-capacity after 39 frames at 194.22/s; 1013 rate-capacity after 39 frames at 195.59/s; 1013 rate-capacity after 39 frames at 197.34/s"
+    },
+    {
+      "id": "overload[age=600].goodput-with-queue-age",
+      "ok": null,
+      "finding": true,
+      "detail": "final/peak goodput = 1; age 600 ms vs full-queue drain 400 ms, fair-rotation bound 700 ms"
+    },
+    {
+      "id": "overload[age=600].global-queue-bound",
+      "ok": true,
+      "detail": "sampled high-water 32 messages / 1299 bytes"
+    },
+    {
+      "id": "overload[age=600].buffered-bound",
+      "ok": true,
+      "detail": "sampled 0 bytes"
+    },
+    {
+      "id": "overload[age=600].host-rss-below-abort",
+      "ok": true,
+      "detail": "85 MiB"
+    },
+    {
+      "id": "non-reader.retired-or-bounded",
+      "ok": true,
+      "detail": "not retired; buffered within bound"
+    },
+    {
+      "id": "non-reader.buffered-bound",
+      "ok": true,
+      "detail": "0 bytes"
+    },
+    {
+      "id": "non-reader.healthy-never-closed",
+      "ok": true,
+      "detail": "0"
+    },
+    {
+      "id": "non-reader.healthy-served-during-attack",
+      "ok": true,
+      "detail": "502,502,502"
+    },
+    {
+      "id": "non-reader.one-credit-per-peer",
+      "ok": true,
+      "detail": "4"
+    },
+    {
+      "id": "storm.jitter.8.attempts-bounded",
+      "ok": true,
+      "detail": "28 attempts, max 4 per client"
+    },
+    {
+      "id": "storm.no-jitter.8.attempts-bounded",
+      "ok": true,
+      "detail": "16 attempts, max 2 per client"
+    },
+    {
+      "id": "storm.jitter.16.attempts-bounded",
+      "ok": true,
+      "detail": "73 attempts, max 6 per client"
+    },
+    {
+      "id": "non-reader.host-rss-below-abort",
+      "ok": true,
+      "detail": "95 MiB"
+    }
+  ],
+  "ownedResourcesAfterCleanup": {
+    "children": 0,
+    "sockets": 0,
+    "startedHostPids": [
+      1321060,
+      1322490,
+      1324421,
+      1326126,
+      1336232,
+      1336822,
+      1337751,
+      1338438,
+      1338627,
+      1339379
+    ]
+  }
+}

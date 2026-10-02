@@ -594,3 +594,60 @@ edited-world persistence remain separate work. See the
 | ID | Contract | State |
 |---|---|---|
 | DX-02 | Learn timeline objectives semantics: [`TimelinePlayer.state().objectives`](../../src/kits/learn/timeline.ts) is true from an `objectives` action until the learner passes the next gate after it, then stays false (it used to stay true for the whole scene, so the card returned over later drawings). The learn runtime shows the card from that flag on the first scene, outside interrupts. ui kit HUD lines and the prompt gain a readability plate ([README](../../src/kits/ui/README.md)). `play:script` gains `holdUntil`. | Implemented, candidate (public PR #40, stacked on #39); not integrated. Timeline unit test, learn `play:script` 9/9 and emulated snaps on the branch. Lessons that relied on the card returning at later gates would see it once; no stock lesson did. No device claim. |
+
+## Overload and goodput probe — NW-07 implemented, candidate
+
+`npm run probe:network` ([guide](network-overload.md)) measures the loopback network
+and replication reference hosts past saturation: goodput against offered load,
+rejections by reason, admitted-work latency, high-water marks, a physical non-reading
+peer and a host-restart reconnect storm. Tools only; implemented, candidate (PR #27); not
+integrated. FIFO goodput plateaued and adversaries were limited without closing
+healthy peers. The replication host's buffered cap retired a paused peer in 2 of 3
+runs. Its finding that a queue age shorter than the real queued wait collapsed goodput
+is resolved by the NW-06 follow-up (PR #33), and queue-age plateaus are now asserted. Loopback/process scope only; WAN, browsers and physical devices remain
+unverified. See the [evidence](../verification/network-overload-20261002/README.md)
+and the [ledger](upgrade-acceptance-ledger.md).
+
+## Tunable jump feel — MV-01 implemented, candidate
+
+`createJumpFeel` and `jumpSystem` (locomotion kit) give creators a frame-rate-independent
+jump mechanism: height and time to apex, release, fall and apex gravity, terminal fall,
+coyote and buffer windows, each bounded and creator-chosen. Author buttons gain an opt-in
+`hold: true` so `ctx.input.held` observes a release; existing buttons are unchanged.
+Implemented as a candidate (`feat/genre-platformer-slice1`, PR #34), not integrated.
+Evidence is focused unit tests only. See the [kit README](../../src/kits/locomotion/README.md#tunable-jump-feel-mv-01),
+the [recipe](../recipes/tune-a-jump.md) and the [ledger](upgrade-acceptance-ledger.md).
+## Sub-path asset base — DX P1-8, candidate
+
+Texture and model URLs now follow Vite's `base` (`import.meta.env.BASE_URL`, exported as
+`PUBLIC_BASE` from `core/env.ts`) through `publicBase()`/`publicUrl()`; the default `/`
+keeps every existing URL unchanged. `npm run test:subpath-browser` (new CI step) fails on
+any request outside the sub-path. Candidate (branch `feat/dx-asset-base-path`); not
+integrated. Local static hosting and desktop Chromium only; see the
+[recipe](../recipes/host-under-a-sub-path.md) for limits.
+
+## Authored materials — DX P1-10, candidate
+
+New author component `Material` (`texture`, `repeat`, `wrap`, `roughness`, `metalness`,
+`emissive`, `emissiveIntensity`, `opacity`, `transparent`) with `defineMaterial` and
+`validateMaterial`. Bounds: repeat ≤ 1024, emissive intensity ≤ 16, kebab-case texture ids;
+invalid runtime data is reported once and drawn with the original material. Lifetime: one
+lease per (texture, wrap) view shared by the visit's surfaces, aborted with the visit; a
+texture change keeps the old view until the new one arrives. Overload: none beyond the texture library's existing admission. Candidate (branch
+`feat/dx-materials`); not integrated. Follow-ups outside this slice: particles, rigid-body
+physics, a game-facing multiplayer session, normal/roughness maps and `Mesh` texture
+coordinates.
+
+## Game sound files — DX P1-10, candidate
+
+`ctx.play(id, options?)` accepts a game sound id as well as a cue id (`PlayOptions`:
+`volume` 0…1, `pitch` 0.25…4, `position`); `CueVoiceOptions` gains `rate` and `wait`
+(≤ 5 s); `defineScene({ sounds })` preloads; `AudioOutput.preload` and the `audio` probe's
+`sounds` counters are new; `audioModule(spatial, { sound, files })` adds the sound-file wiring beside AUD-01's spatial options. Bounds
+follow the brief's minimum device (desktop/laptop: 4 MiB per file, 16 MiB encoded and 32 MiB
+decoded kept; phone 1/8/16 MiB), decodes admitted only when their estimated decoded size fits
+(exact for PCM WAV, 48× the file otherwise), 4 fetches and 2 decodes at once, 256 files with
+LRU replacement, 10 s per fetch or decode, waiting plays counted in the 64-voice cap. Held
+files decode on unlock. Failures (including an HTML fallback page) are reported once and
+retried on the next preload. Candidate (branch `feat/dx-sound-files`); not integrated. Physical
+listening evidence is missing.

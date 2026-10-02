@@ -13,3 +13,11 @@ side faces' edges) with a small, low-contrast orientation glyph per face. 64 px
 keeps the cube near 0.1 MiB and smooth when a phone magnifies it (16 px faces with
 large glyphs looked blurry). These are small ownership/orientation fixtures, not
 production sky artwork. Regenerate with `node templates/mechanics/assets/generate-cube.mjs`.
+
+`generate-panel.mjs` creates `public/textures/mechanics/panel.png`, a 32×32 original CC0
+riveted panel (RGBA) that the lab tiles across its floor and kiosk to demonstrate
+`defineMaterial`. Regenerate with `node templates/mechanics/assets/generate-panel.mjs`.
+
+`generate-chime.mjs` synthesises `public/sounds/mechanics/chime.wav` (0.45 s, 22 050 Hz mono, two soft
+partials, about −10 dBFS peak), an original CC0 sound for the `ctx.play` sound-file demonstration.
+Regenerate with `node templates/mechanics/assets/generate-chime.mjs`.

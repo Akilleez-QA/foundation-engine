@@ -3,6 +3,8 @@ import type { BuildBrief } from '../author/build';
 import { workerModule } from '../platform/workers/module';
 import { textureModule } from '../platform/assets/texture-module';
 import { modelModule } from '../platform/assets/model-module';
+import { publicUrl } from '../platform/assets/public-base';
+import { soundBudgets } from '../platform/audio/sound-files';
 /**
  * app/layer-modules.ts: the core and platform modules (ADR 0036). A short hand-kept list; kits come with the game
  * (`defineGame({ kits })`) and features and packs are discovered by folder (app/modules.ts). Kept free of Vite-only
@@ -21,7 +23,7 @@ import { audioModule, spatialAudioSettings } from '../platform/audio/module';
 import { shellModule } from '../platform/ui/shell-module';
 
 /** The save namespace is the game's id (every stored key starts with it; never renamed). */
-export function layerModules(game: GameDefinition, brief?: Pick<BuildBrief, 'quality'>): EngineModule[] {
+export function layerModules(game: GameDefinition, brief?: Pick<BuildBrief, 'quality'> & Partial<Pick<BuildBrief, 'devices'>>): EngineModule[] {
   return [
     saveModule({ namespace: game.id, build: `${game.id}@${game.version}` }),
     settingsModule({ game: spatialAudioSettings(game.audio) }),
@@ -29,7 +31,13 @@ export function layerModules(game: GameDefinition, brief?: Pick<BuildBrief, 'qua
     features,
     routerModule({ fallbackScene: sceneId(game.firstScene) }),
     inputModule(),
-    audioModule(game.audio),
+    // A game's sound files: `defineAsset({ type: 'audio' })` rows, served under the build's public base; memory bounds
+    // follow the brief's minimum device (sound-files.ts, soundBudgets).
+    audioModule(game.audio, { files: soundBudgets(brief?.devices?.minimum), sound: (s, id) => {
+      const a = s.registries.assets.get(id); if (!a || a.type !== 'audio') return undefined;
+      if (!/^\/?[a-zA-Z0-9_./-]+\.(?:mp3|m4a|ogg|wav)$/i.test(a.url) || a.url.includes('..') || a.url.startsWith('//')) throw Error('audio: expected a local mp3, m4a, ogg or wav file');
+      return publicUrl(a.url);
+    } }),
     workerModule(),
     textureModule((s,id)=>{
       const a=s.registries.assets.get(id);if(!a||a.type!=='texture')return undefined;
