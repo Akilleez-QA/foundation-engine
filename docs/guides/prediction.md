@@ -5,7 +5,7 @@ inputs through a pure reducer. It supplies no physics, simulation clock, smoothi
 ECS mutation or accepted gameplay effects. Creators may omit it or use a maintained
 networking framework's existing prediction owner. Do not layer two prediction owners
 over the same state. The native diagnostic passed on clean `8317c69`; see
-[acceptance evidence](../verification/authority-20261001/README.md). NW-03 is integrated on private `main` by merge `b6fb4a3` ([PR #123](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/123)). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed.
+[acceptance evidence](../verification/authority-20261001/README.md). NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed.
 
 ## Baseline and control ownership
 

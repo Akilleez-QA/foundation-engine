@@ -74,7 +74,7 @@ acquire distributed guarantees by being called from a network dispatch port.
 
 For optional complete scoped replacement and application credit, continue with
 [network views](network-views.md). NW-02 is integrated on main by merge `ea48539`,
-with work tracked in [PR #122](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/122). Its rebased browser pass (`508edd9`) and seven-template
+with work tracked in PR #122 in the private development history. Its rebased browser pass (`508edd9`) and seven-template
 gate pass (`47a7e6d`, 1,965 tests and 129 performance checks) are separate evidence
 from this admission slice. NW-03 durable authority/prediction and physical-device
 acceptance remain open.

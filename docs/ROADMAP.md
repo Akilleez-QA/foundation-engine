@@ -162,7 +162,7 @@ uses the existing application/module owners in `src/core/app.ts`.
 
 ### Optional compact shell
 
-[PR #25](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/25) adds creator-selected
+PR #25 in the private development history adds creator-selected
 compact presentation for existing registered Sound/Graphics controls through the
 existing layer/input owner. Expanded remains the default; compact is not inferred
 from device names and does not select graphics quality. The branch includes
@@ -352,7 +352,7 @@ passed (1,960 tests, zero failures/cancellations); the cause is not established.
 passed. The subsequent exact-head gate passed on `8121257`: all seven templates,
 1,960 tests and 129 performance checks, with zero enforced breaches, regressions
 or inconclusive results. Four software-GL heap advisories remain (two Mechanics,
-two Terrain). NW-02 is now integrated on `main` by merge `ea48539` (work tracked in [PR #122](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/122)).
+two Terrain). NW-02 is now integrated on `main` by merge `ea48539` (work tracked in PR #122 in the private development history).
 The rebased clean browser run passed at `508edd9`; final `47a7e6d` passed all seven
 template gates with 1,965 tests and 129 performance checks, zero enforced breaches,
 regressions or inconclusive results, and four advisory heap warnings. Combined
@@ -367,7 +367,7 @@ protocol or mandatory network dependency is added to ordinary player builds.
 ### NW-03 integration checkpoint
 
 [Durable authority](guides/durable-authority.md),
-[prediction](guides/prediction.md) and the optional SQLite adapter are integrated. NW-03 is integrated on private `main` by merge `b6fb4a3` ([PR #123](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/123)). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. Clean native acceptance passed at `8317c69` with seven observations. Exploratory native correction,
+[prediction](guides/prediction.md) and the optional SQLite adapter are integrated. NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. Clean native acceptance passed at `8317c69` with seven observations. Exploratory native correction,
 replay, restart and retirement checks passed; Node 22.13 storage/host tests passed.
 The [acceptance ledger](guides/upgrade-acceptance-ledger.md) owns the revision and
 evidence details; DV-01 remains open, with minimum phone, tablet and laptop/desktop profiles pending creator selection. This is a continuation of the accepted engine

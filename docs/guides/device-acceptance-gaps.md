@@ -28,14 +28,14 @@ inventory prevents a standards change from being mistaken for device certificati
   to inline closes the sheet and resumes, held input does not revive, manual
   selection survives later resizes, and route exit leaves no sheet. These are
   fixture choices, not prescribed breakpoints or proof of every application layout.
-  See [PR #42](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/42).
+  See PR #42 in the private development history.
 - The composed HUD regression measures a 64×64 CSS-pixel region around one projected
   scene point in phone, tablet and desktop browser viewports. It requires the
   intentionally overcrowded inline presentation to violate the fixture's zero
   obstruction criterion, then requires disclosure to restore a fully in-view,
   unobstructed region. This negative regression is implemented, not remaining work;
   a pass means the bad layout was detected, not accepted. See
-  [PR #33](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/33) and
+  PR #33 in the private development history and
   [visibility diagnostics](ui-visibility-diagnostics.md#composed-hud-regression).
   Conservative rectangles do not establish glyph visibility, contrast, pointer
   routing or accessibility, and creators still choose their own subjects and limits.
