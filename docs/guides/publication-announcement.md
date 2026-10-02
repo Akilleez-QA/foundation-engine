@@ -1,8 +1,8 @@
 # Discord announcement draft
 
-Publish the text below only after public source access and the selected release
-candidate are verified. The repository was private when this draft was prepared. Replace the link if
-the authorized public destination changes. This draft has not been posted.
+The repository is public at the link below (first public commit `c0e73c9`).
+The author has posted the announcement on Discord; this file keeps the
+draft text for reference.
 
 ---
 

@@ -32,7 +32,7 @@ or feature parity with another engine is not sufficient justification for a DAG,
 cache, watcher or editor. Use the existing publisher if the need is only publication.
 
 One directly applicable correction is implemented in
-[PR #34](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/34): manifest artifact
+PR #34 in the private development history: manifest artifact
 paths use explicit UTF-16 code-unit order instead of host-locale collation before
 SHA-256 identity calculation. Separate English/Swedish Node-process tests exercise
 different default collation while requiring identical manifest bytes and release

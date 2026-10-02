@@ -4,7 +4,7 @@ This optional framework separates command admission, durable acceptance and
 response delivery. It is optional: creators choose their state, commands, reducers,
 authorization, storage, transport and presentation. Using Foundation does not
 require a server or database. This guide records the implementation contract;
-focused owner, SQLite process and native composed browser checks passed. NW-03 is integrated on private `main` by merge `b6fb4a3` ([PR #123](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/123)). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed.
+focused owner, SQLite process and native composed browser checks passed. NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed.
 
 ## Owner and ports
 
@@ -164,4 +164,4 @@ It cannot authenticate evicted payloads or derive past state from unavailable co
 The native two-client diagnostic has passed exploratory correction/replay, delayed
 and reordered baselines, persisted restart and scene/control retirement checks.
 Clean native acceptance passed at `8317c69`; [saved evidence](../verification/authority-20261001/README.md)
-records its precise scope. NW-03 is integrated on private `main` by merge `b6fb4a3` ([PR #123](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/123)). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. See the [acceptance ledger](upgrade-acceptance-ledger.md); DV-01 remains open.
+records its precise scope. NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. See the [acceptance ledger](upgrade-acceptance-ledger.md); DV-01 remains open.

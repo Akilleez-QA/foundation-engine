@@ -276,6 +276,6 @@ instantiate them. There is no default database, simulation or transport ownershi
 - [SQLite tooling adapter](../../../tools/authority-workbench/README.md): optional
   server-side example, outside browser builds, with its own Node requirement.
 
-NW-03 is integrated on private `main` by merge `b6fb4a3` ([PR #123](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/123)). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. Clean native acceptance passed at `8317c69` with seven observations; 17 storage/host checks passed on Node 22.13. DV-01 remains open. The [acceptance ledger](../../../docs/guides/upgrade-acceptance-ledger.md)
+NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. Clean native acceptance passed at `8317c69` with seven observations; 17 storage/host checks passed on Node 22.13. DV-01 remains open. The [acceptance ledger](../../../docs/guides/upgrade-acceptance-ledger.md)
 records revisions, process evidence and outstanding work. Application credit,
 command consumption, durable commitment and disclosure permission remain distinct.

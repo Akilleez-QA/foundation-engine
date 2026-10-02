@@ -13,6 +13,12 @@ terrain/document/diagnostic/route/materialization program is integrated within i
 stated boundaries. Those boundaries remain real; unimplemented capabilities are
 not made complete by relabelling them as optional.
 
+Revision references: PR numbers and merge/commit hashes before the public
+repository's first commit `c0e73c9` refer to the private development history,
+which is not published. `c0e73c9` has the same source tree as private `main`
+`b983e1a`. Later public PRs are on
+[github.com/Akilleez-QA/foundation-engine](https://github.com/Akilleez-QA/foundation-engine/pulls).
+
 ## Completion rules
 
 Each item requires an implementation or explicit creator deferral, documented
@@ -59,8 +65,8 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | CR-02 | Authored experimentation and resource spawn lifecycle | Integrated in PR #118 at `1c177d5`. Pinned full recipe/batch facts, explicit spawn replacement/expiry, paid repeat manufacture, protected factory work and durable retry/reload passed at `790aaea`. Failed-write scene reentry preserves pending work and prior accepted custody until acknowledgment. No automatic rotation, universal economy or physical-device certification. |
 | CR-03 | Recipe/effect visual inspectors | Integrated in PR #118 at `1c177d5`. Native bounded inspector, isolated validation/preview, undo and independent recipe persistence passed the `790aaea` desktop workflow. Empty attribute recipes and oversized raw storage are covered. Creator policy remains replaceable; the tool does not impose a player UI. |
 | NW-01 | Transport/session and authenticated authority boundary | Integrated in PR #120 at `3a97ca6`: pure intake `bd65713`, browser text adapter `540bece`, and ephemeral WebSocket reference host `63730cc`. Reported focused checks pass: 16 intake, 13 injected-socket adapter, 10 real TCP/WebSocket host and 5 reference response-schema tests. Native two-browser/separate-host acceptance passed at `4e51a04`, with inspected rendering and independent host counters. Final `5f871b3` passed all seven template gates (1,917 tests; 129 performance checks; zero enforced breaches/regressions/inconclusive, four advisory software-GL heap warnings); combined main tests/build passed. Measured load remains NW-02 work. No durable or complete multiplayer authority claim. |
-| NW-02 | Interest management and bounded snapshots | Integrated on main by merge `ea48539`, preserving input-resize integration `894fc52`; work tracked in [PR #122](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/122). Clean rebased browser passed at `508edd9`; final `47a7e6d` passed all seven gates (1,965 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive, four advisory heap warnings). Combined main 1,965 tests/build passed. Four local load cases passed (worst publisher p95 0.321 ms). Historical failure/retry and earlier candidate revisions remain below. Git ancestry proves integration; GitHub PR state was still OPEN immediately after push. Creator scope is explicit; no general spatial policy or delta replication claim. |
-| NW-03 | Prediction/reconciliation, reconnect and server persistence | NW-03 is integrated on private `main` by merge `b6fb4a3` ([PR #123](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/123)). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. Clean native two-client acceptance passed at `8317c69` (seven observations); all 53 focused tests and 17 actual Node 22.13 storage/host checks passed. Historical component repairs and limits are recorded below. DV-01 remains open; no physical-device, public-release or unrestricted multiplayer claim. |
+| NW-02 | Interest management and bounded snapshots | Integrated on main by merge `ea48539`, preserving input-resize integration `894fc52`; work tracked in PR #122 in the private development history. Clean rebased browser passed at `508edd9`; final `47a7e6d` passed all seven gates (1,965 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive, four advisory heap warnings). Combined main 1,965 tests/build passed. Four local load cases passed (worst publisher p95 0.321 ms). Historical failure/retry and earlier candidate revisions remain below. Git ancestry proves integration; GitHub PR state was still OPEN immediately after push. Creator scope is explicit; no general spatial policy or delta replication claim. |
+| NW-03 | Prediction/reconciliation, reconnect and server persistence | NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. Clean native two-client acceptance passed at `8317c69` (seven observations); all 53 focused tests and 17 actual Node 22.13 storage/host checks passed. Historical component repairs and limits are recorded below. DV-01 remains open; no physical-device, public-release or unrestricted multiplayer claim. |
 | TR-01 | Regional terrain worker and ordinary-surface integration | Integrated in PR #109 at 99e6255. Canonical regional Surface and halo patches, bounded WorkerHost generation/patch adapters, independent geometric oracles and finite coherent render/query consumer passed at 891eb7; all seven template gates passed (1,648 tests, 129 performance checks, zero breaches/regressions, four advisory heap warnings). Combined main tests/build passed. Physical-device performance and unbounded/global streaming are not established. |
 | DV-01 | Supported-device experience and sustained performance evidence | Desktop diagnostics do not certify phone/tablet UI, physical controllers, thermal behavior, accessibility or real GPU timing. Record per-consumer supported profiles and unverified surfaces honestly. |
 
@@ -174,7 +180,7 @@ The initial attempt completed 18 passing performance checks but failed overall.
 The subsequent exact-head gate passed on `8121257`: all seven templates,
 1,960 tests and 129 performance checks, with zero enforced breaches, regressions
 or inconclusive results. Four software-GL heap advisories remain (two Mechanics,
-two Terrain). NW-02 is now integrated on `main` by merge `ea48539` (work tracked in [PR #122](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/122)).
+two Terrain). NW-02 is now integrated on `main` by merge `ea48539` (work tracked in PR #122 in the private development history).
 The rebased clean browser run passed at `508edd9`; final `47a7e6d` passed all seven
 template gates with 1,965 tests and 129 performance checks, zero enforced breaches,
 regressions or inconclusive results, and four advisory heap warnings. Combined
@@ -190,7 +196,7 @@ rebased candidate `508edd9` passed the native two-client/separate-host browser
 workflow on a clean tree with no page or console errors. The rebased final
 `47a7e6d` then passed all seven gates (1,965 tests, 129 performance checks, four
 advisory heap warnings) before merge `ea48539`; combined main tests/build passed.
-Earlier gate results remain tied to their original revisions. [PR #122](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/122) tracks the
+Earlier gate results remain tied to their original revisions. PR #122 in the private development history tracks the
 integrated work; PR #121 was superseded without rewriting its published branch.
 
 
@@ -228,6 +234,6 @@ the passing run. This does not erase the failed run or imply a runtime defect.
 Clean-revision native acceptance, including malformed first-baseline recovery,
 passed at `8317c69` with seven observations and no page/console errors. See the
 [saved report and inspected screenshots](../verification/authority-20261001/README.md).
-NW-03 is integrated on private `main` by merge `b6fb4a3` ([PR #123](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/123)). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed.
+NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed.
 The workflow is configured in CI; no remote CI result is claimed. DV-01 remains open, with minimum phone, tablet and laptop/desktop profiles pending creator selection. Process-crash tests do not establish power loss, arbitrary
 filesystems, trustworthy old backups, WAN scale or supported physical devices.

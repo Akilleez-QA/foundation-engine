@@ -114,7 +114,7 @@ failures/cancellations); the cause is not established. The completed 18 performa
 checks passed, but the gate did not. The subsequent exact-head gate passed on `8121257`: all seven templates,
 1,960 tests and 129 performance checks, with zero enforced breaches, regressions
 or inconclusive results. Four software-GL heap advisories remain (two Mechanics,
-two Terrain). NW-02 is now integrated on `main` by merge `ea48539` (work tracked in [PR #122](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/122)).
+two Terrain). NW-02 is now integrated on `main` by merge `ea48539` (work tracked in PR #122 in the private development history).
 The rebased clean browser run passed at `508edd9`; final `47a7e6d` passed all seven
 template gates with 1,965 tests and 129 performance checks, zero enforced breaches,
 regressions or inconclusive results, and four advisory heap warnings. Combined

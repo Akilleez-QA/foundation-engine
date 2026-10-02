@@ -11,6 +11,12 @@ See the [creator contract](../CREATOR-CONTRACT.md) and
 
 ## Reading this record
 
+Revision references: PR numbers and merge/commit hashes before the public
+repository's first commit `c0e73c9` refer to the private development history,
+which is not published. `c0e73c9` has the same source tree as private `main`
+`b983e1a`. Later public PRs are on
+[github.com/Akilleez-QA/foundation-engine](https://github.com/Akilleez-QA/foundation-engine/pulls).
+
 The original program integrated through PRs #80–#94 on private `main`. Historical
 results below refer to that baseline. The continuation now includes regional Surface
 integration, rigid/weighted appearance, custody, stats/progression and objective
@@ -352,7 +358,7 @@ failures/cancellations); the cause is not established. The
 completed 18 performance checks passed, but the gate did not. The subsequent exact-head gate passed on `8121257`: all seven templates,
 1,960 tests and 129 performance checks, with zero enforced breaches, regressions
 or inconclusive results. Four software-GL heap advisories remain (two Mechanics,
-two Terrain). NW-02 is now integrated on `main` by merge `ea48539` (work tracked in [PR #122](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/122)).
+two Terrain). NW-02 is now integrated on `main` by merge `ea48539` (work tracked in PR #122 in the private development history).
 The rebased clean browser run passed at `508edd9`; final `47a7e6d` passed all seven
 template gates with 1,965 tests and 129 performance checks, zero enforced breaches,
 regressions or inconclusive results, and four advisory heap warnings. Combined
@@ -380,6 +386,6 @@ desktop loopback scope. See the [versioned evidence ledger](upgrade-acceptance-l
 for historical candidate commits and current integration evidence.
 
 Clean-revision native acceptance passed at `8317c69`; see the
-[saved evidence](../verification/authority-20261001/README.md). NW-03 is integrated on private `main` by merge `b6fb4a3` ([PR #123](https://github.com/Akilleez-QA/foundation-engine-private-history/pull/123)). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed.
+[saved evidence](../verification/authority-20261001/README.md). NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed.
 DV-01 physical-device acceptance remains open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. Creators may configure,
 replace or omit these contracts and retain ownership of all game rules.

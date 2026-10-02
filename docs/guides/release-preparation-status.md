@@ -45,3 +45,22 @@ of the framework program. Check the live repository for current visibility.
 At this preparation checkpoint no repository deletion, history replacement, public
 visibility change, package publication, deployment or Discord posting had occurred. Follow the
 [release procedure](release-checklist.md#source-publication-procedure).
+
+## Publication outcome (2026-10-01)
+
+- Public repository: [Akilleez-QA/foundation-engine](https://github.com/Akilleez-QA/foundation-engine),
+  GPL-3.0-only. The first commit `c0e73c9` is a one-commit export with the same tree
+  as private `main` `b983e1a` (#124 in the private development history). The
+  original repository was renamed `foundation-engine-private-history` and remains private.
+- Hosted settings checked after publication: `main` requires the `check` status
+  (strict) and one approving review; administrators are not enforced; force
+  pushes are disabled; private vulnerability reporting is enabled; Issues are on,
+  Discussions and Wiki are off.
+- The first public CI run on `c0e73c9` failed. One SQLite process test read the
+  database back while child writers were still checkpointing on close. The
+  storage outcome was correct. The test fix is a separate public PR. The same
+  failure affected the initial dependency-update PRs. The TypeScript 7 and three.js
+  0.186 updates also fail for real and need deliberate upgrades.
+- Not included in the public source: the device-acceptance branch (DV-01 work,
+  including unintegrated lesson cleanup and touch sizing). DV-01 remains unresolved.
+- The author posted the [announcement](publication-announcement.md) on Discord.
