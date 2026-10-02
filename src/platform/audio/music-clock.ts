@@ -100,7 +100,9 @@ export interface MusicHost {
  *  time between reading the clock and the call. */
 export const MUSIC_START_MARGIN = 0.02;
 
-interface Segment { source: AudioBufferSourceNode; start: number; offset: number }
+/** One source. `done`: it has ended (its stop time passed or the song ran out) but is kept until the hand-off, so
+ *  songTime and state stay on what was last audible. */
+interface Segment { source: AudioBufferSourceNode; start: number; offset: number; done?: boolean }
 
 const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
 
@@ -162,8 +164,8 @@ export function createMusicPlayer(host: MusicHost) {
       source.buffer = buffer;
       if (options.loop) { source.loop = true; source.loopStart = options.loop.start; source.loopEnd = loopEnd(); }
       source.connect(level);
-      const segment = { source, start: at, offset };
-      source.onended = () => { if (current === segment) finish(); else if (previous === segment) { previous = null; segment.source.disconnect(); } };
+      const segment: Segment = { source, start: at, offset };
+      source.onended = () => { if (current === segment) finish(); else if (previous === segment) { segment.done = true; segment.source.disconnect(); } };
       source.start(at, offset);
       if (stopAt !== null) source.stop(stopAt);
       return segment;
@@ -192,6 +194,8 @@ export function createMusicPlayer(host: MusicHost) {
     };
 
     const voice: MusicVoice = {
+      // Between a seek and its hand-off the voice is `playing` even if the old source has already run out: it is in
+      // progress and will sound again at the hand-off.
       get state() { return ended ? 'ended' : !current ? 'loading' : !started(current) && !previous ? 'scheduled' : 'playing'; },
       get ended() { return ended; },
       ready,
@@ -231,9 +235,16 @@ export function createMusicPlayer(host: MusicHost) {
         if (ended) return;
         if (at === undefined || at <= c.currentTime) { finish(); return; }
         if (!current) { pendingStop = at; return; }
+        if (at <= current.start) {
+          // The stop lands before the pending start or hand-off: that source never plays, so release it now (do not
+          // rely on browsers firing `ended` for a source stopped before it started). What is audible now (the
+          // previous source) becomes the voice's only source and ends at `at`; its own `ended` finishes the voice.
+          release(current);
+          current = previous; previous = null;
+          if (!current || current.done) { stopAt = at; finish(); return; }
+        }
         stopAt = at;
-        // Both sources stop by `at`: the one playing now (before a pending hand-off) and the one handed to.
-        try { previous?.source.stop(Math.min(at, current.start)); current.source.stop(at); } catch { finish(); }
+        try { current.source.stop(at); } catch { finish(); }
       },
       setGain(gain) { if (!(finite(gain) && gain >= 0 && gain <= 1)) throw Error('music: gain must be in [0, 1]'); if (!ended) level.gain.value = gain; },
     };

@@ -225,7 +225,7 @@ test('review: stop during a pending seek also stops the audible source; a seek c
   ctx.currentTime = 11;
   voice.seek(60, 15); voice.stop(13);
   assert.deepEqual(sources[0].stops, [15, 13], 'the original stops at 13, before its hand-off');
-  assert.deepEqual(sources[1].stops, [13], 'the hand-off target never plays past the stop');
+  assert.equal(sources[1].disconnected, true, 'the hand-off target is released at once: it never plays');
   assert.equal(voice.songTime(14), 3, 'frozen at the stop');
   assert.throws(() => voice.seek(20, 13.5), /after the scheduled stop/);
   const other = rig(); const kept = other.player.play('song', { at: 10 })!; await kept.ready;
@@ -258,4 +258,38 @@ test('review: songTime freezes after the end; an ended voice keeps no PCM; a sto
   const early = rig({ ready: {} }); const gone = early.player.play('song', { at: 10.5 })!;
   gone.stop(10.2); early.store.waiting.get('song')!.resolve(song(120));
   assert.equal(await gone.ready, false); assert.equal(early.sources.length, 0, 'a stop before the start: nothing plays');
+});
+
+test('re-review: a stop before a pending hand-off freezes on what was heard, after the old source ends and past the hand-off', async () => {
+  const { player, ctx, sources } = rig();
+  const voice = player.play('song', { at: 10 })!; await voice.ready;
+  ctx.currentTime = 11; const start = sources[0].when!;
+  voice.seek(60, 13); voice.stop(12);
+  assert.equal(sources[1].disconnected, true, 'the unreached hand-off is released, not left waiting for an ended event');
+  assert.equal(voice.state, 'playing');
+  ctx.currentTime = 12; sources[0].onended?.();
+  assert.equal(voice.ended, true, 'the audible source ending finishes the voice');
+  // Song second 2 was the last heard (asked to start at 10; the skip-ahead start at `start` began at start - 10 s in).
+  for (const t of [12, 12.5, 13, 14, 30]) assert.ok(Math.abs(voice.songTime(t)! - 2) < 1e-9, `songTime(${t}) holds where the audio stopped`);
+  assert.ok(start > 10);
+  assert.equal(voice.state, 'ended');
+  assert.equal(player.stats.active, 0, 'the slot is free');
+  // A stop before the first, still-pending start: nothing ever plays and the voice ends at once.
+  const later = rig(); const queued = later.player.play('song', { at: 15 })!; await queued.ready;
+  queued.stop(14); assert.equal(queued.ended, true); assert.equal(later.sources[0].disconnected, true); assert.equal(later.player.stats.active, 0);
+});
+
+test('re-review: a hand-off after the song ran out holds songTime at the song end and stays in progress until it', async () => {
+  const { player, ctx, sources } = rig({ ready: { song: song(8) } });
+  const voice = player.play('song', { at: 10 })!; await voice.ready;
+  ctx.currentTime = 11; const start = sources[0].when!;
+  voice.seek(5, 19); // the original runs out at about 18 (8 s song), the hand-off is at 19
+  ctx.currentTime = start + 8.1; sources[0].onended?.();
+  assert.equal(voice.ended, false);
+  for (const t of [ctx.currentTime, 18.5, 18.99]) assert.equal(voice.songTime(t), 8, 'held at the song end, not the hand-off lead-in');
+  assert.equal(voice.state, 'playing', 'in progress between the end and the hand-off');
+  assert.equal(voice.songTime(20), 6, 'the hand-off continues from its offset');
+  // A stop between the natural end and the hand-off: the old source already ended, so the voice ends at once.
+  voice.stop(18.6);
+  assert.equal(voice.ended, true); assert.equal(voice.songTime(40), 8);
 });

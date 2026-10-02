@@ -42,8 +42,13 @@ either path, or both.
   the hand-off. A second seek before the first hand-off replaces that hand-off:
   the audible source keeps playing and now hands over at the new time.
 - **Seeks and stops together.** A seek cannot pass a scheduled stop (it throws),
-  and a seek before the stop carries the stop to the new source. `stop(at)` during
-  a pending seek stops both sources by `at`.
+  and a seek before the stop carries the stop to the new source. `stop(at)` that
+  lands before a pending start or hand-off releases that never-played source at
+  once (the voice does not wait for an `ended` event browsers may not fire for it);
+  the audible source stops at `at`, and `songTime` freezes on what was heard.
+- **Between a seek and its hand-off** the voice is `playing`, even if the old
+  source has already run out (a hand-off after the song's end). `songTime` then
+  holds at the song end until the hand-off.
 - **Muting.** Muting or a zero music volume sets the music bus to 0. The song
   keeps playing silently, so the run stays in sync. A hidden tab suspends the
   context, so the song and the timeline pause together. A song that finishes
