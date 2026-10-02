@@ -671,6 +671,6 @@ no browser output timing, physical-device or audible verification.
 ([README](../../src/kits/input-history/README.md),
 [recipe](../recipes/add-input-history.md)) close two rollback gaps from the
 fighting-game genre study: saving random state, and frame-exact buffered and
-sequence input. Implemented, candidate (PR #TBD, `feat/rng-state-input-history`);
+sequence input. Implemented, candidate (PR #52, `feat/rng-state-input-history`);
 not integrated. Evidence is focused headless tests and fixed-lane and rollback
 consumers; controller and feel acceptance are open.
