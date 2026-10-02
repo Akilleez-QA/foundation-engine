@@ -15,10 +15,11 @@
 //   area <id>                      (explore kit) a scene to move around in: walls, player, camera, prompt
 //   lesson <id>                    (learn kit) an outline-first lesson: data, scene, test, words
 import './lib/node-version.mjs';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { gameDir, ROOT } from './lib/game-dir.mjs';
 import { loadGame } from '../src/app/game-files';
+import { freeAxisBinding, freeButtonBinding } from '../src/author/input-registry';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 export const pascal = (id: string) => id.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join('');
@@ -34,10 +35,23 @@ function write(file: string, text: string, made: string[]) {
   writeFileSync(file, text); made.push(relative(ROOT, file).split('\\').join('/'));
 }
 
+/** GAME.md with `row` added as the last row of its '## Changelog' table (appended at the end when it has none). */
+export function withChangelogRow(md: string, row: string): string {
+  const lines = md.split('\n'), h = lines.findIndex(l => /^##\s+Changelog\b/i.test(l));
+  if (h < 0) return md.replace(/\n*$/, '\n') + row + '\n';
+  let i = h + 1;
+  while (i < lines.length && !lines[i].startsWith('|') && !/^#/.test(lines[i])) i++;
+  if (i < lines.length && lines[i].startsWith('|')) {
+    while (i < lines.length && lines[i].startsWith('|')) i++;
+    lines.splice(i, 0, row);
+  } else lines.splice(h + 1, 0, '', '| Date | Change | Budgets |', '|---|---|---|', row);   // a heading with no table yet
+  return lines.join('\n');
+}
+
 function changelog(dir: string, line: string, made: string[]) {
   const md = join(dir, '..', 'GAME.md');
   if (!existsSync(md)) return;
-  appendFileSync(md, `| ${today()} | ${line} | |\n`);
+  writeFileSync(md, withChangelogRow(readFileSync(md, 'utf8'), `| ${today()} | ${line} | |`));
   made.push(relative(ROOT, md).split('\\').join('/') + ' (changelog row)');
 }
 
@@ -59,7 +73,7 @@ const phone = (b: Brief) => b.devices.targets.includes('phone') || b.devices.tar
 
 export async function generate(kind: string, id: string, opts: Record<string, string | boolean> = {}, dir = gameDir()): Promise<Generated> {
   if (!KEBAB.test(id ?? '')) throw Error(`the id '${id}' must be lowercase kebab-case`);
-  const { brief, game } = await loadGame(dir);
+  const { brief, game, defs } = await loadGame(dir);
   const files: string[] = [], next: string[] = [];
   const P = pascal(id), c = camel(id);
   switch (kind) {
@@ -151,9 +165,16 @@ test('${id}: runs on an empty world', async () => {
     }
     case 'input': {
       const touch = brief.devices.input.includes('touch') || brief.devices.input.includes('pointer');
-      const body = opts.axis
-        ? `axis: {\n    negative: { keys: ['code:KeyQ'], pad: ['lb'] },\n    positive: { keys: ['code:KeyE'], pad: ['rb'] },\n  },`
-        : `keys: ['f'], pad: ['x']${touch ? ', tap: true' : ''},`;
+      // Defaults chosen from the boot's input table (engine rows + this game's and its kits' inputs), so they never clash.
+      const list = (xs: readonly string[]) => `[${xs.map(x => `'${x}'`).join(', ')}]`;
+      let body: string;
+      if (opts.axis) {
+        const a = freeAxisBinding(game, defs, id);
+        body = `axis: {\n    negative: { keys: ${list(a.negative.keys)}, pad: ${list(a.negative.pad)} },\n    positive: { keys: ${list(a.positive.keys)}, pad: ${list(a.positive.pad)} },\n  },`;
+      } else {
+        const b = freeButtonBinding(game, defs, id);
+        body = `keys: ${list(b.keys)}, pad: ${list(b.pad)}${touch ? ', tap: true' : ''},`;
+      }
       write(join(dir, `${id}.ts`), `// The ${id} ${opts.axis ? 'axis (-1…1)' : 'action'}. Change the bindings; every action needs a key and a pad input.
 import { defineInput } from '@engine';
 
@@ -162,7 +183,7 @@ export default defineInput({
   ${body}
 });
 `, files);
-      next.push(opts.axis ? `Read it: ctx.input.axis('${id}')` : `Read it: ctx.input.pressed('${id}') or ctx.input.held('${id}')`, 'npm run check reports a clash with another binding');
+      next.push(opts.axis ? `Read it: ctx.input.axis('${id}')` : `Read it: ctx.input.pressed('${id}') or ctx.input.held('${id}')`, 'The bindings were free when generated; npm run check (lint:brief) reports any later clash with the engine or another input');
       break;
     }
     case 'save-section':

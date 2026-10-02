@@ -11,7 +11,7 @@ export default defineBuild({
   success: [
     { id: 'S1', check: 'holding up moves the player away from the camera and the garden walls stop them', how: 'test', by: 'game/garden.test.ts' },
     { id: 'S2', check: 'standing by the bench shows its prompt and using it counts one of three things', how: 'test', by: 'game/garden.test.ts' },
-    { id: 'S3', check: 'the shed door leads into the shed and its door back arrives beside the garden door', how: 'playtest', by: 'playtest/door.json' },
+    { id: 'S3', check: 'the shed door leads into the shed and its door back arrives beside the garden door', how: 'playtest', by: 'game/playtest/door.json' },
     { id: 'S4', check: 'using all three things shows the found-everything banner, and it stays after a reload', how: 'test', by: 'game/garden.test.ts' },
     { id: 'S5', check: 'both scenes stay inside their budgets.json counts on the gate', how: 'gate' },
   ],

@@ -49,6 +49,7 @@
 | 2026-09-28 | Template created | `main` measured on software GL |
 | 2026-09-30 | Add optional pure dimensional inventory candidate reducer for authorized industrial systems | Unchanged |
 | 2026-09-30 | Compose bounded industrial stock candidates and multi-output work recovery | Unchanged |
+| 2026-10-02 | The scripted playtest `turn.json` moved into the game folder (`game/playtest/`), so `npm run new-game` copies it with the game instead of into the engine's root `playtest/`. Same script. | Unchanged |
 
 ## Engine delivery milestone
 

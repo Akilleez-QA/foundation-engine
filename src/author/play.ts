@@ -18,6 +18,9 @@ export interface SceneHandle {
   entities?(request: SceneEntitiesRequest): SceneEntitiesResult;
   /** Optional on-demand adopted-model diagnostics, installed by stock dev/test runtime only. */
   model?(request: SceneModelRequest): SceneModelResult;
+  /** Dev/test only: mark the picture dirty and ask for one frame (a real draw of an unchanged scene); false when the
+   *  visit is ending. Render on demand stays on: nothing more is drawn until something changes. */
+  redraw?(): boolean;
   /** Move the entity with this `Name` (default 'player'): false when there is none. */
   teleport(x: number, z: number, name?: string): boolean;
 }

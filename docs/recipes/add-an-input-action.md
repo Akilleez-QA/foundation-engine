@@ -21,7 +21,9 @@ export default defineInput({ id: 'steer', label: 'Steer', axis: {
 
 - **Reach** (STD-RUN-30): every action needs a key and a pad input (`defineInput` refuses one without), so every player can reach it. `tap: true` also presses it on a tap or click on the view.
 - **Keys**: printable keys by `key` in lower case (`'f'`), named keys by name (`'Space'`, `'Enter'`), physical keys by code (`'code:KeyW'`, so AZERTY players steer with the same fingers). Pad inputs are named by position (`a`, `b`, `x`, `y`, `lb`, `rb`, `lt`, `rt`, `dpad-*`, `ls-*`, `rs-*`).
-- The row becomes `game.<id>` in the `inputActions` registry. Boot fails when a default binding clashes with another row; the engine's own rows are only `core.back` (Escape, B), `core.pause` (P, Menu), `core.mute` (M), focus (Tab) and the shell menu (X).
+- The row becomes `game.<id>` in the `inputActions` registry. Boot fails when a default binding clashes with another row; the engine's own rows are `core.back` (Escape, B), `core.pause` (P, Menu), `core.mute` (M), focus (Tab, Shift+Tab, d-pad up/down), confirm (Enter, A), paging (PageUp/PageDown, LB/RB) in panels, and the shell menu (pad X). Panel-only rows (back, focus, confirm, paging) may share an input with a game action; a global or always row may not.
+- **Generate it**: `npm run new -- input <id>` (or `--axis`) picks a key and a pad input that no engine, kit or game row already holds, using the same table the boot validates. It says so when nothing is free.
+- **Check it**: `npm run check` (its `lint:brief` step) builds the boot's `inputActions` table (engine rows, then the game's and its kits' inputs) and runs the same validation, so a clash fails check with the boot's message (for example `inputActions: pad x: shell.menu (global) and game.jump (global) overlap`) instead of a dead page. Limit: as at boot, `'f'` (matched by key) and `'code:KeyF'` (matched by code) are different chords to the check.
 
 ## 2. Read it
 
@@ -34,4 +36,4 @@ press no tick has seen yet (STD-SIM-12).
 
 ## 3. Test
 
-`testScene`: `t.press('jump')`, `t.hold('steer', -1)`, `t.release('steer')`. `src/app/registries.test.ts` fails if a new row clashes or is unreachable.
+`testScene`: `t.press('jump')`, `t.hold('steer', -1)`, `t.release('steer')`. `npm run check` (lint:brief) fails if a new row clashes or is unreachable; `src/app/registries.test.ts` checks the engine's own rows.

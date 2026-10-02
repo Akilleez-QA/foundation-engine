@@ -22,7 +22,7 @@
 |---|---|---|
 | S1 | steering right moves the ball right and stops at the lane edge | test: `game/play.test.ts` |
 | S2 | a block that reaches the ball ends the run and shows the game-over banner | test: `game/play.test.ts` |
-| S3 | the restart action after game over starts a fresh run with score zero | playtest: `playtest/restart.json` |
+| S3 | the restart action after game over starts a fresh run with score zero | playtest: `game/playtest/restart.json` |
 | S4 | the best score survives a restart and a reload (save section `run.best`) | test: `game/play.test.ts` |
 | S5 | the play scene stays inside its budgets.json counts on the gate | gate |
 
@@ -35,7 +35,7 @@
 | `game/components.ts` | `Hazard`, the lane size, the `ball`, `block` and `lane` prefabs |
 | `game/steer.ts`, `game/restart.ts` | the inputs: a steer axis (arrows, A/D, stick, d-pad; drag on touch) and play again (Space, Enter, A, tap) |
 | `game/best.ts` | save section `run.best` (maximum score, runs) |
-| `playtest/restart.json` | S3 in a real browser: get hit, restart, check the fresh run |
+| `game/playtest/restart.json` | S3 in a real browser: get hit, restart, check the fresh run |
 
 Controls: ← → or A D, the left stick or d-pad; on touch or with a mouse, hold and drag. Randomness is `ctx.random()`, so `?seed=5` replays a run.
 
@@ -50,3 +50,4 @@ Controls: ← → or A D, the left stick or d-pad; on touch or with a mouse, hol
 | Date | Change | Budgets |
 |---|---|---|
 | 2026-09-28 | Template created | `play` measured on software GL |
+| 2026-10-02 | The scripted playtest moved into the game folder (`game/playtest/`), so `npm run new-game` copies it with the game instead of into the engine's root `playtest/`; the success criterion's `by` names the new path. Same script, same check. | Unchanged |

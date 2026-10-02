@@ -360,6 +360,8 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
         },
       };
       if (TEST_API) handle.systemTrace = timing!.start;
+      // Dev/test only: one real draw of the current picture, so play:snap can measure a still on-demand scene.
+      if (TEST_API) handle.redraw = () => { if (actx.signal.aborted || actx.leaving()) return false; dirty = true; actx.invalidate(); return true; };
       if (TEST_API && models.inspect) handle.model = createSceneModelInspector(models.inspect, visit, actx.signal);
       if (TEST_API) handle.entities = createSceneEntityInspector(world, visit, actx.signal);
       s.play.attach(handle, actx.signal);
