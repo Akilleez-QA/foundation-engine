@@ -51,3 +51,4 @@ Controls: ← → or A D, the left stick or d-pad; on touch or with a mouse, hol
 |---|---|---|
 | 2026-09-28 | Template created | `play` measured on software GL |
 | 2026-10-02 | The scripted playtest moved into the game folder (`game/playtest/`), so `npm run new-game` copies it with the game instead of into the engine's root `playtest/`; the success criterion's `by` names the new path. Same script, same check. | Unchanged |
+| 2026-10-02 | Polish (ui kit): Score, Best and the steering/restart prompt sit on a translucent dark plate; the prompt and banner start hidden, so no empty plate shows. Evidence: emulated SwiftShader play:snap at 1280×800 and 390×844, screenshots inspected; physical devices unverified. | Unchanged |
