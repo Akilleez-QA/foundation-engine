@@ -26,7 +26,7 @@ test('PERF-01: dev wiring follows scene handover and quality changes, and releas
     onQuality(fn, signal) { qualityListeners.add(fn); signal.addEventListener('abort', () => qualityListeners.delete(fn)); },
   }, { windowMs: 1000 });
   let t = 0;
-  const frames = (n: number) => { for (let i = 0; i < n; i++) { t += 16; loop.frame({ timeMs: t, intervalMs: 16, workMs: 1, rendered: true, hidden: false, sinceEnterMs: 0 }); } };
+  const frames = (n: number) => { for (let i = 0; i < n; i++) { t += 16; loop.frame({ timeMs: t, intervalMs: 16, workMs: 1, rendered: true, hidden: false, sinceEnterMs: 0, stepped: false }); } };
   frames(5);
   events.emit('scene.entering', { to: 'scene.b' as SceneId, from: 'scene.a' as SceneId });
   frames(5);
@@ -68,4 +68,21 @@ test('PERF-01: the test API recorder uses the one app loop; invalid options keep
     second.stop();
     assert.equal(loop.hasSampler, false);
   } finally { first.dispose(); app.dispose(); }
+});
+
+test('PERF-01: a recreated test API (hot reload) finds and replaces the page\'s active recorder', async () => {
+  const app = createApp([], { mode: 'test', log() {} });
+  const booted = app.boot();
+  const before = createTestApi(app, booted), after = createTestApi(app, booted);
+  await booted;
+  const loop = appLoop();
+  try {
+    const first = before.sessionRecorder();
+    assert.equal(after.currentSession(), first, 'the new instance sees the running recorder');
+    const second = after.sessionRecorder();
+    assert.equal(first.state, 'disposed', 'and replaces it instead of throwing on the busy sampler slot');
+    assert.equal(loop.hasSampler, true);
+    second.dispose();
+    assert.equal(loop.hasSampler, false);
+  } finally { before.currentSession()?.dispose(); app.dispose(); }
 });

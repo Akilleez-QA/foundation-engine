@@ -61,7 +61,7 @@ on-screen control and no UI text.
 | Owner | The `SessionRecorder` started by the dev/test API, which owns at most one at a time. Starting a new recorder disposes the previous one. Invalid options throw and leave the running recorder in place. The loop has one sampler slot: a second attach throws. |
 | Window | Closes when its summed frame intervals reach `windowMs` (default 30 000), so hidden and idle time is excluded. Windows also record their start and end on the session timeline, and `startMinute` is the drift x-axis. |
 | Percentiles | Nearest rank from a fixed 776-bin histogram: 0.1 ms bins below 50 ms, 1 ms bins below 250 ms, 10 ms bins below 1000 ms, then overflow. A result is never below the exact value and at most one bin width above it, clamped to the observed minimum and maximum. |
-| Frame classes | Long: interval > `longFrameMs` (default 1.5 × `budgetMs`). Severe: interval ≥ `severeFrameMs` (50). Gap: interval ≥ `gapMs` (1000), which is counted but excluded from percentiles. Resume: interval 0, the first frame after an idle or hidden loop. |
+| Frame classes | Stepped: a frame a test driver stepped while frames were held (`engine.clock.hold/step`). Its timing is chosen by the script, so it is counted but never timed, never percentiled and kept off the session timeline. Long: interval > `longFrameMs` (default 1.5 × `budgetMs`). Severe: interval ≥ `severeFrameMs` (50). Gap: interval ≥ `gapMs` (1000), which is counted but excluded from percentiles. Resume: interval 0, the first frame after an idle or hidden loop. |
 | Memory | Four histograms of 776 32-bit counters, at most `maxWindows` (≤ 4096) window summaries and at most `maxSegments` (≤ 4096) segments. A frame does constant work and allocates nothing. A window close allocates one summary. |
 | Drift | Computed per scene and preset, over complete windows only. It is the least-squares slope of window p95 against minutes, and the late/early ratio of mean p95 over the first and last k = max(1, ⌊n/3⌋) windows. It is reported for both frame interval and work time. |
 
@@ -75,6 +75,8 @@ on-screen control and no UI text.
   the transition. The loop resumes with interval 0, so the hidden time never appears as a frame interval.
 - **Clock anomalies.** A backwards or non-finite timestamp is counted in `clockAnomalies`, and session time stays
   monotonic. A forward jump at or above `gapMs` is a gap.
+- **Truncation is final.** When a pause or segment change closes the window that fills the ring under `stop`, the
+  recorder stays `truncated`. Later `segment()` calls and frames are ignored.
 - **Stop.** `stop()` closes the open window with end `stopped`, keeps it if it has at least two frames, and detaches.
 - **Dispose.** `dispose()` drops the open window (counted in `discardedWindows`), freezes the session totals,
   releases the histograms and detaches. Both calls are idempotent, and the retained evidence stays readable.
@@ -104,6 +106,8 @@ measurement is in the [verification note](../verification/session-perf-20261002/
   - segment capacity;
   - hidden-tab windows;
   - backwards, non-finite and forward clock jumps;
+  - frames stepped by a held test driver;
+  - a pause or segment close that fills the ring;
   - stop and dispose mid-window;
   - segment and pause semantics;
   - a synthetic throttling ramp and a flat session;
@@ -111,11 +115,12 @@ measurement is in the [verification note](../verification/session-perf-20261002/
 - `src/core/activity/loop.test.ts` covers the zero-overhead path, the reused record, no idle wake, the hidden record
   and the detachment of a throwing sampler.
 - `src/dev/session-recording.test.ts` covers router and quality segmentation, address options and replacement
-  through the test API.
+  through the test API, and replacement after the test API is recreated by a hot reload.
 - `npm run test:diagnostics-browser` runs `scripts/play/session-recorder-check.mjs` for 30 seconds in the muted,
   isolated browser. The run covers:
   - address auto-start and local download;
   - a deliberate stall that must be recorded as a severe frame;
+  - ten held, script-stepped frames that must be counted without becoming clock anomalies;
   - a synthetic hidden period;
   - a route change when the game has two scenes;
   - counters from the bench probe;
@@ -135,7 +140,9 @@ Limitations:
 - Draws and triangles appear only when the caller supplies counters. The stock app has no production-free
   per-frame draw source; the browser check reuses the bench's WebGL probe.
 - Window classes never reach `steady`, so this output is not baseline gate evidence. It is manual evidence.
-- After a hot module reload the previous API's recorder can still hold the sampler slot. A new start then throws
-  until that recorder is stopped.
+- The active recorder is kept on a page global (`Symbol.for('foundation.dev.session-recording')`). A test API
+  recreated by a hot module reload can therefore still reach it through `currentSession()`, and starting a new
+  recorder replaces it. If another owner holds the loop's sampler slot, starting throws; reload the page to clear
+  it.
 - This tool does not close DV-01. Physical phone, tablet and laptop/desktop runs on creator-selected profiles,
   with declared thresholds and reproducible workloads, remain required.

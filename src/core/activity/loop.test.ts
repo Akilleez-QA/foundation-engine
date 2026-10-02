@@ -345,3 +345,16 @@ test('PERF-01: a throwing sampler is detached and reported; tickers keep running
   loop.dispose();
   assert.throws(() => loop.attachSampler({ frame() {} }), /disposed/);
 });
+
+test('PERF-01: frames stepped while held are marked stepped; released frames are not', () => {
+  const { frames, loop } = setup();
+  loop.add({ owner: 'a', mode: 'continuous', render: () => {} });
+  const seen: boolean[] = [];
+  loop.attachSampler({ frame: r => { seen.push(r.stepped); } });
+  frames.run(16);
+  loop.holdFrames(true);
+  loop.stepFrame(0.05); loop.stepFrame(0.05);
+  loop.holdFrames(false);
+  frames.run(100);
+  assert.deepEqual(seen, [false, true, true, false]);
+});

@@ -16,6 +16,7 @@ import {withFrameTime} from './frame-time';
  * - An optional observational sampler (`attachSampler`, at most one) receives one reused `FrameRecord` per frame and
  *   per hidden transition. Without one, a frame reads no extra clock and builds no record (STD-SYS-18). A sampler
  *   never schedules, wakes or keeps the loop awake; one that throws is detached and reported.
+ *   Frames stepped by a test driver while held are marked `stepped`: their timing is script-chosen.
  *
  * The frame source and the time source are injected; the defaults are the browser's.
  */
@@ -128,7 +129,7 @@ export class FrameLoop {
   private readonly now: () => number;
   private readonly unsubscribe: (() => void)[] = [];
   private sampler: FrameSamplerPort | undefined;
-  private readonly record: FrameRecord = { intervalMs: 0, rendered: false, hidden: false, sinceEnterMs: 0, timeMs: 0, workMs: 0 };
+  private readonly record: FrameRecord = { intervalMs: 0, rendered: false, hidden: false, sinceEnterMs: 0, timeMs: 0, workMs: 0, stepped: false };
 
   constructor(private readonly opts: FrameLoopOptions) {
     this.clock = opts.clock;
@@ -300,6 +301,7 @@ export class FrameLoop {
     const sampler = this.sampler!, r = this.record;
     r.timeMs = timeMs; r.intervalMs = intervalMs; r.rendered = rendered; r.hidden = hidden; r.sinceEnterMs = sinceEnterMs;
     r.workMs = Number.isFinite(workMs) && workMs > 0 ? workMs : 0;
+    r.stepped = this.held && !hidden;
     try { sampler.frame(r); }
     catch (error) {
       if (this.sampler === sampler) this.sampler = undefined;

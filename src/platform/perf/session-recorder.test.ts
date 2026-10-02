@@ -7,7 +7,7 @@ import { binWidthAt, createSessionRecorder, FixedHistogram, HISTOGRAM_BINS, reco
 /** Drives a recorder with synthetic frame records on one timeline. */
 function driver(rec: SessionRecorder, start = 1000) {
   let t = start;
-  const r: FrameRecord = { timeMs: 0, intervalMs: 0, rendered: true, hidden: false, sinceEnterMs: 0, workMs: 0 };
+  const r: FrameRecord = { timeMs: 0, intervalMs: 0, rendered: true, hidden: false, sinceEnterMs: 0, workMs: 0, stepped: false };
   return {
     get t() { return t; },
     frame(intervalMs: number, workMs = 1, rendered = true) {
@@ -268,4 +268,45 @@ test('PERF-01: recordSession uses the loop\'s one sampler slot and releases it o
   const e = rec.evidence();
   assert.equal(e.windows.filter(w => w.complete).length, 2);
   assert.equal(e.session.frames, 21);
+});
+
+test('PERF-01: a pause or segment close that fills the ring stays truncated under the stop policy', () => {
+  for (const close of ['pause', 'segment'] as const) {
+    let detached = 0;
+    const rec = createSessionRecorder({ windowMs: 100, maxWindows: 2 }, () => { detached++; });
+    const d = driver(rec);
+    rec.segment({ scene: 'scene.a', epoch: 1 });
+    for (let i = 0; i < 10; i++) d.frame(10);      // window 1 fills naturally
+    for (let i = 0; i < 3; i++) d.frame(10);       // window 2 open
+    if (close === 'pause') rec.segment(null); else rec.segment({ scene: 'scene.b', epoch: 2 });
+    assert.equal(rec.state, 'truncated', `${close}: the close that filled the ring truncates`);
+    rec.segment({ scene: 'scene.c', epoch: 3 });
+    rec.segment(null);
+    for (let i = 0; i < 30; i++) d.frame(10);
+    const e = rec.evidence();
+    assert.equal(e.state, 'truncated', `${close}: later segment calls cannot revive it`);
+    assert.equal(e.truncated?.reason, 'capacity');
+    assert.equal(e.windows.length, 2);
+    assert.equal(e.session.evictedWindows, 0, 'stop policy never evicts');
+    assert.equal(e.session.frames, 13, 'frames after truncation are ignored');
+    assert.equal(detached, 1);
+  }
+});
+
+test('PERF-01: frames stepped by a held test driver are counted, never timed', () => {
+  const rec = createSessionRecorder({ windowMs: 1000 });
+  const d = driver(rec, 50_000);
+  for (let i = 0; i < 5; i++) d.frame(16);
+  const stepped: FrameRecord = { timeMs: 0, intervalMs: 50, rendered: true, hidden: false, sinceEnterMs: 0, workMs: 9, stepped: true };
+  for (let i = 1; i <= 9; i++) { stepped.timeMs = i * 50; rec.frame(stepped); }   // manualMs restarts at 0
+  for (let i = 0; i < 5; i++) d.frame(16);
+  rec.stop();
+  const e = rec.evidence();
+  assert.equal(e.session.steppedFrames, 9);
+  assert.equal(e.session.clockAnomalies, 0, 'a stepped timeline is not a clock anomaly');
+  assert.equal(e.session.frames, 10);
+  assert.equal(e.session.frameMs!.max, 16, 'script-chosen intervals never enter percentiles');
+  assert.equal(e.session.workMs!.max, 1);
+  assert.equal(e.windows[0].steppedFrames, 9);
+  assert.equal(e.windows[0].activeMs, 160);
 });

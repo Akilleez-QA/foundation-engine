@@ -99,6 +99,8 @@ try {
       // A deliberate 120 ms main-thread stall inside a frame: it must appear as a severe frame.
       await page.evaluate(() => new Promise(r => requestAnimationFrame(() => { const end = performance.now() + 120; while (performance.now() < end) { /* stall */ } r(); })));
       stalled = true;
+      // Held, script-stepped frames (engine.clock) must be counted but never timed.
+      await page.evaluate(() => { engine.clock.hold(); engine.clock.step(500); engine.clock.resume(); });
     }
     if (!hid && elapsed > totalMs * 0.45) {
       await page.evaluate(() => { Object.defineProperty(document, 'hidden', {configurable: true, get: () => true}); document.dispatchEvent(new Event('visibilitychange')); });
@@ -128,6 +130,8 @@ try {
   assert.equal(e.session.hiddenTransitions, 1, 'the synthetic hidden period reached the recorder through the loop');
   assert.ok(e.windows.some(w => w.end === 'hidden'), 'hidden closes the open window');
   assert.ok(e.session.severeFrames >= 1, 'the deliberate stall is a severe frame');
+  assert.equal(e.session.steppedFrames, 10, 'ten 50 ms stepped frames are counted');
+  assert.equal(e.session.clockAnomalies, 0, 'stepped timestamps never reach the session timeline');
   assert.ok(e.session.frameMs.max >= 100, 'the stall appears in the distribution');
   assert.equal(e.session.counterFailures, 0, 'the counters were readable at every window boundary');
   for (const w of e.windows) assert.equal(w.drawsPerRenderedFrame === null, w.renderedFrames === 0, 'per-rendered-frame means exist exactly when frames rendered');

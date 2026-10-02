@@ -62,10 +62,11 @@ export interface EngineTestApi {
   systemTrace(options?: SystemTimingOptions): SystemTimingCapture | null;
   /** Start a bounded scalar capture; replaces this API instance's previous capture. Caller disposes when finished. */
   eventTrace(options?: EventTraceOptions): EventTrace;
-  /** Start the local sustained-session recorder (PERF-01) on the one frame loop; disposes this API's previous one.
+  /** Start the local sustained-session recorder (PERF-01) on the one frame loop; disposes the page's previous one.
+   *  The active recorder is kept on a page global, so an API recreated by a hot reload can still find and replace it.
    *  Invalid options throw and leave the previous recorder running. Nothing leaves the device. */
   sessionRecorder(options?: SessionRecorderOptions): SessionRecording;
-  /** The recorder this API started last (including a `?session-record` auto-start), or null. */
+  /** The recorder started last by any test API instance on this page (including `?session-record`), or null. */
   currentSession(): SessionRecording | null;
   save: { export(): unknown };
   /** Record or replay the current scene's fixed-tick input from its next arrival (needs `?seed=`). Loaded on first use. */
@@ -76,6 +77,11 @@ export interface EngineTestApi {
   };
 }
 
+/** The page's active recorder survives a hot-reloaded test API module: the loop's one sampler slot outlives it. */
+const SESSION_KEY = Symbol.for('foundation.dev.session-recording');
+type SessionHolder = { [SESSION_KEY]?: SessionRecording };
+const activeSession = () => (globalThis as SessionHolder)[SESSION_KEY];
+
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const CODES: Record<string, string> = { ' ': 'Space', Enter: 'Enter', Escape: 'Escape', Tab: 'Tab' };
 const codeOf = (key: string) => CODES[key] ?? (/^[a-z]$/i.test(key) ? `Key${key.toUpperCase()}` : /^\d$/.test(key) ? `Digit${key}` : key);
@@ -84,7 +90,6 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
   let trace: EventTrace | undefined;
   let replay: ReplayDev | undefined;
   const idle: ReplayDevState = Object.freeze({ status: 'idle', mode: null, reason: null, scene: null, ticks: 0, total: null, log: null, digests: null, comparison: null });
-  let session: SessionRecording | undefined;
   const report = () => app.services.app.report();
   const probe = (name: string) => app.probes.read(name as ProbeName);
   const scene = () => probe('scene') as EngineState['scene'];
@@ -147,16 +152,17 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
     },
     sessionRecorder(options) {
       createSessionRecorder(options).dispose(); // validate first: invalid options leave the running recorder in place
-      session?.dispose();
+      activeSession()?.dispose();
       const quality = app.services.app.has('platform.quality') ? app.services.quality : undefined;
-      session = startSessionRecording({
+      const session = startSessionRecording({
         loop: appLoop(), events: app.events, scene,
         preset: () => quality?.preset ?? null,
         onQuality: quality ? (fn, signal) => { quality.subscribe(() => fn(), signal); } : undefined,
       }, options);
+      (globalThis as SessionHolder)[SESSION_KEY] = session;
       return session;
     },
-    currentSession: () => session ?? null,
+    currentSession: () => activeSession() ?? null,
     save: { export: () => app.services.save.exportPlayer() },
     replay: {
       async start(request, timeoutMs = 30000) {

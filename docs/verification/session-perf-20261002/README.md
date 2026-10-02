@@ -13,6 +13,11 @@ not any supported device. Each file labels itself `evidence: emulated`.
 | Workload | The Expedition `field` scene. The script teleports the named player every 100 ms (a test-page driver) so frames render. It then makes a deliberate 120 ms main-thread stall, a synthetic 3 s hidden period (`document.hidden` overridden), and a route to `shelter` and back. |
 | Result | The script passed. No page errors occurred, and no request left the local dev server. |
 
+Review fixes made after this run add a `steppedFrames` count. They also keep a recorder `truncated` when a pause or
+segment change fills the ring, and keep the active recorder reachable after a hot reload. This sample predates those
+fixes, so it has no `steppedFrames` field. The run held no frames, filled no ring and had no hot reload, so its other
+values are unaffected. The 30-second browser check in CI exercises the fixed code.
+
 Files:
 
 - `session-perf.json`: the `foundation.session-perf` v1 evidence from the 10-minute run.

@@ -109,6 +109,9 @@ export interface FrameRecord extends LoopFrameSample {
   /** Elapsed ms around this frame's tickers, from the loop's `now()` (0 for a hidden record). Main-thread wall time
    *  including the clock call itself: not CPU time, GPU time or worker time. */
   workMs: number;
+  /** True for a frame a test driver stepped while frames were held (`stepFrame`): its timestamp and interval are
+   *  script-chosen, not display timing. Samplers count it and never treat it as measured time. */
+  stepped: boolean;
 }
 /** At most one per loop (`FrameLoop.attachSampler`). When none is attached the loop reads no extra clock. */
 export interface FrameSamplerPort {

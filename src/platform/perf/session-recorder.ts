@@ -136,6 +136,8 @@ export interface SessionWindow {
   /** Frames after an idle or hidden loop (interval 0): not percentiled. */
   resumes: number;
   gaps: number;
+  /** Frames stepped by a test driver while the loop was held: counted, never timed. */
+  steppedFrames: number;
   longFrames: number;
   severeFrames: number;
   frameMs: Distribution | null;
@@ -185,6 +187,7 @@ export interface SessionEvidence {
   truncated: { reason: 'capacity' | 'segments'; atMs: number } | null;
   session: {
     records: number; frames: number; renderedFrames: number; idleFrames: number; resumes: number; hiddenTransitions: number;
+    steppedFrames: number;
     gaps: number; clockAnomalies: number; longFrames: number; severeFrames: number;
     durationMs: number;
     frameMs: Distribution | null; workMs: Distribution | null;
@@ -270,7 +273,7 @@ export function createSessionRecorder(options: SessionRecorderOptions = {}, deta
   // Session totals.
   let origin: number | null = null, lastTime = -Infinity;
   let records = 0, frames = 0, renderedFrames = 0, idleFrames = 0, resumes = 0, hiddenTransitions = 0;
-  let gaps = 0, clockAnomalies = 0, longFrames = 0, severeFrames = 0, counterFailures = 0;
+  let steppedFrames = 0, gaps = 0, clockAnomalies = 0, longFrames = 0, severeFrames = 0, counterFailures = 0;
   let firstMs = 0, lastMs = 0;
   let totalFrame: FixedHistogram | null = new FixedHistogram(), totalWork: FixedHistogram | null = new FixedHistogram();
   /** The totals' summaries frozen at dispose, when the histograms are released. */
@@ -285,7 +288,7 @@ export function createSessionRecorder(options: SessionRecorderOptions = {}, deta
 
   // The open window.
   let winFrame: FixedHistogram | null = new FixedHistogram(), winWork: FixedHistogram | null = new FixedHistogram();
-  let open = false, wStart = 0, wEnd = 0, wActive = 0, wFrames = 0, wRendered = 0, wIdle = 0, wResumes = 0, wGaps = 0, wLong = 0, wSevere = 0;
+  let open = false, wStart = 0, wEnd = 0, wActive = 0, wFrames = 0, wRendered = 0, wIdle = 0, wResumes = 0, wGaps = 0, wLong = 0, wSevere = 0, wStepped = 0;
   let wCounters: { draws: number; triangles: number } | null = null;
 
   const readCounters = (): { draws: number; triangles: number } | null => {
@@ -317,7 +320,7 @@ export function createSessionRecorder(options: SessionRecorderOptions = {}, deta
   };
 
   const openWindow = (atMs: number) => {
-    open = true; wStart = atMs; wEnd = atMs; wActive = 0; wFrames = 0; wRendered = 0; wIdle = 0; wResumes = 0; wGaps = 0; wLong = 0; wSevere = 0;
+    open = true; wStart = atMs; wEnd = atMs; wActive = 0; wFrames = 0; wRendered = 0; wIdle = 0; wResumes = 0; wGaps = 0; wLong = 0; wSevere = 0; wStepped = 0;
     winFrame!.reset(); winWork!.reset();
     wCounters = readCounters();
   };
@@ -345,7 +348,7 @@ export function createSessionRecorder(options: SessionRecorderOptions = {}, deta
     const w: SessionWindow = {
       index: closed, segment: currentIndex, startMs: round(startMs), endMs: round(wEnd - origin!), startMinute: round(startMs / 60_000),
       activeMs: round(wActive), complete, end, frames: wFrames, renderedFrames: wRendered, idleFrames: wIdle, resumes: wResumes,
-      gaps: wGaps, longFrames: wLong, severeFrames: wSevere, frameMs: winFrame!.summary(), workMs: winWork!.summary(),
+      gaps: wGaps, steppedFrames: wStepped, longFrames: wLong, severeFrames: wSevere, frameMs: winFrame!.summary(), workMs: winWork!.summary(),
       drawsPerRenderedFrame: draws, trianglesPerRenderedFrame: triangles, classification: classify(complete, end),
     };
     closed++;
@@ -362,6 +365,13 @@ export function createSessionRecorder(options: SessionRecorderOptions = {}, deta
     frame(r: Readonly<FrameRecord>) {
       if (state !== 'recording' && state !== 'paused') return;
       records++;
+      if (r.stepped) {
+        // A test driver stepped this frame (clock.hold/step): its timestamp and interval are script-chosen, so it is
+        // counted but never timed, percentiled or used for the session timeline.
+        steppedFrames++;
+        if (open) wStepped++;
+        return;
+      }
       const t = r.timeMs;
       if (!Number.isFinite(t)) { clockAnomalies++; return; }
       if (t < lastTime) clockAnomalies++;            // a backwards timestamp: keep the session monotonic
@@ -399,11 +409,14 @@ export function createSessionRecorder(options: SessionRecorderOptions = {}, deta
       if (state !== 'recording' && state !== 'paused') return;
       if (key === null) {
         if (state === 'paused') return;
-        closeWindow('paused'); state = 'paused'; current = null; currentIndex = -1;
+        closeWindow('paused');
+        if ((state as RecorderState) === 'truncated') return; // that close filled the ring: stay truncated
+        state = 'paused'; current = null; currentIndex = -1;
         return;
       }
       if (state === 'recording' && sameKey(current, key)) return;
       closeWindow('segment');
+      if ((state as RecorderState) === 'truncated') return;
       current = { scene: key.scene, epoch: key.epoch ?? null, preset: key.preset ?? null, label: key.label ?? null };
       currentIndex = -1;
       state = 'recording';
@@ -434,7 +447,7 @@ export function createSessionRecorder(options: SessionRecorderOptions = {}, deta
             percentile: 'nearest rank, bin upper edge clamped to observed min/max' } },
         state, truncated: truncated ? { ...truncated } : null,
         session: {
-          records, frames, renderedFrames, idleFrames, resumes, hiddenTransitions, gaps, clockAnomalies, longFrames, severeFrames,
+          records, frames, renderedFrames, idleFrames, resumes, hiddenTransitions, steppedFrames, gaps, clockAnomalies, longFrames, severeFrames,
           durationMs: origin === null ? 0 : round(lastMs - firstMs),
           frameMs: totalFrame ? totalFrame.summary() : totalSummary.frame,
           workMs: totalWork ? totalWork.summary() : totalSummary.work,
