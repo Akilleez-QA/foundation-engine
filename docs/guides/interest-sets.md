@@ -1,6 +1,6 @@
 # Interest sets for scoped views (SC-02)
 
-Status: implemented, candidate (branch `feat/sc02-interest-sets`); not integrated.
+Status: implemented, candidate (PR #51); not integrated.
 
 The optional `spatial` kit adds `createInterestSets`, a bounded per-observer relevancy
 set built on the [spatial grid](spatial-index.md) (SC-01). It answers, for each observer,
