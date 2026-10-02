@@ -664,3 +664,13 @@ bounded lookahead dispatch with exact start times, late-drop overload, input
 timestamps (`ctx.input.pressedAt`) and a stored calibration. It reuses the one audio
 output (new read-only `clock()`, scheduled `playVoice({ at })`). Status: integrated in v0.2.0 (PR #31; batch PR #47). Evidence is unit and headless scene tests only;
 no browser output timing, physical-device or audible verification.
+
+## Saveable random state and input history (RNG-01, INPUT-01) — implemented, candidate
+
+`createSaveableRng` (`@engine`) and the optional `@kits/input-history`
+([README](../../src/kits/input-history/README.md),
+[recipe](../recipes/add-input-history.md)) close two rollback gaps from the
+fighting-game genre study: saving random state, and frame-exact buffered and
+sequence input. Implemented, candidate (PR #TBD, `feat/rng-state-input-history`);
+not integrated. Evidence is focused headless tests and fixed-lane and rollback
+consumers; controller and feel acceptance are open.
