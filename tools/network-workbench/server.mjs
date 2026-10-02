@@ -4,9 +4,11 @@ import { pathToFileURL } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 import {
   createConnectionDrain,
+  createIntegrity,
   createNetworkIntake,
   createRateAdmission,
   DRAIN_CLOSE_CODE,
+  integrityRules,
 } from '../../src/kits/network/index.ts';
 
 export const hostLimits = Object.freeze({
@@ -25,6 +27,55 @@ export const hostLimits = Object.freeze({
 const MAX_BUFFERED = 8192,
   ACTIVE_IDLE_MS = 15000,
   MAX_FRAMES_PER_SECOND = 32;
+/**
+ * Optional command integrity example (SEC-01), off unless `integrity: true` / `--integrity`. Counter commands are
+ * unsequenced (IDs only correlate replies), so `check` may refuse one without leaving a gap. One plausibility rule:
+ * a counter may rise by at most 20 units per second of host time since its last authoritative change (host time is
+ * the jitter-sensitive variant; a ticked game should pass tick differences instead). Each implausible command is
+ * refused and scores 1 against the principal (not the connection, so reconnecting keeps the score). Three
+ * violations within 5 s reaching a score of 2.5 close the connection with the terminal reason
+ * `integrity-violation`. Scores decay by 0.5 per second. Example values for this diagnostic, not recommended limits.
+ */
+export const integrityExample = Object.freeze({
+  perSecond: 20,
+  closeScore: 2.5,
+  closeViolations: 3,
+  closeWithinMs: 5000,
+  decayPerSecond: 0.5,
+});
+function createIntegrityExample() {
+  return createIntegrity({
+    rules: [
+      integrityRules.maxRateOfChange({
+        id: 'counter-rate',
+        // Host milliseconds stand in for ticks here.
+        perTick: integrityExample.perSecond / 1000,
+        current: ({ state, command }) => state.counters[command.target],
+        proposed: ({ state, command }) =>
+          state.counters[command.target] + command.delta,
+        elapsedTicks: ({ state, command }) =>
+          state.changedAt[command.target] === null
+            ? null
+            : state.now - state.changedAt[command.target],
+      }),
+    ],
+    limits: {
+      // Keys are principals (two here); well above the connection bound so live keys are never evicted.
+      maxKeys: 8 * hostLimits.maxConnections,
+      maxHistoryPerKey: 8,
+      maxAudit: 64,
+    },
+    decayPerSecond: integrityExample.decayPerSecond,
+    config: 'network-workbench-v1',
+    close: {
+      score: integrityExample.closeScore,
+      requires: {
+        violations: integrityExample.closeViolations,
+        withinMs: integrityExample.closeWithinMs,
+      },
+    },
+  });
+}
 const stringify = (value) => JSON.stringify(value);
 const exact = (value, keys) =>
   value !== null &&
@@ -45,6 +96,7 @@ export async function startNetworkWorkbench({
   driverMs = 10,
   drain: drainOptions,
   maxQueuedAgeMs,
+  integrity: integrityEnabled = false,
 } = {}) {
   if (
     (maxQueuedAgeMs !== undefined &&
@@ -74,6 +126,8 @@ export async function startNetworkWorkbench({
     closed = false,
     timer;
   const counters = { alpha: 0, beta: 0 },
+    // Host time of each counter's last authoritative change; read only by the optional integrity rule.
+    changedAt = { alpha: null, beta: null },
     metrics = {
       receivedFrames: 0,
       dispatched: 0,
@@ -120,6 +174,7 @@ export async function startNetworkWorkbench({
     maxQueuedAgeMs === undefined
       ? hostLimits
       : { ...hostLimits, maxQueuedAgeMs };
+  const integrity = integrityEnabled ? createIntegrityExample() : null;
   const intake = createNetworkIntake({
     limits,
     ports: {
@@ -141,11 +196,27 @@ export async function startNetworkWorkbench({
           !revoked.has(principal.id) &&
           principal.target === command.target &&
           counters[command.target] + command.delta <= 100000;
-        if (!allowed) refuse(peer, 'unauthorized', command.id);
-        return !!allowed;
+        if (!allowed) {
+          refuse(peer, 'unauthorized', command.id);
+          return false;
+        }
+        if (!integrity) return true;
+        // Evaluated against authoritative host state, after permission and before dispatch.
+        const time = now();
+        const decision = integrity.check(
+          principal.id,
+          { command, state: { counters, changedAt, now: time }, tick: null },
+          time,
+        );
+        if (decision.action === 'allow') return true;
+        if (decision.action === 'close') intake.close(peer, decision.reason);
+        // Reject, throttle or owner refusal. Minimal disclosure: the client learns only that integrity refused.
+        else refuse(peer, 'integrity', command.id);
+        return false;
       },
       dispatch({ peer, command }) {
         counters[command.target] += command.delta;
+        changedAt[command.target] = now();
         metrics.dispatched++;
         send(peer, {
           v: 1,
@@ -399,6 +470,13 @@ export async function startNetworkWorkbench({
         })),
         heldAuthentication: held.size,
         drain: drainPlan?.read() ?? null,
+        integrity: integrity
+          ? {
+              stats: integrity.stats(),
+              audit: integrity.audit(),
+              export: integrity.exportAudit(),
+            }
+          : null,
       };
     },
     pump,
@@ -445,6 +523,7 @@ export async function startNetworkWorkbench({
       intake.dispose();
       frameRate.dispose();
       drainPlan?.dispose();
+      integrity?.dispose();
       held.clear();
       for (const socket of wss.clients) socket.terminate();
       closePromise = new Promise((resolve) => wss.close(resolve));
@@ -459,12 +538,14 @@ if (
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   // `--drain` opts in to operator drain; `--drain=<lifetime JSON>` also caps connection lifetime (NW-08).
+  // `--integrity` opts in to the command integrity example (SEC-01).
   const drainArg = process.argv.slice(2).find((arg) => arg === '--drain' || arg.startsWith('--drain='));
-  const host = await startNetworkWorkbench(
-    drainArg === undefined
+  const host = await startNetworkWorkbench({
+    ...(drainArg === undefined
       ? {}
-      : { drain: drainArg === '--drain' ? {} : { lifetime: JSON.parse(drainArg.slice('--drain='.length)) } },
-  );
+      : { drain: drainArg === '--drain' ? {} : { lifetime: JSON.parse(drainArg.slice('--drain='.length)) } }),
+    integrity: process.argv.includes('--integrity'),
+  });
   if (process.send)
     process.send({
       type: 'ready',
