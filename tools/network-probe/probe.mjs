@@ -550,9 +550,9 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
         admittedLatency: latencySummary(s.latency),
         hostDispatchedPerSecond: dispatched === null ? null : round(dispatched / secs),
         hostStaleShed: s.hostAfter && s.hostBefore ? s.hostAfter.stale - s.hostBefore.stale : null,
-        // Pump attempts the host actually made (dispatch + age shed): its achieved capacity in this step.
-        hostAttemptsPerSecond:
-          dispatched === null ? null : round((dispatched + (s.hostAfter.stale - s.hostBefore.stale)) / secs),
+        // Dispatch budget the host actually used: its achieved capacity in this step. Since the NW-06 follow-up
+        // (PR #33) age sheds are not charged to the pump budget, so they are not counted here.
+        hostAttemptsPerSecond: dispatched === null ? null : round(dispatched / secs),
       };
     });
     const goodputs = stepRows.map((r) => r.goodputPerSecond);
@@ -1001,19 +1001,20 @@ export function invariants(report) {
           detail: `${lost.length} adversary close(s) arrived as 1006 without the host's code/reason (close then immediate terminate)` });
     }
     const plateau = `final/peak goodput = ${o.derived.plateauRatio}`;
-    if (o.host.maxQueuedAgeMs !== null)
-      // Finding, reported rather than asserted: an aged shed costs a pump attempt, so once the real queued wait
-      // exceeds the age limit most attempts are spent shedding. See the network-overload guide (NW-07).
-      rows.push({ id: `${id}.goodput-with-queue-age`, ok: null, finding: true,
-        detail: `${plateau}; age ${o.host.maxQueuedAgeMs} ms vs full-queue drain ${o.host.fullQueueDrainMs} ms, fair-rotation bound ${o.host.fairRotationWaitBoundMs} ms` });
-    else {
+    // With or without queue age, goodput past saturation must plateau. Before the NW-06 follow-up (PR #33) each age
+    // shed cost a pump attempt and an age shorter than the real queued wait collapsed goodput (the earlier NW-07
+    // finding); sheds are now free, so the age variants carry the same assertion as FIFO.
+    {
       const last = o.steps.at(-1),
         achieved = last.hostAttemptsPerSecond / o.host.dispatchCapacityPerSecond;
       if (o.derived.plateauRatio < 0.8 && achieved < 0.8)
         // The host process itself was starved of CPU: the drop cannot be attributed to queueing behaviour.
         rows.push({ id: `${id}.goodput-plateaus`, ok: null, inconclusive: true,
-          detail: `${plateau}; host achieved ${last.hostAttemptsPerSecond} of ${o.host.dispatchCapacityPerSecond} attempts/s (CPU-starved)` });
-      else check(`${id}.goodput-plateaus`, o.derived.plateauRatio >= 0.8, `${plateau}; host achieved ${last.hostAttemptsPerSecond} attempts/s`);
+          detail: `${plateau}; host dispatched ${last.hostAttemptsPerSecond} of ${o.host.dispatchCapacityPerSecond}/s (CPU-starved)` });
+      else
+        check(`${id}.goodput-plateaus`, o.derived.plateauRatio >= 0.8,
+          `${plateau}; host dispatched ${last.hostAttemptsPerSecond}/s` +
+            (o.host.maxQueuedAgeMs === null ? '' : `; age ${o.host.maxQueuedAgeMs} ms, ${last.hostStaleShed} shed in the last step`));
     }
     check(`${id}.global-queue-bound`, o.highWater.queuedMessages <= 32 && o.highWater.queuedBytes <= 16384,
       `sampled high-water ${o.highWater.queuedMessages} messages / ${o.highWater.queuedBytes} bytes`);

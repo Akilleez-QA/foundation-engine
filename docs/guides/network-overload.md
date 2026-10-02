@@ -114,22 +114,22 @@ threads) and the probe ran at niceness 15, so these are conservative observation
 
 ## Findings
 
-1. **Queue age shorter than the real queued wait collapses goodput (NW-06
-   interaction).** An aged command is shed when it reaches the head of its turn, and
-   each shed costs one pump attempt. Once the real wait exceeds `maxQueuedAgeMs`,
-   most attempts are spent shedding commands that are already stale. With a 300 ms
+1. **Queue age shorter than the real queued wait collapsed goodput (NW-06
+   interaction); resolved by the NW-06 follow-up (PR #33).** In the saved runs, each
+   aged shed cost one pump attempt, so once the real wait exceeded `maxQueuedAgeMs`
+   most attempts were spent shedding commands that were already stale. With a 300 ms
    age, saturated goodput fell to 20.5, 4.0 and 23.3 results/s (final/peak 0.09 to
-   0.31) while the host still made 76 to 80 attempts/s. The global-queue drain time
-   (32 / 80/s = 400 ms) is not the bound that matters. Under fair per-peer rotation
-   a command 8th in its peer's queue waits about 8 x 7 peers / 80/s = 700 ms, and
-   host lag lengthens that. A 600 ms age plateaued in all three runs (final/peak 1.0). An earlier
-   development run of the same configuration measured 0.71, so the margin is small.
-   This is reported, not fixed: it is a property of the optional intake rule, and a
-   creator who enables `maxQueuedAgeMs` should keep it above the worst queued wait
-   their per-peer queue, peer count and pump budget allow, or shrink the queues.
-   Possible engine follow-ups are admission-time shedding or not charging aged
-   sheds to the pump budget. Either would be an engine change outside this
-   tools-only slice.
+   0.31) while the host still made 76 to 80 attempts/s. Under fair per-peer rotation
+   the worst wait was about 8 x 7 peers / 80/s = 700 ms, not the 400 ms global drain.
+   PR #33 now sheds a peer's aged prefix on its turn without charging the dispatch
+   budget (bounded by the queue, or by `maxStaleDropsPerPump`). On that code the probe
+   asserts a plateau for queue-age variants as it does for FIFO. A short 300 ms run
+   after the rebase (load average about 23) dispatched 79.4 of 80/s at saturation,
+   with healthy goodput 91.3 results/s against 100.4 for FIFO, and admitted p99 latency
+   308 ms against 498 ms for FIFO. Each step's goodput counts replies to commands sent
+   in that step, so it can exceed the per-step dispatch rate. The CI regression
+   (`npm run test:network-probe`) checks the 300 ms variant. The three saved runs
+   predate PR #33, so their queue-age numbers show the old behaviour.
 2. **Client-visible close reasons can be lost under load.** The network host sends
    a close frame and then terminates the socket immediately, so a slow machine can
    discard the frame. One earlier development run saw a flooder close as `1006` with

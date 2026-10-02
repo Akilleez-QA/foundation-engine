@@ -18,7 +18,9 @@ let report;
 before(async () => {
   report = await runNetworkProbe({
     seed: 11,
-    overload: { queueAgeVariants: [null], rampPerClient: [8, 24], stepMs: 1000, drainMs: 400 },
+    // A 300 ms queue age is shorter than the worst queued wait at saturation; since PR #33 its sheds are free, so goodput
+    // must still plateau (before that fix it collapsed).
+    overload: { queueAgeVariants: [null, 300], rampPerClient: [8, 24], stepMs: 1000, drainMs: 400 },
     // Operator changes every 5 ms keep the non-reader's view dirty, so it is driven until the buffered-send cap.
     nonReader: { healthyClients: 2, settleMs: 300, changeEveryMs: 5, maxAttackMs: 30000 },
     // Enough attempts (cumulative backoff up to 11.75 s) and observation that every client resolves even when a
@@ -31,9 +33,10 @@ before(async () => {
   });
 });
 
-test('NW07: healthy goodput stays above a floor past saturation while a flooder is rate-limited', () => {
+for (const age of [null, 300])
+test(`NW07: healthy goodput stays above a floor past saturation while a flooder is rate-limited (queue age ${age ?? 'none'})`, () => {
   assert.equal(report.aborted, null);
-  const [o] = report.scenarios.overload.variants;
+  const o = report.scenarios.overload.variants.find((v) => v.host.maxQueuedAgeMs === age);
   assert.equal(o.unexpectedHealthyCloses.length, 0, 'no healthy peer is closed');
   assert.deepEqual(o.adversaries.filter((a) => a.kind === 'round-error'), []);
   const floods = o.adversaries.filter((a) => a.kind === 'flooder');
@@ -52,6 +55,12 @@ test('NW07: healthy goodput stays above a floor past saturation while a flooder 
   assert.ok(o.highWater.queuedMessages <= 32 && o.highWater.queuedBytes <= 16384);
   assert.ok(o.highWater.peerBufferedBytes <= 8192);
   assert.ok(o.highWater.connections <= 8);
+  if (age !== null) {
+    // Aged commands were shed (with correlated stale refusals) and goodput did not collapse (PR #33).
+    assert.ok(o.steps.at(-1).hostStaleShed > 0, 'aged commands were shed at saturation');
+    const plateau = report.invariants.find((r) => r.id === `overload[age=${age}].goodput-plateaus`);
+    assert.ok(plateau.ok === true || plateau.inconclusive === true, plateau.detail);
+  }
 });
 
 test('NW07: a physical non-reading peer is retired by the buffered-send cap; healthy peers keep current views', () => {

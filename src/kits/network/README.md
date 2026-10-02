@@ -418,8 +418,8 @@ command consumption, durable commitment and disclosure permission remain distinc
 reference hosts past saturation over real loopback WebSockets. It reports goodput
 against offered load, rejections by reason, admitted-work latency, high-water marks,
 a physical non-reading peer and a host-restart reconnect storm paced by
-`createRetrySchedule`. It changes nothing in this kit. One finding concerns this kit's
-optional `maxQueuedAgeMs`: because each aged shed costs a pump attempt, an age shorter
-than the real queued wait collapses goodput instead of letting it plateau. Keep the age
-above the worst wait your queue limits, peer count and pump budget allow. Evidence is
+`createRetrySchedule`. It changes nothing in this kit. Its earlier finding on this kit's
+optional `maxQueuedAgeMs` (an age shorter than the real queued wait collapsed goodput,
+because each aged shed cost a pump attempt) is resolved by the NW-06 follow-up above.
+The probe now asserts that queue-age variants plateau, like FIFO. Evidence is
 loopback/process scope only, not WAN or physical devices. Implemented, candidate (PR #27).

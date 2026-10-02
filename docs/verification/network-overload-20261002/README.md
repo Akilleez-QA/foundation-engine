@@ -2,16 +2,21 @@
 
 Three full runs of `npm run probe:network -- --out <file>` with the default
 configuration (seed 7), recorded at probe commit `0744509` on branch
-`feat/nw07-overload-probe`, before it was rebased for PR #27. The rebased commit `8bca1bc`
-has byte-identical `tools/network-probe/`, `tools/network-workbench/`,
-`tools/replication-workbench/` and `src/kits/network/` trees. Only main's unrelated changes
-(including other tools) and `package.json` script lines from main differ. Later review fixes in PR #27 changed the probe:
+`feat/nw07-overload-probe`, before it was rebased for PR #27. PR #27 is now based on
+`integration/batch-2`. Its rebased commit `44077e1` has byte-identical `tools/network-probe/`
+and `tools/replication-workbench/` trees. The network workbench host and the network kit
+have since gained NW-08 planned drain (PR #21, off by default in the probe). They have also
+gained the NW-06 follow-up (PR #33), which changed the intake's age shedding, so the
+queue-age variants below show the earlier behaviour. The probe's own additions to the
+network workbench (queue-age option, close-reason tally) are unchanged. Later review fixes in PR #27 changed the probe:
 the storm's retries now wait for the restarted host's credentials, and observation
 starts at host readiness. Invariants were added (connection bound, retry budget,
 per-peer credit, storm outcomes), socket closure is measured, and the ready timeout is
 configurable. The tests were split, with the host-driving regression run once in CI.
 These runs were not repeated after those changes: the machine was too loaded to give
-useful numbers. The measurements stand for the code that produced them. Their
+useful numbers. The measurements stand for the code that produced them. In
+particular, the queue-age variants show intake behaviour before the NW-06 follow-up
+(PR #33), when each aged shed still cost a pump attempt. Their
 `invariants` arrays are the earlier, smaller set. Interpretation, findings and limits are in the
 [guide](../../guides/network-overload.md).
 

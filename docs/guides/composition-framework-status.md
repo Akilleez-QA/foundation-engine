@@ -375,7 +375,7 @@ rejections by reason, admitted-work latency, high-water marks, a physical non-re
 peer and a host-restart reconnect storm. Tools only; implemented, candidate (PR #27); not
 integrated. FIFO goodput plateaued and adversaries were limited without closing
 healthy peers. The replication host's buffered cap retired a paused peer in 2 of 3
-runs. A queue age shorter than the real queued wait collapses goodput (finding, not
-fixed). Loopback/process scope only; WAN, browsers and physical devices remain
+runs. Its finding that a queue age shorter than the real queued wait collapsed goodput
+is resolved by the NW-06 follow-up (PR #33), and queue-age plateaus are now asserted. Loopback/process scope only; WAN, browsers and physical devices remain
 unverified. See the [evidence](../verification/network-overload-20261002/README.md)
 and the [ledger](upgrade-acceptance-ledger.md).

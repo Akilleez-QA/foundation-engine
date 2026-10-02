@@ -165,4 +165,5 @@ authorization being rechecked, is never dispatched, and counts in `metrics.stale
 The [overload probe](../network-probe/README.md) (`npm run probe:network`) drives this
 host past saturation over loopback; see its
 [guide](../../docs/guides/network-overload.md) for measured goodput, the
-queue-age goodput finding and the scope of that evidence.
+queue-age finding resolved by the NW-06 follow-up (PR #33), and the scope of that
+evidence.
