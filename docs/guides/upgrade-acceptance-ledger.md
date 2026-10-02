@@ -634,3 +634,42 @@ integrated. These are slices 3 and 4 of the fighting-game genre study. See the
   - charge-input helpers;
   - ordering of several actions inside one tick (`ctx.input.pressedAt` timestamps are not consumed by this kit);
   - physical controllers, arcade sticks and feel.
+
+## MV-02: moving platforms — candidate
+
+Status: implemented, candidate (`feat/mv02-moving-platforms`, PR #53); not integrated.
+
+- Runtime-enforced:
+  - Registry bounds: `maxPlatforms` [1, 1024]; footprints (0, 1000] m; `maxSpeed`
+    (0, 1000] m/s; path poses finite within ±1e7; `advance` steps (0, 0.25] s.
+  - `advance` samples every path before committing and refuses a non-finite pose or an
+    over-speed move without moving any platform. `cut` admits one declared discontinuity
+    with zero delta.
+  - Riding requires the platform's pose to be unchanged since the actor last rode, or
+    advanced by exactly its reported delta. Anything else detaches the actor with no
+    velocity.
+  - Boosts are clamped to ±1000 m/s. Carried planar motion slides in sub-steps of at most
+    half the radius, and is refused above 1,024 sub-steps per tick.
+  - Each adapter tick is a transaction: if any query or limit throws, the jump controller
+    and adapter state are restored and the Transform is not written, so the tick has the
+    effect of a skipped tick (regression: a ground query that throws once mid-fall at
+    30 and 60 Hz, before and after the controller steps, mid-fall and on flat and diagonal
+    lifts, matches the skipped-tick run exactly; removing either half of the rollback fails it).
+  - Default `Walls` stop at ±1e6 m while platform poses are accepted to ±1e7; beyond
+    ±1e6 riders are not carried unless the scene has wider `Walls` (documented, not
+    changed).
+- Checked:
+  - The regression tests run at 30, 60, 120, 165 and 240 Hz ticks: exact riding including a
+    20 m/s descent; jump apex from vertical, diagonal and descending lifts within g·dt²/8 of
+    (v0 + v)²/2g; leave policies and removal; one-way pick-up and pass-through.
+  - Also at those five rates, for the review fixes: frozen, missing and late platform
+    systems; detaching on cut, restart, re-add and an external lift; `when` pauses;
+    riding-tick sweeps (floor, step, overtaking platform); coyote after moving off; a thin
+    solid, walls, and an atomic failed tick.
+  - Narrower runs: identical arcs at aligned times at 30, 60, 120 and 240 Hz; the boost
+    policy at 120 Hz; the 1000 m/s clamp and the sub-step refusal at 60 Hz.
+  - Mutation checks: reverting each review fix fails its regression test. The fixes are the
+    jump-tick base, the frozen delta, the continuity and attachment checks, riding while
+    paused, the riding sweep, coyote grace, the boost clamp and the sub-step refusal.
+- Not established: feel on any device, any template or browser consumer, rotating or
+  sloped platforms, side pushing, and render interpolation between ticks (the next slice).

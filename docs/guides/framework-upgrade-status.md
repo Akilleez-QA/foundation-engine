@@ -695,3 +695,14 @@ fighting-game genre study: saving random state, and frame-exact buffered and
 sequence input. Implemented, candidate (PR #52, `feat/rng-state-input-history`);
 not integrated. Evidence is focused headless tests and fixed-lane and rollback
 consumers; controller and feel acceptance are open.
+
+## Moving platforms — MV-02 implemented, candidate
+
+`createPlatforms`, `platformSystem` and new `jumpSystem` options (locomotion kit) let creators
+add moving support surfaces described as functions of time. Riders follow each tick's exact
+displacement. Leaving keeps the platform's velocity per a Godot-style `onLeave` policy, and
+platforms are one-way in their own frame. Paths, sizes, speed limits and policies are
+creator-chosen and bounded. Implemented as a candidate (`feat/mv02-moving-platforms`,
+PR #53), not integrated. Evidence is focused unit tests only. See the
+[kit README](../../src/kits/locomotion/README.md#moving-platforms-mv-02), the
+[recipe](../recipes/add-moving-platforms.md) and the [ledger](upgrade-acceptance-ledger.md).
