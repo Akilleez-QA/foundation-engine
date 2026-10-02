@@ -60,7 +60,7 @@ test('dispose releases unpublished completed dependents before their published p
 test('one-work preparation starts independent required acquisition despite unresolved optional work',async()=>{
  let optional!:(value:DependencyValue<number>)=>void;
  const d=createDependencyLease({nodes:[{id:'optional',dependencies:[],bytes:1},{id:'required',dependencies:[],bytes:1}],required:['required'],maxPinnedBytes:2,maxConcurrent:2,acquire:async id=>id==='optional'?new Promise<DependencyValue<number>>(r=>{optional=r;}):{bytes:1,lease:{value:1,release(){}}}});
- await d.prepare(1);assert.equal(d.status,'partial');assert.equal(d.get('required'),1);d.dispose();optional({bytes:1,lease:{value:1,release(){}}});await flush();
+ await d.prepare(1);assert.equal(d.status,'partial');assert.equal(d.get('required'),1);d.pump(4);await flush();d.dispose();optional({bytes:1,lease:{value:1,release(){}}});await flush();
 });
 test('depth limit is independent of declaration order and checked before shared admission',async()=>{
  const {createDependencyBudget}=await import('./dependency-budget');const budget=createDependencyBudget(100);

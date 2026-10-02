@@ -29,3 +29,34 @@ and aborts in-flight work; late results release once without publication. The
 the existing worker admission contract when expensive; the closure cannot make an
 unbounded synchronous loader safe. Optional work can continue through the active
 owner's existing frame system after `prepare` completes.
+
+## Cooperative preparation and priority (M2)
+
+`prepare(maxWork = 16)` crosses a real task boundary between pending pump slices,
+including immediately resolving acquisitions. It uses the shared `scheduleTask`
+core seam also used by worker-runtime checkpoints. `DependencyOptions.scheduleTask`
+may supply an existing owner's scheduler: accept a resume callback, return an
+idempotent cancellation function, and resume on a later task (never synchronously
+or solely through microtasks). No additional frame loop is installed. After a
+task boundary, unresolved I/O sleeps on completion notification rather than polling.
+Disposal cancels scheduled continuations immediately; unresolved acquisitions keep
+existing byte admission and prerequisite ownership until actual settlement.
+A scheduler exception retires the closure and rejects preparation.
+
+`pump(maxWork)` remains synchronous, bounded by counted examinations/publications,
+and schedules no continuation. Critical nodes and their transitive prerequisites
+have stable topological priority. While critical work is pending, at most
+`maxConcurrent - 1` optional nodes may occupy acquisition slots. Thus concurrency
+one starts required work first; larger limits admit optional work while retaining
+capacity for a prerequisite's successor. Running callbacks are never preempted.
+Once critical readiness is reached, all slots become available to optional work;
+callers continue optional pumping explicitly. `prepare()` still returns at critical
+readiness, not at completion of every optional node.
+
+These counts are not millisecond deadlines. A synchronous acquisition can block
+arbitrarily; split it into bounded authored work or use the existing WorkerHost.
+Timer scheduling may be delayed or throttled by the browser. This mechanism does
+not infer hardware headroom, promote intent, change resource byte budgets, or
+certify frame responsiveness. The public native task oracle is
+`scripts/play/fixtures/dependency-preparation.ts`; browser evidence is separate
+from deterministic ownership and Node task-queue tests.

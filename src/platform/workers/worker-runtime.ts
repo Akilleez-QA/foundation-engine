@@ -1,3 +1,4 @@
+import {scheduleTask} from '../../core/task-yield';
 /**
  * The generic worker side of the host protocol (ADR 0059 decision 1; ADR 0062 decision 2).
  * One active job per worker. Modules load on demand from the loader table. A `cancel` message is
@@ -23,7 +24,7 @@ export interface WorkerPort {
  */
 export type TaskYield = (fn: () => void) => void;
 
-const defaultYield: TaskYield = (fn) => { globalThis.setTimeout(fn, 0); };
+const defaultYield: TaskYield = scheduleTask;
 
 export function createWorkerRuntime(port: WorkerPort, loaders: JobLoaders, yieldTask: TaskYield = defaultYield): void {
   const modules = new Map<string, Promise<JobModule>>();
