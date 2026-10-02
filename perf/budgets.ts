@@ -17,8 +17,14 @@ export interface BenchScene {
   scene: string;
   /** The route the bench enters it by (the player's own address). */
   route: string;
-  /** Also sample an active window (the game's `activeKeys` held, default the arrow keys). */
+  /** Also sample an active window (the row's `activeKeys` held, default the arrow keys). */
   active?: boolean;
+  /**
+   * The keys (browser key names: 'ArrowUp', 'KeyW', 'Space') the active window holds, first for half the window, then
+   * the second. Naming them says they drive the scene, so a window that then draws no frame is dead (inconclusive).
+   * Without them the arrow keys are held and drive the scene only if they press one of the game's own input actions.
+   */
+  activeKeys?: string[];
   budget: Ported<Partial<SceneBudgetValues>>;
   provenance?: { measured: string; run: string; note?: string };
 }

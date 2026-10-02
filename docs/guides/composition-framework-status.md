@@ -424,3 +424,17 @@ integrated. See the [ledger](upgrade-acceptance-ledger.md).
 `playMusic` composes with the one audio output (its own music store and bus, no second
 context) and the AU-01 timeline (start at `timeline.contextTime(0)`); scenes own their
 music voices. Candidate (PR #54); not integrated. See the [guide](music-on-clock.md).
+## Bench dead-window guard and per-game static files (W1-4, W1-5) — checked on PR #59, not integrated
+
+Perf gate behaviour change: an active bench window that renders no frame is `inconclusive`
+(and fails the gate as "perf inconclusive") only when its held keys drive the scene, that
+is, the scene's `budgets.json` row names them as `activeKeys`, or they press one of the
+game's own input actions; otherwise it is a still window (classification version 3). If
+the game's bindings cannot be read in Node, the keys are assumed to drive the scene.
+Owner: `scripts/perf/bench.mjs` (`heldKeyPlan`) and `platform/perf/window-class.ts`.
+Static files: Vite's `publicDir` is the game's own `public/` (root `public/` only for a game
+without one); the dev server and the build stop on reserved names, symbolic links and
+stranded root files (`scripts/lib/game-public.mjs`). Evidence: unit tests and a local
+`npm run gate -- --game templates/expedition/game` on the PR branch; not yet integrated.
+Limits: bindings are read from default bindings, not a player's rebinding; a scene that
+moves only by pointer gets no driving key, so its dead windows are not detected.

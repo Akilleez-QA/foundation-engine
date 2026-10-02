@@ -11,7 +11,8 @@ In the game's `budgets.json`, under `scenes`:
 ```
 
 - The key (`level`) is the sample id. The first row is where the app starts.
-- `active: true` adds an active window (input held) to the idle window.
+- `active: true` adds an active window (input held) to the idle window. The bench holds the arrow keys (ArrowUp, then ArrowLeft) unless the row names its own: `"activeKeys": ["KeyW", "KeyD"]` (browser key names, held one after the other).
+- An active window that draws no frame is refused as `inconclusive` (the scene probably ended) when its held keys drive the scene: the row names them in `activeKeys`, or they press one of the game's own inputs (`defineInput`, kit inputs). Keys that press nothing in the game cannot change the picture, so such a window counts as a still window, like an idle one. Name `activeKeys` when your scene moves on other keys than the arrows.
 - `npm run new -- scene <id>` writes this row for you, with the brief's per-scene ceilings and an `unmeasured` provenance. It leaves `loadMiB` out, because the bench cannot measure the entry cost of a scene that becomes the start scene; add `loadMiB` from step 2 for any other scene (adding a metric is not a raise).
 
 ## 2. Measure

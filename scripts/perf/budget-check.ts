@@ -11,7 +11,7 @@ import { BENCH_BINDINGS, CHECK_BUDGETS } from '../../perf/budgets';
 import { loadBaseline } from './baselines';
 
 /** What to do about an active window that drew no frame (shared with perf:derive). */
-export const NO_FRAME_HINT = 'the active window drew no frame, so the scene had probably ended (game over, frozen run, pause) and its counts are zeros, not measurements. Make the bench meet the scene in play (for example a start scene before it, so it is entered fresh, or no fail state reachable within the window), then bench again. These windows never pass the gate and perf:derive derives no budget from them.';
+export const NO_FRAME_HINT = 'the active window drew no frame, so the scene had probably ended (game over, frozen run, pause) and its counts are zeros, not measurements. Make the bench meet the scene in play (for example a start scene before it, so it is entered fresh, or no fail state reachable within the window), then bench again. If the held keys are not what moves this scene, name the keys that do as the row\'s activeKeys in budgets.json. These windows never pass the gate and perf:derive derives no budget from them.';
 
 export interface RunReport { report: CheckReport; text: string; incomparable: string[] }
 

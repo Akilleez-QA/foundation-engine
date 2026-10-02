@@ -2,9 +2,10 @@
 // (ADR 0053). Pure, so the rules are unit-tested.
 // - A check blocks only when it fails (over budget, missing, or a blocking regression) on comparable windows in two
 //   consecutive runs.
-// - A non-comparable window never blocks. If the latest run still leaves a check inconclusive (it would fail on a
-//   non-comparable window after the bench's re-sampling), or only one of the two runs could compare it and that run
-//   failed, the gate fails with the label "inconclusive", never as a regression.
+// - A non-comparable window is never a failure or a regression, but it is not a pass either: if the latest run still
+//   leaves a check inconclusive (it would fail on a non-comparable window after the bench's re-sampling, or its window
+//   is 'inconclusive'), or only one of the two runs could compare it and that run failed, the gate fails with the label
+//   "inconclusive".
 import type { CheckReport } from '../../src/platform/perf/budget-check';
 
 export type GateVerdict = 'pass' | 'fail' | 'inconclusive';

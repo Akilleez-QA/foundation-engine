@@ -5,7 +5,10 @@
 // `dev.silent` flag, then enters every scene of perf/budgets.ts by its public route, the way a player's link would.
 // A scene is ready when the scene shell marks its mount `[data-scene="<id>"][data-scene-state="active"]` (never a
 // scene's own DOM). Each idle window samples a fixed number of rendered frames (or ends at its time limit: an
-// on-demand scene that is still renders nothing, which is the point); each active window holds the move keys.
+// on-demand scene that is still renders nothing, which is the point); each active window holds the scene row's
+// `activeKeys` (default the arrow keys). An active window that drew nothing is a dead window (the scene ended) only
+// when its held keys drive the scene: the row names them, or they press one of the game's own input actions. Keys
+// that press nothing in the game cannot change the picture, so that window is still, like an idle one (heldKeyPlan).
 // Every window is guarded (it must stay in its scene) and classified (ADR 0053). The result is a PerfRun (schema 1)
 // in perf/runs/, checked report-only against the budgets unless --no-check.
 //
@@ -24,6 +27,7 @@ import {ROOT, buildAndServe} from './build.mjs';
 import {observeNetwork} from './network.mjs';
 import {BENCH_SCENES, ACTIVE_SCENES} from '../../perf/budgets.ts';
 import {CLASSIFICATION_VERSION} from '../../src/platform/perf/window-class.ts';
+import {gameActionsPressedBy} from '../../src/author/input-registry.ts';
 
 export const PERF_SCHEMA = 1;
 const VIEWPORTS = {desktop: {width: 1280, height: 800}, '4k': {width: 3840, height: 2160}};
@@ -51,13 +55,38 @@ export function parseArgs(argv) {
 const git = (...a) => { try { return execFileSync('git', a, {cwd: ROOT, encoding: 'utf8'}).trim(); } catch { return ''; } };
 const sha256 = s => createHash('sha256').update(s).digest('hex');
 
+/**
+ * The keys an active window holds in a scene, and whether they drive it. A row's `activeKeys` are the author's word
+ * that they do. Otherwise the default keys drive the scene when they press one of the game's own input actions
+ * (`rows`: gameInputRows, engine rows excluded); `rows` null (the game's definitions did not load) leaves it unknown,
+ * which the classifier treats as driving, so a dead window is never excused by a missing fact.
+ */
+export function heldKeyPlan(row, defaultKeys, rows) {
+  if (row.activeKeys !== undefined && (!Array.isArray(row.activeKeys) || !row.activeKeys.length || row.activeKeys.some(k => typeof k !== 'string' || !k)))
+    throw Error(`budgets.json scene ${row.id}: activeKeys must be a non-empty list of key names ('ArrowUp', 'KeyW', 'Space')`);
+  if (row.activeKeys) return {keys: [...row.activeKeys], drive: true, source: 'activeKeys', actions: []};
+  if (!rows) return {keys: [...defaultKeys], drive: undefined, source: 'unknown', actions: []};
+  const actions = [...new Set(defaultKeys.flatMap(k => gameActionsPressedBy(rows, k)))];
+  return {keys: [...defaultKeys], drive: actions.length > 0, source: 'bindings', actions};
+}
+
+/** The game's input rows (engine rows included, filtered by gameActionsPressedBy); null when the game does not load in Node. */
+async function loadInputRows(log) {
+  try {
+    const [{loadGame}, {gameInputRows}] = await Promise.all([import('../../src/app/game-files.ts'), import('../../src/author/input-registry.ts')]);
+    const {game, defs} = await loadGame();
+    return gameInputRows(game, defs);
+  } catch (e) { log('bench: the game\'s input bindings could not be read (' + String(e.message).slice(0, 160) + '); an active window that draws nothing stays inconclusive'); return null; }
+}
+
 /** The ADR 0046 experiment descriptor: everything but the build that decides what a run measures. */
 export function experimentDescriptor(o, {browser, gpuString, launchArguments = []}) {
   const harness = Object.fromEntries(HARNESS_FILES.map(f => { try { return [f, sha256(readFileSync(join(ROOT, f)))]; } catch { return [f, 'missing']; } }));
   const route = BENCH_SCENES.map(p => p.id).filter(p => !o.only || o.only.includes(p));
   return {schema: PERF_SCHEMA, harness: o.gpu ? 'gpu' : 'swiftshader', browser, backend: gpuString, viewport: {...o.view, dpr: 1}, quality: PINNED_QUALITY + ' (pinned)', calm: false,
     execution: {launchArguments}, locale: 'en-US', clock: 'wall', comparisonPolicy: 'strict-taxonomy-v1', route, routes: Object.fromEntries(BENCH_SCENES.map(p => [p.id, p.route])),
-    active: o.active.filter(p => route.includes(p)), keys: o.keys, window: {...WINDOW, frames: o.frames}, network: o.liveNetwork ? 'live' : 'hermetic', classificationVersion: CLASSIFICATION_VERSION, readinessVersion: 1, helpers: harness};
+    active: o.active.filter(p => route.includes(p)), keys: o.keys,
+    activeKeys: Object.fromEntries(BENCH_SCENES.filter(p => p.activeKeys?.length && route.includes(p.id)).map(p => [p.id, p.activeKeys])), window: {...WINDOW, frames: o.frames}, network: o.liveNetwork ? 'live' : 'hermetic', classificationVersion: CLASSIFICATION_VERSION, readinessVersion: 1, helpers: harness};
 }
 
 const GPU_STRING = `(()=>{const c=document.createElement('canvas');const g=c.getContext('webgl2');const e=g&&g.getExtension('WEBGL_debug_renderer_info');const r=g?g.getParameter(e?e.UNMASKED_RENDERER_WEBGL:g.RENDERER):'none';g?.getExtension('WEBGL_lose_context')?.loseContext();return r})()`;
@@ -98,6 +127,7 @@ export async function runBench(o, {log = console.log} = {}) {
       run.samples.push(s); return s;
     }
     async function measure(id, scene, row, mode, during, extra) {
+      const {held, ...rest} = extra; extra = rest;
       const at = await b.evaluate('location.hash');
       const opened = at === row.route && await b.evaluate(`window.__winOpen(${JSON.stringify(sceneSelector(row.scene))},${mode === 'idle' ? o.frames : 0},${WINDOW.minMs},${mode === 'idle' ? WINDOW.maxMs[harness] : WINDOW.activeMs},false)`);
       if (!opened) { const s = {id, scene, mode, error: `not in ${row.route} at the start of the window`, hash: at}; log(id.padEnd(20), 'REJECTED', s.error); return s; }
@@ -106,8 +136,10 @@ export async function runBench(o, {log = console.log} = {}) {
       await b.evaluate('window.__win?.finished');
       const w = await b.evaluate('window.__winClose()'); const m1 = await metrics(), end = network.snapshot();
       const {classification, uploads} = classifyWindow({mode, epochBreak: w.epochBreak, contextLost: w.lostContexts > 0, frames: w.frames, renderedFrames: w.rendered, complete: w.complete,
-        pendingAtStart: start.pending, requestsDuring: end.requests - start.requests, uploads: w.uploads, programsCreated: w.counts.programsCreated});
-      if (classification.kind === 'invalid') { const s = {id, scene, mode, error: 'rejected: ' + classification.reasons.join('; '), hash: w.hash, classification}; log(id.padEnd(20), 'REJECTED', s.error); return s; }
+        pendingAtStart: start.pending, requestsDuring: end.requests - start.requests, uploads: w.uploads, programsCreated: w.counts.programsCreated,
+        ...(mode === 'active' && held ? {heldKeysDrive: held.drive} : {})});
+      if (held) extra = {...extra, heldKeys: held.keys, heldKeysDrive: held.drive ?? null, heldKeysSource: held.source, ...(held.actions.length ? {heldKeyActions: held.actions} : {})};
+      if (classification.kind === 'invalid') { const s = {id, scene, mode, ...(held ? {heldKeys: held.keys} : {}), error: 'rejected: ' + classification.reasons.join('; '), hash: w.hash, classification}; log(id.padEnd(20), 'REJECTED', s.error); return s; }
       const drawn = Math.max(1, w.rendered), per = k => +(((m1[k] - m0[k]) * 1000) / Math.max(1, w.frames)).toFixed(2), mean = v => +(v / drawn).toFixed(1);
       const heapMB = await gcHeap(); const g = await b.evaluate('window.__gpu()');
       const sum = p => uploads.filter(u => u.purpose === p).length;
@@ -145,7 +177,7 @@ export async function runBench(o, {log = console.log} = {}) {
     const heap0 = await gcHeap(), g0 = await b.evaluate('window.__gpu()');
     run.startup = {appReadyMs: ready, transferredMB: +(network.snapshot().bytes / 1048576).toFixed(2), jsKB: nav.jsKB, heapMB: heap0, textureMiB: g0.textureMiB, canvasMiB: g0.canvasMiB, liveContexts: g0.liveContexts, networkQuiet: startupQuiet ? 1 : 0};
     log('startup'.padEnd(20), JSON.stringify(run.startup));
-    const keys = [o.keys[0], o.keys[1] ?? o.keys[0]];
+    const inputRows = o.active.length ? await loadInputRows(log) : null;
     const visit = async (row, entered) => {
       if (o.only && !o.only.includes(row.id)) return;
       try {
@@ -159,7 +191,11 @@ export async function runBench(o, {log = console.log} = {}) {
           extra = {enterMs, enterMB: +((network.snapshot().bytes - b0) / 1048576).toFixed(2), networkQuiet};
         } else { await sleep(WINDOW.settleMs); await quiet(); }
         await sample(row.id, row.id, row, 'idle', null, {...extra, topTextures: await b.evaluate('window.__topTex(6)')});
-        if (o.active.includes(row.id)) await sample(row.id + ':active', row.id, row, 'active', walk(keys[0], keys[1]));
+        if (o.active.includes(row.id)) {
+          const held = heldKeyPlan(row, o.keys, inputRows);
+          if (!o.quiet && held.drive === false) log(' '.repeat(20) + `${row.id}:active holds ${held.keys.join('+')}, which press no game action: a window that draws nothing is still, not dead (set activeKeys in budgets.json to the keys that move this scene)`);
+          await sample(row.id + ':active', row.id, row, 'active', walk(held.keys[0], held.keys[1] ?? held.keys[0]), {held});
+        }
       } catch (e) { const s = {id: row.id, scene: row.id, mode: 'idle', error: String(e.message).slice(0, 200)}; run.samples.push(s); log(row.id.padEnd(20), 'ERROR', s.error); }
     };
     await visit(home, true);

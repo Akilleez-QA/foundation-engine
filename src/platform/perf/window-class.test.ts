@@ -69,3 +69,21 @@ test('an incomplete active window with no frame stays invalid, not inconclusive'
   const { classification } = classifyWindow({ ...steady, mode: 'active', renderedFrames: 0, complete: false });
   assert.equal(classification.kind, 'invalid');
 });
+
+test('an active window whose held keys drive the scene but drew no frame stays inconclusive (a dead window)', () => {
+  const { classification } = classifyWindow({ ...steady, mode: 'active', renderedFrames: 0, heldKeysDrive: true });
+  assert.equal(classification.kind, 'inconclusive');
+  assert.equal(classification.comparable, false);
+});
+
+test('an active window whose held keys press no game action and drew no frame is a still window, comparable', () => {
+  const { classification } = classifyWindow({ ...steady, mode: 'active', renderedFrames: 0, heldKeysDrive: false });
+  assert.equal(classification.kind, 'steady');
+  assert.equal(classification.comparable, true);
+  assert.match(classification.reasons.join(), /press no game action: a still window/);
+});
+
+test('undriven keys never excuse a broken window: the scene left (epoch break) or an incomplete window is still invalid', () => {
+  assert.equal(classifyWindow({ ...steady, mode: 'active', renderedFrames: 0, heldKeysDrive: false, epochBreak: 'scene element replaced (re-entry or exit)' }).classification.kind, 'invalid');
+  assert.equal(classifyWindow({ ...steady, mode: 'active', renderedFrames: 0, heldKeysDrive: false, complete: false }).classification.kind, 'invalid');
+});
