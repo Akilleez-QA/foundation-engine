@@ -37,6 +37,7 @@
     "lint:generic": "node scripts/lint/genericity.mjs",
     "new-game": "node scripts/new-game.mjs",
     "gate:templates": "node scripts/gate-templates.mjs",
+    "gate:ci": "node scripts/gate-ci.mjs",
     "lint:brief": "tsx scripts/lint/brief.ts",
     "new": "tsx scripts/new.ts",
     "check": "node scripts/check.mjs",

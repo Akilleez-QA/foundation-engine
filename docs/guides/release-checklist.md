@@ -12,8 +12,10 @@ npm ci
 npm run build
 npm test
 npx --no-install playwright-core install --with-deps chromium
-npm run gate:templates
+npm run gate:ci
 ```
+
+`npm run gate:ci` runs every `run:` step of `.github/workflows/ci.yml` in order with the same env, GitHub's `bash -eo pipefail` shell and `CI=true`: the browser regression suites, `gate:templates` and the phone smoke. It skips only the setup steps (`npm ci`, the browser install), stops at the first failure with the step, exit code and duration, and resumes with `--from <step>` or narrows with `--only <step>` (`--list` shows the step ids). It refuses a Node major other than the workflow's unless given `--any-node`. A workflow construct it cannot mirror (a second job, `if:`, `shell:`, a matrix) is an error, and `scripts/gate-ci.test.mjs` fails when the workflow gains a step it would not run. It reproduces CI's commands, not CI's machine: a pass does not certify a different browser build, hardware or timing. `npm run gate:templates` remains the template gates alone.
 
 The browser installation may need administrator privileges for operating-system libraries. It is explicit: `npm ci` installs the locked packages, while the browser command installs the matching Chromium. Tests use a fresh, muted browser profile and software rendering by default. `ENGINE_CHROMIUM` can select an existing compatible executable; no developer-specific executable path is required.
 
@@ -30,7 +32,7 @@ Do not change this workflow to execute unreviewed contributions through `pull_re
 ## Before making a release
 
 - Confirm the selected GPL-3.0-only license, package metadata and third-party notices agree, including bundled sample assets.
-- Confirm a fresh Node.js 22 installation and all template gates pass on the exact reviewed commit.
+- Confirm a fresh Node.js 22 installation and `npm run gate:ci` (which includes all template gates) pass on the exact reviewed commit.
 - Check the repository and release archive for credentials, private configuration and machine-specific paths. Ignoring local credential files prevents accidental additions; it does not replace review or remove historical material.
 - Inspect dependency and asset changes; retain source, license and attribution records.
 - Record known limitations, the tested platforms and any reference-performance warnings with the release.
