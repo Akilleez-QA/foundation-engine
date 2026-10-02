@@ -31,6 +31,7 @@ This demonstration is local. Delivery stock and debit persist in one versioned s
 | Date | Change | Budgets |
 |---|---|---|
 | 2026-09-30 | Guided ownership and mechanics integration lab | Measured 5 baseline / 7 peak action draws, 1,172 / 1,196 triangles; derived caps in game/budgets.json |
+| 2026-10-02 | Polish: the sky cube is now six 64×64 seamless gradient faces with a small, low-contrast orientation glyph (was 16×16 with large glyphs that blurred when a phone magnified them); `screenPx` 64. About 0.1 MiB of texture, inside the unchanged textureMiB cap. Evidence: emulated SwiftShader play:snap at 1280×800 and 390×844, screenshots inspected (7 draws, 1,208 triangles, unchanged); physical devices unverified. | Unchanged |
 
 Actor ownership uses the optional control kit: validated ride/exit publishes a
 single controller/frame snapshot, cancels the existing input epoch, and clears

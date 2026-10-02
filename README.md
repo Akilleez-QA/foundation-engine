@@ -32,7 +32,7 @@ A game lives outside the engine, in `game/` (or any folder named by `GAME_DIR`).
 | `blank` | one scene, one entity, one input | none |
 | `arcade` | a lane dodger: score, fail state, instant restart, best score saved | ui |
 | `explorer` | two scenes to move around in, things to use, doors between them | ui, camera, character, explore |
-| `learn` | a lesson: a teacher and a classmate at a chalkboard, a sim to turn, a quiz ([learn mode](docs/guides/learn-mode.md)) | ui, camera, concept-explorer, learn (and chalkboard) |
+| `learn` | a lesson: a chalkboard with a teacher's and a classmate's lines as captions, a sim to turn, a quiz ([learn mode](docs/guides/learn-mode.md)) | ui, camera, concept-explorer, learn (and chalkboard) |
 | `terrain` | canonical surface, contact, finite detail levels and coherent revisions | terrain, character |
 | `expedition` | guided routes, persistent completion and bounded production | navigation, objectives, inventory and supporting kits |
 | `mechanics` | ownership, attachments, local transactions and action results | frames, vehicles, control and supporting kits |

@@ -51,3 +51,20 @@ test('provider: the scripted provider answers by prompt; the kid-safe check reje
   assert.equal(kidSafeProblems([{ do: 'say', who: 't', text: 'see https://example.com' }], id).length, 1);
   assert.equal(kidSafeProblems([{ do: 'say', who: 't', text: 'what is your address?' }], id).length, 1);
 });
+
+test('timeline: the objectives card is up from the objectives action until the next gate is passed, then never again', () => {
+  const p = new TimelinePlayer([
+    { do: 'objectives' }, { do: 'say', who: 'teacher', text: 'hello' }, { do: 'wait-for', event: 'next' },
+    { do: 'draw', target: 'sun' }, { do: 'wait-for', event: 'next' },
+  ]);
+  p.tick(0.1);
+  assert.equal(p.state().objectives, true, 'stated at the start, before the first gate');
+  p.tick(10);
+  assert.equal(p.state().waiting?.event, 'next');
+  assert.equal(p.state().objectives, true);
+  assert.ok(p.satisfy('next'));
+  assert.equal(p.state().objectives, false, 'Next puts the card away at once');
+  p.tick(10);
+  assert.equal(p.state().items.sun.progress, 1);
+  assert.equal(p.state().objectives, false, 'it does not come back over the drawing at the next gate');
+});

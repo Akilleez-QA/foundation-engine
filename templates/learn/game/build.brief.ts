@@ -3,7 +3,7 @@ import { defineBuild } from '@engine';
 
 export default defineBuild({
   goal: 'A short interactive lesson that explains why we have day and night.',
-  pitch: 'A teacher and a classmate at a chalkboard, then a spinning Earth you turn yourself, then three questions.',
+  pitch: 'A chalkboard drawn step by step while a teacher and a classmate speak in named captions (no drawn characters), then a spinning Earth you turn yourself, then three questions.',
   audience: { ages: [8, 11], kids: true, notes: 'Primary school; reads short sentences; may play without sound.' },
   genre: 'learn',
   coreLoop: ['watch and listen to a short board step', 'answer or try something', 'get kind feedback or a hint', 'go on to the next step'],

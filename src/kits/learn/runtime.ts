@@ -136,7 +136,8 @@ function render(ctx: SceneContext, v: Visit, view: LessonView) {
   v.quiz?.set(!asking ? null : q ? { prompt: q.prompt, options: q.options, hints: q.hints, feedback: q.feedback, state: q.state, chosen: q.chosen, answer: question?.answer, index: q.index, count: q.count } : null);
   v.controls?.set({
     progress: say(ctx, 'learn.step', { n: view.scene.index + 1, total: view.scene.count }),
-    objectives: view.timeline.objectives && view.scene.index === 0 && view.timeline.waiting?.event === 'next' ? view.objectives.map(o => ({ text: o.text, met: o.met })) : null,
+    // Stated at the start (from the objectives action until Next): never over the drawings that follow.
+    objectives: view.timeline.objectives && !view.interrupt && view.scene.index === 0 ? view.objectives.map(o => ({ text: o.text, met: o.met })) : null,
     objectivesTitle: say(ctx, 'learn.objectives'),
     can: { ...view.can, pause: !view.finished },
     paused: v.director.main.paused,

@@ -11,6 +11,10 @@
 //   {"waitUntil": {"path": "world.state.phase", "equals": "over"}, "ms": 20000}      poll until it holds (fails on timeout)
 //   {"pressUntil": "Enter", "until": {"path": "…", "equals": "…"}, "every": 500, "ms": 60000}   press a key repeatedly
 //                                         until the expectation holds (a learner clicking Next until a scene arrives)
+//   {"holdUntil": "]", "until": {"path": "…", "contains": "…"}, "ms": 15000}   hold a key down until the expectation
+//                                         holds, then release it (steady under a slow machine, unlike a fixed hold)
+// A step after a press sees state one frame late: wait for something the press changes (a caption, a scene) before
+// waiting for a gate the press only passes through, or a snap shows the moment before the press took effect.
 // Output: playtest/latest/<name>/ (screenshots, report.json; gitignored). Exit code 1 when an expectation failed.
 import {join, resolve} from 'node:path';
 import {readFileSync} from 'node:fs';
@@ -44,14 +48,17 @@ export async function runScript(script, url) {
       else if (step.wait) await sleep(Number(step.wait));
       else if (step.snap) row.file = write(dir, `${String(++n).padStart(2, '0')}-${step.snap}.png`, await b.page.screenshot({type: 'png'}));
       else if (step.expect) { Object.assign(row, judge(await b.evaluate('window.engine.state()'), step.expect)); if (!row.ok) report.pass = false; }
-      else if (step.waitUntil || step.pressUntil) {
+      else if (step.waitUntil || step.pressUntil || step.holdUntil) {
         const want = step.waitUntil ?? step.until, deadline = Date.now() + Number(step.ms ?? 20000);
-        for (;;) {
-          Object.assign(row, judge(await b.evaluate('window.engine.state()'), want));
-          if (row.ok || Date.now() > deadline) break;
-          if (step.pressUntil) await b.evaluate(`window.engine.key(${JSON.stringify(step.pressUntil)})`);
-          await sleep(Number(step.every ?? 100));
-        }
+        if (step.holdUntil) await b.key(step.holdUntil, true);
+        try {
+          for (;;) {
+            Object.assign(row, judge(await b.evaluate('window.engine.state()'), want));
+            if (row.ok || Date.now() > deadline) break;
+            if (step.pressUntil) await b.evaluate(`window.engine.key(${JSON.stringify(step.pressUntil)})`);
+            await sleep(Number(step.every ?? 100));
+          }
+        } finally { if (step.holdUntil) await b.key(step.holdUntil, false); }
         row.expect = want;
         if (!row.ok) report.pass = false;
       }

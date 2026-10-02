@@ -8,7 +8,7 @@
 | | |
 |---|---|
 | **Goal** | A short interactive lesson that explains why we have day and night. |
-| **Pitch** | A teacher and a classmate at a chalkboard, then a spinning Earth you turn yourself, then three questions. |
+| **Pitch** | A chalkboard drawn step by step while a teacher and a classmate speak in named captions (no drawn characters), then a spinning Earth you turn yourself, then three questions. |
 | **Audience** | Ages 8–11 (`kids: true`); policy `kid-safe` ([KID-SAFE](../../docs/policy/KID-SAFE.md)) |
 | **Genre** | learn |
 | **Core loop** | watch and listen to a short board step → answer or try something → kind feedback or a hint → next step |
@@ -64,3 +64,4 @@ Controls: Next (Enter, Space, N, pad A, the Next button), Back (B), Show again (
 |---|---|---|
 | 2026-09-28 | Template created | `day-night` measured on software GL |
 | 2026-10-02 | The scripted playtest moved into the game folder (`game/playtest/`), so `npm run new-game` copies it with the game instead of into the engine's root `playtest/`; the success criterion's `by` names the new path. Same script, same check. | Unchanged |
+| 2026-10-02 | Polish: the objectives card shows from the start until the first Next and never returns over the board's drawings (it used to reappear over the Sun at every Next gate of step 1); the pitch now says the teacher and classmate speak in named captions (no figures are drawn); the scripted playtest waits for each press to take effect, so `02-sun-drawn` shows the Sun, and holds `]` until the objective is met instead of for a fixed time. Brief: pitch wording only. Evidence: emulated SwiftShader play:script/play:snap at 1280×800 and 390×844, screenshots inspected; tablet and physical devices unverified. | Unchanged |
