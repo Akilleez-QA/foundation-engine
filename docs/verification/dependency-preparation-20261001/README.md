@@ -35,8 +35,9 @@ remain pending. No broad performance, quality, or device acceptance is claimed.
 
 ## Prospective postTask comparison
 
-The downstream native consumer measured 12.3 ms for three warm cooperative turns,
-versus 0.1–0.2 ms without cooperation. Before changing the scheduler, predict that
+A downstream consumer outside this repository (not published, so not reproducible
+here) measured 12.3 ms for three warm cooperative turns, versus 0.1–0.2 ms without
+cooperation. That figure is context for the prediction below, not Foundation evidence. Before changing the scheduler, predict that
 feature-detected native `scheduler.postTask` keeps actual task interleaving and
 owner cancellation while reducing timer-clamping overhead on supported browsers.
 Retain the timer fallback and original measured result. Rejection must neither
