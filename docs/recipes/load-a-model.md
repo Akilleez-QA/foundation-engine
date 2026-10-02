@@ -6,7 +6,7 @@ Show a `.glb` model in a scene and play one of its animation clips. The engine l
 
 Files in the repository's `public/` folder are served from the site root, so `public/models/robot.glb` is fetched as `/models/robot.glb`. The repository already ships a tiny CC0 test model, `public/models/mechanics/beacon.glb` (one box with a one-second `pulse` clip), so you can try this recipe before you have a model of your own.
 
-The loader accepts **binary glTF (`.glb`) with everything embedded**: a `.gltf` with a separate `.bin` or image files is rejected (`models: GLB dependencies must be embedded`). Export from Blender with *glTF Binary (.glb)*. Textures embedded in the GLB are drawn; this is the way to get textured surfaces today (see the README's "Not here yet").
+The loader accepts **binary glTF (`.glb`) with everything embedded**: a `.gltf` with a separate `.bin` or image files is rejected (`models: GLB dependencies must be embedded`). Export from Blender with *glTF Binary (.glb)*. Textures embedded in the GLB are drawn. To texture a primitive `Shape` instead, see [give a shape a material](give-a-shape-a-material.md).
 
 ## 2. Declare it as an asset
 

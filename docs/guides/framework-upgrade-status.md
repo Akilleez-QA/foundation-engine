@@ -292,7 +292,6 @@ action/crafting browsers and all seven gates (1,873 tests). Combined main tests/
 passed. See [scene startup](scene-startup.md) and the acceptance ledger; this
 repair does not change framework scope or creator gameplay choices.
 
-
 ### Networking admission — NW-01 integrated
 
 PR #120 (`3a97ca6`) integrates the first networking slice, including:
@@ -334,7 +333,6 @@ plus inspected desktop/mobile smoke. Native held-resize and physical-device
 acceptance are not established by these Node tests or blank-scene snapshots. No budget, device policy or
 input bounds change. [Evidence and limits](../verification/input-resize-20261001/README.md).
 
-
 ### Scoped views — NW-02 integrated and observed limits
 
 Implementation commits `685a25f`, `272a759` and `0dbed00` add optional bounded
@@ -373,7 +371,6 @@ qualifies timing and memory scope. This is local application-credit evidence,
 not physical TCP backpressure, WAN scaling, mobile performance, durable recovery
 or prediction. NW-03 integration is recorded below; DV-01 remains open.
 
-
 ## Durable authority and prediction continuation — integrated
 
 NW-03 now has implemented, separately optional [durable authority](durable-authority.md)
@@ -386,11 +383,11 @@ desktop loopback scope. See the [versioned evidence ledger](upgrade-acceptance-l
 for historical candidate commits and current integration evidence.
 
 Clean-revision native acceptance passed at `8317c69`; see the
-[saved evidence](../verification/authority-20261001/README.md). NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed.
+[saved evidence](../verification/authority-20261001/README.md). NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history) and included in public `main` since `c0e73c9`. Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed.
 DV-01 physical-device acceptance remains open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. Creators may configure,
 replace or omit these contracts and retain ownership of all game rules.
 
-## Device acceptance continuation — public PR, not integrated
+## Device acceptance continuation — layout repair integrated in v0.2.0 (PR #9)
 
 The [stock device matrix](../kits/stock-device-acceptance-matrix.md) records all seven
 current template declarations and remaining task-specific acceptance. The
@@ -399,24 +396,24 @@ separates 16 passing touch-emulated target/tap cases from an observed compact le
 content overlap. The [2026-10-02 layout receipt](../verification/stock-device-20261002/README.md)
 records the repair in the learn kit's layout seam (desktop geometry unchanged), a
 fake-DOM regression and emulated separation checks across board, sim and quiz at
-four profiles on a clean commit. This is emulated evidence, not a completed mobile
+four profiles on a clean commit. The matrix and repair are integrated in v0.2.0 (PR #9, merged to main at `97288f8`). This is emulated evidence, not a completed mobile
 experience: full workflows, text scaling and actual minimum-device performance remain
 open, and minimum phone, tablet and laptop/desktop profiles are pending creator
 selection. DV-01 and the overall upgrade goal remain active. See the
 [continuing ledger](upgrade-acceptance-ledger.md) for the authoritative work state.
 
-## Program preparation candidate (2026-10-01) — public PR #10, not integrated
+## Program preparation (2026-10-01) — integrated in v0.2.0 (PR #10)
 
-Program preparation candidate: context-owned link validation, bounded submitted
+Program preparation: context-owned link validation, bounded submitted
 program readiness and author recovery passed public checkpoint `2cdd442` across
-all seven template gates and inspected desktop/mobile snapshots. Integration is pending. See [contract](program-preparation.md). No performance,
+all seven template gates and inspected desktop/mobile snapshots. Integrated in v0.2.0 (PR #10, merged to main at `4f666a2`). See [contract](program-preparation.md). No performance,
 quality-budget or engine-wide residency completion claim is made.
 
-The same candidate now includes optional owned submitted-frame completion after
+The same change includes optional owned submitted-frame completion after
 initial draw. Native correctness and exact-head template gates are recorded in the
 [checkpoint receipt](../verification/program-preparation/README.md). Completion is not display presentation or a smoothness guarantee.
 
-## Cooperative dependency preparation candidate (2026-10-01)
+## Cooperative dependency preparation (2026-10-01) — integrated in v0.2.0 (PR #11)
 
 M2 adds real task boundaries and reserves one acquisition slot for the required
 closure while optional work uses remaining capacity. Explicit pumping remains
@@ -424,11 +421,11 @@ caller-owned. See the [contract](../../src/platform/assets/dependency-lease.md) 
 [prospective oracle and CPU evidence](../verification/dependency-preparation-20261001/README.md).
 Native task oracle, all seven template gates and the CI browser suites passed (see the
 evidence README and public PR #11);
-integration, frame-time and downstream acceptance remain pending; no resource budget changes.
+integrated in v0.2.0 (PR #11, merged to main at `ae8a61f`); frame-time and downstream acceptance remain pending; no resource budget changes.
 
-## Queue age and submit deadlines — NW-06 implemented, candidate
+## Queue age and submit deadlines — NW-06 integrated in v0.2.0
 
-Implemented, candidate (PR #12); not integrated.
+Integrated in v0.2.0 (PR #12, merged to main at `53d549d`).
 The [network intake](../../src/kits/network/README.md#optional-queued-command-age-nw-06)
 may shed commands older than an optional `maxQueuedAgeMs` before authorization or
 dispatch, and [durable authority](durable-authority.md#optional-submit-deadlines-nw-06)
@@ -437,25 +434,24 @@ storage call starts. In-flight writes keep committed/rejected/unknown semantics 
 `expired` consumes no sequence. Both are off by default. PR #12 evidence was 6 intake and 9
 authority focused tests (9 intake after the follow-up below); load, browser composition and devices remain unverified.
 
-Follow-up (PR #33; candidate, not integrated): the
+Follow-up (PR #33; integrated in v0.2.0, batch PR #42): the
 NW-07 overload probe showed that charging each age shed to the pump budget collapsed
 goodput once queued wait exceeded the age. Shedding is now uncharged and capped by an
-optional `maxStaleDropsPerPump`. With PR #27's probe (not in this tree), at a 300 ms age saturated final/peak goodput was
+optional `maxStaleDropsPerPump`. With PR #27's probe, at a 300 ms age saturated final/peak goodput was
 0.253 and 0.229 before and 0.955 and 0.915 after (two loopback runs each, heavily
 loaded host); the deterministic unit regression measured 22.0/s before and 80.4/s
 after against an 80.4/s FIFO plateau. Defaults without `maxQueuedAgeMs` are unchanged.
 
-## Reconnect/retry pacing — NW-04 implemented, candidate
+## Reconnect/retry pacing — NW-04 integrated in v0.2.0
 
 `createRetrySchedule` (network kit) is an optional, pure pacing helper: full-jitter
 exponential backoff per episode and a token-bucket budget across episodes, driven
 by caller time and an injected random stream. The network workbench client wires it
-behind an opt-in checkbox. Implemented as a candidate (PR #14, `feat/nw04-reconnect-schedule`),
-not integrated; unit tests and the loopback browser workflow are its only evidence.
+behind an opt-in checkbox. Integrated in v0.2.0 (PR #14, merged to main at `82862d6`); unit tests and the loopback browser workflow are its only evidence.
 See the [retry pacing guide](network-retry.md) and the
 [ledger](upgrade-acceptance-ledger.md).
 
-## Rate and concurrency admission — NW-05 implemented, candidate (PR #13)
+## Rate and concurrency admission — NW-05 integrated in v0.2.0 (PR #13)
 
 NW-05 adds an optional, single-process [rate and concurrency admission](rate-admission.md)
 helper (`createRateAdmission`, network kit): a per-key token bucket with an optional
@@ -463,31 +459,30 @@ concurrency gate, bounded keys, explicit refusal results, caller-supplied time a
 idempotent disposal. The three reference hosts replace their hand-rolled fixed
 windows with it, keeping limits, close reasons and check order; the change from a
 fixed window to a bucket is an intended semantic change recorded in the guide.
-Status: implemented, candidate (PR #13); not integrated. Evidence is unit and loopback
+Status: integrated in v0.2.0 (PR #13, merged to main at `cc2ef79`). Evidence is unit and loopback
 host tests only; distributed limits, measured load and physical devices are outside
 this slice.
 
-## Terminal close classification — NW-04 follow-up, candidate
+## Terminal close classification — NW-04 follow-up, integrated in v0.2.0
 
 `read().remoteClose` (browser transport) and `createClosePolicy` (network kit) let a
-consumer treat a terminal refusal as final instead of retrying it. Candidate
-(PR #16), building on integrated NW-04 (PR #14); not integrated. Unit tests and the
+consumer treat a terminal refusal as final instead of retrying it. Integrated in v0.2.0 (PR #16, merged to main at `b93690d`), building on NW-04 (PR #14). Unit tests and the
 loopback browser workflow are its only evidence. See the
 [retry pacing guide](network-retry.md#terminal-refusals-and-transient-loss).
 
-## Replay log and divergence detector (SIM-01) — candidate, not integrated
+## Replay log and divergence detector (SIM-01) — integrated in v0.2.0
 
 | ID | Contract | State |
 |---|---|---|
-| SIM-01 | Optional `@kits/replay`: bounded tick-input log and player (explicit truncation; version, identity and corruption refusal), creator-digest traces with first-divergence comparison, and a prediction-versus-authority agreement check over the existing owners. Dev/test-only `engine.replay` uses the stock scene fixed lane and `?seed=`. [Contract](replay-divergence.md) | Implemented, candidate (public PR #17). Focused tests and the arcade `?seed=` browser replay pass on the branch. Not integrated. No cross-device or cross-browser floating-point determinism, physical-device or multiplayer claim. |
+| SIM-01 | Optional `@kits/replay`: bounded tick-input log and player (explicit truncation; version, identity and corruption refusal), creator-digest traces with first-divergence comparison, and a prediction-versus-authority agreement check over the existing owners. Dev/test-only `engine.replay` uses the stock scene fixed lane and `?seed=`. [Contract](replay-divergence.md) | Integrated in v0.2.0 (PR #17, merged to main at `49047ae`). Focused tests and the arcade `?seed=` browser replay passed on the PR head. No cross-device or cross-browser floating-point determinism, physical-device or multiplayer claim. |
 
-## Sustained-session recorder — PERF-01 candidate
+## Sustained-session recorder — PERF-01 integrated in v0.2.0
 
 | Slice | Capability and actual seam | State | What remains outside the claim |
 |---|---|---|---|
-| PERF-01 | [`FrameLoop.attachSampler`](../../src/core/activity/loop.ts) is a single observational slot. Through it, [`createSessionRecorder`](../../src/platform/perf/session-recorder.ts) records bounded rolling-window percentiles and drift, exposed as `engine.sessionRecorder()` and `?session-record` ([guide](session-performance.md)) | Implemented, candidate (PR #15 on the public repository). Unit tests and an emulated browser run passed on the candidate head; see [verification](../verification/session-perf-20261002/README.md) | No physical-device, thermal, GPU-timer or production telemetry claim. DV-01 remains open |
+| PERF-01 | [`FrameLoop.attachSampler`](../../src/core/activity/loop.ts) is a single observational slot. Through it, [`createSessionRecorder`](../../src/platform/perf/session-recorder.ts) records bounded rolling-window percentiles and drift, exposed as `engine.sessionRecorder()` and `?session-record` ([guide](session-performance.md)) | Integrated in v0.2.0 (PR #15, merged to main at `ae69a38`). Unit tests and an emulated browser run passed on the PR head; see [verification](../verification/session-perf-20261002/README.md) | No physical-device, thermal, GPU-timer or production telemetry claim. DV-01 remains open |
 
-### Bounded asset residency — RES-01 implemented, candidate
+## Bounded asset residency — RES-01 integrated in v0.2.0
 
 The texture and model libraries' existing `LeaseCache` gains an optional residency
 policy from `defineGame({ residency })`: per-preset `warmBytes` and `residentBytes`,
@@ -495,13 +490,13 @@ pinned asset ids, least-recently-used eviction of unpinned retained assets, and 
 explicit once-per-transition pressure report and creator hook when live and pinned
 bytes alone exceed the ceiling. Retained resources drop renderer copies through
 three's public `dispose` event and upload again on their next draw, including after
-context restoration. Candidate (PR #22); not integrated. Evidence is focused
+context restoration. Integrated in v0.2.0 (PR #22, merged to main at `9913019`). Evidence is focused
 unit tests, an opt-in native software-renderer fixture and a temporary composed
 probe ([record](../verification/asset-residency-20261002/README.md)). No program
 budget, combined ceiling, prefetch, physical-device memory or performance claim.
 See the [guide](asset-residency.md).
 
-## Zero-step press retention (STD-SIM-12) — fix, candidate
+## Zero-step press retention (STD-SIM-12) — fix integrated in v0.2.0
 
 The stock author runtime cleared pressed actions and `pointer.pressed` after every
 frame, so a press arriving before a frame that ran no fixed tick (frame time below
@@ -514,131 +509,125 @@ systems keep their per-frame view. Retention is bounded by the visit and by the
 existing cancellation paths (pointer/input cancel, overlay, hidden tab, lost
 ownership, a non-simulating frame, a held SIM-01 replay tap). The latch runs before
 the replay tap's tick sentinel, so a recorded press lands in exactly one tick. Evidence: focused runtime and runner tests;
-browser suites and gates are recorded on the PR. Physical high-refresh devices are
-unverified. Candidate, not integrated.
+browser suites and gates are recorded on the PR. Physical high-refresh devices are unverified. Integrated in v0.2.0 (PR #19; batch PR #42).
 
-## Peer rollback sessions (RB-01) — implemented, candidate
+## Peer rollback sessions (RB-01) — integrated in v0.2.0
 
 Optional `@kits/rollback` ([README](../../src/kits/rollback/README.md),
 [recipe](../recipes/add-rollback-sessions.md)) supplies speculative execution with
 bounded rollback, stall and checksum desync detection over a creator-supplied
-reliable, ordered link, plus a local sync test. Implemented, candidate (PR #25,
-`feat/genre-fighting-slice1`); not integrated. Evidence is focused headless tests
+reliable, ordered link, plus a local sync test. Integrated in v0.2.0 (PR #25; batch PR #42). Evidence is focused headless tests
 and one fixed-lane consumer; network, device and multiplayer acceptance are open.
 
-## Deterministic turn log (turns kit, TB-01) — implemented, candidate
+## Deterministic turn log (turns kit, TB-01) — integrated in v0.2.0
 
-Status: implemented, candidate on branch `feat/genre-turnbased-slice1` (PR #24); not integrated. See the [kit README](../../src/kits/turns/README.md) and [recipe](../recipes/add-a-turn-log.md).
+Status: integrated in v0.2.0 (PR #24; batch PR #42). See the [kit README](../../src/kits/turns/README.md) and [recipe](../recipes/add-a-turn-log.md).
 
 - Runtime-enforced: rules id, validator literal-`true` acceptance, JSON capture limits for commands and states, `maxCommands` retention (`full` overload, `checkpoint` recovery), revision-checked mutations (`stale`), reentrancy (`busy`), disposal (`retired`), frozen states, mutations require an exact safe-integer revision, restore never throws for stored data (`invalid`/`foreign`/`diverged`, including throwing creator validators/reducers) with a 64-bit replay kit `hashText` checksum over the whole retained log (redo entries included), authority random keyed by seed, lineage, stream and sequence.
 - Checked: 18 focused headless unit tests (determinism, preview equals submit, undo/redo/replay, real SaveStore round trip across a fresh store, adversarial reducers and inputs, durable-authority composition with an in-memory adapter).
 - Not established: any template or game consumer, browser or device evidence, reducer CPU deadlines, hidden-information safety of a local log (it is not), AI worker budgets, play-by-turn timeouts.
 
-## Seeded fault schedules — NW-09 implemented, candidate
+## Seeded fault schedules — NW-09 integrated in v0.2.0
 
 `npm run faults:network` (tools/authority-workbench) replays seeded combined faults
 against the composed authority path and checks invariants after every step against
 independent SQLite readback; failing seeds reproduce exactly by seed and step index
 and can be shrunk. Tools/tests only; the host gains optional, default-preserving
-fault seams. Implemented, candidate (PR #26); not integrated. Process-scope loopback
+fault seams. Integrated in v0.2.0 (PR #26; batch PR #42). Process-scope loopback
 evidence only. See the [guide](network-fault-schedule.md) and the
 [ledger](upgrade-acceptance-ledger.md).
 
-## Planned drain and capped lifetime — NW-08 implemented, candidate (PR #21)
+## Planned drain and capped lifetime — NW-08 integrated in v0.2.0 (PR #21)
 
 `createConnectionDrain` (host) and `createDrainFollower` (client), network kit, let a
 host announce a planned drain with a bounded notice and optionally cap connection
 lifetime with randomized dither, so clients stop new work, settle pending replies
 and reconnect through the existing retry schedule after the announced return. Both
 are optional and pure; drain closes are transient (1012). The network workbench host
-and client opt in. Implemented, candidate (PR #21); not integrated. Unit, host socket
+and client opt in. Integrated in v0.2.0 (PR #21; batch PR #42). Unit, host socket
 and loopback browser tests are its only evidence. See the [drain guide](network-drain.md).
 
-## Bounded spatial index (SC-01) — implemented, candidate
+## Bounded spatial index (SC-01) — integrated in v0.2.0
 
 The optional `spatial` kit adds [`createSpatialGrid`](spatial-index.md), a preallocated
 uniform-grid index for neighbour, range and per-observer interest queries with explicit
 cell, result and capacity bounds. It is a reusable proximity mechanism for large
-populations, not a visibility, steering or replication policy. Status: implemented,
-candidate (PR #23); not integrated. Evidence is focused unit tests
+populations, not a visibility, steering or replication policy. Status: integrated in v0.2.0 (PR #23, merged to main at `2c87e3b`). Evidence is focused unit tests
 and a headless 1,000/10,000-entry CPU micro-benchmark; no template consumer, browser,
 worker or physical-device evidence, and no budget change.
 
-## Seeded generation — GEN-01 implemented, candidate
+## Seeded generation — GEN-01 integrated in v0.2.0
 
 GEN-01 adds integer-only hierarchical seed derivation (`deriveSeed`, beside the single
 mulberry32 generator in `src/core/rng.ts`) and an optional `procgen` kit. The kit runs
 creator-registered slice generators over bounded `Uint16Array` cell grids on the
 existing WorkerHost, ships one example row (`job.kits.procgen.cellular`) and provides
 a strict root-seed save section. It adds no scheduler, registry or publication owner;
-results never publish themselves. Status: implemented, candidate (PR,
-`feat/genre-sandbox-slice1`); not integrated. Evidence is focused unit tests plus one
+results never publish themselves. Status: integrated in v0.2.0 (PR #38; batch PR #45). Evidence is focused unit tests plus one
 desktop Chromium worker check. Chunk residency, runtime edit deltas, meshing and
 edited-world persistence remain separate work. See the
 [kit](../../src/kits/procgen/README.md) and the [ledger](upgrade-acceptance-ledger.md).
 
-## Spatial audio voices (AUD-01) — candidate, not integrated
+## Spatial audio voices (AUD-01) — integrated in v0.2.0
 
 | ID | Contract | State |
 |---|---|---|
-| AUD-01 | Platform audio output, per voice: `panning` (`'equalpower'` default \| `'HRTF'`), `distanceModel` (`'inverse'` default \| `'linear'` \| `'exponential'`) with bounded `refDistance`/`maxDistance`/`rolloffFactor`, a model-independent `cutoffDistance` (refused start, faded silence beyond), a separate HRTF voice limit with equal-power fallback and diagnostics, an optional smoothed low-pass/gain filter stage, and smoothed position/listener ramps. Creator control through `defineGame({ audio })` (HRTF limit per quality preset, smoothing, optional `sound.headphone-3d` setting). The mechanics template's ineffective `maxDistance: 60` became `cutoffDistance: 60`. [Guide](spatial-audio.md) | Implemented, candidate (public PR #28). Node unit and boot tests plus `npm run test:audio-browser` (real output rendering into `OfflineAudioContext` in the muted Chromium test browser) pass on the branch. Not integrated. Proves configuration and rendered signal behaviour only: no human localisation trials, no Firefox/WebKit rendering, no device CPU/battery/latency measurement, no iOS evidence. No occlusion queries, propagation, networking or sampled sound. |
+| AUD-01 | Platform audio output, per voice: `panning` (`'equalpower'` default \| `'HRTF'`), `distanceModel` (`'inverse'` default \| `'linear'` \| `'exponential'`) with bounded `refDistance`/`maxDistance`/`rolloffFactor`, a model-independent `cutoffDistance` (refused start, faded silence beyond), a separate HRTF voice limit with equal-power fallback and diagnostics, an optional smoothed low-pass/gain filter stage, and smoothed position/listener ramps. Creator control through `defineGame({ audio })` (HRTF limit per quality preset, smoothing, optional `sound.headphone-3d` setting). The mechanics template's ineffective `maxDistance: 60` became `cutoffDistance: 60`. [Guide](spatial-audio.md) | Integrated in v0.2.0 (PR #28; batch PR #45). Node unit and boot tests plus `npm run test:audio-browser` (real output rendering into `OfflineAudioContext` in the muted Chromium test browser) passed on the PR head. Proves configuration and rendered signal behaviour only: no human localisation trials, no Firefox/WebKit rendering, no device CPU/battery/latency measurement, no iOS evidence. No occlusion queries, propagation or networking; game sound files arrived separately (PR #37) and share this voice chain. |
 
-## Developer-experience checks (DX-01) — candidate, not integrated
-
-| ID | Contract | State |
-|---|---|---|
-| DX-01 | Boot input check and generator: [`src/author/input-registry.ts`](../../src/author/input-registry.ts) rebuilds the boot's `inputActions` table (engine rows, then game and kit inputs) with the registry's own options. `npm run check` (lint:brief) reports every problem; `npm run new -- input` picks bindings that table leaves free. Dev/test `engine.redraw()` ([`SceneHandle.redraw`](../../src/author/play.ts)) asks the running stock scene for one real draw, so `play:snap` judges budgets on rendered frames and reports `not measured` instead of a vacuous pass. [Recipe](../recipes/add-an-input-action.md) | Implemented, candidate (public PR #39); not integrated. Unit and lint regressions plus emulated `play:snap` runs on the branch. A dev/test boot throws on a clash; production drops the row with a warning. `engine.redraw()` covers the stock scene runtime only; the bench's idle windows are unchanged. Forced redraws can make a gate fail where it used to pass vacuously, and `not measured` exits 0. No device claim. |
-
-## Template polish semantics (DX-02) — candidate, not integrated
+## Developer-experience checks (DX-01) — integrated in v0.2.0
 
 | ID | Contract | State |
 |---|---|---|
-| DX-02 | Learn timeline objectives semantics: [`TimelinePlayer.state().objectives`](../../src/kits/learn/timeline.ts) is true from an `objectives` action until the learner passes the next gate after it, then stays false (it used to stay true for the whole scene, so the card returned over later drawings). The learn runtime shows the card from that flag on the first scene, outside interrupts. ui kit HUD lines and the prompt gain a readability plate ([README](../../src/kits/ui/README.md)). `play:script` gains `holdUntil`. | Implemented, candidate (public PR #40, stacked on #39); not integrated. Timeline unit test, learn `play:script` 9/9 and emulated snaps on the branch. Lessons that relied on the card returning at later gates would see it once; no stock lesson did. No device claim. |
+| DX-01 | Boot input check and generator: [`src/author/input-registry.ts`](../../src/author/input-registry.ts) rebuilds the boot's `inputActions` table (engine rows, then game and kit inputs) with the registry's own options. `npm run check` (lint:brief) reports every problem; `npm run new -- input` picks bindings that table leaves free. Dev/test `engine.redraw()` ([`SceneHandle.redraw`](../../src/author/play.ts)) asks the running stock scene for one real draw, so `play:snap` judges budgets on rendered frames and reports `not measured` instead of a vacuous pass. [Recipe](../recipes/add-an-input-action.md) | Integrated in v0.2.0 (PR #39; batch PR #45). Unit and lint regressions plus emulated `play:snap` runs on the PR head. A dev/test boot throws on a clash; production drops the row with a warning. `engine.redraw()` covers the stock scene runtime only; the bench's idle windows are unchanged. Forced redraws can make a gate fail where it used to pass vacuously, and `not measured` exits 0. No device claim. |
 
-## Overload and goodput probe — NW-07 implemented, candidate
+## Template polish semantics (DX-02) — integrated in v0.2.0
+
+| ID | Contract | State |
+|---|---|---|
+| DX-02 | Learn timeline objectives semantics: [`TimelinePlayer.state().objectives`](../../src/kits/learn/timeline.ts) is true from an `objectives` action until the learner passes the next gate after it, then stays false (it used to stay true for the whole scene, so the card returned over later drawings). The learn runtime shows the card from that flag on the first scene, outside interrupts. ui kit HUD lines and the prompt gain a readability plate ([README](../../src/kits/ui/README.md)). `play:script` gains `holdUntil`. | Integrated in v0.2.0 (PR #40; batch PR #45). Timeline unit test, learn `play:script` 9/9 and emulated snaps on the PR head. Lessons that relied on the card returning at later gates would see it once; no stock lesson did. No device claim. |
+
+## Overload and goodput probe — NW-07 integrated in v0.2.0
 
 `npm run probe:network` ([guide](network-overload.md)) measures the loopback network
 and replication reference hosts past saturation: goodput against offered load,
 rejections by reason, admitted-work latency, high-water marks, a physical non-reading
-peer and a host-restart reconnect storm. Tools only; implemented, candidate (PR #27); not
-integrated. FIFO goodput plateaued and adversaries were limited without closing
+peer and a host-restart reconnect storm. Tools only; integrated in v0.2.0 (PR #27; batch PR #46). FIFO goodput plateaued and adversaries were limited without closing
 healthy peers. The replication host's buffered cap retired a paused peer in 2 of 3
 runs. Its finding that a queue age shorter than the real queued wait collapsed goodput
 is resolved by the NW-06 follow-up (PR #33), and queue-age plateaus are now asserted. Loopback/process scope only; WAN, browsers and physical devices remain
 unverified. See the [evidence](../verification/network-overload-20261002/README.md)
 and the [ledger](upgrade-acceptance-ledger.md).
 
-## Tunable jump feel — MV-01 implemented, candidate
+## Tunable jump feel — MV-01 integrated in v0.2.0
 
 `createJumpFeel` and `jumpSystem` (locomotion kit) give creators a frame-rate-independent
 jump mechanism: height and time to apex, release, fall and apex gravity, terminal fall,
 coyote and buffer windows, each bounded and creator-chosen. Author buttons gain an opt-in
 `hold: true` so `ctx.input.held` observes a release; existing buttons are unchanged.
-Implemented as a candidate (`feat/genre-platformer-slice1`, PR #34), not integrated.
+Integrated in v0.2.0 (PR #34; batch PR #46).
 Evidence is focused unit tests only. See the [kit README](../../src/kits/locomotion/README.md#tunable-jump-feel-mv-01),
 the [recipe](../recipes/tune-a-jump.md) and the [ledger](upgrade-acceptance-ledger.md).
-## Sub-path asset base — DX P1-8, candidate
+
+## Sub-path asset base — DX P1-8, integrated in v0.2.0
 
 Texture and model URLs now follow Vite's `base` (`import.meta.env.BASE_URL`, exported as
 `PUBLIC_BASE` from `core/env.ts`) through `publicBase()`/`publicUrl()`; the default `/`
 keeps every existing URL unchanged. `npm run test:subpath-browser` (new CI step) fails on
-any request outside the sub-path. Candidate (branch `feat/dx-asset-base-path`); not
-integrated. Local static hosting and desktop Chromium only; see the
+any request outside the sub-path. Integrated in v0.2.0 (PR #35; batch PR #46). Local static hosting and desktop Chromium only; see the
 [recipe](../recipes/host-under-a-sub-path.md) for limits.
 
-## Authored materials — DX P1-10, candidate
+## Authored materials — DX P1-10, integrated in v0.2.0
 
 New author component `Material` (`texture`, `repeat`, `wrap`, `roughness`, `metalness`,
 `emissive`, `emissiveIntensity`, `opacity`, `transparent`) with `defineMaterial` and
 `validateMaterial`. Bounds: repeat ≤ 1024, emissive intensity ≤ 16, kebab-case texture ids;
 invalid runtime data is reported once and drawn with the original material. Lifetime: one
 lease per (texture, wrap) view shared by the visit's surfaces, aborted with the visit; a
-texture change keeps the old view until the new one arrives. Overload: none beyond the texture library's existing admission. Candidate (branch
-`feat/dx-materials`); not integrated. Follow-ups outside this slice: particles, rigid-body
+texture change keeps the old view until the new one arrives. Overload: none beyond the texture library's existing admission. Integrated in v0.2.0 (PR #36; batch PR #46). Follow-ups outside this slice: particles, rigid-body
 physics, a game-facing multiplayer session, normal/roughness maps and `Mesh` texture
 coordinates.
 
-## Game sound files — DX P1-10, candidate
+## Game sound files — DX P1-10, integrated in v0.2.0
 
 `ctx.play(id, options?)` accepts a game sound id as well as a cue id (`PlayOptions`:
 `volume` 0…1, `pitch` 0.25…4, `position`); `CueVoiceOptions` gains `rate` and `wait`
@@ -649,10 +638,10 @@ decoded kept; phone 1/8/16 MiB), decodes admitted only when their estimated deco
 (exact for PCM WAV, 48× the file otherwise), 4 fetches and 2 decodes at once, 256 files with
 LRU replacement, 10 s per fetch or decode, waiting plays counted in the 64-voice cap. Held
 files decode on unlock. Failures (including an HTML fallback page) are reported once and
-retried on the next preload. Candidate (branch `feat/dx-sound-files`); not integrated. Physical
+retried on the next preload. Integrated in v0.2.0 (PR #37; batch PR #46). Physical
 listening evidence is missing.
 
-## Command integrity — SEC-01 slice A implemented, candidate
+## Command integrity — SEC-01 slice A integrated in v0.2.0
 
 `createIntegrity` (network kit) separates validity from policy. Pure `assess` rules
 judge `{command, state, tick}` and can run inside the authority reducer, so an invalid
@@ -662,17 +651,16 @@ per-key scores, a tick-rate budget on rate admission, throttle, windowed close w
 terminal reason `integrity-violation`, per-rule ceilings and observe mode; the key table
 never refuses a new key and the bounded audit log is exportable as local text.
 Tick-addressed generic helpers and an `assertDisclosure` test helper are included. The
-network workbench wires one plausibility rule behind `--integrity`. Slice A implemented,
-candidate (PR #20); not integrated. Evidence is unit and loopback host tests only.
+network workbench wires one plausibility rule behind `--integrity`. Slice A integrated in v0.2.0 (PR #20; batch PR #47). Evidence is unit and loopback host tests only.
 Slice B (verified runs through the SIM-01 replay kit, merged in PR #17) is a design in the
 [integrity guide](integrity.md#slice-b-verified-runs-planned-not-built), not built.
-## Audio-clock timeline (AU-01) — implemented, candidate
+
+## Audio-clock timeline (AU-01) — integrated in v0.2.0
 
 Optional [`createAudioTimeline`](audio-timeline.md) makes the audio context's clock
 the master timeline for timed gameplay: smoothed audio↔page-clock mapping with
 resync on jumps, heard-time latency from `getOutputTimestamp` or reported latencies,
 bounded lookahead dispatch with exact start times, late-drop overload, input
 timestamps (`ctx.input.pressedAt`) and a stored calibration. It reuses the one audio
-output (new read-only `clock()`, scheduled `playVoice({ at })`). Status: implemented,
-candidate (PR #31); not integrated. Evidence is unit and headless scene tests only;
+output (new read-only `clock()`, scheduled `playVoice({ at })`). Status: integrated in v0.2.0 (PR #31; batch PR #47). Evidence is unit and headless scene tests only;
 no browser output timing, physical-device or audible verification.

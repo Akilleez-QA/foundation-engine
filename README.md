@@ -2,6 +2,17 @@
 
 A layered TypeScript and three.js engine for browser games of any genre, with explicit engineering contracts, automated checks and application-specific acceptance requirements.
 
+## What's new in 0.2.0
+
+- **Your own textures, materials and sound files**: `defineMaterial` for textured, physically based shapes; `defineAsset({ type: 'audio' })` files through `ctx.play` with volume, pitch and position.
+- **3D audio**: HRTF panning, distance models with a hard cutoff, a muffle filter and smoothed movement.
+- **Genre kits**: rollback sessions, a deterministic turn log, a spatial grid, seeded procedural generation, tunable jump feel and an audio-clock timeline for rhythm games.
+- **Multiplayer hardening**: reconnect backoff, rate limiting, queue deadlines, planned drain, and optional host-side command integrity (anti-cheat, slice A).
+- **Replay and divergence detection**, a sustained-session performance recorder, and presses that reach exactly one fixed tick on high-refresh displays.
+- **Newcomer toolchain**: Node 22.18+ check, friendly missing-browser message, Windows-safe scripts, `--game <dir>`, phone testing over Wi-Fi, sub-path hosting, `npm run gate:ci`; three.js 0.186, TypeScript 6 and Vite 8.
+
+Every new framework is optional. See the [changelog](CHANGELOG.md#020--2026-10-03) for the full list with PR numbers and its known limits: physical-device acceptance is still open, multiplayer evidence is loopback/LAN only, and spatial audio has not been verified by ear.
+
 - **Author API** (`@engine`): `defineGame`, `defineScene`, `defineEntity`, `defineComponent`, `defineSystem` (fixed-step or per frame), `defineInput` (buttons and axes over keys, pointer, touch and gamepad), `defineSaveSection` (with migrations), `defineAsset`, `defineMode`, and the build brief `defineBuild`. A game is scenes; a scene is a small ECS world driven by systems.
 - **Kernel**: modules boot in fixed phases (discover, register, patch, freeze, validate, install, start). Open sets live in validated, frozen registries. A typed event bus, typed services and read-on-demand probes connect systems.
 - **Runtime**: one frame loop that renders on change; activities with owned lifetimes; a hash router (`#scene/<id>?key=value`) with navigation epochs, lazy scene chunks and a scene shell (loading and failure cards).
@@ -72,7 +83,7 @@ Without a `game/` folder the blank template runs. `--game <dir>` selects another
 
 ## Not here yet (and workarounds)
 
-The current state as of October 2026; work on several of these is in progress, and this list will link to it as it lands.
+The current state as of 0.2.0 (October 2026). Textures and materials ([recipe](docs/recipes/give-a-shape-a-material.md)) and your own sound files ([recipe](docs/recipes/play-your-own-sounds.md)) are now supported; these are still missing:
 
 | Not here yet | What exists today | Workaround |
 |---|---|---|
@@ -90,7 +101,7 @@ Each template passes the gate on its own: `npm run gate -- --game templates/<nam
 - [Upgrade acceptance ledger](docs/guides/upgrade-acceptance-ledger.md): integrated revisions, verification boundaries and unresolved requirements.
 - [Framework upgrade record](docs/guides/framework-upgrade-status.md): implemented contracts and representative consumers.
 - [Complete scoped views](docs/guides/network-views.md): creator-selected disclosure, bounded application credit, replacement and lifecycle recovery; see the acceptance ledger for integration status.
-- [Durable authority](docs/guides/durable-authority.md) and [prediction](docs/guides/prediction.md): optional contracts integrated in PR #123 in the private development history at `b6fb4a3`, after clean native acceptance and all seven gates. Physical-device acceptance remains open; this private integration is not a public release.
+- [Durable authority](docs/guides/durable-authority.md) and [prediction](docs/guides/prediction.md): optional contracts integrated in PR #123 in the private development history at `b6fb4a3`, after clean native acceptance and all seven gates, and included in public `main` since `c0e73c9`. Physical-device acceptance remains open.
 - [Optional network admission](docs/guides/network-admission.md): intake, browser transport and the loopback diagnostic; replication and durability remain separate.
 - [AGENTS.md](AGENTS.md): how work is done here: building your own game, and for engine contributions worktrees, the gate and releases.
 - [docs/STANDARD.md](docs/STANDARD.md): the twelve laws and every clause.
