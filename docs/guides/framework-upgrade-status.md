@@ -493,12 +493,12 @@ probe ([record](../verification/asset-residency-20261002/README.md)). No program
 budget, combined ceiling, prefetch, physical-device memory or performance claim.
 See the [guide](asset-residency.md).
 
-## Planned drain and capped lifetime — NW-08 implemented, candidate (PR_REF)
+## Planned drain and capped lifetime — NW-08 implemented, candidate (PR #21)
 
 `createConnectionDrain` (host) and `createDrainFollower` (client), network kit, let a
 host announce a planned drain with a bounded notice and optionally cap connection
 lifetime with randomized dither, so clients stop new work, settle pending replies
 and reconnect through the existing retry schedule after the announced return. Both
 are optional and pure; drain closes are transient (1012). The network workbench host
-and client opt in. Implemented, candidate (PR_REF); not integrated. Unit, host socket
+and client opt in. Implemented, candidate (PR #21); not integrated. Unit, host socket
 and loopback browser tests are its only evidence. See the [drain guide](network-drain.md).
