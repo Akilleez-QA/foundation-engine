@@ -485,7 +485,7 @@ See the [procgen kit](../../src/kits/procgen/README.md) and the
 
 ### MV-01: tunable jump feel — candidate
 
-Status: implemented, candidate (`feat/genre-platformer-slice1`, PR pending); not integrated.
+Status: implemented, candidate (`feat/genre-platformer-slice1`, PR #34); not integrated.
 
 - Runtime-enforced: configuration bounds (`RangeError`), step length within `[0, maxDt]`
   (at most 0.25 s), boolean facts, finite external velocity within ±1000 m/s, and a

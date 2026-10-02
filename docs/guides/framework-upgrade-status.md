@@ -601,6 +601,6 @@ edited-world persistence remain separate work. See the
 jump mechanism: height and time to apex, release, fall and apex gravity, terminal fall,
 coyote and buffer windows, each bounded and creator-chosen. Author buttons gain an opt-in
 `hold: true` so `ctx.input.held` observes a release; existing buttons are unchanged.
-Implemented as a candidate (`feat/genre-platformer-slice1`, PR pending), not integrated.
+Implemented as a candidate (`feat/genre-platformer-slice1`, PR #34), not integrated.
 Evidence is focused unit tests only. See the [kit README](../../src/kits/locomotion/README.md#tunable-jump-feel-mv-01),
 the [recipe](../recipes/tune-a-jump.md) and the [ledger](upgrade-acceptance-ledger.md).
