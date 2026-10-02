@@ -52,3 +52,19 @@ test('headless failures retain every system identity and original cause', async 
     return true;
   });
 });
+
+test('a caller-owned input replaces the scripted input, and scripting it is refused', async () => {
+  const seen: number[] = [];
+  let axis = 0;
+  const input = { describe: () => null, pressed: () => false, held: () => false, axis: () => axis, pointer: { x: 0, y: 0, down: false, pressed: false } };
+  const scene = await testScene(defineScene({ id: 'input-owner', title: 'Input owner', systems: [defineSystem({ id: 'read', run(ctx) { seen.push(ctx.input.axis('steer')); } })] }), { input });
+  try {
+    assert.equal(scene.ctx.input, input);
+    axis = -1; scene.run(1 / 60);
+    axis = 1; scene.run(1 / 60);
+    assert.deepEqual(seen, [-1, 1]);
+    assert.throws(() => scene.press('steer'), /caller-owned/);
+    assert.throws(() => scene.hold('steer'), /caller-owned/);
+    assert.throws(() => scene.release('steer'), /caller-owned/);
+  } finally { scene.dispose(); }
+});

@@ -20,7 +20,7 @@ import { parseMessage, renderMessage } from '../core/i18n/format';
 import type { BuildBrief } from './build';
 import { sceneActionHints, defaultActionHints } from './action-hints';
 import { bodyOf, spawnInto } from './body';
-import { Name, type GameDefinition, type InputDefinition, type SceneContext, type SceneDefinition, type SystemDefinition } from './defs';
+import { Name, type GameDefinition, type InputDefinition, type InputState, type SceneContext, type SceneDefinition, type SystemDefinition } from './defs';
 
 export interface TestScene {
   readonly activityErrors: readonly unknown[];
@@ -43,7 +43,8 @@ export interface TestScene {
 }
 
 /** `inputs` enables local press-action hints. Defaults report inContext=true; inject services.input for remaps and modal context. */
-export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief; game?: GameDefinition; inputs?: readonly InputDefinition[]; calm?: boolean; params?: Record<string, string>; seed?: number; systems?: readonly SystemDefinition[]; services?: Partial<Services> } = {}): Promise<TestScene> {
+/** `input` replaces the scripted input with a caller-owned InputState (e.g. a replay log); press/hold/release then throw. */
+export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief; game?: GameDefinition; inputs?: readonly InputDefinition[]; calm?: boolean; params?: Record<string, string>; seed?: number; systems?: readonly SystemDefinition[]; services?: Partial<Services>; input?: InputState } = {}): Promise<TestScene> {
   const body = await bodyOf(scene);
   const hintSource = o.services?.input;
   const describe = sceneActionHints(o.inputs ?? [], hintSource ? id => hintSource.describeAction(id) : defaultActionHints(o.inputs ?? []));
@@ -61,11 +62,12 @@ export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief;
   const ownsSave = injectedSave == null;
   let disposed = false;
   const alive = () => { if (disposed) throw Error('testScene: disposed'); };
+  const scripted = () => { if (o.input) throw Error('testScene: input is caller-owned'); };
   let r = (o.seed ?? 1) >>> 0, frame = 0, t = 0;
   const ctx: SceneContext = {
     world, state: world.resources, brief: o.brief as BuildBrief,
     scene: { id: scene.id, params: o.params ?? {}, goto: id => { went.push(id); }, restart: () => { went.push(scene.id); } },
-    input: { describe, pressed: id => pressed.has(id), held: id => held.has(id), axis: id => held.get(id) ?? 0, pointer: { x: 0, y: 0, down: false, pressed: false } },
+    input: o.input ?? { describe, pressed: id => pressed.has(id), held: id => held.has(id), axis: id => held.get(id) ?? 0, pointer: { x: 0, y: 0, down: false, pressed: false } },
     get time() { return { t, frame, calm: o.calm ?? false }; },
     view: { camera: { position: [...scene.view?.camera?.position ?? [0, 8, 10]], target: [...scene.view?.camera?.target ?? [0, 0, 0]], fov: scene.view?.camera?.fov ?? 50 }, background: scene.view?.background ?? 0x101820, aspect: 16 / 9, overlay: null, openReadingSheet: null },
     spawn: (prefab, ...extra) => spawnInto(world, prefab, extra),
@@ -130,9 +132,9 @@ export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief;
         if (errors.length > 1) throw new AggregateError(errors, errors.map(error => error.message).join('; '));
       }
     },
-    press: id => { alive(); pressed.add(id); },
-    hold: (id, axis = 1) => { alive(); held.set(id, axis); },
-    release: id => { alive(); held.delete(id); },
+    press: id => { alive(); scripted(); pressed.add(id); },
+    hold: (id, axis = 1) => { alive(); scripted(); held.set(id, axis); },
+    release: id => { alive(); scripted(); held.delete(id); },
     dispose,
   };
 }

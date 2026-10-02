@@ -62,7 +62,8 @@
     "test:network-workbench-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/network-workbench-check.mjs playtest/network-workbench",
     "test:replication-workbench-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/replication-workbench-check.mjs playtest/replication-workbench",
     "test:authority-workbench-browser": "node scripts/generate.mjs && node --import tsx -r ./scripts/silent-browser.cjs scripts/play/authority-workbench-check.mjs playtest/authority-workbench",
-    "test:replication-load": "node --import tsx tools/replication-workbench/load.mjs"
+    "test:replication-load": "node --import tsx tools/replication-workbench/load.mjs",
+    "test:replay-browser": "GAME_DIR=templates/arcade/game node scripts/generate.mjs && GAME_DIR=templates/arcade/game node --import tsx -r ./scripts/silent-browser.cjs scripts/play/replay-check.mjs playtest/replay"
   },
   "dependencies": {
     "three": "^0.183.0"

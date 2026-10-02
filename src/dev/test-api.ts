@@ -16,6 +16,8 @@ import type { SceneModelRequest, SceneModelResult } from '../author/model-inspec
  *   engine.loop()               the loop's frame, update and render counters
  *   engine.events(fn)           tap every bus event (returns an unsubscribe)
  *   engine.save.export()        the active player's profile file
+ *   engine.replay.start(request) re-enter the current scene recording or replaying its fixed-tick input (dev/replay.ts)
+ *   engine.replay.read()/stop() the replay session's state, local log text and digest comparison
  *
  * Randomness is deterministic with `?seed=<n>` in the address (the game's `ctx.random()`).
  * It is added to the page only by the dev server and `vite build --mode test`; production builds never contain it.
@@ -27,6 +29,7 @@ import type { ProbeName } from '../core/probe';
 import { appLoop } from '../platform/ui/runtime';
 import type {SceneEntitiesRequest, SceneEntitiesResult} from '../author/play';
 import { createEventTrace, type EventTrace, type EventTraceOptions } from './event-trace';
+import type { ReplayDev, ReplayDevRequest, ReplayDevState, ReplayStart } from './replay';
 
 export interface EngineState {
   scene: { scene: string | null; state: string | null; epoch: number; hash: string } | undefined;
@@ -56,6 +59,12 @@ export interface EngineTestApi {
   /** Start a bounded scalar capture; replaces this API instance's previous capture. Caller disposes when finished. */
   eventTrace(options?: EventTraceOptions): EventTrace;
   save: { export(): unknown };
+  /** Record or replay the current scene's fixed-tick input from its next arrival (needs `?seed=`). Loaded on first use. */
+  replay: {
+    start(request: ReplayDevRequest, timeoutMs?: number): Promise<ReplayStart>;
+    read(): ReplayDevState;
+    stop(): void;
+  };
 }
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -64,6 +73,8 @@ const codeOf = (key: string) => CODES[key] ?? (/^[a-z]$/i.test(key) ? `Key${key.
 
 export function createTestApi(app: App, booted: Promise<BootReport>): EngineTestApi {
   let trace: EventTrace | undefined;
+  let replay: ReplayDev | undefined;
+  const idle: ReplayDevState = Object.freeze({ status: 'idle', mode: null, reason: null, scene: null, ticks: 0, total: null, log: null, digests: null, comparison: null });
   const report = () => app.services.app.report();
   const probe = (name: string) => app.probes.read(name as ProbeName);
   const scene = () => probe('scene') as EngineState['scene'];
@@ -125,5 +136,24 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
       return next;
     },
     save: { export: () => app.services.save.exportPlayer() },
+    replay: {
+      async start(request, timeoutMs = 30000) {
+        await booted;
+        replay ??= (await import('./replay')).createReplayDev();
+        const before = scene();
+        if (!before?.scene || before.state === 'entering') return Object.freeze({ status: 'refused', reason: 'no-active-scene' }) as ReplayStart;
+        const armed = replay.arm(request, before.scene.replace(/^scene\./, ''));
+        if (armed.status !== 'started') return armed;
+        await app.services.router.go(before.scene as SceneId, { again: 'reenter' });
+        for (const t0 = performance.now(); ;) {
+          const state = replay.read();
+          if (state.status !== 'armed') return Object.freeze({ status: 'started', state });
+          if (performance.now() - t0 > timeoutMs) { replay.stop(); return Object.freeze({ status: 'refused', reason: 'arrival-timeout' }); }
+          await sleep(20);
+        }
+      },
+      read: () => replay?.read() ?? idle,
+      stop: () => replay?.stop(),
+    },
   };
 }

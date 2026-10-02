@@ -41,6 +41,7 @@ import type { BuildBrief } from './build';
 import type { SceneHandle } from './play';
 import { TEST_API } from '../core/env';
 import { createSystemTiming } from './system-timing';
+import { openSceneTickTap, type SceneTickTap } from './scene-tick-tap';
 import { createSceneEntityInspector } from './entity-inspection';
 import { actionOf, sceneId } from './ids';
 import { bodyOf, spawnInto } from './body';
@@ -59,6 +60,8 @@ import type { LayerHandle, LayerSpec } from '../platform/ui/layers';
 import { viewOwnsInput } from '../platform/input/owner';
 import { Name, Shape, Transform, type InputDefinition, type SceneContext, type SceneDefinition, type ViewState } from './defs';
 
+/** The fixed lane's step (core/ecs/systems.ts default), named so a replay header can record it. */
+const FIXED_STEP = 1 / 60;
 const seedFromAddress = (): number | null => {
   if (typeof location === 'undefined') return null;
   const s = new URLSearchParams(location.search).get('seed');
@@ -83,6 +86,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
   preparations.delete(visit);
   let ctxRef: SceneContext | null = null;
   let activityStart: (() => void) | undefined;
+  let tapArrive: (() => void) | undefined;
   const activity = {
     id: sceneId(scene.id), kind: 'scene' as const,
     enter(actx: ActivityContext, { mount }: SceneParams): ActivityRun {
@@ -152,6 +156,16 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       const seed = seedFromAddress();
       const rng = seed === null ? null : createRng(seed);
       const random = () => (rng ?? runRandom.stream(`scene.${scene.id}`)).next();
+      const liveInput = sceneInput(ownsInput, id => input.held(id), pressed, pointer, sceneActionHints(o.inputs, id => input.describeAction(id)));
+      // Dev/test only: a replay tool may record or drive this visit's fixed ticks (scene-tick-tap.ts).
+      let tap: SceneTickTap | null = null;
+      if (TEST_API) {
+        try {
+          tap = openSceneTickTap({ scene: scene.id, game: { id: s.play.game.id, version: s.play.game.version }, inputs: o.inputs.map(i => ({ id: i.id, axis: !!i.axis })),
+            seed, step: FIXED_STEP, world, live: liveInput, invalidate: () => actx.invalidate() });
+        } catch (error) { s.log.error(`${scene.id}: tick tap failed`, error); }
+        if (tap) { const owned = tap; actx.own(() => owned.retire()); tapArrive = () => owned.arrive(); }
+      }
       let frame = 0, t = 0, calm = false;
       const voices = createSceneVoices((cue, options) => !s.app.has('platform.audio') || actx.signal.aborted ? null : s.audio.playVoice(cue, options));
       actx.own(() => voices.dispose());
@@ -162,7 +176,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
           goto: (id, params) => { void s.router.go(sceneId(id), params ? { params } : {}); },
           restart: () => { void s.router.go(sceneId(scene.id), { params: { ...visit.params }, again: 'reenter' }); },
         },
-        input: sceneInput(ownsInput, id => input.held(id), pressed, pointer, sceneActionHints(o.inputs, id => input.describeAction(id))),
+        input: tap ? tap.input : liveInput,
         get time() { return { t, frame, calm }; },
         view: viewState,
         spawn: (prefab, ...extra) => spawnInto(world, prefab, extra),
@@ -327,7 +341,9 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       sync();
 
       const timing = TEST_API ? createSystemTiming(body.systems, visit, actx.signal) : undefined;
-      const runner = createSystemRunner(timing?.systems ?? body.systems, { report: (id, error) => s.log.error(`${scene.id}: system ${id} failed`, error), after: () => world.clearEvents() });
+      const fixedSystems = timing?.systems ?? body.systems;
+      const tapped = tap ? [{ id: 'engine-tick-tap-begin', run: () => tap.beforeTick() }, ...fixedSystems, { id: 'engine-tick-tap-end', run: () => tap.afterTick() }] : fixedSystems;
+      const runner = createSystemRunner(tapped, { step: FIXED_STEP, report: (id, error) => s.log.error(`${scene.id}: system ${id} failed`, error), after: () => world.clearEvents() });
       const live = body.systems.length > 0 || [...world.query(Model)].length > 0;
       const handle: SceneHandle = {
         state: () => {
@@ -400,7 +416,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
           try{
           frame++; t += f.dt; calm = f.calm;
           gestures.sync();
-          runner.frame(ctx, f.dt);
+          if (!tap || tap.running()) runner.frame(ctx, f.dt);
           pressed.clear(); pointer.pressed = false;
           sync(f.dt);
           }catch(error){if(error instanceof ProgramLinkError||error instanceof FrameReadinessError)failPrograms(error);else throw error;}
@@ -442,6 +458,6 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
   };
   return enterActivity({
     host: s.shell.activities, mount: s.shell.mount, activity, visit,
-    arrive: () => { if (ctxRef) { scene.enter?.(ctxRef); activityStart?.(); } },
+    arrive: () => { if (ctxRef) { scene.enter?.(ctxRef); activityStart?.(); tapArrive?.(); } },
   });
 }
