@@ -425,3 +425,14 @@ caller-owned. See the [contract](../../src/platform/assets/dependency-lease.md) 
 Native task oracle, all seven template gates and the CI browser suites passed (see the
 evidence README and public PR #11);
 integration, frame-time and downstream acceptance remain pending; no resource budget changes.
+
+## Queue age and submit deadlines — NW-06 implemented, candidate
+
+Implemented, candidate (PR pending on `feat/nw06-queue-deadlines`); not integrated.
+The [network intake](../../src/kits/network/README.md#optional-queued-command-age-nw-06)
+may shed commands older than an optional `maxQueuedAgeMs` before authorization or
+dispatch, and [durable authority](durable-authority.md#optional-submit-deadlines-nw-06)
+may return `expired` for an optional deadline on an injected clock, only before the
+storage call starts. In-flight writes keep committed/rejected/unknown semantics and
+`expired` consumes no sequence. Both are off by default. Evidence is 6 intake and 7
+authority focused tests; load, browser composition and devices remain unverified.

@@ -137,6 +137,45 @@ anchor. Backup restoration requires explicit lineage/floor preservation or trust
 fencing and rollover. Schema validation does not prove historical causality or
 physical power-loss durability.
 
+## Optional submit deadlines (NW-06)
+
+Creators may supply `clock: () => number` when constructing the authority and pass
+`submit(command, {deadlineMs})`. Without a deadline, the clock is never read and
+behaviour is unchanged. The clock is injected; no wall clock is consulted. Any
+finite millisecond scale works if the caller's `deadlineMs` uses the same one.
+
+- **Owner and checks.** The existing serialized authority owns the check; there is
+  no queue or timer. While holding its single reserved slot it reads the clock at
+  most twice: once before command validation, receipts and reduction, and once
+  immediately after the final authorization recheck, with no await between that
+  read and `compareAndSwap`. A reading at or after `deadlineMs` returns
+  `{status: 'expired'}`.
+- **After invocation.** The clock is never read again. An in-flight write keeps the
+  existing `committed`, `rejected` (`unavailable`) and `unknown` semantics exactly,
+  however late it finishes. A deadline is never a storage timeout, and `expired`
+  never means "might have committed".
+- **Consumption.** `expired` consumes no sequence and no revision, writes nothing
+  and returns `status` to ready. It is distinct from `busy`, which
+  also admits no queued work, and from `refused`. The client may retry exactly the
+  same `{stream, sequence, inputJson}` later; retry pacing belongs to one layer.
+- **Receipts.** The first check precedes receipt lookup, so an expired retry of an
+  already committed command returns `expired`, not `duplicate`. A later retry
+  without an elapsed deadline returns the retained receipt as usual.
+- **Invalid input.** A deadline without a configured clock, or a non-finite
+  `deadlineMs`, returns `refused` with reason `deadline`. A clock that throws or
+  returns a non-finite value returns `refused` with reason `clock`. Neither touches
+  storage. Readings need not be monotonic: each one is compared on its own, so a
+  backwards step can admit work that an earlier reading would have refused.
+- **Overload and cancellation.** `busy` is still returned before any deadline check,
+  so expiry adds no waiting. Pure reducer work done before a late expiry is
+  discarded. Reentrant `submit` from the clock is busy; disposal from the clock
+  retires without storage invocation.
+- **Limitations.** A deadline bounds admission, not storage latency or callback CPU
+  time. Clock skew between client and host is the creator's protocol concern.
+  Seven focused tests cover the boundary, expiry during callbacks, late completion
+  as committed/unknown/throw, non-monotonic and invalid clocks, receipt retry
+  interplay, configuration and reentry. No load, WAN or device acceptance is claimed.
+
 ## Composition and acceptance
 
 Existing [network admission](network-admission.md) is a synchronous bounded ingress

@@ -116,6 +116,42 @@ must independently limit traffic before repeatedly calling admission. Queued dat
 bounds are not authentication-provider capacity guarantees or total process heap
 bounds. Trusted projection/domain callbacks and remote I/O are not timed here.
 
+## Optional queued-command age (NW-06)
+
+Creators who want abandoned work dropped may set `limits.maxQueuedAgeMs` (a
+positive safe integer in host-time units) and, optionally, a `stale(context)` port.
+Without `maxQueuedAgeMs` behaviour is unchanged: commands wait indefinitely and
+`pump` returns the same five fields as before.
+
+- **Input and owner.** The intake owner records the `now` passed to `receive` with
+  each queued command. No clock, timer or scheduler is added; age is measured
+  only when the caller drives `pump(now)`.
+- **Rule.** When a command reaches the head of its turn and
+  `now - receivedAt >= maxQueuedAgeMs`, it is shed: removed, its count and bytes
+  released, never passed to `authorize` or `dispatch`. Age equal to the limit is
+  stale. Per-peer receive times are nondecreasing, so a fresh head means the rest
+  of that peer's queue is fresh.
+- **Output.** `pump` adds `stale` (shed count) only when the limit is configured.
+  Shedding consumes one attempt of the pump budget, so overload work stays bounded.
+  Aged work is dropped before it costs authorization or dispatch.
+- **Reply.** `stale({peer, principal, command, receivedAt, ageMs})` may call
+  `intake.send` for one bounded reply through the existing reply path. Authorization
+  is **not** rechecked for this notice; disclose only correlation (for example a
+  command ID and `expired`). Nested pump/receive return busy. A throwing notice
+  retires the peer with `stale-error`.
+- **Bounds.** One extra number per queued command, bounded by the existing
+  message-count limits. It is not added to the UTF-8 byte accounting, so
+  configured byte limits keep their meaning.
+- **Time and recovery.** Backwards or non-finite time still throws before any work,
+  so nothing is shed or dispatched on a bad clock. A shed command never reached
+  creator logic; whether the client retries, and how fast, is creator protocol.
+  Durable authority does not see it, so no authority sequence is consumed.
+- **Limits.** Stale commands deeper in a queue are only examined when they become
+  head of their turn, so an idle pump does not sweep them. Age measures host
+  queueing only, not client send time, network delay or clock skew between hosts.
+  Unit tests cover the exact boundary, budget accounting, fair drain, backwards time,
+  reply/reentry and configuration. No transport, load or device acceptance is claimed.
+
 ## Time, reentry and cleanup
 
 Time is caller supplied, finite, nonnegative and nondecreasing across methods;

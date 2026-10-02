@@ -11,6 +11,7 @@ import type {
   AuthorityOutcome,
   AuthoritySnapshot,
   AuthorityStatus,
+  AuthoritySubmitOptions,
   AuthorityValidation,
 } from './authority-types';
 export { createAuthorityGenesis } from './authority-envelope';
@@ -32,7 +33,8 @@ export function createDurableAuthority(options: AuthorityOptions) {
   };
   const authorize = options.authorize,
     reduce = options.reduce,
-    storage = options.storage;
+    storage = options.storage,
+    clock = options.clock;
   if (
     !authorityIdentity(lineage) ||
     !authorityIdentity(schema) ||
@@ -52,6 +54,8 @@ export function createDurableAuthority(options: AuthorityOptions) {
     ].every((fn) => typeof fn === 'function')
   )
     throw Error('authority: callbacks');
+  if (clock !== undefined && typeof clock !== 'function')
+    throw Error('authority: clock');
   const settle = storage.settle.bind(storage),
     readStorage = storage.read.bind(storage),
     compareAndSwap = storage.compareAndSwap.bind(storage);
@@ -145,11 +149,42 @@ export function createDurableAuthority(options: AuthorityOptions) {
         busy = false;
       }
     },
-    async submit(request: AuthorityCommand): Promise<AuthorityOutcome> {
+    async submit(
+      request: AuthorityCommand,
+      admission?: AuthoritySubmitOptions,
+    ): Promise<AuthorityOutcome> {
       if (retired) return result({ status: 'retired' });
       if (busy) return result({ status: 'busy' });
       if (status !== 'ready' || !current)
         return result({ status: 'unavailable' });
+      let deadline: number | undefined;
+      if (admission !== undefined) {
+        try {
+          deadline = admission.deadlineMs;
+        } catch {
+          deadline = NaN;
+        }
+        if (
+          clock === undefined ||
+          typeof deadline !== 'number' ||
+          !Number.isFinite(deadline)
+        )
+          return result({ status: 'refused', reason: 'deadline' });
+      }
+      // Reads the injected clock only while no storage call has started. Non-monotonic
+      // readings are compared as given; a later reading may pass after an earlier one.
+      const lapsed = (): AuthorityOutcome | null => {
+        if (deadline === undefined) return null;
+        let time: number;
+        try {
+          time = clock!();
+        } catch {
+          return result({ status: 'refused', reason: 'clock' });
+        }
+        if (typeof time !== 'number' || !Number.isFinite(time))
+          return result({ status: 'refused', reason: 'clock' });
+        return time >= deadline ? result({ status: 'expired' }) : null;
+      };
       busy = true;
       status = 'pending';
       reason = null;
@@ -159,6 +194,10 @@ export function createDurableAuthority(options: AuthorityOptions) {
           sequence = request.sequence,
           inputJson = request.inputJson;
         if (!live()) return result({ status: 'retired' });
+        // First admission point: shed abandoned work before validation, receipts or reduction.
+        const early = lapsed();
+        if (!live()) return result({ status: 'retired' });
+        if (early) return early;
         if (
           !authorityIdentity(stream) ||
           !authorityInteger(sequence) ||
@@ -245,6 +284,10 @@ export function createDurableAuthority(options: AuthorityOptions) {
         if (!live()) return result({ status: 'retired' });
         if (permittedNow !== true)
           return result({ status: 'refused', reason: 'unauthorized' });
+        // Last admission point: nothing awaits between this check and invocation.
+        const late = lapsed();
+        if (!live()) return result({ status: 'retired' });
+        if (late) return late;
         invoked = true;
         const outcome = await compareAndSwap(
           Object.freeze({

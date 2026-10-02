@@ -2,7 +2,7 @@ import { createAuthoredDocument, type DocumentLimits, type DocumentValue } from 
 import type { ConnectionHandle, NetworkContext, NetworkIntake, NetworkLimits, NetworkPeerState,
   NetworkPorts, NetworkReason, NetworkRefusal } from './types';
 
-type Message = { value: DocumentValue; bytes: number };
+type Message = { value: DocumentValue; bytes: number; received: number };
 type Slot = {
   peer: ConnectionHandle; state: NetworkPeerState['state']; opened: number;
   principal: DocumentValue | null; attempt: object | null; queue: Message[];
@@ -20,7 +20,7 @@ function capture(json: string, limits: DocumentLimits): Message {
     validate: (value): value is DocumentValue => value !== undefined });
   const { value, bytes } = document.read();
   document.dispose();
-  return { value, bytes };
+  return { value, bytes, received: 0 };
 }
 
 /** Caller-owned, bounded intake. Trusted callbacks are synchronous except explicit auth completion. */
@@ -31,13 +31,16 @@ export function createNetworkIntake(options: { limits: NetworkLimits; ports: Net
     maxPreAuthMessages: input.maxPreAuthMessages, authTimeoutMs: input.authTimeoutMs,
     maxQueuedMessagesPerPeer: input.maxQueuedMessagesPerPeer, maxQueuedBytesPerPeer: input.maxQueuedBytesPerPeer,
     maxQueuedMessages: input.maxQueuedMessages, maxQueuedBytes: input.maxQueuedBytes,
-    maxPumpOperations: input.maxPumpOperations,
+    maxPumpOperations: input.maxPumpOperations, maxQueuedAgeMs: input.maxQueuedAgeMs,
     message: documentLimits(input.message), principal: documentLimits(input.principal),
   });
-  if (!Object.entries(limits).every(([key, value]) => key === 'message' || key === 'principal' || positive(value as number)))
+  if (!Object.entries(limits).every(([key, value]) => key === 'message' || key === 'principal'
+    || (key === 'maxQueuedAgeMs' && value === undefined) || positive(value as number)))
     throw Error('network: invalid limits');
-  const { authenticate: verify, authorize, dispatch, send: transmit, close: notifyClose } = options.ports;
-  if (![verify, authorize, dispatch, transmit, notifyClose].every(fn => typeof fn === 'function'))
+  const maxAge = limits.maxQueuedAgeMs;
+  const { authenticate: verify, authorize, dispatch, send: transmit, close: notifyClose, stale: notifyStale } = options.ports;
+  if (![verify, authorize, dispatch, transmit, notifyClose].every(fn => typeof fn === 'function')
+    || (notifyStale !== undefined && typeof notifyStale !== 'function'))
     throw Error('network: missing port');
   const live = new Map<ConnectionHandle, Slot>();
   const known = new WeakMap<ConnectionHandle, Slot>();
@@ -139,6 +142,7 @@ export function createNetworkIntake(options: { limits: NetworkLimits; ports: Net
       if (slot.queue.length >= limits.maxQueuedMessagesPerPeer || queuedMessages >= limits.maxQueuedMessages
         || message.bytes > limits.maxQueuedBytesPerPeer - slot.bytes || message.bytes > limits.maxQueuedBytes - queuedBytes)
         return refuse('queue-limit');
+      message.received = now;
       slot.queue.push(message); slot.bytes += message.bytes;
       queuedMessages++; queuedBytes += message.bytes;
       return Object.freeze({ status: 'queued' as const });
@@ -148,7 +152,7 @@ export function createNetworkIntake(options: { limits: NetworkLimits; ports: Net
       if (!Number.isSafeInteger(budget) || budget < 0 || budget > limits.maxPumpOperations) throw Error('network: invalid pump budget');
       time(next);
       const expired = expire();
-      let attempted = 0, dispatched = 0, denied = 0, empty = 0;
+      let attempted = 0, dispatched = 0, denied = 0, stale = 0, empty = 0;
       busy = true;
       try {
         while (!disposed && order.length && attempted < budget && empty < order.length) {
@@ -157,6 +161,16 @@ export function createNetworkIntake(options: { limits: NetworkLimits; ports: Net
           empty = 0;
           const command = slot.queue.shift()!; slot.bytes -= command.bytes;
           queuedMessages--; queuedBytes -= command.bytes; attempted++;
+          if (maxAge !== undefined && now - command.received >= maxAge) {
+            // Per-peer receive times are nondecreasing, so a fresh head means the rest of that queue is fresh.
+            stale++;
+            if (notifyStale) {
+              try { notifyStale(Object.freeze({ peer: slot.peer, principal: slot.principal, command: command.value,
+                receivedAt: command.received, ageMs: now - command.received })); }
+              catch { close(slot.peer, 'stale-error'); }
+            }
+            continue;
+          }
           const context: NetworkContext = Object.freeze({ peer: slot.peer, principal: slot.principal, command: command.value });
           let allowed: boolean;
           try { allowed = authorize(context) === true; }
@@ -166,7 +180,9 @@ export function createNetworkIntake(options: { limits: NetworkLimits; ports: Net
           catch { close(slot.peer, 'dispatch-error'); denied++; }
         }
       } finally { busy = false; }
-      return Object.freeze({ status: 'pumped' as const, attempted, dispatched, denied, expired });
+      return Object.freeze(maxAge === undefined
+        ? { status: 'pumped' as const, attempted, dispatched, denied, expired }
+        : { status: 'pumped' as const, attempted, dispatched, denied, expired, stale });
     },
     send(peer: ConnectionHandle, json: string) {
       if (disposed) return refuse('disposed');
