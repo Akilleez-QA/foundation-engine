@@ -10,7 +10,7 @@ or not at all; a production build never contains the dev surface.
 
 State: SIM-01 is integrated in v0.2.0 (PR #17). The creator-chosen replay digest and
 divergence detail (SIM-02, [below](#choose-what-a-replay-must-reproduce-sim-02)) are
-implemented on branch `feat/replay-custom-digest`, candidate (PR), not integrated.
+implemented on branch `feat/replay-custom-digest`, candidate (PR #58), not integrated.
 Evidence and limits are listed below.
 
 > **Frame-phase writes break the default digest.** The default digest hashes every
