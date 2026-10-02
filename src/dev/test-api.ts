@@ -147,6 +147,8 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
         await app.services.router.go(before.scene as SceneId, { again: 'reenter' });
         for (const t0 = performance.now(); ;) {
           const state = replay.read();
+          // A visit-time refusal (seed, identity, scene) leaves that visit untapped: report it, not a start.
+          if (state.status === 'refused' || state.status === 'failed') return Object.freeze({ status: 'refused', reason: state.reason ?? state.status });
           if (state.status !== 'armed') return Object.freeze({ status: 'started', state });
           if (performance.now() - t0 > timeoutMs) { replay.stop(); return Object.freeze({ status: 'refused', reason: 'arrival-timeout' }); }
           await sleep(20);

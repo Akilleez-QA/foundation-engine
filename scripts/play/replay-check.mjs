@@ -93,6 +93,18 @@ try {
   assert.equal(await engine(b, () => window.engine.probe('scene').epoch), epoch, 'a refused log does not re-enter the scene');
   report.states.push({step: 'corrupted log', refused: 'corrupt-checksum'});
 
+  // A log recorded under another seed is refused at the visit (the page is ?seed=7), and start says so.
+  await engine(b, () => window.engine.replay.start({mode: 'record'}));
+  const otherSeed = (await engine(b, () => window.engine.replay.read())).log;
+  await engine(b, () => window.engine.replay.stop());
+  const header = JSON.parse(otherSeed).header;
+  assert.equal(header.seed, 7);
+  const {encodeReplay} = await import('../../src/kits/replay/index.ts');
+  const parsed = JSON.parse(otherSeed);
+  const reseeded = encodeReplay({header: {...header, seed: 8}, ticks: parsed.ticks, truncatedAt: parsed.truncatedAt, runs: parsed.runs, digests: parsed.digests});
+  assert.deepEqual(await engine(b, log => window.engine.replay.start({mode: 'replay', log}), reseeded), {status: 'refused', reason: 'incompatible-seed'});
+  report.states.push({step: 'log for another seed', refused: 'incompatible-seed'});
+
   await b.page.screenshot({path: resolve(out, 'after-replay.png')});
   assert.deepEqual(b.errors, []);
   report.passed = true;

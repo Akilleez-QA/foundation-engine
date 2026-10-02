@@ -107,7 +107,10 @@ authority between commands. That check owns no owners: to cancel, the caller ret
 its prediction and authority, and the next operation reports a refusal. In the dev
 surface, a visit's retirement ends its session (`stopped`, reason `visit-ended`).
 `stop()` ends recording and keeps the log readable. A new `start` stops the previous
-session. A refused request arms nothing and does not re-enter the scene. A failed
+session. A request refused before re-entry (an invalid option, or an unreadable,
+unsupported or corrupted log) arms nothing and does not re-enter the scene. A log
+refused at the visit (another build, configuration, step or `?seed=`) leaves that
+re-entered visit untapped, and `start` returns the refusal. A failed
 recorder or trace stays failed. Recovery means recording again; there is no runtime
 repair, because this is a verification tool.
 
@@ -181,7 +184,8 @@ Browser regression `npm run test:replay-browser`
 - the browser replays it exactly with a different frame grouping;
 - the same log replays exactly in the separate headless harness;
 - a teleport between frames is reported at that exact tick;
-- a corrupted log is refused without re-entering the scene.
+- a corrupted log is refused without re-entering the scene;
+- a log for another seed is refused at the visit.
 
 Not established: physical devices, other browsers, production builds (which do not
 contain the dev surface), multiplayer or WAN, and the creator's own simulations.
