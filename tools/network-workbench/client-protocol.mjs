@@ -81,5 +81,22 @@ export function decodeResponse(raw, { principal, pending }) {
       ...(identified ? { id: frame.id } : {}),
     });
   }
+  if (frame.type === 'drain') {
+    // NW-08 notice. Shape only; the client's drain follower applies its own bounds.
+    if (
+      !exact(frame, ['v', 'type', 'cause', 'closeInMs', 'reconnectAfterMs']) ||
+      !['planned', 'lifetime'].includes(frame.cause) ||
+      !Number.isSafeInteger(frame.closeInMs) ||
+      !Number.isSafeInteger(frame.reconnectAfterMs)
+    )
+      throw Error('drain response');
+    return Object.freeze({
+      v: 1,
+      type: 'drain',
+      cause: frame.cause,
+      closeInMs: frame.closeInMs,
+      reconnectAfterMs: frame.reconnectAfterMs,
+    });
+  }
   throw Error('response type');
 }

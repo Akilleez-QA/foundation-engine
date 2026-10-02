@@ -71,6 +71,8 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | NW-04 | Reconnect/retry pacing: full-jitter backoff and retry budget | Implemented, candidate (PR #14, `feat/nw04-reconnect-schedule`); not integrated. Optional pure `createRetrySchedule` in the network kit, with the network workbench client as an opt-in consumer. Evidence and remaining limits are in the NW-04 section below. No WAN, reconnect-storm-against-a-real-host or physical-device claim. |
 | NW-05 | Shared rate and concurrency admission | Implemented, candidate (PR #13); not integrated. Optional single-process `createRateAdmission` ([guide](rate-admission.md)): per-key token bucket, optional concurrency leases, `maxKeys` with lossless idle reclamation only, explicit `limited`/`refused` results, clock-regression safe, idempotent dispose. Three reference hosts migrated from 1000 ms fixed windows to buckets of equal burst and refill (intended semantic change: no 2x boundary burst; same long-run rate). Focused unit and loopback host tests; no distributed, measured-load or physical-device claim. |
 | RES-01 | Bounded asset residency (texture/model budgets, pins, LRU eviction) | Implemented, candidate (PR #22); not integrated. Optional `defineGame({ residency })` applies per-preset `warmBytes`/`residentBytes` and pinned asset ids to the existing `LeaseCache` of the texture and model libraries; live and pinned assets are never evicted, over-ceiling pressure is reported once per transition with a creator hook, retained three.js resources are parked through public `dispose` events. Default unchanged (dispose at release). Evidence: focused unit tests, an opt-in native SwiftShader fixture (estimate vs uploaded mip chain, `renderer.info` counts, actual context loss) and a temporary composed probe; see [guide](asset-residency.md). No program-count budget, cross-library ceiling, physical-device memory or traversal-performance claim. |
+
+| NW-08 | Planned drain and capped connection lifetime (study N8) | Implemented, candidate (PR_REF, `feat/nw08-planned-drain`); not integrated. Optional pure `createConnectionDrain` (host: bounded notice, operator drain/resume, dithered lifetime cap, per-poll instruction cap) and `createDrainFollower` (client: bounded notice, cooperative close, hold until announced return, then the existing retry schedule) in the network kit; the network workbench host (`--drain`) and client (checkbox) opt in. Drain closes are 1012 and transient. Admitted work is never cancelled. Evidence and limits are in the NW-08 section below. No process-restart, WAN or physical-device claim. |
 | TR-01 | Regional terrain worker and ordinary-surface integration | Integrated in PR #109 at 99e6255. Canonical regional Surface and halo patches, bounded WorkerHost generation/patch adapters, independent geometric oracles and finite coherent render/query consumer passed at 891eb7; all seven template gates passed (1,648 tests, 129 performance checks, zero breaches/regressions, four advisory heap warnings). Combined main tests/build passed. Physical-device performance and unbounded/global streaming are not established. |
 | DV-01 | Supported-device experience and sustained performance evidence | In progress, not integrated: ported to the public `feat/device-acceptance` PR. [Stock matrix](../kits/stock-device-acceptance-matrix.md) covers all seven declarations. The [first receipt](../verification/stock-device-20261001/README.md) records 16 passing emulated target/tap checks and a compact lesson content overlap; lesson visit cleanup and a measured learn layout seam repair it, with a fake-DOM regression and emulated separation checks across board, sim and quiz at four profiles ([layout receipt](../verification/stock-device-20261002/README.md)). Full consumer workflows, in-panel touch scrolling, 200% text, named minimum devices and sustained physical evidence remain open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. No physical-device or accessibility certification. |
 
@@ -305,3 +307,27 @@ Status: candidate (PR #16), building on integrated NW-04 (PR #14); not integrate
 | ID | Contract and required observation | State |
 |---|---|---|
 | PERF-01 | Optional, local-only [sustained-session recorder](session-performance.md) on the one frame loop. It records bounded rolling windows of frame/work p50/p95/p99, long and severe frames, rendered/idle counts, scene/epoch/preset segments and drift, plus a versioned evidence file. It has a zero-cost path when absent and is dev/test-only. | Implemented, candidate (PR #15 on the public repository); not integrated. Focused adversarial tests and an emulated browser run (a 30-second CI check plus a saved 10-minute sample) are recorded in the guide and in [verification](../verification/session-perf-20261002/README.md). This is supporting tooling for DV-01: it supplies the evidence format, not device evidence. DV-01 remains open. |
+
+## Planned drain and capped lifetime (NW-08) — implemented, candidate
+
+Status: implemented, candidate on branch `feat/nw08-planned-drain` (PR_REF); not integrated. See the [drain guide](network-drain.md).
+
+- Runtime-enforced: limit validation (exact keys, safe integers of at most one day,
+  `noticeMs + jitterMs < maxLifetimeMs`, `maxKeys` at most 65,536); drain requests
+  bounded by `maxNoticeMs`/`maxReconnectAfterMs`; lifetime close never later than
+  `maxLifetimeMs`; at most `maxActionsPerPoll` instructions per poll, notify before
+  close, a late notice never postpones its close; a second drain can only bring a
+  close earlier; nondecreasing time; random-port validation; terminal disposal.
+  The client follower refuses notices beyond its own bounds.
+- Checked: 18 focused unit tests (including seeded jitter distribution over 2,000
+  connections, 1,000-connection expiry under a per-poll cap, and reconnect after
+  host return through a real retry schedule with budget and exhaustion honoured);
+  4 host socket tests and 1 client protocol test; the network workbench browser
+  workflow shows a following client holding without opening a transport, an
+  ignoring client closed at the deadline with 1012 `drain` (transient), and both
+  reconnecting with fresh authentication after the operator resumes, with no
+  command resent. Exact-head gate results are in the PR.
+- Not established: a real process restart (reference "host return" is an operator
+  `resume` of the same process), close-frame delivery over lossy links, measured
+  reconnect storms, multi-host or rolling deploys, durable-authority host wiring,
+  physical devices and suitability of the example values for any game.

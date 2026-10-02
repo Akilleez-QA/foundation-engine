@@ -355,6 +355,26 @@ close reason is untrusted remote input: the transport keeps it only as a bounded
 token, and consumers display it only as text. See
 [terminal refusals](../../../docs/guides/network-retry.md#terminal-refusals-and-transient-loss).
 
+## Optional planned drain and capped lifetime (NW-08)
+
+`createConnectionDrain({limits:{maxKeys,maxNoticeMs,maxReconnectAfterMs,maxActionsPerPoll,lifetime?},random?})`
+is a host-side pure state machine. `track(key, now)` on open, `admits(key)` before
+admitting new work, `drain(now, {noticeMs, reconnectAfterMs})` for an operator
+drain (new connections refused until `resume()`), and `poll(now)` from the host's
+existing driver returns at most `maxActionsPerPoll` `notify` then `close`
+instructions, earliest first. An optional `lifetime` caps each connection at
+`maxLifetimeMs`, dithered earlier by up to `jitterMs`, with `noticeMs` warning.
+A second drain can only bring a close earlier. It never cancels admitted work.
+`createDrainFollower({limits:{maxNoticeMs,maxReconnectAfterMs}})` is the client
+side: it validates a notice against the client's bounds, stops new work, signals
+one cooperative close and holds the first reconnect until the announced return;
+pacing after that is the caller's `createRetrySchedule`. Drain closes use
+`DRAIN_CLOSE_CODE` (1012) and are transient under the default close policy. Both
+own no timer, socket or random source; time is caller-supplied and nondecreasing.
+See the [drain guide](../../../docs/guides/network-drain.md). Implemented,
+candidate (NW-08); not integrated, and no WAN, process-restart or physical-device
+acceptance.
+
 NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. Clean native acceptance passed at `8317c69` with seven observations; 17 storage/host checks passed on Node 22.13. DV-01 remains open. The [acceptance ledger](../../../docs/guides/upgrade-acceptance-ledger.md)
 records revisions, process evidence and outstanding work. Application credit,
 command consumption, durable commitment and disclosure permission remain distinct.

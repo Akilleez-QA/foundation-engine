@@ -23,3 +23,8 @@ export type { RateKey, RateLease, RateAdmission, RateAdmissionLimits, RateAdmiss
 export { createClosePolicy, DEFAULT_TERMINAL_CLOSE_REASONS, DEFAULT_TERMINAL_CLOSE_CODES,
   MAX_CLOSE_POLICY_ENTRIES } from './close-policy';
 export type { ClosePolicy, ClosePolicyOptions, CloseClass } from './close-policy';
+export { createConnectionDrain, createDrainFollower, DRAIN_CLOSE_CODE, MAX_DRAIN_KEYS,
+  MAX_DRAIN_WINDOW_MS } from './drain';
+export type { ConnectionDrain, ConnectionDrainLimits, ConnectionDrainOptions, ConnectionDrainState,
+  ConnectionLifetimeLimits, DrainAction, DrainCause, DrainKey, DrainNotice, DrainStartResult, DrainTrackResult,
+  DrainFollower, DrainFollowerLimits, DrainFollowerState, DrainNoticeResult, DrainCloseResult } from './drain';

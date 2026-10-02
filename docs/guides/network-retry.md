@@ -180,3 +180,8 @@ The browser transport itself still implements no reconnect; pacing is the
 consumer's explicit choice. Close classification is only as reliable as the host's
 close frames: the reference host closes then terminates immediately, which delivered
 the frame on loopback but is not established over slow or lossy links.
+
+A planned host drain (NW-08) is a transient close (code 1012, reason `drain` or
+`lifetime`); a client that follows the notice holds until the announced return
+and then paces through this same schedule. See the
+[drain guide](network-drain.md).

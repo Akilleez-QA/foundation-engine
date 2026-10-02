@@ -3,8 +3,10 @@ import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 import {
+  createConnectionDrain,
   createNetworkIntake,
   createRateAdmission,
+  DRAIN_CLOSE_CODE,
 } from '../../src/kits/network/index.ts';
 
 export const hostLimits = Object.freeze({
@@ -41,6 +43,7 @@ export async function startNetworkWorkbench({
   port = 0,
   autoDriver = true,
   driverMs = 10,
+  drain: drainOptions,
 } = {}) {
   if (
     !Number.isSafeInteger(port) ||
@@ -74,6 +77,8 @@ export async function startNetworkWorkbench({
       driverRounds: 0,
       sentBytes: 0,
       transportRefusals: 0,
+      drainNotices: 0,
+      drainRefusals: 0,
     };
   const wss = new WebSocketServer({
     host: '127.0.0.1',
@@ -84,6 +89,18 @@ export async function startNetworkWorkbench({
     clientTracking: true,
   });
   const now = () => performance.now();
+  // Optional planned drain and capped lifetime (NW-08); absent unless the operator configures it.
+  const drainPlan = drainOptions === undefined ? null : createConnectionDrain({
+    limits: {
+      maxKeys: hostLimits.maxConnections,
+      maxNoticeMs: 60000,
+      maxReconnectAfterMs: 60000,
+      maxActionsPerPoll: 16,
+      ...(drainOptions?.lifetime ? { lifetime: drainOptions.lifetime } : {}),
+    },
+    ...(drainOptions?.lifetime ? { random: drainOptions.random ?? Math.random } : {}),
+  });
+  const drainClose = (reason) => reason === 'drain' || reason === 'lifetime';
   // One bucket per live intake peer; the intake connection bound bounds the keys.
   const frameRate = createRateAdmission({
     maxKeys: hostLimits.maxConnections,
@@ -133,13 +150,16 @@ export async function startNetworkWorkbench({
         if (!state) return;
         peers.delete(peer);
         frameRate.forget(peer);
+        drainPlan?.forget(peer);
         metrics.closed++;
         state.socket.removeListener('message', state.message);
         if (state.socket.readyState === WebSocket.OPEN)
           state.socket.close(
-            reason.includes('capacity') || reason.includes('queue')
-              ? 1013
-              : 1008,
+            drainClose(reason)
+              ? DRAIN_CLOSE_CODE
+              : reason.includes('capacity') || reason.includes('queue')
+                ? 1013
+                : 1008,
             String(reason).slice(0, 100),
           );
         // A closed owner must not retain a slow peer waiting indefinitely for the close handshake.
@@ -192,6 +212,10 @@ export async function startNetworkWorkbench({
       intake.close(peer, 'send-refused');
     return { status: 'refused', reason };
   }
+  function notify(peer, value) {
+    if (intake.read(peer)?.state === 'active') return send(peer, value);
+    if (!transportSend(peer, stringify(value))) intake.close(peer, 'send-refused');
+  }
   function announce(peer) {
     const state = peers.get(peer),
       snapshot = intake.read(peer);
@@ -214,6 +238,14 @@ export async function startNetworkWorkbench({
     }
     intake.pump(time);
     for (const peer of peers.keys()) announce(peer);
+    // Notices and closes follow the queued work served above; admitted commands are never revoked.
+    for (const step of drainPlan?.poll(time) ?? []) {
+      if (step.action === 'close') intake.close(step.key, step.cause === 'lifetime' ? 'lifetime' : 'drain');
+      else if (peers.has(step.key)) {
+        metrics.drainNotices++;
+        notify(step.key, { v: 1, type: 'drain', ...step.notice });
+      }
+    }
   }
   wss.on('connection', (socket) => {
     socket.on('error', () => {});
@@ -223,8 +255,15 @@ export async function startNetworkWorkbench({
       socket.terminate();
       return;
     }
-    const peer = result.peer,
-      state = {
+    const peer = result.peer;
+    const tracked = drainPlan?.track(peer, now());
+    if (tracked && tracked.status !== 'tracked') {
+      socket.close(DRAIN_CLOSE_CODE, 'drain');
+      socket.terminate();
+      intake.close(peer, 'drain');
+      return;
+    }
+    const state = {
         socket,
         announced: false,
         lastFrame: now(),
@@ -290,6 +329,12 @@ export async function startNetworkWorkbench({
         frame.delta >= 1 &&
         frame.delta <= 5
       ) {
+        if (drainPlan && !drainPlan.admits(peer)) {
+          // After a drain notice no new work is admitted; already queued work still runs.
+          metrics.drainRefusals++;
+          refuse(peer, 'draining', frame.id);
+          return;
+        }
         const outcome = intake.receive(
           peer,
           stringify({ id: frame.id, target: frame.target, delta: frame.delta }),
@@ -326,6 +371,7 @@ export async function startNetworkWorkbench({
           bufferedBytes: state.socket.bufferedAmount,
         })),
         heldAuthentication: held.size,
+        drain: drainPlan?.read() ?? null,
       };
     },
     pump,
@@ -333,6 +379,19 @@ export async function startNetworkWorkbench({
       if (!['alpha', 'beta'].includes(principal)) throw Error('principal');
       if (value === true) blockedSends.add(principal);
       else blockedSends.delete(principal);
+    },
+    /** Operator drain (NW-08): notify every peer, refuse new connections, close at the notice deadline. */
+    drain(request) {
+      if (!drainPlan) throw Error('drain-disabled');
+      const result = drainPlan.drain(now(), request);
+      if (result.status !== 'draining') throw Error('drain-' + result.reason);
+      pump();
+      return result;
+    },
+    /** End an operator drain: new connections are admitted again (the reference "host return"). */
+    resume() {
+      if (!drainPlan) throw Error('drain-disabled');
+      return drainPlan.resume();
     },
     holdAuthentication(value) {
       hold = value === true;
@@ -358,6 +417,7 @@ export async function startNetworkWorkbench({
       clearInterval(timer);
       intake.dispose();
       frameRate.dispose();
+      drainPlan?.dispose();
       held.clear();
       for (const socket of wss.clients) socket.terminate();
       closePromise = new Promise((resolve) => wss.close(resolve));
@@ -371,7 +431,13 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
-  const host = await startNetworkWorkbench();
+  // `--drain` opts in to operator drain; `--drain=<lifetime JSON>` also caps connection lifetime (NW-08).
+  const drainArg = process.argv.slice(2).find((arg) => arg === '--drain' || arg.startsWith('--drain='));
+  const host = await startNetworkWorkbench(
+    drainArg === undefined
+      ? {}
+      : { drain: drainArg === '--drain' ? {} : { lifetime: JSON.parse(drainArg.slice('--drain='.length)) } },
+  );
   if (process.send)
     process.send({
       type: 'ready',
@@ -395,6 +461,12 @@ if (
         value = host.read();
       } else if (request.method === 'blockSends') {
         host.blockSends(request.principal, request.value);
+        value = host.read();
+      } else if (request.method === 'drain') {
+        host.drain({ noticeMs: request.noticeMs, reconnectAfterMs: request.reconnectAfterMs });
+        value = host.read();
+      } else if (request.method === 'resume') {
+        host.resume();
         value = host.read();
       } else if (request.method === 'holdAuthentication') {
         host.holdAuthentication(request.value);
