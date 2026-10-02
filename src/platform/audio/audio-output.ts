@@ -20,6 +20,7 @@
 import { monotonicNow } from '../../core/clock';
 import { createSoundFiles, type SoundFileOptions, type SoundFileStats } from './sound-files';
 import type { AudioClockReading } from './audio-timeline';
+import { createMusicPlayer, musicBudgets, type MusicOptions, type MusicStats, type MusicVoice } from './music-clock';
 
 /** One synthesis step: a tone sweep (sine, `hz` → `end`) or a burst of low-passed noise ("air"). Times in seconds. */
 export type CueStep =
@@ -124,6 +125,10 @@ export interface AudioOutputOptions {
   sound?(id: string): string | undefined;
   /** Bounds and the injected fetch for sound files (`sound-files.ts`); separate from the cue cache above. */
   files?: Omit<SoundFileOptions, 'report'>;
+  /** Bounds for music on the audio clock (`music-clock.ts`, its own store; default `musicBudgets()`, one decode at a time). */
+  musicFiles?: Omit<SoundFileOptions, 'report'>;
+  /** Music voices on the audio clock at once (default 2; 1 to 16). */
+  maxMusicVoices?: number;
   /**
    * Voices that may use the 'HRTF' panner at once (default min(8, maxVoices); 0 disables HRTF). A request beyond it is
    * downgraded to 'equalpower' and counted in `stats.downgraded`, never refused. Changed later by `setHrtfLimit`.
@@ -285,8 +290,16 @@ export interface AudioOutput {
   /** One sample of the context clock, or null when there is no running context (silent, locked, hidden, disposed).
    *  Never creates or resumes the context. */
   clock(): AudioClockReading | null;
-  /** Start (or switch to) a music track by URL; null stops. A repeated URL keeps playing. */
+  /** Start (or switch to) a music track by URL; null stops. A repeated URL keeps playing. Streamed through an audio
+   *  element: simple background music, not on the context clock (use `playMusic` to sync). */
   music(url: string | null): void;
+  /** Music on the audio clock (music-clock.ts): a decoded song started, sought, looped and stopped at exact context
+   *  times. Null when silent, locked, hidden, unknown or over the voice limit. Muting keeps it playing silently. */
+  playMusic(id: string, options?: MusicOptions): MusicVoice | null;
+  /** Fetch and decode a song ahead. True when it can start exactly; false when silent, locked before any context,
+   *  failed or refused. */
+  loadMusic(id: string, signal?: AbortSignal): Promise<boolean>;
+  readonly musicStats: MusicStats & { readonly files: SoundFileStats };
   /** Call from a user gesture: creates or resumes the context (browsers start audio suspended). */
   unlock(): void;
   /** Suspend on a hidden tab, resume when visible. */
@@ -321,7 +334,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
   const reported = new Set<string>();
   const stats = { contexts: 0, played: 0, skipped: 0, downgraded: 0, culled: 0,
     get active() { return voices.size; }, get hrtfActive() { return hrtf.size; }, get hrtfLimit() { return hrtfLimit; } };
-  let ctx: AudioContext | null = null, master: GainNode | null = null, element: HTMLAudioElement | null = null, track: string | null = null, disposed = false;
+  let ctx: AudioContext | null = null, master: GainNode | null = null, musicBus: GainNode | null = null, element: HTMLAudioElement | null = null, track: string | null = null, disposed = false;
   const reporter = o.report ?? ((m: string) => console.warn('[audio] ' + m));
   let reporting = false;
   const report = (message: string, cause?: unknown) => {
@@ -341,6 +354,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
   const makeContext = o.createContext ?? (() => new AudioContext());
   const apply = () => {
     if (master) master.gain.value = o.muted() ? 0 : o.effects();
+    if (musicBus) musicBus.gain.value = o.muted() ? 0 : Math.max(0, Math.min(1, o.music()));
     if (element) { element.volume = Math.max(0, Math.min(1, o.music())); element.muted = o.muted(); }
   };
   const off = o.onChange?.(apply);
@@ -351,6 +365,14 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
   };
   const voices = new Set<CueVoice>();
   const files = createSoundFiles({ ...o.files, report: m => report(m) });
+  const musicFiles = createSoundFiles({ ...musicBudgets(), maxDecodes: 1, maxFiles: 16, ...o.musicFiles, report: m => report(m) });
+  const songs = createMusicPlayer({
+    running: () => !disposed && !hidden && !o.silent() && ctx && ctx.state === 'running' ? ctx : null,
+    existing: () => !disposed && !o.silent() ? ctx : null,
+    // The music bus is created with the first song, so games without clocked music add no node.
+    bus: () => { if (!ctx || disposed) return null; if (!musicBus) { musicBus = ctx.createGain(); musicBus.connect(ctx.destination); apply(); } return musicBus; }, files: musicFiles, report: m => report(m),
+    url: id => o.sound?.(id), maxVoices: o.maxMusicVoices ?? 2, maxStartAhead,
+  });
   /** HRTF voices in start order (oldest first), and the cutoff checks of voices that have a `cutoffDistance`. */
   const hrtf = new Set<{ downgrade(): void; silentSince: number | null }>();
   /** Once a cutoff fade has run this long (s), the voice is inaudible and its HRTF slot may be reclaimed silently. */
@@ -591,6 +613,9 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
       if (element) { if (hidden) element.pause(); else if (track && !o.silent()) void element.play().catch(() => {}); }
     },
     stats,
-    dispose() { if (disposed) return; disposed = true; for (const voice of [...voices]) { try { voice.stop(); } catch (error) { reportFailure('cue stop failed', error); } } files.dispose(); off?.(); element?.pause(); element = null; void ctx?.close(); ctx = null; master = null; buffers.clear(); bufferBytes = 0; },
+    playMusic: (id, options) => disposed ? null : songs.play(id, options),
+    loadMusic: (id, signal) => disposed || o.silent() ? Promise.resolve(false) : songs.load(id, signal),
+    get musicStats() { return { ...songs.stats, files: { ...musicFiles.stats } }; },
+    dispose() { if (disposed) return; disposed = true; try { songs.dispose(); } catch (error) { reportFailure('music stop failed', error); } musicBus = null; for (const voice of [...voices]) { try { voice.stop(); } catch (error) { reportFailure('cue stop failed', error); } } files.dispose(); off?.(); element?.pause(); element = null; void ctx?.close(); ctx = null; master = null; buffers.clear(); bufferBytes = 0; },
   };
 }

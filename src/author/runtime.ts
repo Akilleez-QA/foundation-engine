@@ -57,6 +57,7 @@ import { retireRepresentations } from './representation-cleanup';
 import { indexedGeometry, replaceIndexedGeometry, releaseIndexed, type IndexedSlot } from './indexed-geometry';
 import { createPrimitiveGeometries, type PrimitiveGeometryLease } from './primitive-geometries';
 import {createSceneVoices} from './scene-audio';
+import type { MusicOptions, MusicVoice } from '../platform/audio/music-clock';
 import {sceneInput} from './scene-input';
 import {appLayers} from '../platform/ui/runtime';
 import { sceneActionHints } from './action-hints';
@@ -193,6 +194,8 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       let frame = 0, t = 0, calm = false, frameMs = monotonicNow();
       const voices = createSceneVoices((cue, options) => !s.app.has('platform.audio') || actx.signal.aborted ? null : s.audio.playVoice(cue, options));
       actx.own(() => voices.dispose());
+      const songs = createSceneVoices<MusicVoice, MusicOptions>((id, options) => !s.app.has('platform.audio') || actx.signal.aborted ? null : s.audio.playMusic(id, options));
+      actx.own(() => songs.dispose());
       const ctx: SceneContext = {
         world, state: world.resources, brief,
         scene: {
@@ -215,6 +218,8 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
         modelSocket: (entity, name) => models.socket(entity, name),
         random,
         audioClock: () => !s.app.has('platform.audio') || actx.signal.aborted ? null : s.audio.clock(),
+        playMusic: (id, options) => songs.play(id, options),
+        loadMusic: id => !s.app.has('platform.audio') || actx.signal.aborted ? Promise.resolve(false) : s.audio.loadMusic(id, actx.signal),
         service: key => s[key],
       };
       ctxRef = ctx;

@@ -56,6 +56,38 @@ export default defineScene({
   If `timeline.stats.source` is `'performance'` while the game wants sound, `stop()`
   and `start()` again once `ctx.audioClock()` is non-null.
 
+## 1b. Play the song on the same clock
+
+A song from a file (`defineAsset({ id: 'song', type: 'audio', url: '/music/song.ogg', … })`)
+plays on the audio clock with `ctx.playMusic` ([guide](../guides/music-on-clock.md)).
+Start it at the timeline's zero and song seconds equal timeline seconds, so a
+chart written in song seconds lines up with what the player hears.
+
+```ts
+// In the scene, after the player presses to begin (a gesture unlocks audio):
+async function begin(ctx: SceneContext) {
+  const loaded = await ctx.loadMusic('song');      // fetch and decode ahead; false when silent or headless
+  timeline!.start(.5);                             // half a second of lead-in
+  const at = timeline!.contextTime(0);             // null on the silent page-clock fallback
+  if (loaded && at !== null) ctx.playMusic('song', { at });
+  for (const note of chart) timeline!.schedule(note.at, note.cue);   // chart times are song seconds
+}
+```
+
+- **Loops and seeks.** `playMusic('song', { at, loop: { start: 32, end: 64 } })`
+  repeats bars 32–64 seconds natively. After a loop or `voice.seek(offset, at)`,
+  song seconds no longer equal timeline seconds: read
+  `voice.songTime(timeline.contextTime(timeline.position)!)` for the song position.
+- **Late decode.** A song that finishes decoding after `at` starts at once where it
+  should be (`late: 'skip-ahead'`, the default), so the chart stays in sync; pass
+  `late: 'drop'` to drop it instead. `loadMusic` first avoids both.
+- **Mute keeps sync.** Muting or a zero music volume silences the song without
+  stopping it. A hidden tab suspends the audio clock, so song and timeline pause
+  together.
+- **Exit stops it.** The scene owns the voice; leaving stops it.
+- **Headless.** `testScene` records `scene.music` and `playMusic` returns null; the
+  timeline runs on the page clock, so charts still advance in tests.
+
 ## 2. Grade a press: example game policy
 
 ```ts
@@ -125,8 +157,10 @@ success criterion depends on timing, name its test after the criterion id
 
 ## Limits
 
-- Streamed music (`ctx` music URLs) is not on the context clock. Build the beat
-  track from cues for now.
+- `ctx.playMusic` decodes the whole song: its length is bounded by the music
+  budget of the brief's minimum device (about 2 minutes 11 seconds of 48 kHz stereo
+  on a phone). Background music through the older `music(url)` element path is not
+  on the context clock.
 - Gamepad presses are quantised to the frame.
 - Timeline-derived state is outside SIM-01 replay determinism.
 - Device latency is only as good as what the browser reports, plus the player's

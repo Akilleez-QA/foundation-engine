@@ -32,6 +32,7 @@ export type { CueVoice, CueVoiceOptions, CueFilter, SpatialCue, PanningModel, Di
 export { distanceGain, audibleGain } from '../platform/audio/audio-output';
 export type { SpatialAudioOptions } from '../platform/audio/module';
 export { Material, defineMaterial, validateMaterial, MATERIAL_DEFAULTS, MATERIAL_LIMITS, type MaterialData, type MaterialWrap } from './material';
+export { musicBudgets, MUSIC_START_MARGIN, type MusicOptions, type MusicVoice, type MusicState, type MusicStats } from '../platform/audio/music-clock';
 export { createAudioTimeline, estimateOffset, validateCalibration, MAX_CALIBRATION_MS, NO_CALIBRATION, type AudioTimeline, type AudioTimelineOptions, type AudioTimelineStats, type AudioClockReading, type AudioCalibration, type TimelineEvent, type TimelineSource, type OffsetEstimate } from '../platform/audio/audio-timeline';
 
 export { defineEnvironment, type EnvironmentState } from './environment';

@@ -664,3 +664,12 @@ bounded lookahead dispatch with exact start times, late-drop overload, input
 timestamps (`ctx.input.pressedAt`) and a stored calibration. It reuses the one audio
 output (new read-only `clock()`, scheduled `playVoice({ at })`). Status: integrated in v0.2.0 (PR #31; batch PR #47). Evidence is unit and headless scene tests only;
 no browser output timing, physical-device or audible verification.
+
+## Music on the audio clock (AU-02) — implemented, candidate
+
+Optional [`playMusic`](music-on-clock.md) plays a decoded song on the audio context's
+clock: exact start, stop, seek and native loop points, `songTime` for charts, a music
+bus following the music volume and mute, music-sized decode bounds per minimum device,
+and skip-ahead for late decodes. Status: implemented, candidate (PR #50); not
+integrated. Evidence is fake-context unit tests only; no browser, device or audible
+verification.

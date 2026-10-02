@@ -384,3 +384,9 @@ Caller-owned `createAudioTimeline` composes with the existing audio output and s
 voices: it adds no context, timer or loop, and is pumped from a scene's frame system.
 Integrated in v0.2.0 (PR #31; batch PR #47). See the [guide](audio-timeline.md) and the
 [recipe](../recipes/sync-gameplay-to-music.md).
+
+## Music on the audio clock (AU-02) — implemented, candidate
+
+`playMusic` composes with the one audio output (its own music store and bus, no second
+context) and the AU-01 timeline (start at `timeline.contextTime(0)`); scenes own their
+music voices. Candidate (PR #50); not integrated. See the [guide](music-on-clock.md).

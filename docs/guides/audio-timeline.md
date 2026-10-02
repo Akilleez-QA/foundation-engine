@@ -153,9 +153,9 @@ differ; do not copy values across.
 
 ## Limitations
 
-- **Music.** Streamed music still plays through the output's `HTMLAudioElement`,
-  which is not on the context clock. To sync gameplay to a song today, schedule its
-  parts as cues. Decoded music started at a context time is a separate slice.
+- **Music.** A song from a file plays on the context clock with `playMusic`
+  ([music on the audio clock](music-on-clock.md), AU-02). The older `music(url)`
+  path still streams through an `HTMLAudioElement` and is not on the context clock.
 - **Outside replay determinism.** The SIM-01 replay kit logs which actions were
   pressed in each fixed tick, not when, and while it records or replays, fixed
   systems read the logged facts. So `pressedAt` is null in every recorded or

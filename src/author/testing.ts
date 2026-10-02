@@ -9,6 +9,7 @@ import { createSaveStore } from '../core/save/store';
 import { MemoryBackend } from '../core/save/storage-port';
 import { createWorkerHost } from '../platform/workers/host';
 import type { AudioClockReading } from '../platform/audio/audio-timeline';
+import type { MusicOptions } from '../platform/audio/music-clock';
 /**
  * author/testing.ts: `testScene`, a scene without a browser, for a game's own unit tests. It spawns the scene's
  * entities into a real world and runs its real systems on the real fixed-step runner; input is scripted (`press`,
@@ -42,6 +43,8 @@ export interface TestScene {
   readonly cues: string[];
   /** Every `ctx.play`, with its options (checked as the runtime checks them). */
   readonly plays: { id: string; options?: PlayOptions }[];
+  /** Songs asked for with `ctx.playMusic` (silent: it returns null, and `loadMusic` resolves false). */
+  readonly music: { id: string; options?: MusicOptions }[];
   /** Exit once and dispose the helper-owned save store. Injected services remain caller-owned. */
   dispose(): void;
 }
@@ -55,7 +58,7 @@ export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief;
   const strings: Record<string, string> = Object.assign(Object.fromEntries((o.inputs ?? []).map(i => [`game.input.${i.id}`, i.label])), ...(o.game?.kits ?? []).map(k => k.strings.en ?? {}), o.game?.strings?.en ?? {});
   const world = new World();
   for (const e of body.entities) spawnInto(world, e);
-  const pressed = new Map<string, number>(), held = new Map<string, number>(), went: string[] = [], cues: string[] = [], plays: { id: string; options?: PlayOptions }[] = [];
+  const pressed = new Map<string, number>(), held = new Map<string, number>(), went: string[] = [], cues: string[] = [], plays: { id: string; options?: PlayOptions }[] = [], music: { id: string; options?: MusicOptions }[] = [];
   // No real timers or retained timer callbacks: headless saves flush explicitly.
   const injectedSave = o.services?.save;
   const save = injectedSave ?? createSaveStore({
@@ -88,6 +91,8 @@ export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief;
     modelSocket: () => null,
     playVoice: cue => { cues.push(cue); return null; },
     audioClock: () => o.audioClock?.(t * 1000) ?? null,
+    playMusic: (id, options) => { music.push({ id, ...(options ? { options: { ...options, ...(options.loop ? { loop: { ...options.loop } } : {}) } } : {}) }); return null; },
+    loadMusic: async () => false,
     random: () => { r = (r + 0x6D2B79F5) >>> 0; let x = r; x = Math.imul(x ^ (x >>> 15), x | 1); x ^= x + Math.imul(x ^ (x >>> 7), x | 61); return ((x ^ (x >>> 14)) >>> 0) / 4294967296; },
     service: key => { const v = key === 'save' ? save : o.services?.[key]; if (!v) throw Error(`testScene: no '${String(key)}' service; pass it in services`); return v as Services[typeof key]; },
   };
@@ -112,7 +117,7 @@ export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief;
     activityEvents?.start();
   } catch (error) { if (ownsSave) save.dispose(); throw error; }
   return {
-    ctx, world, went, cues, plays, activityErrors,
+    ctx, world, went, cues, plays, music, activityErrors,
     setActivity(facts) {
       alive();
       const coverage = facts.coverage, documentHidden = facts.documentHidden;
