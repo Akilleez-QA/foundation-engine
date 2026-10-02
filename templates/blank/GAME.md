@@ -66,3 +66,7 @@
   prepare the author runtime before activation, and retain owned failure recovery.
   Acceptance requires adversarial tests, native shader failure checks and all
   template gates. No game-content, device or budget change.
+
+## Dependency preparation milestone
+
+- 2026-10-01: M2 cooperative dependency preparation extends the existing closure owner with cancellable real task yields and required-closure slot reservation. Optional work uses spare concurrency. Baseline task starvation and optional-blocked critical admission reproduced before changes; CPU regressions checked, native/browser and integration gate pending. No starter brief or budget changes.

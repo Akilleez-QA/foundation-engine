@@ -249,3 +249,13 @@ quality-budget or engine-wide residency completion claim is made.
 The same candidate now includes optional owned submitted-frame completion after
 initial draw. Native correctness and exact-head template gates are recorded in the
 [checkpoint receipt](../verification/program-preparation/README.md). Completion is not display presentation or a smoothness guarantee.
+
+## Cooperative dependency preparation candidate (2026-10-01)
+
+M2 adds real task boundaries and reserves one acquisition slot for the required
+closure while optional work uses remaining capacity. Explicit pumping remains
+caller-owned. See the [contract](../../src/platform/assets/dependency-lease.md) and
+[prospective oracle and CPU evidence](../verification/dependency-preparation-20261001/README.md).
+Native task oracle, all seven template gates and the CI browser suites passed (see the
+evidence README and public PR #11);
+integration, frame-time and downstream acceptance remain pending; no resource budget changes.
