@@ -215,24 +215,43 @@ test('NW06: a command is shed exactly when its age reaches maxQueuedAgeMs, befor
   h.owner.receive(peer, '{"n":1}', 10);
   assert.deepEqual(h.owner.pump(14), { status: 'pumped', attempted: 1, dispatched: 1, denied: 0, expired: 0, stale: 0 });
   h.owner.receive(peer, '{"n":2}', 14);
-  assert.deepEqual(h.owner.pump(19), { status: 'pumped', attempted: 1, dispatched: 0, denied: 0, expired: 0, stale: 1 });
+  assert.deepEqual(h.owner.pump(19), { status: 'pumped', attempted: 0, dispatched: 0, denied: 0, expired: 0, stale: 1 });
   assert.equal(authorizations, 1); assert.equal(h.dispatched.length, 1);
   assert.deepEqual(stale, [{ ageMs: 5, receivedAt: 14, command: { n: 2 } }]);
   assert.equal(h.owner.stats().queuedMessages, 0); assert.equal(h.owner.stats().queuedBytes, 0);
   assert.equal(h.owner.read(peer)?.state, 'active');
 });
 
-test('NW06: shedding consumes one bounded attempt each and fresh work behind stale heads still dispatches fairly', () => {
+test('NW06: shedding is not charged to the dispatch budget; a peer sheds its aged prefix on its turn and fresh work dispatches fairly', () => {
   const h = harness({}, { maxQueuedAgeMs: 5, authTimeoutMs: 1000, maxPumpOperations: 3 });
   const a = h.active('{"id":"a"}'), b = h.active('{"id":"b"}');
   h.owner.receive(a, '{"old":1}', 0); h.owner.receive(a, '{"old":2}', 0);
   h.owner.receive(b, '{"old":3}', 0);
   h.owner.receive(a, '{"fresh":1}', 4); h.owner.receive(b, '{"fresh":2}', 4);
-  assert.deepEqual(h.owner.pump(6, 1), { status: 'pumped', attempted: 1, dispatched: 0, denied: 0, expired: 0, stale: 1 });
-  assert.deepEqual(h.owner.pump(6), { status: 'pumped', attempted: 3, dispatched: 1, denied: 0, expired: 0, stale: 2 });
+  assert.deepEqual(h.owner.pump(6, 0), { status: 'pumped', attempted: 0, dispatched: 0, denied: 0, expired: 0, stale: 0 });
+  assert.equal(h.owner.stats().queuedMessages, 5);
+  assert.deepEqual(h.owner.pump(6, 1), { status: 'pumped', attempted: 1, dispatched: 1, denied: 0, expired: 0, stale: 2 });
+  assert.deepEqual(h.dispatched.map(d => d.command), [{ fresh: 1 }]);
+  assert.deepEqual(h.owner.pump(6), { status: 'pumped', attempted: 1, dispatched: 1, denied: 0, expired: 0, stale: 1 });
+  assert.deepEqual(h.dispatched.map(d => d.command), [{ fresh: 1 }, { fresh: 2 }]);
+  assert.equal(h.owner.stats().queuedMessages, 0); assert.equal(h.owner.stats().queuedBytes, 0);
+});
+
+test('NW06: maxStaleDropsPerPump bounds shedding per pump and never lets a still-stale head dispatch', () => {
+  const h = harness({}, { maxQueuedAgeMs: 5, maxStaleDropsPerPump: 1, authTimeoutMs: 1000, maxPumpOperations: 3 });
+  const a = h.active('{"id":"a"}'), b = h.active('{"id":"b"}');
+  h.owner.receive(a, '{"old":1}', 0); h.owner.receive(a, '{"old":2}', 0); h.owner.receive(a, '{"fresh":1}', 4);
+  h.owner.receive(b, '{"fresh":2}', 4);
+  assert.deepEqual(h.owner.pump(6), { status: 'pumped', attempted: 1, dispatched: 1, denied: 0, expired: 0, stale: 1 });
   assert.deepEqual(h.dispatched.map(d => d.command), [{ fresh: 2 }]);
-  assert.deepEqual(h.owner.pump(6), { status: 'pumped', attempted: 1, dispatched: 1, denied: 0, expired: 0, stale: 0 });
+  assert.equal(h.owner.read(a)?.queuedMessages, 2);
+  assert.deepEqual(h.owner.pump(6), { status: 'pumped', attempted: 1, dispatched: 1, denied: 0, expired: 0, stale: 1 });
   assert.deepEqual(h.dispatched.map(d => d.command), [{ fresh: 2 }, { fresh: 1 }]);
+  for (const maxStaleDropsPerPump of [0, -1, 1.5, Infinity])
+    assert.throws(() => harness({}, { maxQueuedAgeMs: 5, maxStaleDropsPerPump }), /limits/);
+  const off = harness({}, { maxStaleDropsPerPump: 1 }); const peer = off.active();
+  off.owner.receive(peer, '{}', 0);
+  assert.deepEqual(off.owner.pump(9), { status: 'pumped', attempted: 1, dispatched: 1, denied: 0, expired: 0 });
 });
 
 test('NW06: backwards time throws before work and never drops or dispatches the queued command', () => {
@@ -244,7 +263,7 @@ test('NW06: backwards time throws before work and never drops or dispatches the 
   assert.deepEqual(h.owner.pump(10), { status: 'pumped', attempted: 1, dispatched: 1, denied: 0, expired: 0, stale: 0 });
 });
 
-test('NW06: the stale notice may send one bounded reply; reentry is busy and a throwing notice retires the peer', () => {
+test('NW06: the stale notice may reply through send; reentry is busy and a throwing notice retires the peer', () => {
   let owner: NetworkIntake;
   const h = harness({ stale: ({ peer }) => {
     assert.deepEqual(owner.pump(20), { status: 'refused', reason: 'busy' });
@@ -255,13 +274,56 @@ test('NW06: the stale notice may send one bounded reply; reentry is busy and a t
   assert.deepEqual(h.sends, ['{"expired":true}']); assert.equal(owner.read(peer)?.state, 'active');
   const t = harness({ stale: () => { throw Error('notice'); } }, { maxQueuedAgeMs: 5, authTimeoutMs: 1000 });
   const victim = t.active(); t.owner.receive(victim, '{}', 0); t.owner.receive(victim, '{}', 0);
-  assert.deepEqual(t.owner.pump(5), { status: 'pumped', attempted: 1, dispatched: 0, denied: 0, expired: 0, stale: 1 });
+  assert.deepEqual(t.owner.pump(5), { status: 'pumped', attempted: 0, dispatched: 0, denied: 0, expired: 0, stale: 1 });
   assert.equal(t.owner.read(victim)?.reason, 'stale-error');
   assert.equal(t.owner.stats().queuedMessages, 0); assert.equal(t.dispatched.length, 0);
+});
+
+test('NW06: a stale notice that retires its peer does not end the pump before other peers are served', () => {
+  const h = harness({ stale: () => { throw Error('notice'); } }, { maxQueuedAgeMs: 5, authTimeoutMs: 1000 });
+  const a = h.active('{"id":"a"}'), b = h.active('{"id":"b"}');
+  h.owner.receive(a, '{"old":1}', 0); h.owner.receive(b, '{"fresh":1}', 4);
+  assert.deepEqual(h.owner.pump(6), { status: 'pumped', attempted: 1, dispatched: 1, denied: 0, expired: 0, stale: 1 });
+  assert.equal(h.owner.read(a)?.reason, 'stale-error');
+  assert.deepEqual(h.dispatched.map(d => d.command), [{ fresh: 1 }]);
+  assert.equal(h.owner.stats().queuedMessages, 0);
 });
 
 test('NW06: maxQueuedAgeMs and the stale port reject invalid configuration', () => {
   for (const maxQueuedAgeMs of [0, -1, 1.5, Infinity, NaN])
     assert.throws(() => harness({}, { maxQueuedAgeMs }), /limits/);
   assert.throws(() => harness({ stale: 1 as never }, { maxQueuedAgeMs: 5 }), /port/);
+});
+
+/** Deterministic sustained overload shaped like the NW-07 network-workbench probe (80 attempts/s capacity). */
+function overload(maxQueuedAgeMs?: number) {
+  const bounds: Partial<NetworkLimits> = { maxConnections: 8, authTimeoutMs: 1000, maxQueuedMessagesPerPeer: 8,
+    maxQueuedBytesPerPeer: 4096, maxQueuedMessages: 32, maxQueuedBytes: 16384, maxPumpOperations: 4,
+    ...(maxQueuedAgeMs === undefined ? {} : { maxQueuedAgeMs }) };
+  const h = harness({}, bounds);
+  const peers = Array.from({ length: 7 }, (_, i) => h.active(`{"id":${i}}`));
+  const periodMs = 62, pumpMs = 50, endMs = 20_000, measureFromMs = 10_000; // 7 x ~16/s = ~113/s offered
+  let measured = 0, stale = 0, maxAttempts = 0;
+  for (let now = 0; now <= endMs; now++) {
+    peers.forEach((peer, i) => { if ((now + i * 9) % periodMs === 0) h.owner.receive(peer, '{}', now); });
+    if (now % pumpMs === 0) {
+      const before = h.dispatched.length;
+      const result = h.owner.pump(now) as { attempted: number; stale?: number };
+      maxAttempts = Math.max(maxAttempts, result.attempted);
+      if (now >= measureFromMs) { measured += h.dispatched.length - before; stale += result.stale ?? 0; }
+    }
+  }
+  const seconds = (endMs - measureFromMs) / 1000;
+  return { goodput: measured / seconds, stale, maxAttempts };
+}
+
+test('NW06: a tight queue age under sustained overload keeps goodput at the FIFO plateau', () => {
+  const fifo = overload();
+  assert.ok(fifo.goodput >= 76 && fifo.goodput <= 80.5, `FIFO goodput ${fifo.goodput}`);
+  for (const age of [150, 300, 600]) {
+    const aged = overload(age);
+    assert.ok(aged.goodput >= 0.95 * fifo.goodput, `age ${age} ms goodput ${aged.goodput} vs FIFO ${fifo.goodput}`);
+    assert.ok(aged.maxAttempts <= 4);
+  }
+  assert.ok(overload(300).stale > 0, 'the tight age actually sheds work');
 });
