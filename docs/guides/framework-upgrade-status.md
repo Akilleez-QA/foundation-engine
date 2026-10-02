@@ -620,8 +620,11 @@ coordinates.
 `ctx.play(id, options?)` accepts a game sound id as well as a cue id (`PlayOptions`:
 `volume` 0…1, `pitch` 0.25…4, `position`); `CueVoiceOptions` gains `rate` and `wait`
 (≤ 5 s); `defineScene({ sounds })` preloads; `AudioOutput.preload` and the `audio` probe's
-`sounds` counters are new. Bounds: 4 MiB per file, 16 MiB encoded and 32 MiB decoded kept
-(LRU), 4 concurrent fetches (queued), 256 files, 10 s per load, waiting plays counted in
-the 64-voice cap. Failures (including an HTML fallback page) are reported once and retried
-on the next preload. Candidate (branch `feat/dx-sound-files`); not integrated. Physical
+`sounds` counters are new; `audioModule(spatial, { sound, files })` adds the sound-file wiring beside AUD-01's spatial options. Bounds
+follow the brief's minimum device (desktop/laptop: 4 MiB per file, 16 MiB encoded and 32 MiB
+decoded kept; phone 1/8/16 MiB), decodes admitted only when their estimated decoded size fits
+(exact for PCM WAV, 48× the file otherwise), 4 fetches and 2 decodes at once, 256 files with
+LRU replacement, 10 s per fetch or decode, waiting plays counted in the 64-voice cap. Held
+files decode on unlock. Failures (including an HTML fallback page) are reported once and
+retried on the next preload. Candidate (branch `feat/dx-sound-files`); not integrated. Physical
 listening evidence is missing.

@@ -405,5 +405,5 @@ implemented, candidate (branch `feat/dx-sound-files`, stacked on the materials a
 sub-path changes); not integrated. Evidence: unit tests with an injected AudioContext and
 `npm run test:sound-browser` (loading, reporting and silence only: automated browsers never
 decode or play). Audible playback, latency and loudness on physical devices are unverified;
-HRTF, occlusion, streaming and looping are out of scope (a separate spatial-audio study is
-in progress).
+streaming and looping are out of scope. Sound files share AUD-01's voice chain (HRTF limit,
+distance models, cutoff, filter) through `ctx.playVoice`.

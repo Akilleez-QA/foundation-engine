@@ -9,7 +9,7 @@ function fakeContext(state: AudioContextState = 'running') {
   const sources: { buffer: unknown; rate: number; started: number; stops: number; onended: (() => void) | null }[] = [];
   const panners: { x: number }[] = [];
   let decodes = 0, hold: Promise<void> | null = null;
-  const param = (value = 0) => ({ value });
+  const param = (value = 0) => ({ value, cancelScheduledValues() {}, setTargetAtTime(v: number) { this.value = v; }, setValueAtTime(v: number) { this.value = v; } });
   const ctx = {
     state, sampleRate: 48000, currentTime: 0, destination: {},
     listener: { positionX: param(), positionY: param(), positionZ: param(), forwardX: param(), forwardY: param(), forwardZ: param(), upX: param(), upY: param(), upZ: param() },
@@ -150,13 +150,27 @@ test('a scheduled play (`at`, a context time) of a file still decoding starts if
   out.dispose();
 });
 
-test('a waiting voice accepts optional setters before it starts and ends if the start is refused', async () => {
+test('a waiting voice replays its filter when it starts, and ends if the start is refused', async () => {
+  const filters: { frequency: number; targets: number[] }[] = [];
   const { out, fake } = output();
-  const open = fake.pause();
-  const voice = out.playVoice('chime', { wait: 1000 }) as unknown as { setFilter(...a: unknown[]): void; panning: unknown; ended: boolean };
-  assert.doesNotThrow(() => voice.setFilter({ cutoffHz: 800 })); assert.equal(voice.panning, null);
-  fake.ctx.createBufferSource = () => { throw Error('refused'); };
+  (fake.ctx as unknown as { createBiquadFilter(): unknown }).createBiquadFilter = () => {
+    const f = { type: '', targets: [] as number[], frequency: 0 } as { type: string; targets: number[]; frequency: unknown };
+    f.frequency = { value: 0, cancelScheduledValues() {}, setTargetAtTime(v: number) { f.targets.push(v); } };
+    const node = Object.assign(f, { connect() {}, disconnect() {} }); filters.push(node as never); return node;
+  };
+  let open = fake.pause();
+  const voice = out.playVoice('chime', { wait: 1000, filter: { cutoffHz: 2000 } })!;
+  const plain = out.playVoice('chime', { wait: 1000 })!;
+  assert.throws(() => plain.setFilter!({ cutoffHz: 800 }), /no filter stage/); plain.stop();
+  voice.setFilter!({ cutoffHz: 800 }); assert.equal(voice.panning, null);
   open(); await flush(); await flush();
-  assert.equal(voice.ended, true); assert.equal(out.stats.played, 0);
-  out.dispose();
+  assert.equal(fake.sources.length, 1); assert.deepEqual(filters[0]!.targets, [800], 'the latest filter is replayed at start');
+  voice.stop(); out.dispose();
+  const second = output();
+  open = second.fake.pause();
+  const refused = second.out.playVoice('chime', { wait: 1000 })!;
+  second.fake.ctx.createBufferSource = () => { throw Error('refused'); };
+  open(); await flush(); await flush();
+  assert.equal(refused.ended, true); assert.equal(second.out.stats.played, 0);
+  second.out.dispose();
 });
