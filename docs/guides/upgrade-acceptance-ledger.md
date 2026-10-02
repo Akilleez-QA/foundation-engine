@@ -482,3 +482,26 @@ See the [procgen kit](../../src/kits/procgen/README.md) and the
 | ID | Contract | State |
 |---|---|---|
 | DX-02 | Learn timeline objectives semantics: [`TimelinePlayer.state().objectives`](../../src/kits/learn/timeline.ts) is true from an `objectives` action until the learner passes the next gate after it, then stays false (it used to stay true for the whole scene, so the card returned over later drawings). The learn runtime shows the card from that flag on the first scene, outside interrupts. ui kit HUD lines and the prompt gain a readability plate ([README](../../src/kits/ui/README.md)). `play:script` gains `holdUntil`. | Implemented, candidate (public PR #40, stacked on #39); not integrated. Timeline unit test, learn `play:script` 9/9 and emulated snaps on the branch. Lessons that relied on the card returning at later gates would see it once; no stock lesson did. No device claim. |
+
+### MV-01: tunable jump feel — candidate
+
+Status: implemented, candidate (`feat/genre-platformer-slice1`, PR pending); not integrated.
+
+- Runtime-enforced: configuration bounds (`RangeError`), step length within `[0, maxDt]`
+  (at most 0.25 s), boolean facts, finite external velocity within ±1000 m/s, and a
+  ground answer that is finite and not above its query. Rejected steps change no state.
+  At most five integration pieces per step; constant state per actor. The adapter
+  consumes a press at most once per rendered frame.
+- Checked: unit tests for exact apex height and identical arcs at 30, 60, 120, 144 and
+  240 Hz ticks (165 Hz within one tick), release cut, coyote and buffer windows at six
+  rates, no re-jump while held, terminal speed, zero-length steps, cancellation and
+  reset; adapter tests for full-height jump and landing, one-way surfaces, a fall of
+  about 1.5 m per tick landing exactly, step-up, snap-down, coyote off a ledge, and
+  identical fixed-step samples at display rates 30–240 Hz with one jump per press; the
+  hold button through the real action layer (press, no repeat press, release, cancel).
+  Mutation checks: replacing the exact integration, widening the coyote window,
+  the per-frame press guard or the swept landing each fails at least one test.
+- Not established: feel on any device, touch hold controls, a template or browser
+  consumer, moving platforms, slopes, lateral swept collision, and interaction with
+  the zero-step press retention fix (PR #19, open): on current main a press during a
+  frame that runs no fixed tick is still lost before this kit sees it.

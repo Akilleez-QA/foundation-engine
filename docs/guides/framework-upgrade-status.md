@@ -594,3 +594,13 @@ edited-world persistence remain separate work. See the
 | ID | Contract | State |
 |---|---|---|
 | DX-02 | Learn timeline objectives semantics: [`TimelinePlayer.state().objectives`](../../src/kits/learn/timeline.ts) is true from an `objectives` action until the learner passes the next gate after it, then stays false (it used to stay true for the whole scene, so the card returned over later drawings). The learn runtime shows the card from that flag on the first scene, outside interrupts. ui kit HUD lines and the prompt gain a readability plate ([README](../../src/kits/ui/README.md)). `play:script` gains `holdUntil`. | Implemented, candidate (public PR #40, stacked on #39); not integrated. Timeline unit test, learn `play:script` 9/9 and emulated snaps on the branch. Lessons that relied on the card returning at later gates would see it once; no stock lesson did. No device claim. |
+
+## Tunable jump feel — MV-01 implemented, candidate
+
+`createJumpFeel` and `jumpSystem` (locomotion kit) give creators a frame-rate-independent
+jump mechanism: height and time to apex, release, fall and apex gravity, terminal fall,
+coyote and buffer windows, each bounded and creator-chosen. Author buttons gain an opt-in
+`hold: true` so `ctx.input.held` observes a release; existing buttons are unchanged.
+Implemented as a candidate (`feat/genre-platformer-slice1`, PR pending), not integrated.
+Evidence is focused unit tests only. See the [kit README](../../src/kits/locomotion/README.md#tunable-jump-feel-mv-01),
+the [recipe](../recipes/tune-a-jump.md) and the [ledger](upgrade-acceptance-ledger.md).

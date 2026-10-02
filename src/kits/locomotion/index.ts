@@ -21,3 +21,5 @@ export function applyRootMotion(ctx: SceneContext, entity: Entity, delta: RootDe
   const result={applied:true,x:next.x-tr.x,z:next.z-tr.z,yaw:delta.yaw};
   tr.x=next.x;tr.z=next.z;tr.y=height;tr.ry+=delta.yaw;ctx.world.touch();return result;
 }
+export { createJumpFeel, deriveJump, type JumpFeel, type JumpFeelConfig, type JumpFeelDerived, type JumpFeelInput, type JumpFeelStep, type JumpFeelState } from './jump';
+export { jumpSystem, resetJump, type JumpSystemOptions } from './jump-system';

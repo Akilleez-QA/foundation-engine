@@ -22,6 +22,7 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [equipment](../../src/kits/equipment/README.md) | Unique-instance acquisition/release, arrangements and atomic multi-slot changes | expedition, mechanics |
 | [frames](../../src/kits/frames/README.md) | Versioned coordinate frames and bounded delayed updates | mechanics |
 | [vehicles](../../src/kits/vehicles/README.md) | Local seat ownership and validated exits | mechanics |
+| [locomotion](../../src/kits/locomotion/README.md) | Authored root motion through character collision; tunable jump feel (coyote, buffer, variable height, apex gravity) with a fixed-step adapter | mechanics (root motion); jump feel is a candidate with no template consumer |
 | [control](../../src/kits/control/README.md) | Explicit actor ownership and discontinuity resets | mechanics |
 | [animation](../../src/kits/animation/README.md) | Bounded marker crossings, pose sampling and named sockets | mechanics |
 | [audio-mixer](../../src/kits/audio-mixer/README.md) | Owned cue scheduling, real voice limits and ducking | expedition |

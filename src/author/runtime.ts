@@ -137,7 +137,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       const pressed = createPressLatch(), input = s.input;
       for (const i of o.inputs) {
         if (i.axis) for (const side of ['negative', 'positive'] as const) input.onAction(actionOf(i.id, side), () => { actx.invalidate(); return true; }, { owner: actx.runId, signal: actx.signal });
-        else input.onAction(actionOf(i.id), e => { if (e.phase === 'press') { pressed.add(i.id); actx.invalidate(); } return true; }, { owner: actx.runId, signal: actx.signal });
+        else input.onAction(actionOf(i.id), e => { if (e.phase === 'press') pressed.add(i.id); if (e.phase !== 'repeat') actx.invalidate(); return true; }, { owner: actx.runId, signal: actx.signal });
       }
       const ownsInput = () => !actx.signal.aborted && actx.coverage() === 'top' && viewOwnsInput(view) && !view.closest('.view-covered');
       const gestures = bindScenePointer(surface.canvas, {

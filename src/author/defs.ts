@@ -250,6 +250,8 @@ export interface InputInput {
   pad?: readonly PadInput[];
   /** A tap or click on the view also presses it (touch and pointer players). */
   tap?: boolean;
+  /** A button whose release matters: `ctx.input.held(id)` reports it while down. The press edge is unchanged. A tap presses without holding. */
+  hold?: boolean;
   /** An axis instead of a button: the bindings that push it towards -1 and +1. */
   axis?: { negative: Bindings; positive: Bindings };
 }
@@ -259,6 +261,7 @@ export function defineInput(i: InputInput): InputDefinition {
   if (i.axis) {
     for (const side of ['negative', 'positive'] as const) need(!!(i.axis[side].keys?.length && i.axis[side].pad?.length), `input ${i.id}: the ${side} side needs a key and a pad input, so every player can reach it`);
   } else need(!!(i.keys?.length && i.pad?.length), `input ${i.id}: give a key and a pad button, so every player can reach it`);
+  need(i.hold === undefined || (typeof i.hold === 'boolean' && !i.axis), `input ${i.id}: hold is a boolean for buttons only (an axis is already held)`);
   return { ...i, kind: 'input' };
 }
 
