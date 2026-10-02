@@ -75,10 +75,10 @@ closure, so for that path the gate is a regression check, not a responsiveness
 measurement; worker-runtime checkpoints now default to the same task seam. Downstream comparison, frame-time and
 physical-device acceptance remain unverified.
 
-Revision map: `3361a43` (named above) was measured before later rebases and is not
-published. This branch's own files (task seam, dependency lease, worker runtime,
-oracle) are identical in published `b075a9a`; the base additionally gained the
-program-preparation CI fix `17391f3`. Results at the final head are recorded below.
+Revision map: `3361a43` and `dc0ba5c` were measured before later rebases onto newer
+public `main` and are not reachable from the published branch. This branch's own
+files (task seam, dependency lease, worker runtime, oracle) are unchanged since
+then; the pull request records results at its exact current head.
 
 ## Final head `dc0ba5c` (stacked on program preparation, `main` `7d57880`)
 

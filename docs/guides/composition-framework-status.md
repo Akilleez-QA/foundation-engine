@@ -239,5 +239,6 @@ M2 adds real task boundaries and reserves one acquisition slot for the required
 closure while optional work uses remaining capacity. Explicit pumping remains
 caller-owned. See the [contract](../../src/platform/assets/dependency-lease.md) and
 [prospective oracle and CPU evidence](../verification/dependency-preparation-20261001/README.md).
-Native task oracle and all seven template gates passed at submission head `3361a43`;
+Native task oracle, all seven template gates and the CI browser suites passed (see the
+evidence README and public PR #11);
 integration, frame-time and downstream acceptance remain pending; no resource budget changes.
