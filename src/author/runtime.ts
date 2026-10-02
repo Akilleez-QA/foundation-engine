@@ -12,6 +12,8 @@ import { Model } from './model';
 import { createSceneModels } from './scene-model';
 import { RenderMask, validateRenderMask } from './render-mask';
 import { bindEnvironment } from './scene-environment';
+import { Material, materialKey } from './material';
+import { createSceneSurfaces, type Surface } from './scene-materials';
 /**
  * author/runtime.ts: a scene's lazy body, loaded the first time a scene is entered (never in the first-load bundle).
  *
@@ -19,8 +21,10 @@ import { bindEnvironment } from './scene-environment';
  *  - a world (core/ecs) spawned from the scene's entities; its systems run on the one frame loop, `fixed` systems at
  *    a fixed 60 Hz step and `frame` systems once per frame (core/ecs/systems.ts);
  *  - input: each game action is subscribed for the visit; systems read `pressed`, `held`, `axis` and the pointer;
- *  - drawing: entities with `Transform` and `Shape` become meshes on the pooled world surface. A frame is drawn only
- *    when something changed (a transform, a shape, the camera, the world's version): render on change (STD-RUN-9);
+ *  - drawing: entities with `Transform` and `Shape` become meshes on the pooled world surface (a `Material` gives one a
+ *    textured, physically based surface: scene-materials.ts). A frame is drawn only when something changed (a
+ *    transform, a shape, a material or its arriving texture, the camera, the world's version): render on change
+ *    (STD-RUN-9);
  *  - `enter` runs once the visit is active (ADR 0045); `exit` when it is left. Everything the visit creates is owned
  *    by the run and released in reverse order when it leaves.
  */
@@ -214,14 +218,18 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       // Drawing: meshes follow Transform + Shape; draw only when something changed.
       const resources = createSceneResources();
       const geometries = createPrimitiveGeometries(resources);
-      const meshes = new Map<Entity, { mesh: T.Mesh; geometry: PrimitiveGeometryLease; sig: string }>();
+      const meshes = new Map<Entity, { mesh: T.Mesh; geometry: PrimitiveGeometryLease; surface: Surface; sig: string }>();
+      // Anisotropy is a 'reenter-scene' knob: read once per visit, capped by what the context supports.
+      const anisotropy = Math.min(s.quality.knob('textures.anisotropy'), renderer.capabilities?.getMaxAnisotropy?.() ?? 1);
+      const surfaces = createSceneSurfaces({ library: s.assets, resources, signal: actx.signal, anisotropy,
+        changed: () => { dirty = true; actx.invalidate(); }, report: error => s.log.error(`${scene.id}: material texture failed`, error) });
       // Indexed meshes own their geometry/material individually; detach before general tree cleanup.
       const indexed = new Map<Entity, IndexedSlot>();
       actx.own(() => {
         const indexedMeshes = [...indexed.values()], primitiveMeshes = [...meshes.values()];
         indexed.clear(); meshes.clear();
         retireRepresentations(three, [...indexedMeshes, ...primitiveMeshes].map(({ mesh }) => mesh),
-          [() => geometries.dispose(), () => resources.dispose()]);
+          [...primitiveMeshes.map(({ surface }) => () => surface.dispose()), () => geometries.dispose(), () => resources.dispose()]);
       });
       let lastCamera = '', lastVersion = -1, dirty = true;
       const syncListener = () => {
@@ -243,22 +251,23 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
         for (const [e, tr, sh] of world.query(Transform, Shape)) {
           if (world.has(e, Mesh) || world.has(e, Model)) continue; // Deterministic precedence; never draw two representations.
           seen.add(e);
-          const sig = `${tr.x},${tr.y},${tr.z},${tr.rx},${tr.ry},${tr.rz},${tr.scale},${sh.kind},${sh.size},${sh.color},${sh.visible},${maskOf(e)}`;
+          const look = world.get(e, Material), lookKey = look ? materialKey(look) : '';
+          const sig = `${tr.x},${tr.y},${tr.z},${tr.rx},${tr.ry},${tr.rz},${tr.scale},${sh.kind},${sh.size},${sh.color},${sh.visible},${maskOf(e)},${lookKey}`;
           let m = meshes.get(e);
           if (!m) {
             const geometry = geometries.acquire(sh.kind, sh.size);
-            let material: T.MeshLambertMaterial | undefined;
+            let surface: Surface | undefined;
             let mesh: T.Mesh | undefined;
             try {
-              material = resources.own(new T.MeshLambertMaterial({ color: sh.color }));
-              mesh = new T.Mesh(geometry.geometry, material);
+              surface = surfaces.create(look, sh.color);
+              mesh = new T.Mesh(geometry.geometry, surface.material);
               mesh.name = world.get(e, Name)?.name ?? `e${e}`;
-              three.add(mesh); meshes.set(e, m = { mesh, geometry, sig: '' });
+              three.add(mesh); meshes.set(e, m = { mesh, geometry, surface, sig: '' });
             } catch (error) {
               const errors = [error];
               try { if (mesh) three.remove(mesh); } catch (cleanup) { errors.push(cleanup); }
               try { geometry.release(); } catch (cleanup) { errors.push(cleanup); }
-              try { if (material) resources.release(material); } catch (cleanup) { errors.push(cleanup); }
+              try { surface?.dispose(); } catch (cleanup) { errors.push(cleanup); }
               if (errors.length > 1) throw new AggregateError(errors, 'primitive construction failed');
               throw error;
             }
@@ -273,14 +282,21 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
             if (actx.signal.aborted) return;
             if (meshes.get(e) !== m || m.geometry !== replacement) continue;
           }
+          if (m.surface.key !== lookKey) {
+            // A changed look is a new surface (its texture lease is shared); the old one is released after the swap.
+            const previous = m.surface;
+            m.surface = surfaces.create(look, sh.color); mesh.material = m.surface.material;
+            previous.dispose();
+            if (actx.signal.aborted) return;
+          }
           mesh.position.set(tr.x, tr.y, tr.z); mesh.rotation.set(tr.rx, tr.ry, tr.rz); mesh.scale.setScalar(tr.scale);
-          (mesh.material as T.MeshLambertMaterial).color.setHex(sh.color); mesh.visible = sh.visible; mesh.layers.mask = maskOf(e);
+          m.surface.material.color.setHex(sh.color); mesh.visible = sh.visible; mesh.layers.mask = maskOf(e);
           m.sig = sig; dirty = true;
         }
         for (const [e, m] of [...meshes]) if (!seen.has(e) && meshes.get(e) === m) {
           meshes.delete(e); dirty = true;
-          const geometry = m.geometry, material = m.mesh.material as T.Material;
-          retireRepresentations(three, [m.mesh], [() => geometry.release(), () => resources.release(material)]);
+          const geometry = m.geometry, surface = m.surface;
+          retireRepresentations(three, [m.mesh], [() => geometry.release(), () => surface.dispose()]);
           if (actx.signal.aborted) return;
         }
         const indexedSeen = new Set<Entity>();

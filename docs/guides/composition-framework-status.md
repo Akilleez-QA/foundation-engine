@@ -377,3 +377,18 @@ Status: implemented, candidate (branch `feat/dx-asset-base-path`); not integrate
 is unit tests and `npm run test:subpath-browser` (every template built with `--base ./`,
 mechanics also with an absolute sub-path, served by a local static server in desktop
 headless Chromium). Real Pages/itch.io uploads and physical devices are unverified.
+
+## Authored materials (DX P1-10) — implemented, candidate
+
+`Material` / `defineMaterial` (author API) give a `Shape` a texture asset with repeat and
+wrap, roughness, metalness, emission and transparency, drawn as a `MeshStandardMaterial`;
+shapes without it keep the original matte material. Owner: the scene visit
+(`author/scene-materials.ts`); textures are leases from the shared texture library, each
+surface draws a disposable clone with its own sampler transform, and anisotropy follows the
+`textures.anisotropy` quality knob capped by the context. See the
+[recipe](../recipes/give-a-shape-a-material.md). Status: implemented, candidate (branch
+`feat/dx-materials`, stacked on the sub-path base change); not integrated. Evidence: unit
+tests and `npm run test:material-browser` (desktop headless Chromium, software GL); the
+mechanics template demonstrates it with draws and triangles unchanged. No physical-device
+or visual-quality acceptance; `Mesh`/`Model` and texture maps beyond the colour map are out
+of scope.

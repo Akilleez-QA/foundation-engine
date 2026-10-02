@@ -69,6 +69,8 @@ jobs:
         run: npm run test:audio-browser
       - name: Optional replay and divergence browser regressions
         run: npm run test:replay-browser
+      - name: Authored material browser regressions
+        run: npm run test:material-browser
       - name: Sub-path production build browser regressions
         run: npm run test:subpath-browser
       - name: Full gates for every template

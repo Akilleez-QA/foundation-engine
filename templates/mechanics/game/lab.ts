@@ -1,4 +1,4 @@
-import { defineScene, defineSystem, Name, Shape, Transform, Model, type SceneContext } from '@engine';
+import { defineScene, defineSystem, defineMaterial, Name, Shape, Transform, Model, type SceneContext } from '@engine';
 import { cameraSystem } from '@kits/camera';
 import { Character, characterSystem, Walls, Solid } from '@kits/character';
 import { VehicleRider } from '@kits/vehicles';
@@ -27,11 +27,12 @@ const follow = defineSystem({ id: 'lab-rider', run(ctx, dt) { const s = sessionF
 export default defineScene({ id: 'lab', title: 'lab.title', type: 'area',
   view: { background: 0x91bacd, environment: { background: 0x91bacd, cube: { faces: ['lab-sky-px', 'lab-sky-nx', 'lab-sky-py', 'lab-sky-ny', 'lab-sky-pz', 'lab-sky-nz'], screenPx: 64 }, ambient: { sky: 0xffffff, ground: 0x667788, intensity: 2 }, directional: { color: 0xffffff, intensity: 2, position: [3, 8, 5] }, haze: null, points: [], pointSize: 1 }, camera: { position: [0, 12, 15], target: [0, 0, 0], fov: 52, minWidthFov: 70 } },
   entities: [
-    [Name({ name: 'floor' }), Transform({ y: -.12 }), Shape({ kind: 'box', size: [16, .2, 12], color: 0x314e63 })],
+    // Material: the panel texture tiled across the floor (tinted by the shape colour) and a softly lit kiosk.
+    [Name({ name: 'floor' }), Transform({ y: -.12 }), Shape({ kind: 'box', size: [16, .2, 12], color: 0x6f8fa3 }), defineMaterial({ texture: 'lab-panel', repeat: [8, 6], roughness: .85 })],
     [Walls({ minX: -7, maxX: 7, minZ: -5, maxZ: 5 })],
     [Name({ name: 'platform' }), Transform({ x: -3, y: .2 }), Shape({ kind: 'box', size: [2.4, .4, 2], color: 0x5bc8c0 })],
     [Name({ name: 'player' }), Transform({ x: -3, y: .7 }), Shape({ kind: 'capsule', size: [.6, 1.2, .6], color: 0xf5d798 }), Character(), VehicleRider({ id: 'player' })],
-    [Name({ name: 'kiosk' }), Transform({ y: .6, z: 2 }), Shape({ kind: 'box', size: [1, 1.2, 1], color: 0x66aee0 })],
+    [Name({ name: 'kiosk' }), Transform({ y: .6, z: 2 }), Shape({ kind: 'box', size: [1, 1.2, 1], color: 0x66aee0 }), defineMaterial({ texture: 'lab-panel', roughness: .4, metalness: .3, emissive: 0x0b2a3a })],
     [Transform({ x: 2.1, z: -2 }), Solid({ halfX: .1, halfZ: .5 })],
     [Name({ name: 'beacon' }), Transform({ x: 1.5, y: .8, z: -2 }), Model({ asset: 'lab-beacon', clip: 'pulse' })],
     [Name({ name: 'target' }), Transform({ x: 4, y: 1, z: -1 }), Shape({ kind: 'sphere', size: [.9, .9, .9], color: 0xf4bf47 })],
