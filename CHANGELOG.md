@@ -7,7 +7,14 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
-Nothing yet.
+- **Two players in one world (MP-01, candidate).** `@kits/network` now exports a
+  game-facing shared session: `defineSessionRules` (one pure rules file shared by the
+  page and the host), `createSession` (join, predict, reconcile, paced reconnect, close
+  policy) and the transport-neutral `createSessionHost` (intake, scoped views, frame
+  rate limit, integrity in observe mode). `npm run host` runs a game's `session.ts` on a
+  development loopback/LAN WebSocket host, and the `shared-world` template plus the
+  [recipe](docs/recipes/two-players-one-world.md) put two browser tabs in one world.
+  LAN/loopback only: no accounts, matchmaking, NAT traversal or WAN certification.
 
 ## 0.2.0 — 2026-10-03
 

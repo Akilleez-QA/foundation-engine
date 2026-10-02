@@ -446,3 +446,34 @@ optional `maxQueuedAgeMs` (an age shorter than the real queued wait collapsed go
 because each aged shed cost a pump attempt) is resolved by the NW-06 follow-up above.
 The probe now asserts that queue-age variants plateau, like FIFO. Evidence is
 loopback/process scope only, not WAN or physical devices. Integrated in v0.2.0 (PR #27).
+
+## Optional shared session for game code (MP-01)
+
+Game code imports only `@engine` and `@kits/<name>`, so it could not reach the browser
+transport, and nothing composed the owners above into a session a newcomer could run.
+Three exports do that; none is constructed unless a game calls it:
+
+- `defineSessionRules({id, version, maxPlayers, initial, join, leave, action, apply, disclose?, integrity?, limits?})`:
+  one pure, frozen rules definition (a world is entity id to JSON fields, bounded by
+  `limits.world` and `limits.maxEntities`) that the page and the host both import.
+- `createSession({rules, endpoint?})`: the page's owner for one scene visit. Without an
+  endpoint it plays the same rules locally for `p1`. With one it composes the browser
+  transport, `createViewReceiver`, `createPrediction` (baseline = view sequence plus the
+  host's `processed` count in the same view), `createRetrySchedule` and
+  `createClosePolicy` (`SESSION_TERMINAL_REASONS`). `update(now)` drives it from a frame
+  system; `act(action)` predicts and sends; `read()` reports status, world, revision and
+  the last validated close. Lost actions are never resent.
+- `createSessionHost({rules, joinCode, ports, integrity?, limits?})`: transport-neutral
+  authority composing `createNetworkIntake` (join code, player slots, fair sequenced
+  dispatch), one `createViewPublisher` per connection, `createRateAdmission` per
+  connection and `createIntegrity` (`observe` by default). It owns no socket or timer;
+  `scripts/host.mjs` (`npm run host`) supplies `ws`, a 20 ms driver and loopback/LAN
+  binding.
+
+`sessionEndpointFromPage()` reads `?host=&join=` and accepts only loopback and private
+LAN hosts. See the [shared session guide](../../../docs/guides/multiplayer-session.md)
+for the wire contract, bounds, overload, recovery and evidence, and the
+[recipe](../../../docs/recipes/two-players-one-world.md) for the `shared-world`
+template. Implemented, candidate (MP-01); not integrated. Unit, loopback socket and
+desktop headless Chromium evidence only; LAN/loopback only, no accounts, matchmaking,
+NAT traversal or WAN certification.

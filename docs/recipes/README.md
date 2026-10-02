@@ -14,6 +14,7 @@ Short, checked how-tos. Start with [getting started](../guides/getting-started.m
 | play my own sound effects, with volume, pitch and position | [play your own sound files](play-your-own-sounds.md) |
 | put my game on the web | [share your build](share-your-build.md) |
 | host it in a folder (GitHub Pages project site, itch.io) | [host a build under a sub-path](host-under-a-sub-path.md) |
+| play with a friend: two players in one world on my machine or LAN | [two players in one world](two-players-one-world.md) |
 
 ## Building blocks
 

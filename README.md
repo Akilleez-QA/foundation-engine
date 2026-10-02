@@ -47,6 +47,7 @@ A game lives outside the engine, in `game/` (or any folder named by `GAME_DIR`).
 | [`terrain`](templates/terrain/README.md) | canonical surface, contact, finite detail levels and coherent revisions | terrain, character |
 | [`expedition`](templates/expedition/README.md) | guided routes, persistent completion and bounded production | navigation, objectives, inventory and supporting kits |
 | [`mechanics`](templates/mechanics/README.md) | ownership, attachments, local transactions and action results | frames, vehicles, control and supporting kits |
+| [`shared-world`](templates/shared-world/README.md) | two or more players on one board through a local `npm run host` ([recipe](docs/recipes/two-players-one-world.md)) | ui (and `@kits/network`) |
 
 Each template's README lists what is in it, its controls and what to change first. Each template passes the gate on its own: `GAME_DIR=templates/<name>/game npm run gate`.
 
@@ -89,7 +90,7 @@ The current state as of 0.2.0 (October 2026). Textures and materials ([recipe](d
 |---|---|---|
 | Particles | Nothing dedicated | A few short-lived `Shape` entities that a system moves and despawns. Each shape is one draw, so keep the count small and watch `play:snap`'s draw count |
 | Rigid-body physics | Overlap tests in systems; the character kit's kinematic movement with `Walls` and `Solid` blocking | Write simple motion in a fixed-step system (velocity, gravity, stop at the ground); [collision and picking](docs/recipes/collision-and-picking.md) |
-| A multiplayer session you can just run | The optional network kit's admission, transport, scoped views, authority and prediction contracts, and a [reference workbench](docs/guides/network-admission.md) for diagnosis; you supply the server, identity and game rules | Same-device play: give each player their own actions on separate keys |
+| Internet multiplayer (WAN hosting, accounts, matchmaking, NAT traversal) | A LAN/loopback shared session: shared rules in `@kits/network`, a development `npm run host` and the `shared-world` template ([two players in one world](docs/recipes/two-players-one-world.md)); the network kit's admission, views, authority and prediction contracts underneath | Play on one machine or a trusted local network; a public deployment needs your own server, TLS, identity and hardening |
 
 Each template passes the gate on its own: `npm run gate -- --game templates/<name>/game` (any shell; `GAME_DIR=templates/<name>/game npm run gate` also works in POSIX shells).
 
@@ -107,7 +108,7 @@ Each template passes the gate on its own: `npm run gate -- --game templates/<nam
 - [docs/STANDARD.md](docs/STANDARD.md): the twelve laws and every clause.
 - [Device experience policy](docs/policy/DEVICE-EXPERIENCE.md): separate phone, tablet, laptop and desktop UI/UX and quality/performance acceptance.
 - [docs/APPLICATION.md](docs/APPLICATION.md): the template for applying the standard to your game.
-- [docs/recipes/](docs/recipes/README.md): the cookbook (models, HUD and buttons, collision and picking, camera and lighting, sharing a build) and the building blocks (a scene, an entity and component, a system, an input action, a save section, a budget, a kit or a template), plus giving a shape a material, playing your own sound files and hosting a build under a sub-path.
+- [docs/recipes/](docs/recipes/README.md): the cookbook (models, HUD and buttons, collision and picking, camera and lighting, sharing a build) and the building blocks (a scene, an entity and component, a system, an input action, a save section, a budget, a kit or a template), plus giving a shape a material, playing your own sound files, hosting a build under a sub-path and two players in one world.
 - [docs/adr/](docs/adr/README.md): the decisions behind the design.
 - [docs/policy/KID-SAFE.md](docs/policy/KID-SAFE.md): an opt-in stricter player-protection profile.
 - [docs/PROVENANCE.md](docs/PROVENANCE.md): where this engine came from.
