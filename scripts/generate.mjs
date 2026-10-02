@@ -5,6 +5,7 @@
  *   1. `scripts/strings.mjs` writes `src/core/i18n/keys.gen.ts` (the typed string keys `t()` checks), the narration
  *      catalogue and the compact ids, from the string shards.
  */
+import './lib/node-version.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 

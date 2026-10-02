@@ -6,15 +6,15 @@
   "description": "Foundation Engine: a genre-neutral TypeScript and Three.js engine for browser games.",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   },
   "scripts": {
-    "dev": "node scripts/generate.mjs && vite --host 127.0.0.1",
+    "dev": "node scripts/generate.mjs && vite",
     "build": "node scripts/generate.mjs && tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1",
+    "preview": "vite preview",
     "generate": "node scripts/generate.mjs",
     "typecheck": "node scripts/generate.mjs && tsc --noEmit",
-    "test": "node scripts/generate.mjs && tsx --test 'src/**/*.test.ts' 'game/**/*.test.ts' 'templates/*/game/**/*.test.ts' 'scripts/**/*.test.mjs' 'scripts/**/*.test.ts' 'tools/**/*.test.mjs'",
+    "test": "node scripts/generate.mjs && tsx --test \"src/**/*.test.ts\" \"game/**/*.test.ts\" \"templates/*/game/**/*.test.ts\" \"scripts/**/*.test.mjs\" \"scripts/**/*.test.ts\" \"tools/**/*.test.mjs\"",
     "lint": "npm run --silent lint:layers && npm run --silent lint:arch && npm run --silent lint:css && npm run --silent lint:generic && npm run --silent lint:brief && npm run --silent lint:budgets",
     "lint:layers": "node scripts/lint/layers.mjs",
     "lint:arch": "node scripts/lint/architecture.mjs",

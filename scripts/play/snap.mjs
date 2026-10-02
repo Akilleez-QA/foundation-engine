@@ -46,5 +46,6 @@ if (process.argv[1] && process.argv[1].endsWith('snap.mjs')) {
     if (p.errors.length) console.log(`  page errors:\n    ${p.errors.join('\n    ')}`);
     console.log('  details: playtest/latest/probe.json');
     process.exitCode = p.errors.length || Object.values(p.views).some(v => v.budget.status === 'OVER BUDGET') ? 1 : 0;
-  } finally { await server.close(); }
+  } catch (error) { if (!(await import('../perf/bench-browser.mjs')).reportBrowserError(error)) throw error; }
+  finally { await server.close(); }
 }

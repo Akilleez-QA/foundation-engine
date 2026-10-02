@@ -14,6 +14,7 @@
 //   interactable <id> [--door <scene>]   (explore kit) a thing to use, or a door to another scene
 //   area <id>                      (explore kit) a scene to move around in: walls, player, camera, prompt
 //   lesson <id>                    (learn kit) an outline-first lesson: data, scene, test, words
+import './lib/node-version.mjs';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { gameDir, ROOT } from './lib/game-dir.mjs';

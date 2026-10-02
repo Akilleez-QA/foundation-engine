@@ -33,6 +33,15 @@ const licenseNotices: Plugin = {
     }
   },
 };
+// Whenever the dev or preview server listens beyond this machine (`npm run dev -- --host`, ENGINE_HOST), say so.
+const loopback = (host: unknown) => host === undefined || host === false || host === 'localhost' || host === '::1' || /^127\./.test(String(host));
+const lanNotice = 'Listening on the local network: anyone on this network can reach this server (and the dev test API) while it runs. Use a trusted network and stop it with Ctrl+C when done.';
+const lanWarning: Plugin = {
+  name: 'engine-lan-warning',
+  configureServer(server) { server.httpServer?.once('listening', () => { if (!loopback(server.config.server.host)) server.config.logger.warn(lanNotice); }); },
+  configurePreviewServer(server) { server.httpServer?.once('listening', () => { if (!loopback(server.config.preview.host)) server.config.logger.warn(lanNotice); }); },
+};
+const devHost = (value?: string): string | true => !value || value === '0' || value === 'false' ? '127.0.0.1' : value === '1' || value === 'true' ? true : value;
 // Workers are module workers and the worker host loads job modules on demand: ES output with code splitting.
 // Production builds ship short string ids instead of readable keys (scripts/compact-keys.mjs).
 export default defineConfig({
@@ -46,7 +55,12 @@ export default defineConfig({
     {find: /^@kits\/([a-z-]+)$/, replacement: fileURLToPath(new URL('./src/kits/', import.meta.url)) + '$1/index.ts'},
     {find: /^@game\//, replacement: gameDir() + '/'},
   ]},
-  plugins: [engineStrings, licenseNotices, compactKeys(fileURLToPath(new URL('./src/generated/strings/compact-ids.json', import.meta.url))), testApi],
+  plugins: [engineStrings, lanWarning, licenseNotices, compactKeys(fileURLToPath(new URL('./src/generated/strings/compact-ids.json', import.meta.url))), testApi],
+  // `npm run dev` and `npm run preview` listen on this machine only. `npm run dev -- --host` (Vite's own flag) or
+  // ENGINE_HOST=1 listens on the local network too, e.g. to open the game on a phone on the same Wi-Fi; everyone on
+  // that network can then reach the dev server. `npm run play -- --host` does the same for the play server.
+  server: {host: devHost(process.env.ENGINE_HOST)},
+  preview: {host: devHost(process.env.ENGINE_HOST)},
   optimizeDeps: {entries: ['index.html']},
   build: {cssCodeSplit: true, target: 'es2022'},
   worker: {format: 'es'},

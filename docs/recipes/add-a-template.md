@@ -22,8 +22,8 @@ templates/<name>/
 ## Check it
 
 ```
-GAME_DIR=templates/<name>/game npm run gate      # the full gate, on this template
-GAME_DIR=templates/<name>/game npm run dev
+npm run gate -- --game templates/<name>/game     # the full gate, on this template (or GAME_DIR=… in POSIX shells)
+npm run play -- --game templates/<name>/game     # the dev server with the test API
 ```
 
 Measure its budgets as in [add-a-budget](add-a-budget.md). The ratchet reads `templates/<name>/game/budgets.json` with trailer keys prefixed `<name>/`.

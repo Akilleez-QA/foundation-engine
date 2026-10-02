@@ -8,6 +8,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { toolCommand } from '../lib/tool.mjs';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const MARKERS = ['learn-director', 'learnKit'];
@@ -15,7 +16,8 @@ type Chunk = { file: string; isEntry?: boolean; imports?: string[] };
 
 function build(template: string) {
   const out = mkdtempSync(join(tmpdir(), `engine-${template}-`));
-  const r = spawnSync('npx', ['vite', 'build', '--outDir', out, '--emptyOutDir', '--manifest', '--logLevel', 'error'], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, GAME_DIR: `templates/${template}/game` } });
+  const vite = toolCommand('vite', ['build', '--outDir', out, '--emptyOutDir', '--manifest', '--logLevel', 'error']);
+  const r = spawnSync(vite.command, vite.args, { cwd: ROOT, encoding: 'utf8', shell: vite.shell, env: { ...process.env, GAME_DIR: `templates/${template}/game` } });
   assert.equal(r.status, 0, `Vite build ${template}: status=${r.status}, signal=${r.signal}, error=${r.error?.message ?? 'none'}\n${r.stderr}`);
   const manifest = JSON.parse(readFileSync(join(out, '.vite', 'manifest.json'), 'utf8')) as Record<string, Chunk>;
   const first = new Set<string>();

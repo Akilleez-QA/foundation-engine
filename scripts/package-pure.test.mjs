@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { assertPureGraph, buildPurePackage } from './package-pure.mjs';
+import { npmCommand } from './lib/tool.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 test('pure package: immutable packed consumer runs without Foundation runtime or Three and preserves custody', () => {
@@ -18,7 +19,8 @@ test('pure package: immutable packed consumer runs without Foundation runtime or
     assert.equal(first.integrity, second.integrity);
     const consumer = join(dir, 'consumer'); mkdirSync(consumer);
     writeFileSync(join(consumer, 'package.json'), JSON.stringify({ name: 'pure-consumer', version: '1.0.0', private: true, type: 'module' }));
-    execFileSync('npm', ['install', '--ignore-scripts', '--offline', '--no-audit', '--no-fund', first.artifact], { cwd: consumer });
+    const install = npmCommand(['install', '--ignore-scripts', '--offline', '--no-audit', '--no-fund', first.artifact]);
+    execFileSync(install.command, install.args, { cwd: consumer, shell: install.shell });
     const installed = join(consumer, 'node_modules/@foundation-engine/pure');
     const manifest = JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8'));
     assert.equal(manifest.dependencies, undefined);
