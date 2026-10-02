@@ -4,7 +4,7 @@ import {existsSync, readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {compactKeys} from './scripts/compact-keys.mjs';
 import {gameDir} from './scripts/lib/game-dir.mjs';
-import {gamePublic} from './scripts/lib/game-public.mjs';
+import {gamePublic, gamePublicDir} from './scripts/lib/game-public.mjs';
 
 // The generated string catalogues and key types (ADR 0043) are gitignored, so every build and dev server regenerates
 // them first: `npm run build`, the gate, the deploy guard and the verify scripts all build through here. The dev
@@ -59,8 +59,10 @@ export default defineConfig({
     {find: /^@game\//, replacement: gameDir() + '/'},
   ]},
   plugins: [engineStrings, lanWarning, licenseNotices, gamePublic(), compactKeys(fileURLToPath(new URL('./src/generated/strings/compact-ids.json', import.meta.url))), testApi],
-  // Static files: the game's own `<game>/public/` (scripts/lib/game-public.mjs) plus the shared root `public/` (Vite's
-  // publicDir), which the engine leaves empty. A build ships only the game it builds, never another template's files.
+  // Static files: Vite's publicDir is the game's own `<game>/public/`, or the root `public/` for a game without one
+  // (scripts/lib/game-public.mjs), so the dev server and the build serve the same files the same way. A build ships
+  // only the game it builds, never another template's files; gamePublic() refuses reserved names and symbolic links.
+  publicDir: gamePublicDir(),
   // `npm run dev` and `npm run preview` listen on this machine only. `npm run dev -- --host` (Vite's own flag) or
   // ENGINE_HOST=1 listens on the local network too, e.g. to open the game on a phone on the same Wi-Fi; everyone on
   // that network can then reach the dev server. `npm run play -- --host` does the same for the play server.

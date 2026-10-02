@@ -3,71 +3,74 @@
 //
 //   <game>/public/models/robot.glb   is served and built as   <base>models/robot.glb   (asset url '/models/robot.glb')
 //
-// The repository's root `public/` is still Vite's public folder: anything there is shared by every game built from
-// this checkout and ships with each of them. The engine itself keeps nothing there. A path present in both folders is
-// ambiguous: the build stops with both file names, and the dev server serves the game's file and warns once.
+// That folder is Vite's own `publicDir` (vite.config.ts: publicDir: gamePublicDir()), so the dev server and the build
+// treat it exactly as Vite treats any public folder: Vite serves it in dev (Range requests, ?url/?raw/?import) and
+// copies it into the build output after the bundle is written; nothing here reads, holds or streams the files. A game
+// without its own `public/` folder falls back to the repository's root `public/` (the folder older games used; the
+// engine keeps nothing there). Only one of the two is ever used.
 //
-// Owner: the Vite config (vite.config.ts) through gamePublic(); the game folder comes from scripts/lib/game-dir.mjs.
-// Bounds: files are read when the build emits them (one at a time) and streamed by the dev server; nothing is cached.
-import {createReadStream, existsSync, readdirSync, readFileSync, statSync} from 'node:fs';
-import {extname, join, normalize, relative, sep} from 'node:path';
+// gamePublic() checks the folder in use before the dev server starts and when a build starts, and stops either with
+// the same message when:
+// - it holds a reserved name at its top: index.html, LICENSE.txt, COPYRIGHT.txt or THIRD_PARTY_NOTICES.txt, which the
+//   build writes itself (the app page and the licence notices); a copy would replace them;
+// - it holds a symbolic link: the dev server would follow it and the build would copy the link, not the file;
+// - the game has its own folder and the root `public/` still holds files, which would then be silently left out.
+//
+// Owner: the Vite config; the game folder comes from scripts/lib/game-dir.mjs. Bounds: one directory walk per check.
+import {existsSync, readdirSync, statSync} from 'node:fs';
+import {join, relative, sep} from 'node:path';
 import {ROOT, gameDir} from './game-dir.mjs';
+
+/** Names the build writes itself at the top of its output; a public file with one of these names is refused. */
+export const RESERVED = ['index.html', 'LICENSE.txt', 'COPYRIGHT.txt', 'THIRD_PARTY_NOTICES.txt'];
+
+const isDir = dir => existsSync(dir) && statSync(dir).isDirectory();
+const rel = (dir, e) => relative(dir, join(e.parentPath ?? e.path, e.name)).split(sep).join('/');
+const entries = dir => isDir(dir) ? readdirSync(dir, {recursive: true, withFileTypes: true}) : [];
 
 /** Every file under `dir`, relative, with '/' separators, sorted; [] when the folder does not exist. */
 export function publicFiles(dir) {
-  if (!existsSync(dir) || !statSync(dir).isDirectory()) return [];
-  return readdirSync(dir, {recursive: true, withFileTypes: true}).filter(e => e.isFile())
-    .map(e => relative(dir, join(e.parentPath ?? e.path, e.name)).split(sep).join('/')).sort();
+  return entries(dir).filter(e => e.isFile()).map(e => rel(dir, e)).sort();
 }
 
-/** Paths present in both the game's public folder and the shared root folder. */
-export function conflicts(gamePublicDir, sharedDir) {
-  const shared = new Set(publicFiles(sharedDir));
-  return publicFiles(gamePublicDir).filter(f => shared.has(f));
+/** The public folder a build of the game uses: `<game>/public/` when it exists, else the shared root `public/`. */
+export function gamePublicDir({game = join(gameDir(), 'public'), shared = join(ROOT, 'public')} = {}) {
+  return isDir(game) ? game : shared;
 }
 
-const TYPES = {'.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp', '.ktx2': 'image/ktx2', '.svg': 'image/svg+xml', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4',
-  '.json': 'application/json', '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm', '.txt': 'text/plain', '.css': 'text/css'};
+const show = path => relative(ROOT, path).split(sep).join('/') || '.';
 
-/** The file under `dir` a request path names (after the base), or null. Never leaves `dir`. */
-export function resolveRequest(dir, pathname, base = '/') {
-  let path;
-  try { path = decodeURIComponent(pathname); } catch { return null; }
-  if (!path.startsWith(base)) return null;
-  const file = normalize(join(dir, path.slice(base.length)));
-  if (!file.startsWith(dir + sep) || !existsSync(file) || !statSync(file).isFile()) return null;
-  return file;
+/** Why `dir` cannot be served and built as the public folder ([] when it can). `shared` is the root folder. */
+export function publicProblems(dir, shared = join(ROOT, 'public')) {
+  if (!dir || !isDir(dir)) return [];
+  const out = [], all = entries(dir);
+  const reserved = new Set(RESERVED.map(n => n.toLowerCase()));
+  const clash = all.filter(e => (e.isFile() || e.isSymbolicLink()) && !rel(dir, e).includes('/') && reserved.has(e.name.toLowerCase())).map(e => e.name).sort();
+  if (clash.length) out.push(`${show(dir)} holds ${clash.join(', ')}: the build writes ${clash.length > 1 ? 'these names' : 'this name'} itself (the app page and the licence notices) and a copy would replace ${clash.length > 1 ? 'them' : 'it'}. Rename or move ${clash.length > 1 ? 'them' : 'it'} into a subfolder.`);
+  const links = all.filter(e => e.isSymbolicLink()).map(e => rel(dir, e)).sort();
+  if (links.length) out.push(`${show(dir)} holds ${links.length} symbolic link(s) (${links.slice(0, 5).join(', ')}${links.length > 5 ? ', …' : ''}): the dev server would follow them but the build copies the link, not the file. Copy the files in instead.`);
+  if (dir !== shared) {
+    const left = publicFiles(shared);
+    if (left.length) out.push(`the game has its own ${show(dir)}, so the ${left.length} file(s) in the root ${show(shared)} (${left.slice(0, 5).join(', ')}${left.length > 5 ? ', …' : ''}) would be served and built by no one. Move them into ${show(dir)}.`);
+  }
+  return out;
 }
 
-const conflictMessage = (list, gamePublicDir, sharedDir) => `${list.length} file(s) are in both the game's public folder and the shared root public folder: ` +
-  list.slice(0, 5).map(f => `${relative(ROOT, join(gamePublicDir, f)).split(sep).join('/')} and ${relative(ROOT, join(sharedDir, f)).split(sep).join('/')}`).join('; ') +
-  (list.length > 5 ? ` (+${list.length - 5})` : '') + '. Keep each file in one place (a game\'s own files belong in its public/ folder).';
+const message = problems => 'static files: ' + problems.join(' ');
 
-/** The Vite plugin: serve `<game>/public/` in dev and emit it into every build. */
-export function gamePublic({dir = () => join(gameDir(), 'public'), shared = join(ROOT, 'public')} = {}) {
+/** The Vite plugin: refuses a public folder the dev server and the build would not treat the same (see the header). */
+export function gamePublic({shared = join(ROOT, 'public')} = {}) {
+  let dir = '';
   return {
     name: 'engine-game-public',
-    configureServer(server) {
-      const gamePublicDir = dir();
-      const clash = conflicts(gamePublicDir, shared);
-      if (clash.length) server.config.logger.warn(conflictMessage(clash, gamePublicDir, shared) + ' The dev server serves the game\'s copy.');
-      server.middlewares.use((req, res, next) => {
-        if (req.method !== 'GET' && req.method !== 'HEAD') return next();
-        const file = resolveRequest(gamePublicDir, new URL(req.url ?? '/', 'http://x').pathname, server.config.base);
-        if (!file) return next();
-        res.setHeader('Content-Type', TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream');
-        res.setHeader('Content-Length', statSync(file).size);
-        res.setHeader('Cache-Control', 'no-cache');
-        if (req.method === 'HEAD') { res.end(); return; }
-        createReadStream(file).on('error', next).pipe(res);
-      });
+    configResolved(config) { dir = config.publicDir || ''; },
+    configureServer() {
+      const problems = publicProblems(dir, shared);
+      if (problems.length) throw Error(message(problems));
     },
-    generateBundle() {
-      const gamePublicDir = dir();
-      const clash = conflicts(gamePublicDir, shared);
-      if (clash.length) this.error(conflictMessage(clash, gamePublicDir, shared));
-      for (const fileName of publicFiles(gamePublicDir)) this.emitFile({type: 'asset', fileName, source: readFileSync(join(gamePublicDir, fileName))});
+    buildStart() {
+      const problems = publicProblems(dir, shared);
+      if (problems.length) this.error(message(problems));
     },
   };
 }
