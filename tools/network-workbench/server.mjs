@@ -2,7 +2,10 @@ import { randomBytes } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
-import { createNetworkIntake } from '../../src/kits/network/index.ts';
+import {
+  createNetworkIntake,
+  createRateAdmission,
+} from '../../src/kits/network/index.ts';
 
 export const hostLimits = Object.freeze({
   maxConnections: 8,
@@ -81,6 +84,12 @@ export async function startNetworkWorkbench({
     clientTracking: true,
   });
   const now = () => performance.now();
+  // One bucket per live intake peer; the intake connection bound bounds the keys.
+  const frameRate = createRateAdmission({
+    maxKeys: hostLimits.maxConnections,
+    capacity: MAX_FRAMES_PER_SECOND,
+    refillPerSecond: MAX_FRAMES_PER_SECOND,
+  });
   const intake = createNetworkIntake({
     limits: hostLimits,
     ports: {
@@ -123,6 +132,7 @@ export async function startNetworkWorkbench({
         held.delete(peer);
         if (!state) return;
         peers.delete(peer);
+        frameRate.forget(peer);
         metrics.closed++;
         state.socket.removeListener('message', state.message);
         if (state.socket.readyState === WebSocket.OPEN)
@@ -218,8 +228,6 @@ export async function startNetworkWorkbench({
         socket,
         announced: false,
         lastFrame: now(),
-        windowAt: now(),
-        frames: 0,
         preAuthFrames: 0,
         message: null,
       };
@@ -229,11 +237,8 @@ export async function startNetworkWorkbench({
       metrics.receivedFrames++;
       const time = now();
       state.lastFrame = time;
-      if (time - state.windowAt >= 1000) {
-        state.windowAt = time;
-        state.frames = 0;
-      }
-      if (++state.frames > MAX_FRAMES_PER_SECOND) {
+      // Token bucket: a burst of at most MAX_FRAMES_PER_SECOND, refilled at that rate (NW-05).
+      if (frameRate.admit(peer, time).status !== 'admitted') {
         intake.close(peer, 'rate-capacity');
         return;
       }
@@ -352,6 +357,7 @@ export async function startNetworkWorkbench({
       closed = true;
       clearInterval(timer);
       intake.dispose();
+      frameRate.dispose();
       held.clear();
       for (const socket of wss.clients) socket.terminate();
       closePromise = new Promise((resolve) => wss.close(resolve));

@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createNetworkIntake } from '../../src/kits/network/intake.ts';
+import { createRateAdmission } from '../../src/kits/network/rate-admission.ts';
 import {
   createDurableAuthority,
   createAuthorityGenesis,
@@ -21,6 +22,7 @@ const exact = (x, keys) =>
   Object.keys(x).length === keys.length &&
   keys.every((k) => Object.hasOwn(x, k));
 const integer = Number.isSafeInteger;
+const MAX_FRAMES_PER_SECOND = 128;
 const json = { maxBytes: 65536, maxNodes: 4096, maxDepth: 12 };
 export const authorityLimits = Object.freeze({
   envelope: json,
@@ -253,6 +255,12 @@ export async function startAuthorityWorkbench({
       inFlight = null;
     }
   }
+  // Token bucket per live peer: burst 128 frames, refilled at 128 per second (NW-05).
+  const frameRate = createRateAdmission({
+    maxKeys: intakeLimits.maxConnections,
+    capacity: MAX_FRAMES_PER_SECOND,
+    refillPerSecond: MAX_FRAMES_PER_SECOND,
+  });
   const intake = createNetworkIntake({
     limits: intakeLimits,
     ports: {
@@ -284,6 +292,7 @@ export async function startAuthorityWorkbench({
         const s = peers.get(peer);
         if (!s) return;
         peers.delete(peer);
+        frameRate.forget(peer);
         if (controllers.get(s.principal) === s) controllers.delete(s.principal);
         s.socket.removeListener('message', s.message);
         s.socket.terminate();
@@ -333,18 +342,16 @@ export async function startAuthorityWorkbench({
       session: null,
       epoch: null,
       lastFrame: performance.now(),
-      window: performance.now(),
-      count: 0,
       dirty: false,
     };
     peers.set(s.peer, s);
     s.message = (bytes, binary) => {
       const now = performance.now();
-      if (now - s.window >= 1000) {
-        s.window = now;
-        s.count = 0;
-      }
-      if (binary || bytes.length > 1024 || ++s.count > 128) {
+      if (
+        binary ||
+        bytes.length > 1024 ||
+        frameRate.admit(s.peer, now).status !== 'admitted'
+      ) {
         intake.close(s.peer, 'frame-limit');
         return;
       }
@@ -505,6 +512,7 @@ export async function startAuthorityWorkbench({
       clearInterval(timer);
       owner.dispose();
       intake.dispose();
+      frameRate.dispose();
       api.releaseCommitResponse();
       closing = new Promise((resolve) => wss.close(resolve)).then(() =>
         db.close(),

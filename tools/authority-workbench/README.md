@@ -188,7 +188,9 @@ results or baselines are disclosed. Revocation in this diagnostic lasts for the
 host lifetime; it is not a durable account/identity service.
 
 Limits are eight connections, one queued command per peer, eight total queued
-commands, 1,024 incoming bytes, 16 KiB outgoing socket buffering, three permanent
+commands, 1,024 incoming bytes, a per-peer [rate admission](../../docs/guides/rate-admission.md)
+token bucket (burst 128, refill 128 frames/s; a limited frame closes the peer, NW-05;
+previously a 128-per-1000 ms fixed window), 16 KiB outgoing socket buffering, three permanent
 streams including the operator, and four receipts per stream. The service admits
 one pending operation; busy commands are refused without a retry queue. Operator
 state changes use the same authority and their own stream. Withheld disclosure

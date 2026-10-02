@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
-import { createNetworkIntake, createViewPublisher } from '../../src/kits/network/index.ts';
+import { createNetworkIntake, createRateAdmission, createViewPublisher } from '../../src/kits/network/index.ts';
 export const viewLimits = Object.freeze({ maxBytes: 65536, maxNodes: 4096, maxDepth: 8, maxEntities: 64, maxIdentityLength: 256 });
 export const hostLimits = Object.freeze({ maxConnections: 8, maxPendingAuth: 8, maxPreAuthMessages: 2, authTimeoutMs: 1500,
     maxQueuedMessagesPerPeer: 8, maxQueuedBytesPerPeer: 8192, maxQueuedMessages: 64, maxQueuedBytes: 65536, maxPumpOperations: 64,
@@ -41,6 +41,8 @@ export async function startReplicationWorkbench({ port = 0, autoDriver = true, d
             return false;
         }
     }
+    // Token bucket per live peer: burst MAX_RATE frames, refilled at MAX_RATE per second (NW-05).
+    const frameRate = createRateAdmission({ maxKeys: hostLimits.maxConnections, capacity: MAX_RATE, refillPerSecond: MAX_RATE });
     const intake = createNetworkIntake({ limits: hostLimits, ports: {
             authenticate({ credential, complete }) { const p = tokens.get(credential?.token); complete(p && !revoked.has(p) ? JSON.stringify({ id: p }) : null); },
             authorize({ peer, principal, command }) { return !revoked.has(principal.id) && peers.get(peer)?.session === command.session; },
@@ -50,7 +52,7 @@ export async function startReplicationWorkbench({ port = 0, autoDriver = true, d
                 pub?.markDirty(); },
             send: transportSend,
             close(peer) { const s = peers.get(peer); if (!s)
-                return; peers.delete(peer); metrics.closed++; s.publisher?.dispose(); s.socket.removeListener('message', s.message); s.socket.terminate(); },
+                return; peers.delete(peer); frameRate.forget(peer); metrics.closed++; s.publisher?.dispose(); s.socket.removeListener('message', s.message); s.socket.terminate(); },
         } });
     function project(p) {
         metrics.projectionCalls++;
@@ -107,7 +109,7 @@ export async function startReplicationWorkbench({ port = 0, autoDriver = true, d
             socket.terminate();
             return;
         }
-        const peer = opened.peer, s = { socket, session: null, publisher: null, message: null, lastFrame: now(), windowAt: now(), frames: 0, lastSentRound: null };
+        const peer = opened.peer, s = { socket, session: null, publisher: null, message: null, lastFrame: now(), lastSentRound: null };
         peers.set(peer, s);
         s.message = (data, binary) => {
             if (!peers.has(peer) || closed)
@@ -115,11 +117,7 @@ export async function startReplicationWorkbench({ port = 0, autoDriver = true, d
             metrics.received++;
             const t = now();
             s.lastFrame = t;
-            if (t - s.windowAt >= 1000) {
-                s.windowAt = t;
-                s.frames = 0;
-            }
-            if (++s.frames > MAX_RATE || binary || data.length > 1024) {
+            if (frameRate.admit(peer, t).status !== 'admitted' || binary || data.length > 1024) {
                 intake.close(peer, 'frame-capacity');
                 return;
             }
@@ -195,7 +193,7 @@ export async function startReplicationWorkbench({ port = 0, autoDriver = true, d
             if (intake.read(peer)?.principal?.id === principal)
                 intake.revoke(peer); },
         close() { if (closePromise)
-            return closePromise; closed = true; clearInterval(timer); intake.dispose(); for (const s of wss.clients)
+            return closePromise; closed = true; clearInterval(timer); intake.dispose(); frameRate.dispose(); for (const s of wss.clients)
             s.terminate(); closePromise = new Promise(resolve => wss.close(resolve)); return closePromise; },
     };
     return controls;

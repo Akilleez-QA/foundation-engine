@@ -37,7 +37,9 @@ and a new session. Already disclosed data cannot be recalled from an untrusted c
 
 Eight connections, eight pending authentications, two pre-authentication attempts,
 1,500 ms authentication timeout, 15-second incoming-idle timeout. Incoming frames
-are at most 1,024 bytes with 256 messages per second per peer. Intake holds at most
+are at most 1,024 bytes; each peer has a [rate admission](../../docs/guides/rate-admission.md)
+token bucket of burst 256, refilled at 256 messages per second, and a limited frame closes
+the peer (NW-05; previously a 256-per-1000 ms fixed window). Intake holds at most
 eight messages/8 KiB per peer and 64 messages/64 KiB globally, with at most 64
 operations per driver round. Each connection gets at most one publisher attempt
 per round. The default driver interval is 10 ms.
