@@ -74,8 +74,8 @@ export interface InputState {
   held(action: string): boolean;
   /** -1…1 for an axis action (its negative and positive bindings). */
   axis(action: string): number;
-  /** The pointer over the view, in normalised device coordinates (-1…1); `pressed` follows the `pressed()` rules. */
-  readonly pointer: { x: number; y: number; down: boolean; pressed: boolean };
+  /** The pointer over the view, in normalised device coordinates (-1…1); `pressed` follows the `pressed()` rules. Read-only. */
+  readonly pointer: { readonly x: number; readonly y: number; readonly down: boolean; readonly pressed: boolean };
 }
 
 /** One visit-owned reading surface. Cancellation resolves ready with an aborted signal; entry failures reject it. */

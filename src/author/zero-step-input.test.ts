@@ -12,6 +12,7 @@ const source=readFileSync(new URL('./runtime.ts',import.meta.url),'utf8');
 const slice=(from:string,to:string)=>{const a=source.indexOf(from),b=source.indexOf(to,a);assert.ok(a>=0&&b>a,`runtime.ts slice ${from.trim()}`);return source.slice(a,b);};
 const wiring=slice('      const pressed = ','      input.onCancel(');
 const runnerLine=slice('      const runner = createSystemRunner(','\n');
+const inputLine=slice('        input: sceneInput(','\n');
 const update=slice('        update(f: FrameInfo) {','        render() {');
 const STEP=1/60;
 type Seen={tick:number;frame:number;lane:'fixed'|'frame';jump:boolean;tap:boolean};
@@ -24,12 +25,15 @@ function fixture(){
  const run=ts.transpile(`let programFailed=false,simulating=true,frame=0,t=0,calm=false;const timing=undefined,body={systems},world={clearEvents(){}},scene={id:'test'};
 ${wiring}
 ${runnerLine}
-const ctx={input:sceneInput(()=>true,()=>false,pressed,pointer)};
+const ctx={
+${inputLine}
+};
 return {setSimulating:v=>{simulating=v;},${update}};`,{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None});
  const actx={invalidate(){},runId:'run-test',signal:new AbortController().signal,own(){},coverage:()=>'top',leaving:()=>false};
- const api=new Function('s','o','actx','surface','view','bindScenePointer','actionOf','viewOwnsInput','createSystemRunner','sceneInput','createPressLatch','systems','sync','failPrograms','ProgramLinkError','FrameReadinessError',run)(
-  {input:{onAction:(action:string,fn:any)=>{handlers.set(action,fn);},cancel(){}},log:{error(){}}},{inputs:[{id:'jump'},{id:'tap',tap:true}]},actx,{canvas:{}},{closest:()=>null},
-  bindScenePointer,actionOf,()=>true,createSystemRunner,sceneInput,(latch as any).createPressLatch,systems,()=>{},()=>{},class extends Error{},class extends Error{});
+ const sceneActionHints=()=>()=>null;
+ const api=new Function('s','o','actx','surface','view','bindScenePointer','actionOf','viewOwnsInput','createSystemRunner','sceneInput','createPressLatch','sceneActionHints','systems','sync','failPrograms','ProgramLinkError','FrameReadinessError',run)(
+  {input:{onAction:(action:string,fn:any)=>{handlers.set(action,fn);},cancel(){},held:()=>false,describeAction:()=>null},log:{error(){}}},{inputs:[{id:'jump'},{id:'tap',tap:true}]},actx,{canvas:{}},{closest:()=>null},
+  bindScenePointer,actionOf,()=>true,createSystemRunner,sceneInput,(latch as any).createPressLatch,sceneActionHints,systems,()=>{},()=>{},class extends Error{},class extends Error{});
  return {
   seen,
   press:()=>handlers.get(actionOf('jump'))!({phase:'press'}),
@@ -76,4 +80,23 @@ test('retention is bounded: cancellation and a non-simulating frame release a pe
  const held=fixture();
  held.press();held.frame(STEP/2);held.setSimulating(false);held.frame(STEP);held.setSimulating(true);held.frame(STEP);
  assert.equal(held.seen.filter(s=>s.lane==='fixed').length,0,'a frame that does not simulate releases the press');
+});
+
+test('the per-tick latch hooks touch no empty Set (no per-tick allocation when idle)', () => {
+ const l=latch.createPressLatch(),proto=Set.prototype as any,calls:string[]=[];
+ const saved={clear:proto.clear,values:proto.values,iterator:proto[Symbol.iterator]};
+ proto.clear=function(this:Set<unknown>){calls.push('clear');return saved.clear.call(this);};
+ proto.values=proto[Symbol.iterator]=function(this:Set<unknown>){calls.push('iterate');return saved.values.call(this);};
+ try{for(let i=0;i<3;i++){l.beginStep();l.beginStep();l.beginFrameLane();l.endFrame();}}
+ finally{proto.clear=saved.clear;proto.values=saved.values;proto[Symbol.iterator]=saved.iterator;}
+ assert.deepEqual(calls,[]);
+ l.add('jump');l.beginStep();assert.equal(l.has('jump'),true);l.beginStep();assert.equal(l.has('jump'),false);
+});
+
+test('ctx.input.pointer is read-only at compile time, matching the runtime getter view', () => {
+ const view=latch.createPressLatch().pointer({x:0,y:0,down:false,pressed:false});
+ const state=sceneInput(()=>true,()=>false,new Set(),view);
+ // @ts-expect-error A system cannot clear the pointer press; the runtime view has getters only.
+ const write=()=>{state.pointer.pressed=false;};
+ assert.throws(write,TypeError);
 });

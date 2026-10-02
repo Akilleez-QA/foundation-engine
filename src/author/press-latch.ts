@@ -28,11 +28,12 @@ export function createPressLatch() {
     },
     pointerPressed() { pending.add(POINTER); frame.add(POINTER); },
     /** Runner hook: a fixed step begins and takes every pending press. */
-    beginStep() { lane = 'fixed'; tick.clear(); for (const k of pending) tick.add(k); pending.clear(); },
+    // Size guards: Set iteration and clear() allocate in V8 even when empty, and these run every tick.
+    beginStep() { lane = 'fixed'; if (tick.size) tick.clear(); if (pending.size) { for (const k of pending) tick.add(k); pending.clear(); } },
     /** Runner hook: the per-frame lane begins. */
-    beginFrameLane() { lane = 'frame'; tick.clear(); },
+    beginFrameLane() { lane = 'frame'; if (tick.size) tick.clear(); },
     /** The frame ended: per-frame presses are spent; pending presses wait for a fixed tick. */
-    endFrame() { lane = 'idle'; tick.clear(); frame.clear(); },
+    endFrame() { lane = 'idle'; if (tick.size) tick.clear(); if (frame.size) frame.clear(); },
     clear() { pending.clear(); frame.clear(); tick.clear(); },
   };
 }

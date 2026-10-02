@@ -56,13 +56,13 @@ test('character surface: no query retains existing free plane movement and verti
 
 test('character surface: pointer requires an explicit picker and a missed pick does not fall back', async () => {
   const t = await setup({ pointer: true, ground: () => ({ height: 2 }) });
-  t.ctx.input.pointer.down = true;
+  Object.assign(t.ctx.input.pointer, { down: true });
   t.run(0.5);
   assert.equal(position(t).x, 0);
   assert.equal(position(t).z, 0);
   let target: { x: number; z: number } | null = null;
   const picked = await setup({ pointer: true, ground: () => ({ height: 2 }), pointerTarget: () => target });
-  picked.ctx.input.pointer.down = true;
+  Object.assign(picked.ctx.input.pointer, { down: true });
   picked.run(0.5);
   assert.equal(position(picked).x, 0);
   target = { x: 3, z: 0 };
