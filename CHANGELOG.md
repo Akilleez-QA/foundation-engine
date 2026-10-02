@@ -33,6 +33,11 @@ Foundation Engine is preparing its first public source release. Package version
 - Toolchain: TypeScript 6.0 (from 5.9). `tsconfig.json` drops the deprecated
   `baseUrl`; the `@engine`, `@kits/*` and `@game/*` paths were already relative
   and resolve to the same files. TypeScript 7 is not adopted.
+- Toolchain: Vite 8 (from 7), which bundles with Rolldown, transforms and
+  minifies JS with Oxc and minifies CSS with Lightning CSS. `vite.config.ts`
+  declares the pure `@engine` barrel free of side effects so unused test helpers
+  no longer pull the worker host into first-load JS; first-load JS is about 5-9 KiB
+  smaller per template than under Vite 7.
 
 See the [acceptance ledger](docs/guides/upgrade-acceptance-ledger.md) for precise
 integration evidence and limits. Physical-device acceptance remains incomplete;

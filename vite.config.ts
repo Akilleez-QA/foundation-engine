@@ -42,6 +42,8 @@ const lanWarning: Plugin = {
   configurePreviewServer(server) { server.httpServer?.once('listening', () => { if (!loopback(server.config.preview.host)) server.config.logger.warn(lanNotice); }); },
 };
 const devHost = (value?: string): string | true => !value || value === '0' || value === 'false' ? '127.0.0.1' : value === '1' || value === 'true' ? true : value;
+const slash = (path: string) => path.replace(/\\/g, '/');
+const engineBarrel = slash(fileURLToPath(new URL('./src/author/index.ts', import.meta.url)));
 // Workers are module workers and the worker host loads job modules on demand: ES output with code splitting.
 // Production builds ship short string ids instead of readable keys (scripts/compact-keys.mjs).
 export default defineConfig({
@@ -62,6 +64,11 @@ export default defineConfig({
   server: {host: devHost(process.env.ENGINE_HOST)},
   preview: {host: devHost(process.env.ENGINE_HOST)},
   optimizeDeps: {entries: ['index.html']},
-  build: {cssCodeSplit: true, target: 'es2022'},
+  // src/author/index.ts is a pure re-export barrel (scripts/vite-config.test.mjs keeps it so). Declaring it free of
+  // side effects lets Rolldown (Vite 8) drop the unused test helpers' static edge to the worker host, so the host
+  // stays a lazy chunk as it was under Rollup instead of joining first-load JS.
+  build: {cssCodeSplit: true, target: 'es2022', rolldownOptions: {treeshake: {
+    moduleSideEffects: (id: string) => slash(id) === engineBarrel ? false : undefined,
+  }}},
   worker: {format: 'es'},
 });
