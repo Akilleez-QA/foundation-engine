@@ -582,27 +582,33 @@ Status: implemented, candidate (PR #61); not integrated. Guide:
   version, 1-16 players, functions present, a valid initial world); every world a
   creator function returns is checked against id syntax, `maxEntities` and JSON bounds
   before it is adopted or published; join code (16-128 URL-safe characters, compared
-  without early exit), rules id/version match, player slots, connection count, join
-  deadline and pre-join frame count, per-connection frame token bucket, raw frame size,
+  without early exit; `--join` also needs 10 distinct characters), rules id/version
+  match, player slots, joining-connection pool with a per-address cap (2) and a
+  resume-only reserve with a 500 ms deadline, 1.5 s join deadline and pre-join frame
+  count, per-connection frame token bucket (credit-releasing acks free), client action
+  pacing (30/s) and pending bound equal to the host queue (16), raw frame size,
   per-connection and global queued actions, exact action sequence, one view credit per
   connection under view limits, idle and away timeouts; client pending-action bound,
   view-sized inbound queue, retry schedule and budget, terminal close classification,
   and page endpoints limited to loopback and private LAN hosts. `npm run host` binds
-  127.0.0.1 unless `--lan`, refuses browser origins outside those ranges and prints a
-  development-only warning.
-- Checked: `src/kits/network/session.test.ts` (12 tests, in-memory sockets),
-  `scripts/host.test.mjs` (3 tests, real loopback WebSockets),
+  127.0.0.1 unless `--lan`, accepts only loopback browser origins in loopback mode (LAN
+  origins too with `--lan`) and prints a development-only warning.
+- Checked: `src/kits/network/session.test.ts` (15 tests, in-memory sockets, including an
+  idle-socket flood probe, a 60 Hz `act` regression and a queue-size burst),
+  `scripts/host.test.mjs` (4 tests, real loopback WebSockets),
   `templates/shared-world/game/world.test.ts` (S1: local play and host core give the
   same world), `npm run test:session-browser` (two isolated headless Chromium contexts,
   SwiftShader, one loopback host: join, move and paint seen by the other page, host
-  restart on the same port ridden out by paced reconnects, wrong join code terminal
+  restart on the same port with the same join code ridden out by paced reconnects, wrong join code terminal
   with one attempt, integrity observe-only, no page errors). The template gate
   (`npm run gate -- --game templates/shared-world/game`) passed with 2,518 tests and 11
-  performance checks. The `world` draw budget (60) is the measured worst case of four
-  joined players and a fully painted board (54 draws, 2,254 triangles, SwiftShader).
+  performance checks at the first candidate. After review the board became one mesh:
+  the measured worst case (four joined players, all 49 cells painted, SwiftShader) is
+  6 draws and 1,764 triangles, within the derived `world` budget of 10 draws (lowered
+  from the first candidate's 60).
   Exact revisions are recorded in the PR description.
 - Not established: LAN between separate devices, WAN, TLS, NAT traversal, accounts,
   matchmaking, persistence across host restarts, drain (NW-08) on this path, host
   liveness detection by clients, physical-device input or performance, touch, more than
-  four players, load or scalability, and integrity enforcement quality (only observe
-  mode is exercised in a browser).
+  four players, load or scalability, a joining-socket flood from many LAN addresses at
+  once, and integrity enforcement quality (only observe mode is exercised in a browser).

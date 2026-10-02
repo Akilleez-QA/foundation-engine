@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type { BrowserSocket } from '../../platform/network/browser-transport.ts';
 import {
   createSession, createSessionHost, defineSessionRules, integrityRules, isLocalNetworkHost, sessionEndpointFromPage,
-  type Session, type SessionHost, type SessionHostIntegrity, type SessionIntegrityState, type SessionRulesInput, type SessionWorld,
+  type Session, type SessionClientOptions, type SessionHost, type SessionHostIntegrity, type SessionIntegrityState, type SessionRulesInput, type SessionWorld,
 } from './index.ts';
 
 type Step = { dx: number };
@@ -31,7 +31,7 @@ const JOIN = 'join-code-0123456789abcdef';
 /** An in-memory loopback: fake browser sockets on one side, the transport-neutral host on the other. */
 class Link implements BrowserSocket {
   readyState = 0; bufferedAmount = 0; toHost: string[] = []; toClient: string[] = [];
-  closing: { code: number; reason: string } | null = null; clientClosed = false; connected = false;
+  closing: { code: number; reason: string } | null = null; clientClosed = false; connected = false; address: string | undefined;
   listeners = new Map<string, Set<EventListener>>();
   addEventListener(type: string, listener: EventListener) { let rows = this.listeners.get(type); if (!rows) this.listeners.set(type, rows = new Set()); rows.add(listener); }
   removeEventListener(type: string, listener: EventListener) { this.listeners.get(type)?.delete(listener); }
@@ -46,11 +46,11 @@ function network(rules = makeRules(), integrity: SessionHostIntegrity = 'observe
     send: (link, text) => { if (link.readyState !== 1) return false; link.toClient.push(text); return true; },
     close: (link, code, reason) => { link.closing = { code, reason }; },
   } });
-  const socketFactory = () => { const link = new Link(); links.push(link); return link; };
+  const factory = (address?: string) => () => { const link = new Link(); link.address = address; links.push(link); return link; };
   function deliver() {
     for (const link of links) {
       if (link.readyState === 0 && !refuse.has(link)) {
-        link.readyState = 1; link.connected = host.connect(link, now); link.emit('open');
+        link.readyState = 1; link.connected = host.connect(link, now, link.address); link.emit('open');
       }
       if (link.clientClosed) { link.clientClosed = false; host.disconnected(link, now); }
       for (const text of link.toHost.splice(0)) if (link.connected && link.readyState === 1) host.message(link, text, now);
@@ -62,8 +62,8 @@ function network(rules = makeRules(), integrity: SessionHostIntegrity = 'observe
   const net = {
     host, links, refuse,
     get now() { return now; },
-    client(endpoint = { url: 'ws://127.0.0.1:8787/session', joinCode: JOIN }, r = rules) {
-      const session = createSession({ rules: r, endpoint, socketFactory, random: () => 0.5 });
+    client(endpoint = { url: 'ws://127.0.0.1:8787/session', joinCode: JOIN }, r = rules, address?: string, extra: Partial<SessionClientOptions<Step>> = {}) {
+      const session = createSession({ rules: r, endpoint, socketFactory: factory(address), random: () => 0.5, ...extra });
       clients.push(session); return session;
     },
     step(ms = 20, rounds = 1) {
@@ -275,4 +275,79 @@ test('MP01: views larger than the action message bound still reach clients (view
   assert.equal(a.read().stale, false);
   assert.equal(Object.keys(a.read().world).length, 31);
   assert.ok(JSON.stringify(a.read().world).length > big.limits.action.maxBytes * 2);
+});
+
+test('MP01: idle sockets without the join code cannot lock players out (per-address cap, resume reserve, short deadline)', () => {
+  const net = network(makeRules(1, 4), 'observe', { leaveAfterMs: 20000 });
+  const a = net.client(undefined, undefined, '10.0.0.1');
+  net.step(20, 3);
+  assert.equal(a.read().status, 'joined');
+  const player = a.read().player;
+  // An attacker reopening idle sockets every step from the given addresses; refused ones are closed at once.
+  let opened = 0, refused = 0;
+  const flood = (addresses: string[]) => {
+    for (const address of addresses) {
+      const idle = new Link(); idle.readyState = 1;
+      if (net.host.connect(idle, net.now, address)) opened++; else refused++;
+    }
+  };
+  // One hostile address holds at most its share of the pre-join pool: new players from elsewhere still join.
+  for (let round = 0; round < 3; round++) { // Three new players fill the remaining slots.
+    const fresh = net.client(undefined, undefined, `10.0.1.${round}`);
+    for (let i = 0; i < 40 && fresh.read().status !== 'joined'; i++) { flood(['10.0.0.9']); net.step(20); }
+    assert.equal(fresh.read().status, 'joined', `fresh join ${round} under a one-address flood`);
+    fresh.dispose(); net.step(20, 2);
+  }
+  assert.ok(refused > 0, 'the flooding address was capped');
+  // Many hostile addresses fill the normal pool: a returning player still gets back in through the resume reserve.
+  net.drop();
+  for (let i = 0; i < 300 && a.read().status !== 'joined'; i++) { flood(['10.0.2.1', '10.0.2.2', '10.0.2.3', '10.0.2.4']); net.step(25); }
+  assert.equal(a.read().status, 'joined', 'the returning player rejoined, not retry-exhausted');
+  assert.equal(a.read().player, player);
+  assert.ok(net.host.read().metrics.reserveConnections >= 1);
+  // A brand-new player is not admitted through the reserve.
+  const late = new Link(); late.readyState = 1;
+  for (const address of ['10.0.3.1', '10.0.3.2', '10.0.3.3', '10.0.3.4']) net.host.connect(new Link(), net.now, address);
+  if (net.host.connect(late, net.now, '10.0.3.9')) {
+    net.host.message(late, JSON.stringify({ v: 1, type: 'join', rules: 'test-world', version: 1, token: JOIN, player: 'never-seen-key-000000' }), net.now);
+    assert.equal(late.closing?.reason, 'connection-limit');
+  }
+  assert.ok(opened > 0);
+});
+
+test('MP01: act() on every 60 Hz tick is paced by the client: no rate-limit close, nothing reported predicted is dropped', () => {
+  const net = network(), a = net.client(undefined, undefined, '10.0.0.1'), b = net.client(undefined, undefined, '10.0.0.2');
+  net.step(20, 3);
+  const p = a.read().player!;
+  let predicted = 0, paced = 0, busy = 0, dx = 1;
+  for (let tick = 0; tick < 600; tick++) { // Ten seconds of fixed ticks at 60 Hz; the other player moves too.
+    const result = a.act({ dx });
+    if (result.status === 'predicted') { predicted++; dx = -dx; }
+    else if (result.status === 'refused' && result.reason === 'paced') paced++;
+    else if (result.status === 'refused' && result.reason === 'busy') busy++;
+    if (tick % 4 === 0) b.act({ dx: 0 });
+    net.step(1000 / 60);
+    assert.equal(a.read().status, 'joined', `tick ${tick}`);
+  }
+  net.step(20, 5);
+  assert.ok(predicted >= 290 && predicted <= 331, `30 per second plus a burst of 30, got ${predicted}`);
+  assert.ok(paced > 250);
+  assert.equal(net.host.read().closeReasons['rate-limit'], undefined);
+  assert.equal(a.read().reconnects, 0);
+  assert.equal(a.read().pending, 0);
+  assert.equal(net.host.read().metrics.applied + net.host.read().metrics.rejected >= predicted, true);
+  assert.equal(xOf(a.read().world, p), xOf(net.host.read().world, p));
+  void busy;
+});
+
+test('MP01: unconfirmed actions stop at the host queue size, so a burst cannot trigger queue-limit', () => {
+  const net = network(), a = net.client(undefined, undefined, '10.0.0.1', { actionsPerSecond: 1000 });
+  net.step(20, 3);
+  const results = Array.from({ length: 40 }, () => a.act({ dx: 0 }));
+  assert.equal(results.filter(r => r.status === 'predicted').length, 16);
+  assert.deepEqual(results[16], { status: 'refused', reason: 'busy' });
+  net.step(20, 4);
+  assert.equal(a.read().status, 'joined');
+  assert.equal(net.host.read().closeReasons['queue-limit'], undefined);
+  assert.throws(() => createSession({ rules: makeRules(), actionsPerSecond: 0 }));
 });

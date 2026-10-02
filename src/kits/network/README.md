@@ -461,12 +461,15 @@ Three exports do that; none is constructed unless a game calls it:
   transport, `createViewReceiver`, `createPrediction` (baseline = view sequence plus the
   host's `processed` count in the same view), `createRetrySchedule` and
   `createClosePolicy` (`SESSION_TERMINAL_REASONS`). `update(now)` drives it from a frame
-  system; `act(action)` predicts and sends; `read()` reports status, world, revision and
-  the last validated close. Lost actions are never resent.
+  system; `act(action)` predicts and sends, pacing itself (30/s) and keeping at most 16
+  unconfirmed actions (the host's queue), refusing `paced`/`busy` synchronously beyond
+  them; `read()` reports status, world, revision and the last validated close. Lost
+  actions are never resent.
 - `createSessionHost({rules, joinCode, ports, integrity?, limits?})`: transport-neutral
   authority composing `createNetworkIntake` (join code, player slots, fair sequenced
-  dispatch), one `createViewPublisher` per connection, `createRateAdmission` per
-  connection and `createIntegrity` (`observe` by default). It owns no socket or timer;
+  dispatch, a per-address cap on joining sockets and a resume-only reserve), one
+  `createViewPublisher` per connection, `createRateAdmission` per connection and
+  `createIntegrity` (`observe` by default). It owns no socket or timer;
   `scripts/host.mjs` (`npm run host`) supplies `ws`, a 20 ms driver and loopback/LAN
   binding.
 

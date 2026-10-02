@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// scripts/host.mjs (`npm run host [-- --port 8787] [--lan] [--integrity observe|enforce|off] [--game <dir>]`):
+// scripts/host.mjs (`npm run host [-- --port 8787] [--lan] [--join <code>] [--integrity observe|enforce|off] [--game <dir>]`):
 // a development-only reference host for a shared session (MP-01). It loads the game's `session.ts`
 // (`defineSessionRules`) and runs those rules authoritatively with the network kit's `createSessionHost`, over
 // maintained `ws` framing. Off unless you run it. Loopback only unless `--lan`. Unencrypted `ws://`, one shared join
@@ -20,6 +20,21 @@ export const DEFAULT_PORT = 8787;
 export const SECURITY_WARNING = 'Development only: unencrypted ws://, one shared join code, in-memory state, no accounts. '
   + 'Do not expose this host to the Internet or run it on a network you do not trust.';
 
+/** Loopback names and addresses only: `localhost`, 127.0.0.0/8, ::1. */
+export const isLoopbackHost = hostname => {
+  const host = String(hostname).replace(/^\[|\]$/g, '').toLowerCase();
+  return host === 'localhost' || host === '::1' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
+};
+/**
+ * A join code passed with `--join` (to keep the same code across host restarts): 16-128 URL-safe characters with at
+ * least 10 distinct ones, so a typed word or a repeated character is refused. Prefer the generated code.
+ */
+export function checkJoinCode(code) {
+  if (typeof code !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(code)) return 'the join code must be 16-128 characters of A-Z a-z 0-9 _ -';
+  if (new Set(code).size < 10) return 'the join code needs at least 10 different characters; reuse a code the host generated';
+  return null;
+}
+
 /** Load and check the game's shared rules (default export of `<game>/session.ts`). */
 export async function loadSessionRules(dir = gameDir()) {
   const file = join(dir, 'session.ts');
@@ -38,7 +53,9 @@ export async function loadSessionRules(dir = gameDir()) {
  * `close()` stops the driver, closes every connection with `host-closing` and the server.
  */
 export async function startSessionServer({ rules, port = DEFAULT_PORT, host = '127.0.0.1', joinCode = randomBytes(18).toString('base64url'),
-  integrity = 'observe', driverMs = 20, limits, log } = {}) {
+  integrity = 'observe', driverMs = 20, limits, log, lan = host !== '127.0.0.1' } = {}) {
+  const problem = checkJoinCode(joinCode);
+  if (problem) throw Error(`host: ${problem}`);
   if (!Number.isSafeInteger(port) || port < 0 || port > 65535) throw Error('host: port must be 0-65535');
   if (!Number.isSafeInteger(driverMs) || driverMs < 1 || driverMs > 1000) throw Error('host: driverMs must be 1-1000');
   const now = () => performance.now();
@@ -59,16 +76,18 @@ export async function startSessionServer({ rules, port = DEFAULT_PORT, host = '1
   });
   const wss = new WebSocketServer({
     host, port, path: '/session', maxPayload: 8192, perMessageDeflate: false,
-    // A browser always sends Origin: refuse pages served from outside the local network (a stray site cannot
-    // reach this host even if it guessed the code). Non-browser clients without Origin still need the join code.
+    // A browser always sends Origin. Loopback mode accepts only pages served from this machine's loopback names
+    // (localhost, 127.x, ::1); LAN mode also accepts private LAN, link-local and .local/.localhost names. Any other
+    // site is refused at the handshake. Clients without Origin (not browsers) still need the join code.
     verifyClient: ({ origin }) => {
       if (!origin) return true;
-      try { return isLocalNetworkHost(new URL(origin).hostname); } catch { return false; }
+      try { const name = new URL(origin).hostname; return lan ? isLocalNetworkHost(name) : isLoopbackHost(name); } catch { return false; }
     },
   });
-  wss.on('connection', socket => {
+  wss.on('connection', (socket, request) => {
     socket.on('error', () => {});
-    if (!session.connect(socket, now())) return;
+    // The remote address feeds the host's per-address cap on connections that have not joined yet.
+    if (!session.connect(socket, now(), request.socket.remoteAddress)) return;
     socket.on('message', (data, binary) => session.message(socket, binary ? '\u0000binary' : data.toString('utf8'), now()));
     socket.on('close', () => session.disconnected(socket, now()));
   });
@@ -103,12 +122,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const lan = process.argv.includes('--lan');
   const port = flag('--port') === undefined ? DEFAULT_PORT : Number(flag('--port'));
   const integrity = flag('--integrity') ?? 'observe';
+  const join = flag('--join');
+  if (join !== undefined && checkJoinCode(join)) { console.error(`\n  --join: ${checkJoinCode(join)}\n`); process.exit(2); }
   const playPort = Number(process.env.PORT ?? 5173);
   let rules;
   try { rules = await loadSessionRules(); } catch (error) { console.error(`\n  ${error.message}\n`); process.exit(1); }
   const stamp = () => new Date().toISOString().slice(11, 19);
   const server = await startSessionServer({
-    rules, port, host: lan ? '0.0.0.0' : '127.0.0.1', integrity,
+    rules, port, host: lan ? '0.0.0.0' : '127.0.0.1', integrity, lan, ...(join === undefined ? {} : { joinCode: join }),
     log: ({ event, player, reason }) => console.log(`  ${stamp()} ${event}${player ? ' ' + player : ''}${reason ? ` (${reason})` : ''}`),
   }).catch(error => { console.error(`\n  Could not start the host: ${error.message}\n`); process.exit(1); });
   const scene = (await import(pathToFileURL(join(gameDir(), 'game.ts')).href)).default?.firstScene ?? '';
@@ -117,7 +138,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     '',
     `  Shared-session host: rules ${rules.id} v${rules.version}, up to ${rules.maxPlayers} players, integrity ${integrity}`,
     `  Listening on ${lan ? `all interfaces, port ${server.port} (LAN)` : `ws://127.0.0.1:${server.port}/session (this machine only)`}`,
-    `  Join code: ${server.joinCode}  (new each run; anyone with the code and network access can join)`,
+    `  Join code: ${server.joinCode}  (${join === undefined ? 'new each run' : 'from --join'}; anyone with the code and network access can join)`,
+    `  To restart with the same code (open tabs then reconnect by themselves): npm run host -- --join ${server.joinCode}`,
     '',
     `  Start the game in another terminal (npm run play${lan ? ' -- --host' : ''}), then open this link in two tabs:`,
     `    ${link('127.0.0.1')}`,

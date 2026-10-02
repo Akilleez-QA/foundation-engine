@@ -66,18 +66,35 @@ the intake's message limits bound inbound actions and small replies.
 
 | Resource | Default | Over the bound |
 |---|---|---|
-| Connections | `maxPlayers * 2` (at most 64) | refused, close 1013 `connection-limit` |
+| Joined connections | one per player slot (a resume replaces the old connection with `replaced`) | n/a |
+| Joining connections (no join accepted yet) | `maxPreJoin` = max(4, `maxPlayers` + 2), at most `maxPreJoinPerAddress` = 2 from one remote address | refused at connect, close 1013 `connection-limit` (transient, paced retry) |
+| Resume reserve | `resumeReserve` = `maxPlayers` extra joining connections, used only while the normal pool (or the address's share) is full and some slot exists; 2 per address | the join must present a known page key within `reserveJoinMs` (500 ms), otherwise close 1013 `connection-limit` or `auth-timeout` |
 | Players | `maxPlayers` | refused, close 1013 `session-full` (transient: the page retries, paced) |
-| Join deadline | 3000 ms, 2 frames before joining | intake closes `auth-timeout` / `pre-auth-limit` |
-| Incoming frames | 60 per second per connection, burst 60 | close 1013 `rate-limit` |
+| Join deadline | 1500 ms, 2 frames before joining | intake closes `auth-timeout` / `pre-auth-limit` |
+| Incoming frames | 60 per second per connection, burst 60, counting actions, pings, joins and unsolicited acks; an ack that releases the connection's outstanding view credit is free (credit bounds it to one per view) | close 1013 `rate-limit` |
+| Client action pacing | `actionsPerSecond` 30, burst 30 (half the host frame rate) | `act` returns `{status:'refused', reason:'paced'}` synchronously and sends nothing |
 | Raw frame | action bytes + 320 characters; `ws` `maxPayload` 8192 | close `frame-too-large` |
 | Queued actions | 16 per connection, 64 applied per pump, round robin | close 1013 `queue-limit` (actions are sequenced; none is silently dropped) |
 | Views | one unacknowledged view per connection (NW-02 credit); a change while waiting coalesces | the next view waits for the ack |
-| Client pending actions | 32 | `act` returns `{status:'refused', reason:'busy'}` |
+| Client pending actions | `maxPending` 16, equal to the host's `maxQueuedActionsPerPeer`, so a burst cannot fill the host queue | `act` returns `{status:'refused', reason:'busy'}` synchronously and sends nothing |
 | Client inbound queue | 8 frames, view-sized | the transport closes and the page reconnects |
 | Idle connection | 15 s without a frame (clients ping every 5 s) | close 1001 `idle-timeout` |
 | Away player | 10 s | `rules.leave` runs and the slot frees |
 | Host send buffer | 256 KiB per socket (`npm run host`) | send refused, connection closed |
+
+Idle sockets that never present the join code are the cheapest attack on a session
+host. Before MP-01's review fix, eight idle sockets held every connection slot and
+locked out real players. Now one address can hold at most two joining connections,
+they expire after 1.5 s, and a player returning to an existing slot can use the resume
+reserve even while the normal pool is full (`session.test.ts`: "idle sockets without
+the join code cannot lock players out"). Many hostile addresses on the same LAN can
+still fill both pools between expiries; that is outside this development host's scope.
+
+`act` may be called on every 60 Hz fixed tick: the client paces itself below the host
+frame limit and refuses (`paced`, `busy`) instead of sending, so it never reports
+`predicted` for an action the host would drop (`session.test.ts`: "act() on every 60 Hz
+tick"). Keep `actionsPerSecond` at or below half the host's `framesPerSecond` and
+`maxPending` at or below its `maxQueuedActionsPerPeer` if you change either.
 
 These are example limits for a small LAN session, not recommendations; every host
 limit is a `createSessionHost({ limits })` option. They bound admitted application
@@ -124,31 +141,46 @@ exists to measure before anyone enforces it.
 ## `npm run host`
 
 ```
-npm run host [-- --port 8787] [--lan] [--integrity observe|enforce|off] [--game <dir>]
+npm run host [-- --port 8787] [--lan] [--join <code>] [--integrity observe|enforce|off] [--game <dir>]
 ```
 
 It loads the selected game's `session.ts` (default export), starts the host on
 127.0.0.1, prints a fresh join code and the link to open, and logs joins and leaves.
-`--lan` listens on every interface and prints the LAN links. A browser `Origin` from
-outside loopback and private LAN ranges is refused at the handshake. Stop it with
+`--lan` listens on every interface and prints the LAN links. A browser `Origin` is
+checked at the handshake: in the default loopback mode only `localhost`, 127.x and ::1
+pages are accepted; with `--lan`, private LAN (10/8, 172.16/12, 192.168/16),
+link-local and `.local`/`.localhost` pages are accepted too. Any other site is refused.
+The remote address of each connection feeds the per-address joining cap. Stop it with
 Ctrl+C. It is off by default: nothing in a build or a test starts it.
+
+**Restarting the host.** Open pages reconnect by themselves only if the new host uses
+the same join code: run `npm run host -- --join <code>` with the code the previous run
+printed (it prints that command). `--join` takes 16-128 URL-safe characters with at
+least 10 different ones; reuse a generated code rather than typing one. A new code
+means every page must open the new link. Either way the restarted host starts a new,
+empty world.
 
 ## Evidence
 
-- `src/kits/network/session.test.ts` (12 tests): rule validation, local play, two
+- `src/kits/network/session.test.ts` (15 tests): rule validation, local play, two
   in-memory clients joining one host with prediction and authoritative views,
   reconciliation after an enforced rejection, observe mode, terminal refusals (wrong
   code, rules mismatch), paced reconnect that resumes the slot without resending,
   retry exhaustion, capacity and the leave grace period, protocol, sequence and
-  frame-rate closes, views larger than the action bound, and page endpoint parsing.
-- `scripts/host.test.mjs` (3 tests): real loopback WebSockets through `npm run host`'s
-  server: two clients share one world, a wrong code closes 1008 `auth-rejected`, a
-  remote `Origin` is refused, and close sends 1001 `host-closing`.
+  frame-rate closes, views larger than the action bound, page endpoint parsing, an
+  idle-socket flood (one address, then many) that neither blocks new players nor a
+  returning player, `act` on every 60 Hz tick for ten seconds without a close, and a
+  40-action burst stopping at the host queue size.
+- `scripts/host.test.mjs` (4 tests): real loopback WebSockets through `npm run host`'s
+  server: two clients share one world, a wrong code closes 1008 `auth-rejected`,
+  origins are limited by mode (loopback only by default; LAN with `--lan`; public
+  sites never), `--join` reuses a code across a restart and refuses weak codes, and
+  close sends 1001 `host-closing`.
 - `templates/shared-world/game/world.test.ts`: the scene in local play and the host core
   produce the same world from the same actions (criterion S1).
 - `npm run test:session-browser`: two isolated headless Chromium contexts against a
   loopback host: both join, a move and a paint reach the other page, a host restart on
-  the same port is ridden out by paced reconnects, a wrong join code is terminal with
+  the same port with the same join code is ridden out by paced reconnects, a wrong join code is terminal with
   exactly one attempt, integrity stayed in observe mode, no page or console errors
   beyond the expected refused connections while the host was down. Revisions and
   results are in the [ledger](upgrade-acceptance-ledger.md#newcomer-shared-session-mp-01--implemented-candidate).
@@ -159,7 +191,7 @@ Ctrl+C. It is off by default: nothing in a build or a test starts it.
   accounts, identity provider, matchmaking, lobby, NAT traversal, relay or TLS
   termination. Not WAN-certified; no Internet exposure is supported.
 - **Ephemeral.** The world lives in the host's memory; a host restart starts a new
-  world. Durable authority (NW-03) is not wired into this path.
+  world, and pages reconnect only when the restart reuses the join code (`--join`). Durable authority (NW-03) is not wired into this path.
 - **Small worlds.** Every change sends each player a complete view (bounded, coalesced
   by one credit). It suits boards and small rosters, not large or fast worlds; there
   is no interest management, delta compression or server-side simulation tick.

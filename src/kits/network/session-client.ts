@@ -1,6 +1,9 @@
 /**
  * Optional game-facing shared-session client (MP-01). One owner per scene visit: construct in `enter`, call
- * `update(ctx.time.now)` from a frame system, `act(action)` from a fixed system, `dispose()` in `exit`.
+ * `update(ctx.time.now)` from a frame system, `act(action)` when input asks for an action, `dispose()` in `exit`.
+ * `act` paces itself (default 30 actions per second) and bounds unconfirmed actions (default 16, the reference host's
+ * per-connection queue): beyond either it refuses synchronously (`paced`, `busy`) and sends nothing, so calling it on
+ * every 60 Hz fixed tick is safe and never reports `predicted` for an action the host would drop.
  *
  * It composes existing owners: the browser text transport, the complete-view receiver (NW-02), bounded prediction
  * with reconciliation (NW-03 prediction), paced reconnect (NW-04 retry schedule) and the close policy. Without an
@@ -13,6 +16,7 @@ import { createBrowserTransport, type BrowserRemoteClose, type BrowserTransportO
 import { createClosePolicy, type CloseClass, type ClosePolicyOptions } from './close-policy';
 import { createPrediction } from './prediction';
 import type { Prediction } from './prediction-types';
+import { createRateAdmission } from './rate-admission';
 import { createRetrySchedule, type RetryScheduleLimits } from './retry-schedule';
 import { createViewReceiver } from './view-receiver';
 import type { ViewFrame, ViewReceiver } from './view-types';
@@ -39,8 +43,16 @@ export interface SessionClientOptions<A extends DocumentValue> {
   readonly closePolicy?: ClosePolicyOptions;
   /** Keep-alive interval while joined (the reference host closes silent connections). Default 5000 ms. */
   readonly pingMs?: number;
-  /** Unconfirmed predicted actions. At the bound `act` refuses `busy`. Default 32. */
+  /**
+   * Unconfirmed predicted actions. At the bound `act` refuses `busy`. Default 16. Keep it at or below the host's
+   * `maxQueuedActionsPerPeer` (default 16), or a burst can fill the host queue and close the connection.
+   */
   readonly maxPending?: number;
+  /**
+   * Actions sent per second (token bucket, burst equal to the rate, on `update` time). Over it `act` refuses `paced`.
+   * Default 30, half the reference host's default `framesPerSecond` (60), leaving room for pings and joins.
+   */
+  readonly actionsPerSecond?: number;
   /** Trusted test seam: the socket the transport owns. */
   readonly socketFactory?: BrowserTransportOptions['socketFactory'];
 }
@@ -84,9 +96,12 @@ export function createSession<A extends DocumentValue>(options: SessionClientOpt
   const { rules } = options;
   if (!rules || rules.kind !== 'session-rules') throw Error('session: rules must come from defineSessionRules');
   const endpoint = options.endpoint ?? null;
-  const pingMs = options.pingMs ?? 5000, maxPending = options.maxPending ?? 32;
-  if (!Number.isSafeInteger(pingMs) || pingMs < 100 || !Number.isSafeInteger(maxPending) || maxPending < 1 || maxPending > 1024)
-    throw Error('session: invalid pingMs or maxPending');
+  const pingMs = options.pingMs ?? 5000, maxPending = options.maxPending ?? 16;
+  const actionsPerSecond = options.actionsPerSecond ?? 30;
+  if (!Number.isSafeInteger(pingMs) || pingMs < 100 || !Number.isSafeInteger(maxPending) || maxPending < 1 || maxPending > 1024
+    || !Number.isSafeInteger(actionsPerSecond) || actionsPerSecond < 1 || actionsPerSecond > 1000)
+    throw Error('session: invalid pingMs, maxPending or actionsPerSecond');
+  const pacing = createRateAdmission({ maxKeys: 1, capacity: actionsPerSecond, refillPerSecond: actionsPerSecond });
   if (endpoint && (typeof endpoint.url !== 'string' || typeof endpoint.joinCode !== 'string')) throw Error('session: invalid endpoint');
   const viewLimits = sessionViewLimits(rules.limits);
   const transportLimits = Object.freeze({ maxMessageBytes: viewLimits.maxBytes, maxQueuedMessages: 8,
@@ -174,7 +189,9 @@ export function createSession<A extends DocumentValue>(options: SessionClientOpt
         });
       } else {
         const result = prediction.reconcile({ epoch: session!, ...baseline });
-        if (!['reconciled', 'duplicate', 'obsolete'].includes(result.status)) return false;
+        // An obsolete or duplicate baseline must not replace the newer confirmed world.
+        if (result.status === 'obsolete' || result.status === 'duplicate') return true;
+        if (result.status !== 'reconciled') return false;
       }
     } catch { return false; }
     confirmed = Object.freeze(world);
@@ -244,6 +261,7 @@ export function createSession<A extends DocumentValue>(options: SessionClientOpt
       }
       if (status !== 'joined' || !prediction || !transport) return refused('not-joined');
       if (prediction.read().pending.length >= maxPending) return refused('busy');
+      if (pacing.admit('act', lastNow).status !== 'admitted') return refused('paced');
       const pushed = prediction.push(JSON.stringify(action));
       if (pushed.status !== 'predicted') { fail('prediction-' + pushed.status); return refused('resync'); }
       if (!send({ v: 1, type: 'action', seq: pushed.input.sequence, action: pushed.input.value })) return refused('resync');
@@ -257,7 +275,7 @@ export function createSession<A extends DocumentValue>(options: SessionClientOpt
     },
     dispose() {
       if (disposed) return;
-      disposed = true; teardown(); retry?.dispose();
+      disposed = true; teardown(); retry?.dispose(); pacing.dispose();
       if (status !== 'local') { status = 'closed'; reason ??= 'disposed'; }
     },
   });

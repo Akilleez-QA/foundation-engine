@@ -46,3 +46,4 @@
 | Date | Change | Budgets |
 |---|---|---|
 | 2026-10-02 | Template created (MP-01): shared session rules, local play, `npm run host` reference host | `world` measured on software GL |
+| 2026-10-02 | Review fixes: the painted board is one mesh (6 draws at the worst case instead of 54); the session paces actions and caps joining sockets | `world.draws` 60 -> 10 (lowered, measured) |

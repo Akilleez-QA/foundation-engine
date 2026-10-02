@@ -19,7 +19,7 @@
       "scene": "scene.world",
       "route": "#scene/world",
       "budget": {
-        "draws": 60,
+        "draws": 10,
         "triangles": 10000,
         "shadowCasters": 10,
         "textureMiB": 8,
@@ -30,7 +30,7 @@
       "provenance": {
         "measured": "b8e1e8a + the shared-world template (MP-01), swiftshader@1280x800: the gate's start view (local play, 1 avatar) derived 10 draws by npm run perf:derive",
         "run": "npm run gate -- --game templates/shared-world/game (first-load JS 195.2 KiB; startup heap 3.5 MiB)",
-        "note": "draws is the measured worst case instead: 4 players joined to a loopback npm run host with all 49 cells painted measured 54 draws and 2254 triangles per frame (one avatar per player, one tile per painted cell, the floor), +10 % rounded up to 60. The gate only benches the start view."
+        "note": "Measured worst case: 4 players joined to a loopback npm run host with all 49 cells painted measured 6 draws and 1764 triangles per frame (floor, the one board mesh, one capsule per player), within the derived 10 draws; the gate only benches the start view. The earlier one-shape-per-cell board (54 draws, budget 60) was replaced by a single mesh before integration."
       }
     }
   }

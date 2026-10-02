@@ -19,17 +19,34 @@ import {
 } from './session-protocol';
 
 export interface SessionHostLimits {
-  /** Live connections, including ones still joining. Default `maxPlayers * 2`. */
-  readonly maxConnections: number;
-  /** Open-to-join deadline. */
+  /** Connections still joining (no join accepted yet), across all addresses. Default `max(4, maxPlayers + 2)`, so one address (2) cannot fill it. */
+  readonly maxPreJoin: number;
+  /** Connections still joining from one remote address (per pool), when the transport reports addresses. Default 2. */
+  readonly maxPreJoinPerAddress: number;
+  /**
+   * Extra joining connections admitted only while the normal pre-join pool (or the address's share of it) is full.
+   * Their join must resume an existing player slot (a known page key) within `reserveJoinMs`, so idle sockets
+   * cannot lock out reconnecting players. Default `maxPlayers`.
+   */
+  readonly resumeReserve: number;
+  /** Open-to-join deadline for a reserve connection. Default 500 ms. */
+  readonly reserveJoinMs: number;
+  /** Open-to-join deadline. Default 1500 ms. */
   readonly authTimeoutMs: number;
   /** A connection that sends nothing (clients ping) for this long is closed. */
   readonly idleTimeoutMs: number;
   /** A disconnected player keeps their slot this long; reconnecting with the same page key resumes it. */
   readonly leaveAfterMs: number;
-  /** Incoming frames per connection: token bucket burst and refill per second. Over the limit closes. */
+  /**
+   * Incoming frames per connection (actions, pings, joins, unsolicited acks): token bucket burst and refill per
+   * second. Over the limit closes. An ack that releases this connection's outstanding view credit is not charged
+   * (credit already bounds it to one per view). Default 60: twice the client's default action pacing.
+   */
   readonly framesPerSecond: number;
-  /** Queued actions per connection. A full queue closes the connection (actions are sequenced; none is dropped). */
+  /**
+   * Queued actions per connection. A full queue closes the connection (actions are sequenced; none is dropped).
+   * Clients must not keep more unconfirmed actions than this (`createSession` `maxPending`, default equal).
+   */
   readonly maxQueuedActionsPerPeer: number;
   /** Actions applied per `pump`, across connections, round robin. */
   readonly maxPumpActions: number;
@@ -64,8 +81,11 @@ export interface SessionHostSnapshot {
   readonly integrity: Readonly<{ mode: SessionHostIntegrity; stats: unknown; audit: readonly unknown[] }>;
 }
 export interface SessionHost<C> {
-  /** A transport connected. False: refused (the host already called `ports.close`). */
-  connect(conn: C, now: number): boolean;
+  /**
+   * A transport connected. False: refused (the host already called `ports.close`). `address` (the remote address,
+   * when the transport knows it) enables the per-address pre-join cap.
+   */
+  connect(conn: C, now: number, address?: string): boolean;
   /** One complete text frame from that connection. */
   message(conn: C, text: string, now: number): void;
   /** The transport is gone (no close is sent back). The player keeps their slot for `leaveAfterMs`. */
@@ -78,7 +98,8 @@ export interface SessionHost<C> {
 }
 
 export const DEFAULT_SESSION_HOST_LIMITS = Object.freeze({
-  authTimeoutMs: 3000, idleTimeoutMs: 15000, leaveAfterMs: 10000, framesPerSecond: 60,
+  maxPreJoinPerAddress: 2, reserveJoinMs: 500,
+  authTimeoutMs: 1500, idleTimeoutMs: 15000, leaveAfterMs: 10000, framesPerSecond: 60,
   maxQueuedActionsPerPeer: 16, maxPumpActions: 64, tickMs: 50,
 });
 const CAPACITY = new Set(['session-full', 'connection-limit', 'auth-limit', 'pre-auth-limit', 'queue-limit', 'rate-limit']);
@@ -87,6 +108,11 @@ const AWAY = new Set(['host-closing', 'idle-timeout', 'auth-timeout']);
 type Conn<C> = {
   conn: C; peer: ConnectionHandle; player: string | null; session: string | null; publisher: ViewPublisher | null;
   processed: number; lastFrame: number; preAuthFrames: number; lastActionTick: number | null; gone: boolean;
+  /** Remote address, when known. */
+  address: string | null;
+  /** Which pre-join pool holds this connection until its join is accepted; null once joined. */
+  pool: 'normal' | 'reserve' | null;
+  openedAt: number;
 };
 type Slot = { key: string; peer: ConnectionHandle | null; awaySince: number | null };
 
@@ -99,7 +125,7 @@ export function createSessionHost<A extends DocumentValue, C>(options: SessionHo
   if (!['observe', 'enforce', 'off'].includes(mode)) throw Error('session host: invalid integrity mode');
   const supplied = options.limits ?? {};
   const limits: SessionHostLimits = Object.freeze({
-    ...DEFAULT_SESSION_HOST_LIMITS, maxConnections: Math.min(64, rules.maxPlayers * 2), ...supplied,
+    ...DEFAULT_SESSION_HOST_LIMITS, maxPreJoin: Math.max(4, rules.maxPlayers + 2), resumeReserve: rules.maxPlayers, ...supplied,
   });
   for (const value of Object.values(limits)) if (!positiveInteger(value)) throw Error('session host: limits must be positive integers');
   const log = options.log;
@@ -111,12 +137,14 @@ export function createSessionHost<A extends DocumentValue, C>(options: SessionHo
   const messageLimits = { maxBytes: action.maxBytes + 64, maxNodes: action.maxNodes + 4, maxDepth: action.maxDepth + 1 };
   const maxFrameChars = messageLimits.maxBytes + 256;
   const viewLimits: ViewLimits = sessionViewLimits(rules.limits);
+  // Joined connections are bounded by player slots (one live connection per slot); joining ones by the two pools.
+  const maxConnections = rules.maxPlayers + limits.maxPreJoin + limits.resumeReserve;
   const intakeLimits: NetworkLimits = {
-    maxConnections: limits.maxConnections, maxPendingAuth: limits.maxConnections, maxPreAuthMessages: 2,
+    maxConnections, maxPendingAuth: limits.maxPreJoin + limits.resumeReserve, maxPreAuthMessages: 2,
     authTimeoutMs: limits.authTimeoutMs, maxQueuedMessagesPerPeer: limits.maxQueuedActionsPerPeer,
     maxQueuedBytesPerPeer: limits.maxQueuedActionsPerPeer * messageLimits.maxBytes,
-    maxQueuedMessages: limits.maxQueuedActionsPerPeer * limits.maxConnections,
-    maxQueuedBytes: limits.maxQueuedActionsPerPeer * limits.maxConnections * messageLimits.maxBytes,
+    maxQueuedMessages: limits.maxQueuedActionsPerPeer * maxConnections,
+    maxQueuedBytes: limits.maxQueuedActionsPerPeer * maxConnections * messageLimits.maxBytes,
     maxPumpOperations: limits.maxPumpActions, message: messageLimits,
     principal: { maxBytes: 128, maxNodes: 4, maxDepth: 2 },
   };
@@ -126,10 +154,10 @@ export function createSessionHost<A extends DocumentValue, C>(options: SessionHo
   let current: SessionWorld = initial.world, currentJson = initial.json, worldRevision = 0, disposed = false, lastNow = 0;
   const conns = new Map<ConnectionHandle, Conn<C>>(), byTransport = new Map<C, ConnectionHandle>();
   const slots = new Map<string, Slot>(), keys = new Map<string, string>(), overrides = new Map<ConnectionHandle, string>();
-  const metrics = { connections: 0, joined: 0, resumed: 0, left: 0, applied: 0, rejected: 0, ruleErrors: 0, views: 0, closed: 0 };
+  const metrics = { reserveConnections: 0, connections: 0, joined: 0, resumed: 0, left: 0, applied: 0, rejected: 0, ruleErrors: 0, views: 0, closed: 0 };
   const closeReasons: Record<string, number> = {};
 
-  const frames = createRateAdmission({ maxKeys: limits.maxConnections, capacity: limits.framesPerSecond, refillPerSecond: limits.framesPerSecond });
+  const frames = createRateAdmission({ maxKeys: maxConnections, capacity: limits.framesPerSecond, refillPerSecond: limits.framesPerSecond });
   const integrity: Integrity<A, SessionIntegrityState> | null = mode === 'off' ? null : createIntegrity<A, SessionIntegrityState>({
     rules: rules.integrity, enforcement: mode, config: rules.id, decayPerSecond: 0.5,
     limits: { maxKeys: rules.maxPlayers * 4, maxHistoryPerKey: 16, maxAudit: 256 },
@@ -244,7 +272,7 @@ export function createSessionHost<A extends DocumentValue, C>(options: SessionHo
     const c = conns.get(peer);
     if (!c || c.publisher || intake.read(peer)?.state !== 'active') return;
     const session = randomKey(24), player = c.player!;
-    c.session = session;
+    c.session = session; c.pool = null;
     c.publisher = createViewPublisher({ session, limits: viewLimits, ports: {
       current: () => !disposed && conns.get(peer) === c && slots.get(player)?.peer === peer,
       project: () => {
@@ -267,6 +295,18 @@ export function createSessionHost<A extends DocumentValue, C>(options: SessionHo
     if (intake.send(peer, JSON.stringify({ v: 1, type: 'welcome', player, session })).status !== 'sent') retire(peer, 'send-refused');
     else say('joined', { player });
   }
+  /** Which pre-join pool may take a new connection from `address`, or null to refuse it. */
+  function admitPool(address: string | null): 'normal' | 'reserve' | null {
+    let normal = 0, reserve = 0, normalHere = 0, reserveHere = 0;
+    for (const c of conns.values()) {
+      if (c.pool === 'normal') { normal++; if (address !== null && c.address === address) normalHere++; }
+      else if (c.pool === 'reserve') { reserve++; if (address !== null && c.address === address) reserveHere++; }
+    }
+    if (normal < limits.maxPreJoin && normalHere < limits.maxPreJoinPerAddress) return 'normal';
+    // Only worth holding while some player could come back to a slot.
+    if (slots.size > 0 && reserve < limits.resumeReserve && reserveHere < limits.maxPreJoinPerAddress) return 'reserve';
+    return null;
+  }
   const time = (now: number) => {
     if (typeof now !== 'number' || !Number.isFinite(now) || now < 0) throw Error('session host: invalid time');
     lastNow = Math.max(lastNow, now);
@@ -274,18 +314,21 @@ export function createSessionHost<A extends DocumentValue, C>(options: SessionHo
   };
 
   return Object.freeze({
-    connect(conn: C, now: number): boolean {
+    connect(conn: C, now: number, address?: string): boolean {
       time(now);
       if (disposed || byTransport.has(conn)) return false;
-      const opened = intake.open(lastNow);
-      if (opened.status !== 'opened') {
+      const from = typeof address === 'string' && address.length > 0 ? address.slice(0, 128) : null;
+      const pool = admitPool(from);
+      const opened = pool ? intake.open(lastNow) : null;
+      if (!opened || opened.status !== 'opened') {
         closeReasons['connection-limit'] = (closeReasons['connection-limit'] ?? 0) + 1;
         try { ports.close(conn, SESSION_CLOSE_CODES.capacity, 'connection-limit'); } catch { /* Refused either way. */ }
         return false;
       }
       metrics.connections++;
+      if (pool === 'reserve') metrics.reserveConnections++;
       conns.set(opened.peer, { conn, peer: opened.peer, player: null, session: null, publisher: null, processed: 0,
-        lastFrame: lastNow, preAuthFrames: 0, lastActionTick: null, gone: false });
+        lastFrame: lastNow, preAuthFrames: 0, lastActionTick: null, gone: false, address: from, pool, openedAt: lastNow });
       byTransport.set(conn, opened.peer);
       return true;
     },
@@ -294,11 +337,15 @@ export function createSessionHost<A extends DocumentValue, C>(options: SessionHo
       const peer = byTransport.get(conn), c = peer && conns.get(peer);
       if (!peer || !c) return;
       c.lastFrame = lastNow;
-      if (frames.admit(peer, lastNow).status !== 'admitted') { retire(peer, 'rate-limit'); return; }
       if (typeof text !== 'string' || text.length > maxFrameChars) { retire(peer, 'frame-too-large'); return; }
       let frame: unknown;
-      try { frame = JSON.parse(text); } catch { retire(peer, 'protocol'); return; }
+      try { frame = JSON.parse(text); } catch { frame = null; }
       const f = frame as Record<string, unknown> | null, state = intake.read(peer)?.state;
+      // An ack that releases this connection's one outstanding view credit is bounded by that credit (one per view),
+      // so it is not charged; everything else, malformed frames included, spends a frame token first.
+      const outstanding = c.publisher?.read().outstanding;
+      const creditAck = !!f && f.type === 'ack' && f.session === c.session && outstanding?.sequence === f.sequence;
+      if (!creditAck && frames.admit(peer, lastNow).status !== 'admitted') { retire(peer, 'rate-limit'); return; }
       if (!f || typeof f !== 'object' || f.v !== 1) { retire(peer, 'protocol'); return; }
       if (state !== 'active' && ++c.preAuthFrames > 2) { retire(peer, 'pre-auth-limit'); return; }
       if (f.type === 'join' && exactKeys(f, ['v', 'type', 'rules', 'version', 'token', 'player']) && state === 'pre-auth') {
@@ -306,6 +353,8 @@ export function createSessionHost<A extends DocumentValue, C>(options: SessionHo
         if (typeof f.token !== 'string' || f.token.length > 128 || typeof f.player !== 'string' || !SESSION_PLAYER_KEY.test(f.player)) {
           retire(peer, 'auth-rejected'); return;
         }
+        // A reserve connection exists only to let a known player back in while the normal pool is full.
+        if (c.pool === 'reserve' && !keys.has(f.player)) { retire(peer, 'connection-limit'); return; }
         const started = intake.authenticate(peer, JSON.stringify({ token: f.token, player: f.player }), lastNow);
         if (started.status === 'refused') { retire(peer, started.reason); return; }
         welcome(peer);
@@ -334,7 +383,10 @@ export function createSessionHost<A extends DocumentValue, C>(options: SessionHo
     pump(now: number) {
       time(now);
       if (disposed) return;
-      for (const [peer, c] of [...conns]) if (lastNow - c.lastFrame >= limits.idleTimeoutMs) retire(peer, 'idle-timeout');
+      for (const [peer, c] of [...conns]) {
+        if (c.pool === 'reserve' && lastNow - c.openedAt >= limits.reserveJoinMs) retire(peer, 'auth-timeout');
+        else if (lastNow - c.lastFrame >= limits.idleTimeoutMs) retire(peer, 'idle-timeout');
+      }
       intake.pump(lastNow);
       for (const [player, slot] of [...slots])
         if (!slot.peer && slot.awaySince !== null && lastNow - slot.awaySince >= limits.leaveAfterMs) freeSlot(player);

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { testScene, Transform } from '@engine';
+import { Mesh, testScene, Transform } from '@engine';
 import { createSessionHost } from '@kits/network';
 import game from './game';
 import rules, { SIZE, type Action, type Board } from './session';
@@ -23,6 +23,9 @@ test('S1: moving and painting change the shared world through the same rules loc
   assert.equal(t.ctx.state.painted, 1);
   const me = t.ctx.named('avatar:p1')!;
   assert.ok(Math.abs(t.world.get(me, Transform)!.x - at(3)) < 0.01, 'the avatar glided to its cell');
+  const mesh = t.world.get(t.ctx.named('board')!, Mesh)!; // One mesh for the board: cell 3's quad is recolored.
+  assert.notDeepEqual(mesh.colors.slice(3 * 12, 3 * 12 + 3), mesh.colors.slice(0, 3));
+  assert.deepEqual(mesh.colors.slice(4 * 12, 4 * 12 + 3), mesh.colors.slice(0, 3));
 
   // The host applies the same file authoritatively: the same actions give the same world.
   const sent: string[] = [];

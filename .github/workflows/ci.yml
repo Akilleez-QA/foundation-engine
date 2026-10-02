@@ -67,6 +67,8 @@ jobs:
         run: GAME_DIR=templates/expedition/game npm run test:authority-workbench-browser
       - name: Spatial audio offline-render regressions
         run: npm run test:audio-browser
+      - name: Shared session two-browser workflow (MP-01)
+        run: npm run test:session-browser
       - name: Optional replay and divergence browser regressions
         run: npm run test:replay-browser
       - name: Network overload probe regression, loopback only (NW-07)

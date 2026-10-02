@@ -2,7 +2,7 @@
 // One session owner per visit: created in `enter`, driven by the `sync` frame system, disposed in `exit`.
 // Opened with `?host=<port>&join=<code>` (as `npm run host` prints) it joins that host; otherwise it plays locally
 // with the same rules (session.ts), so it also runs in tests, play:snap and the gate without a host.
-import { defineComponent, defineEntity, defineScene, defineSystem, Name, Shape, Transform, type Entity, type SceneContext } from '@engine';
+import { defineComponent, defineEntity, defineMesh, defineScene, defineSystem, Mesh, Name, Shape, Transform, type Entity, type SceneContext } from '@engine';
 import { createSession, sessionEndpointFromPage, type Session, type SessionWorld } from '@kits/network';
 import { hud } from '@kits/ui';
 import rules, { COLORS, isAvatar, SIZE, type Action, type Board } from './session';
@@ -16,12 +16,33 @@ const at = (cell: number) => cell - HALF;
 export const Glide = defineComponent('glide', { x: 0, z: 0 });
 const floor = defineEntity({ id: 'floor', components: [Name({ name: 'floor' }), Transform(), Shape({ kind: 'plane', size: [SIZE + 0.4, 0, SIZE + 0.4], color: 0x2a3342 })] });
 export const avatar = defineEntity({ id: 'avatar', components: [Transform({ y: 0.5 }), Shape({ kind: 'capsule', size: [0.55, 1, 0.55] }), Glide()] });
-export const tile = defineEntity({ id: 'tile', components: [Transform({ y: 0.01 }), Shape({ kind: 'box', size: [0.9, 0.02, 0.9] })] });
+
+// The painted cells are one mesh (one draw for the whole board): a quad per cell, recolored when the board changes.
+const FLOOR = 0x2a3342, CELL = 0.45;
+/** sRGB hex to the linear RGB a mesh's vertex colors use. */
+const linear = (hex: number) => [16, 8, 0].map(shift => {
+  const c = ((hex >> shift) & 255) / 255;
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+});
+function boardColors(cells: readonly number[]): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < SIZE * SIZE; i++) { const rgb = linear(cells[i] ? COLORS[cells[i]! - 1] ?? 0xffffff : FLOOR); for (let v = 0; v < 4; v++) out.push(...rgb); }
+  return out;
+}
+const positions: number[] = [], indices: number[] = [];
+for (let i = 0; i < SIZE * SIZE; i++) {
+  const x = at(i % SIZE), z = at(Math.floor(i / SIZE)), n = i * 4;
+  positions.push(x - CELL, 0, z - CELL, x - CELL, 0, z + CELL, x + CELL, 0, z + CELL, x + CELL, 0, z - CELL);
+  indices.push(n, n + 1, n + 2, n, n + 2, n + 3); // Counter-clockwise seen from above: faces up.
+}
+export const board = defineEntity({ id: 'board', components: [Name({ name: 'board' }), Transform({ y: 0.01 }),
+  defineMesh({ positions, indices, colors: boardColors([]) })] });
 
 // Per-visit owners. A scene runs one visit at a time; `enter` resets them and `exit` releases them.
 let session: Session<Action> | null = null;
 let shown = -1, cooldown = 0;
-const avatars = new Map<string, Entity>(), tiles = new Map<number, Entity>();
+const avatars = new Map<string, Entity>();
+let painted = '';
 
 /** The session this visit owns (tests and the dev probe read it). */
 export const currentSession = () => session;
@@ -42,13 +63,9 @@ function project(ctx: SceneContext, world: SessionWorld) {
     glide.x = at(a.x); glide.z = at(a.z);
   }
   const cells = (world.board as Board | undefined)?.cells ?? [];
-  cells.forEach((mark, i) => {
-    const e = tiles.get(i);
-    if (!mark) { if (e !== undefined) { ctx.world.despawn(e); tiles.delete(i); } return; }
-    const color = COLORS[mark - 1] ?? 0xffffff;
-    if (e === undefined) tiles.set(i, ctx.spawn(tile, Transform({ x: at(i % SIZE), y: 0.01, z: at(Math.floor(i / SIZE)) }), Shape({ kind: 'box', size: [0.9, 0.02, 0.9], color })));
-    else { const shape = ctx.world.get(e, Shape)!; if (shape.color !== color) shape.color = color; }
-  });
+  const key = cells.join();
+  const mesh = ctx.world.get(ctx.named('board')!, Mesh);
+  if (mesh && key !== painted) { painted = key; mesh.colors = boardColors(cells); mesh.revision++; }
   ctx.state.players = players.length;
   ctx.state.painted = cells.filter(Boolean).length;
   ctx.world.touch();
@@ -105,11 +122,11 @@ export const glide = defineSystem({
 export default defineScene({
   id: 'world', title: 'World', type: 'level',
   view: { camera: { position: [0, 8.5, 7.5], target: [0, 0, 0.4], fov: 50 }, background: 0x141a24 },
-  entities: [floor],
+  entities: [floor, board],
   systems: [controls, sync, glide],
   enter(ctx) {
     session?.dispose();
-    avatars.clear(); tiles.clear(); shown = -1; cooldown = 0;
+    avatars.clear(); painted = ''; shown = -1; cooldown = 0;
     session = createSession({ rules, endpoint: sessionEndpointFromPage() });
     const s = session.read();
     Object.assign(ctx.state, { session: s.status, player: s.player ?? '', players: 0, painted: 0 });

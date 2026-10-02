@@ -41,6 +41,10 @@ paint with Space, pad A or a tap. Paint in one tab and watch it appear in the ot
 Opened without `?host=…&join=…` (for example from `npm run play`'s own link), the game
 plays locally with the same rules, so tests, `play:snap` and the gate need no host.
 
+Restarting the host makes a new code, so open the new link. To let open tabs reconnect
+by themselves instead, restart with the old code: `npm run host -- --join <code>` (the
+host prints that command). The world starts empty either way.
+
 To play from another computer on the same network: `npm run play -- --host` and
 `npm run host -- --lan`, then open the LAN link the host prints. Anyone on that
 network who has the code can join while it runs.
@@ -91,7 +95,9 @@ if (s.revision !== shown) { shown = s.revision; project(ctx, s.world); }
 ```
 
 `s.status` is `local`, `connecting`, `joined`, `reconnecting` or `closed`; the HUD shows
-it with string keys from `game.ts`.
+it with string keys from `game.ts`. `act` is safe to call on every fixed tick: it paces
+itself (30 actions per second) and returns `{status:'refused', reason:'paced'}` or
+`'busy'` instead of sending more than the host accepts.
 
 ## 5. Make it yours (1 minute to start)
 

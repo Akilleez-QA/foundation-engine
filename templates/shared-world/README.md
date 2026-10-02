@@ -34,6 +34,6 @@ This README stays with the template; your copy lives in `game/` and `GAME.md`.
 
 ## Limits
 
-Development only. The host listens on 127.0.0.1 unless you pass `--lan`; it speaks unencrypted `ws://` with one shared
+Development only. Restarting the host makes a new join code unless you pass `--join <old code>`. The host listens on 127.0.0.1 unless you pass `--lan`; it speaks unencrypted `ws://` with one shared
 join code, keeps the world in memory, and has no accounts, matchmaking, NAT traversal or Internet hardening. Phones and
 tablets are not targets of this template (no touch movement yet). See the recipe for the full list.

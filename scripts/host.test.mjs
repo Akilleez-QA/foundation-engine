@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { WebSocket } from 'ws';
-import { loadSessionRules, startSessionServer } from './host.mjs';
+import { checkJoinCode, loadSessionRules, startSessionServer } from './host.mjs';
 import { ROOT } from './lib/game-dir.mjs';
 import { join } from 'node:path';
 
@@ -61,20 +61,46 @@ test('MP01 host: two loopback clients share one world; actions apply once and re
   } finally { await server.close(); }
 });
 
-test('MP01 host: a wrong join code closes 1008 auth-rejected; a remote page origin is refused at the handshake', async () => {
+test('MP01 host: a wrong join code closes 1008 auth-rejected; browser origins are limited by mode', async () => {
   const server = await startSessionServer({ rules, port: 0, driverMs: 5 });
+  const lan = await startSessionServer({ rules, port: 0, driverMs: 5, lan: true });
   try {
     const wrong = client(server.url);
     await wrong.opened;
     join_(wrong, 'not-the-code-000000000000', 'page-key-c-0123456789');
     assert.deepEqual(await wrong.closed, { code: 1008, reason: 'auth-rejected' });
-    const remote = client(server.url, { Origin: 'https://example.com' });
-    await assert.rejects(remote.opened, /40[13]/);
-    const local = client(server.url, { Origin: 'http://192.168.1.20:5173' });
-    await local.opened;
-    local.socket.close();
+    // Loopback mode: only pages served from loopback names.
+    for (const origin of ['https://example.com', 'http://192.168.1.20:5173', 'http://box.local:5173', 'http://app.localhost:5173', 'http://169.254.1.1:5173'])
+      await assert.rejects(client(server.url, { Origin: origin }).opened, /40[13]/, origin);
+    for (const origin of ['http://127.0.0.1:5173', 'http://localhost:5173', 'http://[::1]:5173']) {
+      const ok = client(server.url, { Origin: origin });
+      await ok.opened; ok.socket.close();
+    }
+    // LAN mode: private LAN pages too, still no public sites.
+    const local = client(lan.url, { Origin: 'http://192.168.1.20:5173' });
+    await local.opened; local.socket.close();
+    await assert.rejects(client(lan.url, { Origin: 'https://example.com' }).opened, /40[13]/);
     assert.equal(server.read().players.length, 0);
-  } finally { await server.close(); }
+  } finally { await server.close(); await lan.close(); }
+});
+
+test('MP01 host: --join keeps a code across restarts and refuses weak codes', async () => {
+  assert.equal(checkJoinCode('aaaaaaaaaaaaaaaaaaaa'), 'the join code needs at least 10 different characters; reuse a code the host generated');
+  assert.match(checkJoinCode('short'), /16-128/);
+  assert.match(checkJoinCode('has spaces in it ok?'), /16-128/);
+  assert.equal(checkJoinCode('Zx8_k2Lp-q9Rv3Tn'), null);
+  await assert.rejects(startSessionServer({ rules, port: 0, joinCode: 'password-password' }), /different characters/);
+  const first = await startSessionServer({ rules, port: 0, driverMs: 5 });
+  const { port, joinCode } = first;
+  await first.close();
+  const again = await startSessionServer({ rules, port, joinCode, driverMs: 5 });
+  try {
+    const a = client(again.url);
+    await a.opened;
+    join_(a, joinCode, 'page-key-e-0123456789');
+    assert.equal((await a.until(f => f.type === 'welcome')).player, 'p1');
+    a.socket.close();
+  } finally { await again.close(); }
 });
 
 test('MP01 host: close stops the driver and closes clients with host-closing', async () => {
