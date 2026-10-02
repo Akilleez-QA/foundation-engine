@@ -258,9 +258,11 @@ export async function startNetworkWorkbench({
     const peer = result.peer;
     const tracked = drainPlan?.track(peer, now());
     if (tracked && tracked.status !== 'tracked') {
-      socket.close(DRAIN_CLOSE_CODE, 'drain');
+      // Draining is planned (1012, transient); anything else is capacity (1013).
+      if (tracked.reason === 'draining') socket.close(DRAIN_CLOSE_CODE, 'drain');
+      else socket.close(1013, 'connection-capacity');
       socket.terminate();
-      intake.close(peer, 'drain');
+      intake.close(peer, tracked.reason === 'draining' ? 'drain' : 'connection-capacity');
       return;
     }
     const state = {

@@ -313,12 +313,16 @@ Status: implemented, candidate on branch `feat/nw08-planned-drain` (PR #21); not
 
 - Runtime-enforced: limit validation (exact keys, safe integers of at most one day,
   `noticeMs + jitterMs < maxLifetimeMs`, `maxKeys` at most 65,536); drain requests
-  bounded by `maxNoticeMs`/`maxReconnectAfterMs`; lifetime close never later than
-  `maxLifetimeMs`; at most `maxActionsPerPoll` instructions per poll, notify before
-  close, a late notice never postpones its close; a second drain can only bring a
-  close earlier; nondecreasing time; random-port validation; terminal disposal.
-  The client follower refuses notices beyond its own bounds.
-- Checked: 18 focused unit tests (including seeded jitter distribution over 2,000
+  bounded by `maxNoticeMs`/`maxReconnectAfterMs`; lifetime close *scheduled* no
+  later than `maxLifetimeMs` (emission waits for the next poll and the per-poll cap,
+  so it may lag by a bounded, documented amount); at most `maxActionsPerPoll`
+  instructions per poll, notify before close, a late notice never postpones its
+  close; an operator drain reaches already-notified connections (close only earlier,
+  return only longer, one superseding notice when changed); nondecreasing time;
+  random-port validation; terminal disposal. The client follower refuses notices
+  beyond its own bounds and merges later notices monotonically.
+- Checked: 20 focused unit tests (including an operator drain reaching a
+  lifetime-notified connection, emission lag under the per-poll cap, seeded jitter distribution over 2,000
   connections, 1,000-connection expiry under a per-poll cap, and reconnect after
   host return through a real retry schedule with budget and exhaustion honoured);
   4 host socket tests and 1 client protocol test; the network workbench browser

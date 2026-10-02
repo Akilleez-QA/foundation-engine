@@ -228,14 +228,15 @@ function receive(raw, now) {
       now,
     );
     if (outcome.status === 'invalid') throw Error('drain bounds');
-    if (outcome.status === 'draining')
+    if (outcome.status === 'draining' || outcome.status === 'updated')
       message = `Host ${frame.cause} drain: finishing ${pending.size} pending; no new commands`;
     lastFrame = frame;
     return;
   }
   if (frame.type === 'authenticated') {
     retry?.succeeded(now);
-    follower?.reset();
+    // The follower is not reset here: a notice can precede `authenticated` in one batch, and the drain must stand.
+    // A completed hold already cleared it (release), and explicit connect/stop paths reset it.
     principal = frame.principal;
     el('target').value = principal;
     message = 'Authenticated; no command result yet';

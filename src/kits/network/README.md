@@ -364,7 +364,10 @@ drain (new connections refused until `resume()`), and `poll(now)` from the host'
 existing driver returns at most `maxActionsPerPoll` `notify` then `close`
 instructions, earliest first. An optional `lifetime` caps each connection at
 `maxLifetimeMs`, dithered earlier by up to `jitterMs`, with `noticeMs` warning.
-A second drain can only bring a close earlier. It never cancels admitted work.
+A drain reaches connections already notified: the close only moves earlier, the
+announced return only lengthens, and a changed notice is re-sent once. The
+lifetime cap bounds the scheduled close; emission waits for the next poll and the
+per-poll cap. It never cancels admitted work.
 `createDrainFollower({limits:{maxNoticeMs,maxReconnectAfterMs}})` is the client
 side: it validates a notice against the client's bounds, stops new work, signals
 one cooperative close and holds the first reconnect until the announced return;

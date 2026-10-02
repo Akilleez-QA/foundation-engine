@@ -58,20 +58,32 @@ terminal has chosen that clients stop.
 
 ### Lifetime is a cap
 
-A lifetime connection is closed at `track time + maxLifetimeMs - dither`, where
-dither is uniform in `[0, jitterMs]`. Dither only ever brings the close earlier,
-so no connection outlives `maxLifetimeMs`. The notice is sent `noticeMs` before
-that close, and configuration requires `noticeMs + jitterMs < maxLifetimeMs`.
-Connections opened together therefore close spread across a `jitterMs` window
-rather than in one burst.
+A lifetime connection's close is *scheduled* at `track time + maxLifetimeMs -
+dither`, where dither is uniform in `[0, jitterMs]`. Dither only ever brings the
+scheduled close earlier, so no scheduled close exceeds `maxLifetimeMs`. The notice
+is scheduled `noticeMs` before it, and configuration requires
+`noticeMs + jitterMs < maxLifetimeMs`. Connections opened together therefore close
+spread across a `jitterMs` window rather than in one burst.
+
+The schedule is the cap; emission is not instantaneous. An instruction is returned
+by the first `poll` at or after its time, and at most `maxActionsPerPoll` per poll.
+With `n` connections due together (a notify and a close each), the last close is
+emitted up to `pollIntervalMs * (ceil(2n / maxActionsPerPoll) - 1)` late, plus one
+poll interval of driver granularity; the transport close follows. Example: 20
+connections, cap 1000 ms, no dither, `maxActionsPerPoll` 2 and a 10 ms poll emit the
+last close at 1190 ms. Size `maxActionsPerPoll` and dither for the expected
+simultaneous expiries if the cap must hold tightly.
 
 ### Double drain and lifetime interaction
 
-A second `drain` can only bring a close earlier. It never postpones one and never
-re-notifies a connection: the first notice the client received stands. A drain
-whose deadline is later than a connection's pending lifetime close keeps the
-lifetime close but notifies at once. A drain with an earlier deadline replaces the
-lifetime close and its announced return delay.
+An operator `drain` reaches every connection not yet told to close, including one
+already notified of a lifetime close or of an earlier drain. For each, the close
+only moves earlier (`min` of the pending close and the new deadline), the announced
+return only lengthens (`max`), and the cause becomes `planned`. If that changes what
+the connection was told, it gets exactly one superseding notice at the next poll;
+otherwise none. A drain never postpones a close and never reopens admission. So a
+client told "lifetime close, return 0 ms" learns the planned return before the
+close and does not reconnect straight into the draining host.
 
 ## Client side: `createDrainFollower`
 
@@ -80,7 +92,7 @@ import { createDrainFollower } from '../../src/kits/network/index';
 
 const follower = createDrainFollower({ limits: { maxNoticeMs: 60000, maxReconnectAfterMs: 60000 } });
 // On a decoded notice payload:
-follower.notice({ cause, closeInMs, reconnectAfterMs }, now); // draining | duplicate | invalid | retired
+follower.notice({ cause, closeInMs, reconnectAfterMs }, now); // draining | updated | duplicate | invalid | retired
 follower.admits();       // false while draining or holding: send no new commands
 follower.closeDue(now);  // true once at the notice deadline: close cooperatively
 follower.closed(now);    // {status:'hold',untilMs} during a drain; {status:'unplanned'} otherwise
@@ -89,8 +101,10 @@ follower.release(now);   // true once when the hold ends: now ask the retry sche
 
 The follower validates the notice against the *client's* bounds. A notice beyond
 them is `invalid`: the reference client treats that as a protocol error and stops,
-so a host cannot hold a client for longer than the client chose to accept. A
-second notice in one drain is `duplicate` and changes nothing.
+so a host cannot hold a client for longer than the client chose to accept. A later
+notice in the same drain is merged monotonically: it may bring the close earlier,
+lengthen the return or turn the cause to `planned` (`updated`); a notice that would
+postpone the close or shorten the return changes nothing (`duplicate`).
 
 The follower never paces retries. After `release`, the consumer calls its
 existing [`createRetrySchedule`](network-retry.md) `next(now)` exactly as for any
@@ -167,6 +181,8 @@ at the deadline, which it then treats as ordinary transient loss.
 
 - Unit tests (`src/kits/network/drain.test.ts`): validation and capture,
   opt-out, operator drain and resume, drain during in-flight work, double drain,
+  an operator drain superseding a lifetime notice (host and follower), emission lag
+  under the per-poll cap,
   a client ignoring the notice, lifetime cap and notice, seeded jitter distribution
   over 2,000 connections, lifetime expiry under load with a per-poll cap, disposal
   mid-drain, failing and reentrant random ports, follower bounds, and reconnect

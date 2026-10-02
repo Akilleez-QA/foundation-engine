@@ -22,7 +22,7 @@ export type DrainCause = 'planned' | 'lifetime';
 export type DrainKey = object | string;
 
 export interface ConnectionLifetimeLimits {
-  /** Hard cap from `track` to the close instruction. */
+  /** Cap on the scheduled close, measured from `track`. Emission waits for the next `poll` and its per-poll cap. */
   readonly maxLifetimeMs: number;
   /** Each connection closes uniformly in [maxLifetimeMs - jitterMs, maxLifetimeMs] after `track`. 0 disables dither. */
   readonly jitterMs: number;
@@ -83,7 +83,10 @@ export interface ConnectionDrain {
   track(key: DrainKey, now: number): DrainTrackResult;
   /** True only for a tracked connection that has not been notified: admit new work for it. */
   admits(key: DrainKey): boolean;
-  /** Operator drain of every tracked connection. Repeating it can only bring a close earlier, never later. */
+  /**
+   * Operator drain of every tracked connection, including ones already notified: the close only moves earlier, the
+   * announced return only lengthens, the cause becomes `planned`, and a changed notice is re-sent once.
+   */
   drain(now: number, request: { readonly noticeMs: number; readonly reconnectAfterMs: number }): DrainStartResult;
   /** Accept new connections again. Connections already notified keep their close. */
   resume(): boolean;
@@ -134,6 +137,8 @@ const validKey = (key: unknown): key is DrainKey =>
 type Entry = {
   closeAt: number | null; noticeAt: number | null; cause: DrainCause; reconnectAfterMs: number;
   phase: 'live' | 'notified' | 'closing'; order: number;
+  /** Notified, but a later operator drain changed what the client was told: send one superseding notice. */
+  renotify: boolean;
 };
 
 /** Construct one per host (or per listener). Construction reads no clock and draws no randomness. */
@@ -182,7 +187,7 @@ export function createConnectionDrain(options: ConnectionDrainOptions): Connecti
         noticeAt = closeAt - lifetime.noticeMs;
         reconnectAfterMs = lifetime.reconnectAfterMs;
       }
-      entries.set(key, { closeAt, noticeAt, cause: 'lifetime', reconnectAfterMs, phase: 'live', order: order++ });
+      entries.set(key, { closeAt, noticeAt, cause: 'lifetime', reconnectAfterMs, phase: 'live', order: order++, renotify: false });
       return Object.freeze({ status: 'tracked' as const, closeAtMs: closeAt });
     },
     admits(key: DrainKey) {
@@ -202,16 +207,15 @@ export function createConnectionDrain(options: ConnectionDrainOptions): Connecti
       for (const entry of entries.values()) {
         if (entry.phase === 'closing') continue;
         connections++;
-        if (entry.phase === 'live') {
-          // Not yet notified: this drain's notice and return delay replace any later lifetime close.
-          if (entry.closeAt === null || closeBy < entry.closeAt) {
-            entry.closeAt = closeBy; entry.noticeAt = now; entry.cause = 'planned';
-            entry.reconnectAfterMs = request.reconnectAfterMs;
-          } else if ((entry.noticeAt as number) > now) entry.noticeAt = now;
-        } else if (entry.closeAt === null || closeBy < entry.closeAt) {
-          // Already notified: a second drain may only bring the close earlier; the sent notice stands.
-          entry.closeAt = closeBy;
-        }
+        // Every open connection learns this drain: the close only ever moves earlier, the announced return only
+        // ever lengthens, and the cause becomes `planned`, so a client already told of a lifetime close with a
+        // short return does not reconnect straight into the draining host.
+        const closeAt = entry.closeAt === null ? closeBy : Math.min(entry.closeAt, closeBy);
+        const reconnectAfterMs = Math.max(entry.reconnectAfterMs, request.reconnectAfterMs);
+        const changed = closeAt !== entry.closeAt || reconnectAfterMs !== entry.reconnectAfterMs || entry.cause !== 'planned';
+        entry.closeAt = closeAt; entry.reconnectAfterMs = reconnectAfterMs; entry.cause = 'planned';
+        if (entry.phase === 'live') entry.noticeAt = now;
+        else if (changed) { entry.renotify = true; entry.noticeAt = now; }
       }
       return Object.freeze({ status: 'draining' as const, connections, closeByMs: closeBy });
     },
@@ -225,16 +229,17 @@ export function createConnectionDrain(options: ConnectionDrainOptions): Connecti
       time(now);
       const due: Array<[DrainKey, Entry, number]> = [];
       for (const [key, entry] of entries) {
-        if (entry.phase === 'live' && entry.noticeAt !== null && now >= entry.noticeAt) due.push([key, entry, entry.noticeAt]);
+        if ((entry.phase === 'live' || entry.renotify) && entry.noticeAt !== null && now >= entry.noticeAt)
+          due.push([key, entry, entry.noticeAt]);
         else if (entry.phase === 'notified' && now >= (entry.closeAt as number)) due.push([key, entry, entry.closeAt as number]);
       }
       due.sort((a, b) => a[2] - b[2] || a[1].order - b[1].order);
       const actions: DrainAction[] = [];
       for (const [key, entry] of due) {
         if (actions.length >= limits.maxActionsPerPoll) break;
-        if (entry.phase === 'live') {
+        if (entry.phase === 'live' || entry.renotify) {
           const closeAt = entry.closeAt as number;
-          entry.phase = 'notified'; counts.notices++;
+          entry.phase = 'notified'; entry.renotify = false; counts.notices++;
           actions.push(Object.freeze({ key, action: 'notify' as const, notice: Object.freeze({
             cause: entry.cause, closeInMs: Math.max(0, Math.floor(closeAt - now)), reconnectAfterMs: entry.reconnectAfterMs }) }));
           // closeInMs is whole milliseconds rounded down, so a fractional host clock never announces a later close.
@@ -272,6 +277,7 @@ export interface DrainFollowerLimits {
 
 export type DrainNoticeResult =
   | Readonly<{ status: 'draining'; cause: DrainCause; closeByMs: number; reconnectAfterMs: number }>
+  | Readonly<{ status: 'updated'; cause: DrainCause; closeByMs: number; reconnectAfterMs: number }>
   | Readonly<{ status: 'duplicate'; closeByMs: number }>
   | Readonly<{ status: 'invalid' }>
   | Readonly<{ status: 'retired' }>;
@@ -290,7 +296,11 @@ export interface DrainFollowerState {
 }
 
 export interface DrainFollower {
-  /** Validate a decoded notice payload `{cause, closeInMs, reconnectAfterMs}`. A second notice in one drain is a duplicate. */
+  /**
+   * Validate a decoded notice payload `{cause, closeInMs, reconnectAfterMs}`. A later notice in the same drain is
+   * merged monotonically: it may bring the close earlier, lengthen the return delay or turn the cause to `planned`
+   * (`updated`); it can never postpone the close or shorten the return (otherwise `duplicate`).
+   */
   notice(payload: unknown, now: number): DrainNoticeResult;
   /** False while draining or holding: send no new work. Pending work settles normally. */
   admits(): boolean;
@@ -333,6 +343,15 @@ export function createDrainFollower(options: { readonly limits: DrainFollowerLim
         !bounded(payload.closeInMs, 0) || payload.closeInMs > limits.maxNoticeMs ||
         !bounded(payload.reconnectAfterMs, 0) || payload.reconnectAfterMs > limits.maxReconnectAfterMs)
         return Object.freeze({ status: 'invalid' as const });
+      if (state === 'draining') {
+        const nextClose = Math.min(closeBy as number, now + payload.closeInMs);
+        const nextReturn = Math.max(reconnectAfter, payload.reconnectAfterMs);
+        const nextCause: DrainCause = cause === 'planned' || payload.cause === 'planned' ? 'planned' : 'lifetime';
+        if (nextClose === closeBy && nextReturn === reconnectAfter && nextCause === cause)
+          return Object.freeze({ status: 'duplicate' as const, closeByMs: closeBy as number });
+        closeBy = nextClose; reconnectAfter = nextReturn; cause = nextCause;
+        return Object.freeze({ status: 'updated' as const, cause, closeByMs: closeBy, reconnectAfterMs: reconnectAfter });
+      }
       if (state !== 'idle') return Object.freeze({ status: 'duplicate' as const, closeByMs: closeBy ?? now });
       state = 'draining'; cause = payload.cause; closeBy = now + payload.closeInMs; reconnectAfter = payload.reconnectAfterMs;
       return Object.freeze({ status: 'draining' as const, cause, closeByMs: closeBy, reconnectAfterMs: reconnectAfter });

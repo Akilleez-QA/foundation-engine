@@ -73,33 +73,73 @@ test('drain during in-flight work: the helper never revokes admitted work; only 
   assert.deepEqual(drain.poll(110).map(a => a.action), ['close']);
 });
 
-test('double drain only brings a close earlier and never re-notifies; a later lifetime close is replaced', () => {
+test('double drain: the close only moves earlier, the return only lengthens, and a changed notice is re-sent once', () => {
   const drain = createConnectionDrain({ limits: { ...base, lifetime }, random: fixed(0) });
   drain.track('a', 0); // lifetime close at 1000, notice at 900
   drain.drain(100, { noticeMs: 600, reconnectAfterMs: 300 });
   const first = drain.poll(100);
   assert.deepEqual(first.map(a => a.action), ['notify']);
   assert.deepEqual((first[0] as { notice: unknown }).notice, { cause: 'planned', closeInMs: 600, reconnectAfterMs: 300 });
+  // A longer, shorter-return second drain changes nothing the client was told: no second notice, no postponement.
   assert.equal(drain.drain(200, { noticeMs: 4000, reconnectAfterMs: 1 }).status, 'draining');
   assert.deepEqual(drain.poll(699), [], 'a longer second drain does not postpone the close');
   assert.deepEqual(drain.poll(700).map(a => [a.action, (a as { cause?: string }).cause]), [['close', 'planned']]);
-  // A shorter later drain brings an already-notified close earlier without a second notice.
+  assert.equal(drain.read().counts.notices, 1);
+  // A shorter later drain brings an already-notified close earlier and says so once.
   const early = createConnectionDrain({ limits: base });
   early.track('z', 0);
   early.drain(0, { noticeMs: 1000, reconnectAfterMs: 0 });
   assert.equal(early.poll(0).length, 1);
   early.drain(100, { noticeMs: 100, reconnectAfterMs: 0 });
+  assert.deepEqual(early.poll(100).map(a => (a as { notice?: unknown }).notice),
+    [{ cause: 'planned', closeInMs: 100, reconnectAfterMs: 0 }]);
+  assert.equal(early.admits('z'), false, 'a superseding notice never reopens admission');
   assert.deepEqual(early.poll(199), []);
   assert.deepEqual(early.poll(200).map(a => a.action), ['close']);
-  assert.equal(early.read().counts.notices, 1);
-  assert.equal(drain.read().counts.notices, 1);
-  // A drain longer than the remaining lifetime keeps the earlier lifetime close but notifies now.
+  assert.equal(early.read().counts.notices, 2);
+  // A drain longer than the remaining lifetime keeps the earlier close but announces the planned cause now.
   const other = createConnectionDrain({ limits: { ...base, lifetime }, random: fixed(0) });
   other.track('b', 0);
   other.drain(500, { noticeMs: 5000, reconnectAfterMs: 9 });
   assert.deepEqual(other.poll(500).map(a => (a as { notice?: unknown }).notice),
-    [{ cause: 'lifetime', closeInMs: 500, reconnectAfterMs: 50 }]);
-  assert.deepEqual(other.poll(1000).map(a => a.action), ['close']);
+    [{ cause: 'planned', closeInMs: 500, reconnectAfterMs: 50 }]);
+  assert.deepEqual(other.poll(1000).map(a => [a.action, (a as { cause?: string }).cause]), [['close', 'planned']]);
+});
+
+test('an operator drain reaches a connection already notified of its lifetime close (no herd into a draining host)', () => {
+  const drain = createConnectionDrain({ limits: { ...base, maxReconnectAfterMs: 60_000,
+    lifetime: { maxLifetimeMs: 100_000, jitterMs: 0, noticeMs: 30_000, reconnectAfterMs: 0 } }, random: fixed(0) });
+  drain.track('a', 0);
+  const lifetimeNotice = drain.poll(70_000);
+  assert.deepEqual(lifetimeNotice.map(a => (a as { notice?: unknown }).notice),
+    [{ cause: 'lifetime', closeInMs: 30_000, reconnectAfterMs: 0 }]);
+  drain.drain(71_000, { noticeMs: 5000, reconnectAfterMs: 45_000 });
+  const superseding = drain.poll(71_000);
+  assert.deepEqual(superseding.map(a => (a as { notice?: unknown }).notice),
+    [{ cause: 'planned', closeInMs: 5000, reconnectAfterMs: 45_000 }]);
+  assert.deepEqual(drain.poll(76_000).map(a => [a.action, (a as { cause?: string }).cause]), [['close', 'planned']]);
+  // The follower on the other end merges both notices and holds for the planned return.
+  const follower = createDrainFollower({ limits: { maxNoticeMs: 60_000, maxReconnectAfterMs: 60_000 } });
+  follower.notice((lifetimeNotice[0] as { notice: unknown }).notice, 70_000);
+  assert.deepEqual(follower.notice((superseding[0] as { notice: unknown }).notice, 71_000),
+    { status: 'updated', cause: 'planned', closeByMs: 76_000, reconnectAfterMs: 45_000 });
+  assert.deepEqual(follower.closed(76_000), { status: 'hold', untilMs: 121_000, cause: 'planned' });
+});
+
+test('emission lag: a scheduled close is capped, but emission waits for a poll and the per-poll instruction cap', () => {
+  const limits = { ...base, maxKeys: 20, maxActionsPerPoll: 2,
+    lifetime: { maxLifetimeMs: 1000, jitterMs: 0, noticeMs: 0, reconnectAfterMs: 0 } };
+  const drain = createConnectionDrain({ limits, random: fixed(0) });
+  for (let i = 0; i < 20; i++) assert.equal((drain.track(`c${i}`, 0) as { closeAtMs: number }).closeAtMs, 1000);
+  const closedAt: number[] = [];
+  for (let now = 0; now <= 2000; now += 10)
+    for (const action of drain.poll(now)) if (action.action === 'close') closedAt.push(now);
+  assert.equal(closedAt.length, 20);
+  assert.equal(Math.min(...closedAt), 1000);
+  // 40 instructions at 2 per 10 ms poll: the last close is emitted 190 ms after its scheduled time. The documented
+  // bound is pollIntervalMs * (ceil(2 * simultaneous / maxActionsPerPoll) - 1).
+  assert.equal(Math.max(...closedAt), 1190);
+  assert.ok(Math.max(...closedAt) - 1000 <= 10 * (Math.ceil((2 * 20) / 2) - 1));
 });
 
 test('drain requests are bounded by the configured maximum notice and return delay', () => {
@@ -232,16 +272,19 @@ test('follower: drain stops new work, signals one cooperative close, holds until
   assert.deepEqual(follower.notice({ cause: 'planned', closeInMs: 400, reconnectAfterMs: 1000 }, 100),
     { status: 'draining', cause: 'planned', closeByMs: 500, reconnectAfterMs: 1000 });
   assert.equal(follower.admits(), false);
-  // Double drain: the first notice stands.
-  assert.deepEqual(follower.notice({ cause: 'lifetime', closeInMs: 0, reconnectAfterMs: 0 }, 150), { status: 'duplicate', closeByMs: 500 });
+  // Double drain: a notice that would postpone the close or shorten the return changes nothing.
+  assert.deepEqual(follower.notice({ cause: 'lifetime', closeInMs: 4000, reconnectAfterMs: 0 }, 150), { status: 'duplicate', closeByMs: 500 });
+  // One that lengthens the return is merged; the earlier close stands.
+  assert.deepEqual(follower.notice({ cause: 'planned', closeInMs: 4000, reconnectAfterMs: 1500 }, 150),
+    { status: 'updated', cause: 'planned', closeByMs: 500, reconnectAfterMs: 1500 });
   assert.equal(follower.closeDue(499), false);
   assert.equal(follower.closeDue(500), true);
   assert.equal(follower.closeDue(501), false);
-  assert.deepEqual(follower.closed(520), { status: 'hold', untilMs: 1520, cause: 'planned' });
-  assert.deepEqual(follower.closed(530), { status: 'hold', untilMs: 1520, cause: 'planned' }, 'a second close report keeps the hold');
-  assert.equal(follower.release(1519), false);
-  assert.equal(follower.release(1520), true);
-  assert.equal(follower.release(1521), false);
+  assert.deepEqual(follower.closed(520), { status: 'hold', untilMs: 2020, cause: 'planned' });
+  assert.deepEqual(follower.closed(530), { status: 'hold', untilMs: 2020, cause: 'planned' }, 'a second close report keeps the hold');
+  assert.equal(follower.release(2019), false);
+  assert.equal(follower.release(2020), true);
+  assert.equal(follower.release(2021), false);
   assert.equal(follower.admits(), true);
   assert.throws(() => follower.closed(10), RangeError);
 });
