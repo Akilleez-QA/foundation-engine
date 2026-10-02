@@ -34,9 +34,13 @@ function build(view: SceneContext['view']): Hud {
   let current: { handle: Sheet; element: HTMLElement; content: HTMLElement; title: HTMLElement; scroll: HTMLElement; close: HTMLButtonElement } | null = null;
   const details = () => Object.entries(state.lines).filter(([id]) => importance.get(id) === 'detail');
   const closeSheet = () => { const old = current; current = null; old?.handle.close(); trigger?.setAttribute('aria-expanded', 'false'); };
-  const rows = (host: HTMLElement, values: [string, string][]) => {
+  // Lines over the view sit on a translucent plate, so they stay readable over a light sky or a bright floor.
+  const PLATE = 'justify-self:start;padding:2px 10px;border-radius:8px;background:rgb(10 16 22 / 62%);';
+  const rows = (host: HTMLElement, values: [string, string][], plate = false) => {
     host.replaceChildren(...values.map(([id, value]) => {
-      const el = host.ownerDocument.createElement('div'); el.dataset.hud = id; el.textContent = value; return el;
+      const el = host.ownerDocument.createElement('div'); el.dataset.hud = id; el.textContent = value;
+      if (plate) el.style.cssText = PLATE;
+      return el;
     }));
   };
   function showDetails(open: boolean): void {
@@ -77,7 +81,8 @@ function build(view: SceneContext['view']): Hud {
     lines = box('hud-lines', `position:absolute;left:16px;top:56px;display:grid;gap:4px;${text}`);
     banner = box('hud-banner', `position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);max-width:calc(100% - 32px);text-align:center;${text}font-size:var(--engine-text-3xl);`);
     banner.setAttribute('role', 'status'); banner.setAttribute('aria-live', 'polite');
-    prompt = box('hud-prompt', `position:absolute;left:50%;bottom:24px;transform:translateX(-50%);max-width:calc(100% - 32px);text-align:center;${text}`);
+    prompt = box('hud-prompt', `position:absolute;left:50%;bottom:24px;transform:translateX(-50%);max-width:calc(100% - 32px);text-align:center;${text}padding:4px 12px;border-radius:10px;background:rgb(10 16 22 / 62%);`);
+    prompt.hidden = true; banner.hidden = true;   // nothing to show yet: no empty plate
     trigger = doc.createElement('button'); trigger.className = 'hud-details-trigger'; trigger.type = 'button'; trigger.hidden = true;
     trigger.setAttribute('aria-haspopup', 'dialog'); trigger.setAttribute('aria-expanded', 'false');
     trigger.style.cssText = 'position:absolute;right:max(16px,env(safe-area-inset-right));top:max(16px,env(safe-area-inset-top));min-width:48px;min-height:48px;max-width:calc(100% - 32px);pointer-events:auto;font:var(--engine-text-lg) var(--engine-font);white-space:normal;overflow-wrap:anywhere;';
@@ -95,7 +100,7 @@ function build(view: SceneContext['view']): Hud {
       lines.style.cssText = inlineLines + (disclosed ? 'position:static;min-width:0;overflow-wrap:anywhere;' : '');
       trigger.style.cssText = inlineTrigger + (disclosed ? 'position:static;max-width:min(40vw,240px);' : '');
     }
-    if (lines) rows(lines, presentation.mode === 'inline' ? entries : entries.filter(([id]) => importance.get(id) !== 'detail'));
+    if (lines) rows(lines, presentation.mode === 'inline' ? entries : entries.filter(([id]) => importance.get(id) !== 'detail'), true);
     if (trigger) { trigger.hidden = presentation.mode === 'inline' || !secondary.length; if (presentation.mode === 'disclose') trigger.textContent = presentation.label; }
     if (!secondary.length || presentation.mode === 'inline') closeSheet();
     if (current && presentation.mode === 'disclose') {

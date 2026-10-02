@@ -11,7 +11,7 @@ export default defineBuild({
   success: [
     { id: 'S1', check: 'steering right moves the ball right and stops at the lane edge', how: 'test', by: 'game/play.test.ts' },
     { id: 'S2', check: 'a block that reaches the ball ends the run and shows the game-over banner', how: 'test', by: 'game/play.test.ts' },
-    { id: 'S3', check: 'the restart action after game over starts a fresh run with score zero', how: 'playtest', by: 'playtest/restart.json' },
+    { id: 'S3', check: 'the restart action after game over starts a fresh run with score zero', how: 'playtest', by: 'game/playtest/restart.json' },
     { id: 'S4', check: 'the best score survives a restart and a reload (save section run.best)', how: 'test', by: 'game/play.test.ts' },
     { id: 'S5', check: 'the play scene stays inside its budgets.json counts on the gate', how: 'gate' },
   ],

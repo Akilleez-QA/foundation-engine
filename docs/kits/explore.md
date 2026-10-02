@@ -50,7 +50,7 @@ assert.equal(t.ctx.state.near, 'chest');
 t.press('explore-interact'); t.run(2 / 60);
 ```
 
-In the browser, `npm run play:script -- templates/explorer/playtest/door.json` walks through a door and back with `teleport` and `press`.
+In the browser, `npm run play:script -- templates/explorer/game/playtest/door.json` walks through a door and back with `teleport` and `press`.
 
 ## Budgets
 

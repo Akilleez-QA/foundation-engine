@@ -21,7 +21,7 @@
 
 | Id | Check | How |
 |---|---|---|
-| S1 | <what is observed, where, and the pass condition> | <test: `game/<file>.test.ts` / playtest: `playtest/<file>.json` / gate / manual> |
+| S1 | <what is observed, where, and the pass condition> | <test: `game/<file>.test.ts` / playtest: `game/playtest/<file>.json` / gate / manual> |
 
 ## Device experience acceptance
 

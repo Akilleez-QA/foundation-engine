@@ -3,5 +3,7 @@
   "audio.cue.success": "Discovery chime",
   "audio.cue.arrive": "Arrival chime",
   "audio.cue.count": "Countdown beep",
-  "audio.cue.bump": "Soft bump"
+  "audio.cue.bump": "Soft bump",
+  "settings.sound.headphone-3d": "Headphone 3D audio",
+  "settings.sound.headphone-3d.help": "Front, back and height cues for headphones. Turn off for speakers or to save battery."
 }

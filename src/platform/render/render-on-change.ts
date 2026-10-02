@@ -22,7 +22,7 @@ export function createRenderOnChange(){
   else if((v as T.Color).isColor){const c=v as T.Color;push(c.r);push(c.g);push(c.b);}
   else if((v as T.Texture).isTexture)texture(v as T.Texture);
   else if((v as {isVector2?:boolean}).isVector2||(v as {isVector3?:boolean}).isVector3||(v as T.Vector4).isVector4||(v as T.Quaternion).isQuaternion){const x=v as T.Vector4;push(x.x);push(x.y);push(x.z??0);push(x.w??0);}
-  else if((v as T.Matrix4).isMatrix4||(v as T.Matrix3).isMatrix3){for(const e of (v as T.Matrix4).elements)push(e);}
+  else if((v as {isMatrix4?:boolean}).isMatrix4||(v as T.Matrix3).isMatrix3){for(const e of (v as T.Matrix4).elements)push(e);}
   else if(Array.isArray(v)||ArrayBuffer.isView(v)){const list=v as ArrayLike<unknown>;for(let i=0;i<list.length;i++)value(list[i]);}
  };
  function texture(t:T.Texture){push(t.id);push(t.version);push(t.offset.x);push(t.offset.y);push(t.repeat.x);push(t.repeat.y);push(t.rotation);if((t as T.VideoTexture).isVideoTexture)force=true;}

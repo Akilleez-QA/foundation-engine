@@ -139,7 +139,7 @@ Platform systems know no game noun (STD-LAY-5).
 | **STD-SYS-13** | Assets | The asset manifest, the lease cache, variant selection, painted-surface residency | Assets are addressed by id; shared resources are immutable and leased; nothing uploads after its owner is gone |
 | **STD-SYS-14** | UI shell and layers | The layer stack, focus, inertness, Back, shell button rows, notifications, the style cascade and tokens, the scene shell | Nothing bypasses the layer stack |
 | **STD-SYS-15** | Input | Input actions, bindings and remaps, dispatch order, owner epochs | Every action is reachable on every device; a press is dispatched once |
-| **STD-SYS-16** | Audio | The one audio output, cues, music | Never touches the user's system or application audio; silent in tests |
+| **STD-SYS-16** | Audio | The one audio output, cues, music, spatial voices (panning and distance models, audible cutoff, HRTF voice limit, filter stage, smoothing; [guide](guides/spatial-audio.md)) | Never touches the user's system or application audio; silent in tests; HRTF is bounded separately and falls back to equal-power, never refusing playback |
 | **STD-SYS-17** | Workers | Thread creation, bounded admission, the pool, job registry, cancellation | Only this system creates threads; jobs are pure; the frame never awaits a job |
 | **STD-SYS-18** | Performance instrumentation | The perf schema, window classification, budget checking | Costs nothing in production; no number leaves the device |
 
@@ -333,6 +333,7 @@ A game adds its own domain systems (for example an economy or a world model) wit
 | Saved state | Save section in the owner folder, with a migration per version | Store: export, import, reset, quarantine, players | [add-a-save-section](recipes/add-a-save-section.md) |
 | Control | Input action row | Dispatcher, reach check, remaps | [add-an-input-action](recipes/add-an-input-action.md) |
 | Budget | Scene row in the game's `budgets.json` | Bench, gate, ratchet | [add-a-budget](recipes/add-a-budget.md) |
+| Worker job | `src/kits/<kit>/workers/<name>.job.ts` (row `job.kits.<kit>.<name>`) or the domain equivalent | Worker host loader table, main-thread fallback | [generate-seeded-content](recipes/generate-seeded-content.md) |
 | Content pack | Pack folder: rows, patches, lazy behaviour | Registries; a failing pack disables only itself | |
 | Registry | Owner module definition | Boot validation, registries test | |
 | Event, service | Augmentation in the owner's folder | Bus, service table, test API | |
@@ -613,7 +614,7 @@ A game adds its own domain systems (for example an economy or a world model) wit
 - **STD-TST-4.** Verifiers MUST read simulation state through the typed test API (`window.engine`), not by scraping the DOM. UI geometry and accessibility checks follow STD-TST-16. [ADR 0026]
 - **STD-TST-6.** Features expose state for tests through registered probes, read on demand.
 - **STD-TST-7.** Serialised state MUST NOT be written into DOM attributes anywhere. [ADR 0026]
-- **STD-TST-8.** Test browsers MUST be isolated and muted, and MUST NOT change the user's system or application audio.
+- **STD-TST-8.** Test browsers MUST be isolated and muted, and MUST NOT change the user's system or application audio. Audio evidence MAY render with `OfflineAudioContext`, which renders into memory and never reaches a device, inside the muted test browser; it MUST NOT create a real-time `AudioContext`.
 - **STD-TST-9.** Content validation MUST run every registry's validation from the frozen boot, so a mistake names its row. New registries are covered without editing the test.
 - **STD-TST-12.** Save changes pass the fixture chain, the export round-trip and the reset-prefix test.
 - **STD-TST-13.** A cache, key or gate mechanism MUST be tested by mutation: a test deliberately omits an input and checks that it is caught. [ADR 0046]

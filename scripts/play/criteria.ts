@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { gameDir, ROOT } from '../lib/game-dir.mjs';
+import { npmCommand, toolCommand } from '../lib/tool.mjs';
 import { loadGame } from '../../src/app/game-files';
 
 export interface CriterionResult { id: string; check: string; how: string; status: 'pass' | 'fail' | 'not run' | 'ask the author'; detail: string }
@@ -21,7 +22,8 @@ export async function checkCriteria(o: { gate?: boolean; dir?: string } = {}): P
     for (const c of brief.success) {
       const row: CriterionResult = { id: c.id, check: c.check, how: c.how, status: 'not run', detail: '' };
       if (c.how === 'test' && c.by) {
-        const r = spawnSync('npx', ['tsx', '--test', '--test-name-pattern', `^${c.id}\\b`, join(gameRoot, c.by)], { cwd: ROOT, encoding: 'utf8' });
+        const t = toolCommand('tsx', ['--test', '--test-name-pattern', `^${c.id}\\b`, join(gameRoot, c.by)]);
+        const r = spawnSync(t.command, t.args, { cwd: ROOT, encoding: 'utf8', shell: t.shell });
         const ran = /# pass (\d+)/.exec(r.stdout)?.[1];
         row.status = r.status === 0 ? 'pass' : 'fail';
         row.detail = r.status === 0 ? `${c.by}: ${ran ?? '?'} test(s) named ${c.id}` : `${c.by}: ${(r.stdout + r.stderr).split('\n').filter(l => /not ok|error:|expected|actual/.test(l)).slice(0, 4).join(' | ')}`;
@@ -34,7 +36,7 @@ export async function checkCriteria(o: { gate?: boolean; dir?: string } = {}): P
         row.status = r.pass ? 'pass' : 'fail';
         row.detail = `${c.by}: ${r.steps.filter((s: { step: { expect?: unknown } }) => s.step.expect).length} expectation(s); evidence playtest/latest/${script.name}/`;
       } else if (c.how === 'gate') {
-        if (o.gate) { gate ??= spawnSync('npm', ['run', '-s', 'gate'], { cwd: ROOT, stdio: 'ignore', env: { ...process.env, GAME_DIR: relative(ROOT, dir) } }).status === 0; row.status = gate ? 'pass' : 'fail'; row.detail = 'npm run gate'; }
+        if (o.gate) { const n = npmCommand(['run', '-s', 'gate']); gate ??= spawnSync(n.command, n.args, { cwd: ROOT, stdio: 'ignore', shell: n.shell, env: { ...process.env, GAME_DIR: relative(ROOT, dir) } }).status === 0; row.status = gate ? 'pass' : 'fail'; row.detail = 'npm run gate'; }
         else row.detail = 'run with --gate (or npm run gate)';
       } else { row.status = 'ask the author'; row.detail = 'a person judges this one'; }
       out.push(row);
@@ -44,7 +46,12 @@ export async function checkCriteria(o: { gate?: boolean; dir?: string } = {}): P
 }
 
 if (process.argv[1]?.endsWith('criteria.ts')) {
-  const rows = await checkCriteria({ gate: process.argv.includes('--gate') });
+  const rows = await checkCriteria({ gate: process.argv.includes('--gate') }).catch((error: { code?: string; message?: string }) => {
+    // A missing test browser is one actionable line (scripts/perf/bench-browser.mjs), not a stack.
+    if (error?.code !== 'ENGINE_NO_BROWSER') throw error;
+    console.error(error.message);
+    process.exit(1);
+  });
   const dir = join(ROOT, 'playtest', 'latest');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'criteria.json'), JSON.stringify({ when: new Date().toISOString(), game: relative(ROOT, gameDir()), criteria: rows }, null, 2) + '\n');

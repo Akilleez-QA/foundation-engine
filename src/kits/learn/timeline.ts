@@ -18,6 +18,7 @@ export interface TimelineState {
   pointer: string | null;
   spotlight: string | null;
   camera: { yaw?: number; pitch?: number; distance?: number } | null;
+  /** The objectives card is up: from an `objectives` action until the learner passes the next gate after it. */
   objectives: boolean;
   waiting: Extract<Action, { do: 'wait-for' }> | null;
   done: boolean;
@@ -105,6 +106,8 @@ export class TimelinePlayer {
       switch (a.do) {
         case 'say': caption = { who: a.who, text: this.o.text?.(a.text) ?? a.text }; break;
         case 'objectives': objectives = true; break;
+        // Passing a gate after the objectives puts the card away; it never comes back over later drawings.
+        case 'wait-for': if (s.gate?.satisfied) objectives = false; break;
         case 'draw': case 'write': Object.assign(item(a.target), { visible: true, progress: p }); break;
         case 'reveal': Object.assign(item(a.target), { visible: true, progress: 1 }); break;
         case 'hide': item(a.target).visible = false; break;

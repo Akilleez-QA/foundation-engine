@@ -151,7 +151,7 @@ export function directionalBlock(chunk:string):{start:number;end:number;text:str
  const loopEnd=chunk.indexOf('#pragma unroll_loop_end',start);if(loopEnd<0)return null;
  const endif=chunk.indexOf('#endif',loopEnd);if(endif<0)return null;
  const end=endif+'#endif'.length,text=chunk.slice(start,end);
- // The pinned r183 block: one unrolled loop over the directional lights with three's getShadow call.
+ // The pinned r186 block (unchanged since r183): one unrolled loop over the directional lights with three's getShadow call.
  if(!text.includes('getShadow( directionalShadowMap[ i ]')||!text.includes('for ( int i = 0; i < NUM_DIR_LIGHTS; i ++ )'))return null;
  return {start,end,text};
 }

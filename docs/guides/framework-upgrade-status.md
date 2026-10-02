@@ -563,3 +563,34 @@ populations, not a visibility, steering or replication policy. Status: implement
 candidate (PR #23); not integrated. Evidence is focused unit tests
 and a headless 1,000/10,000-entry CPU micro-benchmark; no template consumer, browser,
 worker or physical-device evidence, and no budget change.
+
+## Seeded generation — GEN-01 implemented, candidate
+
+GEN-01 adds integer-only hierarchical seed derivation (`deriveSeed`, beside the single
+mulberry32 generator in `src/core/rng.ts`) and an optional `procgen` kit. The kit runs
+creator-registered slice generators over bounded `Uint16Array` cell grids on the
+existing WorkerHost, ships one example row (`job.kits.procgen.cellular`) and provides
+a strict root-seed save section. It adds no scheduler, registry or publication owner;
+results never publish themselves. Status: implemented, candidate (PR,
+`feat/genre-sandbox-slice1`); not integrated. Evidence is focused unit tests plus one
+desktop Chromium worker check. Chunk residency, runtime edit deltas, meshing and
+edited-world persistence remain separate work. See the
+[kit](../../src/kits/procgen/README.md) and the [ledger](upgrade-acceptance-ledger.md).
+
+## Spatial audio voices (AUD-01) — candidate, not integrated
+
+| ID | Contract | State |
+|---|---|---|
+| AUD-01 | Platform audio output, per voice: `panning` (`'equalpower'` default \| `'HRTF'`), `distanceModel` (`'inverse'` default \| `'linear'` \| `'exponential'`) with bounded `refDistance`/`maxDistance`/`rolloffFactor`, a model-independent `cutoffDistance` (refused start, faded silence beyond), a separate HRTF voice limit with equal-power fallback and diagnostics, an optional smoothed low-pass/gain filter stage, and smoothed position/listener ramps. Creator control through `defineGame({ audio })` (HRTF limit per quality preset, smoothing, optional `sound.headphone-3d` setting). The mechanics template's ineffective `maxDistance: 60` became `cutoffDistance: 60`. [Guide](spatial-audio.md) | Implemented, candidate (public PR #28). Node unit and boot tests plus `npm run test:audio-browser` (real output rendering into `OfflineAudioContext` in the muted Chromium test browser) pass on the branch. Not integrated. Proves configuration and rendered signal behaviour only: no human localisation trials, no Firefox/WebKit rendering, no device CPU/battery/latency measurement, no iOS evidence. No occlusion queries, propagation, networking or sampled sound. |
+
+## Developer-experience checks (DX-01) — candidate, not integrated
+
+| ID | Contract | State |
+|---|---|---|
+| DX-01 | Boot input check and generator: [`src/author/input-registry.ts`](../../src/author/input-registry.ts) rebuilds the boot's `inputActions` table (engine rows, then game and kit inputs) with the registry's own options. `npm run check` (lint:brief) reports every problem; `npm run new -- input` picks bindings that table leaves free. Dev/test `engine.redraw()` ([`SceneHandle.redraw`](../../src/author/play.ts)) asks the running stock scene for one real draw, so `play:snap` judges budgets on rendered frames and reports `not measured` instead of a vacuous pass. [Recipe](../recipes/add-an-input-action.md) | Implemented, candidate (public PR #39); not integrated. Unit and lint regressions plus emulated `play:snap` runs on the branch. A dev/test boot throws on a clash; production drops the row with a warning. `engine.redraw()` covers the stock scene runtime only; the bench's idle windows are unchanged. Forced redraws can make a gate fail where it used to pass vacuously, and `not measured` exits 0. No device claim. |
+
+## Template polish semantics (DX-02) — candidate, not integrated
+
+| ID | Contract | State |
+|---|---|---|
+| DX-02 | Learn timeline objectives semantics: [`TimelinePlayer.state().objectives`](../../src/kits/learn/timeline.ts) is true from an `objectives` action until the learner passes the next gate after it, then stays false (it used to stay true for the whole scene, so the card returned over later drawings). The learn runtime shows the card from that flag on the first scene, outside interrupts. ui kit HUD lines and the prompt gain a readability plate ([README](../../src/kits/ui/README.md)). `play:script` gains `holdUntil`. | Implemented, candidate (public PR #40, stacked on #39); not integrated. Timeline unit test, learn `play:script` 9/9 and emulated snaps on the branch. Lessons that relied on the card returning at later gates would see it once; no stock lesson did. No device claim. |

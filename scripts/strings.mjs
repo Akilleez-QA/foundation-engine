@@ -18,10 +18,12 @@
  * The outputs are generated and not committed (ADR 0043). The Vite plugin in vite.config.ts runs this script at the
  * start of every build and dev server, so `npm run build`, the gate and the deploy guard always see current files.
  */
+import './lib/node-version.mjs';
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseMessage, messageVars } from '../src/core/i18n/format.ts';
+// Loaded after the Node version guard: a static `.ts` import would fail on older Node before the guard could run.
+const { parseMessage, messageVars } = await import('../src/core/i18n/format.ts');
 
 const DETAILED = '@detailed';
 

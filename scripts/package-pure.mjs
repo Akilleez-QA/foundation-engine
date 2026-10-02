@@ -7,6 +7,10 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, copyFileSync, rmSy
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { npmCommand } from './lib/tool.mjs';
+
+/** npm without a bare `npm` spawn (ENOENT on Windows; scripts/lib/tool.mjs). */
+const npm = (args, options) => { const c = npmCommand(args); return execFileSync(c.command, c.args, { ...options, shell: c.shell }); };
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const kits = ['inventory', 'resources', 'capabilities', 'equipment', 'housing', 'authoring'];
@@ -62,7 +66,7 @@ export function buildPurePackage(output = join(root, 'dist/pure')) {
     const sourceDigest = hash(JSON.stringify(inputs.map(path => [path, readFileSync(join(root, path), 'utf8')])));
     const dirty = execFileSync('git', ['status', '--porcelain', '--', ...inputs], { cwd: root, encoding: 'utf8' }).trim().length > 0;
     const version = `0.1.0-rev.${revision.slice(0, 12)}.source.${sourceDigest.slice(0, 16)}`;
-    const npmVersion = execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim();
+    const npmVersion = npm(['--version'], { encoding: 'utf8' }).trim();
     const metadata = { schema: 1, revision, sourceDigest, dirty, compiler: ts.version, npm: npmVersion, sourceFiles };
     const manifest = {
       name: '@foundation-engine/pure', version, private: true, type: 'module', license: 'GPL-3.0-only',
@@ -75,7 +79,7 @@ export function buildPurePackage(output = join(root, 'dist/pure')) {
     writeFileSync(join(staging, 'metadata.json'), JSON.stringify(metadata, null, 2) + '\n');
     copyFileSync(join(root, 'LICENSE'), join(staging, 'LICENSE'));
     copyFileSync(join(root, 'docs/guides/pure-package.md'), join(staging, 'README.md'));
-    const packResult = JSON.parse(execFileSync('npm', ['pack', '--ignore-scripts', '--json'], { cwd: staging, encoding: 'utf8' }));
+    const packResult = JSON.parse(npm(['pack', '--ignore-scripts', '--json'], { cwd: staging, encoding: 'utf8' }));
     const packed = Array.isArray(packResult) ? packResult[0] : packResult[manifest.name];
     if (!packed?.filename || !packed.integrity) throw Error('Unrecognized npm pack receipt');
     const bytes = readFileSync(join(staging, packed.filename));

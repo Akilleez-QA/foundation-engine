@@ -92,7 +92,7 @@ export function createSession(ctx: SceneContext) {
         const hit = sweep([0, 1, previous], [6, 1, target.z], .15, [{ id: 'target', from: [4, 1, previous], to: [4, 1, target.z], radius: .45 }]);
         resolveAction({ id: 'probe-shot', target: 'target', amount: 1 }, { eligible: canProbe, hit: () => hit !== null, mitigate: n => n, commit: result => {
           if (!shots.resolve(result.id, ctx.time.t)) return false;
-          if (result.hit) { tags++; phase = 5; flashUntil = ctx.time.t + .5; ctx.playVoice('ui.success', { spatial: { position: hit!.point, refDistance: 4, maxDistance: 60, rolloffFactor: .5 } }); } return true;
+          if (result.hit) { tags++; phase = 5; flashUntil = ctx.time.t + .5; ctx.playVoice('ui.success', { spatial: { position: hit!.point, refDistance: 4, rolloffFactor: .5, cutoffDistance: 60 } }); } return true;
         } });
       }
       const tool = ctx.world.get(ctx.named('probe')!, Transform)!, player = ctx.world.get(ctx.named('player')!, Transform)!;

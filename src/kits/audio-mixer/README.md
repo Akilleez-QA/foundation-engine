@@ -18,4 +18,4 @@ cleanup before reporting collected failures as an `AggregateError`.
 
 Platform `AudioOutput.playVoice(id, { variant?, gain?, onEnded? })` returns a `CueVoice` with `ended`, `setGain()` and `stop()`, or null when skipped. Existing `play()` remains compatible. Natural completion and explicit stop both clean up connected nodes and notify once.
 
-Costs: O(maxLogical log maxLogical) per pump, O(maxLogical) retained records; O(active duck leases) gain recomputation, one gain node per playing cue. No draws or triangles. No spatial attenuation, room occlusion, streaming music, fades or new audio backend is claimed.
+Costs: O(maxLogical log maxLogical) per pump, O(maxLogical) retained records; O(active duck leases) gain recomputation, one gain node per playing cue. No draws or triangles. No spatial attenuation, room occlusion, streaming music, fades or new audio backend is claimed. The platform output now has spatial voices (panning and distance models, cutoff, HRTF limit, filter stage; see docs/guides/spatial-audio.md), but `CueRequest` cannot carry `spatial` or `filter` yet, so mixer voices remain 2D.

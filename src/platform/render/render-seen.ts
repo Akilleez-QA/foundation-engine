@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {updateWorldMatrixFromRoot} from './world-matrix';
 
 /**
  * Whether a mesh was actually drawn since the last check: three calls onBeforeRender only for
@@ -23,7 +24,7 @@ export function renderedSince(mesh:T.Object3D,within=Infinity){
  */
 export function motionBounds(parts:readonly T.Object3D[],pivot:T.Vector3,slack=0){
  const box=new T.Box3(),corner=new T.Vector3();let radius=0,top=0;
- for(const part of parts){part.updateWorldMatrix(true,true);box.setFromObject(part);if(box.isEmpty())continue;top=Math.max(top,box.max.y-Math.min(0,box.min.y));
+ for(const part of parts){updateWorldMatrixFromRoot(part,true);box.setFromObject(part);if(box.isEmpty())continue;top=Math.max(top,box.max.y-Math.min(0,box.min.y));
   for(let i=0;i<8;i++)radius=Math.max(radius,pivot.distanceTo(corner.set(i&1?box.max.x:box.min.x,i&2?box.max.y:box.min.y,i&4?box.max.z:box.min.z)));}
  return new T.Sphere(pivot.clone(),radius+slack+top);
 }

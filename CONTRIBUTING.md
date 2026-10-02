@@ -6,14 +6,14 @@ Read [AGENTS.md](AGENTS.md), [the architecture standard](docs/STANDARD.md), and 
 
 ## Set up
 
-Use Node.js 22 or later, npm, and Git. CI currently uses Node.js 22. In a checkout:
+Use Node.js 22.18 or later (`.nvmrc` / `.node-version` pin the Node 22 line), npm, and Git. CI currently uses Node.js 22. In a checkout:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Without a `game/` folder, the blank template runs. Set `GAME_DIR=templates/terrain/game` (or another template's game folder) to select a diagnostic consumer. Shell examples use POSIX environment-variable syntax; on other shells, set the variable using that shell's syntax.
+Without a `game/` folder, the blank template runs. Pass `--game templates/terrain/game` (for example `npm run play -- --game templates/terrain/game`; works on every shell) or set `GAME_DIR=templates/terrain/game` to select a diagnostic consumer. Shell examples use POSIX environment-variable syntax; in PowerShell use `$env:GAME_DIR="templates/terrain/game"; npm run …`, in cmd.exe `set GAME_DIR=templates/terrain/game&& npm run …`. The `test:*-browser` scripts assume bash (CI); on Windows run them from WSL or Git Bash.
 
 Browser checks require Chromium. Install the matching browser with:
 
@@ -21,7 +21,7 @@ Browser checks require Chromium. Install the matching browser with:
 npx playwright-core install chromium
 ```
 
-Linux CI may also need browser system dependencies (`npx playwright-core install --with-deps chromium`). The harness accepts `ENGINE_CHROMIUM` as an executable path, then tries Playwright's installed browser and `/usr/bin/chromium`. Test browsers are isolated and muted; do not change system audio or use a personal browser profile for automation.
+Linux CI may also need browser system dependencies (`npx playwright-core install --with-deps chromium`). The harness accepts `ENGINE_CHROMIUM` as an executable path, then tries Playwright's installed browser, then an installed Chrome or Chromium in its usual folder for the OS (`ENGINE_CHROMIUM_SYSTEM=0` skips those); without one it stops with the install command. Test browsers are isolated and muted; do not change system audio or use a personal browser profile for automation.
 
 ## Propose a change
 

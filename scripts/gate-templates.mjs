@@ -5,6 +5,7 @@ import {spawnSync} from 'node:child_process';
 import {existsSync, readdirSync} from 'node:fs';
 import {join} from 'node:path';
 import {ROOT} from './lib/game-dir.mjs';
+import {npmCommand} from './lib/tool.mjs';
 
 const only = process.argv.slice(2);
 const names = readdirSync(join(ROOT, 'templates')).filter(n => existsSync(join(ROOT, 'templates', n, 'game', 'game.ts')) && (!only.length || only.includes(n)));
@@ -12,7 +13,8 @@ const results = [];
 for (const name of names) {
   const t0 = Date.now();
   console.log(`\n=== gate: template ${name} ===`);
-  const r = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', '-s', 'gate'], {cwd: ROOT, stdio: 'inherit', env: {...process.env, GAME_DIR: `templates/${name}/game`}});
+  const npm = npmCommand(['run', '-s', 'gate']);
+  const r = spawnSync(npm.command, npm.args, {cwd: ROOT, stdio: 'inherit', shell: npm.shell, env: {...process.env, GAME_DIR: `templates/${name}/game`}});
   results.push({name, ok: r.status === 0, s: Math.round((Date.now() - t0) / 1000)});
   if (r.status !== 0) break;
 }

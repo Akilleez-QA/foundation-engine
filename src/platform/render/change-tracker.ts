@@ -14,8 +14,9 @@ import {isStillSafe} from './still-safe';
  * Each scan writes every observed render input into a flat numeric signature and compares it, value by value, with
  * the signature of the last due scan. There is no hashing (so no collisions) and no dirty flag: a change is seen
  * because its input differs. Anything the scan cannot observe (an application-authored render hook, a video or
- * render-target texture, a bone outside the scanned graph, a batch whose private state is missing) **forces** the
- * scan due, so a missed change costs a frame and never freezes the picture. No object type forces by itself.
+ * render-target texture, a bone outside the scanned graph, a batch whose private state is missing, a shadow fitted to
+ * the view camera the shadow scan does not read) **forces** the scan due, so a missed change costs a frame and never
+ * freezes the picture. No object type forces by itself: each force names the unobservable input.
  *
  * Batches and skeletons are followed through their full dependency closure regardless of node visibility:
  * a batch's matrix/colour texture versions, ordered instance state and geometry ranges; a skinned mesh's ordered
@@ -38,7 +39,7 @@ import {isStillSafe} from './still-safe';
  * - flags, layer masks, child counts and material ids are packed exactly into shared values;
  * - the depth signature holds shadow lights and casters only (a node that draws no depth acts through them).
  *
- * Private engine state is read only through the adapter below (`readBatchState`), pinned to three 0.183 by the
+ * Private engine state is read only through the adapter below (`readBatchState`), pinned to three 0.186 by the
  * contract test in `change-tracker.test.ts`. Call a scan after simulation and animation, before deciding to skip;
  * the shadow scan additionally expects world matrices to be current (call it after `updateMatrixWorld`, e.g. from
  * `scene.onBeforeRender`). The shadow scheduler (shadows.ts) is its user.
@@ -76,7 +77,7 @@ const PACK_CHILDREN=2**36;
 // ---------------------------------------------------------------------------------------------------------------
 // Pinned adapter: the only scene that reads three's private BatchedMesh state.
 
-/** The private BatchedMesh fields the trackers observe (three 0.183). */
+/** The private BatchedMesh fields the trackers observe (three 0.186). */
 export type BatchState={
  readonly matrices:T.DataTexture;
  readonly colors:T.DataTexture|null;
@@ -305,7 +306,7 @@ export function observeValue(obs:Observer,v:unknown,depth=0):void{
  if(typeof v==='number'){obs.push(1);obs.push(v);return;}
  if(typeof v==='boolean'){obs.push(1);obs.push(v?1:0);return;}
  if(v===null||typeof v!=='object'){obs.push(0);return;}
- const x=v as T.Vector4&T.Color&T.Euler&T.Plane&T.Matrix4&T.Texture&{isVector2?:boolean;isVector3?:boolean;isVector4?:boolean;isQuaternion?:boolean;isMatrix3?:boolean};
+ const x=v as T.Vector4&T.Color&T.Euler&T.Plane&T.Matrix4&T.Texture&{isVector2?:boolean;isVector3?:boolean;isVector4?:boolean;isQuaternion?:boolean;isMatrix3?:boolean;isMatrix4?:boolean};
  if(x.isColor){obs.push(3);obs.push(x.r);obs.push(x.g);obs.push(x.b);}
  else if(x.isTexture){obs.push(4);obs.texture(x);}
  else if(x.isVector2){obs.push(5);obs.push(x.x);obs.push(x.y);}
@@ -564,6 +565,16 @@ export function createColourTracker(){
   if(!batched&&o.onBeforeRender!==objectRenderHook&&!safe(o.onBeforeRender))obs.force('object render hook');
   drawable(o,root,batched);
   if((o as T.Light).isLight)light(o as T.Light);
+  // A light probe grid (three r186 `LightProbeGridWebGL`, not a Light) lights every lit material whose world position
+  // falls in its box: its baked atlas, box and resolution are inputs. The atlas is a render-target texture (rebaked by
+  // rendering, which nothing in the scene announces), so it forces unless marked still-safe.
+  const grid=o as T.Object3D&{isLightProbeGrid?:boolean;texture?:T.Texture|null;boundingBox?:T.Box3;resolution?:T.Vector3};
+  if(grid.isLightProbeGrid){
+   obs.push(-2);obs.texture(grid.texture);
+   const b=grid.boundingBox,res=grid.resolution;
+   if(b&&res){obs.push(b.min.x);obs.push(b.min.y);obs.push(b.min.z);obs.push(b.max.x);obs.push(b.max.y);obs.push(b.max.z);obs.push(res.x);obs.push(res.y);obs.push(res.z);}
+   else obs.force('light probe grid state unreadable');
+  }
   // A LOD picks its visible level from the camera distance while rendering: its levels are inputs.
   const lod=o as T.LOD;if(lod.isLOD){obs.push(lod.autoUpdate?1:0);obs.push(lod.levels.length);for(const x of lod.levels){obs.push(x.distance);obs.push(x.hysteresis);obs.push(x.object.id);}}
   for(let i=0;i<n;i++)visit(children[i],o,root,mask);
@@ -641,7 +652,7 @@ function depthMaterialBody(obs:Observer,m:T.Material){
  const r=obs.rec;let k=obs.room(6);r[k++]=m.visible?1:0;r[k++]=m.side;r[k++]=m.shadowSide??-1;r[k++]=x.wireframe?1:0;r[k++]=m.alphaTest;r[k++]=m.alphaToCoverage?1:0;obs.k=k;
  // The depth pass reads colour and alpha maps only to discard (alphaTest, alphaHash): without either, a map's upload
  // or swap changes no depth, and a late texture must not redraw every shadow map.
- // r183 approximates alpha-to-coverage with alphaTest=.5 in the depth pass.
+ // r186 (as r183) approximates alpha-to-coverage with alphaTest=.5 in the depth pass.
  const discards=m.alphaTest>0||m.alphaHash===true||m.alphaToCoverage===true;obs.push(m.alphaHash?1:0);
  if(discards){obs.texture(x.alphaMap);obs.texture(x.map);}
  obs.texture(x.displacementMap);obs.push(x.displacementScale??0);obs.push(x.displacementBias??0);
@@ -713,7 +724,12 @@ export function createShadowTracker(){
  function visitAny(o:T.Object3D,root:T.Object3D,mask:number,vsm:boolean){
   if(!o.visible)return;
   const l=o as T.DirectionalLight;
-  if(l.isLight&&l.castShadow&&l.shadow)observeShadowLight(obs,l);
+  if(l.isLight&&l.castShadow&&l.shadow){
+   observeShadowLight(obs,l);
+   // A three r186 `SunLight` fits its cascades to the view camera inside the depth pass (`updateMatrices(light,
+   // camera)`); this scan does not read the camera, so its maps are an unobservable input.
+   if((l as T.Light&{isSunLight?:boolean}).isSunLight)obs.force('camera-fitted shadow cascades');
+  }
   const m=o as T.Mesh;
   if((m.isMesh||(o as T.Line).isLine||(o as T.Points).isPoints)&&(m.castShadow||vsm&&m.receiveShadow)&&(o.layers.mask&mask)!==0)observeCaster(obs,m,root);
   const children=o.children,n=children.length;for(let i=0;i<n;i++)visit(children[i],root,mask,vsm);

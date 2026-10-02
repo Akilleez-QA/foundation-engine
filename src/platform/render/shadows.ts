@@ -194,7 +194,7 @@ export function scheduleShadows(renderer:T.WebGLRenderer,o:ScheduleOptions={}):S
  const restored=new AbortController(),canvas=renderer.domElement as Partial<HTMLCanvasElement>|undefined;
  canvas?.addEventListener?.('webglcontextlost',()=>{gpu.contextLost();},{signal:restored.signal});
  canvas?.addEventListener?.('webglcontextrestored',()=>{
-  // r183 replaces the WebGLShadowMap object in initGLContext. Rebind the same
+  // r186 (as r183) replaces the WebGLShadowMap object in initGLContext. Rebind the same
   // scheduler/ownership state to its new pass before the first restored render.
   if(renderer.shadowMap!==map){
    const technique=techniques.get(map)!;schedulers.delete(map);techniques.delete(map);map.render=original;

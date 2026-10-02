@@ -5,6 +5,7 @@
 //   - the first-load JS budget is within the brief's firstLoadKiB;
 //   - every success criterion has a checkable `by` file that exists, and GAME.md mirrors every criterion id;
 //   - quality views, modes and a template's genre agree with the game;
+//   - the input bindings pass the boot's inputActions validation (no overlap with the engine's or each other's rows);
 //   - learn mode: every lesson meets the pedagogy rules (lessonProblems) with the brief's maxPassiveActions and ages.
 import { existsSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -12,6 +13,7 @@ import { gameDirs, ROOT } from './layers.mjs';
 import { loadGame } from '../../src/app/game-files';
 import type { SceneDefinition } from '../../src/author/defs';
 import { lessonProblems, type LessonInput } from '../../src/kits/learn/lesson';
+import { gameInputProblems } from '../../src/author/input-registry';
 
 export interface BriefProblem { game: string; problem: string }
 type Loaded = Awaited<ReturnType<typeof loadGame>>;
@@ -65,6 +67,9 @@ export async function checkGame(dir: string): Promise<string[]> {
   const template = /[\\/]templates[\\/]([^\\/]+)[\\/]game$/.exec(dir)?.[1];
   if (template && brief.genre !== template) out.push(`the template '${template}' has genre '${brief.genre}'`);
   if (!scenes.includes(game.firstScene)) out.push(`the first scene '${game.firstScene}' does not exist`);
+  // The boot's inputActions validation (engine rows + game and kit inputs): a dev/test boot throws on it; production
+  // drops the row with a warning, so the action silently does not work.
+  for (const p of gameInputProblems(game, defs)) out.push(`input bindings would stop the dev/test boot (production drops the row): ${p} (give the game's defineInput another key or pad button)`);
   // Learn mode: every lesson meets the pedagogy rules with the brief's numbers (AGENTS.md, "Teaching").
   const strings = { ...Object.assign({}, ...(game.kits ?? []).map(k => k.strings?.en ?? {})), ...game.strings?.en };
   for (const d of defs) {

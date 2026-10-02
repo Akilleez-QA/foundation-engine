@@ -29,7 +29,7 @@ function scene(technique:ShadowTechnique='reference'){
 }
 
 test('the chunks are patched once, gated, and keep three\'s directional block for every other program',()=>{
- const block=directionalBlock(ORIGINAL_LIGHTS);assert.ok(block,'the pinned three r183 directional block is found');
+ const block=directionalBlock(ORIGINAL_LIGHTS);assert.ok(block,'the pinned three r186 directional block is found');
  assert.equal(installCascadeChunks(),true);assert.equal(installCascadeChunks(),true);
  const lights=T.ShaderChunk.lights_fragment_begin;
  assert.equal(lights.split(block.text).length-1,2,'the original block stays as the fallback branch and the #else branch');

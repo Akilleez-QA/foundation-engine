@@ -22,7 +22,7 @@
 |---|---|---|
 | S1 | holding up moves the player away from the camera and the garden walls stop them | test: `game/garden.test.ts` |
 | S2 | standing by the bench shows its prompt and using it counts one of three things | test: `game/garden.test.ts` |
-| S3 | the shed door leads into the shed and its door back arrives beside the garden door | playtest: `playtest/door.json` |
+| S3 | the shed door leads into the shed and its door back arrives beside the garden door | playtest: `game/playtest/door.json` |
 | S4 | using all three things shows the found-everything banner, and it stays after a reload | test: `game/garden.test.ts` |
 | S5 | both scenes stay inside their budgets.json counts on the gate | gate |
 
@@ -34,7 +34,7 @@
 | `game/garden.ts` | the garden: hedges (`Solid`), the shed and its door, the bench, the lamp and the `lamp-switch` system |
 | `game/shed.ts` | the shed: the crate and the door back |
 | `game/world.ts` | the player prefab, the list of things to find, the shared systems (move, interact, orbit camera, HUD) |
-| `playtest/door.json` | S3 in a real browser: through the door and back |
+| `game/playtest/door.json` | S3 in a real browser: through the door and back |
 
 Controls: WASD or arrows, the left stick or d-pad; on touch or with a mouse, hold where you want to go. Use things with E, Enter, Space, pad A or a tap.
 
@@ -49,3 +49,5 @@ Controls: WASD or arrows, the left stick or d-pad; on touch or with a mouse, hol
 | Date | Change | Budgets |
 |---|---|---|
 | 2026-09-28 | Template created | `garden` and `shed` measured on software GL |
+| 2026-10-02 | The scripted playtest moved into the game folder (`game/playtest/`), so `npm run new-game` copies it with the game instead of into the engine's root `playtest/`; the success criterion's `by` names the new path. Same script, same check. | Unchanged |
+| 2026-10-02 | Polish (ui kit): HUD lines and the use prompt sit on a translucent dark plate, so "Found 0 of 3" stays readable over the light sky on a phone. Evidence: emulated SwiftShader play:snap at 1280×800 and 390×844, screenshots inspected; physical devices unverified. | Unchanged |

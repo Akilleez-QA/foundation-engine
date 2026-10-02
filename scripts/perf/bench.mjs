@@ -182,7 +182,7 @@ export function writeRun(run, path = defaultRunPath(run)) { mkdirSync(join(path,
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const o = parseArgs(process.argv.slice(2));
-  const run = await runBench(o);
+  const run = await runBench(o).catch(async error => { if ((await import('./bench-browser.mjs')).reportBrowserError(error)) process.exit(1); throw error; });
   const path = writeRun(run, o.out);
   console.log('PerfRun →', path, `(${run.samples.length} samples, ${run.samples.filter(s => s.error).length} rejected)`);
   if (o.check) {

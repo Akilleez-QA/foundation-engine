@@ -6,15 +6,15 @@
   "description": "Foundation Engine: a genre-neutral TypeScript and Three.js engine for browser games.",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   },
   "scripts": {
-    "dev": "node scripts/generate.mjs && vite --host 127.0.0.1",
+    "dev": "node scripts/generate.mjs && vite",
     "build": "node scripts/generate.mjs && tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1",
+    "preview": "vite preview",
     "generate": "node scripts/generate.mjs",
     "typecheck": "node scripts/generate.mjs && tsc --noEmit",
-    "test": "node scripts/generate.mjs && tsx --test 'src/**/*.test.ts' 'game/**/*.test.ts' 'templates/*/game/**/*.test.ts' 'scripts/**/*.test.mjs' 'scripts/**/*.test.ts' 'tools/**/*.test.mjs'",
+    "test": "node scripts/generate.mjs && tsx --test \"src/**/*.test.ts\" \"game/**/*.test.ts\" \"templates/*/game/**/*.test.ts\" \"scripts/**/*.test.mjs\" \"scripts/**/*.test.ts\" \"tools/**/*.test.mjs\"",
     "lint": "npm run --silent lint:layers && npm run --silent lint:arch && npm run --silent lint:css && npm run --silent lint:generic && npm run --silent lint:brief && npm run --silent lint:budgets",
     "lint:layers": "node scripts/lint/layers.mjs",
     "lint:arch": "node scripts/lint/architecture.mjs",
@@ -47,7 +47,7 @@
     "test:capture-browser": "GAME_DIR=templates/blank/game node scripts/generate.mjs && GAME_DIR=templates/blank/game node -r ./scripts/silent-browser.cjs scripts/play/capture-matrix-check.mjs playtest/ui/capture-matrix",
     "test:authoring-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/authoring-check.mjs playtest/authoring",
     "test:appearance-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/appearance-check.mjs playtest/appearance",
-    "test:framework-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/terrain-worker-check.mjs playtest/framework/terrain-worker && node -r ./scripts/silent-browser.cjs scripts/play/terrain-regions-check.mjs playtest/framework/terrain-regions && node -r ./scripts/silent-browser.cjs scripts/play/model-inspect-check.mjs playtest/framework/model-inspect && node -r ./scripts/silent-browser.cjs scripts/play/route-dependencies-check.mjs playtest/framework/route-dependencies",
+    "test:framework-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/terrain-worker-check.mjs playtest/framework/terrain-worker && node -r ./scripts/silent-browser.cjs scripts/play/terrain-regions-check.mjs playtest/framework/terrain-regions && node -r ./scripts/silent-browser.cjs scripts/play/model-inspect-check.mjs playtest/framework/model-inspect && node -r ./scripts/silent-browser.cjs scripts/play/route-dependencies-check.mjs playtest/framework/route-dependencies && node -r ./scripts/silent-browser.cjs scripts/play/procgen-worker-check.mjs playtest/framework/procgen-worker",
     "package:pure": "node scripts/package-pure.mjs",
     "test:stage-journal-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/stage-journal-check.mjs playtest/stage-journal",
     "test:model-preview-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/model-preview-check.mjs playtest/model-preview",
@@ -63,16 +63,17 @@
     "test:replication-workbench-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/replication-workbench-check.mjs playtest/replication-workbench",
     "test:authority-workbench-browser": "node scripts/generate.mjs && node --import tsx -r ./scripts/silent-browser.cjs scripts/play/authority-workbench-check.mjs playtest/authority-workbench",
     "test:replication-load": "node --import tsx tools/replication-workbench/load.mjs",
+    "test:audio-browser": "node -r ./scripts/silent-browser.cjs scripts/play/spatial-audio-check.mjs playtest/audio/spatial",
     "test:replay-browser": "GAME_DIR=templates/arcade/game node scripts/generate.mjs && GAME_DIR=templates/arcade/game node --import tsx -r ./scripts/silent-browser.cjs scripts/play/replay-check.mjs playtest/replay",
     "faults:network": "node --disable-warning=ExperimentalWarning --import tsx tools/authority-workbench/fault-harness.mjs",
     "bench:spatial": "node --import tsx tools/spatial-bench/bench.mjs"
   },
   "dependencies": {
-    "three": "^0.183.0"
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@types/node": "^22.20.3",
-    "@types/three": "^0.183.0",
+    "@types/three": "^0.186.0",
     "playwright-core": "1.56.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",

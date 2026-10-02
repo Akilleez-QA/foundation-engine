@@ -8,7 +8,7 @@
 | | |
 |---|---|
 | **Goal** | A short interactive lesson that explains why we have day and night. |
-| **Pitch** | A teacher and a classmate at a chalkboard, then a spinning Earth you turn yourself, then three questions. |
+| **Pitch** | A chalkboard drawn step by step while a teacher and a classmate speak in named captions (no drawn characters), then a spinning Earth you turn yourself, then three questions. |
 | **Audience** | Ages 8–11 (`kids: true`); policy `kid-safe` ([KID-SAFE](../../docs/policy/KID-SAFE.md)) |
 | **Genre** | learn |
 | **Core loop** | watch and listen to a short board step → answer or try something → kind feedback or a hint → next step |
@@ -25,7 +25,7 @@
 | S1 | every objective is taught by a scene and checked by a question or the sim, and no scene has more than three passive steps in a row | test: `game/day-night.test.ts` |
 | S2 | turning the Earth past half a turn in the sim puts the marker in night and meets the second objective | test: `game/day-night.test.ts` |
 | S3 | a wrong quiz answer gets kind feedback and a hint before the answer is ever shown | test: `game/day-night.test.ts` |
-| S4 | the lesson plays from the first board to the end of the quiz in a browser with keys only | playtest: `playtest/lesson.json` |
+| S4 | the lesson plays from the first board to the end of the quiz in a browser with keys only | playtest: `game/playtest/lesson.json` |
 | S5 | the lesson scene stays inside its budgets.json counts, and the learn runtime is not in the first-load bundle | gate |
 
 ## The lesson
@@ -50,7 +50,7 @@ Controls: Next (Enter, Space, N, pad A, the Next button), Back (B), Show again (
 | `game/day-night.body.mts` | the sim's 3D parts and the `spin-earth` system (lazy, with the lesson) |
 | `game/strings.en.json` | every word of the lesson |
 | `game/learn-mode.ts` | the `learn` mode (kid-safe) |
-| `playtest/lesson.json` | S4 in a real browser |
+| `game/playtest/lesson.json` | S4 in a real browser |
 
 ## Milestones
 
@@ -63,3 +63,6 @@ Controls: Next (Enter, Space, N, pad A, the Next button), Back (B), Show again (
 | Date | Change | Budgets |
 |---|---|---|
 | 2026-09-28 | Template created | `day-night` measured on software GL |
+| 2026-10-02 | The scripted playtest moved into the game folder (`game/playtest/`), so `npm run new-game` copies it with the game instead of into the engine's root `playtest/`; the success criterion's `by` names the new path. Same script, same check. | Unchanged |
+| 2026-10-02 | Polish: the objectives card shows from the start until the first Next and never returns over the board's drawings (it used to reappear over the Sun at every Next gate of step 1); the pitch now says the teacher and classmate speak in named captions (no figures are drawn); the scripted playtest waits for each press to take effect, so `02-sun-drawn` shows the Sun, and holds `]` until the objective is met instead of for a fixed time. Brief: pitch wording only. Evidence: emulated SwiftShader play:script/play:snap at 1280×800 and 390×844, screenshots inspected; tablet and physical devices unverified. | Unchanged |
+| 2026-10-02 | ui kit HUD plate: any HUD line or prompt the ui kit shows over the sim sits on a translucent dark plate (the lesson's own board, caption and controls are unchanged). Evidence: emulated only; physical devices unverified. | Unchanged |

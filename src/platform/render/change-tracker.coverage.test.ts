@@ -330,12 +330,13 @@ const textureExclusions:Record<string,string>={
  magFilter:'upload state (sampler parameters are set on upload)',minFilter:'upload state (sampler parameters are set on upload)',
  anisotropy:'upload state (sampler parameters are set on upload)',format:'upload state',internalFormat:'upload state',type:'upload state',
  generateMipmaps:'upload state',premultiplyAlpha:'upload state',flipY:'upload state',unpackAlignment:'upload state',colorSpace:'upload state (internal format)',
+ normalized:'upload state (r184+: selects the norm16 internal format on upload)',
  updateRanges:'partial-upload hint for the next version bump',onUpdate:'upload callback',
  renderTarget:'render-target textures force (proved in change-tracker.test.ts)',
  version:'proved as texture upload',image:'accessor over the source data: uploaded on a version bump',
 };
 const textureSpecial:Record<string,Mutation[]>={
- source:[{label:'source swap',change:h=>{h.source=new T.Source({data:new Uint8Array(4),width:1,height:1});}}],
+ source:[{label:'source swap',change:h=>{h.source=new T.TextureSource({data:new Uint8Array(4),width:1,height:1});}}],
  pmremVersion:[{label:'PMREM regeneration',change:h=>{(h as unknown as T.Texture).needsPMREMUpdate=true;}}],
  matrix:[{label:'manual uv matrix',prepare:h=>{h.matrixAutoUpdate=false;},change:h=>{(h.matrix as T.Matrix3).elements[6]=.5;}}],
  matrixAutoUpdate:[{label:'uv matrix mode',prepare:h=>{(h as unknown as T.Texture).offset.set(.5,0);},change:h=>{h.matrixAutoUpdate=false;}}],

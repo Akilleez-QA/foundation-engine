@@ -2,6 +2,13 @@
 
 A heads-up display over a scene: `hud(ctx).line(id, text)`, `hud(ctx).banner(text)` (announced politely) and `hud(ctx).prompt(text)`. Text should come from string keys (`ctx.text`). No draws; the DOM updates when text, importance or presentation changes. Tests read it with `hud(ctx).read()`.
 
+Readability: each inline line and the prompt sit on a translucent dark plate (`rgb(10 16 22 / 62%)`, rounded), so text
+stays readable over a light sky or a bright floor on any background; the banner keeps its text shadow. The banner and
+the prompt start `hidden` and are shown only while they have text, so no empty plate appears. Lines in the disclosed
+detail sheet use the sheet's own background, without plates. A game that wants a different look styles `.hud-lines
+[data-hud]`, `.hud-prompt` and `.hud-banner` itself. Evidence for the plates is emulated (SwiftShader, 1280×800 and
+390×844); physical-device contrast is unverified.
+
 ## Creator-selected viewport layouts
 
 Layout following is optional. Existing HUDs stay inline until `present(...)` or
