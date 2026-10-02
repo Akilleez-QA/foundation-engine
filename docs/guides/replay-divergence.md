@@ -8,7 +8,7 @@ agreeing with host reduction. It adds no runtime feature, clock, scheduler, stor
 or network path. A creator may use it in tests, in the dev/test build's test API,
 or not at all; a production build never contains the dev surface.
 
-State: implemented on branch `feat/sim01-replay-divergence`, candidate (public PR),
+State: implemented on branch `feat/sim01-replay-divergence`, candidate (public PR #17),
 not integrated. Evidence and limits are listed below.
 
 ## Seams reused
