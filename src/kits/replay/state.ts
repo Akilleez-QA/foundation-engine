@@ -55,7 +55,8 @@ function captureSelection(s: WorldSelection): Selection {
     resources: typeof r === 'boolean' ? r : Object.freeze([...r].sort()), count: s.count ?? false });
 }
 
-function selectionState(world: World, s: Selection): Record<string, unknown> {
+interface Counts { entities: number; components: Record<string, number> }
+function selectionState(world: World, s: Selection, counts?: (c: Counts) => void): Record<string, unknown> {
   const skip = new Set<number>();
   for (const x of s.exclude) for (const [e] of world.query(x)) skip.add(e);
   const rows = new Map<number, Record<string, unknown>>();
@@ -65,9 +66,14 @@ function selectionState(world: World, s: Selection): Record<string, unknown> {
     if (!row) rows.set(e, row = {});
     row[c.id] = value;
   }
+  if (counts) {
+    const components: Record<string, number> = Object.fromEntries(s.components.map(c => [c.id, 0]));
+    for (const row of rows.values()) for (const id of Object.keys(row)) components[id]++;
+    counts({ entities: rows.size, components });
+  }
   const out: Record<string, unknown> = { entities: [...rows].sort((a, b) => a[0] - b[0]) };
   if (s.resources === true) out.resources = world.resources;
-  else if (s.resources !== false) out.resources = Object.fromEntries(s.resources.filter(k => k in world.resources).map(k => [k, world.resources[k]]));
+  else if (s.resources !== false) out.resources = Object.fromEntries(s.resources.filter(k => Object.hasOwn(world.resources, k)).map(k => [k, world.resources[k]]));
   if (s.count) out.count = world.count;
   return out;
 }
@@ -94,11 +100,58 @@ export function replayDigest(selection: WorldSelection & { readonly id?: string 
   const s = captureSelection(selection);
   const id = selection.id ?? idOf(s);
   if (typeof id !== 'string' || !SCENE_REPLAY_DIGEST_ID.test(id)) throw Error('replay digest: id must be 1-128 of A-Za-z0-9._:,;=+-');
-  return Object.freeze({ id, state: (world: World) => selectionState(world, s) });
+  let last: Counts | null = null;
+  const digest: SceneReplayDigest = Object.freeze({ id, state: (world: World) => selectionState(world, s, c => { last = c; }) });
+  probes.set(digest, () => last);
+  return digest;
+}
+/** Selection digests and their last state call's counts (read synchronously right after a sample). */
+const probes = new WeakMap<SceneReplayDigest, () => Counts | null>();
+
+export interface DigestCoverage {
+  /** First sampled tick, or -1 before any sample. */
+  readonly firstTick: number;
+  readonly samples: number;
+  /** Listed (selected, not excluded) entities at the first sample. */
+  readonly entities: number;
+  /** Per selected component: listed entities that had it at the first sample. */
+  readonly components: Readonly<Record<string, number>>;
+  /**
+   * Selected components no listed entity had on any sample so far (a misspelt id, or a component the scene never
+   * uses). Their part of the digest is constant, so an `equal` says nothing about them.
+   */
+  readonly unmatched: readonly string[];
+}
+export interface DigestCoverageTracker {
+  /** Call right after a sample of this digest was taken (observeWorld's `sampled`). */
+  sampled(tick: number): void;
+  /** Null for a digest that is not a component selection (its coverage is the creator's). */
+  read(): DigestCoverage | null;
+}
+/** Coverage of a selection digest across one run's samples. O(selected components) per sample. */
+export function createDigestCoverage(digest: SceneReplayDigest | null): DigestCoverageTracker {
+  const probe = digest ? probes.get(digest) : undefined;
+  let first: (Counts & { tick: number }) | null = null, samples = 0;
+  const seen = new Set<string>(), all: string[] = [];
+  return {
+    sampled(tick) {
+      const c = probe?.();
+      if (!c) return;
+      if (!first) { first = { ...c, components: { ...c.components }, tick }; all.push(...Object.keys(c.components)); }
+      samples++;
+      for (const [id, n] of Object.entries(c.components)) if (n > 0) seen.add(id);
+    },
+    read() {
+      if (!probe) return null;
+      return Object.freeze({ firstTick: first?.tick ?? -1, samples, entities: first?.entities ?? 0,
+        components: Object.freeze({ ...first?.components }), unmatched: Object.freeze(all.filter(id => !seen.has(id))) });
+    },
+  };
 }
 
 /** A creator digest as given, or a selection turned into one. Throws on anything else. */
 export function toReplayDigest(input: ReplayDigestInput): SceneReplayDigest {
+  if (input && typeof input === 'object' && probes.has(input as SceneReplayDigest)) return input as SceneReplayDigest;
   if (input && typeof input === 'object' && 'state' in input) {
     const d = input as SceneReplayDigest;
     if (typeof d.state !== 'function' || typeof d.id !== 'string' || !SCENE_REPLAY_DIGEST_ID.test(d.id)) throw Error('replay digest: needs an id (1-128 of A-Za-z0-9._:,;=+-) and a state(world) function');

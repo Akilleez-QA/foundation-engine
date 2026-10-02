@@ -13,7 +13,7 @@ import type { JsonLimits } from '../network/captured-json';
 import { compareDigests, createDigestTrace, type DigestComparison, type DigestSnapshot, type DigestTraceOptions } from './digest';
 import { digestJson, hashText } from './hash';
 import { explainDivergence, type DivergenceExplanation } from './explain';
-import { observeWorld, replayStateText, toReplayDigest, type ReplayDigestInput } from './state';
+import { createDigestCoverage, observeWorld, replayStateText, toReplayDigest, type DigestCoverage, type ReplayDigestInput } from './state';
 import { createReplayRecorder, openReplay, type OpenLimits, type OpenResult, type RecorderState, type ReplayLimits } from './log';
 
 /** The fixed step `testScene` and the stock runtime use for the fixed lane (core/ecs/systems.ts default). */
@@ -189,12 +189,13 @@ async function drive(scene: SceneDefinition, o: SceneRunOptions, seed: number, t
   const named = o.digest ? null : sceneReplayDigest(scene, o.replayDigest);
   const trace = createDigestTrace({ ...o.trace, identity: sceneTraceIdentity(buildOf(o), config, seed, named?.id) });
   const tap = createSceneInputTap(o.inputs);
+  const coverage = createDigestCoverage(named);
   let tick = 0, observed = 0;
   const observe = defineSystem({ id: 'replay-kit-observe', run(ctx) {
     observed++;
     if (o.digest) trace.observe(tick, () => o.digest!(ctx), o.detail ? () => o.detail!(ctx) : undefined);
     else if (o.detail) trace.observe(tick, named ? () => hashText(replayStateText(ctx.world, named, WORLD_DIGEST_LIMITS)) : () => worldDigest(ctx.world), () => o.detail!(ctx));
-    else observeWorld(trace, tick, ctx.world, named, WORLD_DIGEST_LIMITS, worldDigest);
+    else observeWorld(trace, tick, ctx.world, named, WORLD_DIGEST_LIMITS, worldDigest, () => coverage.sampled(tick));
   } });
   const t = await testScene(scene, { game: o.game, inputs: o.inputs, seed, input: tap.input, systems: [...o.systems ?? [], observe] });
   try {
@@ -204,13 +205,13 @@ async function drive(scene: SceneDefinition, o: SceneRunOptions, seed: number, t
       if (observed !== tick + 1) throw Error(`replay: tick ${tick} ran ${observed - tick} fixed steps, expected one`);
     }
   } finally { t.dispose(); }
-  return { config, trace: trace.read(), ticks: tick };
+  return { config, trace: trace.read(), ticks: tick, coverage: coverage.read() };
 }
 
 /** Run `ticks` fixed ticks of a scene headlessly with scripted facts, recording the inputs and digests. */
 export async function recordSceneRun(scene: SceneDefinition, o: SceneRunOptions & {
   seed: number; ticks: number; limits: ReplayLimits; script(tick: number): SceneTickFacts;
-}): Promise<{ log: string; recorder: RecorderState; digests: DigestSnapshot }> {
+}): Promise<{ log: string; recorder: RecorderState; digests: DigestSnapshot; coverage: DigestCoverage | null }> {
   const config = sceneReplayConfig(scene.id, o.inputs);
   const recorder = createReplayRecorder({ header: { build: buildOf(o), config, seed: o.seed, step: SCENE_STEP }, limits: o.limits });
   const run = await drive(scene, o, o.seed, o.ticks, (tick, tap) => {
@@ -221,14 +222,16 @@ export async function recordSceneRun(scene: SceneDefinition, o: SceneRunOptions 
     tap.load(JSON.parse(json));
     return true;
   });
-  return { log: recorder.export(run.trace), recorder: recorder.read(), digests: run.trace };
+  return { log: recorder.export(run.trace), recorder: recorder.read(), digests: run.trace, coverage: run.coverage };
 }
 
 export type SceneReplayResult =
   | Exclude<OpenResult, { status: 'ready' }>
   | Readonly<{ status: 'replayed'; ticks: number; truncatedAt: number | null; digests: DigestSnapshot; comparison: DigestComparison | null;
       /** When diverged: the first differing entity, component and field (or path), from both sides' detail text. */
-      divergence: DivergenceExplanation | null }>;
+      divergence: DivergenceExplanation | null;
+      /** A selection digest's coverage: listed entities and components, and selected components never matched. */
+      coverage: DigestCoverage | null }>;
 
 /**
  * Replay a log headlessly: same build, configuration and step (else refused), the log's seed, one logged input per
@@ -240,6 +243,10 @@ export async function replaySceneLog(scene: SceneDefinition, o: SceneRunOptions 
   const player = opened.player;
   const run = await drive(scene, o, player.header.seed, player.ticks, (tick, tap) => { tap.load(player.input(tick)!); return true; });
   const comparison = player.digests ? compareDigests(player.digests, run.trace) : null;
-  const divergence = comparison?.status === 'diverged' ? explainDivergence(comparison.tick, comparison.detail.a, comparison.detail.b) : null;
-  return Object.freeze({ status: 'replayed', ticks: run.ticks, truncatedAt: player.truncatedAt, digests: run.trace, comparison, divergence });
+  let divergence: DivergenceExplanation | null = null;
+  if (comparison?.status === 'diverged') {
+    try { divergence = explainDivergence(comparison.tick, comparison.detail.a, comparison.detail.b); }
+    catch { divergence = Object.freeze({ status: 'unavailable', tick: comparison.tick, reason: 'detail-unreadable' }); }
+  }
+  return Object.freeze({ status: 'replayed', ticks: run.ticks, truncatedAt: player.truncatedAt, digests: run.trace, comparison, divergence, coverage: run.coverage });
 }

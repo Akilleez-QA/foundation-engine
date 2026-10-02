@@ -41,8 +41,8 @@ function firstDiff(a: Json, b: Json, path: Step[]): Diff | null {
   }
   const x = a as { readonly [k: string]: Json }, y = b as { readonly [k: string]: Json };
   for (const k of [...new Set([...Object.keys(x), ...Object.keys(y)])].sort()) {
-    if (!(k in y)) return { path: [...path, k], kind: 'removed', a: x[k], b: undefined };
-    if (!(k in x)) return { path: [...path, k], kind: 'added', a: undefined, b: y[k] };
+    if (!Object.hasOwn(y, k)) return { path: [...path, k], kind: 'removed', a: x[k], b: undefined };
+    if (!Object.hasOwn(x, k)) return { path: [...path, k], kind: 'added', a: undefined, b: y[k] };
     const d = firstDiff(x[k], y[k], [...path, k]);
     if (d) return d;
   }
@@ -63,6 +63,10 @@ const rowId = (rows: readonly Json[] | null, i: number) => {
  * Explain the first difference between a diverged tick's recorded (`a`) and replayed (`b`) detail texts. O(text size).
  */
 export function explainDivergence(tick: number, a: string | null, b: string | null, options: DivergenceExplainOptions = {}): DivergenceExplanation {
+  // Never throws: an explanation is diagnostic, and the replay's result must survive any detail text.
+  try { return explain(tick, a, b, options); } catch { return Object.freeze({ status: 'unavailable', tick, reason: 'detail-unreadable' }); }
+}
+function explain(tick: number, a: string | null, b: string | null, options: DivergenceExplainOptions): DivergenceExplanation {
   if (a === null || b === null) return Object.freeze({ status: 'unavailable', tick, reason: 'no-detail' });
   let x: Json, y: Json;
   try { x = captureJson(a, options.limits ?? LIMITS).value as Json; y = captureJson(b, options.limits ?? LIMITS).value as Json; }
@@ -72,7 +76,8 @@ export function explainDivergence(tick: number, a: string | null, b: string | nu
   const max = options.maxValueChars ?? 160;
   const preview = (v: Json | undefined) => {
     if (v === undefined) return null;
-    const s = JSON.stringify(v);
+    const s: string | undefined = JSON.stringify(v);
+    if (typeof s !== 'string') return null;
     return s.length > max ? `${s.slice(0, Math.max(0, max - 1))}…` : s;
   };
   let kind: DivergenceKind = d.kind, entity: number | null = null, component: string | null = null, field: string | null = null, resource: string | null = null;
@@ -92,7 +97,7 @@ export function explainDivergence(tick: number, a: string | null, b: string | nu
   }
   const at = (v: Json, path: readonly Step[]): Json | undefined => {
     let cur: Json | undefined = v;
-    for (const s of path) cur = cur && typeof cur === 'object' ? (cur as Record<string | number, Json>)[s as never] : undefined;
+    for (const s of path) cur = cur && typeof cur === 'object' && Object.hasOwn(cur, s) ? (cur as Record<string | number, Json>)[s as never] : undefined;
     return cur;
   };
   const rowPath = kind === 'entity-set' ? p.slice(0, 2) : p;

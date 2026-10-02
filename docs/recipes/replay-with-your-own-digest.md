@@ -48,6 +48,14 @@ For state that is not in components, write the digest yourself:
 `{ id: 'arena-rules-v1', state: world => ({ score: world.resources.score, lives: world.resources.lives }) }`.
 `state` returns a plain JSON value; the replay canonicalises and hashes it.
 
+Digests see JSON: a `Map` or `Set` in a component becomes `{}`, `NaN` and
+`Infinity` become `null`, `-0` becomes `0`, and `undefined` fields are dropped. Keep
+the components you digest JSON-plain, or convert them in your own `state`.
+
+After a run, check `engine.replay.read().coverage.unmatched` (or `coverage` on a
+headless result) is empty. A misspelt component id matches nothing, digests to a
+constant, and would make every replay look `equal`.
+
 ## 3. Record and replay with detail
 
 Open the scene with a seed (`npm run play`, then `?seed=7`) and, in the browser
@@ -105,7 +113,8 @@ browser replay is the check for frame-phase effects.
 
 ## Limits
 
-- A digest only covers what it selects. Excluded state can change unnoticed.
+- A digest only covers what it selects. Excluded state can change unnoticed, and so
+  can values JSON cannot express (see above).
 - The report names the first difference in sorted-key order at the first divergent
   sample. The cause may be earlier, or outside the digest.
 - Floating-point results can differ between browsers and JavaScript engines; a

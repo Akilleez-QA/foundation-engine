@@ -114,6 +114,24 @@ tick's detail text, so the digest and the detail never disagree. The digest's id
 appended to the trace identity (`…|seed:7|digest:<id>`). Without a named digest the
 identity and the digest are unchanged, so existing logs still replay.
 
+Digests see JSON, not JavaScript. `state(world)` (and so every selected component
+value and resource) goes through `JSON.stringify` before it is canonicalised: a `Map`
+or `Set` becomes `{}`, `NaN` and `±Infinity` become `null`, `-0` becomes `0`, and
+`undefined` fields, functions and symbols are dropped. State held that way is not
+covered, and a change between two such values is invisible. Keep digested components
+and resources JSON-plain (numbers, strings, booleans, arrays, plain objects), or
+convert them in your own `state` function. A `state` result that is not JSON at
+all (`undefined`, a cycle, a `BigInt`) fails the trace.
+
+Coverage. For a selection digest, `coverage` (in `engine.replay.read()`, and on
+`recordSceneRun` and `replaySceneLog` results) gives the listed entities and, per
+selected component, how many of them had it at the first sample. `unmatched` lists
+selected components that no listed entity had on any sample so far: a misspelt id
+(`'scroe'`) or a component the scene never uses. Their part of the digest is
+constant, so an `equal` says nothing about them. The run is not failed, because a
+component may legitimately appear only later; check `unmatched` is empty before you
+rely on an `equal`. A digest written as a function has `coverage: null`.
+
 Outputs. On a diverged replay, `divergence` is either
 `{status: 'found', tick, kind, path, entity, component, field, resource, a, b}` or
 `{status: 'unavailable', tick, reason}`:
@@ -128,9 +146,14 @@ Outputs. On a diverged replay, `divergence` is either
   characters;
 - `no-detail`: the log kept no detail for that tick (no `detail` window, outside it,
   or past `maxChars`); `detail-unreadable`: a detail text is over the parse limits
-  (8 MiB, 2^20 nodes, depth 32) or malformed; `no-difference`: the detail texts match
-  although the digests differ (the default digest also hashes entities without a
-  `Transform`, which its detail does not list).
+  (8 MiB, 2^20 nodes, depth 32) or malformed (the explainer never throws, and a
+  replay's result survives any detail text); `no-difference`: the detail texts match
+  although the digests differ. The built-in paths compute both from the same state
+  (a named digest hashes its detail text; the default detail lists the same count,
+  resources and transforms the default digest hashes), so this means a headless
+  `detail(ctx)` that does not describe the `digest(ctx)` beside it, or a `state()`
+  that is not a pure function of the world (it reads a clock, a counter or
+  `Math.random`, so two calls in one tick differ).
 
 Owner and bounds. The digest is creator code run by the caller's existing tick
 owner: the dev tap after each fixed tick, or the headless `testScene` lane. Nothing
@@ -145,7 +168,11 @@ Overload, failure and recovery. A digest that throws, returns `undefined`, is cy
 or exceeds `WORLD_DIGEST_LIMITS` fails the trace (`digest-threw`); the recording or
 replay ends `failed`. Detail past `maxChars` is dropped, and `detailTruncated` is
 set in the log. A malformed digest or detail request is refused before re-entry
-(`digest`, `detail`). A log replayed under another digest is refused at the visit
+(`digest`, `detail`); `detail` on a replay request is refused too, because a replay
+uses the detail its log was recorded with. An identity over 512 characters (a long
+game id, scene id or digest id) is refused at the visit (`identity-too-long`), and
+any other failure to set up the visit's tap is refused as `tap-setup-failed`, so a
+session never stays armed. A log replayed under another digest is refused at the visit
 (`incompatible-digest`), which leaves that visit untapped; headlessly the comparison
 is `incomparable` (`identity`). Pass the same digest to the replay as to the
 recording. A function digest cannot be carried in the log. Recovery is recording

@@ -185,3 +185,37 @@ test('SIM-02 replay digest: identities without a named digest are unchanged', as
   assert.deepEqual(rec.digests.details, [], 'no detail without a window');
   assert.equal(compareDigests(rec.digests, rec.digests).status, 'equal');
 });
+
+test('SIM-02 replay digest: inherited key names (constructor, toString) are ordinary keys to the explainer', async () => {
+  const removed = explainDivergence(1, '{"constructor":1}', '{}');
+  assert.deepEqual(removed.status === 'found' && [removed.kind, removed.path, removed.a, removed.b], ['removed', 'constructor', '1', null]);
+  const added = explainDivergence(1, '{}', '{"toString":{"valueOf":2}}');
+  assert.deepEqual(added.status === 'found' && [added.kind, added.path], ['added', 'toString']);
+  const rows = (k: string) => JSON.stringify({ entities: [[1, { [k]: { x: 1 } }]] });
+  const comp = explainDivergence(1, rows('constructor'), rows('hasOwnProperty'));
+  assert.deepEqual(comp.status === 'found' && [comp.kind, comp.entity, comp.component], ['removed', 1, 'constructor']);
+  // Headless: a resource called `constructor` present only in the recording is reported, not thrown.
+  const digest = { id: 'resources-v1', state: (w: World) => ({ ...w.resources }) };
+  const scene = orbScene();
+  const mark = defineSystem({ id: 'mark', run(ctx) { Object.assign(ctx.world.resources, { constructor: 1 }); } });
+  const rec = await recordSceneRun(scene, { inputs: [steer], seed: 3, ticks: 20, limits, script, trace, replayDigest: digest, systems: [mark] });
+  const replayed = await replaySceneLog(scene, { inputs: [steer], log: rec.log, limits: open, trace, replayDigest: digest });
+  assert.equal(replayed.status, 'replayed');
+  const d = replayed.status === 'replayed' ? replayed.divergence : null;
+  assert.deepEqual(d?.status === 'found' && [d.tick, d.kind, d.path], [0, 'removed', 'constructor']);
+});
+
+test('SIM-02 replay digest: coverage flags a selected component no entity has (a misspelt id)', async () => {
+  const typo = replayDigest({ components: ['transform', 'scroe'], exclude: [Cosmetic] });
+  const rec = await recordSceneRun(orbScene(), { inputs: [steer], seed: 3, ticks: 30, limits, script, trace, replayDigest: typo });
+  assert.deepEqual(rec.coverage, { firstTick: 0, samples: 30, entities: 1, components: { transform: 1, scroe: 0 }, unmatched: ['scroe'] });
+  const replayed = await replaySceneLog(orbScene(), { inputs: [steer], log: rec.log, limits: open, trace, replayDigest: typo });
+  assert.deepEqual(replayed.status === 'replayed' && [replayed.comparison?.status, replayed.coverage?.unmatched], ['equal', ['scroe']],
+    'equal, but flagged: the misspelt part of the digest was constant');
+  const good = await recordSceneRun(orbScene(), { inputs: [steer], seed: 3, ticks: 5, limits, script, trace, replayDigest: { components: [Transform, Score] } });
+  assert.deepEqual(good.coverage?.unmatched, []);
+  assert.equal(good.coverage?.entities, 2, 'without an exclusion the cosmetic orb is listed too');
+  const custom = await recordSceneRun(orbScene(), { inputs: [steer], seed: 3, ticks: 5, limits, script, trace, replayDigest: { id: 'c', state: w => w.count } });
+  assert.equal(custom.coverage, null, 'a creator function owns its coverage');
+  assert.equal((await recordSceneRun(orbScene(), { inputs: [steer], seed: 3, ticks: 5, limits, script, trace })).coverage, null);
+});

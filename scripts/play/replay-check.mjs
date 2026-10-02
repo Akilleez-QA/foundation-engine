@@ -100,6 +100,8 @@ try {
   const detailed = await engine(b, () => window.engine.replay.read());
   await engine(b, () => window.engine.replay.stop());
   assert.equal(detailed.digest, 'select:c=transform;x=;r=all');
+  assert.deepEqual(detailed.coverage.unmatched, [], 'every selected component matched an entity');
+  assert.ok(detailed.coverage.entities > 0);
   assert.ok(JSON.parse(detailed.log).digests.details.length > 0, 'the log carries detail text');
   await engine(b, () => window.engine.clock.resume());
   assert.deepEqual(await engine(b, log => window.engine.replay.start({mode: 'replay', log}), detailed.log), {status: 'refused', reason: 'incompatible-digest'},

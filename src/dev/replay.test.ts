@@ -216,7 +216,7 @@ function orbVisit(seed: number, live: InputSource, replayDigest: SceneReplayDige
   return { tap, world, body, orb, frame(dt: number) { if (tap!.running()) runner.frame({}, dt); } };
 }
 /** Record under a ragged frame grouping, then replay under a steady 60 Hz one; returns the replay's final state. */
-function recordAndReplay(dev: ReturnType<typeof createReplayDev>, request: Partial<ReplayDevRequest>, replayRequest: Partial<ReplayDevRequest> = request,
+function recordAndReplay(dev: ReturnType<typeof createReplayDev>, request: Partial<ReplayDevRequest>, replayRequest: Partial<ReplayDevRequest> = { digest: request.digest },
   sceneDigest: SceneReplayDigest | null = null, fault?: (visit: ReturnType<typeof orbVisit>, frame: number) => void) {
   assert.equal(dev.arm({ mode: 'record', ...request }, 'demo').status, 'started');
   const live = liveInput(), a = orbVisit(7, live.input, sceneDigest);
@@ -326,5 +326,21 @@ test('SIM-02 replay digest: a throwing or oversized creator digest fails the ses
     assert.ok(log.digests.details.reduce((n: number, [, t]: [number, string]) => n + t.length, 0) <= 400);
     assert.equal(small.replayed.comparison?.status, 'diverged');
     assert.equal(small.replayed.divergence?.status, 'unavailable');
+  } finally { dev.dispose(); }
+});
+
+test('SIM-02 replay digest: coverage, replay-side detail and over-long identities are reported, not ignored', () => {
+  const dev = createReplayDev();
+  try {
+    const { recorded, replayed } = recordAndReplay(dev, { digest: { components: ['transform', 'scroe'], exclude: ['cosmetic'] } });
+    assert.deepEqual(recorded.coverage?.unmatched, ['scroe']);
+    assert.deepEqual([replayed.comparison?.status, replayed.coverage?.unmatched], ['equal', ['scroe']]);
+    assert.equal(recordAndReplay(dev, {}).recorded.coverage, null, 'the default digest has no selection coverage');
+    assert.deepEqual(dev.arm({ mode: 'replay', log: recorded.log!, detail: true }, 'demo'), { status: 'refused', reason: 'detail' });
+    // An identity over 512 characters is refused at the visit instead of leaving the session armed.
+    dev.arm({ mode: 'record', digest: { id: 'd'.repeat(128), exclude: ['cosmetic'] } }, 'demo');
+    const tap = openSceneTickTap({ scene: 'demo', game: { id: 'g'.repeat(400), version: '1' }, inputs: [], seed: 1, step: 1 / 60, world: new World(), live: liveInput().input, invalidate() {} });
+    assert.equal(tap, null);
+    assert.deepEqual([dev.read().status, dev.read().reason], ['refused', 'identity-too-long']);
   } finally { dev.dispose(); }
 });

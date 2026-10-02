@@ -93,7 +93,7 @@ const codeOf = (key: string) => CODES[key] ?? (/^[a-z]$/i.test(key) ? `Key${key.
 export function createTestApi(app: App, booted: Promise<BootReport>): EngineTestApi {
   let trace: EventTrace | undefined;
   let replay: ReplayDev | undefined;
-  const idle: ReplayDevState = Object.freeze({ status: 'idle', mode: null, reason: null, scene: null, ticks: 0, total: null, log: null, digests: null, comparison: null, digest: null, divergence: null });
+  const idle: ReplayDevState = Object.freeze({ status: 'idle', mode: null, reason: null, scene: null, ticks: 0, total: null, log: null, digests: null, comparison: null, digest: null, divergence: null, coverage: null });
   const report = () => app.services.app.report();
   const probe = (name: string) => app.probes.read(name as ProbeName);
   const scene = () => probe('scene') as EngineState['scene'];

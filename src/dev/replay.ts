@@ -10,8 +10,8 @@
 import { installSceneTickTap, type SceneTickTap, type SceneTickTapContext } from '../author/scene-tick-tap';
 import {
   compareDigests, createDigestTrace, createReplayRecorder, createSceneInputTap, explainDivergence, observeWorld, openReplay,
-  replayStateText, sceneReplayConfig, sceneTraceIdentity, toReplayDigest, RUN_OVERHEAD_BYTES, WORLD_DIGEST_LIMITS, worldDigest,
-  type DigestComparison, type DigestDetailWindow, type DigestSnapshot, type DivergenceExplanation, type OpenLimits, type ReplayDigestInput,
+  replayStateText, createDigestCoverage, identityOk, sceneReplayConfig, sceneTraceIdentity, toReplayDigest, RUN_OVERHEAD_BYTES, WORLD_DIGEST_LIMITS, worldDigest,
+  type DigestComparison, type DigestCoverage, type DigestDetailWindow, type DigestSnapshot, type DivergenceExplanation, type OpenLimits, type ReplayDigestInput,
 } from '../kits/replay';
 import type { SceneReplayDigest } from '../author/defs';
 import type { JsonLimits } from '../kits/network/captured-json';
@@ -60,6 +60,8 @@ export interface ReplayDevState {
   readonly digest: string | null;
   /** Replay, once diverged: the first differing entity, component and field (needs a log recorded with `detail`). */
   readonly divergence: DivergenceExplanation | null;
+  /** A selection digest's coverage so far; `unmatched` lists selected components no entity had on any sample. */
+  readonly coverage: DigestCoverage | null;
 }
 export type ReplayStart = Readonly<{ status: 'started'; state: ReplayDevState }> | Readonly<{ status: 'refused'; reason: string }>;
 
@@ -104,6 +106,7 @@ interface Session {
   comparison: DigestComparison | null;
   digest: string | null;
   divergence: DivergenceExplanation | null;
+  coverage: () => DigestCoverage | null;
   stop: (reason: string | null) => void;
 }
 
@@ -129,7 +132,7 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
     const { request, scene, open, digest: requested } = armed;
     armed = null;
     const s: Session = { mode: request.mode, status: 'armed', reason: null, scene: ctx.scene, ticks: () => 0, total: null,
-      log: () => null, digests: () => null, comparison: null, digest: null, divergence: null, stop: () => {} };
+      log: () => null, digests: () => null, comparison: null, digest: null, divergence: null, coverage: () => null, stop: () => {} };
     session = s;
     const fail = (status: 'refused' | 'failed', reason: string) => { s.status = status; s.reason = reason; return null; };
     if (ctx.scene !== scene) return fail('refused', 'scene-changed');
@@ -138,7 +141,11 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
     let digest: SceneReplayDigest | null;
     try { digest = requested ?? (ctx.replayDigest ? toReplayDigest(ctx.replayDigest) : null); } catch { return fail('refused', 'digest'); }
     s.digest = digest?.id ?? null;
-    return request.mode === 'record' ? record(ctx, request, s, digest) : replay(ctx, request, open, s, fail, digest);
+    const identity = sceneTraceIdentity(`${ctx.game.id}@${ctx.game.version}`, sceneReplayConfig(ctx.scene, ctx.inputs), ctx.seed, digest?.id);
+    if (!identityOk(identity)) return fail('refused', 'identity-too-long');
+    // A tap that cannot be set up must not leave the session armed (the runtime only logs a throwing factory).
+    try { return request.mode === 'record' ? record(ctx, request, s, digest) : replay(ctx, request, open, s, fail, digest); }
+    catch { return fail('refused', 'tap-setup-failed'); }
   });
 
   function record(ctx: SceneTickTapContext, request: ReplayDevRequest, s: Session, digest: SceneReplayDigest | null): SceneTickTap {
@@ -151,6 +158,8 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
       maxEntries: request.maxDigests ?? Math.ceil(maxTicks / every), maxDigestLength: 16, ...(detail ? { detail } : {}) });
     const tap = createSceneInputTap(ctx.inputs, id => ctx.live.describe(id));
     tap.passThrough(ctx.live);
+    const coverage = createDigestCoverage(digest);
+    s.coverage = () => coverage.read();
     let arrived = false, recording = true, tick = 0;
     const end = (status: ReplayDevStatus, reason: string | null) => { if (!recording) return; recording = false; s.status = status; s.reason = reason; tap.passThrough(ctx.live); };
     // The export changes only when a tick is recorded or recording ends: cache it between polls.
@@ -175,7 +184,7 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
       },
       afterTick() {
         if (!recording) return;
-        if (observeWorld(trace, tick, ctx.world, digest, WORLD_DIGEST_LIMITS, worldDigest) === 'failed') { end('failed', trace.read().reason); return; }
+        if (observeWorld(trace, tick, ctx.world, digest, WORLD_DIGEST_LIMITS, worldDigest, () => coverage.sampled(tick)) === 'failed') { end('failed', trace.read().reason); return; }
         tick++;
         tap.passThrough(ctx.live);
       },
@@ -207,6 +216,8 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
       maxEntries: request.maxDigests ?? Math.max(1, Math.ceil(player.ticks / every)), maxDigestLength: 16 });
     // The replayed side's state text, kept once: at the first sample that differs from the log's.
     let mismatch: { tick: number; text: string | null } | null = null;
+    const coverage = createDigestCoverage(digest);
+    s.coverage = () => coverage.read();
     const expected = (t: number) => {
       const e = recorded?.entries, first = e?.[0]?.[0];
       if (!e || first === undefined || t < first || (t - first) % every !== 0) return undefined;
@@ -220,7 +231,10 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
       // An empty log has nothing to compare: say so rather than claim a pass.
       const c = s.comparison = player.ticks === 0 ? Object.freeze({ status: 'incomparable', reason: 'no-overlap' } as const)
         : compareDigests(recorded, trace.read(), { through: player.ticks - 1 });
-      if (c.status === 'diverged') s.divergence = explainDivergence(c.tick, c.detail.a, mismatch?.tick === c.tick ? mismatch.text : null);
+      if (c.status === 'diverged') {
+        try { s.divergence = explainDivergence(c.tick, c.detail.a, mismatch?.tick === c.tick ? mismatch.text : null); }
+        catch { s.divergence = Object.freeze({ status: 'unavailable', tick: c.tick, reason: 'detail-unreadable' }); }
+      }
     };
     Object.assign(s, { total: player.ticks, ticks: () => tick, digests: () => trace.read(), stop: (reason: string | null) => { end('stopped', reason); tap.passThrough(ctx.live); } });
     if (player.ticks === 0) end('complete');
@@ -237,7 +251,7 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
       afterTick() {
         if (!playing) return;
         let mine: string | null = null;
-        if (observeWorld(trace, tick, ctx.world, digest, WORLD_DIGEST_LIMITS, worldDigest, d => { mine = d; }) === 'failed') { end('failed', trace.read().reason); return; }
+        if (observeWorld(trace, tick, ctx.world, digest, WORLD_DIGEST_LIMITS, worldDigest, d => { mine = d; coverage.sampled(tick); }) === 'failed') { end('failed', trace.read().reason); return; }
         if (!mismatch && mine !== null) {
           const theirs = expected(tick);
           if (theirs !== undefined && mine !== theirs) {
@@ -256,6 +270,8 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
   return {
     arm(request, scene) {
       if (!request || (request.mode !== 'record' && request.mode !== 'replay')) return refuse('mode');
+      // A replay uses the detail its log was recorded with: a replay-side window would be silently ignored.
+      if (request.mode === 'replay' && request.detail !== undefined) return refuse('detail');
       let digest: SceneReplayDigest | null = null;
       if (request.digest !== undefined) { try { digest = toReplayDigest(request.digest); } catch { return refuse('digest'); } }
       if (request.every !== undefined && !positive(request.every, MAX_TICKS)) return refuse('every');
@@ -281,7 +297,7 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
       session?.stop('replaced');
       armed = { request: { ...request }, scene, open, digest };
       const placeholder: Session = { mode: request.mode, status: 'armed', reason: null, scene, ticks: () => 0, total: null, log: () => null, digests: () => null, comparison: null,
-        digest: digest?.id ?? null, divergence: null,
+        digest: digest?.id ?? null, divergence: null, coverage: () => null,
         stop: reason => { armed = null; placeholder.status = 'stopped'; placeholder.reason = reason ?? 'stopped-before-arrival'; } };
       session = placeholder;
       return Object.freeze({ status: 'started', state: read() });
@@ -293,8 +309,8 @@ export function createReplayDev(options: { log?: JsonLimits } = {}): ReplayDev {
 
   function read(): ReplayDevState {
     const s = session;
-    if (!s) return Object.freeze({ status: 'idle', mode: null, reason: null, scene: null, ticks: 0, total: null, log: null, digests: null, comparison: null, digest: null, divergence: null });
+    if (!s) return Object.freeze({ status: 'idle', mode: null, reason: null, scene: null, ticks: 0, total: null, log: null, digests: null, comparison: null, digest: null, divergence: null, coverage: null });
     return Object.freeze({ status: s.status, mode: s.mode, reason: s.reason, scene: s.scene, ticks: s.ticks(), total: s.total,
-      log: s.mode === 'record' ? s.log() : null, digests: s.digests(), comparison: s.comparison, digest: s.digest, divergence: s.divergence });
+      log: s.mode === 'record' ? s.log() : null, digests: s.digests(), comparison: s.comparison, digest: s.digest, divergence: s.divergence, coverage: s.coverage() });
   }
 }
