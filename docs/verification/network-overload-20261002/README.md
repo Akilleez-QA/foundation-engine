@@ -2,7 +2,7 @@
 
 Three full runs of `npm run probe:network -- --out <file>` with the default
 configuration (seed 7), recorded at probe commit `0744509` on branch
-`feat/nw07-overload-probe`, before it was rebased for PR #27. The rebased commit `c277823`
+`feat/nw07-overload-probe`, before it was rebased for PR #27. The rebased commit `8bca1bc`
 has byte-identical `tools/` and `src/kits/network/` trees; only main's unrelated changes and one
 `package.json` script line from main differ. Later review fixes in PR #27 changed the probe:
 the storm's retries now wait for the restarted host's credentials, and observation
