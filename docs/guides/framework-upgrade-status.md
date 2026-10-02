@@ -651,3 +651,14 @@ LRU replacement, 10 s per fetch or decode, waiting plays counted in the 64-voice
 files decode on unlock. Failures (including an HTML fallback page) are reported once and
 retried on the next preload. Candidate (branch `feat/dx-sound-files`); not integrated. Physical
 listening evidence is missing.
+
+## Audio-clock timeline (AU-01) — implemented, candidate
+
+Optional [`createAudioTimeline`](audio-timeline.md) makes the audio context's clock
+the master timeline for timed gameplay: smoothed audio↔page-clock mapping with
+resync on jumps, heard-time latency from `getOutputTimestamp` or reported latencies,
+bounded lookahead dispatch with exact start times, late-drop overload, input
+timestamps (`ctx.input.pressedAt`) and a stored calibration. It reuses the one audio
+output (new read-only `clock()`, scheduled `playVoice({ at })`). Status: implemented,
+candidate (PR #31); not integrated. Evidence is unit and headless scene tests only;
+no browser output timing, physical-device or audible verification.

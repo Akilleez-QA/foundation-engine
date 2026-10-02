@@ -143,4 +143,41 @@ test('music URLs go through the composition root\'s resolver (the public base)',
  const element={paused:true,src:'',play(){return Promise.resolve();},pause(){}} as unknown as HTMLAudioElement;
  const output=createAudioOutput({silent:()=>false,muted:()=>false,effects:()=>1,music:()=>1,createElement:()=>element,createContext:()=>fakeContext().ctx,resolveUrl:url=>'https://host/sub/'+url.replace(/^\//,'')});
  output.music('/music/theme.m4a');assert.equal(element.src,'https://host/sub/music/theme.m4a');output.dispose();
+
+test('clock() samples the running context without creating or resuming it, and is null whenever nothing can be heard', async () => {
+  const { ctx } = fakeContext('suspended');
+  const clocked = Object.assign(ctx, { currentTime: 2.5, baseLatency: .005, outputLatency: .02, getOutputTimestamp: () => ({ contextTime: 2.47, performanceTime: 1234 }) });
+  let made = 0;
+  const out = createAudioOutput({ silent: () => false, muted: () => false, effects: () => 1, music: () => 1, createContext: () => { made++; return clocked; } });
+  assert.equal(out.clock(), null); assert.equal(made, 0, 'reading the clock never creates a context');
+  assert.equal(out.play('ui.click'), false); assert.equal(made, 1); assert.equal(out.clock(), null, 'suspended: not yet audible');
+  out.unlock(); await Promise.resolve();
+  const reading = out.clock()!;
+  assert.equal(reading.currentTime, 2.5); assert.equal(reading.outputLatency, .02); assert.equal(reading.baseLatency, .005);
+  assert.deepEqual(reading.output, { contextTime: 2.47, performanceTime: 1234 });
+  assert.ok(Number.isFinite(reading.performanceTime));
+  // Zero stamps before the first block, missing or failing APIs and bad latencies degrade to estimates.
+  clocked.getOutputTimestamp = () => ({ contextTime: 0, performanceTime: 0 }); assert.equal(out.clock()!.output, null);
+  clocked.getOutputTimestamp = () => { throw Error('unsupported'); }; assert.equal(out.clock()!.output, null);
+  Object.assign(clocked, { outputLatency: NaN, baseLatency: undefined }); assert.equal(out.clock()!.outputLatency, 0); assert.equal(out.clock()!.baseLatency, 0);
+  out.setHidden(true); assert.equal(out.clock(), null, 'hidden'); out.setHidden(false);
+  out.dispose(); assert.equal(out.clock(), null, 'disposed');
+  const silent = createAudioOutput({ silent: () => true, muted: () => false, effects: () => 1, music: () => 1, createContext: () => { throw Error('never'); } });
+  silent.unlock(); assert.equal(silent.clock(), null);
+});
+
+test('a voice can start at a future context time; past times start now; the horizon and bad times are refused', () => {
+  const { ctx, sources } = fakeContext(); const starts: (number | undefined)[] = []; const reports: string[] = [];
+  Object.assign(ctx, { currentTime: 10, createBufferSource: (() => { const make = ctx.createBufferSource.bind(ctx); return () => { const s = make(); s.start = ((when?: number) => { starts.push(when); }) as typeof s.start; return s; }; })() });
+  const out = createAudioOutput({ silent: () => false, muted: () => false, effects: () => 1, music: () => 1, createContext: () => ctx, maxStartAhead: 5, maxVoices: 2, report: m => reports.push(m) });
+  out.unlock();
+  const ahead = out.playVoice('ui.click', { at: 10.25 })!;
+  assert.ok(ahead); assert.deepEqual(starts, [10.25]);
+  out.playVoice('ui.click', { at: 9 }); assert.deepEqual(starts, [10.25, undefined], 'a past start plays now');
+  assert.equal(out.playVoice('ui.click', { at: 11 }), null, 'a scheduled voice holds its slot until it ends');
+  ahead.stop(); sources[1].onended?.();
+  assert.equal(out.playVoice('ui.click', { at: 15.5 }), null); assert.equal(out.playVoice('ui.click', { at: 16 }), null);
+  assert.deepEqual(reports, ['cue start beyond the schedule horizon'], 'reported once');
+  assert.throws(() => out.playVoice('ui.click', { at: NaN }), /start time/); assert.throws(() => out.playVoice('ui.click', { at: -1 }), /start time/);
+  assert.throws(() => createAudioOutput({ silent: () => true, muted: () => false, effects: () => 1, music: () => 1, maxStartAhead: 0 }));
 });

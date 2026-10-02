@@ -19,6 +19,7 @@
  */
 import { monotonicNow } from '../../core/clock';
 import { createSoundFiles, type SoundFileOptions, type SoundFileStats } from './sound-files';
+import type { AudioClockReading } from './audio-timeline';
 
 /** One synthesis step: a tone sweep (sine, `hz` → `end`) or a burst of low-passed noise ("air"). Times in seconds. */
 export type CueStep =
@@ -136,6 +137,8 @@ export interface AudioOutputOptions {
    * (Firefox) and panners without position AudioParams still write instantly.
    */
   smoothing?: number;
+  /** Largest lead, in seconds, of a voice started at a future context time (`at`). Default 10. */
+  maxStartAhead?: number;
 }
 
 export type AudioVector = readonly [number, number, number];
@@ -208,6 +211,8 @@ export interface CueVoiceOptions {
   rate?: number;
   /** A sound file still loading may start up to this many ms late (0…5000; default 0: dropped instead). */
   wait?: number;
+  /** Context seconds to start at (an audio timeline's `when`); omitted or past: now. A pending voice holds its slot. */
+  at?: number;
 }
 /** Playback rate bounds (`CueVoiceOptions.rate`). */
 export const RATE_LIMITS = { min: .25, max: 4 } as const;
@@ -277,6 +282,9 @@ export interface AudioOutput {
   /** Fetch a sound file ahead of its first play (and decode it once a context exists). True when held. */
   preload(id: string, signal?: AbortSignal): Promise<boolean>;
   readonly sounds: SoundFileStats;
+  /** One sample of the context clock, or null when there is no running context (silent, locked, hidden, disposed).
+   *  Never creates or resumes the context. */
+  clock(): AudioClockReading | null;
   /** Start (or switch to) a music track by URL; null stops. A repeated URL keeps playing. */
   music(url: string | null): void;
   /** Call from a user gesture: creates or resumes the context (browsers start audio suspended). */
@@ -293,7 +301,8 @@ export interface AudioOutput {
 }
 
 export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
-  const maxVoices=o.maxVoices??64,maxBuffers=o.maxBuffers??128,maxBufferBytes=o.maxBufferBytes??16*1024*1024;
+  const maxVoices=o.maxVoices??64,maxBuffers=o.maxBuffers??128,maxBufferBytes=o.maxBufferBytes??16*1024*1024,maxStartAhead=o.maxStartAhead??10;
+  if(!Number.isFinite(maxStartAhead)||maxStartAhead<=0||maxStartAhead>600)throw Error('invalid audio start horizon');
   if(![maxVoices,maxBuffers,maxBufferBytes].every(n=>Number.isSafeInteger(n)&&n>0))throw Error('invalid audio limits');
   const hrtfLimitOk=(n:number)=>Number.isSafeInteger(n)&&n>=0&&n<=maxVoices;
   let hrtfLimit=o.maxHrtfVoices??Math.min(8,maxVoices);
@@ -383,6 +392,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
     const rate = options.rate ?? 1, wait = options.wait ?? 0;
     if (typeof rate !== 'number' || !(rate >= RATE_LIMITS.min && rate <= RATE_LIMITS.max)) throw Error(`playback rate must be in [${RATE_LIMITS.min}, ${RATE_LIMITS.max}]`);
     if (typeof wait !== 'number' || !(wait >= 0 && wait <= MAX_WAIT_MS)) throw Error(`wait must be in [0, ${MAX_WAIT_MS}] ms`);
+    if(options.at!==undefined&&(!Number.isFinite(options.at)||options.at<0))throw Error('invalid cue start time');
     if(voices.size>=maxVoices){stats.skipped++;return null;}
       const cue = cues.get(id);
       let url: string | undefined;
@@ -392,6 +402,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
       const c = context();
       if (!c || c.state !== 'running' || !master) { stats.skipped++; return null; }
       if (options.spatial && beyond(options.spatial, options.spatial.position)) { stats.culled++; return null; }
+      if (options.at !== undefined && options.at > c.currentTime + maxStartAhead) { if (!reported.has('\0horizon')) { reported.add('\0horizon'); report('cue start beyond the schedule horizon'); } stats.skipped++; return null; }
       if (url) {
         const ready = files.buffer(id);
         if (ready) return start(c, ready, options);
@@ -471,7 +482,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
       for (let i = 1; i < stages.length; i++) stages[i - 1].connect(stages[i]);
       stages[stages.length - 1].connect(master_); source.onended = finish;
       voices.add(voice); if (panning === 'HRTF') hrtf.add(slot); if (gate) cutoffChecks.add(checkCutoff);
-      try { source.start(); } catch (error) { finish(); throw error; }
+      try { if (options.at !== undefined && options.at > c.currentTime) source.start(options.at); else source.start(); } catch (error) { finish(); throw error; }
       stats.played++; return voice;
   };
   /**
@@ -547,6 +558,18 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
       return held;
     },
     get sounds() { return files.stats; },
+    clock() {
+      if (disposed || hidden || !ctx || ctx.state !== 'running' || o.silent()) return null;
+      const performanceTime = monotonicNow(), currentTime = ctx.currentTime;
+      const seconds = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : 0;
+      let output: AudioClockReading['output'] = null;
+      try {
+        const stamp = ctx.getOutputTimestamp?.();
+        // Browsers report zeros before the first rendered block; that pair is not a usable mapping.
+        if (stamp && Number.isFinite(stamp.contextTime) && Number.isFinite(stamp.performanceTime) && stamp.contextTime! > 0 && stamp.performanceTime! > 0) output = { contextTime: stamp.contextTime!, performanceTime: stamp.performanceTime! };
+      } catch { /* An unsupported or failing timestamp leaves the latency estimate. */ }
+      return { currentTime, performanceTime, outputLatency: seconds((ctx as { outputLatency?: number }).outputLatency), baseLatency: seconds(ctx.baseLatency), output };
+    },
     music(url) {
       if (url === track) return;
       track = url;

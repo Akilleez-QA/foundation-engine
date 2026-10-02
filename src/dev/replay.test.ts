@@ -5,11 +5,11 @@ import { createSystemRunner } from '../core/ecs/systems';
 import { createRng } from '../core/rng';
 import { openSceneTickTap, type SceneTickTap } from '../author/scene-tick-tap';
 import { Transform } from '../author/defs';
-import type { InputState } from '../author/defs';
+import type { InputSource } from '../author/defs';
 import { createReplayDev } from './replay';
 
 /** A stand-in visit: one fixed system moves a body by the steer axis plus a seeded jitter, like a scene would. */
-function visit(seed: number | null, live: InputState) {
+function visit(seed: number | null, live: InputSource) {
   const world = new World();
   const body = world.spawn(Transform({ x: 0 }));
   const tap = openSceneTickTap({ scene: 'demo', game: { id: 'demo', version: '1.0.0' }, inputs: [{ id: 'steer', axis: true }, { id: 'jump', axis: false }],
@@ -26,7 +26,7 @@ function visit(seed: number | null, live: InputState) {
 }
 function liveInput() {
   const state = { axis: 0, jump: false };
-  const input: InputState = { describe: () => null, pressed: id => id === 'jump' && state.jump, held: () => false, axis: id => (id === 'steer' ? state.axis : 0), pointer: { x: 0, y: 0, down: false, pressed: false } };
+  const input: InputSource = { describe: () => null, pressed: id => id === 'jump' && state.jump, held: () => false, axis: id => (id === 'steer' ? state.axis : 0), pointer: { x: 0, y: 0, down: false, pressed: false } };
   return { state, input };
 }
 
@@ -137,7 +137,7 @@ test('SIM-01 dev replay: a record request is refused when its log could not be r
     // At the boundary: fill the input budget with distinct inputs (one run per tick) and every digest, then reopen.
     assert.equal(dev.arm({ mode: 'record', maxTicks, maxBytes, maxDigests }, 'demo').status, 'started');
     let n = 0;
-    const quotes: InputState = { describe: () => null, pressed: () => false, held: () => false, axis: () => (++n % 2 ? 1 : -1) * (1 + n / 7), pointer: { x: 0, y: 0, down: false, pressed: false } };
+    const quotes: InputSource = { describe: () => null, pressed: () => false, held: () => false, axis: () => (++n % 2 ? 1 : -1) * (1 + n / 7), pointer: { x: 0, y: 0, down: false, pressed: false } };
     const a = visit(1, quotes); a.tap!.arrive();
     for (let f = 0; f < maxTicks + 10; f++) a.frame(1 / 60);
     const s = dev.read();
