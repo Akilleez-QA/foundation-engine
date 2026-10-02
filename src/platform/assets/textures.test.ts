@@ -198,3 +198,20 @@ test('texture retirement closes the original bitmap after a failing listener and
     g.ImageBitmap = saved;
   }
 });
+
+test('wrap is part of the sampler key: a repeating texture is its own counted texture; clamp keeps the old key', async () => {
+  const { library, loads, arrive } = fixture();
+  const signal = new AbortController().signal;
+  const plain = library.texture('asset.texture.stone-wall', { screenPx: keepWidth(2048), signal });
+  const clamp = library.texture('asset.texture.stone-wall', { screenPx: keepWidth(2048), signal, wrap: 'clamp' });
+  const tiled = library.texture('asset.texture.stone-wall', { screenPx: keepWidth(2048), signal, wrap: 'repeat' });
+  const mirrored = library.texture('asset.texture.stone-wall', { screenPx: keepWidth(2048), signal, wrap: 'mirror' });
+  await arrive();
+  const [p, c, t, m] = await Promise.all([plain, clamp, tiled, mirrored]);
+  assert.equal(p.value, c.value); assert.equal(p.key, c.key);
+  assert.deepEqual([t.value.wrapS, t.value.wrapT, m.value.wrapS], [T.RepeatWrapping, T.RepeatWrapping, T.MirroredRepeatWrapping]);
+  assert.equal(new Set([p.value, t.value, m.value]).size, 3);
+  assert.equal(loads.length, 3);
+  assert.ok(library.stats().residentMiB > 0);
+  await assert.rejects(library.texture('asset.texture.stone-wall', { screenPx: 10, signal, wrap: 'spiral' as never }), /unknown wrap/);
+});

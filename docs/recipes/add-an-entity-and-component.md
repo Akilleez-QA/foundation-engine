@@ -14,7 +14,7 @@ export const coin = defineEntity({ id: 'coin', components: [
 ```
 
 - `defineComponent(id, initial)`: the initial value fixes the shape. `Health({ hp: 5 })` overrides fields for one entity.
-- The built-ins the engine reads: `Transform` (position, rotation, scale), `Shape` (a primitive the scene runtime draws: box, sphere, cylinder, cone, plane, capsule) and `Name` (so systems, tools and tests find an entity with `ctx.named('player')`).
+- The built-ins the engine reads: `Transform` (position, rotation, scale), `Shape` (a primitive the scene runtime draws: box, sphere, cylinder, cone, plane, capsule) and `Name` (so systems, tools and tests find an entity with `ctx.named('player')`). A `Material` gives a shape a texture and a physically based look ([recipe](give-a-shape-a-material.md)).
 - Components hold data only: logic belongs in systems. Mutate them in place; call `ctx.world.touch()` when you change something the renderer should redraw outside `Transform`/`Shape`.
 
 ## Use them

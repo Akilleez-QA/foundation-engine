@@ -69,7 +69,9 @@
     "bench:spatial": "node --import tsx tools/spatial-bench/bench.mjs",
     "probe:network": "node --import tsx tools/network-probe/probe.mjs",
     "test:network-probe": "node --import tsx --test tools/network-probe/probe.regression.mjs",
-    "test:subpath-browser": "node -r ./scripts/silent-browser.cjs scripts/play/subpath-check.mjs playtest/subpath"
+    "test:subpath-browser": "node -r ./scripts/silent-browser.cjs scripts/play/subpath-check.mjs playtest/subpath",
+    "test:subpath-browser": "node -r ./scripts/silent-browser.cjs scripts/play/subpath-check.mjs playtest/subpath",
+    "test:material-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/material-check.mjs playtest/material"
   },
   "dependencies": {
     "three": "^0.186.1"

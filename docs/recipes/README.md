@@ -10,6 +10,7 @@ Short, checked how-tos. Start with [getting started](../guides/getting-started.m
 | show a score, messages, a tap action and a button | [HUD text and buttons](hud-and-buttons.md) |
 | collect things by touching them, block movement, click or tap the ground | [collision and picking](collision-and-picking.md) |
 | follow the player with the camera, change light, sky colour and haze | [camera and lighting](camera-and-lighting.md) |
+| texture a shape, make it shiny, glowing or see-through | [give a shape a material](give-a-shape-a-material.md) |
 | put my game on the web | [share your build](share-your-build.md) |
 | host it in a folder (GitHub Pages project site, itch.io) | [host a build under a sub-path](host-under-a-sub-path.md) |
 

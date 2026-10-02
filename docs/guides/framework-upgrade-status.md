@@ -625,3 +625,15 @@ keeps every existing URL unchanged. `npm run test:subpath-browser` (new CI step)
 any request outside the sub-path. Candidate (branch `feat/dx-asset-base-path`); not
 integrated. Local static hosting and desktop Chromium only; see the
 [recipe](../recipes/host-under-a-sub-path.md) for limits.
+
+## Authored materials — DX P1-10, candidate
+
+New author component `Material` (`texture`, `repeat`, `wrap`, `roughness`, `metalness`,
+`emissive`, `emissiveIntensity`, `opacity`, `transparent`) with `defineMaterial` and
+`validateMaterial`. Bounds: repeat ≤ 1024, emissive intensity ≤ 16, kebab-case texture ids;
+invalid runtime data is reported once and drawn with the original material. Lifetime: one
+lease per (texture, wrap) view shared by the visit's surfaces, aborted with the visit; a
+texture change keeps the old view until the new one arrives. Overload: none beyond the texture library's existing admission. Candidate (branch
+`feat/dx-materials`); not integrated. Follow-ups outside this slice: particles, rigid-body
+physics, a game-facing multiplayer session, normal/roughness maps and `Mesh` texture
+coordinates.
