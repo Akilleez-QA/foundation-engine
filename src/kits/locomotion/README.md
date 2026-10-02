@@ -76,11 +76,10 @@ per step and no allocation besides the returned step record; two support queries
 adapter tick. The adapter keeps state only for its current target and drops it when
 that actor is despawned or renamed (`jumpStateCount(world)` reports it). Invalid steps, facts or ground answers
 throw before any state changes; a throwing tick is reported by the system runner.
-A press reported on consecutive ticks counts once, so a frame that runs several fixed
-ticks (and shows one press to each, as current main does) cannot double-jump. The rule
-reads only per-tick input, so a tick-input replay (`@kits/replay`) reproduces it. It
-also merges two genuine presses on adjacent ticks; once PR #19 delivers each press to
-exactly one tick, this filter is redundant and is to be removed.
+Presses are used as the input layer reports them. The stock runtime's press latch
+(STD-SIM-12, PR #19) shows each press to exactly one fixed tick, including through
+frames that run no tick, so the adapter adds no filter of its own: presses on adjacent
+ticks are two presses. A custom input source must keep that exactly-once contract.
 
 **Cancellation and recovery.** `cancelPress()` drops a pending press (`when` returning
 false does this). `reset()` clears everything; `resetJump(world, entity?)` does it for
@@ -90,9 +89,7 @@ release gravity does not cut.
 
 **Limitations.** No moving-platform velocity carry, wall contact, corner correction,
 slope limits or lateral blocking (lateral collision stays with `Walls`/`Solid`s). The
-support query is a height field per (x, z) at the actor centre, not a swept body. On
-current main a press that arrives in a frame running zero fixed ticks is lost before
-any tick sees it (displays above the tick rate); PR #19 retains it until the next tick.
+support query is a height field per (x, z) at the actor centre, not a swept body.
 The adapter never calls `step(0)`; a caller of the pure controller may use `dt = 0` to
 record a press during a frame that runs no tick. Evidence: unit tests at 30, 60, 120, 144, 165 and
 240 Hz ticks and display rates, including exact apex and identical fixed-step samples;

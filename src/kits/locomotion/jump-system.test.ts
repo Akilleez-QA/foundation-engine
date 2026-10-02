@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { defineEntity, defineInput, defineScene, testScene, Name, Transform, type SceneContext, type InputState } from '../../author';
 import { actionRows } from '../../author/compile';
 import { createSystemRunner } from '../../core/ecs/systems';
+import { createPressLatch } from '../../author/press-latch';
 import { InputActions, inputActionRegistry, type KeyEventLike } from '../../platform/input/actions';
 import { jumpSystem, jumpStateCount, resetJump } from './jump-system';
 
@@ -93,25 +94,28 @@ test('MV-01: invalid ground answers fail the tick; invalid options fail at defin
 });
 
 /**
- * The real fixed-step runner (60 Hz ticks) at display rates from 30 to 240 Hz. Input follows the current main-line
- * semantics: a press is visible to every fixed tick of the frame it arrived in (a 30 Hz frame runs two ticks). The
- * adapter must still jump exactly once, and the fixed-step trajectory must not depend on the display rate.
+ * The real fixed-step runner (60 Hz ticks) at display rates from 30 to 240 Hz, with the stock runtime's press latch:
+ * each press reaches exactly one fixed tick, including through frames that run no tick (displays above 60 Hz). One
+ * press must jump once, and the fixed-step trajectory must not depend on the display rate.
  */
 test('MV-01: one press jumps once and the trajectory is identical at display rates 30–240 Hz', async () => {
   const PRESS = 0.5, RELEASE = 0.5 + 1 / 3;   // both on a frame boundary at 30, 60, 120, 144 and 240 Hz
   const trace = async (hz: number) => {
     const t = await testScene(scene(), {});
     const tr = t.world.get(t.ctx.named('player')!, Transform)!;
-    let pressed = false, held = false, frame = 0, now = 0;
-    const input: InputState = { describe: () => null, pressed: id => id === 'jump' && pressed, held: id => id === 'jump' && held, axis: () => 0, pointer: { x: 0, y: 0, down: false, pressed: false } };
+    const latch = createPressLatch();
+    let held = false, frame = 0, now = 0;
+    const input: InputState = { describe: () => null, pressed: id => latch.has(id), held: id => id === 'jump' && held, axis: () => 0, pointer: { x: 0, y: 0, down: false, pressed: false } };
     const ctx = Object.create(t.ctx, { input: { value: input }, time: { get: () => ({ t: now, frame, calm: false }) } }) as SceneContext;
     const ys: number[] = [];
-    const runner = createSystemRunner<SceneContext>([jumpSystem({ action: 'jump', config, ground }), { id: 'probe', run() { ys.push(tr.y); } }], { step: 1 / 60, maxSteps: 8 });
+    const runner = createSystemRunner<SceneContext>([jumpSystem({ action: 'jump', config, ground }), { id: 'probe', run() { ys.push(tr.y); } }],
+      { step: 1 / 60, maxSteps: 8, beforeStep: () => latch.beginStep(), beforeFrameLane: () => latch.beginFrameLane() });
     // Frame i delivers what happened during (previous, now]; events land exactly on frame boundaries here.
     for (let i = 1; now < 2.5; i++) {
       const previous = now; now = i / hz; frame = i;
-      pressed = previous < PRESS - 1e-9 && now >= PRESS - 1e-9; held = now >= PRESS - 1e-9 && now < RELEASE - 1e-9;
-      runner.frame(ctx, now - previous);
+      if (previous < PRESS - 1e-9 && now >= PRESS - 1e-9) latch.add('jump');
+      held = now >= PRESS - 1e-9 && now < RELEASE - 1e-9;
+      runner.frame(ctx, now - previous); latch.endFrame();
     }
     t.dispose();
     const takeOff = ys.findIndex(y => y > 0), rises = ys.filter((y, i) => i > 0 && y > 0 && ys[i - 1] === 0).length;
@@ -135,22 +139,17 @@ test('MV-01: one press jumps once and the trajectory is identical at display rat
   }
 });
 
-test('MV-01: a press visible to several ticks of one frame is consumed once, even when the buffer outlasts the jump', async () => {
+test('MV-01: presses on adjacent ticks are two presses; the adapter adds no filter of its own', async () => {
   const t = await testScene(scene(), {});
   const tr = t.world.get(t.ctx.named('player')!, Transform)!;
   let pressed = false, frame = 0, rises = 0, last = 0;
   const input: InputState = { describe: () => null, pressed: id => id === 'jump' && pressed, held: () => false, axis: () => 0, pointer: { x: 0, y: 0, down: false, pressed: false } };
-  const ctx = Object.create(t.ctx, { input: { value: input }, time: { get: () => ({ t: frame / 30, frame, calm: false }) } }) as SceneContext;
+  const ctx = Object.create(t.ctx, { input: { value: input }, time: { get: () => ({ t: frame / 60, frame, calm: false }) } }) as SceneContext;
   const short = { height: 0.1, timeToApex: 0.1, bufferTime: 1, releaseGravityScale: 1 };
   const runner = createSystemRunner<SceneContext>([jumpSystem({ action: 'jump', config: short, ground }), { id: 'probe', run() { if (last === 0 && tr.y > 0) rises++; last = tr.y; } }], { step: 1 / 60 });
-  for (frame = 1; frame <= 60; frame++) { pressed = frame === 2; runner.frame(ctx, 1 / 30); }
-  assert.equal(rises, 1);
-  // A tick-input replay runs one tick per frame with the same per-tick facts: the outcome must not change.
-  for (frame = 61; frame <= 180; frame++) { pressed = frame === 62 || frame === 63; runner.frame(ctx, 1 / 60); }
-  assert.equal(rises, 2, 'consecutive-tick reports of one press jump once under replay framing');
-  // Two separate presses (released in between) are two presses.
-  for (frame = 181; frame <= 240; frame++) { pressed = frame === 182 || frame === 190; runner.frame(ctx, 1 / 60); }
-  assert.equal(rises, 4);
+  // The second press arrives while airborne and is buffered (1 s) until the landing: two presses, two jumps.
+  for (frame = 1; frame <= 120; frame++) { pressed = frame === 2 || frame === 3; runner.frame(ctx, 1 / 60); }
+  assert.equal(rises, 2);
   t.dispose();
 });
 
