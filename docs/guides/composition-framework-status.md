@@ -95,6 +95,7 @@ are contextual evidence, not verification of Foundation.
 | Asset residency (RES-01) | Optional per-preset texture/model byte budgets, pinned asset ids and a pressure hook over the existing lease caches | Implemented, candidate (PR #22); not integrated. Unit tests and a native software-renderer fixture only; defaults unchanged; no template configures it. See [asset residency](asset-residency.md). |
 | Multiplayer: peer rollback (RB-01) | Optional `@kits/rollback` session (prediction window, input delay, rollback/resimulation, confirmed-state checksums) and local sync test, driven from the fixed lane | Implemented, candidate (PR #25); not integrated. Focused headless tests and a `testScene` consumer only; requires a reliable, ordered link; no WAN, time-sync, spectator or device claim. |
 | Multiplayer: seeded fault schedules (NW-09) | Tool-only `npm run faults:network` harness replaying seeded combined faults against the authority workbench host with per-step invariants and exact seed/step repro | Implemented, candidate (PR #26); not integrated. Process-scope loopback evidence only; no WAN, power-loss, scale or device claim. See [guide](network-fault-schedule.md) |
+| Multiplayer: planned drain and lifetime (NW-08) | Optional host `createConnectionDrain` (bounded notice, operator drain/resume, dithered lifetime cap) and client `createDrainFollower` (hold until announced return, then the existing retry schedule) | Implemented, candidate (PR #21); not integrated. Unit, host socket and loopback browser tests; defaults unchanged; no process-restart, WAN or device claim. |
 | Manual tools | Bounded documents, sessions and optional appearance, progression, custody and objective desktop consumers | Integrated tools cover their finite schemas. Action tooling is integrated; recipe/effect inspectors are integrated in PR #118 with focused tests and final desktop workflow acceptance. Device support is selected per tool; desktop tooling does not impose a phone UI. |
 
 Priority is composition correctness before additional feature catalogs. A creator's
@@ -315,3 +316,12 @@ durable-history, result, prediction, disclosure, bound and leak invariants after
 every step. A failing seed prints its seed and step index and can be shrunk and
 replayed. Implemented, candidate (PR #26); not integrated. Process-scope loopback
 evidence only; it does not certify WAN, power-loss durability or devices.
+
+## Planned drain and capped lifetime (NW-08) — implemented, candidate
+
+The optional [connection drain](network-drain.md) lets a host give clients a bounded
+notice before a planned close, and rotate long-lived connections across a dithered
+window. Admitted work is never cancelled; clients that follow the notice hold until
+the announced return, then pace through the retry schedule. The network workbench
+uses it only when its host flag and client checkbox are set. Implemented, candidate
+(PR #21); not integrated. See the [ledger](upgrade-acceptance-ledger.md).

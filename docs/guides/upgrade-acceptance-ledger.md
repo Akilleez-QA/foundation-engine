@@ -73,6 +73,7 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | RES-01 | Bounded asset residency (texture/model budgets, pins, LRU eviction) | Implemented, candidate (PR #22); not integrated. Optional `defineGame({ residency })` applies per-preset `warmBytes`/`residentBytes` and pinned asset ids to the existing `LeaseCache` of the texture and model libraries; live and pinned assets are never evicted, over-ceiling pressure is reported once per transition with a creator hook, retained three.js resources are parked through public `dispose` events. Default unchanged (dispose at release). Evidence: focused unit tests, an opt-in native SwiftShader fixture (estimate vs uploaded mip chain, `renderer.info` counts, actual context loss) and a temporary composed probe; see [guide](asset-residency.md). No program-count budget, cross-library ceiling, physical-device memory or traversal-performance claim. |
 | RB-01 | Optional peer rollback sessions and local sync test (genre study 2026-10-02, slice 1) | Implemented, candidate (PR #25, `feat/genre-fighting-slice1`); not integrated. Optional `@kits/rollback`: `createRollbackSession` (2–8 peers, `maxPredictionFrames` 0–60, `inputDelay` 0–30, byte-bounded inputs/states, rollback to the earliest contradicted frame, stall at the window, confirmed-state checksums with bounded history/pending reports, fail-closed protocol faults, `AbortSignal` disposal) and `createRollbackSyncTest`. 25 focused tests, including seeded multi-peer convergence against a no-network reference, a sync test that compares every replay with the live step (fixed after review), late-peer pacing on the exposed `frameAdvantage`, and a `testScene` fixed-lane consumer. Requires a reliable, ordered link; there is no built-in time sync. No WAN, unreliable-channel, spectator, cross-browser floating-point or physical-device claim. See the section below and the [kit README](../../src/kits/rollback/README.md). |
 | NW-09 | Seeded fault-schedule harness for the composed authority path (study N6, tools/test only) | Implemented, candidate (PR #26); not integrated. `npm run faults:network` and `tools/authority-workbench/fault-harness.test.mjs` replay seeded combined faults (link delay/reorder/duplicate/drop, connection loss mid-command, controller replacement, held/crashed commits, host restart, SQLite before/after-commit failure with recovery, clock skew, slow consumer, revocation) against the reference host and two scripted clients, checking durable-history, result-semantics, prediction, disclosure, bound and leak invariants after every step against independent SQLite readback; failing seeds print seed + step index and can be shrunk and replayed. Process-scope loopback evidence only: no WAN, power-loss, filesystem, scale or device claim. See the [guide](network-fault-schedule.md). |
+| NW-08 | Planned drain and capped connection lifetime (study N8) | Implemented, candidate (PR #21, `feat/nw08-planned-drain`); not integrated. Optional pure `createConnectionDrain` (host: bounded notice, operator drain/resume, dithered lifetime cap, per-poll instruction cap) and `createDrainFollower` (client: bounded notice, cooperative close, hold until announced return, then the existing retry schedule) in the network kit; the network workbench host (`--drain`) and client (checkbox) opt in. Drain closes are 1012 and transient. Admitted work is never cancelled. Evidence and limits are in the NW-08 section below. No process-restart, WAN or physical-device claim. |
 | TR-01 | Regional terrain worker and ordinary-surface integration | Integrated in PR #109 at 99e6255. Canonical regional Surface and halo patches, bounded WorkerHost generation/patch adapters, independent geometric oracles and finite coherent render/query consumer passed at 891eb7; all seven template gates passed (1,648 tests, 129 performance checks, zero breaches/regressions, four advisory heap warnings). Combined main tests/build passed. Physical-device performance and unbounded/global streaming are not established. |
 | DV-01 | Supported-device experience and sustained performance evidence | In progress, not integrated: ported to the public `feat/device-acceptance` PR. [Stock matrix](../kits/stock-device-acceptance-matrix.md) covers all seven declarations. The [first receipt](../verification/stock-device-20261001/README.md) records 16 passing emulated target/tap checks and a compact lesson content overlap; lesson visit cleanup and a measured learn layout seam repair it, with a fake-DOM regression and emulated separation checks across board, sim and quiz at four profiles ([layout receipt](../verification/stock-device-20261002/README.md)). Full consumer workflows, in-panel touch scrolling, 200% text, named minimum devices and sustained physical evidence remain open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. No physical-device or accessibility certification. |
 
@@ -389,3 +390,31 @@ Tools/tests only; no engine runtime behaviour changed. See the
   existing SIGKILL storage/host tests remain that evidence), power loss, disk-full
   or filesystem faults, TCP/OS backpressure, scoped-view publisher faults, scale,
   browsers and physical devices.
+
+## Planned drain and capped lifetime (NW-08) — implemented, candidate
+
+Status: implemented, candidate on branch `feat/nw08-planned-drain` (PR #21); not integrated. See the [drain guide](network-drain.md).
+
+- Runtime-enforced: limit validation (exact keys, safe integers of at most one day,
+  `noticeMs + jitterMs < maxLifetimeMs`, `maxKeys` at most 65,536); drain requests
+  bounded by `maxNoticeMs`/`maxReconnectAfterMs`; lifetime close *scheduled* no
+  later than `maxLifetimeMs` (emission waits for the next poll and the per-poll cap,
+  so it may lag by a bounded, documented amount); at most `maxActionsPerPoll`
+  instructions per poll, notify before close, a late notice never postpones its
+  close; an operator drain reaches already-notified connections (close only earlier,
+  return only longer, one superseding notice when changed); nondecreasing time;
+  random-port validation; terminal disposal. The client follower refuses notices
+  beyond its own bounds and merges later notices monotonically.
+- Checked: 20 focused unit tests (including an operator drain reaching a
+  lifetime-notified connection, emission lag under the per-poll cap, seeded jitter distribution over 2,000
+  connections, 1,000-connection expiry under a per-poll cap, and reconnect after
+  host return through a real retry schedule with budget and exhaustion honoured);
+  4 host socket tests and 1 client protocol test; the network workbench browser
+  workflow shows a following client holding without opening a transport, an
+  ignoring client closed at the deadline with 1012 `drain` (transient), and both
+  reconnecting with fresh authentication after the operator resumes, with no
+  command resent. Exact-head gate results are in the PR.
+- Not established: a real process restart (reference "host return" is an operator
+  `resume` of the same process), close-frame delivery over lossy links, measured
+  reconnect storms, multi-host or rolling deploys, durable-authority host wiring,
+  physical devices and suitability of the example values for any game.

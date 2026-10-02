@@ -351,3 +351,157 @@ test('NW05: per-peer token bucket admits a capacity burst, closes the next burst
     await shutdown(host, peers);
   }
 });
+
+// NW-08: optional planned drain and capped connection lifetime.
+const closed = (peer) =>
+  new Promise((resolve) => {
+    if (peer.socket.readyState === WebSocket.CLOSED) resolve(peer.closedWith);
+    else
+      peer.socket.once('close', (code, reason) =>
+        resolve({ code, reason: reason.toString() }),
+      );
+  });
+const watchClose = (peer) => {
+  peer.socket.once('close', (code, reason) => {
+    peer.closedWith = { code, reason: reason.toString() };
+  });
+  return peer;
+};
+
+test('NW-08 drain is off by default: no drain state and the operator drain refuses', async () => {
+  const host = await startNetworkWorkbench({ autoDriver: false });
+  try {
+    assert.equal(host.read().drain, null);
+    assert.throws(
+      () => host.drain({ noticeMs: 0, reconnectAfterMs: 0 }),
+      /drain-disabled/,
+    );
+    assert.throws(() => host.resume(), /drain-disabled/);
+  } finally {
+    await shutdown(host);
+  }
+});
+
+test('NW-08 drain during in-flight work: queued commands still dispatch and reply; new commands are refused; the ignoring client is closed at the deadline', async () => {
+  const host = await startNetworkWorkbench({ autoDriver: false, drain: {} }),
+    peers = [];
+  try {
+    const a = watchClose(await connect(host, host.credentials.alpha));
+    peers.push(a);
+    command(a, 'queued-1', 'alpha', 2);
+    command(a, 'queued-2', 'alpha', 3);
+    await until(() => host.read().intake.queuedMessages === 2);
+    // Two notices for the same peer: the second may only shorten the close.
+    host.drain({ noticeMs: 300, reconnectAfterMs: 1000 });
+    assert.throws(
+      () => host.drain({ noticeMs: 60001, reconnectAfterMs: 0 }),
+      /drain-invalid/,
+    );
+    await until(() => a.frames.some((f) => f.type === 'drain'));
+    const results = a.frames.filter((f) => f.type === 'result');
+    assert.deepEqual(
+      results.map((f) => [f.id, f.value]),
+      [
+        ['queued-1', 2],
+        ['queued-2', 5],
+      ],
+      'admitted work completes before the notice',
+    );
+    const { closeInMs, ...notice } = a.frames.find((f) => f.type === 'drain');
+    assert.deepEqual(notice, {
+      v: 1,
+      type: 'drain',
+      cause: 'planned',
+      reconnectAfterMs: 1000,
+    });
+    // Whole milliseconds remaining on the host clock, never more than the requested notice.
+    assert.ok(Number.isSafeInteger(closeInMs) && closeInMs <= 300 && closeInMs >= 250);
+    command(a, 'late', 'alpha', 1);
+    await until(() =>
+      a.frames.some((f) => f.type === 'refused' && f.id === 'late'),
+    );
+    assert.equal(
+      a.frames.find((f) => f.id === 'late').reason,
+      'draining',
+    );
+    host.drain({ noticeMs: 5000, reconnectAfterMs: 1 });
+    assert.equal(a.frames.filter((f) => f.type === 'drain').length, 1);
+    // The client ignores the notice; the host still closes at the deadline with a transient code.
+    const started = Date.now();
+    const pumping = setInterval(() => host.pump(), 10);
+    try {
+      assert.deepEqual(await closed(a), { code: 1012, reason: 'drain' });
+    } finally {
+      clearInterval(pumping);
+    }
+    assert.ok(Date.now() - started < 1500);
+    assert.deepEqual(host.read().counters, { alpha: 5, beta: 0 });
+    assert.equal(host.read().metrics.dispatched, 2);
+    assert.equal(host.read().metrics.drainRefusals, 1);
+    assert.equal(host.read().intake.connections, 0);
+  } finally {
+    await shutdown(host, peers);
+  }
+});
+
+test('NW-08 a draining host refuses new connections transiently until resume, then admits fresh sessions', async () => {
+  const host = await startNetworkWorkbench({ autoDriver: false, drain: {} }),
+    peers = [];
+  try {
+    host.drain({ noticeMs: 0, reconnectAfterMs: 0 });
+    const refused = watchClose(await connect(host));
+    peers.push(refused);
+    assert.deepEqual(await closed(refused), { code: 1012, reason: 'drain' });
+    assert.equal(host.read().drain.counts.refusedDraining, 1);
+    assert.equal(host.read().intake.connections, 0);
+    assert.equal(host.resume(), true);
+    const fresh = await connect(host, host.credentials.beta);
+    peers.push(fresh);
+    assert.ok(fresh.frames.some((f) => f.type === 'authenticated'));
+    command(fresh, 'after', 'beta', 4);
+    await until(() => host.read().intake.queuedMessages === 1);
+    host.pump();
+    await until(() => fresh.frames.some((f) => f.type === 'result'));
+    assert.deepEqual(host.read().counters, { alpha: 0, beta: 4 });
+  } finally {
+    await shutdown(host, peers);
+  }
+});
+
+test('NW-08 capped lifetime: each connection is notified then closed within its dithered cap', async () => {
+  const samples = [0, 0.99];
+  const host = await startNetworkWorkbench({
+      driverMs: 5,
+      drain: {
+        lifetime: {
+          maxLifetimeMs: 600,
+          jitterMs: 300,
+          noticeMs: 100,
+          reconnectAfterMs: 50,
+        },
+        random: () => samples.shift() ?? 0,
+      },
+    }),
+    peers = [];
+  try {
+    const opened = Date.now();
+    const a = watchClose(await connect(host, host.credentials.alpha));
+    const b = watchClose(await connect(host, host.credentials.beta));
+    peers.push(a, b);
+    const [closeA, closeB] = await Promise.all([closed(a), closed(b)]);
+    const elapsed = Date.now() - opened;
+    assert.deepEqual(closeA, { code: 1012, reason: 'lifetime' });
+    assert.deepEqual(closeB, { code: 1012, reason: 'lifetime' });
+    for (const peer of [a, b]) {
+      const notice = peer.frames.find((f) => f.type === 'drain');
+      assert.equal(notice.cause, 'lifetime');
+      assert.equal(notice.reconnectAfterMs, 50);
+      assert.ok(notice.closeInMs <= 100);
+    }
+    assert.ok(elapsed < 1500, `closed within the cap plus scheduling slack (${elapsed} ms)`);
+    assert.equal(host.read().metrics.drainNotices, 2);
+    assert.equal(host.read().drain.tracked, 0);
+  } finally {
+    await shutdown(host, peers);
+  }
+});

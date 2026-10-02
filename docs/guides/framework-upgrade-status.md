@@ -535,3 +535,13 @@ and can be shrunk. Tools/tests only; the host gains optional, default-preserving
 fault seams. Implemented, candidate (PR #26); not integrated. Process-scope loopback
 evidence only. See the [guide](network-fault-schedule.md) and the
 [ledger](upgrade-acceptance-ledger.md).
+
+## Planned drain and capped lifetime — NW-08 implemented, candidate (PR #21)
+
+`createConnectionDrain` (host) and `createDrainFollower` (client), network kit, let a
+host announce a planned drain with a bounded notice and optionally cap connection
+lifetime with randomized dither, so clients stop new work, settle pending replies
+and reconnect through the existing retry schedule after the announced return. Both
+are optional and pure; drain closes are transient (1012). The network workbench host
+and client opt in. Implemented, candidate (PR #21); not integrated. Unit, host socket
+and loopback browser tests are its only evidence. See the [drain guide](network-drain.md).

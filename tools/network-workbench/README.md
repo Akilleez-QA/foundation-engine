@@ -94,6 +94,31 @@ a terminal close such as `auth-rejected` or `revoked` ends reconnecting at once 
 drops the retained credential. The read-out reports the validated `lastClose`
 (code, reason token, class); the reason is shown only as text.
 
+## Optional planned drain and capped lifetime (NW-08)
+
+Off by default. `server.mjs --drain` (or `startNetworkWorkbench({drain:{}})`)
+creates a [connection drain](../../docs/guides/network-drain.md) bounded by the
+connection limit, 60 s maximum notice and return delay, and 16 instructions per
+driver round; `--drain=<lifetime JSON>` (or `drain:{lifetime,random}`) also caps
+each connection's lifetime with dither. Operator methods `drain` (`noticeMs`,
+`reconnectAfterMs`) and `resume` exist over the same trusted IPC; without the flag
+they refuse with `drain-disabled` and `read().drain` is `null`.
+
+After a notice, `{v:1,type:'drain',cause,closeInMs,reconnectAfterMs}`, the host
+refuses that peer's new commands with `{type:'refused',reason:'draining',id}`
+while commands already queued still dispatch and reply. At the deadline it closes
+with code 1012 and reason `drain` or `lifetime`. While an operator drain is in
+force, new connections close at once with 1012 `drain`; `resume` is this
+reference's "host return" (the same process, so fixture credentials stay valid).
+
+The client's "Follow host drain notices" checkbox (off by default) applies the
+drain follower: Send is disabled, the client closes once pending replies settle
+(or at the deadline), then holds for the announced `reconnectAfterMs` before the
+existing retry schedule paces a fresh, freshly authenticated attempt. Unticked,
+the notice is shown but ignored and the host's 1012 close is paced as ordinary
+transient loss. Commands are never resent. These are example values, not
+recommendations for any game.
+
 ## Trusted harness controls and evidence
 
 `startNetworkWorkbench({port:0,autoDriver:true,driverMs:10})` returns `url`,

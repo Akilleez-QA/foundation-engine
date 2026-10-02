@@ -17,6 +17,7 @@ import { createTestApi } from '../../src/dev/test-api.ts';
 import { createBrowserTransport } from '../../src/platform/network/browser-transport.ts';
 import {
   createClosePolicy,
+  createDrainFollower,
   createRetrySchedule,
 } from '../../src/kits/network/index.ts';
 import { createRng } from '../../src/core/rng.ts';
@@ -68,6 +69,13 @@ function retryRandom() {
   const stream = runRandom.stream('network-workbench.reconnect');
   return () => stream.next();
 }
+// Optional planned drain (NW-08). Off unless "Follow host drain notices" is ticked: then a notice stops new commands,
+// the client closes once pending replies settle (or at the notice deadline) and waits for the host's announced return
+// before the retry schedule paces a fresh, freshly authenticated attempt.
+const drainLimits = { maxNoticeMs: 60000, maxReconnectAfterMs: 60000 };
+let follower = null,
+  lastNotice = null,
+  plannedCloses = 0;
 let message = 'Disconnected',
   lastDisplay = '',
   lastProjection = '';
@@ -95,11 +103,12 @@ function project() {
 }
 function render() {
   const state = transport?.read().state ?? 'disconnected';
-  const display = JSON.stringify([state, principal, value, message, active]);
+  const admits = follower?.admits() ?? true;
+  const display = JSON.stringify([state, principal, value, message, active, admits]);
   if (display === lastDisplay) return;
   el('status').textContent = principal ? `${principal} · ${state}` : state;
   el('result').textContent = message;
-  el('send').disabled = !active || state !== 'open' || !principal;
+  el('send').disabled = !active || state !== 'open' || !principal || !admits;
   el('connect').disabled = !active;
   lastDisplay = display;
   project();
@@ -121,6 +130,15 @@ function stopReconnect() {
   reconnectEndpoint = null;
   budgetRetryAt = null;
   retry?.cancel();
+  follower?.reset();
+}
+/** Planned loss: hold until the host's announced return, then pace through the retry schedule as usual. */
+function holdForDrain(reason, now) {
+  retire(reason);
+  const hold = follower.closed(now);
+  plannedCloses++;
+  if (hold.status === 'hold')
+    message = `${reason}; host expected back in ${Math.max(0, Math.round(hold.untilMs - now))} ms`;
 }
 function openTransport(url, token) {
   try {
@@ -181,6 +199,10 @@ function closedByHost(read, now) {
     class: terminal ? 'terminal' : 'transient',
   };
   const cause = remote?.reason ? `${read.reason}: ${remote.reason}` : read.reason;
+  if (!terminal && follower?.read().state === 'draining') {
+    holdForDrain(`Closed by host drain (${cause})`, now);
+    return;
+  }
   if (!terminal) {
     lost(`Connection ended: ${cause}`, now);
     return;
@@ -191,8 +213,30 @@ function closedByHost(read, now) {
 }
 function receive(raw, now) {
   const frame = decodeResponse(raw, { principal, pending });
+  if (frame.type === 'drain') {
+    lastNotice = frame;
+    if (!el('follow-drain').checked) {
+      message = `Host announced a ${frame.cause} drain (not followed)`;
+      return;
+    }
+    const outcome = follower.notice(
+      {
+        cause: frame.cause,
+        closeInMs: frame.closeInMs,
+        reconnectAfterMs: frame.reconnectAfterMs,
+      },
+      now,
+    );
+    if (outcome.status === 'invalid') throw Error('drain bounds');
+    if (outcome.status === 'draining' || outcome.status === 'updated')
+      message = `Host ${frame.cause} drain: finishing ${pending.size} pending; no new commands`;
+    lastFrame = frame;
+    return;
+  }
   if (frame.type === 'authenticated') {
     retry?.succeeded(now);
+    // The follower is not reset here: a notice can precede `authenticated` in one batch, and the drain must stand.
+    // A completed hold already cleared it (release), and explicit connect/stop paths reset it.
     principal = frame.principal;
     el('target').value = principal;
     message = 'Authenticated; no command result yet';
@@ -214,6 +258,10 @@ const poll = defineSystem({
     // The scene's own monotonic visit time; the schedule owns no timer.
     const now = ctx.time.t * 1000;
     const live = ['connecting', 'open'].includes(transport?.read().state);
+    if (!live && follower?.release(now)) {
+      if (reconnectCredential !== null && retry) scheduleReconnect(now);
+      else message = 'Host drain over; connect explicitly';
+    }
     if (!live && reconnectCredential !== null && retry) {
       if (budgetRetryAt !== null) {
         if (now >= budgetRetryAt) {
@@ -246,6 +294,13 @@ const poll = defineSystem({
         break;
       }
     }
+    if (
+      transport.read().state === 'open' &&
+      follower?.read().state === 'draining' &&
+      (pending.size === 0 || follower.closeDue(now))
+    )
+      // Cooperative close: replies to admitted commands have settled, or the notice ran out (outcome unknown, not resent).
+      holdForDrain('Closed for planned host drain', now);
     if (transport.read().state === 'closed') closedByHost(transport.read(), now);
     render();
   },
@@ -263,6 +318,7 @@ const scene = defineScene({
     context = ctx;
     // One schedule per scene visit; its budget spans every reconnect episode of this visit.
     retry = createRetrySchedule({ limits: retryLimits, random: retryRandom() });
+    follower = createDrainFollower({ limits: drainLimits });
     actor = null;
     lastProjection = '';
     lastDisplay = '';
@@ -279,6 +335,8 @@ const scene = defineScene({
     stopReconnect();
     retry?.dispose();
     retry = null;
+    follower?.dispose();
+    follower = null;
     active = false;
     context = null;
     actor = null;
@@ -313,6 +371,7 @@ el('send').addEventListener('click', () => {
     !active ||
     !principal ||
     !transport ||
+    !(follower?.admits() ?? true) ||
     pending.size >= 8 ||
     nextId === Number.MAX_SAFE_INTEGER
   )
@@ -398,6 +457,12 @@ window.networkWorkbench = {
       budgetRetryAt,
       transportsOpened,
       lastClose,
+    },
+    drain: {
+      follow: el('follow-drain').checked,
+      state: follower?.read() ?? null,
+      lastNotice,
+      plannedCloses,
     },
   }),
   world: () =>
