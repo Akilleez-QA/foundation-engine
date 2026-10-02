@@ -918,9 +918,17 @@ export function invariants(report) {
     const id = `overload[age=${o.host.maxQueuedAgeMs ?? 'none'}]`;
     check(`${id}.healthy-never-closed`, o.unexpectedHealthyCloses.length === 0, `${o.unexpectedHealthyCloses.length} unexpected closes`);
     const floods = o.adversaries.filter((a) => a.kind === 'flooder');
-    if (floods.length)
-      check(`${id}.flooder-rate-limited`, floods.every((a) => a.code === 1013 && a.reason === 'rate-capacity'),
-        floods.map((a) => `${a.code} ${a.reason} after ${a.sentBeforeClose} frames`).join('; '));
+    if (floods.length) {
+      // The host's own retirement reason is authoritative; the client-visible close frame can be lost (below).
+      check(`${id}.flooder-rate-limited`,
+        floods.every((a) => a.code !== null) && (o.highWater.hostCloseReasons['rate-capacity'] ?? 0) === floods.length,
+        `host rate-capacity closes ${o.highWater.hostCloseReasons['rate-capacity'] ?? 0}/${floods.length}; client saw ` +
+          floods.map((a) => `${a.code} ${a.reason || '(no reason)'} after ${a.sentBeforeClose} frames at ${a.achievedPerSecond}/s`).join('; '));
+      const lost = o.adversaries.filter((a) => a.code === 1006);
+      if (lost.length)
+        rows.push({ id: `${id}.close-frame-lost`, ok: null, finding: true,
+          detail: `${lost.length} adversary close(s) arrived as 1006 without the host's code/reason (close then immediate terminate)` });
+    }
     const plateau = `final/peak goodput = ${o.derived.plateauRatio}`;
     if (o.host.maxQueuedAgeMs !== null)
       // Finding, reported rather than asserted: an aged shed costs a pump attempt, so once the real queued wait

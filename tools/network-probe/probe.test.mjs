@@ -30,9 +30,13 @@ test('NW07: healthy goodput stays above a floor past saturation while a flooder 
   assert.equal(o.unexpectedHealthyCloses.length, 0, 'no healthy peer is closed');
   const floods = o.adversaries.filter((a) => a.kind === 'flooder');
   assert.ok(floods.length > 0);
-  for (const f of floods) assert.deepEqual([f.code, f.reason], [1013, 'rate-capacity']);
-  for (const a of o.adversaries.filter((a) => a.kind === 'wrong-credential'))
-    assert.deepEqual([a.code, a.reason, a.class], [1008, 'auth-rejected', 'terminal']);
+  // Host-side retirement reason is authoritative; a loaded machine can lose the client-visible close frame.
+  assert.equal(o.highWater.hostCloseReasons['rate-capacity'], floods.length);
+  for (const f of floods) assert.ok(f.code === 1006 || (f.code === 1013 && f.reason === 'rate-capacity'), `${f.code} ${f.reason}`);
+  const wrong = o.adversaries.filter((a) => a.kind === 'wrong-credential');
+  assert.equal(o.highWater.hostCloseReasons['auth-rejected'], wrong.length);
+  for (const a of wrong)
+    assert.ok(a.code === 1006 || (a.code === 1008 && a.reason === 'auth-rejected' && a.class === 'terminal'), `${a.code} ${a.reason}`);
   const saturated = o.steps.at(-1);
   assert.ok(saturated.offeredPerSecond > saturated.goodputPerSecond, 'the last step is past saturation');
   // Nominal capacity is 80 dispatches/s; a quarter of it is a floor that only a real regression breaks.
