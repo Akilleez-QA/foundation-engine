@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBrowserTransport, type BrowserSocket, type BrowserTransportOptions } from './browser-transport.ts';
+import { createBrowserTransport, parseRemoteClose, type BrowserSocket, type BrowserTransportOptions } from './browser-transport.ts';
 class Socket implements BrowserSocket {
   readyState = 0; bufferedAmount = 0; sent: string[] = []; closes = 0;
   listeners = new Map<string, Set<EventListener>>();
@@ -136,4 +136,41 @@ test('hidden or undrained consumer has bounded admitted retention and must repla
   for (let i = 0; i < 100; i++) socket.emit('message', 'full-view');
   assert.equal(transport.read().reason, 'queue-overflow'); assert.equal(transport.read().queuedMessages, 0); assert.equal(transport.read().receivedMessages, 2);
   assert.deepEqual(transport.drain(3), []); assert.equal(socket.count, 0);
+});
+
+test('remote close code and reason are bounded tokens or null, never raw remote text', () => {
+  const close = (code: unknown, reason: unknown) => parseRemoteClose({ code, reason });
+  assert.deepEqual(close(1008, 'auth-rejected'), { code: 1008, reason: 'auth-rejected' });
+  assert.deepEqual(close(4000, 'a'), { code: 4000, reason: 'a' });
+  assert.deepEqual(close(1000, 'x'.repeat(64)), { code: 1000, reason: 'x'.repeat(64) });
+  assert.equal(close(1000, 'x'.repeat(65)).reason, null);
+  assert.equal(close(1000, 'x'.repeat(1 << 20)).reason, null);
+  for (const reason of ['', ' auth', 'auth rejected', '<b>auth</b>', '-lead', 'é', 'a\nb', 'a"b', 7, null, undefined, {}])
+    assert.equal(close(1008, reason).reason, null, String(reason));
+  for (const code of [999, 5000, 1008.5, NaN, Infinity, '1008', null, undefined])
+    assert.equal(close(code, 'ok').code, null, String(code));
+  assert.ok(Object.isFrozen(close(1000, 'ok')));
+  const hostile = { get code(): number { throw Error('code'); }, get reason(): string { throw Error('reason'); } };
+  assert.deepEqual(parseRemoteClose(hostile), { code: null, reason: null });
+  assert.deepEqual(parseRemoteClose(null), { code: null, reason: null });
+});
+
+test('remote close is reported only for a peer close; local retirement and existing reasons are unchanged', () => {
+  const { socket, transport } = fixture();
+  assert.equal(transport.read().remoteClose, null);
+  socket.open();
+  const event = Object.assign(new Event('close'), { code: 1008, reason: 'auth-rejected' });
+  for (const listener of [...socket.listeners.get('close')!]) listener(event);
+  assert.equal(transport.read().reason, 'remote-close');
+  assert.deepEqual(transport.read().remoteClose, { code: 1008, reason: 'auth-rejected' });
+  // A late second close cannot replace the recorded cause, and disposal preserves it.
+  for (const listener of [...(socket.listeners.get('close') ?? [])]) listener(Object.assign(new Event('close'), { code: 1000, reason: 'other' }));
+  transport.dispose();
+  assert.deepEqual(transport.read().remoteClose, { code: 1008, reason: 'auth-rejected' });
+  const local = fixture(); local.socket.open(); local.transport.dispose();
+  assert.equal(local.transport.read().reason, 'disposed'); assert.equal(local.transport.read().remoteClose, null);
+  const error = fixture(); error.socket.open(); error.socket.emit('error');
+  assert.equal(error.transport.read().remoteClose, null);
+  const bare = fixture(); bare.socket.open(); bare.socket.emit('close');
+  assert.deepEqual(bare.transport.read().remoteClose, { code: null, reason: null });
 });

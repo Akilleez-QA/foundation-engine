@@ -278,3 +278,17 @@ Status: implemented, candidate on branch `feat/nw04-reconnect-schedule` (PR #14)
 - Not established: WAN loss, a measured reconnect storm against a real host,
   physical devices and suitability of the example limits for any game. The browser
   transport still never retries by itself.
+
+### NW-04 follow-up: terminal close classification — candidate
+
+Status: candidate (PR #16), building on integrated NW-04 (PR #14); not integrated.
+
+- Runtime-enforced: remote close code 1000–4999 or `null`; reason a token of at most
+  64 characters or `null`, length-checked before matching; first close wins; local
+  causes report `null`. Close policy lists are validated, bounded (32) and captured.
+- Checked: transport and close-policy unit tests; the network workbench browser
+  workflow shows a revoked credential stopping after exactly one transport under the
+  default policy (Chromium received 1008 `auth-rejected`), and the previous bounded
+  exhaustion when refusals are treated as transient.
+- Not established: close-frame delivery over slow or lossy links (a lost frame is
+  1006, classified transient), other hosts' reason vocabularies, physical devices.

@@ -76,8 +76,8 @@ fixture credential for this host lifetime.
 ## Optional paced reconnect (NW-04)
 
 The browser client has a "Reconnect automatically" checkbox, off by default. When
-checked, an unexpected close (including an injected send refusal or a rejected
-authentication) asks one per-visit [retry schedule](../../docs/guides/network-retry.md)
+checked, an unexpected close (for example an injected send refusal, or a rejected
+authentication when refusals are not treated as final) asks one per-visit [retry schedule](../../docs/guides/network-retry.md)
 for a jittered wait: base 250 ms, cap 4,000 ms, five attempts per episode, and a
 budget of eight retries refilling one per 15 s. When due, it opens a fresh transport
 and authenticates again; on `authenticated` the episode ends. It never resends a
@@ -86,6 +86,13 @@ reply was lost stays applied once. Protocol errors, Disconnect, unticking the bo
 hidden page, page exit and scene exit stop reconnecting and drop the retained
 credential. Time is the scene's frame time; jitter uses a dedicated stream that
 `?seed=` replays. These are example limits, not recommendations for any game.
+
+The host closes with code 1008 (1013 for capacity) and the intake reason as the
+close reason. "Treat host refusals as final" (on by default) applies the network
+kit's default [close policy](../../docs/guides/network-retry.md#terminal-refusals-and-transient-loss):
+a terminal close such as `auth-rejected` or `revoked` ends reconnecting at once and
+drops the retained credential. The read-out reports the validated `lastClose`
+(code, reason token, class); the reason is shown only as text.
 
 ## Trusted harness controls and evidence
 

@@ -346,6 +346,15 @@ at one layer; reconnecting does not make an unknown command outcome safe to rese
 See the [retry pacing guide](../../../docs/guides/network-retry.md). Implemented as a
 candidate (NW-04); not integrated, and no WAN or physical-device acceptance.
 
+`createClosePolicy({terminalReasons?, terminalCodes?})` classifies the browser
+transport's validated `remoteClose` (`{code, reason}` or `null`) as `terminal` or
+`transient`, so a consumer stops reconnecting on a refusal that would repeat.
+Defaults: reasons `auth-rejected` and `revoked`, codes 1002, 1003 and 1007; `[]`
+means none; at most 32 distinct entries each. Unknown causes are transient. The
+close reason is untrusted remote input: the transport keeps it only as a bounded
+token, and consumers display it only as text. See
+[terminal refusals](../../../docs/guides/network-retry.md#terminal-refusals-and-transient-loss).
+
 NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. Clean native acceptance passed at `8317c69` with seven observations; 17 storage/host checks passed on Node 22.13. DV-01 remains open. The [acceptance ledger](../../../docs/guides/upgrade-acceptance-ledger.md)
 records revisions, process evidence and outstanding work. Application credit,
 command consumption, durable commitment and disclosure permission remain distinct.

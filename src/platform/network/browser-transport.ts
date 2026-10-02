@@ -25,6 +25,27 @@ export type BrowserTransportReason = 'disposed' | 'remote-close' | 'socket-error
 export type BrowserSendResult = Readonly<{ status: 'sent' } | {
   status: 'refused'; reason: 'not-open' | 'busy' | 'message-type' | 'message-too-large' | 'backpressure' | 'send-error';
 }>;
+/**
+ * What the remote peer said when it closed, after validation. Both fields are untrusted remote input:
+ * `code` is an integer in [1000, 4999] or null; `reason` is a bounded token matching
+ * `CLOSE_REASON_TOKEN` or null (absent, oversized or not a token). Never render it as markup.
+ */
+export type BrowserRemoteClose = Readonly<{ code: number | null; reason: string | null }>;
+/** At most 64 ASCII letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit. */
+export const CLOSE_REASON_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
+export const MAX_CLOSE_REASON_LENGTH = 64;
+/** Bound and validate a native close event; never throws and never retains the raw event or text. */
+export function parseRemoteClose(event: unknown): BrowserRemoteClose {
+  let code: unknown = null, text: unknown = null;
+  try { code = (event as CloseEvent).code; } catch { code = null; }
+  try { text = (event as CloseEvent).reason; } catch { text = null; }
+  return Object.freeze({
+    code: typeof code === 'number' && Number.isInteger(code) && code >= 1000 && code <= 4999 ? code : null,
+    // Check type and length before the pattern so an oversized remote string is never scanned.
+    reason: typeof text === 'string' && text.length > 0 && text.length <= MAX_CLOSE_REASON_LENGTH
+      && CLOSE_REASON_TOKEN.test(text) ? text : null,
+  });
+}
 const capabilities = Object.freeze({ ordered: true, reliable: true, text: true, binary: false, incomingBackpressure: false });
 const positive = (n: number): number => {
   if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 1) throw Error('network: positive safe integer required');
@@ -72,6 +93,7 @@ export function createBrowserTransport(options: BrowserTransportOptions) {
   Object.freeze(protocols);
   let state: 'connecting' | 'open' | 'closed' | 'disposed' = 'connecting';
   let reason: BrowserTransportReason | null = null;
+  let remoteClose: BrowserRemoteClose | null = null;
   let socket: BrowserSocket | null = null, sending = false;
   let queue: { text: string; bytes: number }[] = [], queuedBytes = 0;
   let receivedMessages = 0, receivedBytes = 0, sentMessages = 0, sentBytes = 0, refusedSends = 0;
@@ -108,7 +130,11 @@ export function createBrowserTransport(options: BrowserTransportOptions) {
     queue.push({ text: data, bytes: size }); queuedBytes += size;
     receivedMessages = saturate(receivedMessages); receivedBytes = saturate(receivedBytes, size);
   };
-  const closed: EventListener = () => finish('remote-close', false);
+  const closed: EventListener = event => {
+    if (!live()) return;
+    remoteClose = parseRemoteClose(event);
+    finish('remote-close', false);
+  };
   const error: EventListener = () => finish('socket-error');
   try {
     const factory = options.socketFactory;
@@ -158,7 +184,7 @@ export function createBrowserTransport(options: BrowserTransportOptions) {
       return Object.freeze(rows.map(row => row.text));
     },
     read() {
-      return Object.freeze({ state, reason, queuedMessages: queue.length, queuedBytes,
+      return Object.freeze({ state, reason, remoteClose, queuedMessages: queue.length, queuedBytes,
         receivedMessages, receivedBytes, sentMessages, sentBytes, refusedSends, limits, capabilities });
     },
     dispose() {

@@ -15,7 +15,10 @@ import {
 } from '../../src/author/index.ts';
 import { createTestApi } from '../../src/dev/test-api.ts';
 import { createBrowserTransport } from '../../src/platform/network/browser-transport.ts';
-import { createRetrySchedule } from '../../src/kits/network/index.ts';
+import {
+  createClosePolicy,
+  createRetrySchedule,
+} from '../../src/kits/network/index.ts';
 import { createRng } from '../../src/core/rng.ts';
 import { runRandom } from '../../src/core/run-random.ts';
 
@@ -46,6 +49,10 @@ const retryLimits = {
   maxAttempts: 5,
   budget: { capacity: 8, refillEveryMs: 15000 },
 };
+// Which validated host close reasons/codes end reconnecting. The stock default (credential refusal, protocol
+// violation) applies while "Treat host refusals as final" is ticked; unticked, every loss is paced as transient.
+const closePolicy = createClosePolicy();
+let lastClose = null;
 let retry = null,
   reconnectCredential = null,
   reconnectEndpoint = null,
@@ -130,6 +137,7 @@ function connect() {
   if (!active || !context) return;
   retire('Connecting');
   stopReconnect();
+  lastClose = null;
   const token = el('credential').value,
     url = el('endpoint').value;
   el('credential').value = '';
@@ -161,6 +169,25 @@ function scheduleReconnect(now) {
 function lost(reason, now) {
   retire(reason);
   scheduleReconnect(now);
+}
+/** A remote close is untrusted input: only the transport's validated token/code reach the policy and the text. */
+function closedByHost(read, now) {
+  const remote = read.remoteClose;
+  const terminal =
+    el('final-refusals').checked && closePolicy.classify(remote) === 'terminal';
+  lastClose = {
+    code: remote?.code ?? null,
+    reason: remote?.reason ?? null,
+    class: terminal ? 'terminal' : 'transient',
+  };
+  const cause = remote?.reason ? `${read.reason}: ${remote.reason}` : read.reason;
+  if (!terminal) {
+    lost(`Connection ended: ${cause}`, now);
+    return;
+  }
+  // A refusal will repeat on a fresh connection: stop, forget the credential, and wait for the operator.
+  retire(`Refused by host (${cause}); connect explicitly`);
+  stopReconnect();
 }
 function receive(raw, now) {
   const frame = decodeResponse(raw, { principal, pending });
@@ -219,8 +246,7 @@ const poll = defineSystem({
         break;
       }
     }
-    if (transport.read().state === 'closed')
-      lost(`Connection ended: ${transport.read().reason}`, now);
+    if (transport.read().state === 'closed') closedByHost(transport.read(), now);
     render();
   },
 });
@@ -371,6 +397,7 @@ window.networkWorkbench = {
       last: lastRetry,
       budgetRetryAt,
       transportsOpened,
+      lastClose,
     },
   }),
   world: () =>
