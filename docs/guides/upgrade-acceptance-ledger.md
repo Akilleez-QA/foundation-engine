@@ -77,6 +77,7 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | NW-07 | Overload and goodput acceptance probe (study N4), tools only | Integrated in v0.2.0 (PR #27; batch PR #46). `npm run probe:network` forks the network and replication reference hosts and drives them over real loopback WebSockets: offered-load ramp past saturation (FIFO and queue-age variants), flooder/wrong-credential/over-bound adversaries, a physical paused-socket non-reader, and a host-restart reconnect storm paced by `createRetrySchedule`. Three default runs at `0744509` (load average 94 to 113, niceness 15): FIFO goodput plateaued at the host's achieved capacity (67.9 to 84.1/s at 89 to 119/s offered); all 27 flooders retired `rate-capacity`; no healthy peer closed; the non-reader was retired `send-refused` by the replication host's buffered cap in 2 of 3 runs (host buffered at most 127,213 of 131,072 bytes) and stayed bounded in the third; jitter cut the peak accepted reconnects per 100 ms bin from 6 to 8 to 2. Finding (then): a queue age shorter than the real queued wait collapsed goodput (300 ms: final/peak 0.09 to 0.31). It is resolved by the NW-06 follow-up (PR #33), and the probe now asserts queue-age plateaus. Loopback/process scope only: no WAN, browser, multi-machine or physical-device claim. [Guide](network-overload.md), [evidence](../verification/network-overload-20261002/README.md). |
 | SEC-01 | Command integrity (anti-cheat) at the authoritative host | Slice A integrated in v0.2.0 (PR #20; batch PR #47). Optional `createIntegrity` in the network kit ([guide](integrity.md), [recipe](../recipes/add-command-integrity.md)): pure `assess` validity usable inside the authority reducer (invalid sequenced commands consumed as domain rejections, so no `gap` and prediction reconciles), separate `admit`/`record` policy (decaying per-key scores, tick-rate budget on rate admission, throttle, windowed close with terminal `integrity-violation`, per-rule ceilings, owner/rule observe mode), key table that never refuses new keys, bounded local audit with export, tick-addressed generic helpers and an `assertDisclosure` test helper. Network workbench opt-in example (`--integrity`). Focused unit tests (including an in-memory authority/prediction composition) and loopback host tests only; no browser composition, load, WAN, physical-device, detection-quality or real-world cheat-resistance claim. Slice B (verified runs via the SIM-01 replay kit) is designed in the guide and not built; its SIM-01 dependency (PR #17) is merged. |
 | SIM-02 | Creator-chosen replay digest and divergence detail (backlog W1-1) | Implemented, candidate (PR #58), not integrated. See the SIM-01 section below and the [replay guide](replay-divergence.md#choose-what-a-replay-must-reproduce-sim-02). Focused tests and the arcade browser replay passed on the branch; no physical-device, cross-browser or multiplayer claim. |
+| MP-01 | Newcomer shared session: game-facing `@kits/network` session helpers, `npm run host`, `shared-world` template | Implemented, candidate (PR #61); not integrated. `defineSessionRules`, `createSession` and transport-neutral `createSessionHost` compose existing owners (intake, NW-02 views, prediction, NW-04 retry, close policy, NW-05 rate admission, SEC-01 integrity in observe mode). Unit, loopback socket and one desktop headless Chromium two-context check; template gate passed. Evidence and limits are in the MP-01 section below. LAN/loopback only: no accounts, matchmaking, NAT traversal, WAN, TLS, physical-device or scalability claim. |
 | AU-01 | Audio-clock timeline: audio↔frame time mapping with drift correction, bounded lookahead scheduling, input timestamps in audio time, stored latency calibration | Integrated in v0.2.0 (PR #31; batch PR #47). Optional `createAudioTimeline` ([guide](audio-timeline.md), [recipe](../recipes/sync-gameplay-to-music.md)) reads the one audio output through new `AudioOutput.clock()`; adds `CueVoiceOptions.at`, `ctx.audioClock()`, `ctx.time.now`, `ctx.input.pressedAt()` and audio unlock on scene action presses. Focused unit tests with a simulated drifting, quantised device; author-API scene tests with an injected clock and on the silent fallback. No real-browser output timing, Bluetooth, physical-device or audible verification (test browsers are muted). Streamed music remains off the context clock. |
 | AU-02 | Music on the audio clock: decoded songs started, sought, looped and stopped at exact context times | Implemented, candidate (PR #54); not integrated. `ctx.playMusic` / `AudioOutput.playMusic` ([guide](music-on-clock.md), [recipe](../recipes/sync-gameplay-to-music.md#1b-play-the-song-on-the-same-clock)) on a music bus that follows the music volume and mute, with its own sound-file store under `musicBudgets(minimum device)` (file budget = decoded budget ÷ 24, timeout scaled to the file budget); late decodes skip ahead (or drop) to keep sync; hand-offs re-time on repeated seeks and respect a scheduled stop; scene-owned voices. Focused fake-context tests, including a chart on the AU-01 timeline equal to song seconds. No real-browser timing, device decode-cost, memory-pressure or audible verification. The `music(url)` element path is unchanged. |
 | TR-01 | Regional terrain worker and ordinary-surface integration | Integrated in PR #109 at 99e6255. Canonical regional Surface and halo patches, bounded WorkerHost generation/patch adapters, independent geometric oracles and finite coherent render/query consumer passed at 891eb7; all seven template gates passed (1,648 tests, 129 performance checks, zero breaches/regressions, four advisory heap warnings). Combined main tests/build passed. Physical-device performance and unbounded/global streaming are not established. |
@@ -682,3 +683,44 @@ Status: implemented, candidate (`feat/mv02-moving-platforms`, PR #53); not integ
     paused, the riding sweep, coyote grace, the boost clamp and the sub-step refusal.
 - Not established: feel on any device, any template or browser consumer, rotating or
   sloped platforms, side pushing, and render interpolation between ticks (the next slice).
+
+## Newcomer shared session (MP-01) — implemented, candidate
+
+Status: implemented, candidate (PR #61); not integrated. Guide:
+[shared session](multiplayer-session.md); recipe:
+[two players in one world](../recipes/two-players-one-world.md).
+
+- Runtime-enforced: rules validated and frozen at definition (token id, positive
+  version, 1-16 players, functions present, a valid initial world); every world a
+  creator function returns is checked against id syntax, `maxEntities` and JSON bounds
+  before it is adopted or published; join code (16-128 URL-safe characters, compared
+  without early exit; `--join` also needs 10 distinct characters), rules id/version
+  match, player slots, joining-connection pool with a per-address cap (2) and a
+  resume-only reserve with a 500 ms deadline, 1.5 s join deadline and pre-join frame
+  count, per-connection frame token bucket (credit-releasing acks free), client action
+  pacing (30/s) and pending bound equal to the host queue (16), raw frame size,
+  per-connection and global queued actions, exact action sequence, one view credit per
+  connection under view limits, idle and away timeouts; client pending-action bound,
+  view-sized inbound queue, retry schedule and budget, terminal close classification,
+  and page endpoints limited to loopback and private LAN hosts. `npm run host` binds
+  127.0.0.1 unless `--lan`, accepts only loopback browser origins in loopback mode (LAN
+  origins too with `--lan`) and prints a development-only warning.
+- Checked: `src/kits/network/session.test.ts` (15 tests, in-memory sockets, including an
+  idle-socket flood probe, a 60 Hz `act` regression and a queue-size burst),
+  `scripts/host.test.mjs` (4 tests, real loopback WebSockets),
+  `templates/shared-world/game/world.test.ts` (S1: local play and host core give the
+  same world), `npm run test:session-browser` (two isolated headless Chromium contexts,
+  SwiftShader, one loopback host: join, move and paint seen by the other page, host
+  restart on the same port with the same join code ridden out by paced reconnects, wrong join code terminal
+  with one attempt, integrity observe-only, no page errors). The template gate
+  (`npm run gate -- --game templates/shared-world/game`) passed with 2,518 tests and 11
+  performance checks at the first candidate. After review the board became one mesh:
+  the measured worst case (four joined players, all 49 cells painted, SwiftShader) is
+  6 draws and 1,764 triangles, within the derived `world` budget of 10 draws (lowered
+  from the first candidate's 60).
+  Exact revisions are recorded in the PR description.
+- Not established: LAN between separate devices, WAN, TLS, NAT traversal, accounts,
+  matchmaking, persistence across host restarts, drain (NW-08) on this path, host
+  liveness detection by clients, physical-device input or performance, touch, more than
+  four players, load or scalability, a joining-socket flood from many LAN addresses at
+  once, and integrity enforcement quality (only observe mode is exercised in a browser).

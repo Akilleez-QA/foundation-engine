@@ -721,3 +721,19 @@ bus following the music volume and mute, music-sized decode bounds per minimum d
 and skip-ahead for late decodes. Status: implemented, candidate (PR #54); not
 integrated. Evidence is fake-context unit tests only; no browser, device or audible
 verification.
+
+## Newcomer shared session — MP-01 implemented, candidate
+
+Game code could not import the browser transport and there was no runnable shared
+world. `@kits/network` now exports `defineSessionRules` (one pure rules file for page
+and host), `createSession` (a per-visit page owner: local play without an endpoint;
+otherwise transport, complete views, prediction reconciled on the view sequence and the
+host's `processed` count, paced reconnect and terminal close classification, never
+resending lost actions) and `createSessionHost` (transport-neutral authority over the
+intake, one view publisher per connection, a frame token bucket and integrity in
+observe mode). `npm run host` is a development-only loopback/LAN `ws` host that loads a
+game's `session.ts`; the `shared-world` template is the representative consumer. No
+existing owner changed behaviour. Status: implemented, candidate (PR #61); not
+integrated. Evidence is unit, loopback socket and one desktop headless Chromium
+two-context check; see the [guide](multiplayer-session.md) and the
+[ledger](upgrade-acceptance-ledger.md#newcomer-shared-session-mp-01--implemented-candidate).

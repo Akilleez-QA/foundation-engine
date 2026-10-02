@@ -35,3 +35,14 @@ export type { Integrity, IntegrityOptions, IntegrityLimits, IntegrityRule, Integ
   IntegrityAuditEntry, IntegrityKeyState, IntegrityStats, IntegrityRefusalReason, IntegrityTickClaim } from './integrity';
 export { assertDisclosure, findDisclosureLeaks, MAX_DISCLOSURE_LEAKS } from './disclosure';
 export type { DisclosureLeak, DisclosurePredicate } from './disclosure';
+
+// MP-01: a game-facing shared session over the owners above (rules, transport-neutral host, client).
+export { defineSessionRules, checkWorld, DEFAULT_SESSION_LIMITS, MAX_SESSION_PLAYERS } from './session-rules';
+export type { SessionRules, SessionRulesInput, SessionWorld, SessionLimits, SessionIntegrityState } from './session-rules';
+export { createSessionHost, DEFAULT_SESSION_HOST_LIMITS } from './session-host';
+export type { SessionHost, SessionHostOptions, SessionHostLimits, SessionHostPorts, SessionHostSnapshot,
+  SessionHostIntegrity } from './session-host';
+export { createSession, sessionEndpointFromPage, isLocalNetworkHost } from './session-client';
+export type { Session, SessionClientOptions, SessionEndpoint, SessionSnapshot, SessionStatus } from './session-client';
+export { SESSION_PROTOCOL_VERSION, SESSION_SELF_ENTITY, SESSION_TERMINAL_REASONS, SESSION_TERMINAL_CODES,
+  SESSION_CLOSE_CODES, sessionViewLimits } from './session-protocol';
