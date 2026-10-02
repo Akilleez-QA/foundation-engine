@@ -222,6 +222,8 @@ open, and minimum phone, tablet and laptop/desktop profiles are pending creator
 selection. DV-01 and the overall upgrade goal remain active. See the
 [continuing ledger](upgrade-acceptance-ledger.md) for the authoritative work state.
 
+## Program preparation candidate (2026-10-01) — public PR #10, not integrated
+
 Program preparation candidate: context-owned link validation, bounded submitted
 program readiness and author recovery passed public checkpoint `2cdd442` across
 all seven template gates and inspected desktop/mobile snapshots. Integration is pending. See [contract](program-preparation.md). No performance,

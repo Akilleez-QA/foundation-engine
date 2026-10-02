@@ -239,6 +239,8 @@ NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private
 The workflow is configured in CI; no remote CI result is claimed. DV-01 remains open, with minimum phone, tablet and laptop/desktop profiles pending creator selection. Process-crash tests do not establish power loss, arbitrary
 filesystems, trustworthy old backups, WAN scale or supported physical devices.
 
+## Program preparation candidate (2026-10-01) — public PR #10, not integrated
+
 Program preparation candidate: context-owned link validation, bounded submitted
 program readiness and author recovery passed public checkpoint `2cdd442` across
 all seven template gates and inspected desktop/mobile snapshots. Integration is pending. See [contract](program-preparation.md). No performance,
