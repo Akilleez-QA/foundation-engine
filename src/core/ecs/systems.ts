@@ -7,6 +7,8 @@
  * - `frame` systems run once per frame with the frame's elapsed time (presentation, cameras, UI).
  * Systems run in declaration order within their lane. A throwing system is reported and skipped for that frame; the
  * others still run.
+ * - `beforeStep` runs before each fixed step and `beforeFrameLane` before the per-frame lane, so an owner can address
+ *   input to the tick that consumes it (STD-SIM-12). They must not throw.
  */
 export interface SystemSpec<C> {
   id: string;
@@ -25,7 +27,7 @@ export interface SystemRunner<C> {
   readonly alpha: number;
 }
 
-export function createSystemRunner<C>(systems: readonly SystemSpec<C>[], o: { step?: number; maxSteps?: number; report?: (id: string, error: unknown) => void; after?: () => void } = {}): SystemRunner<C> {
+export function createSystemRunner<C>(systems: readonly SystemSpec<C>[], o: { step?: number; maxSteps?: number; report?: (id: string, error: unknown) => void; after?: () => void; beforeStep?: () => void; beforeFrameLane?: () => void } = {}): SystemRunner<C> {
   const step = o.step ?? 1 / 60, maxSteps = o.maxSteps ?? 5;
   if (!(step > 0)) throw Error('the fixed step must be positive');
   const ids = new Set<string>();
@@ -48,9 +50,10 @@ export function createSystemRunner<C>(systems: readonly SystemSpec<C>[], o: { st
       stats.frames++;
       acc += Math.max(0, Math.min(dt, 1));
       let n = 0;
-      while (acc >= step - 1e-9 && n < maxSteps) { for (const s of fixed) run(s, ctx, step); acc -= step; n++; }
+      while (acc >= step - 1e-9 && n < maxSteps) { o.beforeStep?.(); for (const s of fixed) run(s, ctx, step); acc -= step; n++; }
       if (acc >= step - 1e-9) { const extra = Math.floor(acc / step + 1e-9); stats.dropped += extra; acc -= extra * step; }
       stats.steps += n;
+      o.beforeFrameLane?.();
       for (const s of perFrame) run(s, ctx, dt);
       o.after?.();
       return n;

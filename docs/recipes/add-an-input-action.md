@@ -25,7 +25,12 @@ export default defineInput({ id: 'steer', label: 'Steer', axis: {
 
 ## 2. Read it
 
-In a system: `ctx.input.pressed('jump')` (this frame), `ctx.input.held('jump')`, `ctx.input.axis('steer')`, `ctx.input.pointer`.
+In a system: `ctx.input.pressed('jump')`, `ctx.input.held('jump')`, `ctx.input.axis('steer')`, `ctx.input.pointer`.
+
+`pressed` (and `pointer.pressed`) is true in exactly one fixed tick, the first after the press, even when a short
+frame (120 Hz and faster displays) or a resumed `dt = 0` frame ran no tick; a `phase: 'frame'` system sees it in the
+frame it arrived. Cancellation (an overlay or pause, a hidden tab, lost input ownership, leaving the scene) releases a
+press no tick has seen yet (STD-SIM-12).
 
 ## 3. Test
 
