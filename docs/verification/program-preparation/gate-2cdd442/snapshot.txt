@@ -1,0 +1,7 @@
+npm notice run foundation-engine@0.1.0 play:snap
+npm notice run node scripts/generate.mjs && node scripts/play/snap.mjs --mobile
+strings: wrote src/core/i18n/keys.gen.ts, src/generated/strings/en/narration.json, src/generated/strings/compact-ids.json (25 keys from 6 shards)
+play:snap garden: playtest/latest/garden-desktop.png, playtest/latest/garden-mobile.png
+  world: 11 entities · state {"exploreReady":true,"near":null} · player (0, 1.767)
+  moving: 60 fps (p95 16.8 ms), 10 draws, 1306 tris · still: 26 renders · within budget
+  details: playtest/latest/probe.json

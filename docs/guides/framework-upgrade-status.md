@@ -406,10 +406,10 @@ selection. DV-01 and the overall upgrade goal remain active. See the
 [continuing ledger](upgrade-acceptance-ledger.md) for the authoritative work state.
 
 Program preparation candidate: context-owned link validation, bounded submitted
-program readiness and author recovery are implemented but public-artifact
-acceptance is pending. See [contract](program-preparation.md). No performance,
+program readiness and author recovery passed public checkpoint `2cdd442` across
+all seven template gates and inspected desktop/mobile snapshots. Integration is pending. See [contract](program-preparation.md). No performance,
 quality-budget or engine-wide residency completion claim is made.
 
 The same candidate now includes optional owned submitted-frame completion after
-initial draw. Native correctness is observed; exact-head template gates remain
-pending. Completion is not display presentation or a smoothness guarantee.
+initial draw. Native correctness and exact-head template gates are recorded in the
+[checkpoint receipt](../verification/program-preparation/README.md). Completion is not display presentation or a smoothness guarantee.

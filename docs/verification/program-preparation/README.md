@@ -40,3 +40,37 @@ result remains **FAIL**. [Raw gate](gate-86df82e/gate.txt) is retained. The corr
 uses the existing core monotonic clock and cancellable browser tasks rather than
 adding an animation loop; no ratchet or threshold changed. A new exact-head gate
 is required before acceptance.
+
+## Exact source checkpoint `2cdd442`
+
+All seven template gates passed on
+`2cdd442e7be21fbb319a084830db295478aa1179`, with unchanged budgets:
+
+| Template | Gate duration | Result |
+| --- | ---: | --- |
+| blank (default) | 34 s | PASS |
+| arcade | 33 s (wrapper 34 s) | PASS |
+| expedition | 52 s | PASS |
+| explorer | 52 s | PASS |
+| learn | 34 s | PASS |
+| mechanics | 34 s (wrapper 35 s) | PASS |
+| terrain | 38 s | PASS |
+
+Each gate ran 2046 tests, typechecking, full lint, build, bundle, snapshot and
+software-GL budget checks. See [default log](gate-2cdd442/default.txt) and
+[six-template log](gate-2cdd442/templates.txt). Terrain retained two heap warnings:
+5.3 and 5.7 MiB against nominal 5 MiB; the unchanged checker classified these as
+warnings. No over-budget, regression or inconclusive verdict was suppressed.
+These are software-GL engineering checks, not physical-device performance proof.
+
+An additional explorer desktop/mobile snapshot passed. Both images were personally
+inspected: the player, scene objects, Settings and progress text were visible with
+no failure overlay. See [snapshot log](gate-2cdd442/snapshot.txt),
+[desktop](gate-2cdd442/garden-desktop.png),
+[mobile](gate-2cdd442/garden-mobile.png) and
+[probe](gate-2cdd442/probe.json). The probe reported 60 fps, 10 draws and 1306
+triangles in this software fixture; this is not a sustained travel guarantee.
+
+This document-only receipt follows the tested source checkpoint. Integration and
+submission remain separate. Broader scheduling, resource-vector admission and
+residency policies are not completed by this rendering contract.
