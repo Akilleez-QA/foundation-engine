@@ -84,3 +84,16 @@ test('SC02 host: disconnect frees the observer; maxRelevant must fit the view pr
   host.close();
   assert.throws(() => createInterestHost({ ...demoConfig, interest: { ...demoConfig.interest, maxRelevant: 65 } }), RangeError);
 });
+
+test('SC02 host: a duplicate session or a refused publisher never leaks an observer slot', () => {
+  const host = createInterestHost(demoConfig), max = demoConfig.interest.maxObservers;
+  client(host, 'alpha', 0, 0);
+  for (let i = 0; i < max * 2; i++) assert.deepEqual(host.connect('alpha', 0, 0, () => true), { status: 'duplicate' });
+  for (let i = 0; i < max * 2; i++) assert.throws(() => host.connect('', 0, 0, () => true));
+  assert.equal(host.read().interest.observers, 1, 'only the live connection holds a slot');
+  // Reconnect after disconnect works, and the table can still fill to maxObservers.
+  host.disconnect('alpha');
+  for (let i = 0; i < max; i++) assert.equal(host.connect(`s${i}`, 0, 0, () => true).status, 'connected');
+  assert.deepEqual(host.connect('extra', 0, 0, () => true), { status: 'saturated' });
+  host.close();
+});

@@ -49,11 +49,14 @@ export function createInterestHost(config) {
     },
     /** One authenticated connection: an observer plus its own complete-view publisher. `send` is the transport. */
     connect(session, x, y, send, self) {
+      // One live view per session: a reconnect must disconnect the old one first (no leaked observer slot).
+      if (connections.has(session)) return { status: 'duplicate' };
       const observer = nextObserver++;
       const added = interest.addObserver(observer, x, y, self);
       if (added !== 'added') return { status: added };
       const record = { observer, session, live: true, frames: 0, checkedAt: worldRevision, viewRevision: 0 };
-      record.publisher = createViewPublisher({ session, limits: view, ports: {
+      try {
+        record.publisher = createViewPublisher({ session, limits: view, ports: {
         current: () => record.live,
         project: () => {
           const n = interest.members(observer, ranked), rows = [];
@@ -66,7 +69,11 @@ export function createInterestHost(config) {
         },
         send: json => { record.frames++; return send(json); },
         retire: () => { record.live = false; interest.removeObserver(observer); connections.delete(session); },
-      } });
+        } });
+      } catch (error) {
+        interest.removeObserver(observer); // a refused publisher (e.g. an invalid session) must not keep the slot
+        throw error;
+      }
       connections.set(session, record);
       return { status: 'connected', observer };
     },
@@ -80,8 +87,8 @@ export function createInterestHost(config) {
     },
     /**
      * One host tick: recompute each connection's interest set; a membership change, or a change to an entity in the
-     * set, marks that view dirty (changes outside the set never cause a frame, so frame timing reveals nothing about
-     * them); then pump once (one credit per connection). An incomplete or unavailable set is still published: it
+     * set, marks that view dirty (with complete scans, changes outside the set never cause a frame; an incomplete
+     * scan can, see the guide); then pump once (one credit per connection). An incomplete or unavailable set is still published: it
      * discloses only the members it verified.
      */
     tick() {

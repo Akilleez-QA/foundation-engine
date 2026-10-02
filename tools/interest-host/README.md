@@ -13,4 +13,8 @@ choices. A real host binds `send`/`ack` to its authenticated transport (see
 
 Disclosure discipline shown here: a view is marked dirty only when its membership or a
 member changes; the frame's `worldRevision` is a per-connection counter; entities leaving
-the grid rectangle are despawned. See the [interest sets guide](../../docs/guides/interest-sets.md).
+the grid rectangle are despawned. This hides outside activity only while scans are
+complete: an `incomplete` scan (hidden entities crowding `maxCandidates`) makes unseen
+members leave and so produces a frame. Size `maxCandidates` above the densest exit circle
+and alert on `incomplete`. A session already connected is refused (`duplicate`) until it
+disconnects; a refused publisher releases its observer slot. See the [interest sets guide](../../docs/guides/interest-sets.md).

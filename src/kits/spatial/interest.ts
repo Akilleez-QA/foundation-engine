@@ -8,7 +8,8 @@
  * fail closed: no new entity is admitted and unseen members leave at once.
  *
  * The caller owns the grid (positions, insert/remove), the observers' meaning, what an id discloses, and when to
- * update. Nothing here calls back into the caller, allocates after construction, schedules, or sends.
+ * update. Nothing here calls back into the caller, schedules or sends. All tables and scratch are allocated at
+ * construction; a steady-state `update` allocates nothing (only the limits/result records and `stats` do).
  */
 import type { IdBuffer, QueryResult, SpatialGrid } from './grid';
 import { createQueryResult } from './grid';
@@ -114,7 +115,7 @@ export function createInterestSets(grid: SpatialGrid, input: InterestLimits): In
   const limits: InterestLimits = Object.freeze(Object.fromEntries(KEYS.map(k => [k, input[k]])) as unknown as InterestLimits);
   const { enterRadius, exitRadius, holdUpdates, maxObservers, maxRelevant, maxCandidates, maxPrioritized } = limits;
   if (!finite(enterRadius) || enterRadius < 0) throw new RangeError('interest sets: enterRadius must be finite and >= 0');
-  if (!finite(exitRadius) || exitRadius < enterRadius) throw new RangeError('interest sets: exitRadius must be finite and >= enterRadius');
+  if (!finite(exitRadius) || exitRadius < enterRadius || !Number.isFinite(exitRadius * exitRadius)) throw new RangeError('interest sets: exitRadius must be finite, >= enterRadius, with a finite square');
   if (typeof holdUpdates !== 'number' || !Number.isSafeInteger(holdUpdates) || holdUpdates < 0 || holdUpdates > INTEREST_CEILING.holdUpdates) {
     throw new RangeError(`interest sets: holdUpdates must be a safe integer 0..${INTEREST_CEILING.holdUpdates}`);
   }
@@ -140,7 +141,6 @@ export function createInterestSets(grid: SpatialGrid, input: InterestLimits): In
   const priority = new Map<number, number>();
   // Per-update scratch, shared by every observer (updates are synchronous and never nest).
   const cand = new Float64Array(maxCandidates), scan: QueryResult = createQueryResult();
-  const oldIndex = new Map<number, number>();
   const seen = new Uint8Array(maxRelevant), kept = new Uint8Array(maxRelevant);
   const pickId = new Float64Array(maxRelevant), pickTier = new Float64Array(maxRelevant), pickD = new Float64Array(maxRelevant);
   const pickMissed = new Int32Array(maxRelevant);
@@ -162,6 +162,11 @@ export function createInterestSets(grid: SpatialGrid, input: InterestLimits): In
     pickId[i] = id; pickTier[i] = tier; pickD[i] = d2; pickMissed[i] = miss;
   }
 
+  /** Previous-member index by linear scan over at most maxRelevant slots (no map churn, no allocation); -1 if absent. */
+  function oldAt(base: number, n: number, id: number): number {
+    for (let i = 0; i < n; i++) if (members[base + i] === id) return i;
+    return -1;
+  }
   function checkResult(out: InterestResult): void {
     if (!out || typeof out !== 'object' || Object.isFrozen(out)) throw new TypeError('interest sets: out must be a writable interest result');
     for (const b of [out.relevant, out.entered, out.left]) {
@@ -220,8 +225,7 @@ export function createInterestSets(grid: SpatialGrid, input: InterestLimits): In
       const slot = slotOf.get(observer);
       if (slot === undefined) return empty(out, 'absent');
       const base = slot * maxRelevant, oldCount = memberCount[slot]!, x = ox[slot]!, y = oy[slot]!, own = self[slot]!;
-      oldIndex.clear();
-      for (let i = 0; i < oldCount; i++) { oldIndex.set(members[base + i]!, i); seen[i] = 0; kept[i] = 0; }
+      for (let i = 0; i < oldCount; i++) { seen[i] = 0; kept[i] = 0; }
       picked = 0; qualifying = 0;
       grid.queryCircle(x, y, exitRadius, cand, scan);
       let status: InterestStatus = 'complete';
@@ -232,10 +236,10 @@ export function createInterestSets(grid: SpatialGrid, input: InterestLimits): In
         for (let c = 0; c < scan.count; c++) {
           const id = cand[c]!;
           if (id === own) continue;
-          const old = oldIndex.get(id);
+          const old = oldAt(base, oldCount, id);
           const d2 = grid.distanceSquared(id, x, y);
-          if (old === undefined && (incomplete || d2 > enter2)) continue;  // fail closed: no new entries from a partial scan
-          if (old !== undefined) seen[old] = 1;
+          if (old < 0 && (incomplete || d2 > enter2)) continue;  // fail closed: no new entries from a partial scan
+          if (old >= 0) seen[old] = 1;
           consider(id, d2, 0);
         }
         // Members not seen: beyond exitRadius (complete scan) may be held while still indexed; otherwise they leave.
@@ -250,9 +254,9 @@ export function createInterestSets(grid: SpatialGrid, input: InterestLimits): In
       }
       let entered = 0, left = 0;
       for (let i = 0; i < picked; i++) {
-        const id = pickId[i]!, old = oldIndex.get(id);
+        const id = pickId[i]!, old = oldAt(base, oldCount, id);
         out.relevant[i] = id;
-        if (old === undefined) out.entered[entered++] = id; else kept[old] = 1;
+        if (old < 0) out.entered[entered++] = id; else kept[old] = 1;
       }
       for (let i = 0; i < oldCount; i++) if (!kept[i]) out.left[left++] = members[base + i]!;
       for (let i = 0; i < picked; i++) { members[base + i] = pickId[i]!; missed[base + i] = pickMissed[i]!; }
@@ -274,7 +278,7 @@ export function createInterestSets(grid: SpatialGrid, input: InterestLimits): In
     },
     dispose() {
       if (closed) return;
-      closed = true; slotOf.clear(); priority.clear(); oldIndex.clear(); freeSlots.length = 0;
+      closed = true; slotOf.clear(); priority.clear(); freeSlots.length = 0;
     },
     get stats(): InterestStats { return { observers: slotOf.size, prioritized: priority.size, closed }; },
   };

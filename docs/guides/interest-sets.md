@@ -40,9 +40,13 @@ interest sets and one `createViewPublisher` per connection, in process (no socke
 
 - `project()` lists only the connection's current members, in rank order, with an
   incarnation per id; `maxRelevant` must not exceed the view protocol's `maxEntities`.
-- A view is marked dirty only when its membership changes or a member changes. Activity
-  outside the set produces no frame, and the frame's `worldRevision` is a per-connection
-  counter, so neither timing nor revision numbers reveal hidden changes.
+- A view is marked dirty only when its membership changes or a member changes, and the
+  frame's `worldRevision` is a per-connection counter. While scans are complete, activity
+  outside the set produces no frame, so neither timing nor revision numbers reveal hidden
+  changes. An `incomplete` scan is different: crowding by hidden entities can make unseen
+  members leave, which does produce a frame. Size `maxCandidates` above the densest
+  exit-radius circle the game can produce, and treat `incomplete` (the host can tell it
+  apart from `complete`) as a configuration fault to alert on.
 - An entity moved outside the grid rectangle is despawned rather than left at a stale
   indexed position.
 - Application credit is unchanged: while a frame is unacknowledged, changes coalesce and
@@ -58,9 +62,15 @@ Checked (Node): `src/kits/spatial/interest.test.ts` (9 tests) including a 3,000-
 seeded comparison against an independent reference model (tiers, hold, budget, observer
 motion, removals, self exclusion) and mutation checks during development (breaking
 hysteresis, hold counting or the id tie-break each fails tests);
-`tools/interest-host/host.test.mjs` (5 tests) using real NW-02 view receivers;
+`tools/interest-host/host.test.mjs` (6 tests) using real NW-02 view receivers;
 `tools/spatial-bench/bench.test.mjs` (per-update candidates flat from 1,000 to 10,000
 entities).
+
+Other limits: the hold has no distance cap (a held member may move anywhere while it is
+still indexed), so keep `holdUpdates` small. Entity ids are the creator's: an id reused for a
+different entity while it is still between the radii keeps its membership without an
+`entered` event, so carry an incarnation (as the reference host does) or remove the old id
+first.
 
 Not established: a browser or socket host, WAN behaviour, priority accumulation for
 dropped ids, occlusion or team-shared vision, physical devices, and template integration.

@@ -21,6 +21,7 @@ test('limits are validated, copied and frozen; the exit scan must fit the grid c
     { maxObservers: 0 }, { maxRelevant: 0 }, { maxObservers: 1 << 12, maxRelevant: 1 << 11 },
     { maxCandidates: 0 }, { maxCandidates: INTEREST_CEILING.maxCandidates + 1 }, { maxPrioritized: 0 },
     { exitRadius: 30 }, // floor(60 / 10) + 2 = 8 -> 64 cells > 49
+    { exitRadius: 1e200 }, // square not finite
   ] as Partial<InterestLimits>[]) assert.throws(() => createInterestSets(grid, { ...interestLimits, ...bad }), RangeError, JSON.stringify(bad));
   assert.throws(() => createInterestSets(grid, { ...interestLimits, extra: 1 } as InterestLimits), TypeError);
   assert.throws(() => createInterestSets({} as never, interestLimits), TypeError);

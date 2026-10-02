@@ -170,12 +170,15 @@ export function createSpatialGrid(input: GridLimits): SpatialGrid {
     return r;
   };
 
-  /** Clamp a query box to cell indices; null when it misses the grid entirely. */
-  function cellRange(x0: number, y0: number, x1: number, y1: number): [number, number, number, number] | null {
+  // Reused cell range [col0, row0, col1, row1]: queries are synchronous and never nest, so one buffer suffices.
+  const span = new Int32Array(4);
+  /** Clamp a query box to cell indices in `span`; null when it misses the grid entirely. Allocates nothing. */
+  function cellRange(x0: number, y0: number, x1: number, y1: number): Int32Array | null {
     if (x1 < minX || y1 < minY || x0 > maxX || y0 > maxY) return null;
-    return [colOf(Math.max(x0, minX)), rowOf(Math.max(y0, minY)), colOf(Math.min(x1, maxX)), rowOf(Math.min(y1, maxY))];
+    span[0] = colOf(Math.max(x0, minX)); span[1] = rowOf(Math.max(y0, minY)); span[2] = colOf(Math.min(x1, maxX)); span[3] = rowOf(Math.min(y1, maxY));
+    return span;
   }
-  const tooWide = (r: [number, number, number, number]) => (r[2] - r[0] + 1) * (r[3] - r[1] + 1) > maxCellsPerQuery;
+  const tooWide = (r: Int32Array) => (r[2]! - r[0]! + 1) * (r[3]! - r[1]! + 1) > maxCellsPerQuery;
 
   /** Shared scan for rectangle and circle tests. `circle` uses (cx, cy, r2); otherwise the box is the test. */
   function scan(x0: number, y0: number, x1: number, y1: number, circle: boolean, cx: number, cy: number, r2: number, out: IdBuffer, res: QueryResult | undefined): QueryResult {

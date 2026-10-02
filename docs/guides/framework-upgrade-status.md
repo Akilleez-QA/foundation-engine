@@ -670,7 +670,7 @@ no browser output timing, physical-device or audible verification.
 The optional `spatial` kit adds [`createInterestSets`](interest-sets.md): per-observer,
 ranked and budgeted relevancy sets over the SC-01 grid, with enter/exit hysteresis, a
 hold, entered/left changes and fail-closed partial scans. A tools-only reference host
-feeds NW-02 complete scoped views from them without frames or revisions that reveal
-hidden activity. Status: implemented, candidate (PR #51); not
+feeds NW-02 complete scoped views from them; with complete scans, no frame or revision
+reveals activity outside a connection's set (an `incomplete` scan can). Status: implemented, candidate (PR #51); not
 integrated. Evidence is unit, reference-host and headless benchmark tests only; no socket,
 browser, device or template evidence and no budget change.
