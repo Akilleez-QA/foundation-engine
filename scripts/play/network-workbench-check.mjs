@@ -424,6 +424,49 @@ try {
   await untilHost((s) => s.intake.connections === 1);
   await click(pages.alpha, 'return');
   await active(pages.alpha);
+  // Every other documented stop path drops the retained credential and opens no further transport.
+  const stopsReconnecting = async (label, stop) => {
+    await pages.alpha.locator('#auto-reconnect').check();
+    await connect(pages.alpha, connection.credentials.alpha);
+    await pages.alpha.waitForFunction(
+      () =>
+        networkWorkbench.read().reconnect.armed &&
+        networkWorkbench.read().reconnect.schedule?.attempt >= 1,
+    );
+    await stop();
+    const stopped = await reconnect(pages.alpha);
+    assert.equal(stopped.armed, false, `${label}: credential released`);
+    assert.equal(stopped.budgetRetryAt, null, `${label}: no budget wait`);
+    assert.equal(stopped.schedule.state, 'idle', `${label}: episode ended`);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const later = await reconnect(pages.alpha);
+    assert.equal(
+      later.transportsOpened,
+      stopped.transportsOpened,
+      `${label}: no transport after stop`,
+    );
+    assert.equal(later.armed, false, `${label}: stays disarmed`);
+    report.observations.push({ label: `reconnect-stop-${label}`, reconnect: later });
+  };
+  await stopsReconnecting('disconnect', () => click(pages.alpha, 'disconnect'));
+  await stopsReconnecting('untick', () =>
+    pages.alpha.locator('#auto-reconnect').uncheck(),
+  );
+  await stopsReconnecting('hidden', () =>
+    pages.alpha.evaluate(() => {
+      // Simulate a hidden tab, then restore it so frames keep running during the no-attempt window.
+      for (const [key, value] of [['hidden', true], ['visibilityState', 'hidden']])
+        Object.defineProperty(document, key, { configurable: true, get: () => value });
+      document.dispatchEvent(new Event('visibilitychange'));
+      delete document.hidden;
+      delete document.visibilityState;
+      document.dispatchEvent(new Event('visibilitychange'));
+    }),
+  );
+  await stopsReconnecting('pagehide', () =>
+    pages.alpha.evaluate(() => window.dispatchEvent(new Event('pagehide'))),
+  );
+  await untilHost((s) => s.intake.connections === 1);
   for (const [name, wire] of Object.entries(report.wire))
     for (const text of wire.received) {
       const frame = JSON.parse(text);

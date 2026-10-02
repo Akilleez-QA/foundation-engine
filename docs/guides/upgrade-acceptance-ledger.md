@@ -272,7 +272,8 @@ Status: implemented, candidate on branch `feat/nw04-reconnect-schedule` (PR #14)
   validation and terminal disposal.
 - Checked: 11 focused unit tests, including a seeded 1,000-client restart
   simulation; the network workbench native browser workflow covers paced recovery,
-  bounded exhaustion and exit during an episode. Exact-head gate results are in the PR.
+  bounded exhaustion, exit during an episode, and the Disconnect, untick,
+  hidden-page and pagehide stop paths (the last two as synthetic in-page events). Exact-head gate results are in the PR.
 - Not established: WAN loss, a measured reconnect storm against a real host,
   physical devices and suitability of the example limits for any game. The browser
   transport still never retries by itself.

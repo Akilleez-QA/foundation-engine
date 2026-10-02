@@ -126,7 +126,11 @@ The network workbench browser workflow (`npm run test:network-workbench-browser`
 exercises paced recovery after an injected send refusal closes the connection
 (command not resent; host dispatch count unchanged), bounded exhaustion against a
 revoked credential (exactly one plus `maxAttempts` transports, then no further
-attempts) and owner exit during a reconnect episode (no attempt after exit).
+attempts), owner exit during a reconnect episode (no attempt after exit), and the
+Disconnect, untick, hidden-page and pagehide stop paths (each reports the
+credential released and opens no transport in the following 1.5 s). The hidden and
+pagehide cases dispatch synthetic events in the page; they are not real tab
+switching or navigation.
 
 These establish behaviour under one loopback host and simulated clients. They do
 not establish WAN loss behaviour, a measured multi-client reconnect storm against
