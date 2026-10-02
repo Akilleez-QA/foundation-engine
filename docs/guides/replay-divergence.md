@@ -8,8 +8,9 @@ agreeing with host reduction. It adds no runtime feature, clock, scheduler, stor
 or network path. A creator may use it in tests, in the dev/test build's test API,
 or not at all; a production build never contains the dev surface.
 
-State: implemented on branch `feat/sim01-replay-divergence`, candidate (public PR #17),
-not integrated. Evidence and limits are listed below.
+State: integrated in v0.2.0 (public PR #17, merged to `main` at `49047ae`). Evidence
+and limits are listed below; read [Limitations](#limitations-read-before-relying-on-a-result)
+before relying on a result.
 
 ## Seams reused
 
@@ -131,10 +132,24 @@ and are not observed. Unarmed visits are unchanged.
 
 ## Limitations (read before relying on a result)
 
+- **Per-frame motion breaks the default digest.** The default digest
+  (`worldDigest`) fingerprints every entity's `Transform`. A `phase: 'frame'` system
+  that writes a `Transform` (a bob, a spin, any cosmetic animation driven by
+  `ctx.time`) changes that fingerprint by frame grouping, not by tick, so record and
+  replay report `diverged`, often at tick 0, even in the same browser. Put anything
+  that must replay in fixed-step systems (`phase: 'fixed'`, driven by the tick, not
+  `ctx.time`), or pass your own `digest(ctx)` that leaves cosmetic state out.
+- **A browser recording replayed headlessly (Node) can diverge.** Same-browser replay
+  is exact. Replaying a browser log in Node (`replaySceneLog`) diverges as soon as a
+  fixed system uses `Math.sin`, `Math.cos`, `Math.atan2`, `Math.exp` or `Math.pow`:
+  browser and Node JavaScript engines return different last bits for some inputs.
+  This includes indirect use: the character kit calls `Math.atan2` for
+  camera-relative input and for turning to face the movement direction, so most
+  character-kit games will not replay a browser log headlessly. The stock arcade
+  browser check passes only because its simulation avoids these functions.
 - **Floating-point results are not guaranteed to match across devices, browsers,
   engines or builds.** Replays are exact for the same build in the same JavaScript
-  engine, and the evidence below is same-browser and same-Node only. Transcendental
-  functions (`Math.sin`, `Math.exp`, …) may differ between engines. A cross-device or
+  engine, and the evidence below is same-browser and same-Node only. A cross-device or
   cross-browser divergence is a finding about the platform or the simulation, not a
   failure of this tool. Cross-machine lockstep needs fixed-point or otherwise
   platform-independent arithmetic chosen by the creator.
@@ -145,11 +160,9 @@ and are not observed. Unarmed visits are unchanged.
   world events (cleared per frame), asynchronous asset or model readiness, audio and
   network I/O are outside the log. A fixed system that reads any of them can diverge,
   and the comparator will report where.
-- In the stock runtime, `ctx.input.pressed` is per frame. Every fixed tick in a frame
-  sees a press, and a press in a frame with zero fixed ticks is cleared unseen. The
-  log records exactly what each tick observed, so replay is faithful to the recorded
-  run, but this per-frame grouping is a pre-existing deviation from STD-SIM-12. It is
-  noted here, not changed.
+- Presses follow the press latch (STD-SIM-12, PR #19): each press is seen by exactly
+  one fixed tick, the first one after it arrives, and a frame with zero fixed ticks
+  keeps it pending. The log records exactly what each tick observed.
 - The default world digest covers resources and `Transform` only. Other component
   state needs a creator digest.
 - The checksum and digests use a 64-bit non-cryptographic hash. They detect
@@ -162,7 +175,7 @@ and are not observed. Unarmed visits are unchanged.
   not test reordered or delayed network delivery (the prediction guide's own tests
   do), multiple writers, or physical devices.
 
-## Evidence (candidate, not integrated)
+## Evidence (integrated in v0.2.0)
 
 Implemented: `src/kits/replay/` (hash, log, digest, scene, agreement), the
 `testScene({input})` option, the dev/test-only tick tap in `src/author/runtime.ts`
@@ -191,7 +204,8 @@ Browser regression `npm run test:replay-browser`
 
 - the scene opened with `?seed=7` records real key input under a held clock;
 - the browser replays it exactly with a different frame grouping;
-- the same log replays exactly in the separate headless harness;
+- the same log replays exactly in the separate headless harness (the arcade
+  simulation uses no `Math.sin`/`cos`/`atan2`/`exp`/`pow`; see Limitations);
 - a teleport between frames is reported at that exact tick;
 - a corrupted log is refused without re-entering the scene;
 - a log for another seed is refused at the visit.

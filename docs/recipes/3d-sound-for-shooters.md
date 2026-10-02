@@ -56,9 +56,11 @@ code here; the engine supplies only the smoothed filter.
 
 ## 4. Check it
 
-- `npm run check`, then `npm run play:snap`: the probe's `audio` block shows `active`,
-  `hrtfActive`, `hrtfLimit`, `downgraded` and `culled`. Test browsers are silent, so
-  counts stay zero there; use a unit test with `distanceGain`/`audibleGain` for your
+- `npm run check`. Then, with `npm run play` open, `engine.probe('audio')` in the
+  browser console shows `active`, `hrtfActive`, `hrtfLimit`, `downgraded` and
+  `culled` (`play:snap`'s `probe.json` does not include it). Test browsers are
+  silent, so counts stay zero there; use a unit test with `distanceGain` or
+  `audibleGain(spatial, [lx, ly, lz])` (the listener is a bare position) for your
   class rules.
 - `npm run test:audio-browser` is the engine's offline-render evidence for the
   mechanism.
@@ -70,6 +72,8 @@ code here; the engine supplies only the smoothed filter.
 ## Not covered yet
 
 Occlusion raycasts, sound propagation around corners, reverb, priority/virtual
-voices and networked sound events are later work; recorded sound files are a
-separate change. Do not send sound events a player could not hear: decide
+voices and networked sound events are later work. Recorded sound files work with
+these voice options: declare them as shown in
+[play your own sounds](play-your-own-sounds.md) and pass the file's id to
+`ctx.playVoice`. Do not send sound events a player could not hear: decide
 audibility on the host with the same class rule before disclosure.

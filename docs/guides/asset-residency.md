@@ -1,6 +1,6 @@
 # Bounded asset residency (RES-01)
 
-Status: implemented, candidate (PR #22); not integrated. A creator may opt in to keeping released texture
+Status: integrated in v0.2.0 (PR #22, merged to `main` at `9913019`). A creator may opt in to keeping released texture
 and model assets resident between uses, within budgets chosen per quality preset,
 with named critical assets pinned. Nothing changes for a game that does not set
 `defineGame({ residency })`: released assets are disposed at once, as before.

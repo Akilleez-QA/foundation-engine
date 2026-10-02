@@ -114,6 +114,5 @@ Run Claude Code, Codex or another agent in the repository folder. It reads [AGEN
 | the page stays empty and the console shows `boot failed` | read the listed problems; overlapping key or pad bindings are the usual cause |
 | commands show the blue cube, not your game | there is no `game/` folder in this checkout (see step 3) |
 | `play:snap` says OVER BUDGET | the scene draws more than `game/budgets.json` allows; see the fix-budget skill |
-| one key press counts twice on a slow machine | a known engine issue with slow frames; a fix is in review ([HUD text and buttons](../recipes/hud-and-buttons.md)) |
 | `npm run play` says the port is in use | another server has 5173: `PORT=5174 npm run play` |
 | `./game already exists` | you already started a game; `--force` replaces it, so commit or copy it first |

@@ -19,7 +19,7 @@ font correction, but compact lesson controls visibly cover content. Layout/clean
 repairs, full task workflows and physical-device evidence remain open. This does
 not refresh historical CI results or establish an exact-head gate pass.
 
-## Lesson layout repair — 2026-10-02, public PR, not yet integrated
+## Lesson layout repair — 2026-10-02, integrated in v0.2.0 (PR #9)
 
 The compact lesson overlap is repaired in the learn kit's layout seam: the board,
 caption, slider, cards and quiz stay clear of the wrapped control bar and the
@@ -43,7 +43,7 @@ laptop/desktop profiles are pending creator selection; DV-01 remains unresolved.
 | `src/platform/render/quality.ts` `detectPreset` | Pointer-independent selection now has regression coverage; hardware acceptance remains separate | Measure authored presets on each supported minimum device; do not infer capability from touch |
 | `perf/budgets.ts`, reference bench | Reference counts are checked; software timing is advisory | Each advertised device/preset has cold and sustained measured acceptance; no hardware claims from software rendering |
 | Optional `measureUiOcclusion`, synthetic DOM fixture and composed HUD regression | Synthetic checks cover clipped union geometry and pointer interception; the composed HUD checks one authored projected region, including an overcrowded negative case and disclosure recovery. Neither discovers application critical regions automatically | Application-owned region annotations and task-specific containment, readability, contrast and interaction evidence |
-| Optional PERF-01 [session recorder](session-performance.md) (`engine.sessionRecorder`, `?session-record`) | Implemented, candidate (PR #15 on the public repository). Provides a bounded local evidence format: rolling frame/work percentiles, long frames and drift. Its only runs so far are in emulated headless Chromium | Operator-labelled physical runs, cold and sustained, for each creator-selected profile and preset, with declared thresholds. The recorder output alone is not acceptance |
+| Optional PERF-01 [session recorder](session-performance.md) (`engine.sessionRecorder`, `?session-record`) | Integrated in v0.2.0 (PR #15 on the public repository, merged at `ae69a38`). Provides a bounded local evidence format: rolling frame/work percentiles, long frames and drift. Its only runs so far are in emulated headless Chromium | Operator-labelled physical runs, cold and sustained, for each creator-selected profile and preset, with declared thresholds. The recorder output alone is not acceptance |
 
 ## Implemented mechanisms and remaining acceptance
 

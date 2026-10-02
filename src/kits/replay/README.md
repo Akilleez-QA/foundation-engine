@@ -28,6 +28,17 @@ const opened = openReplay(recorder.export(recorded.read()), { ...limits, log: { 
 // observe a second trace, then compareDigests(opened.player.digests!, replayed.read()).
 ```
 
+Status: integrated in v0.2.0 (PR #17). Two limits catch most first users:
+
+- **Keep anything that must replay in fixed-step systems.** The default digest fingerprints every entity's
+  `Transform`. A `phase: 'frame'` system that moves an entity (a bob or spin driven by `ctx.time`) makes every replay
+  report `diverged`, usually at tick 0, even in the same browser. Move that motion to a fixed system on the tick, or
+  pass a `digest(ctx)` that leaves cosmetic state out.
+- **Same-browser replay is exact; a browser log replayed headlessly (Node) is not, once the simulation uses
+  `Math.sin`, `Math.cos`, `Math.atan2`, `Math.exp` or `Math.pow`.** Browser and Node engines differ in the last bits of
+  these functions. The character kit calls `Math.atan2` (camera-relative input, facing), so most character-kit games
+  cannot replay a browser log headlessly.
+
 Floating-point results are not guaranteed identical across devices, browsers or JavaScript engines; this kit detects
 such divergence, it does not prevent it. Typical cost: one creator digest per sampled tick; the recorder is O(1) per
 tick except a canonical parse of that tick's input.

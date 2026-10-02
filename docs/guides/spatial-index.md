@@ -1,6 +1,6 @@
 # Bounded spatial index (SC-01)
 
-Status: implemented, candidate (PR #23); not integrated.
+Status: integrated in v0.2.0 (PR #23, merged to `main` at `2c87e3b`).
 
 The optional `spatial` kit adds `createSpatialGrid`, a bounded uniform-grid index for
 "which ids are near here" questions over many entities. It is the shared building block

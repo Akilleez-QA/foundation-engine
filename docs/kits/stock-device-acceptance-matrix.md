@@ -8,7 +8,7 @@ or hardware measurements were made for that source audit. The subsequent
 is recorded separately: 16 target/tap checks pass in a dirty working copy, and the
 lesson content overlap found there is repaired in a later
 [layout receipt](../verification/stock-device-20261002/README.md). Both are emulated
-evidence; neither is integrated until the public PR merges. The commits named in this
+evidence; both were integrated in v0.2.0 through public PR #9. The commits named in this
 matrix are in the private development history.
 
 The [device policy](../policy/DEVICE-EXPERIENCE.md) and
@@ -103,9 +103,9 @@ all interfaces.
 
 - Integrated baseline `b6fb4a3` used 14px primary panel text and 44px button
   minimum height in Expedition field and Mechanics lab, and 44px button minimums
-  in Learn. The current candidate raises those minimums to 16px / 48px, wraps the
+  in Learn. PR #9 (integrated in v0.2.0) raises those minimums to 16px / 48px, wraps the
   field row and fixes shelter button font inheritance. Sixteen emulated target/tap
-  checks passed; exact-head gates and integration are still pending. Do not infer
+  checks passed. Do not infer
   complete usability from these sizing checks.
 - Screenshot inspection found Learn's wrapped navigation covering the board/caption
   region at 320×568: the fixed board inset did not reserve the wrapped bar's actual
@@ -138,7 +138,7 @@ continue the automated task cases above without changing promised requirements.
 
 ## 2026-10-02 template polish (emulated evidence only)
 
-Candidate PR #40, not integrated. Evidence is emulated SwiftShader `play:snap` at 1280×800 and 390×844, plus the learn
+Integrated in v0.2.0 (PR #40; batch PR #45). Evidence is emulated SwiftShader `play:snap` at 1280×800 and 390×844, plus the learn
 `play:script`; every screenshot was inspected. No physical phone, tablet, landscape, 200% text or zoom evidence is
 claimed; each row's open acceptance above remains open.
 

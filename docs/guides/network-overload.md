@@ -4,7 +4,7 @@
 real WebSockets and writes a JSON report. It is a **tool**, not an engine
 capability: nothing in `src/` changes, nothing is constructed at runtime, and a
 creator who ships no network host never runs it. Ledger ID NW-07 (proposal N4 of the
-scalability study). Status: implemented, candidate (PR #27); not integrated.
+scalability study). Status: integrated in v0.2.0 (PR #27; batch PR #46).
 
 Requirement served: the ledger recorded "measured network load unverified" and a
 "physical TCP non-reader untested" for the network kit and its reference hosts. The
