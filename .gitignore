@@ -24,6 +24,7 @@ playtest/action-hints/
 playtest/ui/
 playtest/diagnostics/
 playtest/authority-workbench/
+playtest/network-faults/
 playtest/authoring/
 playtest/framework/
 playtest/appearance/

@@ -525,3 +525,13 @@ Status: implemented, candidate on branch `feat/genre-turnbased-slice1` (PR #24);
 - Runtime-enforced: rules id, validator literal-`true` acceptance, JSON capture limits for commands and states, `maxCommands` retention (`full` overload, `checkpoint` recovery), revision-checked mutations (`stale`), reentrancy (`busy`), disposal (`retired`), frozen states, mutations require an exact safe-integer revision, restore never throws for stored data (`invalid`/`foreign`/`diverged`, including throwing creator validators/reducers) with a 64-bit replay kit `hashText` checksum over the whole retained log (redo entries included), authority random keyed by seed, lineage, stream and sequence.
 - Checked: 18 focused headless unit tests (determinism, preview equals submit, undo/redo/replay, real SaveStore round trip across a fresh store, adversarial reducers and inputs, durable-authority composition with an in-memory adapter).
 - Not established: any template or game consumer, browser or device evidence, reducer CPU deadlines, hidden-information safety of a local log (it is not), AI worker budgets, play-by-turn timeouts.
+
+## Seeded fault schedules — NW-09 implemented, candidate
+
+`npm run faults:network` (tools/authority-workbench) replays seeded combined faults
+against the composed authority path and checks invariants after every step against
+independent SQLite readback; failing seeds reproduce exactly by seed and step index
+and can be shrunk. Tools/tests only; the host gains optional, default-preserving
+fault seams. Implemented, candidate (PR #26); not integrated. Process-scope loopback
+evidence only. See the [guide](network-fault-schedule.md) and the
+[ledger](upgrade-acceptance-ledger.md).

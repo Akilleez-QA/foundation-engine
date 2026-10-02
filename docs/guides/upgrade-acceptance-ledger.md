@@ -72,6 +72,7 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | NW-05 | Shared rate and concurrency admission | Implemented, candidate (PR #13); not integrated. Optional single-process `createRateAdmission` ([guide](rate-admission.md)): per-key token bucket, optional concurrency leases, `maxKeys` with lossless idle reclamation only, explicit `limited`/`refused` results, clock-regression safe, idempotent dispose. Three reference hosts migrated from 1000 ms fixed windows to buckets of equal burst and refill (intended semantic change: no 2x boundary burst; same long-run rate). Focused unit and loopback host tests; no distributed, measured-load or physical-device claim. |
 | RES-01 | Bounded asset residency (texture/model budgets, pins, LRU eviction) | Implemented, candidate (PR #22); not integrated. Optional `defineGame({ residency })` applies per-preset `warmBytes`/`residentBytes` and pinned asset ids to the existing `LeaseCache` of the texture and model libraries; live and pinned assets are never evicted, over-ceiling pressure is reported once per transition with a creator hook, retained three.js resources are parked through public `dispose` events. Default unchanged (dispose at release). Evidence: focused unit tests, an opt-in native SwiftShader fixture (estimate vs uploaded mip chain, `renderer.info` counts, actual context loss) and a temporary composed probe; see [guide](asset-residency.md). No program-count budget, cross-library ceiling, physical-device memory or traversal-performance claim. |
 | RB-01 | Optional peer rollback sessions and local sync test (genre study 2026-10-02, slice 1) | Implemented, candidate (PR #25, `feat/genre-fighting-slice1`); not integrated. Optional `@kits/rollback`: `createRollbackSession` (2–8 peers, `maxPredictionFrames` 0–60, `inputDelay` 0–30, byte-bounded inputs/states, rollback to the earliest contradicted frame, stall at the window, confirmed-state checksums with bounded history/pending reports, fail-closed protocol faults, `AbortSignal` disposal) and `createRollbackSyncTest`. 25 focused tests, including seeded multi-peer convergence against a no-network reference, a sync test that compares every replay with the live step (fixed after review), late-peer pacing on the exposed `frameAdvantage`, and a `testScene` fixed-lane consumer. Requires a reliable, ordered link; there is no built-in time sync. No WAN, unreliable-channel, spectator, cross-browser floating-point or physical-device claim. See the section below and the [kit README](../../src/kits/rollback/README.md). |
+| NW-09 | Seeded fault-schedule harness for the composed authority path (study N6, tools/test only) | Implemented, candidate (PR #26); not integrated. `npm run faults:network` and `tools/authority-workbench/fault-harness.test.mjs` replay seeded combined faults (link delay/reorder/duplicate/drop, connection loss mid-command, controller replacement, held/crashed commits, host restart, SQLite before/after-commit failure with recovery, clock skew, slow consumer, revocation) against the reference host and two scripted clients, checking durable-history, result-semantics, prediction, disclosure, bound and leak invariants after every step against independent SQLite readback; failing seeds print seed + step index and can be shrunk and replayed. Process-scope loopback evidence only: no WAN, power-loss, filesystem, scale or device claim. See the [guide](network-fault-schedule.md). |
 | TR-01 | Regional terrain worker and ordinary-surface integration | Integrated in PR #109 at 99e6255. Canonical regional Surface and halo patches, bounded WorkerHost generation/patch adapters, independent geometric oracles and finite coherent render/query consumer passed at 891eb7; all seven template gates passed (1,648 tests, 129 performance checks, zero breaches/regressions, four advisory heap warnings). Combined main tests/build passed. Physical-device performance and unbounded/global streaming are not established. |
 | DV-01 | Supported-device experience and sustained performance evidence | In progress, not integrated: ported to the public `feat/device-acceptance` PR. [Stock matrix](../kits/stock-device-acceptance-matrix.md) covers all seven declarations. The [first receipt](../verification/stock-device-20261001/README.md) records 16 passing emulated target/tap checks and a compact lesson content overlap; lesson visit cleanup and a measured learn layout seam repair it, with a fake-DOM regression and emulated separation checks across board, sim and quiz at four profiles ([layout receipt](../verification/stock-device-20261002/README.md)). Full consumer workflows, in-panel touch scrolling, 200% text, named minimum devices and sustained physical evidence remain open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. No physical-device or accessibility certification. |
 
@@ -358,3 +359,33 @@ Status: implemented, candidate on branch `feat/genre-turnbased-slice1` (PR #24);
 - Runtime-enforced: rules id, validator literal-`true` acceptance, JSON capture limits for commands and states, `maxCommands` retention (`full` overload, `checkpoint` recovery), revision-checked mutations (`stale`), reentrancy (`busy`), disposal (`retired`), frozen states, mutations require an exact safe-integer revision, restore never throws for stored data (`invalid`/`foreign`/`diverged`, including throwing creator validators/reducers) with a 64-bit replay kit `hashText` checksum over the whole retained log (redo entries included), authority random keyed by seed, lineage, stream and sequence.
 - Checked: 18 focused headless unit tests (determinism, preview equals submit, undo/redo/replay, real SaveStore round trip across a fresh store, adversarial reducers and inputs, durable-authority composition with an in-memory adapter).
 - Not established: any template or game consumer, browser or device evidence, reducer CPU deadlines, hidden-information safety of a local log (it is not), AI worker budgets, play-by-turn timeouts.
+
+## Seeded fault-schedule harness (NW-09) — implemented, candidate
+
+Status: implemented, candidate (PR #26, `feat/nw09-seeded-faults`); not integrated.
+Tools/tests only; no engine runtime behaviour changed. See the
+[fault-schedule guide](network-fault-schedule.md).
+
+- Runtime-enforced (harness): per-step invariants on independent SQLite readback
+  (prefix sum equals revision, no rollback, contiguous bounded receipts, one
+  stream/sequence per revision, immutable receipts, state equals committed inputs,
+  committed inputs equal issued inputs), result semantics, storage-fault outcomes,
+  baseline coherence, prediction replay, disclosure only to the current
+  non-revoked controller, host/client bounds, post-heal convergence and release of
+  every socket, server and timer. A loopback wait over 4 s fails as `stuck`.
+- Tool seams: optional `clock`, `storageHooks`, `observe`, `openStorage` options, operator
+  `recoverAuthority()` and `read().connections/intake` on the authority workbench
+  host; defaults keep the reference behaviour. The existing storage/host tests are
+  unchanged and pass; one new host test covers the seams.
+- Checked: 7 tests in `fault-harness.test.mjs` (fixed seeds 1-12 x 300 steps with
+  every fault family exercised, identical replay fingerprint, injected durable
+  corruption failing at its exact step, reproducing and shrinking, and a defective
+  adapter that commits and then reports `rejected` failing `storage-outcome`).
+  Local sweeps on Node 22.23.3: 500 seeds x 300 steps passed; review sweeps of
+  1,000 x 300 and 60 x 2,000 also passed. Six temporary mutations of the host,
+  storage adapter, authority and prediction were caught (see the guide); two more
+  were unreachable through this host. No engine defect was found.
+- Not established: WAN behaviour, real process death inside the harness (the
+  existing SIGKILL storage/host tests remain that evidence), power loss, disk-full
+  or filesystem faults, TCP/OS backpressure, scoped-view publisher faults, scale,
+  browsers and physical devices.

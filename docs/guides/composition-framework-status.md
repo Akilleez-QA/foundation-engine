@@ -94,6 +94,7 @@ are contextual evidence, not verification of Foundation.
 | Multiplayer: queue age and deadlines (NW-06) | Optional intake `maxQueuedAgeMs` with `stale` notice; optional authority `clock` and `submit(command, {deadlineMs})` returning `expired` before storage invocation only | Implemented, candidate (PR #12); not integrated. Focused unit tests only; defaults unchanged; no load, browser-composition or device claim. |
 | Asset residency (RES-01) | Optional per-preset texture/model byte budgets, pinned asset ids and a pressure hook over the existing lease caches | Implemented, candidate (PR #22); not integrated. Unit tests and a native software-renderer fixture only; defaults unchanged; no template configures it. See [asset residency](asset-residency.md). |
 | Multiplayer: peer rollback (RB-01) | Optional `@kits/rollback` session (prediction window, input delay, rollback/resimulation, confirmed-state checksums) and local sync test, driven from the fixed lane | Implemented, candidate (PR #25); not integrated. Focused headless tests and a `testScene` consumer only; requires a reliable, ordered link; no WAN, time-sync, spectator or device claim. |
+| Multiplayer: seeded fault schedules (NW-09) | Tool-only `npm run faults:network` harness replaying seeded combined faults against the authority workbench host with per-step invariants and exact seed/step repro | Implemented, candidate (PR #26); not integrated. Process-scope loopback evidence only; no WAN, power-loss, scale or device claim. See [guide](network-fault-schedule.md) |
 | Manual tools | Bounded documents, sessions and optional appearance, progression, custody and objective desktop consumers | Integrated tools cover their finite schemas. Action tooling is integrated; recipe/effect inspectors are integrated in PR #118 with focused tests and final desktop workflow acceptance. Device support is selected per tool; desktop tooling does not impose a phone UI. |
 
 Priority is composition correctness before additional feature catalogs. A creator's
@@ -304,3 +305,13 @@ integrated. See the [ledger](upgrade-acceptance-ledger.md#rollback-sessions-rb-0
 ## Deterministic turn log (turns kit, TB-01) — implemented, candidate
 
 The optional `turns` kit composes existing owners: authored-document/network JSON capture for bounds, the replay kit `hashText` for snapshot checksums, core `createRng`/`hashSeed` for per-position random streams, save sections for snapshots (a `{json}` section, restored with explicit `invalid`/`foreign`/`diverged` outcomes) and `createDurableAuthority` through `turnAuthorityPolicies` for server-authoritative play. It adds no service, scheduler, storage or frame work. Candidate on branch `feat/genre-turnbased-slice1` (PR #24), not integrated; 18 headless unit tests; no consumer template, browser or device evidence. See the [kit README](../../src/kits/turns/README.md).
+
+## Seeded fault schedules (NW-09) — implemented, candidate
+
+The tool-only [fault-schedule harness](network-fault-schedule.md) drives the
+authority workbench host and two scripted clients through a seeded schedule of
+combined link, connection, host, storage, clock and consumer faults, checking
+durable-history, result, prediction, disclosure, bound and leak invariants after
+every step. A failing seed prints its seed and step index and can be shrunk and
+replayed. Implemented, candidate (PR #26); not integrated. Process-scope loopback
+evidence only; it does not certify WAN, power-loss durability or devices.
