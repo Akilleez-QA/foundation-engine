@@ -6,7 +6,7 @@ does not replace those notices. The original generated diagnostic assets listed
 below are separately dedicated under **CC0-1.0**.
 
 This inventory was checked against `package-lock.json` and installed package
-license files on 2026-09-30. It records pinned versions, not semver ranges.
+license files on 2026-10-02. It records pinned versions, not semver ranges.
 Update it when the dependency graph or shipped assets change.
 
 ## Optional network reference host dependency
@@ -178,7 +178,7 @@ lockfile metadata only.
 | `three` | 0.186.1 | MIT | Required by dependency graph |
 | `tinyglobby` | 0.2.17 | MIT | Required by dependency graph |
 | `tsx` | 4.23.15 | MIT | Required by dependency graph |
-| `typescript` | 5.9.3 | Apache-2.0 | Required by dependency graph |
+| `typescript` | 6.0.3 | Apache-2.0 | Required by dependency graph |
 | `undici-types` | 6.21.0 | MIT | Required by dependency graph |
 | `vite` | 7.3.6 | MIT | Required by dependency graph |
 | `ws` | 8.22.0 | MIT | Optional reference host; installed by the locked development graph |

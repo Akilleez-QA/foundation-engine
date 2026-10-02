@@ -30,6 +30,9 @@ Foundation Engine is preparing its first public source release. Package version
   camera-fitted `SunLight` cascades and observe `LightProbeGridWebGL`. Upstream
   rendering changes (for example multi-scattering energy compensation for
   `MeshStandardMaterial`) slightly alter shading.
+- Toolchain: TypeScript 6.0 (from 5.9). `tsconfig.json` drops the deprecated
+  `baseUrl`; the `@engine`, `@kits/*` and `@game/*` paths were already relative
+  and resolve to the same files. TypeScript 7 is not adopted.
 
 See the [acceptance ledger](docs/guides/upgrade-acceptance-ledger.md) for precise
 integration evidence and limits. Physical-device acceptance remains incomplete;
