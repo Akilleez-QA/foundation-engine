@@ -235,16 +235,23 @@ test('equal-score emissions are admitted oldest-pending first, so newer sources 
   for (let k = 0; k < 4; k++) assert.ok((played.get(k) ?? 0) > 0, `source ${k} played`);
 });
 
-test('a repeater replaces its own voice without a free slot, without stealing or picking itself', () => {
+test('a repeater replaces its own voice within the voice cap: with no free slot its old voice fades first; nothing is stolen', () => {
   const output = fakeOutput(); const audio = createSpatialAudio({ output, classes: flat, limits: { maxVoices: 2 } });
   audio.emit({ cue: 'r', class: 'weak', position: [0, 0, -2], every: .5 }, 0);
   audio.emit({ cue: 'other', class: 'weak', position: [0, 0, -3], every: 100 }, 0);
   audio.pump(0, origin); assert.equal(output.voices.length, 2);
   audio.pump(.5, origin);
-  assert.equal(output.voices.length, 3, 'the repeat started while full'); assert.equal(audio.stats.stolen, 0);
-  assert.equal(output.voices[1].stops + output.voices[1].filters.length, 0, 'the other source is untouched');
+  assert.equal(output.voices.length, 2, 'full: the repeat waits for its own fade');
   assert.deepEqual(output.voices[0].filters.at(-1)?.[1], 0, 'its own previous voice fades');
-  assert.equal(audio.stats.voices, 2, 'the replaced fade does not hold a slot');
+  assert.deepEqual([audio.stats.voices, audio.stats.fading], [2, 1], 'the fade holds its slot');
+  audio.pump(.57, origin);
+  assert.equal(output.voices.length, 3, 'the repeat starts when its fade frees the slot'); assert.equal(output.voices[0].stops, 1);
+  assert.equal(output.voices[1].stops + output.voices[1].filters.length, 0, 'the other source is untouched');
+  assert.deepEqual([audio.stats.stolen, audio.stats.rotated, audio.stats.voices, output.playing().length], [0, 0, 2, 2]);
+  // With a free slot the repeat crossfades at once.
+  const roomy = fakeOutput(); const spare = createSpatialAudio({ output: roomy, classes: flat, limits: { maxVoices: 2 } });
+  spare.emit({ cue: 'r', class: 'weak', position: [0, 0, -2], every: .5 }, 0); spare.pump(0, origin); spare.pump(.5, origin);
+  assert.equal(roomy.voices.length, 2); assert.equal(spare.stats.voices, 2);
 });
 
 test('HRTF is not flipped on repeats: a source replacing its own HRTF voice keeps HRTF', () => {
@@ -276,7 +283,9 @@ test('occlusion refresh of playing voices is not starved by new emissions; stale
     if (t > .1) assert.equal(audio.occluded(walled), true);
   }
   assert.ok(output.voices[0].filters.every(f => f[1] < 1), 'the walled voice never opened');
-  assert.equal(audio.stats.stale, 0, JSON.stringify(audio.stats)); assert.ok(audio.stats.oldestRayAge <= .5, `oldest ${audio.stats.oldestRayAge}`);
+  // Every playing voice that has a result is fresh; the only stale ones are new one-shots that started without a
+  // result (two per pump against one ray for new emissions), and stats say so.
+  assert.equal(audio.stats.stale, audio.stats.unqueried, JSON.stringify(audio.stats)); assert.ok(audio.stats.oldestRayAge <= .5, `oldest ${audio.stats.oldestRayAge}`);
   const starved = createSpatialAudio({ output: fakeOutput(), classes: flat, limits: { raysPerPump: 1 }, occlusion: { query: () => null, maxAge: .03 } });
   for (const z of [-2, -3, -4, -5]) starved.emit({ cue: 'x', class: 'weak', position: [0, 0, z], every: 100 }, 0);
   for (let t = 0; t <= .2; t += 1 / 60) starved.pump(t, origin);
@@ -306,4 +315,118 @@ test('occlusion margin ignores hits at the ends of the segment (own colliders)',
   hit = 3.97; audio.pump(1, origin); assert.equal(audio.occluded(id), false, 'source-side hit ignored');
   hit = 2; audio.pump(2, origin); assert.equal(audio.occluded(id), true);
   assert.throws(() => createSpatialAudio({ output, classes: flat, occlusion: { query: () => null, margin: -1 } }));
+});
+
+// Re-verification regressions (PR #55).
+type Fake = ReturnType<typeof fakeOutput>;
+/** Starts per source, keyed by the voice's position. */
+const key = (p: readonly number[]) => `${p[0]},${p[2]}`;
+const startsByX = (output: Fake) => { const n = new Map<string, number>(); for (const v of output.voices) { const k = key(v.options.spatial!.position); n.set(k, (n.get(k) ?? 0) + 1); } return n; };
+/** Equal sources: the same distance from the listener at the origin, told apart by x. */
+const ring = (k: number, count: number): [number, number, number] => [Math.cos(2 * Math.PI * k / count) * 5, 0, Math.sin(2 * Math.PI * k / count) * 5];
+
+test('equal-score repeaters started together share the voices fairly under default lateness', () => {
+  const output = fakeOutput(); const audio = createSpatialAudio({ output, classes: flat, limits: { maxVoices: 4 } });
+  const xs = Array.from({ length: 8 }, (_, k) => { const p = ring(k, 8); audio.emit({ cue: 'r', class: 'weak', position: p, every: .5 }, 0); return key(p); });
+  for (let i = 0; i <= 600; i++) { audio.pump(i / 60, origin); assert.ok(output.playing().length <= 4); }
+  const n = startsByX(output);
+  for (const x of xs) { const plays = n.get(x) ?? 0; assert.ok(plays >= 9 && plays <= 11, `source ${x} played ${plays} of 20 beats: ${[...n.values()]}`); }
+  assert.equal(audio.stats.stolen, 0, 'equal sources rotate; nothing is stolen'); assert.ok(audio.stats.rotated > 0);
+});
+
+test('equal-score repeaters out of phase share the voices fairly', () => {
+  const output = fakeOutput(); const audio = createSpatialAudio({ output, classes: flat, limits: { maxVoices: 4 } });
+  const xs: string[] = [];
+  for (let i = 0; i <= 600; i++) {
+    const t = i / 60;
+    if (i % 4 === 0 && xs.length < 8) { const p = ring(xs.length, 8); xs.push(key(p)); audio.emit({ cue: 'r', class: 'weak', position: p, every: .5 }, t); }
+    audio.pump(t, origin); assert.ok(output.playing().length <= 4);
+  }
+  const plays = xs.map(x => startsByX(output).get(x) ?? 0);
+  // Staggered beats make some voices younger than `rotateAfter` when a source is due, so shares are not exact.
+  assert.ok(Math.min(...plays) >= 12 && Math.max(...plays) - Math.min(...plays) <= 3, `plays ${plays}`);
+});
+
+test('equal one-shots get turns against older long voices (rotation), without cutting each other', () => {
+  const output = fakeOutput(); const audio = createSpatialAudio({ output, classes: flat, limits: { maxVoices: 2 } });
+  audio.emit({ cue: 'long', class: 'weak', position: ring(0, 12), every: 100 }, 0); audio.emit({ cue: 'long', class: 'weak', position: ring(1, 12), every: 100 }, 0);
+  const xs: string[] = [];
+  for (let i = 0; i <= 360; i++) {
+    const t = i / 60;
+    if (i >= 60 && i % 30 === 0 && xs.length < 9) { const p = ring(2 + xs.length, 12); xs.push(key(p)); audio.emit({ cue: 'shot', class: 'weak', position: p }, t); }
+    audio.pump(t, origin); assert.ok(output.playing().length <= 2);
+  }
+  const n = startsByX(output);
+  assert.deepEqual(xs.map(x => n.get(x) ?? 0), Array(9).fill(1), 'each newer equal one-shot played');
+  assert.equal(audio.stats.dropped, 0); assert.equal(audio.stats.stolen, 0); assert.equal(audio.stats.rotated, 9);
+  // Nine at once: the two slots rotate once to two of them; the newcomers do not cut each other.
+  const burst = fakeOutput(); const busy = createSpatialAudio({ output: burst, classes: flat, limits: { maxVoices: 2 } });
+  busy.emit({ cue: 'long', class: 'weak', position: ring(0, 12), every: 100 }, 0); busy.emit({ cue: 'long', class: 'weak', position: ring(1, 12), every: 100 }, 0);
+  busy.pump(0, origin);
+  for (let k = 0; k < 9; k++) busy.emit({ cue: 'shot', class: 'weak', position: ring(2 + k, 12) }, 1);
+  for (let i = 0; i <= 60; i++) busy.pump(1 + i / 60, origin);
+  assert.equal(burst.voices.length, 4); assert.equal(busy.stats.dropped, 7); assert.equal(busy.stats.rotated, 2);
+  assert.equal(burst.voices.slice(2).filter(v => v.stops === 0).length, 2, 'the two newcomers keep playing');
+});
+
+test('a critical repeater among 20 equal ones at importance 1 gets its share', () => {
+  const output = fakeOutput(); const audio = createSpatialAudio({ output, classes: flat, limits: { maxVoices: 4 } });
+  const xs = Array.from({ length: 21 }, (_, k) => { const p = ring(k, 21); audio.emit({ cue: k === 20 ? 'critical' : 'r', class: 'weak', position: p, every: .5, importance: () => 1 }, 0); return key(p); });
+  for (let i = 0; i <= 600; i++) audio.pump(i / 60, origin);
+  const plays = xs.map(x => startsByX(output).get(x) ?? 0);
+  // 20 beats × 4 voices / 21 sources ≈ 3.8 plays each.
+  assert.ok(plays[20] >= 3, `critical played ${plays[20]}`); assert.ok(Math.min(...plays) >= 3, `plays ${plays}`);
+});
+
+test('real voices never exceed maxVoices, fades included, and stats report them', () => {
+  for (const maxVoices of [64, 24]) {
+    const output = fakeOutput(); const audio = createSpatialAudio({ output, classes: flat, limits: { maxSources: 64, maxVoices } });
+    for (let k = 0; k < 64; k++) audio.emit({ cue: 'r', class: 'weak', position: ring(k, 64), every: .05 }, 0);
+    let peak = 0;
+    for (let i = 0; i <= 120; i++) {
+      audio.pump(i / 60, origin);
+      const real = output.playing().length; peak = Math.max(peak, real);
+      assert.equal(audio.stats.voices, real, 'stats.voices counts real voices'); assert.ok(real <= maxVoices, `${real} real voices > ${maxVoices}`);
+    }
+    assert.equal(peak, maxVoices); assert.ok(output.voices.length > maxVoices, 'still emitting');
+  }
+});
+
+test('a budget of one ray still queries new emissions before they start; unqueried voices count as stale', () => {
+  const output = fakeOutput(); let calls = 0;
+  const audio = createSpatialAudio({ output, classes: flat, limits: { raysPerPump: 1, maxVoices: 64 }, occlusion: { query: () => { calls++; return null; }, unknown: 'blocked' } });
+  for (const z of [-2, -3, -4]) audio.emit({ cue: 'loop', class: 'weak', position: [0, 0, z], every: 100 }, 0);
+  // Three loops started in one pump: one gets the ray; the next pumps (nothing waiting) give the others theirs.
+  for (let i = 0; i < 6; i++) audio.pump(i / 60, origin);
+  assert.equal(audio.stats.unqueried, 0);
+  for (let i = 6; i < 66; i++) { audio.emit({ cue: 'shot', class: 'weak', position: [i % 7, 0, -5] }, i / 60); audio.pump(i / 60, origin); }
+  const shots = output.voices.slice(3);
+  assert.equal(shots.length, 60); assert.ok(shots.every(v => v.options.filter!.gain === 1), 'every new emission started with its own result (open)');
+  assert.equal(calls, 66);
+  assert.equal(audio.stats.unqueried, 0); assert.ok(audio.stats.stale > 0, 'playing voices the budget could not refresh show as stale');
+  const none = createSpatialAudio({ output: fakeOutput(), classes: flat, limits: { raysPerPump: 0 }, occlusion: { query: () => null } });
+  none.emit({ cue: 'x', class: 'weak', position: [0, 0, -2], every: 100 }, 0); none.pump(0, origin);
+  assert.deepEqual([none.stats.unqueried, none.stats.stale], [1, 1], 'a voice that started with no result is stale at once');
+});
+
+test('HRTF has hysteresis: near-equal short cues do not flip panning; a much stronger one takes a free claim', () => {
+  const output = fakeOutput(); const audio = createSpatialAudio({ output, classes: flat, limits: { maxHrtfVoices: 1 } });
+  let wobble = 0;
+  audio.emit({ cue: 'a', class: 'near', position: [3, 0, 0], every: .3, importance: () => 1 + .02 * Math.sin(wobble) }, 0);
+  // In phase: each beat, the order of the two (by a wobbling 2% score difference) changes which one starts first.
+  audio.emit({ cue: 'b', class: 'near', position: [-3, 0, 0], every: .3, importance: () => 1 + .02 * Math.cos(wobble) }, 0);
+  const born = new Map<object, number>();
+  for (let i = 0; i <= 600; i++) {
+    const t = i / 60; wobble = t * 7;
+    for (const v of output.voices) { if (!born.has(v)) born.set(v, t); else if (t - born.get(v)! >= .2) v.end(); }
+    audio.pump(t, origin);
+  }
+  const flips = (x: number) => { const p = output.voices.filter(v => v.options.spatial!.position[0] === x).map(v => v.options.spatial!.panning); return p.slice(1).filter((m, k) => m !== p[k]).length; };
+  assert.equal(flips(3) + flips(-3), 0, 'each source keeps its panning model');
+  assert.ok(audio.stats.hrtf <= 1);
+  // A source with 2x the score takes the claim when the claimant is not playing.
+  const out2 = fakeOutput(); const two = createSpatialAudio({ output: out2, classes: flat, limits: { maxHrtfVoices: 1 } });
+  two.emit({ cue: 'a', class: 'near', position: [3, 0, 0] }, 0); two.pump(0, origin); out2.voices[0].end(); two.pump(.1, origin);
+  two.emit({ cue: 'b', class: 'near', position: [-3, 0, 0], every: 100, importance: () => 2 }, .2); two.pump(.2, origin);
+  assert.equal(out2.voices[1].options.spatial!.panning, 'HRTF');
 });

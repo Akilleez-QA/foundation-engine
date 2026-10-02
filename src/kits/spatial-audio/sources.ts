@@ -58,7 +58,10 @@ export interface OcclusionOptions {
 export interface SpatialAudioLimits {
   /** Logical sources tracked at once (1..1024, default 128). `emit` returns null when full. */
   maxSources?: number;
-  /** Real voices this kit holds at once (1..64, default 24). Stolen, yielding and cancelled voices count while they fade; a source's own replaced voice does not. */
+  /**
+   * Real voices this kit holds at once (1..64, default 24), fading voices included: the number of voices this kit has
+   * on the output never exceeds it. A source replacing its own voice when no slot is free fades the old one first.
+   */
   maxVoices?: number;
   /** Voices this kit asks to pan with HRTF (0..maxVoices, default 6). The output's own HRTF limit also applies. */
   maxHrtfVoices?: number;
@@ -68,6 +71,11 @@ export interface SpatialAudioLimits {
   maxLateness?: number;
   /** A waiting emission steals the weakest voice only when its score is this many times higher (1..10, default 1.5). */
   stealRatio?: number;
+  /**
+   * Seconds a voice plays before a waiting emission of at least its score may take its slot (rotation of equal sounds;
+   * 0..10, default .25). Keep it above `maxLateness` so two equal emissions cannot cut each other in turn.
+   */
+  rotateAfter?: number;
 }
 
 export interface SpatialAudioOptions {
@@ -99,26 +107,36 @@ export interface SourceInput {
 }
 
 export interface SpatialAudioStats {
-  readonly sources: number; readonly voices: number; readonly hrtf: number; readonly waiting: number;
+  /** `voices` counts every voice this kit holds on the output, fading ones included (`fading` of them). */
+  readonly sources: number; readonly voices: number; readonly fading: number; readonly hrtf: number; readonly waiting: number;
   /** Emissions dropped: waited longer than maxLateness, or the output refused them. */
   readonly dropped: number;
   /** Emissions skipped because the source was beyond its class cutoff. */
   readonly culled: number;
-  readonly stolen: number; readonly rays: number;
+  /** Voices taken by a stronger emission (`stealRatio`). */
+  readonly stolen: number;
+  /** Voices that gave their slot to an equal or longer-waiting emission (fair rotation), not steals. */
+  readonly rotated: number;
+  readonly rays: number;
   /** Ray candidates left unqueried because the per-pump budget ran out (cumulative). */
   readonly raysDeferred: number;
   /**
-   * Playing voices whose occlusion result is older than `maxAge` right now (they use `unknown`), and the oldest result
-   * age among playing voices in seconds. A non-zero `stale` means `raysPerPump` cannot refresh every playing voice
-   * within `maxAge`: raise the budget or `maxAge`, or lower the voice count.
+   * Playing voices that use `unknown` right now: their occlusion result is older than `maxAge`, or they have none
+   * (`unqueried` of them started and still play without a result). `oldestRayAge` is the oldest result age among
+   * playing voices that have one, in seconds. A `stale` that stays above 0 means `raysPerPump` cannot keep every
+   * playing voice informed within `maxAge`: raise the budget or `maxAge`, or lower the voice count.
    */
-  readonly stale: number; readonly oldestRayAge: number;
+  readonly stale: number; readonly unqueried: number; readonly oldestRayAge: number;
   readonly errors: number;
 }
 export interface PumpResult { realised: number; waiting: number; rays: number; dropped: number }
 
 const CEILING = { sources: 1024, voices: 64, rays: 256 } as const;
 const FADE = .01, FADE_HOLD = .06, OPEN_HZ = 20000;
+/** HRTF hysteresis: a claim moves only to a score this many times higher; an idle claim lapses after max(1 s, 2 × every). */
+const HRTF_SWITCH = 1.25, HRTF_HOLD = 1;
+/** Scores within this fraction of each other are equal for admission order and rotation. */
+const TIE = .01;
 
 const finite3 = (p: Point) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite);
 const intIn = (n: number, min: number, max: number) => Number.isSafeInteger(n) && n >= min && n <= max;
@@ -161,15 +179,24 @@ interface Source {
   startedAt: number;
   /** A voice is fading out to free a slot for this waiting emission: it must not steal again. */
   reserved: boolean;
+  /**
+   * Starvation credit: when this source first waited for a voice without getting one. It survives dropped emissions
+   * and is cleared when the source plays (or is culled), so equal-score sources rotate.
+   */
+  waitingSince: number | null;
+  /** Voices this source has started; among equal voices, the most-served one rotates out first. */
+  served: number;
+  /** An HRTF claim (kept across emissions), the score it was taken or renewed with, and when. */
+  hrtfClaim: boolean; claimScore: number; claimAt: number;
 }
 
 export function createSpatialAudio(o: SpatialAudioOptions) {
   const l = o.limits ?? {};
   const maxSources = l.maxSources ?? 128, maxVoices = l.maxVoices ?? 24, maxHrtf = l.maxHrtfVoices ?? Math.min(6, maxVoices);
-  const raysPerPump = l.raysPerPump ?? 8, maxLateness = l.maxLateness ?? .15, stealRatio = l.stealRatio ?? 1.5;
+  const raysPerPump = l.raysPerPump ?? 8, maxLateness = l.maxLateness ?? .15, stealRatio = l.stealRatio ?? 1.5, rotateAfter = l.rotateAfter ?? .25;
   const smoothing = o.filterSmoothing ?? .08;
   if (!intIn(maxSources, 1, CEILING.sources) || !intIn(maxVoices, 1, CEILING.voices) || !intIn(maxHrtf, 0, maxVoices) || !intIn(raysPerPump, 0, CEILING.rays)
-    || !numIn(maxLateness, 0, 2) || !numIn(stealRatio, 1, 10) || !numIn(smoothing, .005, 2)) throw new RangeError('spatial-audio: invalid limits');
+    || !numIn(maxLateness, 0, 2) || !numIn(stealRatio, 1, 10) || !numIn(rotateAfter, 0, 10) || !numIn(smoothing, .005, 2)) throw new RangeError('spatial-audio: invalid limits');
   const classes = new Map<string, SoundClass>();
   for (const [id, c] of Object.entries(o.classes)) { validateSoundClass(id, c); classes.set(id, structuredClone(c)); }
   if (!classes.size) throw new RangeError('spatial-audio: at least one sound class is required');
@@ -181,12 +208,9 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
   if (occ && !numIn(margin, 0, 10)) throw new RangeError('spatial-audio: invalid occlusion options');
 
   const sources = new Map<number, Source>();
-  /**
-   * Voices fading out (~50 ms) before they are stopped. `counted` fades (stolen or cancelled voices) hold their slot
-   * in `maxVoices`; a source's own replaced voice does not (its replacement already holds the source's slot).
-   */
-  const fading = new Map<CueVoice, { stopAt: number; counted: boolean; owner: Source | null }>();
-  const stats = { dropped: 0, culled: 0, stolen: 0, rays: 0, raysDeferred: 0, errors: 0 };
+  /** Voices fading out (~50 ms) before they are stopped. Every fade holds its slot in `maxVoices` until it stops. */
+  const fading = new Map<CueVoice, { stopAt: number; owner: Source | null }>();
+  const stats = { dropped: 0, culled: 0, stolen: 0, rotated: 0, rays: 0, raysDeferred: 0, errors: 0 };
   let sequence = 0, clock = -Infinity, closed = false, pumping = false, listener: Point = [0, 0, 0];
 
   /** Counts every failure; reports each kind of failure once per source. */
@@ -196,18 +220,19 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
     try { o.report?.(message); } catch { /* Diagnostics never interrupt the pump. */ }
   };
   const playing = (s: Source) => !!s.voice && !s.voice.ended;
-  const liveVoices = () => { let n = 0; for (const f of fading.values()) if (f.counted) n++; for (const s of sources.values()) if (playing(s)) n++; return n; };
-  const hrtfVoices = (except?: Source) => { let n = 0; for (const s of sources.values()) if (s !== except && s.hrtf && playing(s)) n++; return n; };
+  /** Every voice this kit holds on the output: playing ones and fading ones. */
+  const liveVoices = () => { let n = 0; for (const v of fading.keys()) if (!v.ended) n++; for (const s of sources.values()) if (playing(s)) n++; return n; };
+  const hrtfVoices = () => { let n = 0; for (const s of sources.values()) if (s.hrtf && playing(s)) n++; return n; };
   /** Ramp a voice's filter gain to 0 at its current cutoff (no brightening), then stop it on a later pump. */
-  const fadeOut = (voice: CueVoice, owner: Source | null, now: number, counted: boolean) => {
+  const fadeOut = (voice: CueVoice, owner: Source | null, now: number) => {
     if (voice.ended || fading.has(voice)) return;
-    try { voice.setFilter?.({ cutoffHz: owner?.sentFilter?.hz ?? OPEN_HZ, gain: 0 }, FADE); fading.set(voice, { stopAt: now + FADE_HOLD, counted, owner }); }
+    try { voice.setFilter?.({ cutoffHz: owner?.sentFilter?.hz ?? OPEN_HZ, gain: 0 }, FADE); fading.set(voice, { stopAt: now + FADE_HOLD, owner }); }
     catch (error) { report(owner, 'voice', `spatial-audio: voice fade failed: ${String(error)}`); stop(voice, owner); }
   };
   const stop = (voice: CueVoice, owner: Source | null) => {
     try { if (!voice.ended) voice.stop(); } catch (error) { report(owner, 'voice', `spatial-audio: voice stop failed: ${String(error)}`); }
   };
-  const release = (s: Source, now: number) => { if (playing(s)) fadeOut(s.voice!, s, now, true); s.voice = null; s.hrtf = false; };
+  const release = (s: Source, now: number) => { if (playing(s)) fadeOut(s.voice!, s, now); s.voice = null; s.hrtf = false; };
   const settle = (s: Source) => { s.dueAt = null; s.reserved = false; s.emitted ||= s.input.every === undefined; };
   const retire = (s: Source) => { sources.delete(s.id); s.reserved = false; s.off?.(); s.off = undefined; };
   const isBlocked = (s: Source, now: number) => !occ ? false : s.ray && now - s.ray.at <= maxAge ? s.ray.blocked : unknownBlocked;
@@ -228,9 +253,27 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
     try { const v = s.input.importance(); if (!numIn(v, 0, 1e6)) throw new RangeError('importance must be in [0, 1e6]'); return base * v; }
     catch (error) { report(s, 'importance', `spatial-audio: source ${s.id} importance failed: ${String(error)}`); return base; }
   };
-  /** Start the source's due emission. A previous voice of the same source is replaced (faded, not counted). */
+  /**
+   * HRTF with hysteresis: at most `maxHrtf` sources hold a claim, kept across their emissions, so short cues with
+   * near-equal scores do not flip between HRTF and equal-power. A claim moves only from a claimant that is not playing
+   * HRTF now, to a score `HRTF_SWITCH` times its own; an idle claim lapses (see `claimLapsed`).
+   */
+  const hrtfTarget = (s: Source): Source | null | 'claim' => {
+    if (!s.cls.localise || maxHrtf === 0) return null;
+    if (s.hrtfClaim) return s;
+    let claims = 0, weakest: Source | null = null;
+    for (const o of sources.values()) {
+      if (!o.hrtfClaim) continue;
+      claims++;
+      if (!(o.hrtf && playing(o)) && (!weakest || o.claimScore < weakest.claimScore)) weakest = o;
+    }
+    if (claims < maxHrtf) return 'claim';
+    return weakest && s.score > weakest.claimScore * HRTF_SWITCH ? weakest : null;
+  };
+  const claimLapsed = (s: Source, now: number) => s.hrtfClaim && !playing(s) && s.dueAt === null && now - s.claimAt > Math.max(HRTF_HOLD, 2 * (s.input.every ?? 0));
+  /** Start the source's due emission. A previous voice of the same source is replaced (faded; the fade holds a slot). */
   const start = (s: Source, now: number): boolean => {
-    const c = s.cls, hrtf = !!c.localise && hrtfVoices(s) < maxHrtf, f = filterFor(s, now);
+    const c = s.cls, target = hrtfTarget(s), hrtf = target !== null, f = filterFor(s, now);
     let voice: CueVoice | null = null;
     try {
       voice = o.output.playVoice(s.input.cue, {
@@ -241,8 +284,10 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
     } catch (error) { report(s, 'playback', `spatial-audio: playback of '${s.input.cue}' failed: ${String(error)}`); }
     settle(s);
     if (!voice) { stats.dropped++; return false; }
-    if (playing(s)) fadeOut(s.voice!, s, now, false);
-    s.voice = voice; s.hrtf = voice.panning === 'HRTF'; s.sentPosition = s.position; s.sentFilter = f; s.startedAt = now;
+    if (playing(s)) fadeOut(s.voice!, s, now);
+    if (target !== null && target !== 'claim' && target !== s) target.hrtfClaim = false;
+    if (hrtf) { s.hrtfClaim = true; s.claimScore = s.score; s.claimAt = now; }
+    s.voice = voice; s.hrtf = voice.panning === 'HRTF'; s.sentPosition = s.position; s.sentFilter = f; s.startedAt = now; s.waitingSince = null; s.served++;
     return true;
   };
 
@@ -252,8 +297,13 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
     release(s, clock === -Infinity ? 0 : clock); retire(s); return true;
   };
 
-  /** Seconds since the source's last occlusion result, or since its voice started when it has none. */
-  const rayAge = (s: Source, now: number) => now - (s.ray?.at ?? s.startedAt);
+  /**
+   * Ordering age for refreshing playing voices: seconds since the last result, or since the voice started when it has
+   * none (so a long-playing voice is not starved by a stream of new unqueried ones). Stats do not use it: a voice with
+   * no result counts as stale there.
+   */
+  const refreshAge = (s: Source, now: number) => now - (s.ray?.at ?? s.startedAt);
+  const fresh = (s: Source, now: number) => !!s.ray && now - s.ray.at <= maxAge;
   const query = (s: Source, now: number) => {
     if (!occ) return;
     stats.rays++;
@@ -263,8 +313,24 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
       s.ray = { blocked: hit !== null && hit > margin && hit < s.distance - margin, at: now };
     } catch (error) { report(s, 'occlusion', `spatial-audio: occlusion query failed: ${String(error)}`); }
   };
-  /** Ordering for waiting emissions: score, then the longest-waiting, then the oldest source. */
-  const byPriority = (a: Source, b: Source) => b.score - a.score || (a.dueAt ?? 0) - (b.dueAt ?? 0) || a.id - b.id;
+  /**
+   * Ordering for waiting emissions: by score in tiers, then the starvation credit (the longest-starved source, across
+   * dropped emissions), then the earliest due, then the oldest source. A tier is a run of scores within `TIE` of its
+   * strongest member, so sources that are equal in practice (a float ulp apart, or a few centimetres) rotate instead of
+   * the marginally stronger ones always winning. O(n log n).
+   */
+  const credit = (s: Source) => s.waitingSince ?? s.dueAt ?? 0;
+  const byCredit = (a: Source, b: Source) => credit(a) - credit(b) || (a.dueAt ?? 0) - (b.dueAt ?? 0) || b.score - a.score || a.id - b.id;
+  /** Split a sorted list into runs whose members `same(leader, member)`, sorting each run by `order`. */
+  const tiers = (list: Source[], same: (leader: Source, member: Source) => boolean, order: (a: Source, b: Source) => number): Source[] => {
+    const out: Source[] = [];
+    for (let i = 0; i < list.length;) {
+      let j = i + 1; while (j < list.length && same(list[i], list[j])) j++;
+      out.push(...list.slice(i, j).sort(order)); i = j;
+    }
+    return out;
+  };
+  const byPriority = (list: Source[]) => tiers(list.sort((a, b) => b.score - a.score || a.id - b.id), (a, b) => b.score >= a.score * (1 - TIE), byCredit);
 
   return {
     cancel,
@@ -278,7 +344,8 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
       if (closed || sources.size >= maxSources || input.signal?.aborted) return null;
       const id = ++sequence;
       const s: Source = { id, input: { ...input }, cls, nextAt: now, dueAt: null, emitted: false, voice: null, hrtf: false, score: 0, weight: 0, gain: 0, distance: Infinity,
-        position: [0, 0, 0], sentPosition: null, sentFilter: null, ray: null, reported: new Set(), startedAt: now, reserved: false };
+        position: [0, 0, 0], sentPosition: null, sentFilter: null, ray: null, reported: new Set(), startedAt: now, reserved: false,
+        waitingSince: null, served: 0, hrtfClaim: false, claimScore: 0, claimAt: now };
       if (input.signal) { const abort = () => cancel(id); input.signal.addEventListener('abort', abort, { once: true }); s.off = () => input.signal!.removeEventListener('abort', abort); }
       sources.set(id, s); return id;
     },
@@ -309,58 +376,76 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
             else if (now - s.nextAt > maxLateness) { s.dueAt = now; s.nextAt = now + every; }
             else { s.dueAt = s.nextAt; s.nextAt += every; }
           }
-          if (s.dueAt !== null && s.gain === 0) { stats.culled++; settle(s); }
+          if (s.dueAt !== null && s.gain === 0) { stats.culled++; settle(s); s.waitingSince = null; }
+          if (claimLapsed(s, now)) s.hrtfClaim = false;
           if (s.dueAt !== null && now - s.dueAt > maxLateness) { stats.dropped++; settle(s); }
           if (s.input.every === undefined && s.emitted && s.dueAt === null && !s.voice) { retire(s); continue; }
         }
-        // 2. Occlusion. Half the budget (rounded up) refreshes playing voices, stalest first, so new emissions cannot
-        // starve them; the rest goes to any candidate, stalest first, then by score.
+        // 2. Occlusion. Waiting emissions without a fresh result are guaranteed floor(budget / 2) rays, at least one, so
+        // they start with a result even at a budget of 1. Playing voices get up to half the budget (rounded up) of what
+        // is left, the oldest information first (time since the last result, or since the voice started when it has
+        // none), so a stream of new emissions cannot starve a long-playing voice when the budget is 2 or more. Any rays
+        // left go to the remaining candidates, never-queried first, then by score.
         if (occ && raysPerPump > 0) {
-          const live: Source[] = [], all: Source[] = [];
+          const live: Source[] = [], waiting: Source[] = [], others: Source[] = [];
           for (const s of sources.values()) {
             if (s.gain <= 0) continue;
             s.score = s.gain * s.weight;
             if (playing(s)) live.push(s);
-            if (playing(s) || s.dueAt !== null) all.push(s);
+            else if (s.dueAt !== null) (fresh(s, now) ? others : waiting).push(s);
           }
-          // Oldest information first: time since the last result, or since the voice started when it has none, so a
-          // long-playing voice is not starved by a stream of new ones (those get the other half of the budget).
-          live.sort((a, b) => rayAge(b, now) - rayAge(a, now) || b.score - a.score || a.id - b.id);
-          const done = new Set<Source>();
-          for (const s of live.slice(0, Math.ceil(raysPerPump / 2))) { query(s, now); done.add(s); }
-          const rest = all.filter(s => !done.has(s)).sort((a, b) => (a.ray?.at ?? -Infinity) - (b.ray?.at ?? -Infinity) || b.score - a.score || a.id - b.id);
-          for (const s of rest.slice(0, raysPerPump - done.size)) query(s, now);
-          stats.raysDeferred += Math.max(0, all.length - raysPerPump);
+          live.sort((a, b) => refreshAge(b, now) - refreshAge(a, now) || b.score - a.score || a.id - b.id);
+          const neverFirst = (a: Source, b: Source) => (a.ray?.at ?? -Infinity) - (b.ray?.at ?? -Infinity) || b.score - a.score || a.id - b.id;
+          waiting.sort(neverFirst);
+          const newRays = waiting.length ? Math.min(waiting.length, Math.max(1, Math.floor(raysPerPump / 2))) : 0;
+          const liveRays = Math.min(live.length, raysPerPump - newRays, Math.ceil(raysPerPump / 2));
+          for (const s of live.slice(0, liveRays)) query(s, now);
+          for (const s of waiting.slice(0, newRays)) query(s, now);
+          const rest = [...live.slice(liveRays), ...waiting.slice(newRays), ...others].sort(neverFirst);
+          for (const s of rest.slice(0, raysPerPump - liveRays - newRays)) query(s, now);
+          stats.raysDeferred += Math.max(0, live.length + waiting.length + others.length - raysPerPump);
         }
-        // 3. Admission, in priority order (score, then longest-waiting, then oldest source). A due source whose own
-        // voice still plays holds that slot, so the due set can fill free + (due sources already playing) slots. A
-        // playing source that ranks outside them yields: its voice fades and the slot is reserved for a waiting
-        // emission that ranked inside (equal sources rotate instead of starving). A source replacing its own voice
-        // needs no free slot. Remaining emissions may steal the weakest non-due voices, strongest first, stopping at
-        // the first that does not clear `stealRatio`; an emission with a reserved slot never steals again.
+        // 3. Admission, in priority order (score tier, then starvation credit, then earliest due, then oldest source). Every
+        // voice, fading ones included, holds a slot, so this kit never has more than `maxVoices` on the output. A due
+        // source whose own voice still plays holds that slot, so the due set can fill free + (due sources already
+        // playing) slots. Inside them, waiting emissions take free slots first, then the slots of playing sources that
+        // ranked outside (those yield: their voice fades and the slot is reserved, so equal sources rotate). A due source
+        // replacing its own voice crossfades into a free slot, or, with none left, fades its old voice first and starts
+        // when that slot frees. Remaining emissions may take voices that are not due, weakest (then longest-playing)
+        // first: a steal needs `stealRatio` times the score; a rotation needs an equal score (within `TIE`) and a voice that has played
+        // `rotateAfter`. The pass stops at the first voice it cannot take; a reserved emission never takes another.
         for (const s of sources.values()) s.score = s.gain * s.weight * (isBlocked(s, now) ? blocked.gain : 1);
-        const due = [...sources.values()].filter(s => s.dueAt !== null).sort(byPriority);
+        const due = byPriority([...sources.values()].filter(s => s.dueAt !== null));
         const holds = (s: Source) => playing(s) && !fading.has(s.voice!);
         let free = Math.max(0, maxVoices - liveVoices());
         const admit = (s: Source) => { if (start(s, now)) realised++; else if (s.input.every === undefined && !s.voice) retire(s); };
         const slots = free + due.filter(holds).length;
         const inside = due.slice(0, slots), outside = due.slice(slots);
-        const yielding = outside.filter(holds);
-        for (const s of inside) if (holds(s)) admit(s);
-        for (const s of inside.filter(s => s.dueAt !== null)) {
-          if (free > 0) { free--; admit(s); }
-          else if (s.reserved) continue;
-          else { const y = yielding.shift(); if (y) { release(y, now); s.reserved = true; stats.stolen++; } }
+        const yielding = outside.filter(holds), holding = inside.filter(holds);
+        for (const s of inside) {
+          if (holding.includes(s)) continue;
+          if (free > 0) { free--; admit(s); continue; }
+          if (s.reserved) continue;
+          const y = yielding.shift(); if (y) { release(y, now); s.reserved = true; stats.rotated++; }
+        }
+        for (const s of holding) {
+          if (free > 0) { free--; admit(s); } else { release(s, now); s.reserved = true; }
         }
         const candidates = outside.filter(s => s.dueAt !== null && !s.reserved && !holds(s));
         if (candidates.length) {
-          const weakest = [...sources.values()].filter(v => holds(v) && v.dueAt === null).sort((a, b) => a.score - b.score || b.id - a.id);
-          for (let i = 0; i < candidates.length && i < weakest.length; i++) {
-            const s = candidates[i], victim = weakest[i];
-            if (!(s.score > victim.score * stealRatio)) break;
-            release(victim, now); s.reserved = true; stats.stolen++;
+          // Weakest tier first; inside a tier the most-served source, then the longest-playing voice, gives way first.
+          const victims = tiers([...sources.values()].filter(v => holds(v) && v.dueAt === null).sort((a, b) => a.score - b.score || a.id - b.id), (a, b) => b.score <= a.score * (1 + TIE),
+            (a, b) => b.served - a.served || a.startedAt - b.startedAt || a.id - b.id);
+          // Each candidate scans at most the (<= maxVoices) victims; the pass ends at the first candidate that takes none.
+          for (const s of candidates) {
+            const k = victims.findIndex(v => s.score > v.score * stealRatio || (s.score >= v.score * (1 - TIE) && now - v.startedAt >= rotateAfter));
+            if (k < 0) break;
+            const [victim] = victims.splice(k, 1);
+            if (s.score > victim.score * stealRatio) stats.stolen++; else stats.rotated++;
+            release(victim, now); s.reserved = true;
           }
         }
+        for (const s of sources.values()) if (s.dueAt !== null) s.waitingSince ??= s.dueAt;
         // 4. Follow playing voices: position and filter, written only when they changed enough to matter.
         for (const s of sources.values()) {
           const v = s.voice; if (!v || v.ended || fading.has(v)) continue;
@@ -378,13 +463,16 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
     /** Whether a source's last occlusion result (fresh or not) says blocked; null when never queried or unknown id. */
     occluded(id: number): boolean | null { return sources.get(id)?.ray?.blocked ?? null; },
     get stats(): SpatialAudioStats {
-      let waiting = 0, stale = 0, oldestRayAge = 0;
+      let waiting = 0, stale = 0, unqueried = 0, oldestRayAge = 0, fades = 0;
       const now = clock === -Infinity ? 0 : clock;
+      for (const v of fading.keys()) if (!v.ended) fades++;
       for (const s of sources.values()) {
         if (s.dueAt !== null) waiting++;
-        if (occ && playing(s)) { const age = rayAge(s, now); oldestRayAge = Math.max(oldestRayAge, age); if (age > maxAge) stale++; }
+        if (!occ || !playing(s)) continue;
+        if (!s.ray) { unqueried++; stale++; continue; }
+        oldestRayAge = Math.max(oldestRayAge, now - s.ray.at); if (!fresh(s, now)) stale++;
       }
-      return { sources: sources.size, voices: liveVoices(), hrtf: hrtfVoices(), waiting, stale, oldestRayAge, ...stats };
+      return { sources: sources.size, voices: liveVoices(), fading: fades, hrtf: hrtfVoices(), waiting, stale, unqueried, oldestRayAge, ...stats };
     },
     /** Stop this kit's voices and reject new sources. The borrowed output is never closed. Idempotent. */
     dispose(): void {

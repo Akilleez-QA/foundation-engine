@@ -90,7 +90,8 @@ sound.pump(ctx.time.t, ctx.camera.position);
   results expire to `unknown`. If `sound.stats.stale` stays above 0, the budget cannot
   refresh every playing voice within `maxAge`.
 - Dispose the kit with the scene (`sound.dispose()`); `sound.stats` shows `voices`,
-  `waiting`, `dropped`, `culled`, `stolen`, `rays`, `raysDeferred` and `stale`.
+  `waiting`, `dropped`, `culled`, `stolen`, `rotated`, `rays`, `raysDeferred` and `stale`.
+  Equal sounds take turns; give a sound that must not be cut a higher `importance`.
 
 ## 4. Check it
 
