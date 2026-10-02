@@ -38,3 +38,48 @@ export function createRng(seed:string|number):Rng{
   pick:<T>(arr:readonly T[]):T=>{if(arr.length===0)throw new RangeError('rng.pick: empty array');return arr[Math.floor(arr.length*next())];},
  };
 }
+
+/** A seed path component: a safe integer (negative allowed) or a short string. Floats are rejected, not rounded. */
+export type SeedPart=number|string;
+/** Bounds on {@link deriveSeed} input: path components and UTF-16 code units per string component. */
+export const SEED_PATH_LIMITS=Object.freeze({maxParts:32,maxStringLength:256});
+
+/** lowbias32 (C. Wellons, hash-prospector, public domain): a bijective 32-bit integer mixer. */
+function mix32(x:number):number{
+ x^=x>>>16;x=Math.imul(x,0x7feb352d);x^=x>>>15;x=Math.imul(x,0x846ca68b);x^=x>>>16;return x>>>0;
+}
+/** Absorbs one word; for a fixed state it is a bijection of the word, so sibling components never collide. */
+const absorb=(h:number,w:number)=>mix32((h^mix32((w+0x9e3779b9)>>>0))>>>0);
+
+/**
+ * Derives an unsigned 32-bit child seed from a root seed and an ordered path, e.g.
+ * `deriveSeed(root, 'region', cx, cz)` or `deriveSeed(root, 'floor', 3, 'loot')`.
+ *
+ * A pure function of its arguments: independent of call order, wall clock and every other stream, so a region or
+ * level regenerates identically whenever it is requested. 32-bit integer arithmetic (`Math.imul`, shifts, xor; no
+ * `Math.sin`), plus one exact power-of-two division to split integers wider than 32 bits, keeps results
+ * bit-identical across JavaScript engines, workers and the main thread. Components are type-tagged and
+ * length-prefixed: `1` differs from `'1'`, and `('ab')` from `('a','b')`. For the same root and prefix, distinct
+ * final 32-bit signed integer components (-2^31..2^31-1) map to distinct seeds (the absorb step is bijective);
+ * larger safe integers use a separately tagged two-word encoding.
+ * Seeds are 32-bit: unrelated paths can collide (birthday bound near 2^16 paths), so a derived seed is a stream
+ * seed, never an identity. Throws on a root outside 0..2^32-1, a non-integer or unsafe number, a string longer than
+ * {@link SEED_PATH_LIMITS}.maxStringLength, or more than maxParts components.
+ */
+export function deriveSeed(root:number,...path:readonly SeedPart[]):number{
+ if(!Number.isSafeInteger(root)||root<0||root>0xffffffff)throw new RangeError('deriveSeed: root must be an unsigned 32-bit integer');
+ if(path.length>SEED_PATH_LIMITS.maxParts)throw new RangeError('deriveSeed: too many path components');
+ let h=absorb(0x5eed0001,root);
+ for(const part of path){
+  if(typeof part==='number'){
+   if(!Number.isSafeInteger(part))throw new RangeError('deriveSeed: numeric components must be safe integers');
+   if(part>=-0x80000000&&part<=0x7fffffff)h=absorb(absorb(h,1),part>>>0);
+   else{const lo=part>>>0;h=absorb(absorb(absorb(h,3),Math.floor((part-lo)/4294967296)|0),lo);}
+  }else if(typeof part==='string'){
+   if(part.length>SEED_PATH_LIMITS.maxStringLength)throw new RangeError('deriveSeed: string component too long');
+   h=absorb(absorb(h,2),part.length);
+   for(let i=0;i<part.length;i++)h=absorb(h,part.charCodeAt(i));
+  }else throw new TypeError('deriveSeed: components must be numbers or strings');
+ }
+ return absorb(h,path.length);
+}

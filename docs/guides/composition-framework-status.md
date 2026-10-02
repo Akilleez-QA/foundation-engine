@@ -335,3 +335,16 @@ populations, not a visibility, steering or replication policy. Status: implement
 candidate (PR #23); not integrated. Evidence is focused unit tests
 and a headless 1,000/10,000-entry CPU micro-benchmark; no template consumer, browser,
 worker or physical-device evidence, and no budget change.
+
+## Seeded generation (GEN-01) — implemented, candidate
+
+GEN-01 adds integer-only hierarchical seed derivation (`deriveSeed`, beside the single
+mulberry32 generator in `src/core/rng.ts`) and an optional `procgen` kit. The kit runs
+creator-registered slice generators over bounded `Uint16Array` cell grids on the
+existing WorkerHost, ships one example row (`job.kits.procgen.cellular`) and provides
+a strict root-seed save section. It adds no scheduler, registry or publication owner;
+results never publish themselves. Status: implemented, candidate (PR,
+`feat/genre-sandbox-slice1`); not integrated. Evidence is focused unit tests plus one
+desktop Chromium worker check. Chunk residency, runtime edit deltas, meshing and
+edited-world persistence remain separate work. See the
+[kit](../../src/kits/procgen/README.md) and the [ledger](upgrade-acceptance-ledger.md).

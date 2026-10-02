@@ -333,6 +333,7 @@ A game adds its own domain systems (for example an economy or a world model) wit
 | Saved state | Save section in the owner folder, with a migration per version | Store: export, import, reset, quarantine, players | [add-a-save-section](recipes/add-a-save-section.md) |
 | Control | Input action row | Dispatcher, reach check, remaps | [add-an-input-action](recipes/add-an-input-action.md) |
 | Budget | Scene row in the game's `budgets.json` | Bench, gate, ratchet | [add-a-budget](recipes/add-a-budget.md) |
+| Worker job | `src/kits/<kit>/workers/<name>.job.ts` (row `job.kits.<kit>.<name>`) or the domain equivalent | Worker host loader table, main-thread fallback | [generate-seeded-content](recipes/generate-seeded-content.md) |
 | Content pack | Pack folder: rows, patches, lazy behaviour | Registries; a failing pack disables only itself | |
 | Registry | Owner module definition | Boot validation, registries test | |
 | Event, service | Augmentation in the owner's folder | Bus, service table, test API | |

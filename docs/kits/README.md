@@ -12,6 +12,7 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [chalkboard](../../src/kits/chalkboard/README.md) | A chalkboard drawn in SVG: strokes that draw on, text, arrows, axes, number lines | learn |
 | [concept-explorer](../../src/kits/concept-explorer/README.md) | Orbit a model, tap parts, toggle layers, a parameter slider, a mini quiz | learn |
 | [terrain](../../src/kits/terrain/README.md) | Canonical surface, exact contact queries, bounded chunks and coherent revisions | terrain, expedition |
+| [procgen](../../src/kits/procgen/README.md) | Hierarchical seed derivation, bounded seeded grid generation on the worker host, a strict root-seed save section | None yet. GEN-01 implemented, candidate (PR), not integrated |
 | [navigation](../../src/kits/navigation/README.md) | Incremental bounded route search with cancellation | expedition |
 | [dialogue](../../src/kits/dialogue/README.md) | Stable choices, revision guards and validated graph exits | expedition |
 | [objectives](../../src/kits/objectives/README.md) | Counted event runs, explicit stage composition and retry-safe completion claims | expedition |

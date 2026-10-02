@@ -75,6 +75,7 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | NW-09 | Seeded fault-schedule harness for the composed authority path (study N6, tools/test only) | Implemented, candidate (PR #26); not integrated. `npm run faults:network` and `tools/authority-workbench/fault-harness.test.mjs` replay seeded combined faults (link delay/reorder/duplicate/drop, connection loss mid-command, controller replacement, held/crashed commits, host restart, SQLite before/after-commit failure with recovery, clock skew, slow consumer, revocation) against the reference host and two scripted clients, checking durable-history, result-semantics, prediction, disclosure, bound and leak invariants after every step against independent SQLite readback; failing seeds print seed + step index and can be shrunk and replayed. Process-scope loopback evidence only: no WAN, power-loss, filesystem, scale or device claim. See the [guide](network-fault-schedule.md). |
 | NW-08 | Planned drain and capped connection lifetime (study N8) | Implemented, candidate (PR #21, `feat/nw08-planned-drain`); not integrated. Optional pure `createConnectionDrain` (host: bounded notice, operator drain/resume, dithered lifetime cap, per-poll instruction cap) and `createDrainFollower` (client: bounded notice, cooperative close, hold until announced return, then the existing retry schedule) in the network kit; the network workbench host (`--drain`) and client (checkbox) opt in. Drain closes are 1012 and transient. Admitted work is never cancelled. Evidence and limits are in the NW-08 section below. No process-restart, WAN or physical-device claim. |
 | TR-01 | Regional terrain worker and ordinary-surface integration | Integrated in PR #109 at 99e6255. Canonical regional Surface and halo patches, bounded WorkerHost generation/patch adapters, independent geometric oracles and finite coherent render/query consumer passed at 891eb7; all seven template gates passed (1,648 tests, 129 performance checks, zero breaches/regressions, four advisory heap warnings). Combined main tests/build passed. Physical-device performance and unbounded/global streaming are not established. |
+| GEN-01 | Deterministic seed derivation and bounded seeded generation jobs | Implemented, candidate (PR, `feat/genre-sandbox-slice1`); not integrated. Pure integer-only `deriveSeed` in `src/core/rng.ts` and the optional `procgen` kit: `createGridGenerationJob` on the existing WorkerHost, the example `job.kits.procgen.cellular` row, and a strict root-seed save section. Evidence and limits are in the GEN-01 section below. No chunk residency, edit deltas, meshing, physical-device or generation-quality claim. |
 | DV-01 | Supported-device experience and sustained performance evidence | In progress, not integrated: ported to the public `feat/device-acceptance` PR. [Stock matrix](../kits/stock-device-acceptance-matrix.md) covers all seven declarations. The [first receipt](../verification/stock-device-20261001/README.md) records 16 passing emulated target/tap checks and a compact lesson content overlap; lesson visit cleanup and a measured learn layout seam repair it, with a fake-DOM regression and emulated separation checks across board, sim and quiz at four profiles ([layout receipt](../verification/stock-device-20261002/README.md)). Full consumer workflows, in-panel touch scrolling, 200% text, named minimum devices and sustained physical evidence remain open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. No physical-device or accessibility certification. |
 | SC-01 | Bounded spatial index for neighbour, range and interest queries at scale | Implemented, candidate (PR #23); not integrated. Optional `spatial` kit `createSpatialGrid`: preallocated uniform grid, admission before write, `too-wide` refusal before scanning, explicitly `truncated` results, terminal disposal. Checked: 12 focused unit tests (seeded brute-force oracle, refusals without mutation, narrow-buffer rejection, ECS interest consumer handling despawn and out-of-bounds and failing closed) and a work-count test of the 1,000/10,000-entry micro-benchmark. Headless Node medians recorded in the [guide](spatial-index.md#measured-cost). No template consumer, browser, worker or physical-device evidence; no budget change. |
 
@@ -435,3 +436,30 @@ Status: implemented, candidate (PR #23); not integrated. See the
   `tools/spatial-bench/bench.test.mjs` (per-query work flat from 1,000 to 10,000 entries).
 - Not established: browser frame cost, physical devices, worker offload, a running
   network-view or fog-of-war consumer, and template integration.
+
+## Seeded generation (GEN-01) — implemented, candidate
+
+Status: implemented, candidate on `feat/genre-sandbox-slice1` (PR); not integrated.
+See the [procgen kit](../../src/kits/procgen/README.md) and the
+[recipe](../recipes/generate-seeded-content.md).
+
+- **Runtime-enforced:**
+  - `deriveSeed`: an unsigned 32-bit root; at most 32 components, each a safe integer or a string of at most 256 code units; floats and other types are rejected.
+  - Grid recipes: format and generator versions; id 1–256 code units; a nonnegative revision; an unsigned 32-bit seed; at most `maxCells` cells (default 262,144, hard ceiling 4,194,304); parameter bytes before parsing, then nodes and depth.
+  - Execution: a literal-`true` validator; at most `maxSlices` slices (default 65,536); checked `set`; a whole-grid `maxValue` scan.
+  - Adoption: descriptor, length, element type and slice count are checked.
+  - Byte reservation is made before materialization. The existing host owns admission, cancellation, supersession and fallback.
+- **Checked:**
+  - Focused tests: 4 GEN-01 seed tests in `src/core/rng.test.ts` (pinned values, order independence, 200,002 collision-free int32 siblings, avalanche/lag, rejection) and 11 kit tests.
+  - The kit tests cover an independent cellular oracle and identical output across runs, fallback, transfer and the real in-process worker runtime. They also cover request-order independence, refusal before admission, runaway and out-of-range generators, cancellation mid-job in all three paths, supersession, owner loss, captured queued input, nine corrupt worker outputs, and a real SaveStore round trip with quarantine of twelve corrupt or unversioned seed records.
+  - Desktop Chromium module-worker check (`scripts/play/procgen-worker-check.mjs`, in `test:framework-browser`): worker, fallback and direct drain are bit-identical; cancellation and staleness are named; reservations retire after acknowledgement.
+  - Exact-head gate results are in the PR.
+- **Review fixes (PR #38):**
+  - Generators may declare their slice count, which is checked before admission. The cellular example declares an exact count and yields every 4,096 visits.
+  - `prepare` options accept `key` (including `false`), and the 4,096-keys-per-owner limit is documented.
+  - The seed section stores `contentVersion`.
+  - Adoption requires an exact, unshared, zero-offset backing buffer.
+  - Errors are typed as `GridJobError` with a stage.
+  - Locally produced output is not scanned twice. Cancellation wording now covers deadline termination.
+  - Evidence: 3 added kit tests (11 in total), with the seed-section tests updated.
+- **Not established:** physical-device timing, generation quality or aesthetics, determinism of arbitrary creator generators, chunk residency/streaming, runtime edit deltas, meshing, or persistence of large edited worlds. Research and the ranked follow-up slices are outside this repository.
