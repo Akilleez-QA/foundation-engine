@@ -252,3 +252,29 @@ test('native pose callback removing the last relation restores ordinary presenta
     assert.equal(root.visible,true); assert.equal(f.owner.sync(),false);
   } finally {f.owner.dispose();}
 });
+
+test('sockets and chained attachments read current world matrices after the scene container moves (three r185+ updateWorldMatrix)', async () => {
+  // three r185+ recomputes an ancestor in updateWorldMatrix(true, …) only when its own matrixWorldNeedsUpdate is set.
+  // Attached roots keep a manual local matrix, so a moved container must still reach their sockets and descendants.
+  const f=fixture();
+  try {
+    const last=f.spawn('last'), middle=f.spawn('middle'), first=f.spawn('first',5);
+    f.world.add(last,relation(middle)); f.world.add(middle,relation(first)); await f.ready(last,middle,first); f.owner.sync();
+    const before=new Set(f.scene.children), lastRoot=f.scene.children[0], middleRoot=f.scene.children[1];
+    assert.equal(middleRoot.matrixAutoUpdate,false);
+    const s0=f.owner.socket(middle,'anchor')!.matrix, last0=lastRoot.matrixWorld.elements[12];
+    // Move only the container (no full scene update): every read below must still see it.
+    f.scene.position.set(100,0,-4);
+    const s1=f.owner.socket(middle,'anchor')!.matrix;
+    assert.equal(s1[12],s0[12]+100,'socket follows the moved container'); assert.equal(s1[14],s0[14]-4);
+    // A new attachment to that socket resolves from the current container, not the pre-move world matrix.
+    const extra=f.spawn('extra'); f.world.add(extra,relation(middle)); await f.ready(extra); f.owner.sync();
+    assert.equal(f.owner.attachmentState(extra).status,'ready');
+    const extraRoot=f.scene.children.find(r=>!before.has(r))!;
+    f.scene.updateMatrixWorld(true);
+    assert.equal(lastRoot.matrixWorld.elements[12],last0+100);
+    assert.equal(extraRoot.matrixWorld.elements[12],lastRoot.matrixWorld.elements[12],'same socket, same offset, same world');
+    assert.equal(extraRoot.matrixWorld.elements[14],lastRoot.matrixWorld.elements[14]);
+  } finally { f.owner.dispose(); }
+  assert.deepEqual(f.errors,[]);
+});

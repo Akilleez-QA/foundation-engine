@@ -60,7 +60,9 @@ visibility change, package publication, deployment or Discord posting had occurr
   database back while child writers were still checkpointing on close. The
   storage outcome was correct. The test fix is a separate public PR. The same
   failure affected the initial dependency-update PRs. The TypeScript 7 and three.js
-  0.186 updates also fail for real and need deliberate upgrades.
+  0.186 updates also fail for real and need deliberate upgrades. The three.js 0.186
+  migration is the `feat/three-0.186` branch (re-verified private-state adapters);
+  Dependabot ignores three minors until such a migration lands.
 - Not included in the public source: the device-acceptance branch (DV-01 work,
   including unintegrated lesson cleanup and touch sizing). DV-01 remains unresolved.
 - The author posted the [announcement](publication-announcement.md) on Discord.

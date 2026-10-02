@@ -141,7 +141,7 @@ test('a newly installed after-shadow hook wakes the first frame after idle',()=>
  assert.equal(frame(),true);
 });
 
-test('r183 context restoration replaces shadowMap: existing scheduler rebinds before first presentation',()=>{
+test('r186 context restoration replaces shadowMap: existing scheduler rebinds before first presentation',()=>{
  const {renderer,scene,camera,shadows,frame}=fixture('high');frame();
  const old=renderer.shadowMap;let calls=0;
  renderer.shadowMap={...old,render(lights:T.Light[]){calls++;assert.ok(lights.every(l=>(l as T.DirectionalLight).shadow.needsUpdate));}};

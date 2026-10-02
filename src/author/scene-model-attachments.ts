@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { updateWorldMatrixFromRoot } from '../platform/render/world-matrix';
 import type { Entity, World } from '../core/ecs/world';
 import { Transform } from './defs';
 import { Model, type ModelData } from './model';
@@ -50,7 +51,7 @@ export function reconcileModelAttachments(world: World, slots: ReadonlyMap<Entit
     // Automatic roots need neither repeated publication nor scratch matrices.
     root.matrixAutoUpdate = true;
     root.position.set(tr.x, tr.y, tr.z); root.rotation.set(tr.rx, tr.ry, tr.rz); root.scale.setScalar(tr.scale);
-    root.visible = data.visible; root.updateWorldMatrix(true, true); if (pose) root.updateMatrixWorld(true); changed = true;
+    root.visible = data.visible; updateWorldMatrixFromRoot(root, true); if (pose) root.updateMatrixWorld(true); changed = true;
   };
   // Ordinary scenes allocate no graph scratch storage. Retired relation roots are
   // restored even when a native callback removed the last relation during this pass.
@@ -107,7 +108,7 @@ export function reconcileModelAttachments(world: World, slots: ReadonlyMap<Entit
     root.matrixAutoUpdate = false;
     if (matrix && !root.matrix.equals(matrix)) { root.matrix.copy(matrix); root.matrixWorldNeedsUpdate = true; changed = true; }
     if (root.visible !== visible) { root.visible = visible; changed = true; }
-    root.updateWorldMatrix(true, true); if (pose) root.updateMatrixWorld(true);
+    updateWorldMatrixFromRoot(root, true); if (pose) root.updateMatrixWorld(true);
   };
   const unavailable = (entity: Entity, status: ModelAttachmentState['status']) => {
     if (poseEntities.has(entity)) { changed = pose!.unavailable(entity, status) || changed; return; }
@@ -152,7 +153,7 @@ export function reconcileModelAttachments(world: World, slots: ReadonlyMap<Entit
         else {
           const parentModel = world.get(relation.parent, Model), targetModel = world.get(entity, Model);
           const parentAttachment = world.get(relation.parent, ModelAttachment), parentPose = world.get(relation.parent, ModelPoseLink);
-          node.updateWorldMatrix(true, false);
+          updateWorldMatrixFromRoot(node);
           // Object3D overrides may synchronously end the owner or replace requests.
           if (!current(entity, slot) || slots.get(relation.parent) !== parent || !usable(relation.parent, parent)
             || world.get(relation.parent, Model) !== parentModel || world.get(entity, Model) !== targetModel

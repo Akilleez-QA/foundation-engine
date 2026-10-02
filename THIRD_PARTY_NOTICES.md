@@ -21,14 +21,14 @@ WebSocket acceleration package is required by this integration.
 
 ## Code distributed in browser builds
 
-- **three 0.183.2**, MIT, Copyright © 2010–2026 three.js authors.
-  [Source](https://github.com/mrdoob/three.js/tree/r183).
+- **three 0.186.1**, MIT, Copyright © 2010–2026 three.js authors.
+  [Source](https://github.com/mrdoob/three.js/tree/r186).
   This includes the GLTFLoader and SkeletonUtils addons. The build uses the
   package's source-module entry for consistent module identity and tree shaking.
-- **meshoptimizer decoder 1.0**, MIT, Copyright (C) 2016–2025 Arseny Kapoulkine.
+- **meshoptimizer decoder 1.1**, MIT, Copyright (C) 2016–2026 Arseny Kapoulkine.
   The runtime decoder is vendored in three at
   `examples/jsm/libs/meshopt_decoder.module.js`, including its embedded WASM.
-  Its header identifies meshoptimizer 1.0. This is distinct from the 1.0.1
+  Its header identifies meshoptimizer 1.1. This is distinct from the 1.1.1
   development dependency in the lockfile.
   [Source](https://github.com/zeux/meshoptimizer).
 - Vite can generate browser preload helpers. Keep relevant Vite notices when
@@ -72,7 +72,7 @@ THE SOFTWARE.
 ```text
 MIT License
 
-Copyright (c) 2016-2025 Arseny Kapoulkine
+Copyright (c) 2016-2026 Arseny Kapoulkine
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -95,8 +95,8 @@ SOFTWARE.
 
 ## Locked dependency inventory
 
-The lockfile contains 79 dependency entries. Its declared licenses are 73 MIT,
-three Apache-2.0, two BSD-3-Clause, and one ISC. These include transitive tools,
+The lockfile contains 78 dependency entries. Its declared licenses are 73 MIT,
+three Apache-2.0, one BSD-3-Clause, and one ISC. These include transitive tools,
 types, and optional platform binaries; the table is not a statement that all
 packages ship in a browser build. The original 2026-09-30 audit installed 29 packages on its
 host; the separately documented network-host addition followed on 2026-10-01. Optional binaries for other operating systems were inspected through
@@ -161,14 +161,13 @@ lockfile metadata only.
 | `@types/estree` | 1.0.9 | MIT | Required by dependency graph |
 | `@types/node` | 22.20.4 | MIT | Required by dependency graph |
 | `@types/stats.js` | 0.17.4 | MIT | Required by dependency graph |
-| `@types/three` | 0.183.1 | MIT | Required by dependency graph |
+| `@types/three` | 0.186.0 | MIT | Required by dependency graph |
 | `@types/webxr` | 0.5.24 | MIT | Required by dependency graph |
-| `@webgpu/types` | 0.1.74 | BSD-3-Clause | Required by dependency graph |
 | `esbuild` | 0.28.2 | MIT | Required by dependency graph |
 | `fdir` | 6.5.0 | MIT | Required by dependency graph |
 | `fflate` | 0.8.3 | MIT | Required by dependency graph |
 | `fsevents` | 2.3.3 | MIT | Optional |
-| `meshoptimizer` | 1.0.1 | MIT | Required by dependency graph |
+| `meshoptimizer` | 1.1.1 | MIT | Required by dependency graph |
 | `nanoid` | 3.3.19 | MIT | Required by dependency graph |
 | `picocolors` | 1.1.1 | ISC | Required by dependency graph |
 | `picomatch` | 4.0.7 | MIT | Required by dependency graph |
@@ -176,7 +175,7 @@ lockfile metadata only.
 | `postcss` | 8.5.28 | MIT | Required by dependency graph |
 | `rollup` | 4.63.5 | MIT | Required by dependency graph |
 | `source-map-js` | 1.2.1 | BSD-3-Clause | Required by dependency graph |
-| `three` | 0.183.2 | MIT | Required by dependency graph |
+| `three` | 0.186.1 | MIT | Required by dependency graph |
 | `tinyglobby` | 0.2.17 | MIT | Required by dependency graph |
 | `tsx` | 4.23.15 | MIT | Required by dependency graph |
 | `typescript` | 5.9.3 | Apache-2.0 | Required by dependency graph |
@@ -193,8 +192,7 @@ installed notice paths include:
 - `node_modules/typescript/LICENSE.txt` and
   `node_modules/@dimforge/rapier3d-compat/LICENSE` (Apache-2.0).
 - `node_modules/playwright-core/LICENSE` and `NOTICE` (Apache-2.0).
-- `node_modules/@webgpu/types/LICENSE` and `node_modules/source-map-js/LICENSE`
-  (BSD-3-Clause).
+- `node_modules/source-map-js/LICENSE` (BSD-3-Clause).
 - `node_modules/picocolors/LICENSE` (ISC).
 - Other installed MIT packages' `LICENSE` or `LICENSE.md` files.
 
