@@ -86,10 +86,32 @@ off: exact application receipts are a separate requirement.
 ## Lifecycle and hidden consumers
 
 `read()` reports `connecting`, `open`, `closed` or `disposed`; terminal reason;
-queued count/bytes; captured limits; and admitted receive/send/refusal counters.
-Counters saturate at `Number.MAX_SAFE_INTEGER`. Reads neither drain messages nor
-query authority. Fixed failure reasons do not echo endpoint credentials, remote
-close text or exception content.
+`remoteClose`; queued count/bytes; captured limits; and admitted receive/send/refusal
+counters. Counters saturate at `Number.MAX_SAFE_INTEGER`. Reads neither drain
+messages nor query authority. Fixed failure reasons do not echo endpoint credentials,
+raw remote close text or exception content.
+
+## Remote close code and reason
+
+When the peer closes the connection (`reason: 'remote-close'`), `read().remoteClose`
+is a frozen `{code, reason}`; for every other cause, and before any close, it is
+`null`. Both fields are untrusted remote input, validated by the exported
+`parseRemoteClose` before they are retained:
+
+- `code` is an integer in 1000–4999, otherwise `null`. Browsers report 1006 when no
+  close frame arrived (for example the host dropped TCP first), so 1006 says nothing
+  about why.
+- `reason` is a token of at most 64 ASCII letters, digits, `.`, `_`, `:` or `-`,
+  starting with a letter or digit (`CLOSE_REASON_TOKEN`), otherwise `null`. Type and
+  length are checked before the pattern, so an oversized string is never scanned;
+  free text, whitespace, markup and non-ASCII become `null`, never a truncated copy.
+  Display it only as text (`textContent`), never as HTML.
+
+The first close event wins; a later event and disposal do not change it. The
+`reason` field and every existing outcome are unchanged, so callers that ignore
+`remoteClose` behave as before. The adapter does not decide what a code or reason
+means: a consumer may classify it, for example with the network kit's
+[close policy](network-retry.md#terminal-refusals-and-transient-loss).
 
 Closing or disposal revokes event authority before removing listeners and invoking
 native close. Late retained open/message/error/close callbacks cannot revive the
@@ -111,7 +133,9 @@ its frame loop.
 
 Focused injected-socket tests exercise text ordering, Unicode bytes, exact limits,
 binary refusal, queue overload, buffered-send refusal, disposal/late callbacks,
-partial listener-install failure, cleanup/send reentry and hidden undrained intake.
+partial listener-install failure, cleanup/send reentry, hidden undrained intake and
+remote close parsing (code range, token pattern, length bound, hostile getters, first
+close wins, `null` for local causes).
 The implementation and these tests pass an isolated strict TypeScript check.
 
 These tests establish adapter behavior under a controlled socket port. They do not

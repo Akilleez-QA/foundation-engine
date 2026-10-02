@@ -34,6 +34,7 @@ const report = {
     'NW01 ephemeral authentication and command scopes only; no durable recovery, replicated baseline or prediction acceptance.',
     'Credentials are random operator fixtures supplied through trusted IPC and native password inputs; no production identity-provider claim.',
     'NW04 paced reconnect is exercised against one loopback host with injected send refusal and revoked credentials; no WAN loss, host restart fleet or thundering-herd measurement in a browser.',
+    'Terminal close classification is exercised for one loopback auth-rejected close (code 1008); a close frame lost before TCP teardown would surface as code 1006 and be paced as transient.',
   ],
 };
 const evidence = diagnosticReport(report, resolve(out, 'report.json'));
@@ -389,8 +390,34 @@ try {
   await command(pages.beta, 'beta', 1);
   assert.equal((await read(pages.beta)).value, 6);
   await shot(pages.beta, 'beta-reconnected');
-  // A revoked credential cannot authenticate: retries stop at maxAttempts, then stay offline without spinning.
+  // A revoked credential is refused with a terminal close reason: with the default policy the client makes
+  // exactly one attempt, releases the credential and never schedules a retry.
   await pages.alpha.locator('#auto-reconnect').check();
+  assert.equal(await pages.alpha.locator('#final-refusals').isChecked(), true);
+  const refusedFrom = (await reconnect(pages.alpha)).transportsOpened;
+  await connect(pages.alpha, connection.credentials.alpha);
+  await pages.alpha.waitForFunction(
+    () => networkWorkbench.read().reconnect.lastClose !== null,
+  );
+  const refused = await read(pages.alpha);
+  assert.deepEqual(refused.transport.remoteClose, { code: 1008, reason: 'auth-rejected' });
+  assert.deepEqual(refused.reconnect.lastClose, {
+    code: 1008,
+    reason: 'auth-rejected',
+    class: 'terminal',
+  });
+  assert.equal(refused.reconnect.armed, false);
+  assert.equal(refused.reconnect.schedule.state, 'idle');
+  assert.equal(refused.reconnect.schedule.attempt, 0);
+  assert.equal(refused.reconnect.last, null);
+  assert.equal(refused.reconnect.transportsOpened, refusedFrom + 1);
+  assert.match(refused.message, /Refused by host \(remote-close: auth-rejected\)/);
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  assert.equal((await reconnect(pages.alpha)).transportsOpened, refusedFrom + 1);
+  report.observations.push({ label: 'terminal-close-single-attempt', reconnect: await reconnect(pages.alpha) });
+  await shot(pages.alpha, 'alpha-refused-final');
+  // A creator may instead treat refusals as transient: retries then stop at maxAttempts, offline without spinning.
+  await pages.alpha.locator('#final-refusals').uncheck();
   const alphaOpened = (await reconnect(pages.alpha)).transportsOpened;
   await connect(pages.alpha, connection.credentials.alpha);
   await pages.alpha.waitForFunction(
@@ -402,6 +429,7 @@ try {
   assert.equal(exhausted.armed, false);
   assert.equal(exhausted.transportsOpened, alphaOpened + 1 + exhausted.last.attempts);
   assert.equal(exhausted.last.attempts, exhausted.schedule.limits.maxAttempts);
+  assert.equal(exhausted.lastClose.class, 'transient');
   assert.match((await read(pages.alpha)).message, /Offline: 5 reconnect attempts failed/);
   await new Promise((resolve) => setTimeout(resolve, 1000));
   assert.equal((await reconnect(pages.alpha)).transportsOpened, exhausted.transportsOpened);

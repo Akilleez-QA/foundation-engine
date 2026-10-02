@@ -263,3 +263,9 @@ fixed window to a bucket is an intended semantic change recorded in the guide.
 Status: implemented, candidate (PR #13); not integrated. Evidence is unit and loopback
 host tests only; distributed limits, measured load and physical devices are outside
 this slice.
+
+## Terminal close classification (NW-04 follow-up) — implemented, candidate
+
+The browser transport exposes a validated remote close `{code, reason}`; the optional
+network kit `createClosePolicy` classifies it as terminal or transient so the workbench
+stops reconnecting on `auth-rejected`. Candidate (PR #16), building on integrated NW-04 (PR #14); not integrated. See the [retry guide](network-retry.md#terminal-refusals-and-transient-loss).

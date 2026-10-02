@@ -458,3 +458,11 @@ fixed window to a bucket is an intended semantic change recorded in the guide.
 Status: implemented, candidate (PR #13); not integrated. Evidence is unit and loopback
 host tests only; distributed limits, measured load and physical devices are outside
 this slice.
+
+## Terminal close classification — NW-04 follow-up, candidate
+
+`read().remoteClose` (browser transport) and `createClosePolicy` (network kit) let a
+consumer treat a terminal refusal as final instead of retrying it. Candidate
+(PR #16), building on integrated NW-04 (PR #14); not integrated. Unit tests and the
+loopback browser workflow are its only evidence. See the
+[retry pacing guide](network-retry.md#terminal-refusals-and-transient-loss).

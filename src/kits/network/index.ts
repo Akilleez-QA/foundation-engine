@@ -20,3 +20,6 @@ export type { RetrySchedule, RetryScheduleLimits, RetryScheduleOptions, RetrySch
 export { createRateAdmission } from './rate-admission';
 export type { RateKey, RateLease, RateAdmission, RateAdmissionLimits, RateAdmissionResult,
   RateRefusalReason, RateKeyState, RateAdmissionStats } from './rate-admission';
+export { createClosePolicy, DEFAULT_TERMINAL_CLOSE_REASONS, DEFAULT_TERMINAL_CLOSE_CODES,
+  MAX_CLOSE_POLICY_ENTRIES } from './close-policy';
+export type { ClosePolicy, ClosePolicyOptions, CloseClass } from './close-policy';

@@ -102,6 +102,38 @@ who wants automatic `recover()` attempts on durable authority can drive them
 through one schedule; with a single serialized slot that is one probe at a time.
 Commands whose outcome is unknown are not made safe to resend by reconnecting.
 
+## Terminal refusals and transient loss
+
+Some closes will repeat on every fresh connection: a revoked or rejected credential,
+or a protocol violation. Retrying them only spends attempts and host capacity.
+`createClosePolicy` (network kit, `src/kits/network/close-policy.ts`) classifies the
+transport's validated `remoteClose` (see the
+[transport guide](network-transport.md#remote-close-code-and-reason)) as `terminal`
+or `transient`. It is optional and stateless after construction; it owns no socket,
+timer or retry state.
+
+```ts
+import { createClosePolicy } from '../../src/kits/network/index';
+
+const closes = createClosePolicy(); // or { terminalReasons: ['banned'], terminalCodes: [4401] }
+const read = transport.read();
+if (read.state === 'closed' && closes.classify(read.remoteClose) === 'terminal') {
+  retry.cancel();             // stop, forget the credential, ask the player
+} else if (read.state === 'closed') {
+  retry.next(now);            // pace a fresh attempt
+}
+```
+
+The creator chooses what is terminal. Defaults: reasons `auth-rejected` and
+`revoked` (the stock intake's credential refusals) and codes 1002, 1003 and 1007
+(RFC 6455 protocol error, unsupported data, invalid payload). An omitted list uses
+the default; `[]` means none. Each list holds at most 32 distinct entries; reasons
+must be valid close tokens and codes integers in 1000–4999; unknown keys are
+rejected; lists are captured. Anything not configured, a `null` record and a 1006
+abnormal close are `transient`, so an unknown cause still gets bounded, paced
+retries rather than silently stopping. A host must actually send a close frame for
+the reason to arrive: a frame lost before TCP teardown degrades to transient.
+
 ## Representative consumer
 
 The [network workbench](../../tools/network-workbench/README.md) client has an
@@ -109,7 +141,11 @@ optional "Reconnect automatically" checkbox, off by default. When checked, an
 unexpected transport close schedules a wait; when it is due, the client opens a
 fresh transport and authenticates again. It never resends commands: pending
 correlation IDs are cleared on loss. A protocol error, explicit disconnect, hidden
-page, page exit or scene exit stops reconnecting. The credential is kept in memory
+page, page exit or scene exit stops reconnecting. A second checkbox, "Treat host
+refusals as final" (on by default), applies the default close policy: a terminal
+host close such as `auth-rejected` stops reconnecting after the one attempt that was
+refused and reports the validated reason as text. Unticked, every close is paced as
+transient. The credential is kept in memory
 only while reconnect is armed, and the diagnostic read-out reports only whether it
 is armed. Its jitter stream is `?seed=`-replayable and otherwise independent per tab.
 
@@ -121,12 +157,17 @@ reset, budget refill and cross-episode spending, the window bound under a hostil
 consumer, cancel and dispose during a wait, time validation, failing, invalid and
 reentrant random ports, seeded replay, and a seeded 1,000-client host-restart
 simulation where arrivals spread across the jitter window instead of one spike.
+`src/kits/network/close-policy.test.ts` covers default and creator-chosen terminal
+reasons and codes, `[]` as none, validation and capture, and that hostile close text
+cannot match a terminal token.
 
 The network workbench browser workflow (`npm run test:network-workbench-browser`)
 exercises paced recovery after an injected send refusal closes the connection
-(command not resent; host dispatch count unchanged), bounded exhaustion against a
-revoked credential (exactly one plus `maxAttempts` transports, then no further
-attempts), owner exit during a reconnect episode (no attempt after exit), and the
+(command not resent; host dispatch count unchanged), a revoked credential under the
+default close policy (real Chromium receives code 1008 reason `auth-rejected`;
+exactly one transport, no retry scheduled, none in the following 1.5 s), bounded
+exhaustion against a revoked credential with refusals treated as transient (exactly
+one plus `maxAttempts` transports, then no further attempts), owner exit during a reconnect episode (no attempt after exit), and the
 Disconnect, untick, hidden-page and pagehide stop paths (each reports the
 credential released and opens no transport in the following 1.5 s). The hidden and
 pagehide cases dispatch synthetic events in the page; they are not real tab
@@ -136,4 +177,6 @@ These establish behaviour under one loopback host and simulated clients. They do
 not establish WAN loss behaviour, a measured multi-client reconnect storm against
 a real host, physical-device behaviour, or that the example limits suit any game.
 The browser transport itself still implements no reconnect; pacing is the
-consumer's explicit choice.
+consumer's explicit choice. Close classification is only as reliable as the host's
+close frames: the reference host closes then terminates immediately, which delivered
+the frame on loopback but is not established over slow or lossy links.
