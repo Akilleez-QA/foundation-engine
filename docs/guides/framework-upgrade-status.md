@@ -428,7 +428,7 @@ integration, frame-time and downstream acceptance remain pending; no resource bu
 
 ## Queue age and submit deadlines — NW-06 implemented, candidate
 
-Implemented, candidate (PR pending on `feat/nw06-queue-deadlines`); not integrated.
+Implemented, candidate (PR #12); not integrated.
 The [network intake](../../src/kits/network/README.md#optional-queued-command-age-nw-06)
 may shed commands older than an optional `maxQueuedAgeMs` before authorization or
 dispatch, and [durable authority](durable-authority.md#optional-submit-deadlines-nw-06)
