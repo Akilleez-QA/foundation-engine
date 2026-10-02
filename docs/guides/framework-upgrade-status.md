@@ -389,3 +389,18 @@ Clean-revision native acceptance passed at `8317c69`; see the
 [saved evidence](../verification/authority-20261001/README.md). NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed.
 DV-01 physical-device acceptance remains open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. Creators may configure,
 replace or omit these contracts and retain ownership of all game rules.
+
+## Device acceptance continuation — public PR, not integrated
+
+The [stock device matrix](../kits/stock-device-acceptance-matrix.md) records all seven
+current template declarations and remaining task-specific acceptance. The
+[2026-10-01 exploratory receipt](../verification/stock-device-20261001/README.md)
+separates 16 passing touch-emulated target/tap cases from an observed compact lesson
+content overlap. The [2026-10-02 layout receipt](../verification/stock-device-20261002/README.md)
+records the repair in the learn kit's layout seam (desktop geometry unchanged), a
+fake-DOM regression and emulated separation checks across board, sim and quiz at
+four profiles on a clean commit. This is emulated evidence, not a completed mobile
+experience: full workflows, text scaling and actual minimum-device performance remain
+open, and minimum phone, tablet and laptop/desktop profiles are pending creator
+selection. DV-01 and the overall upgrade goal remain active. See the
+[continuing ledger](upgrade-acceptance-ledger.md) for the authoritative work state.

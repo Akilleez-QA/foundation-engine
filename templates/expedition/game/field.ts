@@ -49,11 +49,11 @@ function enter(ctx: SceneContext) {
   let panel:HTMLElement|undefined, message:HTMLElement|undefined, progress:HTMLElement|undefined, go:HTMLButtonElement|undefined, halt:HTMLButtonElement|undefined, assist:HTMLButtonElement|undefined;
   if(overlay&&doc){
     panel=doc.createElement('section');panel.setAttribute('aria-label',ctx.text('expedition.progress',{n:count(ctx)}));
-    panel.style.cssText='position:absolute;bottom:12px;left:12px;right:12px;max-width:320px;padding:12px;border-radius:12px;background:#102431ed;color:white;pointer-events:auto;font:500 14px/1.4 system-ui';
+    panel.style.cssText='position:absolute;bottom:12px;left:12px;right:12px;max-width:320px;padding:12px;border-radius:12px;background:#102431ed;color:white;pointer-events:auto;font:500 16px/1.4 system-ui';
     progress=doc.createElement('strong');message=doc.createElement('p');message.style.cssText='margin:6px 0;';message.setAttribute('role','status');
-    const row=doc.createElement('div');row.style.cssText='display:flex;gap:8px';
+    const row=doc.createElement('div');row.style.cssText='display:flex;flex-wrap:wrap;gap:8px';
     go=doc.createElement('button');assist=doc.createElement('button');halt=doc.createElement('button');
-    for(const b of [go,assist,halt]){b.type='button';b.style.cssText='min-height:44px;padding:8px 12px;border:0;border-radius:8px;font:inherit';row.append(b);}
+    for(const b of [go,assist,halt]){b.type='button';b.style.cssText='min-height:48px;min-width:48px;padding:8px 12px;border:0;border-radius:8px;font:inherit';row.append(b);}
     go.onclick=()=>begin(ctx,s);assist.onclick=()=>begin(ctx,s,true);halt.onclick=()=>stop(ctx,s);panel.append(progress,message,row);overlay.append(panel);
   }
   s.render=()=>{

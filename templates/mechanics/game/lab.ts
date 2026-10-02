@@ -11,9 +11,9 @@ function enter(ctx: SceneContext) {
   const doc = ctx.view.overlay?.ownerDocument; if (!doc) return;
   const panel = doc.createElement('section'), message = doc.createElement('p'), button = doc.createElement('button');
   panel.setAttribute('aria-label', ctx.text('lab.title'));
-  panel.style.cssText = 'position:absolute;bottom:12px;left:12px;right:12px;max-width:320px;padding:12px;border-radius:12px;background:#102431ed;color:white;pointer-events:auto;font:500 14px/1.4 system-ui';
+  panel.style.cssText = 'position:absolute;bottom:12px;left:12px;right:12px;max-width:320px;padding:12px;border-radius:12px;background:#102431ed;color:white;pointer-events:auto;font:500 16px/1.4 system-ui';
   message.setAttribute('role', 'status'); message.style.cssText = 'margin:0 0 10px';
-  button.type = 'button'; button.style.cssText = 'min-height:44px;padding:8px 12px;border:0;border-radius:8px;font:inherit;background:#a7eddb;color:#102431';
+  button.type = 'button'; button.style.cssText = 'min-height:48px;min-width:48px;padding:8px 12px;border:0;border-radius:8px;font:inherit;background:#a7eddb;color:#102431';
   button.onclick = () => s.next(ctx); panel.append(message, button); ctx.view.overlay!.append(panel);
   let last = '';
   const render = () => { const key = s.status() + s.label(); if (key === last) return; last = key; message.textContent = ctx.text(s.status()); button.textContent = ctx.text(s.label()); button.disabled = s.status() === 'lab.wait'; };

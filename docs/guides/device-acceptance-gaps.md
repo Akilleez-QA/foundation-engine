@@ -1,12 +1,38 @@
 # Device acceptance: current enforcement gaps
 
-Source and CI configuration reviewed against `f357f17` on 2026-09-30, including
+Historical source and CI configuration review: `f357f17`, 2026-09-30, including
 composed HUD obstruction and acknowledged resize regressions, capture steps and
 their CI command, saved controls and owned touch producers. This source review
 does not certify an uninspected CI run. The
 [device policy](../policy/DEVICE-EXPERIENCE.md) is normative; the following runtime
 and automation limitations remain unverified or require implementation. This
 inventory prevents a standards change from being mistaken for device certification.
+
+## Current candidate update — 2026-10-01
+
+The [stock template matrix](../kits/stock-device-acceptance-matrix.md) inventories all seven
+briefs at integrated `b6fb4a3`. It preserves their declared targets and separates
+existing tests from complete consumer workflows. The subsequent
+[exploratory touch receipt](../verification/stock-device-20261001/README.md) records
+16 target/tap checks on a dirty candidate: minimum sizing passes after a shelter
+font correction, but compact lesson controls visibly cover content. Layout/cleanup
+repairs, full task workflows and physical-device evidence remain open. This does
+not refresh historical CI results or establish an exact-head gate pass.
+
+## Lesson layout repair — 2026-10-02, public PR, not yet integrated
+
+The compact lesson overlap is repaired in the learn kit's layout seam: the board,
+caption, slider, cards and quiz stay clear of the wrapped control bar and the
+progress line, and keep their authored geometry where there is space (desktop
+unchanged). `src/kits/learn/layout.test.ts` and the runner's new separation checks
+fail on the old layout. The [layout repair receipt](../verification/stock-device-20261002/README.md)
+records a clean-commit emulated pass at 320×568, 390×844, 844×390 and 820×1180 and
+the inspected screenshots. Still open: touch scrolling in the fitted quiz (phone
+landscape), the small compact board, 200% text/zoom, the full touch lesson, other
+template workflows and all physical-device evidence. Minimum phone, tablet and
+laptop/desktop profiles are pending creator selection; DV-01 remains unresolved.
+
+## Existing mechanisms
 
 | Existing mechanism | Limitation | Required follow-up evidence |
 |---|---|---|

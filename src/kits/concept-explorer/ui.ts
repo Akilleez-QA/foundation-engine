@@ -26,7 +26,7 @@ export function createPin(overlay: HTMLElement): Pin {
   } };
 }
 
-export interface Slider { readonly value: number; set(v: number): void; show(on: boolean): void; onInput(fn: (v: number) => void): void }
+export interface Slider { readonly root: HTMLElement; readonly value: number; set(v: number): void; show(on: boolean): void; onInput(fn: (v: number) => void): void; destroy(): void }
 export function createSlider(overlay: HTMLElement, o: { id: string; label: string; min: number; max: number; step: number; value: number; unit?: string }): Slider {
   const doc = overlay.ownerDocument, wrap = doc.createElement('label');
   wrap.className = 'explorer-slider';
@@ -35,15 +35,19 @@ export function createSlider(overlay: HTMLElement, o: { id: string; label: strin
   input.type = 'range'; input.min = String(o.min); input.max = String(o.max); input.step = String(o.step); input.value = String(o.value);
   input.style.cssText = 'width:100%;height:32px;accent-color:#ffd166;';
   wrap.append(text, input); overlay.append(wrap);
+  let retired = false;
   let value = o.value, fn: ((v: number) => void) | null = null;
   const show = () => { text.textContent = `${o.label}: ${Math.round(value)}${o.unit ?? ''}`; };
   show();
-  input.addEventListener('input', () => { value = Number(input.value); show(); fn?.(value); });
+  const onInput = () => { if (retired) return; value = Number(input.value); show(); fn?.(value); };
+  input.addEventListener('input', onInput);
   return {
+    root: wrap,
     get value() { return value; },
-    set(v) { if (v === value) return; value = v; input.value = String(v); show(); },
-    show(on) { showEl(wrap, on); },
-    onInput(f) { fn = f; },
+    set(v) { if (retired || v === value) return; value = v; input.value = String(v); show(); },
+    show(on) { if (!retired) showEl(wrap, on); },
+    onInput(f) { if (!retired) fn = f; },
+    destroy() { if (retired) return; retired = true; fn = null; input.removeEventListener('input', onInput); wrap.remove(); },
   };
 }
 
@@ -62,16 +66,20 @@ export function createLayerToggles(overlay: HTMLElement, layers: { id: string; l
 }
 
 export interface QuizPanelView { prompt: string; options: { id: string; text: string }[]; hints: string[]; feedback: string | null; state: 'asking' | 'right' | 'revealed'; chosen: string | null; answer?: string; index: number; count: number }
-export interface QuizPanel { set(v: QuizPanelView | null): void; onAnswer(fn: (id: string) => void): void }
+export interface QuizPanel { readonly root: HTMLElement; set(v: QuizPanelView | null): void; onAnswer(fn: (id: string) => void): void; destroy(): void }
 export function createQuizPanel(overlay: HTMLElement, o: { questionOf: (i: number, n: number) => string; hintLabel: string }): QuizPanel {
   const doc = overlay.ownerDocument, box = doc.createElement('section');
   box.className = 'explorer-quiz'; box.setAttribute('aria-live', 'polite');
   box.style.cssText = `position:absolute;left:50%;top:50%;transform:translate(-50%,-55%);width:min(560px,calc(100% - 32px));display:grid;gap:10px;${card}`;
   overlay.append(box); showEl(box, false);
+  let retired = false;
   let last = '', fn: ((id: string) => void) | null = null;
   return {
-    onAnswer(f) { fn = f; },
+    root: box,
+    onAnswer(f) { if (!retired) fn = f; },
+    destroy() { if (retired) return; retired = true; fn = null; box.replaceChildren(); box.remove(); },
     set(v) {
+      if (retired) return;
       const key = JSON.stringify(v);
       if (key === last) return; last = key;
       showEl(box, !!v); box.replaceChildren();
