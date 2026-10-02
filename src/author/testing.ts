@@ -12,6 +12,7 @@ import type { AudioClockReading } from '../platform/audio/audio-timeline';
 import { normalizeCueVoiceOptions, type CueVoiceOptions } from '../platform/audio/audio-output';
 import type { MusicOptions } from '../platform/audio/music-clock';
 import { EMITTER_ID, type ParticleStats } from './particle-contract';
+import { createRng, deriveSeed } from '../core/rng';
 /**
  * author/testing.ts: `testScene`, a scene without a browser, for a game's own unit tests. It spawns the scene's
  * entities into a real world and runs its real systems on the real fixed-step runner; input is scripted (`press`,
@@ -133,7 +134,9 @@ export async function testScene(scene: SceneDefinition, o: { particleScale?: num
   }
   const failures: { id: string; error: unknown }[] = [];
   const particleReports: string[] = [];
-  const particles = scene.particles?.createField({ scale: o.particleScale ?? 1, seed: () => ctx.random(),
+  // Particles' own stream (as in a visit with `?seed=`): never the gameplay `ctx.random()`.
+  const particleRng = createRng(deriveSeed(o.seed ?? 1, 'particles'));
+  const particles = scene.particles?.createField({ scale: o.particleScale ?? 1, seed: () => particleRng.next(),
     report: error => { particleReports.push(error.message); } }) ?? null;
   const emitterProbe = { id: EMITTER_ID } as ComponentType<object>;
   const stepParticles = particles ? [{ id: 'engine.particles', run: (_: SceneContext, dt: number) => particles.step(world, dt) }] : [];

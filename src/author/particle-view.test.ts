@@ -10,7 +10,7 @@ const slots = new Map<number, EmitterSlot>();
 const slot = (n: number) => { let s = slots.get(n); if (!s) slots.set(n, s = { entity: n } as unknown as EmitterSlot); return s; };
 function drawing() {
   const calls: string[] = [];
-  const d: ParticleDrawing = { stats: { bound: 1, visible: 0, leased: 0, applied: 0, failed: 0 },
+  const d: ParticleDrawing = { stats: { bound: 1, visible: 0, requested: 0, leases: 0, applied: 0, failed: 0 },
     bind: s => { calls.push(`bind ${s.entity}`); }, draw: (s, n) => { calls.push(`draw ${s.entity} ${n}`); }, release: s => { calls.push(`release ${s.entity}`); }, dispose: () => { calls.push('dispose'); } };
   return { d, calls };
 }
@@ -26,7 +26,7 @@ test('the renderer loads on the first bound emitter, once; waiting emitters are 
   const { d, calls } = drawing();
   const t = setup(async () => ({ createSceneParticles: () => d }));
   assert.equal(t.view.state, 'idle'); assert.equal(t.loads, 0, 'nothing loads until an emitter needs it');
-  assert.deepEqual(t.view.stats, { bound: 0, visible: 0, leased: 0, applied: 0, failed: 0 });
+  assert.deepEqual(t.view.stats, { bound: 0, visible: 0, requested: 0, leases: 0, applied: 0, failed: 0 });
   t.view.bind(slot(1)); t.view.bind(slot(2)); t.view.release(slot(2)); t.view.draw(slot(1), 4);
   assert.equal(t.view.state, 'loading'); assert.equal(t.loads, 1);
   await flush();
@@ -51,4 +51,14 @@ test('a renderer that arrives after the visit ends is never created; a failed lo
   failed.view.bind(slot(2)); failed.view.draw(slot(2), 3); await flush();
   assert.equal(failed.errors.length, 1, 'no retry within the visit');
   failed.view.dispose();
+});
+
+test('a renderer that throws while being created moves to failed, reports once and drops queued emitters', async () => {
+  const t = setup(async () => ({ createSceneParticles: () => { throw Error('no context'); } }));
+  t.view.bind(slot(1)); t.view.bind(slot(2));
+  await flush();
+  assert.equal(t.view.state, 'failed'); assert.equal(t.errors.length, 1); assert.equal(t.ready, 0);
+  t.view.bind(slot(3)); t.view.preload(); await flush();
+  assert.equal(t.errors.length, 1); assert.equal(t.loads, 1, 'no retry within the visit');
+  t.view.dispose();
 });

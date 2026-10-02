@@ -23,7 +23,7 @@ export interface SceneHandle {
    *  visit is ending. Render on demand stays on: nothing more is drawn until something changes. */
   redraw?(): boolean;
   /** Dev/test only: the visit's particle counters and the draws its emitters issue per frame (FX-01). */
-  particles?(): ParticleStats & { draws: number; textures: { leased: number; applied: number; failed: number } };
+  particles?(): ParticleStats & { draws: number; textures: { requested: number; leases: number; applied: number; failed: number } };
   /** Move the entity with this `Name` (default 'player'): false when there is none. */
   teleport(x: number, z: number, name?: string): boolean;
 }

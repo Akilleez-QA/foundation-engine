@@ -8,7 +8,8 @@
  * remembered and nothing is drawn; then each remembered slot is bound and the next interpolated write draws it.
  *
  * Lifetime: owned by the visit. `dispose` (or the signal) drops remembered slots; a module that arrives afterwards is
- * ignored. A failed load is reported once; particles keep simulating and are not drawn for the rest of the visit.
+ * ignored. A failed load (or a renderer that cannot be created) is reported once; queued emitters are dropped and
+ * particles keep simulating undrawn for the rest of the visit.
  */
 import type { EmitterSlot, ParticleRenderer } from './particle-contract';
 import type { SceneParticleOptions, ParticleDrawing } from './scene-particles';
@@ -23,7 +24,7 @@ export interface ParticleView extends ParticleRenderer {
   dispose(): void;
 }
 
-const NONE = Object.freeze({ bound: 0, visible: 0, leased: 0, applied: 0, failed: 0 });
+const NONE = Object.freeze({ bound: 0, visible: 0, requested: 0, leases: 0, applied: 0, failed: 0 });
 
 export function createParticleView(o: SceneParticleOptions & {
   load: () => Promise<{ createSceneParticles(options: SceneParticleOptions): ParticleDrawing }>;
@@ -38,7 +39,9 @@ export function createParticleView(o: SceneParticleOptions & {
     state = 'loading';
     o.load().then(m => {
       if (disposed || o.signal.aborted) return;
-      view = m.createSceneParticles(o); state = 'ready';
+      try { view = m.createSceneParticles(o); }
+      catch (error) { state = 'failed'; waiting.clear(); report(error); return; }
+      state = 'ready';
       for (const slot of [...waiting]) { waiting.delete(slot); try { view.bind(slot); } catch (error) { report(error); } }
       o.ready();
     }, error => { if (disposed || o.signal.aborted) return; state = 'failed'; waiting.clear(); report(error); }).catch(report);

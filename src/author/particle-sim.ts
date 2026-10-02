@@ -5,18 +5,21 @@
  * Owner and lifetime: one field per visit, stepped by the engine's fixed system (`engine.particles`, after the scene's
  * own fixed systems) and disposed with the visit. Each admitted emitter gets one slot with a pool allocated ONCE at
  * admission (typed arrays sized by its `max`, thinned by the quality scale); stepping, spawning, killing and the
- * per-frame interpolated write allocate nothing.
+ * per-frame write do not allocate per particle (the world query that finds emitters allocates its usual iterator).
  *
  * Bounds and overload:
  * - per emitter: `max` live particles. A spawn into a full pool is dropped and counted (`dropped`), never recycled;
  * - per scene: admitted emitters' `max` sum to at most `limits.max`, and at most `limits.emitters` emitters (one draw
- *   each). An emitter that does not fit is refused, reported once, not drawn, and admitted on a later step if
+ *   each). An emitter that does not fit is refused and counted (the first refusal of a visit is reported) and not
+ *   drawn. A refused burst is dropped and counted, and a refused `despawn` one-shot is removed, so a refused hit never
+ *   fires late; a refused continuous emitter is admitted on a later step if
  *   capacity frees. Admission uses the unscaled `max`, so it is the same on every quality preset;
  * - per step: at most `PARTICLE_LIMITS.burstsPerStep` bursts and `max` continuous spawns per emitter; the rest are
  *   dropped and counted.
  * Invalid data is reported once per change of problem and the emitter freezes (no step, no spawn) until it is valid.
  *
- * Determinism: an emitter's stream is seeded with one `seed()` draw (the scene's `ctx.random`) when admitted; every
+ * Determinism: an emitter's stream is seeded with one `seed()` draw when admitted. `seed` is the particles' own stream
+ * (runtime.ts, testing.ts), never the gameplay `ctx.random`, so effects cannot shift a game's random sequence; every
  * spawn attempt takes exactly four draws, before thinning and before the pool check, so the stream (and the
  * `despawn` time) does not depend on the quality preset. Thinning keeps spawn index k when
  * floor((k+1)·scale) > floor(k·scale): a lighter preset draws a deterministic subset of the reference particles.
@@ -36,7 +39,15 @@ interface Slot extends EmitterSlot {
   readonly linear: Float32Array;
   drawn: number; seen: number;
 }
-interface Note { seen: number; problem: string | null; refused: boolean }
+/** Per-entity bookkeeping while the entity has an emitter: survives a rebuild of its slot. */
+interface Note {
+  seen: number; problem: string | null; refused: boolean;
+  /** Bursts already accounted for (fired, or dropped while refused); null before the first admission or refusal, so a
+   *  prefab's `bursts: 1` fires on spawn while a rebuilt or late-admitted emitter never re-fires old bursts. */
+  bursts: number | null;
+  /** Its renderer refused to bind it: not admitted again this visit. */
+  failed: boolean;
+}
 
 function allocatePool(capacity: number): ParticlePool {
   return {
@@ -64,7 +75,7 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
   // Emitters waiting for admission this step (reused arrays): admitted after retired slots free their capacity.
   const waiting: Entity[] = [], waitingData: EmitterData[] = [];
   const counts = { spawned: 0, thinned: 0, dropped: 0, refused: 0, invalid: 0 };
-  let tick = 0, reserved = 0, disposed = false;
+  let tick = 0, reserved = 0, disposed = false, refusalReported = false;
   const report = (error: Error) => { try { o.report(error); } catch { /* Diagnostics cannot stop the step. */ } };
   // Per-step scratch (numbers only): the rotated launch axis and two perpendicular unit vectors.
   let ax = 0, ay = 1, az = 0, ux = 1, uy = 0, uz = 0, wx = 0, wy = 0, wz = 1;
@@ -72,6 +83,8 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
   const release = (slot: Slot) => {
     if (slots.get(slot.entity) !== slot) return;
     slots.delete(slot.entity); reserved -= slot.reserved; slot.pool.live = 0;
+    const note = notes.get(slot.entity);
+    if (note) note.bursts = slot.seenBursts;
     try { o.renderer?.release(slot); } catch (error) { report(error instanceof Error ? error : Error(String(error))); }
   };
 
@@ -79,7 +92,11 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
     if (slots.size >= o.limits.emitters || reserved + d.max > o.limits.max) {
       if (!note.refused) {
         note.refused = true; counts.refused++;
-        report(Error(`particles: emitter on entity ${e} refused (scene limit ${o.limits.emitters} emitters, ${o.limits.max} particles; ${slots.size} emitters and ${reserved} particles admitted)`));
+        // Once per visit: sustained overload must not flood the log; `stats.refused` keeps counting.
+        if (!refusalReported) {
+          refusalReported = true;
+          report(Error(`particles: emitter on entity ${e} refused (scene limit ${o.limits.emitters} emitters, ${o.limits.max} particles; ${slots.size} emitters and ${reserved} particles admitted). Further refusals this visit are counted in stats.refused, not reported`));
+        }
       }
       return undefined;
     }
@@ -89,12 +106,12 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
       entity: e, data: d, reserved: d.max, scale: s, texture: d.texture, blending: d.blending, view: undefined,
       pool: allocatePool(Math.max(1, Math.ceil(d.max * s))),
       rng: mulberry32(Math.floor(Math.min(.999999999, Math.max(0, o.seed())) * 4294967296) >>> 0),
-      spawnIndex: 0, seenBursts: 0, carry: 0, sinceEmit: 0, emitted: false, hasPos: false, ex: 0, ey: 0, ez: 0,
+      spawnIndex: 0, seenBursts: note.bursts ?? 0, carry: 0, sinceEmit: 0, emitted: false, hasPos: false, ex: 0, ey: 0, ez: 0,
       linear: new Float32Array(PARTICLE_LIMITS.keys * 3), drawn: 0, seen: tick,
     };
     slots.set(e, slot); reserved += d.max;
     try { o.renderer?.bind(slot); }
-    catch (error) { report(error instanceof Error ? error : Error(String(error))); release(slot); return undefined; }
+    catch (error) { note.failed = true; report(error instanceof Error ? error : Error(String(error))); release(slot); return undefined; }
     return slot;
   };
 
@@ -200,7 +217,7 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
       finished.length = 0; waiting.length = 0; waitingData.length = 0;
       for (const [e, tr, d] of world.query(Transform, Emitter)) {
         let note = notes.get(e);
-        if (!note) notes.set(e, note = { seen: tick, problem: null, refused: false });
+        if (!note) notes.set(e, note = { seen: tick, problem: null, refused: false, bursts: null, failed: false });
         note.seen = tick;
         let slot = slots.get(e);
         if (slot && (slot.data !== d || slot.reserved !== d.max || slot.texture !== d.texture || slot.blending !== d.blending)) { release(slot); slot = undefined; }
@@ -218,8 +235,19 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
       for (const [e, note] of notes) if (note.seen !== tick) notes.delete(e);
       // Admission in spawn order, after this step's retirements, so freed capacity is reused at once.
       for (let i = 0; i < waiting.length; i++) {
-        const e = waiting[i], d = waitingData[i], slot = admit(e, d, notes.get(e)!);
-        if (!slot) continue;
+        const e = waiting[i], d = waitingData[i], note = notes.get(e)!;
+        if (note.failed) continue;
+        const slot = admit(e, d, note);
+        if (!slot) {
+          // Refused: a burst is dropped and counted, never fired late from a stale position; a one-shot that would remove
+          // itself is removed now. A continuous emitter waits and starts when capacity frees.
+          if (d.mode === 'burst') {
+            const pending = d.bursts - (note.bursts ?? 0);
+            note.bursts = d.bursts;
+            if (pending > 0) { counts.dropped += pending * d.count; if (d.despawn) finished.push(e); }
+          }
+          continue;
+        }
         const tr = world.get(e, Transform)!;
         if (simulate(slot, d, tr.x, tr.y, tr.z, tr.rx, tr.ry, tr.rz, dt)) finished.push(e);
       }
@@ -252,7 +280,7 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
       if (disposed) return false;
       for (const s of slots.values()) if (s.pool.live > 0 || (s.data.despawn && s.emitted)) return true;
       for (const [e, , d] of world.query(Transform, Emitter)) {
-        if (d.mode === 'continuous' ? d.playing && d.rate > 0 : d.bursts > (slots.get(e)?.seenBursts ?? 0)) return true;
+        if (d.mode === 'continuous' ? d.playing && d.rate > 0 : d.bursts > (slots.get(e)?.seenBursts ?? notes.get(e)?.bursts ?? 0)) return true;
       }
       return false;
     },

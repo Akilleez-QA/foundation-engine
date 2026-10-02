@@ -46,12 +46,20 @@ const sample = defineScene({id: 'sample', title: 'Particles', particles: scenePa
   ],
   systems: [idle, orbit], enter(ctx) { context = ctx; }});
 const other = defineScene({id: 'other', title: 'Other', enter(ctx) { context = ctx; }});
-const compiled = compileGame({brief, game, defs: [sample, other, panel]});
+// No systems: the scene runs on-demand frames, goes continuous only while its one-shot burst plays, then is still.
+const still = defineScene({id: 'still', title: 'Still', particles: sceneParticles(), view: {camera: {position: [0, 3, 7], target: [0, .8, 0]}, background: 0x10141c},
+  entities: [
+    [Name({name: 'floor'}), Transform({y: -.05}), Shape({kind: 'box', size: [8, .1, 4], color: 0x46505e})],
+    [Name({name: 'pop'}), Transform({y: .5}), defineEmitter({mode: 'burst', count: 32, max: 32, bursts: 1, lifetime: [.5, .8], speed: [1, 3], spread: Math.PI / 2,
+      gravity: [0, -6, 0], size: [.12, .02], color: [0xffffff, 0x66ccff], opacity: [1, 0], despawn: true})],
+  ],
+  enter(ctx) { context = ctx; }});
+const compiled = compileGame({brief, game, defs: [sample, other, still, panel]});
 const app = createApp([...layerModules(game, brief), ...compiled.modules], {mode: 'test', events: appBus, flag: id => appFeatures().enabled(id), probes: true});
 const boot = app.boot();
 window.particleCheck = {
   boot: () => boot.then(() => true),
-  snapshot: () => ({renders, last, disposedGeometries, chunk: performance.getEntriesByType('resource').filter(r => /scene-particles/.test(r.name)).length, scene: app.probes.read('world')?.scene ?? null,
+  snapshot: () => ({renders, last, entities: app.probes.read('world')?.entities ?? null, disposedGeometries, chunk: performance.getEntriesByType('resource').filter(r => /scene-particles/.test(r.name)).length, scene: app.probes.read('world')?.scene ?? null,
     particles: app.services.play.current()?.particles?.() ?? null, assets: app.services.assets.stats()}),
   fire: name => burst(context.world, context.named(name)),
   trail: on => { context.world.get(context.named('trail'), Emitter).playing = on; context.world.touch(); },

@@ -40,7 +40,7 @@ import type { ActivityContext, ActivityRun } from '../core/activity/activity';
 import type { FrameInfo } from '../core/activity/loop';
 import { World, type ComponentType, type Entity } from '../core/ecs/world';
 import { createSystemRunner } from '../core/ecs/systems';
-import { createRng } from '../core/rng';
+import { createRng, deriveSeed } from '../core/rng';
 import { appI18n } from '../core/i18n/app-i18n';
 import { runRandom } from '../core/run-random';
 import { appRenderers } from '../platform/render/renderer-pool';
@@ -279,11 +279,16 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
         changed: () => { dirty = true; actx.invalidate(); }, ready: () => { dirty = true; actx.invalidate(); },
         report: error => s.log.error(`${scene.id}: particle drawing failed`, error) });
       // Only a scene that opted in (`sceneParticles()`) has a field; elsewhere an emitter is reported once, never drawn.
-      const particles: ParticleField | null = scene.particles ? scene.particles.createField({ scale: s.quality.knob('effects.particles'), seed: random,
+      // Particles draw from their own stream, never the gameplay one, so adding an effect cannot shift `ctx.random()`
+      // or an existing `?seed=` replay: derived from the seed when there is one, else the visit's named stream.
+      const particleRng = seed === null ? null : createRng(deriveSeed(seed >>> 0, 'particles'));
+      const particleSeed = () => (particleRng ?? runRandom.stream(`scene.${scene.id}.particles`)).next();
+      const particles: ParticleField | null = scene.particles ? scene.particles.createField({ scale: s.quality.knob('effects.particles'), seed: particleSeed,
         report: error => s.log.error(`${scene.id}: particles`, error), renderer: particleView }) : null;
       const emitterProbe = { id: EMITTER_ID } as ComponentType<object>;
       let emittersReported = false;
-      if (particles && body.entities.some(e => ('kind' in e ? e.components : e).some(c => c.type.id === EMITTER_ID))) particleView.preload();
+      // Preload whenever the scene opted in: a runtime-spawned first burst must not wait for (and miss) the chunk.
+      if (particles) particleView.preload();
       actx.own(() => { try { particles?.dispose(); } finally { particleView.dispose(); } });
       const sync = (dt = 0) => {
         if (actx.signal.aborted) return;
@@ -430,7 +435,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       if (TEST_API) handle.redraw = () => { if (actx.signal.aborted || actx.leaving()) return false; dirty = true; actx.invalidate(); return true; };
       if (TEST_API && models.inspect) handle.model = createSceneModelInspector(models.inspect, visit, actx.signal);
       if (TEST_API) handle.entities = createSceneEntityInspector(world, visit, actx.signal);
-      if (TEST_API && particles) handle.particles = () => ({ ...particles.stats, draws: particleView.stats.visible, textures: { leased: particleView.stats.leased, applied: particleView.stats.applied, failed: particleView.stats.failed } });
+      if (TEST_API && particles) handle.particles = () => ({ ...particles.stats, draws: particleView.stats.visible, textures: { requested: particleView.stats.requested, leases: particleView.stats.leases, applied: particleView.stats.applied, failed: particleView.stats.failed } });
       s.play.attach(handle, actx.signal);
 
       // Prepare authored resident materials before router activation/first render.
@@ -491,8 +496,9 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
           if (!tap || tap.running()) runner.frame(ctx, f.dt); else pressed.clear();
           pressed.endFrame(); gestures.pointer.pressed = false;
           sync(f.dt);
-          // Interpolated between the last two fixed steps; writes only while particles are (or were just) live.
-          if (particles?.interpolate(runner.alpha)) dirty = true;
+          // Drawn at the latest fixed step, like Shape meshes (sync above), so particles never trail their emitter;
+          // writes only while particles are (or were just) live.
+          if (particles?.interpolate(1)) dirty = true;
           }catch(error){if(error instanceof ProgramLinkError||error instanceof FrameReadinessError)failPrograms(error);else throw error;}
         },
         render() {

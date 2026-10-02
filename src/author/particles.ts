@@ -9,7 +9,7 @@
  * - `mode: 'burst'` emits `count` particles each time `bursts` grows (`burst(world, entity)` adds one); a prefab with
  *   `bursts: 1` emits once when it is spawned. `mode: 'continuous'` emits `rate` per second while `playing`.
  * - Curves (`size`, `color`, `opacity`) are 1 to 8 keys spread evenly over a particle's life, linearly interpolated.
- * - Randomness is seeded from `ctx.random()` (one draw when the emitter starts) into the emitter's own stream, and every
+ * - Randomness comes from the particles' own seeded stream (derived from `?seed=` when given), never `ctx.random()`, and every
  *   spawn attempt takes the same number of draws whatever the quality preset, so a replay with `?seed=` is exact and a
  *   lighter preset shows a deterministic subset of the same particles.
  * - Particles are presentation: they never change the world, except `despawn: true`, which removes the entity at a

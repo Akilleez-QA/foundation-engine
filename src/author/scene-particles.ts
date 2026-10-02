@@ -62,8 +62,9 @@ export interface SceneParticleOptions {
 }
 
 export interface ParticleDrawing extends ParticleRenderer {
-  /** Emitters bound now; draw calls the last frame would issue (visible emitters); texture loads and failures. */
-  readonly stats: { readonly bound: number; readonly visible: number; readonly leased: number; readonly applied: number; readonly failed: number };
+  /** Emitters bound now; draw calls the last frame would issue (visible emitters); texture requests, leases held now,
+   *  textures applied and failures. */
+  readonly stats: { readonly bound: number; readonly visible: number; readonly requested: number; readonly leases: number; readonly applied: number; readonly failed: number };
   dispose(): void;
 }
 
@@ -75,7 +76,7 @@ interface View {
 }
 
 export function createSceneParticles(o: SceneParticleOptions): ParticleDrawing {
-  const stats = { bound: 0, visible: 0, leased: 0, applied: 0, failed: 0 };
+  const stats = { bound: 0, visible: 0, requested: 0, leases: 0, applied: 0, failed: 0 };
   const views = new Set<View>();
   const report = (error: unknown) => { try { o.report(error); } catch { /* Diagnostics cannot strand cleanup. */ } };
   let disposed = false;
@@ -89,7 +90,7 @@ export function createSceneParticles(o: SceneParticleOptions): ParticleDrawing {
     try { o.scene.remove(view.mesh); } catch (error) { errors.push(error); }
     try { view.mesh.material.uniforms.map.value = null; view.mesh.material.dispose(); } catch (error) { errors.push(error); }
     try { view.mesh.geometry.dispose(); } catch (error) { errors.push(error); }
-    try { view.lease?.release(); } catch (error) { errors.push(error); }
+    try { if (view.lease) { stats.leases--; view.lease.release(); } } catch (error) { errors.push(error); }
     view.lease = undefined;
     if (errors.length) throw new AggregateError(errors, 'particle emitter cleanup failed');
   };
@@ -119,11 +120,11 @@ export function createSceneParticles(o: SceneParticleOptions): ParticleDrawing {
       o.scene.add(mesh);
       slot.view = view;
       if (slot.texture && o.library) {
-        stats.leased++;
+        stats.requested++;
         const life = view.life;
         o.library.texture(slot.texture, { screenPx: SPRITE_PX, signal: life.signal, colorSpace: 'srgb' }).then(lease => {
           if (life.signal.aborted || !views.has(view)) { lease.release(); return; }
-          view.lease = lease;
+          view.lease = lease; stats.leases++;
           material.uniforms.map.value = lease.value; material.uniforms.useMap.value = 1;
           stats.applied++;
           o.changed();

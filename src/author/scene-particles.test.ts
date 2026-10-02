@@ -85,8 +85,10 @@ test('a particle texture is leased under the visit, applied when it arrives, rel
   await flush();
   assert.equal(m.material.uniforms.map.value, t.lib!.shared); assert.equal(m.material.uniforms.useMap.value, 1);
   assert.equal(t.changed, 1); assert.equal(t.lib!.live, 1);
+  assert.equal(t.view.stats.leases, 1); assert.equal(t.view.stats.requested, 1);
   t.world.despawn(e); t.field.step(t.world, 1 / 60);
   assert.equal(t.lib!.live, 0); assert.equal(disposed, 0, 'the shared texture belongs to the library');
+  assert.equal(t.view.stats.leases, 0, 'leases counts what is held now'); assert.equal(t.view.stats.requested, 1);
   t.field.dispose(); t.view.dispose();
 });
 

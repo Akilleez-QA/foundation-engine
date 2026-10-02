@@ -79,16 +79,18 @@ export function compileGame(o: { brief: BuildBrief; game: GameDefinition; defs: 
   const ids = scenes.map(s => s.id);
   const twice = ids.find((id, i) => ids.indexOf(id) !== i);
   if (twice) throw Error(`game: two scenes are called '${twice}'`);
-  // Materials and particle emitters named in a scene's own entities must name texture assets (lazy bodies and runtime
-  // edits are reported when the texture fails to load).
-  for (const scene of scenes) for (const entity of scene.entities ?? []) {
-    for (const init of 'kind' in entity ? entity.components : entity) {
+  // Materials and particle emitters named in a scene's own entities, or in a prefab listed with the game's definitions,
+  // must name texture assets (lazy bodies, unlisted prefabs and runtime edits are reported when the texture fails to load).
+  const checkTextures = (where: string, inits: readonly { type: { id: string }; value: unknown }[]) => {
+    for (const init of inits) {
       const owner = init.type.id === 'material' ? 'material' : init.type.id === 'emitter' ? 'emitter' : '';
       const texture = owner ? (init.value as { texture?: unknown }).texture : '';
       if (typeof texture === 'string' && texture && !assets.some(a => a.id === texture && a.type === 'texture'))
-        throw Error(`scene ${scene.id}: ${owner} texture '${texture}' has no defineAsset({ type: 'texture' })`);
+        throw Error(`${where}: ${owner} texture '${texture}' has no defineAsset({ type: 'texture' })`);
     }
-  }
+  };
+  for (const scene of scenes) for (const entity of scene.entities ?? []) checkTextures(`scene ${scene.id}`, 'kind' in entity ? entity.components : entity);
+  for (const d of defs) if (d.kind === 'entity') checkTextures(`entity ${d.id}`, d.components);
   for (const scene of scenes) for (const sound of scene.sounds ?? [])
     if (!assets.some(a => a.id === sound && a.type === 'audio')) throw Error(`scene ${scene.id}: sound '${sound}' has no defineAsset({ type: 'audio' })`);
   for (const [locale, catalog] of Object.entries(mergedStrings(game, defs))) appI18n.addCatalog(locale, catalog);

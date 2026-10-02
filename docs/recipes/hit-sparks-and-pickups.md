@@ -109,25 +109,29 @@ their lives.
 | `essential` | `false` | `true`: never thinned by the particle-density quality setting (use it when particles carry meaning). |
 | `despawn` | `false` | `true`: remove the entity once it has emitted and finished. |
 
-`defineEmitter` checks the data and throws on a bad field; building the game fails when a scene's own entities name a
-texture that is not a texture asset. Changing `max`, `texture` or `blending` at run time restarts that emitter (its
-live particles are cleared); every other field may change every step.
+`defineEmitter` checks the data and throws on a bad field; building the game fails when a scene's own entities, or a
+prefab listed with the game's definitions, name a texture that is not a texture asset. Changing `max`, `texture` or
+`blending` at run time restarts that emitter (its live particles are cleared; bursts already fired do not fire again);
+every other field may change every step.
 
 ## Cost and limits
 
 - **Draws:** one per emitter with live particles, two triangles per particle; both show in `play:snap` and the gate's
   per-scene counts. Idle emitters draw nothing and an idle scene renders no frames. The drawing code is a small
-  separate file, fetched when the scene's first emitter starts (or as the scene opens, when its own entities have
-  emitters); until it arrives particles simulate but are not drawn.
+  separate file, fetched as a scene with `sceneParticles()` opens; until it arrives particles simulate but are not
+  drawn.
 - **Scene limits:** `sceneParticles()` admits 16 emitters reserving 4,096 particles in total (the sum of their
   `max`). Change them with `sceneParticles({ emitters, max })`. An emitter beyond them is not drawn and is
-  reported once in the console; it is admitted when another emitter is removed. In a scene without
+  counted; the first refusal of a visit is reported in the console. A refused burst is dropped (it never fires late)
+  and a refused `despawn: true` one-shot removes itself at once; a refused continuous emitter starts when another
+  emitter is removed. In a scene without
   `sceneParticles()`, emitters are not simulated or drawn, and the first one is reported once.
 - **Quality:** the Graphics knob `effects.particles` (registered, not yet shown on the Graphics screen) draws 100 % on
   reference and high, 75 % on medium and 50 % on low, and shrinks each pool to match. Lighter presets draw a fixed
   subset of the same particles; `essential: true` emitters are never thinned.
-- **Determinism:** each emitter's randomness is seeded from `ctx.random()` when it starts, and particles step on the
-  fixed 60 Hz step, so `?seed=` replays them exactly; drawing is interpolated between steps. Particles never change
+- **Determinism:** particles have their own random stream (derived from `?seed=` when given), never `ctx.random()`,
+  so adding effects never changes your game's random numbers; they step on the fixed 60 Hz step, so `?seed=` replays
+  them exactly, and are drawn at the latest step like shapes. Particles never change
   the world, except `despawn`, whose timing depends only on the data.
 
 ## Test it

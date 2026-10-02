@@ -8,7 +8,8 @@
 //   - a textured emitter leases the library texture and applies it;
 //   - when particles die the picture is drawn once more without them, then the scene is still again;
 //   - the drawing code is a separate chunk, fetched once for a scene whose own entities have emitters;
-//   - leaving the scene disposes every emitter geometry and releases the texture (library resident bytes 0).
+//   - leaving the scene disposes every emitter geometry and releases the texture (library resident bytes 0);
+//   - a scene with no systems (on-demand frames) plays its own one-shot burst, removes the entity, then draws nothing.
 // Limitations: desktop Chromium with software GL; no physical device, GPU timing or visual-quality judgement beyond
 // screenshots.
 import assert from 'node:assert/strict';
@@ -90,9 +91,22 @@ try {
     const left = await snap();
     assert.equal(left.disposedGeometries, 3, 'three emitter geometries disposed with the visit');
     run.left = {disposedGeometries: left.disposedGeometries, assets: left.assets};
+    // On-demand frames: a scene without systems plays its own one-shot burst, removes it, and is still again.
+    await p.evaluate(() => window.particleCheck.goto('still'));
+    await p.waitForFunction(() => window.particleCheck.snapshot().scene === 'still');
+    await p.waitForFunction(() => (window.particleCheck.snapshot().particles?.spawned ?? 0) > 0, null, {timeout: 30000});
+    await p.waitForFunction(() => window.particleCheck.snapshot().entities === 1, null, {timeout: 10000});
+    await sleep(300);
+    const still = await snap();
+    assert.equal(still.particles.live, 0); assert.equal(still.particles.draws, 0);
+    assert.equal(still.particles.spawned - still.particles.thinned, quality === 'low' ? 16 : 32);
+    assert.ok(still.renders > left.renders, 'the burst was drawn');
+    await sleep(800);
+    assert.equal((await snap()).renders - still.renders, 0, 'on-demand scene still after its burst');
+    run.still = {particles: still.particles, last: still.last};
     assert.deepEqual(browser.errors, []);
     await browser.close(); browser = null;
-    console.log(`particles (${quality}): idle 0 draws and 0 frames; burst +1 draw (${drawn.last.triangles - base.last.triangles} triangles, ${expectedFirst}/48 particles); three emitters ${three.last.calls - base.last.calls} draws; still after; 3 geometries disposed and texture released on exit`);
+    console.log(`particles (${quality}): idle 0 draws and 0 frames; burst +1 draw (${drawn.last.triangles - base.last.triangles} triangles, ${expectedFirst}/48 particles); three emitters ${three.last.calls - base.last.calls} draws; still after; 3 geometries disposed and texture released on exit; on-demand scene played its burst, despawned it and went still`);
   }
   report.passed = true;
 } catch (error) { evidence.fail(error); }

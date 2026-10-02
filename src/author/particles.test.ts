@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { World } from '../core/ecs/world';
 import { mulberry32 } from '../core/rng';
-import { Transform, defineScene } from './defs';
+import { Transform, defineEntity, defineScene, defineSystem } from './defs';
 import { Emitter, EMITTER_DEFAULTS, PARTICLE_LIMITS, burst, defineEmitter, emitterProblem, validateEmitter, type EmitterData } from './particles';
 import { normalizeSceneParticles } from './particle-contract';
 import { createParticleField, keeps, sceneParticles, type EmitterSlot, type ParticleFieldOptions } from './particle-sim';
@@ -148,7 +148,8 @@ test('scene admission refuses over-limit emitters once, draws nothing for them, 
   assert.equal(r.released.length, 1); assert.equal(reports.length, 1);
   const g = field({ limits: normalizeSceneParticles({ emitters: 0 }) });
   world.spawn(Transform(), defineEmitter({})); run(g.f, world, 3);
-  assert.equal(g.f.stats.emitters, 0); assert.equal(g.reports.length, 3, 'one report per refused emitter');
+  assert.equal(g.f.stats.emitters, 0); assert.equal(g.f.stats.refused, 3, 'every refused emitter is counted');
+  assert.equal(g.reports.length, 1, 'one report per visit, however many are refused');
 });
 
 test('invalid data freezes the emitter with one report per problem, and it resumes when fixed', () => {
@@ -235,10 +236,11 @@ test('testScene steps particles like a visit: bursts, despawn, admission reports
   t.run(1 / 60);
   assert.equal(t.particles.stats!.emitters, 1); assert.equal(t.particles.stats!.live, 12);
   assert.equal(t.particles.reports.length, 1);
-  t.run(.5);
-  assert.equal(t.world.count, 1, 'the first despawned; the second was admitted, fired and is finishing');
+  assert.equal(t.world.count, 1, 'the refused one-shot dropped its burst and removed itself at once');
+  assert.equal(t.particles.stats!.dropped, 12);
   t.run(.5);
   assert.equal(t.world.count, 0);
+  assert.equal(t.particles.stats!.spawned, 12, 'the refused burst never fires late');
   t.dispose();
   const low = await testScene(defineScene({ id: 'fx', title: 'FX', particles: sceneParticles(), entities: [[...spark]] }), { seed: 5, particleScale: .5 });
   low.run(1 / 60);
@@ -259,4 +261,89 @@ test('a scene\'s emitter textures must name texture assets of the game', () => {
   assert.throws(() => compileGame({ brief, game, defs: [scene] }), /emitter texture 'spark' has no defineAsset/);
   const spark = defineAsset({ id: 'spark', type: 'texture', url: '/spark.png', licence: 'CC0-1.0', author: 'a', source: 's' });
   assert.doesNotThrow(() => compileGame({ brief, game, defs: [scene, spark] }));
+});
+
+test('H1: particles never draw from the gameplay random stream: ctx.random() is identical with and without emitters', async () => {
+  const sparks = defineEntity({ id: 'sparks', components: [defineEmitter({ mode: 'burst', count: 4, max: 4, bursts: 1, despawn: true })] });
+  const play = async (effects: boolean) => {
+    const out: number[] = [];
+    let n = 0;
+    const roll = defineSystem({ id: 'roll', run(ctx) {
+      n++;
+      // Spawn one-shot effects every few ticks, and rebuild a continuous one (re-admission).
+      if (effects && n % 3 === 0) ctx.spawn(sparks, Transform({ x: n }));
+      out.push(ctx.random());
+    } });
+    const entities = effects ? [[Transform(), defineEmitter({ mode: 'continuous', rate: 30 })]] : [];
+    const t = await testScene(defineScene({ id: 's', title: 'S', particles: sceneParticles(), entities: entities as never, systems: [roll] }), { seed: 42 });
+    t.run(.5);
+    if (effects) { assert.ok(t.particles.stats!.spawned > 0); for (const [, d] of t.world.query(Emitter)) d.blending = 'normal'; }
+    t.run(.5);
+    t.dispose();
+    return out;
+  };
+  const without = await play(false), withEffects = await play(true);
+  assert.equal(without.length, 60);
+  assert.deepEqual(withEffects, without);
+});
+
+test('H2: sustained one-shot hits over the scene limit stay bounded: entities, reports and spawned particles', async () => {
+  const fx = defineEntity({ id: 'fx', components: [defineEmitter({ mode: 'burst', count: 8, max: 8, bursts: 1, lifetime: [1, 1], despawn: true })] });
+  const hit = defineSystem({ id: 'hit', run(ctx) { ctx.spawn(fx, Transform()); } });
+  const t = await testScene(defineScene({ id: 's', title: 'S', particles: sceneParticles(), systems: [hit] }), { seed: 1 });
+  const counts: number[] = [];
+  for (let s = 0; s < 10; s++) { t.run(1); counts.push(t.world.count); }
+  const stats = t.particles.stats!;
+  // 16 admitted at a time, each living 1 s plus its own step: entities stay near the emitter limit.
+  assert.ok(Math.max(...counts) <= 16 + 1, `entities bounded (${counts})`);
+  assert.ok(counts[9] <= counts[1] + 1, 'no growth over time');
+  assert.equal(t.particles.reports.length, 1, 'one refusal report per visit');
+  assert.ok(stats.refused > 400 && stats.dropped === stats.refused * 8, 'every refused burst is dropped and counted');
+  t.dispose();
+});
+
+test('H2: a refused burst never fires late at a stale position; a refused continuous emitter starts when capacity frees', async () => {
+  const fx = defineEntity({ id: 'fx', components: [defineEmitter({ mode: 'burst', count: 8, max: 8, bursts: 1, lifetime: [1, 1] })] });
+  const t = await testScene(defineScene({ id: 's', title: 'S', particles: sceneParticles({ emitters: 1 }) }), { seed: 1 });
+  const first = t.ctx.spawn(fx, Transform({ x: 0 }));
+  const second = t.ctx.spawn(fx, Transform({ x: 100 }));
+  t.run(1 / 60);
+  t.world.despawn(first);
+  t.run(1.2);
+  assert.equal(t.particles.stats!.spawned, 8, 'the second hit was dropped, not fired 1.2 s late');
+  assert.equal(t.particles.stats!.emitters, 1, 'it was admitted when capacity freed, with nothing pending');
+  burst(t.world, second); t.run(1 / 60);
+  assert.equal(t.particles.stats!.spawned, 16, 'a new request after admission fires normally');
+  t.dispose();
+  const u = await testScene(defineScene({ id: 's', title: 'S', particles: sceneParticles({ emitters: 1 }) }), { seed: 1 });
+  const a = u.ctx.spawn(fx, Transform());
+  u.ctx.spawn(defineEntity({ id: 'jet', components: [defineEmitter({ mode: 'continuous', rate: 60 })] }), Transform());
+  u.run(.5); assert.equal(u.particles.stats!.spawned, 8);
+  u.world.despawn(a); u.run(.5);
+  assert.ok(u.particles.stats!.spawned > 8, 'the waiting continuous emitter started');
+  u.dispose();
+});
+
+test('M1: rebuilding a burst emitter (blending, texture, max or a replaced component) never re-fires old bursts', async () => {
+  const s = defineScene({ id: 's', title: 'S', particles: sceneParticles(), entities: [[Transform(), defineEmitter({ mode: 'burst', count: 10, max: 40, lifetime: [5, 5] })]] as never });
+  const t = await testScene(s, { seed: 1 });
+  const [e] = [...t.world.query(Emitter)][0];
+  burst(t.world, e, 3); t.run(1 / 60);
+  assert.equal(t.particles.stats!.spawned, 30);
+  t.world.get(e, Emitter)!.blending = 'normal'; t.run(1 / 60);
+  t.world.add(e, Emitter({ ...t.world.get(e, Emitter)!, max: 20 })); t.run(1 / 60);
+  assert.equal(t.particles.stats!.spawned, 30, 'restarts kept the burst count');
+  burst(t.world, e); t.run(1 / 60);
+  assert.equal(t.particles.stats!.spawned, 40);
+  t.dispose();
+});
+
+test('a renderer that cannot bind an emitter is reported once and not retried every step', () => {
+  const world = new World(), reports: string[] = [];
+  let binds = 0;
+  const f = createParticleField({ limits: normalizeSceneParticles(undefined), scale: 1, seed: mulberry32(1), report: e => reports.push(e.message),
+    renderer: { bind: () => { binds++; throw Error('no GPU'); }, draw: () => {}, release: () => {} } });
+  world.spawn(Transform(), defineEmitter({ mode: 'continuous' }));
+  run(f, world, 30);
+  assert.equal(binds, 1); assert.deepEqual(reports, ['no GPU']); assert.equal(f.stats.emitters, 0);
 });

@@ -128,7 +128,8 @@ export interface ParticleStats {
 export interface ParticleField {
   /** One fixed step: admit, simulate, spawn, retire and despawn finished emitters. */
   step(world: World, dt: number): void;
-  /** Write interpolated instance data (alpha: 0…1 through the current step). True when the picture changed. */
+  /** Write instance data between the last two steps (alpha 0…1; the stock runtime passes 1: the latest step, as Shape
+   *  meshes are drawn). True when the picture changed. */
   interpolate(alpha: number): boolean;
   /** Something will change without outside input: live particles, a playing emitter, a pending burst or despawn. */
   busy(world: World): boolean;
@@ -140,7 +141,7 @@ export interface ParticleFieldOptions {
   limits: SceneParticleLimits;
   /** Quality scale (0, 1] for non-essential emitters: the `effects.particles` knob, read once per visit. */
   scale: number;
-  /** One uniform draw in [0, 1) per admitted emitter: the scene's `ctx.random`. */
+  /** One uniform draw in [0, 1) per admitted emitter, from the particles' own stream (never the gameplay `ctx.random`). */
   seed(): number;
   report(error: Error): void;
   renderer?: ParticleRenderer;

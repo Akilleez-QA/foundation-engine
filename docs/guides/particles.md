@@ -3,7 +3,7 @@
 Status: implemented, candidate (PR #63); not integrated. Optional and opt-in per scene: only a scene with
 `defineScene({ particles: sceneParticles() })` simulates and draws emitters. A game that never imports it carries no
 particle simulation or drawing code: the stock runtime keeps only the contract (`particle-contract.ts`) and a small
-lazy-loading proxy (about 2 kB minified in the scene runtime chunk), and its draws and budgets do not change. The how-to is the
+lazy-loading proxy (about 3 kB minified in the scene runtime chunk), and its draws and budgets do not change. The how-to is the
 [hit sparks and pickups recipe](../recipes/hit-sparks-and-pickups.md); this guide records the contract.
 
 ## Requirement and existing seams
@@ -16,7 +16,7 @@ cache or registry:
 |---|---|---|
 | Data on entities, validation | Author components (`defineComponent`, like `Material`) | `Emitter` / `defineEmitter` / `burst` in `src/author/particles.ts` |
 | Scene opt-in and bounds | `defineScene` (like `modelPoseLinks`) | `sceneParticles({ max, emitters })` carries the limits and the simulation; contract types in `src/author/particle-contract.ts` |
-| Fixed-step simulation, seeded randomness | The visit's system runner (60 Hz), `ctx.random` (`?seed=`) | Engine fixed system `engine.particles`, run after the scene's own fixed systems; pure `src/author/particle-sim.ts` |
+| Fixed-step simulation, seeded randomness | The visit's system runner (60 Hz); the `?seed=` / named-stream scheme of `ctx.random` | Engine fixed system `engine.particles`, run after the scene's own fixed systems; pure `src/author/particle-sim.ts` |
 | Drawing, render on change | Scene runtime `sync`/`dirty` and the frame loop (STD-RUN-9) | `src/author/scene-particles.ts`, a lazy chunk behind `src/author/particle-view.ts`: one instanced mesh per admitted emitter, written in place |
 | Textures | Shared texture library leases (STD-REN-33), RES-01 residency | One lease per textured emitter under the visit's signal |
 | Quality | Knob registry (`platform/render/quality.ts`) | Knob `effects.particles`, read once per visit |
@@ -31,7 +31,7 @@ cache or registry:
   entities or read back by systems. The one world change is `despawn: true`, which removes the entity in the fixed
   step at a time that depends only on the emitter's data and the step count.
 - **Diagnostics:** `testScene(...).particles.stats`; in dev/test builds the scene handle's `particles()` adds the
-  draws per frame and texture lease counts; refusals and invalid data are reported through the scene's error log.
+  draws per frame and texture counts (`requested`, `leases` held now, `applied`, `failed`); refusals and invalid data are reported through the scene's error log.
 
 ## Owner and lifetime
 
@@ -43,7 +43,8 @@ One particle field per scene visit, created with the visit's world and disposed 
 materials and texture leases) when the visit ends, before the scene tree's own cleanup. An emitter's slot is created
 when it is admitted and released when its entity is despawned or loses its `Emitter` or `Transform`. Replacing the
 component, or changing `max`, `texture` or `blending`, releases the slot and admits a new one (live particles are
-cleared). Covered or hidden scenes do not step (the frame loop does not run them), so particles freeze with the
+cleared); the burst count carries over, so a rebuild never re-fires bursts already fired. A renderer that cannot bind
+an emitter is reported once and that emitter is not admitted again this visit. Covered or hidden scenes do not step (the frame loop does not run them), so particles freeze with the
 scene.
 
 ## Bounds and overload
@@ -53,7 +54,7 @@ scene.
 | Particles per emitter | `max`, 1…4,096 (validated) | A spawn into a full pool is dropped and counted (`dropped`); no recycling |
 | Bursts per emitter per step | 4 | Further requested bursts in that step are dropped and counted |
 | Continuous spawns per emitter per step | `max` | The excess is dropped and counted |
-| Emitters per scene | default 16, cap 256 | Not admitted, not drawn, reported once; admitted when capacity frees (same step) |
+| Emitters per scene | default 16, cap 256 | Refused: not drawn, counted in `stats.refused`; the first refusal of a visit is reported. A refused burst is dropped and counted in `dropped` (never fired late), and a refused `despawn: true` one-shot is removed at once; a refused continuous emitter is admitted when capacity frees (same step) |
 | Reserved particles per scene (sum of admitted `max`) | default 4,096, cap 65,536 | As above |
 | Curve keys, lifetime, speed, gravity, drag, rate | 8 keys, 30 s, 1,000 m/s, ±1,000 m/s², 10/s, 10,000/s | `defineEmitter` throws; mutated data freezes the emitter with one report until fixed |
 
@@ -63,16 +64,18 @@ CPU deadline: the per-step cost is proportional to live particles plus spawn att
 ## Rendering and cost
 
 - The drawing code is a separate lazy chunk (about 3 kB minified), requested when the first emitter is admitted, or
-  while the scene opens when its own entities include an emitter. Simulation never waits for it: until it arrives
+  while the scene opens (whenever it has `sceneParticles()`). Simulation never waits for it: until it arrives
   admitted emitters simulate and are not drawn, then they are bound and drawn from the next frame. A failed chunk load
   is reported once and particles stay undrawn for the rest of the visit.
 
 - One `InstancedBufferGeometry` (a unit quad: 4 vertices, 2 triangles) and one `ShaderMaterial` per admitted emitter;
   the vertex shader billboards each instance to the camera. Per-particle centre, size and linear colour with opacity
   are three `DynamicDrawUsage` instance attributes over the emitter's pool arrays, allocated once at admission.
-- Each frame with live particles writes interpolated values (between the last two fixed steps, `runner.alpha`) for
+- Each frame with live particles writes the latest fixed step's values (the same state `Shape` meshes show, so
+  particles never trail their emitter) for
   the live prefix only, and uploads that range (`addUpdateRange`). Nothing is rebuilt per frame (STD-REN-36) and the
-  step, spawn and write paths allocate nothing.
+  step, spawn and write paths do not allocate per particle (finding emitters uses the world's ordinary query, which
+  allocates its iterator once per step).
 - Draws: one per emitter with live particles; triangles: two per live particle. An emitter with nothing alive is
   hidden (no draw). When the last particle dies the picture is drawn once more without it; then an idle scene renders
   no frames, and a scene without other systems returns to on-demand frames.
@@ -94,12 +97,19 @@ a template that uses particles can wire it. Only the reference preset is gated (
 
 ## Determinism
 
-Each admitted emitter seeds its own mulberry32 stream from one `ctx.random()` draw at admission, in spawn order, so
+Particles have their own random stream, separate from gameplay: with `?seed=` (or `testScene({ seed })`) it is
+`createRng(deriveSeed(seed, 'particles'))`, otherwise the visit's named stream `scene.<id>.particles`. Each admitted
+emitter seeds its own mulberry32 stream from one draw of it at admission, in spawn order, so
 with `?seed=` (or `testScene({ seed })`) and the same tick-addressed input a run's particles are identical after N
-ticks. Particles never feed back into game state; the scene's own random stream advances only by one draw per
-admitted emitter. Cross-browser floating-point identity is not claimed (as for replay and rollback).
+ticks. Particles never feed back into game state and never draw from `ctx.random()`: adding, removing or rebuilding
+an effect leaves the gameplay sequence and existing `?seed=` replays unchanged (regression test in
+`particles.test.ts`). Cross-browser floating-point identity is not claimed (as for replay and rollback).
 
 ## Cancellation and failure recovery
+
+- The texture check at build time covers a scene's own entities and prefabs listed in the game's definitions
+  (`defineEntity` passed to `compileGame`); a prefab that is only imported by a system is checked when its texture
+  fails to load (reported once).
 
 - Leaving the visit aborts pending texture loads; a texture that arrives later is released, never applied. Leased
   textures are released, never disposed by the emitter (the library owns them).
@@ -113,9 +123,10 @@ admitted emitter. Cross-browser floating-point identity is not claimed (as for r
 
 | Level | Evidence | Scope |
 |---|---|---|
-| Unit | `src/author/particles.test.ts` (validation, burst/continuous, seeded determinism, thinning subset, overload, admission and refusal, invalid-data freeze, rebuild, interpolation and curves, rotation, trail spacing, `testScene`, compile-time texture check); `src/author/scene-particles.test.ts` (one hidden instanced mesh per emitter, live-prefix upload ranges, blending, texture lease/apply/release/failure/late arrival, visit disposal); `src/author/particle-view.test.ts` (lazy renderer: loads once on first need, binds waiting emitters, ignores a late arrival after the visit, reports a failed load once); `src/author/particles-recipe.test.ts` (the recipe's code) | Node, no GPU |
+| Unit | `src/author/particles.test.ts` (validation, burst/continuous, seeded determinism, gameplay stream unchanged by effects, bounded refusal under sustained hits with no late firing, no re-fire on rebuild, bind failure not retried, thinning subset, overload, admission and refusal, invalid-data freeze, rebuild, interpolation and curves, rotation, trail spacing, `testScene`, compile-time texture check); `src/author/scene-particles.test.ts` (one hidden instanced mesh per emitter, live-prefix upload ranges, blending, texture lease/apply/release/failure/late arrival, visit disposal); `src/author/particle-view.test.ts` (lazy renderer: loads once on first need, binds waiting emitters, ignores a late arrival after the visit, reports a failed load or a failed renderer creation once); `src/author/particles-recipe.test.ts` (the recipe's code, plus a check that its definitions still match the recipe's code blocks) | Node, no GPU |
 | Browser | `npm run test:particle-browser` (`scripts/play/particle-check.mjs`): reference and low presets; idle emitters 0 draws and 0 frames; one burst +1 draw with 2 triangles per particle (48 on reference, 24 on low); three live emitters 3 draws; back to the baseline draws and still once particles die; the drawing chunk fetched once; 3 emitter geometries disposed and the texture released on exit | Desktop headless Chromium, software GL |
-| Gate | Template budgets unchanged: no template uses `Emitter`. Blank template build: scene runtime chunk +2.0 kB (489.6 → 491.5 kB), first-load JS +0.4 kB | Per-scene counts and bundle of the checked templates |
+| Browser (on-demand) | Same check: a scene without systems plays its own one-shot burst, removes the entity and then renders no frames | As above |
+| Gate | Template budgets unchanged: no template uses `Emitter`. Blank template build: scene runtime chunk +3.0 kB (489.6 → 492.6 kB, including the particle seed derivation), first-load JS +0.5 kB | Per-scene counts and bundle of the checked templates |
 
 Not established: physical-device or GPU timing, fill-rate cost of large or overlapping particles, visual quality
 beyond screenshots, phone/tablet acceptance (DV-01), and cross-browser floating-point determinism.
