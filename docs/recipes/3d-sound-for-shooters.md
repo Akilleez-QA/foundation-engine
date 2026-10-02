@@ -14,7 +14,7 @@ export default defineGame({
   audio: {
     // HRTF voices at once, per quality preset. These are starting points, not measured budgets.
     hrtf: { maxVoices: 8, ports: { medium: { maxVoices: 2 }, low: { maxVoices: 0 } } },
-    smoothing: .03,          // ramp listener and source moves (no zipper noise on fast turns)
+    smoothing: .03,          // ramp small per-frame moves (no zipper noise); cuts and 180° snaps still flip
     headphoneSetting: true,  // players get "Headphone 3D audio" (default on)
   },
 });

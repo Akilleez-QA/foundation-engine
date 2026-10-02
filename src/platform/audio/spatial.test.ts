@@ -50,7 +50,7 @@ test('distance gains follow the Web Audio formulas; inverse and exponential neve
   close(distanceGain('exponential', 8, { refDistance: 2, maxDistance: 4, rolloffFactor: 2 }), Math.pow(4, -2));
   close(distanceGain('linear', 50, { refDistance: 10, maxDistance: 90 }), .5);
   close(distanceGain('linear', 200, { refDistance: 10, maxDistance: 90 }), 0);
-  close(distanceGain('linear', 200, { refDistance: 10, maxDistance: 90, rolloffFactor: 5 }), 0, );
+  close(distanceGain('linear', 200, { refDistance: 10, maxDistance: 90, rolloffFactor: 5 }), 0);
   close(distanceGain('linear', 90, { refDistance: 10, maxDistance: 90, rolloffFactor: .25 }), .75);
   close(distanceGain('linear', 3, { refDistance: 5, maxDistance: 5, rolloffFactor: .4 }), .6);
   assert.throws(() => distanceGain('inverse', -1));
@@ -122,6 +122,31 @@ test('lowering the HRTF limit moves the newest HRTF voices to equal-power; 0 dis
   out.dispose();
 });
 
+test('positions accept arrays and typed arrays of three finite numbers, and are copied', () => {
+  const f = fake(); const out = output(f);
+  const at = new Float32Array([1, 2, 3]);
+  const voice = out.playVoice('ui.click', { spatial: { position: at as unknown as readonly [number, number, number] } })!;
+  at[0] = 9; assert.equal(f.panners[0].positionX.value, 1);
+  voice.setPosition!(new Float64Array([4, 5, 6]) as unknown as readonly [number, number, number]); assert.equal(f.panners[0].positionX.value, 4);
+  out.setListener(new Float32Array([0, 0, 0]) as never, new Float32Array([0, 0, -1]) as never, new Float32Array([0, 1, 0]) as never);
+  for (const bad of [[1, 2], [1, 2, NaN], new Float32Array([1, 2, Infinity]), null]) assert.throws(() => voice.setPosition!(bad as never), /invalid audio position/);
+  out.dispose();
+});
+
+test('a voice silenced by its cutoff yields its HRTF slot to a new request once the fade has run', () => {
+  const f = fake(); const out = output(f, { maxHrtfVoices: 1 });
+  const far = out.playVoice('ui.click', { spatial: { position: [0, 0, -10], panning: 'HRTF', cutoffDistance: 20 } })!;
+  far.setPosition!([0, 0, -30]); // beyond: fading out from t = 0
+  f.ctx.currentTime = CUTOFF_TIME_CONSTANT; // fade still running: the slot is kept
+  assert.equal(out.playVoice('ui.click', { spatial: { position: [0, 0, -2], panning: 'HRTF' } })!.panning, 'equalpower');
+  f.ctx.currentTime = 1;
+  const near = out.playVoice('ui.click', { spatial: { position: [0, 0, -2], panning: 'HRTF' } })!;
+  assert.equal(near.panning, 'HRTF'); assert.equal(far.panning, 'equalpower'); assert.equal(f.panners[0].panningModel, 'equalpower');
+  assert.equal(out.stats.hrtfActive, 1); assert.equal(out.stats.downgraded, 2, 'the refused request and the reclaimed voice');
+  far.setPosition!([0, 0, -5]); assert.equal(far.panning, 'equalpower', 'a reclaimed voice returns in range with equal-power');
+  out.dispose();
+});
+
 test('the audible cutoff refuses distant starts and silences a voice that leaves range, for any model', () => {
   for (const distanceModel of ['inverse', 'linear', 'exponential'] as const) {
     const f = fake(); const out = output(f);
@@ -160,6 +185,8 @@ test('the filter stage exists only on request and ramps without an instant path'
   assert.throws(() => out.playVoice('ui.click', { filter: { cutoffHz: NaN } }), /invalid cue filter/);
   voice.stop(); assert.equal(filter.disconnected, true); assert.equal(muffle.disconnected, true);
   const calls = filter.frequency.calls.length; voice.setFilter!({ cutoffHz: 500 }); assert.equal(filter.frequency.calls.length, calls, 'ended voices ignore updates');
+  plain.stop(); assert.doesNotThrow(() => plain.setFilter!({ cutoffHz: 800 }), 'an ended voice ignores setFilter even without a stage');
+  assert.throws(() => plain.setFilter!({ cutoffHz: 1 }), /invalid cue filter/, 'arguments are still validated');
   assert.ok(out.playVoice('ui.click', { filter: { cutoffHz: 500 } }), 'a 2D voice can be filtered too');
   out.dispose();
 });
@@ -178,6 +205,10 @@ test('smoothing ramps position and listener updates after an instant first write
   const fast = out.playVoice('ui.click', { spatial: { position: [0, 0, 0], smoothing: 0 } })!;
   fast.setPosition!([3, 0, 0]); assert.deepEqual(f.panners[1].positionX.calls.at(-1), ['value', 3], 'per-voice 0 overrides the output');
   voice.setGain(.5); assert.deepEqual(f.gains[1].gain.calls.at(-1), ['value', .5]);
+  // Only changed parameters are written: a move along x leaves y and z alone; a listener turn leaves its position alone.
+  const ys = p.positionY.calls.length; voice.setPosition!([-2, 0, 0]); assert.equal(p.positionY.calls.length, ys);
+  const lx = l.positionX.calls.length; out.setListener([2, 0, 0], [1, 0, 0], [0, 1, 0]); assert.equal(l.positionX.calls.length, lx);
+  assert.deepEqual((f.listener as { forwardX: Param }).forwardX.calls.at(-1), ['target', 1, .5, .02]);
   out.dispose();
   const legacy = fake({ legacyListener: true }); const old = output(legacy, { smoothing: .02 });
   old.setListener([1, 2, 3], [0, 0, -1], [0, 1, 0]); old.playVoice('ui.click', { spatial: { position: [0, 0, 0] } });
@@ -190,6 +221,11 @@ test('creator spatial options: HRTF limits per quality preset, validation, and t
   const options = { hrtf: { maxVoices: 8, ports: { medium: { maxVoices: 2 }, low: { maxVoices: 0 } } } };
   assert.deepEqual(['reference', 'high', 'medium', 'low'].map(p => hrtfLimitFor(options, p as never)), [8, 8, 2, 0]);
   assert.equal(hrtfLimitFor(undefined, 'low'), 8);
+  // A preset without its own port falls back to the next heavier port, as budgets do (low → medium → high → reference).
+  const mediumOnly = { hrtf: { maxVoices: 8, ports: { medium: { maxVoices: 2 } } } };
+  assert.deepEqual(['reference', 'high', 'medium', 'low'].map(p => hrtfLimitFor(mediumOnly, p as never)), [8, 8, 2, 2]);
+  const highOnly = { hrtf: { maxVoices: 8, ports: { high: { maxVoices: 4 } } } };
+  assert.deepEqual(['reference', 'high', 'medium', 'low'].map(p => hrtfLimitFor(highOnly, p as never)), [8, 4, 4, 4]);
   for (const bad of [{ hrtf: { maxVoices: -1 } }, { hrtf: { maxVoices: 65 } }, { hrtf: { maxVoices: 2, ports: { low: { maxVoices: 1.5 } } } }, { hrtf: { maxVoices: 2, ports: { ultra: { maxVoices: 1 } } } }, { smoothing: 2 }])
     assert.throws(() => validateSpatialAudioOptions(bad as never));
   assert.deepEqual(spatialAudioSettings(undefined), []); assert.deepEqual(spatialAudioSettings({ headphoneSetting: true }), [HEADPHONE_3D_SETTING]);

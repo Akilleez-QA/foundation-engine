@@ -88,11 +88,16 @@ async function filter() {
 }
 
 async function smoothing() {
+  // An off-axis pass in front of the listener (z = -3, x +5 -> -5): the image should sweep, not jump. A path through
+  // the listener, a camera cut or a 180-degree snap still flips the image; smoothing only removes per-update zipper.
+  // Measurement blocks are aligned to the 128-frame render quantum the move lands on.
+  const Q = BLOCK / RATE, MOVE = 113 * Q;
   const run = async smoothing => {
-    const r = await render({cue: tone(1000, 1), options: {smoothing}, setup: out => out.playVoice('test.tone', {spatial: {position: [5, 0, 0]}}),
-      events: [[.3, (out, voice) => voice.setPosition([-5, 0, 0])]]});
-    const first = [.3 + BLOCK / RATE, .3 + 2 * BLOCK / RATE];
-    return {firstBlockRightOverLeftDb: db(rms(r.R, ...first), rms(r.L, ...first)), settledRightOverLeftDb: db(rms(r.R, .6, .9), rms(r.L, .6, .9)), finalX: r.created.panners[0].positionX.value};
+    const r = await render({cue: tone(1000, 1), options: {smoothing}, setup: out => out.playVoice('test.tone', {spatial: {position: [5, 0, -3]}}),
+      events: [[MOVE, (out, voice) => voice.setPosition([-5, 0, -3])]]});
+    const balance = []; for (let t = MOVE - 8 * Q; t < MOVE + 60 * Q; t += Q) balance.push(db(rms(r.R, t, t + BLOCK / RATE), rms(r.L, t, t + BLOCK / RATE)));
+    let worst = 0; for (let i = 1; i < balance.length; i++) worst = Math.max(worst, Math.abs(balance[i] - balance[i - 1]));
+    return {startRightOverLeftDb: balance[0], settledRightOverLeftDb: db(rms(r.R, .6, .9), rms(r.L, .6, .9)), worstBlockBalanceStepDb: worst, finalX: r.created.panners[0].positionX.value};
   };
   return {instant: await run(0), smoothed: await run(.02)};
 }

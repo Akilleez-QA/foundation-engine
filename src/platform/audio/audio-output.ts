@@ -117,9 +117,10 @@ export interface AudioOutputOptions {
   maxHrtfVoices?: number;
   /**
    * Time constant in seconds for listener and spatial position updates: [0, 1], default 0 (instant writes, the
-   * behaviour before smoothing existed). A positive value ramps each update with `setTargetAtTime` (~95% after three
-   * time constants), which removes zipper noise on fast motion. Browsers without listener AudioParams (Firefox) and
-   * panners without position AudioParams still write instantly.
+   * behaviour before smoothing existed). A positive value ramps each changed parameter with `setTargetAtTime` (~95%
+   * after three time constants), which removes zipper noise from small per-update moves. Camera cuts, 180-degree snaps
+   * and paths through the listener still flip the image, only more slowly. Browsers without listener AudioParams
+   * (Firefox) and panners without position AudioParams still write instantly.
    */
   smoothing?: number;
 }
@@ -151,7 +152,8 @@ export interface SpatialCue {
   rolloffFactor?: number;
   /**
    * Default 'equalpower' (unchanged). 'HRTF' is granted while the output has a free HRTF slot (`maxHrtfVoices`);
-   * otherwise the voice plays with 'equalpower' and `stats.downgraded` counts it. HRTF never refuses playback.
+   * otherwise the voice plays with 'equalpower' and `stats.downgraded` counts it. HRTF never refuses playback. A full
+   * limit first reclaims the slot of a voice its cutoff has kept silent for 50 ms or more (that voice stays equal-power).
    */
   panning?: PanningModel;
   /** Default 'inverse' (unchanged). */
@@ -161,7 +163,7 @@ export interface SpatialCue {
    * playing voice that moves (or whose listener moves) beyond it fades to silence and returns when back in range.
    */
   cutoffDistance?: number;
-  /** Time constant (s) of `setPosition` ramps: [0, 1], default the output's `smoothing`. 0 writes instantly. */
+  /** Time constant (s) of `setPosition` ramps (small per-update moves; large jumps still flip): [0, 1], default the output's `smoothing`. 0 writes instantly. */
   smoothing?: number;
 }
 /** The optional per-voice low-pass and gain stage ("muffle"), for occlusion, air absorption or effects. */
@@ -230,7 +232,9 @@ export function audibleGain(spatial: SpatialCue, listener: AudioVector): number 
   return distanceGain(spatial.distanceModel ?? 'inverse', d, spatial);
 }
 
-const vector = (p: AudioVector) => { if (!Array.isArray(p) || p.length !== 3 || !p.every(Number.isFinite)) throw Error('invalid audio position'); };
+/** Arrays and typed arrays of three finite numbers are accepted (as before); the output keeps its own copy. */
+const vector = (p: ArrayLike<number>) => { if (!p || p.length !== 3 || ![0, 1, 2].every(i => Number.isFinite(p[i]))) throw Error('invalid audio position'); };
+const copy = (p: ArrayLike<number>): AudioVector => [p[0], p[1], p[2]];
 const within = (n: number | undefined, min: number, max: number) => n === undefined || (typeof n === 'number' && n >= min && n <= max);
 function validateSpatial(p: SpatialCue): void {
   vector(p.position);
@@ -309,14 +313,17 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
   const off = o.onChange?.(apply);
   const context = (): AudioContext | null => {
     if (disposed || o.silent()) return null;
-    if (!ctx) { ctx = makeContext(); stats.contexts++; listenerKey = ''; master = ctx.createGain(); master.connect(ctx.destination); apply(); }
+    if (!ctx) { ctx = makeContext(); stats.contexts++; listenerWritten = null; master = ctx.createGain(); master.connect(ctx.destination); apply(); }
     return ctx;
   };
   const voices = new Set<CueVoice>();
   /** HRTF voices in start order (oldest first), and the cutoff checks of voices that have a `cutoffDistance`. */
-  const hrtf = new Set<{ downgrade(): void }>();
+  const hrtf = new Set<{ downgrade(): void; silentSince: number | null }>();
+  /** Once a cutoff fade has run this long (s), the voice is inaudible and its HRTF slot may be reclaimed silently. */
+  const RECLAIM_AFTER = 5 * CUTOFF_TIME_CONSTANT;
   const cutoffChecks = new Set<() => void>();
-  // Smoothed writes: one cancel plus one setTargetAtTime per changed parameter, so each update has constant cost.
+  // Smoothed writes: one cancel plus one setTargetAtTime per changed parameter (callers skip unchanged ones), so each
+  // update has constant cost.
   // A parameter that was ever automated is written with setValueAtTime afterwards, so an instant write is not lost.
   const automated = new WeakSet<AudioParam>();
   const write = (p: AudioParam, value: number, timeConstant: number) => {
@@ -326,12 +333,13 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
     else p.value = value;
   };
   let listener:{position:AudioVector;forward:AudioVector;up:AudioVector}|null=null;
-  /** The listener values last written to this context ('' for none: the first write is instant). */
-  let listenerKey = '';
+  /** The listener values last written to this context (null: none yet, so the first write is instant). */
+  let listenerWritten: number[] | null = null;
   const applyListener=()=>{if(!ctx||!listener)return;const l=ctx.listener;
-    const key=[...listener.position,...listener.forward,...listener.up].join();if(key===listenerKey)return;
-    const tau=listenerKey?smoothing:0;listenerKey=key;
-    if(l.positionX){const params=[l.positionX,l.positionY,l.positionZ,l.forwardX,l.forwardY,l.forwardZ,l.upX,l.upY,l.upZ],values=[...listener.position,...listener.forward,...listener.up];params.forEach((p,i)=>write(p,values[i],tau));}
+    const values=[...listener.position,...listener.forward,...listener.up],last=listenerWritten;
+    if(last&&values.every((v,i)=>v===last[i]))return;
+    const tau=last?smoothing:0;listenerWritten=values;
+    if(l.positionX){const params=[l.positionX,l.positionY,l.positionZ,l.forwardX,l.forwardY,l.forwardZ,l.upX,l.upY,l.upZ];params.forEach((p,i)=>{if(!last||last[i]!==values[i])write(p,values[i],tau);});}
     else {l.setPosition(...listener.position);l.setOrientation(...listener.forward,...listener.up);}
   };
   const listenerPosition = (): AudioVector => listener?.position ?? [0, 0, 0];
@@ -342,7 +350,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
   };
   const validateGain = (gain: number) => { if (!Number.isFinite(gain) || gain < 0 || gain > 1) throw Error('cue gain must be in [0, 1]'); };
   const playVoice = (id: string, options: CueVoiceOptions = {}): CueVoice | null => {
-    options = { ...options, ...(options.spatial ? { spatial: { ...options.spatial, position: [...options.spatial.position] as AudioVector } } : {}), ...(options.filter ? { filter: { ...options.filter } } : {}) };
+    options = { ...options, ...(options.spatial ? { spatial: { ...options.spatial, position: copy(options.spatial.position) } } : {}), ...(options.filter ? { filter: { ...options.filter } } : {}) };
     validateGain(options.gain ?? 1);
     if(!Number.isSafeInteger(options.variant??0))throw Error('invalid cue variant');
     if(options.spatial)validateSpatial(options.spatial);
@@ -376,12 +384,16 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
       const gate=spatial?.cutoffDistance!==undefined?c.createGain():null;
       let target:AudioVector|null=null,inRange=true;
       const positionTau=spatial?.smoothing??smoothing;
-      const checkCutoff=()=>{if(!gate||!spatial||!target)return;const next=!beyond(spatial,target);if(next===inRange)return;inRange=next;write(gate.gain,next?1:0,CUTOFF_TIME_CONSTANT);};
-      const position=(p:AudioVector)=>{vector(p);if(!panner)return;const tau=target?positionTau:0;target=[...p] as unknown as AudioVector;
-        if(panner.positionX){write(panner.positionX,p[0],tau);write(panner.positionY,p[1],tau);write(panner.positionZ,p[2],tau);}else panner.setPosition(...p);checkCutoff();};
+      const checkCutoff=()=>{if(!gate||!spatial||!target)return;const next=!beyond(spatial,target);if(next===inRange)return;inRange=next;
+        slot.silentSince=next?null:c.currentTime;write(gate.gain,next?1:0,CUTOFF_TIME_CONSTANT);};
+      const position=(value:AudioVector)=>{vector(value);if(!panner)return;const p=copy(value),last=target,tau=last?positionTau:0;target=p;
+        if(panner.positionX){const params=[panner.positionX,panner.positionY,panner.positionZ];for(let i=0;i<3;i++)if(!last||last[i]!==p[i])write(params[i],p[i],tau);}
+        else if(!last||p.some((v,i)=>v!==last[i]))panner.setPosition(...p);checkCutoff();};
       let panning:PanningModel|null=null;
-      const slot={downgrade(){if(!panner||panning!=='HRTF')return;panner.panningModel=panning='equalpower';hrtf.delete(slot);stats.downgraded++;}};
+      const slot={silentSince:null as number|null,downgrade(){if(!panner||panning!=='HRTF')return;panner.panningModel=panning='equalpower';hrtf.delete(slot);stats.downgraded++;}};
       if(panner&&spatial){
+        // A voice silenced by its cutoff for longer than its fade gives up its HRTF slot to a new request (no audible change).
+        if(spatial.panning==='HRTF'&&hrtf.size>=hrtfLimit&&hrtfLimit>0){for(const held of hrtf)if(held.silentSince!==null&&c.currentTime-held.silentSince>=RECLAIM_AFTER){held.downgrade();break;}}
         panning=spatial.panning==='HRTF'&&hrtf.size<hrtfLimit?'HRTF':'equalpower';
         if(spatial.panning==='HRTF'&&panning!=='HRTF')stats.downgraded++;
         panner.panningModel=panning;panner.distanceModel=spatial.distanceModel??'inverse';panner.refDistance=spatial.refDistance??1;panner.maxDistance=spatial.maxDistance??100;panner.rolloffFactor=spatial.rolloffFactor??1;position(spatial.position);applyListener();
@@ -401,8 +413,9 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
         setGain(value) { validateGain(value); if (!ended) write(level.gain, value, 0); },
         setFilter(value, timeConstant = FILTER_TIME_CONSTANT.default) {
           validateFilter(value, timeConstant);
+          if (ended) return;
           if (!filter || !muffle) throw Error('voice has no filter stage: pass `filter` to playVoice');
-          if (!ended) { write(filter.frequency, value.cutoffHz, timeConstant); write(muffle.gain, value.gain ?? 1, timeConstant); }
+          { write(filter.frequency, value.cutoffHz, timeConstant); write(muffle.gain, value.gain ?? 1, timeConstant); }
         },
         stop() { if (ended) return; try { source.stop(); } finally { finish(); } },
       };
@@ -417,10 +430,10 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
   return {
     playVoice,
     setListener(position,forward,up){vector(position);vector(forward);vector(up);
-      const fn=Math.hypot(...forward),un=Math.hypot(...up);if(!Number.isFinite(fn)||!Number.isFinite(un)||fn===0||un===0)throw Error('invalid audio orientation');
-      const f=forward.map(x=>x/fn) as unknown as AudioVector,u=up.map(x=>x/un) as unknown as AudioVector;
+      const fn=Math.hypot(forward[0],forward[1],forward[2]),un=Math.hypot(up[0],up[1],up[2]);if(!Number.isFinite(fn)||!Number.isFinite(un)||fn===0||un===0)throw Error('invalid audio orientation');
+      const f=copy(forward).map(x=>x/fn) as unknown as AudioVector,u=copy(up).map(x=>x/un) as unknown as AudioVector;
       if(Math.abs(f.reduce((sum,x,i)=>sum+x*u[i],0))>0.999)throw Error('parallel audio orientation');
-      listener={position:[...position],forward:f,up:u};applyListener();
+      listener={position:copy(position),forward:f,up:u};applyListener();
       for(const check of [...cutoffChecks])check();
     },
     setHrtfLimit(limit){

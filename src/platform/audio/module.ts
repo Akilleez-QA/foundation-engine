@@ -15,6 +15,7 @@ import { defineModule, type EngineModule } from '../../core/module';
 import type { Registry } from '../../core/registry';
 import type { SettingDef } from '../../core/settings/settings';
 import { isQualityPreset, QUALITY_PRESETS, type Ported, type QualityPreset } from '../../core/tiers';
+import { budgetFor } from '../../core/budget';
 import type {} from '../../core/settings/module';
 import type {} from '../render/quality-module';
 import type {} from '../../core/settings/features-module';
@@ -35,7 +36,7 @@ export const HEADPHONE_3D_SETTING: SettingDef<'sound.headphone-3d'> = {
 
 /** The creator's spatial audio choices; every field is optional and the defaults keep the previous behaviour. */
 export interface SpatialAudioOptions {
-  /** HRTF voices allowed at once, per quality preset (flat value = reference; `ports` override lighter presets). Default 8. */
+  /** HRTF voices allowed at once, per quality preset (flat value = reference; `ports` override lighter presets, falling back low → medium → high → reference). Default 8. */
   hrtf?: Ported<{ maxVoices: number }>;
   /** Listener and position smoothing time constant in seconds, [0, 1]. Default 0 (instant). */
   smoothing?: number;
@@ -45,8 +46,8 @@ export interface SpatialAudioOptions {
 
 /** Validated HRTF limit for `preset`. */
 export function hrtfLimitFor(options: SpatialAudioOptions | undefined, preset: QualityPreset, maxVoices = 64): number {
-  const hrtf = options?.hrtf;
-  const value = (preset === 'reference' ? undefined : hrtf?.ports?.[preset]?.maxVoices) ?? hrtf?.maxVoices ?? Math.min(8, maxVoices);
+  // The engine's preset fallback (core/budget.ts): low → medium → high → reference.
+  const value = options?.hrtf ? budgetFor(options.hrtf, preset).maxVoices ?? options.hrtf.maxVoices : Math.min(8, maxVoices);
   if (!Number.isSafeInteger(value) || value < 0 || value > maxVoices) throw Error(`audio: HRTF voice limit for ${preset} must be an integer in [0, ${maxVoices}]`);
   return value;
 }

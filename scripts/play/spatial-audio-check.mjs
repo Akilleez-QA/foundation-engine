@@ -72,10 +72,14 @@ try {
   close(r.filter.frequencyAfter, 375, 375 * .01, 'filter frequency after the ramp');
   assert.ok(r.filter.attenuationDb > 30, `3 kHz attenuated by the 375 Hz low-pass and 0.5 gain (${r.filter.attenuationDb} dB)`);
   assert.ok(r.filter.worstBlockStepDb < 4, `ramped: no 128-frame block steps by 4 dB or more (${r.filter.worstBlockStepDb} dB)`);
-  // Position smoothing: an instant move flips the image at once; a smoothed move does not, and both settle.
-  assert.ok(r.smoothing.instant.firstBlockRightOverLeftDb < -3, `instant move flips at once (${r.smoothing.instant.firstBlockRightOverLeftDb} dB)`);
-  assert.ok(r.smoothing.smoothed.firstBlockRightOverLeftDb > 3, `smoothed move still on the right one block later (${r.smoothing.smoothed.firstBlockRightOverLeftDb} dB)`);
-  for (const run of [r.smoothing.instant, r.smoothing.smoothed]) { assert.ok(run.settledRightOverLeftDb < -3); close(run.finalX, -5, .01, 'final position'); }
+  // Position smoothing on an off-axis pass: an instant move jumps the stereo balance in one block; a smoothed move
+  // sweeps it in small per-block steps. Both end at the same place.
+  assert.ok(r.smoothing.instant.worstBlockBalanceStepDb > 15, `instant move jumps (${r.smoothing.instant.worstBlockBalanceStepDb} dB in one block)`);
+  assert.ok(r.smoothing.smoothed.worstBlockBalanceStepDb < 4, `smoothed move sweeps (worst ${r.smoothing.smoothed.worstBlockBalanceStepDb} dB per block)`);
+  for (const run of [r.smoothing.instant, r.smoothing.smoothed]) {
+    assert.ok(run.startRightOverLeftDb > 6 && run.settledRightOverLeftDb < -6, 'right before, left after');
+    close(run.finalX, -5, .01, 'final position');
+  }
   assert.deepEqual(report.errors, []);
   report.passed = true;
 } catch (error) { evidence.fail(error); }

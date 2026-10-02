@@ -39,6 +39,12 @@ integrated. See [Evidence](#evidence) for what is and is not established.
 
 Invalid values throw before any node is allocated. The handle adds
 `voice.panning` (the model in effect) and `voice.setFilter(filter, timeConstant?)`.
+Positions may be arrays or typed arrays of three finite numbers; the output copies them.
+
+Validation is tighter than before: `refDistance`, `maxDistance` and `cutoffDistance`
+are capped at 1e6 and `rolloffFactor` at 100 (previously only finite, non-negative and
+`maxDistance >= refDistance` were checked). A game passing larger values now gets an
+`invalid spatial cue` error.
 
 ### Distance models and `maxDistance`
 
@@ -81,6 +87,11 @@ Web Audio node, so it has its own bound:
 - A request beyond the limit plays with `'equalpower'` and counts in
   `stats.downgraded`. HRTF never refuses playback; the output-wide `maxVoices` is
   still the only refusal bound for voice count.
+- When the limit is full, a new HRTF request first reclaims the slot of a voice that
+  its cutoff has kept silent for at least 50 ms (five fade time constants). That voice
+  switches to `'equalpower'` while inaudible, counts in `stats.downgraded`, and stays
+  equal-power if it returns in range. A voice silenced by its cutoff otherwise keeps
+  its slot (and its HRTF processing cost) until it ends or is reclaimed.
 - `setHrtfLimit(n)` changes it live. Lowering it moves the newest HRTF voices beyond
   the new limit to `'equalpower'` (also counted); raising it affects later starts only.
   Changing a live panner's model may produce an audible discontinuity on that voice.
@@ -97,19 +108,24 @@ the panner, for occlusion, air absorption or effects. It exists only on voices t
 ask for it. `voice.setFilter({ cutoffHz, gain }, timeConstant = 0.03)` ramps both
 values with `setTargetAtTime` (~95% after three time constants). The time constant
 is bounded to [0.005, 2] s; there is no instant path, so updates do not click or
-zipper. Calling `setFilter` on a voice without the stage throws; on an ended voice
-it does nothing. The engine does not decide *when* a sound is occluded: that is a
+zipper. Arguments are always validated. On an ended voice `setFilter` does nothing;
+on a playing voice started without the stage it throws. The engine does not decide *when* a sound is occluded: that is a
 caller (or a later kit) decision.
 
 ## Smoothed position and listener updates
 
 `smoothing` (output option, default 0) and `spatial.smoothing` (per voice) set a
 time constant in seconds. With a positive value, each listener or `setPosition`
-update cancels later automation and ramps with `setTargetAtTime` from the current
-value. The first write on a context or voice is instant (no sweep from the origin).
-Cost per update is constant: one cancel and one ramp per changed parameter (3 for a
-position, 9 for the listener), and an unchanged listener writes nothing. The runtime
-updates the listener only when the camera changes.
+update cancels later automation on the parameters that changed and ramps them with
+`setTargetAtTime` from the current value. The first write on a context or voice is
+instant (no sweep from the origin). Cost per update is constant: one cancel and one
+ramp per changed parameter (at most 3 for a position, 9 for the listener); unchanged
+parameters are not written. The runtime updates the listener only when the camera
+changes.
+
+Smoothing is for small per-update moves (a source or camera moving a little each
+frame). It does not hide discontinuities: a camera cut, a 180-degree snap or a path
+through the listener still flips the image, only spread over the ramp.
 
 Browsers without listener `AudioParam`s (Firefox) and panners without position
 `AudioParam`s use the instant `setPosition`/`setOrientation` fallback: no ramps there.
@@ -132,7 +148,8 @@ defineGame({
 ```
 
 - `hrtf` is a `Ported<{ maxVoices }>`: the flat value is the reference preset; `ports`
-  override lighter quality presets. The limit follows `quality.setPreset` live.
+  override lighter quality presets, falling back like budgets (`budgetFor`): low →
+  medium → high → reference, so `ports: { medium: { maxVoices: 2 } }` also gives low 2. The limit follows `quality.setPreset` live.
   These numbers are creator choices; no per-device audio cost has been measured.
 - `smoothing` sets the output's default time constant.
 - `headphoneSetting: true` registers the `sound.headphone-3d` setting (device scope,
@@ -174,6 +191,10 @@ Without `audio`, the HRTF limit is 8 and smoothing is 0. Because voices default 
   parameters change are unverified.
 - The cutoff uses straight-line distance from the listener; it does not know about
   geometry.
+- Chromium loads its HRTF data on the first HRTF panner; a real-time context may output
+  silence from that voice until the data is loaded. The output does not pre-load it
+  (that would cost memory for games that never use HRTF). The offline harness renders
+  HRTF signal after loading but does not measure this delay.
 
 ## Evidence
 
@@ -181,8 +202,9 @@ Without `audio`, the HRTF limit is 8 and smoothing is 0. Because voices default 
 |---|---|---|
 | Node unit tests | `src/platform/audio/spatial.test.ts` (fake context) | Defaults unchanged; model selection and validation bounds; HRTF limit, fallback, live lowering and slot release; cutoff refusal and gate fade/restore for every model; filter creation, ramps, bounds; smoothing wiring and Firefox fallback; `distanceGain` against the spec formulas |
 | Node boot test | `src/platform/audio/module.test.ts` | The headphone setting and quality preset drive the effective HRTF limit live |
-| Muted browser, offline render | `npm run test:audio-browser` (`scripts/play/spatial-audio-check.mjs`) | With the real output rendering into `OfflineAudioContext` in the muted test browser: panning model on the real nodes; equal-power renders front = back and level = above, HRTF renders them differently, and the limit's fallback renders as equal-power; measured distance gain within 1% of the formula for all three models; silence beyond the cutoff and return at the model's gain; filter frequency after the ramp, >30 dB attenuation, no 128-frame step of 4 dB or more; a smoothed position move has not flipped one block later while an instant one has |
-| Not established | — | Perceived localisation (needs headphone trials with listeners), Firefox/WebKit rendering, any device's CPU, battery or latency, iOS behaviour |
+| Preset fallback | `spatial.test.ts` | HRTF limits follow the engine's `budgetFor` order: a preset without its own port uses the next heavier port (low → medium → high → reference) |
+| Muted browser, offline render | `npm run test:audio-browser` (`scripts/play/spatial-audio-check.mjs`) | With the real output rendering into `OfflineAudioContext` in the muted test browser: panning model on the real nodes; equal-power renders front = back and level = above, HRTF renders them differently, and the limit's fallback renders as equal-power; measured distance gain within 1% of the formula for all three models; silence beyond the cutoff and return at the model's gain; filter frequency after the ramp, >30 dB attenuation, no 128-frame step of 4 dB or more; on an off-axis pass in front of the listener (z = -3, x +5 to -5) an instant move changes the stereo balance by >15 dB in one block, a smoothed one (0.02 s) by <4 dB per block |
+| Not established | — | Perceived localisation (needs headphone trials with listeners), Firefox/WebKit rendering, any device's CPU, battery or latency, iOS behaviour, real-time HRTF load delay |
 
 `OfflineAudioContext` renders into memory and never reaches an audio device, so it
 is compatible with STD-TST-8; the harness still runs in the muted, isolated browser
