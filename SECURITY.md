@@ -15,4 +15,6 @@ Once a private channel is confirmed, useful report information includes:
 
 Limit testing to systems and data you own or are authorized to assess. Do not access other people's data, disrupt services, or publish working exploit details before discussing disclosure with the maintainer. This policy does not authorize testing a third-party game or hosting provider.
 
+For building games: browser clients are untrusted, and client-side anti-cheat is not a security boundary. The [command integrity guide](docs/guides/integrity.md) maps the engine's host-side protections (authority, validation, scoped views, rate limits, integrity rules) and what each does and does not stop.
+
 There is currently no published supported-version window, security response SLA, or vulnerability bounty. Fixes and release availability must be checked against the repository's actual commits and releases. Ordinary correctness bugs without sensitive security implications can use the bug report template.

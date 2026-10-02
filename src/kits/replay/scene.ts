@@ -6,7 +6,7 @@
  * axis values and the pointer. Replaying those facts tick by tick with the same seed must give the same world.
  * The same tap serves the stock browser runtime's dev-only replay surface (src/dev/replay.ts).
  */
-import { defineSystem, testScene, Transform, type GameDefinition, type InputDefinition, type InputState,
+import { defineSystem, testScene, Transform, type GameDefinition, type InputDefinition, type InputState, type InputSource,
   type SceneContext, type SceneDefinition, type SystemDefinition, type World } from '../../author';
 import type { DocumentValue } from '../authoring/document';
 import type { JsonLimits } from '../network/captured-json';
@@ -62,11 +62,11 @@ export interface SceneInputTap {
   /** The input systems read: the current tick's facts (or the pass-through source outside a tick). */
   readonly input: InputState;
   /** Record mode: read the live input's facts for this tick, make them current and return their canonical JSON. */
-  capture(live: InputState): string;
+  capture(live: InputSource): string;
   /** Replay mode: make a logged tick's input current. Throws on a malformed or undeclared entry. */
   load(value: DocumentValue): void;
   /** Where reads go outside a tick: a live source, or null to keep the last tick's facts. */
-  passThrough(source: InputState | null): void;
+  passThrough(source: InputSource | null): void;
 }
 
 const EMPTY: readonly string[] = Object.freeze([]);
@@ -75,7 +75,7 @@ export function createSceneInputTap(inputs: readonly SceneInputSpec[], describe:
   const known = new Set(inputs.map(i => i.id));
   let pressed: readonly string[] = EMPTY, held: readonly string[] = EMPTY, axes: Readonly<Record<string, number>> = {};
   const ptr = { x: 0, y: 0, down: false, pressed: false };
-  let source: InputState | null = null;
+  let source: InputSource | null = null;
   const pointer = {
     get x() { return source ? source.pointer.x : ptr.x; },
     get y() { return source ? source.pointer.y : ptr.y; },
@@ -90,6 +90,9 @@ export function createSceneInputTap(inputs: readonly SceneInputSpec[], describe:
   const input: InputState = {
     describe: id => describe(id),
     pressed: id => source ? source.pressed(id) : pressed.includes(id),
+    // The log records which actions were pressed in a tick, not when: a recorded or replayed tick has no press
+    // timestamps (capture makes the logged facts current, so even a live recorded tick reads null).
+    pressedAt: id => source?.pressedAt?.(id) ?? null,
     held: id => source ? source.held(id) : held.includes(id),
     axis: id => source ? source.axis(id) : axes[id] ?? 0,
     pointer,

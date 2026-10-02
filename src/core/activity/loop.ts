@@ -190,7 +190,9 @@ export class FrameLoop {
   /** A test driver holds the actual scheduler, then steps the same update/render path. No second loop or clock. */
   holdFrames(held: boolean): void {
     if (this.held === held) return;
-    this.held = held; this.cancel(); this.lastTick = null; this.manualMs = 0;
+    // Held frames continue from the loop's real time: event timestamps (Event.timeStamp, the audio clock) stay on the
+    // same timebase as stepped frame times instead of being off by the page's age.
+    this.held = held; this.cancel(); this.lastTick = null; this.manualMs = held ? this.now() : 0;
     if (!held) this.wake();
   }
   get framesHeld(): boolean { return this.held; }

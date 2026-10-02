@@ -22,7 +22,7 @@ export {
   defineGame, defineScene, defineComponent, defineEntity, defineSystem, defineInput, defineSaveSection, defineAsset, defineMode, defineKit,
   shapeParser, Transform, Shape, Name,
   type AuthorDef, type GameDefinition, type SceneDefinition, type EntityDefinition, type SystemDefinition, type InputDefinition,
-  type SaveSectionDef, type AssetDefinition, type PlayOptions, validatePlayOptions, PLAY_LATE_MS, type ModeDefinition, type KitDefinition, type SceneContext, type SaveHandle, type InputState, type ActionHint,
+  type SaveSectionDef, type AssetDefinition, type PlayOptions, validatePlayOptions, PLAY_LATE_MS, type ModeDefinition, type KitDefinition, type SceneContext, type SaveHandle, type InputState, type InputSource, type ActionHint,
   type ViewState, type ReadingSheet, type ReadingSheetOptions, type ScenePreparationContext, type Vec3, type SceneBody, type SceneInput, type ComponentType, type ComponentInit, type Entity, type World,
 } from './defs';
 export { testScene, createTestWorkerHost, type TestScene } from './testing';
@@ -32,6 +32,7 @@ export type { CueVoice, CueVoiceOptions, CueFilter, SpatialCue, PanningModel, Di
 export { distanceGain, audibleGain } from '../platform/audio/audio-output';
 export type { SpatialAudioOptions } from '../platform/audio/module';
 export { Material, defineMaterial, validateMaterial, MATERIAL_DEFAULTS, MATERIAL_LIMITS, type MaterialData, type MaterialWrap } from './material';
+export { createAudioTimeline, estimateOffset, validateCalibration, MAX_CALIBRATION_MS, NO_CALIBRATION, type AudioTimeline, type AudioTimelineOptions, type AudioTimelineStats, type AudioClockReading, type AudioCalibration, type TimelineEvent, type TimelineSource, type OffsetEstimate } from '../platform/audio/audio-timeline';
 
 export { defineEnvironment, type EnvironmentState } from './environment';
 

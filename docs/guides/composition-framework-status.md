@@ -97,6 +97,9 @@ are contextual evidence, not verification of Foundation.
 | Multiplayer: seeded fault schedules (NW-09) | Tool-only `npm run faults:network` harness replaying seeded combined faults against the authority workbench host with per-step invariants and exact seed/step repro | Implemented, candidate (PR #26); not integrated. Process-scope loopback evidence only; no WAN, power-loss, scale or device claim. See [guide](network-fault-schedule.md) |
 | Multiplayer: planned drain and lifetime (NW-08) | Optional host `createConnectionDrain` (bounded notice, operator drain/resume, dithered lifetime cap) and client `createDrainFollower` (hold until announced return, then the existing retry schedule) | Implemented, candidate (PR #21); not integrated. Unit, host socket and loopback browser tests; defaults unchanged; no process-restart, WAN or device claim. |
 | Movement feel: jump (MV-01) | Pure `createJumpFeel` (exact piecewise gravity, coyote, buffer, variable height, apex gravity, terminal fall) and the optional `jumpSystem` adapter in the locomotion kit; opt-in `hold: true` author buttons | Implemented, candidate (PR #34); not integrated. Focused unit tests at 30–240 Hz only; no template consumer, browser or device evidence. Moving-platform carry, slopes, swept lateral collision and vehicles remain separate slices. |
+
+
+| Multiplayer: command integrity (SEC-01) | Optional host-side `createIntegrity`: pure validity `assess` for authority reducers, `admit`/`record` policy with decaying scores, tick budget, throttle, windowed close, observe mode and bounded local audit; `assertDisclosure` test helper; network workbench opt-in example | Slice A implemented, candidate (PR #20); not integrated. Unit and loopback host tests only; verified runs (slice B) planned, not built. See the [integrity guide](integrity.md). |
 | Manual tools | Bounded documents, sessions and optional appearance, progression, custody and objective desktop consumers | Integrated tools cover their finite schemas. Action tooling is integrated; recipe/effect inspectors are integrated in PR #118 with focused tests and final desktop workflow acceptance. Device support is selected per tool; desktop tooling does not impose a phone UI. |
 
 Priority is composition correctness before additional feature catalogs. A creator's
@@ -421,3 +424,10 @@ sub-path changes); not integrated. Evidence: unit tests with an injected AudioCo
 decode or play). Audible playback, latency and loudness on physical devices are unverified;
 streaming and looping are out of scope. Sound files share AUD-01's voice chain (HRTF limit,
 distance models, cutoff, filter) through `ctx.playVoice`.
+
+## Audio-clock timeline (AU-01) — implemented, candidate
+
+Caller-owned `createAudioTimeline` composes with the existing audio output and scene
+voices: it adds no context, timer or loop, and is pumped from a scene's frame system.
+Candidate (PR #31); not integrated. See the [guide](audio-timeline.md) and the
+[recipe](../recipes/sync-gameplay-to-music.md).

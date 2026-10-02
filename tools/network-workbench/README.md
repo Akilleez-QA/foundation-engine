@@ -119,6 +119,22 @@ the notice is shown but ignored and the host's 1012 close is paced as ordinary
 transient loss. Commands are never resent. These are example values, not
 recommendations for any game.
 
+## Optional command integrity (SEC-01)
+
+Off by default. `startNetworkWorkbench({integrity: true})` or
+`node --import tsx tools/network-workbench/server.mjs --integrity` wires the
+[integrity](../../docs/guides/integrity.md) owner's `check` into the `authorize` port,
+after the ownership check. Counter commands are unsequenced, so refusing one leaves no
+gap. One plausibility rule: a counter may rise by at most 20 units per second of host
+time since its last authoritative change (the jitter-sensitive host-time variant). An
+implausible command is refused with the generic reason `integrity` (the rule name is
+not disclosed) and scores 1 against the principal; three violations within 5 s
+reaching a score of 2.5 close the connection with 1008 `integrity-violation`; scores
+decay by 0.5 per second and survive reconnects. The browser client's close policy
+treats `integrity-violation` as terminal. `read()` adds `integrity: {stats, audit,
+export}` (null when off). Without the option, behaviour is unchanged. Example values
+only; tests named `SEC01:` cover both modes.
+
 ## Trusted harness controls and evidence
 
 `startNetworkWorkbench({port:0,autoDriver:true,driverMs:10})` returns `url`,

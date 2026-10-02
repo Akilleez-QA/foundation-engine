@@ -1,6 +1,6 @@
 /** One pointer session per scene. Cancellation invalidates the gesture, not merely its next event. */
 export function bindScenePointer(canvas: HTMLCanvasElement, options: {
-  signal: AbortSignal; owns(): boolean; press(): void; canceled(): void; blocked(): void; invalidate(): void;
+  signal: AbortSignal; owns(): boolean; press(timeStamp: number): void; canceled(): void; blocked(): void; invalidate(): void;
 }) {
   const doc = canvas.ownerDocument, win = doc.defaultView;
   const pointer = { x: 0, y: 0, down: false, pressed: false };
@@ -25,7 +25,7 @@ export function bindScenePointer(canvas: HTMLCanvasElement, options: {
     if (e.button !== 0 || active !== null || !sync()) return;
     active = e.pointerId; point(e); pointer.down = true; pointer.pressed = true;
     try { canvas.setPointerCapture?.(e.pointerId); } catch { /* A detached synthetic pointer has no capture. */ }
-    options.press(); options.invalidate();
+    options.press(e.timeStamp); options.invalidate();
   }, listener);
   canvas.addEventListener('pointermove', e => {
     if (!sync() || (active !== null && active !== e.pointerId)) return;

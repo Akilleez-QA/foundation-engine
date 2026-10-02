@@ -241,6 +241,18 @@ test('manual capture holds real animation and steps the same clock, updates and 
   assert.throws(() => loop.stepFrame(.01), /Hold/);
 });
 
+test('held frames continue from the loop clock, so event timestamps and stepped frame times share one timebase', () => {
+  let now = 5000;
+  const { loop } = setup({ now: () => now });
+  const times: number[] = [];
+  loop.add({ owner: 'world', mode: 'continuous', render: f => times.push(f.t * 1000) });
+  loop.holdFrames(true); loop.stepFrame(.01); loop.stepFrame(.01);
+  assert.deepEqual(times.map(t => Math.round(t)), [5010, 5020]);
+  loop.holdFrames(false); now = 9000; loop.holdFrames(true); loop.stepFrame(.02);
+  assert.equal(Math.round(times.at(-1)!), 9020, 'a new hold starts from the current time');
+  loop.dispose();
+});
+
 test('application updates bypass layer coverage, never hidden documents or render ownership', () => {
  const {frames,layers,loop}=setup();let owner=0;const coverage:Coverage[]=[];
  loop.add({owner:'scene',mode:'continuous',update(){owner++;}});

@@ -407,6 +407,29 @@ See the [drain guide](../../../docs/guides/network-drain.md). Implemented,
 candidate (NW-08); not integrated, and no WAN, process-restart or physical-device
 acceptance.
 
+## Optional command integrity (SEC-01)
+
+`createIntegrity({rules, limits, decayPerSecond, enforcement?, config?, subject?, tickBudget?, throttle?, close?, ruleErrorWeight?, onAudit?})`
+separates validity from policy. `assess({command, state, tick})` is pure: creator
+rules return `integrityOk()`, `integrityReject(reason, weight, evidence?)` or
+`integrityFlag(...)`, and the result can be computed inside an authority reducer so an
+invalid sequenced command is consumed as a domain rejection (no `gap`; prediction
+reconciles). `admit(key, now, {tick})` applies policy before dispatch: close state,
+score throttle and a tick-rate budget built on `createRateAdmission` that charges the
+claimed tick gap (only early retries score; impossible claims are rejected `tick-claim`). `record(key,
+assessment, now, ref)` scores an outcome once. `check` composes them for unsequenced
+commands. Scores decay linearly with host time; per-rule ceilings, windowed close
+(`requires: {violations, withinMs}`) and owner or rule observe mode contain false
+positives. Close uses the terminal token `integrity-violation`. The key table evicts
+the least-recently-seen key and never refuses a new one. Audit entries are bounded,
+local and exportable (`exportAudit()`). Pure tick-addressed helpers in
+`integrityRules`: `maxRateOfChange`, `valueInRange`, `valueInSet`, `monotonic`,
+`cooldown`, `claimedTickInBand`. `assertDisclosure`/`findDisclosureLeaks` check a
+view projection against what an observer may know, in tests. See the
+[integrity guide](../../../docs/guides/integrity.md) and the
+[five-minute recipe](../../../docs/recipes/add-command-integrity.md). Implemented,
+candidate (PR #20); not integrated. Unit and loopback host tests only.
+
 NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed. Clean native acceptance passed at `8317c69` with seven observations; 17 storage/host checks passed on Node 22.13. DV-01 remains open. The [acceptance ledger](../../../docs/guides/upgrade-acceptance-ledger.md)
 records revisions, process evidence and outstanding work. Application credit,
 command consumption, durable commitment and disclosure permission remain distinct.
