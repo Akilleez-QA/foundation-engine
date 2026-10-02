@@ -41,8 +41,8 @@ test('package scripts quote globs with double quotes, which sh and cmd.exe both 
   assert.match(scripts.test, /tsx --test "src\/\*\*\/\*\.test\.ts"/, 'npm test globs are expanded by node --test, not the shell');
 });
 
-test('the check, gate, criteria, hook and template-gate scripts start tools through this helper, never bare npx or npm', () => {
-  for (const file of ['scripts/check.mjs', 'scripts/hooks/after-edit.mjs', 'scripts/play/criteria.ts', 'scripts/perf/gate.mjs', 'scripts/gate-templates.mjs', 'scripts/perf/learn-isolation.test.ts']) {
+test('the check, gate, criteria, hook, template-gate and packaging scripts start tools through this helper, never bare npx or npm', () => {
+  for (const file of ['scripts/check.mjs', 'scripts/hooks/after-edit.mjs', 'scripts/play/criteria.ts', 'scripts/perf/gate.mjs', 'scripts/gate-templates.mjs', 'scripts/perf/learn-isolation.test.ts', 'scripts/package-pure.mjs', 'scripts/package-pure.test.mjs']) {
     const text = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
     assert.doesNotMatch(text, /(spawn|exec|execFile)(Sync)?\(\s*['"](npx|npm|npm\.cmd)['"]|\(\s*\w+\s*,\s*['"](npx|npm)['"]\s*,/, file);
   }
