@@ -33,6 +33,7 @@ const licenseNotices: Plugin = {
     }
   },
 };
+const devHost = (value?: string): string | true => !value || value === '0' || value === 'false' ? '127.0.0.1' : value === '1' || value === 'true' ? true : value;
 // Workers are module workers and the worker host loads job modules on demand: ES output with code splitting.
 // Production builds ship short string ids instead of readable keys (scripts/compact-keys.mjs).
 export default defineConfig({
@@ -47,6 +48,11 @@ export default defineConfig({
     {find: /^@game\//, replacement: gameDir() + '/'},
   ]},
   plugins: [engineStrings, licenseNotices, compactKeys(fileURLToPath(new URL('./src/generated/strings/compact-ids.json', import.meta.url))), testApi],
+  // `npm run dev` and `npm run preview` listen on this machine only. `npm run dev -- --host` (Vite's own flag) or
+  // ENGINE_HOST=1 listens on the local network too, e.g. to open the game on a phone on the same Wi-Fi; everyone on
+  // that network can then reach the dev server. `npm run play -- --host` does the same for the play server.
+  server: {host: devHost(process.env.ENGINE_HOST)},
+  preview: {host: devHost(process.env.ENGINE_HOST)},
   optimizeDeps: {entries: ['index.html']},
   build: {cssCodeSplit: true, target: 'es2022'},
   worker: {format: 'es'},

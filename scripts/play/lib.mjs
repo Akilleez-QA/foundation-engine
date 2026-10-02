@@ -14,13 +14,25 @@ export const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 const freePort = () => new Promise((resolve, reject) => { const s = netServer(); s.once('error', reject); s.listen(0, '127.0.0.1', () => { const {port} = s.address(); s.close(() => resolve(port)); }); });
 
-/** The dev server (test API included), on a free local port. */
-export async function serve({port} = {}) {
+/**
+ * Where `npm run play` listens: this machine only (127.0.0.1) unless asked. `--host` alone (or ENGINE_HOST=1/true)
+ * listens on every network interface, so a phone on the same Wi-Fi can open it; `--host <address>` or
+ * ENGINE_HOST=<address> picks one. Anyone on that network can then reach the dev server and its test API.
+ */
+export function listenHost(argv = process.argv.slice(2), env = process.env) {
+  const i = argv.findIndex(a => a === '--host' || a.startsWith('--host='));
+  const value = i < 0 ? env.ENGINE_HOST : argv[i].startsWith('--host=') ? argv[i].slice(7) : (argv[i + 1] && !argv[i + 1].startsWith('-') ? argv[i + 1] : true);
+  if (value === undefined || value === '' || value === '0' || value === 'false') return '127.0.0.1';
+  return value === true || value === '1' || value === 'true' ? true : value;
+}
+
+/** The dev server (test API included), on a free local port; `host` as in listenHost (default 127.0.0.1). */
+export async function serve({port, host = '127.0.0.1'} = {}) {
   const {createServer} = await import('vite');
-  const server = await createServer({root: ROOT, logLevel: 'error', server: {host: '127.0.0.1', port: port ?? await freePort(), strictPort: true}});
+  const server = await createServer({root: ROOT, logLevel: 'error', server: {host, port: port ?? await freePort(), strictPort: true}});
   await server.listen();
   const url = server.resolvedUrls.local[0].replace(/\/$/, '');
-  return {url, close: () => server.close()};
+  return {url, network: server.resolvedUrls.network.map(u => u.replace(/\/$/, '')), close: () => server.close()};
 }
 
 export function readJson(file) { return JSON.parse(readFileSync(join(ROOT, file), 'utf8')); }
