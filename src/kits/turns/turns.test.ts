@@ -100,7 +100,8 @@ test('restore refuses foreign, malformed, tampered and rules-drifted snapshots w
   assert.equal(restoreTurnLog({ rules: cardRules(), limits }, { ...snap, cursor: 9 }).status, 'invalid');
   assert.equal(restoreTurnLog({ rules: cardRules(), limits }, { ...snap, commands: [{ type: 'teleport' }] }).status, 'invalid');
   assert.equal(restoreTurnLog({ rules: cardRules(), limits }, null).status, 'invalid');
-  assert.equal(restoreTurnLog({ rules: cardRules(), limits }, { ...snap, checksum: snap.checksum ^ 1 }).status, 'diverged');
+  assert.equal(restoreTurnLog({ rules: cardRules(), limits }, { ...snap, checksum: 12 }).status, 'invalid');
+  assert.equal(restoreTurnLog({ rules: cardRules(), limits }, { ...snap, checksum: (snap.checksum[0] === '0' ? '1' : '0') + snap.checksum.slice(1) }).status, 'diverged');
   // Same rules id, changed behaviour: detected rather than silently loading another game.
   const drifted = play([{ type: 'draw' }, { type: 'play', card: 1 }]).snapshot();
   assert.equal(restoreTurnLog({ rules: cardRules('test-cards@1', 5), limits }, drifted).status, 'diverged');

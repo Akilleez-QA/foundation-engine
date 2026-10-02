@@ -483,6 +483,6 @@ loopback browser workflow are its only evidence. See the
 
 Status: implemented, candidate on branch `feat/genre-turnbased-slice1` (PR pending); not integrated. See the [kit README](../../src/kits/turns/README.md) and [recipe](../recipes/add-a-turn-log.md).
 
-- Runtime-enforced: rules id, validator literal-`true` acceptance, JSON capture limits for commands and states, `maxCommands` retention (`full` overload, `checkpoint` recovery), revision-checked mutations (`stale`), reentrancy (`busy`), disposal (`retired`), frozen states, restore outcomes `invalid`/`foreign`/`diverged` with a 32-bit replay checksum.
+- Runtime-enforced: rules id, validator literal-`true` acceptance, JSON capture limits for commands and states, `maxCommands` retention (`full` overload, `checkpoint` recovery), revision-checked mutations (`stale`), reentrancy (`busy`), disposal (`retired`), frozen states, restore outcomes `invalid`/`foreign`/`diverged` with a 64-bit replay checksum (replay kit `hashText`).
 - Checked: 17 focused headless unit tests (determinism, preview equals submit, undo/redo/replay, real SaveStore round trip across a fresh store, adversarial reducers and inputs, durable-authority composition with an in-memory adapter).
 - Not established: any template or game consumer, browser or device evidence, reducer CPU deadlines, hidden-information safety of a local log (it is not), AI worker budgets, play-by-turn timeouts.

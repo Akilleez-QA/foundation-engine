@@ -8,6 +8,7 @@
 import type { DocumentValue } from '../authoring/document';
 import { captureJson, captureJsonLimits, type JsonLimits } from '../network/captured-json';
 import { createRng, hashSeed, type Rng } from '../../core/rng';
+import { hashText } from '../replay/hash';
 
 /** Pure creator reducer outcome. A rejection leaves the log unchanged and records nothing. */
 export type TurnReduction<S extends DocumentValue> =
@@ -35,7 +36,7 @@ export interface TurnLogLimits {
   readonly command: JsonLimits;
 }
 
-/** Plain JSON for a save section. `checksum` is a 32-bit drift detector, not a security hash. */
+/** Plain JSON for a save section. `checksum` is the replay kit's 64-bit `hashText` of the head state: a drift detector, not a security hash. */
 export interface TurnLogSnapshot {
   readonly format: 'turns/1';
   readonly rules: string;
@@ -44,7 +45,7 @@ export interface TurnLogSnapshot {
   readonly initial: DocumentValue;
   readonly commands: readonly DocumentValue[];
   readonly cursor: number;
-  readonly checksum: number;
+  readonly checksum: string;
 }
 
 export interface TurnLogView<S extends DocumentValue> {
@@ -148,7 +149,7 @@ function openTurnLog<S extends DocumentValue, C extends DocumentValue>(
   const limits = checkLimits(options.limits);
   const { validateState, validateCommand, reduce } = rules, rulesId = rules.id;
 
-  let seed: number, base: number, initial: Captured, commands: Captured[] = [], cursor: number, expectChecksum: number | null = null;
+  let seed: number, base: number, initial: Captured, commands: Captured[] = [], cursor: number, expectChecksum: string | null = null;
   if (snapshot === FRESH) {
     const s = options.seed;
     if (typeof s === 'string' ? s.length === 0 || s.length > 256 : !(Number.isSafeInteger(s) && (s as number) >= 0 && (s as number) <= 0xffffffff)) throw Error('turns: invalid seed');
@@ -165,7 +166,7 @@ function openTurnLog<S extends DocumentValue, C extends DocumentValue>(
     if (!Number.isSafeInteger(snap.seed) || snap.seed! < 0 || snap.seed! > 0xffffffff || !Number.isSafeInteger(snap.base) || snap.base! < 0
       || !Array.isArray(snap.commands) || snap.commands.length > limits.maxCommands
       || !Number.isSafeInteger(snap.cursor) || snap.cursor! < 0 || snap.cursor! > snap.commands.length
-      || !Number.isSafeInteger(snap.checksum) || snap.base! > Number.MAX_SAFE_INTEGER - snap.commands.length) return { status: 'invalid', reason: 'malformed snapshot' };
+      || typeof snap.checksum !== 'string' || !/^[0-9a-f]{16}$/.test(snap.checksum) || snap.base! > Number.MAX_SAFE_INTEGER - snap.commands.length) return { status: 'invalid', reason: 'malformed snapshot' };
     seed = snap.seed!; base = snap.base!; cursor = snap.cursor!; expectChecksum = snap.checksum!;
     const c = capture(snap.initial, limits.state);
     if (typeof c === 'string' || validateState(c.value) !== true) return { status: 'invalid', reason: 'initial state rejected' };
@@ -204,7 +205,7 @@ function openTurnLog<S extends DocumentValue, C extends DocumentValue>(
     const restored = replayTo(cursor);
     if ('reason' in restored) { if (snapshot === FRESH) throw Error(`turns: ${restored.reason}`); return { status: 'diverged', reason: restored.reason }; }
     head = restored;
-    if (expectChecksum !== null && hashSeed(head.json) !== expectChecksum) return { status: 'diverged', reason: 'replayed state differs from the saved checksum' };
+    if (expectChecksum !== null && hashText(head.json) !== expectChecksum) return { status: 'diverged', reason: 'replayed state differs from the saved checksum' };
   }
 
   const view = (): TurnLogView<S> => Object.freeze({
@@ -295,7 +296,7 @@ function openTurnLog<S extends DocumentValue, C extends DocumentValue>(
     },
     snapshot: () => structuredClone({
       format: 'turns/1' as const, rules: rulesId, seed, base, initial: initial.value,
-      commands: commands.map(c => c.value), cursor, checksum: hashSeed(head.json),
+      commands: commands.map(c => c.value), cursor, checksum: hashText(head.json),
     }),
     commands: () => Object.freeze(commands.map(c => c.value as C)),
     dispose() { retired = true; },
