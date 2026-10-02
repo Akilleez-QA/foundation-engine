@@ -508,3 +508,12 @@ ownership, a non-simulating frame, a held SIM-01 replay tap). The latch runs bef
 the replay tap's tick sentinel, so a recorded press lands in exactly one tick. Evidence: focused runtime and runner tests;
 browser suites and gates are recorded on the PR. Physical high-refresh devices are
 unverified. Candidate, not integrated.
+
+## Peer rollback sessions (RB-01) — implemented, candidate
+
+Optional `@kits/rollback` ([README](../../src/kits/rollback/README.md),
+[recipe](../recipes/add-rollback-sessions.md)) supplies speculative execution with
+bounded rollback, stall and checksum desync detection over a creator-supplied
+reliable, ordered link, plus a local sync test. Implemented, candidate (PR #25,
+`feat/genre-fighting-slice1`); not integrated. Evidence is focused headless tests
+and one fixed-lane consumer; network, device and multiplayer acceptance are open.

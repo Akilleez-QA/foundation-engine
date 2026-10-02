@@ -71,6 +71,7 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | NW-04 | Reconnect/retry pacing: full-jitter backoff and retry budget | Implemented, candidate (PR #14, `feat/nw04-reconnect-schedule`); not integrated. Optional pure `createRetrySchedule` in the network kit, with the network workbench client as an opt-in consumer. Evidence and remaining limits are in the NW-04 section below. No WAN, reconnect-storm-against-a-real-host or physical-device claim. |
 | NW-05 | Shared rate and concurrency admission | Implemented, candidate (PR #13); not integrated. Optional single-process `createRateAdmission` ([guide](rate-admission.md)): per-key token bucket, optional concurrency leases, `maxKeys` with lossless idle reclamation only, explicit `limited`/`refused` results, clock-regression safe, idempotent dispose. Three reference hosts migrated from 1000 ms fixed windows to buckets of equal burst and refill (intended semantic change: no 2x boundary burst; same long-run rate). Focused unit and loopback host tests; no distributed, measured-load or physical-device claim. |
 | RES-01 | Bounded asset residency (texture/model budgets, pins, LRU eviction) | Implemented, candidate (PR #22); not integrated. Optional `defineGame({ residency })` applies per-preset `warmBytes`/`residentBytes` and pinned asset ids to the existing `LeaseCache` of the texture and model libraries; live and pinned assets are never evicted, over-ceiling pressure is reported once per transition with a creator hook, retained three.js resources are parked through public `dispose` events. Default unchanged (dispose at release). Evidence: focused unit tests, an opt-in native SwiftShader fixture (estimate vs uploaded mip chain, `renderer.info` counts, actual context loss) and a temporary composed probe; see [guide](asset-residency.md). No program-count budget, cross-library ceiling, physical-device memory or traversal-performance claim. |
+| RB-01 | Optional peer rollback sessions and local sync test (genre study 2026-10-02, slice 1) | Implemented, candidate (PR #25, `feat/genre-fighting-slice1`); not integrated. Optional `@kits/rollback`: `createRollbackSession` (2–8 peers, `maxPredictionFrames` 0–60, `inputDelay` 0–30, byte-bounded inputs/states, rollback to the earliest contradicted frame, stall at the window, confirmed-state checksums with bounded history/pending reports, fail-closed protocol faults, `AbortSignal` disposal) and `createRollbackSyncTest`. 25 focused tests, including seeded multi-peer convergence against a no-network reference, a sync test that compares every replay with the live step (fixed after review), late-peer pacing on the exposed `frameAdvantage`, and a `testScene` fixed-lane consumer. Requires a reliable, ordered link; there is no built-in time sync. No WAN, unreliable-channel, spectator, cross-browser floating-point or physical-device claim. See the section below and the [kit README](../../src/kits/rollback/README.md). |
 | TR-01 | Regional terrain worker and ordinary-surface integration | Integrated in PR #109 at 99e6255. Canonical regional Surface and halo patches, bounded WorkerHost generation/patch adapters, independent geometric oracles and finite coherent render/query consumer passed at 891eb7; all seven template gates passed (1,648 tests, 129 performance checks, zero breaches/regressions, four advisory heap warnings). Combined main tests/build passed. Physical-device performance and unbounded/global streaming are not established. |
 | DV-01 | Supported-device experience and sustained performance evidence | In progress, not integrated: ported to the public `feat/device-acceptance` PR. [Stock matrix](../kits/stock-device-acceptance-matrix.md) covers all seven declarations. The [first receipt](../verification/stock-device-20261001/README.md) records 16 passing emulated target/tap checks and a compact lesson content overlap; lesson visit cleanup and a measured learn layout seam repair it, with a fake-DOM regression and emulated separation checks across board, sim and quiz at four profiles ([layout receipt](../verification/stock-device-20261002/README.md)). Full consumer workflows, in-panel touch scrolling, 200% text, named minimum devices and sustained physical evidence remain open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. No physical-device or accessibility certification. |
 
@@ -305,3 +306,47 @@ Status: candidate (PR #16), building on integrated NW-04 (PR #14); not integrate
 | ID | Contract and required observation | State |
 |---|---|---|
 | PERF-01 | Optional, local-only [sustained-session recorder](session-performance.md) on the one frame loop. It records bounded rolling windows of frame/work p50/p95/p99, long and severe frames, rendered/idle counts, scene/epoch/preset segments and drift, plus a versioned evidence file. It has a zero-cost path when absent and is dev/test-only. | Implemented, candidate (PR #15 on the public repository); not integrated. Focused adversarial tests and an emulated browser run (a 30-second CI check plus a saved 10-minute sample) are recorded in the guide and in [verification](../verification/session-perf-20261002/README.md). This is supporting tooling for DV-01: it supplies the evidence format, not device evidence. DV-01 remains open. |
+
+## Rollback sessions (RB-01) — implemented, candidate
+
+Status: implemented, candidate (PR #25, `feat/genre-fighting-slice1`); not integrated.
+See the [kit README](../../src/kits/rollback/README.md) and the
+[recipe](../recipes/add-rollback-sessions.md).
+
+- Runtime-enforced: exact-key limit validation and ranges; UTF-8 byte bounds on
+  every input and saved state; contiguous per-player remote frames; a remote lead of
+  at most `maxPredictionFrames + 2 × inputDelay + 2`; no step past the prediction
+  window; at most one `load` and `maxPredictionFrames + 1` steps per `advance`;
+  bounded checksum history and pending reports; `busy` on reentry; immediate
+  disposal, including from a callback or an aborted signal.
+- Checked: 25 focused tests in `src/kits/rollback/`.
+  - Seeded two- and three-peer runs over delayed in-memory links match a
+    no-network replay (delay 0/2/3, windows 0/2/8, links slower than the window).
+  - Injected divergence is reported at the first checksum frame.
+  - The sync test compares every resimulated state with the **live** step's
+    checksum. Review of PR #25 found the first candidate compared replay with
+    replay, which missed every fault at distance 1 and missed one-shot live reads
+    at every distance; this has been fixed. Its tests cover distances 1, 3 and 8:
+    hidden state, unseeded randomness, an incomplete load, a one-shot live value,
+    `-0` lost by JSON, and an outside mutation. The three new regressions fail
+    without the fix.
+  - A 20-tick late start leaves the early peer a full window ahead unless it paces
+    on `frameAdvantage`.
+  - A `testScene` consumer drives two sessions from the fixed lane.
+  - A deliberately disabled rollback trigger fails 7 session tests.
+  - Exact-head check, test, lint and `gate:ci` results are in the PR.
+- Manual measurement, not a budget: a worst-case 8-frame rollback on every tick
+  with a JSON codec took p95 0.19 ms for a state of about 2.5 KB (Node 22,
+  desktop CPU, shared machine).
+- Not established:
+  - resend or redundancy over lossy links (a reliable, ordered transport is required);
+  - WebRTC;
+  - built-in time synchronization (only `frameAdvantage` is exposed; pacing is the host's job);
+  - input during a stall: `local()` returns `full` and keeps nothing, so edges must be carried by the host;
+  - disconnect policy;
+  - spectators;
+  - a saveable engine random generator;
+  - an ECS-world snapshot adapter;
+  - floating-point determinism across browsers;
+  - physical devices;
+  - real multiplayer acceptance.
