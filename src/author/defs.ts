@@ -23,6 +23,7 @@ import { validateResidency, type AssetResidencyInput } from '../platform/assets/
 import { validateSpatialAudioOptions, type SpatialAudioOptions } from '../platform/audio/module';
 import type { AudioClockReading } from '../platform/audio/audio-timeline';
 import type { MusicOptions, MusicVoice } from '../platform/audio/music-clock';
+import type { SceneParticles } from './particle-contract';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const need = (ok: boolean, message: string) => { if (!ok) throw Error(message); };
@@ -231,6 +232,10 @@ export interface SceneInput extends SceneBody {
   modelPoseLinks?: Partial<ModelPoseLinkLimits>;
   /** Optional replay verification: `digest` replaces the default replay digest (resources and every Transform). */
   replay?: { readonly digest?: SceneReplayDigest };
+  /** Particle support and bounds (FX-01, docs/guides/particles.md): `sceneParticles({ max, emitters })`. Admitted
+   *  emitters' `max` sum to at most `max` (default 4096); at most `emitters` (default 16, one draw each) are drawn.
+   *  Without it the scene's emitters are not simulated or drawn (reported once). */
+  particles?: SceneParticles;
   id: string;
   title: string;
   /** Open, game-defined ('level', 'menu', 'world', 'cutscene', …). */
@@ -259,6 +264,7 @@ export function defineScene(s: SceneInput): SceneDefinition {
     `scene ${s.id}: replay.digest needs an id (1-128 of A-Za-z0-9._:,;=+-) and a state(world) function`);
   const captured = { ...s };
   if (captured.modelPoseLinks !== undefined) captured.modelPoseLinks = normalizeModelPoseLinkLimits(captured.modelPoseLinks);
+  need(captured.particles === undefined || (captured.particles as { kind?: unknown })?.kind === 'scene-particles', `scene ${s.id}: particles must be sceneParticles(...)`);
   return { ...captured, kind: 'scene', type: captured.type ?? 'scene' };
 }
 

@@ -77,6 +77,8 @@ jobs:
         run: npm run test:network-probe
       - name: Authored material browser regressions
         run: npm run test:material-browser
+      - name: Particle emitter browser regressions
+        run: npm run test:particle-browser
       - name: Sound file browser regressions
         run: npm run test:sound-browser
       - name: Sub-path production build browser regressions

@@ -8,6 +8,7 @@ import type { SystemTimingOptions, SystemTimingCapture } from './system-timing';
 import type { EntityMetadataRequest, EntityMetadataPage } from '../core/ecs/world';
 import type { BuildBrief } from './build';
 import type { GameDefinition } from './defs';
+import type { ParticleStats } from './particle-contract';
 
 /** What a running scene reports and accepts from tools (the test API, probes, play scripts). */
 export interface SceneHandle {
@@ -21,6 +22,8 @@ export interface SceneHandle {
   /** Dev/test only: mark the picture dirty and ask for one frame (a real draw of an unchanged scene); false when the
    *  visit is ending. Render on demand stays on: nothing more is drawn until something changes. */
   redraw?(): boolean;
+  /** Dev/test only: the visit's particle counters and the draws its emitters issue per frame (FX-01). */
+  particles?(): ParticleStats & { draws: number; textures: { leased: number; applied: number; failed: number } };
   /** Move the entity with this `Name` (default 'player'): false when there is none. */
   teleport(x: number, z: number, name?: string): boolean;
 }

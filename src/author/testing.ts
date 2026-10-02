@@ -11,13 +11,14 @@ import { createWorkerHost } from '../platform/workers/host';
 import type { AudioClockReading } from '../platform/audio/audio-timeline';
 import { normalizeCueVoiceOptions, type CueVoiceOptions } from '../platform/audio/audio-output';
 import type { MusicOptions } from '../platform/audio/music-clock';
+import { EMITTER_ID, type ParticleStats } from './particle-contract';
 /**
  * author/testing.ts: `testScene`, a scene without a browser, for a game's own unit tests. It spawns the scene's
  * entities into a real world and runs its real systems on the real fixed-step runner; input is scripted (`press`,
  * `hold`, `axis`) and saves live in memory. `ctx.text` reads the English strings of `game` (the key itself without one). What a test sees is what a player's frame computes, minus the drawing.
  */
 import { createSystemRunner } from '../core/ecs/systems';
-import { World, type Entity } from '../core/ecs/world';
+import { World, type ComponentType, type Entity } from '../core/ecs/world';
 import type { Services } from '../core/services';
 import { parseMessage, renderMessage } from '../core/i18n/format';
 import type { BuildBrief } from './build';
@@ -64,13 +65,18 @@ export interface TestScene {
   readonly voices: TestVoice[];
   /** Songs asked for with `ctx.playMusic` (silent: it returns null, and `loadMusic` resolves false). */
   readonly music: { id: string; options?: MusicOptions }[];
+  /** The scene's particle field, stepped as in a visit (`engine.particles` after the scene's fixed systems), without
+   *  drawing: its counters (null when the scene has no `sceneParticles()`), and every problem it reported (refusals,
+   *  invalid emitter data, emitters in a scene without particles). */
+  readonly particles: { readonly stats: ParticleStats | null; readonly reports: readonly string[] };
   /** Exit once and dispose the helper-owned save store. Injected services remain caller-owned. */
   dispose(): void;
 }
 
 /** `inputs` enables local press-action hints. Defaults report inContext=true; inject services.input for remaps and modal context. */
 /** `input` replaces the scripted input with a caller-owned InputState (e.g. a replay log); press/hold/release then throw. */
-export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief; game?: GameDefinition; inputs?: readonly InputDefinition[]; calm?: boolean; params?: Record<string, string>; seed?: number; systems?: readonly SystemDefinition[]; services?: Partial<Services>; input?: InputSource; audioClock?: (nowMs: number) => AudioClockReading | null } = {}): Promise<TestScene> {
+/** `particleScale` is the `effects.particles` quality knob (default 1, the reference preset). */
+export async function testScene(scene: SceneDefinition, o: { particleScale?: number; brief?: BuildBrief; game?: GameDefinition; inputs?: readonly InputDefinition[]; calm?: boolean; params?: Record<string, string>; seed?: number; systems?: readonly SystemDefinition[]; services?: Partial<Services>; input?: InputSource; audioClock?: (nowMs: number) => AudioClockReading | null } = {}): Promise<TestScene> {
   const body = await bodyOf(scene);
   const hintSource = o.services?.input;
   const describe = sceneActionHints(o.inputs ?? [], hintSource ? id => hintSource.describeAction(id) : defaultActionHints(o.inputs ?? []));
@@ -123,10 +129,15 @@ export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief;
     disposed = true;
     activityFacts = { ...activityFacts, phase: 'retired' };
     activityEvents?.retire();
-    try { scene.exit?.(ctx); } finally { if (ownsSave) save.dispose(); }
+    try { scene.exit?.(ctx); } finally { try { particles?.dispose(); } finally { if (ownsSave) save.dispose(); } }
   }
   const failures: { id: string; error: unknown }[] = [];
-  const runner = createSystemRunner([...body.systems, ...o.systems ?? []], {
+  const particleReports: string[] = [];
+  const particles = scene.particles?.createField({ scale: o.particleScale ?? 1, seed: () => ctx.random(),
+    report: error => { particleReports.push(error.message); } }) ?? null;
+  const emitterProbe = { id: EMITTER_ID } as ComponentType<object>;
+  const stepParticles = particles ? [{ id: 'engine.particles', run: (_: SceneContext, dt: number) => particles.step(world, dt) }] : [];
+  const runner = createSystemRunner([...body.systems, ...o.systems ?? [], ...stepParticles], {
     report: (id, error) => { failures.push({ id, error }); },
     after: () => world.clearEvents(),
   });
@@ -137,6 +148,7 @@ export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief;
   } catch (error) { if (ownsSave) save.dispose(); throw error; }
   return {
     ctx, world, went, cues, plays, voices, music, activityErrors,
+    particles: { get stats() { return particles?.stats ?? null; }, reports: particleReports },
     setActivity(facts) {
       alive();
       const coverage = facts.coverage, documentHidden = facts.documentHidden;
@@ -151,6 +163,7 @@ export async function testScene(scene: SceneDefinition, o: { brief?: BuildBrief;
         frame++; t += 1 / 60;
         runner.frame(ctx, 1 / 60);
         pressed.clear();
+        if (!particles && !particleReports.length && world.first(emitterProbe)) particleReports.push(`${scene.id}: an Emitter is not drawn: the scene has no particles (defineScene({ particles: sceneParticles() }))`);
         // Report after the frame: sibling systems, events and tick accounting must finish first.
         const errors = failures.splice(0).map(({ id, error }) => {
           let detail = 'unprintable error';

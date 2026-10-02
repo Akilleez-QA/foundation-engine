@@ -33,9 +33,9 @@ ${inputLine}
 return {setSimulating:v=>{simulating=v;},${update}};`,{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None});
  const actx={invalidate(){},runId:'run-test',signal:new AbortController().signal,own(){},coverage:()=>'top',leaving:()=>false};
  const sceneActionHints=()=>()=>null;
- const api=new Function('s','o','actx','surface','view','bindScenePointer','actionOf','viewOwnsInput','createSystemRunner','sceneInput','createPressLatch','sceneActionHints','systems','tapRunning','sync','failPrograms','ProgramLinkError','FrameReadinessError','monotonicNow',run)(
+ const api=new Function('s','o','actx','surface','view','bindScenePointer','actionOf','viewOwnsInput','createSystemRunner','sceneInput','createPressLatch','sceneActionHints','systems','tapRunning','sync','failPrograms','ProgramLinkError','FrameReadinessError','monotonicNow','particles',run)(
   {app:{has:()=>false},input:{onAction:(action:string,fn:any)=>{handlers.set(action,fn);},cancel(){},held:()=>false,describeAction:()=>null},log:{error(){}}},{inputs:[{id:'jump'},{id:'tap',tap:true}]},actx,{canvas:{}},{closest:()=>null},
-  bindScenePointer,actionOf,()=>true,createSystemRunner,sceneInput,(latch as any).createPressLatch,sceneActionHints,systems,tapRunning,()=>{},()=>{},class extends Error{},class extends Error{},()=>1);
+  bindScenePointer,actionOf,()=>true,createSystemRunner,sceneInput,(latch as any).createPressLatch,sceneActionHints,systems,tapRunning,()=>{},()=>{},class extends Error{},class extends Error{},()=>1,{step(){},interpolate:()=>false});
  return {
   seen,
   press:()=>handlers.get(actionOf('jump'))!({phase:'press'}),

@@ -31,6 +31,17 @@ Every new framework below is optional: a game that does not use it is unchanged.
   development loopback/LAN WebSocket host, and the `shared-world` template plus the
   [recipe](docs/recipes/two-players-one-world.md) put two browser tabs in one world.
   LAN/loopback only: no accounts, matchmaking, NAT traversal or WAN certification.
+- **Particle emitters (FX-01), optional.** `Emitter`/`defineEmitter`/`burst` in the author
+  API, drawn in scenes that opt in with `defineScene({ particles: sceneParticles() })`: burst and continuous emitters with lifetime, speed, direction/spread, gravity, drag
+  and size/colour/opacity curves, an optional texture asset and additive or normal
+  blending. Each emitter is one instanced draw (two triangles per live particle) and
+  nothing while idle; simulation is on the fixed step and seeded from `ctx.random`, drawing
+  is interpolated. Bounded per emitter (`max`) and per scene (`sceneParticles({ max, emitters })`,
+  default 16 emitters and 4,096 particles), with counted drops and reported refusals; a new
+  `effects.particles` quality knob thins non-essential emitters on medium and low (not yet
+  shown on the Graphics screen). `testScene` steps emitters and exposes their counters.
+  [Recipe](docs/recipes/hit-sparks-and-pickups.md), [guide](docs/guides/particles.md),
+  `npm run test:particle-browser`. Desktop software-GL evidence only (#63).
 
 ## 0.2.0 — 2026-10-03
 

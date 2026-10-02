@@ -14,6 +14,8 @@ import { RenderMask, validateRenderMask } from './render-mask';
 import { bindEnvironment } from './scene-environment';
 import { Material, materialKey } from './material';
 import { createSceneSurfaces, type Surface } from './scene-materials';
+import { createParticleView } from './particle-view';
+import { EMITTER_ID, type ParticleField } from './particle-contract';
 /**
  * author/runtime.ts: a scene's lazy body, loaded the first time a scene is entered (never in the first-load bundle).
  *
@@ -25,6 +27,9 @@ import { createSceneSurfaces, type Surface } from './scene-materials';
  *    textured, physically based surface: scene-materials.ts). A frame is drawn only when something changed (a
  *    transform, a shape, a material or its arriving texture, the camera, the world's version): render on change
  *    (STD-RUN-9);
+ *  - particles: entities with `Transform` and `Emitter` are simulated by the engine's fixed system `engine.particles`
+ *    (after the scene's own fixed systems) and drawn as one instanced draw per emitter, interpolated between steps
+ *    (particle-sim.ts, scene-particles.ts). A scene without emitters creates nothing for them;
  *  - `enter` runs once the visit is active (ADR 0045); `exit` when it is left. Everything the visit creates is owned
  *    by the run and released in reverse order when it leaves.
  */
@@ -33,7 +38,7 @@ import type { Services } from '../core/services';
 import type { SceneRun, SceneVisit } from '../core/router/handover';
 import type { ActivityContext, ActivityRun } from '../core/activity/activity';
 import type { FrameInfo } from '../core/activity/loop';
-import { World, type Entity } from '../core/ecs/world';
+import { World, type ComponentType, type Entity } from '../core/ecs/world';
 import { createSystemRunner } from '../core/ecs/systems';
 import { createRng } from '../core/rng';
 import { appI18n } from '../core/i18n/app-i18n';
@@ -267,9 +272,22 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       const models = createSceneModels({ poseLinks: scene.modelPoseLinks === undefined ? undefined : normalizeModelPoseLinkLimits(scene.modelPoseLinks), inspection: TEST_API,world, scene: three, library: s.models, signal: actx.signal,
         mask: maskOf, invalidate: () => { dirty = true; actx.invalidate(); }, report: error => s.log.error(`${scene.id}: model failed`, error)});
       actx.own(() => models.dispose());
+      // Particles (FX-01): the field is pure and visit-owned and steps on the fixed lane; its renderer (one hidden mesh
+      // per admitted emitter) is a lazy chunk, requested by the first admitted emitter, or now when the scene's own
+      // entities have one. The density knob is 'reenter-scene': read once per visit.
+      const particleView = createParticleView({ scene: three, library: s.assets, signal: actx.signal, load: () => import('./scene-particles'),
+        changed: () => { dirty = true; actx.invalidate(); }, ready: () => { dirty = true; actx.invalidate(); },
+        report: error => s.log.error(`${scene.id}: particle drawing failed`, error) });
+      // Only a scene that opted in (`sceneParticles()`) has a field; elsewhere an emitter is reported once, never drawn.
+      const particles: ParticleField | null = scene.particles ? scene.particles.createField({ scale: s.quality.knob('effects.particles'), seed: random,
+        report: error => s.log.error(`${scene.id}: particles`, error), renderer: particleView }) : null;
+      const emitterProbe = { id: EMITTER_ID } as ComponentType<object>;
+      let emittersReported = false;
+      if (particles && body.entities.some(e => ('kind' in e ? e.components : e).some(c => c.type.id === EMITTER_ID))) particleView.preload();
+      actx.own(() => { try { particles?.dispose(); } finally { particleView.dispose(); } });
       const sync = (dt = 0) => {
         if (actx.signal.aborted) return;
-        actx.setFrameMode(body.systems.length || [...world.query(Model)].some(([,m])=>m.playing && !!m.clip && m.speed>0) ? 'continuous' : 'on-demand');
+        actx.setFrameMode(body.systems.length || [...world.query(Model)].some(([,m])=>m.playing && !!m.clip && m.speed>0) || !!particles?.busy(world) ? 'continuous' : 'on-demand');
         if (models.sync(dt)) dirty = true;
         const seen = new Set<Entity>();
         for (const [e, tr, sh] of world.query(Transform, Shape)) {
@@ -371,7 +389,13 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
           three.background = new T.Color(viewState.background); dirty = true;
         }
         if (cubes.sync(viewState.environment?.cube, viewState.environment?.reflection, viewState.environment?.background ?? viewState.background)) dirty = true;
-        if (world.version !== lastVersion) { lastVersion = world.version; dirty = true; }
+        if (world.version !== lastVersion) {
+          lastVersion = world.version; dirty = true;
+          if (!particles && !emittersReported && world.first(emitterProbe)) {
+            emittersReported = true;
+            s.log.error(`${scene.id}: an Emitter is not drawn: the scene has no particles (defineScene({ particles: sceneParticles() }))`);
+          }
+        }
       };
       const resize = () => {
         const w = Math.max(1, view.clientWidth), h = Math.max(1, view.clientHeight);
@@ -384,9 +408,11 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
 
       const timing = TEST_API ? createSystemTiming(body.systems, visit, actx.signal) : undefined;
       const fixedSystems = timing?.systems ?? body.systems;
-      const tapped = tap ? [{ id: 'engine-tick-tap-begin', run: () => tap.beforeTick() }, ...fixedSystems, { id: 'engine-tick-tap-end', run: () => tap.afterTick() }] : fixedSystems;
+      // The engine's particle step runs after the scene's own fixed systems, inside the replay tap's tick.
+      const stepped = particles ? [...fixedSystems, { id: 'engine.particles', run: (_: SceneContext, dt: number) => particles.step(world, dt) }] : fixedSystems;
+      const tapped = tap ? [{ id: 'engine-tick-tap-begin', run: () => tap.beforeTick() }, ...stepped, { id: 'engine-tick-tap-end', run: () => tap.afterTick() }] : stepped;
       const runner = createSystemRunner(tapped, { step: FIXED_STEP, report: (id, error) => s.log.error(`${scene.id}: system ${id} failed`, error), after: () => world.clearEvents(), beforeStep: pressed.beginStep, beforeFrameLane: pressed.beginFrameLane });
-      const live = body.systems.length > 0 || [...world.query(Model)].length > 0;
+      const live = body.systems.length > 0 || [...world.query(Model)].length > 0 || !!particles?.busy(world);
       const handle: SceneHandle = {
         state: () => {
           const named: Record<string, { x: number; y: number; z: number }> = {};
@@ -404,6 +430,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       if (TEST_API) handle.redraw = () => { if (actx.signal.aborted || actx.leaving()) return false; dirty = true; actx.invalidate(); return true; };
       if (TEST_API && models.inspect) handle.model = createSceneModelInspector(models.inspect, visit, actx.signal);
       if (TEST_API) handle.entities = createSceneEntityInspector(world, visit, actx.signal);
+      if (TEST_API && particles) handle.particles = () => ({ ...particles.stats, draws: particleView.stats.visible, textures: { leased: particleView.stats.leased, applied: particleView.stats.applied, failed: particleView.stats.failed } });
       s.play.attach(handle, actx.signal);
 
       // Prepare authored resident materials before router activation/first render.
@@ -464,6 +491,8 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
           if (!tap || tap.running()) runner.frame(ctx, f.dt); else pressed.clear();
           pressed.endFrame(); gestures.pointer.pressed = false;
           sync(f.dt);
+          // Interpolated between the last two fixed steps; writes only while particles are (or were just) live.
+          if (particles?.interpolate(runner.alpha)) dirty = true;
           }catch(error){if(error instanceof ProgramLinkError||error instanceof FrameReadinessError)failPrograms(error);else throw error;}
         },
         render() {

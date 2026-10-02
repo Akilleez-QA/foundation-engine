@@ -79,13 +79,14 @@ export function compileGame(o: { brief: BuildBrief; game: GameDefinition; defs: 
   const ids = scenes.map(s => s.id);
   const twice = ids.find((id, i) => ids.indexOf(id) !== i);
   if (twice) throw Error(`game: two scenes are called '${twice}'`);
-  // Materials named in a scene's own entities must name texture assets (lazy bodies and runtime edits are reported
-  // when the texture fails to load).
+  // Materials and particle emitters named in a scene's own entities must name texture assets (lazy bodies and runtime
+  // edits are reported when the texture fails to load).
   for (const scene of scenes) for (const entity of scene.entities ?? []) {
     for (const init of 'kind' in entity ? entity.components : entity) {
-      const texture = init.type.id === 'material' ? (init.value as { texture?: unknown }).texture : '';
+      const owner = init.type.id === 'material' ? 'material' : init.type.id === 'emitter' ? 'emitter' : '';
+      const texture = owner ? (init.value as { texture?: unknown }).texture : '';
       if (typeof texture === 'string' && texture && !assets.some(a => a.id === texture && a.type === 'texture'))
-        throw Error(`scene ${scene.id}: material texture '${texture}' has no defineAsset({ type: 'texture' })`);
+        throw Error(`scene ${scene.id}: ${owner} texture '${texture}' has no defineAsset({ type: 'texture' })`);
     }
   }
   for (const scene of scenes) for (const sound of scene.sounds ?? [])
