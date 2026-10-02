@@ -219,10 +219,11 @@ for preserving the notices accompanying the actual distributed material.
 | `public/models/mechanics/beacon.glb` | Locally generated two-link skinned cuboid and pulse clip, `templates/mechanics/assets/generate-fixture.mjs` | CC0-1.0 |
 | `public/models/mechanics/sky-{px,nx,py,ny,pz,nz}.png` | Six locally generated 16×16 orientation glyph textures, `templates/mechanics/assets/generate-cube.mjs` | CC0-1.0 |
 | `public/textures/mechanics/panel.png` | Locally generated 32×32 riveted panel texture, `templates/mechanics/assets/generate-panel.mjs` | CC0-1.0 |
+| `public/sounds/mechanics/chime.wav` | Locally synthesised 0.45 s two-partial chime, `templates/mechanics/assets/generate-chime.mjs` | CC0-1.0 |
 
 These fixtures were generated for Foundation Engine by its contributors, with no
-external mesh, texture, photograph, or downloaded art input. Their eight files
-are individually under 3 KiB. The generators remain project source under the
+external mesh, texture, photograph, recording, or downloaded art input. Of their
+nine files, eight are individually under 3 KiB and the chime is about 20 KiB. The generators remain project source under the
 project license; the generated asset dedication is independent. Template
 verification screenshots capture locally rendered diagnostic scenes and UI.
 See the [CC0 dedication](https://creativecommons.org/publicdomain/zero/1.0/).

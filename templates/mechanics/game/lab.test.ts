@@ -94,3 +94,11 @@ test('diagnostic root motion stops at collider while skeletal pose overrides rem
   const stopped=tr.x;t.run(1);assert.equal(tr.x,stopped);
   s.beaconOwner.transition({owner:'none',target:'beacon',frame:{id:'lab',generation:1}},()=>true);t.run(.1);assert.equal(tr.x,stopped);
 });
+
+test('collecting and equipping the probe play the lab chime: from the kiosk, then higher', async () => {
+  const t = await setup(), s = sessionFor(t.ctx);
+  s.next(t.ctx); s.next(t.ctx); assert.deepEqual(t.plays, []);
+  s.next(t.ctx); assert.deepEqual(t.plays, [{ id: 'lab-chime', options: { volume: .7, position: [0, .6, 2] } }]);
+  s.next(t.ctx); assert.deepEqual(t.plays[1], { id: 'lab-chime', options: { volume: .5, pitch: 1.5 } });
+  assert.equal(s.claim(), false); assert.equal(t.plays.length, 2, 'a repeated claim plays nothing');
+});

@@ -407,3 +407,17 @@ tests and `npm run test:material-browser` (desktop headless Chromium, software G
 mechanics template demonstrates it with draws and triangles unchanged. No physical-device
 or visual-quality acceptance; `Mesh`/`Model` and texture maps beyond the colour map are out
 of scope.
+
+## Game sound files (DX P1-10) — implemented, candidate
+
+`defineAsset({ type: 'audio' })` files play through `ctx.play(id, { volume, pitch,
+position })` and `ctx.playVoice`, with a scene's `sounds` fetched while it loads. Owner:
+the one audio output (`platform.audio`) with `platform/audio/sound-files.ts` keeping and
+decoding files; mute, effects volume, autoplay unlock, hidden tabs and automation silence
+apply unchanged. See the [recipe](../recipes/play-your-own-sounds.md). Status:
+implemented, candidate (branch `feat/dx-sound-files`, stacked on the materials and
+sub-path changes); not integrated. Evidence: unit tests with an injected AudioContext and
+`npm run test:sound-browser` (loading, reporting and silence only: automated browsers never
+decode or play). Audible playback, latency and loudness on physical devices are unverified;
+streaming and looping are out of scope. Sound files share AUD-01's voice chain (HRTF limit,
+distance models, cutoff, filter) through `ctx.playVoice`.

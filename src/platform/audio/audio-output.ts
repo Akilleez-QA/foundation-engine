@@ -10,8 +10,15 @@
  *
  * Cues are data (`CueDef`): a recipe of tone sweeps and filtered noise, synthesised once per sample rate and cached.
  * Games register their own cues; a cue id without a row plays nothing and is reported once.
+ *
+ * Sound files: a game's own recordings (`defineAsset({ type: 'audio' })`) play through the same voices, spatial chain,
+ * gain, mute, hidden-tab and listener rules. The composition root resolves a sound id to its URL (`sound`);
+ * `sound-files.ts` fetches, keeps and decodes it within its bounds. A file that is not decoded yet is loaded on first
+ * use; a voice asked to `wait` starts when it is ready if that is within the wait, and is otherwise dropped (counted
+ * as skipped). `preload` fetches ahead (a scene's `sounds`); held files decode once a context exists (unlock).
  */
 import { monotonicNow } from '../../core/clock';
+import { createSoundFiles, type SoundFileOptions, type SoundFileStats } from './sound-files';
 
 /** One synthesis step: a tone sweep (sine, `hz` → `end`) or a burst of low-passed noise ("air"). Times in seconds. */
 export type CueStep =
@@ -112,6 +119,10 @@ export interface AudioOutputOptions {
   maxBuffers?: number;
   /** Decoded mono sample bytes retained in the cache (default 16 MiB). */
   maxBufferBytes?: number;
+  /** A game's sound files: the URL of a sound id, or undefined when the id is not a sound. */
+  sound?(id: string): string | undefined;
+  /** Bounds and the injected fetch for sound files (`sound-files.ts`); separate from the cue cache above. */
+  files?: Omit<SoundFileOptions, 'report'>;
   /**
    * Voices that may use the 'HRTF' panner at once (default min(8, maxVoices); 0 disables HRTF). A request beyond it is
    * downgraded to 'equalpower' and counted in `stats.downgraded`, never refused. Changed later by `setHrtfLimit`.
@@ -193,7 +204,14 @@ export interface CueVoiceOptions {
   variant?: number; gain?: number; spatial?: SpatialCue; onEnded?: () => void;
   /** Adds the filter stage, starting at these values (no ramp at start). */
   filter?: CueFilter;
+  /** Playback rate, 0.25…4: 2 is an octave up and twice as fast. Default 1. */
+  rate?: number;
+  /** A sound file still loading may start up to this many ms late (0…5000; default 0: dropped instead). */
+  wait?: number;
 }
+/** Playback rate bounds (`CueVoiceOptions.rate`). */
+export const RATE_LIMITS = { min: .25, max: 4 } as const;
+export const MAX_WAIT_MS = 5000;
 export interface AudioStats {
   readonly contexts: number; readonly played: number;
   /** Starts refused (silent, muted, locked, unknown id, voice limit). */
@@ -253,8 +271,12 @@ export interface AudioOutput {
   /** An owned cue handle, null if playback was skipped. */
   playVoice(id: string, options?: CueVoiceOptions): CueVoice | null;
   setListener(position: AudioVector, forward: AudioVector, up: AudioVector): void;
-  /** Play a registered cue. Returns false when nothing played (silent, muted, locked, unknown id). */
+  /** Play a registered cue or a decoded sound. Returns false when nothing played (silent, muted, locked, unknown id,
+   *  a sound still loading). */
   play(id: string, variant?: number): boolean;
+  /** Fetch a sound file ahead of its first play (and decode it once a context exists). True when held. */
+  preload(id: string, signal?: AbortSignal): Promise<boolean>;
+  readonly sounds: SoundFileStats;
   /** Start (or switch to) a music track by URL; null stops. A repeated URL keeps playing. */
   music(url: string | null): void;
   /** Call from a user gesture: creates or resumes the context (browsers start audio suspended). */
@@ -319,6 +341,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
     return ctx;
   };
   const voices = new Set<CueVoice>();
+  const files = createSoundFiles({ ...o.files, report: m => report(m) });
   /** HRTF voices in start order (oldest first), and the cutoff checks of voices that have a `cutoffDistance`. */
   const hrtf = new Set<{ downgrade(): void; silentSince: number | null }>();
   /** Once a cutoff fade has run this long (s), the voice is inaudible and its HRTF slot may be reclaimed silently. */
@@ -357,13 +380,27 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
     if(!Number.isSafeInteger(options.variant??0))throw Error('invalid cue variant');
     if(options.spatial)validateSpatial(options.spatial);
     if(options.filter)validateFilter(options.filter);
+    const rate = options.rate ?? 1, wait = options.wait ?? 0;
+    if (typeof rate !== 'number' || !(rate >= RATE_LIMITS.min && rate <= RATE_LIMITS.max)) throw Error(`playback rate must be in [${RATE_LIMITS.min}, ${RATE_LIMITS.max}]`);
+    if (typeof wait !== 'number' || !(wait >= 0 && wait <= MAX_WAIT_MS)) throw Error(`wait must be in [0, ${MAX_WAIT_MS}] ms`);
     if(voices.size>=maxVoices){stats.skipped++;return null;}
       const cue = cues.get(id);
-      if (!cue) { if (!reported.has(id) && reported.size < 1024) { reported.add(id); report(`no cue '${id}'`); } stats.skipped++; return null; }
+      let url: string | undefined;
+      if (!cue) try { url = o.sound?.(id); } catch (error) { if (!reported.has(id) && reported.size < 1024) { reported.add(id); reportFailure(`sound '${id}' cannot be resolved`, error); } stats.skipped++; return null; }
+      if (!cue && !url) { if (!reported.has(id) && reported.size < 1024) { reported.add(id); report(o.sound ? `no cue or sound '${id}'` : `no cue '${id}'`); } stats.skipped++; return null; }
       if (hidden || o.silent() || o.muted() || o.effects() <= 0) { stats.skipped++; return null; }
       const c = context();
       if (!c || c.state !== 'running' || !master) { stats.skipped++; return null; }
       if (options.spatial && beyond(options.spatial, options.spatial.position)) { stats.culled++; return null; }
+      if (url) {
+        const ready = files.buffer(id);
+        if (ready) return start(c, ready, options);
+        if (files.failed(id)) { stats.skipped++; return null; }
+        const loading = files.decode(id, url, c);
+        if (wait <= 0) { loading.catch(() => { /* reported by the store */ }); stats.skipped++; return null; }
+        return late(loading, wait, options);
+      }
+      if (!cue) { stats.skipped++; return null; }
       const variant = options.variant ?? 0;
       const key = `${id}|${variant}|${c.sampleRate}`;
       let buffer = buffers.get(key);
@@ -379,6 +416,13 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
       }
       // Refresh recency; active voices keep their own bounded references after cache eviction.
       buffers.delete(key); buffers.set(key, buffer);
+      return start(c, buffer, options);
+  };
+  /** One voice over a ready buffer (a synthesised cue or a decoded file); null when its spatial cutoff culls it. */
+  const start = (c: AudioContext, buffer: AudioBuffer, options: CueVoiceOptions): CueVoice | null => {
+      if (!master) return null;
+      if (options.spatial && beyond(options.spatial, options.spatial.position)) { stats.culled++; return null; }
+      const master_ = master;
       const source = c.createBufferSource(), level = c.createGain();
       const spatial=options.spatial,panner=spatial?c.createPanner():null;
       // Optional stages, created only when asked for: filter + muffle gain (CueFilter), then the cutoff gate.
@@ -422,12 +466,62 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
         stop() { if (ended) return; try { source.stop(); } finally { finish(); } },
       };
       level.gain.value = options.gain ?? 1;
-      source.buffer = buffer; source.connect(level);
+      source.buffer = buffer; if (options.rate !== undefined && options.rate !== 1) source.playbackRate.value = options.rate;
+      source.connect(level);
       for (let i = 1; i < stages.length; i++) stages[i - 1].connect(stages[i]);
-      stages[stages.length - 1].connect(master); source.onended = finish;
+      stages[stages.length - 1].connect(master_); source.onended = finish;
       voices.add(voice); if (panning === 'HRTF') hrtf.add(slot); if (gate) cutoffChecks.add(checkCutoff);
       try { source.start(); } catch (error) { finish(); throw error; }
       stats.played++; return voice;
+  };
+  /**
+   * A voice for a sound still loading: an owned handle at once (it holds a voice slot, so `maxVoices` bounds waiting
+   * plays too), started when the file is ready if that is within `wait` (or before a scheduled context start time
+   * `at`, when a caller passes one) and audio may still play; otherwise it ends unplayed. Gain, position and the
+   * filter work before and after it starts (applied, or replayed with their latest values, at start); `panning` is
+   * null until then. A start the output refuses (a spatial cutoff) ends the handle.
+   */
+  const late = (loading: Promise<AudioBuffer>, wait: number, options: CueVoiceOptions): CueVoice => {
+    const asked = monotonicNow();
+    let inner: CueVoice | null = null, ended = false, gain = options.gain ?? 1;
+    let position = options.spatial ? copy(options.spatial.position) : undefined;
+    let filterCall: [CueFilter, number | undefined] | null = null;
+    const finish = () => {
+      if (ended) return; ended = true; voices.delete(voice);
+      try { options.onEnded?.(); } catch (error) { reportFailure('cue completion failed', error); }
+    };
+    const voice: CueVoice = {
+      get ended() { return ended; },
+      get panning() { return inner?.panning ?? null; },
+      setGain(value) { validateGain(value); gain = value; inner?.setGain(value); },
+      setPosition(value) { vector(value); position = copy(value); inner?.setPosition?.(value); },
+      setFilter(value, timeConstant) {
+        validateFilter(value, timeConstant);
+        if (ended) return;
+        if (!options.filter) throw Error('voice has no filter stage: pass `filter` to playVoice');
+        if (inner) inner.setFilter?.(value, timeConstant); else filterCall = [{ ...value }, timeConstant];
+      },
+      stop() { if (ended) return; if (inner) inner.stop(); else finish(); },
+    };
+    voices.add(voice);
+    const at = (options as { at?: unknown }).at;
+    loading.then(buffer => {
+      if (ended) return;
+      const c = ctx;
+      const onTime = monotonicNow() - asked <= wait || (typeof at === 'number' && !!c && c.currentTime <= at);
+      if (disposed || !onTime || hidden || o.silent() || o.muted() || o.effects() <= 0 || !c || c.state !== 'running' || !master) { stats.skipped++; finish(); return; }
+      voices.delete(voice);
+      try { inner = start(c, buffer, { ...options, gain, ...(options.spatial && position ? { spatial: { ...options.spatial, position } } : {}), onEnded: finish }); }
+      catch (error) { stats.skipped++; finish(); reportFailure('sound start failed', error); return; }
+      if (!inner) { finish(); return; }
+      if (filterCall) { inner.setFilter?.(...filterCall); filterCall = null; }
+    }, () => { if (!ended) { stats.skipped++; finish(); } });
+    return voice;
+  };
+  /** Decode held files once a context exists, so a first (or scheduled) play finds them ready. Bounded by the store. */
+  const warm = () => {
+    if (!ctx || disposed || o.silent()) return;
+    for (const [id, url] of files.undecoded()) files.decode(id, url, ctx).catch(() => { /* reported by the store */ });
   };
   return {
     playVoice,
@@ -443,6 +537,16 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
       hrtfLimit=limit;for(const slot of [...hrtf].slice(limit))slot.downgrade();
     },
     play(id, variant = 0) { return playVoice(id, { variant }) !== null; },
+    async preload(id, signal) {
+      let url: string | undefined;
+      try { url = !cues.has(id) ? o.sound?.(id) : undefined; } catch (error) { reportFailure(`sound '${id}' cannot be resolved`, error); return false; }
+      if (!url || disposed) return false;
+      files.retry(id);
+      const held = await files.fetch(id, url, signal);
+      if (held) warm();
+      return held;
+    },
+    get sounds() { return files.stats; },
     music(url) {
       if (url === track) return;
       track = url;
@@ -455,6 +559,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
     unlock() {
       const c = context();
       if (!hidden && c && c.state === 'suspended') void c.resume();
+      warm();
       if (!hidden && element && track && element.paused && !o.silent()) void element.play().catch(() => {});
     },
     setHidden(value) {
@@ -463,6 +568,6 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
       if (element) { if (hidden) element.pause(); else if (track && !o.silent()) void element.play().catch(() => {}); }
     },
     stats,
-    dispose() { if (disposed) return; disposed = true; for (const voice of [...voices]) { try { voice.stop(); } catch (error) { reportFailure('cue stop failed', error); } } off?.(); element?.pause(); element = null; void ctx?.close(); ctx = null; master = null; buffers.clear(); bufferBytes = 0; },
+    dispose() { if (disposed) return; disposed = true; for (const voice of [...voices]) { try { voice.stop(); } catch (error) { reportFailure('cue stop failed', error); } } files.dispose(); off?.(); element?.pause(); element = null; void ctx?.close(); ctx = null; master = null; buffers.clear(); bufferBytes = 0; },
   };
 }

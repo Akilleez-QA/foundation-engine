@@ -126,8 +126,10 @@ export interface SceneContext {
   save<T>(def: SaveSectionDef<T>): SaveHandle<T>;
   /** Translated text for a string key (`defineGame({ strings })`, or a derived key), with `{name}` holes filled. */
   text(key: string, vars?: Readonly<Record<string, string | number>>): string;
-  /** An audio cue ('ui.click', 'ui.success', …); silent in tests. */
-  play(cue: string): void;
+  /** Play a built-in cue ('ui.click', 'ui.success', …) or one of the game's sound files (an audio asset id), with an
+   *  optional volume, pitch and position in the world. Fire and forget; silent in tests, while muted and before the
+   *  player's first gesture. */
+  play(cue: string, options?: PlayOptions): void;
   /** Read-only observed asset readiness; does not request, retry or inspect model geometry. */
   modelState(entity: Entity): ModelState;
   /** Last reconciled presentation relation; independent of asset readiness. */
@@ -141,6 +143,27 @@ export interface SceneContext {
   random(): number;
   /** An engine or kit service (`ctx.service('progression')`), for kits' helper functions. */
   service<K extends keyof Services>(key: K): Services[K];
+}
+
+/** How one `ctx.play` sounds. */
+export interface PlayOptions {
+  /** 0…1 (default 1), multiplied by the player's effects volume. */
+  volume?: number;
+  /** Playback rate 0.25…4 (default 1): 2 is an octave higher and twice as fast. */
+  pitch?: number;
+  /** Where the sound is in the world: it pans and fades with distance from the camera. Omit for a flat sound. */
+  position?: Vec3;
+}
+/** A sound file not yet loaded may start this late; later than that, that one play is dropped. */
+export const PLAY_LATE_MS = 250;
+
+/** Throws on options `ctx.play` would refuse, naming the field. */
+export function validatePlayOptions(o: PlayOptions | undefined): void {
+  if (o === undefined) return;
+  if (typeof o !== 'object' || o === null) throw Error('play: options must be an object');
+  if (o.volume !== undefined && !(typeof o.volume === 'number' && o.volume >= 0 && o.volume <= 1)) throw Error('play: volume must be in [0, 1]');
+  if (o.pitch !== undefined && !(typeof o.pitch === 'number' && o.pitch >= .25 && o.pitch <= 4)) throw Error('play: pitch must be in [0.25, 4]');
+  if (o.position !== undefined && !(Array.isArray(o.position) && o.position.length === 3 && o.position.every(Number.isFinite))) throw Error('play: position must be [x, y, z]');
 }
 
 // ------------------------------------------------------------------ systems
@@ -174,6 +197,8 @@ export interface SceneInput extends SceneBody {
   type?: string;
   /** The starting view: camera and background. */
   view?: { camera?: { position: Vec3; target: Vec3; fov?: number; minWidthFov?: number; mask?: number }; background?: number; lights?: 'default' | 'none'; environment?: EnvironmentState };
+  /** Sound files (audio asset ids) this scene plays: fetched while it loads, so their first play is on time. */
+  sounds?: readonly string[];
   /** Heavy content that should load with the scene, not with the game: a dynamic import returning a body. */
   body?: () => Promise<SceneBody | { default: SceneBody }>;
   /** Prepare required resources before first render/activation; abort follows this visit. */
@@ -188,6 +213,7 @@ export function defineScene(s: SceneInput): SceneDefinition {
   kebab('scene', s.id);
   const ids = (s.systems ?? []).map(x => x.id);
   need(new Set(ids).size === ids.length, `scene ${s.id}: two systems share an id`);
+  for (const sound of s.sounds ?? []) kebab(`scene ${s.id} sound`, sound);
   const captured = { ...s };
   if (captured.modelPoseLinks !== undefined) captured.modelPoseLinks = normalizeModelPoseLinkLimits(captured.modelPoseLinks);
   return { ...captured, kind: 'scene', type: captured.type ?? 'scene' };
@@ -273,6 +299,7 @@ export function defineAsset(a: Omit<AssetDefinition, 'kind'>): AssetDefinition {
   kebab('asset', a.id);
   need([a.width,a.height].every(v=>v===undefined||(Number.isSafeInteger(v)&&v>0&&v<=16384)), `asset ${a.id}: invalid dimensions`);
   need(!!a.licence.trim() && !!a.author.trim() && !!a.source.trim(), `asset ${a.id}: licence, author and source are required`);
+  if (a.type === 'audio') need(/\.(?:mp3|m4a|ogg|wav)$/i.test(a.url), `asset ${a.id}: an audio file is mp3, m4a, ogg or wav`);
   return { ...a, kind: 'asset' };
 }
 
