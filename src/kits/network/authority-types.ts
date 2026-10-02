@@ -55,6 +55,15 @@ export interface AuthorityCommand {
   readonly sequence: number;
   readonly inputJson: string;
 }
+/** Optional per-call admission policy. Not part of the command's retry identity. */
+/** Read only when `submit` receives a non-null object; any other second argument is ignored. */
+export interface AuthoritySubmitOptions {
+  /**
+   * Absolute time on the injected `clock`. When the clock reads at or after this value
+   * before storage invocation, `submit` returns `expired` without consuming the sequence.
+   */
+  readonly deadlineMs: number;
+}
 export interface AuthorityReduction {
   readonly stream: string;
   readonly sequence: number;
@@ -64,6 +73,14 @@ export interface AuthorityReduction {
 export interface AuthorityOptions extends AuthorityValidation {
   readonly minimumRevision?: number;
   readonly storage: AuthorityStorage;
+  /**
+   * Optional injected time source for submit deadlines (any finite millisecond scale shared
+   * with the caller's `deadlineMs`). Consulted only when a deadline is supplied, and never
+   * after storage invocation. No wall clock is read by default. Called without a receiver:
+   * pass `() => performance.now()`, not the unbound method `performance.now`, which throws
+   * and makes every deadlined submit `refused` with reason `clock`.
+   */
+  readonly clock?: () => number;
   /** Access permission, including current permission to disclose historical results. Not domain validation. */
   authorize(context: AuthorityReduction): boolean;
   /** Pure creator policy; unchanged state plus a result can represent a consumed domain rejection. */
@@ -90,6 +107,7 @@ export type AuthorityOutcome =
   | Readonly<{
       status:
         | 'busy'
+        | 'expired'
         | 'unknown'
         | 'unavailable'
         | 'retired'

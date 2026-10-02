@@ -609,3 +609,289 @@ test('bounded receipt chronology agrees with independently enumerated small comm
     }
   }
 });
+
+function timed(readings: number[] | (() => number), extra: Partial<AuthorityOptions> = {}) {
+  const base = fixture();
+  let calls = 0;
+  const list = Array.isArray(readings) ? readings : null;
+  const clock = () => {
+    calls++;
+    if (!list) return (readings as () => number)();
+    return list.length > 1 ? list.shift()! : list[0]!;
+  };
+  const f = fixture({ storage: base.storage, clock, ...extra });
+  return {
+    owner: f.owner,
+    get writes() {
+      return base.writes;
+    },
+    get reductions() {
+      return f.reductions;
+    },
+    get calls() {
+      return calls;
+    },
+    get raw() {
+      return base.raw;
+    },
+  };
+}
+
+test('NW06: deadline expires exactly at the boundary before any work and consumes no sequence', async () => {
+  const t = timed([100]);
+  await t.owner.recover();
+  assert.deepEqual(await t.owner.submit(command('a', 1, 3), { deadlineMs: 100 }), { status: 'expired' });
+  assert.equal(t.writes, 0);
+  assert.equal(t.reductions, 0);
+  assert.equal(t.owner.read().status, 'ready');
+  assert.equal(t.owner.read().reason, null);
+  const committed = await t.owner.submit(command('a', 1, 3), { deadlineMs: 101 });
+  assert.equal(committed.status, 'committed');
+  assert.equal((committed as { sequence: number }).sequence, 1);
+  assert.equal(JSON.parse(t.raw!).revision, 1);
+  assert.equal(t.writes, 1);
+});
+
+test('NW06: deadline passing during creator callbacks refuses at the last pre-invocation check', async () => {
+  let time = 0;
+  const t = timed(() => time, {
+    reduce({ state, input }) {
+      time = 50;
+      const value = (state as number) + (input as number);
+      return { stateJson: String(value), resultJson: String(value) };
+    },
+  });
+  await t.owner.recover();
+  assert.deepEqual(await t.owner.submit(command('a', 1, 2), { deadlineMs: 50 }), { status: 'expired' });
+  assert.equal(t.writes, 0);
+  assert.equal(t.calls, 2);
+  assert.equal(t.owner.read().snapshot!.envelope.revision, 0);
+  time = 0;
+  assert.equal((await t.owner.submit(command('a', 2, 2))).status, 'gap');
+  assert.equal((await t.owner.submit(command('a', 1, 2))).status, 'committed');
+  assert.equal(t.writes, 1);
+});
+
+test('NW06: deadline passing while storage is in flight never converts committed/unknown into expiry', async () => {
+  for (const ending of ['committed', 'unknown', 'throw'] as const) {
+    const base = fixture(),
+      gate = deferred<void>();
+    let time = 10,
+      calls = 0;
+    const owner = createDurableAuthority({
+      ...config,
+      authorize: () => true,
+      reduce: () => ({ stateJson: '1', resultJson: '1' }),
+      clock: () => {
+        calls++;
+        return time;
+      },
+      storage: {
+        settle: () => base.storage.settle(),
+        read: () => base.storage.read(),
+        async compareAndSwap(q) {
+          await gate.promise;
+          if (ending === 'throw') throw Error('lost connection');
+          const outcome = await base.storage.compareAndSwap(q);
+          return ending === 'unknown' ? 'unknown' : outcome;
+        },
+      },
+    });
+    await owner.recover();
+    const pending = owner.submit(command('a', 1, 1), { deadlineMs: 20 });
+    await Promise.resolve();
+    assert.equal(calls, 2);
+    time = 1_000;
+    gate.resolve();
+    const outcome = await pending;
+    assert.equal(calls, 2, 'clock is never read after invocation');
+    assert.equal(base.writes, ending === 'throw' ? 0 : 1);
+    if (ending === 'committed') {
+      assert.equal(outcome.status, 'committed');
+      assert.equal(owner.read().status, 'ready');
+    } else {
+      assert.deepEqual(outcome, { status: 'unknown' });
+      assert.equal(owner.read().status, 'unknown');
+      assert.equal(owner.read().reason, 'commit-unknown');
+    }
+  }
+});
+
+test('NW06: non-monotonic clock readings are compared independently and invalid readings refuse before storage', async () => {
+  const back = timed([50, 10]);
+  await back.owner.recover();
+  assert.equal((await back.owner.submit(command('a', 1, 1), { deadlineMs: 60 })).status, 'committed');
+  const late = timed([10, 60, 0]);
+  await late.owner.recover();
+  assert.deepEqual(await late.owner.submit(command('a', 1, 1), { deadlineMs: 60 }), { status: 'expired' });
+  assert.equal(late.writes, 0);
+  assert.equal((await late.owner.submit(command('a', 1, 1), { deadlineMs: 60 })).status, 'committed');
+  for (const reading of [() => NaN, () => Infinity, () => { throw Error('clock'); }]) {
+    const t = timed(reading);
+    await t.owner.recover();
+    assert.deepEqual(await t.owner.submit(command('a', 1, 1), { deadlineMs: 60 }), {
+      status: 'refused',
+      reason: 'clock',
+    });
+    assert.equal(t.writes, 0);
+    assert.equal(t.owner.read().status, 'ready');
+    assert.equal((await t.owner.submit(command('a', 1, 1))).status, 'committed');
+  }
+});
+
+test('NW06: expired exact retries never read receipts and a later live retry keeps idempotent identity', async () => {
+  const t = timed([5]);
+  await t.owner.recover();
+  assert.equal((await t.owner.submit(command('a', 1, 4))).status, 'committed');
+  assert.deepEqual(await t.owner.submit(command('a', 1, 4), { deadlineMs: 5 }), { status: 'expired' });
+  assert.deepEqual(await t.owner.submit(command('a', 1, 99), { deadlineMs: 5 }), { status: 'expired' });
+  assert.equal((await t.owner.submit(command('a', 1, 4), { deadlineMs: 6 })).status, 'duplicate');
+  assert.equal((await t.owner.submit(command('a', 1, 99), { deadlineMs: 6 })).status, 'conflict');
+  assert.deepEqual(await t.owner.submit(command('a', 2, 1), { deadlineMs: 1 }), { status: 'expired' });
+  assert.equal((await t.owner.submit(command('a', 3, 1))).status, 'gap');
+  const retried = await t.owner.submit(command('a', 2, 1), { deadlineMs: 6 });
+  assert.equal(retried.status, 'committed');
+  assert.equal((retried as { revision: number }).revision, 2);
+  assert.equal((await t.owner.submit(command('a', 2, 1))).status, 'duplicate');
+  assert.equal(t.writes, 2);
+});
+
+test('NW06: deadlines are optional, need an injected clock and finite value, and admit no queued work', async () => {
+  const silent = timed([0]);
+  await silent.owner.recover();
+  assert.equal((await silent.owner.submit(command('a', 1, 1))).status, 'committed');
+  assert.equal(silent.calls, 0);
+  const f = fixture();
+  await f.owner.recover();
+  assert.deepEqual(await f.owner.submit(command('a', 1, 1), { deadlineMs: 10 }), {
+    status: 'refused',
+    reason: 'deadline',
+  });
+  for (const deadlineMs of [NaN, Infinity, '10' as never])
+    assert.deepEqual(await silent.owner.submit(command('a', 2, 1), { deadlineMs }), {
+      status: 'refused',
+      reason: 'deadline',
+    });
+  assert.equal(f.writes + silent.writes, 1);
+  assert.throws(() => fixture({ clock: 1 as never }), /clock/);
+  const gate = deferred<void>(),
+    base = fixture();
+  const owner = createDurableAuthority({
+    ...config,
+    authorize: () => true,
+    reduce: () => ({ stateJson: '1', resultJson: '1' }),
+    clock: () => 0,
+    storage: {
+      settle: () => base.storage.settle(),
+      read: () => base.storage.read(),
+      async compareAndSwap(q) {
+        await gate.promise;
+        return base.storage.compareAndSwap(q);
+      },
+    },
+  });
+  await owner.recover();
+  const first = owner.submit(command('a', 1, 1), { deadlineMs: 10 });
+  assert.deepEqual(await owner.submit(command('b', 1, 1), { deadlineMs: 0 }), { status: 'busy' });
+  gate.resolve();
+  assert.equal((await first).status, 'committed');
+});
+
+test('NW06: clock reentry is busy and disposal from the clock prevents storage invocation', async () => {
+  let owner!: ReturnType<typeof createDurableAuthority>,
+    nested: Promise<unknown> | undefined,
+    reads = 0;
+  const t = timed(() => {
+    reads++;
+    if (reads === 1) nested = owner.submit(command('b', 1, 1));
+    if (reads === 2) owner.dispose();
+    return 0;
+  });
+  owner = t.owner;
+  await owner.recover();
+  assert.deepEqual(await owner.submit(command('a', 1, 1), { deadlineMs: 10 }), { status: 'retired' });
+  assert.deepEqual(await nested, { status: 'busy' });
+  assert.equal(t.writes, 0);
+});
+
+test('NW06: a deadlineMs getter reads under the reserved slot, so reentry is busy and disposal retires', async () => {
+  for (const reenter of ['submit', 'recover', 'dispose'] as const) {
+    const base = fixture(),
+      gate = deferred<void>();
+    let inflight = 0,
+      maxInflight = 0,
+      nested: Promise<unknown> | undefined,
+      owner!: ReturnType<typeof createDurableAuthority>;
+    owner = createDurableAuthority({
+      ...config,
+      authorize: () => true,
+      reduce: () => ({ stateJson: '1', resultJson: '1' }),
+      clock: () => 0,
+      storage: {
+        settle: () => base.storage.settle(),
+        read: () => base.storage.read(),
+        async compareAndSwap(q) {
+          inflight++;
+          maxInflight = Math.max(maxInflight, inflight);
+          await gate.promise;
+          inflight--;
+          return base.storage.compareAndSwap(q);
+        },
+      },
+    });
+    await owner.recover();
+    const admission = {
+      get deadlineMs() {
+        if (reenter === 'submit') nested ??= owner.submit(command('b', 1, 1));
+        if (reenter === 'recover') nested ??= owner.recover();
+        if (reenter === 'dispose') owner.dispose();
+        return 100;
+      },
+    };
+    const outer = owner.submit(command('a', 1, 1), admission);
+    if (reenter === 'dispose') {
+      assert.deepEqual(await outer, { status: 'retired' });
+      assert.equal(owner.read().status, 'retired');
+      assert.equal(base.writes, 0);
+      continue;
+    }
+    assert.deepEqual(await nested, { status: 'busy' });
+    assert.equal(owner.read().status, 'pending');
+    assert.deepEqual(await owner.submit(command('c', 1, 1)), { status: 'busy' });
+    gate.resolve();
+    assert.equal((await outer).status, 'committed');
+    assert.equal(maxInflight, 1);
+    assert.equal(base.writes, 1);
+    assert.equal(owner.read().status, 'ready');
+  }
+});
+
+test('NW06: the clock is called without a receiver and non-object admission arguments are ignored', async () => {
+  const holder = {
+    base: 0,
+    now(this: { base: number }) {
+      return this.base;
+    },
+  };
+  const unbound = timed(holder.now as () => number);
+  await unbound.owner.recover();
+  assert.deepEqual(await unbound.owner.submit(command('a', 1, 1), { deadlineMs: 10 }), {
+    status: 'refused',
+    reason: 'clock',
+  });
+  const wrapped = timed(() => holder.now());
+  await wrapped.owner.recover();
+  assert.equal((await wrapped.owner.submit(command('a', 1, 1), { deadlineMs: 10 })).status, 'committed');
+  const mapped = timed([0]);
+  await mapped.owner.recover();
+  const outcomes = [];
+  for (const [index, cmd] of [command('a', 1, 1), command('a', 2, 1)].entries())
+    outcomes.push(await (mapped.owner.submit as (c: unknown, i: unknown) => Promise<{ status: string }>)(cmd, index));
+  assert.deepEqual(outcomes.map((o) => o.status), ['committed', 'committed']);
+  assert.equal((await mapped.owner.submit(command('a', 3, 1), null as never)).status, 'committed');
+  assert.equal(mapped.calls, 0);
+  assert.deepEqual(await mapped.owner.submit(command('a', 4, 1), {} as never), {
+    status: 'refused',
+    reason: 'deadline',
+  });
+});

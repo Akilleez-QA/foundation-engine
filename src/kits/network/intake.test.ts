@@ -197,3 +197,71 @@ test('NW01: authorization can emit bounded refusal without permitting the domain
   owner = h.owner; const peer = h.active(); owner.receive(peer, '{}', 0); owner.pump(0);
   assert.equal(h.dispatched.length, 0); assert.deepEqual(h.sends, ['{"denied":true}']);
 });
+
+test('NW06: queued age is unbounded by default and the pump result keeps its prior shape', () => {
+  const h = harness(); const peer = h.active();
+  h.owner.receive(peer, '{"n":1}', 0);
+  assert.deepEqual(h.owner.pump(1_000_000), { status: 'pumped', attempted: 1, dispatched: 1, denied: 0, expired: 0 });
+  assert.equal(h.dispatched.length, 1);
+});
+
+test('NW06: a command is shed exactly when its age reaches maxQueuedAgeMs, before authorize or dispatch', () => {
+  let authorizations = 0;
+  const stale: { ageMs: number; receivedAt: number; command: unknown }[] = [];
+  const h = harness({ authorize: () => { authorizations++; return true; },
+    stale: ({ ageMs, receivedAt, command }) => { stale.push({ ageMs, receivedAt, command }); } },
+  { maxQueuedAgeMs: 5, authTimeoutMs: 1000 });
+  const peer = h.active();
+  h.owner.receive(peer, '{"n":1}', 10);
+  assert.deepEqual(h.owner.pump(14), { status: 'pumped', attempted: 1, dispatched: 1, denied: 0, expired: 0, stale: 0 });
+  h.owner.receive(peer, '{"n":2}', 14);
+  assert.deepEqual(h.owner.pump(19), { status: 'pumped', attempted: 1, dispatched: 0, denied: 0, expired: 0, stale: 1 });
+  assert.equal(authorizations, 1); assert.equal(h.dispatched.length, 1);
+  assert.deepEqual(stale, [{ ageMs: 5, receivedAt: 14, command: { n: 2 } }]);
+  assert.equal(h.owner.stats().queuedMessages, 0); assert.equal(h.owner.stats().queuedBytes, 0);
+  assert.equal(h.owner.read(peer)?.state, 'active');
+});
+
+test('NW06: shedding consumes one bounded attempt each and fresh work behind stale heads still dispatches fairly', () => {
+  const h = harness({}, { maxQueuedAgeMs: 5, authTimeoutMs: 1000, maxPumpOperations: 3 });
+  const a = h.active('{"id":"a"}'), b = h.active('{"id":"b"}');
+  h.owner.receive(a, '{"old":1}', 0); h.owner.receive(a, '{"old":2}', 0);
+  h.owner.receive(b, '{"old":3}', 0);
+  h.owner.receive(a, '{"fresh":1}', 4); h.owner.receive(b, '{"fresh":2}', 4);
+  assert.deepEqual(h.owner.pump(6, 1), { status: 'pumped', attempted: 1, dispatched: 0, denied: 0, expired: 0, stale: 1 });
+  assert.deepEqual(h.owner.pump(6), { status: 'pumped', attempted: 3, dispatched: 1, denied: 0, expired: 0, stale: 2 });
+  assert.deepEqual(h.dispatched.map(d => d.command), [{ fresh: 2 }]);
+  assert.deepEqual(h.owner.pump(6), { status: 'pumped', attempted: 1, dispatched: 1, denied: 0, expired: 0, stale: 0 });
+  assert.deepEqual(h.dispatched.map(d => d.command), [{ fresh: 2 }, { fresh: 1 }]);
+});
+
+test('NW06: backwards time throws before work and never drops or dispatches the queued command', () => {
+  const h = harness({}, { maxQueuedAgeMs: 5, authTimeoutMs: 1000 }); const peer = h.active();
+  h.owner.receive(peer, '{}', 10);
+  assert.throws(() => h.owner.pump(9), /monotonic/);
+  assert.throws(() => h.owner.pump(NaN), /monotonic/);
+  assert.equal(h.owner.stats().queuedMessages, 1); assert.equal(h.dispatched.length, 0);
+  assert.deepEqual(h.owner.pump(10), { status: 'pumped', attempted: 1, dispatched: 1, denied: 0, expired: 0, stale: 0 });
+});
+
+test('NW06: the stale notice may send one bounded reply; reentry is busy and a throwing notice retires the peer', () => {
+  let owner: NetworkIntake;
+  const h = harness({ stale: ({ peer }) => {
+    assert.deepEqual(owner.pump(20), { status: 'refused', reason: 'busy' });
+    assert.deepEqual(owner.receive(peer, '{}', 20), { status: 'refused', reason: 'busy' });
+    assert.deepEqual(owner.send(peer, '{"expired":true}'), { status: 'sent' });
+  } }, { maxQueuedAgeMs: 5, authTimeoutMs: 1000 }); owner = h.owner;
+  const peer = h.active(); owner.receive(peer, '{}', 0); owner.pump(20);
+  assert.deepEqual(h.sends, ['{"expired":true}']); assert.equal(owner.read(peer)?.state, 'active');
+  const t = harness({ stale: () => { throw Error('notice'); } }, { maxQueuedAgeMs: 5, authTimeoutMs: 1000 });
+  const victim = t.active(); t.owner.receive(victim, '{}', 0); t.owner.receive(victim, '{}', 0);
+  assert.deepEqual(t.owner.pump(5), { status: 'pumped', attempted: 1, dispatched: 0, denied: 0, expired: 0, stale: 1 });
+  assert.equal(t.owner.read(victim)?.reason, 'stale-error');
+  assert.equal(t.owner.stats().queuedMessages, 0); assert.equal(t.dispatched.length, 0);
+});
+
+test('NW06: maxQueuedAgeMs and the stale port reject invalid configuration', () => {
+  for (const maxQueuedAgeMs of [0, -1, 1.5, Infinity, NaN])
+    assert.throws(() => harness({}, { maxQueuedAgeMs }), /limits/);
+  assert.throws(() => harness({ stale: 1 as never }, { maxQueuedAgeMs: 5 }), /port/);
+});

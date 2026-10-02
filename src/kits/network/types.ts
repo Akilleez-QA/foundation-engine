@@ -13,18 +13,31 @@ export interface NetworkLimits {
   maxQueuedMessages: number;
   maxQueuedBytes: number;
   maxPumpOperations: number;
+  /**
+   * Optional maximum queued-command age, measured from the `receive` time. Absent keeps every
+   * queued command eligible regardless of age. A command whose age has reached this value when
+   * its turn comes is shed before `authorize`/`dispatch`.
+   */
+  maxQueuedAgeMs?: number;
   message: DocumentLimits;
   principal: DocumentLimits;
 }
 export type NetworkReason = 'disposed' | 'busy' | 'unknown-peer' | 'closed' | 'not-active'
   | 'auth-state' | 'connection-limit' | 'auth-limit' | 'pre-auth-limit' | 'auth-timeout'
   | 'invalid-data' | 'queue-limit' | 'auth-rejected' | 'auth-error' | 'unauthorized'
-  | 'authorize-error' | 'dispatch-error' | 'send-refused' | 'send-error' | 'revoked' | 'closed-by-owner';
+  | 'authorize-error' | 'dispatch-error' | 'stale-error' | 'send-refused' | 'send-error' | 'revoked' | 'closed-by-owner';
 export interface NetworkRefusal { readonly status: 'refused'; readonly reason: NetworkReason }
 export interface NetworkContext {
   readonly peer: ConnectionHandle;
   readonly principal: DocumentValue;
   readonly command: DocumentValue;
+}
+/** A queued command shed for age. Not authorized and never dispatched. */
+export interface NetworkStaleContext extends NetworkContext {
+  /** Host time supplied to the `receive` that queued this command. */
+  readonly receivedAt: number;
+  /** Host time of the shedding pump minus `receivedAt`; at least `maxQueuedAgeMs`. */
+  readonly ageMs: number;
 }
 export interface NetworkPorts {
   /** May complete later. null rejects; any other principal must be bounded JSON text. */
@@ -37,6 +50,11 @@ export interface NetworkPorts {
   authorize(context: NetworkContext): boolean;
   /** Synchronous admission to creator logic, not a transaction or durable acknowledgment. */
   dispatch(context: NetworkContext): void;
+  /**
+   * Optional notice for a command shed by `maxQueuedAgeMs`. It may reply through `intake.send`
+   * (each send bounded by message limits); current authorization is not rechecked, so disclose only correlation.
+   */
+  stale?(context: NetworkStaleContext): void;
   /** true means transport admission only. Caller transport owns outgoing memory and delivery. */
   send(peer: ConnectionHandle, json: string): boolean;
   /** Called once, after membership, pending authentication and queued data are retired. */
@@ -63,6 +81,8 @@ export interface NetworkPumpResult {
   readonly dispatched: number;
   readonly denied: number;
   readonly expired: number;
+  /** Present only when `maxQueuedAgeMs` is configured: queued commands shed for age. */
+  readonly stale?: number;
 }
 export interface NetworkIntake {
   open(now: number): Readonly<{ status: 'opened'; peer: ConnectionHandle }> | NetworkRefusal;
