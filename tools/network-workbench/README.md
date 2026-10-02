@@ -51,7 +51,7 @@ and validates the two allowed message shapes before domain dispatch.
 | Pre-authentication frames | 2 per connection; excess closes |
 | Open-to-authentication deadline | 1500 ms; expires without another frame |
 | Active connection idle timeout | 15000 ms |
-| Incoming frames | 32 per connection per 1000 ms window; excess closes |
+| Incoming frames | Token bucket per connection ([rate admission](../../docs/guides/rate-admission.md)): burst 32, refill 32/s; a limited frame closes (NW-05; previously a 32-per-1000 ms fixed window) |
 | Reassembled transport message | 1024 bytes, enforced by ws before application parsing |
 | Captured command | 1024 UTF-8 bytes, 32 nodes, depth 4 |
 | Captured principal | 256 UTF-8 bytes, 8 nodes, depth 2 |

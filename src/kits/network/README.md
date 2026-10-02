@@ -111,8 +111,10 @@ an apparently successful send. Port admission must separately check transport
 buffering. Browser/network buffers are outside this helper's retained-memory
 bounds; an application queue bound is not inbound browser backpressure.
 
-The library does not rate-limit bytes/messages per second. The reference adapter
-must independently limit traffic before repeatedly calling admission. Queued data
+The intake itself does not rate-limit bytes/messages per second. The kit exports a
+separate, optional [`createRateAdmission`](#optional-rate-and-concurrency-admission)
+token bucket that an adapter can apply per peer before calling intake admission;
+the three reference hosts do so. Neither establishes distributed or cross-process limits. Queued data
 bounds are not authentication-provider capacity guarantees or total process heap
 bounds. Trusted projection/domain callbacks and remote I/O are not timed here.
 
@@ -297,6 +299,22 @@ or physical-device performance.
 For creator-side examples, ECS replacement, scene suspension and native-render
 recovery, see [the complete scoped-view guide](../../../docs/guides/network-views.md).
 
+
+## Optional rate and concurrency admission
+
+`createRateAdmission({maxKeys, capacity, refillPerSecond, maxInFlight?, maxKeyLength?})`
+is a pure, caller-owned token bucket with an optional per-key concurrency gate. It
+constructs no timer or clock; time is supplied on each call (finite, nonnegative, at most
+`Number.MAX_SAFE_INTEGER` ms; a backwards reading grants no refill). `refillPerSecond`
+is at most 1e6 and `capacity` at most 1e9. `admit(key, now, cost?)`
+returns `admitted` (with a lease when `maxInFlight` is set), `limited` (`rate` with
+`retryAfterMs`, or `concurrency`) or `refused` (`key-capacity`, `invalid-key`,
+`invalid-time`, `invalid-cost`, `disposed`); overload never throws and a limited call
+consumes nothing. Tracked keys are bounded by `maxKeys`; only an idle, fully refilled
+key is reclaimed, so key churn cannot reset a limit. The owner calls `forget(key)` on
+retirement and `dispose()` with the host. It is single-process only. See the
+[rate admission guide](../../../docs/guides/rate-admission.md) for bounds, clock
+regression, cancellation, limitations and the reference-host migration (NW-05).
 
 ## Optional authority and prediction exports
 

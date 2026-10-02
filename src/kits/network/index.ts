@@ -17,3 +17,6 @@ export type { Prediction, PredictionBaseline, PredictionInput, PredictionLimits,
 export { createRetrySchedule } from './retry-schedule';
 export type { RetrySchedule, RetryScheduleLimits, RetryScheduleOptions, RetryScheduleNext,
   RetryScheduleState } from './retry-schedule';
+export { createRateAdmission } from './rate-admission';
+export type { RateKey, RateLease, RateAdmission, RateAdmissionLimits, RateAdmissionResult,
+  RateRefusalReason, RateKeyState, RateAdmissionStats } from './rate-admission';

@@ -256,3 +256,24 @@ test('one pending durable operation refuses new work without queuing it and stal
   assert.equal((await result(b, 1)).status, 'committed');
   assert.equal(h.read().checkpoint.state, 5);
 });
+
+test('NW05: per-peer token bucket keeps a capacity burst open and closes the next burst', async (t) => {
+  const d = await directory(t);
+  await initializeAuthorityWorkbench({ directory: d });
+  const h = await startAuthorityWorkbench({ directory: d });
+  t.after(() => h.close());
+  const a = await connect(t, h),
+    b = await connect(t, h, 'b');
+  const closed = new Promise((resolve) => a.socket.once('close', resolve));
+  await new Promise((r) => setTimeout(r, 100)); // refill the token spent on authentication
+  h.holdCommitResponse(); // keep later commands busy rather than committed
+  for (let n = 1; n <= 128; n++) a.send(n, 1);
+  await until(() => a.frames.filter((f) => f.type === 'result' && f.status === 'busy').length >= 127);
+  assert.equal(a.socket.readyState, WebSocket.OPEN, 'a burst of exactly the capacity is admitted');
+  for (let n = 129; n <= 256; n++) a.send(n, 1);
+  await closed;
+  h.releaseCommitResponse();
+  await until(() => h.read().status === 'ready');
+  b.send(1, 3);
+  assert.equal((await result(b, 1)).status, 'committed');
+});

@@ -251,3 +251,15 @@ exponential backoff, full jitter and a retry budget. It owns no timer, socket or
 credential; the network workbench client uses it only when its checkbox is ticked.
 Implemented as a candidate (PR #14, `feat/nw04-reconnect-schedule`), not integrated. No WAN
 or physical-device acceptance; see the [ledger](upgrade-acceptance-ledger.md).
+
+## Rate and concurrency admission — NW-05 implemented, candidate (PR #13)
+
+NW-05 adds an optional, single-process [rate and concurrency admission](rate-admission.md)
+helper (`createRateAdmission`, network kit): a per-key token bucket with an optional
+concurrency gate, bounded keys, explicit refusal results, caller-supplied time and
+idempotent disposal. The three reference hosts replace their hand-rolled fixed
+windows with it, keeping limits, close reasons and check order; the change from a
+fixed window to a bucket is an intended semantic change recorded in the guide.
+Status: implemented, candidate (PR #13); not integrated. Evidence is unit and loopback
+host tests only; distributed limits, measured load and physical devices are outside
+this slice.

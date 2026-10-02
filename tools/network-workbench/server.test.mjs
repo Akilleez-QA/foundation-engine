@@ -323,3 +323,31 @@ test('separate host process issues operator-only credentials and correlated IPC 
     if (child.exitCode === null) child.kill();
   }
 });
+
+test('NW05: per-peer token bucket admits a capacity burst, closes the next burst and leaves a healthy peer served', async () => {
+  const host = await startNetworkWorkbench({ autoDriver: false }),
+    peers = [];
+  try {
+    const a = await connect(host, host.credentials.alpha),
+      b = await connect(host, host.credentials.beta);
+    peers.push(a, b);
+    const closed = once(a.socket, 'close');
+    await delay(100); // refill the token spent on authentication
+    const before = host.read().metrics.receivedFrames;
+    // Version-mismatch frames are refused without closing, so only the rate bound can close this peer.
+    for (let i = 0; i < 32; i++) a.socket.send(JSON.stringify({ v: 2 }));
+    await until(() => host.read().metrics.receivedFrames === before + 32);
+    assert.equal(a.socket.readyState, WebSocket.OPEN, 'a burst of exactly the capacity is admitted');
+    for (let i = 0; i < 32; i++) a.socket.send(JSON.stringify({ v: 2 }));
+    const [code, reason] = await closed;
+    assert.equal(code, 1013);
+    assert.equal(reason.toString(), 'rate-capacity');
+    command(b, 'healthy', 'beta');
+    await until(() => host.read().intake.queuedMessages === 1);
+    host.pump();
+    await until(() => b.frames.some((f) => f.type === 'result'));
+    assert.equal(host.read().counters.beta, 1);
+  } finally {
+    await shutdown(host, peers);
+  }
+});
