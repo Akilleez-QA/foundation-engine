@@ -30,6 +30,17 @@ workflow rules do not prescribe the design or tooling of every independent game.
 - Agent identity changes no runtime rule or budget. These are authority and workflow
   responsibilities, not a sandbox, permission system or authorship-dependent API.
 
+## Building your own game (solo or build day)
+
+Most people clone this repository to make a game, not to change the engine. Then:
+
+- **Work in the checkout you cloned, on a branch of your own.** `npm run new-game` writes `game/`, `GAME.md` and the template's `playtest/*.json` into the current checkout, untracked. Right after it, `git switch -c <game-id>` and commit `game/`, `GAME.md` and those playtest scripts there; commit each step that passes `npm run check`.
+- **Do not start game work in a new worktree from `origin/main`.** It has no `game/`, so every command silently builds `templates/blank/game`. If you want worktrees for your game, branch them from your game branch.
+- **The loop, the brief, the short rules, the teaching rules and device acceptance all apply.** `npm run gate` is recommended before sharing a build; it is not a merge requirement for a game branch.
+- **Worktree per task, serial integration into `main` and `npm run deploy:production` are for contributions to this engine repository.** A game branch is not merged into this repository's `main`, and the production guard (which requires a clean `main` equal to `origin/main` and a provider hook) is not how a game is shared. Build with `npm run build` and upload `dist/` to any static host ([share your build](docs/recipes/share-your-build.md)).
+- **Never delete, move or `--force`-replace an existing `game/`** without the author's explicit request; it may hold uncommitted work.
+- Start with [getting started](docs/guides/getting-started.md), each template's README, and the [cookbook](docs/recipes/README.md).
+
 ## The loop
 
 Every request from the author goes round this loop, in small steps:
@@ -101,7 +112,7 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 
 | Command | What it does |
 |---|---|
-| `npm run new-game -- --template <name>` | Start a game from a template (blank, arcade, explorer, learn) |
+| `npm run new-game -- --template <name>` | Start a game from a template (blank, arcade, explorer, learn, terrain, expedition, mechanics); then commit `game/` on your own branch |
 | `npm run new -- <kind> <id>` | Generators: scene, entity, component, system, input, save-section, kit; interactable, area (explore); lesson (learn) |
 | `npm run play` | Dev server with the test API; prints the URL |
 | `npm run check` | Focused check: typecheck, lints, brief, affected tests; duration depends on the checkout and hardware |
@@ -113,11 +124,13 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 | `npm run gate:ci [-- --from <step> \| --only <step> \| --list]` | Every `run:` step of `.github/workflows/ci.yml`, in order with its env (browser suites, `gate:templates`, phone smoke); stops at the first failure and tables the steps |
 | `npm run bench`, `npm run perf:derive` | Measure scenes; derive budgets |
 | `npm run quality:guard` | Picture comparison of two builds |
-| `npm run deploy:production` | The only production release path |
+| `npm run deploy:production` | The only production release path for this repository's `main` (a game is shared with `npm run build` and static hosting) |
 
 The dev and test builds expose `window.engine` (src/dev/test-api.ts): `state()`, `goto(scene, params)`, `teleport(x, z, name)`, `key(key, ms)`, `clock.hold/step/resume`, `probe(name)`, `events(fn)`. Production builds never contain it.
 
 ## Worktree per task, gate before integration, production only from a clean main
+
+These rules govern contributions to this engine repository. For a game of your own, see [Building your own game](#building-your-own-game-solo-or-build-day).
 
 - **One task, one worktree.** Start each task from the current `origin/main`, in its own named branch and worktree (`git worktree add ../<repo>-<task> -b <task> origin/main`). Never edit the shared main checkout, reuse another task's worktree, or run two tasks in one checkout.
 - **Commit and validate in that worktree.** Before integrating, fetch and rebase onto the current `origin/main`. Keep other tasks' changes; never overwrite them.
