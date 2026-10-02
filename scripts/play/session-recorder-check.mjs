@@ -51,6 +51,7 @@ try {
   server = await serve();
   const origin = new URL(server.url).origin;
   browser = await launch({...view, strictClose: true});
+  report.browser = {version: browser.version, executable: browser.executable, launchArguments: browser.launchArguments};
   const page = browser.page;
   await page.addInitScript(PROBE);
   page.on('pageerror', e => report.errors.push(String(e?.message ?? e)));

@@ -9,7 +9,7 @@ not any supported device. Each file labels itself `evidence: emulated`.
 |---|---|
 | Revision | `abe977e`, the recorder code commit on a clean tree. Documentation was added afterwards. Later rebases onto `main` kept the same patch-id (the code commit is the first commit of PR #15), and the recorder, loop, dev and script files are unchanged since the run |
 | Command | `GAME_DIR=templates/expedition/game node -r ./scripts/silent-browser.cjs scripts/play/session-recorder-check.mjs <out> --minutes 10 --window-ms 30000` |
-| Browser | Playwright-core 1.56.1 Chromium, muted and isolated, `?flags=dev.silent`, 1280×800 at DPR 1, software GL |
+| Browser | Driven by playwright-core 1.56.1, muted, with a throwaway context, `?flags=dev.silent`, 1280×800 at DPR 1 and software GL. `ENGINE_CHROMIUM` was not set and Playwright's bundled build is not installed, so `bench-browser.mjs` resolved the executable to the system `/usr/bin/chromium`. Its version was not recorded in this report, and that system launcher may also apply the host user's Chromium flags file. Later runs record the executable, version and launch arguments in `report.json` and use an isolated automation launcher via `ENGINE_CHROMIUM` |
 | Workload | The Expedition `field` scene. The script teleports the named player every 100 ms (a test-page driver) so frames render. It then makes a deliberate 120 ms main-thread stall, a synthetic 3 s hidden period (`document.hidden` overridden), and a route to `shelter` and back. |
 | Result | The script passed. No page errors occurred, and no request left the local dev server. |
 
