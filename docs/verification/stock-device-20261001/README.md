@@ -1,5 +1,10 @@
 # Stock touch controls: exploratory evidence
 
+> **Follow-up (2026-10-02):** the compact lesson overlap recorded here is repaired
+> in the learn kit's layout seam; see the [layout repair receipt](../stock-device-20261002/README.md).
+> The commits named below (`b6fb4a3`, `81e84ba`, `108b29c`) are in the private
+> development history. This receipt is kept unchanged as the record of the failure.
+
 2026-10-01, candidate branch `feat/device-acceptance`, based on integrated
 `b6fb4a3`. Both saved reports identify HEAD
 `81e84babbb1bf10ac990beddef93244cd8e3635d` and **workingTreeDirty: true**.

@@ -5,8 +5,11 @@ stock templates' existing declarations and executable workflows. It is not a new
 support policy or a claim that a declaration passed device acceptance. No browser
 or hardware measurements were made for that source audit. The subsequent
 [candidate touch-control evidence](../verification/stock-device-20261001/README.md)
-is recorded separately: 16 target/tap checks pass in a dirty working copy, while
-lesson content overlap remains unresolved. That candidate is not integrated.
+is recorded separately: 16 target/tap checks pass in a dirty working copy, and the
+lesson content overlap found there is repaired in a later
+[layout receipt](../verification/stock-device-20261002/README.md). Both are emulated
+evidence; neither is integrated until the public PR merges. The commits named in this
+matrix are in the private development history.
 
 The [device policy](../policy/DEVICE-EXPERIENCE.md) and
 [application annex](../APPLICATION.md) define acceptance. Independent creators may
@@ -105,9 +108,11 @@ all interfaces.
   checks passed; exact-head gates and integration are still pending. Do not infer
   complete usability from these sizing checks.
 - Screenshot inspection found Learn's wrapped navigation covering the board/caption
-  region at 320×568. The fixed board inset does not reserve the wrapped bar's actual
-  height. Content layout and scene-owned cleanup remain open repairs; full lesson
-  touch, text scaling and orientation acceptance must follow.
+  region at 320×568: the fixed board inset did not reserve the wrapped bar's actual
+  height. Scene-owned cleanup and a measured layout seam now repair this; emulated
+  separation checks pass at four profiles across board, sim and quiz
+  ([receipt](../verification/stock-device-20261002/README.md)). Full lesson touch,
+  in-panel touch scrolling, text scaling and physical-device acceptance must follow.
 - Expedition/Mechanics custom panels are persistent and do not select the optional
   compact disclosure owner. Their position/max-width alone does not establish
   essential-view acceptance. Test changing messages and translated/large text.

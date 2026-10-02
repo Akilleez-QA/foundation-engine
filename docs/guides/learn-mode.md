@@ -73,7 +73,40 @@ retired controls ignore setters and callback registration, and retained DOM refe
 cannot deliver a new callback. Creators may replace this presentation and retain
 the same lesson data and lifecycle contract.
 
-The current candidate includes focused visit/reentry tests and real Chromium
-retained-node callback checks. These do not fix the separate compact content overlap
-or establish complete touch lesson acceptance. See the
+Focused visit/reentry tests and real Chromium retained-node callback checks cover
+this lifecycle. They do not establish complete touch lesson acceptance. See the
 [device evidence](../verification/stock-device-20261001/README.md).
+
+## Layout on narrow screens
+
+The control bar wraps onto two or three rows on phones, and the progress line takes
+the top-left corner. The controls (`src/kits/learn/ui.ts`) own one `ResizeObserver`
+over the bar, the progress line, the overlay and lesson content registered with
+`controls.arrange({ line, panel, floor })`. It runs only when one of those changes
+size (wrapping, rotation, text or visibility changes), never per frame, and it
+publishes on the overlay:
+
+| Property | Value | Used by |
+|---|---|---|
+| `--learn-controls-reserve` | bar bottom offset + bar height + 8px gap | `aboveControls(min)`: the board (76px authored inset) and the slider (84px) |
+| `--learn-top-clear`, `--learn-top-side` | set only when a centred top line would touch the progress line | `topLine()`: the caption line on sim and quiz scenes drops below the progress line with 16px gutters |
+
+The objectives and finished cards, and the panel passed to `arrange` (the quiz),
+keep their authored centre unless they would cover the progress or caption line,
+reach the bar, or (cards only) cover the board's caption. Then they start below the
+top content and scroll within the space left (`max-height`, `overflow-y: auto`).
+
+Every value keeps its authored geometry wherever there is room, so desktop and
+tablet layouts with a one-row bar do not change; nothing here imposes a phone layout
+on larger screens. When the space is too small for a panel (phone landscape), the
+panel scrolls rather than covering the caption or the controls. The observer
+disconnects and the properties are cleared when the controls are destroyed (scene
+exit through `disposeLesson`). Without `ResizeObserver` (non-browser hosts) the
+authored insets apply unchanged.
+
+A creator who replaces the lesson UI can keep these helpers, use their own owner,
+or omit them. Regressions: `src/kits/learn/layout.test.ts` (fake DOM geometry: what
+moves, by how much, what stays) and the Learn route of
+`scripts/play/stock-touch-check.mjs` (Chromium touch emulation at four profiles,
+walking board, sim and quiz). Neither is physical-device acceptance; see the
+[layout repair receipt](../verification/stock-device-20261002/README.md).

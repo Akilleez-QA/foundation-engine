@@ -19,6 +19,19 @@ font correction, but compact lesson controls visibly cover content. Layout/clean
 repairs, full task workflows and physical-device evidence remain open. This does
 not refresh historical CI results or establish an exact-head gate pass.
 
+## Lesson layout repair — 2026-10-02, public PR, not yet integrated
+
+The compact lesson overlap is repaired in the learn kit's layout seam: the board,
+caption, slider, cards and quiz stay clear of the wrapped control bar and the
+progress line, and keep their authored geometry where there is room (desktop
+unchanged). `src/kits/learn/layout.test.ts` and the runner's new separation checks
+fail on the old layout. The [layout repair receipt](../verification/stock-device-20261002/README.md)
+records a clean-commit emulated pass at 320×568, 390×844, 844×390 and 820×1180 and
+the inspected screenshots. Still open: touch scrolling in the fitted quiz (phone
+landscape), the small compact board, 200% text/zoom, the full touch lesson, other
+template workflows and all physical-device evidence. Minimum phone, tablet and
+laptop/desktop profiles are pending creator selection; DV-01 remains unresolved.
+
 ## Existing mechanisms
 
 | Existing mechanism | Limitation | Required follow-up evidence |

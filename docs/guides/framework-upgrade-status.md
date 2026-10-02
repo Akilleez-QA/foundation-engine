@@ -390,13 +390,17 @@ Clean-revision native acceptance passed at `8317c69`; see the
 DV-01 physical-device acceptance remains open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. Creators may configure,
 replace or omit these contracts and retain ownership of all game rules.
 
-## Device acceptance continuation — candidate, not integrated
+## Device acceptance continuation — public PR, not integrated
 
 The [stock device matrix](../kits/stock-device-acceptance-matrix.md) records all seven
 current template declarations and remaining task-specific acceptance. The
 [2026-10-01 exploratory receipt](../verification/stock-device-20261001/README.md)
 separates 16 passing touch-emulated target/tap cases from an observed compact lesson
-content overlap. Candidate sizing changes are not a completed mobile experience;
-layout/cleanup repairs and full workflows remain open alongside actual minimum-device
-performance. DV-01 and the overall upgrade goal remain active. See the
+content overlap. The [2026-10-02 layout receipt](../verification/stock-device-20261002/README.md)
+records the repair in the learn kit's layout seam (desktop geometry unchanged), a
+fake-DOM regression and emulated separation checks across board, sim and quiz at
+four profiles on a clean commit. This is emulated evidence, not a completed mobile
+experience: full workflows, text scaling and actual minimum-device performance remain
+open, and minimum phone, tablet and laptop/desktop profiles are pending creator
+selection. DV-01 and the overall upgrade goal remain active. See the
 [continuing ledger](upgrade-acceptance-ledger.md) for the authoritative work state.
