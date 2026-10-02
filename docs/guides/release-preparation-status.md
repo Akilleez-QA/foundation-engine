@@ -66,3 +66,11 @@ visibility change, package publication, deployment or Discord posting had occurr
 - Not included in the public source: the device-acceptance branch (DV-01 work,
   including unintegrated lesson cleanup and touch sizing). DV-01 remains unresolved.
 - The author posted the [announcement](publication-announcement.md) on Discord.
+
+## Later reconciliation (2026-10-03)
+
+- The device-acceptance branch noted above as not included was ported and merged
+  as public PR #9 (`97288f8`) and is part of v0.2.0. DV-01 itself remains open.
+- The three.js 0.186 migration landed as public PR #29 (v0.2.0).
+- Private vulnerability reporting was re-checked through the GitHub API on
+  2026-10-02 (`enabled: true`); [SECURITY.md](../../SECURITY.md) now points to it.
