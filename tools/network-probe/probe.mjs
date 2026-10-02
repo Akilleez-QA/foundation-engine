@@ -459,9 +459,10 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
       bad.send(JSON.stringify({ v: 1, type: 'auth', token: 'x'.repeat(43) }));
       const badClose = await badClosed;
       const floodStart = now();
+      // Catch up on elapsed time so a starved probe timer still offers the configured flood rate.
       const floodTimer = setInterval(() => {
-        const per = Math.max(1, Math.round(o.flooderPerSecond / 100));
-        for (let k = 0; k < per && flood.readyState === WebSocket.OPEN; k++)
+        const due = Math.floor(((now() - floodStart) / 1000) * o.flooderPerSecond) - floodSent;
+        for (let k = 0; k < Math.min(due, 200) && flood.readyState === WebSocket.OPEN; k++)
           flood.send(JSON.stringify({ v: 1, type: 'command', id: `f-${++floodSent}`, target: 'alpha', delta: 1 }));
       }, 10);
       const floodClose = await floodClosed;
@@ -469,7 +470,8 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
       for (const s of [flood, bad, excess]) s.terminate();
       const label = (close) => (close ? describeClose(close.code, close.reason) : { code: null, reason: 'not closed within 4 s', class: null });
       adversaries.push(
-        { step, kind: 'flooder', sentBeforeClose: floodSent, closeAfterMs: round(now() - floodStart), ...label(floodClose) },
+        { step, kind: 'flooder', sentBeforeClose: floodSent, closeAfterMs: round(now() - floodStart),
+          achievedPerSecond: round(floodSent / Math.max(0.001, (now() - floodStart) / 1000)), ...label(floodClose) },
         { step, kind: 'wrong-credential', ...label(badClose) },
         { step, kind: 'over-connection-bound', transportOpened: excessOpened, ...label(excessClose) },
       );
