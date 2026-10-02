@@ -80,13 +80,17 @@ sound.pump(ctx.time.t, ctx.camera.position);
 ```
 
 - The classes replace the `SOUND` table above; `classGain(class, distance)` is the
-  same rule as a pure function, for tests and host-side audibility.
+  same rule as a pure function, for tests and host-side audibility. A host must measure
+  distance from the same listener position the client's output uses (the camera, not
+  the player character in third person).
 - `importance()` is your threat rule (aiming at the player, recently fired, on
   screen). The kit only ranks; it does not decide what is a threat.
-- `level.firstHit` is your geometry query. Keep `raysPerPump` small: queries rotate
-  stalest first and old results expire to `unknown`.
+- `level.firstHit` is your geometry query; exclude the source's and the listener's own
+  colliders from it. Keep `raysPerPump` small: queries rotate stalest first and old
+  results expire to `unknown`. If `sound.stats.stale` stays above 0, the budget cannot
+  refresh every playing voice within `maxAge`.
 - Dispose the kit with the scene (`sound.dispose()`); `sound.stats` shows `voices`,
-  `waiting`, `dropped`, `culled`, `stolen`, `rays` and `raysDeferred`.
+  `waiting`, `dropped`, `culled`, `stolen`, `rays`, `raysDeferred` and `stale`.
 
 ## 4. Check it
 
