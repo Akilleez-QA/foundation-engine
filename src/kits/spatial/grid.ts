@@ -126,7 +126,7 @@ export function createSpatialGrid(input: GridLimits): SpatialGrid {
   if (input === null || typeof input !== 'object') throw new TypeError('spatial grid: limits must be an object');
   const extra = Object.keys(input).filter(k => !(KEYS as readonly string[]).includes(k));
   if (extra.length) throw new TypeError(`spatial grid: unknown limit '${extra[0]}'`);
-  const limits: GridLimits = Object.freeze(Object.fromEntries(KEYS.map(k => [k, input[k]])) as unknown as GridLimits);
+  const limits: GridLimits = Object.freeze({ cellSize: input.cellSize, minX: input.minX, minY: input.minY, maxX: input.maxX, maxY: input.maxY, maxEntries: input.maxEntries, maxCells: input.maxCells, maxCellsPerQuery: input.maxCellsPerQuery });
   const { cellSize, minX, minY, maxX, maxY, maxEntries, maxCells, maxCellsPerQuery } = limits;
   if (!finite(cellSize) || cellSize <= 0) throw new RangeError('spatial grid: cellSize must be finite and positive');
   if (![minX, minY, maxX, maxY].every(finite) || !(minX < maxX) || !(minY < maxY)) throw new RangeError('spatial grid: bounds must be finite with min < max');

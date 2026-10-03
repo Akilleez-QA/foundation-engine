@@ -208,7 +208,7 @@ export function createGridGenerationJob(id: string, generator: GridGenerator, li
   };
   const adopt = (recipe: GridRecipe, wire: GridWire): GeneratedGrid => {
     if (!wire || typeof wire !== 'object' || !wire.descriptor || typeof wire.descriptor !== 'object') fail('malformed output');
-    const expected = descriptorOf(recipe), d = wire.descriptor as unknown as Record<string, unknown>;
+    const expected = descriptorOf(recipe), d = wire.descriptor;
     for (const k of Object.keys(expected) as (keyof GridDescriptor)[]) if (d[k] !== expected[k]) fail(`output ${k} mismatch`);
     const { values, slices: used } = wire, count = recipe.cellsX * recipe.cellsY * recipe.cellsZ;
     if (!(values instanceof Uint16Array) || values.length !== count) fail('output length');

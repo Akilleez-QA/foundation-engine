@@ -139,6 +139,7 @@ export function captureAuthorityEnvelope(
     omitted += event.omittedPrefix;
   }
   return Object.freeze({
+    // lint:allow-unknown-cast every field was validated above; AuthorityEnvelope has no DocumentValue index signature
     envelope: value as unknown as AuthorityEnvelope,
     json: captured.json,
     bytes: captured.bytes,
