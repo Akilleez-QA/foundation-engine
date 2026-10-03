@@ -182,11 +182,21 @@ empty world.
 - `templates/shared-world/game/world.test.ts`: the scene in local play and the host core
   produce the same world from the same actions (criterion S1).
 - `npm run test:session-browser`: two isolated headless Chromium contexts against a
-  loopback host: both join, a move and a paint reach the other page, a host restart on
-  the same port with the same join code is ridden out by paced reconnects, a wrong join code is terminal with
-  exactly one attempt, integrity stayed in observe mode, no page or console errors
-  beyond the expected refused connections while the host was down. Revisions and
-  results are in the [ledger](upgrade-acceptance-ledger.md#newcomer-shared-session-mp-01--implemented-candidate).
+  loopback host: both join, a move and a paint reach the other page, and a host restart
+  on the same port with the same join code is ridden out by paced reconnects on both
+  pages (1-7 session sockets each). After the restart each page must show the new,
+  empty world before any action is sent: its HUD has left "waiting for the world", its
+  painted count is 0 (it was 2), the host board is empty, the host world revision has
+  started again (2, two joins) and the host has applied no action; then one paint
+  reaches both pages. A drop of page B alone (Playwright offline emulation of B's
+  context, the host and page A stay up): A stays joined and keeps moving and painting,
+  B reconnects within the same bound, resumes the same player slot (host `resumed` +1,
+  no new join or leave), converges on the host's world and its earlier paint is applied
+  once. A wrong join code is terminal with exactly one attempt, integrity stayed in
+  observe mode, no page or console errors beyond the expected refused connections while
+  the host was down. Keeping the old view after a reconnect makes the fresh-baseline
+  assertion fail. See the [recovery receipt](../verification/session-recovery-20261003.md);
+  revisions and results are in the [ledger](upgrade-acceptance-ledger.md#newcomer-shared-session-mp-01--implemented-candidate).
 
 ## Limits (honest)
 
@@ -204,6 +214,7 @@ empty world.
 - **No host liveness check from the client.** A silent host whose TCP connection stays
   open is not detected until the connection closes.
 - **Drain (NW-08) is not wired** into this path; a restart is seen as a transient loss.
-- Evidence is unit, loopback-socket and desktop headless Chromium on one machine. No
-  LAN between devices, WAN, physical phone or tablet, gamepad, touch, thermal or
+- Evidence is unit, loopback-socket and desktop headless Chromium on one machine:
+  **loopback only**. LAN mode (`--lan`) is supported but has no evidence between
+  separate devices; that needs devices on a real network. No WAN, physical phone or tablet, gamepad, touch, thermal or
   scalability claim. The template targets desktop and laptop only.
