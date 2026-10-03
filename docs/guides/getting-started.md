@@ -3,7 +3,7 @@
 ```text
       [##]          FOUNDATION ENGINE
     [======]        =================
-  [==][==][==]      STAGE 1: YOUR FIRST GAME
+  [==][==][==]      STAGE 1: FIRST GAME
  [############]
 ```
 
