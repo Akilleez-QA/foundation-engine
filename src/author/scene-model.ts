@@ -42,7 +42,8 @@ export function createSceneModels(o: {
   invalidate(): void;
   report(error: unknown): void;
   maxInstances?: number;
-  /** Diagnostics builds pass `inspectModel`; production leaves it out so the inspector is not bundled. */ inspection?: typeof inspectModel;
+  /** Diagnostics builds pass `inspectModel`; production leaves it out so the inspector is not bundled. */ inspection?:
+    typeof inspectModel | undefined;
   poseLinks?: ModelPoseLinkLimits | undefined;
   mask?(entity: Entity): number;
 }) {

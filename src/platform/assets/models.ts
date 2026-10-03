@@ -133,7 +133,8 @@ export function modelBytes(root: T.Object3D): number {
     if (geometry.attributes) {
       for (const a of Object.values(geometry.attributes)) n += (a as T.BufferAttribute).array?.byteLength ?? 0;
       n += geometry.index?.array.byteLength ?? 0;
-      for (const attrs of Object.values(geometry.morphAttributes ?? {})) for (const a of attrs ?? []) n += a.array.byteLength;
+      for (const attrs of Object.values(geometry.morphAttributes ?? {}))
+        for (const a of attrs ?? []) n += a.array.byteLength;
     }
     const image = (r as Partial<T.Texture>).isTexture
       ? ((r as T.Texture).image as {width?: number; height?: number} | null)
