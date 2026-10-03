@@ -58,6 +58,10 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
 
 ### Changes
 
+- **Fixed (docs): world-edit saves acknowledge only the submitted revision.** The
+  [large world records](docs/recipes/store-large-world-records.md) recipe captures the revision
+  before awaiting `store.write` and passes it to `markSaved`, so edits made while a save is
+  pending stay dirty instead of being lost; a GEN-02 regression test covers it.
 - **Reload tests and checked playtest scripts.** `createTestSaves()` from `@engine` gives game tests
   in-memory storage shared across `testScene` runs: `reload()` flushes the store as a page's
   `pagehide` does and re-opens it over the same storage (`{ flush: false }` loses pending writes, as a
@@ -77,6 +81,12 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
   unchanged; exhaustive import-report consumers must handle the three new
   outcomes. Retain source files for explicit reconciliation or retry.
 
+- **8-bit brand.** An original pixel-art Plinth mark (a stepped base of blue bricks with a gold capstone),
+  lockups, icon and social preview in `assets/brand/`, drawn as SVG pixel grids with no fonts; a README hero,
+  ASCII page headers, a [documentation index](docs/README.md) and the [brand guide](docs/brand.md).
+  `scripts/brand/build.mjs` generates every asset from pixel grids (PNGs through the new development
+  dependency `@resvg/resvg-js`, MPL-2.0); `scripts/brand/build.test.mjs` guards contrast and palette.
+  Documentation and tooling only; no runtime change.
 - **Held touch buttons.** `touchButton(ctx, input, { label })` in `@kits/ui` presses a game input on
   touch, holds a `hold: true` input while the finger stays on it, and releases on lift, cancel,
   slide-off, blur or the visit's end; presses keep the exactly-once fixed-tick delivery. Touch only,
