@@ -43,3 +43,8 @@ Browser:21 samples passed; workflow parser:6 tests passed. Syntax and diff check
 ## Review correction
 
 The first run accidentally retained its initial browser context during subsequent context groups. Its numerical baseline is superseded by the samples above; the original receipt remains in Git history. The corrected script closes every context, including the initial context, and asserts exactly one live context during each sample group and zero before the next. All 21 refreshed samples passed. This removes background application workload from earlier groups without claiming browser/driver caches were cleared. Final documentation passed `node scripts/lint/genericity.mjs`; no full gate was run.
+
+
+## Standalone public-main preparation
+
+This focused branch is based directly on public main `2fb6e69`; it contains only the diagnostic, its npm/CI registration and this evidence. It does not include the broader local integration candidate. The observed test APIs (`engine.goto`, `engine.state`, pool probe), browser launcher, explorer consumer and shell readiness markers already exist on that base. The historical samples above were recorded on the earlier local candidate and must not be presented as timing measurements of public main. Browser acceptance of this rebased branch is pending; syntax, genericity and six workflow-parser tests passed after extraction.
