@@ -33,8 +33,9 @@ export function gameInputRows(game: GameDefinition, defs: readonly (AuthorDef | 
 /** The `key` and `code` a browser-automation key name sends: 'ArrowUp' → ArrowUp/ArrowUp, 'KeyW' → w/KeyW, 'Digit1' → 1/Digit1, 'Space' → ' '/Space. */
 export function keyEventOf(name: string): { key: string; code: string } {
   const letter = /^Key([A-Z])$/.exec(name), digit = /^Digit(\d)$/.exec(name);
-  if (letter) return { key: letter[1].toLowerCase(), code: name };
-  if (digit) return { key: digit[1], code: name };
+  // Each pattern's one group is not optional, so a match always captures it.
+  if (letter) return { key: letter[1]!.toLowerCase(), code: name };
+  if (digit) return { key: digit[1]!, code: name };
   if (name === 'Space' || name === ' ') return { key: ' ', code: 'Space' };
   if (name.length === 1) return { key: name, code: /[a-z]/i.test(name) ? 'Key' + name.toUpperCase() : /\d/.test(name) ? 'Digit' + name : name };
   return { key: name, code: name };
@@ -78,7 +79,7 @@ const AXIS_PAD_PAIRS: readonly (readonly [PadInput, PadInput])[] = [['lb', 'rb']
 export function keyIdentity(chord: KeyChord): string {
   const base = chord.split('+').pop()!;
   const code = /^code:(?:Key([A-Z])|Digit(\d)|(.+))$/.exec(base);
-  return code ? (code[1] ?? code[2] ?? code[3]).toLowerCase() : base.toLowerCase();
+  return code ? (code[1] ?? code[2] ?? code[3]!).toLowerCase() : base.toLowerCase(); // a match captures one alternative
 }
 
 function usedBy(rows: readonly { row: InputActionDef }[]) {

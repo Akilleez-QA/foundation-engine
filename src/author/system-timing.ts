@@ -107,7 +107,7 @@ function recorder(epoch: number, options: SystemTimingOptions) {
       const traceEvents: ReturnType<SystemTimingCapture['exportTrace']>['traceEvents'] = [];
       for (const row of records) {
         if (row.startMs === null || row.durationMs === null) { invalidTimingRecords++; continue; }
-        traceEvents.push({ ph: 'X', cat: 'foundation.systems', name: row.label === null ? '(unlabelled system)' : labels[row.label],
+        traceEvents.push({ ph: 'X', cat: 'foundation.systems', name: row.label === null ? '(unlabelled system)' : labels[row.label]!, // a record's label indexes its own snapshot's labels
           pid: 1, tid: 1, ts: row.startMs * 1000, dur: row.durationMs * 1000,
           args: { epoch, ordinal: row.ordinal, phase: row.phase, failed: row.failed } });
       }

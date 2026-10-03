@@ -18,7 +18,7 @@ test('a tap is ≤ 12 px for a mouse and ≤ 16 px for touch, and a 1.2 s slow p
  assert.equal(s.sink.latch.drain().taps.length,1);assert.deepEqual(s.captured,[1]);
  s.fire('pointerdown',2,100,100);s.fire('pointermove',2,113,100);s.fire('pointerup',2,113,100);assert.equal(s.sink.latch.drain().taps.length,0,'13 px on a mouse is a drag');
  s.fire('pointerdown',3,100,100,{...touch,timeStamp:1});s.fire('pointermove',3,114,100,touch);s.fire('pointerup',3,114,100,{...touch,timeStamp:1201});
- const [tap]=s.sink.latch.drain().taps;assert.equal(tap.pointerType,'touch');assert.equal(tap.duration,1200);
+ const [tap]=s.sink.latch.drain().taps;assert.ok(tap);assert.equal(tap.pointerType,'touch');assert.equal(tap.duration,1200);
  s.fire('pointerdown',4,0,0,{...touch,timeStamp:1});s.fire('pointerup',4,0,0,{...touch,timeStamp:1600});assert.equal(s.sink.latch.drain().taps.length,0,'a 1.6 s press is a hold, not a world tap');
 });
 test('a drag never becomes a tap, even when it returns to its start',()=>{
@@ -38,9 +38,9 @@ test('only the primary mouse button moves or looks; other buttons are ignored an
 test('two fingers pinch as log-ratio zoom notches after a 20 px latch; spreading zooms in',()=>{
  const s=setup();s.fire('pointerdown',1,100,100,touch);s.fire('pointerdown',2,200,100,touch);
  s.fire('pointermove',2,210,100,touch);assert.equal(s.sink.latch.drain().zoom.length,0,'10 px is below the latch');
- s.fire('pointermove',2,300,100,touch);const [step]=s.sink.latch.drain().zoom;assert.equal(step.source,'pinch');
+ s.fire('pointermove',2,300,100,touch);const [step]=s.sink.latch.drain().zoom;assert.ok(step);assert.equal(step.source,'pinch');
  assert.ok(Math.abs(step.notches-Math.max(-1.5,-PINCH_NOTCHES_PER_EFOLD*Math.log(2)))<1e-9);
- s.fire('pointermove',2,290,100,touch);const [inward]=s.sink.latch.drain().zoom;assert.ok(inward.notches>0,'pinching in zooms out');
+ s.fire('pointermove',2,290,100,touch);const [inward]=s.sink.latch.drain().zoom;assert.ok(inward);assert.ok(inward.notches>0,'pinching in zooms out');
  assert.ok(Math.abs(inward.notches-(-PINCH_NOTCHES_PER_EFOLD*Math.log(190/200)))<1e-9);
  assert.ok(s.g.pinching);assert.deepEqual(s.sink.latch.drain().look,{x:0,y:0});
 });

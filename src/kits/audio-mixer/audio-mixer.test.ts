@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createCueMixer, createDucking } from './index';
 import { defineScene, testScene } from '../../author';
 import type { CueVoiceOptions } from '../../platform/audio/audio-output';
+import { must } from '../../testing/must';
 const cue = (cue = 'a', priority = 0, expiresAt = 10) => ({ cue, priority, expiresAt });
 function setup(fails = false) {
   const voices: { cue: string; gain: number; ended: boolean; stop(): void; setGain(v: number): void }[] = [];
@@ -18,10 +19,10 @@ function setup(fails = false) {
 test('logical and audible caps independently bound work until actual completion, not elapsed time', () => {
   const { mixer, voices } = setup();
   mixer.request(cue('a'), 0); mixer.request(cue('b', 5), 0); mixer.request(cue('c'), 0);
-  assert.equal(mixer.request(cue(), 0), null); assert.equal(mixer.pump(0), 1); assert.equal(voices[0].cue, 'b');
+  assert.equal(mixer.request(cue(), 0), null); assert.equal(mixer.pump(0), 1); assert.equal(must(voices[0]).cue, 'b');
   assert.deepEqual(mixer.stats, { pending: 2, active: 1, logical: 3 }); assert.equal(mixer.pump(5), 0);
-  voices[0].stop(); assert.equal(mixer.pump(5), 1); assert.equal(voices[1].cue, 'a');
-  voices[1].stop(); assert.equal(mixer.pump(5), 1); assert.equal(voices[2].cue, 'c');
+  must(voices[0]).stop(); assert.equal(mixer.pump(5), 1); assert.equal(must(voices[1]).cue, 'a');
+  must(voices[1]).stop(); assert.equal(mixer.pump(5), 1); assert.equal(must(voices[2]).cue, 'c');
 });
 test('pending cancellation, expiry and failed playback release logical slots', () => {
   const { mixer } = setup(true), id = mixer.request(cue(), 0)!;
@@ -30,15 +31,15 @@ test('pending cancellation, expiry and failed playback release logical slots', (
 });
 test('cancel and dispose stop only owned voices and reject new work', () => {
   const { mixer, voices } = setup(); const id = mixer.request(cue(), 0)!; mixer.pump(0);
-  assert.equal(mixer.cancel(id), true); assert.equal(voices[0].ended, true);
+  assert.equal(mixer.cancel(id), true); assert.equal(must(voices[0]).ended, true);
   mixer.request(cue(), 0); mixer.pump(0); mixer.dispose(); mixer.dispose();
-  assert.equal(voices[1].ended, true); assert.equal(mixer.request(cue(), 0), null); assert.equal(mixer.stats.active, 0);
+  assert.equal(must(voices[1]).ended, true); assert.equal(mixer.request(cue(), 0), null); assert.equal(mixer.stats.active, 0);
 });
 test('ducking affects both playing and subsequent voices without modifying user settings', () => {
   const { mixer, voices } = setup(); mixer.request(cue(), 0); mixer.pump(0);
-  const a = mixer.duck(.5), b = mixer.duck(.2); a(); assert.equal(voices[0].gain, .2);
-  voices[0].stop(); mixer.request(cue(), 0); mixer.pump(0); assert.equal(voices[1].gain, .2);
-  b(); assert.equal(voices[1].gain, 1);
+  const a = mixer.duck(.5), b = mixer.duck(.2); a(); assert.equal(must(voices[0]).gain, .2);
+  must(voices[0]).stop(); mixer.request(cue(), 0); mixer.pump(0); assert.equal(must(voices[1]).gain, .2);
+  b(); assert.equal(must(voices[1]).gain, 1);
 });
 test('scheduler rejects invalid budgets, data and backwards clocks', () => {
   assert.throws(() => createCueMixer({ output: { playVoice: () => null }, maxLogical: 1, maxAudible: 2 }));

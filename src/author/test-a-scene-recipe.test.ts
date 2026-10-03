@@ -3,6 +3,7 @@
 // FOUNDATION_WRITE_DOCS=1 rewrites that table in place instead of failing when it drifts.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { BUILT_IN_CUES, defineInput, defineScene, defineSystem, testScene } from './index';
 import { CORE_CUES } from '../platform/audio/audio-output';
@@ -48,7 +49,7 @@ test('recipe: the definitions above are the recipe\'s code', () => {
   const recipe = readFileSync(new URL('../../docs/recipes/test-a-scene.md', import.meta.url), 'utf8');
   const code = norm([...recipe.matchAll(/```ts\n([\s\S]*?)```/g)].map(m => m[1]).join('\n'));
   const own = readFileSync(new URL(import.meta.url), 'utf8');
-  const blocks = [...own.matchAll(/\/\/ recipe:begin\n([\s\S]*?)\/\/ recipe:end/g)].map(m => m[1]);
+  const blocks = [...own.matchAll(/\/\/ recipe:begin\n([\s\S]*?)\/\/ recipe:end/g)].map(m => must(m[1], 'recipe block'));
   assert.equal(blocks.length, 2);
   for (const block of blocks) assert.ok(code.includes(norm(block)), `not in the recipe:\n${block}`);
 });

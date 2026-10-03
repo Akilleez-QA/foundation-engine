@@ -519,12 +519,14 @@ export function chooseVariant(def: AssetDef, q: VariantQuery): AssetVariant {
   if (usable.length === 0) throw new Error(`${def.id}: no variant usable on tier '${q.tier}'`);
   const capped = q.maxWidth === undefined ? usable : usable.filter(v => v.width === undefined || v.width <= q.maxWidth!);
   // A cap below every variant keeps the smallest one rather than failing.
-  const pool = capped.length > 0 ? [...capped].sort(preferred) : [[...usable].sort(preferred)[0]];
-  if (q.screenPx === undefined) return pool[pool.length - 1].width === undefined ? pool[0] : pool[pool.length - 1];
+  // usable is non-empty (checked above), so pool is non-empty.
+  const pool = capped.length > 0 ? [...capped].sort(preferred) : [[...usable].sort(preferred)[0]!];
+  const first = pool[0]!, last = pool[pool.length - 1]!;
+  if (q.screenPx === undefined) return last.width === undefined ? first : last;
   const need = q.screenPx * (q.pixelRatio ?? 1) * TEXELS_PER_PIXEL;
-  const wide = pool.filter(v => (v.width ?? 0) >= need);
-  if (wide.length > 0) return wide[0];
-  const top = pool[pool.length - 1].width;
+  const wide = pool.find(v => (v.width ?? 0) >= need);
+  if (wide !== undefined) return wide;
+  const top = last.width;
   return pool.find(v => v.width === top)!;
 }
 

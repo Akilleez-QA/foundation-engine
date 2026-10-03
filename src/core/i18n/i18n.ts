@@ -38,7 +38,7 @@ export function localeChain(locale: string, base: string, fallbacks: Readonly<Re
   };
   const truncations = (tag: string) => {
     const parts = tag.split(/[-_]/);
-    while (parts.length > 1) { parts.pop(); if (parts.length > 1 && parts[parts.length - 1].length === 1) parts.pop(); add(parts.join('-')); }
+    while (parts.length > 1) { parts.pop(); if (parts.length > 1 && parts[parts.length - 1]!.length === 1) parts.pop(); add(parts.join('-')); } // length > 1: last exists
   };
   add(locale);
   const explicit = Object.hasOwn(fallbacks, locale) ? fallbacks[locale] : [];
@@ -118,8 +118,9 @@ export function createI18n<P>(opts: I18nOptions): I18n<P> {
     for (const l of chain()) {
       const c = catalogs.get(l);
       if (!c) continue;
-      if (want === 'detailed' && Object.hasOwn(c, key + DETAILED_SUFFIX)) return { text: c[key + DETAILED_SUFFIX], locale: l };
-      if (Object.hasOwn(c, key)) return { text: c[key], locale: l };
+      // Each read follows an Object.hasOwn check of the same key; a catalog's own values are strings.
+      if (want === 'detailed' && Object.hasOwn(c, key + DETAILED_SUFFIX)) return { text: c[key + DETAILED_SUFFIX]!, locale: l };
+      if (Object.hasOwn(c, key)) return { text: c[key]!, locale: l };
     }
     return null;
   }

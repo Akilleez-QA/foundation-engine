@@ -39,7 +39,7 @@ function helpers(next:()=>number):Rng{
   next,
   range:(lo,hi)=>lo+(hi-lo)*next(),
   int:(lo,hi)=>lo+Math.floor((hi-lo+1)*next()),
-  pick:<T>(arr:readonly T[]):T=>{if(arr.length===0)throw new RangeError('rng.pick: empty array');return arr[Math.floor(arr.length*next())];},
+  pick:<T>(arr:readonly T[]):T=>{if(arr.length===0)throw new RangeError('rng.pick: empty array');return arr[Math.floor(arr.length*next())]!;},// next() in [0,1): index in [0,length)
  };
 }
 

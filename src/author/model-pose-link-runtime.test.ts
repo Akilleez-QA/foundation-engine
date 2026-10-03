@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import * as T from 'three';
 import {World} from '../core/ecs/world';
 import {Transform} from './defs';
@@ -30,7 +31,7 @@ async function fixture(extra:Partial<Parameters<typeof createSceneModels>[0]>={}
  return {world,scene,life,library,owner,spawn,ready,root,errors,close(){owner.dispose();library.dispose();}};
 }
 function vertices(root:T.Object3D){const mesh=root.getObjectByName('surface') as T.SkinnedMesh;return [0,1,2].map(i=>mesh.getVertexPosition(i,new T.Vector3()).applyMatrix4(mesh.matrixWorld).toArray());}
-function near(actual:number[][],expected:number[][]){for(let i=0;i<actual.length;i++)for(let j=0;j<3;j++)assert.ok(Math.abs(actual[i][j]-expected[i][j])<1e-6,`${actual[i]} expected ${expected[i]}`);}
+function near(actual:number[][],expected:number[][]){for(const [i,row] of actual.entries()){const want=must(expected[i],`expected row ${i}`);for(let j=0;j<3;j++)assert.ok(Math.abs(must(row[j])-must(want[j]))<1e-6,`${row} expected ${want}`);}}
 
 test('weighted local pose, source placement and chains publish parent-first in both allocation orders',async()=>{
  for(const reverse of [false,true]){const f=await fixture();try{
@@ -47,7 +48,7 @@ test('weighted local pose, source placement and chains publish parent-first in b
 test('unlink restores mapped scale and ordinary placement before child native animation, including nonidentity asset root',async()=>{
  const f=await fixture({},2);try{const source=f.spawn('source',3),part=f.spawn('part',20);f.world.add(part,link(source));await f.ready(source,part);const child=f.root(part);
  f.world.get(source,Model)!.clip='grow';f.world.get(source,Model)!.playing=true;f.owner.sync(.5);assert.equal(f.owner.poseLinkState(part).status,'ready');assert.equal(child.getObjectByName('B')!.scale.x,1.5);
- f.world.remove(part,ModelPoseLink);f.owner.sync();assert.equal(f.owner.poseLinkState(part).status,'unlinked');assert.equal(child.position.x,20);assert.equal(child.children[0].position.x,2);assert.deepEqual(child.getObjectByName('B')!.scale.toArray(),[1,1,1]);near(vertices(child),[[22,1,0],[24,0,0],[24,0,0]]);
+ f.world.remove(part,ModelPoseLink);f.owner.sync();assert.equal(f.owner.poseLinkState(part).status,'unlinked');assert.equal(child.position.x,20);assert.equal(must(child.children[0],'child node').position.x,2);assert.deepEqual(child.getObjectByName('B')!.scale.toArray(),[1,1,1]);near(vertices(child),[[22,1,0],[24,0,0],[24,0,0]]);
  }finally{f.close();}
 });
 test('combined rigid and weighted graph handles carrier, mapped sockets, mixed cycles and dual root authority',async()=>{

@@ -49,7 +49,8 @@ export function installActionGamepad(o: ActionGamepadOptions): { readonly family
       if (buttonDown(pad.buttons[index], down.has(input))) next.add(input);
     }
     for (const [prefix, offset] of [['ls', 0], ['rs', 2]] as const) {
-      for (const [name, value] of [['left', -pad.axes[offset]], ['right', pad.axes[offset]], ['up', -pad.axes[offset + 1]], ['down', pad.axes[offset + 1]]] as const) {
+      const x = pad.axes[offset] ?? NaN, y = pad.axes[offset + 1] ?? NaN; // a missing axis is not finite, as before
+      for (const [name, value] of [['left', -x], ['right', x], ['up', -y], ['down', y]] as const) {
         const input = `${prefix}-${name}` as PadInput;
         if (Number.isFinite(value) && value > (down.has(input) ? MENU_RELEASE : MENU_ENGAGE)) next.add(input);
       }

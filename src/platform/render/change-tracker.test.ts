@@ -4,6 +4,7 @@ import * as T from 'three';
 import {SunLight} from 'three/addons/lights/SunLight.js';
 import {LightProbeGridWebGL} from 'three/addons/lighting/LightProbeGridWebGL.js';
 import {createColourTracker,createShadowTracker,readBatchState,stillSafe,type Surface} from './change-tracker';
+import {must} from '../../testing/must';
 
 const surface=():Surface=>({domElement:{width:800,height:600},toneMapping:T.ACESFilmicToneMapping,toneMappingExposure:1});
 
@@ -23,7 +24,7 @@ function fixture(){
  const hip=new T.Bone(),knee=new T.Bone();hip.add(knee);knee.position.y=1;skinned.add(hip);
  const hiddenRig=new T.Group();hiddenRig.visible=false;const hand=new T.Bone();hiddenRig.add(hand);scene.add(skinned,hiddenRig);
  scene.updateMatrixWorld(true);skinned.bind(new T.Skeleton([hip,knee,hand]));
- const morph=new T.Mesh(new T.BoxGeometry(),new T.MeshStandardMaterial());morph.geometry.morphAttributes.position=[morph.geometry.attributes.position.clone()];morph.updateMorphTargets();morph.castShadow=true;scene.add(morph);
+ const morph=new T.Mesh(new T.BoxGeometry(),new T.MeshStandardMaterial());morph.geometry.morphAttributes.position=[morph.geometry.getAttribute('position').clone()];morph.updateMorphTargets();morph.castShadow=true;scene.add(morph);
  return {scene,camera,sun,material,box,instanced,batch,cube,ball,pieces,skinned,hip,knee,hand,hiddenRig,morph};
 }
 type Fixture=ReturnType<typeof fixture>;
@@ -50,23 +51,23 @@ const mutations:Mutation[]=[
  ['alpha test',r=>{r.material.alphaTest=.5;},true],
  ['texture upload',r=>{r.material.map=new T.DataTexture(new Uint8Array(4),1,1);},true],
  ['texture version',r=>{r.material.map!.needsUpdate=true;},true],
- ['geometry deformed',r=>{r.box.geometry.attributes.position.needsUpdate=true;},true],
+ ['geometry deformed',r=>{r.box.geometry.getAttribute('position').needsUpdate=true;},true],
  ['instance matrix',r=>{r.instanced.setMatrixAt(1,new T.Matrix4().makeTranslation(1,0,0));r.instanced.instanceMatrix.needsUpdate=true;},true],
  ['instance count',r=>{r.instanced.count=3;},true],
- ['batch setMatrixAt',r=>r.batch.setMatrixAt(r.pieces[0],new T.Matrix4().makeTranslation(0,1,0)),true],
- ['batch setColorAt',r=>r.batch.setColorAt(r.pieces[0],new T.Color(1,0,0)),false],
- ['batch setVisibleAt',r=>r.batch.setVisibleAt(r.pieces[1],false),true],
- ['batch setGeometryIdAt',r=>r.batch.setGeometryIdAt(r.pieces[0],r.ball),true],
- ['batch deleteInstance',r=>r.batch.deleteInstance(r.pieces[1]),true],
+ ['batch setMatrixAt',r=>r.batch.setMatrixAt(must(r.pieces[0]),new T.Matrix4().makeTranslation(0,1,0)),true],
+ ['batch setColorAt',r=>r.batch.setColorAt(must(r.pieces[0]),new T.Color(1,0,0)),false],
+ ['batch setVisibleAt',r=>r.batch.setVisibleAt(must(r.pieces[1]),false),true],
+ ['batch setGeometryIdAt',r=>r.batch.setGeometryIdAt(must(r.pieces[0]),r.ball),true],
+ ['batch deleteInstance',r=>r.batch.deleteInstance(must(r.pieces[1])),true],
  ['batch addInstance',r=>{r.pieces[1]=r.batch.addInstance(r.cube);},true],
  ['batch setGeometryAt',r=>r.batch.setGeometryAt(r.ball,new T.SphereGeometry(.4,8,6)),true],
  ['bone pose',r=>{r.knee.rotation.z=.3;},true],
  ['bone under hidden ancestor',r=>{r.hand.position.x=2;},true],
  ['hidden ancestor moves',r=>{r.hiddenRig.position.y=1;},true],
- ['inverse bind',r=>{r.skinned.skeleton.boneInverses[2].makeTranslation(-1,0,0);},true],
+ ['inverse bind',r=>{must(r.skinned.skeleton.boneInverses[2]).makeTranslation(-1,0,0);},true],
  ['bind matrix',r=>{r.skinned.bindMatrix.makeTranslation(0,.1,0);r.skinned.bindMatrixInverse.copy(r.skinned.bindMatrix).invert();},true],
  ['bind mode',r=>{r.skinned.bindMode=T.DetachedBindMode;},true],
- ['skeleton reordered',r=>{const s=r.skinned.skeleton;r.skinned.bind(new T.Skeleton([s.bones[1],s.bones[0],s.bones[2]],[s.boneInverses[1],s.boneInverses[0],s.boneInverses[2]]),r.skinned.bindMatrix);},true],
+ ['skeleton reordered',r=>{const s=r.skinned.skeleton;r.skinned.bind(new T.Skeleton([must(s.bones[1]),must(s.bones[0]),must(s.bones[2])],[must(s.boneInverses[1]),must(s.boneInverses[0]),must(s.boneInverses[2])]),r.skinned.bindMatrix);},true],
  ['skeleton replaced',r=>{const s=r.skinned.skeleton;r.skinned.bind(new T.Skeleton(s.bones.slice(),s.boneInverses.map(m=>m.clone())),r.skinned.bindMatrix);},true],
  ['bone reparented',r=>{r.hip.attach(r.hand);},true],
  ['morph weight',r=>{r.morph.morphTargetInfluences![0]=.5;},true],
@@ -107,12 +108,12 @@ test('ADR 0057 counterexamples: a hidden-ancestor bone and an inverse-bind-only 
  // The visible-node signature of the old tracker misses both; the skinned vertex still moves on screen.
  const r=fixture(),t=trackers(r);t.colourDue();t.shadowDue();
  r.hand.position.x=3;assert.equal(t.colourDue(),true);assert.equal(t.shadowDue(),true);
- r.skinned.skeleton.boneInverses[2].makeTranslation(-2,0,0);assert.equal(t.colourDue(),true);assert.equal(t.shadowDue(),true);
+ must(r.skinned.skeleton.boneInverses[2]).makeTranslation(-2,0,0);assert.equal(t.colourDue(),true);assert.equal(t.shadowDue(),true);
  // setGeometryIdAt changes no texture version. r186 also raises the private _visibilityChanged flag (r183 did not);
  // the trackers never read that flag, so it is cleared again here: only the ordered instance scan can see the change.
- const before=r.batch.getGeometryIdAt(r.pieces[2]),matrices=readBatchState(r.batch)!.matrices.version;
+ const before=r.batch.getGeometryIdAt(must(r.pieces[2])),matrices=readBatchState(r.batch)!.matrices.version;
  const flags=r.batch as unknown as {_visibilityChanged:boolean};flags._visibilityChanged=false;
- r.batch.setGeometryIdAt(r.pieces[2],before===r.cube?r.ball:r.cube);
+ r.batch.setGeometryIdAt(must(r.pieces[2]),before===r.cube?r.ball:r.cube);
  assert.equal(flags._visibilityChanged,true,'three r186 flags the instance change');flags._visibilityChanged=false;
  assert.equal(readBatchState(r.batch)!.matrices.version,matrices);assert.equal(flags._visibilityChanged,false);
  assert.equal(t.colourDue(),true);assert.equal(t.shadowDue(),true);
@@ -174,7 +175,7 @@ test('adapter contract: three 0.186 exposes the private batch state the trackers
  const b=new T.BatchedMesh(4,100,300,new T.MeshBasicMaterial()),g=b.addGeometry(new T.BoxGeometry()),i=b.addInstance(g);
  const s=readBatchState(b);assert.ok(s);assert.ok(s.matrices.isDataTexture);assert.equal(s.colors,null);
  assert.deepEqual(s.instances.map(x=>[x.active,x.visible,x.geometryIndex]),[[true,true,g]]);
- assert.deepEqual(Object.keys(s.geometries[0]).filter(k=>['active','vertexStart','vertexCount','indexStart','indexCount','start','count'].includes(k)).sort(),['active','count','indexCount','indexStart','start','vertexCount','vertexStart']);
+ assert.deepEqual(Object.keys(must(s.geometries[0])).filter(k=>['active','vertexStart','vertexCount','indexStart','indexCount','start','count'].includes(k)).sort(),['active','count','indexCount','indexStart','start','vertexCount','vertexStart']);
  const version=s.matrices.version;b.setMatrixAt(i,new T.Matrix4().makeScale(2,2,2));assert.ok(s.matrices.version>version);
  b.setColorAt(i,new T.Color(1,0,0));assert.ok(readBatchState(b)!.colors?.isDataTexture);
 });
@@ -188,9 +189,9 @@ test('timing: tracker scans for 1,000 objects plus a 60-bone rig (ADR 0056 rever
  const bones:T.Bone[]=[];for(let i=0;i<60;i++){const b=new T.Bone();b.position.y=.1;(bones[i-1]??scene).add(b);bones.push(b);}
  const rig=new T.SkinnedMesh(new T.BoxGeometry(),new T.MeshStandardMaterial());rig.castShadow=true;scene.add(rig);scene.updateMatrixWorld(true);rig.bind(new T.Skeleton(bones));
  const out=surface(),colour=createColourTracker(),shadow=createShadowTracker();
- const time=(scan:()=>void)=>{for(let i=0;i<2000;i++)scan();const samples:number[]=[];for(let k=0;k<25;k++){const c0=process.cpuUsage();for(let i=0;i<40;i++)scan();const used=process.cpuUsage(c0);samples.push((used.user+used.system)/1e3/40);}samples.sort((a,b)=>a-b);return {median:samples[12],p90:samples[22]};};
+ const time=(scan:()=>void)=>{for(let i=0;i<2000;i++)scan();const samples:number[]=[];for(let k=0;k<25;k++){const c0=process.cpuUsage();for(let i=0;i<40;i++)scan();const used=process.cpuUsage(c0);samples.push((used.user+used.system)/1e3/40);}samples.sort((a,b)=>a-b);return {median:must(samples[12]),p90:must(samples[22])};};
  const c=time(()=>colour.scan(out,[scene,camera])),s=time(()=>shadow.scan(scene));
- const pose=time(()=>{bones[30].rotation.z+=1e-3;colour.scan(out,[scene,camera]);});
+ const pose=time(()=>{must(bones[30]).rotation.z+=1e-3;colour.scan(out,[scene,camera]);});
  console.log(`[change-tracker timing] 1000 meshes + 60-bone rig: colour scan median ${(c.median*1000).toFixed(1)} µs (p90 ${(c.p90*1000).toFixed(1)}), ${colour.stats.values} values; shadow scan median ${(s.median*1000).toFixed(1)} µs (p90 ${(s.p90*1000).toFixed(1)}), ${shadow.stats.values} values; colour scan while posing ${(pose.median*1000).toFixed(1)} µs`);
  assert.ok(colour.stats.forced===0&&shadow.stats.forced===0);
 });

@@ -72,7 +72,7 @@ export function directorSystem(lesson: Lesson | LessonInput, o: { provider?: Dis
         if (c === 'pause') { if (d.main.paused) d.resume(); else d.pause(); } else d[c]();
       }
       const quiz = d.view().quiz;
-      for (const k of [1, 2, 3]) if (input.pressed(`learn-option-${k}`) && quiz?.options[k - 1]) v.answers.push(quiz.options[k - 1].id);
+      for (const k of [1, 2, 3]) if (input.pressed(`learn-option-${k}`)) { const option = quiz?.options[k - 1]; if (option) v.answers.push(option.id); }
       for (const a of v.answers) d.answer(a);
       v.answers.length = 0;
       const sim = d.scene.sim;

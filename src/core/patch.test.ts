@@ -4,6 +4,7 @@ import { adminOf, type Registry } from './registry';
 import { createApp } from './app';
 import { defineModule } from './module';
 import { evaluateNeeds, patch } from './patch';
+import { must } from '../testing/must';
 
 interface TrailDef { id: string; trail: string[] }
 interface ShopItemDef { id: string; price: number; look: { colour: string; tags: string[] } }
@@ -40,10 +41,10 @@ test('patches run in ModuleManager pass order (first → before/for/after per mo
   assert.deepEqual(app.registries.ktpTrails.get('x').trail,
     ['z-first', 'a', 'z-after-a', 'z-before-b', 'b', 'z-default', 'z-not-missing', 'z-final']);
   const skipped = Object.fromEntries(report.patches.skipped.map(s => [s.patch, s.reason]));
-  assert.match(skipped['pack.ktp-z/z-needs-missing'], /needs 'feature\.ktp-missing' not met/);
-  assert.match(skipped['pack.ktp-z/z-before-absent'], /before:feature\.ktp-absent: that module is not installed/);
-  assert.match(skipped['pack.ktp-z/z-no-match'], /no entry matches nothing-\*/);
-  assert.match(skipped['pack.ktp-z/z-flag'], /flag:ktp-on/);
+  assert.match(must(skipped['pack.ktp-z/z-needs-missing'], 'z-needs-missing'), /needs 'feature\.ktp-missing' not met/);
+  assert.match(must(skipped['pack.ktp-z/z-before-absent'], 'z-before-absent'), /before:feature\.ktp-absent: that module is not installed/);
+  assert.match(must(skipped['pack.ktp-z/z-no-match'], 'z-no-match'), /no entry matches nothing-\*/);
+  assert.match(must(skipped['pack.ktp-z/z-flag'], 'z-flag'), /flag:ktp-on/);
   assert.deepEqual(report.patches.errors.map(e => e.patch), ['feature.ktp-a/a-final'], "'final' belongs to packs only");
   assert.deepEqual(adminOf(app.registries.ktpTrails).provenance('x').filter(p => p.action === 'patch').map(p => p.note)[0], 'pack.ktp-z/z-first');
 
@@ -54,7 +55,7 @@ test('patches run in ModuleManager pass order (first → before/for/after per mo
   const app2 = createApp([owner, thrower], { mode: 'test', ...quiet });
   const r2 = await app2.boot();
   assert.deepEqual(app2.registries.ktpTrails.get('x').trail, []);
-  assert.equal(r2.patches.errors[0].error, 'nope');
+  assert.equal(r2.patches.errors[0]?.error, 'nope');
 
   // The needs grammar: ',' and '&' are AND, '|' is OR, '!' negates.
   const has = (t: string) => t === 'a' || t === 'b';
@@ -91,8 +92,9 @@ test('the first content pack: a seasonal shop that edits, copies and removes ent
   assert.deepEqual(items.all().map(i => `${i.id}:${i.price}:${i.look.colour}`), ['hat-plain:1:orange', 'scarf:4:red', 'hat-witch:5:orange']);
   assert.deepEqual(items.get('hat-witch').look.tags, ['hat', 'halloween']);
   assert.deepEqual(items.get('hat-plain').look.tags, ['hat'], 'the copy does not share arrays with its source');
-  assert.equal(shopRows[0].price, 3, 'authored content objects are never mutated');
-  assert.equal(shopRows[0].look.colour, 'grey');
+  const firstRow = must(shopRows[0], 'the first shop row');
+  assert.equal(firstRow.price, 3, 'authored content objects are never mutated');
+  assert.equal(firstRow.look.colour, 'grey');
   assert.equal(adminOf(items).sourceOf('hat-witch'), 'pack.ktp-seasonal-shop');
   assert.deepEqual(adminOf(items).provenance('hat-summer').map(p => `${p.action}:${p.source}`), ['add:feature.ktp-shop', 'patch:pack.ktp-seasonal-shop', 'remove:pack.ktp-seasonal-shop']);
   assert.deepEqual(report.patches.applied.map(p => p.patch), [

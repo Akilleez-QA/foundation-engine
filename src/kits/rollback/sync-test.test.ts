@@ -4,6 +4,7 @@ import { createRng } from '../../core/rng';
 import { createRollbackSyncTest } from './sync-test';
 import { INPUTS, toyPorts, toyStep, type Toy } from './test-harness';
 import type { SyncTestOptions } from './types';
+import { must } from '../../testing/must';
 
 const options = (ports: SyncTestOptions['ports'], o: Partial<SyncTestOptions> = {}): SyncTestOptions =>
   ({ checkDistance: 3, maxStateBytes: 4096, maxInputBytes: 8, players: 2, ports, ...o });
@@ -11,7 +12,7 @@ const drive = (frames: number, ports: SyncTestOptions['ports'], o: Partial<SyncT
   const sync = createRollbackSyncTest(options(ports, o)), rng = createRng(11);
   let last: ReturnType<typeof sync.advance> | undefined;
   for (let f = 0; f < frames; f++) {
-    last = sync.advance([INPUTS[rng.int(0, 3)], INPUTS[rng.int(0, 3)]]);
+    last = sync.advance([must(INPUTS[rng.int(0, 3)]), must(INPUTS[rng.int(0, 3)])]);
     if (last.status !== 'checked') break;
   }
   return { sync, last: last! };

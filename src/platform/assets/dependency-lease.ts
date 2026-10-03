@@ -60,7 +60,7 @@ export function createDependencyLease<T>(options:DependencyOptions<T>){
     if(item.error!==undefined||!item.value||!Number.isSafeInteger(item.value.bytes)||item.value.bytes<0||item.value.bytes>nodes.get(item.id)!.bytes){if(item.value)release(item.id,item.value);if(closed)return work;states.set(item.id,'failed');if(critical.has(item.id)){failure=true;closed=true;cleanup();return work;}}
     else {held.set(item.id,item.value);states.set(item.id,'ready');}
    }
-   for(let examined=0;examined<order.length&&work<maxWork&&active<maxConcurrent;examined++){const id=order[cursor];cursor=(cursor+1)%order.length;work++;if(states.get(id)!=='waiting')continue;
+   for(let examined=0;examined<order.length&&work<maxWork&&active<maxConcurrent;examined++){const id=order[cursor]!;/* cursor < order.length (non-empty inside this loop) */cursor=(cursor+1)%order.length;work++;if(states.get(id)!=='waiting')continue;
     if(!admissible(id))continue;
     const node=nodes.get(id)!;
     if(node.dependencies.some(d=>states.get(d)==='failed')){states.set(id,'failed');continue;}

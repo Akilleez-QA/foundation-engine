@@ -5,6 +5,7 @@ import { defineSaveSection } from '../../author';
 import { authorSaveHandle } from '../../author/save-handle';
 import { createSaveStore } from '../../core/save/store';
 import { MemoryBackend } from '../../core/save/storage-port';
+import { must } from '../../testing/must';
 
 const shop: DialogueDefinition = {
   id: 'shop', start: 'hello',
@@ -123,7 +124,7 @@ test('definitions validate variables, conditions and assignments, with bounded t
 test('authored definitions are copied: later edits to conditions or variables change nothing', () => {
   const def = structuredClone(shop), d = createDialogue(def, 'run');
   (def.variables as Record<string, unknown>).coins = 0;
-  (def.nodes[0].options[0] as { when: unknown }).when = { fact: 'never' };
+  (must(def.nodes[0]?.options[0]) as { when: unknown }).when = { fact: 'never' };
   assert.deepEqual(ids(d), ['buy', 'chat', 'bye']);
   const vars = d.variables() as Record<string, unknown>; vars.coins = 99;
   assert.equal(d.variables().coins, 3);

@@ -9,6 +9,7 @@ import { controlsSettingsModule } from './controls-settings-module';
 import { bindControlsSettings, controlsSettingsSection } from './controls-settings';
 import { BACK, type ActionOverrides } from './actions';
 import type { SaveSection } from '../../core/save/section';
+import {must} from '../../testing/must';
 
 const timers = { set: () => 0, clear() {}, now: () => 0 };
 const options = { id: 'preferences.controls', scope: 'player' as const };
@@ -34,7 +35,7 @@ test('optional composed controls module persists overrides and follows player ow
     controls.set(value);
     value[BACK].keys[0] = 'z';
     assert.deepEqual(app.services.input.effective(BACK), { keys: ['q'], pad: defaults.pad });
-    assert.ok(Object.isFrozen(controls.get()[BACK].keys));
+    assert.ok(Object.isFrozen(must(controls.get()[BACK]).keys));
     app.services.save.flush('test');
     const other = app.services.save.addPlayer('Other');
     app.services.save.setActivePlayer(other);
@@ -47,7 +48,7 @@ test('optional composed controls module persists overrides and follows player ow
     next = setup(fake.document as unknown as Document, disk).app;
     await next.boot();
     assert.deepEqual(next.services.input.effective(BACK).keys, ['q']);
-    assert.deepEqual(next.services.controlsSettings.get()['absent.action'].pad, ['x']);
+    assert.deepEqual(must(next.services.controlsSettings.get()['absent.action']).pad, ['x']);
     next.services.controlsSettings.reset();
     assert.deepEqual(next.services.input.effective(BACK), defaults);
   } finally { next?.dispose(); app.dispose(); fake.restore(); }
@@ -64,8 +65,8 @@ test('saved controls reject malformed or oversized bindings and detach nested va
   const source = { a: { keys: ['code:KeyW'], pad: [] } };
   const snapshot = section.parse(source);
   source.a.keys.push('q');
-  assert.deepEqual(snapshot.a.keys, ['code:KeyW']);
-  assert.deepEqual(snapshot.a.pad, []);
+  assert.deepEqual(must(snapshot.a).keys, ['code:KeyW']);
+  assert.deepEqual(must(snapshot.a).pad, []);
 });
 
 test('reentrant saved remaps keep the newest value and disposal stops subscriptions', async () => {
@@ -81,7 +82,7 @@ test('reentrant saved remaps keep the newest value and disposal stops subscripti
     controls.set({ [BACK]: { keys: ['o'] } });
     assert.equal(cancels, 1, 'nested remapping does not recurse through cancellation listeners');
     assert.deepEqual(app.services.input.effective(BACK).keys, ['n']);
-    assert.deepEqual(controls.get()[BACK].keys, ['n']);
+    assert.deepEqual(must(controls.get()[BACK]).keys, ['n']);
     off();
     controls.dispose();
     app.services.save.section(app.registries.saveSections.get(options.id)).replace({ [BACK]: { keys: ['d'] } });

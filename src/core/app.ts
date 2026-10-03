@@ -159,7 +159,8 @@ export function createApp(input: readonly EngineModule[], opts: AppOptions): App
     input.forEach((m, i) => {
       const had = first.get(m.id);
       if (had !== undefined) {
-        duplicates.push({ registry: 'modules', id: m.id, problem: `module id declared twice, by ${where(input[had], had)} and by ${where(m, i)}; boot stops` });
+        // `had` is an index this forEach recorded for an earlier element of `input`.
+        duplicates.push({ registry: 'modules', id: m.id, problem: `module id declared twice, by ${where(input[had]!, had)} and by ${where(m, i)}; boot stops` });
         return;
       }
       first.set(m.id, i);
@@ -321,7 +322,7 @@ export function createApp(input: readonly EngineModule[], opts: AppOptions): App
   function installPhase(from = 0): Promise<void> | void {
     for (let i = from; i < order.length; i++) {
       appCtl.signal.throwIfAborted();
-      const id = order[i];
+      const id = order[i]!; // i < order.length
       const m = byId.get(id)!; if (!alive(id)) continue;
       const ctl = new AbortController(), allowed = closure(m), t0 = now();
       const claimedKeys = new Set((m.serviceKeys ?? []).map(String)), claimedAreas = new Set(m.eventAreas ?? []);

@@ -61,13 +61,14 @@ export function cameraSystem(mode: CameraMode, o: CameraOptions & { target?: str
       if (!tr && mode !== 'fixed') { previous.delete(ctx.world); return; }
       const pose = cameraPose(mode, tr ? { x: tr.x, y: tr.y, z: tr.z, heading: tr.ry } : { x: 0, y: 0, z: 0, heading: 0 }, { ...o, ...o.options?.(ctx) });
       const old = previous.get(ctx.world);
-      const discontinuity = old && o.teleportDistance !== undefined && Math.hypot(...pose.target.map((v, i) => v - old[i])) > o.teleportDistance;
+      const discontinuity = old && o.teleportDistance !== undefined && Math.hypot(...pose.target.map((v, i) => v - old[i]!)) > o.teleportDistance;
       previous.set(ctx.world, [...pose.target]);
       const k = revisionChanged || discontinuity ? 1 : (o.smooth ?? 0.12) <= 0 ? 1 : 1 - Math.exp(-dt / (o.smooth ?? 0.12));
       const cam = ctx.view.camera;
+      // Vec3 triples: every map index i is in range (old is a copy of a previous target).
       const ease = (from: Vec3, to: Vec3): Vec3 => {
-        const next = from.map((v, i) => v + (to[i] - v) * k) as Vec3;
-        return next.every((v, i) => Math.abs(v - to[i]) < 1e-3) ? to : next;
+        const next = from.map((v, i) => v + (to[i]! - v) * k) as Vec3;
+        return next.every((v, i) => Math.abs(v - to[i]!) < 1e-3) ? to : next;
       };
       const eased = { position: ease(cam.position, pose.position), target: ease(cam.target, pose.target) };
       const { position, target } = o.obstruction ? clearCamera(eased, o.obstruction, o.clearanceRadius, o.clearancePadding) : eased;

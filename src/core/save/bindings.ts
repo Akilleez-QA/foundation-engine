@@ -18,7 +18,7 @@ export interface ImportOptions {
 export function importJson(key: (player: PlayerId) => string, o: ImportOptions = {}): LegacyBinding {
   return {
     mode: 'import', keys: p => [key(p)], fromVersion: 1, mirror: o.mirror, session: o.session,
-    decode: ([raw]) => (raw === null ? null : JSON.parse(raw)),
+    decode: ([raw]) => (raw === null ? null : JSON.parse(raw!)), // one raw per key, and keys() has one
     encode: v => [v === null || v === undefined ? null : JSON.stringify(v)],
   };
 }

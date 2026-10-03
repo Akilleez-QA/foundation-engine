@@ -34,7 +34,7 @@ export const narrationCatalogKey = (legacyKey: string) => 'narration.' + legacyK
 
 /** The hole names of a pattern, in order of first appearance. */
 export function narrationFamilyHoles(pattern: string): string[] {
-  return [...new Set([...pattern.matchAll(HOLE)].map(m => m[1]))];
+  return [...new Set([...pattern.matchAll(HOLE)].map(m => m[1]!))]; // HOLE's group 1 is not optional
 }
 
 /** Structural problems with one family: holes without a domain, unused domains, empty domains, stray exceptions. */
@@ -45,9 +45,10 @@ export function narrationFamilyProblems(def: NarrationFamilyDef): string[] {
   if (!def.id.startsWith('narration-family.')) problems.push(`${def.id}: id must start with "narration-family."`);
   if (!holes.length) problems.push(`${def.id}: pattern "${def.pattern}" has no {holes}; a fixed key is not a family`);
   for (const h of holes) {
+    // Past the first branch, h is an own key of domain.
     if (!Object.hasOwn(domain, h)) problems.push(`${def.id}: hole {${h}} has no domain`);
-    else if (!domain[h].length) problems.push(`${def.id}: hole {${h}} has an empty domain`);
-    else if (new Set(domain[h].map(String)).size !== domain[h].length) problems.push(`${def.id}: hole {${h}} repeats a value`);
+    else if (!domain[h]!.length) problems.push(`${def.id}: hole {${h}} has an empty domain`);
+    else if (new Set(domain[h]!.map(String)).size !== domain[h]!.length) problems.push(`${def.id}: hole {${h}} repeats a value`);
   }
   for (const d of Object.keys(domain)) if (!holes.includes(d)) problems.push(`${def.id}: domain "${d}" is not a hole in "${def.pattern}"`);
   if (problems.length) return problems;
@@ -94,7 +95,8 @@ function expandGrid(def: NarrationFamilyDef): string[] {
   let keys = [def.pattern];
   for (const h of narrationFamilyHoles(def.pattern)) {
     const next: string[] = [];
-    for (const k of keys) for (const v of domain[h]) next.push(k.split(`{${h}}`).join(String(v)));
+    // Callers validate first (narrationFamilyProblems): every hole has a domain.
+    for (const k of keys) for (const v of domain[h]!) next.push(k.split(`{${h}}`).join(String(v)));
     keys = next;
   }
   return keys;

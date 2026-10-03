@@ -95,7 +95,7 @@ function rules(raw: unknown, b: ProgressionBounds): ProgressionRules {
   // Iterative DAG validation does not exhaust the call stack for deep authored trees.
   const ready = skills.filter(s => s.requires.length === 0).map(s => s.id);
   for (let i = 0; i < ready.length; i++) {
-    for (const child of dependents.get(ready[i]) ?? []) {
+    for (const child of dependents.get(ready[i]!) ?? []) { // i < ready.length
       const left = pending.get(child)! - 1; pending.set(child, left); if (left === 0) ready.push(child);
     }
   }

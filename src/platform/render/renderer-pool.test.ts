@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRendererPool, type PoolRenderer, type RendererPoolOptions } from './renderer-pool';
+import {must} from '../../testing/must';
 
 /** A minimal element: children, attributes, listeners with AbortSignal removal. */
 class El {
@@ -232,7 +233,7 @@ test('shell handover and probes do not construct a pool, then address the existi
   lease.release();
   settleAppRendererPool();
   assert.equal(rendererPoolStats()?.contexts, 0, 'released surface is retired by the original owner');
-  assert.equal(contexts[0].lost, true);
+  assert.equal(must(contexts[0]).lost, true);
   assert.equal(constructions, 1);
 });
 

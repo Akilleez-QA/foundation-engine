@@ -131,8 +131,7 @@ export function captureAuthorityEnvelope(
   // This validates possible metadata interleaving, not evicted payload authenticity.
   events.sort((a, b) => a.revision - b.revision);
   let omitted = 0;
-  for (let i = 0; i < events.length; i++) {
-    const event = events[i];
+  for (const [i, event] of events.entries()) {
     const available = event.revision - 1 - i;
     if (event.omittedPrefix > available - omitted)
       throw Error('authority: impossible receipt chronology');

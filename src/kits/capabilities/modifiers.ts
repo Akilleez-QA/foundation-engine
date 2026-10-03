@@ -19,7 +19,7 @@ export function createModifiers(base: Readonly<Record<string, number>>, maxSourc
         if(rows)rows.push(Object.freeze({source,row,stat:m.stat,add:m.add,multiply:m.multiply}));
       }
     }
-    const value=(initial[stat]+add)*multiply;
+    const value=(initial[stat]!+add)*multiply; // callers pass only own keys of initial
     if(!Number.isFinite(value))throw Error('modifiers: overflow');
     return {add,multiply,value};
   };
@@ -54,7 +54,7 @@ export function createModifiers(base: Readonly<Record<string, number>>, maxSourc
       if(typeof stat!=='string')throw Error('modifiers: stat must be a string');
       if(!Object.hasOwn(initial,stat))return null;
       const contributions:ModifierExplanationRow[]=[],result=evaluateStat(stat,sources,contributions);
-      return Object.freeze({stat,base:initial[stat],additive:result.add,multiplier:result.multiply,value:result.value,contributions:Object.freeze(contributions)});
+      return Object.freeze({stat,base:initial[stat]!/* own key: checked above */,additive:result.add,multiplier:result.multiply,value:result.value,contributions:Object.freeze(contributions)});
     },
   };
 }

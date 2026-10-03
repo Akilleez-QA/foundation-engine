@@ -9,6 +9,7 @@ import { hashText } from './hash';
 import type { OpenLimits } from './log';
 import { recordSceneRun, replaySceneLog, sceneReplayDigest, worldDigest, WORLD_DIGEST_LIMITS } from './scene';
 import { observeWorld, replayDigest, replayStateText, selectWorldState, toReplayDigest } from './state';
+import { must } from '../../testing/must';
 
 const Cosmetic = defineComponent('cosmetic', {});
 const Score = defineComponent('score', { value: 0 });
@@ -63,19 +64,19 @@ test('SIM-02 replay digest: the digest is the hash of the canonical state text, 
   assert.equal(observeWorld(trace, 0, w, counted, WORLD_DIGEST_LIMITS, worldDigest, v => { seen = v; }), 'sampled');
   assert.equal(calls, 1, 'one state read serves both the digest and the detail');
   const snap = trace.read();
-  assert.equal(snap.entries[0][1], hashText(snap.details[0][1]));
-  assert.equal(seen, snap.entries[0][1]);
-  assert.equal(snap.details[0][1], replayStateText(w, d, WORLD_DIGEST_LIMITS));
+  assert.equal(must(snap.entries[0])[1], hashText(must(snap.details[0])[1]));
+  assert.equal(seen, must(snap.entries[0])[1]);
+  assert.equal(must(snap.details[0])[1], replayStateText(w, d, WORLD_DIGEST_LIMITS));
   // The cosmetic entity does not move the digest; a selected component does.
   w.get(orb, Transform)!.y = 5;
-  assert.equal(hashText(replayStateText(w, d, WORLD_DIGEST_LIMITS)), snap.entries[0][1]);
+  assert.equal(hashText(replayStateText(w, d, WORLD_DIGEST_LIMITS)), must(snap.entries[0])[1]);
   w.get(1, Transform)!.x = 2;
-  assert.notEqual(hashText(replayStateText(w, d, WORLD_DIGEST_LIMITS)), snap.entries[0][1]);
+  assert.notEqual(hashText(replayStateText(w, d, WORLD_DIGEST_LIMITS)), must(snap.entries[0])[1]);
   // Without a creator digest, the default world digest is kept and the detail shows its coverage.
   const plain = createDigestTrace({ identity: 'i', every: 1, maxEntries: 8, maxDigestLength: 16, detail: { from: 0, to: 8, maxChars: 1 << 16 } });
   observeWorld(plain, 0, w, null, WORLD_DIGEST_LIMITS, worldDigest);
-  assert.equal(plain.read().entries[0][1], worldDigest(w));
-  assert.deepEqual(Object.keys(JSON.parse(plain.read().details[0][1])), ['count', 'entities', 'resources']);
+  assert.equal(must(plain.read().entries[0])[1], worldDigest(w));
+  assert.deepEqual(Object.keys(JSON.parse(must(plain.read().details[0])[1])), ['count', 'entities', 'resources']);
 });
 
 test('SIM-02 replay digest: a divergence names the first differing entity, component and field', () => {
@@ -83,20 +84,20 @@ test('SIM-02 replay digest: a divergence names the first differing entity, compo
   const text = (v: unknown) => JSON.stringify(v);
   const edit = (f: (v: typeof base) => void) => { const v = structuredClone(base); f(v); return text(v); };
   const found = (b: string) => explainDivergence(7, text(base), b);
-  assert.deepEqual(found(edit(v => { (v.entities[1][1] as { transform: { y: number } }).transform.y = 0.5; })),
+  assert.deepEqual(found(edit(v => { (must(v.entities[1])[1] as { transform: { y: number } }).transform.y = 0.5; })),
     { status: 'found', tick: 7, kind: 'value', path: 'entities[1][1].transform.y', entity: 4, component: 'transform', field: 'y', resource: null, a: '0', b: '0.5' });
   // The first difference in canonical order wins: entity 1 (score before transform), not entity 4.
-  const two = found(edit(v => { (v.entities[0][1] as { score: { value: number } }).score.value = 4; (v.entities[1][1] as { transform: { x: number } }).transform.x = 9; }));
+  const two = found(edit(v => { (must(v.entities[0])[1] as { score: { value: number } }).score.value = 4; (must(v.entities[1])[1] as { transform: { x: number } }).transform.x = 9; }));
   assert.deepEqual(two.status === 'found' && [two.entity, two.component, two.field], [1, 'score', 'value']);
   // A component present on one side only.
-  const missing = found(edit(v => { delete (v.entities[0][1] as { score?: unknown }).score; }));
+  const missing = found(edit(v => { delete (must(v.entities[0])[1] as { score?: unknown }).score; }));
   assert.deepEqual(missing.status === 'found' && [missing.kind, missing.entity, missing.component, missing.field, missing.a, missing.b], ['removed', 1, 'score', null, '{"value":3}', null]);
   // Entity sets: an extra entity, a missing entity, a different entity at the same position.
   const extra = found(edit(v => { v.entities.push([9, { transform: { x: 0, y: 0 } }]); }));
   assert.deepEqual(extra.status === 'found' && [extra.kind, extra.entity, extra.path, extra.a], ['entity-set', 9, 'entities[2]', null]);
   const gone = found(edit(v => { v.entities.pop(); }));
   assert.deepEqual(gone.status === 'found' && [gone.kind, gone.entity, gone.b], ['entity-set', 4, null]);
-  const swapped = found(edit(v => { v.entities[1][0] = 5; }));
+  const swapped = found(edit(v => { must(v.entities[1])[0] = 5; }));
   assert.deepEqual(swapped.status === 'found' && [swapped.kind, swapped.entity], ['entity-set', 4]);
   // Resources, nested fields, type changes.
   const res = found(edit(v => { v.resources.nest.a[1] = 3; }));

@@ -47,7 +47,8 @@ export function authorPose(matrix: readonly number[]) {
   const source = new Matrix4().fromArray(poseMatrix(matrix)), p = new Vector3(), q = new Quaternion(), s = new Vector3(); source.decompose(p, q, s);
   if (Math.abs(s.x - s.y) > 1e-6 || Math.abs(s.x - s.z) > 1e-6) throw Error('author pose requires uniform scale');
   const rebuilt = new Matrix4().compose(p, q, s);
-  if (rebuilt.elements.some((v, i) => Math.abs(v - source.elements[i]) > 1e-6)) throw Error('author pose cannot represent shear');
+  // Both are 16-element matrices: i is in range.
+  if (rebuilt.elements.some((v, i) => Math.abs(v - source.elements[i]!) > 1e-6)) throw Error('author pose cannot represent shear');
   const r = new Euler().setFromQuaternion(q, 'XYZ');
   return { x: p.x, y: p.y, z: p.z, rx: r.x, ry: r.y, rz: r.z, scale: s.x };
 }
