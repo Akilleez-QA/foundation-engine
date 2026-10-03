@@ -38,12 +38,13 @@ try {
  assert.equal(report.renderCounts.drawsPerFrame,3,'two model primitives and one floor draw');
  assert.equal(report.renderCounts.trisPerFrame,14,'twelve model triangles plus two floor triangles');
  assert.equal(report.budget.status,'within budget');
- assert.deepEqual(report.errors,[]); report.passed=true;
+ report.passed=true;
 } catch (error) {
  evidence.fail(error);
 } finally {
  await evidence.close(browser,'browser cleanup');
  await evidence.close(server,'server cleanup');
+ if(report.errors.length) evidence.fail(Error(report.errors.join('\n')),'page or console errors');
  evidence.finish();
 }
 console.log(JSON.stringify(report,null,2));
