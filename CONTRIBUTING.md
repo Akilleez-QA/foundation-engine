@@ -1,5 +1,12 @@
 # Contributing to Foundation Engine
 
+```text
+      [##]          FOUNDATION ENGINE
+    [======]        =================
+  [==][==][==]      PLAYER 2 HAS JOINED
+ [############]
+```
+
 Foundation Engine is infrastructure for independently authored browser games. Contributions should improve a reusable engine contract, an optional kit, or a small template that demonstrates a contract. A game's world, campaign, economy rules, and progression content belong in that game's repository.
 
 Read [AGENTS.md](AGENTS.md), [the architecture standard](docs/STANDARD.md), and the relevant [recipe](docs/recipes/) before changing code. These documents apply to human and assisted contributions. Review [the conduct policy](CODE_OF_CONDUCT.md) and [security reporting guidance](SECURITY.md).
