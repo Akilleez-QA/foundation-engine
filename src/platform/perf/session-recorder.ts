@@ -46,7 +46,7 @@ export class FixedHistogram {
   private readonly counts = new Uint32Array(HISTOGRAM_BINS);
   count = 0; sum = 0; min = Infinity; max = -Infinity;
   add(ms: number): void {
-    this.counts[binOf(ms)]++;
+    this.counts[binOf(ms)]!++; // a bin index from binOf (typed array: no undefined element)
     this.count++; this.sum += ms;
     if (ms < this.min) this.min = ms;
     if (ms > this.max) this.max = ms;
@@ -58,7 +58,7 @@ export class FixedHistogram {
     const rank = Math.max(1, Math.ceil(p * this.count));
     let seen = 0;
     for (let b = 0; b < HISTOGRAM_BINS; b++) {
-      seen += this.counts[b];
+      seen += this.counts[b]!; // b < HISTOGRAM_BINS = counts.length
       if (seen >= rank) return Math.max(this.min, Math.min(this.max, upperEdge(b)));
     }
     return this.max;
@@ -241,10 +241,11 @@ export function slope(xs: readonly number[], ys: readonly number[]): number | nu
   const n = xs.length;
   if (n < 2) return null;
   let mx = 0, my = 0;
-  for (let i = 0; i < n; i++) { mx += xs[i]; my += ys[i]; }
+  // i < n = xs.length; ys is expected to be xs-aligned (a shorter ys gives NaN, as before).
+  for (let i = 0; i < n; i++) { mx += xs[i]!; my += ys[i]!; }
   mx /= n; my /= n;
   let sxx = 0, sxy = 0;
-  for (let i = 0; i < n; i++) { sxx += (xs[i] - mx) ** 2; sxy += (xs[i] - mx) * (ys[i] - my); }
+  for (let i = 0; i < n; i++) { sxx += (xs[i]! - mx) ** 2; sxy += (xs[i]! - mx) * (ys[i]! - my); }
   return sxx > 0 ? round(sxy / sxx) : null;
 }
 

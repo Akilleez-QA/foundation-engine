@@ -26,7 +26,7 @@ export async function leaseCube(library: TextureLibrary, spec: CubeSpec, signal:
   try {
     if(signal.aborted)throw new AbortError();
     const variants=await Promise.all(faces.map(id=>library.variant(id,screenPx)));
-    const side=variants[0].width;
+    const side=variants[0]?.width;
     if(!side || !Number.isSafeInteger(side) || variants.some(v=>v.width!==side||v.height!==side) || side*side*6*4*(2+4/3)>maxBytes)throw Error('cube: incompatible dimensions or byte budget');
     if(released)throw new AbortError();
     const images: unknown[]=[];

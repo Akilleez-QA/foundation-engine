@@ -5,15 +5,16 @@ import {installFakeDom,keyEvent,live} from '../../testing/fake-dom';
 import {openOverlayLayer,swallowActions,wrapAtEnds,wrapByIndex} from './keymap-overlay';
 import {appLayers,installAppInput} from '../ui/runtime';
 import {CORE_INPUT_ACTIONS,inputActionRegistry,type InputActionDef} from './actions';
+import {must} from '../../testing/must';
 
 /** A game's move rows (movement is a game's or a kit's action, not a core row). */
-const MOVE_ROWS:InputActionDef[]=(['up','down','left','right'] as const).map((d,i)=>({id:`game.move-${d}`,label:`game.move-${d}`,scope:'global',kind:'hold',defaults:{keys:[['code:KeyW','code:ArrowUp'],['code:KeyS','code:ArrowDown'],['code:KeyA','code:ArrowLeft'],['code:KeyD','code:ArrowRight']][i],pad:[(['ls-up','ls-down','ls-left','ls-right'] as const)[i]]}}));
+const MOVE_ROWS:InputActionDef[]=([['up',['code:KeyW','code:ArrowUp'],'ls-up'],['down',['code:KeyS','code:ArrowDown'],'ls-down'],['left',['code:KeyA','code:ArrowLeft'],'ls-left'],['right',['code:KeyD','code:ArrowRight'],'ls-right']] as const).map(([d,keys,pad])=>({id:`game.move-${d}`,label:`game.move-${d}`,scope:'global',kind:'hold',defaults:{keys:[...keys],pad:[pad]}}));
 
 const as=<T>(x:unknown)=>x as T;
 function overlay(){
  const dom=installFakeDom(),doc=dom.document;
  const host=doc.createElement('div');doc.body.append(host);
- const root=doc.createElement('section');const buttons=[0,1,2].map(i=>{const b=doc.createElement('button');b.textContent='b'+i;root.append(b);return b;});host.append(root);
+ const root=doc.createElement('section');const button=(i:number)=>{const b=doc.createElement('button');b.textContent='b'+i;root.append(b);return b;};const buttons=[button(0),button(1),button(2)] as const;host.append(root);
  const outside=doc.createElement('button');host.append(outside);
  return {dom,doc,host,root,buttons,outside};
 }
@@ -76,7 +77,7 @@ test('overlay keys: swallowed actions are consumed on the layer only while `when
 test('wrap rules: the panel card’s and trapFocus’s',()=>{
  const t=overlay();
  try{
-  const list=as<HTMLElement[]>(t.buttons),card=wrapAtEnds;
+  const list=as<[HTMLElement,HTMLElement,HTMLElement]>(t.buttons),card=wrapAtEnds;
   assert.equal(card(list[2],list,false),list[0]);assert.equal(card(list[0],list,true),list[2]);assert.equal(card(list[1],list,false),null);
   assert.equal(card(as<HTMLElement>(t.root),list,true),null,'inside the card but not a control: native');
   assert.equal(wrapByIndex(as<HTMLElement>(t.root),list,true),list[2],'trapFocus: not in the list wraps');assert.equal(wrapByIndex(list[1],list,true),null);
@@ -100,9 +101,9 @@ for (const closeFirst of [true, false]) {
    t.host.append(replacement);
    const second = openOverlayLayer({id: 'tools', element: as<HTMLElement>(replacement), signal: owner.signal, focusables, onEscape() {}});
    assert.equal(first.closed, true);
-   buttons[1].focus();
+   must(buttons[1]).focus();
    const event = keyEvent('Tab');
-   buttons[1].dispatchEvent(event);
+   must(buttons[1]).dispatchEvent(event);
    assert.equal(t.doc.activeElement, buttons[0], 'new layer owns wrapping after the old layer closes');
    assert.equal((event as {defaultPrevented?: boolean}).defaultPrevented, true);
    second.close();

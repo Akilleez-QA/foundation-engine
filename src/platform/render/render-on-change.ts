@@ -15,7 +15,7 @@ export const stillSafeHook=<F extends object>(hook:F)=>{(hook as {stillSafe?:boo
 export function createRenderOnChange(){
  let data=new Float64Array(2048),last=new Float64Array(2048),n=0,size=-1,lastHeader=-1,coast=false,still=0,force=false,frame=0;const seen=new WeakMap<object,number>(),fields=new WeakMap<object,{version:number;numbers:string[];colors:string[];textures:string[];other:string[]}>();
  const push=(v:number)=>{if(n===data.length){const grown=new Float64Array(n*2);grown.set(data);data=grown;}data[n++]=v;};
- const matrix=(m:T.Matrix4)=>{const e=m.elements;for(let i=0;i<16;i++)push(e[i]);};
+ const matrix=(m:T.Matrix4)=>{const e=m.elements;for(let i=0;i<16;i++)push(e[i]!);}; // i < 16 = elements.length
  // Local transforms of every visible node imply the world transforms, without a second updateMatrixWorld per frame.
  const local=(o:T.Object3D)=>{if(!o.matrixAutoUpdate)return matrix(o.matrix);const {position:p,quaternion:q,scale:k}=o;push(p.x);push(p.y);push(p.z);push(q.x);push(q.y);push(q.z);push(q.w);push(k.x);push(k.y);push(k.z);};
  const value=(v:unknown)=>{
@@ -38,7 +38,7 @@ export function createRenderOnChange(){
   for(const key of f.colors){const c=record[key] as T.Color;push(c.r);push(c.g);push(c.b);}
   for(const key of f.textures){const t=record[key] as T.Texture|null;if(t)texture(t);else push(-1);}
   for(const key of f.other)value(record[key]);
-  const uniforms=(m as T.ShaderMaterial).uniforms;if(uniforms)for(const key of Object.keys(uniforms))value(uniforms[key].value);
+  const uniforms=(m as T.ShaderMaterial).uniforms;if(uniforms)for(const key of Object.keys(uniforms))value(uniforms[key]!.value); // key comes from Object.keys(uniforms)
  }
  function visit(o:T.Object3D,mask:number){
   if(!o.visible)return;push(o.id);local(o);push(o.layers.mask&mask);push(o.renderOrder);

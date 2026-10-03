@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CORE_CUES, createAudioOutput, cueGate, synthCue, type CueDef } from './audio-output';
+import {must} from '../../testing/must';
 
 test('every core cue has finite samples, headroom, audible energy and click-free edges at common rates', () => {
   for (const rate of [44100, 48000]) for (const cue of CORE_CUES) {
@@ -69,12 +70,12 @@ test('voice handles apply separate gain, notify natural completion once and stop
   const { ctx, sources, gains } = fakeContext(); let ended = 0;
   const output = createAudioOutput({ silent: () => false, muted: () => false, effects: () => .8, music: () => 1, createContext: () => ctx });
   const voice = output.playVoice('ui.click', { gain: .5, onEnded: () => { ended++; } })!;
-  assert.equal(gains[0].gain.value, .8); assert.equal(gains[1].gain.value, .5);
-  voice.setGain(.2); assert.equal(gains[1].gain.value, .2); assert.equal(gains[0].gain.value, .8);
-  assert.throws(() => voice.setGain(NaN)); sources[0].onended!(); voice.stop();
-  assert.equal(voice.ended, true); assert.equal(ended, 1); assert.equal(sources[0].stops, 0);
+  assert.equal(must(gains[0]).gain.value, .8); assert.equal(must(gains[1]).gain.value, .5);
+  voice.setGain(.2); assert.equal(must(gains[1]).gain.value, .2); assert.equal(must(gains[0]).gain.value, .8);
+  assert.throws(() => voice.setGain(NaN)); must(sources[0]).onended!(); voice.stop();
+  assert.equal(voice.ended, true); assert.equal(ended, 1); assert.equal(must(sources[0]).stops, 0);
   const second = output.playVoice('ui.click', { onEnded: () => { ended++; } })!;
-  output.dispose(); second.stop(); output.dispose(); assert.equal(ended, 2); assert.equal(sources[1].stops, 1);
+  output.dispose(); second.stop(); output.dispose(); assert.equal(ended, 2); assert.equal(must(sources[1]).stops, 1);
   assert.equal(output.playVoice('ui.click'), null);
 });
 test('silent voice playback never creates a context or invokes completion', () => {
@@ -85,8 +86,8 @@ test('silent voice playback never creates a context or invokes completion', () =
 test('spatial voices use one context, track source and listener, and release panners',()=>{
  const {ctx,panners}=fakeContext();const out=createAudioOutput({silent:()=>false,muted:()=>false,effects:()=>1,music:()=>1,createContext:()=>ctx,maxVoices:1,maxBuffers:1});
  out.setListener([1,2,3],[0,0,-1],[0,1,0]);assert.equal(out.stats.contexts,0);
- const voice=out.playVoice('ui.click',{spatial:{position:[4,5,6]}})!;assert.equal(out.stats.contexts,1);assert.equal(ctx.listener.positionX.value,1);assert.equal(panners[0].positionZ.value,6);
- voice.setPosition!([7,8,9]);assert.equal(panners[0].positionX.value,7);assert.equal(out.playVoice('ui.click'),null);voice.stop();assert.equal(panners[0].disconnected,true);assert.ok(out.playVoice('ui.click'));
+ const voice=out.playVoice('ui.click',{spatial:{position:[4,5,6]}})!;assert.equal(out.stats.contexts,1);assert.equal(ctx.listener.positionX.value,1);assert.equal(must(panners[0]).positionZ.value,6);
+ voice.setPosition!([7,8,9]);assert.equal(must(panners[0]).positionX.value,7);assert.equal(out.playVoice('ui.click'),null);voice.stop();assert.equal(must(panners[0]).disconnected,true);assert.ok(out.playVoice('ui.click'));
  assert.throws(()=>out.setListener([0,0,0],[0,1,0],[0,1,0]));out.dispose();
 });
 test('invalid spatial data is rejected without creating an output',()=>{let made=0;const out=createAudioOutput({silent:()=>true,muted:()=>false,effects:()=>1,music:()=>1,createContext:()=>{made++;return fakeContext().ctx;}});assert.throws(()=>out.playVoice('ui.click',{spatial:{position:[NaN,0,0]}}));assert.equal(out.playVoice('ui.click',{spatial:{position:[0,0,0]}}),null);assert.equal(made,0);});
@@ -101,7 +102,7 @@ test('cue registration snapshots mutable author data and validates before subscr
  let subscriptions=0;const options={silent:()=>false,muted:()=>false,effects:()=>1,music:()=>1,onChange:()=>{subscriptions++;return ()=>{};},createContext:()=>fakeContext().ctx};
  assert.throws(()=>createAudioOutput({...options,maxBuffers:0}));assert.equal(subscriptions,0);
  const cue:CueDef={id:'test',duration:.1,steps:[{tone:{at:0,duration:.08,hz:400}}]};const output=createAudioOutput({...options,cues:[cue]});cue.duration=Infinity;
- assert.ok(output.playVoice('test'));output.dispose();assert.throws(()=>synthCue(cue,48000));assert.throws(()=>synthCue(CORE_CUES[0],Infinity));
+ assert.ok(output.playVoice('test'));output.dispose();assert.throws(()=>synthCue(cue,48000));assert.throws(()=>synthCue(must(CORE_CUES[0]),Infinity));
 });
 test('music pauses in hidden tabs even without an AudioContext and stays paused across unlock',()=>{
  let plays=0,pauses=0;const element={paused:true,play(){plays++;return Promise.resolve();},pause(){pauses++;}} as unknown as HTMLAudioElement;
@@ -132,7 +133,7 @@ for (const fallbackThrows of [false, true]) {
    assert.doesNotThrow(()=>output.dispose());
    assert.equal(first.ended,true);assert.equal(second.ended,true);assert.equal(finished,1);
    assert.equal(reports,1);assert.equal(diagnostics.length,1);
-   const failures=(diagnostics[0][1] as AggregateError).errors;
+   const failures=(must(diagnostics[0])[1] as AggregateError).errors;
    assert.equal(failures[0].cause,completionFailure);assert.equal(failures[1],reporterFailure);
    assert.equal(log.filter(entry=>entry==='close').length,1);
    output.dispose();assert.equal(finished,1);assert.equal(log.filter(entry=>entry==='close').length,1);
@@ -176,7 +177,7 @@ test('a voice can start at a future context time; past times start now; the hori
   assert.ok(ahead); assert.deepEqual(starts, [10.25]);
   out.playVoice('ui.click', { at: 9 }); assert.deepEqual(starts, [10.25, undefined], 'a past start plays now');
   assert.equal(out.playVoice('ui.click', { at: 11 }), null, 'a scheduled voice holds its slot until it ends');
-  ahead.stop(); sources[1].onended?.();
+  ahead.stop(); must(sources[1]).onended?.();
   assert.equal(out.playVoice('ui.click', { at: 15.5 }), null); assert.equal(out.playVoice('ui.click', { at: 16 }), null);
   assert.deepEqual(reports, ['cue start beyond the schedule horizon'], 'reported once');
   assert.throws(() => out.playVoice('ui.click', { at: NaN }), /start time/); assert.throws(() => out.playVoice('ui.click', { at: -1 }), /start time/);

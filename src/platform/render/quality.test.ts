@@ -5,6 +5,7 @@ import {
   resolveKnobs, textureVariant, ResolutionGovernor, graphicsSettingsSection, defaultGraphicsSettings, shadowMapFor,
   type DeviceSignals, type GraphicsChoiceStore, type GraphicsSettings, type KnobDef, type QualityChange, type QualityPreset,
 } from './quality';
+import {must} from '../../testing/must';
 
 // Fake effects augment the knob map exactly as a real effect module would.
 declare module './quality-knobs' {
@@ -315,7 +316,7 @@ test('proof: knob registry: every preset value is legal; overrides win; illegal 
   assert.equal(k.get('shadows.quality'), 'ultra');
   assert.equal(k.get('textures.max-size'), 2048);
   const bad = { ...coreKnobs[0], id: 'resolution.scale', presets: { reference: 1, high: 1, medium: 1, low: 2 } } as KnobDef<'resolution.scale'>;
-  assert.match(knobProblems([bad as never])[0], /preset low/);
+  assert.match(must(knobProblems([bad as never])[0]), /preset low/);
   assert.equal(shadowMapFor('ultra'), 4096);
 });
 

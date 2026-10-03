@@ -5,8 +5,8 @@ import {bakeGeometry} from './geometry';
 test('paint bake retains exact authored attributes and releases temporary inputs once',()=>{
  const parts=[new T.BoxGeometry(),new T.BoxGeometry().translate(3,0,0)];let disposed=0;
  parts.forEach(p=>p.addEventListener('dispose',()=>disposed++));
- const expected=parts.flatMap(p=>Array.from(p.attributes.position.array));
- const merged=bakeGeometry(parts);assert.equal(disposed,2);assert.deepEqual(Array.from(merged.attributes.position.array),expected);assert.equal(merged.index!.count,72);
+ const expected=parts.flatMap(p=>Array.from(p.getAttribute('position').array));
+ const merged=bakeGeometry(parts);assert.equal(disposed,2);assert.deepEqual(Array.from(merged.getAttribute('position').array),expected);assert.equal(merged.index!.count,72);
 });
 
 test('nullable material buckets preserve failure fallback and retire each temporary once',async t=>{
