@@ -8,14 +8,15 @@ export function sweep(from:Vec3,to:Vec3,radius:number,targets:readonly SweepTarg
  const ids=new Set<string>();let nearest:{id:string;time:number;point:Vec3}|null=null;
  for(const target of targets){
   if(!target.id||ids.has(target.id)||!valid(target.from)||!valid(target.to)||!Number.isFinite(target.radius)||target.radius<0)throw Error('combat: invalid target');ids.add(target.id);
-  const p=from.map((v,i)=>v-target.from[i]),d=to.map((v,i)=>v-from[i]-(target.to[i]-target.from[i])),r=radius+target.radius;
+  // Every Vec3 here has length 3 (valid), so the map index i is in range of each tuple.
+  const p=from.map((v,i)=>v-target.from[i]!),d=to.map((v,i)=>v-from[i]!-(target.to[i]!-target.from[i]!)),r=radius+target.radius;
   if(![...p,...d,r].every(Number.isFinite))throw Error('combat: relative range overflow');
   // Scale coordinates to avoid overflow in the quadratic at large world distances.
   const scale=(Math.max(r,...p.map(Math.abs),...d.map(Math.abs))||1),q=p.map(v=>v/scale),v=d.map(x=>x/scale),rr=r/scale;
-  const a=v.reduce((s,x)=>s+x*x,0),b=2*q.reduce((s,x,i)=>s+x*v[i],0),c=q.reduce((s,x)=>s+x*x,0)-rr*rr;
+  const a=v.reduce((s,x)=>s+x*x,0),b=2*q.reduce((s,x,i)=>s+x*v[i]!,0),c=q.reduce((s,x)=>s+x*x,0)-rr*rr;
   let time:number|null=c<=0?0:null;
   if(time===null&&a>0){const disc=b*b-4*a*c;if(disc>=0){const root=Math.sqrt(disc),denom=-b+root;const t=denom!==0?2*c/denom:(-b-root)/(2*a);if(t>=0&&t<=1)time=t;}}
-  if(time!==null&&(!nearest||time<nearest.time||(time===nearest.time&&target.id<nearest.id)))nearest={id:target.id,time,point:from.map((x,i)=>x+(to[i]-x)*time) as Vec3};
+  if(time!==null&&(!nearest||time<nearest.time||(time===nearest.time&&target.id<nearest.id)))nearest={id:target.id,time,point:from.map((x,i)=>x+(to[i]!-x)*time) as Vec3};
  }
  return nearest;
 }

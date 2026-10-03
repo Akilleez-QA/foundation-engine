@@ -4,6 +4,7 @@ import { installFakeDom } from '../../testing/fake-dom';
 import { checkReach, inputActionRegistry, type ActionEvent } from '../input/actions';
 import { LayerManager } from './layers';
 import { APP_INPUT_ACTIONS, APP_INPUT_OVERRIDES, createInput, installAppInput, type InputWindow } from './runtime';
+import {must} from '../../testing/must';
 
 /**
  * M mute runs through the app's one dispatcher. The fake document stands in for window (it is the root
@@ -41,7 +42,7 @@ test('M mutes under a modal, even when the modal stops keydown, and the key is n
     const { ok } = a.modal();
     a.press(ok, 'm');
     assert.equal(a.muted.length, 1, 'M mutes under a page modal');
-    assert.equal(a.muted[0].t, a.now() - 16, 'the action carries the key event timeStamp');
+    assert.equal(must(a.muted[0]).t, a.now() - 16, 'the action carries the key event timeStamp');
     a.press(a.mover, 'm');
     assert.equal(a.muted.length, 2);
     assert.deepEqual(a.seen.at(-1), { key: 'm', prevented: false }, 'the bubble listener still sees M, not prevented');

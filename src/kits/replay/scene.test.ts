@@ -11,6 +11,7 @@ import { compareDigests, createDigestTrace } from './digest';
 import { hashText } from './hash';
 import { createReplayRecorder, openReplay, type OpenLimits } from './log';
 import { createSceneInputTap, encodeSceneTick, recordSceneRun, replaySceneLog, sceneReplayConfig, worldDigestText, type SceneTickFacts } from './scene';
+import { must } from '../../testing/must';
 
 const inputs = [steer, restart];
 const limits = { maxTicks: 2000, maxBytes: 65536, input: { maxBytes: 512, maxNodes: 32, maxDepth: 4 } };
@@ -126,8 +127,8 @@ test('SIM-01 scene: tick facts are canonical and limited to declared actions', (
 
 /** A pure thrust term driven by the tick input, plus an optional "outside" term the log cannot explain. */
 function sim(outside?: () => number) {
-  const thrust: ForceTerm<number> = { id: 'thrust', order: 100, accumulate(ctx, acc) { acc[0] += ctx.params; } };
-  const leak: ForceTerm<number> = { id: 'leak', order: 200, accumulate(_ctx, acc) { acc[1] += outside!(); } };
+  const thrust: ForceTerm<number> = { id: 'thrust', order: 100, accumulate(ctx, acc) { acc[0]! += ctx.params; } }; // acc is the 3-axis force accumulator
+  const leak: ForceTerm<number> = { id: 'leak', order: 200, accumulate(_ctx, acc) { acc[1]! += outside!(); } };
   return new FixedStepHost(new PointMassSim('probe', 0.01, new Float64Array([0, 0, 0, 0, 0, 0, 1]), outside ? [thrust, leak] : [thrust]), { maxPhysicsWarp: 10 });
 }
 const digestState = (y: Float64Array) => hashText(Array.from(y, v => v.toString()).join(','));
@@ -140,7 +141,7 @@ test('SIM-01 host: inputs fetched per tick replay exactly under a different fram
   const a = sim(), ta = createDigestTrace({ identity: 'probe', every: 1, maxEntries: 1000, maxDigestLength: 16 });
   // Irregular frames: the state at the start of each tick is digested where the host asks for that tick's input.
   const frames = [0.016, 0.034, 0.008, 0.016, 0.05, 0.016, 0.003];
-  for (let f = 0; a.stepsTaken < 400; f++) a.advance(frames[f % frames.length], tick => {
+  for (let f = 0; a.stepsTaken < 400; f++) a.advance(must(frames[f % frames.length]), tick => {
     ta.observe(tick, () => digestState(a.sim.state));
     const thrust = Math.round(live.range(-2, 2) * 100) / 100;
     assert.equal(recorder.record(tick, JSON.stringify(thrust)).status, 'recorded');

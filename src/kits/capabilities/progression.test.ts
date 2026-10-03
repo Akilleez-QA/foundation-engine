@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCapabilities, createModifiers, type CapabilityRevocation, type CapabilitySnapshot, type Grant } from './index';
+import { must } from '../../testing/must';
 const definitions = [
   { id: 'foundation', requires: [], evidence: ['practice'] },
   { id: 'specialist', requires: ['foundation'], evidence: [] },
@@ -149,5 +150,5 @@ test('redundant prerequisite and evidence declarations retain compatibility with
   assert.deepEqual(plan.removed, ['base', 'derived']);
   assert.deepEqual(createCapabilities(definitions, owner.snapshot()).snapshot(), owner.snapshot());
   assert.throws(() => createCapabilities([{ id: 'base', requires: [], evidence: Array(4097).fill('seen') }]));
-  assert.throws(() => createCapabilities([definitions[0], { id: 'derived', requires: Array(1025).fill('base'), evidence: [] }]));
+  assert.throws(() => createCapabilities([must(definitions[0]), { id: 'derived', requires: Array(1025).fill('base'), evidence: [] }]));
 });

@@ -12,6 +12,7 @@ import type { SaveSection } from './section';
 import { sectionProblems } from './validate';
 import { importJson } from './bindings';
 import * as S from './test-sections';
+import { must } from '../../testing/must';
 
 const PREFIXES = savePrefixes();
 
@@ -60,10 +61,10 @@ test('legacy data loads through its bindings; legacy keys are never modified', (
   const h = <T,>(d: SaveSection<T>) => store.section(d).get();
   assert.deepEqual(h(S.look), look);
   assert.equal(h(S.voice), 'brave');
-  assert.equal(h(S.journal).entries.climb.assisted, true);
+  assert.equal(h(S.journal).entries.climb?.assisted, true);
   assert.equal(h(S.wallet).balance, 12);
   assert.equal(h(S.records).unlocked, true);
-  assert.equal(h(S.stories)[0].id, 'm1');
+  assert.equal(h(S.stories)[0]?.id, 'm1');
   assert.equal(h(S.best), 83.25);
   assert.deepEqual(h(S.liveRecord), live);
   assert.deepEqual(h(S.settings), { 'sound.muted': false, 'sound.music': 0.5, 'comfort.calm': true });
@@ -102,7 +103,7 @@ test('migration chain v1 → v3 runs once, keeps a pre-migration backup, and rej
   assert.equal(JSON.parse(b.data.get('game|p:1|demo.garden')!).v, 3);
   assert.equal(JSON.parse(b.data.get('game-bak|game|p:1|demo.garden|v1')!).data.flowers, 3);
   // a missing step is unreadable data, not a crash: it is quarantined
-  const gap = { ...v3, id: 'demo.gap', migrations: { 2: v3.migrations![2] } };
+  const gap = { ...v3, id: 'demo.gap', migrations: { 2: must(v3.migrations![2], 'migration 2') } };
   b.data.set('game|p:1|demo.gap', JSON.stringify({ v: 1, by: 'x', data: { flowers: 1 } }));
   assert.deepEqual(store.section(gap).get(), { blooms: 0, beds: [] });
   assert.equal(store.section(gap).status(), 'quarantined');
@@ -529,7 +530,7 @@ test('usage() counts every byte under the reset prefixes, per section', () => {
   store.section(S.look).get(); store.flush();
   const u = store.usage();
   assert.ok(u.chars > 0);
-  assert.ok(u.sections['demo.look'] > 0);
+  assert.ok(must(u.sections['demo.look'], 'demo.look usage') > 0);
 });
 
 test('registry validation: the empty registry and the example sections pass; bad definitions are named', () => {
@@ -619,7 +620,7 @@ test('export notices a legacy write that no event announced after the section wa
   assert.equal(store.section(list).of('1').get(), null);          // read while nothing is stored
   b.data.set('game-demo-list-1', '["seeded"]');                 // same tab: no storage event
   store.section(list);                                              // (registered, as the game's registry does)
-  assert.deepEqual(store.exportPlayer('1').sections['demo.list'].data, ['seeded']);
+  assert.deepEqual(store.exportPlayer('1').sections['demo.list']?.data, ['seeded']);
   assert.deepEqual(store.section(list).of('1').get(), ['seeded']);
 });
 

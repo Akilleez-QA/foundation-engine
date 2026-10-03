@@ -175,24 +175,28 @@ export class LayerManager implements LayerPort, ActionLayers {
 
   /** The top interactive layer: toasts never own input and dormant layers are not yet live. */
   top(): LayerInfo | null {
-    for (let i = this.entries.length - 1; i >= 0; i--) if (this.live(this.entries[i])) return this.entries[i];
+    for (let i = this.entries.length - 1; i >= 0; i--) { const e = this.entries[i]!; if (this.live(e)) return e; } // i < entries.length
     return null;
   }
   /** Every open layer, bottom to top, dormant and toast included. */
   stack(): readonly LayerInfo[] { return this.entries; }
   /** Interactive layers from the top down, as the input dispatcher traverses them. */
   fromTop(): readonly LayerInfo[] { return this.entries.filter(e => this.live(e)).reverse(); }
+  /** The index of the owner's highest layer, or -1 when it has none. */
+  private lastIndexOfOwner(owner: string): number {
+    for (let i = this.entries.length - 1; i >= 0; i--) if (this.entries[i]!.owner === owner) return i; // i < entries.length
+    return -1;
+  }
 
   /**
    * The coverage signal: how covered an owner's highest layer is. An owner with no layer counts as
    * 'top' only when nothing covers the page. Dormant layers cover nothing.
    */
   coverage(owner: string): Coverage {
-    let index = -1;
-    for (let i = this.entries.length - 1; i >= 0; i--) if (this.entries[i].owner === owner) { index = i; break; }
+    const index = this.lastIndexOfOwner(owner);
     let result: Coverage = 'top';
     for (let i = index + 1; i < this.entries.length; i++) {
-      const e = this.entries[i];
+      const e = this.entries[i]!; // i < entries.length
       if (e.dormant) continue;
       if (e.cover === 'opaque') return 'opaque';
       if (e.cover === 'scrim') result = 'scrim';
@@ -205,9 +209,8 @@ export class LayerManager implements LayerPort, ActionLayers {
    * anywhere when the owner has none: the covered scene keeps drawing beneath it so changes are seen live.
    */
   previewing(owner: string): boolean {
-    let index = -1;
-    for (let i = this.entries.length - 1; i >= 0; i--) if (this.entries[i].owner === owner) { index = i; break; }
-    for (let i = index + 1; i < this.entries.length; i++) if (!this.entries[i].dormant && this.entries[i].spec.preview === true) return true;
+    const index = this.lastIndexOfOwner(owner);
+    for (let i = index + 1; i < this.entries.length; i++) { const e = this.entries[i]!; if (!e.dormant && e.spec.preview === true) return true; } // i < entries.length
     return false;
   }
 
@@ -348,10 +351,11 @@ export class LayerManager implements LayerPort, ActionLayers {
     }
     let blocker = -1;
     for (let i = this.entries.length - 1; i >= 0; i--) {
-      const e = this.entries[i];
+      const e = this.entries[i]!; // i < entries.length
       if (this.live(e) && e.modal !== false) { blocker = i; break; }
     }
-    if (blocker >= 0) {
+    const blocking = this.entries[blocker];
+    if (blocking) {
       const keep = this.entries.slice(blocker).filter(e => !e.dormant).map(e => e.element);
       // Inert what is beside the path to a kept layer, never an ancestor of one.
       const cover = (el: HTMLElement) => {
@@ -359,8 +363,8 @@ export class LayerManager implements LayerPort, ActionLayers {
         if (!keep.some(k => el.contains(k))) { want.add(el); return; }
         for (const child of Array.from(el.children) as HTMLElement[]) cover(child);
       };
-      for (let i = 0; i < blocker; i++) cover(this.entries[i].element);
-      if (this.entries[blocker].modal === 'page') for (const el of this.opts.shell?.() ?? []) want.add(el);
+      for (let i = 0; i < blocker; i++) cover(this.entries[i]!.element); // i < blocker < entries.length
+      if (blocking.modal === 'page') for (const el of this.opts.shell?.() ?? []) want.add(el);
     }
     for (const [el, before] of this.inerted) if (!want.has(el)) { el.inert = before; this.inerted.delete(el); }
     for (const el of want) if (!this.inerted.has(el)) { this.inerted.set(el, el.inert === true); el.inert = true; }

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import { createSceneActivity } from './scene-activity';
 import { defineScene, type SceneActivityFacts } from './defs';
 import { testScene } from './testing';
@@ -20,7 +21,7 @@ test('headless activity follows enter, explicit synchronous facts and terminal e
   h.setActivity({ coverage: 'top', documentHidden: false });
   h.dispose(); h.dispose();
   assert.deepEqual(events, ['enter', 'active', 'active', 'active', 'active', 'active', 'retired', 'exit']);
-  assert.equal(facts[3].documentHidden, true);
+  assert.equal(must(facts[3], 'fourth facts').documentHidden, true);
   assert.throws(() => h.setActivity({ coverage: 'top', documentHidden: false }), /disposed/);
 });
 test('hook failure is reported and does not prevent retirement or cleanup', async () => {

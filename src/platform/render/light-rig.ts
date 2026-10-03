@@ -60,7 +60,7 @@ export function createRigLight<D extends LightDef>(def:D, renderer?:T.WebGLRende
 
 export function createLightRig<const D extends Record<string,LightDef>>(rows:D,renderer?:T.WebGLRenderer){
  const lights={} as {[K in keyof D]:LightFor<D[K]>};
- for(const key in rows)lights[key]=createRigLight(rows[key],renderer);
+ for(const key in rows)lights[key]=createRigLight(rows[key]!,renderer); // key comes from iterating rows
  let disposed=false;
  return {lights,dispose(){
   if(disposed)return;disposed=true;

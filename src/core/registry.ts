@@ -146,7 +146,7 @@ export function defineRegistry<T extends { id: string }>(name: string, opts: Reg
   } };
   const lastPatcher = (id: string) => {
     const h = history.get(id) ?? [];
-    for (let i = h.length - 1; i >= 0; i--) if (h[i].action === 'patch') return h[i].source;
+    for (let i = h.length - 1; i >= 0; i--) { const e = h[i]!; if (e.action === 'patch') return e.source; } // 0 <= i < h.length
     return undefined;
   };
   const admin: RegistryAdmin<T> = {
@@ -160,7 +160,7 @@ export function defineRegistry<T extends { id: string }>(name: string, opts: Reg
       let n = 0;
       // Undo these sources' patches, newest first, where nobody else changed the entry since.
       for (let i = journal.length - 1; i >= 0; i--) {
-        const j = journal[i];
+        const j = journal[i]!; // 0 <= i < journal.length
         if (!out.has(j.source) || j.undone) continue;
         j.undone = true;
         const current = entries.get(j.id);

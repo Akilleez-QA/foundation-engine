@@ -8,7 +8,10 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import type { BuildBrief } from '../../author/build';
 
-const pascal = (id: string) => id.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join('');
+const pascal = (id: string) => id.split('-').map(w => {
+  const c = w[0]; if (c === undefined) throw Error(`lesson id '${id}' has an empty segment`);
+  return c.toUpperCase() + w.slice(1);
+}).join('');
 
 export function generateLesson(dir: string, id: string, brief: BuildBrief, root: string): { files: string[]; text: Record<string, string>; next: string[]; strings: string[] } {
   const rel = (f: string) => relative(root, join(dir, f)).split('\\').join('/');

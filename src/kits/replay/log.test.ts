@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createReplayRecorder, encodeReplay, openReplay, REPLAY_VERSION, RUN_OVERHEAD_BYTES, type OpenLimits, type ReplayLogData } from './log';
 import { hashText } from './hash';
 import { createDigestTrace } from './digest';
+import { must } from '../../testing/must';
 
 const header = { build: 'demo@1.0.0', config: 'scene:demo;inputs:jump,steer~', seed: 7, step: 1 / 60 };
 const input = { maxBytes: 256, maxNodes: 32, maxDepth: 4 };
@@ -151,7 +152,7 @@ test('SIM-01 log: embedded digests are checked and survive the round trip', () =
   const opened = openReplay(text, open, expect);
   assert.equal(opened.status, 'ready');
   if (opened.status === 'ready') assert.deepEqual(opened.player.digests, trace.read());
-  const broken = reencode(text, d => { ((d.digests as Record<string, unknown>).entries as unknown[][])[0][0] = 3; });
+  const broken = reencode(text, d => { must(((d.digests as Record<string, unknown>).entries as unknown[][])[0])[0] = 3; });
   assert.equal(openReplay(broken, open, expect).status, 'corrupt', 'an entry off the cadence is refused');
   assert.equal(openReplay(text, { ...open, digests: { maxEntries: 3, maxDigestLength: 16 } }, expect).status, 'corrupt', 'more entries than the reader admits');
   // A sample removed (or its tick shifted) and re-checksummed no longer passes as a complete trace.

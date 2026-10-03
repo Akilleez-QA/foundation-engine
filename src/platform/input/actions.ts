@@ -697,17 +697,18 @@ function reachOf(rows: readonly InputActionDef[], overrides: ActionOverrides = {
     const path = d.via?.[device];
     if (!path?.length || visiting.has(id)) return false; // no route, or a cycle with no entry
     visiting.add(id);
-    const ok = path.every(step => byId.has(step) && step !== id) && reachable(path[0], device, visiting);
+    const ok = path.every(step => byId.has(step) && step !== id) && reachable(path[0]!, device, visiting); // path is non-empty (checked above)
     visiting.delete(id);
     memo.set(key, ok);
     return ok;
   };
   for (const d of rows) {
-    report.routes[d.id] = { keyboard: null, pad: null };
+    const routes: ReachReport['routes'][ActionId] = { keyboard: null, pad: null };
+    report.routes[d.id] = routes;
     if (d.reachability === 'pointer-only-by-design') { report.exceptions.push({ id: d.id, reason: d.reason ?? '' }); continue; }
     for (const device of REACH_DEVICES) {
       const path = d.via?.[device];
-      if (reachable(d.id, device, new Set())) { report.routes[d.id][device] = direct(d, device) ? 'direct' : path!; continue; }
+      if (reachable(d.id, device, new Set())) { routes[device] = direct(d, device) ? 'direct' : path!; continue; }
       const b = effectiveBindings(d, overrides);
       if (device === 'keyboard' && b.keys.length && b.keys.every(k => MODIFIER.test(k)) && !path?.length) {
         report.problems.push(`${d.id}: a modifier chord is the only keyboard route`);
@@ -738,7 +739,7 @@ export function bindingConflicts(rows: readonly InputActionDef[], overrides: Act
     for (const p of b.pad) push(by, 'pad ' + p, d);
   }
   for (const [input, list] of by) for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
-    const a = list[i], b = list[j];
+    const a = list[i]!, b = list[j]!; // i < j < list.length
     if (overlaps(a, b)) out.push(`${input}: ${a.id} (${a.scope}) and ${b.id} (${b.scope}) overlap`);
   }
   return out;

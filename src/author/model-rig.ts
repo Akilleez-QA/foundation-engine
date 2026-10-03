@@ -23,7 +23,7 @@ export interface ModelRigPair { readonly source: T.Object3D; readonly target: T.
 export type ModelRigResolution = { readonly ok: true; readonly pairs: readonly ModelRigPair[] } | { readonly ok: false; readonly reason: ModelRigFailure };
 const fail = (reason: ModelRigFailure) => Object.freeze({ ok: false as const, reason });
 const array = (values: number[]) => Object.freeze(values);
-const equal = (a: readonly number[], b: readonly number[], tolerance: number) => a.length === b.length && a.every((n, i) => Math.abs(n - b[i]) <= tolerance);
+const equal = (a: readonly number[], b: readonly number[], tolerance: number) => a.length === b.length && a.every((n, i) => Math.abs(n - b[i]!) <= tolerance); // i < a.length = b.length
 function validMatrix(matrix: T.Matrix4): boolean {
   const e = matrix.elements;
   return e.every(Number.isFinite) && e[3] === 0 && e[7] === 0 && e[11] === 0 && e[15] === 1 && Number.isFinite(matrix.determinant()) && matrix.determinant() !== 0;
@@ -36,7 +36,8 @@ export function captureModelRig(root: T.Object3D, limits: ModelPoseLinkLimits): 
     while (pending.length) {
       if (nodes.length + pending.length > limits.maxRigNodesPerModel) return fail('capacity');
       const { node, parent } = pending.pop()!;
-      if (indices.has(node) || (parent !== null && node.parent !== nodes[parent].node)) return fail('hierarchy');
+      // A pending parent is the index of a node already pushed.
+      if (indices.has(node) || (parent !== null && node.parent !== nodes[parent]!.node)) return fail('hierarchy');
       const position = array(node.position.toArray()), quaternion = array(node.quaternion.toArray()), scale = array(node.scale.toArray());
       if (![...position, ...quaternion, ...scale].every(Number.isFinite) || Math.abs(Math.hypot(...quaternion) - 1) > 1e-6) return fail('rest');
       const matrix = new T.Matrix4().compose(node.position, node.quaternion, node.scale);
@@ -46,7 +47,7 @@ export function captureModelRig(root: T.Object3D, limits: ModelPoseLinkLimits): 
       const children = node.children, childCount = children.length;
       if (!Number.isSafeInteger(childCount) || childCount < 0) return fail('hierarchy');
       if (childCount > limits.maxRigNodesPerModel - nodes.length - pending.length) return fail('capacity');
-      for (let i = childCount - 1; i >= 0; i--) pending.push({ node: children[i], parent: index });
+      for (let i = childCount - 1; i >= 0; i--) pending.push({ node: children[i]!, parent: index }); // i < childCount = children.length
       if (node.children !== children || children.length !== childCount) return fail('hierarchy');
     }
     const skins: ModelRigSkin[] = [];
@@ -54,8 +55,8 @@ export function captureModelRig(root: T.Object3D, limits: ModelPoseLinkLimits): 
     // Admit every skin's scan first, so a rejected aggregate never starts scanning vertices.
     type Attribute = T.BufferAttribute | T.InterleavedBufferAttribute;
     const meshes: { mesh: T.SkinnedMesh; index: number; geometry: T.BufferGeometry; skeleton: T.Skeleton; bones: T.Bone[]; inverseMatrices: T.Matrix4[]; count: number; vertices: number; positions: Attribute; indicesAttribute: Attribute; weights: Attribute }[] = [];
-    for (let index = 0; index < nodes.length; index++) {
-      const mesh = nodes[index].node as T.SkinnedMesh;
+    for (const [index, { node }] of nodes.entries()) {
+      const mesh = node as T.SkinnedMesh;
       if (!mesh.isSkinnedMesh) continue;
       if (mesh.bindMode !== T.AttachedBindMode || (mesh.geometry.morphAttributes.position?.length || mesh.geometry.morphAttributes.normal?.length || mesh.geometry.morphAttributes.color?.length)) return fail('skin');
       const geometry = mesh.geometry, skeleton = mesh.skeleton, bones = skeleton.bones, inverseMatrices = skeleton.boneInverses;
@@ -71,10 +72,11 @@ export function captureModelRig(root: T.Object3D, limits: ModelPoseLinkLimits): 
       if (skeleton.bones !== bones || bones.length !== count || skeleton.boneInverses !== inverseMatrices) return fail('hierarchy');
       const seen = new Set<number>();
       for (let j = 0; j < count; j++) {
-        const id = indices.get(bones[j]);
+        // j < count = bones.length = inverseMatrices.length (checked above).
+        const id = indices.get(bones[j]!), inverse = inverseMatrices[j]!;
         if (id === undefined || seen.has(id)) return fail('hierarchy');
-        if (!validMatrix(inverseMatrices[j])) return fail('bind');
-        seen.add(id); joints.push(id); inverses.push(array([...inverseMatrices[j].elements]));
+        if (!validMatrix(inverse)) return fail('bind');
+        seen.add(id); joints.push(id); inverses.push(array([...inverse.elements]));
       }
       let attributeCount = 0;
       for (const name in geometry.attributes) {
@@ -109,7 +111,7 @@ export function resolveModelRig(source: ModelRig, target: ModelRig, relation: Mo
   if (relation.nodes.length > limits.maxMappedNodesPerLink) return fail('capacity');
   const lookup = (rig: ModelRig) => {
     const map = new Map<string, number | null>();
-    for (let i = 1; i < rig.nodes.length; i++) { const name = rig.nodes[i].name; if (name) map.set(name, map.has(name) ? null : i); }
+    for (let i = 1; i < rig.nodes.length; i++) { const name = rig.nodes[i]!.name; if (name) map.set(name, map.has(name) ? null : i); } // i < rig.nodes.length
     return map;
   };
   const fromNames = lookup(source), toNames = lookup(target), mapping = new Map<number, number>([[0, 0]]), used = new Set<number>([0]);
@@ -118,30 +120,32 @@ export function resolveModelRig(source: ModelRig, target: ModelRig, relation: Mo
     if (from == null || to == null || mapping.has(to) || used.has(from)) return fail('mapping');
     mapping.set(to, from); used.add(from);
   }
+  // Mapped, joint and parent indices all come from the rigs' own node lists (0 is the root), so they are in range.
   for (const [to, from] of mapping) {
-    const a = source.nodes[from], b = target.nodes[to];
+    const a = source.nodes[from]!, b = target.nodes[to]!;
     if ((b.parent === null ? null : mapping.get(b.parent)) !== a.parent) return fail('hierarchy');
     if (!equal(a.matrix, b.matrix, limits.restTolerance)) return fail('rest');
   }
   const required = new Set<number>();
   for (const skin of target.skins) for (const joint of skin.joints) {
     let cursor: number | null = joint;
-    while (cursor !== null && !required.has(cursor)) { required.add(cursor); cursor = target.nodes[cursor].parent; }
+    while (cursor !== null && !required.has(cursor)) { required.add(cursor); cursor = target.nodes[cursor]!.parent; }
   }
   for (const node of required) if (!mapping.has(node)) return fail('mapping');
   // Fold all source occurrences once. Repeated skins must agree without quadratic searches.
   const sourceBinds = new Map<number, { inverse: readonly number[]; bind: readonly number[]; conflict: boolean }>();
-  for (const skin of source.skins) for (let j = 0; j < skin.joints.length; j++) {
-    const previous = sourceBinds.get(skin.joints[j]);
-    if (previous) previous.conflict ||= !equal(previous.inverse, skin.inverses[j], limits.restTolerance) || !equal(previous.bind, skin.bind, limits.restTolerance);
-    else sourceBinds.set(skin.joints[j], { inverse: skin.inverses[j], bind: skin.bind, conflict: false });
+  // A skin's inverses are captured one per joint, so inverses[j] exists for each joint j.
+  for (const skin of source.skins) for (const [j, joint] of skin.joints.entries()) {
+    const previous = sourceBinds.get(joint), inverse = skin.inverses[j]!;
+    if (previous) previous.conflict ||= !equal(previous.inverse, inverse, limits.restTolerance) || !equal(previous.bind, skin.bind, limits.restTolerance);
+    else sourceBinds.set(joint, { inverse, bind: skin.bind, conflict: false });
   }
-  for (const skin of target.skins) for (let j = 0; j < skin.joints.length; j++) {
-    const occurrence = sourceBinds.get(mapping.get(skin.joints[j])!);
+  for (const skin of target.skins) for (const [j, joint] of skin.joints.entries()) {
+    const occurrence = sourceBinds.get(mapping.get(joint)!);
     if (!occurrence) return fail('mapping');
-    if (occurrence.conflict || !equal(skin.bind, occurrence.bind, limits.restTolerance) || !equal(skin.inverses[j], occurrence.inverse, limits.restTolerance)) return fail('bind');
+    if (occurrence.conflict || !equal(skin.bind, occurrence.bind, limits.restTolerance) || !equal(skin.inverses[j]!, occurrence.inverse, limits.restTolerance)) return fail('bind');
   }
-  const pairs = [...mapping].map(([to, from]) => Object.freeze({ source: source.nodes[from].node, target: target.nodes[to].node }));
+  const pairs = [...mapping].map(([to, from]) => Object.freeze({ source: source.nodes[from]!.node, target: target.nodes[to]!.node }));
   return Object.freeze({ ok: true, pairs: Object.freeze(pairs) });
 }
 /** Restore only a projection's touched nodes. Never update a retired source or shared bind arrays. */

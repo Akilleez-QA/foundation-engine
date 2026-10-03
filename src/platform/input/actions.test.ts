@@ -9,6 +9,7 @@ import {
 } from './actions';
 import { openActionSource, ownActionSource } from './owned-action-source';
 import { adminOf } from '../../core/registry';
+import {must} from '../../testing/must';
 
 /** A game's own rows (move, interact, camera, zoom): they used to be core rows and are now any game's or kit's. The
  *  dispatcher tests use them as a typical game's action set. */
@@ -216,7 +217,7 @@ test('confirm held while a menu opens and closes produces no stray action; later
     // One poll: X opens the menu, then A in the same poll was meant for the traversal and must not reach anyone.
     w.input.padFrame([{ input: 'x', pressed: true }, { input: 'a', pressed: true }]);
     assert.equal(menus.length, 1); assert.deepEqual(w.input.drain('home#1'), []);
-    menus[0].close();
+    must(menus[0]).close();
     w.input.padFrame([{ input: 'a', pressed: false }, { input: 'x', pressed: false }]);
     assert.deepEqual(w.input.drain('home#1'), [], 'releasing A after the menu closed is not an interact');
     w.input.pad('a', true); w.input.pad('a', false);
@@ -249,6 +250,7 @@ test('press timing is unchanged: actions fire on the press edge; only repeat row
     w.tick(16);
     w.input.pad('y', true);
     const [recentre] = w.input.drain('home#1');
+    assert.ok(recentre);
     assert.equal(recentre.action, 'core.recentre'); assert.equal(recentre.t, 16, 'Y recentres on press, not release');
     w.tick(180); w.input.pad('y', false); assert.deepEqual(w.input.drain('home#1'), [], 'a press row sends nothing on release');
     w.input.keyDown(key('i')); w.input.keyDown(key('i', { repeat: true })); w.input.keyUp(key('i'));
@@ -280,7 +282,7 @@ test('reach: every core and quick-slot action is reachable from keyboard and pad
   assert.deepEqual(report.routes['quick.slot3'], { keyboard: 'direct', pad: [SHELL_MENU, 'shell.quick-slots'] });
   assert.deepEqual(report.routes['core.mute'], { keyboard: 'direct', pad: [SHELL_MENU] });
   assert.deepEqual(report.routes[SHELL_MENU], { keyboard: ['core.focus-next'], pad: 'direct' });
-  for (const row of registry.all()) for (const device of ['keyboard', 'pad'] as const) assert.ok(report.routes[row.id][device], `${row.id} by ${device}`);
+  for (const row of registry.all()) for (const device of ['keyboard', 'pad'] as const) assert.ok(must(report.routes[row.id])[device], `${row.id} by ${device}`);
   assert.deepEqual(checkReach(inputActionRegistry([...CORE_ROWS, ...QUICK_SLOT_ROWS]), SWAP).problems, [], 'the Nintendo preset stays conflict-free');
 });
 
@@ -305,7 +307,7 @@ test('reach rejects unreachable actions, broken or cyclic paths, chord-only rout
   const report = checkReach(inputActionRegistry([...CORE_ROWS, pointerOnly]));
   assert.deepEqual(report.problems, []); assert.deepEqual(report.exceptions, [{ id: 'pack.draw', reason: 'free drawing' }]);
   assert.ok(problems([...CORE_ROWS, { ...pointerOnly, reason: undefined }]).includes('pack.draw: a pointer-only exception needs a reason'));
-  assert.ok(problems([...CORE_ROWS, CORE_ROWS[0]]).includes('core.back: registered twice'));
+  assert.ok(problems([...CORE_ROWS, must(CORE_ROWS[0])]).includes('core.back: registered twice'));
   assert.deepEqual(bindingConflicts(CORE_ROWS), [], 'the core defaults do not overlap');
 });
 
@@ -344,9 +346,9 @@ test('inputActions is a core defineRegistry registry; a duplicate id or an unrea
   assert.equal(inputActionRegistry(CORE_ROWS).all().length, CORE_ROWS.length);
 
   const dup = defineInputActions();
-  dup.add(CORE_ROWS[0], 'core');
-  assert.throws(() => dup.add(CORE_ROWS[0], 'pack.x'), /duplicate id 'core\.back'/, 'core rejects a duplicate at add');
-  assert.ok(checkReach(inputActionRegistry([...CORE_ROWS, CORE_ROWS[0]])).problems.includes('core.back: registered twice'));
+  dup.add(must(CORE_ROWS[0]), 'core');
+  assert.throws(() => dup.add(must(CORE_ROWS[0]), 'pack.x'), /duplicate id 'core\.back'/, 'core rejects a duplicate at add');
+  assert.ok(checkReach(inputActionRegistry([...CORE_ROWS, must(CORE_ROWS[0])])).problems.includes('core.back: registered twice'));
 
   const lonely = defineInputActions();
   for (const row of CORE_ROWS) lonely.add(row, 'core');

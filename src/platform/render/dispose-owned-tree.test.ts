@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from 'three';
 import {disposeOwnedTree} from './dispose-owned-tree';
+import {must} from '../../testing/must';
 test('throwing resource disposers do not skip sibling resources or dispose borrowed references',()=>{
  const root=new T.Group(),first=new T.BoxGeometry(),second=new T.PlaneGeometry();
  const texture=new T.Texture(),borrowedTexture=new T.Texture();
@@ -24,7 +25,7 @@ test('throwing resource disposers do not skip sibling resources or dispose borro
 test('owned activity resources dispose once across meshes, lines, sprites and duplicate maps',()=>{
  const root=new T.Group(),geometry=new T.BoxGeometry(),texture=new T.Texture(),material=new T.MeshBasicMaterial({map:texture,alphaMap:texture}),spriteMaterial=new T.SpriteMaterial({map:texture});
  root.add(new T.Mesh(geometry,[material,material]),new T.Mesh(geometry,material),new T.Line(geometry,material),new T.Sprite(spriteMaterial));
- const counts=[0,0,0,0];[geometry,texture,material,spriteMaterial].forEach((resource,i)=>resource.addEventListener('dispose',()=>counts[i]++));
+ const counts=[0,0,0,0];[geometry,texture,material,spriteMaterial].forEach((resource,i)=>resource.addEventListener('dispose',()=>counts[i]=must(counts[i])+1));
  const result=disposeOwnedTree(root);assert.deepEqual(counts,[1,1,1,1]);assert.equal(result.textures,1);assert.equal(result.materials,2);assert.equal(result.geometries,1);
  assert.deepEqual(disposeOwnedTree(undefined),{geometries:0,materials:0,textures:0});
 });
@@ -33,7 +34,7 @@ test('borrowed finishes and their textures survive disposal of an owning geometr
  const root=new T.Group(),geometry=new T.BoxGeometry(),sharedTexture=new T.Texture(),ownTexture=new T.Texture();
  const borrowed=new T.MeshBasicMaterial({map:sharedTexture}),owned=new T.MeshBasicMaterial({map:sharedTexture,alphaMap:ownTexture});
  root.add(new T.Mesh(geometry,[borrowed,owned]));
- const counts=[0,0,0,0,0];[geometry,borrowed,owned,sharedTexture,ownTexture].forEach((resource,i)=>resource.addEventListener('dispose',()=>counts[i]++));
+ const counts=[0,0,0,0,0];[geometry,borrowed,owned,sharedTexture,ownTexture].forEach((resource,i)=>resource.addEventListener('dispose',()=>counts[i]=must(counts[i])+1));
  assert.deepEqual(disposeOwnedTree(root,{preserveMaterial:m=>m===borrowed}),{geometries:1,materials:1,textures:1});
  assert.deepEqual(counts,[1,0,1,0,1]);
  borrowed.dispose();sharedTexture.dispose();
@@ -46,7 +47,7 @@ test('module-lifetime resources survive: shared flags, kit finishes, ArrowHelper
  const instanced=new T.InstancedMesh(new T.BoxGeometry(),new T.MeshBasicMaterial(),4);
  root.add(new T.Mesh(sharedGeo,kit),new T.Mesh(new T.PlaneGeometry(),shared),new T.Mesh(new T.PlaneGeometry(),new T.MeshBasicMaterial({map:patch})),arrow,instanced);
  const spared=[kit,kitMap,shared,shared.map!,sharedGeo,patch,arrow.line.geometry,arrow.cone.geometry],hits=spared.map(()=>0);
- spared.forEach((r,i)=>r.addEventListener('dispose',()=>hits[i]++));
+ spared.forEach((r,i)=>r.addEventListener('dispose',()=>hits[i]=must(hits[i])+1));
  const result=disposeOwnedTree(root);
  assert.deepEqual(hits,spared.map(()=>0));
  // Owned: two plane geometries + instanced box; the patch mesh material, the instanced material and the two arrow materials.
@@ -65,7 +66,7 @@ test('disposeOwnedTree spares every resource assets.owns() answers for ',async()
  const glow=pageResidents.adopt(new T.Texture()),glowMaterial=new T.SpriteMaterial({map:glow});
  const ownedMap=new T.Texture(),root=new T.Group();
  root.add(new T.Mesh(sharedGeo2,kit),new T.Mesh(new T.PlaneGeometry(),sharedMat2),new T.Mesh(new T.PlaneGeometry(),new T.MeshBasicMaterial({map:leased,alphaMap:ownedMap})),new T.Sprite(glowMaterial));
- const spared=[leased,kit,kitMap,sharedGeo2,sharedMat2,glow],hits=spared.map(()=>0);spared.forEach((r,i)=>r.addEventListener('dispose',()=>hits[i]++));
+ const spared=[leased,kit,kitMap,sharedGeo2,sharedMat2,glow],hits=spared.map(()=>0);spared.forEach((r,i)=>r.addEventListener('dispose',()=>hits[i]=must(hits[i])+1));
  for(const r of spared)if(r!==kitMap)assert.equal(assetOwners.owns(r),true); // kitMap is spared as a map of an owned finish
  let glowMaterialDisposed=0;glowMaterial.addEventListener('dispose',()=>glowMaterialDisposed++);
  // Owned: the two planes; the leased-map material and the glow sprite's material; the owned alpha map.

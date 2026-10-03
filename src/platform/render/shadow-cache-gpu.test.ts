@@ -5,6 +5,7 @@ import {createShadowGPUCache,shadowGPURevisionSupported,SHADOW_GPU_THREE_REVISIO
 import {scheduleShadows} from './shadows';
 import {adoptStaticShadowCache} from './shadow-cache-policy';
 import {markReferenceShadowLight} from './shadow-technique';
+import {must} from '../../testing/must';
 
 function fixture(approved=true){
  const scene=new T.Scene(),camera=new T.PerspectiveCamera(),light=new T.DirectionalLight();
@@ -28,9 +29,9 @@ function fixture(approved=true){
 }
 test('GPU adapter uses a static-only target then composite + movers; never copies full depth',()=>{
  const f=fixture();f.frame();const final=f.light.shadow.map;
- assert.deepEqual(f.passes[0].casters,[f.fixed,f.moving]);
- assert.deepEqual(f.passes[1].casters,[f.fixed]);assert.notEqual(f.passes[1].target,final);
- assert.equal(f.passes[2].target,final);assert.equal((f.passes[2].casters[0] as T.Mesh).material instanceof T.ShaderMaterial,true);assert.equal(((f.passes[2].casters[0] as T.Mesh).material as T.Material).shadowSide,T.DoubleSide);assert.equal(f.passes[2].casters.length,2);assert.equal(f.passes[2].casters[1],f.moving);
+ assert.deepEqual(must(f.passes[0]).casters,[f.fixed,f.moving]);
+ assert.deepEqual(must(f.passes[1]).casters,[f.fixed]);assert.notEqual(must(f.passes[1]).target,final);
+ assert.equal(must(f.passes[2]).target,final);assert.equal((must(f.passes[2]).casters[0] as T.Mesh).material instanceof T.ShaderMaterial,true);assert.equal(((must(f.passes[2]).casters[0] as T.Mesh).material as T.Material).shadowSide,T.DoubleSide);assert.equal(must(f.passes[2]).casters.length,2);assert.equal(must(f.passes[2]).casters[1],f.moving);
  assert.equal(f.light.shadow.map,final);assert.equal(f.scene.children.length,4);assert.ok(f.fixed.castShadow&&f.moving.castShadow);
  f.moving.position.x=2;f.frame();assert.equal(f.passes.length,4);assert.equal(f.gpu.cache.stats.hits,1);
  assert.deepEqual(f.gpu.stats,{staticRebuildDraws:1,dynamicDraws:2,compositeDraws:2,fullDraws:2,failures:0});
@@ -64,7 +65,7 @@ test('unproved modes, context loss, proof withdrawal and filter transitions use 
 });
 test('private adapters never transfer a target or membership between instances; removal releases storage',()=>{
  const a=fixture(),b=fixture();a.frame();b.frame();
- assert.notEqual(a.passes[1].target,b.passes[1].target);a.gpu.dispose();assert.ok(b.gpu.residentBytes()>36);
+ assert.notEqual(must(a.passes[1]).target,must(b.passes[1]).target);a.gpu.dispose();assert.ok(b.gpu.residentBytes()>36);
  b.gpu.render(()=>{},[],b.scene,b.camera);assert.equal(b.gpu.residentBytes(),36);b.gpu.dispose();
 });
 test('post-shadow hooks are unsafe even when art declares the caster static',()=>{
@@ -115,7 +116,7 @@ test('restored raw reference depth bootstraps stock filter state before private 
  f.gpu.render(()=>{},[],new T.Scene(),f.camera);
  f.frame();
  assert.deepEqual(f.passes.slice(count).map(p=>p.casters.length),[2,1,2]);
- assert.deepEqual(f.passes[count].casters,[f.fixed,f.moving]);
+ assert.deepEqual(must(f.passes[count]).casters,[f.fixed,f.moving]);
  assert.equal(f.gpu.stats.fullDraws-full,2,'restoration stock work is counted');
  assert.equal(f.gpu.cache.stats.rebuilds,2);f.gpu.dispose();
 });

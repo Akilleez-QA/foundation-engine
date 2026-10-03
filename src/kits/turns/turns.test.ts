@@ -6,6 +6,7 @@ import { defineSaveSection } from '../../author';
 import { authorSaveHandle } from '../../author/save-handle';
 import { createSaveStore } from '../../core/save/store';
 import { MemoryBackend } from '../../core/save/storage-port';
+import { must } from '../../testing/must';
 
 const open = (seed: number | string = 7) => createTurnLog({ rules: cardRules(), limits, seed, initial: table });
 const play = (moves: Move[], seed: number | string = 7) => {
@@ -55,7 +56,7 @@ test('undo and redo restore exact states, including random draws; a new command 
   assert.equal(log.redo(log.read().revision).status, 'empty');
   log.undo(log.read().revision);
   const hand = log.read().state.hand;
-  assert.equal(log.submit(log.read().revision, { type: 'play', card: hand[0] }).status, 'applied');
+  assert.equal(log.submit(log.read().revision, { type: 'play', card: must(hand[0]) }).status, 'applied');
   assert.equal(log.read().canRedo, false);
   assert.equal(log.read().length, 3);
   for (let k = 3; k > 0; k--) log.undo(log.read().revision);

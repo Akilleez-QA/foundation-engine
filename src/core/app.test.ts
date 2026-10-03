@@ -5,6 +5,7 @@ import { adminOf, lazy, type Lazy, type Registry } from './registry';
 import { BootValidationError, createApp, nextEvent } from './app';
 import { defineModule, type EngineModule } from './module';
 import { patch } from './patch';
+import { must } from '../testing/must';
 
 interface SceneDef { id: string; title: string; load: Lazy<{ enter(): string }> }
 interface StationDef { id: string; scene: string; runsIn?: string }
@@ -446,7 +447,7 @@ test('a duplicate module id fails boot in every mode with a BootValidationError 
     await assert.rejects(app.boot(), (e: unknown) => {
       assert.ok(e instanceof BootValidationError, mode);
       assert.equal(e.problems.length, 1);
-      assert.equal(e.problems[0].id, 'feature.kta-twin');
+      assert.equal(must(e.problems[0], 'the problem').id, 'feature.kta-twin');
       assert.match(e.message, /modules\[feature\.kta-twin\]: module id declared twice, by src\/app\/shell-modules\.ts #0 and by src\/features\/home\/index\.ts #2; boot stops/);
       return true;
     }, mode);

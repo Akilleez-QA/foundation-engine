@@ -18,49 +18,49 @@ test('keys move camera-relative, diagonals stay unit length and moveStarted fire
  assert.equal(s.input.sample(5).dt,.1,'dt is clamped after a stall');
 });
 test('a tap shorter than a frame is latched for exactly one sample',()=>{
- const s=setup();s.fire('pointerdown',1,50,60);s.fire('pointerup',1,50,60);const f=s.frame();assert.equal(f.taps.length,1);assert.deepEqual([f.taps[0].x,f.taps[0].y],[50,60]);assert.equal(s.frame().taps.length,0);
+ const s=setup();s.fire('pointerdown',1,50,60);s.fire('pointerup',1,50,60);const f=s.frame();assert.equal(f.taps.length,1);const [tap]=f.taps;assert.ok(tap);assert.deepEqual([tap.x,tap.y],[50,60]);assert.equal(s.frame().taps.length,0);
  s.k('keydown','KeyM','m');s.k('keyup','KeyM','m');assert.ok(s.frame().pressed.has('mute'));
 });
 test('opening a layer cancels held input; its frames go to the layer; closing requires a fresh press',()=>{
- const pads=[fakePad()],s=setup({pads});s.frame();s.k('keydown','KeyW','w');pads[0].stick(0,0,-1);s.frame();
+ const pad=fakePad(),pads=[pad],s=setup({pads});s.frame();s.k('keydown','KeyW','w');pad.stick(0,0,-1);s.frame();
  const seen:string[]=[];const layer=s.input.openLayer('modal',{label:'guide',onFrame:f=>seen.push(...f.actions.map(a=>a.action))});
  let f=s.frame();assert.equal(f.mine,false);assert.equal(f.context,layer);assert.deepEqual(f.move,{x:0,y:0});
- pads[0].press(1);s.frame();assert.deepEqual(seen,[],'B pressed while the stick is still held from gameplay is swallowed');
+ pad.press(1);s.frame();assert.deepEqual(seen,[],'B pressed while the stick is still held from gameplay is swallowed');
  s.k('keydown','Escape','Escape');s.frame();assert.deepEqual(seen,['back'],'a fresh key press reaches the layer');
- pads[0].stick(0,0,0);pads[0].release(1);s.frame();pads[0].press(1);s.frame();assert.deepEqual(seen,['back','back'],'after neutral, B goes back');pads[0].release(1);s.frame();
+ pad.stick(0,0,0);pad.release(1);s.frame();pad.press(1);s.frame();assert.deepEqual(seen,['back','back'],'after neutral, B goes back');pad.release(1);s.frame();
  layer.pop();s.k('keydown','KeyW','w',{repeat:true});f=s.frame();assert.deepEqual(f.move,{x:0,y:0},'W still held from before the modal does not move');assert.ok(f.mine);
  s.k('keyup','KeyW','w');s.k('keydown','KeyW','w');assert.deepEqual(s.frame().move,{x:0,y:1});
 });
 test('blur, pagehide and a hidden page stop keys, pad buttons and the gamepad',()=>{
  for(const fire of [(s:ReturnType<typeof setup>)=>s.win.dispatchEvent(ev('blur')),(s:ReturnType<typeof setup>)=>s.win.dispatchEvent(ev('pagehide')),(s:ReturnType<typeof setup>)=>{s.doc.hidden=true;s.doc.dispatchEvent(ev('visibilitychange'));}]){
-  const pads=[fakePad()],s=setup({pads});s.frame();s.k('keydown','KeyA','a');pads[0].stick(0,0,-1);s.input.held.press('pointer:4','up');s.fire('pointerdown',2,0,0);s.fire('pointermove',2,50,0);
+  const pad=fakePad(),pads=[pad],s=setup({pads});s.frame();s.k('keydown','KeyA','a');pad.stick(0,0,-1);s.input.held.press('pointer:4','up');s.fire('pointerdown',2,0,0);s.fire('pointermove',2,50,0);
   s.frame();fire(s);const f=s.frame();assert.deepEqual(f.move,{x:0,y:0});assert.equal(f.dragging,false);
  }
 });
 test('gamepad through the facade: A interacts, View cycles, R3 anchors, the d-pad zooms, disconnect pauses',()=>{
- const pads=[fakePad()],s=setup({pads});s.frame();
- const tap=(i:number)=>{pads[0].press(i);const f=s.frame();pads[0].release(i);s.frame();return f;};
+ const pad=fakePad(),pads=[pad],s=setup({pads});s.frame();
+ const tap=(i:number)=>{pad.press(i);const f=s.frame();pad.release(i);s.frame();return f;};
  assert.deepEqual(tap(0).actions.map(a=>[a.action,a.device]),[['interact','gamepad']]);
  assert.deepEqual(tap(8).actions.map(a=>a.mode),['cycle']);const r3=tap(11);assert.deepEqual(r3.actions.map(a=>a.mode),['anchor']);assert.ok(r3.cameraInput);
  assert.equal(s.doc.body.dataset.inputDevice,'gamepad');
- pads[0].press(13);assert.deepEqual(s.frame().zoom.map(z=>[z.notches,z.source]),[[1,'pad']]);pads[0].release(13);s.frame();
- pads[0].stick(1,1,0);assert.ok(s.frame().look.x>0);pads[0].stick(1,0,0);
- pads[0].connected=false;assert.ok(s.frame().pressed.has('pause'));
+ pad.press(13);assert.deepEqual(s.frame().zoom.map(z=>[z.notches,z.source]),[[1,'pad']]);pad.release(13);s.frame();
+ pad.stick(1,1,0);assert.ok(s.frame().look.x>0);pad.stick(1,0,0);
+ pad.connected=false;assert.ok(s.frame().pressed.has('pause'));
 });
 test('in a modal the pad navigates instead of moving, zooming or interacting',()=>{
- const pads=[fakePad()],s=setup({pads});s.frame();const got:string[]=[];s.input.openLayer('ui',{onFrame:f=>got.push(...f.actions.map(a=>a.action))});s.frame();
- pads[0].press(13);pads[0].stick(0,0,-1);let f=s.frame();assert.equal(f.zoom.length,0);assert.deepEqual(f.move,{x:0,y:0});pads[0].release(13);pads[0].stick(0,0,0);
- pads[0].press(0);f=s.frame();assert.equal(f.actions.length,0,'A confirms the focused control, not interact');pads[0].release(0);s.frame();
- pads[0].press(9);s.frame();assert.deepEqual(got,['pause']);
+ const pad=fakePad(),pads=[pad],s=setup({pads});s.frame();const got:string[]=[];s.input.openLayer('ui',{onFrame:f=>got.push(...f.actions.map(a=>a.action))});s.frame();
+ pad.press(13);pad.stick(0,0,-1);let f=s.frame();assert.equal(f.zoom.length,0);assert.deepEqual(f.move,{x:0,y:0});pad.release(13);pad.stick(0,0,0);
+ pad.press(0);f=s.frame();assert.equal(f.actions.length,0,'A confirms the focused control, not interact');pad.release(0);s.frame();
+ pad.press(9);s.frame();assert.deepEqual(got,['pause']);
 });
 test('a minigame layer with stick play gets the sticks and bumpers; A, B and the d-pad stay menu controls',()=>{
- const pads=[fakePad()],s=setup({pads});s.frame();const frames:{move:{x:number;y:number};zoom:number;actions:string[]}[]=[];
+ const pad=fakePad(),pads=[pad],s=setup({pads});s.frame();const frames:{move:{x:number;y:number};zoom:number;actions:string[]}[]=[];
  const layer=s.input.openLayer('modal',{label:'minigame',stick:'play',onFrame:f=>frames.push({move:f.move,zoom:f.zoom.length,actions:f.actions.map(a=>a.action)})});s.frame();
- pads[0].stick(0,1,0);let f=s.frame();assert.ok(frames.at(-1)!.move.x>.9,'the left stick plays');assert.deepEqual(f.move,{x:0,y:0},'the mover gets nothing');
- pads[0].stick(0,0,0);pads[0].press(5);s.frame();assert.equal(frames.at(-1)!.zoom,1,'RB zooms the game view');pads[0].release(5);s.frame();
- pads[0].press(0);s.frame();assert.deepEqual(frames.at(-1)!.actions,[],'A clicks the focused control');pads[0].release(0);s.frame();
- pads[0].press(1);s.frame();assert.deepEqual(frames.at(-1)!.actions,['back']);pads[0].release(1);s.frame();
- layer.pop();s.frame();const plain:number[]=[];s.input.openLayer('modal',{onFrame:f=>plain.push(f.move.x)});s.frame();pads[0].stick(0,1,0);s.frame();assert.equal(plain.at(-1),0,'without stick play a modal only navigates');
+ pad.stick(0,1,0);let f=s.frame();assert.ok(frames.at(-1)!.move.x>.9,'the left stick plays');assert.deepEqual(f.move,{x:0,y:0},'the mover gets nothing');
+ pad.stick(0,0,0);pad.press(5);s.frame();assert.equal(frames.at(-1)!.zoom,1,'RB zooms the game view');pad.release(5);s.frame();
+ pad.press(0);s.frame();assert.deepEqual(frames.at(-1)!.actions,[],'A clicks the focused control');pad.release(0);s.frame();
+ pad.press(1);s.frame();assert.deepEqual(frames.at(-1)!.actions,['back']);pad.release(1);s.frame();
+ layer.pop();s.frame();const plain:number[]=[];s.input.openLayer('modal',{onFrame:f=>plain.push(f.move.x)});s.frame();pad.stick(0,1,0);s.frame();assert.equal(plain.at(-1),0,'without stick play a modal only navigates');
 });
 test('a viewer layer receives look and zoom while gameplay stops moving',()=>{
  const s=setup();const frames:number[]=[];s.input.openLayer('viewer',{label:'star viewer',onFrame:f=>frames.push(f.zoom.length)});
@@ -106,15 +106,15 @@ test('B on a covering native dialog nobody handles closes it like Escape; the mo
  const Keyboard=class extends Event{key:string;code:string;constructor(type:string,init:KeyboardEventInit){super(type,init);this.key=init.key??'';this.code=init.code??'';}};
  const g=globalThis as {KeyboardEvent?:unknown},saved=g.KeyboardEvent;g.KeyboardEvent=Keyboard;
  try{
-  const pads=[fakePad()],s=setup({pads});s.frame();const seen:string[]=[];
+  const pad=fakePad(),pads=[pad],s=setup({pads});s.frame();const seen:string[]=[];
   const dialog=Object.assign(new EventTarget(),{tagName:'DIALOG',open:true,contains:(el:unknown)=>el===button,requestClose(){seen.push('requestClose');dialog.open=false;}});
   const button=Object.assign(new EventTarget(),{closest:()=>dialog});dialog.addEventListener('keydown',e=>seen.push((e as KeyboardEvent).key+':'+String((e as KeyboardEvent&{inputSynthetic?:boolean}).inputSynthetic)));
   button.addEventListener('keydown',e=>dialog.dispatchEvent(new Keyboard('keydown',{key:(e as KeyboardEvent).key,code:'Escape'})));
   (s.doc as {activeElement:unknown}).activeElement=button;const cover=s.input.contexts.push('modal',{label:'dom-modal'});s.frame();
-  pads[0].press(1);const f=s.frame();pads[0].release(1);s.frame();
+  pad.press(1);const f=s.frame();pad.release(1);s.frame();
   assert.deepEqual(seen,['Escape:undefined','requestClose'],'Escape reaches the focused control, then the dialog closes');assert.equal(f.mine,false);
   assert.equal(s.doc.body.dataset.inputDevice,'gamepad','the synthetic Escape does not switch the prompts to the keyboard');
   cover.pop();dialog.open=true;seen.length=0;const own=s.input.openLayer('ui',{label:'eyepiece',onFrame:frame=>{if(frame.pressed.has('back'))seen.push('layer back');}});s.frame();
-  pads[0].press(1);s.frame();pads[0].release(1);s.frame();assert.deepEqual(seen,['layer back'],'a layer with its own handler gets B instead');own.pop();
+  pad.press(1);s.frame();pad.release(1);s.frame();assert.deepEqual(seen,['layer back'],'a layer with its own handler gets B instead');own.pop();
  }finally{g.KeyboardEvent=saved;}
 });

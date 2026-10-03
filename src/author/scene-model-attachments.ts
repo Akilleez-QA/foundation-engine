@@ -130,7 +130,7 @@ export function reconcileModelAttachments(world: World, slots: ReadonlyMap<Entit
     }
     if (cursor !== undefined && active.has(cursor)) {
       const cycleStart = path.indexOf(cursor);
-      for (let i = cycleStart; i < path.length; i++) { unavailable(path[i], 'cycle'); done.add(path[i]); }
+      for (const entity of path.slice(cycleStart)) { unavailable(entity, 'cycle'); done.add(entity); }
     }
     while (path.length) {
       const entity = path.pop()!; active.delete(entity);
@@ -206,8 +206,8 @@ export function reconcileModelAttachments(world: World, slots: ReadonlyMap<Entit
       if (!slot || !relationReady(entity, slot) || parent === undefined || !usable(parent, source)
         || (related(parent) && !relationReady(parent, source!))) enqueue(entity);
     }
-    for (let i = 0; i < queue.length; i++) {
-      const entity = queue[i], slot = slots.get(entity);
+    for (const entity of queue) { // also visits entities enqueued meanwhile
+      const slot = slots.get(entity);
       if (slot && (poseEntities.has(entity) ? pose.ready(entity) : slot.attachment?.state?.status === 'ready')) unavailable(entity, 'blocked');
       for (const child of children.get(entity) ?? []) enqueue(child);
     }

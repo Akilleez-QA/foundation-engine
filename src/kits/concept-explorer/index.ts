@@ -42,7 +42,7 @@ export function pickPart(ctx: SceneContext, ndc: { x: number; y: number }): stri
   let best: string | null = null, bestT = Infinity;
   for (const [, tr, part, sh] of ctx.world.query(Transform, Part, Shape)) {
     if (!sh.visible) continue;
-    const c = [tr.x - origin[0], tr.y - origin[1], tr.z - origin[2]], t = c[0] * dir[0] + c[1] * dir[1] + c[2] * dir[2];
+    const c: Vec3 = [tr.x - origin[0], tr.y - origin[1], tr.z - origin[2]], t = c[0] * dir[0] + c[1] * dir[1] + c[2] * dir[2];
     if (t <= 0) continue;
     const d2 = c[0] ** 2 + c[1] ** 2 + c[2] ** 2 - t * t;
     if (d2 <= part.radius ** 2 && t < bestT) { bestT = t; best = part.id; }
@@ -71,7 +71,7 @@ export function explorerSystem(o: { smooth?: number } = {}): SystemDefinition {
       s.orbit.yaw += ctx.input.axis('explorer-orbit') * 1.5 * dt;
       const pose = cameraPose('orbit', { x: s.orbit.target[0], y: s.orbit.target[1], z: s.orbit.target[2], heading: 0 }, s.orbit);
       const k = (o.smooth ?? 0.1) <= 0 ? 1 : 1 - Math.exp(-dt / (o.smooth ?? 0.1));
-      const ease = (a: Vec3, b: Vec3) => { const n = a.map((v, j) => v + (b[j] - v) * k) as Vec3; return n.every((v, j) => Math.abs(v - b[j]) < 1e-3) ? b : n; };
+      const ease = (a: Vec3, b: Vec3) => { const n = a.map((v, j) => v + (b[j]! - v) * k) as Vec3; return n.every((v, j) => Math.abs(v - b[j]!) < 1e-3) ? b : n; }; // j < 3 over Vec3 tuples
       const cam = ctx.view.camera, np = ease(cam.position, pose.position), nt = ease(cam.target, pose.target);
       if (np.some((v, j) => v !== cam.position[j]) || nt.some((v, j) => v !== cam.target[j])) { cam.position = np; cam.target = nt; }
       // The selected part's label, pinned beside it.

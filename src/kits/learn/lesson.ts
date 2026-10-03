@@ -103,8 +103,7 @@ export function flatten(actions: readonly Action[]): Action[] {
 /** The longest run of passive actions before the learner acts, along any branch path. */
 export function longestPassiveRun(actions: readonly Action[], run = 0): number {
   let best = run, cur = run;
-  for (let i = 0; i < actions.length; i++) {
-    const a = actions[i];
+  for (const [i, a] of actions.entries()) {
     if (a.do === 'branch') {
       const rest = actions.slice(i + 1);
       return Math.max(best, longestPassiveRun([...a.then, ...rest], cur), longestPassiveRun([...(a.else ?? []), ...rest], cur));
@@ -153,7 +152,8 @@ export function lessonProblems(l: LessonInput, o: LessonCheckOptions = {}): stri
     for (const q of s.quiz?.questions ?? []) for (const k of [q.feedback.right, q.feedback.retry, ...q.hints]) if (UNKIND.test(text(k))) out.push(`${item.id}/${q.id}: feedback is kind: reword "${text(k)}"`);
   }
   for (const id of Object.keys(l.scenes)) if (!ids.has(id)) out.push(`scene '${id}' is not in the outline`);
-  if (l.outline.length && !flatten(l.scenes[l.outline[0].id]?.timeline ?? []).some(a => a.do === 'objectives')) out.push('state the objectives: the first scene has an { do: "objectives" } action');
+  const first = l.outline[0];
+  if (first && !flatten(l.scenes[first.id]?.timeline ?? []).some(a => a.do === 'objectives')) out.push('state the objectives: the first scene has an { do: "objectives" } action');
   for (const ob of l.objectives) {
     const scenes = l.outline.filter(i => i.objective === ob.id);
     const checks = Object.values(l.scenes).flatMap(s => [...s.quiz?.questions.filter(q => q.objective === ob.id) ?? [], ...s.sim?.checks.filter(c => c.objective === ob.id) ?? [], ...s.explore?.checks.filter(c => c.objective === ob.id) ?? [], ...s.project?.milestones.filter(m => m.objective === ob.id) ?? []]);

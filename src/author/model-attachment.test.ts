@@ -8,6 +8,7 @@ import { ModelAttachment, captureModelAttachment } from './model-attachment';
 import { createSceneModels } from './scene-model';
 import { createModelLibrary } from '../platform/assets/models';
 import { testScene } from './testing';
+import { must } from '../testing/must';
 const identity = () => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 const relation = (parent: number, extra: Partial<Parameters<typeof captureModelAttachment>[0]> = {}) => ModelAttachment({ parent, socket: 'anchor', unavailable: 'hide', inheritVisibility: true, ...extra });
 async function waitFor(predicate: () => boolean) {
@@ -62,14 +63,14 @@ test('same-frame native pose composes full affine attachment without simulation 
     f.world.add(child, relation(parent, { offset: offset.elements }));
     const tr = { ...f.world.get(child, Transform)! };
     await f.ready(parent, child);
-    const childRoot = f.scene.children[1]; assert.equal(childRoot.visible, false, 'async publication starts hidden');
+    const childRoot = must(f.scene.children[1], 'scene root 1'); assert.equal(childRoot.visible, false, 'async publication starts hidden');
     f.world.get(parent, Transform)!.x = 7;
     f.world.get(parent, Model)!.clip = 'move'; f.world.get(parent, Model)!.playing = true;
     f.owner.sync(.25);
     assert.equal(f.owner.attachmentState(child).status, 'ready');
     // Analytic columns: diagonal(2,3,1) times Z rotation; translation = parent + joint + scaled offset.
     const a = Math.SQRT1_2, expected = [2*a,3*a,0,0,-2*a,3*a,0,0,0,0,1,0,8,3.5,0,1];
-    childRoot.matrixWorld.elements.forEach((n,i) => assert.ok(Math.abs(n-expected[i]) < 1e-12, `matrix ${i}`));
+    childRoot.matrixWorld.elements.forEach((n,i) => assert.ok(Math.abs(n-must(expected[i], `expected ${i}`)) < 1e-12, `matrix ${i}`));
     assert.deepEqual(f.world.get(child, Transform), tr);
     f.world.get(parent, Model)!.playing = false;
     f.owner.sync(); assert.equal(f.owner.sync(), false); assert.equal(f.owner.sync(), false);
@@ -88,7 +89,7 @@ test('reverse allocation chains resolve parent-first and cycles block descendant
   try {
     const last=f.spawn('last'), middle=f.spawn('middle'), first=f.spawn('first',5);
     f.world.add(last,relation(middle)); f.world.add(middle,relation(first)); await f.ready(last,middle,first); f.owner.sync();
-    const lastRoot=f.scene.children[0], middleRoot=f.scene.children[1];
+    const lastRoot=must(f.scene.children[0], 'scene root 0'), middleRoot=must(f.scene.children[1], 'scene root 1');
     assert.equal(lastRoot.matrixWorld.elements[12],8); assert.equal(middleRoot.matrixWorld.elements[12],6);
     const old=lastRoot.matrixWorld.clone();
     f.world.add(first,relation(middle)); f.owner.sync();
@@ -104,7 +105,7 @@ test('hide and hold distinguish unavailable ancestry, visibility inheritance and
   try {
     const parent=f.spawn('parent',3), child=f.spawn('child'), grandchild=f.spawn('grandchild');
     f.world.add(child,relation(parent,{unavailable:'hold'})); f.world.add(grandchild,relation(child,{inheritVisibility:false}));
-    await f.ready(parent,child,grandchild); f.owner.sync(); const childRoot=f.scene.children[1], grandchildRoot=f.scene.children[2];
+    await f.ready(parent,child,grandchild); f.owner.sync(); const childRoot=must(f.scene.children[1], 'scene root 1'), grandchildRoot=must(f.scene.children[2], 'scene root 2');
     f.world.get(parent,Model)!.visible=false; f.owner.sync(); assert.equal(childRoot.visible,false); assert.equal(grandchildRoot.visible,true);
     f.world.get(parent,Model)!.visible=true; f.owner.sync(); const matrix=childRoot.matrixWorld.clone();
     f.world.despawn(parent); f.owner.sync();
@@ -120,15 +121,15 @@ test('missing sockets and overflowing composition remain hidden with observed fa
   const f=fixture();
   try {
     const parent=f.spawn('parent'), child=f.spawn('child'); f.world.add(child,relation(parent,{socket:'absent'})); await f.ready(parent,child); f.owner.sync();
-    assert.equal(f.owner.attachmentState(child).status,'missing-socket'); assert.equal(f.scene.children[1].visible,false);
+    assert.equal(f.owner.attachmentState(child).status,'missing-socket'); assert.equal(must(f.scene.children[1], 'scene root 1').visible,false);
     const offset=identity(); offset[12]=Number.MAX_VALUE; f.world.add(child,relation(parent,{offset})); f.owner.sync();
-    assert.equal(f.owner.attachmentState(child).status,'invalid'); assert.equal(f.scene.children[1].visible,false); assert.equal(f.owner.sync(),false);
+    assert.equal(f.owner.attachmentState(child).status,'invalid'); assert.equal(must(f.scene.children[1], 'scene root 1').visible,false); assert.equal(f.owner.sync(),false);
   } finally { f.owner.dispose(); }
 });
 
 test('headless attachment state does not pretend a model or native pose was rendered',async()=>{
   const visit=await testScene(defineScene({id:'attachment-test',title:'Attachment',entities:[[Transform(),Model({asset:'original'})]]}));
-  const e=[...visit.world.query(Model)][0][0]; visit.world.add(e,relation(999));
+  const [e]=must([...visit.world.query(Model)][0], 'a model entity'); visit.world.add(e,relation(999));
   assert.deepEqual(visit.ctx.modelAttachmentState(e),{status:'unresolved',held:false});
   visit.run(.1); assert.equal(visit.ctx.modelAttachmentState(e).status,'unresolved'); visit.dispose(); assert.equal(visit.ctx.modelAttachmentState(e).status,'absent');
 });
@@ -138,7 +139,7 @@ test('duplicate node names cannot resolve an attachment', async () => {
   const f=fixture(2,true);
   try {
     const parent=f.spawn('parent'), child=f.spawn('child'); f.world.add(child,relation(parent)); await f.ready(parent,child); f.owner.sync();
-    assert.equal(f.owner.attachmentState(child).status,'ambiguous-socket'); assert.equal(f.scene.children[1].visible,false);
+    assert.equal(f.owner.attachmentState(child).status,'ambiguous-socket'); assert.equal(must(f.scene.children[1], 'scene root 1').visible,false);
   } finally { f.owner.dispose(); }
 });
 
@@ -148,7 +149,7 @@ test('later relation capture cannot publish a removed or replaced earlier relati
     try {
       const parent=f.spawn('parent',5), first=f.spawn('first',20), later=f.spawn('later');
       f.world.add(first,relation(parent)); f.world.add(later,relation(parent)); await f.ready(parent,first,later); f.owner.sync();
-      const firstRoot=f.scene.children[1];
+      const firstRoot=must(f.scene.children[1], 'scene root 1');
       const raw={...relation(parent).value};
       Object.defineProperty(raw,'socket',{get(){
         if(remove) f.world.remove(first,ModelAttachment); else f.world.add(first,relation(999));
@@ -164,7 +165,7 @@ test('later relation capture cannot publish a removed or replaced earlier relati
 test('native matrix callback cannot revive a disposed attachment owner',async()=>{
   const f=fixture();
   const parent=f.spawn('parent'),child=f.spawn('child');f.world.add(child,relation(parent)); await f.ready(parent,child);f.owner.sync();
-  const node=f.scene.children[0].getObjectByName('anchor')!, original=node.updateWorldMatrix;
+  const node=must(f.scene.children[0], 'scene root 0').getObjectByName('anchor')!, original=node.updateWorldMatrix;
   let trigger=false;
   node.updateWorldMatrix=function(a,b){original.call(this,a,b);if(trigger)f.owner.dispose();}; trigger=true;
   assert.doesNotThrow(()=>f.owner.sync()); assert.equal(f.owner.attachmentState(child).status,'absent');
@@ -176,9 +177,9 @@ test('affine attachment uses world socket once even with a transformed scene con
   try {
     f.scene.position.set(10,20,30);f.scene.scale.set(2,3,4);
     const parent=f.spawn('parent',5),child=f.spawn('child');f.world.add(child,relation(parent));await f.ready(parent,child);f.owner.sync();
-    assert.equal(f.scene.children[1].matrixWorld.elements[12],22);
-    assert.equal(f.scene.children[1].matrixWorld.elements[13],20);
-    assert.equal(f.scene.children[1].matrixWorld.elements[14],30);
+    assert.equal(must(f.scene.children[1], 'scene root 1').matrixWorld.elements[12],22);
+    assert.equal(must(f.scene.children[1], 'scene root 1').matrixWorld.elements[13],20);
+    assert.equal(must(f.scene.children[1], 'scene root 1').matrixWorld.elements[14],30);
     assert.equal(f.owner.sync(),false);
   }finally{f.owner.dispose();}
 });
@@ -194,14 +195,14 @@ test('parent replacement holds only prior valid presentation and late completion
   try{
     const parent=f.spawn('parent',3),child=f.spawn('child');f.world.add(child,relation(parent,{unavailable:'hold'}));
     owner.sync();await waitFor(()=>owner.state(parent).status==='ready'&&owner.state(child).status==='ready');owner.sync();
-    const childRoot=f.scene.children[1], accepted=childRoot.matrix.clone();
+    const childRoot=must(f.scene.children[1], 'scene root 1'), accepted=childRoot.matrix.clone();
     f.world.get(parent,Model)!.asset='slow';owner.sync();await waitFor(()=>!!arrive);
     assert.deepEqual(owner.attachmentState(child),{status:'waiting',held:true});assert.ok(childRoot.matrix.equals(accepted));assert.equal(childRoot.visible,true);
     f.world.get(parent,Transform)!.x=10;f.world.get(parent,Model)!.asset='replacement';owner.sync();await waitFor(()=>owner.state(parent).status==='ready');owner.sync();
     assert.equal(childRoot.matrixWorld.elements[12],11);arrive!();await waitFor(()=>lateReleased===1);owner.sync();
     assert.equal(childRoot.matrixWorld.elements[12],11);assert.equal(f.library.stats().instances,2);
     f.world.get(child,Model)!.asset='new-child';owner.sync();assert.equal(owner.attachmentState(child).held,false);
-    await waitFor(()=>owner.state(child).status==='ready');assert.equal(f.scene.children.find(r=>r!==f.scene.children[0])!.visible,false);owner.sync();
+    await waitFor(()=>owner.state(child).status==='ready');assert.equal(f.scene.children.find(r=>r!==must(f.scene.children[0], 'scene root 0'))!.visible,false);owner.sync();
     assert.equal(owner.attachmentState(child).status,'ready');assert.deepEqual(f.errors,[]);
   }finally{owner.dispose();arrive?.();}
   assert.equal(f.library.stats().instances,0);assert.equal(f.library.stats().residentMiB,0);
@@ -211,7 +212,7 @@ test('native pose overrides precede attachment composition',async()=>{
   const f=fixture();try{
     const parent=f.spawn('parent',3),child=f.spawn('child');const offset=identity();offset[12]=1;f.world.add(child,relation(parent,{offset}));await f.ready(parent,child);
     f.world.get(parent,Model)!.pose=[{node:'anchor',position:[2,0,0],rotation:[0,0,Math.SQRT1_2,Math.SQRT1_2]}];f.owner.sync();
-    const matrix=f.scene.children[1].matrixWorld.elements;assert.ok(Math.abs(matrix[12]-5)<1e-12);assert.ok(Math.abs(matrix[13]-2)<1e-12);assert.equal(f.owner.sync(),false);
+    const matrix=must(f.scene.children[1], 'scene root 1').matrixWorld.elements;assert.ok(Math.abs(matrix[12]-5)<1e-12);assert.ok(Math.abs(matrix[13]-2)<1e-12);assert.equal(f.owner.sync(),false);
   }finally{f.owner.dispose();}
 });
 
@@ -220,7 +221,7 @@ test('a relation superseding itself during capture cannot leave prior socket pre
     const f=fixture();
     try {
       const parent=f.spawn('parent',4),child=f.spawn('child',20);
-      f.world.add(child,relation(parent));await f.ready(parent,child);f.owner.sync();const root=f.scene.children[1];
+      f.world.add(child,relation(parent));await f.ready(parent,child);f.owner.sync();const root=must(f.scene.children[1], 'scene root 1');
       assert.equal(root.matrixWorld.elements[12],5);
       const raw={...relation(parent).value};
       Object.defineProperty(raw,'socket',{get(){
@@ -240,7 +241,7 @@ test('native pose callback removing the last relation restores ordinary presenta
   try {
     const parent=f.spawn('parent',4), child=f.spawn('child',20);
     f.world.add(child,relation(parent)); await f.ready(parent,child); f.owner.sync();
-    const root=f.scene.children[1], node=root.getObjectByName('anchor')!, original=node.updateWorldMatrix;
+    const root=must(f.scene.children[1], 'scene root 1'), node=root.getObjectByName('anchor')!, original=node.updateWorldMatrix;
     assert.equal(root.matrixWorld.elements[12],5); let armed=true;
     node.updateWorldMatrix=function(parents,children){
       original.call(this,parents,children);
@@ -260,13 +261,13 @@ test('sockets and chained attachments read current world matrices after the scen
   try {
     const last=f.spawn('last'), middle=f.spawn('middle'), first=f.spawn('first',5);
     f.world.add(last,relation(middle)); f.world.add(middle,relation(first)); await f.ready(last,middle,first); f.owner.sync();
-    const before=new Set(f.scene.children), lastRoot=f.scene.children[0], middleRoot=f.scene.children[1];
+    const before=new Set(f.scene.children), lastRoot=must(f.scene.children[0], 'scene root 0'), middleRoot=must(f.scene.children[1], 'scene root 1');
     assert.equal(middleRoot.matrixAutoUpdate,false);
     const s0=f.owner.socket(middle,'anchor')!.matrix, last0=lastRoot.matrixWorld.elements[12];
     // Move only the container (no full scene update): every read below must still see it.
     f.scene.position.set(100,0,-4);
     const s1=f.owner.socket(middle,'anchor')!.matrix;
-    assert.equal(s1[12],s0[12]+100,'socket follows the moved container'); assert.equal(s1[14],s0[14]-4);
+    assert.equal(s1[12],must(s0[12])+100,'socket follows the moved container'); assert.equal(s1[14],must(s0[14])-4);
     // A new attachment to that socket resolves from the current container, not the pre-move world matrix.
     const extra=f.spawn('extra'); f.world.add(extra,relation(middle)); await f.ready(extra); f.owner.sync();
     assert.equal(f.owner.attachmentState(extra).status,'ready');

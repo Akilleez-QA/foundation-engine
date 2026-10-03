@@ -72,23 +72,24 @@ export function openActionSource(input: InputActions, actions: readonly ActionId
   admission.serial = serial;
   admission.count++;
   let disposed = false;
+  // slot() returns an index into ids, and rows, sources and revisions are all ids-aligned.
   return {
     isDown: id => !disposed && physical.has(slot(id)),
-    accepted: id => !disposed && bridge.accepted(sources[slot(id)]),
+    accepted: id => !disposed && bridge.accepted(sources[slot(id)]!),
     press: (id, epoch, valid = () => true) => {
       if (disposed) return;
-      const index = slot(id), revision = revisions[index];
+      const index = slot(id), revision = revisions[index]!;
       if (physical.has(index)) return;
       physical.add(index);
       if (epoch !== input.epoch) return;
-      bridge.press(rows[index], sources[index], device, () => !disposed && revisions[index] === revision && input.epoch === epoch && valid());
+      bridge.press(rows[index]!, sources[index]!, device, () => !disposed && revisions[index] === revision && input.epoch === epoch && valid());
     },
     release: id => {
       if (disposed) return;
       const index = slot(id);
-      revisions[index]++;
+      revisions[index]!++;
       physical.delete(index);
-      bridge.release(sources[index]);
+      bridge.release(sources[index]!);
     },
     dispose: () => {
       if (disposed) return;

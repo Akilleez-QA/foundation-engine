@@ -92,9 +92,10 @@ export function forcesRhs<P>(terms: readonly ForceTerm<P>[], params: () => P): R
   return (t, y, dy) => {
     acc[0] = acc[1] = acc[2] = 0; dm.value = 0;
     if (ctx) { ctx.t = t; ctx.y = y; ctx.params = params(); } else ctx = { t, y, params: params() };
-    for (let i = 0; i < sorted.length; i++) sorted[i].accumulate(ctx, acc, dm);   // indexed: no iterator object
-    dy[0] = y[3]; dy[1] = y[4]; dy[2] = y[5];
-    dy[3] = acc[0]; dy[4] = acc[1]; dy[5] = acc[2];
+    // i < sorted.length; y/dy have the ForceCtx layout (>= 7 entries) and acc is Float64Array(3): indices in range.
+    for (let i = 0; i < sorted.length; i++) sorted[i]!.accumulate(ctx, acc, dm);   // indexed: no iterator object
+    dy[0] = y[3]!; dy[1] = y[4]!; dy[2] = y[5]!;
+    dy[3] = acc[0]!; dy[4] = acc[1]!; dy[5] = acc[2]!;
     dy[6] = dm.value;
     for (let i = 7; i < dy.length; i++) dy[i] = 0;
   };
@@ -219,7 +220,7 @@ export class FixedStepHost<S, I> {
       this.simTime = this.stepsTaken * h;
       this.acc -= h;
       const drained = sim.drainEvents ? sim.drainEvents() : NO_EVENTS;
-      for (let i = 0; i < drained.length; i++) r.events.push(drained[i]);
+      for (let i = 0; i < drained.length; i++) r.events.push(drained[i]!); // i < drained.length
     }
     if (this.acc < 0) this.acc = 0;   // the 1e-12 tolerance may leave a tiny negative remainder
     if (local && steps === this.maxSubsteps && this.acc >= h) { const keep = this.acc % h; dropped += this.acc - keep; this.acc = keep; }

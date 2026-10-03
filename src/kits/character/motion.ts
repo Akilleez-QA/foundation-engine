@@ -49,8 +49,8 @@ export function createMotion(options:{speed:number;accelTime?:number;stopTime?:n
    const cap=Math.min(speed,Math.sqrt(2*decel*remaining)),next=current<cap?Math.min(cap,current+accel*dt):Math.max(cap,current-decel*dt);
    let travel=(current+next)/2*dt,x=from.x,z=from.z,lastDir:Vec|null=null;
    if(travel>=remaining-1e-4)travel=remaining+1;
-   while(route.length){
-    const p=route[0],d=m.hypot(p.x-x,p.z-z);
+   for(let p=route[0];p;p=route[0]){
+    const d=m.hypot(p.x-x,p.z-z);
     if(d<=travel){if(d>1e-9)lastDir={x:(p.x-x)/d,z:(p.z-z)/d};travel-=d;x=p.x;z=p.z;route.shift();continue;}
     lastDir={x:(p.x-x)/d,z:(p.z-z)/d};x+=lastDir.x*travel;z+=lastDir.z*travel;break;
    }

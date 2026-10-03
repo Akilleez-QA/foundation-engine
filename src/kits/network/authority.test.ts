@@ -8,6 +8,7 @@ import {
 } from './authority';
 import { captureAuthorityEnvelope } from './authority-envelope';
 import type { DocumentValue } from '../authoring/document';
+import { must } from '../../testing/must';
 
 /** A mutable view of the stored envelope wire shape, for tests that read or corrupt it. */
 interface WireEnvelope {
@@ -178,13 +179,13 @@ test('recovery rejects independently corrupted coupled envelope fields without w
   await f.owner.submit(command('b', 1, 3));
   const base: WireEnvelope = JSON.parse(f.raw!);
   const mutants: ((e: WireEnvelope) => unknown)[] = [
-    (e) => e.streams.push(e.streams[0]),
-    (e) => e.streams[0].receipts.pop(),
-    (e) => (e.streams[0].receipts[0].sequence = 2),
-    (e) => (e.streams[0].through = 0),
+    (e) => e.streams.push(must(e.streams[0])),
+    (e) => must(e.streams[0]).receipts.pop(),
+    (e) => (must(must(e.streams[0]).receipts[0]).sequence = 2),
+    (e) => (must(e.streams[0]).through = 0),
     (e) => (e.revision = 4),
-    (e) => (e.streams[0].receipts[0].revision = 4),
-    (e) => (e.streams[1].receipts[0].revision = 2),
+    (e) => (must(must(e.streams[0]).receipts[0]).revision = 4),
+    (e) => (must(must(e.streams[1]).receipts[0]).revision = 2),
     (e) => (e.lineage = 'foreign'),
     (e) => (e.schema = 'other'),
     (e) => (e.extra = true),
@@ -570,12 +571,12 @@ test('recovery cannot rewrite overlapping confirmed receipt identity or result a
     await f.owner.submit(command('a', 1, 7));
     await f.owner.submit(command('b', 1, 1));
     const e = JSON.parse(f.raw!);
-    e.revision = 3; e.streams[1].through = 2;
-    e.streams[1].receipts.push({ sequence: 2, revision: 3, input: 1, result: 9 }); e.state = 9;
+    e.revision = 3; must(e.streams[1]).through = 2;
+    must(e.streams[1]).receipts.push({ sequence: 2, revision: 3, input: 1, result: 9 }); e.state = 9;
     if (field === 'revision') {
-      e.streams[0].receipts[0].revision = 2;
-      e.streams[1].receipts[0].revision = 1;
-    } else e.streams[0].receipts[0][field] = 8;
+      must(must(e.streams[0]).receipts[0]).revision = 2;
+      must(must(e.streams[1]).receipts[0]).revision = 1;
+    } else must(must(e.streams[0]).receipts[0])[field] = 8;
     f.raw = JSON.stringify(e);
     assert.equal((await f.owner.recover()).status, 'unavailable', field);
     assert.equal(f.owner.read().lastConfirmed?.envelope.revision, 2);
@@ -589,7 +590,7 @@ test('receipt chronology rejects competing omitted prefixes without iterating wo
     { id: 'b', through: 3, receipts: [receipt(2, 3), receipt(3, 5)] },
   ] };
   assert.throws(() => captureAuthorityEnvelope(JSON.stringify(e), config));
-  e.streams[1].receipts[0].revision = 4; // a1,a2,b1,b2,b3,a3 is feasible
+  must(must(e.streams[1]).receipts[0]).revision = 4; // a1,a2,b1,b2,b3,a3 is feasible
   assert.equal(captureAuthorityEnvelope(JSON.stringify(e), config).envelope.revision, 6);
   const large = Number.MAX_SAFE_INTEGER;
   e.revision = large; e.streams = [{ id: 'a', through: large, receipts: [receipt(large - 1, large - 1), receipt(large, large)] }];

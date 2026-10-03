@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buttonDown,GamepadInput,hatDirection,LOOK_CURVE,padFamily,scaledRadial,type GamepadOptions} from './gamepad';
 import {fakePad,snapshots} from '../../testing/input-fakes';
+import {must} from '../../testing/must';
 
 const near=(a:number,b:number,eps=1e-9)=>assert.ok(Math.abs(a-b)<eps,`${a} ≉ ${b}`);
-const rig=(pads=[fakePad()],options:GamepadOptions={})=>{const get=snapshots(pads);const g=new GamepadInput({getPads:get,...options});let t=0;const poll=(ms=16)=>g.poll(ms/1000,t+=ms);return {g,get,pad:pads[0],pads,poll,time:()=>t};};
+const rig=(pads=[fakePad()],options:GamepadOptions={})=>{const get=snapshots(pads);const g=new GamepadInput({getPads:get,...options});let t=0;const poll=(ms=16)=>g.poll(ms/1000,t+=ms);return {g,get,pad:must(pads[0],'pad'),pads,poll,time:()=>t};};
 /** Poll once in neutral so the pad is armed. */
 const armed=(pads=[fakePad()],options:GamepadOptions={})=>{const r=rig(pads,options);r.poll();return r;};
 
@@ -55,9 +56,9 @@ test('menu direction from the stick uses .5 engage and .35 release on the domina
 });
 test('disconnecting the active pad pauses once and clears held state; reconnecting needs neutral again',()=>{
  const pads:ReturnType<typeof fakePad>[]=[fakePad()];const r=armed(pads);r.pad.stick(0,0,-1);r.poll();r.poll();
- pads[0].connected=false;const gone=r.poll();assert.ok(gone.disconnected);assert.deepEqual(gone.edges,['pause']);assert.deepEqual(gone.move,{x:0,y:0});
+ r.pad.connected=false;const gone=r.poll();assert.ok(gone.disconnected);assert.deepEqual(gone.edges,['pause']);assert.deepEqual(gone.move,{x:0,y:0});
  assert.equal(r.poll().disconnected,false,'pauses once');
- pads[0].connected=true;const back=r.poll();assert.deepEqual(back.move,{x:0,y:0},'a stick still held on reconnect does not move');
+ r.pad.connected=true;const back=r.poll();assert.deepEqual(back.move,{x:0,y:0},'a stick still held on reconnect does not move');
  const idle=rig();idle.poll();(idle.pads[0] as {connected:boolean}).connected=false;assert.equal(idle.poll().disconnected,false,'an untouched pad leaving does not pause');
 });
 test('requireNeutral after a reset or context change: held buttons and sticks wait for release',()=>{

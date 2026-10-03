@@ -102,7 +102,7 @@ export class World {
     const stores = types.map(t => this.stores.get(t.id));
     if (stores.some(s => !s)) return;
     const [first, ...rest] = [...stores as Map<Entity, object>[]].sort((a, b) => a.size - b.size);
-    const order = [...first.keys()].sort((a, b) => a - b);
+    const order = [...first!.keys()].sort((a, b) => a - b); // types.length > 0, so `stores` (and `first`) exist
     for (const e of order) {
       if (!rest.every(s => s.has(e))) continue;
       yield queryRow<Q>([e, ...stores.map(s => s!.get(e))]);
