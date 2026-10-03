@@ -19,7 +19,7 @@ cd foundation-engine
 npm ci
 ```
 
-`npm ci` installs exactly the versions in `package-lock.json`.
+`npm ci` installs exactly the versions in `package-lock.json`. Two dependencies are marked as having install scripts, and neither is needed: esbuild's `postinstall` only re-checks the native binary npm already installed as an optional dependency, and fsevents (macOS only) ships its binary prebuilt. `package.json` records that review as `"allowScripts": {"esbuild": false, "fsevents": false}`, so npm 12 and newer, which block dependency install scripts that `allowScripts` does not approve, skip them without a warning. Older npm versions ignore the field and run esbuild's check as before. Either way the tools work.
 
 ## 2. Prepare automated browser checks (optional for first play)
 
