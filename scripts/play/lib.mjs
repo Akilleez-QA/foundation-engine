@@ -30,11 +30,29 @@ export function listenHost(argv = process.argv.slice(2), env = process.env) {
   return value === true || value === '1' || value === 'true' ? true : value;
 }
 
-/** The dev server (test API included), on a free local port; `host` as in listenHost (default 127.0.0.1). */
+/**
+ * True when a listen failed because the port is taken: Node's EADDRINUSE, or Vite's own `Port N is already in use`
+ * (strictPort), which carries no code.
+ */
+export const isPortBusy = error => error?.code === 'EADDRINUSE' || /^Port \d+ is already in use$/.test(String(error?.message));
+
+/** The one line a command prints for a busy port, with the next port to try, e.g. `PORT=5174 npm run play`. */
+export const portBusyHint = (port, retry) => `port ${port} is busy; try ${retry(Number(port) + 1)}`;
+
+/**
+ * The dev server (test API included), on a free local port; `host` as in listenHost (default 127.0.0.1). A taken
+ * `port` rejects with an error whose `code` is 'EADDRINUSE' and whose `port` names it, after closing the half-started
+ * server; callers print portBusyHint instead of a stack trace.
+ */
 export async function serve({port, host = '127.0.0.1'} = {}) {
   const {createServer} = await import('vite');
-  const server = await createServer({root: ROOT, logLevel: 'error', server: {host, port: port ?? await freePort(), strictPort: true}});
-  await server.listen();
+  const chosen = port ?? await freePort();
+  const server = await createServer({root: ROOT, logLevel: 'error', server: {host, port: chosen, strictPort: true}});
+  try { await server.listen(); }
+  catch (error) {
+    await server.close().catch(() => {});
+    throw isPortBusy(error) ? Object.assign(Error(`port ${chosen} is busy`, {cause: error}), {code: 'EADDRINUSE', port: chosen}) : error;
+  }
   // A specific non-loopback address (`--host 192.168.1.5`) is listed only under `network`, with `local` empty.
   const {local = [], network = []} = server.resolvedUrls ?? {};
   const first = local[0] ?? network[0];

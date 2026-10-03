@@ -27,7 +27,7 @@ cd ../foundation-engine-my-change
 npm ci
 ```
 
-Here **`origin` is the canonical upstream; `fork` is your personal repository**. This is intentional: history and budget checks compare against `origin/main`. If you already cloned your fork as `origin`, rename that remote with `git remote rename origin fork`, add the canonical URL with `git remote add origin https://github.com/Akilleez-QA/foundation-engine.git`, and fetch it before creating the task worktree. Keep each worktree's own dependencies; do not reuse another contributor's `node_modules`.
+Here **`origin` is the canonical upstream; `fork` is your personal repository**. This is intentional: history and budget checks compare against `origin/main`. If you already cloned your fork as `origin`, rename that remote with `git remote rename origin fork`, add the canonical URL with `git remote add origin https://github.com/Akilleez-QA/foundation-engine.git`, and fetch it before creating the task worktree. Keep each worktree's own dependencies; do not reuse another contributor's `node_modules`. A new dependency with an install script needs a reviewed `allowScripts` entry in `package.json` (`npm approve-scripts <pkg>` or `npm deny-scripts <pkg>` on npm 12 or newer); `scripts/install-scripts.test.mjs` fails until it has one.
 
 For a first contribution, a small reproduction, test, recipe correction or accessibility finding is useful. Choose the relevant existing contract and avoid unrelated cleanup. Making your own game instead? Follow [getting started](docs/guides/getting-started.md); game branches are not engine pull requests.
 

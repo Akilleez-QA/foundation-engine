@@ -1,0 +1,1443 @@
+{
+  "revision": "06fedec8f0dfda89f7f60d244195086b7a544de7",
+  "dirtyWorktree": false,
+  "scriptSha256": "82135a9938d5c7ce759cb9b348387e1d79c7dc00599b116cb51b68b68ddfe5e7",
+  "game": "templates/explorer/game",
+  "mode": "production",
+  "environment": {
+    "node": "v22.23.3",
+    "platform": "linux 7.2.5-3-omarchy",
+    "cpuModel": "AMD Ryzen 9 7950X 16-Core Processor",
+    "logicalCpus": 32,
+    "totalMemoryGiB": 125.4,
+    "niceness": 15,
+    "loadAverage": [
+      56.61,
+      52.59,
+      42.73
+    ],
+    "browser": "152.0.7977.82",
+    "executable": {
+      "path": "/home/akilleez/.local/bin/chromium-automation",
+      "source": "ENGINE_CHROMIUM"
+    },
+    "arguments": [
+      "--mute-audio",
+      "--no-first-run",
+      "--no-default-browser-check",
+      "--disable-extensions",
+      "--disable-background-networking",
+      "--enable-automation",
+      "--ignore-gpu-blocklist",
+      "--window-size=1280,800",
+      "--use-angle=swiftshader",
+      "--enable-unsafe-swiftshader"
+    ],
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "server": "static /first-use/ (loopback)"
+  },
+  "buildMs": 446.754976,
+  "limitations": [
+    "Advisory raw timings, no latency budget or statistical percentile claim. Three fresh contexts in one isolated Chromium process; browser/driver caches may remain warm.",
+    "Static production build served by a local loopback host under /first-use/ (hashed assets immutable, other files no-cache with ETag revalidation). No CDN, network latency, compression, download benchmark, hardware/device or thermal result.",
+    "Warm entry: a second navigation (after about:blank) in the same context with its HTTP cache primed by the cold visit. Renderer processes, compiled scripts and GPU shader caches may also be warm; it is not a cross-session repeat-visit claim.",
+    "MutationObserver timestamps observe batched DOM changes. Shell active follows the engine submitted-picture contract; it does not prove display presentation.",
+    "Program readiness covers an aggregate preparation path including initial render and submitted-command fence. Compile, decode, GPU upload and first draw durations are unmeasured.",
+    "Production builds have no window.engine: input-to-movement time and renderer pool counts are unobservable (null); transitions are requested through the hash route.",
+    "No cancellation or unsettled-asset retention claim. Pool counts are sampled after successful arrival, not complete heap/listener accounting."
+  ],
+  "outsidePrefix": [],
+  "resourceSummaries": [
+    {
+      "context": 1,
+      "visit": "cold",
+      "count": 11,
+      "cacheServed": 0,
+      "transferBytes": 906141,
+      "decodedBytes": 902841,
+      "resourceTimingTruncated": false
+    },
+    {
+      "context": 1,
+      "visit": "warm",
+      "count": 11,
+      "cacheServed": 10,
+      "transferBytes": 300,
+      "decodedBytes": 902841,
+      "resourceTimingTruncated": false
+    },
+    {
+      "context": 2,
+      "visit": "cold",
+      "count": 11,
+      "cacheServed": 0,
+      "transferBytes": 906141,
+      "decodedBytes": 902841,
+      "resourceTimingTruncated": false
+    },
+    {
+      "context": 2,
+      "visit": "warm",
+      "count": 11,
+      "cacheServed": 10,
+      "transferBytes": 300,
+      "decodedBytes": 902841,
+      "resourceTimingTruncated": false
+    },
+    {
+      "context": 3,
+      "visit": "cold",
+      "count": 11,
+      "cacheServed": 0,
+      "transferBytes": 906141,
+      "decodedBytes": 902841,
+      "resourceTimingTruncated": false
+    },
+    {
+      "context": 3,
+      "visit": "warm",
+      "count": 11,
+      "cacheServed": 10,
+      "transferBytes": 300,
+      "decodedBytes": 902841,
+      "resourceTimingTruncated": false
+    }
+  ],
+  "samples": [
+    {
+      "context": 1,
+      "label": "context-cold entry",
+      "scene": "garden",
+      "requestAtMs": 0,
+      "marks": [
+        {
+          "atMs": 11.900000005960464,
+          "kind": "shell",
+          "value": "undefined:undefined",
+          "scene": null
+        },
+        {
+          "atMs": 38.70000001788139,
+          "kind": "shell",
+          "value": "scene.garden:entering",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 434,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 705.8000000119209,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 774.7000000178814,
+          "kind": "shell",
+          "value": "scene.garden:active",
+          "scene": "scene.garden"
+        }
+      ],
+      "activeAtMs": 774.7000000178814,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 774.7000000178814,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 11,
+        "ok": 11,
+        "notModified": 0,
+        "bytes": 902841
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 1,
+      "label": "first transition",
+      "scene": "shed",
+      "requestAtMs": 787.3000000119209,
+      "marks": [
+        {
+          "atMs": 788.3000000119209,
+          "kind": "shell",
+          "value": "scene.shed:entering",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 823.9000000059605,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 855.3000000119209,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 880.0999999940395,
+          "kind": "shell",
+          "value": "scene.shed:active",
+          "scene": "scene.shed"
+        }
+      ],
+      "activeAtMs": 880.0999999940395,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 92.7999999821186,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 1,
+      "label": "first return",
+      "scene": "garden",
+      "requestAtMs": 882.5999999940395,
+      "marks": [
+        {
+          "atMs": 883,
+          "kind": "shell",
+          "value": "scene.garden:entering",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 892.2000000178814,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 933.5,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 963.4000000059605,
+          "kind": "shell",
+          "value": "scene.garden:active",
+          "scene": "scene.garden"
+        }
+      ],
+      "activeAtMs": 963.4000000059605,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 80.80000001192093,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 1,
+      "label": "repeat transition 1",
+      "scene": "shed",
+      "requestAtMs": 966,
+      "marks": [
+        {
+          "atMs": 966.3000000119209,
+          "kind": "shell",
+          "value": "scene.shed:entering",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 976.2000000178814,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 1007.3000000119209,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 1030.0999999940395,
+          "kind": "shell",
+          "value": "scene.shed:active",
+          "scene": "scene.shed"
+        }
+      ],
+      "activeAtMs": 1030.0999999940395,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 64.09999999403954,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 1,
+      "label": "repeat return 1",
+      "scene": "garden",
+      "requestAtMs": 1032.800000011921,
+      "marks": [
+        {
+          "atMs": 1033.2000000178814,
+          "kind": "shell",
+          "value": "scene.garden:entering",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 1041.9000000059605,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 1083.4000000059605,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 1113.4000000059605,
+          "kind": "shell",
+          "value": "scene.garden:active",
+          "scene": "scene.garden"
+        }
+      ],
+      "activeAtMs": 1113.4000000059605,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 80.59999999403954,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 1,
+      "label": "repeat transition 2",
+      "scene": "shed",
+      "requestAtMs": 1116.5999999940395,
+      "marks": [
+        {
+          "atMs": 1117.0999999940395,
+          "kind": "shell",
+          "value": "scene.shed:entering",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 1125.800000011921,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 1167.0999999940395,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 1196.5999999940395,
+          "kind": "shell",
+          "value": "scene.shed:active",
+          "scene": "scene.shed"
+        }
+      ],
+      "activeAtMs": 1196.5999999940395,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 80,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 1,
+      "label": "repeat return 2",
+      "scene": "garden",
+      "requestAtMs": 1199.300000011921,
+      "marks": [
+        {
+          "atMs": 1199.7000000178814,
+          "kind": "shell",
+          "value": "scene.garden:entering",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 1208.0999999940395,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 1249.4000000059605,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 1280,
+          "kind": "shell",
+          "value": "scene.garden:active",
+          "scene": "scene.garden"
+        }
+      ],
+      "activeAtMs": 1280,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 80.69999998807907,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 1,
+      "label": "context-warm entry",
+      "scene": "garden",
+      "requestAtMs": 0,
+      "marks": [
+        {
+          "atMs": 7.699999988079071,
+          "kind": "shell",
+          "value": "undefined:undefined",
+          "scene": null
+        },
+        {
+          "atMs": 12.300000011920929,
+          "kind": "shell",
+          "value": "scene.garden:entering",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 39.400000005960464,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 82.69999998807907,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 109.59999999403954,
+          "kind": "shell",
+          "value": "scene.garden:active",
+          "scene": "scene.garden"
+        }
+      ],
+      "activeAtMs": 109.59999999403954,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 109.59999999403954,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 1,
+        "ok": 0,
+        "notModified": 1,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 2,
+      "label": "context-cold entry",
+      "scene": "garden",
+      "requestAtMs": 0,
+      "marks": [
+        {
+          "atMs": 14.900000005960464,
+          "kind": "shell",
+          "value": "undefined:undefined",
+          "scene": null
+        },
+        {
+          "atMs": 94.19999998807907,
+          "kind": "shell",
+          "value": "scene.garden:entering",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 757.6999999880791,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 1452.2999999821186,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 1489.5,
+          "kind": "shell",
+          "value": "scene.garden:active",
+          "scene": "scene.garden"
+        }
+      ],
+      "activeAtMs": 1489.5,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 1489.5,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 11,
+        "ok": 11,
+        "notModified": 0,
+        "bytes": 902841
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 2,
+      "label": "first transition",
+      "scene": "shed",
+      "requestAtMs": 1570.0999999940395,
+      "marks": [
+        {
+          "atMs": 1582.9000000059605,
+          "kind": "shell",
+          "value": "scene.shed:entering",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 1870.699999988079,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 2109.9000000059605,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 2135.699999988079,
+          "kind": "shell",
+          "value": "scene.shed:active",
+          "scene": "scene.shed"
+        }
+      ],
+      "activeAtMs": 2135.699999988079,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 565.5999999940395,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 2,
+      "label": "first return",
+      "scene": "garden",
+      "requestAtMs": 2189.199999988079,
+      "marks": [
+        {
+          "atMs": 2190.7999999821186,
+          "kind": "shell",
+          "value": "scene.garden:entering",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 2374.2999999821186,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 2546.5999999940395,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 2586.0999999940395,
+          "kind": "shell",
+          "value": "scene.garden:active",
+          "scene": "scene.garden"
+        }
+      ],
+      "activeAtMs": 2586.0999999940395,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 396.90000000596046,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 2,
+      "label": "repeat transition 1",
+      "scene": "shed",
+      "requestAtMs": 2596.199999988079,
+      "marks": [
+        {
+          "atMs": 2597,
+          "kind": "shell",
+          "value": "scene.shed:entering",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 3107.4000000059605,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 3331.5999999940395,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 3363.4000000059605,
+          "kind": "shell",
+          "value": "scene.shed:active",
+          "scene": "scene.shed"
+        }
+      ],
+      "activeAtMs": 3363.4000000059605,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 767.2000000178814,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 2,
+      "label": "repeat return 1",
+      "scene": "garden",
+      "requestAtMs": 3379,
+      "marks": [
+        {
+          "atMs": 3381,
+          "kind": "shell",
+          "value": "scene.garden:entering",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 3469.5,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 3582.7999999821186,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 3616.4000000059605,
+          "kind": "shell",
+          "value": "scene.garden:active",
+          "scene": "scene.garden"
+        }
+      ],
+      "activeAtMs": 3616.4000000059605,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 237.40000000596046,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 2,
+      "label": "repeat transition 2",
+      "scene": "shed",
+      "requestAtMs": 3639.2999999821186,
+      "marks": [
+        {
+          "atMs": 3641.9000000059605,
+          "kind": "shell",
+          "value": "scene.shed:entering",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 3676.4000000059605,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 3809,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 3829.9000000059605,
+          "kind": "shell",
+          "value": "scene.shed:active",
+          "scene": "scene.shed"
+        }
+      ],
+      "activeAtMs": 3829.9000000059605,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 190.60000002384186,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 2,
+      "label": "repeat return 2",
+      "scene": "garden",
+      "requestAtMs": 3849.5,
+      "marks": [
+        {
+          "atMs": 3851.5999999940395,
+          "kind": "shell",
+          "value": "scene.garden:entering",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 3930,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 4065.9000000059605,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 4079.5999999940395,
+          "kind": "shell",
+          "value": "scene.garden:active",
+          "scene": "scene.garden"
+        }
+      ],
+      "activeAtMs": 4079.5999999940395,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 230.09999999403954,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 2,
+      "label": "context-warm entry",
+      "scene": "garden",
+      "requestAtMs": 0,
+      "marks": [
+        {
+          "atMs": 25.30000001192093,
+          "kind": "shell",
+          "value": "undefined:undefined",
+          "scene": null
+        },
+        {
+          "atMs": 61.5,
+          "kind": "shell",
+          "value": "scene.garden:entering",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 209.40000000596046,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 336.80000001192093,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 373.09999999403954,
+          "kind": "shell",
+          "value": "scene.garden:active",
+          "scene": "scene.garden"
+        }
+      ],
+      "activeAtMs": 373.09999999403954,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 373.09999999403954,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 1,
+        "ok": 0,
+        "notModified": 1,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 3,
+      "label": "context-cold entry",
+      "scene": "garden",
+      "requestAtMs": 0,
+      "marks": [
+        {
+          "atMs": 117.80000001192093,
+          "kind": "shell",
+          "value": "undefined:undefined",
+          "scene": null
+        },
+        {
+          "atMs": 401,
+          "kind": "shell",
+          "value": "scene.garden:entering",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 814.3000000119209,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 964.8000000119209,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 1018.5999999940395,
+          "kind": "shell",
+          "value": "scene.garden:active",
+          "scene": "scene.garden"
+        }
+      ],
+      "activeAtMs": 1018.5999999940395,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 1018.5999999940395,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 11,
+        "ok": 11,
+        "notModified": 0,
+        "bytes": 902841
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 3,
+      "label": "first transition",
+      "scene": "shed",
+      "requestAtMs": 1040.2000000178814,
+      "marks": [
+        {
+          "atMs": 1045.2000000178814,
+          "kind": "shell",
+          "value": "scene.shed:entering",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 1155.4000000059605,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 1264.0999999940395,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 1278.4000000059605,
+          "kind": "shell",
+          "value": "scene.shed:active",
+          "scene": "scene.shed"
+        }
+      ],
+      "activeAtMs": 1278.4000000059605,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 238.19999998807907,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 3,
+      "label": "first return",
+      "scene": "garden",
+      "requestAtMs": 1290.800000011921,
+      "marks": [
+        {
+          "atMs": 1292.7000000178814,
+          "kind": "shell",
+          "value": "scene.garden:entering",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 1383.5,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 1506.5999999940395,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 1534.4000000059605,
+          "kind": "shell",
+          "value": "scene.garden:active",
+          "scene": "scene.garden"
+        }
+      ],
+      "activeAtMs": 1534.4000000059605,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 243.59999999403954,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 3,
+      "label": "repeat transition 1",
+      "scene": "shed",
+      "requestAtMs": 1553.2000000178814,
+      "marks": [
+        {
+          "atMs": 1553.9000000059605,
+          "kind": "shell",
+          "value": "scene.shed:entering",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 1657.0999999940395,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 1795.4000000059605,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 1816.0999999940395,
+          "kind": "shell",
+          "value": "scene.shed:active",
+          "scene": "scene.shed"
+        }
+      ],
+      "activeAtMs": 1816.0999999940395,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 262.89999997615814,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 3,
+      "label": "repeat return 1",
+      "scene": "garden",
+      "requestAtMs": 1828.0999999940395,
+      "marks": [
+        {
+          "atMs": 1830,
+          "kind": "shell",
+          "value": "scene.garden:entering",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 2356.300000011921,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 2577.5999999940395,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 2609.800000011921,
+          "kind": "shell",
+          "value": "scene.garden:active",
+          "scene": "scene.garden"
+        }
+      ],
+      "activeAtMs": 2609.800000011921,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 781.7000000178814,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 3,
+      "label": "repeat transition 2",
+      "scene": "shed",
+      "requestAtMs": 2631.5999999940395,
+      "marks": [
+        {
+          "atMs": 2636,
+          "kind": "shell",
+          "value": "scene.shed:entering",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 2699.7000000178814,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 2779.5999999940395,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.shed"
+        },
+        {
+          "atMs": 2814,
+          "kind": "shell",
+          "value": "scene.shed:active",
+          "scene": "scene.shed"
+        }
+      ],
+      "activeAtMs": 2814,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 182.40000000596046,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 3,
+      "label": "repeat return 2",
+      "scene": "garden",
+      "requestAtMs": 2852,
+      "marks": [
+        {
+          "atMs": 2853.5,
+          "kind": "shell",
+          "value": "scene.garden:entering",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 2949.9000000059605,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 3099.5,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 3146.4000000059605,
+          "kind": "shell",
+          "value": "scene.garden:active",
+          "scene": "scene.garden"
+        }
+      ],
+      "activeAtMs": 3146.4000000059605,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 294.40000000596046,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 0,
+        "ok": 0,
+        "notModified": 0,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    },
+    {
+      "context": 3,
+      "label": "context-warm entry",
+      "scene": "garden",
+      "requestAtMs": 0,
+      "marks": [
+        {
+          "atMs": 42.79999998211861,
+          "kind": "shell",
+          "value": "undefined:undefined",
+          "scene": null
+        },
+        {
+          "atMs": 73.59999999403954,
+          "kind": "shell",
+          "value": "scene.garden:entering",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 550.2999999821186,
+          "kind": "program",
+          "value": "preparing",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 973.2999999821186,
+          "kind": "program",
+          "value": "unsupported",
+          "scene": "scene.garden"
+        },
+        {
+          "atMs": 982.7999999821186,
+          "kind": "shell",
+          "value": "scene.garden:active",
+          "scene": "scene.garden"
+        }
+      ],
+      "activeAtMs": 982.7999999821186,
+      "pool": null,
+      "testApi": false,
+      "arrivalMs": 982.7999999821186,
+      "inputEventToObservedMovementMs": null,
+      "input": null,
+      "serverRequests": {
+        "total": 1,
+        "ok": 0,
+        "notModified": 1,
+        "bytes": 0
+      },
+      "unmeasured": {
+        "fetchMs": null,
+        "decodeMs": null,
+        "uploadMs": null,
+        "programCompileMs": null,
+        "gpuFirstDrawMs": null,
+        "presentationMs": null,
+        "inputEventToObservedMovementMs": null,
+        "pool": null
+      }
+    }
+  ]
+}
