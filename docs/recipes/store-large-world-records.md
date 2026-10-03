@@ -58,11 +58,14 @@ const edits = createCellEdits(baselineGrid, { saved: stored?.data, revision: sto
 if (edits.set(x, y, z, block) === 'full') showNotice('worlds.edit-limit');
 // later, at a save point (not every frame):
 if (edits.dirty) {
-  const r = await store.write([{ key: `region:${cx},${cz}`, revision: edits.revision, data: edits.encode() }]);
-  if (r.status === 'saved') edits.markSaved(edits.revision);
+  const submittedRevision = edits.revision;
+  const r = await store.write([{ key: `region:${cx},${cz}`, revision: submittedRevision, data: edits.encode() }]);
+  if (r.status === 'saved') edits.markSaved(submittedRevision);
 }
 ```
 
+- **Acknowledgement:** capture the revision before awaiting the write and acknowledge
+  that exact revision. Edits made while the write is pending must remain dirty.
 - **Atomic:** one `write` call commits all its records or none. Use one call for
   neighbouring regions that must change together.
 - **Revisions:** each must be strictly newer than the stored one. The check runs

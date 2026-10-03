@@ -123,3 +123,32 @@ test('GEN-02 edits are bound to grid dimensions: uniform content of another shap
     assert.throws(() => createCellEdits({ ...shape, values: new Uint16Array(32) }, { saved: edits.encode() }), /grid dimensions mismatch/);
   assert.equal(createCellEdits({ ...wide, values: new Uint16Array(32) }, { saved: edits.encode() }).get(7, 0, 0), 5, 'identical shape and content still load');
 });
+
+test('GEN-02 acknowledging a pending save retains edits made after submission', async () => {
+  const fake = createFakeIdb();
+  const store = await openChunkStore({ name: 'pending-edit', schema: 1, factory: fake.factory });
+  const baseline = { cellsX: 2, cellsY: 1, cellsZ: 1, values: new Uint16Array(2) };
+  const edits = createCellEdits(baseline);
+  try {
+    edits.set(0, 0, 0, 1);
+    const submittedRevision = edits.revision;
+    const pending = store.write([{ key: 'region', revision: submittedRevision, data: edits.encode() }]);
+    edits.set(1, 0, 0, 2);
+    assert.equal((await pending).status, 'saved');
+    edits.markSaved(submittedRevision);
+    assert.equal(edits.dirty, true);
+    const first = await store.read('region');
+    assert.equal(first.status, 'found');
+    if (first.status !== 'found') return;
+    const persisted = createCellEdits(baseline, { saved: first.data, revision: first.revision });
+    assert.equal(persisted.get(0, 0, 0), 1);
+    assert.equal(persisted.get(1, 0, 0), 0);
+    const nextRevision = edits.revision;
+    assert.equal((await store.write([{ key: 'region', revision: nextRevision, data: edits.encode() }])).status, 'saved');
+    edits.markSaved(nextRevision);
+    assert.equal(edits.dirty, false);
+    const final = await store.read('region');
+    assert.equal(final.status, 'found');
+    if (final.status === 'found') assert.equal(createCellEdits(baseline, { saved: final.data, revision: final.revision }).get(1, 0, 0), 2);
+  } finally { store.close(); }
+});
