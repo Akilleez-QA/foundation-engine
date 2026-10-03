@@ -13,11 +13,18 @@ peaks at 2 m within 0.4 s").
 
 ## 2. A hold-aware action
 
+Generate it so the bindings are free in your game (`npm run new -- input jump`), then add `hold: true`:
+
 ```ts
 // game/jump.ts
 import { defineInput } from '@engine';
-export default defineInput({ id: 'jump', label: 'Jump', keys: ['Space'], pad: ['a'], tap: true, hold: true });
+export default defineInput({ id: 'jump', label: 'Jump', keys: ['f'], pad: ['y'], tap: true, hold: true });
 ```
+
+The keys are what the generator picks in an `explorer` game. Do not copy Space and pad A
+there: the explore kit's "use" action (`explore-interact`) already owns Space, `e`, Enter
+and pad A, and `npm run check` reports the overlap. In a game without the explore kit,
+Space and pad A are fine.
 
 `hold: true` lets `ctx.input.held('jump')` observe the release. A tap on the view
 presses without holding, so it produces the shortest jump. If the creator wants
@@ -55,6 +62,7 @@ systems: [
   jumpSystem({
     action: 'jump',
     ground: floor,               // highest surface at or below `below`, or null
+    groundOffset: 0.7,           // the Transform centre's height above the feet
     config: { height: 2, timeToApex: 0.4, releaseGravityScale: 2.5, coyoteTime: 0.1, bufferTime: 0.12 },
     snapDistance: 0.05, stepHeight: 0.2,
   }),
@@ -64,6 +72,11 @@ systems: [
 The `ground` query receives the start-of-tick foot height, so a surface above the
 feet never catches a rising actor (one-way platforms) and a fast fall cannot pass
 through one. Lateral blocking stays with `Walls` and `Solid`s.
+
+`groundOffset` defaults to 0, which puts the Transform centre on the surface. The
+explorer template's player capsule (`size: [0.6, 1.4, 0.6]`, `Transform({ y: 0.7 })`) is
+centred at half its height, so without `groundOffset: 0.7` it lands sunk halfway
+into the floor. Use half your actor's height.
 
 ## 4. Tune with numbers, not frames
 
@@ -88,9 +101,9 @@ the system and drops a pending press.
 
 ```ts
 test('S1: the held jump peaks at 2 m', async () => {
-  const t = await testScene(scene, { systems: [jumpSystem({ action: 'jump', config, ground: floor })] });
+  const t = await testScene(scene, { systems: [jumpSystem({ action: 'jump', config, ground: floor, groundOffset: 0.7 })] });
   t.press('jump'); t.hold('jump'); t.run(0.4);
-  // assert on the player's Transform.y
+  // assert on the player's Transform.y (the centre: feet + groundOffset)
 });
 ```
 
