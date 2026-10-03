@@ -6,9 +6,9 @@ import {
   type AuthorityOptions,
   type AuthorityStorage,
 } from './authority';
-import { captureAuthorityEnvelope } from './authority-envelope';
-import type { DocumentValue } from '../authoring/document';
-import { must } from '../../testing/must';
+import {captureAuthorityEnvelope} from './authority-envelope';
+import type {DocumentValue} from '../authoring/document';
+import {must} from '../../testing/must';
 
 /** A mutable view of the stored envelope wire shape, for tests that read or corrupt it. */
 interface WireEnvelope {
@@ -20,14 +20,14 @@ interface WireEnvelope {
   streams: {
     id: string;
     through: number;
-    receipts: { sequence: number; revision: number; input: unknown; result: unknown }[];
+    receipts: {sequence: number; revision: number; input: unknown; result: unknown}[];
   }[];
   extra?: boolean;
 }
-const isRecord = (v: DocumentValue | undefined): v is { readonly [key: string]: DocumentValue } =>
+const isRecord = (v: DocumentValue | undefined): v is {readonly [key: string]: DocumentValue} =>
   v !== null && typeof v === 'object' && !Array.isArray(v);
 
-const json = { maxBytes: 65536, maxNodes: 4096, maxDepth: 12 };
+const json = {maxBytes: 65536, maxNodes: 4096, maxDepth: 12};
 const limits = {
   envelope: json,
   state: json,
@@ -37,14 +37,11 @@ const limits = {
   maxReceiptsPerStream: 2,
 };
 const validators = {
-  validateState: (v: unknown) =>
-    typeof v === 'number' && Number.isSafeInteger(v),
-  validateInput: (v: unknown) =>
-    typeof v === 'number' && Number.isSafeInteger(v),
-  validateResult: (v: unknown) =>
-    typeof v === 'number' && Number.isSafeInteger(v),
+  validateState: (v: unknown) => typeof v === 'number' && Number.isSafeInteger(v),
+  validateInput: (v: unknown) => typeof v === 'number' && Number.isSafeInteger(v),
+  validateResult: (v: unknown) => typeof v === 'number' && Number.isSafeInteger(v),
 };
-const config = { lineage: 'world', schema: 'sum-v1', limits, ...validators };
+const config = {lineage: 'world', schema: 'sum-v1', limits, ...validators};
 function fixture(extra: Partial<AuthorityOptions> = {}) {
   let raw: string | null = createAuthorityGenesis({
       ...config,
@@ -60,12 +57,7 @@ function fixture(extra: Partial<AuthorityOptions> = {}) {
     async compareAndSwap(q) {
       writes++;
       const old = JSON.parse(raw!);
-      if (
-        old.lineage !== q.lineage ||
-        old.schema !== q.schema ||
-        old.revision !== q.revision
-      )
-        return 'rejected';
+      if (old.lineage !== q.lineage || old.schema !== q.schema || old.revision !== q.revision) return 'rejected';
       raw = q.json;
       return 'committed';
     },
@@ -74,10 +66,10 @@ function fixture(extra: Partial<AuthorityOptions> = {}) {
     ...config,
     storage,
     authorize: () => true,
-    reduce({ state, input }) {
+    reduce({state, input}) {
       reductions++;
       const value = (state as number) + Math.max(0, input as number);
-      return { stateJson: String(value), resultJson: String(value) };
+      return {stateJson: String(value), resultJson: String(value)};
     },
     ...extra,
   });
@@ -105,18 +97,15 @@ const command = (stream: string, sequence: number, input: number) => ({
 });
 const deferred = <T>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((r) => {
+  const promise = new Promise<T>(r => {
     resolve = r;
   });
-  return { promise, resolve };
+  return {promise, resolve};
 };
 
 test('literal two-stream durable oracle, domain rejection, suffix eviction and exact retry', async () => {
   const f = fixture();
-  assert.equal(
-    (await f.owner.submit(command('a', 1, 3))).status,
-    'unavailable',
-  );
+  assert.equal((await f.owner.submit(command('a', 1, 3))).status, 'unavailable');
   await f.owner.recover();
   await f.owner.submit(command('a', 1, 3));
   await f.owner.submit(command('b', 1, 4));
@@ -126,11 +115,7 @@ test('literal two-stream durable oracle, domain rejection, suffix eviction and e
   assert.equal(saved.revision, 4);
   assert.equal(saved.state, 9);
   assert.deepEqual(
-    saved.streams.map((s) => [
-      s.id,
-      s.through,
-      s.receipts.map((r) => [r.sequence, r.revision, r.result]),
-    ]),
+    saved.streams.map(s => [s.id, s.through, s.receipts.map(r => [r.sequence, r.revision, r.result])]),
     [
       [
         'a',
@@ -145,10 +130,7 @@ test('literal two-stream durable oracle, domain rejection, suffix eviction and e
   );
   assert.equal((await f.owner.submit(command('a', 3, 2))).status, 'duplicate');
   assert.equal((await f.owner.submit(command('a', 3, 99))).status, 'conflict');
-  assert.equal(
-    (await f.owner.submit(command('a', 1, 99))).status,
-    'result-unavailable',
-  );
+  assert.equal((await f.owner.submit(command('a', 1, 99))).status, 'result-unavailable');
   assert.equal((await f.owner.submit(command('a', 5, 2))).status, 'gap');
   assert.equal((await f.owner.submit(command('c', 1, 1))).status, 'refused');
   assert.equal(f.writes, 4);
@@ -162,14 +144,8 @@ test('literal two-stream durable oracle, domain rejection, suffix eviction and e
     },
   });
   await restarted.recover();
-  assert.equal(
-    (await restarted.submit(command('a', 1, 3))).status,
-    'result-unavailable',
-  );
-  assert.equal(
-    (await restarted.submit(command('a', 3, 2))).status,
-    'duplicate',
-  );
+  assert.equal((await restarted.submit(command('a', 1, 3))).status, 'result-unavailable');
+  assert.equal((await restarted.submit(command('a', 3, 2))).status, 'duplicate');
 });
 test('recovery rejects independently corrupted coupled envelope fields without writing', async () => {
   const f = fixture();
@@ -179,16 +155,16 @@ test('recovery rejects independently corrupted coupled envelope fields without w
   await f.owner.submit(command('b', 1, 3));
   const base: WireEnvelope = JSON.parse(f.raw!);
   const mutants: ((e: WireEnvelope) => unknown)[] = [
-    (e) => e.streams.push(must(e.streams[0])),
-    (e) => must(e.streams[0]).receipts.pop(),
-    (e) => (must(must(e.streams[0]).receipts[0]).sequence = 2),
-    (e) => (must(e.streams[0]).through = 0),
-    (e) => (e.revision = 4),
-    (e) => (must(must(e.streams[0]).receipts[0]).revision = 4),
-    (e) => (must(must(e.streams[1]).receipts[0]).revision = 2),
-    (e) => (e.lineage = 'foreign'),
-    (e) => (e.schema = 'other'),
-    (e) => (e.extra = true),
+    e => e.streams.push(must(e.streams[0])),
+    e => must(e.streams[0]).receipts.pop(),
+    e => (must(must(e.streams[0]).receipts[0]).sequence = 2),
+    e => (must(e.streams[0]).through = 0),
+    e => (e.revision = 4),
+    e => (must(must(e.streams[0]).receipts[0]).revision = 4),
+    e => (must(must(e.streams[1]).receipts[0]).revision = 2),
+    e => (e.lineage = 'foreign'),
+    e => (e.schema = 'other'),
+    e => (e.extra = true),
   ];
   for (const mutate of mutants) {
     const e = structuredClone(base);
@@ -198,12 +174,12 @@ test('recovery rejects independently corrupted coupled envelope fields without w
   assert.equal(f.writes, 3);
 });
 test('canonical retries match object order and normalized numeric wire values', async () => {
-  const seen: { input?: DocumentValue } = {};
+  const seen: {input?: DocumentValue} = {};
   const f = fixture({
     validateInput: () => true,
     reduce(c) {
       seen.input = c.input;
-      return { stateJson: '1', resultJson: '1' };
+      return {stateJson: '1', resultJson: '1'};
     },
   });
   await f.owner.recover();
@@ -257,7 +233,7 @@ test('unknown delayed write cannot be bypassed by recovery reading old data', as
     ...config,
     storage,
     authorize: () => true,
-    reduce: () => ({ stateJson: '3', resultJson: '3' }),
+    reduce: () => ({stateJson: '3', resultJson: '3'}),
   });
   await owner.recover();
   assert.equal((await owner.submit(command('a', 1, 3))).status, 'unknown');
@@ -279,14 +255,11 @@ test('external CAS conflict requires recovery; same-revision corruption and know
     ...config,
     storage: f.storage,
     authorize: () => true,
-    reduce: () => ({ stateJson: '8', resultJson: '8' }),
+    reduce: () => ({stateJson: '8', resultJson: '8'}),
   });
   await other.recover();
   await other.submit(command('b', 1, 8));
-  assert.equal(
-    (await f.owner.submit(command('a', 1, 2))).status,
-    'unavailable',
-  );
+  assert.equal((await f.owner.submit(command('a', 1, 2))).status, 'unavailable');
   assert.equal(f.owner.read().status, 'unavailable');
   assert.equal((await f.owner.recover()).status, 'recovered');
   assert.equal(f.owner.read().snapshot?.envelope.state, 8);
@@ -314,12 +287,9 @@ test('storage missing/read/settlement failures cannot seed or admit mutations', 
         return 'committed';
       },
     };
-    const f = fixture({ storage });
+    const f = fixture({storage});
     assert.equal((await f.owner.recover()).status, 'unavailable');
-    assert.equal(
-      (await f.owner.submit(command('a', 1, 1))).status,
-      'unavailable',
-    );
+    assert.equal((await f.owner.submit(command('a', 1, 1))).status, 'unavailable');
     assert.equal(writes, 0);
   }
 });
@@ -333,14 +303,14 @@ test('authorization is checked before retained disclosure and again after reduct
     },
     reduce() {
       allowed = false;
-      return { stateJson: '1', resultJson: '1' };
+      return {stateJson: '1', resultJson: '1'};
     },
   });
   await f.owner.recover();
   assert.equal((await f.owner.submit(command('a', 1, 1))).status, 'refused');
   assert.equal(f.writes, 0);
   assert.equal(calls, 2);
-  const g = fixture({ authorize: () => allowed });
+  const g = fixture({authorize: () => allowed});
   allowed = true;
   await g.owner.recover();
   await g.owner.submit(command('a', 1, 1));
@@ -349,19 +319,18 @@ test('authorization is checked before retained disclosure and again after reduct
   assert.equal(g.writes, 1);
 });
 test('callback reentry is busy and disposal fences final CAS and late recovery', async () => {
-  let nested: Promise<unknown> | undefined,
-    owner!: ReturnType<typeof createDurableAuthority>;
+  let nested: Promise<unknown> | undefined, owner!: ReturnType<typeof createDurableAuthority>;
   const f = fixture({
     reduce() {
       nested = owner.submit(command('b', 1, 2));
       owner.dispose();
-      return { stateJson: '1', resultJson: '1' };
+      return {stateJson: '1', resultJson: '1'};
     },
   });
   owner = f.owner;
   await owner.recover();
   assert.equal((await owner.submit(command('a', 1, 1))).status, 'retired');
-  assert.deepEqual(await nested, { status: 'busy' });
+  assert.deepEqual(await nested, {status: 'busy'});
   assert.equal(f.writes, 0);
   assert.equal(owner.read().lastConfirmed, null);
   const gate = deferred<void>(),
@@ -409,7 +378,7 @@ test('dispose during invoked commit does not promise rollback or publish locally
 });
 test('whole-envelope capacity refuses before storage and exhaustion retains read/retry', async () => {
   const f = fixture({
-    limits: { ...limits, envelope: { ...json, maxBytes: 100 } },
+    limits: {...limits, envelope: {...json, maxBytes: 100}},
   });
   await f.owner.recover();
   assert.equal((await f.owner.submit(command('a', 1, 1))).status, 'refused');
@@ -428,18 +397,15 @@ test('whole-envelope capacity refuses before storage and exhaustion retains read
         id: 'a',
         through: maximum,
         receipts: [
-          { sequence: maximum - 1, revision: maximum - 1, input: 0, result: 0 },
-          { sequence: maximum, revision: maximum, input: 0, result: 0 },
+          {sequence: maximum - 1, revision: maximum - 1, input: 0, result: 0},
+          {sequence: maximum, revision: maximum, input: 0, result: 0},
         ],
       },
     ],
   });
   await g.owner.recover();
   assert.equal((await g.owner.submit(command('b', 1, 1))).status, 'exhausted');
-  assert.equal(
-    (await g.owner.submit(command('a', maximum, 0))).status,
-    'duplicate',
-  );
+  assert.equal((await g.owner.submit(command('a', maximum, 0))).status, 'duplicate');
   assert.equal(g.writes, 0);
 });
 
@@ -460,10 +426,7 @@ test('throw after possible storage commit is unknown; settled readback returns e
   await g.owner.recover();
   assert.equal((await g.owner.submit(command('a', 1, 6))).status, 'unknown');
   assert.equal(g.owner.read().lastConfirmed?.envelope.state, 0);
-  assert.equal(
-    (await g.owner.submit(command('a', 1, 6))).status,
-    'unavailable',
-  );
+  assert.equal((await g.owner.submit(command('a', 1, 6))).status, 'unavailable');
   await g.owner.recover();
   assert.equal((await g.owner.submit(command('a', 1, 6))).status, 'duplicate');
   assert.equal(g.owner.read().snapshot?.envelope.state, 6);
@@ -496,7 +459,7 @@ test('late revocation cannot undo invoked commit; transport must separately gate
   assert.equal((await g.owner.submit(command('a', 1, 2))).status, 'refused');
 });
 test('trusted floor, permanent stream floors and incompatible receipt capacity fail closed', async () => {
-  const floor = fixture({ minimumRevision: 1 });
+  const floor = fixture({minimumRevision: 1});
   assert.equal((await floor.owner.recover()).status, 'unavailable');
   assert.equal(floor.writes, 0);
   const f = fixture();
@@ -507,8 +470,8 @@ test('trusted floor, permanent stream floors and incompatible receipt capacity f
   wrong.streams[0].id = 'b';
   wrong.streams[0].through = 3;
   wrong.streams[0].receipts = [
-    { sequence: 2, revision: 2, input: 1, result: 2 },
-    { sequence: 3, revision: 3, input: 1, result: 3 },
+    {sequence: 2, revision: 2, input: 1, result: 2},
+    {sequence: 3, revision: 3, input: 1, result: 3},
   ];
   wrong.revision = 3;
   wrong.state = 3;
@@ -518,7 +481,7 @@ test('trusted floor, permanent stream floors and incompatible receipt capacity f
   assert.throws(() =>
     captureAuthorityEnvelope(f.raw!, {
       ...config,
-      limits: { ...limits, maxReceiptsPerStream: 1 },
+      limits: {...limits, maxReceiptsPerStream: 1},
     }),
   );
 });
@@ -567,12 +530,15 @@ test('retiring in recovery validation prevents every later creator validator', a
 });
 test('recovery cannot rewrite overlapping confirmed receipt identity or result at a newer revision', async () => {
   for (const field of ['input', 'result', 'revision']) {
-    const f = fixture(); await f.owner.recover();
+    const f = fixture();
+    await f.owner.recover();
     await f.owner.submit(command('a', 1, 7));
     await f.owner.submit(command('b', 1, 1));
     const e = JSON.parse(f.raw!);
-    e.revision = 3; must(e.streams[1]).through = 2;
-    must(e.streams[1]).receipts.push({ sequence: 2, revision: 3, input: 1, result: 9 }); e.state = 9;
+    e.revision = 3;
+    must(e.streams[1]).through = 2;
+    must(e.streams[1]).receipts.push({sequence: 2, revision: 3, input: 1, result: 9});
+    e.state = 9;
     if (field === 'revision') {
       must(must(e.streams[0]).receipts[0]).revision = 2;
       must(must(e.streams[1]).receipts[0]).revision = 1;
@@ -584,26 +550,42 @@ test('recovery cannot rewrite overlapping confirmed receipt identity or result a
   }
 });
 test('receipt chronology rejects competing omitted prefixes without iterating world history', () => {
-  const receipt = (sequence: number, revision: number) => ({ sequence, revision, input: 1, result: 1 });
-  const e = { version: 1, lineage: config.lineage, schema: config.schema, revision: 6, state: 0, streams: [
-    { id: 'a', through: 3, receipts: [receipt(2, 2), receipt(3, 6)] },
-    { id: 'b', through: 3, receipts: [receipt(2, 3), receipt(3, 5)] },
-  ] };
+  const receipt = (sequence: number, revision: number) => ({sequence, revision, input: 1, result: 1});
+  const e = {
+    version: 1,
+    lineage: config.lineage,
+    schema: config.schema,
+    revision: 6,
+    state: 0,
+    streams: [
+      {id: 'a', through: 3, receipts: [receipt(2, 2), receipt(3, 6)]},
+      {id: 'b', through: 3, receipts: [receipt(2, 3), receipt(3, 5)]},
+    ],
+  };
   assert.throws(() => captureAuthorityEnvelope(JSON.stringify(e), config));
   must(must(e.streams[1]).receipts[0]).revision = 4; // a1,a2,b1,b2,b3,a3 is feasible
   assert.equal(captureAuthorityEnvelope(JSON.stringify(e), config).envelope.revision, 6);
   const large = Number.MAX_SAFE_INTEGER;
-  e.revision = large; e.streams = [{ id: 'a', through: large, receipts: [receipt(large - 1, large - 1), receipt(large, large)] }];
+  e.revision = large;
+  e.streams = [{id: 'a', through: large, receipts: [receipt(large - 1, large - 1), receipt(large, large)]}];
   assert.equal(captureAuthorityEnvelope(JSON.stringify(e), config).envelope.revision, large);
 });
 test('recovery permits actual multi-stream history with receipt eviction and unchanged overlapping receipts', async () => {
-  const f = fixture(); await f.owner.recover();
-  await f.owner.submit(command('a', 1, 1)); await f.owner.submit(command('b', 1, 2));
-  const other = createDurableAuthority({ ...config, storage: f.storage, authorize: () => true,
-    reduce: ({ state, input }) => ({ stateJson: String(Number(state) + Number(input)), resultJson: String(input) }) });
+  const f = fixture();
+  await f.owner.recover();
+  await f.owner.submit(command('a', 1, 1));
+  await f.owner.submit(command('b', 1, 2));
+  const other = createDurableAuthority({
+    ...config,
+    storage: f.storage,
+    authorize: () => true,
+    reduce: ({state, input}) => ({stateJson: String(Number(state) + Number(input)), resultJson: String(input)}),
+  });
   await other.recover();
-  await other.submit(command('a', 2, 3)); await other.submit(command('b', 2, 4));
-  await other.submit(command('a', 3, 5)); await other.submit(command('b', 3, 6));
+  await other.submit(command('a', 2, 3));
+  await other.submit(command('b', 2, 4));
+  await other.submit(command('a', 3, 5));
+  await other.submit(command('b', 3, 6));
   assert.equal((await f.owner.recover()).status, 'recovered');
   assert.equal(f.owner.read().snapshot?.envelope.revision, 6);
   assert.equal((await f.owner.submit(command('a', 1, 1))).status, 'result-unavailable');
@@ -612,23 +594,40 @@ test('recovery permits actual multi-stream history with receipt eviction and unc
 test('bounded receipt chronology agrees with independently enumerated small command interleavings', () => {
   const possible = new Set<string>();
   for (let mask = 0; mask < 64; mask++) {
-    const a: number[] = [], b: number[] = [];
-    for (let revision = 1; revision <= 6; revision++) ((mask & (1 << (revision - 1))) ? a : b).push(revision);
+    const a: number[] = [],
+      b: number[] = [];
+    for (let revision = 1; revision <= 6; revision++) (mask & (1 << (revision - 1)) ? a : b).push(revision);
     if (a.length === 3 && b.length === 3) possible.add(JSON.stringify([a.slice(1), b.slice(1)]));
   }
-  const receipt = (sequence: number, revision: number) => ({ sequence, revision, input: 1, result: 1 });
-  for (let a2 = 1; a2 <= 6; a2++) for (let a3 = a2 + 1; a3 <= 6; a3++) {
-    for (let b2 = 1; b2 <= 6; b2++) for (let b3 = b2 + 1; b3 <= 6; b3++) {
-      const e = { version: 1, lineage: config.lineage, schema: config.schema, revision: 6, state: 0, streams: [
-        { id: 'a', through: 3, receipts: [receipt(2, a2), receipt(3, a3)] },
-        { id: 'b', through: 3, receipts: [receipt(2, b2), receipt(3, b3)] },
-      ] };
-      let accepted = true;
-      try { captureAuthorityEnvelope(JSON.stringify(e), config); } catch { accepted = false; }
-      const key = JSON.stringify([[a2, a3], [b2, b3]]);
-      assert.equal(accepted, possible.has(key), key);
+  const receipt = (sequence: number, revision: number) => ({sequence, revision, input: 1, result: 1});
+  for (let a2 = 1; a2 <= 6; a2++)
+    for (let a3 = a2 + 1; a3 <= 6; a3++) {
+      for (let b2 = 1; b2 <= 6; b2++)
+        for (let b3 = b2 + 1; b3 <= 6; b3++) {
+          const e = {
+            version: 1,
+            lineage: config.lineage,
+            schema: config.schema,
+            revision: 6,
+            state: 0,
+            streams: [
+              {id: 'a', through: 3, receipts: [receipt(2, a2), receipt(3, a3)]},
+              {id: 'b', through: 3, receipts: [receipt(2, b2), receipt(3, b3)]},
+            ],
+          };
+          let accepted = true;
+          try {
+            captureAuthorityEnvelope(JSON.stringify(e), config);
+          } catch {
+            accepted = false;
+          }
+          const key = JSON.stringify([
+            [a2, a3],
+            [b2, b3],
+          ]);
+          assert.equal(accepted, possible.has(key), key);
+        }
     }
-  }
 });
 
 function timed(readings: number[] | (() => number), extra: Partial<AuthorityOptions> = {}) {
@@ -640,7 +639,7 @@ function timed(readings: number[] | (() => number), extra: Partial<AuthorityOpti
     if (!list) return (readings as () => number)();
     return list.length > 1 ? list.shift()! : list[0]!;
   };
-  const f = fixture({ storage: base.storage, clock, ...extra });
+  const f = fixture({storage: base.storage, clock, ...extra});
   return {
     owner: f.owner,
     get writes() {
@@ -661,14 +660,14 @@ function timed(readings: number[] | (() => number), extra: Partial<AuthorityOpti
 test('NW06: deadline expires exactly at the boundary before any work and consumes no sequence', async () => {
   const t = timed([100]);
   await t.owner.recover();
-  assert.deepEqual(await t.owner.submit(command('a', 1, 3), { deadlineMs: 100 }), { status: 'expired' });
+  assert.deepEqual(await t.owner.submit(command('a', 1, 3), {deadlineMs: 100}), {status: 'expired'});
   assert.equal(t.writes, 0);
   assert.equal(t.reductions, 0);
   assert.equal(t.owner.read().status, 'ready');
   assert.equal(t.owner.read().reason, null);
-  const committed = await t.owner.submit(command('a', 1, 3), { deadlineMs: 101 });
+  const committed = await t.owner.submit(command('a', 1, 3), {deadlineMs: 101});
   assert.equal(committed.status, 'committed');
-  assert.equal((committed as { sequence: number }).sequence, 1);
+  assert.equal((committed as {sequence: number}).sequence, 1);
   assert.equal(JSON.parse(t.raw!).revision, 1);
   assert.equal(t.writes, 1);
 });
@@ -676,14 +675,14 @@ test('NW06: deadline expires exactly at the boundary before any work and consume
 test('NW06: deadline passing during creator callbacks refuses at the last pre-invocation check', async () => {
   let time = 0;
   const t = timed(() => time, {
-    reduce({ state, input }) {
+    reduce({state, input}) {
       time = 50;
       const value = (state as number) + (input as number);
-      return { stateJson: String(value), resultJson: String(value) };
+      return {stateJson: String(value), resultJson: String(value)};
     },
   });
   await t.owner.recover();
-  assert.deepEqual(await t.owner.submit(command('a', 1, 2), { deadlineMs: 50 }), { status: 'expired' });
+  assert.deepEqual(await t.owner.submit(command('a', 1, 2), {deadlineMs: 50}), {status: 'expired'});
   assert.equal(t.writes, 0);
   assert.equal(t.calls, 2);
   assert.equal(t.owner.read().snapshot!.envelope.revision, 0);
@@ -702,7 +701,7 @@ test('NW06: deadline passing while storage is in flight never converts committed
     const owner = createDurableAuthority({
       ...config,
       authorize: () => true,
-      reduce: () => ({ stateJson: '1', resultJson: '1' }),
+      reduce: () => ({stateJson: '1', resultJson: '1'}),
       clock: () => {
         calls++;
         return time;
@@ -719,7 +718,7 @@ test('NW06: deadline passing while storage is in flight never converts committed
       },
     });
     await owner.recover();
-    const pending = owner.submit(command('a', 1, 1), { deadlineMs: 20 });
+    const pending = owner.submit(command('a', 1, 1), {deadlineMs: 20});
     await Promise.resolve();
     assert.equal(calls, 2);
     time = 1_000;
@@ -731,7 +730,7 @@ test('NW06: deadline passing while storage is in flight never converts committed
       assert.equal(outcome.status, 'committed');
       assert.equal(owner.read().status, 'ready');
     } else {
-      assert.deepEqual(outcome, { status: 'unknown' });
+      assert.deepEqual(outcome, {status: 'unknown'});
       assert.equal(owner.read().status, 'unknown');
       assert.equal(owner.read().reason, 'commit-unknown');
     }
@@ -741,16 +740,22 @@ test('NW06: deadline passing while storage is in flight never converts committed
 test('NW06: non-monotonic clock readings are compared independently and invalid readings refuse before storage', async () => {
   const back = timed([50, 10]);
   await back.owner.recover();
-  assert.equal((await back.owner.submit(command('a', 1, 1), { deadlineMs: 60 })).status, 'committed');
+  assert.equal((await back.owner.submit(command('a', 1, 1), {deadlineMs: 60})).status, 'committed');
   const late = timed([10, 60, 0]);
   await late.owner.recover();
-  assert.deepEqual(await late.owner.submit(command('a', 1, 1), { deadlineMs: 60 }), { status: 'expired' });
+  assert.deepEqual(await late.owner.submit(command('a', 1, 1), {deadlineMs: 60}), {status: 'expired'});
   assert.equal(late.writes, 0);
-  assert.equal((await late.owner.submit(command('a', 1, 1), { deadlineMs: 60 })).status, 'committed');
-  for (const reading of [() => NaN, () => Infinity, () => { throw Error('clock'); }]) {
+  assert.equal((await late.owner.submit(command('a', 1, 1), {deadlineMs: 60})).status, 'committed');
+  for (const reading of [
+    () => NaN,
+    () => Infinity,
+    () => {
+      throw Error('clock');
+    },
+  ]) {
     const t = timed(reading);
     await t.owner.recover();
-    assert.deepEqual(await t.owner.submit(command('a', 1, 1), { deadlineMs: 60 }), {
+    assert.deepEqual(await t.owner.submit(command('a', 1, 1), {deadlineMs: 60}), {
       status: 'refused',
       reason: 'clock',
     });
@@ -764,15 +769,15 @@ test('NW06: expired exact retries never read receipts and a later live retry kee
   const t = timed([5]);
   await t.owner.recover();
   assert.equal((await t.owner.submit(command('a', 1, 4))).status, 'committed');
-  assert.deepEqual(await t.owner.submit(command('a', 1, 4), { deadlineMs: 5 }), { status: 'expired' });
-  assert.deepEqual(await t.owner.submit(command('a', 1, 99), { deadlineMs: 5 }), { status: 'expired' });
-  assert.equal((await t.owner.submit(command('a', 1, 4), { deadlineMs: 6 })).status, 'duplicate');
-  assert.equal((await t.owner.submit(command('a', 1, 99), { deadlineMs: 6 })).status, 'conflict');
-  assert.deepEqual(await t.owner.submit(command('a', 2, 1), { deadlineMs: 1 }), { status: 'expired' });
+  assert.deepEqual(await t.owner.submit(command('a', 1, 4), {deadlineMs: 5}), {status: 'expired'});
+  assert.deepEqual(await t.owner.submit(command('a', 1, 99), {deadlineMs: 5}), {status: 'expired'});
+  assert.equal((await t.owner.submit(command('a', 1, 4), {deadlineMs: 6})).status, 'duplicate');
+  assert.equal((await t.owner.submit(command('a', 1, 99), {deadlineMs: 6})).status, 'conflict');
+  assert.deepEqual(await t.owner.submit(command('a', 2, 1), {deadlineMs: 1}), {status: 'expired'});
   assert.equal((await t.owner.submit(command('a', 3, 1))).status, 'gap');
-  const retried = await t.owner.submit(command('a', 2, 1), { deadlineMs: 6 });
+  const retried = await t.owner.submit(command('a', 2, 1), {deadlineMs: 6});
   assert.equal(retried.status, 'committed');
-  assert.equal((retried as { revision: number }).revision, 2);
+  assert.equal((retried as {revision: number}).revision, 2);
   assert.equal((await t.owner.submit(command('a', 2, 1))).status, 'duplicate');
   assert.equal(t.writes, 2);
 });
@@ -784,23 +789,23 @@ test('NW06: deadlines are optional, need an injected clock and finite value, and
   assert.equal(silent.calls, 0);
   const f = fixture();
   await f.owner.recover();
-  assert.deepEqual(await f.owner.submit(command('a', 1, 1), { deadlineMs: 10 }), {
+  assert.deepEqual(await f.owner.submit(command('a', 1, 1), {deadlineMs: 10}), {
     status: 'refused',
     reason: 'deadline',
   });
   for (const deadlineMs of [NaN, Infinity, '10' as never])
-    assert.deepEqual(await silent.owner.submit(command('a', 2, 1), { deadlineMs }), {
+    assert.deepEqual(await silent.owner.submit(command('a', 2, 1), {deadlineMs}), {
       status: 'refused',
       reason: 'deadline',
     });
   assert.equal(f.writes + silent.writes, 1);
-  assert.throws(() => fixture({ clock: 1 as never }), /clock/);
+  assert.throws(() => fixture({clock: 1 as never}), /clock/);
   const gate = deferred<void>(),
     base = fixture();
   const owner = createDurableAuthority({
     ...config,
     authorize: () => true,
-    reduce: () => ({ stateJson: '1', resultJson: '1' }),
+    reduce: () => ({stateJson: '1', resultJson: '1'}),
     clock: () => 0,
     storage: {
       settle: () => base.storage.settle(),
@@ -812,8 +817,8 @@ test('NW06: deadlines are optional, need an injected clock and finite value, and
     },
   });
   await owner.recover();
-  const first = owner.submit(command('a', 1, 1), { deadlineMs: 10 });
-  assert.deepEqual(await owner.submit(command('b', 1, 1), { deadlineMs: 0 }), { status: 'busy' });
+  const first = owner.submit(command('a', 1, 1), {deadlineMs: 10});
+  assert.deepEqual(await owner.submit(command('b', 1, 1), {deadlineMs: 0}), {status: 'busy'});
   gate.resolve();
   assert.equal((await first).status, 'committed');
 });
@@ -830,8 +835,8 @@ test('NW06: clock reentry is busy and disposal from the clock prevents storage i
   });
   owner = t.owner;
   await owner.recover();
-  assert.deepEqual(await owner.submit(command('a', 1, 1), { deadlineMs: 10 }), { status: 'retired' });
-  assert.deepEqual(await nested, { status: 'busy' });
+  assert.deepEqual(await owner.submit(command('a', 1, 1), {deadlineMs: 10}), {status: 'retired'});
+  assert.deepEqual(await nested, {status: 'busy'});
   assert.equal(t.writes, 0);
 });
 
@@ -846,7 +851,7 @@ test('NW06: a deadlineMs getter reads under the reserved slot, so reentry is bus
     owner = createDurableAuthority({
       ...config,
       authorize: () => true,
-      reduce: () => ({ stateJson: '1', resultJson: '1' }),
+      reduce: () => ({stateJson: '1', resultJson: '1'}),
       clock: () => 0,
       storage: {
         settle: () => base.storage.settle(),
@@ -871,14 +876,14 @@ test('NW06: a deadlineMs getter reads under the reserved slot, so reentry is bus
     };
     const outer = owner.submit(command('a', 1, 1), admission);
     if (reenter === 'dispose') {
-      assert.deepEqual(await outer, { status: 'retired' });
+      assert.deepEqual(await outer, {status: 'retired'});
       assert.equal(owner.read().status, 'retired');
       assert.equal(base.writes, 0);
       continue;
     }
-    assert.deepEqual(await nested, { status: 'busy' });
+    assert.deepEqual(await nested, {status: 'busy'});
     assert.equal(owner.read().status, 'pending');
-    assert.deepEqual(await owner.submit(command('c', 1, 1)), { status: 'busy' });
+    assert.deepEqual(await owner.submit(command('c', 1, 1)), {status: 'busy'});
     gate.resolve();
     assert.equal((await outer).status, 'committed');
     assert.equal(maxInflight, 1);
@@ -890,25 +895,28 @@ test('NW06: a deadlineMs getter reads under the reserved slot, so reentry is bus
 test('NW06: the clock is called without a receiver and non-object admission arguments are ignored', async () => {
   const holder = {
     base: 0,
-    now(this: { base: number }) {
+    now(this: {base: number}) {
       return this.base;
     },
   };
   const unbound = timed(holder.now as () => number);
   await unbound.owner.recover();
-  assert.deepEqual(await unbound.owner.submit(command('a', 1, 1), { deadlineMs: 10 }), {
+  assert.deepEqual(await unbound.owner.submit(command('a', 1, 1), {deadlineMs: 10}), {
     status: 'refused',
     reason: 'clock',
   });
   const wrapped = timed(() => holder.now());
   await wrapped.owner.recover();
-  assert.equal((await wrapped.owner.submit(command('a', 1, 1), { deadlineMs: 10 })).status, 'committed');
+  assert.equal((await wrapped.owner.submit(command('a', 1, 1), {deadlineMs: 10})).status, 'committed');
   const mapped = timed([0]);
   await mapped.owner.recover();
   const outcomes = [];
   for (const [index, cmd] of [command('a', 1, 1), command('a', 2, 1)].entries())
-    outcomes.push(await (mapped.owner.submit as (c: unknown, i: unknown) => Promise<{ status: string }>)(cmd, index));
-  assert.deepEqual(outcomes.map((o) => o.status), ['committed', 'committed']);
+    outcomes.push(await (mapped.owner.submit as (c: unknown, i: unknown) => Promise<{status: string}>)(cmd, index));
+  assert.deepEqual(
+    outcomes.map(o => o.status),
+    ['committed', 'committed'],
+  );
   assert.equal((await mapped.owner.submit(command('a', 3, 1), null as never)).status, 'committed');
   assert.equal(mapped.calls, 0);
   assert.deepEqual(await mapped.owner.submit(command('a', 4, 1), {} as never), {

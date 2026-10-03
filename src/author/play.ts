@@ -1,14 +1,14 @@
-import type { SceneModelRequest, SceneModelResult } from './model-inspection';
+import type {SceneModelRequest, SceneModelResult} from './model-inspection';
 /**
  * author/play.ts: the `play` service (owned by `feature.game`): the game's brief and identity, and a handle on the
  * running scene for the test API, probes and play:snap. A scene attaches its handle when it enters and it detaches
  * when the visit ends.
  */
-import type { SystemTimingOptions, SystemTimingCapture } from './system-timing';
-import type { EntityMetadataRequest, EntityMetadataPage } from '../core/ecs/world';
-import type { BuildBrief } from './build';
-import type { GameDefinition } from './defs';
-import type { ParticleStats } from './particle-contract';
+import type {SystemTimingOptions, SystemTimingCapture} from './system-timing';
+import type {EntityMetadataRequest, EntityMetadataPage} from '../core/ecs/world';
+import type {BuildBrief} from './build';
+import type {GameDefinition} from './defs';
+import type {ParticleStats} from './particle-contract';
 
 /** What a running scene reports and accepts from tools (the test API, probes, play scripts). */
 export interface SceneHandle {
@@ -23,11 +23,16 @@ export interface SceneHandle {
    *  visit is ending. Render on demand stays on: nothing more is drawn until something changes. */
   redraw?(): boolean;
   /** Dev/test only: the visit's particle counters and the draws its emitters issue per frame (FX-01). */
-  particles?(): ParticleStats & { draws: number; textures: { requested: number; leases: number; applied: number; failed: number } };
+  particles?(): ParticleStats & {
+    draws: number;
+    textures: {requested: number; leases: number; applied: number; failed: number};
+  };
   /** Move the entity with this `Name` (default 'player'): false when there is none. */
   teleport(x: number, z: number, name?: string): boolean;
 }
-export interface SceneEntitiesRequest extends EntityMetadataRequest { expectedEpoch: number }
+export interface SceneEntitiesRequest extends EntityMetadataRequest {
+  expectedEpoch: number;
+}
 export type SceneEntitiesResult =
   | {status: 'unavailable'}
   | {status: 'stale'; epoch: number}
@@ -39,7 +44,7 @@ export interface SceneState {
   /** The world's resources (score, lives, phase), as plain JSON. */
   state: Record<string, unknown>;
   /** Named entities and where they are. */
-  named: Record<string, { x: number; y: number; z: number }>;
+  named: Record<string, {x: number; y: number; z: number}>;
   frame: number;
 }
 
@@ -50,10 +55,14 @@ export interface PlayService {
   attach(handle: SceneHandle, signal: AbortSignal): void;
 }
 
-declare module '../core/services' { interface Services { readonly play: PlayService } }
+declare module '../core/services' {
+  interface Services {
+    readonly play: PlayService;
+  }
+}
 declare module '../core/probe' {
   interface EngineProbes {
-    game: { id: string; genre: string; policy: string; modes: readonly string[]; minimum: string };
+    game: {id: string; genre: string; policy: string; modes: readonly string[]; minimum: string};
     world: SceneState | null;
   }
 }
@@ -61,8 +70,18 @@ declare module '../core/probe' {
 export function createPlayService(brief: BuildBrief, game: GameDefinition): PlayService {
   let current: SceneHandle | null = null;
   return {
-    brief, game,
+    brief,
+    game,
     current: () => current,
-    attach(handle, signal) { current = handle; signal.addEventListener('abort', () => { if (current === handle) current = null; }, { once: true }); },
+    attach(handle, signal) {
+      current = handle;
+      signal.addEventListener(
+        'abort',
+        () => {
+          if (current === handle) current = null;
+        },
+        {once: true},
+      );
+    },
   };
 }

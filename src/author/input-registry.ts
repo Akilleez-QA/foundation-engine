@@ -13,32 +13,49 @@
  * Limits: like the boot check, a key matched by `key` ('f') and one matched by `code` ('code:KeyF') are different
  * chords here; the generator treats them as the same letter when it chooses a free key.
  */
-import { adminOf } from '../core/registry';
-import { bindingConflicts, codeChordOf, comboOf, CORE_INPUT_ACTIONS, defineInputActions, type InputActionDef, type KeyChord, type PadInput } from '../platform/input/actions';
-import { actionRows, allDefinitions, GAME_MODULE_ID } from './compile';
-import type { AuthorDef, GameDefinition, InputDefinition } from './defs';
+import {adminOf} from '../core/registry';
+import {
+  bindingConflicts,
+  codeChordOf,
+  comboOf,
+  CORE_INPUT_ACTIONS,
+  defineInputActions,
+  type InputActionDef,
+  type KeyChord,
+  type PadInput,
+} from '../platform/input/actions';
+import {actionRows, allDefinitions, GAME_MODULE_ID} from './compile';
+import type {AuthorDef, GameDefinition, InputDefinition} from './defs';
 
 /** platform/input/module.ts INPUT_MODULE_ID (not imported: that module pulls in the DOM runtime). */
 const INPUT_MODULE_ID = 'platform.input';
 
 /** The `inputActions` rows a game boots with: the engine's rows, then the game's and its kits' inputs. */
-export function gameInputRows(game: GameDefinition, defs: readonly (AuthorDef | undefined)[]): { row: InputActionDef; source: string }[] {
+export function gameInputRows(
+  game: GameDefinition,
+  defs: readonly (AuthorDef | undefined)[],
+): {row: InputActionDef; source: string}[] {
   const inputs = allDefinitions(game, defs).filter((d): d is InputDefinition => d.kind === 'input');
   return [
-    ...CORE_INPUT_ACTIONS.map(row => ({ row, source: INPUT_MODULE_ID })),
-    ...inputs.flatMap(i => actionRows(i).map(row => ({ row, source: GAME_MODULE_ID }))),
+    ...CORE_INPUT_ACTIONS.map(row => ({row, source: INPUT_MODULE_ID})),
+    ...inputs.flatMap(i => actionRows(i).map(row => ({row, source: GAME_MODULE_ID}))),
   ];
 }
 
 /** The `key` and `code` a browser-automation key name sends: 'ArrowUp' → ArrowUp/ArrowUp, 'KeyW' → w/KeyW, 'Digit1' → 1/Digit1, 'Space' → ' '/Space. */
-export function keyEventOf(name: string): { key: string; code: string } {
-  const letter = /^Key([A-Z])$/.exec(name), digit = /^Digit(\d)$/.exec(name);
+export function keyEventOf(name: string): {key: string; code: string} {
+  const letter = /^Key([A-Z])$/.exec(name),
+    digit = /^Digit(\d)$/.exec(name);
   // Each pattern's one group is not optional, so a match always captures it.
-  if (letter) return { key: letter[1]!.toLowerCase(), code: name };
-  if (digit) return { key: digit[1]!, code: name };
-  if (name === 'Space' || name === ' ') return { key: ' ', code: 'Space' };
-  if (name.length === 1) return { key: name, code: /[a-z]/i.test(name) ? 'Key' + name.toUpperCase() : /\d/.test(name) ? 'Digit' + name : name };
-  return { key: name, code: name };
+  if (letter) return {key: letter[1]!.toLowerCase(), code: name};
+  if (digit) return {key: digit[1]!, code: name};
+  if (name === 'Space' || name === ' ') return {key: ' ', code: 'Space'};
+  if (name.length === 1)
+    return {
+      key: name,
+      code: /[a-z]/i.test(name) ? 'Key' + name.toUpperCase() : /\d/.test(name) ? 'Digit' + name : name,
+    };
+  return {key: name, code: name};
 }
 
 /**
@@ -46,16 +63,24 @@ export function keyEventOf(name: string): { key: string; code: string } {
  * `name` presses, by default binding. The bench uses it to tell a still active window (the held keys press nothing the
  * game reads) from a dead one (they do, yet nothing was drawn). Rebinding overrides are a player's, not the bench's.
  */
-export function gameActionsPressedBy(rows: readonly { row: InputActionDef; source: string }[], name: string): string[] {
-  const e = keyEventOf(name), chords = new Set([comboOf(e), codeChordOf(e)].filter((c): c is KeyChord => c !== null));
-  return rows.filter(r => r.source === GAME_MODULE_ID && (r.row.defaults.keys ?? []).some(k => chords.has(k))).map(r => r.row.id);
+export function gameActionsPressedBy(rows: readonly {row: InputActionDef; source: string}[], name: string): string[] {
+  const e = keyEventOf(name),
+    chords = new Set([comboOf(e), codeChordOf(e)].filter((c): c is KeyChord => c !== null));
+  return rows
+    .filter(r => r.source === GAME_MODULE_ID && (r.row.defaults.keys ?? []).some(k => chords.has(k)))
+    .map(r => r.row.id);
 }
 
 /** Problems the boot's `inputActions` validation would report, as '<registry>[<row>] (from <module>): <problem>'. */
-export function inputRowProblems(rows: readonly { row: InputActionDef; source: string }[]): string[] {
-  const registry = defineInputActions(), out: string[] = [];
-  for (const { row, source } of rows) {
-    try { registry.add(row, source); } catch (e) { out.push(`inputActions[${row.id}] (from ${source}): ${(e as Error).message}`); }
+export function inputRowProblems(rows: readonly {row: InputActionDef; source: string}[]): string[] {
+  const registry = defineInputActions(),
+    out: string[] = [];
+  for (const {row, source} of rows) {
+    try {
+      registry.add(row, source);
+    } catch (e) {
+      out.push(`inputActions[${row.id}] (from ${source}): ${(e as Error).message}`);
+    }
   }
   for (const p of adminOf(registry).check('report')) {
     out.push(`${p.registry}${p.id ? `[${p.id}]` : ''}${p.source ? ` (from ${p.source})` : ''}: ${p.problem}`);
@@ -69,11 +94,83 @@ export function gameInputProblems(game: GameDefinition, defs: readonly (AuthorDe
 }
 
 /** Keys the generator offers, in order: letters away from the usual movement and engine keys first. */
-const KEY_CANDIDATES: readonly KeyChord[] = ['f', 'r', 'g', 't', 'c', 'v', 'x', 'z', 'h', 'j', 'k', 'l', 'y', 'u', 'i', 'o', 'n', 'b', 'q', 'e', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
+const KEY_CANDIDATES: readonly KeyChord[] = [
+  'f',
+  'r',
+  'g',
+  't',
+  'c',
+  'v',
+  'x',
+  'z',
+  'h',
+  'j',
+  'k',
+  'l',
+  'y',
+  'u',
+  'i',
+  'o',
+  'n',
+  'b',
+  'q',
+  'e',
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+  '0',
+];
 /** Pad buttons the generator offers for a button, in order: free face and shoulder buttons first. */
-const PAD_CANDIDATES: readonly PadInput[] = ['y', 'a', 'rb', 'lb', 'rt', 'lt', 'r3', 'l3', 'dpad-left', 'dpad-right', 'dpad-up', 'dpad-down', 'view', 'x', 'b'];
-const AXIS_KEY_PAIRS: readonly (readonly [KeyChord, KeyChord])[] = [['code:KeyQ', 'code:KeyE'], ['code:KeyZ', 'code:KeyC'], ['code:KeyR', 'code:KeyF'], ['code:KeyG', 'code:KeyH'], ['code:KeyJ', 'code:KeyL'], ['code:KeyU', 'code:KeyO'], ['code:KeyT', 'code:KeyY'], ['code:KeyV', 'code:KeyB'], ['code:KeyI', 'code:KeyK'], ['code:Digit1', 'code:Digit2'], ['code:Digit3', 'code:Digit4'], ['code:Digit5', 'code:Digit6'], ['code:Digit7', 'code:Digit8']];
-const AXIS_PAD_PAIRS: readonly (readonly [PadInput, PadInput])[] = [['lb', 'rb'], ['lt', 'rt'], ['rs-left', 'rs-right'], ['rs-up', 'rs-down'], ['ls-left', 'ls-right'], ['ls-up', 'ls-down'], ['dpad-left', 'dpad-right'], ['dpad-up', 'dpad-down'], ['l3', 'r3'], ['x', 'b']];
+const PAD_CANDIDATES: readonly PadInput[] = [
+  'y',
+  'a',
+  'rb',
+  'lb',
+  'rt',
+  'lt',
+  'r3',
+  'l3',
+  'dpad-left',
+  'dpad-right',
+  'dpad-up',
+  'dpad-down',
+  'view',
+  'x',
+  'b',
+];
+const AXIS_KEY_PAIRS: readonly (readonly [KeyChord, KeyChord])[] = [
+  ['code:KeyQ', 'code:KeyE'],
+  ['code:KeyZ', 'code:KeyC'],
+  ['code:KeyR', 'code:KeyF'],
+  ['code:KeyG', 'code:KeyH'],
+  ['code:KeyJ', 'code:KeyL'],
+  ['code:KeyU', 'code:KeyO'],
+  ['code:KeyT', 'code:KeyY'],
+  ['code:KeyV', 'code:KeyB'],
+  ['code:KeyI', 'code:KeyK'],
+  ['code:Digit1', 'code:Digit2'],
+  ['code:Digit3', 'code:Digit4'],
+  ['code:Digit5', 'code:Digit6'],
+  ['code:Digit7', 'code:Digit8'],
+];
+const AXIS_PAD_PAIRS: readonly (readonly [PadInput, PadInput])[] = [
+  ['lb', 'rb'],
+  ['lt', 'rt'],
+  ['rs-left', 'rs-right'],
+  ['rs-up', 'rs-down'],
+  ['ls-left', 'ls-right'],
+  ['ls-up', 'ls-down'],
+  ['dpad-left', 'dpad-right'],
+  ['dpad-up', 'dpad-down'],
+  ['l3', 'r3'],
+  ['x', 'b'],
+];
 
 /** The letter or name a chord presses, so 'f', 'F' and 'code:KeyF' count as one key when choosing a free one. */
 export function keyIdentity(chord: KeyChord): string {
@@ -82,13 +179,14 @@ export function keyIdentity(chord: KeyChord): string {
   return code ? (code[1] ?? code[2] ?? code[3]!).toLowerCase() : base.toLowerCase(); // a match captures one alternative
 }
 
-function usedBy(rows: readonly { row: InputActionDef }[]) {
-  const keys = new Set<string>(), pad = new Set<string>();
-  for (const { row } of rows) {
+function usedBy(rows: readonly {row: InputActionDef}[]) {
+  const keys = new Set<string>(),
+    pad = new Set<string>();
+  for (const {row} of rows) {
     for (const k of row.defaults.keys ?? []) keys.add(keyIdentity(k));
     for (const p of row.defaults.pad ?? []) pad.add(p);
   }
-  return { keys, pad };
+  return {keys, pad};
 }
 
 /**
@@ -96,35 +194,76 @@ function usedBy(rows: readonly { row: InputActionDef }[]) {
  * inputs no row uses at all, then inputs only a layer row owns (a 'layer' row over a 'global' one is ownership by
  * design, not a clash).
  */
-function pick<T>(base: readonly { row: InputActionDef }[], candidates: readonly T[], unused: (c: T) => boolean, rowsOf: (c: T) => InputActionDef[], sameKeyFree: (c: T) => boolean = () => true): T | undefined {
-  const rows = base.map(b => b.row), before = new Set(bindingConflicts(rows));
+function pick<T>(
+  base: readonly {row: InputActionDef}[],
+  candidates: readonly T[],
+  unused: (c: T) => boolean,
+  rowsOf: (c: T) => InputActionDef[],
+  sameKeyFree: (c: T) => boolean = () => true,
+): T | undefined {
+  const rows = base.map(b => b.row),
+    before = new Set(bindingConflicts(rows));
   const ok = (c: T) => bindingConflicts([...rows, ...rowsOf(c)]).every(p => before.has(p));
   // Prefer inputs no row holds; else an input only a layer row owns. Never fall back past `unused` for keys: the
   // caller's `sameKey` filter (f / code:KeyF) stays on in the fallback.
   return candidates.find(c => unused(c) && ok(c)) ?? candidates.find(c => sameKeyFree(c) && ok(c));
 }
 
-const probe = (id: string, side?: 'neg' | 'pos'): Pick<InputActionDef, 'id' | 'label' | 'scope' | 'kind'> =>
-  ({ id: `game.${id}${side ? '.' + side : ''}`, label: `game.input.${id}`, scope: 'global', kind: side ? 'hold' : 'press' });
+const probe = (id: string, side?: 'neg' | 'pos'): Pick<InputActionDef, 'id' | 'label' | 'scope' | 'kind'> => ({
+  id: `game.${id}${side ? '.' + side : ''}`,
+  label: `game.input.${id}`,
+  scope: 'global',
+  kind: side ? 'hold' : 'press',
+});
 
 /** A key and a pad button for a new button `id` that pass the boot check with the game's current inputs. */
-export function freeButtonBinding(game: GameDefinition, defs: readonly (AuthorDef | undefined)[], id: string): { keys: KeyChord[]; pad: PadInput[] } {
-  const base = gameInputRows(game, defs), used = usedBy(base);
+export function freeButtonBinding(
+  game: GameDefinition,
+  defs: readonly (AuthorDef | undefined)[],
+  id: string,
+): {keys: KeyChord[]; pad: PadInput[]} {
+  const base = gameInputRows(game, defs),
+    used = usedBy(base);
   const keyFree = (k: KeyChord) => !used.keys.has(keyIdentity(k));
-  const key = pick(base, KEY_CANDIDATES, keyFree, k => [{ ...probe(id), defaults: { keys: [k] } } as InputActionDef], keyFree);
-  const pad = pick(base, PAD_CANDIDATES, p => !used.pad.has(p), p => [{ ...probe(id), defaults: { pad: [p] } } as InputActionDef]);
-  if (!key || !pad) throw Error(`no free ${key ? 'pad button' : 'key'} is left for input '${id}'; choose its bindings by hand`);
-  return { keys: [key], pad: [pad] };
+  const key = pick(
+    base,
+    KEY_CANDIDATES,
+    keyFree,
+    k => [{...probe(id), defaults: {keys: [k]}} as InputActionDef],
+    keyFree,
+  );
+  const pad = pick(
+    base,
+    PAD_CANDIDATES,
+    p => !used.pad.has(p),
+    p => [{...probe(id), defaults: {pad: [p]}} as InputActionDef],
+  );
+  if (!key || !pad)
+    throw Error(`no free ${key ? 'pad button' : 'key'} is left for input '${id}'; choose its bindings by hand`);
+  return {keys: [key], pad: [pad]};
 }
 
 /** Negative and positive keys and pad inputs for a new axis `id` that pass the boot check with the game's inputs. */
-export function freeAxisBinding(game: GameDefinition, defs: readonly (AuthorDef | undefined)[], id: string): { negative: { keys: KeyChord[]; pad: PadInput[] }; positive: { keys: KeyChord[]; pad: PadInput[] } } {
-  const base = gameInputRows(game, defs), used = usedBy(base);
+export function freeAxisBinding(
+  game: GameDefinition,
+  defs: readonly (AuthorDef | undefined)[],
+  id: string,
+): {negative: {keys: KeyChord[]; pad: PadInput[]}; positive: {keys: KeyChord[]; pad: PadInput[]}} {
+  const base = gameInputRows(game, defs),
+    used = usedBy(base);
   const rows = <T extends string>(pair: readonly [T, T], field: 'keys' | 'pad') =>
-    (['neg', 'pos'] as const).map((side, i) => ({ ...probe(id, side), defaults: { [field]: [pair[i]] } } as InputActionDef));
+    (['neg', 'pos'] as const).map(
+      (side, i) => ({...probe(id, side), defaults: {[field]: [pair[i]]}}) as InputActionDef,
+    );
   const pairFree = (p: readonly [KeyChord, KeyChord]) => p.every(k => !used.keys.has(keyIdentity(k)));
   const keys = pick(base, AXIS_KEY_PAIRS, pairFree, p => rows(p, 'keys'), pairFree);
-  const pad = pick(base, AXIS_PAD_PAIRS, p => p.every(b => !used.pad.has(b)), p => rows(p, 'pad'));
-  if (!keys || !pad) throw Error(`no free ${keys ? 'pad pair' : 'key pair'} is left for axis '${id}'; choose its bindings by hand`);
-  return { negative: { keys: [keys[0]], pad: [pad[0]] }, positive: { keys: [keys[1]], pad: [pad[1]] } };
+  const pad = pick(
+    base,
+    AXIS_PAD_PAIRS,
+    p => p.every(b => !used.pad.has(b)),
+    p => rows(p, 'pad'),
+  );
+  if (!keys || !pad)
+    throw Error(`no free ${keys ? 'pad pair' : 'key pair'} is left for axis '${id}'; choose its bindings by hand`);
+  return {negative: {keys: [keys[0]], pad: [pad[0]]}, positive: {keys: [keys[1]], pad: [pad[1]]}};
 }

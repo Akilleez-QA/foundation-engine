@@ -1,26 +1,18 @@
-import { createAuthoredDocument } from '../../src/kits/authoring/document.ts';
+import {createAuthoredDocument} from '../../src/kits/authoring/document.ts';
 import {
   parseDimensionalStock,
   prepareStockChange,
   prepareStockTransfers,
 } from '../../src/kits/inventory/dimensional.ts';
-import {
-  parseIndustrialState,
-  prepareIndustryCommand,
-} from '../../src/kits/resources/industry.ts';
+import {parseIndustrialState, prepareIndustryCommand} from '../../src/kits/resources/industry.ts';
 import {
   beginCraftExperiment,
   applyCraftExperiment,
   lockCraftManifest,
   resolveCraftSlots,
 } from '../../src/kits/resources/crafting.ts';
-import { defineDeposit } from '../../src/kits/resources/deposits.ts';
-import {
-  captureRecipe,
-  initialStock,
-  stockBounds,
-  craftBounds,
-} from './recipe.mjs';
+import {defineDeposit} from '../../src/kits/resources/deposits.ts';
+import {captureRecipe, initialStock, stockBounds, craftBounds} from './recipe.mjs';
 export const runtimeLimits = Object.freeze({
   maxBytes: 262144,
   maxNodes: 32768,
@@ -35,22 +27,12 @@ export const industryBounds = Object.freeze({
 });
 export const equal = (a, b) => {
   if (a === b) return true;
-  if (
-    !a ||
-    !b ||
-    typeof a !== 'object' ||
-    typeof b !== 'object' ||
-    Array.isArray(a) !== Array.isArray(b)
-  )
-    return false;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object' || Array.isArray(a) !== Array.isArray(b)) return false;
   const ak = Object.keys(a),
     bk = Object.keys(b);
-  return (
-    ak.length === bk.length &&
-    ak.every((k) => Object.hasOwn(b, k) && equal(a[k], b[k]))
-  );
+  return ak.length === bk.length && ak.every(k => Object.hasOwn(b, k) && equal(a[k], b[k]));
 };
-export const freeze = (v) => {
+export const freeze = v => {
   if (v && typeof v === 'object') {
     Object.values(v).forEach(freeze);
     Object.freeze(v);
@@ -61,9 +43,8 @@ const integer = (v, min = 0, max = Number.MAX_SAFE_INTEGER) => {
   if (!Number.isSafeInteger(v) || v < min || v > max) throw Error('integer');
   return v;
 };
-const id = (v) => {
-  if (typeof v !== 'string' || !v.length || v.length > 96)
-    throw Error('identity');
+const id = v => {
+  if (typeof v !== 'string' || !v.length || v.length > 96) throw Error('identity');
   return v;
 };
 const fields = (v, names) => {
@@ -72,7 +53,7 @@ const fields = (v, names) => {
     typeof v !== 'object' ||
     Array.isArray(v) ||
     Object.keys(v).length !== names.length ||
-    Object.keys(v).some((k) => !names.includes(k))
+    Object.keys(v).some(k => !names.includes(k))
   )
     throw Error('fields');
   return v;
@@ -81,8 +62,7 @@ const fields = (v, names) => {
 export function captureData(raw) {
   let nodes = 0;
   const visit = (v, depth) => {
-    if (++nodes > runtimeLimits.maxNodes || depth > 24)
-      throw Error('capture-bound');
+    if (++nodes > runtimeLimits.maxNodes || depth > 24) throw Error('capture-bound');
     if (v === null || typeof v === 'boolean') return v;
     if (typeof v === 'number') {
       if (!Number.isFinite(v)) throw Error('number');
@@ -101,11 +81,7 @@ export function captureData(raw) {
       return out;
     }
     const keys = Reflect.ownKeys(v);
-    if (
-      keys.length > 64 ||
-      keys.some((k) => typeof k !== 'string' || k === '__proto__')
-    )
-      throw Error('keys');
+    if (keys.length > 64 || keys.some(k => typeof k !== 'string' || k === '__proto__')) throw Error('keys');
     const out = {};
     for (const k of keys) out[k] = visit(v[k], depth + 1);
     return out;
@@ -127,12 +103,12 @@ const port = (id, mass = 100000, volume = 100000) => ({
   maxVolumeUl: volume,
   phases: ['solid'],
 });
-const input = (s) => ({
+const input = s => ({
   stock: s.industry.stock,
   stockBounds,
   bounds: craftBounds,
 });
-const stock = (s) => {
+const stock = s => {
   const parsed = parseIndustrialState(s.industry, industryBounds);
   s.industry = parsed;
 };
@@ -142,11 +118,7 @@ function changed(s, change) {
   s.industry.stock = result.state;
 }
 function moved(s, transfers) {
-  const result = prepareStockTransfers(
-    s.industry.stock,
-    transfers,
-    stockBounds,
-  );
+  const result = prepareStockTransfers(s.industry.stock, transfers, stockBounds);
   if (!result.ok) throw Error(result.reason);
   s.industry.stock = result.state;
 }
@@ -156,13 +128,10 @@ function industry(s, command) {
   s.industry = result.state;
   return result;
 }
-const active = (s) => !['completed', 'cancelled'].includes(s.phase);
+const active = s => !['completed', 'cancelled'].includes(s.phase);
 const claimed = (s, container) =>
   s.sessions.some(
-    (row) =>
-      active(row) &&
-      (row.holding === container ||
-        (row.machine && `${row.machine}.input` === container)),
+    row => active(row) && (row.holding === container || (row.machine && `${row.machine}.input` === container)),
   );
 function aggregate(selected, from, to) {
   const rows = new Map();
@@ -187,15 +156,9 @@ export function initialRuntimeEnvelope() {
   base.containers.push(port('buffer'));
   for (const m of ['m-a', 'm-b'])
     for (const p of ['input', 'output', 'work', 'installed'])
-      base.containers.push(
-        port(
-          `${m}.${p}`,
-          p === 'output' ? 20 : 100000,
-          p === 'output' ? 10 : 100000,
-        ),
-      );
+      base.containers.push(port(`${m}.${p}`, p === 'output' ? 20 : 100000, p === 'output' ? 10 : 100000));
   const initial = parseDimensionalStock(base, stockBounds),
-    batch = initial.batches.find((b) => b.id === 'input-a');
+    batch = initial.batches.find(b => b.id === 'input-a');
   return {
     version: 1,
     revision: 0,
@@ -249,8 +212,7 @@ export function captureCommand(raw) {
     fields(p, ['kind', 'recipe', 'selections', 'pointBudget']);
     p.recipe = captureRecipe(p.recipe);
     integer(p.pointBudget, 0, 16);
-    if (!Array.isArray(p.selections) || p.selections.length > 8)
-      throw Error('selection-bound');
+    if (!Array.isArray(p.selections) || p.selections.length > 8) throw Error('selection-bound');
     for (const r of p.selections) {
       fields(r, ['slot', 'container', 'batch', 'quantity']);
       id(r.slot);
@@ -261,8 +223,7 @@ export function captureCommand(raw) {
   } else if (kind === 'repeat') {
     fields(p, ['kind', 'session', 'selections']);
     id(p.session);
-    if (!Array.isArray(p.selections) || p.selections.length > 8)
-      throw Error('selection-bound');
+    if (!Array.isArray(p.selections) || p.selections.length > 8) throw Error('selection-bound');
     for (const r of p.selections) {
       fields(r, ['slot', 'container', 'batch', 'quantity']);
       id(r.slot);
@@ -309,23 +270,10 @@ export function captureCommand(raw) {
     integer(p.incarnation);
     integer(p.quantity, 1);
   } else if (kind === 'replace-spawn') {
-    fields(p, [
-      'kind',
-      'spawn',
-      'seed',
-      'cellSize',
-      'expiresAt',
-      'reserve',
-      'grade',
-    ]);
+    fields(p, ['kind', 'spawn', 'seed', 'cellSize', 'expiresAt', 'reserve', 'grade']);
     id(p.spawn);
     integer(p.seed, 0, 0xffffffff);
-    if (
-      typeof p.cellSize !== 'number' ||
-      !Number.isFinite(p.cellSize) ||
-      p.cellSize <= 0
-    )
-      throw Error('cell-size');
+    if (typeof p.cellSize !== 'number' || !Number.isFinite(p.cellSize) || p.cellSize <= 0) throw Error('cell-size');
     integer(p.expiresAt);
     integer(p.reserve);
     integer(p.grade, 0, 1000);
@@ -333,7 +281,7 @@ export function captureCommand(raw) {
   return freeze(c);
 }
 function applyTransition(value, c) {
-  const prior = value.receipts.find((r) => r.id === c.id);
+  const prior = value.receipts.find(r => r.id === c.id);
   if (prior) {
     if (!equal(prior, c)) throw Error('conflict');
     return null;
@@ -343,16 +291,9 @@ function applyTransition(value, c) {
     p = c.payload;
   let row;
   if (p.kind === 'begin') {
-    if (s.sessions.filter(active).length >= 2)
-      throw Error('live-session-capacity');
+    if (s.sessions.filter(active).length >= 2) throw Error('live-session-capacity');
     if (s.sessions.length >= 16) throw Error('session-capacity');
-    if (
-      p.selections.some(
-        (r) =>
-          claimed(s, r.container) ||
-          !['source-a', 'source-b', 'buffer'].includes(r.container),
-      )
-    )
+    if (p.selections.some(r => claimed(s, r.container) || !['source-a', 'source-b', 'buffer'].includes(r.container)))
       throw Error('protected-source');
     const serial = s.sessions.length + 1,
       session = `session-${serial}`,
@@ -360,16 +301,16 @@ function applyTransition(value, c) {
     const experiment = beginCraftExperiment(
         p.recipe,
         p.selections,
-        { id: session, pointBudget: p.pointBudget },
+        {id: session, pointBudget: p.pointBudget},
         input(s),
       ),
       values = resolveCraftSlots(p.recipe, p.selections, input(s)).values;
-    changed(s, { addContainers: [port(holding)] });
+    changed(s, {addContainers: [port(holding)]});
     moved(
       s,
       aggregate(
         experiment.selections,
-        (r) => r.container,
+        r => r.container,
         () => holding,
       ),
     );
@@ -386,21 +327,13 @@ function applyTransition(value, c) {
       cycle: null,
     });
   } else if (p.kind === 'repeat') {
-    const source = s.sessions.find((r) => r.id === p.session);
-    if (!source || source.phase !== 'completed' || !source.manifest)
-      throw Error('repeat-source');
-    if (s.sessions.filter(active).length >= 2)
-      throw Error('live-session-capacity');
+    const source = s.sessions.find(r => r.id === p.session);
+    if (!source || source.phase !== 'completed' || !source.manifest) throw Error('repeat-source');
+    if (s.sessions.filter(active).length >= 2) throw Error('live-session-capacity');
     if (s.sessions.length >= 16) throw Error('session-capacity');
-    if (
-      p.selections.some(
-        (r) =>
-          claimed(s, r.container) ||
-          !['source-a', 'source-b', 'buffer'].includes(r.container),
-      )
-    )
+    if (p.selections.some(r => claimed(s, r.container) || !['source-a', 'source-b', 'buffer'].includes(r.container)))
       throw Error('protected-source');
-    const qualified = (rows) => {
+    const qualified = rows => {
       const totals = new Map();
       for (const row of rows) {
         const key = JSON.stringify([row.slot, row.batch]);
@@ -408,26 +341,18 @@ function applyTransition(value, c) {
       }
       return [...totals].sort(([a], [b]) => a.localeCompare(b));
     };
-    if (
-      !equal(qualified(p.selections), qualified(source.experiment.selections))
-    )
-      throw Error('repeat-facts');
+    if (!equal(qualified(p.selections), qualified(source.experiment.selections))) throw Error('repeat-facts');
     const serial = s.sessions.length + 1,
       session = `session-${serial}`,
       holding = `holding-${serial}`;
     let experiment = beginCraftExperiment(
       source.recipe,
       p.selections,
-      { id: session, pointBudget: source.experiment.pointBudget },
+      {id: session, pointBudget: source.experiment.pointBudget},
       input(s),
     );
     for (const step of source.experiment.steps)
-      experiment = applyCraftExperiment(
-        experiment,
-        step,
-        source.recipe,
-        input(s),
-      ).state;
+      experiment = applyCraftExperiment(experiment, step, source.recipe, input(s)).state;
     const manifest = lockCraftManifest(
       experiment,
       {
@@ -438,20 +363,17 @@ function applyTransition(value, c) {
       source.recipe,
       input(s),
     );
-    const canonicalPlan = (plan) => ({
+    const canonicalPlan = plan => ({
       ...plan,
       inputs: [...plan.inputs].sort((a, b) => a.batch.localeCompare(b.batch)),
     });
-    if (
-      !equal(canonicalPlan(manifest.plan), canonicalPlan(source.manifest.plan))
-    )
-      throw Error('repeat-plan');
-    changed(s, { addContainers: [port(holding)] });
+    if (!equal(canonicalPlan(manifest.plan), canonicalPlan(source.manifest.plan))) throw Error('repeat-plan');
+    changed(s, {addContainers: [port(holding)]});
     moved(
       s,
       aggregate(
         experiment.selections,
-        (r) => r.container,
+        r => r.container,
         () => holding,
       ),
     );
@@ -467,14 +389,11 @@ function applyTransition(value, c) {
       machine: null,
       cycle: null,
     });
-  } else if (
-    ['experiment', 'lock', 'assign', 'step', 'cancel-session'].includes(p.kind)
-  ) {
-    row = s.sessions.find((r) => r.id === p.session);
+  } else if (['experiment', 'lock', 'assign', 'step', 'cancel-session'].includes(p.kind)) {
+    row = s.sessions.find(r => r.id === p.session);
     if (!row) throw Error('session');
     if (p.kind === 'experiment') {
-      if (!['reserved', 'experimenting'].includes(row.phase))
-        throw Error('phase');
+      if (!['reserved', 'experimenting'].includes(row.phase)) throw Error('phase');
       const result = applyCraftExperiment(
         row.experiment,
         {
@@ -489,8 +408,7 @@ function applyTransition(value, c) {
       row.values = result.values;
       row.phase = 'experimenting';
     } else if (p.kind === 'lock') {
-      if (!['reserved', 'experimenting'].includes(row.phase))
-        throw Error('phase');
+      if (!['reserved', 'experimenting'].includes(row.phase)) throw Error('phase');
       const manifest = lockCraftManifest(
         row.experiment,
         {
@@ -502,7 +420,7 @@ function applyTransition(value, c) {
         input(s),
       );
       if (s.industry.plans.length >= 16) throw Error('plan-capacity');
-      changed(s, { issueBatches: manifest.plan.outputs.map((o) => o.batch) });
+      changed(s, {issueBatches: manifest.plan.outputs.map(o => o.batch)});
       s.industry.plans.push(manifest.plan);
       row.manifest = manifest;
       row.experiment = manifest.experiment;
@@ -510,15 +428,10 @@ function applyTransition(value, c) {
       row.phase = 'locked';
     } else if (p.kind === 'assign') {
       if (row.phase !== 'locked') throw Error('phase');
-      if (s.sessions.some((r) => active(r) && r.machine === p.machine))
-        throw Error('machine-claimed');
-      let machine = s.industry.machines.find((m) => m.id === p.machine);
+      if (s.sessions.some(r => active(r) && r.machine === p.machine)) throw Error('machine-claimed');
+      let machine = s.industry.machines.find(m => m.id === p.machine);
       if (machine?.active) throw Error('machine-active');
-      if (
-        s.industry.stock.positions.some((r) =>
-          [`${p.machine}.input`, `${p.machine}.work`].includes(r.container),
-        )
-      )
+      if (s.industry.stock.positions.some(r => [`${p.machine}.input`, `${p.machine}.work`].includes(r.container)))
         throw Error('machine-input-occupied');
       if (!machine) {
         machine = {
@@ -556,7 +469,7 @@ function applyTransition(value, c) {
           ticks: p.ticks,
           allocatedPowerW: p.power,
         }),
-        machine = s.industry.machines.find((m) => m.id === row.machine);
+        machine = s.industry.machines.find(m => m.id === row.machine);
       if (result.completed) {
         if (machine.completed !== row.cycle) throw Error('cycle');
         row.phase = 'completed';
@@ -565,7 +478,7 @@ function applyTransition(value, c) {
       if (!active(row)) throw Error('phase');
       let source = row.holding;
       if (row.machine) {
-        industry(s, { kind: 'cancel', machine: row.machine });
+        industry(s, {kind: 'cancel', machine: row.machine});
         source = `${row.machine}.input`;
       }
       moved(
@@ -573,7 +486,7 @@ function applyTransition(value, c) {
         aggregate(
           row.experiment.selections,
           () => source,
-          (r) => r.container,
+          r => r.container,
         ),
       );
       row.phase = 'cancelled';
@@ -591,24 +504,21 @@ function applyTransition(value, c) {
     if (
       claimed(s, p.container) ||
       s.industry.machines.some(
-        (m) =>
+        m =>
           [m.work, m.installed].includes(p.container) &&
-          (m.active || s.sessions.some((r) => active(r) && r.machine === m.id)),
+          (m.active || s.sessions.some(r => active(r) && r.machine === m.id)),
       )
     )
       throw Error('claimed-custody');
     changed(s, {
-      resizeContainers: [
-        { id: p.container, maxMassMg: p.mass, maxVolumeUl: p.volume },
-      ],
+      resizeContainers: [{id: p.container, maxMassMg: p.mass, maxVolumeUl: p.volume}],
     });
   } else if (p.kind === 'advance') {
     if (p.time < s.clock) throw Error('clock');
     s.clock = p.time;
   } else if (p.kind === 'harvest') {
-    const spawn = s.spawns.find((r) => r.id === p.spawn);
-    if (!spawn || spawn.incarnation !== p.incarnation)
-      throw Error('stale-spawn');
+    const spawn = s.spawns.find(r => r.id === p.spawn);
+    if (!spawn || spawn.incarnation !== p.incarnation) throw Error('stale-spawn');
     if (s.clock >= spawn.deposit.expiresTick) throw Error('expired-spawn');
     if (claimed(s, p.container)) throw Error('claimed-custody');
     industry(s, {
@@ -619,7 +529,7 @@ function applyTransition(value, c) {
     });
   } else if (p.kind === 'replace-spawn') {
     if (p.expiresAt <= s.clock) throw Error('expired-spawn');
-    const prior = s.spawns.find((r) => r.id === p.spawn);
+    const prior = s.spawns.find(r => r.id === p.spawn);
     if (!prior && s.spawns.length >= 4) throw Error('spawn-capacity');
     const serial = integer(s.spawnSerial + 1),
       batch = {
@@ -629,9 +539,9 @@ function applyTransition(value, c) {
         phase: 'solid',
         massMg: 10,
         volumeUl: 5,
-        properties: { grade: p.grade },
+        properties: {grade: p.grade},
       };
-    changed(s, { issueBatches: [batch] });
+    changed(s, {issueBatches: [batch]});
     const spatial = {
       id: p.spawn,
       incarnation: serial,
@@ -649,9 +559,9 @@ function applyTransition(value, c) {
         },
       }),
     };
-    s.spawns = s.spawns.filter((r) => r.id !== p.spawn);
+    s.spawns = s.spawns.filter(r => r.id !== p.spawn);
     s.spawns.push(spatial);
-    s.industry.deposits = s.industry.deposits.filter((r) => r.id !== p.spawn);
+    s.industry.deposits = s.industry.deposits.filter(r => r.id !== p.spawn);
     s.industry.deposits.push({
       id: p.spawn,
       body: 'sample',
@@ -676,10 +586,8 @@ export function recoveryStates(value) {
     totals = new Map();
   for (const row of live)
     for (const selection of row.experiment.selections) {
-      const batch = value.industry.stock.batches.find(
-        (b) => b.id === selection.batch,
-      );
-      const total = totals.get(selection.container) ?? { mass: 0n, volume: 0n };
+      const batch = value.industry.stock.batches.find(b => b.id === selection.batch);
+      const total = totals.get(selection.container) ?? {mass: 0n, volume: 0n};
       total.mass += BigInt(selection.quantity) * BigInt(batch.massMg);
       total.volume += BigInt(selection.quantity) * BigInt(batch.volumeUl);
       totals.set(selection.container, total);
@@ -687,47 +595,31 @@ export function recoveryStates(value) {
   const receipt = () => {
     let key;
     do {
-      key = (++serial)
-        .toString(2)
-        .padStart(96, '0')
-        .replaceAll('0', '\u0000')
-        .replaceAll('1', '\u0001');
-    } while (state.receipts.some((r) => r.id === key));
+      key = (++serial).toString(2).padStart(96, '0').replaceAll('0', '\u0000').replaceAll('1', '\u0001');
+    } while (state.receipts.some(r => r.id === key));
     return key;
   };
-  const apply = (payload) => {
-    const next = applyTransition(state, { id: receipt(), payload });
+  const apply = payload => {
+    const next = applyTransition(state, {id: receipt(), payload});
     if (!next) throw Error('recovery-identity');
     captureData(next);
     states.push(next);
     state = next;
   };
-  for (const [container, returned] of [...totals].sort(([a], [b]) =>
-    a.localeCompare(b),
-  )) {
-    const current = value.industry.stock.containers.find(
-      (c) => c.id === container,
-    );
+  for (const [container, returned] of [...totals].sort(([a], [b]) => a.localeCompare(b))) {
+    const current = value.industry.stock.containers.find(c => c.id === container);
     let mass = returned.mass,
       volume = returned.volume;
-    for (const p of value.industry.stock.positions.filter(
-      (p) => p.container === container,
-    )) {
-      const batch = value.industry.stock.batches.find((b) => b.id === p.batch);
+    for (const p of value.industry.stock.positions.filter(p => p.container === container)) {
+      const batch = value.industry.stock.batches.find(b => b.id === p.batch);
       mass += BigInt(p.quantity) * BigInt(batch.massMg);
       volume += BigInt(p.quantity) * BigInt(batch.volumeUl);
     }
-    if (
-      mass > BigInt(Number.MAX_SAFE_INTEGER) ||
-      volume > BigInt(Number.MAX_SAFE_INTEGER)
-    )
+    if (mass > BigInt(Number.MAX_SAFE_INTEGER) || volume > BigInt(Number.MAX_SAFE_INTEGER))
       throw Error('recovery-dimension-capacity');
     const neededMass = Math.max(current.maxMassMg, Number(mass)),
       neededVolume = Math.max(current.maxVolumeUl, Number(volume));
-    if (
-      neededMass !== current.maxMassMg ||
-      neededVolume !== current.maxVolumeUl
-    )
+    if (neededMass !== current.maxMassMg || neededVolume !== current.maxVolumeUl)
       apply({
         kind: 'resize',
         container,
@@ -735,7 +627,7 @@ export function recoveryStates(value) {
         volume: neededVolume,
       });
   }
-  for (const row of live) apply({ kind: 'cancel-session', session: row.id });
+  for (const row of live) apply({kind: 'cancel-session', session: row.id});
   return states;
 }
 export function transition(value, c) {
@@ -750,18 +642,8 @@ export function transition(value, c) {
 }
 export function parseRuntimeEnvelope(raw) {
   const value = captureData(raw);
-  fields(value, [
-    'version',
-    'revision',
-    'clock',
-    'spawnSerial',
-    'industry',
-    'sessions',
-    'spawns',
-    'receipts',
-  ]);
-  if (value.version !== 1 || !Array.isArray(value.receipts))
-    throw Error('envelope');
+  fields(value, ['version', 'revision', 'clock', 'spawnSerial', 'industry', 'sessions', 'spawns', 'receipts']);
+  if (value.version !== 1 || !Array.isArray(value.receipts)) throw Error('envelope');
   let expected = initialRuntimeEnvelope();
   for (const rawCommand of value.receipts) {
     const next = applyTransition(expected, captureCommand(rawCommand));
@@ -778,9 +660,9 @@ export function project(value) {
     stock: value.industry.stock,
     machines: value.industry.machines,
     clock: value.clock,
-    spawns: value.spawns.map((s) => ({
+    spawns: value.spawns.map(s => ({
       ...s,
-      remaining: value.industry.deposits.find((d) => d.id === s.id).remaining,
+      remaining: value.industry.deposits.find(d => d.id === s.id).remaining,
     })),
   });
 }

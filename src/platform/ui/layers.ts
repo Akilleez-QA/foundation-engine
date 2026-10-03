@@ -1,5 +1,5 @@
 /**
- * platform/ui/layers.ts: the layer manager, the only owner of "what is on top of the screen" (ADR 0020; 
+ * platform/ui/layers.ts: the layer manager, the only owner of "what is on top of the screen" (ADR 0020;
  * STD-RUN-20). It owns focus trapping and focus return, `inert`, Escape and the coverage signal the frame loop reads.
  *
  * Status: live since. `appLayers()` (platform/ui/runtime.ts) is the app's one manager: `showActivity` pushes
@@ -19,13 +19,19 @@
  * (platform/input/actions.ts); the vocabulary (kinds, covers, coverage, close reasons) is core/activity's.
  */
 import type {
-  Coverage, LayerCloseReason, LayerCover, LayerHandle as PortLayerHandle, LayerKind, LayerPort, LayerRequest,
+  Coverage,
+  LayerCloseReason,
+  LayerCover,
+  LayerHandle as PortLayerHandle,
+  LayerKind,
+  LayerPort,
+  LayerRequest,
 } from '../../core/activity/ports';
-import type { ActionLayers } from '../input/actions';
+import type {ActionLayers} from '../input/actions';
 
-export type { Coverage, LayerCover, LayerKind };
+export type {Coverage, LayerCover, LayerKind};
 export const LAYER_KINDS: readonly LayerKind[] = ['scene', 'panel', 'sheet', 'modal', 'toast'];
-export const LAYER_RANK: Readonly<Record<LayerKind, number>> = { scene: 0, panel: 1, sheet: 2, modal: 3, toast: 4 };
+export const LAYER_RANK: Readonly<Record<LayerKind, number>> = {scene: 0, panel: 1, sheet: 2, modal: 3, toast: 4};
 /** 'page': everything else (shell included) is inert. 'scope': layers below are inert; the shell stays usable. */
 export type LayerModality = 'page' | 'scope' | false;
 export type CloseReason = LayerCloseReason;
@@ -61,23 +67,38 @@ export interface LayerSpec extends LayerRequest {
   onClose?: (reason: CloseReason) => void;
 }
 export interface LayerInfo {
-  readonly id: string; readonly kind: LayerKind; readonly element: HTMLElement; readonly owner?: string;
-  readonly cover: LayerCover; readonly modal: LayerModality; readonly narration?: string; readonly music?: string;
+  readonly id: string;
+  readonly kind: LayerKind;
+  readonly element: HTMLElement;
+  readonly owner?: string;
+  readonly cover: LayerCover;
+  readonly modal: LayerModality;
+  readonly narration?: string;
+  readonly music?: string;
   readonly dormant: boolean;
 }
 export interface LayerHandle extends LayerInfo, PortLayerHandle {
   readonly signal: AbortSignal;
   readonly closed: boolean;
   close(reason?: CloseReason): void;
-  set(patch: { narration?: string; music?: string; cover?: LayerCover }): void;
+  set(patch: {narration?: string; music?: string; cover?: LayerCover}): void;
   /** Wake a dormant layer: it becomes live, may take focus and joins coverage, narration and input. */
   activate(): void;
 }
-export interface LayerChange { top: LayerInfo | null; reason: 'push' | 'close' | 'update' | 'activate' }
+export interface LayerChange {
+  top: LayerInfo | null;
+  reason: 'push' | 'close' | 'update' | 'activate';
+}
 
 interface Entry extends LayerHandle {
-  spec: LayerSpec; seq: number; opener: HTMLElement | null; abort: AbortController;
-  cover: LayerCover; narration?: string; music?: string; dormant: boolean;
+  spec: LayerSpec;
+  seq: number;
+  opener: HTMLElement | null;
+  abort: AbortController;
+  cover: LayerCover;
+  narration?: string;
+  music?: string;
+  dormant: boolean;
 }
 
 const FOCUSABLE = 'button,a,input,select,textarea,summary,[tabindex]';
@@ -87,11 +108,16 @@ export function isInert(el: Element | null): boolean {
   return false;
 }
 export function focusables(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(e =>
-    !(e as HTMLButtonElement).disabled && e.tabIndex >= 0 && e.getClientRects().length > 0 && !isInert(e) &&
-    !(e.tagName === 'A' && !e.hasAttribute('href')));
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    e =>
+      !(e as HTMLButtonElement).disabled &&
+      e.tabIndex >= 0 &&
+      e.getClientRects().length > 0 &&
+      !isInert(e) &&
+      !(e.tagName === 'A' && !e.hasAttribute('href')),
+  );
 }
-const focus = (el: HTMLElement | null | undefined) => el?.focus?.({ preventScroll: true });
+const focus = (el: HTMLElement | null | undefined) => el?.focus?.({preventScroll: true});
 
 export interface LayerManagerOptions {
   /** Shell regions (header, settings menu) made inert under a 'page' modal. */
@@ -110,33 +136,52 @@ export class LayerManager implements LayerPort, ActionLayers {
   private escaping = false;
   private readonly opening = new Map<string, object>();
 
-  constructor(private readonly doc: Document, private readonly opts: LayerManagerOptions = {}) {}
+  constructor(
+    private readonly doc: Document,
+    private readonly opts: LayerManagerOptions = {},
+  ) {}
 
   /** Open one layer per id. A same-id open during replacement callbacks supersedes the outer
    * request. That outer call returns its own closed handle, without admitting or focusing it. */
   open(spec: LayerSpec): LayerHandle {
-    const abort = new AbortController(), mgr = this;
+    const abort = new AbortController(),
+      mgr = this;
     const entry: Entry = {
-      spec, seq: this.seq++, abort, signal: abort.signal, opener: null,
-      id: spec.id, kind: spec.kind, element: spec.element, owner: spec.owner,
+      spec,
+      seq: this.seq++,
+      abort,
+      signal: abort.signal,
+      opener: null,
+      id: spec.id,
+      kind: spec.kind,
+      element: spec.element,
+      owner: spec.owner,
       cover: spec.cover ?? (spec.kind === 'toast' || spec.kind === 'scene' ? 'none' : 'scrim'),
-      modal: spec.modal ?? (spec.kind === 'modal' ? 'page' : spec.kind === 'panel' || spec.kind === 'sheet' ? 'scope' : false),
-      narration: spec.narration, music: spec.music, dormant: spec.dormant === true,
-      get closed() { return abort.signal.aborted; },
-      close(reason: CloseReason = 'program') { mgr.closeEntry(entry, reason); },
+      modal:
+        spec.modal ??
+        (spec.kind === 'modal' ? 'page' : spec.kind === 'panel' || spec.kind === 'sheet' ? 'scope' : false),
+      narration: spec.narration,
+      music: spec.music,
+      dormant: spec.dormant === true,
+      get closed() {
+        return abort.signal.aborted;
+      },
+      close(reason: CloseReason = 'program') {
+        mgr.closeEntry(entry, reason);
+      },
       set(patch) {
         if (entry.closed) return;
         if (patch.narration !== undefined) entry.narration = patch.narration;
         if (patch.music !== undefined) entry.music = patch.music;
         if (patch.cover !== undefined) entry.cover = patch.cover;
-        mgr.emit({ top: mgr.top(), reason: 'update' });
+        mgr.emit({top: mgr.top(), reason: 'update'});
       },
       activate() {
         if (entry.closed || !entry.dormant) return;
         entry.dormant = false;
         mgr.applyInert();
         mgr.focusIfTop(entry);
-        mgr.emit({ top: mgr.top(), reason: 'activate' });
+        mgr.emit({top: mgr.top(), reason: 'activate'});
       },
     };
     const identity = {};
@@ -155,7 +200,7 @@ export class LayerManager implements LayerPort, ActionLayers {
       this.entries.sort((a, b) => LAYER_RANK[a.kind] - LAYER_RANK[b.kind] || a.seq - b.seq);
       this.applyInert();
       this.focusIfTop(entry);
-      this.emit({ top: this.top(), reason: 'push' });
+      this.emit({top: this.top(), reason: 'push'});
       return entry;
     } finally {
       if (this.opening.get(entry.id) === identity) this.opening.delete(entry.id);
@@ -163,7 +208,9 @@ export class LayerManager implements LayerPort, ActionLayers {
   }
   /** the activity host calls it `push` (`LayerPort.push`). The request must carry the platform's
    *  `LayerSpec` fields: the port's `LayerRequest` is the open, augmentable core of it. */
-  push(spec: LayerSpec): LayerHandle { return this.open(spec); }
+  push(spec: LayerSpec): LayerHandle {
+    return this.open(spec);
+  }
 
   /** Close a layer by id or handle. Returns false when no such open layer exists. */
   close(layer: string | LayerInfo, reason: CloseReason = 'program'): boolean {
@@ -175,13 +222,20 @@ export class LayerManager implements LayerPort, ActionLayers {
 
   /** The top interactive layer: toasts never own input and dormant layers are not yet live. */
   top(): LayerInfo | null {
-    for (let i = this.entries.length - 1; i >= 0; i--) { const e = this.entries[i]!; if (this.live(e)) return e; } // i < entries.length
+    for (let i = this.entries.length - 1; i >= 0; i--) {
+      const e = this.entries[i]!;
+      if (this.live(e)) return e;
+    } // i < entries.length
     return null;
   }
   /** Every open layer, bottom to top, dormant and toast included. */
-  stack(): readonly LayerInfo[] { return this.entries; }
+  stack(): readonly LayerInfo[] {
+    return this.entries;
+  }
   /** Interactive layers from the top down, as the input dispatcher traverses them. */
-  fromTop(): readonly LayerInfo[] { return this.entries.filter(e => this.live(e)).reverse(); }
+  fromTop(): readonly LayerInfo[] {
+    return this.entries.filter(e => this.live(e)).reverse();
+  }
   /** The index of the owner's highest layer, or -1 when it has none. */
   private lastIndexOfOwner(owner: string): number {
     for (let i = this.entries.length - 1; i >= 0; i--) if (this.entries[i]!.owner === owner) return i; // i < entries.length
@@ -210,7 +264,10 @@ export class LayerManager implements LayerPort, ActionLayers {
    */
   previewing(owner: string): boolean {
     const index = this.lastIndexOfOwner(owner);
-    for (let i = index + 1; i < this.entries.length; i++) { const e = this.entries[i]!; if (!e.dormant && e.spec.preview === true) return true; } // i < entries.length
+    for (let i = index + 1; i < this.entries.length; i++) {
+      const e = this.entries[i]!;
+      if (!e.dormant && e.spec.preview === true) return true;
+    } // i < entries.length
     return false;
   }
 
@@ -242,7 +299,9 @@ export class LayerManager implements LayerPort, ActionLayers {
         if (e.modal !== false) return true;
       }
       return false;
-    } finally { this.escaping = false; }
+    } finally {
+      this.escaping = false;
+    }
   }
 
   /** Activate an eligible focused control in the highest live modal; false leaves native/custom handling intact. */
@@ -250,10 +309,20 @@ export class LayerManager implements LayerPort, ActionLayers {
     const top = this.fromTop().find(layer => layer.modal !== false);
     if (!top) return false;
     const target = this.doc.activeElement as HTMLElement | null;
-    if (!target || !top.element.contains(target) || !focusables(top.element).includes(target)
-      || target.closest('[aria-disabled="true"]')) return false;
+    if (
+      !target ||
+      !top.element.contains(target) ||
+      !focusables(top.element).includes(target) ||
+      target.closest('[aria-disabled="true"]')
+    )
+      return false;
     // Preserve native text/edit/select behavior; an arbitrary focusable container is not an action.
-    if (!target.matches('button,a[href],summary,input[type="button"],input[type="submit"],input[type="reset"],input[type="checkbox"],input[type="radio"],[role="button"]')) return false;
+    if (
+      !target.matches(
+        'button,a[href],summary,input[type="button"],input[type="submit"],input[type="reset"],input[type="checkbox"],input[type="radio"],[role="button"]',
+      )
+    )
+      return false;
     target.click();
     return true;
   }
@@ -263,11 +332,18 @@ export class LayerManager implements LayerPort, ActionLayers {
     const top = this.fromTop().find(layer => layer.modal !== false);
     if (!top) return false;
     const active = this.doc.activeElement as HTMLElement | null;
-    if (!active || !top.element.contains(active) || active.closest('input,textarea,select,[contenteditable="true"]')) return false;
+    if (!active || !top.element.contains(active) || active.closest('input,textarea,select,[contenteditable="true"]'))
+      return false;
     const region = active.closest('[data-ui-scroll]') as HTMLElement | null;
-    if (!region || !top.element.contains(region) || !focusables(top.element).includes(region)
-      || active.closest('[aria-disabled="true"]')) return false;
-    const height = region.clientHeight, extent = region.scrollHeight - height;
+    if (
+      !region ||
+      !top.element.contains(region) ||
+      !focusables(top.element).includes(region) ||
+      active.closest('[aria-disabled="true"]')
+    )
+      return false;
+    const height = region.clientHeight,
+      extent = region.scrollHeight - height;
     if (height > 0 && Number.isFinite(height) && Number.isFinite(extent) && extent > 0) {
       region.scrollTop = Math.max(0, Math.min(extent, region.scrollTop + direction * height * 0.8));
       // A scrollable region owns paging at its boundary too; avoid scrolling an ancestor instead.
@@ -283,7 +359,13 @@ export class LayerManager implements LayerPort, ActionLayers {
     const list = focusables(top.element);
     if (!list.length) return true;
     const i = list.indexOf(this.doc.activeElement as HTMLElement);
-    const next = backwards ? (i <= 0 ? list[list.length - 1] : list[i - 1]) : (i < 0 || i === list.length - 1 ? list[0] : list[i + 1]);
+    const next = backwards
+      ? i <= 0
+        ? list[list.length - 1]
+        : list[i - 1]
+      : i < 0 || i === list.length - 1
+        ? list[0]
+        : list[i + 1];
     focus(next);
     return true;
   }
@@ -308,12 +390,17 @@ export class LayerManager implements LayerPort, ActionLayers {
   onChange(fn: (c: LayerChange) => void, signal?: AbortSignal): () => void {
     if (signal?.aborted) return () => {};
     this.listeners.add(fn);
-    const off = () => { this.listeners.delete(fn); signal?.removeEventListener('abort', off); };
-    signal?.addEventListener('abort', off, { once: true });
+    const off = () => {
+      this.listeners.delete(fn);
+      signal?.removeEventListener('abort', off);
+    };
+    signal?.addEventListener('abort', off, {once: true});
     return off;
   }
 
-  private live(e: Entry) { return e.kind !== 'toast' && !e.dormant; }
+  private live(e: Entry) {
+    return e.kind !== 'toast' && !e.dormant;
+  }
 
   private focusIfTop(entry: Entry) {
     if (entry.dormant || entry.modal === false || this.top() !== entry) return;
@@ -329,14 +416,16 @@ export class LayerManager implements LayerPort, ActionLayers {
     entry.abort.abort();
     this.entries = this.entries.filter(e => e !== entry);
     this.applyInert();
-    try { entry.spec.onClose?.(reason); } finally {
+    try {
+      entry.spec.onClose?.(reason);
+    } finally {
       // A layer that never takes focus (modal: false, e.g. a scene) never moves it on close either.
       if (wasTop && reason !== 'replaced' && entry.modal !== false) {
         const wanted = entry.spec.returnFocus?.() ?? entry.opener;
         const usable = wanted && wanted.isConnected && !isInert(wanted);
         focus(usable ? wanted : this.top()?.element);
       }
-      this.emit({ top: this.top(), reason: 'close' });
+      this.emit({top: this.top(), reason: 'close'});
     }
   }
 
@@ -347,33 +436,55 @@ export class LayerManager implements LayerPort, ActionLayers {
     for (const e of this.entries) {
       const host = e.spec.inertHost;
       if (!host || e.dormant) continue;
-      for (const child of Array.from(host.children) as HTMLElement[]) if (child !== e.element && !child.contains(e.element)) want.add(child);
+      for (const child of Array.from(host.children) as HTMLElement[])
+        if (child !== e.element && !child.contains(e.element)) want.add(child);
     }
     let blocker = -1;
     for (let i = this.entries.length - 1; i >= 0; i--) {
       const e = this.entries[i]!; // i < entries.length
-      if (this.live(e) && e.modal !== false) { blocker = i; break; }
+      if (this.live(e) && e.modal !== false) {
+        blocker = i;
+        break;
+      }
     }
     const blocking = this.entries[blocker];
     if (blocking) {
-      const keep = this.entries.slice(blocker).filter(e => !e.dormant).map(e => e.element);
+      const keep = this.entries
+        .slice(blocker)
+        .filter(e => !e.dormant)
+        .map(e => e.element);
       // Inert what is beside the path to a kept layer, never an ancestor of one.
       const cover = (el: HTMLElement) => {
         if (keep.includes(el)) return;
-        if (!keep.some(k => el.contains(k))) { want.add(el); return; }
+        if (!keep.some(k => el.contains(k))) {
+          want.add(el);
+          return;
+        }
         for (const child of Array.from(el.children) as HTMLElement[]) cover(child);
       };
       for (let i = 0; i < blocker; i++) cover(this.entries[i]!.element); // i < blocker < entries.length
       if (blocking.modal === 'page') for (const el of this.opts.shell?.() ?? []) want.add(el);
     }
-    for (const [el, before] of this.inerted) if (!want.has(el)) { el.inert = before; this.inerted.delete(el); }
-    for (const el of want) if (!this.inerted.has(el)) { this.inerted.set(el, el.inert === true); el.inert = true; }
+    for (const [el, before] of this.inerted)
+      if (!want.has(el)) {
+        el.inert = before;
+        this.inerted.delete(el);
+      }
+    for (const el of want)
+      if (!this.inerted.has(el)) {
+        this.inerted.set(el, el.inert === true);
+        el.inert = true;
+      }
   }
 
   private emit(c: LayerChange) {
     for (const fn of [...this.listeners]) {
       // A throwing listener is isolated (the event-bus rule): the others still hear the change.
-      try { fn(c); } catch (err) { (this.opts.report ?? console.error)(err); }
+      try {
+        fn(c);
+      } catch (err) {
+        (this.opts.report ?? console.error)(err);
+      }
     }
   }
 }

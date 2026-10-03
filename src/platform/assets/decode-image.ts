@@ -18,8 +18,8 @@
  * host has no workers, the decoder runs the same `fetch` + `createImageBitmap` on
  * the main thread, which browsers still decode off the main thread; nothing falls back to an `<img>`.
  */
-import { AbortError } from './lease-cache';
-import { WorkerJobError, type JobKind, type JobOwner, type JobRequest, type JobResult } from '../workers/job.ts';
+import {AbortError} from './lease-cache';
+import {WorkerJobError, type JobKind, type JobOwner, type JobRequest, type JobResult} from '../workers/job.ts';
 
 /** The decode options that reproduce three.js's `<img>` upload with `texture.flipY = false`. */
 export const IMAGE_BITMAP_OPTIONS: ImageBitmapOptions = {
@@ -41,8 +41,8 @@ export const DECODE_IMAGE_JOB_ID = 'job.assets.decode-image';
  */
 export const decodeImageJob: JobKind<DecodeImageInput, ImageBitmap> = {
   id: DECODE_IMAGE_JOB_ID,
-  cancellation: { mode: 'sliced', deadlineMs: 1000 },
-  fallback: { mode: 'unavailable' },
+  cancellation: {mode: 'sliced', deadlineMs: 1000},
+  fallback: {mode: 'unavailable'},
   release: bitmap => bitmap.close(),
 };
 
@@ -63,9 +63,9 @@ export type ImageDecoder = (url: string, signal: AbortSignal, hint?: DecodeHint)
 export async function fetchImageBitmap(
   url: string,
   signal?: AbortSignal,
-  io: { fetch: typeof fetch; createImageBitmap: typeof createImageBitmap } = globalThis,
+  io: {fetch: typeof fetch; createImageBitmap: typeof createImageBitmap} = globalThis,
 ): Promise<ImageBitmap> {
-  const response = await io.fetch(url, signal ? { signal } : undefined);
+  const response = await io.fetch(url, signal ? {signal} : undefined);
   if (!response.ok) throw new Error(`[assets] ${url}: HTTP ${response.status}`);
   const blob = await response.blob();
   if (signal?.aborted) throw new AbortError();
@@ -101,7 +101,7 @@ export interface ImageDecoderOptions {
 }
 
 const pageUrl = (url: string): string => {
-  const g = globalThis as { document?: { baseURI?: string }; location?: { href?: string } };
+  const g = globalThis as {document?: {baseURI?: string}; location?: {href?: string}};
   const base = g.document?.baseURI ?? g.location?.href;
   return base ? new URL(url, base).href : url;
 };
@@ -136,54 +136,96 @@ export function createImageDecoder(options: ImageDecoderOptions): ImageDecoder {
     if (!Number.isSafeInteger(limit) || limit < 0) throw Error('[assets] invalid decode limit');
   for (const delay of [admissionTimeoutMs, retryDelay])
     if (!Number.isSafeInteger(delay) || delay < 1 || delay > 2147483647) throw Error('[assets] invalid decode delay');
-  let pendingBytes = 0, pendingCount = 0;
-  type Waiting = { bytes: number; admit(): void };
+  let pendingBytes = 0,
+    pendingCount = 0;
+  type Waiting = {bytes: number; admit(): void};
   const waiting: Waiting[] = [];
   const fits = (bytes: number) => pendingCount < maxConcurrent && bytes <= maxBytes - pendingBytes;
-  const reserve = (bytes: number) => { pendingBytes += bytes; pendingCount++; };
+  const reserve = (bytes: number) => {
+    pendingBytes += bytes;
+    pendingCount++;
+  };
   const pump = () => {
     while (waiting.length && fits(waiting[0]!.bytes)) {
-      const next = waiting.shift()!; reserve(next.bytes); next.admit();
+      const next = waiting.shift()!;
+      reserve(next.bytes);
+      next.admit();
     }
   };
   const admit = (bytes: number, signal: AbortSignal): Promise<void> => {
     if (bytes > maxBytes) return Promise.reject(Error('[assets] image decode admission oversized'));
-    if (!waiting.length && fits(bytes)) { reserve(bytes); return Promise.resolve(); }
+    if (!waiting.length && fits(bytes)) {
+      reserve(bytes);
+      return Promise.resolve();
+    }
     if (waiting.length >= maxQueued) return Promise.reject(Error('[assets] image decode admission queue exceeded'));
     return new Promise((resolve, reject) => {
-      const cleanup = () => { clearTimeout(timer); signal.removeEventListener('abort', abort); };
+      const cleanup = () => {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', abort);
+      };
       const remove = (error: Error) => {
-        const at = waiting.indexOf(entry); if (at < 0) return;
-        waiting.splice(at, 1); cleanup(); reject(error); pump();
+        const at = waiting.indexOf(entry);
+        if (at < 0) return;
+        waiting.splice(at, 1);
+        cleanup();
+        reject(error);
+        pump();
       };
       const abort = () => remove(new AbortError());
-      const entry: Waiting = { bytes, admit: () => { cleanup(); resolve(); } };
+      const entry: Waiting = {
+        bytes,
+        admit: () => {
+          cleanup();
+          resolve();
+        },
+      };
       const timer = setTimeout(() => remove(Error('[assets] image decode admission timed out')), admissionTimeoutMs);
-      waiting.push(entry); signal.addEventListener('abort', abort, { once: true });
+      waiting.push(entry);
+      signal.addEventListener('abort', abort, {once: true});
       if (signal.aborted) abort();
     });
   };
-  const waitRetry = (signal: AbortSignal): Promise<void> => new Promise((resolve, reject) => {
-    const cleanup = () => { clearTimeout(timer); signal.removeEventListener('abort', abort); };
-    const abort = () => { cleanup(); reject(new AbortError()); };
-    const timer = setTimeout(() => { cleanup(); resolve(); }, retryDelay);
-    signal.addEventListener('abort', abort, { once: true });
-    if (signal.aborted) abort();
-  });
+  const waitRetry = (signal: AbortSignal): Promise<void> =>
+    new Promise((resolve, reject) => {
+      const cleanup = () => {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', abort);
+      };
+      const abort = () => {
+        cleanup();
+        reject(new AbortError());
+      };
+      const timer = setTimeout(() => {
+        cleanup();
+        resolve();
+      }, retryDelay);
+      signal.addEventListener('abort', abort, {once: true});
+      if (signal.aborted) abort();
+    });
   const resolve = options.resolve ?? pageUrl;
   const fallback = options.fallback ?? ((url: string, signal: AbortSignal) => fetchImageBitmap(url, signal));
   // The texture cache's lifetime: the cache itself aborts each load through `signal`.
-  const owner: JobOwner = { id: 'platform.assets.textures', signal: new AbortController().signal };
+  const owner: JobOwner = {id: 'platform.assets.textures', signal: new AbortController().signal};
 
   return async (url, signal, hint) => {
     if (signal.aborted) throw new AbortError();
     const bytes = reservedBytes(hint, unknownBytes);
     await admit(bytes, signal);
     const validate = (bitmap: ImageBitmap) => {
-      if (signal.aborted) { bitmap.close(); throw new AbortError(); }
-      if (!Number.isSafeInteger(bitmap.width) || !Number.isSafeInteger(bitmap.height) ||
-          bitmap.width < 1 || bitmap.height < 1 || bitmap.width * bitmap.height * 4 > bytes) {
-        bitmap.close(); throw Error('[assets] decoded image exceeds reservation');
+      if (signal.aborted) {
+        bitmap.close();
+        throw new AbortError();
+      }
+      if (
+        !Number.isSafeInteger(bitmap.width) ||
+        !Number.isSafeInteger(bitmap.height) ||
+        bitmap.width < 1 ||
+        bitmap.height < 1 ||
+        bitmap.width * bitmap.height * 4 > bytes
+      ) {
+        bitmap.close();
+        throw Error('[assets] decoded image exceeds reservation');
       }
       return bitmap;
     };
@@ -201,8 +243,8 @@ export function createImageDecoder(options: ImageDecoderOptions): ImageDecoder {
               owner,
               version: 0,
               class: 'foreground',
-              bytes: { input: 0, output: bytes, scratch: 0 },
-              materialise: () => ({ input: { url: absolute } }),
+              bytes: {input: 0, output: bytes, scratch: 0},
+              materialise: () => ({input: {url: absolute}}),
             },
             signal,
           );
@@ -222,11 +264,16 @@ export function createImageDecoder(options: ImageDecoderOptions): ImageDecoder {
         }
         if (result.status === 'cancelled' || signal.aborted) throw new AbortError();
         if ((result.status === 'saturated' || result.status === 'preempted') && attempt < maxRetries) {
-          await waitRetry(signal); continue;
+          await waitRetry(signal);
+          continue;
         }
         // Capacity refusal must not escape the host's limits through another execution path.
         throw Error(`[assets] image decode ${result.status}`);
       }
-    } finally { pendingBytes -= bytes; pendingCount--; pump(); }
+    } finally {
+      pendingBytes -= bytes;
+      pendingCount--;
+      pump();
+    }
   };
 }

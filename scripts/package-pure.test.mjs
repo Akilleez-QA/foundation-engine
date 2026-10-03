@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, readdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {execFileSync} from 'node:child_process';
+import {mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, readdirSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import ts from 'typescript';
-import { assertPureGraph, buildPurePackage } from './package-pure.mjs';
-import { npmCommand } from './lib/tool.mjs';
+import {assertPureGraph, buildPurePackage} from './package-pure.mjs';
+import {npmCommand} from './lib/tool.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 test('pure package: immutable packed consumer runs without Foundation runtime or Three and preserves custody', () => {
@@ -17,18 +17,27 @@ test('pure package: immutable packed consumer runs without Foundation runtime or
     const second = buildPurePackage(join(dir, 'artifacts'));
     assert.equal(first.sha256, second.sha256);
     assert.equal(first.integrity, second.integrity);
-    const consumer = join(dir, 'consumer'); mkdirSync(consumer);
-    writeFileSync(join(consumer, 'package.json'), JSON.stringify({ name: 'pure-consumer', version: '1.0.0', private: true, type: 'module' }));
+    const consumer = join(dir, 'consumer');
+    mkdirSync(consumer);
+    writeFileSync(
+      join(consumer, 'package.json'),
+      JSON.stringify({name: 'pure-consumer', version: '1.0.0', private: true, type: 'module'}),
+    );
     const install = npmCommand(['install', '--ignore-scripts', '--offline', '--no-audit', '--no-fund', first.artifact]);
-    execFileSync(install.command, install.args, { cwd: consumer, shell: install.shell });
+    execFileSync(install.command, install.args, {cwd: consumer, shell: install.shell});
     const installed = join(consumer, 'node_modules/@foundation-engine/pure');
     const manifest = JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8'));
     assert.equal(manifest.dependencies, undefined);
     assert.equal(manifest.peerDependencies, undefined);
     assert.equal(manifest.scripts, undefined);
     assert.equal(JSON.parse(readFileSync(join(installed, 'metadata.json'), 'utf8')).revision, first.revision);
-    assert.deepEqual(readdirSync(join(consumer, 'node_modules')).filter(name => !name.startsWith('.')), ['@foundation-engine']);
-    writeFileSync(join(consumer, 'smoke.mjs'), `
+    assert.deepEqual(
+      readdirSync(join(consumer, 'node_modules')).filter(name => !name.startsWith('.')),
+      ['@foundation-engine'],
+    );
+    writeFileSync(
+      join(consumer, 'smoke.mjs'),
+      `
       import assert from 'node:assert/strict';
       import { createInventoryLedger, prepareStockChange } from '@foundation-engine/pure/inventory';
       import * as resources from '@foundation-engine/pure/resources';
@@ -102,9 +111,12 @@ test('pure package: immutable packed consumer runs without Foundation runtime or
       assert.equal(restored.quantity('hold','batch'),0);
       assert.equal(restored.quantity('store','batch'),5);
       assert.equal(owner.quantity('hold','batch'),5);
-    `);
-    execFileSync(process.execPath, ['smoke.mjs'], { cwd: consumer });
-    writeFileSync(join(consumer, 'consumer.ts'), `
+    `,
+    );
+    execFileSync(process.execPath, ['smoke.mjs'], {cwd: consumer});
+    writeFileSync(
+      join(consumer, 'consumer.ts'),
+      `
       import { createInventoryLedger, type MaterialBatch } from '@foundation-engine/pure/inventory';
       import { createProduction, prepareIndustryCommand, createIndustryCandidate, type IndustryCandidate, type IndustrialState, type ProductionSnapshot, beginCraftExperiment, applyCraftExperiment, lockCraftManifest, parseCraftManifest, type CraftRecipe, type CraftManifest } from '@foundation-engine/pure/resources';
       import { createCapabilities, createProgressionState, parseProgressionRules, parseProgressionState,
@@ -134,20 +146,45 @@ test('pure package: immutable packed consumer runs without Foundation runtime or
       const industrial: IndustrialState = {version:1,stock:{version:1,containers:[],batches:[],positions:[]},deposits:[],plans:[],machines:[]};
       const chain: IndustryCandidate = createIndustryCandidate(industrial,{stock:{containers:1,batches:1,positions:1,changes:1,properties:1},deposits:1,plans:1,machines:1,maxStepTicks:1});
       chain.snapshot(); chain.dispose(); void prepareIndustryCommand; void production;
-    `);
-    execFileSync(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '--noEmit', '--strict', '--target', 'ES2022', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', 'consumer.ts'], { cwd: consumer });
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+    `,
+    );
+    execFileSync(
+      process.execPath,
+      [
+        join(root, 'node_modules/typescript/bin/tsc'),
+        '--noEmit',
+        '--strict',
+        '--target',
+        'ES2022',
+        '--module',
+        'NodeNext',
+        '--moduleResolution',
+        'NodeNext',
+        'consumer.ts',
+      ],
+      {cwd: consumer},
+    );
+  } finally {
+    rmSync(dir, {recursive: true, force: true});
+  }
 });
 
 test('pure package: dependency closure rejects a renderer/runtime import even when type-only', () => {
   const dir = mkdtempSync(join(tmpdir(), 'pure-boundary-'));
   try {
-    mkdirSync(join(dir, 'inventory')); mkdirSync(join(dir, 'core'));
+    mkdirSync(join(dir, 'inventory'));
+    mkdirSync(join(dir, 'core'));
     writeFileSync(join(dir, 'inventory/pure.ts'), "export type { Runtime } from '../core/runtime.js';\n");
     writeFileSync(join(dir, 'core/runtime.ts'), 'export interface Runtime { renderer: unknown }\n');
-    const program = ts.createProgram([join(dir, 'inventory/pure.ts')], { types: [], moduleResolution: ts.ModuleResolutionKind.Bundler, module: ts.ModuleKind.ESNext });
+    const program = ts.createProgram([join(dir, 'inventory/pure.ts')], {
+      types: [],
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      module: ts.ModuleKind.ESNext,
+    });
     assert.throws(() => assertPureGraph(program, dir), /outside kit source/);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  } finally {
+    rmSync(dir, {recursive: true, force: true});
+  }
 });
 
 test('pure package: external and dynamic imports cannot evade the boundary', () => {
@@ -160,8 +197,14 @@ test('pure package: external and dynamic imports cannot evade the boundary', () 
       ["export const load = () => import('three');", /dynamic dependencies/],
     ]) {
       writeFileSync(path, source);
-      const program = ts.createProgram([path], { types: [], moduleResolution: ts.ModuleResolutionKind.Bundler, module: ts.ModuleKind.ESNext });
+      const program = ts.createProgram([path], {
+        types: [],
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+        module: ts.ModuleKind.ESNext,
+      });
       assert.throws(() => assertPureGraph(program, dir), reason);
     }
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  } finally {
+    rmSync(dir, {recursive: true, force: true});
+  }
 });

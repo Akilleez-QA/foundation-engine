@@ -3,18 +3,256 @@ import assert from 'node:assert/strict';
 import {authorSaveHandle} from '../../src/author/save-handle.ts';
 import {createSaveStore} from '../../src/core/save/store.ts';
 import {MemoryBackend} from '../../src/core/save/storage-port.ts';
-import {initialGraph,graphSectionDefinition,graphStorageKey,createGraphStoragePort} from './graph.mjs';
+import {initialGraph, graphSectionDefinition, graphStorageKey, createGraphStoragePort} from './graph.mjs';
 import {createEditorController} from './editor-controller.mjs';
-function fixture(backend=new MemoryBackend(),options={}){const port=backend.port(0),store=createSaveStore({namespace:'objective-workbench',build:'test',local:port,session:new MemoryBackend().port(0,'session'),timers:{now:()=>0,set:()=>0,clear:()=>{}}}),handle=store.section(graphSectionDefinition),controller=createEditorController({saveHandle:handle,readPersisted:options.readPersisted??(()=>port.get(graphStorageKey))});return {backend,port,store,handle,controller,close(){controller.dispose();store.dispose();}};}
-function changed(){const g=structuredClone(initialGraph());g.definition.revision=2;g.definition.stages[0].requirements[0].target=2;return g;}
-test('S1 graph candidate has isolated real runtime; rejection and cancellation preserve accepted definition',()=>{const f=fixture(),c=f.controller;try{const original=c.read().graph;assert.equal(c.preview(changed()).status,'prepared');assert.equal(c.read().graph,original);const callback=c.captureEvent('work1','work');assert.equal(callback().status,'accepted');assert.equal(c.read().preview.view.ready,false);assert.equal(callback().status,'duplicate');assert.equal(c.captureEvent('work2','work')().status,'accepted');assert.equal(c.choose('short','choice1').status,'accepted');assert.equal(c.read().preview.view.status,'complete');assert.equal(f.port.get(graphStorageKey),null);assert.equal(c.preview('{').status,'rejected');assert.equal(c.read().candidate,null);assert.equal(c.read().preview,null);assert.equal(callback().status,'stale');assert.equal(c.commit().status,'empty');assert.equal(c.read().graph,original);}finally{f.close();}});
-test('S1 commit undo redo and identical graph preview replacements never revive callbacks',()=>{const f=fixture(),c=f.controller;try{c.startPreview();const old=c.captureEvent('late','work');c.preview(changed());c.commit();assert.equal(old().status,'stale');assert.equal(c.read().graph.definition.revision,2);c.undo();assert.equal(c.read().graph.definition.revision,1);c.startPreview();assert.equal(old().status,'stale');assert.equal(c.captureEvent('fresh','work')().status,'accepted');const replacement=c.captureEvent('later','work');c.startPreview();assert.equal(replacement().status,'stale');c.redo();assert.equal(c.read().graph.definition.revision,2);assert.equal(c.read().preview,null);c.dispose();assert.equal(old().status,'retired');assert.equal(c.save().status,'retired');}finally{f.close();}});
-test('S1 save failure preserves dirty accepted graph then exact save and reload restore it',()=>{const f=fixture(),c=f.controller;try{assert.equal(c.read().durable,false);c.preview(changed());c.commit();f.backend.failSet=()=>true;assert.equal(c.save().status,'unsaved');assert.equal(f.port.get(graphStorageKey),null);assert.equal(c.read().graph.definition.revision,2);f.backend.failSet=()=>false;assert.equal(c.save().status,'saved');const reload=fixture(f.backend);try{assert.equal(reload.controller.read().graph.definition.revision,2);assert.equal(reload.controller.read().preview,null);assert.equal(reload.controller.read().history.entries,0);}finally{reload.close();}}finally{f.close();}});
-test('S1 newer and corrupt storage blocks editor fallback and preserves original bytes',()=>{for(const raw of ['{',JSON.stringify({v:2,data:initialGraph()})]){const backend=new MemoryBackend();backend.port(0).set(graphStorageKey,raw);const f=fixture(backend);try{assert.ok(f.controller.read().blocked);assert.equal(f.controller.preview(changed()).status,'refused');assert.equal(f.controller.save().status,'refused');assert.equal(f.port.get(graphStorageKey),raw);}finally{f.close();}}});
-test('S1 stale physical startup blocks edits and preview capture disposal cannot publish',()=>{const f=fixture();try{const current=f.handle;f.port.set(graphStorageKey,JSON.stringify({v:1,data:changed()}));const c=createEditorController({saveHandle:current,readPersisted:()=>f.port.get(graphStorageKey)});assert.ok(c.read().blocked);assert.equal(c.preview(initialGraph()).status,'refused');c.dispose();}finally{f.close();}const g=fixture();try{const raw=structuredClone(initialGraph());Object.defineProperty(raw,'version',{enumerable:true,get(){g.controller.dispose();return 1;}});assert.equal(g.controller.preview(raw).status,'retired');assert.equal(g.controller.read().graph.definition.revision,1);}finally{g.close();}});
-test('S1 history bounded and earlier stage result cannot enter successor',()=>{const f=fixture(),c=f.controller;try{c.startPreview();const late=c.captureEvent('second','work');c.captureEvent('first','work')();assert.equal(c.choose('continue','move').status,'accepted');assert.equal(late().status,'stale');for(let i=0;i<20;i++){const g=structuredClone(initialGraph());g.definition.revision=i+2;assert.equal(c.preview(g).status,'prepared');assert.equal(c.commit().status,'accepted');}assert.equal(c.read().history.entries,16);assert.ok(c.read().history.bytes<=524288);}finally{f.close();}});
+function fixture(backend = new MemoryBackend(), options = {}) {
+  const port = backend.port(0),
+    store = createSaveStore({
+      namespace: 'objective-workbench',
+      build: 'test',
+      local: port,
+      session: new MemoryBackend().port(0, 'session'),
+      timers: {now: () => 0, set: () => 0, clear: () => {}},
+    }),
+    handle = store.section(graphSectionDefinition),
+    controller = createEditorController({
+      saveHandle: handle,
+      readPersisted: options.readPersisted ?? (() => port.get(graphStorageKey)),
+    });
+  return {
+    backend,
+    port,
+    store,
+    handle,
+    controller,
+    close() {
+      controller.dispose();
+      store.dispose();
+    },
+  };
+}
+function changed() {
+  const g = structuredClone(initialGraph());
+  g.definition.revision = 2;
+  g.definition.stages[0].requirements[0].target = 2;
+  return g;
+}
+test('S1 graph candidate has isolated real runtime; rejection and cancellation preserve accepted definition', () => {
+  const f = fixture(),
+    c = f.controller;
+  try {
+    const original = c.read().graph;
+    assert.equal(c.preview(changed()).status, 'prepared');
+    assert.equal(c.read().graph, original);
+    const callback = c.captureEvent('work1', 'work');
+    assert.equal(callback().status, 'accepted');
+    assert.equal(c.read().preview.view.ready, false);
+    assert.equal(callback().status, 'duplicate');
+    assert.equal(c.captureEvent('work2', 'work')().status, 'accepted');
+    assert.equal(c.choose('short', 'choice1').status, 'accepted');
+    assert.equal(c.read().preview.view.status, 'complete');
+    assert.equal(f.port.get(graphStorageKey), null);
+    assert.equal(c.preview('{').status, 'rejected');
+    assert.equal(c.read().candidate, null);
+    assert.equal(c.read().preview, null);
+    assert.equal(callback().status, 'stale');
+    assert.equal(c.commit().status, 'empty');
+    assert.equal(c.read().graph, original);
+  } finally {
+    f.close();
+  }
+});
+test('S1 commit undo redo and identical graph preview replacements never revive callbacks', () => {
+  const f = fixture(),
+    c = f.controller;
+  try {
+    c.startPreview();
+    const old = c.captureEvent('late', 'work');
+    c.preview(changed());
+    c.commit();
+    assert.equal(old().status, 'stale');
+    assert.equal(c.read().graph.definition.revision, 2);
+    c.undo();
+    assert.equal(c.read().graph.definition.revision, 1);
+    c.startPreview();
+    assert.equal(old().status, 'stale');
+    assert.equal(c.captureEvent('fresh', 'work')().status, 'accepted');
+    const replacement = c.captureEvent('later', 'work');
+    c.startPreview();
+    assert.equal(replacement().status, 'stale');
+    c.redo();
+    assert.equal(c.read().graph.definition.revision, 2);
+    assert.equal(c.read().preview, null);
+    c.dispose();
+    assert.equal(old().status, 'retired');
+    assert.equal(c.save().status, 'retired');
+  } finally {
+    f.close();
+  }
+});
+test('S1 save failure preserves dirty accepted graph then exact save and reload restore it', () => {
+  const f = fixture(),
+    c = f.controller;
+  try {
+    assert.equal(c.read().durable, false);
+    c.preview(changed());
+    c.commit();
+    f.backend.failSet = () => true;
+    assert.equal(c.save().status, 'unsaved');
+    assert.equal(f.port.get(graphStorageKey), null);
+    assert.equal(c.read().graph.definition.revision, 2);
+    f.backend.failSet = () => false;
+    assert.equal(c.save().status, 'saved');
+    const reload = fixture(f.backend);
+    try {
+      assert.equal(reload.controller.read().graph.definition.revision, 2);
+      assert.equal(reload.controller.read().preview, null);
+      assert.equal(reload.controller.read().history.entries, 0);
+    } finally {
+      reload.close();
+    }
+  } finally {
+    f.close();
+  }
+});
+test('S1 newer and corrupt storage blocks editor fallback and preserves original bytes', () => {
+  for (const raw of ['{', JSON.stringify({v: 2, data: initialGraph()})]) {
+    const backend = new MemoryBackend();
+    backend.port(0).set(graphStorageKey, raw);
+    const f = fixture(backend);
+    try {
+      assert.ok(f.controller.read().blocked);
+      assert.equal(f.controller.preview(changed()).status, 'refused');
+      assert.equal(f.controller.save().status, 'refused');
+      assert.equal(f.port.get(graphStorageKey), raw);
+    } finally {
+      f.close();
+    }
+  }
+});
+test('S1 stale physical startup blocks edits and preview capture disposal cannot publish', () => {
+  const f = fixture();
+  try {
+    const current = f.handle;
+    f.port.set(graphStorageKey, JSON.stringify({v: 1, data: changed()}));
+    const c = createEditorController({saveHandle: current, readPersisted: () => f.port.get(graphStorageKey)});
+    assert.ok(c.read().blocked);
+    assert.equal(c.preview(initialGraph()).status, 'refused');
+    c.dispose();
+  } finally {
+    f.close();
+  }
+  const g = fixture();
+  try {
+    const raw = structuredClone(initialGraph());
+    Object.defineProperty(raw, 'version', {
+      enumerable: true,
+      get() {
+        g.controller.dispose();
+        return 1;
+      },
+    });
+    assert.equal(g.controller.preview(raw).status, 'retired');
+    assert.equal(g.controller.read().graph.definition.revision, 1);
+  } finally {
+    g.close();
+  }
+});
+test('S1 history bounded and earlier stage result cannot enter successor', () => {
+  const f = fixture(),
+    c = f.controller;
+  try {
+    c.startPreview();
+    const late = c.captureEvent('second', 'work');
+    c.captureEvent('first', 'work')();
+    assert.equal(c.choose('continue', 'move').status, 'accepted');
+    assert.equal(late().status, 'stale');
+    for (let i = 0; i < 20; i++) {
+      const g = structuredClone(initialGraph());
+      g.definition.revision = i + 2;
+      assert.equal(c.preview(g).status, 'prepared');
+      assert.equal(c.commit().status, 'accepted');
+    }
+    assert.equal(c.read().history.entries, 16);
+    assert.ok(c.read().history.bytes <= 524288);
+  } finally {
+    f.close();
+  }
+});
 
-test('S1 graph guard preserves external bytes through autonomous flush and disposal of a failed save',()=>{for(const mode of ['flush','dispose','delete']){const backend=new MemoryBackend(),raw=backend.port(0),port=createGraphStoragePort(raw),store=createSaveStore({namespace:'objective-workbench',build:'test',local:port,session:new MemoryBackend().port(0,'session'),timers:{now:()=>0,set:()=>0,clear:()=>{}}}),handle=store.section(graphSectionDefinition),c=createEditorController({saveHandle:handle,readPersisted:()=>port.get(graphStorageKey)});c.save();c.preview(changed());c.commit();backend.failSet=()=>true;assert.equal(c.save().status,'unsaved');backend.failSet=()=>false;const external=JSON.stringify({v:1,data:{...initialGraph(),definition:{...initialGraph().definition,revision:9}}});if(mode==='delete')raw.remove(graphStorageKey);else raw.set(graphStorageKey,external);const expected=raw.get(graphStorageKey);if(mode==='dispose'){c.dispose();store.dispose();}else{store.flush('automatic');assert.ok(c.read().blocked);c.dispose();store.dispose();}assert.equal(raw.get(graphStorageKey),expected);}});
+test('S1 graph guard preserves external bytes through autonomous flush and disposal of a failed save', () => {
+  for (const mode of ['flush', 'dispose', 'delete']) {
+    const backend = new MemoryBackend(),
+      raw = backend.port(0),
+      port = createGraphStoragePort(raw),
+      store = createSaveStore({
+        namespace: 'objective-workbench',
+        build: 'test',
+        local: port,
+        session: new MemoryBackend().port(0, 'session'),
+        timers: {now: () => 0, set: () => 0, clear: () => {}},
+      }),
+      handle = store.section(graphSectionDefinition),
+      c = createEditorController({saveHandle: handle, readPersisted: () => port.get(graphStorageKey)});
+    c.save();
+    c.preview(changed());
+    c.commit();
+    backend.failSet = () => true;
+    assert.equal(c.save().status, 'unsaved');
+    backend.failSet = () => false;
+    const external = JSON.stringify({
+      v: 1,
+      data: {...initialGraph(), definition: {...initialGraph().definition, revision: 9}},
+    });
+    if (mode === 'delete') raw.remove(graphStorageKey);
+    else raw.set(graphStorageKey, external);
+    const expected = raw.get(graphStorageKey);
+    if (mode === 'dispose') {
+      c.dispose();
+      store.dispose();
+    } else {
+      store.flush('automatic');
+      assert.ok(c.read().blocked);
+      c.dispose();
+      store.dispose();
+    }
+    assert.equal(raw.get(graphStorageKey), expected);
+  }
+});
 
-test('S1 clean handle external-event refresh cannot authorize replacing the editor baseline',()=>{const f=fixture();try{f.controller.save();const incoming=JSON.stringify({v:1,data:changed()});f.backend.port(1).set(graphStorageKey,incoming);assert.equal(f.handle.get().definition.revision,2);assert.equal(f.controller.read().graph.definition.revision,1);assert.equal(f.controller.read().blocked,'external-conflict');assert.equal(f.controller.save().status,'refused');assert.equal(f.port.get(graphStorageKey),incoming);}finally{f.close();}});
-test('S1 actual author save adapter persists mutations and undo clears stale saved feedback',()=>{const f=fixture();const c=createEditorController({saveHandle:authorSaveHandle(f.store,{section:graphSectionDefinition}),readPersisted:()=>f.port.get(graphStorageKey)});try{c.preview(changed());c.commit();assert.equal(c.save().status,'saved');assert.equal(JSON.parse(f.port.get(graphStorageKey)).data.definition.revision,2);assert.equal(c.undo().status,'accepted');assert.equal(c.read().durable,false);assert.doesNotMatch(c.read().message,/graph saved/);assert.equal(c.redo().status,'accepted');assert.doesNotMatch(c.read().message,/graph saved/);}finally{c.dispose();f.close();}});
+test('S1 clean handle external-event refresh cannot authorize replacing the editor baseline', () => {
+  const f = fixture();
+  try {
+    f.controller.save();
+    const incoming = JSON.stringify({v: 1, data: changed()});
+    f.backend.port(1).set(graphStorageKey, incoming);
+    assert.equal(f.handle.get().definition.revision, 2);
+    assert.equal(f.controller.read().graph.definition.revision, 1);
+    assert.equal(f.controller.read().blocked, 'external-conflict');
+    assert.equal(f.controller.save().status, 'refused');
+    assert.equal(f.port.get(graphStorageKey), incoming);
+  } finally {
+    f.close();
+  }
+});
+test('S1 actual author save adapter persists mutations and undo clears stale saved feedback', () => {
+  const f = fixture();
+  const c = createEditorController({
+    saveHandle: authorSaveHandle(f.store, {section: graphSectionDefinition}),
+    readPersisted: () => f.port.get(graphStorageKey),
+  });
+  try {
+    c.preview(changed());
+    c.commit();
+    assert.equal(c.save().status, 'saved');
+    assert.equal(JSON.parse(f.port.get(graphStorageKey)).data.definition.revision, 2);
+    assert.equal(c.undo().status, 'accepted');
+    assert.equal(c.read().durable, false);
+    assert.doesNotMatch(c.read().message, /graph saved/);
+    assert.equal(c.redo().status, 'accepted');
+    assert.doesNotMatch(c.read().message, /graph saved/);
+  } finally {
+    c.dispose();
+    f.close();
+  }
+});

@@ -1,7 +1,4 @@
-import {
-  resolveCraftSlots,
-  beginCraftExperiment,
-} from '../../src/kits/resources/crafting.ts';
+import {resolveCraftSlots, beginCraftExperiment} from '../../src/kits/resources/crafting.ts';
 export const recipeLimits = Object.freeze({
   maxBytes: 131072,
   maxNodes: 16384,
@@ -24,26 +21,23 @@ export const stockBounds = Object.freeze({
   properties: 8,
 });
 export const recipeStorageKey = 'crafting-workbench|device|crafting.recipe';
-const freeze = (v) => {
+const freeze = v => {
   if (v && typeof v === 'object') {
     Object.values(v).forEach(freeze);
     Object.freeze(v);
   }
   return v;
 };
-const id = (v) => {
-  if (typeof v !== 'string' || !v.length || v.length > 96)
-    throw Error('recipe identity');
+const id = v => {
+  if (typeof v !== 'string' || !v.length || v.length > 96) throw Error('recipe identity');
   return v;
 };
 const num = (v, min = 0, max = Number.MAX_SAFE_INTEGER) => {
-  if (!Number.isSafeInteger(v) || v < min || v > max || Object.is(v, -0))
-    throw Error('recipe integer');
+  if (!Number.isSafeInteger(v) || v < min || v > max || Object.is(v, -0)) throw Error('recipe integer');
   return v;
 };
-const record = (v) => {
-  if (!v || typeof v !== 'object' || Array.isArray(v))
-    throw Error('recipe record');
+const record = v => {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw Error('recipe record');
   return v;
 };
 const list = (v, max, read) => {
@@ -65,19 +59,16 @@ const properties = (v, read) => {
 /** Canonical finite evaluator schema. Unrelated input fields never enter captured historical facts. */
 export function captureRecipe(raw) {
   if (typeof raw === 'string') {
-    if (
-      raw.length > recipeLimits.maxBytes ||
-      new TextEncoder().encode(raw).length > recipeLimits.maxBytes
-    )
+    if (raw.length > recipeLimits.maxBytes || new TextEncoder().encode(raw).length > recipeLimits.maxBytes)
       throw Error('recipe byte limit');
     raw = JSON.parse(raw);
   }
   const r = record(raw),
-    model = (v) => {
+    model = v => {
       const m = record(v);
       return {
         base: num(m.base),
-        terms: list(m.terms, 4, (v) => {
+        terms: list(m.terms, 4, v => {
           const t = record(v);
           return {
             attribute: id(t.attribute),
@@ -92,7 +83,7 @@ export function captureRecipe(raw) {
     id: id(r.id),
     version: num(r.version, 1),
     pointLimit: num(r.pointLimit, 0, 16),
-    slots: list(r.slots, 4, (v) => {
+    slots: list(r.slots, 4, v => {
       const x = record(v);
       return {
         id: id(x.id),
@@ -101,11 +92,11 @@ export function captureRecipe(raw) {
         quantity: num(x.quantity, 1),
       };
     }),
-    attributes: list(r.attributes, 4, (v) => {
+    attributes: list(r.attributes, 4, v => {
       const a = record(v);
       return {
         id: id(a.id),
-        weights: list(a.weights, 16, (v) => {
+        weights: list(a.weights, 16, v => {
           const w = record(v);
           return {
             slot: id(w.slot),
@@ -132,20 +123,19 @@ export function captureRecipe(raw) {
       phase: id(s.phase),
       massMg: num(s.massMg, 1),
       volumeUl: num(s.volumeUl),
-      properties: properties(s.properties, (v) => num(v)),
+      properties: properties(s.properties, v => num(v)),
     },
     workJ: num(r.workJ, 1, Math.floor(Number.MAX_SAFE_INTEGER / 10)),
     maxPowerW: num(r.maxPowerW, 1),
   };
   // Synthetic rows exercise the real recipe parser independently of available preview ingredients.
-  const stock = { version: 1, containers: [], batches: [], positions: [] },
+  const stock = {version: 1, containers: [], batches: [], positions: []},
     selected = [];
   result.slots.forEach((slot, i) => {
     const container = `validation-${i}`,
       batch = `validation-batch-${i}`,
       props = Object.create(null);
-    for (const a of result.attributes)
-      for (const w of a.weights) if (w.slot === slot.id) props[w.property] = 0;
+    for (const a of result.attributes) for (const w of a.weights) if (w.slot === slot.id) props[w.property] = 0;
     stock.containers.push({
       id: container,
       maxMassMg: Number.MAX_SAFE_INTEGER,
@@ -161,25 +151,22 @@ export function captureRecipe(raw) {
       volumeUl: 0,
       properties: props,
     });
-    stock.positions.push({ container, batch, quantity: slot.quantity });
-    selected.push({ slot: slot.id, container, batch, quantity: slot.quantity });
+    stock.positions.push({container, batch, quantity: slot.quantity});
+    selected.push({slot: slot.id, container, batch, quantity: slot.quantity});
   });
   resolveCraftSlots(result, selected, {
     stock,
-    stockBounds: { ...stockBounds, properties: 64 },
+    stockBounds: {...stockBounds, properties: 64},
     bounds: craftBounds,
   });
   const json = JSON.stringify(result);
-  if (new TextEncoder().encode(json).length > recipeLimits.maxBytes)
-    throw Error('recipe byte limit');
+  if (new TextEncoder().encode(json).length > recipeLimits.maxBytes) throw Error('recipe byte limit');
   let nodes = 0;
-  const queue = [{ v: result, d: 0 }];
+  const queue = [{v: result, d: 0}];
   while (queue.length) {
-    const { v, d } = queue.pop();
-    if (++nodes > recipeLimits.maxNodes || d > 24)
-      throw Error('recipe structure');
-    if (v && typeof v === 'object')
-      for (const c of Object.values(v)) queue.push({ v: c, d: d + 1 });
+    const {v, d} = queue.pop();
+    if (++nodes > recipeLimits.maxNodes || d > 24) throw Error('recipe structure');
+    if (v && typeof v === 'object') for (const c of Object.values(v)) queue.push({v: c, d: d + 1});
   }
   return freeze(result);
 }
@@ -188,11 +175,11 @@ export function initialRecipe() {
     id: 'authored-recipe',
     version: 1,
     pointLimit: 4,
-    slots: [{ id: 'feed', materials: ['input'], unit: 'unit', quantity: 2 }],
+    slots: [{id: 'feed', materials: ['input'], unit: 'unit', quantity: 2}],
     attributes: [
       {
         id: 'quality',
-        weights: [{ slot: 'feed', property: 'grade', weight: 1 }],
+        weights: [{slot: 'feed', property: 'grade', weight: 1}],
         initialPermille: 500,
         gainPermille: 250,
         effectPermille: 1000,
@@ -202,12 +189,12 @@ export function initialRecipe() {
       material: 'crafted',
       unit: 'unit',
       phase: 'solid',
-      massMg: { base: 18, terms: [] },
-      volumeUl: { base: 8, terms: [] },
+      massMg: {base: 18, terms: []},
+      volumeUl: {base: 8, terms: []},
       properties: {
         grade: {
           base: 0,
-          terms: [{ attribute: 'quality', coefficient: 1000 }],
+          terms: [{attribute: 'quality', coefficient: 1000}],
         },
       },
     },
@@ -226,7 +213,7 @@ export function initialRecipe() {
 export function initialStock() {
   return {
     version: 1,
-    containers: ['source-a', 'source-b'].map((id) => ({
+    containers: ['source-a', 'source-b'].map(id => ({
       id,
       maxMassMg: 40,
       maxVolumeUl: 20,
@@ -239,9 +226,9 @@ export function initialStock() {
       phase: 'solid',
       massMg: 10,
       volumeUl: 5,
-      properties: { grade },
+      properties: {grade},
     })),
-    positions: ['a', 'b'].map((s) => ({
+    positions: ['a', 'b'].map(s => ({
       container: `source-${s}`,
       batch: `input-${s}`,
       quantity: 4,
@@ -249,25 +236,21 @@ export function initialStock() {
   };
 }
 export function initialSelections() {
-  return ['a', 'b'].map((s) => ({
+  return ['a', 'b'].map(s => ({
     slot: 'feed',
     container: `source-${s}`,
     batch: `input-${s}`,
     quantity: 1,
   }));
 }
-export function evaluateRecipe(
-  raw,
-  selections = initialSelections(),
-  stock = initialStock(),
-) {
+export function evaluateRecipe(raw, selections = initialSelections(), stock = initialStock()) {
   const recipe = captureRecipe(raw),
-    input = { stock, stockBounds, bounds: craftBounds };
+    input = {stock, stockBounds, bounds: craftBounds};
   return freeze({
     experiment: beginCraftExperiment(
       recipe,
       selections,
-      { id: 'isolated-preview', pointBudget: recipe.pointLimit },
+      {id: 'isolated-preview', pointBudget: recipe.pointLimit},
       input,
     ),
     ...resolveCraftSlots(recipe, selections, input),
@@ -291,8 +274,7 @@ export function createRecipeStoragePort(port) {
     throw Error('recipe external-conflict');
   };
   const check = () => {
-    if (conflicted || !seen || port.get(recipeStorageKey) !== expected)
-      refuse();
+    if (conflicted || !seen || port.get(recipeStorageKey) !== expected) refuse();
   };
   return {
     kind: port.kind,
@@ -331,6 +313,6 @@ export function createRecipeStoragePort(port) {
       } else port.remove(key);
     },
     keys: () => port.keys(),
-    ...(port.subscribe ? { subscribe: (fn) => port.subscribe(fn) } : {}),
+    ...(port.subscribe ? {subscribe: fn => port.subscribe(fn)} : {}),
   };
 }

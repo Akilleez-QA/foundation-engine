@@ -7,15 +7,15 @@
  *
  * The tap does not add a clock: tick k is the k-th fixed step the visit's system runner takes after arrival.
  */
-import type { World } from '../core/ecs/world';
-import type { InputSource, InputState, SceneReplayDigest } from './defs';
+import type {World} from '../core/ecs/world';
+import type {InputSource, InputState, SceneReplayDigest} from './defs';
 
 export interface SceneTickTapContext {
   /** The scene id (without the `scene.` prefix). */
   readonly scene: string;
-  readonly game: Readonly<{ id: string; version: string }>;
+  readonly game: Readonly<{id: string; version: string}>;
   /** The scene's declared inputs; `axis` marks axis actions. */
-  readonly inputs: readonly Readonly<{ id: string; axis: boolean }>[];
+  readonly inputs: readonly Readonly<{id: string; axis: boolean}>[];
   /** The visit's `?seed=`, or null when the random stream is not seeded (and so not replayable). */
   readonly seed: number | null;
   /** Seconds per fixed tick. */
@@ -50,7 +50,9 @@ let factory: SceneTickTapFactory | null = null;
 export function installSceneTickTap(next: SceneTickTapFactory | null): () => void {
   const previous = factory;
   factory = next;
-  return () => { if (factory === next) factory = previous; };
+  return () => {
+    if (factory === next) factory = previous;
+  };
 }
 
 /** The runtime's one call per visit. A throwing factory is reported by the caller and the visit runs untapped. */

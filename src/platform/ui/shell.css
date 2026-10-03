@@ -1,28 +1,175 @@
 /* The page frame: the header row, the settings menu, the scene mount and the loading card. Scenes draw inside #app. */
 @layer shell {
-html,body{margin:0;height:100%;background:var(--engine-ink-deep);color:var(--engine-text);font:var(--engine-text-md) var(--engine-font)}
-body{display:grid;grid-template-rows:auto 1fr;overflow:hidden}
-.shell-header{display:flex;align-items:center;justify-content:space-between;gap:var(--engine-space-3);padding:var(--engine-space-2) var(--engine-space-4);background:var(--engine-ink);border-bottom:1px solid var(--engine-line);z-index:var(--engine-z-sheet)}
-.shell-header h1{margin:0;font-size:var(--engine-text-lg)}
-.header-right{display:flex;align-items:center;gap:var(--engine-space-2)}
-.shell-menu{position:relative}
-.shell-menu>summary{cursor:pointer;list-style:none;padding:var(--engine-space-1-5) var(--engine-space-3);border:1px solid var(--engine-line);border-radius:var(--engine-radius-pill)}
-.shell-menu-content{position:absolute;right:0;top:calc(100% + var(--engine-space-1));display:grid;gap:var(--engine-space-1);min-width:180px;padding:var(--engine-space-2);background:var(--engine-surface-card);border:1px solid var(--engine-line);border-radius:var(--engine-radius-md);box-shadow:var(--engine-shadow)}
-.shell-header button,.shell-menu-content button{min-height:40px;padding:var(--engine-space-1-5) var(--engine-space-3);font:inherit;color:inherit;background:transparent;border:1px solid var(--engine-line);border-radius:var(--engine-radius-md);cursor:pointer}
-button:focus-visible,summary:focus-visible{outline:none;box-shadow:var(--engine-focus-ring)}
-#app{position:relative;min-height:0;overflow:hidden}
-.scene-loading-card{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:var(--engine-space-3) var(--engine-space-5);background:var(--engine-surface-card);border-radius:var(--engine-radius-pill);box-shadow:var(--engine-shadow);z-index:var(--engine-z-loading)}
-.scene-view{position:absolute;inset:0;outline:none}
-.scene-view>canvas{display:block;width:100%;height:100%;touch-action:none}
-.scene-overlay{position:absolute;inset:0;pointer-events:none;z-index:var(--engine-z-scene-ui)}
-.boot-failure{position:fixed;inset:auto var(--engine-space-4) var(--engine-space-4);max-width:440px;margin:0 auto;padding:var(--engine-space-4);background:var(--engine-surface-card);border:2px solid var(--engine-line);border-radius:var(--engine-radius-xl);z-index:var(--engine-z-loading)}
+  html,
+  body {
+    margin: 0;
+    height: 100%;
+    background: var(--engine-ink-deep);
+    color: var(--engine-text);
+    font: var(--engine-text-md) var(--engine-font);
+  }
+  body {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+  }
+  .shell-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--engine-space-3);
+    padding: var(--engine-space-2) var(--engine-space-4);
+    background: var(--engine-ink);
+    border-bottom: 1px solid var(--engine-line);
+    z-index: var(--engine-z-sheet);
+  }
+  .shell-header h1 {
+    margin: 0;
+    font-size: var(--engine-text-lg);
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--engine-space-2);
+  }
+  .shell-menu {
+    position: relative;
+  }
+  .shell-menu > summary {
+    cursor: pointer;
+    list-style: none;
+    padding: var(--engine-space-1-5) var(--engine-space-3);
+    border: 1px solid var(--engine-line);
+    border-radius: var(--engine-radius-pill);
+  }
+  .shell-menu-content {
+    position: absolute;
+    right: 0;
+    top: calc(100% + var(--engine-space-1));
+    display: grid;
+    gap: var(--engine-space-1);
+    min-width: 180px;
+    padding: var(--engine-space-2);
+    background: var(--engine-surface-card);
+    border: 1px solid var(--engine-line);
+    border-radius: var(--engine-radius-md);
+    box-shadow: var(--engine-shadow);
+  }
+  .shell-header button,
+  .shell-menu-content button {
+    min-height: 40px;
+    padding: var(--engine-space-1-5) var(--engine-space-3);
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 1px solid var(--engine-line);
+    border-radius: var(--engine-radius-md);
+    cursor: pointer;
+  }
+  button:focus-visible,
+  summary:focus-visible {
+    outline: none;
+    box-shadow: var(--engine-focus-ring);
+  }
+  #app {
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .scene-loading-card {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    padding: var(--engine-space-3) var(--engine-space-5);
+    background: var(--engine-surface-card);
+    border-radius: var(--engine-radius-pill);
+    box-shadow: var(--engine-shadow);
+    z-index: var(--engine-z-loading);
+  }
+  .scene-view {
+    position: absolute;
+    inset: 0;
+    outline: none;
+  }
+  .scene-view > canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  .scene-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: var(--engine-z-scene-ui);
+  }
+  .boot-failure {
+    position: fixed;
+    inset: auto var(--engine-space-4) var(--engine-space-4);
+    max-width: 440px;
+    margin: 0 auto;
+    padding: var(--engine-space-4);
+    background: var(--engine-surface-card);
+    border: 2px solid var(--engine-line);
+    border-radius: var(--engine-radius-xl);
+    z-index: var(--engine-z-loading);
+  }
 }
 
 @layer shell {
-.shell-menu-compact>.shell-menu-content{display:none}
-.shell-menu-compact>summary{box-sizing:border-box;min-width:48px;min-height:48px;display:flex;align-items:center;justify-content:center}
-.shell-compact-panel{position:fixed;inset:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));z-index:var(--engine-z-modal);max-width:480px;margin-inline:auto;padding:16px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px;min-height:0;background:var(--engine-ink);border:2px solid var(--engine-line);border-radius:var(--engine-radius-md)}
-.shell-compact-panel .shell-menu-content{position:static;min-width:0;min-height:0;overflow:auto;flex:1;align-content:start;gap:8px;box-sizing:border-box;box-shadow:none}
-.shell-compact-panel button{min-height:48px;min-width:48px;white-space:normal;overflow-wrap:anywhere;font:inherit;color:inherit;background:var(--engine-ink);border:1px solid var(--engine-line);border-radius:var(--engine-radius-md);padding:8px}
-.shell-compact-close{flex-shrink:0}
+  .shell-menu-compact > .shell-menu-content {
+    display: none;
+  }
+  .shell-menu-compact > summary {
+    box-sizing: border-box;
+    min-width: 48px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .shell-compact-panel {
+    position: fixed;
+    inset: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
+    z-index: var(--engine-z-modal);
+    max-width: 480px;
+    margin-inline: auto;
+    padding: 16px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+    background: var(--engine-ink);
+    border: 2px solid var(--engine-line);
+    border-radius: var(--engine-radius-md);
+  }
+  .shell-compact-panel .shell-menu-content {
+    position: static;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    flex: 1;
+    align-content: start;
+    gap: 8px;
+    box-sizing: border-box;
+    box-shadow: none;
+  }
+  .shell-compact-panel button {
+    min-height: 48px;
+    min-width: 48px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font: inherit;
+    color: inherit;
+    background: var(--engine-ink);
+    border: 1px solid var(--engine-line);
+    border-radius: var(--engine-radius-md);
+    padding: 8px;
+  }
+  .shell-compact-close {
+    flex-shrink: 0;
+  }
 }

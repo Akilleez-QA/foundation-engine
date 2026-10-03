@@ -4,7 +4,7 @@
  * never uses particles carry no particle simulation code: a scene opts in with `defineScene({ particles:
  * sceneParticles() })`, and that value brings the simulation (particle-sim.ts) with it.
  */
-import type { Entity, World } from '../core/ecs/world';
+import type {Entity, World} from '../core/ecs/world';
 
 /** The `Emitter` component's id. */
 export const EMITTER_ID = 'emitter';
@@ -16,11 +16,21 @@ type Vec3 = [x: number, y: number, z: number];
  * `perScene`/`emitters` are the defaults a scene can lower or raise up to the hard caps with `defineScene({ particles })`.
  */
 export const PARTICLE_LIMITS = Object.freeze({
-  perEmitter: 4096, rate: 10_000, lifetime: 30, speed: 1000, keys: 8, size: 100, drag: 10, gravity: 1000, textureId: 64,
+  perEmitter: 4096,
+  rate: 10_000,
+  lifetime: 30,
+  speed: 1000,
+  keys: 8,
+  size: 100,
+  drag: 10,
+  gravity: 1000,
+  textureId: 64,
   /** Default and hard cap of particles reserved per scene (the sum of admitted emitters' `max`). */
-  perScene: 4096, perSceneCap: 65_536,
+  perScene: 4096,
+  perSceneCap: 65_536,
   /** Default and hard cap of emitters drawn per scene: each is one draw. */
-  emitters: 16, emittersCap: 256,
+  emitters: 16,
+  emittersCap: 256,
   /** Bursts handled per emitter per fixed step; requests beyond it are dropped and counted. */
   burstsPerStep: 4,
 });
@@ -33,10 +43,13 @@ export interface SceneParticleLimits {
   emitters: number;
 }
 export function normalizeSceneParticles(input: Partial<SceneParticleLimits> | undefined): SceneParticleLimits {
-  const max = input?.max ?? PARTICLE_LIMITS.perScene, emitters = input?.emitters ?? PARTICLE_LIMITS.emitters;
-  if (!Number.isInteger(max) || max < 0 || max > PARTICLE_LIMITS.perSceneCap) throw Error(`particles: max must be an integer in [0, ${PARTICLE_LIMITS.perSceneCap}]`);
-  if (!Number.isInteger(emitters) || emitters < 0 || emitters > PARTICLE_LIMITS.emittersCap) throw Error(`particles: emitters must be an integer in [0, ${PARTICLE_LIMITS.emittersCap}]`);
-  return Object.freeze({ max, emitters });
+  const max = input?.max ?? PARTICLE_LIMITS.perScene,
+    emitters = input?.emitters ?? PARTICLE_LIMITS.emitters;
+  if (!Number.isInteger(max) || max < 0 || max > PARTICLE_LIMITS.perSceneCap)
+    throw Error(`particles: max must be an integer in [0, ${PARTICLE_LIMITS.perSceneCap}]`);
+  if (!Number.isInteger(emitters) || emitters < 0 || emitters > PARTICLE_LIMITS.emittersCap)
+    throw Error(`particles: emitters must be an integer in [0, ${PARTICLE_LIMITS.emittersCap}]`);
+  return Object.freeze({max, emitters});
 }
 
 export type EmitterMode = 'burst' | 'continuous';
@@ -89,10 +102,16 @@ export interface ParticlePool {
   readonly capacity: number;
   /** Live particles: indices [0, live) are packed. */
   live: number;
-  readonly pos: Float64Array; readonly prev: Float64Array; readonly vel: Float64Array;
-  readonly age: Float64Array; readonly prevAge: Float64Array; readonly life: Float64Array;
+  readonly pos: Float64Array;
+  readonly prev: Float64Array;
+  readonly vel: Float64Array;
+  readonly age: Float64Array;
+  readonly prevAge: Float64Array;
+  readonly life: Float64Array;
   /** Interpolated centre (xyz), size and linear colour with opacity (rgba) per drawn particle. */
-  readonly offset: Float32Array; readonly size: Float32Array; readonly tint: Float32Array;
+  readonly offset: Float32Array;
+  readonly size: Float32Array;
+  readonly tint: Float32Array;
 }
 
 export interface EmitterSlot {
@@ -118,13 +137,18 @@ export interface ParticleRenderer {
 }
 
 export interface ParticleStats {
-  readonly emitters: number; readonly live: number; readonly reserved: number;
+  readonly emitters: number;
+  readonly live: number;
+  readonly reserved: number;
   /** Spawn attempts, those thinned by the quality scale, those dropped (full pool or per-step cap). */
-  readonly spawned: number; readonly thinned: number; readonly dropped: number;
+  readonly spawned: number;
+  readonly thinned: number;
+  readonly dropped: number;
   /** Admission refusals and invalid-data reports so far. */
-  readonly refused: number; readonly invalid: number;
+  readonly refused: number;
+  readonly invalid: number;
   /** Refusals by cause: the emitter count limit, or the reserved-particle limit. */
-  readonly refusals: { readonly emitters: number; readonly particles: number };
+  readonly refusals: {readonly emitters: number; readonly particles: number};
 }
 
 export interface ParticleField {

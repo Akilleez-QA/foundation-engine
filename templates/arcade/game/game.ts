@@ -1,8 +1,11 @@
-import { defineGame } from '@engine';
-import { ui } from '@kits/ui';
+import {defineGame} from '@engine';
+import {ui} from '@kits/ui';
 
 export default defineGame({
-  id: 'arcade', title: 'Dodge', version: '0.1.0', firstScene: 'play',
+  id: 'arcade',
+  title: 'Dodge',
+  version: '0.1.0',
+  firstScene: 'play',
   kits: [ui()],
   strings: {
     en: {

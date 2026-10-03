@@ -15,7 +15,7 @@ import {
 
 export interface WorkerPort {
   postMessage(message: WorkerToHost, transfer?: Transferable[]): void;
-  onmessage: ((event: { data: HostToWorker }) => void) | null;
+  onmessage: ((event: {data: HostToWorker}) => void) | null;
 }
 
 /**
@@ -28,7 +28,7 @@ const defaultYield: TaskYield = scheduleTask;
 
 export function createWorkerRuntime(port: WorkerPort, loaders: JobLoaders, yieldTask: TaskYield = defaultYield): void {
   const modules = new Map<string, Promise<JobModule>>();
-  let active: { job: number; cancelled: boolean } | null = null;
+  let active: {job: number; cancelled: boolean} | null = null;
 
   const load = (kind: string) => {
     let m = modules.get(kind);
@@ -39,35 +39,38 @@ export function createWorkerRuntime(port: WorkerPort, loaders: JobLoaders, yield
       // A failed load (a chunk that could not be fetched) is forgotten, so the next job of that kind loads it again.
       const loading = m;
       modules.set(kind, loading);
-      loading.catch(() => { if (modules.get(kind) === loading) modules.delete(kind); });
+      loading.catch(() => {
+        if (modules.get(kind) === loading) modules.delete(kind);
+      });
     }
     return m;
   };
 
   const run = async (job: number, kind: string, input: unknown) => {
-    const state = { job, cancelled: false };
+    const state = {job, cancelled: false};
     active = state;
     const ctx: JobContext = {
       cancelled: () => state.cancelled,
-      checkpoint: () => new Promise<void>((resolve, reject) => {
-        yieldTask(() => (state.cancelled ? reject(new JobCancelledSignal()) : resolve()));
-      }),
+      checkpoint: () =>
+        new Promise<void>((resolve, reject) => {
+          yieldTask(() => (state.cancelled ? reject(new JobCancelledSignal()) : resolve()));
+        }),
     };
     try {
       const mod = await load(kind);
       if (state.cancelled) throw new JobCancelledSignal();
       const out = await mod.run(input, ctx);
-      if (state.cancelled) port.postMessage({ type: 'cancelled', job });
-      else port.postMessage({ type: 'done', job, kind, output: out.output }, [...(out.transfer ?? [])]);
+      if (state.cancelled) port.postMessage({type: 'cancelled', job});
+      else port.postMessage({type: 'done', job, kind, output: out.output}, [...(out.transfer ?? [])]);
     } catch (err) {
-      if (err instanceof JobCancelledSignal || state.cancelled) port.postMessage({ type: 'cancelled', job });
-      else port.postMessage({ type: 'failed', job, message: err instanceof Error ? err.message : String(err) });
+      if (err instanceof JobCancelledSignal || state.cancelled) port.postMessage({type: 'cancelled', job});
+      else port.postMessage({type: 'failed', job, message: err instanceof Error ? err.message : String(err)});
     } finally {
       if (active === state) active = null;
     }
   };
 
-  port.onmessage = ({ data }) => {
+  port.onmessage = ({data}) => {
     if (data.type === 'cancel') {
       if (active && active.job === data.job) active.cancelled = true;
       return;

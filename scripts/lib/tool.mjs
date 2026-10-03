@@ -1,4 +1,4 @@
-// scripts/lib/tool.mjs: start the repository's command-line tools (tsc, tsx, vite) and npm from a script the same way
+// scripts/lib/tool.mjs: start the repository's command-line tools (tsc, tsx, vite, prettier) and npm from a script the same way
 // on Linux, macOS and Windows. `spawnSync('npx', …)` without a shell fails with ENOENT on Windows, where npx and the
 // node_modules/.bin entries are `.cmd` files, and Node refuses to spawn a `.cmd` without a shell. So:
 //   - a package's tool runs as `node <its JS bin entry> …args` (process.execPath plus the `bin` file from the package's
@@ -15,7 +15,7 @@ import {fileURLToPath} from 'node:url';
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
 /** Which package provides each command (its package.json `bin` names the JS entry). */
-export const TOOL_PACKAGES = {tsc: 'typescript', tsx: 'tsx', vite: 'vite'};
+export const TOOL_PACKAGES = {tsc: 'typescript', tsx: 'tsx', vite: 'vite', prettier: 'prettier'};
 
 /** The absolute path of a package's JS bin entry for `bin` (default: the package's only or same-named bin). */
 export function binEntry(pkg, bin = pkg, {from = ROOT} = {}) {
@@ -34,14 +34,21 @@ export function toolCommand(name, args = [], {from = ROOT} = {}) {
 }
 
 /** The command for npm itself: npm's own CLI under this Node when npm started us, else the platform's npm. */
-export function npmCommand(args = [], {env = process.env, platform = process.platform, execPath = process.execPath, exists = existsSync} = {}) {
+export function npmCommand(
+  args = [],
+  {env = process.env, platform = process.platform, execPath = process.execPath, exists = existsSync} = {},
+) {
   const cli = env.npm_execpath;
   if (cli && /\.(c|m)?js$/.test(cli)) return {command: execPath, args: [cli, ...args], shell: false};
   if (platform === 'win32') {
     const bundled = win32.join(win32.dirname(execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
     if (exists(bundled)) return {command: execPath, args: [bundled, ...args], shell: false};
     // Last resort: cmd.exe joins the arguments with spaces, so quote each one (paths may contain spaces).
-    return {command: 'npm.cmd', args: args.map(a => /[\s"&|<>^]/.test(a) ? `"${a.replace(/"/g, '""')}"` : a), shell: true};
+    return {
+      command: 'npm.cmd',
+      args: args.map(a => (/[\s"&|<>^]/.test(a) ? `"${a.replace(/"/g, '""')}"` : a)),
+      shell: true,
+    };
   }
   return {command: 'npm', args, shell: false};
 }

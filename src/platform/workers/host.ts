@@ -24,13 +24,13 @@ import {
   type WorkerJobErrorReason,
   type WorkerToHost,
 } from './job.ts';
-import { PROVISIONAL_WORKER_PROFILE, sizePool, type PoolSize, type WorkerProfile } from './pool-sizing.ts';
+import {PROVISIONAL_WORKER_PROFILE, sizePool, type PoolSize, type WorkerProfile} from './pool-sizing.ts';
 
 /** The part of `Worker` the host uses; tests inject a fake. */
 export interface WorkerLike {
   postMessage(message: HostToWorker, transfer: Transferable[]): void;
   terminate(): void;
-  onmessage: ((event: { data: WorkerToHost }) => void) | null;
+  onmessage: ((event: {data: WorkerToHost}) => void) | null;
   onerror: ((event: unknown) => void) | null;
 }
 
@@ -79,12 +79,12 @@ export interface WorkerHost {
 /** The designated only `new Worker` site (STD-RUN-35). */
 function defaultWorkerFactory(): WorkerFactory | null {
   if (typeof Worker === 'undefined') return null;
-  return () => new Worker(new URL('./worker-entry.ts', import.meta.url), { type: 'module' }) as WorkerLike;
+  return () => new Worker(new URL('./worker-entry.ts', import.meta.url), {type: 'module'}) as WorkerLike;
 }
 
 const defaultTimers: HostTimers = {
   setTimeout: (fn, ms) => globalThis.setTimeout(fn, ms),
-  clearTimeout: (h) => globalThis.clearTimeout(h as ReturnType<typeof globalThis.setTimeout>),
+  clearTimeout: h => globalThis.clearTimeout(h as ReturnType<typeof globalThis.setTimeout>),
 };
 
 type AnyKind = JobKind<unknown, unknown>;
@@ -114,11 +114,13 @@ interface Slot {
 
 export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
   const size = sizePool(
-    options.hardwareConcurrency ?? (globalThis as { navigator?: { hardwareConcurrency?: number } }).navigator?.hardwareConcurrency,
+    options.hardwareConcurrency ??
+      (globalThis as {navigator?: {hardwareConcurrency?: number}}).navigator?.hardwareConcurrency,
     options.profile ?? PROVISIONAL_WORKER_PROFILE,
   );
   const maxKeysPerOwner = options.maxKeysPerOwner ?? 4096;
-  if (!Number.isSafeInteger(maxKeysPerOwner) || maxKeysPerOwner < 0) throw new RangeError('maxKeysPerOwner must be a nonnegative safe integer');
+  if (!Number.isSafeInteger(maxKeysPerOwner) || maxKeysPerOwner < 0)
+    throw new RangeError('maxKeysPerOwner must be a nonnegative safe integer');
   const createWorker = options.createWorker === undefined ? defaultWorkerFactory() : options.createWorker;
   const timers = options.timers ?? defaultTimers;
   const reporter = options.report;
@@ -126,9 +128,13 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
   const report = (error: WorkerJobError) => {
     if (reporting) return;
     reporting = true;
-    try { reporter?.(error); }
-    catch { /* Diagnostics cannot interrupt settlement, retirement or fallback. */ }
-    finally { reporting = false; }
+    try {
+      reporter?.(error);
+    } catch {
+      /* Diagnostics cannot interrupt settlement, retirement or fallback. */
+    } finally {
+      reporting = false;
+    }
   };
 
   let workersAvailable = createWorker !== null;
@@ -139,14 +145,14 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
   let peakReserved = 0;
   let inlineBusy: Entry | null = null;
   const slots: Slot[] = [];
-  const queues: Record<JobClass, Entry[]> = { foreground: [], background: [] };
+  const queues: Record<JobClass, Entry[]> = {foreground: [], background: []};
   const kinds = new Map<string, AnyKind>();
   /** Per owner lifetime (keyed by its signal): newest version and current entry per `(kind, key)`. */
-  const scopes = new WeakMap<AbortSignal, { versions: Map<string, number>; current: Map<string, Entry> }>();
+  const scopes = new WeakMap<AbortSignal, {versions: Map<string, number>; current: Map<string, Entry>}>();
 
   const scopesOf = (owner: AbortSignal) => {
     let s = scopes.get(owner);
-    if (!s) scopes.set(owner, (s = { versions: new Map(), current: new Map() }));
+    if (!s) scopes.set(owner, (s = {versions: new Map(), current: new Map()}));
     return s;
   };
   const running = () => slots.reduce((n, s) => n + (s.entry ? 1 : 0), 0) + (inlineBusy ? 1 : 0);
@@ -183,8 +189,9 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
 
   /** Cleanup is one attempted handoff; a callback failure must not retain execution capacity. */
   const release = (kind: AnyKind, output: unknown) => {
-    try { kind.release?.(output); }
-    catch (cause) {
+    try {
+      kind.release?.(output);
+    } catch (cause) {
       const error = new WorkerJobError('threw', kind.id, 'output release failed');
       error.cause = cause;
       report(error);
@@ -193,13 +200,16 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
 
   /** Delivery is a separate authority check (ADR 0062 decision 3). */
   const deliver = (e: Entry, output: unknown) => {
-    if (e.delivered) { release(e.kind, output); return; }
-    if (!isCurrent(e)) {
-      e.settle({ status: e.signal.aborted || e.req.owner.signal.aborted ? 'cancelled' : 'superseded' });
+    if (e.delivered) {
       release(e.kind, output);
       return;
     }
-    e.settle({ status: 'done', output });
+    if (!isCurrent(e)) {
+      e.settle({status: e.signal.aborted || e.req.owner.signal.aborted ? 'cancelled' : 'superseded'});
+      release(e.kind, output);
+      return;
+    }
+    e.settle({status: 'done', output});
   };
 
   // ---------------------------------------------------------------- slots
@@ -250,8 +260,9 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
       return;
     }
     if (msg.type === 'done') deliver(e, msg.output);
-    else if (msg.type === 'failed') { if (!e.delivered) fail(e, 'threw', msg.message); }
-    else if (!e.delivered) e.settle({ status: 'cancelled' });
+    else if (msg.type === 'failed') {
+      if (!e.delivered) fail(e, 'threw', msg.message);
+    } else if (!e.delivered) e.settle({status: 'cancelled'});
     free(slot, e);
   };
 
@@ -265,9 +276,9 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
       report(new WorkerJobError('spawn', 'host', err instanceof Error ? err.message : String(err)));
       return null;
     }
-    const slot: Slot = { worker, entry: null, alive: true, idleTimer: undefined, cancelTimer: undefined };
-    worker.onmessage = (event) => onMessage(slot, event.data);
-    worker.onerror = (event) => {
+    const slot: Slot = {worker, entry: null, alive: true, idleTimer: undefined, cancelTimer: undefined};
+    worker.onmessage = event => onMessage(slot, event.data);
+    worker.onerror = event => {
       const e = slot.entry;
       if (e && !e.delivered) fail(e, 'terminated', event instanceof Error ? event.message : 'worker error');
       retire(slot);
@@ -281,7 +292,7 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
     const busy = slots.reduce((n, s) => n + (s.entry ? 1 : 0), 0);
     const limit = cls === 'foreground' || size.cap === 1 ? size.cap : size.cap - 1;
     if (busy >= limit) return 'none';
-    const idle = slots.find((s) => s.entry === null);
+    const idle = slots.find(s => s.entry === null);
     if (idle) return idle;
     if (slots.length >= size.cap) return 'none';
     return spawn() ?? 'unavailable';
@@ -301,7 +312,11 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
     }
     // materialise may synchronously abort, dispose this host, or admit a newer version.
     if (disposed || !slot.alive || e.delivered || !isCurrent(e)) {
-      if (!e.delivered) cancel(e, disposed || !slot.alive || e.signal.aborted || e.req.owner.signal.aborted ? 'cancelled' : 'superseded');
+      if (!e.delivered)
+        cancel(
+          e,
+          disposed || !slot.alive || e.signal.aborted || e.req.owner.signal.aborted ? 'cancelled' : 'superseded',
+        );
       if (slot.alive) armIdle(slot);
       return;
     }
@@ -310,7 +325,9 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
     e.slot = slot;
     slot.entry = e;
     try {
-      slot.worker.postMessage({ type: 'run', job: e.id, kind: e.kind.id, input: payload.input }, [...(payload.transfer ?? [])]);
+      slot.worker.postMessage({type: 'run', job: e.id, kind: e.kind.id, input: payload.input}, [
+        ...(payload.transfer ?? []),
+      ]);
     } catch (err) {
       slot.entry = null;
       finish(e);
@@ -336,12 +353,17 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
     e.phase = 'running';
     inlineBusy = e;
     peakRunning = Math.max(peakRunning, running());
-    const done = () => { if (inlineBusy === e) inlineBusy = null; finish(e); pump(); };
+    const done = () => {
+      if (inlineBusy === e) inlineBusy = null;
+      finish(e);
+      pump();
+    };
     let slices: Generator<void, unknown, void>;
     try {
       const payload = e.req.materialise();
       if (disposed || e.delivered || !isCurrent(e)) {
-        if (!e.delivered) cancel(e, disposed || e.signal.aborted || e.req.owner.signal.aborted ? 'cancelled' : 'superseded');
+        if (!e.delivered)
+          cancel(e, disposed || e.signal.aborted || e.req.owner.signal.aborted ? 'cancelled' : 'superseded');
         done();
         return true;
       }
@@ -355,12 +377,15 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
     const step = () => {
       if (e.delivered) {
         // One close attempt only: a generator may yield from finally instead of finishing.
-        try { slices.return(undefined); }
-        catch (cause) {
+        try {
+          slices.return(undefined);
+        } catch (cause) {
           const error = new WorkerJobError('threw', e.kind.id, 'fallback cleanup failed');
           error.cause = cause;
           report(error);
-        } finally { done(); }
+        } finally {
+          done();
+        }
         return;
       }
       let r: IteratorResult<void, unknown>;
@@ -371,7 +396,11 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
         done();
         return;
       }
-      if (r.done) { deliver(e, r.value); done(); return; }
+      if (r.done) {
+        deliver(e, r.value);
+        done();
+        return;
+      }
       timers.setTimeout(step, 0);
     };
     timers.setTimeout(step, 0);
@@ -383,10 +412,16 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
   let pumping = false;
   let again = false;
   function pump() {
-    if (pumping) { again = true; return; }
+    if (pumping) {
+      again = true;
+      return;
+    }
     pumping = true;
     try {
-      do { again = false; pumpOnce(); } while (again);
+      do {
+        again = false;
+        pumpOnce();
+      } while (again);
     } finally {
       pumping = false;
     }
@@ -404,7 +439,7 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
       if (slot === 'unavailable') continue;
       if (slot === 'none') {
         if (e.cls === 'foreground' && size.cap === 1) {
-          const bg = slots.find((s) => s.entry && s.entry.cls === 'background' && !s.entry.delivered)?.entry;
+          const bg = slots.find(s => s.entry && s.entry.cls === 'background' && !s.entry.delivered)?.entry;
           if (bg) cancel(bg, 'preempted');
         }
         return;
@@ -416,14 +451,20 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
   /** Invalidates delivery now, then stops execution by the kind's declared rule. */
   function cancel(e: Entry, status: 'cancelled' | 'superseded' | 'preempted') {
     if (e.delivered) return;
-    e.settle({ status });
-    if (e.phase === 'pending') { finish(e); pump(); return; }
+    e.settle({status});
+    if (e.phase === 'pending') {
+      finish(e);
+      pump();
+      return;
+    }
     const slot = e.slot;
     if (e.phase !== 'running' || !slot) return; // inline: the slice loop sees `delivered` and stops
     const c = e.kind.cancellation;
     if (c.mode === 'sliced') {
-      slot.worker.postMessage({ type: 'cancel', job: e.id }, []);
-      slot.cancelTimer = timers.setTimeout(() => { if (slot.entry === e) retire(slot); }, c.deadlineMs);
+      slot.worker.postMessage({type: 'cancel', job: e.id}, []);
+      slot.cancelTimer = timers.setTimeout(() => {
+        if (slot.entry === e) retire(slot);
+      }, c.deadlineMs);
     } else {
       retire(slot);
     }
@@ -449,9 +490,9 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
       const req = request as JobRequest<unknown, unknown>;
       registerKind(req.kind);
       const early = (status: 'cancelled' | 'superseded' | 'saturated' | 'oversized') =>
-        Promise.resolve({ status } as JobResult<O>);
-      const { input, output, scratch } = req.bytes;
-      if (![input, output, scratch].every((b) => Number.isFinite(b) && b >= 0)) {
+        Promise.resolve({status} as JobResult<O>);
+      const {input, output, scratch} = req.bytes;
+      if (![input, output, scratch].every(b => Number.isFinite(b) && b >= 0)) {
         throw new RangeError(`worker job ${req.kind.id}: reserved bytes must be finite and non-negative`);
       }
       if (disposed || signal.aborted || req.owner.signal.aborted) return early('cancelled');
@@ -476,7 +517,8 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
       const ended = () => disposed || signal.aborted || req.owner.signal.aborted;
       const replaced = () => {
         if (scope === undefined) return false;
-        const state = scopesOf(req.owner.signal), current = state.current.get(scope);
+        const state = scopesOf(req.owner.signal),
+          current = state.current.get(scope);
         return state.versions.get(scope) !== req.version || (current !== undefined && current !== previous);
       };
       if (ended()) return early('cancelled');
@@ -509,8 +551,8 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
             else resolve(result as JobResult<O>);
           },
         };
-        signal.addEventListener('abort', onAbort, { once: true });
-        req.owner.signal.addEventListener('abort', onAbort, { once: true });
+        signal.addEventListener('abort', onAbort, {once: true});
+        req.owner.signal.addEventListener('abort', onAbort, {once: true});
         reserved += bytes;
         peakReserved = Math.max(peakReserved, reserved);
         if (scope !== undefined) scopesOf(req.owner.signal).current.set(scope, e);
@@ -535,7 +577,7 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
       for (const e of [...queues.foreground, ...queues.background]) cancel(e, 'cancelled');
       if (inlineBusy) cancel(inlineBusy, 'cancelled');
       for (const slot of [...slots]) {
-        if (slot.entry) slot.entry.settle({ status: 'cancelled' });
+        if (slot.entry) slot.entry.settle({status: 'cancelled'});
         retire(slot);
       }
     },

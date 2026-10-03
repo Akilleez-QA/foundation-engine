@@ -7,10 +7,10 @@
  * The log is a prefix: overflow stops recording and marks the log truncated at that tick (never a silent pass). It is
  * not a ring, because inputs without an initial state checkpoint cannot be replayed from the middle.
  */
-import type { DocumentValue } from '../authoring/document';
-import { captureJson, captureJsonLimits, type JsonLimits } from '../network/captured-json';
-import { checkDigestSnapshot, identityOk, type DigestSnapshot } from './digest';
-import { hashText } from './hash';
+import type {DocumentValue} from '../authoring/document';
+import {captureJson, captureJsonLimits, type JsonLimits} from '../network/captured-json';
+import {checkDigestSnapshot, identityOk, type DigestSnapshot} from './digest';
+import {hashText} from './hash';
 
 export const REPLAY_FORMAT = 'foundation.replay';
 export const REPLAY_VERSION = 1;
@@ -38,10 +38,10 @@ export interface ReplayLimits {
   readonly input: JsonLimits;
 }
 export type RecordResult =
-  | Readonly<{ status: 'recorded' }>
+  | Readonly<{status: 'recorded'}>
   /** Full: nothing was stored, the log stays a replayable prefix ending before `truncatedAt`. */
-  | Readonly<{ status: 'truncated'; truncatedAt: number }>
-  | Readonly<{ status: 'failed'; reason: string }>;
+  | Readonly<{status: 'truncated'; truncatedAt: number}>
+  | Readonly<{status: 'failed'; reason: string}>;
 export interface RecorderState {
   readonly status: 'recording' | 'truncated' | 'failed';
   readonly reason: string | null;
@@ -63,35 +63,54 @@ const positive = (n: unknown): n is number => Number.isSafeInteger(n) && (n as n
 const utf8 = (s: string) => new TextEncoder().encode(s).length;
 
 export function captureHeader(h: ReplayHeader): ReplayHeader {
-  if (!h || !identityOk(h.build) || !identityOk(h.config)) throw Error('replay: build and config must be non-empty strings of at most 512 characters');
-  if (!Number.isSafeInteger(h.seed) || h.seed < 0 || h.seed > 0xffffffff) throw Error('replay: seed must be an unsigned 32-bit integer');
-  if (typeof h.step !== 'number' || !Number.isFinite(h.step) || !(h.step > 0)) throw Error('replay: step must be finite and positive');
-  return Object.freeze({ build: h.build, config: h.config, seed: h.seed, step: h.step });
+  if (!h || !identityOk(h.build) || !identityOk(h.config))
+    throw Error('replay: build and config must be non-empty strings of at most 512 characters');
+  if (!Number.isSafeInteger(h.seed) || h.seed < 0 || h.seed > 0xffffffff)
+    throw Error('replay: seed must be an unsigned 32-bit integer');
+  if (typeof h.step !== 'number' || !Number.isFinite(h.step) || !(h.step > 0))
+    throw Error('replay: step must be finite and positive');
+  return Object.freeze({build: h.build, config: h.config, seed: h.seed, step: h.step});
 }
 export function captureReplayLimits(l: ReplayLimits): ReplayLimits {
-  if (!l || !positive(l.maxTicks) || !positive(l.maxBytes)) throw Error('replay: maxTicks and maxBytes must be positive safe integers');
-  return Object.freeze({ maxTicks: l.maxTicks, maxBytes: l.maxBytes, input: captureJsonLimits(l.input) });
+  if (!l || !positive(l.maxTicks) || !positive(l.maxBytes))
+    throw Error('replay: maxTicks and maxBytes must be positive safe integers');
+  return Object.freeze({maxTicks: l.maxTicks, maxBytes: l.maxBytes, input: captureJsonLimits(l.input)});
 }
 
 type Run = [count: number, json: string];
 
-export function createReplayRecorder(o: { header: ReplayHeader; limits: ReplayLimits }): ReplayRecorder {
-  const header = captureHeader(o.header), limits = captureReplayLimits(o.limits);
+export function createReplayRecorder(o: {header: ReplayHeader; limits: ReplayLimits}): ReplayRecorder {
+  const header = captureHeader(o.header),
+    limits = captureReplayLimits(o.limits);
   const runs: Run[] = [];
-  let ticks = 0, bytes = 0, truncatedAt: number | null = null;
-  let status: RecorderState['status'] = 'recording', reason: string | null = null;
-  const fail = (why: string): RecordResult => { status = 'failed'; reason = why; return Object.freeze({ status: 'failed', reason: why }); };
+  let ticks = 0,
+    bytes = 0,
+    truncatedAt: number | null = null;
+  let status: RecorderState['status'] = 'recording',
+    reason: string | null = null;
+  const fail = (why: string): RecordResult => {
+    status = 'failed';
+    reason = why;
+    return Object.freeze({status: 'failed', reason: why});
+  };
   const truncate = (): RecordResult => {
-    if (status === 'recording') { status = 'truncated'; truncatedAt = ticks; }
-    return Object.freeze({ status: 'truncated', truncatedAt: truncatedAt! });
+    if (status === 'recording') {
+      status = 'truncated';
+      truncatedAt = ticks;
+    }
+    return Object.freeze({status: 'truncated', truncatedAt: truncatedAt!});
   };
   return {
     record(tick, inputJson) {
-      if (status === 'failed') return Object.freeze({ status: 'failed', reason: reason! });
+      if (status === 'failed') return Object.freeze({status: 'failed', reason: reason!});
       if (status === 'truncated') return truncate();
       if (tick !== ticks) return fail('tick-order');
       let json: string;
-      try { json = captureJson(inputJson, limits.input).json; } catch { return fail('input'); }
+      try {
+        json = captureJson(inputJson, limits.input).json;
+      } catch {
+        return fail('input');
+      }
       if (ticks >= limits.maxTicks) return truncate();
       const last = runs[runs.length - 1];
       if (last && last[1] === json) {
@@ -100,15 +119,16 @@ export function createReplayRecorder(o: { header: ReplayHeader; limits: ReplayLi
       } else {
         const cost = utf8(json) + RUN_OVERHEAD_BYTES;
         if (bytes + cost > limits.maxBytes) return truncate();
-        runs.push([1, json]); bytes += cost;
+        runs.push([1, json]);
+        bytes += cost;
       }
       ticks++;
-      return Object.freeze({ status: 'recorded' });
+      return Object.freeze({status: 'recorded'});
     },
-    read: () => Object.freeze({ status, reason, ticks, runs: runs.length, bytes, truncatedAt }),
+    read: () => Object.freeze({status, reason, ticks, runs: runs.length, bytes, truncatedAt}),
     export(digests = null) {
       if (status === 'failed') throw Error(`replay: cannot export a failed recording (${reason})`);
-      return encodeReplay({ header, ticks, truncatedAt, runs: runs.map(([n, j]) => [n, j] as Run), digests });
+      return encodeReplay({header, ticks, truncatedAt, runs: runs.map(([n, j]) => [n, j] as Run), digests});
     },
   };
 }
@@ -122,13 +142,18 @@ export interface ReplayLogData {
 }
 
 const body = (d: ReplayLogData) => ({
-  format: REPLAY_FORMAT, version: REPLAY_VERSION, header: d.header, ticks: d.ticks, truncatedAt: d.truncatedAt,
-  runs: d.runs, digests: d.digests,
+  format: REPLAY_FORMAT,
+  version: REPLAY_VERSION,
+  header: d.header,
+  ticks: d.ticks,
+  truncatedAt: d.truncatedAt,
+  runs: d.runs,
+  digests: d.digests,
 });
 /** Canonical v1 (sorted keys) of the log body; the checksum covers exactly this text. */
 const canonicalBody = (d: ReplayLogData) => {
   const text = JSON.stringify(body(d));
-  return captureJson(text, { maxBytes: Math.max(1, utf8(text)), maxNodes: Number.MAX_SAFE_INTEGER, maxDepth: 16 }).json;
+  return captureJson(text, {maxBytes: Math.max(1, utf8(text)), maxNodes: Number.MAX_SAFE_INTEGER, maxDepth: 16}).json;
 };
 
 /** Encode a log as local JSON text with a checksum over its canonical body. */
@@ -141,7 +166,7 @@ export interface OpenLimits extends ReplayLimits {
   /** Bounds of the whole log text, checked before parsing. */
   readonly log: JsonLimits;
   /** Bounds of an embedded digest trace. */
-  readonly digests?: Readonly<{ maxEntries: number; maxDigestLength: number }>;
+  readonly digests?: Readonly<{maxEntries: number; maxDigestLength: number}>;
 }
 export interface ReplayExpectation {
   readonly build: string;
@@ -161,34 +186,48 @@ export interface ReplayPlayer {
   json(tick: number): string | undefined;
 }
 export type OpenResult =
-  | Readonly<{ status: 'ready'; player: ReplayPlayer }>
-  | Readonly<{ status: 'unsupported-version'; version: unknown }>
-  | Readonly<{ status: 'corrupt'; reason: string }>
-  | Readonly<{ status: 'incompatible'; field: 'build' | 'config' | 'step' | 'seed'; expected: string | number; actual: string | number }>;
+  | Readonly<{status: 'ready'; player: ReplayPlayer}>
+  | Readonly<{status: 'unsupported-version'; version: unknown}>
+  | Readonly<{status: 'corrupt'; reason: string}>
+  | Readonly<{
+      status: 'incompatible';
+      field: 'build' | 'config' | 'step' | 'seed';
+      expected: string | number;
+      actual: string | number;
+    }>;
 
 /**
  * Decode and check a log, then return a tick-addressed player. Order: byte/structure limits, format, version,
  * checksum, structure, then the expectation. Nothing is partially accepted.
  */
 export function openReplay(text: string, limits: OpenLimits, expect: ReplayExpectation): OpenResult {
-  const l = captureReplayLimits(limits), logLimits = captureJsonLimits(limits.log);
-  const corrupt = (why: string): OpenResult => Object.freeze({ status: 'corrupt', reason: why });
+  const l = captureReplayLimits(limits),
+    logLimits = captureJsonLimits(limits.log);
+  const corrupt = (why: string): OpenResult => Object.freeze({status: 'corrupt', reason: why});
   let raw: Record<string, unknown>;
   try {
     const value = captureJson(text, logLimits).value;
     if (!value || typeof value !== 'object' || Array.isArray(value)) return corrupt('structure');
     raw = value as Record<string, unknown>;
-  } catch { return corrupt('unreadable-or-over-limit'); }
+  } catch {
+    return corrupt('unreadable-or-over-limit');
+  }
   if (raw.format !== REPLAY_FORMAT) return corrupt('format');
-  if (raw.version !== REPLAY_VERSION) return Object.freeze({ status: 'unsupported-version', version: raw.version });
-  if (Object.keys(raw).sort().join() !== 'checksum,digests,format,header,runs,ticks,truncatedAt,version') return corrupt('fields');
+  if (raw.version !== REPLAY_VERSION) return Object.freeze({status: 'unsupported-version', version: raw.version});
+  if (Object.keys(raw).sort().join() !== 'checksum,digests,format,header,runs,ticks,truncatedAt,version')
+    return corrupt('fields');
   let data: ReplayLogData;
   try {
-    const keys = (v: unknown) => v && typeof v === 'object' ? Object.keys(v).sort().join() : '';
+    const keys = (v: unknown) => (v && typeof v === 'object' ? Object.keys(v).sort().join() : '');
     if (keys(raw.header) !== 'build,config,seed,step') return corrupt('header');
-    if (raw.digests !== null && keys(raw.digests) !== 'detailTruncated,details,dropped,entries,every,firstTick,identity,lastTick,reason,status') return corrupt('digests');
+    if (
+      raw.digests !== null &&
+      keys(raw.digests) !== 'detailTruncated,details,dropped,entries,every,firstTick,identity,lastTick,reason,status'
+    )
+      return corrupt('digests');
     const header = captureHeader(raw.header as ReplayHeader);
-    const ticks = raw.ticks, truncatedAt = raw.truncatedAt;
+    const ticks = raw.ticks,
+      truncatedAt = raw.truncatedAt;
     if (!counter(ticks) || ticks > l.maxTicks) return corrupt('ticks');
     if (!(truncatedAt === null || truncatedAt === ticks)) return corrupt('truncatedAt');
     if (!Array.isArray(raw.runs)) return corrupt('runs');
@@ -197,32 +236,49 @@ export function openReplay(text: string, limits: OpenLimits, expect: ReplayExpec
       return [r[0], r[1]] as Run;
     });
     const d = limits.digests;
-    const digests = raw.digests === null ? null
-      : checkDigestSnapshot(raw.digests, d?.maxEntries ?? l.maxTicks, d?.maxDigestLength ?? 512);
-    data = { header, ticks, truncatedAt: truncatedAt as number | null, runs, digests };
-  } catch { return corrupt('structure'); }
+    const digests =
+      raw.digests === null
+        ? null
+        : checkDigestSnapshot(raw.digests, d?.maxEntries ?? l.maxTicks, d?.maxDigestLength ?? 512);
+    data = {header, ticks, truncatedAt: truncatedAt as number | null, runs, digests};
+  } catch {
+    return corrupt('structure');
+  }
   if (raw.checksum !== hashText(canonicalBody(data))) return corrupt('checksum');
-  let total = 0, bytes = 0, previous: string | null = null;
-  const values: DocumentValue[] = [], starts: number[] = [];
+  let total = 0,
+    bytes = 0,
+    previous: string | null = null;
+  const values: DocumentValue[] = [],
+    starts: number[] = [];
   for (const [count, json] of data.runs) {
     let captured;
-    try { captured = captureJson(json, l.input); } catch { return corrupt('input'); }
+    try {
+      captured = captureJson(json, l.input);
+    } catch {
+      return corrupt('input');
+    }
     if (captured.json !== json) return corrupt('non-canonical-input');
     if (json === previous) return corrupt('unmerged-run');
     previous = json;
-    starts.push(total); values.push(captured.value);
-    total += count; bytes += utf8(json) + RUN_OVERHEAD_BYTES;
+    starts.push(total);
+    values.push(captured.value);
+    total += count;
+    bytes += utf8(json) + RUN_OVERHEAD_BYTES;
     if (!Number.isSafeInteger(total)) return corrupt('ticks');
   }
   if (total !== data.ticks) return corrupt('tick-count');
   if (bytes > l.maxBytes) return corrupt('over-byte-limit');
   const h = data.header;
-  const incompatible = (field: 'build' | 'config' | 'step' | 'seed', expected: string | number, actual: string | number): OpenResult =>
-    Object.freeze({ status: 'incompatible', field, expected, actual });
+  const incompatible = (
+    field: 'build' | 'config' | 'step' | 'seed',
+    expected: string | number,
+    actual: string | number,
+  ): OpenResult => Object.freeze({status: 'incompatible', field, expected, actual});
   if (h.build !== expect.build) return incompatible('build', expect.build, h.build);
   if (h.config !== expect.config) return incompatible('config', expect.config, h.config);
   if (h.step !== expect.step) return incompatible('step', expect.step, h.step);
-  if (expect.seed !== undefined && expect.seed !== null && h.seed !== expect.seed) return incompatible('seed', expect.seed, h.seed);
+  if (expect.seed !== undefined && expect.seed !== null && h.seed !== expect.seed)
+    return incompatible('seed', expect.seed, h.seed);
   let cursor = 0;
   // starts, values and data.runs are parallel (one entry per run); a tick below data.ticks means there is at least one
   // run, and cursor, lo, mid and hi stay run indices.
@@ -231,14 +287,28 @@ export function openReplay(text: string, limits: OpenLimits, expect: ReplayExpec
     const fits = (i: number) => tick >= starts[i]! && tick < starts[i]! + data.runs[i]![0];
     if (fits(cursor)) return cursor;
     if (cursor + 1 < starts.length && fits(cursor + 1)) return ++cursor;
-    let lo = 0, hi = starts.length - 1;
-    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts[mid]! <= tick) lo = mid; else hi = mid - 1; }
-    return cursor = lo;
+    let lo = 0,
+      hi = starts.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (starts[mid]! <= tick) lo = mid;
+      else hi = mid - 1;
+    }
+    return (cursor = lo);
   };
   const player: ReplayPlayer = Object.freeze({
-    header: h, ticks: data.ticks, truncatedAt: data.truncatedAt, digests: data.digests,
-    input(tick: number) { const i = runAt(tick); return i < 0 ? undefined : values[i]; },
-    json(tick: number) { const i = runAt(tick); return i < 0 ? undefined : data.runs[i]![1]; },
+    header: h,
+    ticks: data.ticks,
+    truncatedAt: data.truncatedAt,
+    digests: data.digests,
+    input(tick: number) {
+      const i = runAt(tick);
+      return i < 0 ? undefined : values[i];
+    },
+    json(tick: number) {
+      const i = runAt(tick);
+      return i < 0 ? undefined : data.runs[i]![1];
+    },
   });
-  return Object.freeze({ status: 'ready', player });
+  return Object.freeze({status: 'ready', player});
 }

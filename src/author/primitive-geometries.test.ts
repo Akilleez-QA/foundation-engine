@@ -1,13 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from 'three';
-import { createPrimitiveGeometries } from './primitive-geometries';
-import { createSceneResources } from './scene-resources';
-import { disposeOwnedTree } from '../platform/render/dispose-owned-tree';
+import {createPrimitiveGeometries} from './primitive-geometries';
+import {createSceneResources} from './scene-resources';
+import {disposeOwnedTree} from '../platform/render/dispose-owned-tree';
 
 function track(geometry: T.BufferGeometry | T.Material) {
   let disposals = 0;
-  geometry.addEventListener('dispose', () => { disposals++; });
+  geometry.addEventListener('dispose', () => {
+    disposals++;
+  });
   return () => disposals;
 }
 
@@ -43,7 +45,8 @@ test('identical live primitives share geometry until the last mesh releases it',
   const second = geometries.acquire('sphere', [2, 2, 2]);
   const count = track(first.geometry);
   assert.equal(first.geometry, second.geometry);
-  first.release(); first.release();
+  first.release();
+  first.release();
   assert.equal(count(), 0);
   const third = geometries.acquire('sphere', [2, 2, 2]);
   assert.equal(third.geometry, second.geometry);
@@ -54,7 +57,9 @@ test('identical live primitives share geometry until the last mesh releases it',
   const recreated = geometries.acquire('sphere', [2, 2, 2]);
   assert.notEqual(recreated.geometry, first.geometry);
   const recreatedCount = track(recreated.geometry);
-  recreated.release(); geometries.dispose(); resources.dispose();
+  recreated.release();
+  geometries.dispose();
+  resources.dispose();
   assert.equal(count(), 1);
   assert.equal(recreatedCount(), 1);
 });
@@ -63,18 +68,27 @@ test('scene exit disposes shared and distinct primitive geometry exactly once', 
   const resources = createSceneResources();
   const geometries = createPrimitiveGeometries(resources);
   const scene = new T.Scene();
-  const leases = [geometries.acquire('plane', [2, 1, 3]),
-    geometries.acquire('plane', [2, 1, 3]), geometries.acquire('cone', [1, 2, 1])] as const;
+  const leases = [
+    geometries.acquire('plane', [2, 1, 3]),
+    geometries.acquire('plane', [2, 1, 3]),
+    geometries.acquire('cone', [1, 2, 1]),
+  ] as const;
   const counts = [track(leases[0].geometry), track(leases[2].geometry)];
   const material = resources.own(new T.MeshLambertMaterial());
   const materialCount = track(material);
   const meshes = leases.map(lease => new T.Mesh(lease.geometry, material));
   scene.add(...meshes);
   scene.remove(...meshes); // Runtime detaches owned representations before tree cleanup.
-  geometries.dispose(); resources.dispose(); disposeOwnedTree(scene);
+  geometries.dispose();
+  resources.dispose();
+  disposeOwnedTree(scene);
   for (const lease of leases) lease.release();
-  geometries.dispose(); resources.dispose();
-  assert.deepEqual(counts.map(count => count()), [1, 1]);
+  geometries.dispose();
+  resources.dispose();
+  assert.deepEqual(
+    counts.map(count => count()),
+    [1, 1],
+  );
   assert.equal(materialCount(), 1);
   assert.throws(() => geometries.acquire('box', [1, 1, 1]), /already disposed/);
 });
@@ -93,9 +107,12 @@ test('throwing last-release listener cannot poison a replacement with the same k
   assert.equal(retained.geometry, replacement!.geometry);
   assert.notEqual(retained.geometry, old.geometry);
   const count = track(retained.geometry);
-  old.release(); replacement!.release();
+  old.release();
+  replacement!.release();
   assert.equal(count(), 0);
-  retained.release(); geometries.dispose(); resources.dispose();
+  retained.release();
+  geometries.dispose();
+  resources.dispose();
   assert.equal(count(), 1);
 });
 
@@ -104,14 +121,27 @@ test('failed geometry disposal drains siblings and remaining scene resources', (
   const geometries = createPrimitiveGeometries(resources);
   const first = geometries.acquire('box', [1, 1, 1]);
   const second = geometries.acquire('box', [2, 1, 1]);
-  first.geometry.addEventListener('dispose', () => { throw Error('failed'); });
+  first.geometry.addEventListener('dispose', () => {
+    throw Error('failed');
+  });
   const count = track(second.geometry);
   let otherDisposed = 0;
-  resources.own({ dispose() { otherDisposed++; } });
+  resources.own({
+    dispose() {
+      otherDisposed++;
+    },
+  });
   assert.throws(() => {
-    try { geometries.dispose(); } finally { resources.dispose(); }
+    try {
+      geometries.dispose();
+    } finally {
+      resources.dispose();
+    }
   }, AggregateError);
-  first.release(); second.release(); geometries.dispose(); resources.dispose();
+  first.release();
+  second.release();
+  geometries.dispose();
+  resources.dispose();
   assert.equal(count(), 1);
   assert.equal(otherDisposed, 1);
 });

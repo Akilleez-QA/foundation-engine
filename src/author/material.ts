@@ -9,7 +9,7 @@
  * decode and one upload per context however many entities use it), tinted by `Shape.color` (white keeps its own
  * colours), and drawn untextured until it arrives or if it fails to load.
  */
-import { defineComponent, type ComponentInit } from './defs';
+import {defineComponent, type ComponentInit} from './defs';
 
 export type MaterialWrap = 'repeat' | 'clamp' | 'mirror';
 export interface MaterialData {
@@ -33,31 +33,64 @@ export interface MaterialData {
 }
 
 /** Validation bounds: data errors, not performance allowances (the scene's budgets still apply). */
-export const MATERIAL_LIMITS = { repeat: 1024, emissiveIntensity: 16, textureId: 64 } as const;
+export const MATERIAL_LIMITS = {repeat: 1024, emissiveIntensity: 16, textureId: 64} as const;
 
-export const MATERIAL_DEFAULTS: Readonly<MaterialData> = Object.freeze({ texture: '', repeat: [1, 1], wrap: 'repeat', roughness: 1, metalness: 0, emissive: 0, emissiveIntensity: 1, opacity: 1, transparent: false } as MaterialData);
+export const MATERIAL_DEFAULTS: Readonly<MaterialData> = Object.freeze({
+  texture: '',
+  repeat: [1, 1],
+  wrap: 'repeat',
+  roughness: 1,
+  metalness: 0,
+  emissive: 0,
+  emissiveIntensity: 1,
+  opacity: 1,
+  transparent: false,
+} as MaterialData);
 
-export const Material = defineComponent<MaterialData>('material', { ...MATERIAL_DEFAULTS, repeat: [1, 1] });
+export const Material = defineComponent<MaterialData>('material', {...MATERIAL_DEFAULTS, repeat: [1, 1]});
 
 const unit = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1;
 
 /** Throws on data the renderer would not draw as written. */
 export function validateMaterial(data: MaterialData): void {
-  const fail = (reason: string): never => { throw new Error(`material: ${reason}`); };
-  if (typeof data.texture !== 'string' || data.texture.length > MATERIAL_LIMITS.textureId || (data.texture !== '' && !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(data.texture))) fail('texture must be \'\' or a kebab-case texture asset id');
-  if (!Array.isArray(data.repeat) || data.repeat.length !== 2 || data.repeat.some(r => typeof r !== 'number' || !Number.isFinite(r) || r <= 0 || r > MATERIAL_LIMITS.repeat)) fail(`repeat must be [u, v], each in (0, ${MATERIAL_LIMITS.repeat}]`);
+  const fail = (reason: string): never => {
+    throw new Error(`material: ${reason}`);
+  };
+  if (
+    typeof data.texture !== 'string' ||
+    data.texture.length > MATERIAL_LIMITS.textureId ||
+    (data.texture !== '' && !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(data.texture))
+  )
+    fail("texture must be '' or a kebab-case texture asset id");
+  if (
+    !Array.isArray(data.repeat) ||
+    data.repeat.length !== 2 ||
+    data.repeat.some(r => typeof r !== 'number' || !Number.isFinite(r) || r <= 0 || r > MATERIAL_LIMITS.repeat)
+  )
+    fail(`repeat must be [u, v], each in (0, ${MATERIAL_LIMITS.repeat}]`);
   if (!['repeat', 'clamp', 'mirror'].includes(data.wrap)) fail('wrap must be repeat, clamp or mirror');
   if (!unit(data.roughness)) fail('roughness must be in [0, 1]');
   if (!unit(data.metalness)) fail('metalness must be in [0, 1]');
-  if (!Number.isInteger(data.emissive) || data.emissive < 0 || data.emissive > 0xffffff) fail('emissive must be a 24-bit RGB integer');
-  if (typeof data.emissiveIntensity !== 'number' || !Number.isFinite(data.emissiveIntensity) || data.emissiveIntensity < 0 || data.emissiveIntensity > MATERIAL_LIMITS.emissiveIntensity) fail(`emissiveIntensity must be in [0, ${MATERIAL_LIMITS.emissiveIntensity}]`);
+  if (!Number.isInteger(data.emissive) || data.emissive < 0 || data.emissive > 0xffffff)
+    fail('emissive must be a 24-bit RGB integer');
+  if (
+    typeof data.emissiveIntensity !== 'number' ||
+    !Number.isFinite(data.emissiveIntensity) ||
+    data.emissiveIntensity < 0 ||
+    data.emissiveIntensity > MATERIAL_LIMITS.emissiveIntensity
+  )
+    fail(`emissiveIntensity must be in [0, ${MATERIAL_LIMITS.emissiveIntensity}]`);
   if (!unit(data.opacity)) fail('opacity must be in [0, 1]');
   if (typeof data.transparent !== 'boolean') fail('transparent must be boolean');
 }
 
 /** A checked `Material` initialiser; omitted fields take {@link MATERIAL_DEFAULTS}. */
 export function defineMaterial(input: Partial<MaterialData>): ComponentInit<MaterialData> {
-  const data: MaterialData = { ...MATERIAL_DEFAULTS, ...input, repeat: [...(input.repeat ?? MATERIAL_DEFAULTS.repeat)] as [number, number] };
+  const data: MaterialData = {
+    ...MATERIAL_DEFAULTS,
+    ...input,
+    repeat: [...(input.repeat ?? MATERIAL_DEFAULTS.repeat)] as [number, number],
+  };
   validateMaterial(data);
   return Material(data);
 }

@@ -9,8 +9,11 @@ import type * as T from 'three';
  * world matrix and everything read below it is stale too. Forcing each level restores the r183 result at the r183
  * cost (r183 recomputed every level); the recursion allocates nothing.
  */
-export function updateWorldMatrixFromRoot(o:T.Object3D,children=false):void{
- if(o.parent)ancestors(o.parent);
- o.updateWorldMatrix(false,children,true);
+export function updateWorldMatrixFromRoot(o: T.Object3D, children = false): void {
+  if (o.parent) ancestors(o.parent);
+  o.updateWorldMatrix(false, children, true);
 }
-const ancestors=(o:T.Object3D):void=>{if(o.parent)ancestors(o.parent);o.updateWorldMatrix(false,false,true);};
+const ancestors = (o: T.Object3D): void => {
+  if (o.parent) ancestors(o.parent);
+  o.updateWorldMatrix(false, false, true);
+};

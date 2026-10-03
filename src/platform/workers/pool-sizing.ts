@@ -45,9 +45,10 @@ const positive = (name: string, v: number) => {
 /** `cap = min(profile.maxSlots, max(1, floor(hardwareConcurrency) − 2))`, 1 if unknown; `warm = min(4, cap)`. */
 export function sizePool(hardwareConcurrency: number | undefined, profile: WorkerProfile): PoolSize {
   const declared = Math.floor(positive('maxSlots', profile.maxSlots));
-  const hc = hardwareConcurrency !== undefined && Number.isFinite(hardwareConcurrency) && hardwareConcurrency > 0
-    ? Math.max(1, Math.floor(hardwareConcurrency) - 2)
-    : 1;
+  const hc =
+    hardwareConcurrency !== undefined && Number.isFinite(hardwareConcurrency) && hardwareConcurrency > 0
+      ? Math.max(1, Math.floor(hardwareConcurrency) - 2)
+      : 1;
   const cap = Math.max(1, Math.min(declared, hc));
   const warm = Math.max(0, Math.min(Math.floor(profile.warm ?? 4), cap));
   return {
