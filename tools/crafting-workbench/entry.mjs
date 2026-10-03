@@ -1,9 +1,9 @@
 import '../../src/app/styles.ts';
 import './style.css';
-import { createApp } from '../../src/core/app.ts';
-import { appFeatures } from '../../src/core/settings/app-features.ts';
-import { layerModules } from '../../src/app/layer-modules.ts';
-import { compileGame } from '../../src/author/compile.ts';
+import {createApp} from '../../src/core/app.ts';
+import {appFeatures} from '../../src/core/settings/app-features.ts';
+import {layerModules} from '../../src/app/layer-modules.ts';
+import {compileGame} from '../../src/author/compile.ts';
 import {
   defineBuild,
   defineGame,
@@ -13,24 +13,20 @@ import {
   Transform,
   Shape,
 } from '../../src/author/index.ts';
-import { createTestApi } from '../../src/dev/test-api.ts';
-import { saveModule } from '../../src/core/save/module.ts';
-import { browserPort } from '../../src/core/save/storage-port.ts';
-import { createEditorController } from './editor-controller.mjs';
-import {
-  recipeSectionDefinition,
-  recipeStorageKey,
-  createRecipeStoragePort,
-} from './recipe.mjs';
+import {createTestApi} from '../../src/dev/test-api.ts';
+import {saveModule} from '../../src/core/save/module.ts';
+import {browserPort} from '../../src/core/save/storage-port.ts';
+import {createEditorController} from './editor-controller.mjs';
+import {recipeSectionDefinition, recipeStorageKey, createRecipeStoragePort} from './recipe.mjs';
 import {
   createRuntimeController,
   createRuntimeStoragePort,
   runtimeSectionDefinition,
   runtimeStorageKey,
 } from './runtime-controller.mjs';
-import { createSurveyAdapter } from './survey.mjs';
-const definition = (d) => {
-  const section = defineSaveSection({ ...d, initial: d.initial() });
+import {createSurveyAdapter} from './survey.mjs';
+const definition = d => {
+  const section = defineSaveSection({...d, initial: d.initial()});
   section.section = d;
   return section;
 };
@@ -50,8 +46,7 @@ const brief = defineBuild({
   success: [
     {
       id: 'S1',
-      check:
-        'Definition edits remain isolated from accepted material custody, production and historical facts.',
+      check: 'Definition edits remain isolated from accepted material custody, production and historical facts.',
       how: 'playtest',
       by: 'scripts/play/crafting-workbench-check.mjs',
     },
@@ -63,17 +58,12 @@ const game = defineGame({
   title: 'Crafting workbench',
   firstScene: 'sample',
 });
-const guarded = createRecipeStoragePort(
-    createRuntimeStoragePort(browserPort('local')),
-  ),
+const guarded = createRecipeStoragePort(createRuntimeStoragePort(browserPort('local'))),
   failureKey = 'crafting-refuse-runtime';
 const storage = {
   ...guarded,
   set(key, value) {
-    if (
-      key === runtimeStorageKey &&
-      sessionStorage.getItem(failureKey) === 'yes'
-    )
+    if (key === runtimeStorageKey && sessionStorage.getItem(failureKey) === 'yes')
       throw Error('Intentional runtime storage refusal');
     guarded.set(key, value);
   },
@@ -94,14 +84,14 @@ let editor,
   signature = '',
   projection = '',
   entities = [];
-const el = (id) => document.getElementById(id),
+const el = id => document.getElementById(id),
   clone = structuredClone,
-  number = (id) => Number(el(id).value),
+  number = id => Number(el(id).value),
   id = () => crypto.randomUUID();
 const options = (select, values) => {
   const old = select.value;
   select.replaceChildren(
-    ...values.map((value) => {
+    ...values.map(value => {
       const row = document.createElement('option');
       row.value = value;
       row.textContent = value;
@@ -116,38 +106,24 @@ function fields() {
   const r = recipe();
   options(
     el('slot'),
-    r.slots.map((s) => s.id),
+    r.slots.map(s => s.id),
   );
   options(
     el('attribute'),
-    r.attributes.map((a) => a.id),
+    r.attributes.map(a => a.id),
   );
-  options(el('output-property'), [
-    'massMg',
-    'volumeUl',
-    ...Object.keys(r.output.properties),
-  ]);
-  const slot = r.slots.find((s) => s.id === el('slot').value),
-    attribute = r.attributes.find((a) => a.id === el('attribute').value),
-    model =
-      r.output[el('output-property').value] ??
-      r.output.properties[el('output-property').value];
-  for (const name of ['slot-materials', 'slot-unit', 'slot-quantity'])
-    el(name).disabled = !slot;
+  options(el('output-property'), ['massMg', 'volumeUl', ...Object.keys(r.output.properties)]);
+  const slot = r.slots.find(s => s.id === el('slot').value),
+    attribute = r.attributes.find(a => a.id === el('attribute').value),
+    model = r.output[el('output-property').value] ?? r.output.properties[el('output-property').value];
+  for (const name of ['slot-materials', 'slot-unit', 'slot-quantity']) el(name).disabled = !slot;
   el('slot-materials').value = slot?.materials.join(',') ?? '';
   el('slot-unit').value = slot?.unit ?? '';
   el('slot-quantity').value = slot?.quantity ?? '';
-  for (const name of [
-    'attribute-weights',
-    'attribute-initial',
-    'attribute-gain',
-    'attribute-effect',
-  ])
+  for (const name of ['attribute-weights', 'attribute-initial', 'attribute-gain', 'attribute-effect'])
     el(name).disabled = !attribute;
   el('attribute-weights').value =
-    attribute?.weights
-      .map((w) => `${w.slot} / ${w.property} / ${w.weight}`)
-      .join('\n') ?? '';
+    attribute?.weights.map(w => `${w.slot} / ${w.property} / ${w.weight}`).join('\n') ?? '';
   for (const [field, key] of [
     ['attribute-initial', 'initialPermille'],
     ['attribute-gain', 'gainPermille'],
@@ -156,22 +132,18 @@ function fields() {
     el(field).value = attribute?.[key] ?? '';
   el('point-limit').value = r.pointLimit;
   el('output-base').value = model.base;
-  el('output-terms').value = model.terms
-    .map((t) => `${t.attribute} / ${t.coefficient}`)
-    .join('\n');
+  el('output-terms').value = model.terms.map(t => `${t.attribute} / ${t.coefficient}`).join('\n');
   el('recipe-json').value = JSON.stringify(r, null, 2);
 }
 function applyFields() {
   const r = clone(recipe()),
-    slot = r.slots.find((s) => s.id === el('slot').value),
-    attribute = r.attributes.find((a) => a.id === el('attribute').value),
-    model =
-      r.output[el('output-property').value] ??
-      r.output.properties[el('output-property').value];
+    slot = r.slots.find(s => s.id === el('slot').value),
+    attribute = r.attributes.find(a => a.id === el('attribute').value),
+    model = r.output[el('output-property').value] ?? r.output.properties[el('output-property').value];
   if (slot) {
     slot.materials = el('slot-materials')
       .value.split(',')
-      .map((s) => s.trim());
+      .map(s => s.trim());
     slot.unit = el('slot-unit').value;
     slot.quantity = number('slot-quantity');
   }
@@ -179,9 +151,9 @@ function applyFields() {
     attribute.weights = el('attribute-weights')
       .value.split('\n')
       .filter(Boolean)
-      .map((line) => {
-        const [slot, property, weight] = line.split('/').map((s) => s.trim());
-        return { slot, property, weight: Number(weight) };
+      .map(line => {
+        const [slot, property, weight] = line.split('/').map(s => s.trim());
+        return {slot, property, weight: Number(weight)};
       });
     attribute.initialPermille = number('attribute-initial');
     attribute.gainPermille = number('attribute-gain');
@@ -192,15 +164,14 @@ function applyFields() {
   model.terms = el('output-terms')
     .value.split('\n')
     .filter(Boolean)
-    .map((line) => {
-      const [attribute, coefficient] = line.split('/').map((s) => s.trim());
-      return { attribute, coefficient: Number(coefficient) };
+    .map(line => {
+      const [attribute, coefficient] = line.split('/').map(s => s.trim());
+      return {attribute, coefficient: Number(coefficient)};
     });
   draft = r;
-  el('draft-status').textContent =
-    'Draft changed; validation and commit remain explicit.';
+  el('draft-status').textContent = 'Draft changed; validation and commit remain explicit.';
   fields();
-  return { status: 'draft' };
+  return {status: 'draft'};
 }
 function project() {
   const r = runtime.read(),
@@ -219,7 +190,7 @@ function project() {
             : 1;
       created.push(
         context.world.spawn(
-          Name({ name: `stock:${p.container}:${p.batch}` }),
+          Name({name: `stock:${p.container}:${p.batch}`}),
           Transform({
             x: lane,
             y: 0.2 + p.quantity * 0.04,
@@ -234,10 +205,10 @@ function project() {
       );
     }
   } catch (error) {
-    created.forEach((e) => context.world.despawn(e));
+    created.forEach(e => context.world.despawn(e));
     throw error;
   }
-  entities.forEach((e) => context.world.despawn(e));
+  entities.forEach(e => context.world.despawn(e));
   entities = created;
   projection = next;
   context.world.touch();
@@ -249,55 +220,45 @@ function render() {
   el('compact-status').textContent =
     `Recipe ${e.recipe.id} v${e.recipe.version} · ${r.view.sessions.length} sessions · time ${r.view.clock}${r.pending ? ' · publication pending' : ''}`;
   if (!el('details')) return;
-  for (const name of ['editor', 'runtime', 'survey'])
-    el(`${name}-pane`).hidden = pane !== name;
+  for (const name of ['editor', 'runtime', 'survey']) el(`${name}-pane`).hidden = pane !== name;
   el('revisions').textContent =
     `Editable document r${e.revision}; accepted sessions retain their own recipe and batch facts.`;
   el('editor-message').textContent = e.blocked ?? e.message;
   el('recipe-values').textContent =
     e.evaluation?.status === 'evaluated'
-      ? e.evaluation.values
-          .map((v) => `${v.id}: ceiling ${v.ceiling}, initial ${v.value}`)
-          .join('; ')
+      ? e.evaluation.values.map(v => `${v.id}: ceiling ${v.ceiling}, initial ${v.value}`).join('; ')
       : (e.evaluation?.reason ?? 'No isolated preview');
   el('commit-recipe').disabled = !e.candidate || !!e.blocked;
   el('sessions').replaceChildren(
-    ...r.view.sessions.map((s) => {
+    ...r.view.sessions.map(s => {
       const row = document.createElement('p');
-      row.textContent = `${s.id}: ${s.phase}; recipe ${s.recipe.id} v${s.recipe.version}; ${s.values.map((v) => `${v.id}=${v.value}`).join(', ')}${s.machine ? `; ${s.machine} cycle ${s.cycle}` : ''}`;
+      row.textContent = `${s.id}: ${s.phase}; recipe ${s.recipe.id} v${s.recipe.version}; ${s.values.map(v => `${v.id}=${v.value}`).join(', ')}${s.machine ? `; ${s.machine} cycle ${s.cycle}` : ''}`;
       return row;
     }),
   );
   options(
     el('session'),
-    r.view.sessions.map((s) => s.id),
+    r.view.sessions.map(s => s.id),
   );
-  el('experiment').disabled = !r.view.sessions.find(
-    (s) => s.id === el('session').value,
-  )?.recipe.attributes.length;
+  el('experiment').disabled = !r.view.sessions.find(s => s.id === el('session').value)?.recipe.attributes.length;
   for (const name of ['from', 'to', 'capacity-container', 'harvest-container'])
     options(
       el(name),
-      r.view.stock.containers.map((c) => c.id),
+      r.view.stock.containers.map(c => c.id),
     );
   options(
     el('batch'),
-    r.view.stock.batches.map((b) => b.id),
+    r.view.stock.batches.map(b => b.id),
   );
   options(
     el('spawn'),
-    r.view.spawns.map((s) => s.id),
+    r.view.spawns.map(s => s.id),
   );
   el('stock').replaceChildren(
-    ...r.view.stock.positions.map((p) => {
+    ...r.view.stock.positions.map(p => {
       const tr = document.createElement('tr'),
-        batch = r.view.stock.batches.find((b) => b.id === p.batch);
-      for (const value of [
-        p.container,
-        p.batch,
-        p.quantity,
-        p.quantity * batch.massMg,
-      ]) {
+        batch = r.view.stock.batches.find(b => b.id === p.batch);
+      for (const value of [p.container, p.batch, p.quantity, p.quantity * batch.massMg]) {
         const td = document.createElement('td');
         td.textContent = value;
         tr.append(td);
@@ -307,24 +268,17 @@ function render() {
   );
   el('machines').textContent =
     r.view.machines
-      .map(
-        (m) =>
-          `${m.id}: ${m.progressJ} J, completed ${m.completed}${m.active ? ' (work protected)' : ''}`,
-      )
+      .map(m => `${m.id}: ${m.progressJ} J, completed ${m.completed}${m.active ? ' (work protected)' : ''}`)
       .join('; ') || 'No assigned machine';
-  const spawn = r.view.spawns.find((s) => s.id === el('spawn').value);
+  const spawn = r.view.spawns.find(s => s.id === el('spawn').value);
   el('spawn-status').textContent = spawn
     ? `${spawn.id} incarnation ${spawn.incarnation}; remaining ${spawn.remaining}; expires ${spawn.deposit.expiresTick}`
     : 'No spawn';
   const observed = survey.read();
-  el('survey-status').textContent =
-    `${observed.status}: ${observed.points.length} observed points`;
+  el('survey-status').textContent = `${observed.status}: ${observed.points.length} observed points`;
   el('survey-map').replaceChildren(
-    ...observed.points.map((p) => {
-      const circle = document.createElementNS(
-        'http://www.w3.org/2000/svg',
-        'circle',
-      );
+    ...observed.points.map(p => {
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       circle.setAttribute('cx', 20 + p.x * 40);
       circle.setAttribute('cy', 20 + p.z * 40);
       circle.setAttribute('r', 3 + p.abundance * 12);
@@ -355,7 +309,7 @@ function act(fn) {
     });
     project();
   } catch (error) {
-    lastResult = { status: 'exception', reason: error.message };
+    lastResult = {status: 'exception', reason: error.message};
     message = error.message;
   }
   render();
@@ -363,17 +317,14 @@ function act(fn) {
 function prepare(payload) {
   if (prepared && !runtime.read().pending) runtime.cancel(prepared.candidate);
   prepared = null;
-  const result = runtime.preview({ id: id(), payload });
-  if (result.status === 'prepared')
-    prepared = { candidate: result.candidate, payload };
+  const result = runtime.preview({id: id(), payload});
+  if (result.status === 'prepared') prepared = {candidate: result.candidate, payload};
   return result;
 }
 async function open() {
   if (sheet || !context) return;
   try {
-    const element = document
-      .importNode(el('details-template').content, true)
-      .querySelector('#details');
+    const element = document.importNode(el('details-template').content, true).querySelector('#details');
     const opened = context.view.openReadingSheet({
       id: 'crafting-details',
       element,
@@ -391,7 +342,7 @@ async function open() {
         }
         if (sheet === opened) sheet = null;
       },
-      { once: true },
+      {once: true},
     );
     await opened.ready;
     if (opened.signal.aborted) return;
@@ -408,7 +359,7 @@ async function open() {
     bind('apply-fields', applyFields);
     bind('apply-json', () => {
       draft = JSON.parse(el('recipe-json').value);
-      return { status: 'draft' };
+      return {status: 'draft'};
     });
     bind('preview-recipe', () => editor.preview(recipe()));
     bind('commit-recipe', () => {
@@ -436,18 +387,17 @@ async function open() {
         kind: 'begin',
         recipe: editor.read().recipe,
         selections: ['a', 'b']
-          .map((s) => ({
+          .map(s => ({
             slot: editor.read().recipe.slots[0].id,
             container: `source-${s}`,
             batch: `input-${s}`,
             quantity: number(`quantity-${s}`),
           }))
-          .filter((s) => s.quantity > 0),
+          .filter(s => s.quantity > 0),
         pointBudget: number('point-budget'),
       }),
     );
-    const session = () =>
-      runtime.read().view.sessions.find((s) => s.id === el('session').value);
+    const session = () => runtime.read().view.sessions.find(s => s.id === el('session').value);
     bind('experiment', () =>
       prepare({
         kind: 'experiment',
@@ -457,20 +407,19 @@ async function open() {
         effectPermille: session().recipe.attributes[0].effectPermille,
       }),
     );
-    for (const kind of ['lock', 'cancel-session'])
-      bind(kind, () => prepare({ kind, session: session().id }));
+    for (const kind of ['lock', 'cancel-session']) bind(kind, () => prepare({kind, session: session().id}));
     bind('repeat', () =>
       prepare({
         kind: 'repeat',
         session: session().id,
         selections: ['a', 'b']
-          .map((s) => ({
+          .map(s => ({
             slot: session().recipe.slots[0].id,
             container: `source-${s}`,
             batch: `input-${s}`,
             quantity: number(`quantity-${s}`),
           }))
-          .filter((s) => s.quantity > 0),
+          .filter(s => s.quantity > 0),
       }),
     );
     bind('assign', () =>
@@ -505,9 +454,8 @@ async function open() {
         volume: number('capacity-volume'),
       }),
     );
-    bind('advance', () => prepare({ kind: 'advance', time: number('clock') }));
-    const spawn = () =>
-      runtime.read().view.spawns.find((s) => s.id === el('spawn').value);
+    bind('advance', () => prepare({kind: 'advance', time: number('clock')}));
+    const spawn = () => runtime.read().view.spawns.find(s => s.id === el('spawn').value);
     bind('replace-spawn', () => {
       const s = spawn();
       return prepare({
@@ -535,15 +483,11 @@ async function open() {
       return result;
     });
     bind('survey-step', () => survey.step());
-    bind('survey-late', () => retainedSurvey?.() ?? { status: 'empty' });
+    bind('survey-late', () => retainedSurvey?.() ?? {status: 'empty'});
     bind('survey-cancel', () => survey.cancel());
-    bind('commit-runtime', () =>
-      prepared ? runtime.commit(prepared.candidate) : { status: 'empty' },
-    );
+    bind('commit-runtime', () => (prepared ? runtime.commit(prepared.candidate) : {status: 'empty'}));
     bind('cancel-runtime', () => {
-      const result = prepared
-        ? runtime.cancel(prepared.candidate)
-        : { status: 'empty' };
+      const result = prepared ? runtime.cancel(prepared.candidate) : {status: 'empty'};
       if (!runtime.read().pending) prepared = null;
       return result;
     });
@@ -556,19 +500,16 @@ async function open() {
     });
     bind('reload', () => location.reload());
     for (const name of ['slot', 'attribute', 'output-property'])
-      el(name).addEventListener('change', fields, { signal: opened.signal });
-    el('session').addEventListener('change', render, { signal: opened.signal });
-    el('spawn').addEventListener('change', render, { signal: opened.signal });
+      el(name).addEventListener('change', fields, {signal: opened.signal});
+    el('session').addEventListener('change', render, {signal: opened.signal});
+    el('spawn').addEventListener('change', render, {signal: opened.signal});
     el('fail-storage').addEventListener(
       'change',
       () => {
-        sessionStorage.setItem(
-          failureKey,
-          el('fail-storage').checked ? 'yes' : 'no',
-        );
+        sessionStorage.setItem(failureKey, el('fail-storage').checked ? 'yes' : 'no');
         render();
       },
-      { signal: opened.signal },
+      {signal: opened.signal},
     );
     fields();
     render();
@@ -601,7 +542,7 @@ const scene = defineScene({
   id: 'sample',
   title: 'Accepted material custody',
   view: {
-    camera: { position: [8, 7, 9], target: [0, 0, 0] },
+    camera: {position: [8, 7, 9], target: [0, 0, 0]},
     background: 0x172738,
   },
   enter(ctx) {
@@ -619,21 +560,18 @@ const scene = defineScene({
       resume: runtimeResume,
     });
     runtimeResume = null;
-    survey = createSurveyAdapter({ readRuntime: () => runtime.read() });
+    survey = createSurveyAdapter({readRuntime: () => runtime.read()});
     draft = null;
     prepared = null;
     projection = '';
     signature = '';
     entities = [];
-    ctx.world.spawn(
-      Transform({ y: -0.1 }),
-      Shape({ kind: 'box', size: [9, 0.2, 6], color: 0x355065 }),
-    );
+    ctx.world.spawn(Transform({y: -0.1}), Shape({kind: 'box', size: [9, 0.2, 6], color: 0x355065}));
     project();
     el('open').disabled = false;
     el('exit-scene').disabled = false;
     el('reenter').disabled = true;
-    el('open').addEventListener('click', open, { signal: life.signal });
+    el('open').addEventListener('click', open, {signal: life.signal});
     render();
     const timer = setInterval(refresh, 150);
     life.signal.addEventListener('abort', () => clearInterval(timer), {
@@ -656,7 +594,7 @@ const scene = defineScene({
 const retiredScene = defineScene({
   id: 'retired',
   title: 'Retired crafting session',
-  view: { background: 0x172738 },
+  view: {background: 0x172738},
   enter(ctx) {
     context = ctx;
     el('reenter').disabled = false;
@@ -683,7 +621,7 @@ el('reenter').addEventListener('click', () => {
   }
 });
 el('retired-survey').addEventListener('click', () => {
-  lastResult = retainedSurvey?.() ?? { status: 'empty' };
+  lastResult = retainedSurvey?.() ?? {status: 'empty'};
   el('compact-status').textContent = `Retained survey: ${lastResult.status}`;
 });
 const compiled = compileGame({
@@ -691,18 +629,18 @@ const compiled = compileGame({
   game,
   defs: [scene, retiredScene, recipeSection, runtimeSection],
 });
-const modules = layerModules(game, brief).map((m) =>
+const modules = layerModules(game, brief).map(m =>
   m.id === 'core.save'
     ? saveModule({
         namespace: game.id,
         build: saveBuild,
-        storage: () => ({ local: storage, session: browserPort('session') }),
+        storage: () => ({local: storage, session: browserPort('session')}),
       })
     : m,
 );
 const app = createApp([...modules, ...compiled.modules], {
   mode: 'test',
-  flag: (id) => appFeatures().enabled(id),
+  flag: id => appFeatures().enabled(id),
   probes: true,
 });
 const booted = app.boot();

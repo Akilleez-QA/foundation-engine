@@ -11,8 +11,8 @@
  * ignored. A failed load (or a renderer that cannot be created) is reported once; queued emitters are dropped and
  * particles keep simulating undrawn for the rest of the visit.
  */
-import type { EmitterSlot, ParticleRenderer } from './particle-contract';
-import type { SceneParticleOptions, ParticleDrawing } from './scene-particles';
+import type {EmitterSlot, ParticleRenderer} from './particle-contract';
+import type {SceneParticleOptions, ParticleDrawing} from './scene-particles';
 
 export interface ParticleView extends ParticleRenderer {
   /** Start loading the renderer now (idempotent). */
@@ -24,50 +24,104 @@ export interface ParticleView extends ParticleRenderer {
   dispose(): void;
 }
 
-const NONE = Object.freeze({ bound: 0, visible: 0, requested: 0, leases: 0, applied: 0, failed: 0 });
+const NONE = Object.freeze({bound: 0, visible: 0, requested: 0, leases: 0, applied: 0, failed: 0});
 
-export function createParticleView(o: SceneParticleOptions & {
-  load: () => Promise<{ createSceneParticles(options: SceneParticleOptions): ParticleDrawing }>;
-  /** The renderer arrived and bound waiting emitters (they draw from their next step). */
-  ready(): void;
-  /** A waiting emitter could not be bound once the renderer arrived: the field releases it (`ParticleField.bindFailed`). */
-  bindFailed?(slot: EmitterSlot, error: unknown): void;
-}): ParticleView {
-  let view: ParticleDrawing | null = null, state: ParticleView['state'] = 'idle', disposed = false;
+export function createParticleView(
+  o: SceneParticleOptions & {
+    load: () => Promise<{createSceneParticles(options: SceneParticleOptions): ParticleDrawing}>;
+    /** The renderer arrived and bound waiting emitters (they draw from their next step). */
+    ready(): void;
+    /** A waiting emitter could not be bound once the renderer arrived: the field releases it (`ParticleField.bindFailed`). */
+    bindFailed?(slot: EmitterSlot, error: unknown): void;
+  },
+): ParticleView {
+  let view: ParticleDrawing | null = null,
+    state: ParticleView['state'] = 'idle',
+    disposed = false;
   const waiting = new Set<EmitterSlot>();
-  const report = (error: unknown) => { try { o.report(error); } catch { /* Diagnostics cannot strand cleanup. */ } };
+  const report = (error: unknown) => {
+    try {
+      o.report(error);
+    } catch {
+      /* Diagnostics cannot strand cleanup. */
+    }
+  };
   const preload = () => {
     if (state !== 'idle' || disposed || o.signal.aborted) return;
     state = 'loading';
-    o.load().then(m => {
-      if (disposed || o.signal.aborted) return;
-      try { view = m.createSceneParticles(o); }
-      catch (error) { state = 'failed'; waiting.clear(); report(error); return; }
-      state = 'ready';
-      for (const slot of [...waiting]) {
-        waiting.delete(slot);
-        try { view.bind(slot); }
-        catch (error) { try { o.bindFailed?.(slot, error); } catch (e) { report(e); } if (!o.bindFailed) report(error); }
-      }
-      o.ready();
-    }, error => { if (disposed || o.signal.aborted) return; state = 'failed'; waiting.clear(); report(error); }).catch(report);
+    o.load()
+      .then(
+        m => {
+          if (disposed || o.signal.aborted) return;
+          try {
+            view = m.createSceneParticles(o);
+          } catch (error) {
+            state = 'failed';
+            waiting.clear();
+            report(error);
+            return;
+          }
+          state = 'ready';
+          for (const slot of [...waiting]) {
+            waiting.delete(slot);
+            try {
+              view.bind(slot);
+            } catch (error) {
+              try {
+                o.bindFailed?.(slot, error);
+              } catch (e) {
+                report(e);
+              }
+              if (!o.bindFailed) report(error);
+            }
+          }
+          o.ready();
+        },
+        error => {
+          if (disposed || o.signal.aborted) return;
+          state = 'failed';
+          waiting.clear();
+          report(error);
+        },
+      )
+      .catch(report);
   };
-  o.signal.addEventListener('abort', () => { waiting.clear(); }, { once: true });
+  o.signal.addEventListener(
+    'abort',
+    () => {
+      waiting.clear();
+    },
+    {once: true},
+  );
   return {
     preload,
-    get stats() { return view?.stats ?? NONE; },
-    get state() { return state; },
+    get stats() {
+      return view?.stats ?? NONE;
+    },
+    get state() {
+      return state;
+    },
     bind(slot) {
-      if (view) { view.bind(slot); return; }
+      if (view) {
+        view.bind(slot);
+        return;
+      }
       if (disposed || o.signal.aborted) throw Error('particles: the visit has ended');
       if (state === 'failed') return;
-      waiting.add(slot); preload();
+      waiting.add(slot);
+      preload();
     },
-    draw(slot, count) { view?.draw(slot, count); },
-    release(slot) { waiting.delete(slot); view?.release(slot); },
+    draw(slot, count) {
+      view?.draw(slot, count);
+    },
+    release(slot) {
+      waiting.delete(slot);
+      view?.release(slot);
+    },
     dispose() {
       if (disposed) return;
-      disposed = true; waiting.clear();
+      disposed = true;
+      waiting.clear();
       view?.dispose();
     },
   };

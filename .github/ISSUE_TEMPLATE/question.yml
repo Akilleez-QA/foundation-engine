@@ -1,11 +1,11 @@
 name: Question
 description: Ask how to use the engine, a kit, or a template.
-title: "[Question]: "
-labels: ["needs-triage", "question"]
+title: '[Question]: '
+labels: ['needs-triage', 'question']
 body:
   - type: markdown
     attributes:
-      value: "For a defect, use the bug report. For a reusable contract, use the engine proposal. For a suspected vulnerability, read SECURITY.md first and do not post details here."
+      value: 'For a defect, use the bug report. For a reusable contract, use the engine proposal. For a suspected vulnerability, read SECURITY.md first and do not post details here.'
   - type: textarea
     id: question
     attributes:

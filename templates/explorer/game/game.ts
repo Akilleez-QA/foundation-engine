@@ -1,11 +1,14 @@
-import { defineGame } from '@engine';
-import { camera } from '@kits/camera';
-import { character } from '@kits/character';
-import { explore } from '@kits/explore';
-import { ui } from '@kits/ui';
+import {defineGame} from '@engine';
+import {camera} from '@kits/camera';
+import {character} from '@kits/character';
+import {explore} from '@kits/explore';
+import {ui} from '@kits/ui';
 
 export default defineGame({
-  id: 'explorer', title: 'Garden', version: '0.1.0', firstScene: 'garden',
+  id: 'explorer',
+  title: 'Garden',
+  version: '0.1.0',
+  firstScene: 'garden',
   kits: [ui(), camera(), character(), explore()],
   strings: {
     en: {

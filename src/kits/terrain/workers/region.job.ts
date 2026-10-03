@@ -1,2 +1,2 @@
-import { basicTerrainRegionJob } from '../region-job';
+import {basicTerrainRegionJob} from '../region-job';
 export default basicTerrainRegionJob.module;

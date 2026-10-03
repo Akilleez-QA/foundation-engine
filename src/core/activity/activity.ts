@@ -12,14 +12,24 @@
  * Preparation and activation (ADR 0045) are the router's to drive: this host exposes the run (`ready`, `activate`)
  * on the returned handle and does not interpret them.
  */
-import type { Disposable } from '../module';
-import type { FrameInfo, FrameLoop, TickerHandle, TickerSpec } from './loop';
+import type {Disposable} from '../module';
+import type {FrameInfo, FrameLoop, TickerHandle, TickerSpec} from './loop';
 import type {
-  Coverage, FrameMode, LayerHandle, LayerPort, LayerRequest, QualityPreset, SurfaceLease, SurfacePort, SurfaceRequest, WhenCovered,
+  Coverage,
+  FrameMode,
+  LayerHandle,
+  LayerPort,
+  LayerRequest,
+  QualityPreset,
+  SurfaceLease,
+  SurfacePort,
+  SurfaceRequest,
+  WhenCovered,
 } from './ports';
 
 export type ActivityKind = 'scene' | 'panel' | 'minigame' | 'widget';
-export type LeaveReason = 'exit' | 'escape' | 'route' | 'replaced' | 'parent-left' | 'player-changed' | 'error' | 'context-lost';
+export type LeaveReason =
+  'exit' | 'escape' | 'route' | 'replaced' | 'parent-left' | 'player-changed' | 'error' | 'context-lost';
 
 /** Returned by `enter()`: the per-visit behaviour. Everything else is owned through the context. */
 export interface ActivityRun {
@@ -46,7 +56,7 @@ export interface Activity<P = void> {
 }
 
 /** The kernel's `Disposable` (core/module.ts), re-exported for the activity host's callers. */
-export type { Disposable };
+export type {Disposable};
 
 export interface ActivityContext {
   readonly id: string;
@@ -107,17 +117,28 @@ export class ActivityHost {
   private report(id: string, error: unknown): void {
     if (this.reporting) return;
     this.reporting = true;
-    try { this.deps.report?.(id, error); } catch { /* diagnostics must not interrupt ownership cleanup */ }
-    finally { this.reporting = false; }
+    try {
+      this.deps.report?.(id, error);
+    } catch {
+      /* diagnostics must not interrupt ownership cleanup */
+    } finally {
+      this.reporting = false;
+    }
   }
 
   /** Runs that have entered and not left, in start order. */
-  running(): readonly RunningActivity[] { return [...this.live]; }
+  running(): readonly RunningActivity[] {
+    return [...this.live];
+  }
 
   /** The renderer pool restored the GPU context: tell every live run, parents before children. */
   contextRestored(): void {
     for (const r of [...this.live]) {
-      try { r.run?.contextRestored?.(); } catch (error) { this.report(r.id, error); }
+      try {
+        r.run?.contextRestored?.();
+      } catch (error) {
+        this.report(r.id, error);
+      }
     }
   }
 
@@ -126,9 +147,11 @@ export class ActivityHost {
   }
 
   private async launch<P>(
-    activity: Activity<P>, params: P, parent: { ctx: ActivityContext; children: Set<RunningActivity>; stopped(): boolean } | null,
+    activity: Activity<P>,
+    params: P,
+    parent: {ctx: ActivityContext; children: Set<RunningActivity>; stopped(): boolean} | null,
   ): Promise<RunningActivity> {
-    const { loop, layers } = this.deps;
+    const {loop, layers} = this.deps;
     const runId = `${activity.id}#${++this.serial}`;
     const abort = new AbortController();
     const disposers: (() => void)[] = [];
@@ -138,9 +161,17 @@ export class ActivityHost {
     let pendingMode: FrameMode | undefined;
     let stopped = false;
     let resolveDone!: (reason: LeaveReason) => void;
-    const done = new Promise<LeaveReason>(resolve => { resolveDone = resolve; });
+    const done = new Promise<LeaveReason>(resolve => {
+      resolveDone = resolve;
+    });
     const fail = (error: unknown) => this.report(activity.id, error);
-    const dispose = (d: () => void) => { try { d(); } catch (error) { fail(error); } };
+    const dispose = (d: () => void) => {
+      try {
+        d();
+      } catch (error) {
+        fail(error);
+      }
+    };
 
     const stop = (reason: LeaveReason) => {
       if (stopped) return;
@@ -157,31 +188,46 @@ export class ActivityHost {
     };
 
     const running: RunningActivity = {
-      id: activity.id, runId, signal: abort.signal, done, stop,
-      get run() { return run; },
-      get stopped() { return stopped; },
+      id: activity.id,
+      runId,
+      signal: abort.signal,
+      done,
+      stop,
+      get run() {
+        return run;
+      },
+      get stopped() {
+        return stopped;
+      },
     };
     // Adopted before entering, so a parent that leaves mid-enter still stops this child first.
     parent?.children.add(running);
 
     const host = this;
     const ctx: ActivityContext = {
-      id: activity.id, runId, signal: abort.signal, parent: parent?.ctx ?? null,
+      id: activity.id,
+      runId,
+      signal: abort.signal,
+      parent: parent?.ctx ?? null,
       layer: request => {
-        const handle = layers.push({ ...request, owner: runId });
+        const handle = layers.push({...request, owner: runId});
         if (stopped) handle.close('owner-left');
         return handle;
       },
       ticker: spec => {
-        const handle = loop.add({ ...spec, owner: runId });
+        const handle = loop.add({...spec, owner: runId});
         ctx.own(() => handle.remove());
         return handle;
       },
       invalidate: () => main?.invalidate(),
-      setFrameMode: mode => { if (main) main.setMode(mode); else pendingMode = mode; },
+      setFrameMode: mode => {
+        if (main) main.setMode(mode);
+        else pendingMode = mode;
+      },
       own(x) {
-        const d = typeof x === 'function' ? x as () => void : () => (x as Disposable).dispose();
-        if (stopped) dispose(d); else disposers.push(d);
+        const d = typeof x === 'function' ? (x as () => void) : () => (x as Disposable).dispose();
+        if (stopped) dispose(d);
+        else disposers.push(d);
         return x;
       },
       async start(child, childParams) {
@@ -195,13 +241,13 @@ export class ActivityHost {
       quality: () => this.deps.quality?.() ?? 'reference',
       surface: request => {
         if (!this.deps.surfaces) throw new Error('No surface port is installed');
-        const lease = this.deps.surfaces.acquire({ ...request, owner: runId });
+        const lease = this.deps.surfaces.acquire({...request, owner: runId});
         ctx.own(() => lease.release());
         return lease;
       },
     };
     // `start` reads this only after `ctx` exists.
-    const self = { ctx, children, stopped: () => stopped };
+    const self = {ctx, children, stopped: () => stopped};
 
     let entered: ActivityRun;
     try {
@@ -213,7 +259,11 @@ export class ActivityHost {
     }
     if (stopped) {
       // Left (or its parent left) while entering: the late run still gets its last words, and nothing ticks.
-      try { entered.leave?.('replaced'); } catch (error) { fail(error); }
+      try {
+        entered.leave?.('replaced');
+      } catch (error) {
+        fail(error);
+      }
       return running;
     }
     run = entered;

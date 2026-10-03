@@ -1,1 +1,1 @@
-{"extends":"../../tsconfig.json","include":["game/**/*.ts"]}
+{"extends": "../../tsconfig.json", "include": ["game/**/*.ts"]}

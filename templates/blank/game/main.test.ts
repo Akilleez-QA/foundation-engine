@@ -1,6 +1,6 @@
-import { test } from 'node:test';
+import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import { testScene, Transform } from '@engine';
+import {testScene, Transform} from '@engine';
 import main from './main';
 
 test('S1: pressing turn rotates the cube a quarter turn within half a second', async () => {

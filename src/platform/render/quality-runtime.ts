@@ -13,8 +13,15 @@
  * This file and quality.ts are the only scenes that read `devicePixelRatio` or probe the GPU (STD-SET-4).
  */
 import {
-  createQuality, isQualityPreset, readDeviceSignals,
-  type DeviceSignals, type GraphicsChoiceStore, type KnobRegistry, type Quality, type QualityPreset, type ShadowMapRequest,
+  createQuality,
+  isQualityPreset,
+  readDeviceSignals,
+  type DeviceSignals,
+  type GraphicsChoiceStore,
+  type KnobRegistry,
+  type Quality,
+  type QualityPreset,
+  type ShadowMapRequest,
 } from './quality';
 
 const browserDpr = (): number => (typeof devicePixelRatio === 'number' && devicePixelRatio > 0 ? devicePixelRatio : 1);
@@ -22,15 +29,26 @@ const browserDpr = (): number => (typeof devicePixelRatio === 'number' && device
 let installed: Quality | null = null;
 let bindingEpoch = 0;
 /** Make `q` the app's quality service (main.ts, before any renderer exists). */
-export function installAppQuality(q: Quality): Quality { bindingEpoch++; installed = q; return q; }
+export function installAppQuality(q: Quality): Quality {
+  bindingEpoch++;
+  installed = q;
+  return q;
+}
 /** Owned binding: retiring an older app cannot clear a newer installation. */
 export function bindAppQuality(q: Quality): () => void {
   installAppQuality(q);
   const epoch = bindingEpoch;
-  return () => { if (bindingEpoch === epoch) { bindingEpoch++; installed = null; } };
+  return () => {
+    if (bindingEpoch === epoch) {
+      bindingEpoch++;
+      installed = null;
+    }
+  };
 }
 /** The app's quality service. */
-export function appQuality(): Quality { return installed ??= createQuality({ devicePixelRatio: browserDpr }); }
+export function appQuality(): Quality {
+  return (installed ??= createQuality({devicePixelRatio: browserDpr}));
+}
 
 /** `?quality=<preset>` pins the preset for a gate, bench or verifier run. Anything else is no pin. */
 export function pinnedPreset(search: string): QualityPreset | undefined {
@@ -51,12 +69,14 @@ export function probeDevice(doc: Document = document): DeviceSignals | undefined
     const gl = canvas.getContext('webgl2');
     const signals = readDeviceSignals({
       matchMedia: typeof matchMedia === 'function' ? q => matchMedia(q) : undefined,
-      navigator: typeof navigator === 'object' ? navigator as never : undefined,
+      navigator: typeof navigator === 'object' ? (navigator as never) : undefined,
       gl,
     });
-    (gl?.getExtension('WEBGL_lose_context') as { loseContext(): void } | null)?.loseContext();
+    (gl?.getExtension('WEBGL_lose_context') as {loseContext(): void} | null)?.loseContext();
     return signals;
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
 }
 
 export interface AppQualityOptions {
@@ -75,13 +95,22 @@ export interface AppQualityOptions {
 /** The running game's service: pin > saved choice > authored startup > optional detection/default. */
 export function createAppQuality(o: AppQualityOptions): Quality {
   return createQuality({
-    registry: o.registry, initialPreset: o.initialPreset, store: o.store, pinned: pinnedPreset(o.search ?? ''), build: o.build,
-    signals: o.signals ?? (() => probeDevice()), devicePixelRatio: browserDpr,
+    registry: o.registry,
+    initialPreset: o.initialPreset,
+    store: o.store,
+    pinned: pinnedPreset(o.search ?? ''),
+    build: o.build,
+    signals: o.signals ?? (() => probeDevice()),
+    devicePixelRatio: browserDpr,
   });
 }
 
 /** What `livePixelRatio` needs from a renderer (three's WebGLRenderer, or a pooled renderer). */
-export interface PixelRatioTarget { setPixelRatio(ratio: number): void; getPixelRatio?(): number; dispose(): void }
+export interface PixelRatioTarget {
+  setPixelRatio(ratio: number): void;
+  getPixelRatio?(): number;
+  dispose(): void;
+}
 
 let resizePending = false;
 /**
@@ -91,21 +120,28 @@ let resizePending = false;
 function redrawAfterResize(): void {
   if (resizePending || typeof window !== 'object' || typeof Event !== 'function') return;
   resizePending = true;
-  queueMicrotask(() => { resizePending = false; window.dispatchEvent(new Event('resize')); });
+  queueMicrotask(() => {
+    resizePending = false;
+    window.dispatchEvent(new Event('resize'));
+  });
 }
 
 /**
  * Sets `quality.pixelRatio(max)` on `renderer`, and again whenever the ratio changes (the Graphics screen), until
  * `renderer.dispose()`. `max` stays the activity's ceiling.
  */
-export function livePixelRatio<R extends PixelRatioTarget>(renderer: R, max?: number, quality: Quality = appQuality()): R {
+export function livePixelRatio<R extends PixelRatioTarget>(
+  renderer: R,
+  max?: number,
+  quality: Quality = appQuality(),
+): R {
   let current = quality.pixelRatio(max);
   renderer.setPixelRatio(current);
   // A preset change reports its slowest knob's `applies`, so every change is checked; the ratio knobs are all live.
   const off = quality.subscribe(() => {
     const next = quality.pixelRatio(max);
     if ((renderer.getPixelRatio?.() ?? current) === next) return;
-    renderer.setPixelRatio(current = next);
+    renderer.setPixelRatio((current = next));
     redrawAfterResize();
   });
   const dispose = renderer.dispose;
@@ -119,7 +155,7 @@ export function livePixelRatio<R extends PixelRatioTarget>(renderer: R, max?: nu
 /** What `liveShadowMap` needs from a shadow-casting light (three's DirectionalLight or SpotLight). */
 export interface ShadowLightTarget {
   castShadow: boolean;
-  shadow: { mapSize: { x: number; set(x: number, y: number): unknown }; map: { dispose(): void } | null };
+  shadow: {mapSize: {x: number; set(x: number, y: number): unknown}; map: {dispose(): void} | null};
 }
 export interface LiveShadowMap {
   /** A new requested size (a scene that sizes its map by its view, e.g. on resize); the knob still caps it. */
@@ -133,16 +169,31 @@ export interface LiveShadowMap {
  * when shadows come back. A resized map is released and redrawn on the next frame (the shadow scheduler sees the new
  * size). Stops following the knob on `dispose()` or when `owner` (the scene's renderer) is disposed.
  */
-export function liveShadowMap(light: ShadowLightTarget, requested: ShadowMapRequest, owner?: { dispose(): void }, quality: Quality = appQuality()): LiveShadowMap {
-  let want = requested, offByKnob = false, live = true;
+export function liveShadowMap(
+  light: ShadowLightTarget,
+  requested: ShadowMapRequest,
+  owner?: {dispose(): void},
+  quality: Quality = appQuality(),
+): LiveShadowMap {
+  let want = requested,
+    offByKnob = false,
+    live = true;
   const apply = (): boolean => {
     const size = quality.shadowMapSize(want);
     if (size === 0) {
-      if (light.castShadow) { light.castShadow = false; offByKnob = true; return true; }
+      if (light.castShadow) {
+        light.castShadow = false;
+        offByKnob = true;
+        return true;
+      }
       return false;
     }
     let changed = false;
-    if (offByKnob) { light.castShadow = true; offByKnob = false; changed = true; }
+    if (offByKnob) {
+      light.castShadow = true;
+      offByKnob = false;
+      changed = true;
+    }
     if (light.shadow.mapSize.x !== size) {
       light.shadow.mapSize.set(size, size);
       light.shadow.map?.dispose();
@@ -152,10 +203,19 @@ export function liveShadowMap(light: ShadowLightTarget, requested: ShadowMapRequ
     return changed;
   };
   apply();
-  const off = quality.subscribe(() => { if (apply()) redrawAfterResize(); });
+  const off = quality.subscribe(() => {
+    if (apply()) redrawAfterResize();
+  });
   const handle: LiveShadowMap = {
-    request(size) { want = size; if (live) apply(); },
-    dispose() { if (!live) return; live = false; off(); },
+    request(size) {
+      want = size;
+      if (live) apply();
+    },
+    dispose() {
+      if (!live) return;
+      live = false;
+      off();
+    },
   };
   if (owner) {
     const dispose = owner.dispose;

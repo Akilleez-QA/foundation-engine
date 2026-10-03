@@ -51,19 +51,23 @@ export interface ConnectionDrainOptions {
   readonly random?: () => number;
 }
 
-export interface DrainNotice { readonly cause: DrainCause; readonly closeInMs: number; readonly reconnectAfterMs: number }
+export interface DrainNotice {
+  readonly cause: DrainCause;
+  readonly closeInMs: number;
+  readonly reconnectAfterMs: number;
+}
 
 export type DrainAction =
-  | Readonly<{ key: DrainKey; action: 'notify'; notice: DrainNotice }>
-  | Readonly<{ key: DrainKey; action: 'close'; cause: DrainCause }>;
+  | Readonly<{key: DrainKey; action: 'notify'; notice: DrainNotice}>
+  | Readonly<{key: DrainKey; action: 'close'; cause: DrainCause}>;
 
 export type DrainTrackResult =
-  | Readonly<{ status: 'tracked'; closeAtMs: number | null }>
-  | Readonly<{ status: 'refused'; reason: 'draining' | 'capacity' | 'duplicate' | 'invalid-key' | 'busy' | 'retired' }>;
+  | Readonly<{status: 'tracked'; closeAtMs: number | null}>
+  | Readonly<{status: 'refused'; reason: 'draining' | 'capacity' | 'duplicate' | 'invalid-key' | 'busy' | 'retired'}>;
 
 export type DrainStartResult =
-  | Readonly<{ status: 'draining'; connections: number; closeByMs: number }>
-  | Readonly<{ status: 'refused'; reason: 'invalid' | 'busy' | 'retired' }>;
+  | Readonly<{status: 'draining'; connections: number; closeByMs: number}>
+  | Readonly<{status: 'refused'; reason: 'invalid' | 'busy' | 'retired'}>;
 
 export interface ConnectionDrainState {
   readonly tracked: number;
@@ -74,7 +78,7 @@ export interface ConnectionDrainState {
   /** An operator drain is in force: new connections are refused until `resume`. */
   readonly draining: boolean;
   readonly retired: string | null;
-  readonly counts: Readonly<{ notices: number; closes: number; refusedDraining: number; refusedCapacity: number }>;
+  readonly counts: Readonly<{notices: number; closes: number; refusedDraining: number; refusedCapacity: number}>;
   readonly limits: ConnectionDrainLimits;
 }
 
@@ -87,7 +91,7 @@ export interface ConnectionDrain {
    * Operator drain of every tracked connection, including ones already notified: the close only moves earlier, the
    * announced return only lengthens, the cause becomes `planned`, and a changed notice is re-sent once.
    */
-  drain(now: number, request: { readonly noticeMs: number; readonly reconnectAfterMs: number }): DrainStartResult;
+  drain(now: number, request: {readonly noticeMs: number; readonly reconnectAfterMs: number}): DrainStartResult;
   /** Accept new connections again. Connections already notified keep their close. */
   resume(): boolean;
   /** Due instructions, at most `maxActionsPerPoll`, earliest first. A connection's notify always precedes its close. */
@@ -110,48 +114,78 @@ const onlyKeys = (value: Record<string, unknown>, required: readonly string[], o
 function captureLifetime(value: unknown): ConnectionLifetimeLimits {
   if (!isRecord(value) || !onlyKeys(value, ['maxLifetimeMs', 'jitterMs', 'noticeMs', 'reconnectAfterMs']))
     throw Error('connection drain: invalid lifetime');
-  const { maxLifetimeMs, jitterMs, noticeMs, reconnectAfterMs } = value;
-  if (!bounded(maxLifetimeMs) || !bounded(jitterMs, 0) || !bounded(noticeMs, 0) || !bounded(reconnectAfterMs, 0) ||
-    (noticeMs as number) + (jitterMs as number) >= (maxLifetimeMs as number))
+  const {maxLifetimeMs, jitterMs, noticeMs, reconnectAfterMs} = value;
+  if (
+    !bounded(maxLifetimeMs) ||
+    !bounded(jitterMs, 0) ||
+    !bounded(noticeMs, 0) ||
+    !bounded(reconnectAfterMs, 0) ||
+    (noticeMs as number) + (jitterMs as number) >= (maxLifetimeMs as number)
+  )
     throw Error('connection drain: invalid lifetime');
-  return Object.freeze({ maxLifetimeMs, jitterMs, noticeMs, reconnectAfterMs }) as ConnectionLifetimeLimits;
+  return Object.freeze({maxLifetimeMs, jitterMs, noticeMs, reconnectAfterMs}) as ConnectionLifetimeLimits;
 }
 
 function captureLimits(value: unknown): ConnectionDrainLimits {
-  if (!isRecord(value) || !onlyKeys(value, ['maxKeys', 'maxNoticeMs', 'maxReconnectAfterMs', 'maxActionsPerPoll'], ['lifetime']))
+  if (
+    !isRecord(value) ||
+    !onlyKeys(value, ['maxKeys', 'maxNoticeMs', 'maxReconnectAfterMs', 'maxActionsPerPoll'], ['lifetime'])
+  )
     throw Error('connection drain: invalid limits');
-  const { maxKeys, maxNoticeMs, maxReconnectAfterMs, maxActionsPerPoll } = value;
-  if (!Number.isSafeInteger(maxKeys) || (maxKeys as number) < 1 || (maxKeys as number) > MAX_DRAIN_KEYS ||
-    !bounded(maxNoticeMs, 0) || !bounded(maxReconnectAfterMs, 0) ||
-    !Number.isSafeInteger(maxActionsPerPoll) || (maxActionsPerPoll as number) < 2 || (maxActionsPerPoll as number) > MAX_DRAIN_KEYS)
+  const {maxKeys, maxNoticeMs, maxReconnectAfterMs, maxActionsPerPoll} = value;
+  if (
+    !Number.isSafeInteger(maxKeys) ||
+    (maxKeys as number) < 1 ||
+    (maxKeys as number) > MAX_DRAIN_KEYS ||
+    !bounded(maxNoticeMs, 0) ||
+    !bounded(maxReconnectAfterMs, 0) ||
+    !Number.isSafeInteger(maxActionsPerPoll) ||
+    (maxActionsPerPoll as number) < 2 ||
+    (maxActionsPerPoll as number) > MAX_DRAIN_KEYS
+  )
     throw Error('connection drain: invalid limits');
   const lifetime = value.lifetime === undefined ? undefined : captureLifetime(value.lifetime);
-  return Object.freeze({ maxKeys, maxNoticeMs, maxReconnectAfterMs, maxActionsPerPoll,
-    ...(lifetime ? { lifetime } : {}) }) as ConnectionDrainLimits;
+  return Object.freeze({
+    maxKeys,
+    maxNoticeMs,
+    maxReconnectAfterMs,
+    maxActionsPerPoll,
+    ...(lifetime ? {lifetime} : {}),
+  }) as ConnectionDrainLimits;
 }
 
 const validKey = (key: unknown): key is DrainKey =>
-  (typeof key === 'object' && key !== null) || typeof key === 'function' ||
+  (typeof key === 'object' && key !== null) ||
+  typeof key === 'function' ||
   (typeof key === 'string' && key.length > 0 && key.length <= 256);
 
 type Entry = {
-  closeAt: number | null; noticeAt: number | null; cause: DrainCause; reconnectAfterMs: number;
-  phase: 'live' | 'notified' | 'closing'; order: number;
+  closeAt: number | null;
+  noticeAt: number | null;
+  cause: DrainCause;
+  reconnectAfterMs: number;
+  phase: 'live' | 'notified' | 'closing';
+  order: number;
   /** Notified, but a later operator drain changed what the client was told: send one superseding notice. */
   renotify: boolean;
 };
 
 /** Construct one per host (or per listener). Construction reads no clock and draws no randomness. */
 export function createConnectionDrain(options: ConnectionDrainOptions): ConnectionDrain {
-  if (!isRecord(options) || !onlyKeys(options, ['limits'], ['random'])) throw Error('connection drain: invalid configuration');
+  if (!isRecord(options) || !onlyKeys(options, ['limits'], ['random']))
+    throw Error('connection drain: invalid configuration');
   const limits = captureLimits(options.limits);
   const random = options.random;
   if (random !== undefined && typeof random !== 'function') throw Error('connection drain: invalid configuration');
   if (limits.lifetime && !random) throw Error('connection drain: lifetime requires a random port');
 
   const entries = new Map<DrainKey, Entry>();
-  const counts = { notices: 0, closes: 0, refusedDraining: 0, refusedCapacity: 0 };
-  let retired: string | null = null, draining = false, busy = false, lastNow = 0, order = 0;
+  const counts = {notices: 0, closes: 0, refusedDraining: 0, refusedCapacity: 0};
+  let retired: string | null = null,
+    draining = false,
+    busy = false,
+    lastNow = 0,
+    order = 0;
 
   function time(now: number) {
     if (typeof now !== 'number' || !Number.isFinite(now) || now < 0 || now < lastNow)
@@ -160,10 +194,12 @@ export function createConnectionDrain(options: ConnectionDrainOptions): Connecti
   }
   function retire(reason: string) {
     if (retired !== null) return;
-    retired = reason; entries.clear(); draining = false;
+    retired = reason;
+    entries.clear();
+    draining = false;
   }
-  const refusedTrack = (reason: Extract<DrainTrackResult, { status: 'refused' }>['reason']) =>
-    Object.freeze({ status: 'refused' as const, reason });
+  const refusedTrack = (reason: Extract<DrainTrackResult, {status: 'refused'}>['reason']) =>
+    Object.freeze({status: 'refused' as const, reason});
 
   return Object.freeze({
     track(key: DrainKey, now: number): DrainTrackResult {
@@ -172,35 +208,66 @@ export function createConnectionDrain(options: ConnectionDrainOptions): Connecti
       time(now);
       if (!validKey(key)) return refusedTrack('invalid-key');
       if (entries.has(key)) return refusedTrack('duplicate');
-      if (draining) { counts.refusedDraining++; return refusedTrack('draining'); }
-      if (entries.size >= limits.maxKeys) { counts.refusedCapacity++; return refusedTrack('capacity'); }
-      let closeAt: number | null = null, noticeAt: number | null = null, reconnectAfterMs = 0;
+      if (draining) {
+        counts.refusedDraining++;
+        return refusedTrack('draining');
+      }
+      if (entries.size >= limits.maxKeys) {
+        counts.refusedCapacity++;
+        return refusedTrack('capacity');
+      }
+      let closeAt: number | null = null,
+        noticeAt: number | null = null,
+        reconnectAfterMs = 0;
       const lifetime = limits.lifetime;
       if (lifetime) {
         let sample: unknown;
         busy = true;
-        try { sample = (random as () => number)(); } catch { retire('random-failed'); return refusedTrack('retired'); } finally { busy = false; }
+        try {
+          sample = (random as () => number)();
+        } catch {
+          retire('random-failed');
+          return refusedTrack('retired');
+        } finally {
+          busy = false;
+        }
         if ((retired as string | null) !== null) return refusedTrack('retired');
-        if (typeof sample !== 'number' || !(sample >= 0 && sample < 1)) { retire('random-invalid'); return refusedTrack('retired'); }
+        if (typeof sample !== 'number' || !(sample >= 0 && sample < 1)) {
+          retire('random-invalid');
+          return refusedTrack('retired');
+        }
         const dither = Math.min(lifetime.jitterMs, Math.floor(sample * (lifetime.jitterMs + 1)));
         closeAt = now + lifetime.maxLifetimeMs - dither;
         noticeAt = closeAt - lifetime.noticeMs;
         reconnectAfterMs = lifetime.reconnectAfterMs;
       }
-      entries.set(key, { closeAt, noticeAt, cause: 'lifetime', reconnectAfterMs, phase: 'live', order: order++, renotify: false });
-      return Object.freeze({ status: 'tracked' as const, closeAtMs: closeAt });
+      entries.set(key, {
+        closeAt,
+        noticeAt,
+        cause: 'lifetime',
+        reconnectAfterMs,
+        phase: 'live',
+        order: order++,
+        renotify: false,
+      });
+      return Object.freeze({status: 'tracked' as const, closeAtMs: closeAt});
     },
     admits(key: DrainKey) {
       return retired === null && entries.get(key)?.phase === 'live';
     },
-    drain(now: number, request: { readonly noticeMs: number; readonly reconnectAfterMs: number }): DrainStartResult {
-      if (retired !== null) return Object.freeze({ status: 'refused' as const, reason: 'retired' as const });
-      if (busy) return Object.freeze({ status: 'refused' as const, reason: 'busy' as const });
+    drain(now: number, request: {readonly noticeMs: number; readonly reconnectAfterMs: number}): DrainStartResult {
+      if (retired !== null) return Object.freeze({status: 'refused' as const, reason: 'retired' as const});
+      if (busy) return Object.freeze({status: 'refused' as const, reason: 'busy' as const});
       time(now);
-      if (!isRecord(request) || !onlyKeys(request, ['noticeMs', 'reconnectAfterMs']) ||
-        !bounded(request.noticeMs, 0) || request.noticeMs > limits.maxNoticeMs ||
-        !bounded(request.reconnectAfterMs, 0) || request.reconnectAfterMs > limits.maxReconnectAfterMs)
-        return Object.freeze({ status: 'refused' as const, reason: 'invalid' as const });
+      if (
+        !isRecord(request) ||
+        !onlyKeys(request, ['noticeMs', 'reconnectAfterMs']) ||
+        !bounded(request.noticeMs, 0) ||
+        request.noticeMs > limits.maxNoticeMs ||
+        !bounded(request.reconnectAfterMs, 0) ||
+        request.reconnectAfterMs > limits.maxReconnectAfterMs
+      )
+        return Object.freeze({status: 'refused' as const, reason: 'invalid' as const});
       draining = true;
       const closeBy = now + request.noticeMs;
       let connections = 0;
@@ -212,12 +279,18 @@ export function createConnectionDrain(options: ConnectionDrainOptions): Connecti
         // short return does not reconnect straight into the draining host.
         const closeAt = entry.closeAt === null ? closeBy : Math.min(entry.closeAt, closeBy);
         const reconnectAfterMs = Math.max(entry.reconnectAfterMs, request.reconnectAfterMs);
-        const changed = closeAt !== entry.closeAt || reconnectAfterMs !== entry.reconnectAfterMs || entry.cause !== 'planned';
-        entry.closeAt = closeAt; entry.reconnectAfterMs = reconnectAfterMs; entry.cause = 'planned';
+        const changed =
+          closeAt !== entry.closeAt || reconnectAfterMs !== entry.reconnectAfterMs || entry.cause !== 'planned';
+        entry.closeAt = closeAt;
+        entry.reconnectAfterMs = reconnectAfterMs;
+        entry.cause = 'planned';
         if (entry.phase === 'live') entry.noticeAt = now;
-        else if (changed) { entry.renotify = true; entry.noticeAt = now; }
+        else if (changed) {
+          entry.renotify = true;
+          entry.noticeAt = now;
+        }
       }
-      return Object.freeze({ status: 'draining' as const, connections, closeByMs: closeBy });
+      return Object.freeze({status: 'draining' as const, connections, closeByMs: closeBy});
     },
     resume() {
       if (retired !== null || busy || !draining) return false;
@@ -231,7 +304,8 @@ export function createConnectionDrain(options: ConnectionDrainOptions): Connecti
       for (const [key, entry] of entries) {
         if ((entry.phase === 'live' || entry.renotify) && entry.noticeAt !== null && now >= entry.noticeAt)
           due.push([key, entry, entry.noticeAt]);
-        else if (entry.phase === 'notified' && now >= (entry.closeAt as number)) due.push([key, entry, entry.closeAt as number]);
+        else if (entry.phase === 'notified' && now >= (entry.closeAt as number))
+          due.push([key, entry, entry.closeAt as number]);
       }
       due.sort((a, b) => a[2] - b[2] || a[1].order - b[1].order);
       const actions: DrainAction[] = [];
@@ -239,15 +313,27 @@ export function createConnectionDrain(options: ConnectionDrainOptions): Connecti
         if (actions.length >= limits.maxActionsPerPoll) break;
         if (entry.phase === 'live' || entry.renotify) {
           const closeAt = entry.closeAt as number;
-          entry.phase = 'notified'; entry.renotify = false; counts.notices++;
-          actions.push(Object.freeze({ key, action: 'notify' as const, notice: Object.freeze({
-            cause: entry.cause, closeInMs: Math.max(0, Math.floor(closeAt - now)), reconnectAfterMs: entry.reconnectAfterMs }) }));
+          entry.phase = 'notified';
+          entry.renotify = false;
+          counts.notices++;
+          actions.push(
+            Object.freeze({
+              key,
+              action: 'notify' as const,
+              notice: Object.freeze({
+                cause: entry.cause,
+                closeInMs: Math.max(0, Math.floor(closeAt - now)),
+                reconnectAfterMs: entry.reconnectAfterMs,
+              }),
+            }),
+          );
           // closeInMs is whole milliseconds rounded down, so a fractional host clock never announces a later close.
           // A notice delivered late (per-poll cap) does not postpone the close; a close already due follows at once.
           if (now < closeAt || actions.length >= limits.maxActionsPerPoll) continue;
         }
-        entry.phase = 'closing'; counts.closes++;
-        actions.push(Object.freeze({ key, action: 'close' as const, cause: entry.cause }));
+        entry.phase = 'closing';
+        counts.closes++;
+        actions.push(Object.freeze({key, action: 'close' as const, cause: entry.cause}));
       }
       return Object.freeze(actions);
     },
@@ -256,15 +342,25 @@ export function createConnectionDrain(options: ConnectionDrainOptions): Connecti
       return entries.delete(key);
     },
     read(): ConnectionDrainState {
-      let notified = 0, closing = 0;
+      let notified = 0,
+        closing = 0;
       for (const entry of entries.values()) {
         if (entry.phase === 'notified') notified++;
         else if (entry.phase === 'closing') closing++;
       }
-      return Object.freeze({ tracked: entries.size, notified, closing, draining, retired,
-        counts: Object.freeze({ ...counts }), limits });
+      return Object.freeze({
+        tracked: entries.size,
+        notified,
+        closing,
+        draining,
+        retired,
+        counts: Object.freeze({...counts}),
+        limits,
+      });
     },
-    dispose() { retire('disposed'); },
+    dispose() {
+      retire('disposed');
+    },
   });
 }
 
@@ -276,16 +372,16 @@ export interface DrainFollowerLimits {
 }
 
 export type DrainNoticeResult =
-  | Readonly<{ status: 'draining'; cause: DrainCause; closeByMs: number; reconnectAfterMs: number }>
-  | Readonly<{ status: 'updated'; cause: DrainCause; closeByMs: number; reconnectAfterMs: number }>
-  | Readonly<{ status: 'duplicate'; closeByMs: number }>
-  | Readonly<{ status: 'invalid' }>
-  | Readonly<{ status: 'retired' }>;
+  | Readonly<{status: 'draining'; cause: DrainCause; closeByMs: number; reconnectAfterMs: number}>
+  | Readonly<{status: 'updated'; cause: DrainCause; closeByMs: number; reconnectAfterMs: number}>
+  | Readonly<{status: 'duplicate'; closeByMs: number}>
+  | Readonly<{status: 'invalid'}>
+  | Readonly<{status: 'retired'}>;
 
 export type DrainCloseResult =
-  | Readonly<{ status: 'hold'; untilMs: number; cause: DrainCause }>
-  | Readonly<{ status: 'unplanned' }>
-  | Readonly<{ status: 'retired' }>;
+  | Readonly<{status: 'hold'; untilMs: number; cause: DrainCause}>
+  | Readonly<{status: 'unplanned'}>
+  | Readonly<{status: 'retired'}>;
 
 export interface DrainFollowerState {
   readonly state: 'idle' | 'draining' | 'holding' | 'retired';
@@ -318,45 +414,77 @@ export interface DrainFollower {
 }
 
 /** Construct one per connection owner (scene visit). It owns no timer and never opens or closes a transport. */
-export function createDrainFollower(options: { readonly limits: DrainFollowerLimits }): DrainFollower {
-  if (!isRecord(options) || !onlyKeys(options, ['limits']) || !isRecord(options.limits) ||
+export function createDrainFollower(options: {readonly limits: DrainFollowerLimits}): DrainFollower {
+  if (
+    !isRecord(options) ||
+    !onlyKeys(options, ['limits']) ||
+    !isRecord(options.limits) ||
     !onlyKeys(options.limits, ['maxNoticeMs', 'maxReconnectAfterMs']) ||
-    !bounded(options.limits.maxNoticeMs, 0) || !bounded(options.limits.maxReconnectAfterMs, 0))
+    !bounded(options.limits.maxNoticeMs, 0) ||
+    !bounded(options.limits.maxReconnectAfterMs, 0)
+  )
     throw Error('drain follower: invalid limits');
-  const limits = Object.freeze({ maxNoticeMs: options.limits.maxNoticeMs, maxReconnectAfterMs: options.limits.maxReconnectAfterMs });
-  let state: DrainFollowerState['state'] = 'idle', cause: DrainCause | null = null;
-  let closeBy: number | null = null, reconnectAfter = 0, holdUntil: number | null = null, closeSignalled = false, lastNow = 0;
+  const limits = Object.freeze({
+    maxNoticeMs: options.limits.maxNoticeMs,
+    maxReconnectAfterMs: options.limits.maxReconnectAfterMs,
+  });
+  let state: DrainFollowerState['state'] = 'idle',
+    cause: DrainCause | null = null;
+  let closeBy: number | null = null,
+    reconnectAfter = 0,
+    holdUntil: number | null = null,
+    closeSignalled = false,
+    lastNow = 0;
 
   function time(now: number) {
     if (typeof now !== 'number' || !Number.isFinite(now) || now < 0 || now < lastNow)
       throw RangeError('drain follower: time must be finite, nonnegative and nondecreasing');
     lastNow = now;
   }
-  function clear() { state = 'idle'; cause = null; closeBy = null; reconnectAfter = 0; holdUntil = null; closeSignalled = false; }
+  function clear() {
+    state = 'idle';
+    cause = null;
+    closeBy = null;
+    reconnectAfter = 0;
+    holdUntil = null;
+    closeSignalled = false;
+  }
 
   return Object.freeze({
     notice(payload: unknown, now: number): DrainNoticeResult {
-      if (state === 'retired') return Object.freeze({ status: 'retired' as const });
+      if (state === 'retired') return Object.freeze({status: 'retired' as const});
       time(now);
-      if (!isRecord(payload) || !onlyKeys(payload, ['cause', 'closeInMs', 'reconnectAfterMs']) ||
+      if (
+        !isRecord(payload) ||
+        !onlyKeys(payload, ['cause', 'closeInMs', 'reconnectAfterMs']) ||
         (payload.cause !== 'planned' && payload.cause !== 'lifetime') ||
-        !bounded(payload.closeInMs, 0) || payload.closeInMs > limits.maxNoticeMs ||
-        !bounded(payload.reconnectAfterMs, 0) || payload.reconnectAfterMs > limits.maxReconnectAfterMs)
-        return Object.freeze({ status: 'invalid' as const });
+        !bounded(payload.closeInMs, 0) ||
+        payload.closeInMs > limits.maxNoticeMs ||
+        !bounded(payload.reconnectAfterMs, 0) ||
+        payload.reconnectAfterMs > limits.maxReconnectAfterMs
+      )
+        return Object.freeze({status: 'invalid' as const});
       if (state === 'draining') {
         const nextClose = Math.min(closeBy as number, now + payload.closeInMs);
         const nextReturn = Math.max(reconnectAfter, payload.reconnectAfterMs);
         const nextCause: DrainCause = cause === 'planned' || payload.cause === 'planned' ? 'planned' : 'lifetime';
         if (nextClose === closeBy && nextReturn === reconnectAfter && nextCause === cause)
-          return Object.freeze({ status: 'duplicate' as const, closeByMs: closeBy as number });
-        closeBy = nextClose; reconnectAfter = nextReturn; cause = nextCause;
-        return Object.freeze({ status: 'updated' as const, cause, closeByMs: closeBy, reconnectAfterMs: reconnectAfter });
+          return Object.freeze({status: 'duplicate' as const, closeByMs: closeBy as number});
+        closeBy = nextClose;
+        reconnectAfter = nextReturn;
+        cause = nextCause;
+        return Object.freeze({status: 'updated' as const, cause, closeByMs: closeBy, reconnectAfterMs: reconnectAfter});
       }
-      if (state !== 'idle') return Object.freeze({ status: 'duplicate' as const, closeByMs: closeBy ?? now });
-      state = 'draining'; cause = payload.cause; closeBy = now + payload.closeInMs; reconnectAfter = payload.reconnectAfterMs;
-      return Object.freeze({ status: 'draining' as const, cause, closeByMs: closeBy, reconnectAfterMs: reconnectAfter });
+      if (state !== 'idle') return Object.freeze({status: 'duplicate' as const, closeByMs: closeBy ?? now});
+      state = 'draining';
+      cause = payload.cause;
+      closeBy = now + payload.closeInMs;
+      reconnectAfter = payload.reconnectAfterMs;
+      return Object.freeze({status: 'draining' as const, cause, closeByMs: closeBy, reconnectAfterMs: reconnectAfter});
     },
-    admits() { return state === 'idle'; },
+    admits() {
+      return state === 'idle';
+    },
     closeDue(now: number) {
       if (state !== 'draining' || closeSignalled) return false;
       time(now);
@@ -365,12 +493,14 @@ export function createDrainFollower(options: { readonly limits: DrainFollowerLim
       return true;
     },
     closed(now: number): DrainCloseResult {
-      if (state === 'retired') return Object.freeze({ status: 'retired' as const });
+      if (state === 'retired') return Object.freeze({status: 'retired' as const});
       time(now);
-      if (state === 'holding') return Object.freeze({ status: 'hold' as const, untilMs: holdUntil as number, cause: cause as DrainCause });
-      if (state !== 'draining') return Object.freeze({ status: 'unplanned' as const });
-      state = 'holding'; holdUntil = now + reconnectAfter;
-      return Object.freeze({ status: 'hold' as const, untilMs: holdUntil, cause: cause as DrainCause });
+      if (state === 'holding')
+        return Object.freeze({status: 'hold' as const, untilMs: holdUntil as number, cause: cause as DrainCause});
+      if (state !== 'draining') return Object.freeze({status: 'unplanned' as const});
+      state = 'holding';
+      holdUntil = now + reconnectAfter;
+      return Object.freeze({status: 'hold' as const, untilMs: holdUntil, cause: cause as DrainCause});
     },
     release(now: number) {
       if (state !== 'holding') return false;
@@ -379,10 +509,15 @@ export function createDrainFollower(options: { readonly limits: DrainFollowerLim
       clear();
       return true;
     },
-    reset() { if (state !== 'retired') clear(); },
-    read(): DrainFollowerState {
-      return Object.freeze({ state, cause, closeByMs: closeBy, holdUntilMs: holdUntil, limits });
+    reset() {
+      if (state !== 'retired') clear();
     },
-    dispose() { clear(); state = 'retired'; },
+    read(): DrainFollowerState {
+      return Object.freeze({state, cause, closeByMs: closeBy, holdUntilMs: holdUntil, limits});
+    },
+    dispose() {
+      clear();
+      state = 'retired';
+    },
   });
 }

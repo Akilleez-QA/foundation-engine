@@ -1,28 +1,25 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { World } from '../../src/core/ecs/world.ts';
-import { Shape, Name } from '../../src/author/defs.ts';
-import { createReplicaProjection, Replica } from './projection.mjs';
-const row = (id, incarnation = 0, fields = { value: 1, private: 'own' }) => ({
+import {World} from '../../src/core/ecs/world.ts';
+import {Shape, Name} from '../../src/author/defs.ts';
+import {createReplicaProjection, Replica} from './projection.mjs';
+const row = (id, incarnation = 0, fields = {value: 1, private: 'own'}) => ({
   id,
   incarnation,
   fields,
 });
-const view = (...entities) => ({ entities });
+const view = (...entities) => ({entities});
 
 test('complete fields and entity omissions replace actual ECS facts, preserving local entities', () => {
   const world = new World(),
-    local = world.spawn(Name({ name: 'local' })),
+    local = world.spawn(Name({name: 'local'})),
     owner = createReplicaProjection(world);
   assert.equal(owner.replace(view(row('a'), row('b'))).status, 'projected');
   const old = world.first(Replica)[0];
-  assert.equal(
-    owner.replace(view(row('a', 0, { value: 2 }))).status,
-    'projected',
-  );
+  assert.equal(owner.replace(view(row('a', 0, {value: 2}))).status, 'projected');
   assert.deepEqual(
-    [...world.query(Replica)].map(([id, facts]) => ({ id, facts })),
-    [{ id: old, facts: { id: 'a', incarnation: 0, fields: { value: 2 } } }],
+    [...world.query(Replica)].map(([id, facts]) => ({id, facts})),
+    [{id: old, facts: {id: 'a', incarnation: 0, fields: {value: 2}}}],
   );
   assert.equal(world.exists(local), true);
   assert.equal(world.count, 2);
@@ -53,7 +50,7 @@ test('changed incarnation and same-incarnation reappearance retire delayed prese
 });
 test('failure after partial allocation clears all replica rows, never unrelated local state', () => {
   const world = new World(),
-    local = world.spawn(Name({ name: 'local' }));
+    local = world.spawn(Name({name: 'local'}));
   let fail = true;
   const owner = createReplicaProjection(world, {
     beforeWrite: (_id, index) => {
@@ -66,10 +63,7 @@ test('failure after partial allocation clears all replica rows, never unrelated 
   fail = false;
   assert.equal(owner.replace(view(row('a'), row('b'))).status, 'projected');
   assert.equal(world.count, 3);
-  assert.equal(
-    owner.replace(view(row('a', 0, { private: 'x', unexpected: true }))).status,
-    'failed',
-  );
+  assert.equal(owner.replace(view(row('a', 0, {private: 'x', unexpected: true}))).status, 'failed');
   assert.equal(world.count, 1);
 });
 test('reentrant retirement cannot publish a later row or revive a disposed projection', () => {
@@ -86,7 +80,7 @@ test('reentrant retirement cannot publish a later row or revive a disposed proje
 });
 test('overbound or duplicate identities fail closed before exposing a partial replacement', () => {
   const world = new World(),
-    owner = createReplicaProjection(world, { maxEntities: 1 });
+    owner = createReplicaProjection(world, {maxEntities: 1});
   owner.replace(view(row('a')));
   assert.equal(owner.replace(view(row('b'), row('c'))).status, 'failed');
   assert.equal(world.count, 0);

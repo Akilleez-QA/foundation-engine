@@ -25,12 +25,18 @@ import {ROOT, gameDir} from './game-dir.mjs';
 export const RESERVED = ['index.html', 'LICENSE.txt', 'COPYRIGHT.txt', 'THIRD_PARTY_NOTICES.txt'];
 
 const isDir = dir => existsSync(dir) && statSync(dir).isDirectory();
-const rel = (dir, e) => relative(dir, join(e.parentPath ?? e.path, e.name)).split(sep).join('/');
-const entries = dir => isDir(dir) ? readdirSync(dir, {recursive: true, withFileTypes: true}) : [];
+const rel = (dir, e) =>
+  relative(dir, join(e.parentPath ?? e.path, e.name))
+    .split(sep)
+    .join('/');
+const entries = dir => (isDir(dir) ? readdirSync(dir, {recursive: true, withFileTypes: true}) : []);
 
 /** Every file under `dir`, relative, with '/' separators, sorted; [] when the folder does not exist. */
 export function publicFiles(dir) {
-  return entries(dir).filter(e => e.isFile()).map(e => rel(dir, e)).sort();
+  return entries(dir)
+    .filter(e => e.isFile())
+    .map(e => rel(dir, e))
+    .sort();
 }
 
 /** The public folder a build of the game uses: `<game>/public/` when it exists, else the shared root `public/`. */
@@ -43,15 +49,31 @@ const show = path => relative(ROOT, path).split(sep).join('/') || '.';
 /** Why `dir` cannot be served and built as the public folder ([] when it can). `shared` is the root folder. */
 export function publicProblems(dir, shared = join(ROOT, 'public')) {
   if (!dir || !isDir(dir)) return [];
-  const out = [], all = entries(dir);
+  const out = [],
+    all = entries(dir);
   const reserved = new Set(RESERVED.map(n => n.toLowerCase()));
-  const clash = all.filter(e => (e.isFile() || e.isSymbolicLink()) && !rel(dir, e).includes('/') && reserved.has(e.name.toLowerCase())).map(e => e.name).sort();
-  if (clash.length) out.push(`${show(dir)} holds ${clash.join(', ')}: the build writes ${clash.length > 1 ? 'these names' : 'this name'} itself (the app page and the licence notices) and a copy would replace ${clash.length > 1 ? 'them' : 'it'}. Rename or move ${clash.length > 1 ? 'them' : 'it'} into a subfolder.`);
-  const links = all.filter(e => e.isSymbolicLink()).map(e => rel(dir, e)).sort();
-  if (links.length) out.push(`${show(dir)} holds ${links.length} symbolic link(s) (${links.slice(0, 5).join(', ')}${links.length > 5 ? ', …' : ''}): the dev server would follow them but the build copies the link, not the file. Copy the files in instead.`);
+  const clash = all
+    .filter(e => (e.isFile() || e.isSymbolicLink()) && !rel(dir, e).includes('/') && reserved.has(e.name.toLowerCase()))
+    .map(e => e.name)
+    .sort();
+  if (clash.length)
+    out.push(
+      `${show(dir)} holds ${clash.join(', ')}: the build writes ${clash.length > 1 ? 'these names' : 'this name'} itself (the app page and the licence notices) and a copy would replace ${clash.length > 1 ? 'them' : 'it'}. Rename or move ${clash.length > 1 ? 'them' : 'it'} into a subfolder.`,
+    );
+  const links = all
+    .filter(e => e.isSymbolicLink())
+    .map(e => rel(dir, e))
+    .sort();
+  if (links.length)
+    out.push(
+      `${show(dir)} holds ${links.length} symbolic link(s) (${links.slice(0, 5).join(', ')}${links.length > 5 ? ', …' : ''}): the dev server would follow them but the build copies the link, not the file. Copy the files in instead.`,
+    );
   if (dir !== shared) {
     const left = publicFiles(shared);
-    if (left.length) out.push(`the game has its own ${show(dir)}, so the ${left.length} file(s) in the root ${show(shared)} (${left.slice(0, 5).join(', ')}${left.length > 5 ? ', …' : ''}) would be served and built by no one. Move them into ${show(dir)}.`);
+    if (left.length)
+      out.push(
+        `the game has its own ${show(dir)}, so the ${left.length} file(s) in the root ${show(shared)} (${left.slice(0, 5).join(', ')}${left.length > 5 ? ', …' : ''}) would be served and built by no one. Move them into ${show(dir)}.`,
+      );
   }
   return out;
 }
@@ -63,7 +85,9 @@ export function gamePublic({shared = join(ROOT, 'public')} = {}) {
   let dir = '';
   return {
     name: 'engine-game-public',
-    configResolved(config) { dir = config.publicDir || ''; },
+    configResolved(config) {
+      dir = config.publicDir || '';
+    },
     configureServer() {
       const problems = publicProblems(dir, shared);
       if (problems.length) throw Error(message(problems));

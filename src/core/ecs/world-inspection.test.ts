@@ -8,10 +8,17 @@ const Second = component('second-component', {value: 2});
 test('metadata inspection includes unnamed entities without reading component values', () => {
   const world = new World();
   const id = world.spawn(First(), Second());
-  Object.defineProperty(world.get(id, First)!, 'value', {get() { throw Error('must not serialize values'); }});
+  Object.defineProperty(world.get(id, First)!, 'value', {
+    get() {
+      throw Error('must not serialize values');
+    },
+  });
   const page = world.inspectMetadata({maxLabelLength: 5});
   assert.equal(page.entities[0]!.id, id);
-  assert.deepEqual(page.entities[0]!.components, [{label: 'first', truncated: true}, {label: 'secon', truncated: true}]);
+  assert.deepEqual(page.entities[0]!.components, [
+    {label: 'first', truncated: true},
+    {label: 'secon', truncated: true},
+  ]);
   assert.equal(page.entities[0]!.componentsComplete, true);
   assert.equal(page.checks, 3);
   page.entities[0]!.components[0]!.label = 'mutated';
@@ -52,18 +59,24 @@ test('component membership and entity slots share one budget; partial metadata i
 
 test('metadata pages report structural changes without retaining dead entities', () => {
   const world = new World();
-  const first = world.spawn(First()), second = world.spawn(Second());
+  const first = world.spawn(First()),
+    second = world.spawn(Second());
   const page = world.inspectMetadata({limit: 1});
-  world.despawn(first); world.despawn(second);
+  world.despawn(first);
+  world.despawn(second);
   const third = world.spawn();
   const next = world.inspectMetadata({afterId: page.nextAfterId!});
   assert.notEqual(next.version, page.version);
-  assert.deepEqual(next.entities.map(row => row.id), [third]);
+  assert.deepEqual(
+    next.entities.map(row => row.id),
+    [third],
+  );
   assert.equal(next.total, 1);
   assert.equal(world.inspectMetadata({maxChecks: 0}).checks, 0);
   assert.deepEqual(world.inspectMetadata({limit: 0}).entities, []);
   for (const field of ['afterId', 'limit', 'maxChecks', 'maxLabelLength']) {
-    for (const value of [-1, 0.5, Infinity, NaN]) assert.throws(() => world.inspectMetadata({[field]: value}), RangeError);
+    for (const value of [-1, 0.5, Infinity, NaN])
+      assert.throws(() => world.inspectMetadata({[field]: value}), RangeError);
   }
   assert.throws(() => world.inspectMetadata({maxLabelLength: 0}), RangeError);
 });

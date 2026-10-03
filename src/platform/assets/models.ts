@@ -26,10 +26,10 @@
  * - The three.js loader modules are imported on the first model request, so this module costs nothing at boot.
  */
 import type * as T from 'three';
-import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
-import { AbortError, LeaseCache, chooseVariant, type AssetLease } from './lease-cache';
-import type { AssetDef, AssetVariant, QualityTier } from './manifest';
-import type { AssetResidencyPolicy } from './residency';
+import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
+import {AbortError, LeaseCache, chooseVariant, type AssetLease} from './lease-cache';
+import type {AssetDef, AssetVariant, QualityTier} from './manifest';
+import type {AssetResidencyPolicy} from './residency';
 
 /** A parsed model shared by its leases. Treat `scene` as read-only; draw `instantiate()` copies. */
 export interface ModelTemplate {
@@ -100,10 +100,13 @@ export interface ModelLibraryOptions {
   residency?: AssetResidencyPolicy;
 }
 
-export interface ParsedModel { scene: T.Object3D; animations: readonly T.AnimationClip[] }
+export interface ParsedModel {
+  scene: T.Object3D;
+  animations: readonly T.AnimationClip[];
+}
 const MIB = 1024 * 1024;
 
-type Disposable = { dispose(): void; userData: Record<string, unknown> };
+type Disposable = {dispose(): void; userData: Record<string, unknown>};
 
 /** Every geometry, material and texture a tree draws with, each once. */
 export function modelResources(root: T.Object3D): Set<Disposable> {
@@ -115,7 +118,8 @@ export function modelResources(root: T.Object3D): Set<Disposable> {
     for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
       found.add(material);
       for (const value of Object.values(material))
-        if (value && typeof value === 'object' && (value as { isTexture?: boolean }).isTexture) found.add(value as T.Texture);
+        if (value && typeof value === 'object' && (value as {isTexture?: boolean}).isTexture)
+          found.add(value as T.Texture);
     }
   });
   return found;
@@ -131,39 +135,83 @@ export function modelBytes(root: T.Object3D): number {
       n += geometry.index?.array.byteLength ?? 0;
       for (const attrs of Object.values(geometry.morphAttributes ?? {})) for (const a of attrs) n += a.array.byteLength;
     }
-    const image = (r as Partial<T.Texture>).isTexture ? ((r as T.Texture).image as { width?: number; height?: number } | null) : null;
+    const image = (r as Partial<T.Texture>).isTexture
+      ? ((r as T.Texture).image as {width?: number; height?: number} | null)
+      : null;
     if (image) n += Math.round((image.width ?? 0) * (image.height ?? 0) * 4 * (4 / 3));
   }
   return n;
 }
 
 const defaultFetch = async (url: string, signal: AbortSignal, limit: number): Promise<ArrayBuffer> => {
-  const response = await fetch(url, { signal });
+  const response = await fetch(url, {signal});
   if (!response.ok) throw new Error(`[assets] ${url}: HTTP ${response.status}`);
-  if (Number(response.headers.get('content-length')) > limit) { await response.body?.cancel(); throw Error('models: file exceeds budget'); }
-  if (!response.body) { const bytes = await response.arrayBuffer(); if (bytes.byteLength > limit) throw Error('models: file exceeds budget'); return bytes; }
-  const reader = response.body.getReader(), chunks: Uint8Array[] = []; let length = 0;
+  if (Number(response.headers.get('content-length')) > limit) {
+    await response.body?.cancel();
+    throw Error('models: file exceeds budget');
+  }
+  if (!response.body) {
+    const bytes = await response.arrayBuffer();
+    if (bytes.byteLength > limit) throw Error('models: file exceeds budget');
+    return bytes;
+  }
+  const reader = response.body.getReader(),
+    chunks: Uint8Array[] = [];
+  let length = 0;
   try {
-    for (;;) { const next = await reader.read(); if (next.done) break; length += next.value.byteLength; if (length > limit) throw Error('models: file exceeds budget'); chunks.push(next.value); }
-  } catch (error) { await reader.cancel(); throw error; }
-  finally { reader.releaseLock(); }
-  const data = new Uint8Array(length); let at = 0; for (const chunk of chunks) { data.set(chunk, at); at += chunk.length; } return data.buffer;
+    for (;;) {
+      const next = await reader.read();
+      if (next.done) break;
+      length += next.value.byteLength;
+      if (length > limit) throw Error('models: file exceeds budget');
+      chunks.push(next.value);
+    }
+  } catch (error) {
+    await reader.cancel();
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
+  const data = new Uint8Array(length);
+  let at = 0;
+  for (const chunk of chunks) {
+    data.set(chunk, at);
+    at += chunk.length;
+  }
+  return data.buffer;
 };
 /** Reject side-loaded dependencies before GLTFLoader can initiate requests outside this lease. */
 export function validateEmbeddedGlb(bytes: ArrayBuffer): void {
   if (bytes.byteLength < 20) throw Error('models: invalid GLB');
-  const view = new DataView(bytes), length = view.getUint32(12, true);
-  if (view.getUint32(0, true) !== 0x46546c67 || view.getUint32(4, true) !== 2 || view.getUint32(8, true) !== bytes.byteLength || view.getUint32(16, true) !== 0x4e4f534a || length > bytes.byteLength - 20) throw Error('models: invalid GLB');
+  const view = new DataView(bytes),
+    length = view.getUint32(12, true);
+  if (
+    view.getUint32(0, true) !== 0x46546c67 ||
+    view.getUint32(4, true) !== 2 ||
+    view.getUint32(8, true) !== bytes.byteLength ||
+    view.getUint32(16, true) !== 0x4e4f534a ||
+    length > bytes.byteLength - 20
+  )
+    throw Error('models: invalid GLB');
   const json = JSON.parse(new TextDecoder().decode(new Uint8Array(bytes, 20, length)));
-  if ([...(json.buffers ?? []), ...(json.images ?? [])].some((row: {uri?: unknown}) => row.uri !== undefined)) throw Error('models: GLB dependencies must be embedded');
-  const components: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16 };
+  if ([...(json.buffers ?? []), ...(json.images ?? [])].some((row: {uri?: unknown}) => row.uri !== undefined))
+    throw Error('models: GLB dependencies must be embedded');
+  const components: Record<string, number> = {SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16};
   let scalars = 0;
   if ((json.accessors?.length ?? 0) > 4096) throw Error('models: accessor budget exceeded');
   for (const accessor of json.accessors ?? []) {
     const width = components[accessor.type];
-    if (!width || !Number.isSafeInteger(accessor.count) || accessor.count < 0 || accessor.count > 1048576 || (scalars += accessor.count * width) > 16777216) throw Error('models: decoded accessor budget exceeded');
+    if (
+      !width ||
+      !Number.isSafeInteger(accessor.count) ||
+      accessor.count < 0 ||
+      accessor.count > 1048576 ||
+      (scalars += accessor.count * width) > 16777216
+    )
+      throw Error('models: decoded accessor budget exceeded');
   }
-  if ((json.nodes?.length ?? 0) > 4096 || (json.skins?.length ?? 0) > 128 || (json.animations?.length ?? 0) > 128) throw Error('models: graph budget exceeded');
+  if ((json.nodes?.length ?? 0) > 4096 || (json.skins?.length ?? 0) > 128 || (json.animations?.length ?? 0) > 128)
+    throw Error('models: graph budget exceeded');
 }
 
 let gltfParser: Promise<(bytes: ArrayBuffer, url: string) => Promise<ParsedModel>> | undefined;
@@ -172,11 +220,11 @@ function defaultParse(bytes: ArrayBuffer, url: string): Promise<ParsedModel> {
   gltfParser ??= Promise.all([
     import('three/addons/loaders/GLTFLoader.js'),
     import('three/addons/libs/meshopt_decoder.module.js'),
-  ]).then(([{ GLTFLoader }, { MeshoptDecoder }]) => {
+  ]).then(([{GLTFLoader}, {MeshoptDecoder}]) => {
     const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
     return async (data: ArrayBuffer, from: string) => {
       const result = await loader.parseAsync(data, from.slice(0, from.lastIndexOf('/') + 1));
-      return { scene: result.scene, animations: result.animations };
+      return {scene: result.scene, animations: result.animations};
     };
   });
   gltfParser.catch(() => (gltfParser = undefined));
@@ -189,12 +237,30 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
   const fetchBytes = options.fetchBytes ?? ((url: string, signal: AbortSignal) => defaultFetch(url, signal, maxFile));
   const parse = options.parse ?? defaultParse;
   const keepLimit = options.keepBytes ?? 64 * MIB;
-  const maxFile = options.maxFileBytes ?? 32 * MIB, maxResident = options.maxResidentBytes ?? 128 * MIB;
+  const maxFile = options.maxFileBytes ?? 32 * MIB,
+    maxResident = options.maxResidentBytes ?? 128 * MIB;
   const maxInstanceBytes = options.maxInstanceBytes ?? 32 * MIB;
-  const maxInstances = options.maxInstances ?? 128, maxPending = options.maxPending ?? 16;
-  for (const n of [keepLimit, maxFile, maxResident, maxInstanceBytes, maxInstances, maxPending, options.warmBytes ?? 0, options.residency?.warmBytes ?? 0]) if (!Number.isSafeInteger(n) || n < 0) throw Error('models: invalid budget');
-  if (!maxFile || !maxResident || !maxInstanceBytes || !maxInstances || !maxPending) throw Error('models: zero admission budget');
-  let resident = 0, instanceCount = 0, instanceBytes = 0, pendingCount = 0, activeLoads = 0, closed = false;
+  const maxInstances = options.maxInstances ?? 128,
+    maxPending = options.maxPending ?? 16;
+  for (const n of [
+    keepLimit,
+    maxFile,
+    maxResident,
+    maxInstanceBytes,
+    maxInstances,
+    maxPending,
+    options.warmBytes ?? 0,
+    options.residency?.warmBytes ?? 0,
+  ])
+    if (!Number.isSafeInteger(n) || n < 0) throw Error('models: invalid budget');
+  if (!maxFile || !maxResident || !maxInstanceBytes || !maxInstances || !maxPending)
+    throw Error('models: zero admission budget');
+  let resident = 0,
+    instanceCount = 0,
+    instanceBytes = 0,
+    pendingCount = 0,
+    activeLoads = 0,
+    closed = false;
   const lifetimes = new Set<AbortController>();
   const slots = new Map<string, AssetVariant>();
   const inside = new WeakSet<object>();
@@ -203,7 +269,7 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
 
   // ── File bytes: shared in flight, then kept (LRU by bytes) for the session.
   const kept = new Map<string, ArrayBuffer>();
-  const inFlight = new Map<string, { promise: Promise<ArrayBuffer>; signal: AbortSignal }>();
+  const inFlight = new Map<string, {promise: Promise<ArrayBuffer>; signal: AbortSignal}>();
   let keptBytes = 0;
   function keep(url: string, bytes: ArrayBuffer) {
     if (bytes.byteLength > keepLimit) return;
@@ -228,7 +294,7 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
     let pending = inFlight.get(url);
     if (!pending || pending.signal.aborted) {
       fetches[url] = (fetches[url] ?? 0) + 1;
-      const entry = { signal, promise: Promise.resolve(new ArrayBuffer(0)) };
+      const entry = {signal, promise: Promise.resolve(new ArrayBuffer(0))};
       entry.promise = fetchBytes(url, signal).then(
         bytes => {
           const current = inFlight.get(url) === entry;
@@ -242,25 +308,38 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
           throw error;
         },
       );
-      inFlight.set(url, entry); pending = entry;
+      inFlight.set(url, entry);
+      pending = entry;
     }
     return pending.promise;
   }
 
   // Disposed resources stay marked (flag and `owns`): a consumer tree that still points at one must not dispose it again.
   const release = (scene: T.Object3D) => {
-    const errors: unknown[] = [], images = new Set<{close():void}>();
-    const attempt = (fn:()=>void) => { try { fn(); } catch (error) { errors.push(error); } };
+    const errors: unknown[] = [],
+      images = new Set<{close(): void}>();
+    const attempt = (fn: () => void) => {
+      try {
+        fn();
+      } catch (error) {
+        errors.push(error);
+      }
+    };
     for (const resource of modelResources(scene)) {
       const texture = resource as Partial<T.Texture>;
-      if (texture.isTexture) for (const image of [texture.image].flat()) {
-        if (image && typeof image === 'object' && 'close' in image && typeof image.close === 'function') images.add(image as {close():void});
-      }
+      if (texture.isTexture)
+        for (const image of [texture.image].flat()) {
+          if (image && typeof image === 'object' && 'close' in image && typeof image.close === 'function')
+            images.add(image as {close(): void});
+        }
       attempt(() => resource.dispose());
     }
     for (const image of images) attempt(() => image.close());
     const skeletons = new Set<T.Skeleton>();
-    scene.traverse(node => { const skeleton = (node as T.SkinnedMesh).skeleton; if (skeleton) skeletons.add(skeleton); });
+    scene.traverse(node => {
+      const skeleton = (node as T.SkinnedMesh).skeleton;
+      if (skeleton) skeletons.add(skeleton);
+    });
     for (const skeleton of skeletons) attempt(() => skeleton.dispose());
     if (errors.length) throw new AggregateError(errors, 'models: cleanup failed');
   };
@@ -280,16 +359,19 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
           if (signal.aborted) throw new AbortError();
           parses++;
           const parsed = await parse(bytes, url);
-          return 'scene' in parsed ? parsed as ParsedModel : { scene: parsed, animations: [] };
-        } finally { activeLoads--; }
+          return 'scene' in parsed ? (parsed as ParsedModel) : {scene: parsed, animations: []};
+        } finally {
+          activeLoads--;
+        }
       },
       upload: parsed => {
-        const { scene } = parsed;
+        const {scene} = parsed;
         // Upload owns the decoded scene even when preparation fails before publication.
         let reserved = 0;
         try {
           let bytes = modelBytes(scene);
-          for (const clip of parsed.animations) for (const track of clip.tracks) bytes += track.times.byteLength + track.values.byteLength;
+          for (const clip of parsed.animations)
+            for (const track of clip.tracks) bytes += track.times.byteLength + track.values.byteLength;
           if (!Number.isSafeInteger(bytes)) throw Error('models: resident budget exceeded');
           // Retained (released, unpinned) templates yield to a new live one before the hard admission (RES-01).
           if (bytes + resident > maxResident) cache.makeSpace(() => bytes + resident > maxResident);
@@ -297,13 +379,17 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
           resident += bytes;
           reserved = bytes;
           const clips = Object.freeze(parsed.animations.map(clip => clip.clone()));
-          for (const r of modelResources(scene)) { r.userData.shared = true; inside.add(r); }
+          for (const r of modelResources(scene)) {
+            r.userData.shared = true;
+            inside.add(r);
+          }
           // SkeletonUtils.clone creates a skeleton per SkinnedMesh, even when source meshes share one.
           // Keep the existing node allowance; reserve initial matrices plus padded CPU/GPU bone texture
           // storage (including allocation overlap). This is an estimate, not a physical heap measurement.
           let perInstance = 0;
           const addInstanceBytes = (bytes: number) => {
-            if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > Number.MAX_SAFE_INTEGER - perInstance) throw Error('models: instance estimate overflow');
+            if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > Number.MAX_SAFE_INTEGER - perInstance)
+              throw Error('models: instance estimate overflow');
             perInstance += bytes;
           };
           scene.traverse(node => {
@@ -316,54 +402,96 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
             addInstanceBytes(count * 64);
             addInstanceBytes(side * side * 32); // RGBA float CPU array and GPU texture, 16 bytes each per texel
           });
-          const instances = new Set<T.Object3D>(); let retired = false;
+          const instances = new Set<T.Object3D>();
+          let retired = false;
           const releaseInstance = (root: T.Object3D) => {
             if (!instances.delete(root)) return;
-            instanceCount--; instanceBytes -= perInstance;
+            instanceCount--;
+            instanceBytes -= perInstance;
             const errors: unknown[] = [];
-            try { root.removeFromParent(); } catch (error) { errors.push(error); }
+            try {
+              root.removeFromParent();
+            } catch (error) {
+              errors.push(error);
+            }
             const skeletons = new Set<T.Skeleton>();
-            root.traverse(object => { const sk = (object as T.SkinnedMesh).skeleton; if (sk) skeletons.add(sk); });
-            for (const skeleton of skeletons) try { skeleton.dispose(); } catch (error) { errors.push(error); }
+            root.traverse(object => {
+              const sk = (object as T.SkinnedMesh).skeleton;
+              if (sk) skeletons.add(sk);
+            });
+            for (const skeleton of skeletons)
+              try {
+                skeleton.dispose();
+              } catch (error) {
+                errors.push(error);
+              }
             if (errors.length) throw new AggregateError(errors, 'models: instance cleanup failed');
           };
-          const template: ModelTemplate = { scene, animations: clips,
+          const template: ModelTemplate = {
+            scene,
+            animations: clips,
             instantiate() {
               if (closed || retired) throw Error('models: template retired');
-              if (instanceCount >= maxInstances || perInstance > maxInstanceBytes - instanceBytes) throw Error('models: instance budget exceeded');
-              const root = cloneSkeleton(scene); instances.add(root); instanceCount++; instanceBytes += perInstance; return root;
-            }, releaseInstance,
+              if (instanceCount >= maxInstances || perInstance > maxInstanceBytes - instanceBytes)
+                throw Error('models: instance budget exceeded');
+              const root = cloneSkeleton(scene);
+              instances.add(root);
+              instanceCount++;
+              instanceBytes += perInstance;
+              return root;
+            },
+            releaseInstance,
           };
           templateBytes.set(template, bytes);
           cleanups.set(template, () => {
-            if (retired) return; retired = true;
+            if (retired) return;
+            retired = true;
             const errors: unknown[] = [];
-            for (const root of instances) try { releaseInstance(root); } catch (error) { errors.push(error); }
+            for (const root of instances)
+              try {
+                releaseInstance(root);
+              } catch (error) {
+                errors.push(error);
+              }
             resident -= bytes;
-            try { release(scene); } catch (error) { errors.push(error); }
+            try {
+              release(scene);
+            } catch (error) {
+              errors.push(error);
+            }
             if (errors.length) throw new AggregateError(errors, 'models: template cleanup failed');
           });
           return template;
         } catch (error) {
           resident -= reserved;
-          try { release(scene); }
-          catch (cleanupError) {
-            throw new AggregateError([error, cleanupError], 'models: preparation cleanup failed', { cause: error });
+          try {
+            release(scene);
+          } catch (cleanupError) {
+            throw new AggregateError([error, cleanupError], 'models: preparation cleanup failed', {cause: error});
           }
           throw error;
         }
       },
       discard: parsed => release(parsed.scene),
-      dispose: template => { const cleanup = cleanups.get(template); cleanups.delete(template); cleanup?.(); },
+      dispose: template => {
+        const cleanup = cleanups.get(template);
+        cleanups.delete(template);
+        cleanup?.();
+      },
       // Retained after release: renderers drop their GPU copies and listeners; parsed data stays for a later draw.
       park: template => {
         const errors: unknown[] = [];
-        for (const resource of modelResources(template.scene)) try { resource.dispose(); } catch (error) { errors.push(error); }
+        for (const resource of modelResources(template.scene))
+          try {
+            resource.dispose();
+          } catch (error) {
+            errors.push(error);
+          }
         if (errors.length) throw new AggregateError(errors, 'models: park failed');
       },
       bytes: template => templateBytes.get(template) ?? 0,
     },
-    { warmBytes: options.residency?.warmBytes ?? options.warmBytes ?? 0, residency: options.residency },
+    {warmBytes: options.residency?.warmBytes ?? options.warmBytes ?? 0, residency: options.residency},
   );
 
   async function resolve(id: string): Promise<AssetDef> {
@@ -378,33 +506,70 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
       if (closed || o.signal.aborted) throw new AbortError();
       if (pendingCount >= maxPending || activeLoads >= maxPending) throw Error('models: pending budget exceeded');
       pendingCount++;
-      const life = new AbortController(); lifetimes.add(life);
-      const abort = () => life.abort(); o.signal.addEventListener('abort', abort, { once: true });
-      const detach = () => { lifetimes.delete(life); o.signal.removeEventListener('abort', abort); };
-      life.signal.addEventListener('abort', detach, { once: true });
+      const life = new AbortController();
+      lifetimes.add(life);
+      const abort = () => life.abort();
+      o.signal.addEventListener('abort', abort, {once: true});
+      const detach = () => {
+        lifetimes.delete(life);
+        o.signal.removeEventListener('abort', abort);
+      };
+      life.signal.addEventListener('abort', detach, {once: true});
       try {
         const def = await resolve(id);
         if (life.signal.aborted) throw new AbortError();
-        const variant = chooseVariant(def, { tier }), key = `${id}|${variant.path}`;
+        const variant = chooseVariant(def, {tier}),
+          key = `${id}|${variant.path}`;
         if (!slots.has(key)) slots.set(key, variant);
         const lease = await cache.acquire(key, life.signal);
-        return { value: lease.value, key: lease.key, id, variant, release() { life.abort(); lease.release(); detach(); } };
-      } catch (error) { life.abort(); throw error; }
-      finally { pendingCount--; }
+        return {
+          value: lease.value,
+          key: lease.key,
+          id,
+          variant,
+          release() {
+            life.abort();
+            lease.release();
+            detach();
+          },
+        };
+      } catch (error) {
+        life.abort();
+        throw error;
+      } finally {
+        pendingCount--;
+      }
     },
-    dispose() { if (closed) return; closed = true; for (const life of lifetimes) life.abort(); try { cache.evictWarm(); } finally { kept.clear(); keptBytes = 0; slots.clear(); } },
-    owns: resource => typeof resource === 'object' && resource !== null && (inside.has(resource) || cache.owns(resource)),
+    dispose() {
+      if (closed) return;
+      closed = true;
+      for (const life of lifetimes) life.abort();
+      try {
+        cache.evictWarm();
+      } finally {
+        kept.clear();
+        keptBytes = 0;
+        slots.clear();
+      }
+    },
+    owns: resource =>
+      typeof resource === 'object' && resource !== null && (inside.has(resource) || cache.owns(resource)),
     stats: () => ({
-      fetches: { ...fetches },
+      fetches: {...fetches},
       parses,
       hits: cache.stats.hits,
       lateDrops: cache.stats.lateDrops,
       disposed: cache.stats.disposed,
-      bytesKeptMiB: keptBytes / MIB, residentMiB: resident / MIB, instances: instanceCount,
-      pinnedMiB: cache.pinnedBytes() / MIB, evictions: cache.stats.evictions, reloads: cache.stats.reloads,
-      pressure: cache.stats.pressure, cleanupFailures: cache.stats.cleanupFailures,
+      bytesKeptMiB: keptBytes / MIB,
+      residentMiB: resident / MIB,
+      instances: instanceCount,
+      pinnedMiB: cache.pinnedBytes() / MIB,
+      evictions: cache.stats.evictions,
+      reloads: cache.stats.reloads,
+      pressure: cache.stats.pressure,
+      cleanupFailures: cache.stats.cleanupFailures,
     }),
-    setResidency: ({ warmBytes, ...residency }) => {
+    setResidency: ({warmBytes, ...residency}) => {
       if (!Number.isSafeInteger(warmBytes) || warmBytes < 0) throw Error('models: invalid budget');
       if (!closed) cache.setResidency(warmBytes, residency);
     },

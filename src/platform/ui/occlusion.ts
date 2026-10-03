@@ -21,24 +21,31 @@ export interface UiOcclusionReport extends OcclusionMeasure {
 }
 
 /** Diagnostic work limits; exceeding these throws before geometry is processed. */
-export const UI_OCCLUSION_LIMITS = Object.freeze({ footprints: 256, criticalRegions: 64 });
+export const UI_OCCLUSION_LIMITS = Object.freeze({footprints: 256, criticalRegions: 64});
 
-type Bounds = { left: number; top: number; right: number; bottom: number };
+type Bounds = {left: number; top: number; right: number; bottom: number};
 
 function bounds(rect: OcclusionRect, label: string): Bounds {
-  const { x, y, width, height } = rect;
-  if (![x, y, width, height].every(Number.isFinite) || width < 0 || height < 0
-    || !Number.isFinite(x + width) || !Number.isFinite(y + height)
-    || !Number.isFinite(width * height)) {
+  const {x, y, width, height} = rect;
+  if (
+    ![x, y, width, height].every(Number.isFinite) ||
+    width < 0 ||
+    height < 0 ||
+    !Number.isFinite(x + width) ||
+    !Number.isFinite(y + height) ||
+    !Number.isFinite(width * height)
+  ) {
     throw new RangeError(`${label}: expected finite coordinates, nonnegative dimensions and finite edges/area`);
   }
-  return { left: x, top: y, right: x + width, bottom: y + height };
+  return {left: x, top: y, right: x + width, bottom: y + height};
 }
 
 function intersect(a: Bounds, b: Bounds): Bounds | undefined {
-  const left = Math.max(a.left, b.left), top = Math.max(a.top, b.top);
-  const right = Math.min(a.right, b.right), bottom = Math.min(a.bottom, b.bottom);
-  return right > left && bottom > top ? { left, top, right, bottom } : undefined;
+  const left = Math.max(a.left, b.left),
+    top = Math.max(a.top, b.top);
+  const right = Math.min(a.right, b.right),
+    bottom = Math.min(a.bottom, b.bottom);
+  return right > left && bottom > top ? {left, top, right, bottom} : undefined;
 }
 
 // Sweep x slabs and merge their occupied y intervals. Overlapping footprints are
@@ -47,9 +54,11 @@ function unionArea(rects: readonly Bounds[]): number {
   const xs = [...new Set(rects.flatMap(r => [r.left, r.right]))].sort((a, b) => a - b);
   let area = 0;
   for (let i = 1; i < xs.length; i++) {
-    const left = xs[i - 1]!, right = xs[i]!; // 1 <= i < xs.length
+    const left = xs[i - 1]!,
+      right = xs[i]!; // 1 <= i < xs.length
     const spans = rects.filter(r => r.left < right && r.right > left).sort((a, b) => a.top - b.top);
-    let length = 0, end = -Infinity;
+    let length = 0,
+      end = -Infinity;
     for (const span of spans) {
       if (span.bottom > end) {
         length += span.bottom - Math.max(span.top, end);
@@ -62,16 +71,16 @@ function unionArea(rects: readonly Bounds[]): number {
 }
 
 function measure(region: Bounds | undefined, footprints: readonly Bounds[]): OcclusionMeasure {
-  if (!region) return Object.freeze({ area: 0, occupiedArea: 0, occupiedRatio: 0 });
+  if (!region) return Object.freeze({area: 0, occupiedArea: 0, occupiedRatio: 0});
   const area = (region.right - region.left) * (region.bottom - region.top);
-  if (area === 0) return Object.freeze({ area: 0, occupiedArea: 0, occupiedRatio: 0 });
+  if (area === 0) return Object.freeze({area: 0, occupiedArea: 0, occupiedRatio: 0});
   const clipped = footprints.flatMap(rect => {
     const overlap = intersect(region, rect);
     return overlap ? [overlap] : [];
   });
   // Roundoff can slightly exceed the containing area after many additions.
   const occupiedArea = Math.min(area, unionArea(clipped));
-  return Object.freeze({ area, occupiedArea, occupiedRatio: occupiedArea / area });
+  return Object.freeze({area, occupiedArea, occupiedRatio: occupiedArea / area});
 }
 
 /**
@@ -90,8 +99,10 @@ export function measureUiOcclusion(
   footprints: readonly OcclusionRect[],
   criticalRegions: readonly OcclusionRect[] = [],
 ): UiOcclusionReport {
-  if (footprints.length > UI_OCCLUSION_LIMITS.footprints
-    || criticalRegions.length > UI_OCCLUSION_LIMITS.criticalRegions) {
+  if (
+    footprints.length > UI_OCCLUSION_LIMITS.footprints ||
+    criticalRegions.length > UI_OCCLUSION_LIMITS.criticalRegions
+  ) {
     throw new RangeError('UI occlusion diagnostic input limit exceeded');
   }
   const view = bounds(viewport, 'viewport');

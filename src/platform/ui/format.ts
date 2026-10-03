@@ -1,5 +1,5 @@
 /**
- * platform/ui/format: the one place display units are made (readouts; 
+ * platform/ui/format: the one place display units are made (readouts;
  * STD-SIM-23: "display units are converted only in the formatting layer").
  *
  * A simulation hands over SI (m, m/s, rad, a plain ratio) or a short text id; `formatValue` turns it into the
@@ -29,19 +29,19 @@ const RAD_PER_DEG = Math.PI / 180;
 /** The display units, by id. A readout row names one of these; `displayUnitProblems` checks rows against it. */
 export const displayUnits = {
   /** m → whole km, grouped: altitudes, apsides. */
-  'length.km': { per: 1000, suffix: ' km', digits: 0, group: true },
+  'length.km': {per: 1000, suffix: ' km', digits: 0, group: true},
   /** m → whole km, ungrouped: the engineer's radius. */
-  'length.km-plain': { per: 1000, suffix: ' km', digits: 0 },
+  'length.km-plain': {per: 1000, suffix: ' km', digits: 0},
   /** m/s → km/s to 2 scenes. */
-  'speed.km-s-2': { per: 1000, suffix: ' km/s', digits: 2 },
+  'speed.km-s-2': {per: 1000, suffix: ' km/s', digits: 2},
   /** m/s → km/s to 3 scenes. */
-  'speed.km-s-3': { per: 1000, suffix: ' km/s', digits: 3 },
+  'speed.km-s-3': {per: 1000, suffix: ' km/s', digits: 3},
   /** m/s → whole m/s, grouped: Δv totals. */
-  'speed.m-s': { per: 1, suffix: ' m/s', digits: 0, group: true },
+  'speed.m-s': {per: 1, suffix: ' m/s', digits: 0, group: true},
   /** rad → degrees to 1 scene. */
-  'angle.deg-1': { per: RAD_PER_DEG, suffix: '°', digits: 1 },
+  'angle.deg-1': {per: RAD_PER_DEG, suffix: '°', digits: 1},
   /** A plain ratio to 3 scenes (eccentricity). */
-  'ratio.3': { per: 1, suffix: '', digits: 3 },
+  'ratio.3': {per: 1, suffix: '', digits: 3},
 } as const satisfies Record<string, DisplayUnitDef>;
 
 export type DisplayUnit = keyof typeof displayUnits;
@@ -51,7 +51,7 @@ export const isDisplayUnit = (id: string): id is DisplayUnit => Object.hasOwn(di
 const groupers = new Map<string | undefined, Intl.NumberFormat>();
 const grouper = (locale: string | undefined) => {
   let f = groupers.get(locale);
-  if (!f) groupers.set(locale, f = new Intl.NumberFormat(locale));
+  if (!f) groupers.set(locale, (f = new Intl.NumberFormat(locale)));
   return f;
 };
 
@@ -66,13 +66,17 @@ export function formatValue(value: number, unit: DisplayUnit, locale?: string): 
 export type FormatLevel = 'standard' | 'detailed';
 
 /** The i18n text function a formatter writes through (core/i18n `t`, with the message's `{value}` hole). */
-export type FormatText = (key: string, vars: Readonly<Record<string, string | number>>, opts: { level: FormatLevel }) => string;
+export type FormatText = (
+  key: string,
+  vars: Readonly<Record<string, string | number>>,
+  opts: {level: FormatLevel},
+) => string;
 
 /** What `formatReadout` needs from a readout row. */
 export interface FormattableReadout {
   id: string;
   /** Message keys. Each has a `{value}` hole; `<key>.none` is shown when the value is `null`. */
-  format: { readonly standard: string; readonly detailed: string };
+  format: {readonly standard: string; readonly detailed: string};
   /** A `displayUnits` id for a number; absent for a text value, which is shown as it is. */
   unit?: string;
 }
@@ -81,18 +85,26 @@ export interface FormattableReadout {
  * A readout's value in its message, for one reading level. A `null` value (nothing to show: no apoapsis on an escape)
  * uses the message `<key>.none`. An unknown unit is a content error and throws, so a bad row fails its test.
  */
-export function formatReadout(r: FormattableReadout, value: unknown, level: FormatLevel, text: FormatText, locale?: string): string {
+export function formatReadout(
+  r: FormattableReadout,
+  value: unknown,
+  level: FormatLevel,
+  text: FormatText,
+  locale?: string,
+): string {
   const key = level === 'detailed' ? r.format.detailed : r.format.standard;
-  if (value === null || value === undefined) return text(key + '.none', {}, { level });
+  if (value === null || value === undefined) return text(key + '.none', {}, {level});
   let shown: string;
   if (r.unit === undefined) shown = String(value);
   else if (!isDisplayUnit(r.unit)) throw new Error(`[format] readout ${r.id}: unknown display unit "${r.unit}"`);
   else if (typeof value !== 'number') throw new Error(`[format] readout ${r.id}: a ${r.unit} value must be a number`);
   else shown = formatValue(value, r.unit, locale);
-  return text(key, { value: shown }, { level });
+  return text(key, {value: shown}, {level});
 }
 
 /** Rows naming a unit `displayUnits` does not have. */
 export function displayUnitProblems(rows: readonly FormattableReadout[]): string[] {
-  return rows.filter(r => r.unit !== undefined && !isDisplayUnit(r.unit)).map(r => `${r.id}: unknown display unit "${r.unit}"`);
+  return rows
+    .filter(r => r.unit !== undefined && !isDisplayUnit(r.unit))
+    .map(r => `${r.id}: unknown display unit "${r.unit}"`);
 }

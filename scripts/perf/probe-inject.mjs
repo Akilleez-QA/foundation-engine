@@ -11,8 +11,10 @@
 // - A per-frame monitor: during a window it records each frame's interval and draw deltas.
 // - The scene guard: a window tags the scene element; the end check needs the same hash, no hashchange and
 //   the same connected element (a same-hash re-entry remounts the scene).
-export const windowFinished=(win,elapsed)=>!win.scriptPending&&((win.target>0&&win.rendered>=win.target&&elapsed>=win.minMs)||elapsed>=win.maxMs);
-export const PROBE=`(()=>{
+export const windowFinished = (win, elapsed) =>
+  !win.scriptPending &&
+  ((win.target > 0 && win.rendered >= win.target && elapsed >= win.minMs) || elapsed >= win.maxMs);
+export const PROBE = `(()=>{
  const windowFinished=${windowFinished.toString()};
  const W=window;W.__draws=0;W.__tris=0;W.__off=0;W.__texLive=new Map();W.__canv=[];W.__hashChanges=0;
  const C=W.__count={useProgram:0,programsCreated:0,uniformCalls:0,bindVertexArray:0,bufferSubData:0,textureUploads:0};

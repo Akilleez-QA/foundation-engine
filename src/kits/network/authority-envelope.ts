@@ -1,38 +1,21 @@
-import type { DocumentValue } from '../authoring/document';
-import { captureJson, captureJsonLimits } from './captured-json';
-import type {
-  AuthorityEnvelope,
-  AuthorityLimits,
-  AuthoritySnapshot,
-  AuthorityValidation,
-} from './authority-types';
+import type {DocumentValue} from '../authoring/document';
+import {captureJson, captureJsonLimits} from './captured-json';
+import type {AuthorityEnvelope, AuthorityLimits, AuthoritySnapshot, AuthorityValidation} from './authority-types';
 
-const record = (
-  v: DocumentValue,
-): v is { readonly [key: string]: DocumentValue } =>
+const record = (v: DocumentValue): v is {readonly [key: string]: DocumentValue} =>
   v !== null && typeof v === 'object' && !Array.isArray(v);
 const exact = (v: DocumentValue, fields: readonly string[]) =>
-  record(v) &&
-  Object.keys(v).length === fields.length &&
-  fields.every((k) => Object.hasOwn(v, k));
-export const authorityInteger = (n: unknown): n is number =>
-  typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
-export const authorityIdentity = (s: unknown): s is string =>
-  typeof s === 'string' && s.length > 0 && s.length <= 256;
-export function captureAuthorityLimits(
-  input: AuthorityLimits,
-): AuthorityLimits {
+  record(v) && Object.keys(v).length === fields.length && fields.every(k => Object.hasOwn(v, k));
+export const authorityInteger = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
+export const authorityIdentity = (s: unknown): s is string => typeof s === 'string' && s.length > 0 && s.length <= 256;
+export function captureAuthorityLimits(input: AuthorityLimits): AuthorityLimits {
   const envelope = captureJsonLimits(input.envelope),
     state = captureJsonLimits(input.state),
     command = captureJsonLimits(input.input),
     result = captureJsonLimits(input.result);
   const maxStreams = input.maxStreams,
     maxReceiptsPerStream = input.maxReceiptsPerStream;
-  if (
-    ![maxStreams, maxReceiptsPerStream].every(
-      (n) => authorityInteger(n) && n > 0,
-    )
-  )
+  if (![maxStreams, maxReceiptsPerStream].every(n => authorityInteger(n) && n > 0))
     throw Error('authority: invalid capacity');
   return Object.freeze({
     envelope,
@@ -43,21 +26,11 @@ export function captureAuthorityLimits(
     maxReceiptsPerStream,
   });
 }
-export function captureAuthorityEnvelope(
-  json: string,
-  options: AuthorityValidation,
-): AuthoritySnapshot {
+export function captureAuthorityEnvelope(json: string, options: AuthorityValidation): AuthoritySnapshot {
   const captured = captureJson(json, options.limits.envelope),
     value = captured.value;
   if (
-    !exact(value, [
-      'version',
-      'lineage',
-      'schema',
-      'revision',
-      'state',
-      'streams',
-    ]) ||
+    !exact(value, ['version', 'lineage', 'schema', 'revision', 'state', 'streams']) ||
     !record(value) ||
     value.version !== 1 ||
     value.lineage !== options.lineage ||
@@ -67,12 +40,8 @@ export function captureAuthorityEnvelope(
     value.streams.length > options.limits.maxStreams
   )
     throw Error('authority: envelope');
-  captureJson(
-    JSON.stringify(value.state),
-    options.limits.state,
-    options.validateState,
-  );
-  const events: { revision: number; omittedPrefix: number }[] = [];
+  captureJson(JSON.stringify(value.state), options.limits.state, options.validateState);
+  const events: {revision: number; omittedPrefix: number}[] = [];
   const ids = new Set<string>(),
     revisions = new Set<number>();
   let remaining = value.revision,
@@ -86,8 +55,7 @@ export function captureAuthorityEnvelope(
       !authorityInteger(stream.through) ||
       stream.through > remaining ||
       !Array.isArray(stream.receipts) ||
-      stream.receipts.length !==
-        Math.min(stream.through, options.limits.maxReceiptsPerStream)
+      stream.receipts.length !== Math.min(stream.through, options.limits.maxReceiptsPerStream)
     )
       throw Error('authority: stream');
     ids.add(stream.id);
@@ -107,24 +75,15 @@ export function captureAuthorityEnvelope(
         revisions.has(receipt.revision)
       )
         throw Error('authority: receipt');
-      captureJson(
-        JSON.stringify(receipt.input),
-        options.limits.input,
-        options.validateInput,
-      );
-      captureJson(
-        JSON.stringify(receipt.result),
-        options.limits.result,
-        options.validateResult,
-      );
+      captureJson(JSON.stringify(receipt.input), options.limits.input, options.validateInput);
+      captureJson(JSON.stringify(receipt.result), options.limits.result, options.validateResult);
       previous = receipt.revision;
       latest = Math.max(latest, previous);
       revisions.add(previous);
-      events.push({ revision: previous, omittedPrefix: i === 0 ? sequence - 1 : 0 });
+      events.push({revision: previous, omittedPrefix: i === 0 ? sequence - 1 : 0});
     }
   }
-  if (remaining !== 0 || latest !== value.revision)
-    throw Error('authority: revision coherence');
+  if (remaining !== 0 || latest !== value.revision) throw Error('authority: revision coherence');
   // The only unknown commands precede each stream's contiguous retained suffix.
   // Fixed retained revisions consume slots; omitted prefixes must fit in the free
   // slots before their first retained receipt (earliest-deadline feasibility).
@@ -133,8 +92,7 @@ export function captureAuthorityEnvelope(
   let omitted = 0;
   for (const [i, event] of events.entries()) {
     const available = event.revision - 1 - i;
-    if (event.omittedPrefix > available - omitted)
-      throw Error('authority: impossible receipt chronology');
+    if (event.omittedPrefix > available - omitted) throw Error('authority: impossible receipt chronology');
     omitted += event.omittedPrefix;
   }
   return Object.freeze({
@@ -154,8 +112,7 @@ export function createAuthorityGenesis(
     schema = options.schema,
     limits = captureAuthorityLimits(options.limits),
     validateState = options.validateState;
-  if (!authorityIdentity(lineage) || !authorityIdentity(schema))
-    throw Error('authority: identity');
+  if (!authorityIdentity(lineage) || !authorityIdentity(schema)) throw Error('authority: identity');
   const state = captureJson(options.stateJson, limits.state, validateState);
   return captureAuthorityEnvelope(
     JSON.stringify({

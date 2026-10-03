@@ -8,7 +8,7 @@
  *   - no readable key is left in the shipped JS.
  * Narration keys are not shortened: they are composed at run time and their catalogue is fetched, not bundled.
  */
-import { readFileSync } from 'node:fs';
+import {readFileSync} from 'node:fs';
 
 const DETAILED = '@detailed';
 const QUOTED = /(['"`])([A-Za-z0-9][\w.\-]*\.[\w.\-]*(?:@detailed)?)\1/g;
@@ -19,7 +19,10 @@ const idOf = (ids, key) => {
 
 /** Source with every quoted literal that is exactly a key (or its detailed variant) replaced by the key's id. */
 export function compactSource(code, ids) {
-  return code.replace(QUOTED, (whole, q, key) => { const id = idOf(ids, key); return id === undefined ? whole : q + id + q; });
+  return code.replace(QUOTED, (whole, q, key) => {
+    const id = idOf(ids, key);
+    return id === undefined ? whole : q + id + q;
+  });
 }
 
 /** A string shard (JSON text) with its keys replaced by their ids. A key without an id is an error. */
@@ -38,25 +41,35 @@ export function compactProblems(code, ids) {
   const problems = [];
   for (const m of code.matchAll(QUOTED)) if (idOf(ids, m[2]) !== undefined) problems.push(`readable key "${m[2]}"`);
   const keys = Object.keys(ids);
-  for (const m of code.matchAll(/`((?:[\w-]+\.)+[\w-]*)\$\{/g)) if (keys.some(k => k.startsWith(m[1]))) problems.push(`composed key \`${m[1]}\${…}\``);
+  for (const m of code.matchAll(/`((?:[\w-]+\.)+[\w-]*)\$\{/g))
+    if (keys.some(k => k.startsWith(m[1]))) problems.push(`composed key \`${m[1]}\${…}\``);
   return problems;
 }
 
-const SHARD = /[\\/]src[\\/](?:(?:features|packs|kits|platform)[\\/])?(?:[\w-]+[\\/])*strings[\\/](?:[\w-]+[\\/])*[\w-]+\.json$/;
+const SHARD =
+  /[\\/]src[\\/](?:(?:features|packs|kits|platform)[\\/])?(?:[\w-]+[\\/])*strings[\\/](?:[\w-]+[\\/])*[\w-]+\.json$/;
 const SOURCE = /[\\/]src[\\/].*\.(?:ts|tsx|js|mjs)$/;
 
 /** The Vite plugin: production builds only. `idsFile` is read when the first module is transformed. */
 export function compactKeys(idsFile) {
-  let on = false, ids = null;
+  let on = false,
+    ids = null;
   const load = () => (ids ??= JSON.parse(readFileSync(idsFile, 'utf8')));
   return {
-    name: 'engine-compact-keys', enforce: 'pre', apply: 'build',
-    configResolved(config) { on = config.mode === 'production'; },
+    name: 'engine-compact-keys',
+    enforce: 'pre',
+    apply: 'build',
+    configResolved(config) {
+      on = config.mode === 'production';
+    },
     transform(code, id) {
       if (!on) return null;
       const file = id.split('?')[0];
-      if (SHARD.test(file)) return { code: compactCatalog(code, load(), file), map: null };
-      if (SOURCE.test(file) && !file.includes('/node_modules/')) { const out = compactSource(code, load()); return out === code ? null : { code: out, map: null }; }
+      if (SHARD.test(file)) return {code: compactCatalog(code, load(), file), map: null};
+      if (SOURCE.test(file) && !file.includes('/node_modules/')) {
+        const out = compactSource(code, load());
+        return out === code ? null : {code: out, map: null};
+      }
       return null;
     },
     generateBundle(_options, bundle) {
@@ -64,7 +77,8 @@ export function compactKeys(idsFile) {
       for (const chunk of Object.values(bundle)) {
         if (chunk.type !== 'chunk') continue;
         const problems = compactProblems(chunk.code, load());
-        if (problems.length) this.error(`compact string keys: ${chunk.fileName}: ${[...new Set(problems)].slice(0, 12).join('; ')}`);
+        if (problems.length)
+          this.error(`compact string keys: ${chunk.fileName}: ${[...new Set(problems)].slice(0, 12).join('; ')}`);
       }
     },
   };
