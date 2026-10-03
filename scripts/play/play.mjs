@@ -7,7 +7,7 @@ import {isLoopback, listenHost, portBusyHint, serve, homeScene} from './lib.mjs'
 
 const host = listenHost();
 const port = Number(process.env.PORT ?? 5173);
-const started = await serve({port, host}).catch(error => {
+const started = await serve({port, host, watch: true}).catch(error => {
   if (error.code !== 'EADDRINUSE') throw error;
   // Another server (often an earlier `npm run play`) has the port: one line and a non-zero exit, not a stack trace.
   console.error(`\n  npm run play: ${portBusyHint(port, next => `PORT=${next} npm run play`)}\n`);
