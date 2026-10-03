@@ -26,6 +26,10 @@ Every new framework below is optional: a game that does not use it is unchanged.
   unchanged; exhaustive import-report consumers must handle the three new
   outcomes. Retain source files for explicit reconciliation or retry.
 
+- **8-bit brand.** An original pixel-art Plinth mark (a stepped base of blue bricks with a gold capstone),
+  lockups, icon and social preview in `assets/brand/`, drawn as SVG pixel grids with no fonts; a README hero,
+  ASCII page headers, a [documentation index](docs/README.md) and the [brand guide](docs/brand.md).
+  Documentation only; no runtime change.
 - **Held touch buttons.** `touchButton(ctx, input, { label })` in `@kits/ui` presses a game input on
   touch, holds a `hold: true` input while the finger stays on it, and releases on lift, cancel,
   slide-off, blur or the visit's end; presses keep the exactly-once fixed-tick delivery. Touch only,

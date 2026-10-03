@@ -1,4 +1,10 @@
-# Foundation Engine
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/lockup-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/brand/lockup-light.svg">
+    <img alt="Foundation Engine" src="assets/brand/lockup-light.svg" width="480">
+  </picture>
+</h1>
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Akilleez-QA/foundation-engine/ci.yml?branch=main)](https://github.com/Akilleez-QA/foundation-engine/actions/workflows/ci.yml?query=branch%3Amain)
 [![GPL-3.0-only](https://img.shields.io/static/v1?label=license&message=GPL-3.0-only&color=blue)](LICENSE)
@@ -110,6 +116,7 @@ Each template passes the gate on its own: `npm run gate -- --game templates/<nam
 
 ## Read next
 
+- [Documentation index](docs/README.md): every guide by route.
 - [Getting started](docs/guides/getting-started.md): from a clone to a shared build, by hand or with an agent; then the [cookbook](docs/recipes/README.md).
 - [docs/GOALS.md](docs/GOALS.md): defined engine outcomes, acceptance criteria and scope.
 - [Capability map](docs/guides/composition-framework-status.md): existing optional frameworks and remaining work.
@@ -159,3 +166,18 @@ Copyright © 2026 Akilleez-QA and contributors. Engine code is licensed under **
 See [GOVERNANCE.md](GOVERNANCE.md), [SUPPORT.md](SUPPORT.md) and [CHANGELOG.md](CHANGELOG.md).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development and contribution guidance, [SECURITY.md](SECURITY.md) for vulnerability reporting, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for participation expectations. Repository visibility and publication are separate release steps.
+
+```text
+ 88"""" o8""8o 88  88 88o 88 88""8o o8""8o ""88"" "88" o8""8o 88o 88
+ 88ooo  88  88 88  88 88"888 88  88 88oo88   88    88  88  88 88"888
+ 88     88  88 88  88 88  88 88  88 88  88   88    88  88  88 88  88
+ 88      8888   8888  88  88 88888  88  88   88   8888  8888  88  88
+
+           [####]            88"""" 88o 88 o8"""" "88" 88o 88 88""""
+        [====][====]         88ooo  88"888 88 ooo  88  88"888 88ooo
+     [====][====][====]      88     88  88 88  88  88  88  88 88
+  [====][====][====][====]   888888 88  88  88888 8888 88  88 888888
+ [#################################################################]
+```
+
+Brand assets, palette and copy-paste banners: [docs/brand.md](docs/brand.md).
