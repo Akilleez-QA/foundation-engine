@@ -42,7 +42,7 @@ export interface LayerSpec extends LayerRequest {
   kind: LayerKind;
   element: HTMLElement;
   /** Activity run that owns the layer; the loop asks coverage() by this key. */
-  owner?: string;
+  owner?: string | undefined;
   /** What this layer does to the activities beneath it. 'none' = a stage window (VAB benches) or a toast. */
   cover?: LayerCover;
   modal?: LayerModality;
@@ -64,17 +64,17 @@ export interface LayerSpec extends LayerRequest {
   returnFocus?: () => HTMLElement | null | undefined;
   /** Escape on this layer. Default: close('escape'). Return false to let Escape fall to the layer below. */
   onEscape?: () => void | boolean;
-  onClose?: (reason: CloseReason) => void;
+  onClose?: ((reason: CloseReason) => void) | undefined;
 }
 export interface LayerInfo {
   readonly id: string;
   readonly kind: LayerKind;
   readonly element: HTMLElement;
-  readonly owner?: string;
+  readonly owner?: string | undefined;
   readonly cover: LayerCover;
   readonly modal: LayerModality;
-  readonly narration?: string;
-  readonly music?: string;
+  readonly narration?: string | undefined;
+  readonly music?: string | undefined;
   readonly dormant: boolean;
 }
 export interface LayerHandle extends LayerInfo, PortLayerHandle {
@@ -96,8 +96,8 @@ interface Entry extends LayerHandle {
   opener: HTMLElement | null;
   abort: AbortController;
   cover: LayerCover;
-  narration?: string;
-  music?: string;
+  narration?: string | undefined;
+  music?: string | undefined;
   dormant: boolean;
 }
 

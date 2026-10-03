@@ -124,7 +124,12 @@ export class UiNav {
  * focus to the opener, or to `fallback` when the opener is gone. Native modal dialogs already trap. */
 export function trapFocus(
   scope: El,
-  options: {doc?: Document; initial?: El | null; fallback?: () => El | null; signal?: AbortSignal} = {},
+  options: {
+    doc?: Document;
+    initial?: El | null | undefined;
+    fallback?: (() => El | null) | undefined;
+    signal?: AbortSignal;
+  } = {},
 ) {
   const doc = options.doc ?? globalThis.document,
     opener = doc.activeElement as El | null,

@@ -102,7 +102,7 @@ export interface ResidencyBinding {
   readonly kind: AssetResidencyKind;
   readonly input: AssetResidencyInput;
   /** The current preset's source; omitted (no quality service): the reference row. */
-  quality?: {readonly preset: QualityPreset; subscribe(fn: () => void, signal?: AbortSignal): () => void};
+  quality?: {readonly preset: QualityPreset; subscribe(fn: () => void, signal?: AbortSignal): () => void} | undefined;
   signal: AbortSignal;
   log: {warn(msg: string, data?: unknown): void; error(msg: string, data?: unknown): void};
   /** Applies the resolved policy to the library (now, and after each preset change). */

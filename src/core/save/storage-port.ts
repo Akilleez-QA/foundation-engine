@@ -12,7 +12,7 @@ export interface StoragePort {
   remove(key: string): void;
   keys(): string[];
   /** Cross-tab change feed (the window 'storage' event). Fires for writes made by OTHER tabs only. */
-  subscribe?(fn: (key: string | null) => void): () => void;
+  subscribe?: ((fn: (key: string | null) => void) => () => void) | undefined;
 }
 
 /** Browser adapter. `storage` events only fire for localStorage in other tabs, which is what we want. */

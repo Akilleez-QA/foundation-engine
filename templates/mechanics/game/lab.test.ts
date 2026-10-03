@@ -67,7 +67,7 @@ test('S3: one probe action emits one marker and commits one moving-target tag', 
 test('probe result emits one spatial cue at the committed impact position', async () => {
   const t = await setup(),
     s = sessionFor(t.ctx);
-  const played: {cue: string; options?: CueVoiceOptions}[] = [];
+  const played: {cue: string; options?: CueVoiceOptions | undefined}[] = [];
   t.ctx.playVoice = (cue, options) => {
     played.push({cue, options});
     return null;

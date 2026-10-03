@@ -108,8 +108,8 @@ export const PAD_BUTTON_INDEX: Readonly<Partial<Record<PadInput, number>>> = {
   home: 16,
 };
 export interface ActionBindings {
-  readonly keys?: readonly KeyChord[];
-  readonly pad?: readonly PadInput[];
+  readonly keys?: readonly KeyChord[] | undefined;
+  readonly pad?: readonly PadInput[] | undefined;
 }
 
 /** A point-in-time description, not a claim that a handler exists or an action is reachable. */
@@ -169,7 +169,7 @@ export type ActionOverrides = Readonly<Record<ActionId, ActionBindings>>;
 export interface ActionLayerInfo {
   readonly id: string;
   readonly kind: string;
-  readonly owner?: string;
+  readonly owner?: string | undefined;
   readonly modal: 'page' | 'scope' | false;
 }
 export interface ActionLayers {
@@ -343,7 +343,10 @@ export function inputActionRegistry(rows: readonly InputActionDef[] = [], source
 }
 
 /** Effective bindings: an override replaces the device it names and keeps the other device's defaults. */
-export function effectiveBindings(def: InputActionDef, overrides: ActionOverrides = {}): Required<ActionBindings> {
+export function effectiveBindings(
+  def: InputActionDef,
+  overrides: ActionOverrides = {},
+): {readonly keys: readonly KeyChord[]; readonly pad: readonly PadInput[]} {
   const o = overrides[def.id];
   return {keys: o?.keys ?? def.defaults.keys ?? [], pad: o?.pad ?? def.defaults.pad ?? []};
 }
@@ -400,8 +403,8 @@ export type ActionHandler = (e: ActionEvent) => void | boolean;
 interface Subscription {
   action: ActionId;
   fn: ActionHandler;
-  layer?: string;
-  owner?: string;
+  layer?: string | undefined;
+  owner?: string | undefined;
 }
 type Target = {kind: 'sub'; sub: Subscription} | {kind: 'queue'; owner: string};
 interface Down {
@@ -477,7 +480,7 @@ export class InputActions {
     return this.epochValue;
   }
 
-  effective(id: ActionId): Required<ActionBindings> {
+  effective(id: ActionId): {readonly keys: readonly KeyChord[]; readonly pad: readonly PadInput[]} {
     const def = this.opts.registry.find(id);
     return def ? effectiveBindings(def, this.overrides) : {keys: [], pad: []};
   }

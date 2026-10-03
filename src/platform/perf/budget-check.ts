@@ -213,7 +213,7 @@ const over = (measured: number, reference: number, t: Tolerance) =>
 
 export interface CheckOptions {
   readonly tier: Tier;
-  readonly baseline?: BenchResult;
+  readonly baseline?: BenchResult | undefined;
   readonly tolerance?: Partial<Record<BudgetMetric, Tolerance>>;
   readonly regression?: Partial<Record<BudgetMetric, Tolerance>>;
   /** True when the run is on the reference GPU, so timings are enforced rather than advisory. */

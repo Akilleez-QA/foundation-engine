@@ -108,7 +108,7 @@ export async function testScene(
     particleScale?: number;
     sounds?: readonly string[];
     brief?: BuildBrief;
-    game?: GameDefinition;
+    game?: GameDefinition | undefined;
     inputs?: readonly InputDefinition[];
     calm?: boolean;
     params?: Record<string, string>;

@@ -577,7 +577,7 @@ test('reach rejects unreachable actions, broken or cyclic paths, chord-only rout
   assert.deepEqual(report.problems, []);
   assert.deepEqual(report.exceptions, [{id: 'pack.draw', reason: 'free drawing'}]);
   assert.ok(
-    problems([...CORE_ROWS, {...pointerOnly, reason: undefined}]).includes(
+    problems([...CORE_ROWS, {...pointerOnly, reason: undefined as never}]).includes(
       'pack.draw: a pointer-only exception needs a reason',
     ),
   );

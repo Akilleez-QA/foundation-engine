@@ -49,7 +49,7 @@ interface FakeCanvas {
 }
 
 function harness(extra: Partial<ContextRecoveryOptions> = {}) {
-  const listeners: {type: string; fn: (e: unknown) => void; signal?: AbortSignal}[] = [];
+  const listeners: {type: string; fn: (e: unknown) => void; signal?: AbortSignal | undefined}[] = [];
   const canvases: FakeCanvas[] = [];
   const doc = {
     addEventListener(type: string, fn: (e: unknown) => void, o: {capture?: boolean; signal?: AbortSignal}) {

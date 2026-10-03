@@ -68,7 +68,11 @@ export const isActivatable = (t: KeyTarget | null) =>
     /^(button|link|checkbox|switch|menuitem|tab|option|radio)$/.test(t.getAttribute?.('role') ?? ''));
 export const isSingleCharacter = (key: string) => key.length === 1 && key !== ' ';
 
-export type KeyboardOptions = {bindings?: KeyBindings; now?: () => number; singleKeyShortcuts?: () => boolean};
+export type KeyboardOptions = {
+  bindings?: KeyBindings | undefined;
+  now?: () => number;
+  singleKeyShortcuts?: () => boolean;
+};
 /** The keyboard state machine, DOM-free for tests. `down` returns true when it consumed the key. */
 export class KeyboardInput {
   private bindings: KeyBindings;

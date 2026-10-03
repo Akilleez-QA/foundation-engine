@@ -18,7 +18,7 @@ export interface BrowserTransportOptions {
   protocols?: readonly string[];
   limits: BrowserTransportLimits;
   /** Trusted construction seam; the returned socket is exclusively owned by this adapter. */
-  socketFactory?: (url: string, protocols: readonly string[]) => BrowserSocket;
+  socketFactory?: ((url: string, protocols: readonly string[]) => BrowserSocket) | undefined;
 }
 export type BrowserTransportReason =
   | 'disposed'

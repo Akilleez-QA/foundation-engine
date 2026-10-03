@@ -34,7 +34,7 @@ export function moduleBudgetFor<K extends keyof ModuleBudgetValues>(
   b: ModuleBudget | undefined,
   key: K,
   preset: ModulePreset,
-): ModuleBudgetValues[K] {
+): ModuleBudgetValues[K] | undefined {
   if (!b) return undefined;
   const chain: ModulePreset[] = ['low', 'medium', 'high'];
   for (let i = chain.indexOf(preset); i >= 0 && i < chain.length; i++) {
@@ -72,7 +72,7 @@ export interface EngineModule {
   patches?: readonly Patch[];
   /** Phase 6: wire behaviour, provide services, contribute UI. A throw fails this module and disables its dependants.
    *  Anything acquired must be tied to `s.signal` as it is acquired: a disposable returned after a throw never arrives. */
-  install?(s: Services): void | Disposable | Promise<void | Disposable>;
+  install?: ((s: Services) => void | Disposable | Promise<void | Disposable>) | undefined;
 }
 
 /** Identity helper: gives module literals full type checking (excess-property checks on defines/patches). */

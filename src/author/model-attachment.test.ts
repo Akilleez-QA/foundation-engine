@@ -99,8 +99,8 @@ test('attachment constructor detaches affine input and requires explicit finite 
   for (const bad of [
     {parent: 0},
     {socket: ''},
-    {unavailable: undefined},
-    {inheritVisibility: undefined},
+    {unavailable: undefined as never},
+    {inheritVisibility: undefined as never},
     {offset: [1]},
     {offset: identity().map((n, i) => (i === 3 ? 1 : n))},
     {offset: identity().map((n, i) => (i === 12 ? Infinity : n))},

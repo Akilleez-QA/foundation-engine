@@ -98,11 +98,11 @@ export type EvidenceClass = 'physical' | 'emulated' | 'unspecified';
 
 export interface SessionMeta {
   /** Operator-entered device profile label (never inferred), e.g. 'phone-minimum'. */
-  profile?: string;
+  profile?: string | undefined;
   /** What produced the record. The recorder cannot verify it; only the operator can label a physical device run. */
-  evidence?: EvidenceClass;
+  evidence?: EvidenceClass | undefined;
   /** Build revision, supplied by whoever built and served the page. */
-  build?: string;
+  build?: string | undefined;
   notes?: string;
 }
 
@@ -112,7 +112,7 @@ export interface SessionRecorderOptions {
   /** Retained window summaries. Default 120 (60 minutes of 30 s windows). */
   maxWindows?: number;
   /** At capacity: 'stop' (default) records a truncation marker and stops; 'ring' evicts the oldest and counts it. */
-  overflow?: OverflowPolicy;
+  overflow?: OverflowPolicy | undefined;
   /** Distinct segments (scene/epoch/preset/label). At capacity the recorder truncates, whatever the policy. Default 256. */
   maxSegments?: number;
   /** The frame budget in ms (the brief's fps target). Default 1000 / 60. */
@@ -197,7 +197,7 @@ export type RecorderState = 'recording' | 'paused' | 'stopped' | 'truncated' | '
 export interface SessionEvidence {
   schema: typeof SESSION_EVIDENCE_SCHEMA;
   version: typeof SESSION_EVIDENCE_VERSION;
-  meta: Required<Pick<SessionMeta, 'profile' | 'evidence' | 'build'>> & {notes: string | null};
+  meta: {profile: string; evidence: EvidenceClass; build: string; notes: string | null};
   recorder: {
     windowMs: number;
     maxWindows: number;

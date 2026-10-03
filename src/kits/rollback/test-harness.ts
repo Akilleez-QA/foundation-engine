@@ -99,7 +99,7 @@ export function runPeers(o: {
   /** Peer 1 starts this many ticks late (a hitch or late join); it still receives messages. */
   late?: number;
   /** Pacing: a peer whose largest frame advantage exceeds this skips its tick (no input, no advance). */
-  pace?: number;
+  pace?: number | undefined;
   /** Called after every tick with the tick number. */
   observe?: (tick: number, sessions: readonly RollbackSession[]) => void;
 }): PeerRun {

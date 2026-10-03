@@ -169,7 +169,7 @@ interface Pending<T> {
   at: number;
   payload: T;
   live: boolean;
-  off?: () => void;
+  off?: (() => void) | undefined;
 }
 
 export function createAudioTimeline<T = unknown>(o: AudioTimelineOptions<T>): AudioTimeline<T> {

@@ -15,7 +15,12 @@ export function bindSceneCubes(
   report: (error: unknown) => void,
   load: CubeLoader = loadCube,
 ) {
-  type Slot = {key: string; life?: AbortController; lease?: Lease<T.CubeTexture>; pending?: Promise<void>};
+  type Slot = {
+    key: string;
+    life?: AbortController | undefined;
+    lease?: Lease<T.CubeTexture> | undefined;
+    pending?: Promise<void>;
+  };
   const slots: {background: Slot; environment: Slot} = {background: {key: ''}, environment: {key: ''}};
   const original = {background: scene.background, environment: scene.environment};
   let closed = false;

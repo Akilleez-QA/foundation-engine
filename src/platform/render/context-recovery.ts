@@ -41,7 +41,7 @@ export interface ContextRecoveryOptions {
   /** Two failures within the window: one quality tier down. */
   stepDown?(): void;
   /** Show the one recovery layer; `retry` recreates. Returns a function that removes it. */
-  showBreak?(retry: () => void): () => void;
+  showBreak?: ((retry: () => void) => () => void) | undefined;
   /** Observes each step (the app emits `render.context.*`). */
   emit?(event: RecoveryEvent, canvas: HTMLCanvasElement): void;
   timers?: RecoveryTimers;

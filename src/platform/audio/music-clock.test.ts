@@ -16,8 +16,8 @@ import {must} from '../../testing/must';
 /** A fake context clock with recording buffer sources. */
 function fakeContext(now = 10) {
   const sources: {
-    when?: number;
-    offset?: number;
+    when?: number | undefined;
+    offset?: number | undefined;
     stops: (number | undefined)[];
     loop: boolean;
     loopStart: number;

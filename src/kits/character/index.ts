@@ -97,7 +97,7 @@ export interface CharacterOptions {
    * engine's own Math, unchanged; 'deterministic' uses dmath, so results are bit-identical in every JavaScript engine
    * (a browser replay log re-simulates exactly in Node) at a small cost. See docs/guides/deterministic-math.md.
    */
-  math?: ScalarMathMode;
+  math?: ScalarMathMode | undefined;
   /** Only while this returns true (a paused game, an open dialog). */
   when?: (ctx: Parameters<SystemDefinition['run']>[0]) => boolean;
 }

@@ -30,10 +30,10 @@ export interface PatchOf<K extends RegistryName> {
   registry: K;
   /** An id, a glob ('set.*', 'hat-?'), a list, or a predicate (MM :HAS). Ignored by 'add'. */
   target?: string | readonly string[] | ((def: EntryOf<K>) => boolean);
-  pass?: PatchPass;
+  pass?: PatchPass | undefined;
   /** MM grammar: ',' and '&' are AND, '|' is OR and binds tighter, '!' negates one term. Terms are module ids,
    *  provided ids, or 'flag:<setting-id>'. */
-  needs?: string;
+  needs?: string | undefined;
   op: PatchOp<EntryOf<K>>;
 }
 
@@ -46,8 +46,8 @@ export interface AnyPatch {
   id: string;
   registry: string;
   target?: string | readonly string[] | ((def: never) => boolean);
-  pass?: PatchPass;
-  needs?: string;
+  pass?: PatchPass | undefined;
+  needs?: string | undefined;
   op: {kind: PatchOp<{id: string}>['kind']};
 }
 

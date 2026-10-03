@@ -23,6 +23,13 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
   or tuple-less matrix elements without a check. *To do:* run `npm run typecheck`; destructure, iterate with
   `for…of`, check for `undefined`, or type fixed-length data as tuples. Use `!` only for a local, obvious
   invariant, with a comment.
+- **Stricter TypeScript: `exactOptionalPropertyTypes`.** An optional property (`x?: T`) no longer accepts an
+  explicit `undefined` unless it is typed `x?: T | undefined`. Engine and kit options that callers fill from
+  possibly-undefined values (`ages`, `provider`, `math`, `signal`, `residency`, audio cue fields and others)
+  are now typed `| undefined`, so passing them through still compiles and behaves as before. *Affected:* game
+  code that writes `{ x: maybe }` into its own optional properties, or assigns `obj.x = undefined` to one.
+  *To do:* run `npm run typecheck`; add `| undefined` to the property, or omit the key
+  (`...(maybe === undefined ? {} : { x: maybe })`) where its presence matters.
 - **Game code is linted for `Math.random()` and literal UI text (#90).** `npm run lint:game`, run by
   `npm run check`, `npm run lint` and the gate, scans `game/` (or `GAME_DIR`) and every
   `templates/*/game`. Previously only `src/` was checked, so a game that passed on 0.2.0 can now fail.

@@ -60,7 +60,7 @@ test('pose link rejects malformed mappings, duplicate identities and omitted pol
         {source: 'c', target: 'b'},
       ],
     },
-    {inheritVisibility: undefined},
+    {inheritVisibility: undefined as never},
   ])
     assert.throws(() => ModelPoseLink({...input, ...bad}), /pose link/);
 });

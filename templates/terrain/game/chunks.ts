@@ -60,12 +60,14 @@ interface State {
   publications: number;
   closed: boolean;
   owner: ReturnType<typeof createTerrainOwner>;
-  pending?: {
-    builder: ReturnType<typeof createTerrainGenerationBuilder>;
-    resolve(generation: TerrainGeneration): void;
-    reject(error: Error): void;
-  };
-  views?: MeshData[];
+  pending?:
+    | {
+        builder: ReturnType<typeof createTerrainGenerationBuilder>;
+        resolve(generation: TerrainGeneration): void;
+        reject(error: Error): void;
+      }
+    | undefined;
+  views?: MeshData[] | undefined;
 }
 const states = new WeakMap<SceneContext['world'], State>();
 export function enterChunks(ctx: SceneContext): void {

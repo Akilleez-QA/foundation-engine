@@ -9,7 +9,7 @@ export type InputContext = {
   readonly id: number;
   readonly kind: ContextKind;
   readonly label: string;
-  readonly element?: Element;
+  readonly element?: Element | undefined;
   pop(): void;
   readonly active: boolean;
 };
@@ -19,7 +19,10 @@ export class InputContextStack {
   private entries: InputContext[] = [];
   private listeners = new Set<(change: ContextChange) => void>();
   private nextId = 1;
-  push(kind: ContextKind, options: {label?: string; element?: Element; onPop?: () => void} = {}): InputContext {
+  push(
+    kind: ContextKind,
+    options: {label?: string | undefined; element?: Element | undefined; onPop?: () => void} = {},
+  ): InputContext {
     const previous = this.top(),
       stack = this;
     let active = true;
@@ -79,7 +82,7 @@ export function observeDomModals(
   host: HTMLElement,
   options: {
     signal?: AbortSignal;
-    covered?: string;
+    covered?: string | undefined;
     owns?: (host: HTMLElement) => boolean;
     Observer?: typeof MutationObserver;
   } = {},

@@ -93,7 +93,7 @@ export interface KnobDef<K extends KnobId = KnobId> {
   presets: Record<QualityPreset, GraphicsKnobs[K]>;
   applies: KnobApplies;
   /** Relative GPU cost of a value (0–1), measured by bench-perf on the reference machine, for the screen's cost bars. */
-  cost?: (v: GraphicsKnobs[K]) => number;
+  cost?: ((v: GraphicsKnobs[K]) => number) | undefined;
   floor?: KnobFloor<K>;
   /** Owning module id, for provenance on the screen and in bug reports. */
   owner: string;
@@ -136,11 +136,11 @@ export interface GraphicsChoiceStore {
 /** What detection reads. Gathered by `readDeviceSignals` (the only device probe) or supplied by a test. */
 export interface DeviceSignals {
   coarsePointer: boolean; // retained probe metadata; never selects graphics quality
-  deviceMemory?: number; // GB, navigator.deviceMemory (Chromium only)
-  cores?: number; // navigator.hardwareConcurrency
-  gpu?: string; // WEBGL_debug_renderer_info UNMASKED_RENDERER_WEBGL
+  deviceMemory?: number | undefined; // GB, navigator.deviceMemory (Chromium only)
+  cores?: number | undefined; // navigator.hardwareConcurrency
+  gpu?: string | undefined; // WEBGL_debug_renderer_info UNMASKED_RENDERER_WEBGL
   maxTextureSize: number;
-  saveData?: boolean;
+  saveData?: boolean | undefined;
 }
 export interface Detection {
   /** Applied on a first run: always today's pixel ratio (Wave 1). */

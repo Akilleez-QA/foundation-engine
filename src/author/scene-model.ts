@@ -22,9 +22,9 @@ interface Slot {
   life: AbortController;
   root?: T.Object3D;
   instance?: T.Object3D;
-  lease?: AssetLease<ModelTemplate>;
+  lease?: AssetLease<ModelTemplate> | undefined;
   mixer?: T.AnimationMixer;
-  action?: T.AnimationAction;
+  action?: T.AnimationAction | undefined;
   animationKey?: string;
   nodes?: Map<string, T.Object3D | null>;
   failed?: boolean;
@@ -42,8 +42,9 @@ export function createSceneModels(o: {
   invalidate(): void;
   report(error: unknown): void;
   maxInstances?: number;
-  /** Diagnostics builds pass `inspectModel`; production leaves it out so the inspector is not bundled. */ inspection?: typeof inspectModel;
-  poseLinks?: ModelPoseLinkLimits;
+  /** Diagnostics builds pass `inspectModel`; production leaves it out so the inspector is not bundled. */ inspection?:
+    typeof inspectModel | undefined;
+  poseLinks?: ModelPoseLinkLimits | undefined;
   mask?(entity: Entity): number;
 }) {
   const slots = new Map<Entity, Slot>();

@@ -31,7 +31,7 @@ export interface LayerRequest {
   id: string;
   kind: LayerKind;
   /** Activity run that owns the layer; the loop asks coverage by this key. Filled in by the activity host. */
-  owner?: string;
+  owner?: string | undefined;
   cover?: LayerCover;
   /** The Graphics screen: the covered scene keeps ticking at full rate beneath it (ADR 0032). */
   preview?: boolean;

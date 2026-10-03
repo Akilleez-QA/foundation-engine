@@ -35,11 +35,11 @@ export interface SceneVisit {
 /** What `enter` returns: the visit's run. Preparation is dormant; effects wait for `arrive`. */
 export interface SceneRun {
   /** Preparation only (ADR 0045): resolves when the run can render its first frame. */
-  ready?: Promise<void>;
+  ready?: Promise<void> | undefined;
   /** Synchronous, current owner only, after the first successful render: enable owner-scoped work. */
   activate?(): void;
   /** After the epoch recheck: drain the entry work queued during preparation (rewards, facts). */
-  arrive?(): void;
+  arrive?: (() => void) | undefined;
   /** Dispose the run. Called once: before activation for a stale or failed run, or when the player moves on. */
   leave(reason: HandoverLeave): void;
 }
@@ -50,7 +50,7 @@ export interface SceneEntry<M = unknown> {
   /** For the loading card: "Going to <label>…". */
   readonly label: string;
   /** 'idle': fetched in idle time after the first picture, in row order. */
-  readonly preload?: 'idle' | 'never';
+  readonly preload?: 'idle' | 'never' | undefined;
   load(): M | Promise<M>;
   /** Required CPU/data preparation while the previous run remains usable; no render surface allocation. */
   prepare?(module: M, visit: SceneVisit): void | Promise<void>;

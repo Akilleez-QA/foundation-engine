@@ -84,9 +84,9 @@ export interface ResidencyPressure {
 /** Optional residency policy (RES-01). Omitted: no ceiling, no pins, the warm budget alone applies. */
 export interface LeaseResidency {
   /** Ceiling on every byte the cache owns (live, pinned and warm). Over it, unpinned released entries are evicted LRU. */
-  residentBytes?: number;
+  residentBytes?: number | undefined;
   /** Released entries whose key this accepts are retained past the warm budget and never evicted for a budget. */
-  pinned?(key: string): boolean;
+  pinned?: ((key: string) => boolean) | undefined;
   /** Called once per transition into a state where live and pinned bytes alone exceed `residentBytes`. */
   onPressure?(report: ResidencyPressure): void;
   /** An eviction triggered by a publication or a policy change failed; such failures never fail that operation. */
@@ -96,7 +96,7 @@ export interface LeaseResidency {
 export interface LeaseCacheOptions {
   /** Bytes of released-but-kept resources; set per quality tier. */
   warmBytes: number;
-  residency?: LeaseResidency;
+  residency?: LeaseResidency | undefined;
 }
 
 export interface LeaseCacheStats {
@@ -578,16 +578,16 @@ export const TEXELS_PER_PIXEL = 2;
 
 export interface VariantQuery {
   /** On-screen size in CSS pixels at the reference resolution. Omit for non-image assets. */
-  screenPx?: number;
+  screenPx?: number | undefined;
   /** Device pixel ratio at the reference resolution. Default 1. */
-  pixelRatio?: number;
+  pixelRatio?: number | undefined;
   tier: QualityTier;
   /** The quality knob's cap on texture width. Undefined on the reference tier means uncapped. */
-  maxWidth?: number;
+  maxWidth?: number | undefined;
   /** Formats the context can use (KTX2 only with a transcoder and a supported GPU format). */
-  supports?: (format: AssetFormat) => boolean;
-  locale?: string;
-  voice?: string;
+  supports?: ((format: AssetFormat) => boolean) | undefined;
+  locale?: string | undefined;
+  voice?: string | undefined;
 }
 
 function eligible(def: AssetDef, q: VariantQuery): AssetVariant[] {

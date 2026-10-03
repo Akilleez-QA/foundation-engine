@@ -87,7 +87,7 @@ export type FakePad = {
   connected: boolean;
   axes: number[];
   buttons: {pressed: boolean; value: number}[];
-  vibrationActuator?: PadLike['vibrationActuator'];
+  vibrationActuator?: Exclude<PadLike['vibrationActuator'], undefined>;
 };
 export function fakePad(
   index = 0,

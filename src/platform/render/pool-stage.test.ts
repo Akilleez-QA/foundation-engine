@@ -8,7 +8,7 @@ class Canvas {
   height = 150;
   parent: Host | null = null;
   style: Record<string, string> = {};
-  listeners: {type: string; fn: (e: {preventDefault(): void}) => void; signal?: AbortSignal}[] = [];
+  listeners: {type: string; fn: (e: {preventDefault(): void}) => void; signal?: AbortSignal | undefined}[] = [];
   draws: unknown[][] = [];
   ctx2d = {
     globalCompositeOperation: 'source-over',

@@ -33,7 +33,7 @@ const inverseWith =
  * Authored planar root motion, independent of skeletal playback. Yaw is unwrapped radians. `math`: 'platform'
  * (default, Math.*) or 'deterministic' (dmath: the same bits in every JavaScript engine).
  */
-export function createRootMotion(input: RootClip, loop = false, options: {math?: ScalarMathMode} = {}) {
+export function createRootMotion(input: RootClip, loop = false, options: {math?: ScalarMathMode | undefined} = {}) {
   const m = scalarMath(options.math),
     compose = composeWith(m),
     inverse = inverseWith(m);

@@ -74,7 +74,10 @@ export function disposeLesson(ctx: SceneContext): void {
   if (errors.length) throw new AggregateError(errors, 'Lesson UI cleanup failed');
 }
 
-export function directorSystem(lesson: Lesson | LessonInput, o: {provider?: DiscussProvider} = {}): SystemDefinition {
+export function directorSystem(
+  lesson: Lesson | LessonInput,
+  o: {provider?: DiscussProvider | undefined} = {},
+): SystemDefinition {
   return defineSystem({
     id: 'learn-director',
     phase: 'frame',
@@ -298,7 +301,10 @@ function render(ctx: SceneContext, v: Visit, view: LessonView) {
 
 /** A caption line for scenes without a board (sim, quiz): who speaks, what they say. */
 const captions = new WeakMap<HTMLElement, {el: HTMLElement; last: string}>();
-function captionLine(overlay: HTMLElement, cap: {who: string; text: string; color?: string} | null): HTMLElement {
+function captionLine(
+  overlay: HTMLElement,
+  cap: {who: string; text: string; color?: string | undefined} | null,
+): HTMLElement {
   let c = captions.get(overlay);
   if (!c) {
     const el = overlay.ownerDocument.createElement('p');
@@ -321,7 +327,7 @@ function captionLine(overlay: HTMLElement, cap: {who: string; text: string; colo
 export function lessonBody(
   lesson: Lesson | LessonInput,
   extra: SceneBody = {},
-  o: {provider?: DiscussProvider} = {},
+  o: {provider?: DiscussProvider | undefined} = {},
 ): SceneBody {
   return {
     entities: [...(extra.entities ?? [])],

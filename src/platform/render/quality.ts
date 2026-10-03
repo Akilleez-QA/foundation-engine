@@ -386,8 +386,8 @@ export function detectPreset(s: DeviceSignals): Detection {
 
 /** The minimal environment the probe reads; the browser's `window` and a WebGL2 context satisfy it. */
 export interface DeviceProbeEnv {
-  matchMedia?: (q: string) => {matches: boolean};
-  navigator?: {deviceMemory?: number; hardwareConcurrency?: number; connection?: {saveData?: boolean}};
+  matchMedia?: ((q: string) => {matches: boolean}) | undefined;
+  navigator?: {deviceMemory?: number; hardwareConcurrency?: number; connection?: {saveData?: boolean}} | undefined;
   gl?: {MAX_TEXTURE_SIZE: number; getParameter(p: number): unknown; getExtension(name: string): unknown} | null;
 }
 /** The one device probe (STD-SET-4): touch, deviceMemory, cores, data saver, GPU string and texture limit. */
@@ -537,18 +537,18 @@ export interface Quality {
 
 export interface QualityOptions {
   /** The knob registry; defaults to a registry holding the core knobs. */
-  registry?: KnobRegistry;
+  registry?: KnobRegistry | undefined;
   /** The player's saved choice (section 'graphics.settings'), owned by core/save. */
   store?: GraphicsChoiceStore;
   /** Authored startup preset, used only without a pin or saved choice. Remains unsaved until the player acts. */
-  initialPreset?: QualityPreset;
+  initialPreset?: QualityPreset | undefined;
   /** First-run probe; called at most once, only without a saved choice or authored startup preset. */
   signals?: () => DeviceSignals | undefined;
   devicePixelRatio?: () => number;
   /** A gate or bench `?quality=<preset>`: no read, no write, no detection, no governor. */
-  pinned?: QualityPreset;
+  pinned?: QualityPreset | undefined;
   /** Recorded with a detection. */
-  build?: string;
+  build?: string | undefined;
   /** Governor budget when 'frame-rate.cap' is 0 (display rate). */
   displayFrameMs?: number;
 }

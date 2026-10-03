@@ -9,6 +9,7 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noImplicitReturns": true,
+    "exactOptionalPropertyTypes": true,
     "noEmit": true,
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,

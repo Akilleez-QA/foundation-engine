@@ -126,7 +126,7 @@ export interface ViewState {
   camera: {position: Vec3; target: Vec3; fov: number; minWidthFov?: number; mask?: number};
   background: number;
   /** Replace this value to publish an environment change. */
-  environment?: EnvironmentState;
+  environment?: EnvironmentState | undefined;
   /** Width / height of the view (16/9 in node tests). */
   readonly aspect: number;
   /** An element over the view for HUD text and prompts (the UI kit uses it); null in node tests. */
@@ -279,7 +279,7 @@ export interface SceneInput extends SceneBody {
   /** Particle support and bounds (FX-01, docs/guides/particles.md): `sceneParticles({ max, emitters })`. Admitted
    *  emitters' `max` sum to at most `max` (default 4096); at most `emitters` (default 16, one draw each) are drawn.
    *  Without it the scene's emitters are not simulated or drawn (reported once). */
-  particles?: SceneParticles;
+  particles?: SceneParticles | undefined;
   id: string;
   title: string;
   /** Open, game-defined ('level', 'menu', 'world', 'cutscene', …). */

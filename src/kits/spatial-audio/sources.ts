@@ -78,7 +78,7 @@ export interface SpatialAudioLimits {
    * frequent one-shots that should get turns against older equal voices (shooters); leave it off for long equal sounds
    * (ambience, loops), which it would cut. Keep it above `maxLateness`.
    */
-  rotateAfter?: number;
+  rotateAfter?: number | undefined;
 }
 
 export interface SpatialAudioOptions {
@@ -99,14 +99,14 @@ export interface SourceInput {
   /** A fixed position, or a function read once per pump. */
   position: Point | (() => Point);
   /** Extra importance (>= 0), read once per pump; multiplied by the class importance. Default 1. */
-  importance?: () => number;
+  importance?: (() => number) | undefined;
   /** Repeat interval in seconds (>= .05): the source emits its cue every interval until cancelled. Omit for one emission. */
-  every?: number;
+  every?: number | undefined;
   variant?: number;
   /** Voice gain [0, 1], default 1. */
   gain?: number;
   /** Aborting cancels the source (as `cancel(id)`). */
-  signal?: AbortSignal;
+  signal?: AbortSignal | undefined;
   /**
    * Repeating sources only, opt-in (default false). Off, an emission that cannot start within `maxLateness` is
    * dropped and the source plays its next beat on time: right for gunfire and steps, where a late sound is worse than a
@@ -236,7 +236,7 @@ interface Source {
   sentFilter: {hz: number; gain: number} | null;
   ray: {blocked: boolean; at: number} | null;
   reported: Set<string>;
-  off?: () => void;
+  off?: (() => void) | undefined;
   /** When the current voice started (for occlusion age before its first query). */
   startedAt: number;
   /**

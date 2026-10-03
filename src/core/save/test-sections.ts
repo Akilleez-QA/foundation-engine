@@ -44,7 +44,7 @@ export const voice: SaveSection<Voice> = {
 
 export interface Journal {
   version: 1;
-  entries: Record<string, {completed?: boolean; assisted?: boolean}>;
+  entries: Record<string, {completed?: boolean | undefined; assisted?: boolean}>;
 }
 export const journal: SaveSection<Journal> = {
   id: 'demo.journal',

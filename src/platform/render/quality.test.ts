@@ -52,7 +52,9 @@ const fakeScatter: KnobDef<'test.fake-scatter'> = {
   applies: 'reenter-scene',
 };
 
-function memoryStore(initial?: GraphicsSettings): GraphicsChoiceStore & {value?: GraphicsSettings; writes: number} {
+function memoryStore(
+  initial?: GraphicsSettings,
+): GraphicsChoiceStore & {value?: GraphicsSettings | undefined; writes: number} {
   const s = {
     value: initial,
     writes: 0,

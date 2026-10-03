@@ -53,17 +53,17 @@ export interface TickerSpec {
   scope?: 'owner' | 'application';
   /** Owner key, usually the activity run id. The layer port answers coverage for it. */
   owner: string;
-  update?(f: FrameInfo): void;
+  update?: ((f: FrameInfo) => void) | undefined;
   /** Draw. Called when the ticker is dirty, or every running frame in 'continuous' mode. */
   /** Draw. Return `false` when nothing needed drawing (a continuous run whose picture did not change): the frame is
    *  then counted as skipped, not rendered (STD-RUN-9). */
-  render?(f: FrameInfo): unknown;
-  mode?: FrameMode;
-  whenCovered?: WhenCovered;
+  render?: ((f: FrameInfo) => unknown) | undefined;
+  mode?: FrameMode | undefined;
+  whenCovered?: WhenCovered | undefined;
   /** Lower runs first (simulation before camera before render). Default 0; ties keep insertion order. */
   priority?: number;
   /** Largest dt handed to this ticker, in seconds. Default 0.05. */
-  maxDt?: number;
+  maxDt?: number | undefined;
 }
 
 export interface TickerHandle {
@@ -89,7 +89,7 @@ export interface FrameLoopOptions {
   /** Milliseconds on the same timebase as the scheduler's timestamps. Used outside frames, and inside a frame only
    *  while a sampler is attached (two reads around the tickers). */
   now?: () => number;
-  clock?: ClockDriverPort;
+  clock?: ClockDriverPort | undefined;
   quality?: QualityPort;
   visibility?: VisibilityPort;
   /** A ticker threw; it has been removed. Defaults to console.error. Reporter failures cannot stop other owners. */

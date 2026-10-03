@@ -116,7 +116,7 @@ test('the baseline is the per-metric maximum over K comparable runs (level trian
     const tris = [158586, 180088, 172003];
     let i = 0;
     await baselineFromBenches(
-      async () => run([{...sample('level', 'level', 110), trisPerRenderedFrame: tris[i++]}]),
+      async () => run([{...sample('level', 'level', 110), trisPerRenderedFrame: must(tris[i++])}]),
       ['level'],
       {runs: 3, attempts: 5},
       dir,

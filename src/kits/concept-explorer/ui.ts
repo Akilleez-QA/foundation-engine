@@ -141,7 +141,7 @@ export interface QuizPanelView {
   feedback: string | null;
   state: 'asking' | 'right' | 'revealed';
   chosen: string | null;
-  answer?: string;
+  answer?: string | undefined;
   index: number;
   count: number;
 }

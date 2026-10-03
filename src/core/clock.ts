@@ -118,7 +118,7 @@ export function createClock(opts: ClockOptions = {}): {clock: GameClock; driver:
   const pauses = new Set<string>(),
     warps = new Map<string, WarpRequest>(),
     catchUps = new Set<(c: CatchUp) => void>();
-  type Ev = {at: number; fn: () => void; signal?: AbortSignal};
+  type Ev = {at: number; fn: () => void; signal?: AbortSignal | undefined};
   let events: Ev[] = [];
   const regrant = () => {
     let best: WarpRequest | null = null;

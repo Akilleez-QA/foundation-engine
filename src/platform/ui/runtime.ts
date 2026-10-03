@@ -170,13 +170,15 @@ export function createInput(
       stamp = previous;
     }
   };
+  // Listener options omit an absent signal: the DOM treats a missing and an undefined `signal` member alike.
+  const listen = signal === undefined ? {} : {signal};
   win.addEventListener(
     'keydown',
     e =>
       dispatchKey(e, () => {
         actions.keyDown(e as KeyboardEvent);
       }),
-    {capture: true, signal},
+    {capture: true, ...listen},
   );
   win.addEventListener(
     'keyup',
@@ -184,11 +186,11 @@ export function createInput(
       dispatchKey(e, () => {
         actions.keyUp(e as KeyboardEvent);
       }),
-    {capture: true, signal},
+    {capture: true, ...listen},
   );
   const cancel = () => actions.cancel('blur');
-  win.addEventListener('blur', cancel, {signal});
-  win.addEventListener('pagehide', cancel, {signal});
+  win.addEventListener('blur', cancel, {...listen});
+  win.addEventListener('pagehide', cancel, {...listen});
   return actions;
 }
 
@@ -200,7 +202,7 @@ function createDocumentInput(doc: Document, registry?: Registry<InputActionDef>,
     () => {
       if (doc.hidden) actions.cancel('blur');
     },
-    {signal},
+    signal === undefined ? {} : {signal},
   );
   return actions;
 }

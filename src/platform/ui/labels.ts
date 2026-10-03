@@ -61,7 +61,7 @@ export interface ScenedLabel<K = unknown> {
   readonly world: THREE.Vector3;
   readonly ndc: THREE.Vector3;
   /** Decision: the `hidden` attribute (undefined leaves it as it is). */
-  hidden?: boolean;
+  hidden?: boolean | undefined;
   /** Decision: inline style to write. */
   readonly style: LabelStyle;
   /** Decision: `data-*` flags to set (a string) or remove (null). */

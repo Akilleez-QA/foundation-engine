@@ -10,7 +10,7 @@
  * event (as browsers do), then opens a fresh database.
  * It is not a conformance implementation: no indexes, key ranges, durability, or upgrades beyond creation.
  */
-type Store = Map<IDBValidKey, unknown> & {auto?: number; autoIncrement?: boolean};
+type Store = Map<IDBValidKey, unknown> & {auto?: number | undefined; autoIncrement?: boolean | undefined};
 const later = (fn: () => void) => setTimeout(fn, 0);
 const domError = (name: string, message = name) => Object.assign(new Error(message), {name});
 

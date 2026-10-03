@@ -18,7 +18,7 @@ export function applyRootMotion(
     maxStep?: number;
     maxSteps?: number;
     ground?: (x: number, z: number) => number | null;
-    math?: ScalarMathMode;
+    math?: ScalarMathMode | undefined;
   },
 ) {
   const m = scalarMath(options.math);

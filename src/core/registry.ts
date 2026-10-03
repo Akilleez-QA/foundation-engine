@@ -100,14 +100,14 @@ export type BehaviourRegistryName = {
 export interface Provenance {
   source: string;
   action: 'add' | 'patch' | 'remove' | 'drop' | 'restore';
-  note?: string;
+  note?: string | undefined;
 }
 
 export interface RegistryProblem {
   registry: string;
   id?: string;
   /** The module that added the row. */
-  source?: string;
+  source?: string | undefined;
   /** The latest module that patched the row, when that is not its source. */
   patchedBy?: string;
   problem: string;

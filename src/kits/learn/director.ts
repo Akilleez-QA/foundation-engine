@@ -25,7 +25,7 @@ export interface DirectorOptions {
   text?: (key: string) => string;
   reducedMotion?: boolean;
   save?: ProgressHandle;
-  provider?: DiscussProvider;
+  provider?: DiscussProvider | undefined;
   /** Reject provider responses that fail the kid-safe check (the brief's kid-safe policy). */
   kidSafe?: boolean;
   /** Cues for feedback ('ui.success', 'ui.bump'). */

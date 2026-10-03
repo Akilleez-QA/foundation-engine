@@ -242,7 +242,7 @@ export interface CascadeOptions {
   scheduler: CascadeScheduler;
   quality?: Pick<Quality, 'knob'>;
   /** How far from the camera cascades reach (m). Default: the diagonal of the sun's authored shadow box. */
-  maxFar?: number;
+  maxFar?: number | undefined;
 }
 export interface CascadeRig {
   /** True while the cascades stand in for the sun. */

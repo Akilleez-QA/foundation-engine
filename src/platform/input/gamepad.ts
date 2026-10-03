@@ -27,7 +27,7 @@ export type PadFrame = {
   disconnected: boolean;
 };
 export type GamepadOptions = {
-  getPads?: () => readonly (PadLike | null)[];
+  getPads?: (() => readonly (PadLike | null)[]) | undefined;
   /** Nintendo layout: the right face button confirms and the bottom one goes back. */
   nintendoSwap?: () => boolean;
   /** 'zoom': d-pad up/down zooms; 'move': the d-pad moves, for digital-only play. LB/RB zoom either way. */

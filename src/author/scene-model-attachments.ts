@@ -18,10 +18,10 @@ export interface AttachmentPresentation {
   /** Held only for this slot and this relation's transform identity. */
   last?: T.Matrix4;
   heldVisible?: boolean;
-  parentSlot?: AttachmentSlot;
-  parentModel?: ModelData;
-  targetModel?: ModelData;
-  parentAttachment?: ModelAttachmentData;
+  parentSlot?: AttachmentSlot | undefined;
+  parentModel?: ModelData | undefined;
+  targetModel?: ModelData | undefined;
+  parentAttachment?: ModelAttachmentData | undefined;
   parentPose?: unknown;
 }
 export interface AttachmentSlot {
@@ -29,7 +29,7 @@ export interface AttachmentSlot {
   ready?: boolean;
   root?: T.Object3D;
   nodes?: Map<string, T.Object3D | null>;
-  attachment?: AttachmentPresentation;
+  attachment?: AttachmentPresentation | undefined;
 }
 /** Optional second relation kind, reconciled in this same parent-first traversal. */
 export interface PoseRelationHooks {

@@ -26,7 +26,7 @@ export function createLifetimeRouteQueue(options: {maxOwners: number; maxRequest
   // bound those tombstones; the adapter independently enforces the public request cap.
   const queue = createRouteQueue({maxRequests: Math.max(maxOwners, maxRequests), maxNodes});
   type Lifetime = {retired: boolean; ids: Set<string>; cleanup(): void};
-  type Slot = {epoch: number; lifetime?: Lifetime};
+  type Slot = {epoch: number; lifetime?: Lifetime | undefined};
   const slots: Slot[] = [];
   let closed = false,
     busy = false;
@@ -42,7 +42,7 @@ export function createLifetimeRouteQueue(options: {maxOwners: number; maxRequest
     if (closed) queue.dispose();
   };
   return {
-    openOwner(input: {label: string; signal?: AbortSignal}): RouteOwnerAdmission {
+    openOwner(input: {label: string; signal?: AbortSignal | undefined}): RouteOwnerAdmission {
       if (closed) return {status: 'closed'};
       idle();
       busy = true;

@@ -8,7 +8,7 @@ interface Entry {
   canvases: readonly HTMLCanvasElement[];
   refs: number;
   bytes: number;
-  dispose?: () => void;
+  dispose?: (() => void) | undefined;
 }
 
 /** CPU paintings and optional immutable texture groups shared through explicit leases.
