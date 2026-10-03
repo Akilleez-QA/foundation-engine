@@ -67,7 +67,7 @@ try{
  assert.equal(await page.locator('#persistence').innerText(),'Persistence: saved');
  assert.equal(JSON.parse(await durable()).data.parts.surface,'cyan');snapshots.retrySaved=await read();await shot('save-recovered');
  await reload();await ready();await open();assert.equal((await read()).value.parts.surface,'cyan');
- assert.equal((await read()).accepted.part,'cyan');assert.equal(await page.locator('#summary').innerText(),'saved');
+ assert.equal((await read()).accepted.asset,'cyan');assert.equal(await page.locator('#summary').innerText(),'saved');
  await check(0,-2);snapshots.retryReloaded=await read();await shot('recovered-reload');
  // A reload deliberately clears history. Create fresh edits before exercising the existing undo branch.
  await preview('reversed');await waitCandidate();await click('commit');
