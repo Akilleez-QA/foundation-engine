@@ -1,0 +1,269 @@
+{
+ "schema": 1,
+ "sha": "636e308e87c288a7781edacccd0ce1a0ed0bebc6",
+ "dirty": false,
+ "harness": "swiftshader",
+ "viewport": {
+  "width": 1280,
+  "height": 800,
+  "dpr": 1
+ },
+ "gpu": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+ "browser": "Chromium 152.0.7977.82",
+ "when": "2026-10-03T18:09:31.218Z",
+ "loadAverage": 12.24,
+ "descriptor": "8d58f52ee91768dab79af7ad9e2459fa759730d6b5c8997596e554ca5b0c6cdf",
+ "experiment": {
+  "schema": 1,
+  "harness": "swiftshader",
+  "browser": "Chromium 152.0.7977.82",
+  "backend": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "viewport": {
+   "width": 1280,
+   "height": 800,
+   "dpr": 1
+  },
+  "quality": "reference (pinned)",
+  "calm": false,
+  "execution": {
+   "launchArguments": [
+    "--mute-audio",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-extensions",
+    "--disable-background-networking",
+    "--enable-automation",
+    "--ignore-gpu-blocklist",
+    "--window-size=1280,800",
+    "--use-angle=swiftshader",
+    "--enable-unsafe-swiftshader"
+   ]
+  },
+  "locale": "en-US",
+  "clock": "wall",
+  "comparisonPolicy": "strict-taxonomy-v1",
+  "route": [
+   "play"
+  ],
+  "routes": {
+   "play": "#scene/play"
+  },
+  "active": [
+   "play"
+  ],
+  "keys": [
+   "ArrowUp",
+   "ArrowLeft"
+  ],
+  "activeRestart": {
+   "play": {
+    "when": ".hud-banner:not([hidden])",
+    "key": "Space",
+    "timeoutMs": 30000
+   }
+  },
+  "activeKeys": {
+   "play": [
+    "ArrowLeft",
+    "ArrowRight"
+   ]
+  },
+  "window": {
+   "resample": 3,
+   "settleMs": 1500,
+   "quietMs": 1000,
+   "quietTimeoutMs": 30000,
+   "minMs": 2000,
+   "maxMs": {
+    "swiftshader": 6000,
+    "gpu": 4000
+   },
+   "frames": 6,
+   "activeMs": 4000,
+   "enterTimeoutMs": 60000
+  },
+  "network": "hermetic",
+  "classificationVersion": 3,
+  "readinessVersion": 1,
+  "helpers": {
+   "scripts/perf/bench-browser.mjs": "07f0257e3c2a757925b0147cdf6bc5e561c7669d0f7f720d38f74cc88617e80a",
+   "scripts/perf/network.mjs": "00c7586bbf61d0b4ac45cf0e0036d630142f5108ca57f239104c0eb5b911f310",
+   "scripts/perf/probe-inject.mjs": "ce89278af30c1aea6392e1063537777639b90452e464e653a52b1ab8d9a8d073",
+   "scripts/perf/bench.mjs": "82dfce06d85c783fd8cc051404a7df6b78438ecc0ec3a92907737d1499c61841",
+   "scripts/perf/active-restart.mjs": "fc4c0b647b22d55ea868863ead8632c7a98c8d235a65524eaccbd7c3960a6d29",
+   "scripts/perf/build.mjs": "5bba566ec2798f737937e3808b29ebdc70dde804547e33227823f51c467ea68c",
+   "src/platform/perf/window-class.ts": "cb9201721f45bd61a9ef2e262c1642b98c5a5a586f992e36b94933143d9c2fb4"
+  }
+ },
+ "build": {
+  "digest": "4230a05a8044384224123d8e9b5c1b4500c1a7d7829462834454db65050b87b6",
+  "files": 38
+ },
+ "startup": {
+  "appReadyMs": 638,
+  "transferredMB": 0.25,
+  "jsKB": 248,
+  "heapMB": 3.7,
+  "textureMiB": 0,
+  "canvasMiB": 0,
+  "liveContexts": 1,
+  "networkQuiet": 1
+ },
+ "samples": [
+  {
+   "id": "play",
+   "scene": "play",
+   "mode": "idle",
+   "hash": "#scene/play",
+   "classification": {
+    "kind": "steady",
+    "version": 3,
+    "reasons": [],
+    "comparable": true
+   },
+   "windowMs": 2012,
+   "frames": 121,
+   "renderedFrames": 43,
+   "renderedFrameRatio": 0.36,
+   "drawsPerRenderedFrame": 7,
+   "drawsMaxFrame": 7,
+   "trisPerRenderedFrame": 779,
+   "offscreenDrawsPerRenderedFrame": 0,
+   "shadowPassDrawsMax": 0,
+   "taskMsPerFrame": 0.43,
+   "frameMsP95": 16.7,
+   "frameMsMax": 16.8,
+   "layouts": 1,
+   "heapMB": 4.2,
+   "textureMiB": 0,
+   "canvasMiB": 0,
+   "canvases": 0,
+   "liveContexts": 1,
+   "submission": {
+    "useProgram": 0,
+    "programsCreated": 0,
+    "programLookups": null,
+    "uniformCalls": 15.1,
+    "bindVertexArray": 2.9,
+    "bufferSubData": 0,
+    "textureUploads": 0,
+    "shadowDueRatio": 0
+   },
+   "uploads": {
+    "initial": 0,
+    "recurring": 0,
+    "firstUse": 0,
+    "unknown": 0,
+    "bytes": 0
+   },
+   "topTextures": [
+    "1x1 x2 = 0.0 MiB"
+   ]
+  },
+  {
+   "id": "play:active",
+   "scene": "play",
+   "mode": "active",
+   "hash": "#scene/play",
+   "classification": {
+    "kind": "steady",
+    "version": 3,
+    "reasons": [],
+    "comparable": true
+   },
+   "windowMs": 4005,
+   "frames": 241,
+   "renderedFrames": 206,
+   "renderedFrameRatio": 0.85,
+   "drawsPerRenderedFrame": 4,
+   "drawsMaxFrame": 6,
+   "trisPerRenderedFrame": 746,
+   "offscreenDrawsPerRenderedFrame": 0,
+   "shadowPassDrawsMax": 0,
+   "taskMsPerFrame": 0.62,
+   "frameMsP95": 16.8,
+   "frameMsMax": 16.8,
+   "layouts": 2,
+   "heapMB": 5.4,
+   "textureMiB": 0,
+   "canvasMiB": 0,
+   "canvases": 0,
+   "liveContexts": 1,
+   "submission": {
+    "useProgram": 0,
+    "programsCreated": 0,
+    "programLookups": null,
+    "uniformCalls": 10.9,
+    "bindVertexArray": 2.9,
+    "bufferSubData": 0,
+    "textureUploads": 0,
+    "shadowDueRatio": 0
+   },
+   "uploads": {
+    "initial": 0,
+    "recurring": 0,
+    "firstUse": 0,
+    "unknown": 0,
+    "bytes": 0
+   },
+   "heldKeys": [
+    "ArrowLeft",
+    "ArrowRight"
+   ],
+   "heldKeysDrive": true,
+   "heldKeysSource": "activeKeys",
+   "preparations": [
+    {
+     "key": "Space",
+     "when": ".hud-banner:not([hidden])",
+     "elapsedMs": 140,
+     "retiredMarker": true
+    }
+   ]
+  }
+ ],
+ "afterTour": {
+  "textureMiB": 0,
+  "canvasMiB": 0,
+  "heapMB": 5.4,
+  "liveContexts": 1
+ },
+ "chunks": {
+  "Bone": 0.1,
+  "DirectionalLight": 22.2,
+  "GLTFLoader": 62,
+  "ImageLoader": 3,
+  "InstancedBufferAttribute": 0.3,
+  "Mesh": 89,
+  "PropertyBinding": 19.8,
+  "Texture": 33.9,
+  "action-gamepad": 3,
+  "boot-failure": 0.4,
+  "cellular.job": 8,
+  "compact-shell": 2.2,
+  "cube": 1.6,
+  "decode-image.job": 0.6,
+  "host": 7.2,
+  "index": 174.9,
+  "lease-cache": 6.6,
+  "meshopt_decoder.module": 25.9,
+  "model-playback": 13.8,
+  "models": 8.4,
+  "patch": 3.5,
+  "patch.job": 0.2,
+  "recipe": 4,
+  "recipe.job": 3.2,
+  "region.job": 5.8,
+  "runtime": 481.4,
+  "scene-particles": 3.3,
+  "shadow-cascades": 26,
+  "shadows": 24.6,
+  "surface": 8.7,
+  "textures": 2.4,
+  "worker-entry": 2.4
+ },
+ "network": {
+  "mode": "hermetic",
+  "external": {}
+ }
+}
