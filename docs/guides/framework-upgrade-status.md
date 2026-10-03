@@ -737,6 +737,7 @@ existing owner changed behaviour. Status: implemented, candidate (PR #61); not
 integrated. Evidence is unit, loopback socket and one desktop headless Chromium
 two-context check; see the [guide](multiplayer-session.md) and the
 [ledger](upgrade-acceptance-ledger.md#newcomer-shared-session-mp-01--implemented-candidate).
+
 ## Bench dead-window guard (W1-4) — perf gate behaviour change, checked on PR #59, not integrated
 
 An active window that draws no frame fails the gate as "perf inconclusive" only when its

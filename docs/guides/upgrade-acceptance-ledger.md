@@ -724,6 +724,7 @@ Status: implemented, candidate (PR #61); not integrated. Guide:
   liveness detection by clients, physical-device input or performance, touch, more than
   four players, load or scalability, a joining-socket flood from many LAN addresses at
   once, and integrity enforcement quality (only observe mode is exercised in a browser).
+
 ## Bench dead-window guard (W1-4) — checked on PR #59, not integrated
 
 - Implemented: per-scene `activeKeys` in `budgets.json`; the bench reads the game's input

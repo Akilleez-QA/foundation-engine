@@ -424,6 +424,7 @@ integrated. See the [ledger](upgrade-acceptance-ledger.md).
 `playMusic` composes with the one audio output (its own music store and bus, no second
 context) and the AU-01 timeline (start at `timeline.contextTime(0)`); scenes own their
 music voices. Candidate (PR #54); not integrated. See the [guide](music-on-clock.md).
+
 ## Bench dead-window guard and per-game static files (W1-4, W1-5) — checked on PR #59, not integrated
 
 Perf gate behaviour change: an active bench window that renders no frame is `inconclusive`
