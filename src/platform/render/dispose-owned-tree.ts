@@ -1,5 +1,9 @@
 import * as T from 'three';
 import {assetOwners} from '../assets/app-ownership';
+// three's own type flags (`isSprite`, `type`) rather than `instanceof`, so the Sprite and ArrowHelper classes stay out
+// of the scene runtime chunk when no scene creates one.
+const isSprite=(o:T.Object3D):o is T.Sprite=>(o as Partial<T.Sprite>).isSprite===true;
+const isArrowHelper=(o:T.Object3D|null):o is T.ArrowHelper=>o?.type==='ArrowHelper';
 /** Release standard-material resources owned solely by this activity.
  * Shared references within the tree are disposed once. Anything the asset library owns (assets.owns: leased
  * textures, shared finishes with their textures, geometry caches, glow sprites, and
@@ -14,9 +18,9 @@ import {assetOwners} from '../assets/app-ownership';
 export function disposeOwnedTree(root:T.Object3D|undefined,options:{preserveMaterial?:(material:T.Material)=>boolean}={}){
  const geometries=new Set<T.BufferGeometry>(),materials=new Set<T.Material>(),textures=new Set<T.Texture>(),borrowedTextures=new Set<T.Texture>();
  root?.traverse(object=>{
-  if(object instanceof T.Mesh||object instanceof T.Line||object instanceof T.Points||object instanceof T.Sprite){
+  if(object instanceof T.Mesh||object instanceof T.Line||object instanceof T.Points||isSprite(object)){
    // Sprite and ArrowHelper geometries are Three.js-wide singletons, not activity-owned.
-   if(!(object instanceof T.Sprite)&&!(object.parent instanceof T.ArrowHelper&&(object===object.parent.line||object===object.parent.cone)))geometries.add(object.geometry);
+   if(!isSprite(object)&&!(isArrowHelper(object.parent)&&(object===object.parent.line||object===object.parent.cone)))geometries.add(object.geometry);
    for(const material of Array.isArray(object.material)?object.material:[object.material]){
     const borrowed=assetOwners.owns(material)||(options.preserveMaterial?.(material)??false);
     if(!borrowed)materials.add(material);
