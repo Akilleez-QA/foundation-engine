@@ -29,7 +29,7 @@ const server=await createServer({root:ROOT,logLevel:'error',plugins:[{name:'mode
   const respond=()=>{if(res.destroyed)return;res.setHeader('Content-Type','model/gltf-binary');res.end(id==='first'?original:id==='missing'||(id==='second'&&secondMissing)?missing:second);};
   if(id==='slow')held.push(respond);else respond();
 });}}],server:{host:'127.0.0.1',port:0}});
-const report={revision:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),passed:false,errors:[],consoleErrors:[],screenshots:[],limitations:['Desktop Chromium emulation only; no physical-device, phone or full accessibility acceptance.','Two original fixture variants; no skeletal fusion or retargeting claim.','Single-writer local save; readiness is separate from durable publication.']};
+const report={dirtyWorktree:!!execFileSync('git',['status','--porcelain'],{cwd:ROOT,encoding:'utf8'}).trim(),revision:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),passed:false,errors:[],consoleErrors:[],screenshots:[],limitations:['Desktop Chromium emulation only; no physical-device, phone or full accessibility acceptance.','Two original fixture variants; no skeletal fusion or retargeting claim.','Single-writer local save; readiness is separate from durable publication.']};
 const evidence=diagnosticReport(report,resolve(out,'report.json'));let browser;
 try{
  await server.listen();browser=await launch({width:1440,height:960,strictClose:true});const page=browser.page;page.on('pageerror',e=>report.errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')report.consoleErrors.push({text:m.text(),url:m.location().url});});
@@ -71,8 +71,45 @@ try{
  const epoch=await page.evaluate(()=>engine.state().scene.epoch);await page.evaluate(()=>engine.goto('sample',{again:'replacement'}));release();
  await page.waitForFunction(epoch=>engine.state().scene?.epoch!==epoch&&modelPreview.read().accepted?.status==='ready',epoch);
  assert.equal((await read()).candidate,null);assert.equal((await read()).count,1);assert.equal((await read()).accepted.adoptedAsset,'second');
- await choose('slow');await heldRequest();await page.waitForFunction(()=>modelPreview.read().candidate?.status==='loading');await page.evaluate(()=>modelPreview.dispose());release();await page.waitForTimeout(100);assert.equal((await read()).retired,true);assert.equal((await read()).count,0);
- const released=await page.evaluate(()=>modelPreview.resources());assert.equal(released.instances,0);assert.equal(released.residentMiB,0);
+ // Correlate terminal events with the exact request object, not a reused URL or earlier injected failure.
+ const terminalFor=request=>{
+  let timer,finished,failed;
+  const promise=new Promise((resolve,reject)=>{
+   const cleanup=()=>{clearTimeout(timer);page.off('requestfinished',finished);page.off('requestfailed',failed);};
+   const settle=(candidate,status)=>{if(candidate!==request)return;cleanup();resolve({url:request.url(),status,error:request.failure()?.errorText??null});};
+   finished=candidate=>settle(candidate,'finished');failed=candidate=>settle(candidate,'failed');
+   page.on('requestfinished',finished);page.on('requestfailed',failed);
+   timer=setTimeout(()=>{cleanup();reject(Error('exact delayed request did not settle'));},5000);
+  });
+  // Preserve a meaningful scenario failure if an action throws before this terminal wait is awaited.
+  promise.catch(()=>{});return promise;
+ };
+ const beginDelayed=async()=>{
+  const started=page.waitForEvent('request',{predicate:request=>new URL(request.url()).pathname==='/__model-preview/slow.glb',timeout:5000});
+  await choose('slow');const request=await started;const terminal=terminalFor(request);
+  await heldRequest();await page.waitForFunction(()=>modelPreview.read().candidate?.status==='loading');return {terminal};
+ };
+ const resources=()=>page.evaluate(()=>modelPreview.resources());
+ const baseline=await resources();assert.equal(baseline.instances,1);assert.equal(baseline.cleanupFailures,0);
+ const cycles=[];
+ for(let cycle=0;cycle<3;cycle++){
+  const {terminal}=await beginDelayed();const prior=(await read()).accepted.entity;
+  await click('cancel');const transport=await terminal;release();
+  const cancelled=await read(),settled=await resources();
+  assert.equal(cancelled.candidate,null);assert.equal(cancelled.accepted.entity,prior);assert.equal(cancelled.accepted.adoptedAsset,'second');
+  assert.equal(settled.instances,1);assert.ok(settled.residentMiB<=baseline.residentMiB);assert.ok(settled.bytesKeptMiB<=baseline.bytesKeptMiB);assert.equal(settled.cleanupFailures,0);
+  const previousEpoch=await page.evaluate(()=>engine.state().scene.epoch);
+  await page.evaluate(cycle=>engine.goto('sample',{cycle:String(cycle)}),cycle);await acceptedReady();
+  assert.notEqual(await page.evaluate(()=>engine.state().scene.epoch),previousEpoch);
+  const reentered=await read(),retained=await resources();assert.equal(reentered.candidate,null);assert.equal(reentered.accepted.adoptedAsset,'second');assert.equal(reentered.count,1);
+  assert.equal(retained.instances,1);assert.ok(retained.residentMiB<=baseline.residentMiB);assert.ok(retained.bytesKeptMiB<=baseline.bytesKeptMiB);assert.equal(retained.cleanupFailures,0);
+  cycles.push({cycle,transport,cancelled,settled,reentered,retained});
+ }
+ await shot('repeated-retirement');
+ const {terminal}=await beginDelayed();await page.evaluate(()=>modelPreview.dispose());const disposalTransport=await terminal;release();
+ assert.equal((await read()).retired,true);assert.equal((await read()).count,0);
+ const released=await resources();assert.equal(released.instances,0);assert.equal(released.residentMiB,0);assert.equal(released.bytesKeptMiB,0);assert.equal(released.pinnedMiB,0);assert.equal(released.cleanupFailures,0);
+ report.retirement={baseline,cycles,disposalTransport,released,scope:'Exact browser transport terminal events precede owned-resource assertions. Requests can abort before decode; this is not decoded-work completion or document-owned renderer disposal evidence.'};
  assert.deepEqual(report.errors,[]);
  for(const id of ['failed','second']){
    const resource=report.consoleErrors.filter(e=>e.url.endsWith(`/__model-preview/${id}.glb`)&&/^Failed to load resource:.*503/.test(e.text));
