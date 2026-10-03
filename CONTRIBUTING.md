@@ -39,7 +39,7 @@ During development:
 npm run check
 ```
 
-`check` selects affected tests from working-tree changes against HEAD, including untracked files. A clean committed tree does not make it a full regression run. Before requesting review, run the complete source checks:
+`check` selects affected tests from working-tree changes against HEAD, including untracked files. A clean committed tree can select zero tests; the output reports that explicitly. Use `npm run check -- --base origin/main` (or your fork's upstream base) to include committed changes since the merge base, together with staged, unstaged and untracked changes. This selection is a local heuristic, not complete dependency coverage. Use `npm run check -- --all` to run the canonical `npm test` suite during the check. Invalid revisions and unknown selection options fail instead of silently selecting no tests. Before requesting review, run the complete source checks:
 
 ```sh
 npm run typecheck
