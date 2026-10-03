@@ -79,7 +79,8 @@ export function createInputHistory(options: InputHistoryOptions): InputHistory {
     for (const p of pairs) {
       const ba = (1 << p.ia) >>> 0, bb = (1 << p.ib) >>> 0;
       if ((raw & ba) === 0 || (raw & bb) === 0) continue;
-      const ta = lastRawPress[p.ia], tb = lastRawPress[p.ib];
+      // ia/ib are indexOf of known actions; lastRawPress has one slot per action.
+      const ta = lastRawPress[p.ia]!, tb = lastRawPress[p.ib]!;
       const keep = p.policy === 'a' ? ba : p.policy === 'b' ? bb
         : ta === tb || p.policy === 'neutral' ? 0
         : p.policy === 'last' ? (ta > tb ? ba : bb) : (ta < tb ? ba : bb);
@@ -99,7 +100,7 @@ export function createInputHistory(options: InputHistoryOptions): InputHistory {
   const bitAt = (ring: Uint32Array, action: string, frame: number | undefined) => {
     const b = bitOf(action);
     if (frame === undefined) { if (latest < 0) return false; frame = latest; }
-    return (ring[slot(frame)] & b) !== 0;
+    return (ring[slot(frame)]! & b) !== 0; // slot() is in 0..capacity-1 = ring length
   };
   const history: InputHistory = {
     actions, capacity,
@@ -134,7 +135,7 @@ export function createInputHistory(options: InputHistoryOptions): InputHistory {
     },
     latest: () => latest,
     oldest,
-    heldAt: frame => held[slot(frame)],
+    heldAt: frame => held[slot(frame)]!, // slot() is in 0..capacity-1
     held: (action, frame) => bitAt(held, action, frame),
     pressed: (action, frame) => bitAt(press, action, frame),
     released: (action, frame) => bitAt(release, action, frame),
@@ -144,16 +145,16 @@ export function createInputHistory(options: InputHistoryOptions): InputHistory {
       const range = window(within, at);
       if (!range) return -1;
       for (let f = range[1]; f >= range[0]; f--) {
-        const s = f % capacity;
-        const edges = edge === 'release' ? release[s] : includeConsumed ? press[s] : (press[s] & ~consumed[s]) >>> 0;
+        const s = f % capacity; // s < capacity = ring length
+        const edges = edge === 'release' ? release[s]! : includeConsumed ? press[s]! : (press[s]! & ~consumed[s]!) >>> 0;
         if (edges & b) return f;
       }
       return -1;
     },
     consume(action, frame) {
-      const b = bitOf(action), s = slot(frame);
-      if ((press[s] & b) === 0 || (consumed[s] & b) !== 0) return false;
-      consumed[s] = (consumed[s] | b) >>> 0;
+      const b = bitOf(action), s = slot(frame); // s < capacity = ring length
+      if ((press[s]! & b) === 0 || (consumed[s]! & b) !== 0) return false;
+      consumed[s] = (consumed[s]! | b) >>> 0;
       return true;
     },
     sequence(steps: readonly SequenceStep[]) {
@@ -162,9 +163,10 @@ export function createInputHistory(options: InputHistoryOptions): InputHistory {
       const out = { steps: n, all: new Uint32Array(n), none: new Uint32Array(n), pressed: new Uint32Array(n), released: new Uint32Array(n) };
       steps.forEach((step, i) => {
         if (step === null || typeof step !== 'object') throw RangeError('input history: invalid step');
-        out.all[i] = maskOf(step.all); out.none[i] = maskOf(step.none); out.pressed[i] = maskOf(step.pressed); out.released[i] = maskOf(step.released);
-        if ((out.all[i] | out.none[i] | out.pressed[i] | out.released[i]) === 0) throw RangeError('input history: a step needs at least one condition');
-        if ((out.all[i] & out.none[i]) !== 0 || (out.pressed[i] & out.none[i]) !== 0) throw RangeError('input history: a step can never match');
+        const all = maskOf(step.all), none = maskOf(step.none), pressed = maskOf(step.pressed), released = maskOf(step.released);
+        out.all[i] = all; out.none[i] = none; out.pressed[i] = pressed; out.released[i] = released;
+        if ((all | none | pressed | released) === 0) throw RangeError('input history: a step needs at least one condition');
+        if ((all & none) !== 0 || (pressed & none) !== 0) throw RangeError('input history: a step can never match');
       });
       const frozen = Object.freeze(out);
       compiled.add(frozen);
@@ -178,9 +180,11 @@ export function createInputHistory(options: InputHistoryOptions): InputHistory {
       const range = window(within, o.at);
       if (!range) return null;
       const seq = sequence as Compiled, [lo, end] = range, n = end - lo + 1;
+      // s < capacity = ring length; i < seq.steps = step array length; k < n <= within <= capacity = scratch length.
       const satisfied = (i: number, f: number) => {
-        const s = f % capacity, h = held[s], p = (press[s] & ~consumed[s]) >>> 0, r = release[s];
-        return (h & seq.all[i]) === seq.all[i] && (h & seq.none[i]) === 0 && (p & seq.pressed[i]) === seq.pressed[i] && (r & seq.released[i]) === seq.released[i];
+        const s = f % capacity, h = held[s]!, p = (press[s]! & ~consumed[s]!) >>> 0, r = release[s]!;
+        const all = seq.all[i]!, pressed = seq.pressed[i]!, released = seq.released[i]!;
+        return (h & all) === all && (h & seq.none[i]!) === 0 && (p & pressed) === pressed && (r & released) === released;
       };
       let prev = scratchA, cur = scratchB;
       for (let k = 0; k < n; k++) cur[k] = satisfied(0, lo + k) ? lo + k : -1;
@@ -190,17 +194,18 @@ export function createInputHistory(options: InputHistoryOptions): InputHistory {
         for (let k = 0; k < n; k++) {
           const f = lo + k;
           cur[k] = lastFrame >= 0 && f - lastFrame <= maxGap && satisfied(i, f) ? lastStart : -1;
-          if (prev[k] >= 0) { lastFrame = f; lastStart = prev[k]; }
+          const start = prev[k]!;
+          if (start >= 0) { lastFrame = f; lastStart = start; }
         }
       }
-      for (let k = n - 1; k >= 0; k--) if (cur[k] >= 0) return Object.freeze({ start: cur[k], end: lo + k });
+      for (let k = n - 1; k >= 0; k--) { const start = cur[k]!; if (start >= 0) return Object.freeze({ start, end: lo + k }); }
       return null;
     },
     save(): InputHistorySnapshot {
       const out = { held: [] as number[], press: [] as number[], release: [] as number[], consumed: [] as number[] };
       if (latest >= 0) for (let f = oldest(); f <= latest; f++) {
-        const s = f % capacity;
-        out.held.push(held[s]); out.press.push(press[s]); out.release.push(release[s]); out.consumed.push(consumed[s]);
+        const s = f % capacity; // s < capacity = ring length
+        out.held.push(held[s]!); out.press.push(press[s]!); out.release.push(release[s]!); out.consumed.push(consumed[s]!);
       }
       return Object.freeze({ v: 1 as const, config, first, latest, prevRaw, prevHeld, lastRawPress: Object.freeze(Array.from(lastRawPress)),
         held: Object.freeze(out.held), press: Object.freeze(out.press), release: Object.freeze(out.release), consumed: Object.freeze(out.consumed) });
@@ -217,18 +222,21 @@ export function createInputHistory(options: InputHistoryOptions): InputHistory {
       const count = empty ? 0 : f1 - Math.max(f0, f1 - capacity + 1) + 1;
       const arrays = [snapshot.held, snapshot.press, snapshot.release, snapshot.consumed];
       if (!arrays.every(a => Array.isArray(a) && a.length === count)) bad('lengths');
-      const [h, p, r, c] = arrays.map(a => Array.from(a as readonly number[]));
+      const copy = (a: unknown) => Array.from(a as readonly number[]);
+      const h = copy(snapshot.held), p = copy(snapshot.press), r = copy(snapshot.release), c = copy(snapshot.consumed);
+      // k < count = each array's checked length.
       for (let k = 0; k < count; k++) {
-        if (![h[k], p[k], r[k], c[k]].every(validMask)) bad('masks');
-        if ((p[k] & ~h[k]) >>> 0 || (r[k] & h[k]) >>> 0 || (c[k] & ~p[k]) >>> 0) bad('edges');
-        if (k > 0 && (p[k] !== ((h[k] & ~h[k - 1]) >>> 0) || r[k] !== ((h[k - 1] & ~h[k]) >>> 0))) bad('edges');
+        const hk = h[k]!, pk = p[k]!, rk = r[k]!, ck = c[k]!;
+        if (![hk, pk, rk, ck].every(validMask)) bad('masks');
+        if ((pk & ~hk) >>> 0 || (rk & hk) >>> 0 || (ck & ~pk) >>> 0) bad('edges');
+        if (k > 0) { const hp = h[k - 1]!; if (pk !== ((hk & ~hp) >>> 0) || rk !== ((hp & ~hk) >>> 0)) bad('edges'); }
       }
       if (count > 0 && (ph !== h[count - 1] || (ph & ~pr) >>> 0)) bad('latest');
       const lrp = snapshot.lastRawPress;
       if (!Array.isArray(lrp) || lrp.length !== actions.length || !lrp.every(t => t === -1 || (frameNumber(t) && t <= f1))) bad('press frames');
       first = f0; latest = f1; prevRaw = pr; prevHeld = ph;
       held.fill(0); press.fill(0); release.fill(0); consumed.fill(0);
-      for (let k = 0; k < count; k++) { const s = (f1 - count + 1 + k) % capacity; held[s] = h[k]; press[s] = p[k]; release[s] = r[k]; consumed[s] = c[k]; }
+      for (let k = 0; k < count; k++) { const s = (f1 - count + 1 + k) % capacity; held[s] = h[k]!; press[s] = p[k]!; release[s] = r[k]!; consumed[s] = c[k]!; } // k < count
       lastRawPress.set(lrp);
     },
   };

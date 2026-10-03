@@ -5,8 +5,10 @@ import { createAppearanceDocument, type AppearanceValue } from './appearance';
 
 const limits = { maxParts: 2, maxParameters: 2, maxBytes: 1024, maxNodes: 32, maxDepth: 4 };
 const json = (form = 'box', scale = 1, version = 1) => JSON.stringify({ version, parts: { form }, parameters: { scale } });
-const compatible = (value: AppearanceValue) => ['box', 'sphere'].includes(value.parts.form)
-  && value.parameters.scale >= 0.5 && value.parameters.scale <= (value.parts.form === 'sphere' ? 1 : 2);
+const compatible = (value: AppearanceValue) => {
+  const form = value.parts.form, scale = value.parameters.scale;
+  return form !== undefined && scale !== undefined && ['box', 'sphere'].includes(form) && scale >= 0.5 && scale <= (form === 'sphere' ? 1 : 2);
+};
 const create = (saved = json(), validate = compatible) => createAppearanceDocument({ id: 'appearance', json: saved, version: 1, limits, validate });
 
 test('appearance consumer: preview, rejection, cancellation, commit, undo and restore preserve accepted selections', () => {

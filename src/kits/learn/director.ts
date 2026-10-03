@@ -63,7 +63,9 @@ export class LessonDirector {
     this.enter(this.sceneIndex);
   }
 
-  get scene(): LessonScene { return this.lesson.scenes[this.lesson.outline[this.sceneIndex].id]; }
+  /** The current outline item: sceneIndex stays within the outline, so only an empty outline has none. */
+  private get item() { const item = this.lesson.outline[this.sceneIndex]; if (!item) throw Error('lesson: no outline item at the current scene'); return item; }
+  get scene(): LessonScene { return this.lesson.scenes[this.item.id]!; } // a valid lesson has a scene per outline item
   private player(actions: readonly Action[]) { return new TimelinePlayer(actions, { text: this.text, reducedMotion: this.o.reducedMotion, answers: () => this.answers, params: () => this.params }); }
   private enter(i: number) {
     this.sceneIndex = i; this.interrupt = null;
@@ -176,14 +178,14 @@ export class LessonDirector {
   }
   async discuss(prompt: string): Promise<void> {
     const s = this.scene; if (!s.discuss?.prompts.some(p => p.id === prompt)) return;
-    let response = this.o.provider ? await this.o.provider.respond(prompt, { lesson: this.lesson.id, scene: this.lesson.outline[this.sceneIndex].id, text: this.text }) : [];
+    let response = this.o.provider ? await this.o.provider.respond(prompt, { lesson: this.lesson.id, scene: this.item.id, text: this.text }) : [];
     if (this.o.kidSafe && kidSafeProblems(response, this.text).length) response = [];
     this.asked.add(prompt);
     this.main.pause(); this.interrupt = this.player(response.length ? response : s.interrupts?.question ?? []);
   }
 
   view(): LessonView {
-    const s = this.scene, item = this.lesson.outline[this.sceneIndex], t = (this.interrupt ?? this.main).state();
+    const s = this.scene, item = this.item, t = (this.interrupt ?? this.main).state();
     const q = s.quiz?.questions[this.quiz.index];
     const complete = this.sceneComplete();
     return {

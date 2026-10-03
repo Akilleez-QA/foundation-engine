@@ -62,9 +62,10 @@ test('NW05: no 2x burst at a boundary; any interval T admits at most capacity + 
     t += Math.floor(random() * 40);
     if (admitted(bucket.admit('k', t))) times.push(t);
   }
+  // i <= j < times.length: both indices are in range.
   for (let i = 0; i < times.length; i++)
-    for (let j = i; j < times.length && times[j] - times[i] <= 2000; j++)
-      assert.ok(j - i + 1 <= 8 + Math.floor((20 * (times[j] - times[i])) / 1000) + 1e-9,
+    for (let j = i; j < times.length && times[j]! - times[i]! <= 2000; j++)
+      assert.ok(j - i + 1 <= 8 + Math.floor((20 * (times[j]! - times[i]!)) / 1000) + 1e-9,
         `interval [${times[i]}, ${times[j]}] admitted ${j - i + 1}`);
 });
 

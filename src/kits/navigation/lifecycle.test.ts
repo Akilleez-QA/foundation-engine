@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createNavigationGraph} from './search';import {createRouteQueue} from './queue';import {createRouteFollower} from './follower';import {definePortal,crossPortal} from './portals';import {createFrames} from '../frames/frame';
+import { must } from '../../testing/must';
 const matrix=(x=0)=>[1,0,0,0,0,1,0,0,0,0,1,0,x,0,0,1];
 test('round robin work serves short request alongside long route and admits before allocation',()=>{const q=createRouteQueue({maxRequests:2,maxNodes:102});const graph=createNavigationGraph(Array.from({length:100},(_,i)=>({id:String(i),edges:i===99?[]:[{to:String(i+1),cost:1}]})));assert.equal(q.offer({id:'long',owner:'a',generation:0,graph,start:'0',goal:'99'}),'accepted');const short=createNavigationGraph([{id:'s',edges:[]}]);q.offer({id:'short',owner:'b',generation:0,graph:short,start:'s',goal:'s'});assert.equal(q.offer({id:'third',owner:'c',generation:0,graph:short,start:'bad',goal:'bad'}),'saturated');assert.equal(q.pump(12),12);assert.equal(q.result('short')?.status,'arrived');assert.equal(q.result('long')?.status,'pending');q.dispose();assert.equal(q.stats.nodes,0);});
 test('portal rechecks clearance, readiness and both frame lifetimes at crossing',()=>{const f=createFrames();f.set({id:'outside',generation:0,matrix:matrix()});f.set({id:'inside',generation:0,matrix:matrix(3)});const p=definePortal({id:'door',revision:0,from:{frame:{id:'outside',generation:0},position:[0,0,0]},to:{frame:{id:'inside',generation:0},position:[0,0,0]},width:1,height:2,open:true});assert.equal(crossPortal(p,0,{radius:.6,height:1},f,()=>true,()=>true).status,'blocked');assert.equal(crossPortal(p,0,{radius:.3,height:1},f,()=>false,()=>true).status,'unavailable');assert.equal(crossPortal(p,0,{radius:.3,height:1},f,()=>true,()=>{f.remove({id:'inside',generation:0});return true;}).status,'stale');});
@@ -23,7 +24,7 @@ test('structural request duplicates use source identity while search and account
   assert.equal(queue.offer({ ...request, goal: 'start' }), 'conflict');
 
   // Reoffering the same identity does not replace already admitted topology.
-  graph.nodes[0].edges[0].cost = 99;
+  must(graph.nodes[0]?.edges[0]).cost = 99;
   graph.nodes.push({ id: 'late', edges: [] });
   assert.equal(queue.offer(request), 'duplicate');
   assert.deepEqual(queue.stats, { requests: 1, nodes: 2, owners: 1 });

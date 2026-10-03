@@ -95,7 +95,7 @@ const compare = (op: DialogueOp, a: DialogueValue, b: DialogueValue) =>
 
 /** Evaluate a validated condition. Facts come from the caller and are read through `has` only. */
 export function evaluate(c: DialogueCondition, env: { variables: DialogueVariables; visits(node: string): number; facts: ReadonlySet<string> }): boolean {
-  if ('var' in c) return compare(c.op, env.variables[c.var], c.value);
+  if ('var' in c) return compare(c.op, env.variables[c.var]!, c.value); // validated against the declared variables
   if ('visits' in c) return compare(c.op, env.visits(c.visits), c.value);
   if ('fact' in c) return env.facts.has(c.fact);
   if ('all' in c) return c.all.every(x => evaluate(x, env));

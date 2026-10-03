@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {ACCEL_TIME,createMotion,STOP_TIME,turnToward} from './motion';
+import { must } from '../../testing/must';
 
 /** Hold a direction for `hold` seconds, then let go, at a fixed frame rate: positions over time. */
 function walk(fps:number,hold:number,total:number,speed=3.8){
@@ -22,7 +23,7 @@ test('walking reaches top speed in ACCEL_TIME and stops in STOP_TIME, independen
 });
 
 test('a tap still moves at once, and a release never keeps their walking for more than a short coast',()=>{
- const {at}=walk(60,1/60,.5);assert.ok(at[0]>0,'moves on the first frame');
+ const {at}=walk(60,1/60,.5);assert.ok(must(at[0])>0,'moves on the first frame');
  const {x}=walk(60,1,1.2);const {x:held}=walk(60,1,1);assert.ok(x-held<3.8*STOP_TIME/2+.01,'coast after release is about half the stop time at top speed');
 });
 

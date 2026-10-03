@@ -34,7 +34,7 @@ function firstDiff(a: Json, b: Json, path: Step[]): Diff | null {
   if (a === null || typeof a !== 'object') return a === b ? null : { path, kind: 'value', a, b };
   if (Array.isArray(a)) {
     const y = b as readonly Json[];
-    for (let i = 0; i < Math.min(a.length, y.length); i++) { const d = firstDiff(a[i], y[i], [...path, i]); if (d) return d; }
+    for (let i = 0; i < Math.min(a.length, y.length); i++) { const d = firstDiff(a[i]!, y[i]!, [...path, i]); if (d) return d; } // i < both lengths
     if (a.length === y.length) return null;
     const i = Math.min(a.length, y.length);
     return a.length > y.length ? { path: [...path, i], kind: 'removed', a: a[i], b: undefined } : { path: [...path, i], kind: 'added', a: undefined, b: y[i] };
@@ -43,7 +43,7 @@ function firstDiff(a: Json, b: Json, path: Step[]): Diff | null {
   for (const k of [...new Set([...Object.keys(x), ...Object.keys(y)])].sort()) {
     if (!Object.hasOwn(y, k)) return { path: [...path, k], kind: 'removed', a: x[k], b: undefined };
     if (!Object.hasOwn(x, k)) return { path: [...path, k], kind: 'added', a: undefined, b: y[k] };
-    const d = firstDiff(x[k], y[k], [...path, k]);
+    const d = firstDiff(x[k]!, y[k]!, [...path, k]); // own key of both (checked above)
     if (d) return d;
   }
   return null;
@@ -53,7 +53,7 @@ const pathText = (path: readonly Step[]) => path.map((s, i) => typeof s === 'num
 const fieldText = (path: readonly Step[]) => path.length ? pathText(path).replace(/^\./, '') : null;
 
 const rowsOf = (v: Json): readonly Json[] | null => v && typeof v === 'object' && !Array.isArray(v) && Array.isArray((v as Record<string, Json>).entities)
-  ? (v as Record<string, readonly Json[]>).entities : null;
+  ? (v as { readonly entities: readonly Json[] }).entities : null;
 const rowId = (rows: readonly Json[] | null, i: number) => {
   const r = rows?.[i];
   return Array.isArray(r) && r.length === 2 && typeof r[0] === 'number' ? r[0] : null;
