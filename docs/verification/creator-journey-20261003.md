@@ -4,7 +4,9 @@
 
 The new `npm run test:creator-journey-browser` composes the existing explorer template, settings service, input lifecycle, scene router, save store and pooled renderer. CI now runs this command. No engine runtime or template behavior changed.
 
-Passed locally at **2026-10-03T17:33:32.914154+00:00**, on base `1be7ba7c7d61e11126d0f6959d68155b67a987fd` with the new test/command/CI files uncommitted (`dirtyWorktree: true` in the report). The exact tested script was committed unchanged in `6d7b20f686c61729ee8fc9d18381e5c9f9da3084`. Script SHA-256: `0caf3535d9a5c8e88ea558bfb58167ef7426a0c5710274ed77a9dd78e2b45581`. This is working-tree evidence tied to exact test content, not a claim that a full gate ran on that commit.
+Latest standalone public-main run passed at **2026-10-03T17:50:50.677956+00:00**, on exact clean head `c0a7776c45f4b8f81e0bf144c77dbcd91e8b7d46` based directly on public main `2fb6e69`. The report records `dirtyWorktree: false`. Script SHA-256: `9b940508dd0e41f78198102a8aa5d4854fa50cb118efea3a1d6bc6fe8b55edae`. This receipt update changes documentation only. No full gate or remote CI was run for this evidence.
+
+This focused branch contains only the journey script, npm/CI registration, generated-evidence ignore entry and receipt. The explorer, test API, shell settings and renderer probes already exist on public main; no broader candidate implementation was imported.
 
 Environment: Linux, Node 26.8.1, Chromium 152.0.7977.82, 1280×800 isolated headless software-GL context, muted by the standard browser launcher and `dev.silent`, seed 1. Run at niceness 15; no other task browser was active. Local regenerable artifacts: `playtest/creator-journey/report.json` and `start.png`, `discovered.png`, `reloaded.png` (not committed). The reloaded screenshot was inspected: readable Found 3 of 3, completion banner, garden and player rendered.
 
@@ -36,6 +38,6 @@ During development, two test assumptions failed before the passing run: expectin
 
 This does not close physical-device, OS suspension, gamepad, touch, auditory, accessibility or newcomer trials. It does not exercise actual quota exhaustion or rendered refused-save/retry UI; existing headless save tests remain that limited evidence. It does not certify full application disposal, heap/listener retention, WAN sessions, production-bundle behavior or combined-candidate full gates. Lamp visual state and player position are not promised persisted state. Public API and save formats are unchanged.
 
-## Review follow-up
+## Historical development evidence
 
-Strengthened startup and first-return assertions require exactly one live context and zero overflows, so a leak already present before repeated visits cannot become an accepted baseline. Rerun passed at 2026-10-03T17:37:27.471526+00:00 on base `45c8171` plus the reviewed assertions; 9 states, no failures. Exact tested script SHA-256: `9b940508dd0e41f78198102a8aa5d4854fa50cb118efea3a1d6bc6fe8b55edae`. The source is committed unchanged with this receipt. Browser and server closed successfully; no full integration gate was run.
+Earlier passing browser runs were on the local integration candidate and are retained in Git history. They are not the latest public-main acceptance above. Review strengthened startup and first-return assertions to require exactly one live context and zero overflows, preventing an initially leaked context from becoming an accepted comparison baseline. The final standalone run includes those assertions and records nine states with no scenario or cleanup failures. Final documentation passed the genericity lint; focused source tests passed 25/25.
