@@ -6,6 +6,7 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 import ts from 'typescript';
+import {TAP_REPORTER, childTestEnv, testTotals} from './lib/test-output.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const fixture = resolve(root, 'scripts/fixtures/compatibility/c0e73c9');
@@ -40,16 +41,21 @@ function compile(files) {
     : '';
 }
 
-/** Runs one retained test file in its own Node test runner (no browser, server or temporary files). */
+/**
+ * Runs one retained test file in its own Node test runner (no browser, server or temporary files) and returns its
+ * totals. The reporter is named: Node 23+ no longer defaults to TAP when the output is piped.
+ */
 function runRetained(file) {
-  const childEnv = {...process.env, TSX_TSCONFIG_PATH: resolve(root, 'tsconfig.json')};
-  delete childEnv.NODE_TEST_CONTEXT; // This is an independent test runner, not a nested harness.
-  return execFileSync(process.execPath, ['--import', 'tsx', '--test', file], {
+  const childEnv = {...childTestEnv(), TSX_TSCONFIG_PATH: resolve(root, 'tsconfig.json')};
+  const output = execFileSync(process.execPath, ['--import', 'tsx', '--test', TAP_REPORTER, file], {
     cwd: root,
     timeout: 30_000,
     encoding: 'utf8',
     env: childEnv,
   });
+  const totals = testTotals(output);
+  assert.ok(totals, `no test totals in the child runner's output:\n${output}`);
+  return {tests: totals.tests, pass: totals.pass, fail: totals.fail};
 }
 
 test('retained first-public-source consumer compiles and behaves against current author API', () => {
@@ -62,10 +68,8 @@ test('retained first-public-source consumer compiles and behaves against current
   verifyManifest(fixture, manifest.files);
   const errors = compile(manifest.files.map(entry => resolve(fixture, entry.file)));
   assert.equal(errors, '', errors);
-  const output = runRetained(resolve(fixture, 'main.test.ts'));
-  assert.match(output, /# tests 2\b/);
-  assert.match(output, /# pass 2\b/);
-  assert.match(output, /# fail 0\b/);
+  const totals = runRetained(resolve(fixture, 'main.test.ts'));
+  assert.deepEqual(totals, {tests: '2', pass: '2', fail: '0'});
 });
 
 test('retained v0.2.0 arcade template compiles and passes its released tests against current @engine', () => {
@@ -85,10 +89,8 @@ test('retained v0.2.0 arcade template compiles and passes its released tests aga
     '',
     `v0.2.0 arcade no longer compiles; see docs/guides/public-compatibility.md#retained-v020-baseline\n${errors}`,
   );
-  const output = runRetained(resolve(released, 'play.test.ts'));
-  assert.match(output, /# tests 4\b/);
-  assert.match(output, /# pass 4\b/);
-  assert.match(output, /# fail 0\b/);
+  const totals = runRetained(resolve(released, 'play.test.ts'));
+  assert.deepEqual(totals, {tests: '4', pass: '4', fail: '0'});
 });
 
 test('a hash-mismatched retained fixture fails the manifest check', () => {

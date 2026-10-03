@@ -87,6 +87,13 @@ test('check: complete test totals remain visible without per-test output', () =>
     '# tests 5\n# pass 5\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 12',
   );
   assert.equal(testSummary('no test output'), '');
+  assert.equal(
+    testSummary(
+      '✔ example\nℹ tests 5\nℹ suites 0\nℹ pass 5\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 12\n',
+    ),
+    '# tests 5\n# pass 5\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 12',
+    'Node 23+ spec summaries',
+  );
 });
 
 test('check: selection options reject missing or conflicting revisions', () => {

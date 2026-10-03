@@ -6,7 +6,7 @@ For an ordinary contribution, start with [CONTRIBUTING.md](../../CONTRIBUTING.md
 
 ## A new checkout
 
-Use Node.js 22.18 or newer in the 22.x line to match the supported toolchain and CI. From a full Git checkout:
+Use Node.js 22.18 or newer; the 22.x line matches the primary CI jobs (a cheap `node-current` CI job also runs `npm run test` and `npm run check` on Node 26). From a full Git checkout:
 
 ```sh
 npm ci
@@ -132,13 +132,18 @@ do not delete a repository merely because an orphan export has been prepared.
 Hosted CI runs framework/browser checks serially in `browser`, alongside two
 isolated template runners. Each sorted discovered template belongs to exactly one
 shard; each still runs the complete gate (including full tests) and phone smoke.
-The terminal required check remains `check` and accepts only explicit success from
-all three work jobs. Failure, cancellation, skipped or missing results do not pass.
+A fourth, cheap `node-current` job runs `npm run test` and `npm run check` on the
+newest Node major (26; raise it when a newer major ships), with no browser or template
+gates. The terminal required check remains `check` and accepts only explicit success from
+all four work jobs. Failure, cancellation, skipped or missing results do not pass.
 Existing budgets, runner permissions, pinned actions and timeouts are unchanged.
 
 On a suitable local machine, `npm run gate:ci` reads this workflow and executes all
 work jobs serially, then checks their actual results. A failed step stops its job;
-other independent jobs still execute. Install dependencies and Chromium first as
+other independent jobs still execute. Steps of a job that uses another Node major than
+the local one are skipped and the run is reported as partial (no aggregate); run them
+under that Node with `npm run gate:ci -- --only node-current/test,node-current/check`,
+or pass `--any-node` to run everything under the local Node. Install dependencies and Chromium first as
 shown above. This reproduces the checks, not GitHub runner isolation or hardware.
 Unsupported job graphs, conditions and expressions fail before execution.
 

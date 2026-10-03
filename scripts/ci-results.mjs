@@ -3,7 +3,7 @@
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-export const WORK_JOBS = ['browser', 'templates-1', 'templates-2'];
+export const WORK_JOBS = ['browser', 'templates-1', 'templates-2', 'node-current'];
 export const AGGREGATE_COMMAND = 'node scripts/ci-results.mjs';
 export const RESULTS_ENV = 'CI_JOB_RESULTS';
 export const RESULTS_EXPRESSION = '${{ toJSON(needs) }}';

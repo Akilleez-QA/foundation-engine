@@ -70,6 +70,15 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
 
 ### Changes
 
+- **The gate passes on Node 23 and newer.** Node 23 changed the test runner's default report for piped output
+  from TAP (`# tests 4`) to spec (`ℹ tests 4`), so `scripts/compatibility.test.mjs` failed `npm test` and
+  `npm run gate` for a fresh game on every Node newer than 22. Scripts that read test output now name the TAP
+  reporter and read totals with `scripts/lib/test-output.mjs` (TAP or spec): the compatibility test,
+  `npm run check`'s test summary and `npm run play:criteria`. `play:criteria` also fails a `test` criterion when
+  no test named after it ran, instead of passing with `? test(s)`. CI adds a cheap `node-current` job (Node 26:
+  `npm run test` and `npm run check`, no browser or template gates) that the required `check` waits for;
+  `npm run gate:ci` skips another Node's job as a partial run unless it runs under that Node or `--any-node`.
+
 - **Explorer journey failure paths and dev/test `engine.dispose()`.** `npm run test:creator-journey-browser`
   now also refuses localStorage writes through a labelled test switch (the discovery stays on the HUD, the
   durable bytes stay byte-identical, the save store's own scheduled retry writes it once storage accepts

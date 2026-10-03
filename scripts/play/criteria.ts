@@ -8,6 +8,7 @@ import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, relative} from 'node:path';
 import {gameDir, ROOT} from '../lib/game-dir.mjs';
 import {npmCommand, toolCommand} from '../lib/tool.mjs';
+import {TAP_REPORTER, childTestEnv, testTotals} from '../lib/test-output.mjs';
 import {loadGame} from '../../src/app/game-files';
 
 export interface CriterionResult {
@@ -29,13 +30,23 @@ export async function checkCriteria(o: {gate?: boolean; dir?: string} = {}): Pro
     for (const c of brief.success) {
       const row: CriterionResult = {id: c.id, check: c.check, how: c.how, status: 'not run', detail: ''};
       if (c.how === 'test' && c.by) {
-        const t = toolCommand('tsx', ['--test', '--test-name-pattern', `^${c.id}\\b`, join(gameRoot, c.by)]);
-        const r = spawnSync(t.command, t.args, {cwd: ROOT, encoding: 'utf8', shell: t.shell});
-        const ran = /# pass (\d+)/.exec(r.stdout)?.[1];
-        row.status = r.status === 0 ? 'pass' : 'fail';
-        row.detail =
-          r.status === 0
-            ? `${c.by}: ${ran ?? '?'} test(s) named ${c.id}`
+        // The reporter is named: Node 23+ prints spec, not TAP, to a pipe by default.
+        const t = toolCommand('tsx', [
+          '--test',
+          TAP_REPORTER,
+          '--test-name-pattern',
+          `^${c.id}\\b`,
+          join(gameRoot, c.by),
+        ]);
+        const r = spawnSync(t.command, t.args, {cwd: ROOT, encoding: 'utf8', shell: t.shell, env: childTestEnv()});
+        const ran = testTotals(r.stdout)?.pass;
+        // A pattern that matches no test exits 0; a criterion is checked only when a test named after it ran.
+        const none = r.status === 0 && !(Number(ran) > 0);
+        row.status = r.status === 0 && !none ? 'pass' : 'fail';
+        row.detail = none
+          ? `${c.by}: no test named ${c.id} ran (name it test('${c.id}: …'))`
+          : r.status === 0
+            ? `${c.by}: ${ran} test(s) named ${c.id}`
             : `${c.by}: ${(r.stdout + r.stderr)
                 .split('\n')
                 .filter(l => /not ok|error:|expected|actual/.test(l))
