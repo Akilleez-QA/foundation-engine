@@ -22,6 +22,7 @@ import type { SceneModelRequest, SceneModelResult } from '../author/model-inspec
  *   engine.save.export()        the active player's profile file
  *   engine.replay.start(request) re-enter the current scene recording or replaying its fixed-tick input (dev/replay.ts)
  *   engine.replay.read()/stop() the replay session's state, local log text, digest comparison and divergence detail
+ *   engine.dispose()            retire the booted app through its own `App.dispose()` and report what is left
  *
  * Randomness is deterministic with `?seed=<n>` in the address (the game's `ctx.random()`).
  * It is added to the page only by the dev server and `vite build --mode test`; production builds never contain it.
@@ -31,6 +32,8 @@ import type { App, BootReport } from '../core/app';
 import type { SceneId } from '../core/router/resolve';
 import type { ProbeName } from '../core/probe';
 import { appLoop } from '../platform/ui/runtime';
+import { rendererPoolStats } from '../platform/render/app-renderer-pool';
+import type { PoolStats } from '../platform/render/renderer-pool-types';
 import type {SceneEntitiesRequest, SceneEntitiesResult} from '../author/play';
 import { createEventTrace, type EventTrace, type EventTraceOptions } from './event-trace';
 import type { ReplayDev, ReplayDevRequest, ReplayDevState, ReplayStart } from './replay';
@@ -41,6 +44,20 @@ export interface EngineState {
   scene: { scene: string | null; state: string | null; epoch: number; hash: string } | undefined;
   world: unknown;
   game: unknown;
+}
+
+/** What `engine.dispose()` observed after the app's own disposal. The page-level renderer pool outlives the app. */
+export interface EngineDisposal {
+  /** False when this call found the app already disposed (the call changed nothing). */
+  disposed: boolean;
+  /** A scene handle was still attached to the play service after disposal. */
+  running: boolean;
+  /** Probe getters still registered after disposal (each is owned by a module's signal). */
+  probes: string[];
+  /** The page renderer pool after disposal; null when nothing ever rendered. */
+  pool: PoolStats | null;
+  /** The disposal recorded a new renderer release audit (the running scene's lease was returned to the pool). */
+  poolReleased: boolean;
 }
 
 export interface EngineTestApi {
@@ -79,6 +96,10 @@ export interface EngineTestApi {
     read(): ReplayDevState;
     stop(reason?: string): void;
   };
+  /** Dev/test only: retire the whole app through the kernel's existing `App.dispose()` (module disposers in reverse
+   *  install order: the running scene leaves, the save store makes its final flush, listeners and probes go), then
+   *  report what is left. Idempotent. The page cannot be used again until it is reloaded. Production has no test API. */
+  dispose(): EngineDisposal;
 }
 
 /** The page's active recorder survives a hot-reloaded test API module: the loop's one sampler slot outlives it. */
@@ -99,6 +120,7 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
   const report = () => app.services.app.report();
   const probe = (name: string) => app.probes.read(name as ProbeName);
   const scene = () => probe('scene') as EngineState['scene'];
+  let retired = false;
   return {
     ready: () => booted,
     modules: () => report().modules.map(m => ({ id: m.id, status: m.status, ...(m.reason ? { reason: m.reason } : {}) })),
@@ -141,7 +163,11 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
     },
     clock: {
       hold: () => appLoop().holdFrames(true),
-      step: ms => { for (let left = ms; left > 0; left -= 50) appLoop().stepFrame(Math.min(50, left) / 1000); },
+      step: ms => {
+        // The page loop outlives the app; a retired app's owners (settings, save) must not be stepped.
+        if (retired) throw Error('engine.clock.step: the app is disposed; reload the page');
+        for (let left = ms; left > 0; left -= 50) appLoop().stepFrame(Math.min(50, left) / 1000);
+      },
       resume: () => appLoop().holdFrames(false),
     },
     loop: () => ({ ...appLoop().stats }),
@@ -196,6 +222,15 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
       },
       read: () => replay?.read() ?? idle,
       stop: reason => replay?.stop(reason),
+    },
+    dispose() {
+      const first = !retired;
+      retired = true;
+      const before = rendererPoolStats()?.lastRelease ?? null;
+      if (first) { replay?.stop('app-disposed'); trace?.dispose(); trace = undefined; app.dispose(); }
+      const pool = rendererPoolStats() ?? null;
+      const running = app.services.app.has('feature.game') ? app.services.play?.current() != null : false;
+      return { disposed: first, running, probes: app.probes.names(), pool, poolReleased: first && (pool?.lastRelease ?? null) !== before };
     },
   };
 }

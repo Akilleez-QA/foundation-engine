@@ -8,7 +8,7 @@ import { createSaveTestAdapter } from './test-adapter';
 const tickets: SaveSection<{ n: number }> = {
   id: 'wallet.tickets', scope: 'player', version: 1, aliases: ['wallet.old'],
   initial: () => ({ n: 0 }), parse: raw => ({ n: Number((raw as { n?: unknown } | null)?.n ?? 0) }),
-  legacy: { mode: 'live', fromVersion: 1, keys: p => ['game-tickets-' + p], decode: ([r]) => (r === null ? { n: 0 } : JSON.parse(r)), encode: v => [JSON.stringify(v)] },
+  legacy: { mode: 'live', fromVersion: 1, keys: p => ['game-tickets-' + p], decode: ([r]) => (r === null ? { n: 0 } : JSON.parse(r!)) /* one raw per key; one key */, encode: v => [JSON.stringify(v)] },
 };
 const device: SaveSection<string> = { id: 'graphics.pick', scope: 'device', version: 1, initial: () => 'auto', parse: raw => String(raw ?? 'auto') };
 

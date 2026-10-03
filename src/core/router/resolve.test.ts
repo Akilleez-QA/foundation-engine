@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MAX_REDIRECT_HOPS, redirectProblems, resolveRoute, routesOf, splitQuery, withQuery, type RedirectDef } from './resolve';
 import { buildRouteTables, routeTableProblems, type SceneRow } from './scenes';
+import { must } from '../../testing/must';
 
 const scenes: SceneRow[] = [
   { id: 'scene.menu', kind: 'menu', routes: [{ hash: '#scene/menu' }], title: 'Menu' },
@@ -9,7 +10,7 @@ const scenes: SceneRow[] = [
   { id: 'scene.bonus', kind: 'level', routes: [{ hash: '#scene/bonus-easy', params: { difficulty: 'easy' } }, { hash: '#scene/bonus-hard', params: { difficulty: 'hard' } }], title: 'Bonus', parent: 'scene.level' },
 ];
 const routes = routesOf(scenes);
-const old: RedirectDef = { id: 'redirect.old-level', from: /^#old\/level=(\d+)$/, to: '#scene/level', params: g => ({ n: g[0] }), note: 'test' };
+const old: RedirectDef = { id: 'redirect.old-level', from: /^#old\/level=(\d+)$/, to: '#scene/level', params: g => ({ n: must(g[0], 'the level group') }), note: 'test' };
 
 test('an exact route wins and carries its params; the query adds params; a redirect carries its params and its trail', () => {
   assert.deepEqual(resolveRoute('#scene/bonus-hard', routes, [old]), { sceneId: 'scene.bonus', hash: '#scene/bonus-hard', params: { difficulty: 'hard' } });
@@ -53,7 +54,7 @@ test('the hop limit stops a cycle; redirectProblems reports cycles, dead ends, s
 test('the registries validate rows: ids, hash routes, parents, notes and stateful patterns', () => {
   assert.deepEqual(routeTableProblems(buildRouteTables(scenes, [old], 'test')), []);
   const bad = buildRouteTables(
-    [{ id: 'scene.x', kind: 'level', routes: [{ hash: 'game/x' }], title: 'X', parent: 'scene.gone' }, { ...scenes[0] }],
+    [{ id: 'scene.x', kind: 'level', routes: [{ hash: 'game/x' }], title: 'X', parent: 'scene.gone' }, { ...must(scenes[0], 'the first scene') }],
     [{ id: 'redirect.g', from: /^#g$/g, to: '#scene/menu', note: '' }], 'test');
   const problems = routeTableProblems(bad);
   assert.ok(problems.some(p => /route 'game\/x' is not a hash route/.test(p)));

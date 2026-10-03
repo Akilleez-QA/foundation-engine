@@ -7,7 +7,7 @@ export type Version = readonly [major: number, minor: number, patch: number];
 /** 'x', 'x.y' or 'x.y.z' → [x, y, z]; anything else → null. */
 export function parseVersion(v: string): Version | null {
   const m = /^(\d+)(?:\.(\d+))?(?:\.(\d+))?$/.exec(v.trim());
-  return m ? [+m[1], +(m[2] ?? 0), +(m[3] ?? 0)] : null;
+  return m ? [+m[1]!, +(m[2] ?? 0), +(m[3] ?? 0)] : null; // group 1 is not optional
 }
 
 /** Negative when a < b, zero when equal, positive when a > b. */
@@ -21,7 +21,7 @@ export function satisfies(version: string, range: string | undefined): boolean {
   const v = parseVersion(version);
   if (!v) return false;
   const op = /^(\^|~|>=)?(.*)$/.exec(range.trim())!;
-  const r = parseVersion(op[2]);
+  const r = parseVersion(op[2]!); // group 2 `(.*)` always matches
   if (!r) return false;
   if (op[1] === '>=') return compareVersions(v, r) >= 0;
   if (op[1] === '^') return v[0] === r[0] && compareVersions(v, r) >= 0;

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FrameLoop, type FrameInfo } from './loop';
 import type { Coverage, LoopFrameSample, VisibilityPort } from './ports';
+import { must } from '../../testing/must';
 
 /** A fake rAF: frames run only when the test advances time. */
 function fakeFrames() {
@@ -127,12 +128,12 @@ test('a scrim throttles a ticker that asks for {hz}; "run" keeps full rate; prev
   assert.equal(previewed.length, 0);
   // 20 ms frames at 10 Hz: the ticker runs every 100 ms with the accumulated time.
   assert.equal(ambient.length, 2);
-  assert.ok(Math.abs(ambient[0] - 0.1) < 1e-9);
+  assert.ok(Math.abs(must(ambient[0], 'the first ambient tick') - 0.1) < 1e-9);
   layers.setPreview('prev', true);
   frames.run(260); frames.run(280);
   assert.equal(previewed.length, 2);
-  assert.equal(previewed[0].dt, 0);
-  assert.equal(previewed[1].coverage, 'opaque', 'the frame still reports the real coverage');
+  assert.equal(previewed[0]?.dt, 0);
+  assert.equal(previewed[1]?.coverage, 'opaque', 'the frame still reports the real coverage');
   layers.set('prev', 'hidden');
   frames.run(300);
   assert.equal(previewed.length, 2, 'preview never runs a hidden layer');
@@ -190,7 +191,7 @@ test('the frame carries ut, calm, preset and coverage; quality gets one sample p
   assert.equal(seen.length, 1, 'a paused dirty ticker does not run');
   assert.deepEqual({ ...seen[0] }, { dt: 0, t: 1, frame: 1, ut: 100, calm: false, preset: 'medium', coverage: 'top' });
   assert.deepEqual(samples.map(s => s.rendered), [true, false], 'a frame that drew nothing is marked');
-  assert.ok(Math.abs(samples[1].intervalMs - 16) < 1e-9);
+  assert.ok(Math.abs(must(samples[1], 'the second sample').intervalMs - 16) < 1e-9);
   assert.ok(Math.abs(ut - 100.032) < 1e-9);
   other.remove();
   layers.set('a', 'top');
@@ -230,8 +231,8 @@ test('manual capture holds real animation and steps the same clock, updates and 
   frames.run(1000);
   assert.equal(seen.length, 0); assert.equal(ut, 20); assert.equal(frames.pending, 0);
   loop.stepFrame(0); loop.stepFrame(1 / 60); loop.stepFrame(1 / 60);
-  assert.equal(seen.length, 3); assert.equal(seen[0].dt, 0);
-  assert.ok(Math.abs(seen[2].dt - 1 / 60) < 1e-12);
+  assert.equal(seen.length, 3); assert.equal(seen[0]?.dt, 0);
+  assert.ok(Math.abs(must(seen[2], 'the third frame').dt - 1 / 60) < 1e-12);
   assert.ok(Math.abs(ut - (20 + 2 / 60)) < 1e-12);
   assert.equal(frames.pending, 0, 'manual ticks never schedule free-running animation');
   loop.add({ owner: 'handover', update: () => seen.push({} as FrameInfo) });
@@ -285,7 +286,7 @@ for (const fallbackThrows of [false, true]) {
       assert.equal(healthy, 2);
       assert.deepEqual(reported, ['bad', original]);
       assert.equal(diagnostics.length, 1);
-      assert.deepEqual((diagnostics[0][1] as AggregateError).errors, [original, reporting]);
+      assert.deepEqual((must(diagnostics[0], 'the diagnostic')[1] as AggregateError).errors, [original, reporting]);
     } finally { loop.dispose(); console.error = oldError; }
   });
 }
