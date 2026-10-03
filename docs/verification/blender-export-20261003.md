@@ -62,3 +62,13 @@ Validated source hashes (SHA-256):
 - Model: `fcc71461117220b6ac0f5452d00beabb5b419ba1eeb3c09f5d0ea956d18823cb`.
 
 The following receipt-only commit does not change those sources. No remote write was performed during this validation.
+
+## Interactive-entry and brief review correction
+
+Subsequent independent review found two gaps that the direct browser helper did not cover: the documented `npm run play -- --game tools/blender-export/game` entry needed a missing `budgets.json`, and S1's `by` path did not resolve to a named criterion test. Added the budget document and matching `GAME.md`; S1 now points to `verify.test.mjs` relative to the consumer root and selects its actual `S1` test. The initial browser state now explicitly requires zero turns and rotation before pressing Space.
+
+The draw/triangle caps follow this fixture's geometry: two material primitives plus one floor draw; twelve model triangles plus two floor triangles. The 1024 KiB first-load and 64 MiB heap caps are the stock desktop brief defaults, not new measured performance claims. Texture allocation from this sample is zero. No existing template cap was changed. The browser diagnostic now forces real redraws and checks the scene's draw/triangle limits; first-load bytes, heap and other gate dimensions remain separate acceptance.
+
+Node 22.23.3 checks pass: **15/15** focused asset/cleanup/CI-parser tests; explicit `scripts/lint/brief.ts tools/blender-export/game`; and `npm run play:criteria -- --game tools/blender-export/game` executes exactly one S1 test and reports PASS. The actual documented `npm run play` entry was started on an ephemeral loopback port, printed its `#scene/main` URL, and its owned process group was stopped. A first capture attempt timed out because its Python text reader buffered output; a binary-pipe capture then verified the printed URL. This was a harness observation, not a game startup failure.
+
+Default repository lints alone do not discover this tools consumer. The new `test:blender-export-browser` npm/CI step explicitly runs its TypeScript check, brief validation and browser consumer. Required CI is now wired for this slice; a full remote CI result is still pending.

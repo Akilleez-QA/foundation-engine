@@ -21,7 +21,7 @@ function variant(change, rehash = true, binaryChange = () => {}) {
  writeFileSync(file,result);writeFileSync(join(dir,'sample.provenance.json'),JSON.stringify(manifest));
  return {file,close:()=>rmSync(dir,{recursive:true,force:true})};
 }
-test('checked-in Blender sample meets the physical export contract',async()=>{
+test('S1: checked-in Blender sample meets the physical export contract',async()=>{
  const report=await verify(fileURLToPath(source));assert.equal(report.triangles,12);assert.equal(report.materials,2);
 });
 test('a changed artifact cannot retain the previous provenance hash',async()=>{

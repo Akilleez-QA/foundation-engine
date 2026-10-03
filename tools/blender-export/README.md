@@ -59,9 +59,13 @@ On POSIX shells, from the repository root:
 ```sh
 GAME_DIR=tools/blender-export/game node scripts/generate.mjs
 node node_modules/typescript/bin/tsc --noEmit -p tools/blender-export/tsconfig.json
+node --import tsx scripts/lint/brief.ts tools/blender-export/game
+npm run play:criteria -- --game tools/blender-export/game
 GAME_DIR=tools/blender-export/game node -r ./scripts/silent-browser.cjs tools/blender-export/browser.mjs
 ```
 
-PowerShell: set `$env:GAME_DIR="tools/blender-export/game"` before these commands and omit the leading `GAME_DIR=...`; remove it afterwards with `Remove-Item Env:GAME_DIR`. The browser helper uses the existing isolated/muted browser selection, including `ENGINE_CHROMIUM` if set. Reports and screenshots go to `playtest/blender-export/`. This diagnostic is available explicitly, not yet a required CI browser step.
+PowerShell: set `$env:GAME_DIR="tools/blender-export/game"` before these commands and omit the leading `GAME_DIR=...`; remove it afterwards with `Remove-Item Env:GAME_DIR`. The default repository lints discover templates and root `game/`, not this tools consumer. The scoped command below validates this consumer's brief and its `GAME.md` explicitly.
+
+The browser helper uses the existing isolated/muted browser selection, including `ENGINE_CHROMIUM` if set. Reports and screenshots go to `playtest/blender-export/`. CI runs this scoped typecheck, brief validation and browser diagnostic through `npm run test:blender-export-browser`. The asset tests also run in the existing `npm test` tools glob.
 
 See [recorded evidence](../../docs/verification/blender-export-20261003.md). Automated software-GL evidence does not certify physical devices, Blender UI/MCP operation, animations, texture colour management or production artwork quality.

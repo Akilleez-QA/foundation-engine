@@ -65,6 +65,8 @@ jobs:
         run: GAME_DIR=templates/expedition/game npm run test:replication-workbench-browser
       - name: Durable authority browser workflow
         run: GAME_DIR=templates/expedition/game npm run test:authority-workbench-browser
+      - name: Blender export consumer and brief
+        run: npm run test:blender-export-browser
       - name: Spatial audio offline-render regressions
         run: npm run test:audio-browser
       - name: Shared session two-browser workflow (MP-01)

@@ -4,7 +4,7 @@ import {mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {launch} from '../../scripts/perf/bench-browser.mjs';
 import {diagnosticReport} from '../../scripts/play/diagnostic-report.mjs';
-import {serve, open} from '../../scripts/play/lib.mjs';
+import {serve, open, measure, budgetStatus} from '../../scripts/play/lib.mjs';
 const out = resolve(process.argv[2] ?? 'playtest/blender-export');
 mkdirSync(out,{recursive:true});
 const report = {passed:false, errors:[], limitations:['Desktop software GL only; no physical-device, textured asset, animation, Blender GUI or MCP acceptance.']};
@@ -18,6 +18,8 @@ try {
  await open(browser,server.url,'main');
  await browser.page.waitForFunction(()=>window.engine.state().world.state.modelStatus==='ready');
  report.before=await browser.evaluate('window.engine.state().world.state');
+ assert.equal(report.before.turns,0,'no input applied before the test press');
+ assert.equal(report.before.rotation,0,'initial rotation is zero');
  await browser.page.screenshot({path:resolve(out,'loaded.png')});
  await browser.page.keyboard.press('Space');
  await browser.page.waitForFunction(()=>window.engine.state().world.state.turns===1);
@@ -26,6 +28,12 @@ try {
  report.modelResponses=requests;
  assert.equal(requests.length,1); assert.equal(requests[0].status,200);
  await browser.page.screenshot({path:resolve(out,'turned.png')});
+ report.renderCounts=await measure(browser,async()=>{
+   for(let i=0;i<3;i++){ await browser.evaluate('window.engine.redraw()'); await browser.page.waitForTimeout(100); }
+ },500);
+ report.budget=budgetStatus('main',report.renderCounts);
+ assert.ok(report.renderCounts.renders>0,'count budget requires actual rendered frames');
+ assert.equal(report.budget.status,'within budget');
  assert.deepEqual(report.errors,[]); report.passed=true;
 } catch (error) {
  evidence.fail(error);
