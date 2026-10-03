@@ -185,5 +185,56 @@ export async function testScene(scene: SceneDefinition, o: { particleScale?: num
   };
 }
 
+/** A save store over `TestSaves` memory: what `testScene`'s `services.save` takes. */
+export type TestSaveStore = ReturnType<typeof createSaveStore>;
+
+/**
+ * Saves that outlive one `testScene`, for reload tests: in-memory local and session storage shared by every store it
+ * opens. Pass `store` as `testScene(scene, { services: { save: saves.store } })`, dispose that scene, then
+ * `saves.reload()` and start the scene again with the new `store`: it reads what the first one wrote, as a reloaded page
+ * does. No real timers run: writes happen at flush points (`{ now: true }`, `flush()`, a reload, `dispose`).
+ */
+export interface TestSaves {
+  /** The current store. It stays caller-owned: `testScene` never disposes an injected store. */
+  readonly store: TestSaveStore;
+  /**
+   * A page reload: the current store is flushed (as `pagehide` flushes a page) and disposed, then a fresh store opens
+   * over the same memory and becomes `store`. `{ flush: false }` is a reload that never reached its flush (a crash, a
+   * killed tab): writes still pending are lost and storage is left as it was. Dispose the scenes using the old store
+   * first: their `exit` may still write.
+   */
+  reload(options?: { flush?: boolean }): TestSaveStore;
+  /** Flushes and disposes the current store (idempotent); `store` and `reload` then throw. */
+  dispose(): void;
+}
+
+/** In-memory saves shared across `testScene` runs: `reload()` re-opens the store over the same storage. */
+export function createTestSaves(): TestSaves {
+  const local = new MemoryBackend(), session = new MemoryBackend();
+  let disposed = false;
+  const open = () => createSaveStore({
+    local: local.port(), session: session.port(0, 'session'),
+    build: 'test-scene', namespace: 'test-scene',
+    timers: { set: () => 0, clear: () => {}, now: () => 0 },
+  });
+  let store = open();
+  const alive = () => { if (disposed) throw Error('createTestSaves: disposed'); };
+  return {
+    get store() { alive(); return store; },
+    reload(options = {}) {
+      alive();
+      if (options === null || typeof options !== 'object' || (options.flush !== undefined && typeof options.flush !== 'boolean')) throw Error('createTestSaves: reload options are { flush?: boolean }');
+      if (options.flush === false) {
+        // A store's dispose always attempts a last flush; a crash never gets one, so storage is put back as it was.
+        const kept = [new Map(local.data), new Map(session.data)] as const;
+        store.dispose();
+        for (const [backend, data] of [[local, kept[0]], [session, kept[1]]] as const) { backend.data.clear(); for (const [k, v] of data) backend.data.set(k, v); }
+      } else { store.flush('reload'); store.dispose(); }
+      return store = open();
+    },
+    dispose() { if (disposed) return; disposed = true; store.dispose(); },
+  };
+}
+
 /** Deterministic worker fallback for headless scene tests; caller owns disposal. */
 export const createTestWorkerHost = () => createWorkerHost({createWorker:null});

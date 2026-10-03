@@ -36,6 +36,7 @@
 | `game/steer.ts`, `game/restart.ts` | the inputs: a steer axis (arrows, A/D, stick, d-pad; drag on touch) and play again (Space, Enter, A, tap) |
 | `game/best.ts` | save section `run.best` (maximum score, runs) |
 | `game/playtest/restart.json` | S3 in a real browser: get hit, restart, check the fresh run |
+| `game/playtest/best-reload.json` | S4 in a real browser: get hit, reload the page, check the best score is still there |
 
 Controls: ← → or A D, the left stick or d-pad; on touch or with a mouse, hold and drag. Randomness is `ctx.random()`, so `?seed=5` replays a run.
 
@@ -52,3 +53,4 @@ Controls: ← → or A D, the left stick or d-pad; on touch or with a mouse, hol
 | 2026-09-28 | Template created | `play` measured on software GL |
 | 2026-10-02 | The scripted playtest moved into the game folder (`game/playtest/`), so `npm run new-game` copies it with the game instead of into the engine's root `playtest/`; the success criterion's `by` names the new path. Same script, same check. | Unchanged |
 | 2026-10-02 | Polish (ui kit): Score, Best and the steering/restart prompt sit on a translucent dark plate; the prompt and banner start hidden, so no empty plate shows. Evidence: emulated SwiftShader play:snap at 1280×800 and 390×844, screenshots inspected; physical devices unverified. | Unchanged |
+| 2026-10-03 | S4 ("survives a restart and a reload") is now tested across a reload: `game/play.test.ts` saves, re-opens the store with `createTestSaves().reload()` and reads the best back; `game/playtest/best-reload.json` reloads the real page. Same criterion, stronger evidence (emulated headless Chromium only). | Unchanged |

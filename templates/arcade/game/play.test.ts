@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { testScene, Transform } from '@engine';
+import { createTestSaves, testScene, Transform } from '@engine';
 import { hud } from '@kits/ui';
 import game from './game';
 import play from './play';
@@ -40,6 +40,22 @@ test('S4: the best score is saved when a run ends and read when the next begins'
   assert.equal(t.ctx.state.phase, 'over');
   assert.deepEqual(t.ctx.save((await import('./best')).default).get(), { score: 12, runs: 1 });
   assert.equal(t.ctx.state.best, 12);
+});
+
+test('S4: the best score survives a reload', async () => {
+  const saves = createTestSaves();                              // storage shared by every store it opens
+  const t = await testScene(play, { game, seed: 3, services: { save: saves.store } });
+  t.ctx.state.score = 12;
+  const tr = t.world.get(t.ctx.spawn((await import('./components')).block), Transform)!;
+  tr.x = player(t).x; tr.z = player(t).z;
+  t.run(1 / 60);                                                // the hit saves the best score
+  assert.equal(t.ctx.state.phase, 'over');
+  t.dispose();
+  const after = await testScene(play, { game, seed: 3, services: { save: saves.reload() } });   // a fresh store, as a reloaded page opens
+  assert.equal(after.ctx.state.best, 12, 'the new run reads the saved best');
+  assert.deepEqual(after.ctx.save((await import('./best')).default).get(), { score: 12, runs: 1 });
+  after.dispose();
+  saves.dispose();
 });
 
 test('the same seed plays the same run', async () => {

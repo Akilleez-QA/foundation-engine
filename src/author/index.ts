@@ -26,7 +26,7 @@ export {
   type SaveSectionDef, type AssetDefinition, type PlayOptions, validatePlayOptions, PLAY_LATE_MS, type ModeDefinition, type KitDefinition, type SceneContext, type SaveHandle, type InputState, type InputSource, type ActionHint,
   type ViewState, type ReadingSheet, type ReadingSheetOptions, type ScenePreparationContext, type Vec3, type SceneBody, type SceneInput, type SceneReplayDigest, type ComponentType, type ComponentInit, type Entity, type World,
 } from './defs';
-export { testScene, createTestWorkerHost, type TestScene, type TestVoice } from './testing';
+export { testScene, createTestWorkerHost, createTestSaves, type TestScene, type TestVoice, type TestSaves, type TestSaveStore } from './testing';
 /** Seeded randomness whose state a simulation can save and restore (rollback, reload, replay). */
 export { createSaveableRng, type SaveableRng, type Rng } from '../core/rng';
 export { effectiveFov, viewRay, pointerOnGround, projectToView } from './view-math';
