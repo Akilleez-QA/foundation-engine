@@ -11,6 +11,8 @@
  * here, recorded in GAME.md's changelog, and re-derives the budgets (which still only fall without a Perf-Budget
  * trailer). The audience is neutral by default; `kids: true` (or the learn template) opts in to the kid-safe profile.
  */
+import {DEFAULT_RENDER_BACKEND, renderBackendProblem, type RenderBackendId} from '../platform/render/render-backend';
+
 type Immutable<T> = T extends object ? {readonly [K in keyof T]: Immutable<T[K]>} : T;
 /** Clone only normalized contract data, so freezing never changes creator-owned inputs. */
 function snapshot<T>(value: T): Immutable<T> {
@@ -108,6 +110,9 @@ export interface BuildInput {
   pedagogy?: {maxPassiveActions?: number};
   /** Kid-safe tuning: the most repeats any reward may ask for (default 5). */
   kidSafe?: {maxRepeat?: number};
+  /** The render backend (ADR 0078): 'webgl2' (the default) or 'webgpu'. 'webgpu' is refused as not available yet
+   *  until the WebGPU backend lands; a build never falls back from it silently. */
+  render?: {backend?: RenderBackendId};
 }
 
 export type BuildBrief = Immutable<{
@@ -131,6 +136,7 @@ export type BuildBrief = Immutable<{
   readonly policy: 'default' | 'kid-safe';
   readonly pedagogy: {maxPassiveActions: number};
   readonly kidSafe: {maxRepeat: number};
+  readonly render: {backend: RenderBackendId};
 }>;
 
 /** Problems in a brief; [] when it is a usable contract. */
@@ -174,7 +180,7 @@ export function briefProblems(value: unknown): string[] {
     if (!targets.includes(b.devices.minimum as string)) out.push('devices.minimum must be one of the declared targets');
     list(b.devices.input, 'devices.input', true, ['keyboard', 'pointer', 'touch', 'gamepad']);
   }
-  for (const key of ['audience', 'quality', 'performance', 'constraints', 'pedagogy', 'kidSafe'])
+  for (const key of ['audience', 'quality', 'performance', 'constraints', 'pedagogy', 'kidSafe', 'render'])
     if (b[key] !== undefined && !record(b[key])) out.push(`${key}: expected an object`);
   if (record(b.audience)) {
     const audience = b.audience;
@@ -236,6 +242,10 @@ export function briefProblems(value: unknown): string[] {
     number(b.pedagogy.maxPassiveActions, 'pedagogy.maxPassiveActions', false, true);
   if (record(b.kidSafe) && b.kidSafe.maxRepeat !== undefined)
     number(b.kidSafe.maxRepeat, 'kidSafe.maxRepeat', false, true);
+  if (record(b.render) && b.render.backend !== undefined) {
+    const problem = renderBackendProblem(b.render.backend);
+    if (problem) out.push(problem);
+  }
   const ids = new Set<string>();
   if (!Array.isArray(b.success) || !b.success.length) out.push('state at least one success criterion');
   else
@@ -311,5 +321,6 @@ export function defineBuild(b: BuildInput): BuildBrief {
     policy: childProfile ? ('kid-safe' as const) : ('default' as const),
     pedagogy: {maxPassiveActions: b.pedagogy?.maxPassiveActions ?? 3},
     kidSafe: {maxRepeat: b.kidSafe?.maxRepeat ?? 5},
+    render: {backend: b.render?.backend ?? DEFAULT_RENDER_BACKEND},
   });
 }

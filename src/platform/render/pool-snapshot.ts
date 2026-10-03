@@ -104,6 +104,7 @@ function toCanvas(pixels: Uint8Array, {width, height}: SnapshotSize): HTMLCanvas
 }
 
 export function createSnapshots(pool: RendererPool, o: SnapshotOptions = {}): Snapshots {
+  // Snapshots read pixels back synchronously, so they need a WebGL2 context of their own (render-backend.ts).
   const createContext =
     o.createContext ??
     (() => {
@@ -127,7 +128,7 @@ export function createSnapshots(pool: RendererPool, o: SnapshotOptions = {}): Sn
   const setTimer = o.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
   const clearTimer = o.clearTimer ?? (t => clearTimeout(t as ReturnType<typeof setTimeout>));
   const counts = {snapshots: 0, onWorld: 0, created: 0};
-  const lost = (gl: GL) => !!gl.isContextLost?.();
+  const lost = (gl: GL) => access.backend.isLost(gl);
 
   /** The snapshot renderer and the context it is bound to. */
   let borrowed: {gl: GL; renderer: SnapshotRenderer} | null = null;
@@ -152,7 +153,7 @@ export function createSnapshots(pool: RendererPool, o: SnapshotOptions = {}): Sn
     if (borrowed?.gl === u.gl) drop();
     utility = null;
     access.stats.contexts = Math.max(0, access.stats.contexts - 1);
-    if (!lost(u.gl)) (u.gl.getExtension?.('WEBGL_lose_context') as WEBGL_lose_context | null)?.loseContext();
+    if (!lost(u.gl)) access.backend.lose(u.gl);
   };
   const access = pool.attachUtility({
     worldChanged() {

@@ -1,12 +1,11 @@
-import {createFrameReadiness} from './frame-readiness';
-import {installProgramValidation, type ProgramValidation} from './program-validation';
 import {TEST_API} from '../../core/env';
-import {waitForPrograms} from './program-readiness';
 /**
  * platform/render/renderer-pool.ts: the renderer pool (ADRs 0016, 0040, 0041, 0045;
  * STD-REN-3, STD-REN-4, STD-REN-5, STD-REN-34, STD-RUN-17). the `world` role.
  *
- * The pool owns WebGL contexts, never scenes. A `world` lease borrows the one world canvas and its context for one
+ * The pool owns contexts, never scenes, and creates every renderer and context through its render backend
+ * (render-backend.ts, ADR 0078): the default WebGL2 backend is `backends/webgl/backend.ts`, the only one so far.
+ * A `world` lease borrows the one world canvas and its context for one
  * scene visit (a hub, a scene of the scene engine, a view). Fast travel and a scene door hand the same context to
  * the next visit instead of creating a new one.
  *
@@ -43,14 +42,15 @@ import {waitForPrograms} from './program-readiness';
  * context (it draws into a render target there) and tells it when that context changes hands, so it lets go before a
  * lease starts or a release sweeps the context, and retires its own utility context once a world exists.
  */
-import * as T from 'three';
-import {getAppRendererPool} from './app-renderer-pool';
+import type * as T from 'three';
+import {appRenderBackend, getAppRendererPool} from './app-renderer-pool';
 export {rendererPoolStats} from './app-renderer-pool';
 import {livePixelRatio} from './quality-runtime';
 import {setShadowTechnique, type ShadowTechnique} from './shadow-technique';
 import {anonymousOwner, appLoop} from '../ui/runtime';
 import {createStagePool, type StageSurfaceRequest} from './pool-stage';
-import {glDelete} from './gl-interop';
+import {webglBackend} from './backends/webgl/backend';
+import {availableRenderBackend, type ContextObjects} from './render-backend';
 
 import type {
   SurfaceRole,
@@ -64,6 +64,7 @@ import type {
   RendererPool,
   UtilityAccess,
   PoolRenderer,
+  PoolBackend,
   RendererPoolOptions,
 } from './renderer-pool-types';
 export type {
@@ -78,6 +79,7 @@ export type {
   RendererPool,
   UtilityAccess,
   PoolRenderer,
+  PoolBackend,
   RendererPoolOptions,
 } from './renderer-pool-types';
 
@@ -85,46 +87,10 @@ type GL = WebGL2RenderingContext;
 /** Reference: a context is recycled only when a scene leaves an implausible amount behind. */
 export const REFERENCE_VALVE: RecycleValve = {textures: 2048, geometries: 16384, every: 0};
 
-const GL_KINDS = [
-  ['createTexture', 'deleteTexture'],
-  ['createBuffer', 'deleteBuffer'],
-  ['createFramebuffer', 'deleteFramebuffer'],
-  ['createRenderbuffer', 'deleteRenderbuffer'],
-  ['createVertexArray', 'deleteVertexArray'],
-  ['createProgram', 'deleteProgram'],
-  ['createShader', 'deleteShader'],
-  ['createQuery', 'deleteQuery'],
-  ['createSampler', 'deleteSampler'],
-] as const;
-
-/**
- * Wraps the pooled context's own create/delete calls (instance properties; the prototype is untouched) so a release
- * can delete what its lease left behind. The context's own startup objects (made before the wrap) are never deleted.
- */
-function trackGlObjects(gl: GL): {live: Map<object, string>; validation: ProgramValidation} {
-  const live = new Map<object, string>();
-  const g: Record<(typeof GL_KINDS)[number][number], unknown> = gl;
-  for (const [create, del] of GL_KINDS) {
-    const c = g[create],
-      d = g[del];
-    if (typeof c !== 'function' || typeof d !== 'function') continue;
-    g[create] = function (this: unknown, ...a: unknown[]) {
-      const o: unknown = c.apply(gl, a);
-      if (o && typeof o === 'object') live.set(o, del);
-      return o;
-    };
-    g[del] = function (this: unknown, o: unknown) {
-      if (o && typeof o === 'object') live.delete(o);
-      return d.call(gl, o);
-    };
-  }
-  return {live, validation: installProgramValidation(gl)};
-}
-
 interface Slot {
   canvas: HTMLCanvasElement;
   gl: GL;
-  tracker: ReturnType<typeof trackGlObjects>;
+  tracker: ContextObjects;
   leased: boolean;
   uses: number;
   lost: boolean;
@@ -133,9 +99,8 @@ interface Slot {
 }
 
 export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
-  const make =
-    o.createRenderer ??
-    ((canvas, context) => new T.WebGLRenderer(canvas ? {canvas, context, antialias: true} : {antialias: true}));
+  const backend = o.backend ?? webglBackend;
+  const make = o.createRenderer ?? backend.createRenderer;
   const pixelRatio =
     o.pixelRatio ??
     ((r, max) => {
@@ -221,7 +186,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
     worldChanged();
     if (world === slot) world = null;
     slot.off.abort();
-    if (lose && !slot.lost) (slot.gl.getExtension?.('WEBGL_lose_context') as WEBGL_lose_context | null)?.loseContext();
+    if (lose && !slot.lost) backend.lose(slot.gl);
     slot.tracker.live.clear();
     slot.tracker.validation.clear();
     slot.canvas.remove?.();
@@ -231,7 +196,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
   const watch = (slot: Slot) => {
     const signal = slot.off.signal;
     slot.canvas.addEventListener(
-      'webglcontextlost',
+      backend.lostEvent,
       e => {
         // three calls preventDefault for a leased context; a parked one needs it too so it may be restored.
         e.preventDefault();
@@ -245,7 +210,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
       {signal},
     );
     slot.canvas.addEventListener(
-      'webglcontextrestored',
+      backend.restoredEvent,
       () => {
         slot.lost = false;
         if (current?.canvas === slot.canvas) for (const f of [...current.restored]) f();
@@ -255,11 +220,11 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
   };
 
   const newSlot = (r: PoolRenderer): Slot => {
-    const gl = r.getContext() as GL;
+    const gl = backend.contextOf(r);
     const slot: Slot = {
       canvas: r.domElement,
       gl,
-      tracker: trackGlObjects(gl),
+      tracker: backend.track(gl),
       leased: false,
       uses: 0,
       lost: false,
@@ -301,7 +266,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
     for (const [obj, del] of [...slot.tracker.live]) {
       audit.glObjects++;
       try {
-        glDelete(slot.gl, del, obj);
+        backend.deleteObject(slot.gl, del, obj);
       } catch {
         /* lost */
       }
@@ -317,26 +282,9 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
     doc,
     pixelRatio,
     applyProfile,
-    track: trackGlObjects,
+    backend,
     createRenderer: (view, gl) => make(view, gl),
-    createContext:
-      o.createStageContext ??
-      (antialias => {
-        const canvas = doc()!.createElement('canvas');
-        // three's own context attributes (it always asks for an alpha channel), with this stage's antialias.
-        const gl = canvas.getContext('webgl2', {
-          alpha: true,
-          depth: true,
-          stencil: false,
-          antialias,
-          premultipliedAlpha: true,
-          preserveDrawingBuffer: false,
-          powerPreference: 'default',
-          failIfMajorPerformanceCaveat: false,
-        });
-        if (!gl) throw Error('WebGL2 unavailable');
-        return {canvas, gl};
-      }),
+    createContext: o.createStageContext ?? (antialias => backend.createStageContext(antialias, doc()!)),
   });
 
   const lease = (req: SurfaceRequest | StageSurfaceRequest<Partial<RenderProfile>>): RenderSurface | null => {
@@ -344,7 +292,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
     // A scene change: an idle stage context is not kept across it (the live-context peak stays world + stage).
     stage.settle();
     // A world context that was lost (or is lost now) is never handed on: retire it and start a new one.
-    if (world && !world.leased && (world.lost || world.gl.isContextLost?.())) {
+    if (world && !world.leased && (world.lost || backend.isLost(world.gl))) {
       retire(world, false);
       stats.recreations++;
     }
@@ -388,8 +336,8 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
     let released = false;
     let preparationOwner = new AbortController();
     let pendingPreparation: AbortController | undefined;
-    const programTracker = slot?.tracker ?? trackGlObjects(r.getContext() as GL);
-    const frameReadiness = createFrameReadiness(r.getContext() as GL, () => released);
+    const programTracker = slot?.tracker ?? backend.track(backend.contextOf(r));
+    const frameReadiness = backend.frameReadiness(backend.contextOf(r), () => released);
     const retirePreparation = () => {
       preparationOwner.abort();
       frameReadiness.retire();
@@ -401,7 +349,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
     const overflowEvents = new AbortController();
     if (!slot) {
       canvas.addEventListener(
-        'webglcontextlost',
+        backend.lostEvent,
         event => {
           if (released) return;
           event.preventDefault();
@@ -413,7 +361,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
         {signal: overflowEvents.signal},
       );
       canvas.addEventListener(
-        'webglcontextrestored',
+        backend.restoredEvent,
         () => {
           if (released) return;
           for (const fn of [...restored]) fn();
@@ -439,14 +387,15 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
         pendingPreparation?.abort();
         const request = new AbortController();
         pendingPreparation = request;
-        return waitForPrograms(
-          r.getContext() as GL,
-          programTracker.live,
-          AbortSignal.any([signal, preparationOwner.signal, request.signal]),
-          {validate: programTracker.validation.validate},
-        ).finally(() => {
-          if (pendingPreparation === request) pendingPreparation = undefined;
-        });
+        return backend
+          .programsReady(
+            backend.contextOf(r),
+            programTracker,
+            AbortSignal.any([signal, preparationOwner.signal, request.signal]),
+          )
+          .finally(() => {
+            if (pendingPreparation === request) pendingPreparation = undefined;
+          });
       },
       release() {
         if (released) return;
@@ -474,7 +423,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
           audit.textures > valve.textures ||
           audit.geometries > valve.geometries ||
           (valve.every > 0 && slot.uses >= valve.every);
-        if (slot.lost || slot.gl.isContextLost?.()) retire(slot, false);
+        if (slot.lost || backend.isLost(slot.gl)) retire(slot, false);
         else if (over) {
           stats.recycles++;
           retire(slot, true);
@@ -513,7 +462,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
       const cancel = nextFrame(() => finish(capture(d, slot)));
     });
   const capture = (d: Document, slot: Slot): HeldFrame | null => {
-    if (world !== slot || !slot.leased || slot.lost || slot.gl.isContextLost?.()) return null;
+    if (world !== slot || !slot.leased || slot.lost || backend.isLost(slot.gl)) return null;
     const source = slot.canvas,
       rect = source.getBoundingClientRect();
     if (!rect.width || !rect.height || !source.width || !source.height) return null;
@@ -557,7 +506,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
       copy.remove();
     };
     // A lost context gives no promise that its pixels survive (ADR 0045 5): the DOM recovery replaces the hold.
-    slot.canvas.addEventListener('webglcontextlost', drop, {once: true});
+    slot.canvas.addEventListener(backend.lostEvent, drop, {once: true});
     return {
       element: copy,
       drop,
@@ -590,12 +539,15 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
     stats: () => ({...stats}),
     attachUtility(u) {
       utility = u;
-      return {make, stats, world: () => world};
+      return {make, stats, world: () => world, backend};
     },
   };
 }
 
-/** The app's renderer pool (created on first use). */
+/** The app's renderer pool (created on first use) on the brief's backend (`selectAppRenderBackend`). */
 export function appRenderers(): RendererPool {
-  return getAppRendererPool(createRendererPool);
+  return getAppRendererPool(() => {
+    availableRenderBackend(appRenderBackend());
+    return createRendererPool({backend: webglBackend});
+  });
 }
