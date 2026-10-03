@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { buildRouteTables, type SceneRow } from './scenes';
 import { createHashRouter, type RouterWindow } from './router';
 import type { RedirectDef } from './resolve';
+import { must } from '../../testing/must';
 
 const scenes: SceneRow[] = [
   { id: 'scene.menu', kind: 'menu', routes: [{ hash: '#scene/menu' }], title: 'Menu' },
@@ -10,7 +11,7 @@ const scenes: SceneRow[] = [
   { id: 'scene.bonus', kind: 'level', routes: [{ hash: '#scene/bonus-easy', params: { difficulty: 'easy' } }, { hash: '#scene/bonus-hard', params: { difficulty: 'hard' } }], title: 'Bonus' },
 ];
 const redirects: RedirectDef[] = [
-  { id: 'redirect.old-level', from: /^#old\/level=(\d+)$/, to: '#scene/level', params: g => ({ n: g[0] }), note: 't' },
+  { id: 'redirect.old-level', from: /^#old\/level=(\d+)$/, to: '#scene/level', params: g => ({ n: must(g[0], 'the level group') }), note: 't' },
   { id: 'redirect.unknown', from: /^#scene\//, to: '#scene/menu', address: 'keep', note: 't' },
 ];
 

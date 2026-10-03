@@ -58,7 +58,7 @@ export function createHashRouter(tables: RouteTables, win: RouterWindow, fallbac
     const keys = params ? Object.keys(params) : [];
     // A route whose fixed params are all given is used as is; the rest of `params` goes into the query.
     const route = keys.length ? scene.routes.find(r => r.params && Object.keys(r.params).every(k => params![k] === r.params![k])) : undefined;
-    const rest = Object.fromEntries(keys.filter(k => route?.params?.[k] === undefined).map(k => [k, params![k]]));
+    const rest = Object.fromEntries(keys.filter(k => route?.params?.[k] === undefined).map(k => [k, params![k]!])); // k is an own key of params
     return withQuery((route ?? scene.routes[0]).hash, rest);
   };
   const follow = (hash: string, o: Omit<GoOptions, 'params'> = {}) => {

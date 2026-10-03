@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { compareModuleIds, defineModule, moduleBudgetFor } from './module';
 import { compareVersions, parseVersion, satisfies, splitDep } from './version';
 import { createApp } from './app';
+import { must } from '../testing/must';
 
 test('module budgets: the reference tier is primary, lower tiers fall back upward, and an overrun is reported, not fatal', async () => {
   const budget = { bootMs: 5, chunkKiB: 40, ports: { medium: { bootMs: 12 } } };
@@ -27,7 +28,7 @@ test('module budgets: the reference tier is primary, lower tiers fall back upwar
   // The medium column is 12 ms, so the same install is within budget there.
   t = 0;
   const medium = await createApp([{ ...slow }], { mode: 'test', now: () => t, preset: 'medium', log() {} }).boot();
-  assert.equal(medium.modules[0].overBudget, undefined);
+  assert.equal(must(medium.modules[0], 'the module report').overBudget, undefined);
 });
 
 test('versions: semver-lite ranges and dependency strings', () => {

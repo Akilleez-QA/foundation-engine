@@ -102,7 +102,7 @@ export const liveRecord: SaveSection<LiveRecord | null> = {
     if (!o || o.version !== 4 || !Array.isArray(o.progress)) throw Error('Invalid live record');
     return { version: 4, progress: [...o.progress] };
   },
-  legacy: { mode: 'live', keys: p => ['game-live-' + p], fromVersion: 1, decode: ([raw]) => (raw === null ? null : JSON.parse(raw)), encode: v => [v === null ? null : JSON.stringify(v)] },
+  legacy: { mode: 'live', keys: p => ['game-live-' + p], fromVersion: 1, decode: ([raw]) => (raw === null ? null : JSON.parse(raw!)) /* one raw per key; one key */, encode: v => [v === null ? null : JSON.stringify(v)] },
 };
 
 export type Settings = Record<string, boolean | number | string>;
@@ -111,9 +111,9 @@ export const settings: SaveSection<Settings> = {
   parse: raw => { if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw Error('Invalid settings'); return { ...(raw as Settings) }; },
   legacy: {
     keys: () => ['game-audio', 'game-comfort'], fromVersion: 1,
-    decode: ([audio, comfort]) => {
-      const a = audio === null ? {} : JSON.parse(audio) as { muted?: boolean; music?: number };
-      const c = comfort === null ? {} : JSON.parse(comfort) as { still?: boolean };
+    decode: ([audio, comfort]) => { // one raw per key: both exist
+      const a = audio === null ? {} : JSON.parse(audio!) as { muted?: boolean; music?: number };
+      const c = comfort === null ? {} : JSON.parse(comfort!) as { still?: boolean };
       return {
         ...(a.muted === undefined ? {} : { 'sound.muted': a.muted }), ...(a.music === undefined ? {} : { 'sound.music': a.music }),
         ...(c.still === undefined ? {} : { 'comfort.calm': c.still }),

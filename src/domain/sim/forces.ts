@@ -5,6 +5,8 @@
 /** Standard gravity, m/s² (the Isp definition's g0; a unit constant, not a body fact). */
 export const G0_STANDARD = 9.80665;
 import type { ForceTerm } from './host';
+// Index invariant for every term below: `y` has the ForceCtx layout (>= 7 entries: position, velocity, mass),
+// `acc` is the host's Float64Array(3) and a thrust `dir` is a 3-vector, so the `[0..6]!` accesses are in range.
 
 /** A central body as a force term reads it: SI, already resolved (STD-SIM-22). */
 export interface CentralBodyParams {
@@ -25,8 +27,8 @@ export interface AtmosphereBodyParams extends CentralBodyParams {
 export const gravityTerm: ForceTerm<{ body: CentralBodyParams }> = {
   id: 'gravity', order: 0,
   accumulate({ y, params }, acc) {
-    const r2 = y[0] * y[0] + y[1] * y[1] + y[2] * y[2], k = -params.body.mu / (r2 * Math.sqrt(r2));
-    acc[0] += k * y[0]; acc[1] += k * y[1]; acc[2] += k * y[2];
+    const r2 = y[0]! * y[0]! + y[1]! * y[1]! + y[2]! * y[2]!, k = -params.body.mu / (r2 * Math.sqrt(r2));
+    acc[0]! += k * y[0]!; acc[1]! += k * y[1]!; acc[2]! += k * y[2]!;
   },
 };
 
@@ -40,11 +42,11 @@ export function dragTerm<P extends { body: AtmosphereBodyParams; cdA: number }>(
     accumulate({ y, params }, acc) {
       const body = params.body, cdA = params.cdA;
       if (!(cdA > 0)) return;
-      const r = Math.sqrt(y[0] * y[0] + y[1] * y[1] + y[2] * y[2]), rho = body.density(r - body.radius);
+      const r = Math.sqrt(y[0]! * y[0]! + y[1]! * y[1]! + y[2]! * y[2]!), rho = body.density(r - body.radius);
       if (!(rho > 0)) return;
-      const vx = y[3] + body.omega * y[1], vy = y[4] - body.omega * y[0], vz = y[5];
-      const v = Math.sqrt(vx * vx + vy * vy + vz * vz), k = (-0.5 * rho * v * cdA) / y[6];
-      acc[0] += k * vx; acc[1] += k * vy; acc[2] += k * vz;
+      const vx = y[3]! + body.omega * y[1]!, vy = y[4]! - body.omega * y[0]!, vz = y[5]!;
+      const v = Math.sqrt(vx * vx + vy * vy + vz * vz), k = (-0.5 * rho * v * cdA) / y[6]!;
+      acc[0]! += k * vx; acc[1]! += k * vy; acc[2]! += k * vz;
     },
   };
 }
@@ -57,10 +59,10 @@ export function thrustTerm<P extends { thrust: { thrustN: number; ispS: number; 
   return {
     id: 'thrust', order: 100,
     accumulate({ y, params }, acc, dm) {
-      const th = params.thrust, m = y[6];
+      const th = params.thrust, m = y[6]!;
       if (!(th.thrustN > 0) || !(m > th.dryMassKg)) return;
       const a = th.thrustN / m;
-      acc[0] += a * th.dir[0]; acc[1] += a * th.dir[1]; acc[2] += a * th.dir[2];
+      acc[0]! += a * th.dir[0]!; acc[1]! += a * th.dir[1]!; acc[2]! += a * th.dir[2]!;
       dm.value -= th.thrustN / (th.ispS * G0_STANDARD);
     },
   };
