@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { installFakeDom } from '../../testing/fake-dom';
 import { Shell } from './shell';
 import { compactShellMenu, configureCompactShell } from './compact-shell';
+import {must} from '../../testing/must';
 
 function bar() {
   const fake = installFakeDom(), doc = fake.document as unknown as Document;
@@ -27,7 +28,7 @@ test('rows land in order whatever order they register in, around content that is
     assert.deepEqual(ids(doc.querySelector('.shell-menu-content')), ['sound', 'comfort', 'graphics']);
     assert.deepEqual(shell.list('header').map(r => r.id), ['shell.menu', 'shell.sound-quick', 'shell.level', 'shell.listen']);
     // A module that still prepends outside the shell keeps its scene in front.
-    right.children[0].before(button('map'));
+    must(right.children[0]).before(button('map'));
     shell.add({ id: 'shell.late', zone: 'header', order: 45, element: button('late') });
     assert.deepEqual(ids(right), ['map', 'shell-menu', 'quick', 'late', 'level-tag', 'listen']);
   } finally { fake.restore(); }
@@ -71,7 +72,7 @@ test('compact shell opts in, retains registered rows and disposes its owned laye
     summary.click();
     assert.equal(cancelled, 1);
     assert.equal(layers.stack().length, 1);
-    assert.equal(layers.stack()[0].modal, 'page');
+    assert.equal(must(layers.stack()[0]).modal, 'page');
     assert.equal(doc.querySelector('.shell-compact-panel')?.contains(sound), true);
     const graphics = button('graphics');
     shell.add({ id: 'shell.graphics', zone: 'menu', order: 70, element: graphics });
@@ -198,9 +199,9 @@ test('replacement during layer acquisition finds rows and late old close cannot 
     };
     summary.click();
     assert.equal(layers.stack().length, 1);
-    assert.equal(layers.stack()[0].element.contains(sound), true);
+    assert.equal(must(layers.stack()[0]).element.contains(sound), true);
     assert.equal(summary.getAttribute('aria-expanded'), 'true');
-    layers.stack()[0].element.querySelector<HTMLElement>('button.shell-compact-close')?.click();
+    must(layers.stack()[0]).element.querySelector<HTMLElement>('button.shell-compact-close')?.click();
   } finally { fake.restore(); }
 });
 

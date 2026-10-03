@@ -1,7 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';import * as T from 'three';import {batchStaticMeshes} from './model-batching';
+import {must} from '../../testing/must';
 test('incompatible UV layouts batch separately without losing vertices or warning',()=>{
  const g=new T.Group(),m=new T.MeshStandardMaterial();for(let i=0;i<4;i++){const geo=new T.BoxGeometry(1,1,1);if(i>1)geo.deleteAttribute('uv');const mesh=new T.Mesh(geo,m);mesh.position.x=i*2;g.add(mesh);}const before=new T.Box3().setFromObject(g),errors:unknown[]=[];const old=console.error;console.error=(...a)=>errors.push(a);try{batchStaticMeshes(g);}finally{console.error=old;}
- assert.equal(g.children.length,2);assert.deepEqual(errors,[]);assert.ok(new T.Box3().setFromObject(g).equals(before));const drawn=(geo:T.BufferGeometry)=>geo.index?geo.index.count:geo.attributes.position.count;assert.equal(g.children.reduce((n,o)=>n+drawn((o as T.Mesh).geometry),0),144);
+ assert.equal(g.children.length,2);assert.deepEqual(errors,[]);assert.ok(new T.Box3().setFromObject(g).equals(before));const drawn=(geo:T.BufferGeometry)=>geo.index?geo.index.count:geo.getAttribute('position').count;assert.equal(g.children.reduce((n,o)=>n+drawn((o as T.Mesh).geometry),0),144);
 });
 test('batch preserves hidden, shadow, layer and render order states',()=>{const g=new T.Group(),m=new T.MeshStandardMaterial();for(let i=0;i<4;i++){const mesh=new T.Mesh(new T.BoxGeometry(),m);mesh.visible=i<2;mesh.castShadow=i<2;mesh.renderOrder=i<2?4:8;mesh.layers.set(i<2?2:3);g.add(mesh);}batchStaticMeshes(g);assert.equal(g.children.length,2);for(const mesh of g.children as T.Mesh[]){assert.equal(mesh.renderOrder,mesh.visible?4:8);assert.equal(mesh.layers.mask,mesh.visible?4:8);assert.equal(mesh.castShadow,mesh.visible);}});
 test('rig hooks, transparent sorting, instancing, and mirrored winding stay independent',()=>{const g=new T.Group(),m=new T.MeshStandardMaterial(),glass=new T.MeshStandardMaterial({transparent:true});const hook=new T.Mesh(new T.BoxGeometry(),m),mirror=new T.Mesh(new T.BoxGeometry(),m),instances=new T.InstancedMesh(new T.BoxGeometry(),m,2);mirror.scale.x=-1;const a=new T.Mesh(new T.BoxGeometry(),glass),b=a.clone();g.add(hook,mirror,instances,a,b);batchStaticMeshes(g,new Set([hook]));assert.deepEqual(g.children,[hook,mirror,instances,a,b]);});
@@ -9,9 +10,9 @@ test('shared geometry stays alive for a kept mesh and named parts keep their ide
  const g=new T.Group(),m=new T.MeshStandardMaterial(),geo=new T.BoxGeometry();let disposed=0;geo.addEventListener('dispose',()=>disposed++);const hook=new T.Mesh(geo,m);hook.name='Engine attachment';g.add(hook,new T.Mesh(geo,m),new T.Mesh(geo,m));batchStaticMeshes(g);assert.equal(g.children.length,2);assert.equal(g.getObjectByName('Engine attachment'),hook);assert.equal(disposed,0);
 });
 test('indexed parts batch indexed, and a non-indexed part joins them with a sequential index',()=>{
- const g=new T.Group(),m=new T.MeshStandardMaterial();g.add(new T.Mesh(new T.SphereGeometry(1,16,10),m),new T.Mesh(new T.SphereGeometry(1,16,10),m),new T.Mesh(new T.DodecahedronGeometry(1,0),m));g.children[1].position.x=3;g.children[2].position.x=6;
+ const g=new T.Group(),m=new T.MeshStandardMaterial();g.add(new T.Mesh(new T.SphereGeometry(1,16,10),m),new T.Mesh(new T.SphereGeometry(1,16,10),m),new T.Mesh(new T.DodecahedronGeometry(1,0),m));must(g.children[1]).position.x=3;must(g.children[2]).position.x=6;
  const sphere=new T.SphereGeometry(1,16,10),dodeca=new T.DodecahedronGeometry(1,0);batchStaticMeshes(g);assert.equal(g.children.length,1);const geo=(g.children[0] as T.Mesh).geometry;
- assert.equal(geo.attributes.position.count,sphere.attributes.position.count*2+dodeca.attributes.position.count);assert.equal(geo.index!.count,sphere.index!.count*2+dodeca.attributes.position.count);
+ assert.equal(geo.getAttribute('position').count,sphere.getAttribute('position').count*2+dodeca.getAttribute('position').count);assert.equal(geo.index!.count,sphere.index!.count*2+dodeca.getAttribute('position').count);
 });
 test('bakeStaticMeshes flattens a scene per material across groups, leaving moving parts, skipped scopes and transparent glass',async()=>{
  const {bakeStaticMeshes}=await import('./model-batching');
@@ -69,7 +70,7 @@ test('baking preserves transformed positions, normals, UVs and ray hits under no
  for(const name of ['position','normal','uv']){
   const values=expected.flatMap(g=>Array.from(g.getAttribute(name).array));assert.deepEqual(Array.from(mesh.geometry.getAttribute(name).array),values);
  }
- const after=ray.intersectObject(root).map(h=>h.distance);assert.equal(after.length,before.length);after.forEach((v,i)=>assert.ok(Math.abs(v-before[i])<1e-6));
+ const after=ray.intersectObject(root).map(h=>h.distance);assert.equal(after.length,before.length);after.forEach((v,i)=>assert.ok(Math.abs(v-must(before[i]))<1e-6));
 });
 test('sibling bake retains manual matrices and leaves nested semantic scopes alone on request',()=>{
  const root=new T.Group(),material=new T.MeshBasicMaterial(),nested=new T.Group();nested.name='toggle me';

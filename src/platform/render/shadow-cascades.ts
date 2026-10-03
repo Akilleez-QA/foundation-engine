@@ -175,10 +175,11 @@ class SunCascades extends CSM{
  override update(){
   const camera=this.camera,dir=this.lightDirection;
   orientation.lookAt(origin,dir,up);inverse.copy(orientation).invert();
+  // CSM keeps one light per frustum (i < frustums.length), and each frustum has 4 near and 4 far vertices (j < 4).
   for(let i=0;i<this.frustums.length;i++){
-   const light=this.lights[i],cam=light.shadow.camera,width=cam.right-cam.left,step=Math.round(SNAP*this.shadowMapSize)*width/this.shadowMapSize;
-   cameraToLight.multiplyMatrices(inverse,camera.matrixWorld);this.frustums[i].toSpace(cameraToLight,lightFrustum);
-   box.makeEmpty();for(let j=0;j<4;j++){box.expandByPoint(lightFrustum.vertices.near[j]);box.expandByPoint(lightFrustum.vertices.far[j]);}
+   const light=this.lights[i]!,cam=light.shadow.camera,width=cam.right-cam.left,step=Math.round(SNAP*this.shadowMapSize)*width/this.shadowMapSize;
+   cameraToLight.multiplyMatrices(inverse,camera.matrixWorld);this.frustums[i]!.toSpace(cameraToLight,lightFrustum);
+   box.makeEmpty();for(let j=0;j<4;j++){box.expandByPoint(lightFrustum.vertices.near[j]!);box.expandByPoint(lightFrustum.vertices.far[j]!);}
    box.getCenter(center);
    // Half the depth range lies sunward of the slice. The centre snaps to a grid of a tenth of the cascade's width (a
    // whole number of texels) in all three axes; the cascade is `SLACK` wider than its slice, so the slice stays

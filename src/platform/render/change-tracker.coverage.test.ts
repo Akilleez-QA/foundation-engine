@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from 'three';
 import {createColourTracker,createShadowTracker,materialReaders,type Surface} from './change-tracker';
+import {must} from '../../testing/must';
 
 /**
  * Mutation coverage for the render change trackers (STD-REN-38 "change detection observes, never guesses").
@@ -124,7 +125,7 @@ const materialSpecial:Record<string,Mutation[]>={
  shadowSide:[{label:'set',change:h=>{h.shadowSide=T.BackSide;}}],
  clippingPlanes:[
   {label:'planes set',change:h=>{h.clippingPlanes=[new T.Plane(new T.Vector3(0,1,0),.5)];}},
-  {label:'plane moved',prepare:h=>{h.clippingPlanes=[new T.Plane(new T.Vector3(0,1,0),.5)];},change:h=>{(h.clippingPlanes as T.Plane[])[0].constant=.7;}},
+  {label:'plane moved',prepare:h=>{h.clippingPlanes=[new T.Plane(new T.Vector3(0,1,0),.5)];},change:h=>{must((h.clippingPlanes as T.Plane[])[0]).constant=.7;}},
  ],
  matcap:[{label:'texture set',change:h=>{h.matcap=tex();}},{label:'texture upload',prepare:h=>{h.matcap=tex();},change:h=>{(h.matcap as T.Texture).needsUpdate=true;}}],
  iridescenceThicknessRange:[{label:'range',change:h=>{(h.iridescenceThicknessRange as number[])[1]=500;}}],
@@ -146,7 +147,7 @@ test('every field and accessor of every three material class is observed by the 
    proved++;
    expectSeen(label,w=>{
     const material=new Material() as unknown as Holder,mesh=new T.Mesh(new T.BoxGeometry(),material as unknown as T.Material);w.scene.add(mesh);
-    const key=label.slice(name.length+1).split(' ')[0];
+    const key=must(label.slice(name.length+1).split(' ')[0]);
     if(accessorKeys.has(key))material[key]=.5;
     m.prepare?.(material);
     return ()=>{if(accessorKeys.has(key))material[key]=.8;else m.change(material);};
@@ -187,9 +188,9 @@ test('shader uniforms: every value kind is observed; uniform groups and unknown 
   ['texture null',null,u=>{u.value=tex();}],
   ['number array',[1,2,3],u=>{(u.value as number[])[2]=4;}],
   ['typed array',new Float32Array(4),u=>{(u.value as Float32Array)[3]=1;}],
-  ['vector array',[new T.Vector3(),new T.Vector3()],u=>{(u.value as T.Vector3[])[1].x=1;}],
+  ['vector array',[new T.Vector3(),new T.Vector3()],u=>{must((u.value as T.Vector3[])[1]).x=1;}],
   ['struct',{a:1,b:new T.Vector2()},u=>{(u.value as {b:T.Vector2}).b.x=1;}],
-  ['struct array',[{a:1},{a:2}],u=>{(u.value as {a:number}[])[1].a=3;}],
+  ['struct array',[{a:1},{a:2}],u=>{must((u.value as {a:number}[])[1]).a=3;}],
   ['kind change',1,u=>{u.value=new T.Vector2(1,0);}],
  ];
  for(const [name,initial,change] of kinds)expectSeen('uniform '+name,w=>{
@@ -241,7 +242,7 @@ const nodeSpecial:Record<string,Mutation[]>={
   const m=h as unknown as T.Mesh;
   if(m.morphTargetInfluences){m.morphTargetInfluences[0]=.5;return;}
   // A mesh without morph targets gains them (geometry and weights both change).
-  m.geometry.morphAttributes.position=[m.geometry.attributes.position.clone()];m.updateMorphTargets();
+  m.geometry.morphAttributes.position=[m.geometry.getAttribute('position').clone()];m.updateMorphTargets();
  }}],
  instanceMatrix:[{label:'instance upload',change:h=>{(h.instanceMatrix as T.BufferAttribute).needsUpdate=true;}}],
  instanceColor:[{label:'instance colour',change:h=>{(h as unknown as T.InstancedMesh).setColorAt(0,new T.Color(1,0,0));}}],
@@ -250,10 +251,10 @@ const nodeSpecial:Record<string,Mutation[]>={
  target:[{label:'target moved',change:h=>{(h.target as T.Object3D).position.x+=1;}}],
  shadow:[],// swept as its own family below
  map:[{label:'cookie set',change:h=>{h.map=tex();}}],
- sh:[{label:'irradiance',change:h=>{(h.sh as T.SphericalHarmonics3).coefficients[4].y+=1;}}],
+ sh:[{label:'irradiance',change:h=>{must((h.sh as T.SphericalHarmonics3).coefficients[4]).y+=1;}}],
  levels:[
-  {label:'level distance',change:h=>{(h.levels as {distance:number}[])[1].distance=7;}},
-  {label:'level hysteresis',change:h=>{(h.levels as {hysteresis:number}[])[1].hysteresis=.3;}},
+  {label:'level distance',change:h=>{must((h.levels as {distance:number}[])[1]).distance=7;}},
+  {label:'level hysteresis',change:h=>{must((h.levels as {hysteresis:number}[])[1]).hysteresis=.3;}},
  ],
  center:[{label:'sprite centre',change:h=>{(h.center as T.Vector2).x=.25;}}],
 };
@@ -269,7 +270,7 @@ const kindExclusions:Record<string,Record<string,string>>={
 };
 type NodeKind=readonly [name:string,build:()=>T.Object3D];
 const standard=()=>new T.MeshStandardMaterial();
-const morphed=()=>{const m=new T.Mesh(new T.BoxGeometry(),standard());m.geometry.morphAttributes.position=[m.geometry.attributes.position.clone()];m.updateMorphTargets();return m;};
+const morphed=()=>{const m=new T.Mesh(new T.BoxGeometry(),standard());m.geometry.morphAttributes.position=[m.geometry.getAttribute('position').clone()];m.updateMorphTargets();return m;};
 const nodeKinds:NodeKind[]=[
  ['Mesh',()=>new T.Mesh(new T.BoxGeometry(),standard())],
  ['Mesh (morphed)',morphed],
@@ -354,17 +355,17 @@ test('every own field of a texture is observed or is upload state behind the obs
 test('geometry: attributes, index, morphs, groups, draw range and the culling sphere are observed by both scans',()=>{
  const mesh=(w:World,g:T.BufferGeometry)=>{const m=new T.Mesh(g,standard());m.castShadow=true;w.scene.add(m);return g;};
  const changes:[string,(g:T.BufferGeometry)=>void][]=[
-  ['attribute upload',g=>{g.attributes.position.needsUpdate=true;}],
-  ['attribute replaced',g=>{g.setAttribute('position',g.attributes.position.clone());}],
-  ['attribute added',g=>{g.setAttribute('color',new T.BufferAttribute(new Float32Array(g.attributes.position.count*3),3));}],
+  ['attribute upload',g=>{g.getAttribute('position').needsUpdate=true;}],
+  ['attribute replaced',g=>{g.setAttribute('position',g.getAttribute('position').clone());}],
+  ['attribute added',g=>{g.setAttribute('color',new T.BufferAttribute(new Float32Array(g.getAttribute('position').count*3),3));}],
   ['attribute removed',g=>{g.deleteAttribute('uv');}],
   ['index replaced',g=>{g.setIndex(g.index!.clone());}],
   ['index upload',g=>{g.index!.needsUpdate=true;}],
   ['index removed',g=>{g.setIndex(null);}],
-  ['morph attribute added',g=>{g.morphAttributes.position=[g.attributes.position.clone()];}],
+  ['morph attribute added',g=>{g.morphAttributes.position=[g.getAttribute('position').clone()];}],
   ['morph relative',g=>{g.morphTargetsRelative=!g.morphTargetsRelative;}],
   ['group added',g=>{g.addGroup(0,6,0);}],
-  ['group changed',g=>{g.groups[0].count=12;}],
+  ['group changed',g=>{must(g.groups[0]).count=12;}],
   ['draw range',g=>{g.setDrawRange(0,6);}],
   ['culling sphere set',g=>{g.boundingSphere=new T.Sphere(new T.Vector3(),.1);}],
   ['culling sphere moved',g=>{g.computeBoundingSphere();g.boundingSphere!.center.x=3;}],

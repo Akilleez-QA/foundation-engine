@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createWorkerHost, type WorkerHostOptions } from './host.ts';
 import { drainSlices, WorkerJobError, type JobClass, type JobKind, type JobOwner, type JobRequest } from './job.ts';
 import { createFakeTimers, createInProcessWorker, fakeWorkerFactory } from './fake-worker.ts';
+import {must} from '../../testing/must';
 
 const MiB = 1024 * 1024;
 
@@ -469,7 +470,7 @@ for (const cancellation of ['caller', 'owner', 'dispose', 'supersede'] as const)
       assert.equal(runs.length, !inline && newer ? 1 : 0);
       assert.equal(f.h.stats().reservedBytes, newer ? 16 : 0);
       if (newer) {
-        if (inline) f.timers.flush(); else f.workers[0].complete(10);
+        if (inline) f.timers.flush(); else must(f.workers[0]).complete(10);
         assert.deepEqual(await newer, { status: 'done', output: 10 });
       }
       assert.equal(sliceFactories, inline && newer ? 1 : 0);
@@ -482,7 +483,7 @@ for (const cancellation of ['caller', 'owner', 'dispose', 'supersede'] as const)
         const nextLife = owner('next.owner');
         const next = f.h.run(req(k, nextLife.owner, { bytes: { input: 8, output: 8, scratch: 0 } }), new AbortController().signal);
         assert.equal(f.h.stats().reservedBytes, 16);
-        if (inline) f.timers.flush(); else f.workers[0].complete(6);
+        if (inline) f.timers.flush(); else must(f.workers[0]).complete(6);
         assert.deepEqual(await next, { status: 'done', output: 6 });
         assert.equal(f.h.stats().reservedBytes, 0);
       } else assert.ok(f.workers.every(w => w.terminated));
@@ -503,7 +504,7 @@ test('throwing worker reporter preserves job errors and dispatches queued succes
     const failed = h.run(req(k, o), signal);
     const rejection = assert.rejects(failed, error => error === reports[0] && error instanceof WorkerJobError && error.reason === (crash ? 'terminated' : 'threw'));
     const next = h.run(req(k, o), signal);
-    assert.doesNotThrow(() => crash ? workers[0].crash() : workers[0].throwInJob('original failure'));
+    assert.doesNotThrow(() => crash ? must(workers[0]).crash() : must(workers[0]).throwInJob('original failure'));
     await rejection;
     assert.equal(h.stats().pending, 0);
     assert.equal(h.stats().running, 1);
@@ -542,7 +543,7 @@ test('throwing spawn reporter still reaches fallback and settles unavailable job
   const first = h.run(req(k, o), signal);
   timers.flush();
   assert.deepEqual(await first, { status: 'done', output: 6 });
-  assert.equal(reports[0].reason, 'spawn');
+  assert.equal(must(reports[0]).reason, 'spawn');
   const { k: unavailable } = kind('job.test.report-unavailable', { fallback: { mode: 'unavailable' } });
   await assert.rejects(h.run(req(unavailable, o), signal), error => error === reports[1] && error instanceof WorkerJobError && error.reason === 'unavailable');
   assert.equal(h.stats().reservedBytes, 0);
@@ -557,7 +558,7 @@ test('reporter teardown cannot replace the original failure', async () => {
   const { owner: o } = owner();
   const failed = h.run(req(k, o), new AbortController().signal);
   const rejection = assert.rejects(failed, error => error instanceof WorkerJobError && error.reason === 'threw');
-  assert.doesNotThrow(() => workers[0].throwInJob('original failure'));
+  assert.doesNotThrow(() => must(workers[0]).throwInJob('original failure'));
   await rejection;
   assert.equal(reports, 1);
   assert.equal(h.stats().reservedBytes, 0);
@@ -596,19 +597,19 @@ for (const inline of [false, true]) {
       if (inline) assert.doesNotThrow(() => timers.flush());
       else {
         ctl.abort();
-        assert.doesNotThrow(() => workers[0].complete(42));
+        assert.doesNotThrow(() => must(workers[0]).complete(42));
         if (teardown === 'none') {
-          assert.equal(workers[0].lastRun()!.kind, healthy.id);
-          workers[0].complete(6);
+          assert.equal(must(workers[0]).lastRun()!.kind, healthy.id);
+          must(workers[0]).complete(6);
         }
       }
       assert.deepEqual(await cancelled, { status: 'cancelled' });
       assert.deepEqual(await next, teardown === 'none' ? { status: 'done', output: 6 } : { status: 'cancelled' });
       assert.equal(attempts, 1);
       assert.equal(reports.length, 1);
-      assert.equal(reports[0].kind, k.id);
-      assert.equal(reports[0].cause, releaseFailure);
-      assert.match(reports[0].message, /output release failed/);
+      assert.equal(must(reports[0]).kind, k.id);
+      assert.equal(must(reports[0]).cause, releaseFailure);
+      assert.match(must(reports[0]).message, /output release failed/);
       assert.equal(h.stats().reservedBytes, 0);
       assert.equal(h.stats().running, 0);
       assert.equal(h.stats().pending, 0);
@@ -623,16 +624,16 @@ test('unmatched late output cleanup cannot retire the worker current job', async
   const { k } = kind('job.test.late-release', { release() { attempts++; throw null; } });
   const { owner: o } = owner();
   const first = h.run(req(k, o), o.signal);
-  const old = workers[0].lastRun()!;
-  workers[0].complete(1);
+  const old = must(workers[0]).lastRun()!;
+  must(workers[0]).complete(1);
   assert.deepEqual(await first, { status: 'done', output: 1 });
   const next = h.run(req(k, o), o.signal);
-  assert.doesNotThrow(() => workers[0].onmessage!({ data: { type: 'done', job: old.job, kind: old.kind, output: 2 } }));
+  assert.doesNotThrow(() => must(workers[0]).onmessage!({ data: { type: 'done', job: old.job, kind: old.kind, output: 2 } }));
   assert.equal(attempts, 1);
   assert.equal(reports.length, 1);
   assert.equal(h.stats().reservedBytes, 2 * MiB);
   assert.equal(h.stats().running, 1);
-  workers[0].complete(3);
+  must(workers[0]).complete(3);
   assert.deepEqual(await next, { status: 'done', output: 3 });
   assert.equal(h.stats().reservedBytes, 0);
   h.dispose();
@@ -677,8 +678,8 @@ for (const cancellation of ['caller', 'owner', 'dispose'] as const) {
         ? { status: 'cancelled' } : { status: 'done', output: 6 });
       assert.equal(attempts, 1);
       assert.equal(reports.length, 1);
-      assert.equal(reports[0].cause, cleanupFailure);
-      assert.match(reports[0].message, /fallback cleanup failed/);
+      assert.equal(must(reports[0]).cause, cleanupFailure);
+      assert.match(must(reports[0]).message, /fallback cleanup failed/);
       assert.equal(h.stats().reservedBytes, 0);
       assert.equal(h.stats().running, 0);
       assert.equal(h.stats().pending, 0);

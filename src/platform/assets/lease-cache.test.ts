@@ -11,6 +11,7 @@ import {
   type LeaseLoader,
 } from './lease-cache';
 import type { AssetDef, AssetFormat } from './manifest';
+import {must} from '../../testing/must';
 
 /** A fake GPU resource: an object so it has identity, like a THREE.Texture. */
 interface Gpu {
@@ -54,7 +55,7 @@ function manualLoader(bytes = 64) {
     pending.get(key)!.shift()!.reject(error);
     await settle();
   };
-  const signalOf = (key: string, i = 0) => pending.get(key)![i].signal;
+  const signalOf = (key: string, i = 0) => must(pending.get(key)![i]).signal;
   return { loader, log, arrive, fail, signalOf };
 }
 
@@ -261,7 +262,7 @@ test('variant choice: a maxTier port variant is used only on that tier or worse'
   const q = { screenPx: 400, supports: allFormats };
   assert.equal(chooseVariant(wall, { ...q, tier: 'high' }).path, 'textures/stone/wall-2048.ktx2');
   assert.equal(chooseVariant(wall, { ...q, tier: 'low' }).path, 'textures/stone/wall-1024.ktx2');
-  assert.throws(() => chooseVariant({ ...wall, variants: [wall.variants[4]] }, { ...q, tier: 'reference' }), /no variant/);
+  assert.throws(() => chooseVariant({ ...wall, variants: [must(wall.variants[4])] }, { ...q, tier: 'reference' }), /no variant/);
 });
 
 function assetLoader() {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {heldVector} from './frame-actions';
 import {attachKeyboard,KeyboardInput} from './keyboard';
 import {env,ev,key,recordingSink} from '../../testing/input-fakes';
+import {must} from '../../testing/must';
 
 const setup=(options={})=>{const sink=recordingSink(),e=env(),abort=new AbortController();attachKeyboard(sink,{...e,signal:abort.signal,now:()=>1000,...options});return {sink,...e,abort,down:(code:string,k:string,x={})=>{const k2=key('keydown',code,k,x);e.win.dispatchEvent(k2);return k2;},up:(code:string,k:string,x={})=>e.win.dispatchEvent(key('keyup',code,k,x))};};
 
@@ -32,7 +33,7 @@ test('zoom keys: + = I and NumpadAdd zoom in, − _ O and NumpadSubtract out; re
  press('Equal','+');press('Equal','=');press('KeyI','i');press('NumpadAdd','+');press('Minus','-');press('Minus','_');press('KeyO','O');press('NumpadSubtract','-');
  assert.deepEqual(sink.latch.drain().zoom.map(z=>[z.notches,z.source]),[[-1,'key'],[-1,'key'],[-1,'key'],[-1,'key'],[1,'key'],[1,'key'],[1,'key'],[1,'key']]);
  t=1000;press('Minus','-');for(let i=1;i<=30;i++){t=1000+i*33;press('Minus','-',{repeat:true});}
- const steps=sink.latch.drain().zoom;assert.equal(steps[0].source,'key');assert.ok(steps.slice(1).every(z=>z.source==='repeat'));assert.ok(steps.length-1<=8,`${steps.length-1} repeats in one second`);
+ const steps=sink.latch.drain().zoom;assert.equal(must(steps[0]).source,'key');assert.ok(steps.slice(1).every(z=>z.source==='repeat'));assert.ok(steps.length-1<=8,`${steps.length-1} repeats in one second`);
 });
 test('editable targets own every key and focused buttons own Space and Enter',()=>{
  const {sink,down}=setup();

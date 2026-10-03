@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { LeaseCache, type LeaseLoader, type LeaseResidency, type ResidencyPressure } from './lease-cache';
+import {must} from '../../testing/must';
 
 /** RES-01 adversarial cases for the residency policy of the existing lease cache. */
 
@@ -84,7 +85,7 @@ test('RES-01: everything pinned over the ceiling degrades explicitly: kept, repo
   assert.deepEqual(reports[0], { residentBytes: 128, limitBytes: 100, liveBytes: 64, pinnedBytes: 64, warmBytes: 0 });
   assert.equal(c.pinnedBytes(), 192);
   // Staying over budget across more traffic never re-reports, reloads or evicts.
-  for (let i = 0; i < 20; i++) await use(c, ['a', 'b', 'c'][i % 3]);
+  for (let i = 0; i < 20; i++) await use(c, must(['a', 'b', 'c'][i % 3]));
   assert.equal(reports.length, 1);
   assert.equal(c.stats.loads, 3);
   assert.equal(c.stats.evictions, 0);
@@ -94,7 +95,7 @@ test('RES-01: everything pinned over the ceiling degrades explicitly: kept, repo
   assert.equal(c.residentBytes(), 64);
   const x = await c.acquire('x', owner().signal), y = await c.acquire('y', owner().signal);
   assert.equal(reports.length, 2, 'a new transition over the ceiling reports again');
-  assert.deepEqual([reports[1].liveBytes, reports[1].pinnedBytes], [64, 64], 'reported at the first breach (x), not again for y');
+  assert.deepEqual([must(reports[1]).liveBytes, must(reports[1]).pinnedBytes], [64, 64], 'reported at the first breach (x), not again for y');
   x.release(); y.release();
   assert.equal(c.residentBytes(), 64);
 });
@@ -199,7 +200,7 @@ test('RES-01: alternating access does not thrash when the working set fits, and 
 
   // A working set larger than the budget pays LRU reloads, bounded: at most one eviction per load, none of a pin.
   const small = cache(64, { residentBytes: 128, pinned: key => key === 'p' });
-  for (let i = 0; i < 30; i++) await use(small.c, ['p', 'a', 'b'][i % 3]);
+  for (let i = 0; i < 30; i++) await use(small.c, must(['p', 'a', 'b'][i % 3]));
   assert.ok(small.c.stats.evictions <= small.c.stats.loads);
   assert.equal(small.m.log.uploaded.filter(k => k === 'p').length, 1);
   assert.equal(small.c.stats.pressure, 0);

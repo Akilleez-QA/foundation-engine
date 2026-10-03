@@ -47,7 +47,7 @@ function unionArea(rects: readonly Bounds[]): number {
   const xs = [...new Set(rects.flatMap(r => [r.left, r.right]))].sort((a, b) => a - b);
   let area = 0;
   for (let i = 1; i < xs.length; i++) {
-    const left = xs[i - 1], right = xs[i];
+    const left = xs[i - 1]!, right = xs[i]!; // 1 <= i < xs.length
     const spans = rects.filter(r => r.left < right && r.right > left).sort((a, b) => a.top - b.top);
     let length = 0, end = -Infinity;
     for (const span of spans) {
