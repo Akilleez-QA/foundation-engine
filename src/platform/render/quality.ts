@@ -1,6 +1,6 @@
 /**
  * platform/render/quality.ts: the quality service core (ADR 0017 as superseded by ADR 0029;
- * ADR 0034 for the one WebGL2 path; STD-SET-5 to STD-SET-13, STD-PRI-4, STD-PRI-5).
+ * ADR 0078 for the default WebGL2 backend; STD-SET-5 to STD-SET-13, STD-PRI-4, STD-PRI-5).
  *
  * `quality-runtime.ts` builds the app's service from the `graphics.settings` section; every renderer's pixel ratio goes
  * through `livePixelRatio(renderer, max)` (= `quality.pixelRatio(max)`, re-applied on a change); shadow maps go through
