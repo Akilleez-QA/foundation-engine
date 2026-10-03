@@ -13,6 +13,13 @@ terrain/document/diagnostic/route/materialization program is integrated within i
 stated boundaries. Those boundaries remain real; unimplemented capabilities are
 not made complete by relabelling them as optional.
 
+Current status (2026-10-03): every public PR merged through #116 is integrated on
+`main`, including merge-train batches #62, #64 and #65 and GEN-02 (#56). See
+[post-0.2.0 integration](#post-020-integration-2026-10-02-to-2026-10-03) and the
+[creator-readiness milestone](#creator-readiness-milestone-2026-10-03), which cites each
+milestone receipt in `docs/verification/`. Earlier candidate wording below is kept as
+history beside a dated current-status line.
+
 Revision references: PR numbers and merge/commit hashes before the public
 repository's first commit `c0e73c9` refer to the private development history,
 which is not published. `c0e73c9` has the same source tree as private `main`
@@ -76,20 +83,20 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | NW-08 | Planned drain and capped connection lifetime (study N8) | Integrated in v0.2.0 (PR #21; batch PR #42). Optional pure `createConnectionDrain` (host: bounded notice, operator drain/resume, dithered lifetime cap, per-poll instruction cap) and `createDrainFollower` (client: bounded notice, cooperative close, hold until announced return, then the existing retry schedule) in the network kit; the network workbench host (`--drain`) and client (checkbox) opt in. Drain closes are 1012 and transient. Admitted work is never cancelled. Evidence and limits are in the NW-08 section below. No process-restart, WAN or physical-device claim. |
 | NW-07 | Overload and goodput acceptance probe (study N4), tools only | Integrated in v0.2.0 (PR #27; batch PR #46). `npm run probe:network` forks the network and replication reference hosts and drives them over real loopback WebSockets: offered-load ramp past saturation (FIFO and queue-age variants), flooder/wrong-credential/over-bound adversaries, a physical paused-socket non-reader, and a host-restart reconnect storm paced by `createRetrySchedule`. Three default runs at `0744509` (load average 94 to 113, niceness 15): FIFO goodput plateaued at the host's achieved capacity (67.9 to 84.1/s at 89 to 119/s offered); all 27 flooders retired `rate-capacity`; no healthy peer closed; the non-reader was retired `send-refused` by the replication host's buffered cap in 2 of 3 runs (host buffered at most 127,213 of 131,072 bytes) and stayed bounded in the third; jitter cut the peak accepted reconnects per 100 ms bin from 6 to 8 to 2. Finding (then): a queue age shorter than the real queued wait collapsed goodput (300 ms: final/peak 0.09 to 0.31). It is resolved by the NW-06 follow-up (PR #33), and the probe now asserts queue-age plateaus. Loopback/process scope only: no WAN, browser, multi-machine or physical-device claim. [Guide](network-overload.md), [evidence](../verification/network-overload-20261002/README.md). |
 | SEC-01 | Command integrity (anti-cheat) at the authoritative host | Slice A integrated in v0.2.0 (PR #20; batch PR #47). Optional `createIntegrity` in the network kit ([guide](integrity.md), [recipe](../recipes/add-command-integrity.md)): pure `assess` validity usable inside the authority reducer (invalid sequenced commands consumed as domain rejections, so no `gap` and prediction reconciles), separate `admit`/`record` policy (decaying per-key scores, tick-rate budget on rate admission, throttle, windowed close with terminal `integrity-violation`, per-rule ceilings, owner/rule observe mode), key table that never refuses new keys, bounded local audit with export, tick-addressed generic helpers and an `assertDisclosure` test helper. Network workbench opt-in example (`--integrity`). Focused unit tests (including an in-memory authority/prediction composition) and loopback host tests only; no browser composition, load, WAN, physical-device, detection-quality or real-world cheat-resistance claim. Slice B (verified runs via the SIM-01 replay kit) is designed in the guide and not built; its SIM-01 dependency (PR #17) is merged. |
-| SIM-02 | Creator-chosen replay digest and divergence detail (backlog W1-1) | Implemented, candidate (PR #58), not integrated. See the SIM-01 section below and the [replay guide](replay-divergence.md#choose-what-a-replay-must-reproduce-sim-02). Focused tests and the arcade browser replay passed on the branch; no physical-device, cross-browser or multiplayer claim. |
-| MP-01 | Newcomer shared session: game-facing `@kits/network` session helpers, `npm run host`, `shared-world` template | Implemented, candidate (PR #61); not integrated. `defineSessionRules`, `createSession` and transport-neutral `createSessionHost` compose existing owners (intake, NW-02 views, prediction, NW-04 retry, close policy, NW-05 rate admission, SEC-01 integrity in observe mode). Unit, loopback socket and one desktop headless Chromium two-context check; template gate passed. Evidence and limits are in the MP-01 section below. LAN/loopback only: no accounts, matchmaking, NAT traversal, WAN, TLS, physical-device or scalability claim. |
+| SIM-02 | Creator-chosen replay digest and divergence detail (backlog W1-1) | **Integrated 2026-10-02** (PR #58 merge `4943174`, batch PR #62, `main` `6485572`). Before integration: implemented, candidate (PR #58). See the SIM-01 section below and the [replay guide](replay-divergence.md#choose-what-a-replay-must-reproduce-sim-02). Focused tests and the arcade browser replay passed on the branch; no physical-device, cross-browser or multiplayer claim. |
+| MP-01 | Newcomer shared session: game-facing `@kits/network` session helpers, `npm run host`, `shared-world` template | **Integrated 2026-10-03** (PR #61 merge `41d0261`, batch PR #64, `main` `3b449fa`). Before integration: implemented, candidate (PR #61). `defineSessionRules`, `createSession` and transport-neutral `createSessionHost` compose existing owners (intake, NW-02 views, prediction, NW-04 retry, close policy, NW-05 rate admission, SEC-01 integrity in observe mode). Unit, loopback socket and one desktop headless Chromium two-context check; template gate passed. Evidence and limits are in the MP-01 section below. LAN/loopback only: no accounts, matchmaking, NAT traversal, WAN, TLS, physical-device or scalability claim. |
 | AU-01 | Audio-clock timeline: audio↔frame time mapping with drift correction, bounded lookahead scheduling, input timestamps in audio time, stored latency calibration | Integrated in v0.2.0 (PR #31; batch PR #47). Optional `createAudioTimeline` ([guide](audio-timeline.md), [recipe](../recipes/sync-gameplay-to-music.md)) reads the one audio output through new `AudioOutput.clock()`; adds `CueVoiceOptions.at`, `ctx.audioClock()`, `ctx.time.now`, `ctx.input.pressedAt()` and audio unlock on scene action presses. Focused unit tests with a simulated drifting, quantised device; author-API scene tests with an injected clock and on the silent fallback. No real-browser output timing, Bluetooth, physical-device or audible verification (test browsers are muted). Streamed music remains off the context clock. |
-| AU-02 | Music on the audio clock: decoded songs started, sought, looped and stopped at exact context times | Implemented, candidate (PR #54); not integrated. `ctx.playMusic` / `AudioOutput.playMusic` ([guide](music-on-clock.md), [recipe](../recipes/sync-gameplay-to-music.md#1b-play-the-song-on-the-same-clock)) on a music bus that follows the music volume and mute, with its own sound-file store under `musicBudgets(minimum device)` (file budget = decoded budget ÷ 24, timeout scaled to the file budget); late decodes skip ahead (or drop) to keep sync; hand-offs re-time on repeated seeks and respect a scheduled stop; scene-owned voices. Focused fake-context tests, including a chart on the AU-01 timeline equal to song seconds. No real-browser timing, device decode-cost, memory-pressure or audible verification. The `music(url)` element path is unchanged. |
+| AU-02 | Music on the audio clock: decoded songs started, sought, looped and stopped at exact context times | **Integrated 2026-10-03** (PR #54 merge `0aa5caf`, batch PR #64, `main` `3b449fa`). Before integration: implemented, candidate (PR #54). `ctx.playMusic` / `AudioOutput.playMusic` ([guide](music-on-clock.md), [recipe](../recipes/sync-gameplay-to-music.md#1b-play-the-song-on-the-same-clock)) on a music bus that follows the music volume and mute, with its own sound-file store under `musicBudgets(minimum device)` (file budget = decoded budget ÷ 24, timeout scaled to the file budget); late decodes skip ahead (or drop) to keep sync; hand-offs re-time on repeated seeks and respect a scheduled stop; scene-owned voices. Focused fake-context tests, including a chart on the AU-01 timeline equal to song seconds. No real-browser timing, device decode-cost, memory-pressure or audible verification. The `music(url)` element path is unchanged. |
 | TR-01 | Regional terrain worker and ordinary-surface integration | Integrated in PR #109 at 99e6255. Canonical regional Surface and halo patches, bounded WorkerHost generation/patch adapters, independent geometric oracles and finite coherent render/query consumer passed at 891eb7; all seven template gates passed (1,648 tests, 129 performance checks, zero breaches/regressions, four advisory heap warnings). Combined main tests/build passed. Physical-device performance and unbounded/global streaming are not established. |
 | GEN-01 | Deterministic seed derivation and bounded seeded generation jobs | Integrated in v0.2.0 (PR #38; batch PR #45). Pure integer-only `deriveSeed` in `src/core/rng.ts` and the optional `procgen` kit: `createGridGenerationJob` on the existing WorkerHost, the example `job.kits.procgen.cellular` row, and a strict root-seed save section. Evidence and limits are in the GEN-01 section below. No chunk residency, edit deltas, meshing, physical-device or generation-quality claim. |
-| FX-01 | Optional particle emitters (hit sparks, pickups, trails, smoke) | Implemented, candidate (PR #63); not integrated. `Emitter`/`defineEmitter`/`burst` in the author API, opt-in per scene with `defineScene({ particles: sceneParticles({ max, emitters }) })` (games without it carry no particle simulation or drawing code; the drawing code is a lazy chunk); fixed-step simulation on its own seeded stream (never the gameplay `ctx.random`; regression-tested), drawn at the latest step like `Shape` meshes, one instanced draw per emitter with live particles (2 triangles per particle) and none while idle; pools allocated once; per-emitter, per-step and per-scene bounds with counted drops; refused bursts dropped (never fired late) and refused one-shots removed, refusals counted and reported once per cause per visit (bounded under sustained hits); textures leased from the shared library; `effects.particles` knob (registered, unwired) thins non-essential emitters deterministically. Reviews of `8cf76ae` (stream isolation, refusal growth, re-fire on rebuild, preload, draw state) and `0d3afb3` (any-number `testScene` seeds, idle-window browser flake, per-cause refusals, step-gated writes, late bind failures) addressed in follow-up commits. Evidence: focused unit tests (including the recipe's code and its sync check) and `npm run test:particle-browser` on reference and low, including an on-demand scene (desktop headless Chromium, software GL). No template consumer, physical-device, GPU timing, fill-rate or visual-quality acceptance; see the [guide](particles.md). |
-| GEN-02 | Bounded IndexedDB store for large edited worlds and sparse cell edits | Implemented, candidate (PR, `feat/gen02-chunk-store`); not integrated. `src/core/save/chunk-port.ts` (sole IndexedDB user, lint rule `indexed-db`) and `chunk-store.ts`: atomic multi-record writes, in-transaction revision checks, creator schema, CRC-32 quarantine before overwrite, bounded keys/bytes/records/batch/pending/quarantine, opt-in LRU eviction, session fallback. `createCellEdits` in the procgen kit. Evidence and limits are in the GEN-02 section below. No physical-device, private-mode, quota-exhaustion or multi-browser claim. |
+| FX-01 | Optional particle emitters (hit sparks, pickups, trails, smoke) | **Integrated 2026-10-03** (PR #63 merge `b7b5550`, batch PR #65, `main` `1f9d10d`). Before integration: implemented, candidate (PR #63). `Emitter`/`defineEmitter`/`burst` in the author API, opt-in per scene with `defineScene({ particles: sceneParticles({ max, emitters }) })` (games without it carry no particle simulation or drawing code; the drawing code is a lazy chunk); fixed-step simulation on its own seeded stream (never the gameplay `ctx.random`; regression-tested), drawn at the latest step like `Shape` meshes, one instanced draw per emitter with live particles (2 triangles per particle) and none while idle; pools allocated once; per-emitter, per-step and per-scene bounds with counted drops; refused bursts dropped (never fired late) and refused one-shots removed, refusals counted and reported once per cause per visit (bounded under sustained hits); textures leased from the shared library; `effects.particles` knob (registered, unwired) thins non-essential emitters deterministically. Reviews of `8cf76ae` (stream isolation, refusal growth, re-fire on rebuild, preload, draw state) and `0d3afb3` (any-number `testScene` seeds, idle-window browser flake, per-cause refusals, step-gated writes, late bind failures) addressed in follow-up commits. Evidence: focused unit tests (including the recipe's code and its sync check) and `npm run test:particle-browser` on reference and low, including an on-demand scene (desktop headless Chromium, software GL). No template consumer, physical-device, GPU timing, fill-rate or visual-quality acceptance; see the [guide](particles.md). |
+| GEN-02 | Bounded IndexedDB store for large edited worlds and sparse cell edits | **Integrated 2026-10-03** (PR #56, merged to `main` at `2fb6e69`). Before integration: implemented, candidate (`feat/gen02-chunk-store`). `src/core/save/chunk-port.ts` (sole IndexedDB user, lint rule `indexed-db`) and `chunk-store.ts`: atomic multi-record writes, in-transaction revision checks, creator schema, CRC-32 quarantine before overwrite, bounded keys/bytes/records/batch/pending/quarantine, opt-in LRU eviction, session fallback. `createCellEdits` in the procgen kit. Evidence and limits are in the GEN-02 section below. No physical-device, private-mode, quota-exhaustion or multi-browser claim. |
 | DV-01 | Supported-device experience and sustained performance evidence | In progress. The stock matrix, lesson visit cleanup and compact layout repair are integrated in v0.2.0 (PR #9, merged to main at `97288f8`); DV-01 itself remains open. [Stock matrix](../kits/stock-device-acceptance-matrix.md) covers all seven declarations. The [first receipt](../verification/stock-device-20261001/README.md) records 16 passing emulated target/tap checks and a compact lesson content overlap; lesson visit cleanup and a measured learn layout seam repair it, with a fake-DOM regression and emulated separation checks across board, sim and quiz at four profiles ([layout receipt](../verification/stock-device-20261002/README.md)). Full consumer workflows, in-panel touch scrolling, 200% text, named minimum devices and sustained physical evidence remain open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. No physical-device or accessibility certification. |
 | SC-01 | Bounded spatial index for neighbour, range and interest queries at scale | Integrated in v0.2.0 (PR #23, merged to main at `2c87e3b`). Optional `spatial` kit `createSpatialGrid`: preallocated uniform grid, admission before write, `too-wide` refusal before scanning, explicitly `truncated` results, terminal disposal. Checked: 12 focused unit tests (seeded brute-force oracle, refusals without mutation, narrow-buffer rejection, ECS interest consumer handling despawn and out-of-bounds and failing closed) and a work-count test of the 1,000/10,000-entry micro-benchmark. Headless Node medians recorded in the [guide](spatial-index.md#measured-cost). No template consumer, browser, worker or physical-device evidence; no budget change. |
-| SC-02 | Per-observer interest sets feeding scoped views | Implemented, candidate (PR #51); not integrated. Optional `spatial` kit `createInterestSets` over the SC-01 grid: ranked (tier, distance, id), budgeted, enter/exit hysteresis with hold, entered/left events, fail-closed partial scans; reference host composes NW-02 view publishers so that, while scans are complete, no frame or revision reveals activity outside a connection's set (an `incomplete` scan can; size `maxCandidates` above the densest exit circle). Checked: 9 unit tests (incl. a 3,000-step reference-model comparison), 6 reference-host tests with real view receivers, a 1,000/10,000-entity bench work-count test. No socket, browser, device or template evidence; no budget change. |
+| SC-02 | Per-observer interest sets feeding scoped views | **Integrated 2026-10-02** (PR #51 merge `f0f020e`, batch PR #62, `main` `6485572`). Before integration: implemented, candidate (PR #51). Optional `spatial` kit `createInterestSets` over the SC-01 grid: ranked (tier, distance, id), budgeted, enter/exit hysteresis with hold, entered/left events, fail-closed partial scans; reference host composes NW-02 view publishers so that, while scans are complete, no frame or revision reveals activity outside a connection's set (an `incomplete` scan can; size `maxCandidates` above the densest exit circle). Checked: 9 unit tests (incl. a 3,000-step reference-model comparison), 6 reference-host tests with real view receivers, a 1,000/10,000-entity bench work-count test. No socket, browser, device or template evidence; no budget change. |
 | DEP-01 | three.js 0.183 → 0.186 deliberate migration (Dependabot keeps ignoring three minors) | Integrated in v0.2.0 (PR #29; batch PR #45). Private-state adapters re-verified against r186 source and pinned: batch state (`readBatchState`, contract test), the static shadow GPU cache (exported revision predicate; other revisions render the stock full path). Trackers force on camera-fitted `SunLight` cascades and observe `LightProbeGridWebGL`; `Texture.normalized` is classified as upload state. Engine ancestor-dependent world-matrix reads keep r183 results under r185's `updateWorldMatrix` change (regression test with a moved container). Exact head `bde17ad`: `npm run gate:ci` passed all 21 steps (19 browser suites, all seven template gates with 2,130 tests and 129 performance checks, zero enforced breaches/regressions/inconclusive, the four known advisory software-GL heap warnings; phone smoke for every template). Quality guard against the 0.183 build: 5 still views pixel-identical; the 3 animated start views compared under a held clock were identical (arcade, explorer) or within the scene's own run-to-run variance (mechanics). JS grows ~27 KiB raw / ~6 KiB gzip per template, inside every first-load budget. Software-GL frame times were measured under heavy host load and are inconclusive, not device evidence; no physical-device or GPU timing claim. |
-| RNG-01 | Saveable seeded random state for rollback, reload and replay (genre study 2026-10-02, slice 3) | Implemented, candidate (PR #52, `feat/rng-state-input-history`); not integrated. `createSaveableRng(seed)` in `core/rng.ts`, exported from `@engine`: draws exactly equal `createRng`, `state()` returns the whole generator as one unsigned 32-bit word, and `restore(word)` refuses anything else without changing state. 3 focused tests and a rollback sync-test consumer with an unsaved-word negative control. `ctx.random()` itself is unchanged and still cannot be rolled back. |
-| INPUT-01 | Frame-exact input history: per-tick edges, buffers, release edges, opposite cleaning and sequences (genre study 2026-10-02, slice 4) | Implemented, candidate (PR #52); not integrated. Optional `@kits/input-history`: up to 32 actions in typed-array rings (capacity 1–3600), contiguous `record` with `stale`/`gap`/`invalid` refusals, taps, five opposite policies, `lastEdge` buffers with consumption, bounded `match` (1–16 steps, steps × within work), and a validated snapshot. 17 tests, including an exhaustive-oracle comparison, tamper refusal, rollback sync-test integration and a `testScene` consumer. No per-game window values, physical controller or feel claim. |
+| RNG-01 | Saveable seeded random state for rollback, reload and replay (genre study 2026-10-02, slice 3) | **Integrated 2026-10-02** (PR #52 merge `2d5f50e`, batch PR #62, `main` `6485572`). Before integration: implemented, candidate (PR #52, `feat/rng-state-input-history`). `createSaveableRng(seed)` in `core/rng.ts`, exported from `@engine`: draws exactly equal `createRng`, `state()` returns the whole generator as one unsigned 32-bit word, and `restore(word)` refuses anything else without changing state. 3 focused tests and a rollback sync-test consumer with an unsaved-word negative control. `ctx.random()` itself is unchanged and still cannot be rolled back. |
+| INPUT-01 | Frame-exact input history: per-tick edges, buffers, release edges, opposite cleaning and sequences (genre study 2026-10-02, slice 4) | **Integrated 2026-10-02** (PR #52 merge `2d5f50e`, batch PR #62, `main` `6485572`). Before integration: implemented, candidate (PR #52). Optional `@kits/input-history`: up to 32 actions in typed-array rings (capacity 1–3600), contiguous `record` with `stale`/`gap`/`invalid` refusals, taps, five opposite policies, `lastEdge` buffers with consumption, bounded `match` (1–16 steps, steps × within work), and a validated snapshot. 17 tests, including an exhaustive-oracle comparison, tamper refusal, rollback sync-test integration and a `testScene` consumer. No per-game window values, physical controller or feel claim. |
 
 ## v0.2.0 integration (2026-10-03)
 
@@ -121,14 +128,117 @@ Still open after 0.2.0: DV-01 physical-device acceptance and minimum device
 profiles; multiplayer beyond loopback/LAN; human listening and device cost for
 AUD-01, AU-01 and sound files; SEC-01 slice B; cross-browser floating-point
 determinism for replay, rollback and turn logs. The arithmetic part has a candidate,
-[W1-2](#deterministic-scalar-maths-w1-2--candidate). Consumers and other browsers
+[W1-2](#deterministic-scalar-maths-w1-2--integrated), integrated since 2026-10-03 through batch
+PR #64. Consumers and other browsers
 remain open.
 
-## Deterministic scalar maths (W1-2) — candidate
+## Post-0.2.0 integration (2026-10-02 to 2026-10-03)
+
+These public PRs reached `main` after the v0.2.0 tag (`071e3c2`) and are in no
+release. Each component PR passed the required `check` on its own head. Batch PRs
+were merged `--no-ff`; their PR descriptions record conflict resolutions and local
+`check`, `lint` and `npm test` results. The batches did not run local `gate:ci` or
+browser suites; GitHub CI on the batch heads and on `main` is the gate.
+
+| Batch | Component PRs (PR merge) | Reached `main` | Main CI on that merge |
+|---|---|---|---|
+| #62 (batch 5) | #50 TB-02 (`d622111`), #51 SC-02 (`f0f020e`), #52 RNG-01/INPUT-01 (`2d5f50e`), #57 touch hold and `testScene` voices (`e58010a`), #58 SIM-02 (`4943174`) | `6485572`, 2026-10-02 | Run 37069963774 passed |
+| #64 (batch 6) | #53 MV-02 (`b6dd99d`), #54 AU-02 (`0aa5caf`), #60 W1-2 (`ca972b3`), #61 MP-01 (`41d0261`) | `3b449fa`, 2026-10-03 | Run 37082507567 passed |
+| #65 (batch 7) | #59 W1-4/W1-5/W1-6 (`4931e24`), #63 FX-01 (`b7b5550`), #55 AUD-02 (`87c1a20`) | `1f9d10d`, 2026-10-03 | Run 37086722080 **failed**: the arcade active bench window drew no frame (perf inconclusive). PR #75 later fixed that ended-visit bench defect. |
+| (direct) | #56 GEN-02 | `2fb6e69`, 2026-10-03 | Run 37088378582 passed; it is the first green main CI containing batch 7 |
+
+The per-row evidence boundaries in this ledger are unchanged by integration. No
+row above gained template, browser, device or audible evidence by being merged.
+
+## Creator-readiness milestone (2026-10-03)
+
+Tracking: [issue #66](https://github.com/Akilleez-QA/foundation-engine/issues/66) and the
+[creator-readiness goal](creator-readiness-goal.md). Evidence classes stay separate:
+
+- **CI** means hosted GitHub Actions on an exact head.
+- **Focused** means named local runs at a recorded source revision.
+- **Simulated** means agent-operated trials.
+- **Human and physical-device** evidence does not exist for this milestone.
+
+Every PR below is **integrated** (merged to public `main`, required `check` passed on
+its head). "Implemented" and "checked" are not inferred from integration: each
+receipt states the revision its checks ran on, which is often a branch head before
+the merge.
+
+### Receipts
+
+| Receipt | PR (merge) | Checked scope | Not established |
+|---|---|---|---|
+| [creator-onboarding-20261003.md](../verification/creator-onboarding-20261003.md) | #68 (`5a68f06`) | Simulated: one agent rehearsal at engine candidate `1be7ba7` (new game, edit, `check`, tests, build, sub-path preview), plus a committed sub-path probe rerun on public `2fb6e69`. | No stopwatch, no human newcomer, warm caches. |
+| [session-host-cli-20261003.md](../verification/session-host-cli-20261003.md) | #70 (`1d5c6c7`) | Focused: 6/6 `scripts/host.test.mjs` on Node 22.23.3, two real subprocess cases that fail on the old CLI. CI: main run 37144692200 passed on `1d5c6c7`. | No LAN between machines. |
+| [creator-journey-20261003.md](../verification/creator-journey-20261003.md) | #72 (`35011a3`) | Focused: `test:creator-journey-browser` at clean `c0a7776` (base `2fb6e69`), Chromium 152, software GL. The command runs in CI. | Blur and focus are synthetic events; no physical device. |
+| [creator-journey-recovery-20261003.md](../verification/creator-journey-recovery-20261003.md) | #98 (`8e8cbbb`), card B3 | Focused: two passing runs at clean `854d26a` (base `40b9c70`): refused save then retry and reload, interrupted scene changes, and application disposal through the dev-only `engine.dispose()` in `src/dev/test-api.ts`. CI: main run 37152653292 passed on `52e3d7e`, which contains it. | Storage refusal is emulated, not real quota exhaustion; no physical device. |
+| [first-use-20261003/](../verification/first-use-20261003/README.md) | #73 (`c915599`), then #104 (`8dd899a`), card B4 | Focused, advisory: development-server samples (#73); a production build served under `/first-use/` plus a warm second visit (#104), recorded at branch head `06fedec` on a heavily shared machine. No thresholds or budgets. | Fetch, decode, upload, compile and present stages are null; no CDN or real hosting; no physical device or thermal evidence. |
+| [active-restart-20261003/](../verification/active-restart-20261003/README.md) | #75 (`2ca1ea0`) | Focused: bench restarts an ended visit before active samples; reproduces hosted run 37141691681. | Pointer-only scenes. |
+| [blender-export-20261003.md](../verification/blender-export-20261003.md) | #74 (`40b9c70`) | Focused: two repeatable Blender 5.2.1 exports, validator tests, last local browser pass at source `4ff2058`. CI: main run 37149365823 passed on `40b9c70`, including `test:blender-export-browser`. | Other Blender versions, textured or animated art, physical devices. |
+| [save-recovery-20261003.md](../verification/save-recovery-20261003.md) | #76 (`1a32601`) | Focused: `test:weighted-appearance-browser` at clean `6a22639` (base `2fb6e69`): visible refusal, durable retry, reload. | Injected refusal, not real quota or power loss. |
+| [model-retirement-20261003.md](../verification/model-retirement-20261003.md) | #78 (`b5fbe8d`) | Focused: three transport cancellations and reentry cycles at clean `c750dd0` (base `5a68f06`), plus disposal with a pending request. | Heap and listener audit (counters only). |
+| [decode-cancellation-20261003.md](../verification/decode-cancellation-20261003.md) | #116 (`6dc111a`), card B5 | Focused: three browser cycles cancelling after a fully delivered response and a decoded image, with ownership back at baseline. | Counters only, no whole-heap or listener audit; no physical device. |
+| [contributor-rehearsal-20261003.md](../verification/contributor-rehearsal-20261003.md) | #80 (`7f4dee4`) | Simulated: public clone at `5a68f06`, local bare repository as the fork, test-only change, `check`, tests and `lint`. | Ran before #67 and #80 changed the instructions; no real GitHub fork or fork-PR CI. |
+| [dpr-redraw-20261003.md](../verification/dpr-redraw-20261003.md) | #83 (`5b12552`) | Focused: eight resize and cleanup tests and a browser run at clean `422975c`. CI: main run 37148687488 passed on `5b12552`. | Physical high-DPR displays. |
+| [session-recovery-20261003.md](../verification/session-recovery-20261003.md) | #97 (`e1bdc31`), card B2 | Focused and CI: `test:session-browser` asserts a fresh world after host restart before any action, a client-only drop that resumes the same player, and bounded attempts on both pages. Main run 37151563604 passed on `e1bdc31`. | Loopback only: no LAN between machines, no WAN. |
+| [brand-20261003.md](../verification/brand-20261003.md) | #93 (`15f9c20`) | Documentation art only; GitHub markdown API render shown in a local approximation. | github.com rendering, screen readers. |
+
+### Evidence without a separate receipt
+
+| Change | PR (merge) | Evidence boundary |
+|---|---|---|
+| Acknowledge only the submitted world-edit revision (card B1) | #95 (`0a09710`) | Recipe fix and the regression `GEN-02 acknowledging a pending save retains edits made after submission`. Main CI run 37150583760 passed. |
+| Retained v0.2.0 consumer and released save envelopes, upgrade notes (card B6) | #96 (`144a43e`) | Arcade source from tag `v0.2.0` compiled and tested against current `@engine`; envelopes written by the v0.2.0 store; corrupted and future-version negatives. Node with in-memory storage only; one template. See [public compatibility](public-compatibility.md). |
+| Versioned save migration and recovery fixtures | #79 (`9909898`) | Synthetic example envelopes, not past-release data. |
+| Public source consumer compatibility (`c0e73c9`) | #81 (`41eb97c`) | Hash-manifest consumer compiled against current source. |
+| Orphan import receipts | #77 (`24d7512`) | See the orphan import section below. |
+| Committed-change check selection, `--base`, `--all` | #67 (`b4f8579`) | Unit tests; not rehearsed from public docs yet. |
+| Sharded template gates with a strict aggregate `check` | #82 (`d028d2a`) | CI configuration; the aggregate rejects missing, failed, skipped or cancelled jobs. |
+| Game-code lint for `Math.random()` and literal UI text | #90 (`f922a78`) | Lint tests; can fail an existing game's `check` (upgrade note in #96). |
+| Enter before systems on scene re-entry | #92 (`b55d0f3`) | Unit regression. |
+| `createTestSaves` and the `reload` playtest step | #94 (`d4d92ac`) | Unit and playtest-script tests. |
+| Documentation and contributor entry points | #69, #71, #88, #89, #91, #109 | Documentation only. |
+| Strict types: remove `any` | #99 (`52e3d7e`) | Typecheck and tests. Main CI run 37152653292 passed. |
+| `noUncheckedIndexedAccess` slices 1 to 4 | #103 (`7238410`), #105 (`00e4a31`), #106 (`2a48e35`), #107 (`2cec0d0`) | Typecheck and tests per slice. Slice 5 (scripts, templates, enabling the flags) is PR #114, **open, not integrated**. |
+| Prettier formatting | #101 (`305dc6a`) | `format:check` in `npm run lint`; Markdown is excluded. Main CI run 37155979128 passed on `305dc6a`. |
+| Runtime bundle: GLSL without comments, test-only classes out of the scene runtime | #100 (`f1c2057`), #102 (`0b2af56`) | `perf:bundle`. Main CI run 37155164464 passed on `0b2af56`. |
+| Port-busy hint, npm 12 `allowScripts`, no file watcher for non-interactive servers | #110 (`99edd16`), #111 (`758f8d6`), #112 (`5c1ba4a`) | Unit tests and CI. |
+| ADR 0078 render backend decision | #113 (`7fbd77a`) | Decision and lint only; no WebGPU backend exists. |
+| Arcade bench heap warning (Playwright selector engine) | #115 (`c470644`) | Bench tooling only. |
+
+Main CI on 2026-10-03: runs on intermediate merges were often cancelled by the next
+push, so those merges have no full-CI result of their own. Completed green main runs:
+`1d5c6c7` (37144692200), `5b12552` (37148687488), `40b9c70` (37149365823), `0a09710`
+(37150583760), `e1bdc31` (37151563604), `52e3d7e` (37152653292), `0b2af56`
+(37155164464) and `305dc6a` (37155979128). Main CI on `6dc111a` (run 37157174423,
+containing #112, #113, #115 and #116) was in progress when this record was written.
+
+### Scorecard status (2026-10-03, after the audit)
+
+| # | Row | Status | Evidence | Still open |
+|---|---|---|---|---|
+| 1 | Discovery | Met | README routes, prerequisites and limits; game-agent path (#89); recipe index completed for #87. | No hosted demo (deliberate). Issues #84 to #86. |
+| 2 | First success | Partial | One simulated persona trial with a first-playable time; onboarding receipt (#68); stale claims fixed (#109). | Two timed trials on a named candidate with CPU, RAM and network recorded (card C1). Human newcomer trial (author). |
+| 3 | First edit and share | Met, at earlier revisions | Persona trial and onboarding receipt. | Re-confirm on the named candidate (card C1). |
+| 4 | Reliable session | Evidence added | Composed explorer journey with refusal, retry, interruption and disposal (#98); data-loss recipe fix (#95); re-entry ordering (#92). | Real storage quota and OS tab suspension on devices. |
+| 5 | Optional network path | Evidence added, loopback scope | Fresh baseline after restart and client-only drop (#97); host CLI fix (#70). | LAN with two physical machines (author or devices). |
+| 6 | Assets | Met | #74, receipt, and main CI run 37149365823 passed on `40b9c70`. | Other Blender versions, textured or animated art. |
+| 7 | Performance | Evidence added, advisory | Production and warm first use (#104); decode cancellation (#116); bench lifecycle (#75); budgets enforced by CI gates. Retention is declared as counters only. | Physical-device, thermal and sustained performance. |
+| 8 | Compatibility | Evidence added | Retained v0.2.0 consumer and released saves, upgrade notes (#96); synthetic migrations (#79); `c0e73c9` consumer (#81). | A complete changelog for the candidate (card E2). |
+| 9 | Contribution | Partial | Contributor rehearsal (#80) and entry points (#88). | Re-rehearse the current `check -- --base` and `--all` path (card C2). Real GitHub fork, fork PR and fork CI need a second account (author). |
+| 10 | Release | Not met | Ledgers reconciled (this section). | Named candidate with full green CI, support matrix for eight templates, archive build rehearsal, release notes (card E2). Version, tag and release (author). |
+
+"Evidence added" means the audit's listed gap has a merged check and receipt; the
+row is not called met until the evidence is repeated on a named release candidate.
+
+## Deterministic scalar maths (W1-2) — integrated
+
+**Current status (2026-10-03): integrated.** PR #60 (PR merge `ca972b3`) reached `main` through merge-train batch PR #64, merged to `main` at `3b449fa` on 2026-10-03 (main CI run 37082507567 passed on that merge). Not in any release: v0.2.0 (`071e3c2`) predates it. "Integrated" is source delivery; the evidence scope below is unchanged and the candidate-era status is kept as history.
 
 | ID | Contract | State |
 |---|---|---|
-| W1-2 | Optional `dmath` from `@engine` (`src/core/dmath.ts`): `sin`, `cos`, `atan`, `atan2`, `exp`, `log`, `pow`, `sqrt`, `hypot`, built only from correctly rounded operations, so the bits are the same in every engine. `platformMath`/`scalarMath` select it. The character, locomotion and root-motion kits take `math: 'deterministic'` (default `'platform'`, unchanged). Golden vectors are committed as hex (`src/core/dmath.golden.json`). [Guide](deterministic-math.md) | Implemented, candidate (PR #60), not integrated. Checked: focused tests (golden bits, correctly rounded `Math.sqrt` and `hypot` proved in integers, special values, at most 1 ulp to V8 `Math` over 16 ranges, kit options within 10⁻⁹ of `Math` and repeating exactly) and `npm run test:dmath-browser`: 1,075 vectors (including huge `sin`/`cos` arguments up to about 10³⁰⁸) and a 3,000-tick character-kit workload bit-identical in Chromium 152 and Node 22, where `Math` differed. Cost is about 1–2.5× `Math` per call (`pow` up to 4× in Chromium). Not established: Firefox/WebKit, physical devices, a browser-recorded character-scene replay in Node (camera-relative yaw and default pointer picking stay on `Math`), and the RB-01/SEC-01 slice B consumers. |
+| W1-2 | Optional `dmath` from `@engine` (`src/core/dmath.ts`): `sin`, `cos`, `atan`, `atan2`, `exp`, `log`, `pow`, `sqrt`, `hypot`, built only from correctly rounded operations, so the bits are the same in every engine. `platformMath`/`scalarMath` select it. The character, locomotion and root-motion kits take `math: 'deterministic'` (default `'platform'`, unchanged). Golden vectors are committed as hex (`src/core/dmath.golden.json`). [Guide](deterministic-math.md) | **Integrated 2026-10-03** (PR #60 merge `ca972b3`, batch PR #64, `main` `3b449fa`). Before integration: implemented, candidate (PR #60). Checked: focused tests (golden bits, correctly rounded `Math.sqrt` and `hypot` proved in integers, special values, at most 1 ulp to V8 `Math` over 16 ranges, kit options within 10⁻⁹ of `Math` and repeating exactly) and `npm run test:dmath-browser`: 1,075 vectors (including huge `sin`/`cos` arguments up to about 10³⁰⁸) and a 3,000-tick character-kit workload bit-identical in Chromium 152 and Node 22, where `Math` differed. Cost is about 1–2.5× `Math` per call (`pow` up to 4× in Chromium). Not established: Firefox/WebKit, physical devices, a browser-recorded character-scene replay in Node (camera-relative yaw and default pointer picking stay on `Math`), and the RB-01/SEC-01 slice B consumers. |
 
 ## Goal continuity
 
@@ -352,7 +462,7 @@ Status: integrated in v0.2.0 (PR #16, merged to main at `b93690d`), building on 
 | ID | Contract | State |
 |---|---|---|
 | SIM-01 | Optional `@kits/replay`: bounded tick-input log and player (explicit truncation; version, identity and corruption refusal), creator-digest traces with first-divergence comparison, and a prediction-versus-authority agreement check over the existing owners. Dev/test-only `engine.replay` uses the stock scene fixed lane and `?seed=`. [Contract](replay-divergence.md) | Integrated in v0.2.0 (PR #17, merged to main at `49047ae`). Focused tests and the arcade `?seed=` browser replay passed on the PR head. No cross-device or cross-browser floating-point determinism, physical-device or multiplayer claim. |
-| SIM-02 | Creator-chosen replay digest and divergence detail (backlog W1-1; demo finding F1). Optional `defineScene({replay: {digest}})`, `@kits/replay` `replayDigest`/`selectWorldState` (selected components, excluded tags, chosen resources) and `explainDivergence`; dev/test-only `engine.replay.start({digest, detail})` and a bounded `divergence` report naming the first differing entity, component and field. Default digest and identities unchanged. [Contract](replay-divergence.md#choose-what-a-replay-must-reproduce-sim-02), [recipe](../recipes/replay-with-your-own-digest.md) | Implemented, candidate (PR #58), not integrated. Focused tests (including the demo's frame-phase orb case: default diverges and names the orb, a digest excluding the cosmetic tag replays exactly) and `npm run test:replay-browser` (arcade, desktop Chromium software GL) passed on the branch. No cross-browser floating-point, physical-device, production-build or multiplayer claim. |
+| SIM-02 | Creator-chosen replay digest and divergence detail (backlog W1-1; demo finding F1). Optional `defineScene({replay: {digest}})`, `@kits/replay` `replayDigest`/`selectWorldState` (selected components, excluded tags, chosen resources) and `explainDivergence`; dev/test-only `engine.replay.start({digest, detail})` and a bounded `divergence` report naming the first differing entity, component and field. Default digest and identities unchanged. [Contract](replay-divergence.md#choose-what-a-replay-must-reproduce-sim-02), [recipe](../recipes/replay-with-your-own-digest.md) | **Integrated 2026-10-02** (PR #58 merge `4943174`, batch PR #62, `main` `6485572`). Before integration: implemented, candidate (PR #58). Focused tests (including the demo's frame-phase orb case: default diverges and names the orb, a digest excluding the cosmetic tag replays exactly) and `npm run test:replay-browser` (arcade, desktop Chromium software GL) passed on the branch. No cross-browser floating-point, physical-device, production-build or multiplayer claim. |
 
 ## Sustained-session recorder — PERF-01 integrated in v0.2.0
 
@@ -398,7 +508,7 @@ See the [kit README](../../src/kits/rollback/README.md) and the
   - input during a stall: `local()` returns `full` and keeps nothing, so edges must be carried by the host;
   - disconnect policy;
   - spectators;
-  - a saveable engine random generator (addressed afterwards by RNG-01, candidate PR #52);
+  - a saveable engine random generator (addressed afterwards by RNG-01, PR #52, integrated through batch PR #62);
   - an ECS-world snapshot adapter;
   - floating-point determinism across browsers;
   - physical devices;
@@ -583,7 +693,8 @@ Status: integrated in v0.2.0 (PR #34; batch PR #46).
   lengths, and despawn pruning. Mutation checks: replacing the exact integration, widening the coyote window,
   dropping the window tolerance, ignoring the tick peak, not pruning,
   re-adding a press filter or the swept landing each fails at least one test.
-- Touch hold controls: candidate in PR #57 (not integrated). `touchButton` in `@kits/ui`
+- Touch hold controls: integrated 2026-10-02 (PR #57 merge `e58010a`, batch PR #62, `main` `6485572`);
+  before that a candidate in PR #57. `touchButton` in `@kits/ui`
   presses and holds an author input from an on-screen touch button through the real
   dispatcher and press latch; checked by fake-DOM tests and the Chromium touch-emulation
   `touch-sources-check.mjs` (one press, held across fixed ticks, slide-off release). No
@@ -592,17 +703,21 @@ Status: integrated in v0.2.0 (PR #34; batch PR #46).
   `origin/integration/batch-2`, where the PR #19 press latch is present; the kit relies
   on it for exactly-once presses.
 
-## Strings select/ordinals/locale chain and dialogue variables (TB-02) — implemented, candidate
+## Strings select/ordinals/locale chain and dialogue variables (TB-02) — integrated
 
-Status: implemented, candidate on branch `feat/tb02-strings-dialogue` (PR #50); not integrated. Recipes: [plurals, ordinals and variants](../recipes/write-plurals-ordinals-and-variants.md), [branching dialogue](../recipes/add-branching-dialogue.md); [dialogue kit README](../../src/kits/dialogue/README.md).
+**Current status (2026-10-03): integrated.** PR #50 (PR merge `d622111`) reached `main` through merge-train batch PR #62, merged to `main` at `6485572` on 2026-10-02 (main CI run 37069963774 passed on that merge). Not in any release: v0.2.0 (`071e3c2`) predates it. "Integrated" is source delivery; the evidence scope below is unchanged and the candidate-era status is kept as history.
+
+Status before integration: implemented, candidate on branch `feat/tb02-strings-dialogue` (PR #50); not integrated. Recipes: [plurals, ordinals and variants](../recipes/write-plurals-ordinals-and-variants.md), [branching dialogue](../recipes/add-branching-dialogue.md); [dialogue kit README](../../src/kits/dialogue/README.md).
 
 - Runtime-enforced: message parsing bounds (16,384 UTF-16 units, argument depth 8, 1,024 parts); CLDR plural categories only; `other` required for `plural`, `selectordinal` and `select`; prototype names never match select cases; locale tags Intl does not support (well-formed or malformed) resolve to `en` rules and digits through `supportedLocalesOf`, never the host default; select and plural form tables have null prototypes; locale chain explicit fallbacks, then truncation, then base, at most 8 entries. Dialogue: declared typed variables (≤256), bounded condition trees (≤64 nodes, depth 8), ≤32 assignments per option, type-checked at construction; atomic assignment with the move; `overflow` without change; visit counts saturating; snapshot validation of variables and visits (the current node must have at least one visit; prototype-named node ids keep their counts); first-version snapshots restore.
 - Checked: focused unit tests (`src/core/i18n/select-ordinal.test.ts`, `src/kits/dialogue/variables.test.ts`, including a real SaveStore round trip across a fresh store); existing i18n, string-generation, dialogue and expedition tests unchanged and passing.
 - Not established: a run-time locale selection author API (the running game stays `en`), translated catalogues for any template, RTL/bidi or CJK line-breaking policy, text speed or typewriter reveal, any browser or device evidence, a template using dialogue variables.
 
-## Interest sets for scoped views (SC-02) — implemented, candidate
+## Interest sets for scoped views (SC-02) — integrated
 
-Status: implemented, candidate (PR #51); not integrated. See the
+**Current status (2026-10-03): integrated.** PR #51 (PR merge `f0f020e`) reached `main` through merge-train batch PR #62, merged to `main` at `6485572` on 2026-10-02 (main CI run 37069963774 passed on that merge). Not in any release: v0.2.0 (`071e3c2`) predates it. "Integrated" is source delivery; the evidence scope below is unchanged and the candidate-era status is kept as history.
+
+Status before integration: implemented, candidate (PR #51); not integrated. See the
 [interest sets guide](interest-sets.md) and [recipe](../recipes/use-interest-sets.md).
 
 - Runtime-enforced: limit validation and ceilings; exit-radius scan checked against the
@@ -614,9 +729,11 @@ Status: implemented, candidate (PR #51); not integrated. See the
 - Not established: socket or browser hosts, WAN, priority accumulation for dropped ids,
   occlusion or shared vision, physical devices, template integration.
 
-## Saveable random state (RNG-01) and input history (INPUT-01) — implemented, candidate
+## Saveable random state (RNG-01) and input history (INPUT-01) — integrated
 
-Status: implemented, candidate (PR #52, `feat/rng-state-input-history`); not
+**Current status (2026-10-03): integrated.** PR #52 (PR merge `2d5f50e`) reached `main` through merge-train batch PR #62, merged to `main` at `6485572` on 2026-10-02 (main CI run 37069963774 passed on that merge). Not in any release: v0.2.0 (`071e3c2`) predates it. "Integrated" is source delivery; the evidence scope below is unchanged and the candidate-era status is kept as history.
+
+Status before integration: implemented, candidate (PR #52, `feat/rng-state-input-history`); not
 integrated. These are slices 3 and 4 of the fighting-game genre study. See the
 [input-history README](../../src/kits/input-history/README.md), the
 [input-history recipe](../recipes/add-input-history.md) and the
@@ -647,9 +764,11 @@ integrated. These are slices 3 and 4 of the fighting-game genre study. See the
   - ordering of several actions inside one tick (`ctx.input.pressedAt` timestamps are not consumed by this kit);
   - physical controllers, arcade sticks and feel.
 
-## MV-02: moving platforms — candidate
+## MV-02: moving platforms — integrated
 
-Status: implemented, candidate (`feat/mv02-moving-platforms`, PR #53); not integrated.
+**Current status (2026-10-03): integrated.** PR #53 (PR merge `b6dd99d`) reached `main` through merge-train batch PR #64, merged to `main` at `3b449fa` on 2026-10-03 (main CI run 37082507567 passed on that merge). Not in any release: v0.2.0 (`071e3c2`) predates it. "Integrated" is source delivery; the evidence scope below is unchanged and the candidate-era status is kept as history.
+
+Status before integration: implemented, candidate (`feat/mv02-moving-platforms`, PR #53); not integrated.
 
 - Runtime-enforced:
   - Registry bounds: `maxPlatforms` [1, 1024]; footprints (0, 1000] m; `maxSpeed`
@@ -686,9 +805,11 @@ Status: implemented, candidate (`feat/mv02-moving-platforms`, PR #53); not integ
 - Not established: feel on any device, any template or browser consumer, rotating or
   sloped platforms, side pushing, and render interpolation between ticks (the next slice).
 
-## Newcomer shared session (MP-01) — implemented, candidate
+## Newcomer shared session (MP-01) — integrated
 
-Status: implemented, candidate (PR #61); not integrated. Guide:
+**Current status (2026-10-03): integrated.** PR #61 (PR merge `41d0261`) reached `main` through merge-train batch PR #64, merged to `main` at `3b449fa` on 2026-10-03 (main CI run 37082507567 passed on that merge). Not in any release: v0.2.0 (`071e3c2`) predates it. "Integrated" is source delivery; the evidence scope below is unchanged and the candidate-era status is kept as history.
+
+Status before integration: implemented, candidate (PR #61); not integrated. Guide:
 [shared session](multiplayer-session.md); recipe:
 [two players in one world](../recipes/two-players-one-world.md).
 
@@ -732,7 +853,9 @@ Status: implemented, candidate (PR #61); not integrated. Guide:
   four players, load or scalability, a joining-socket flood from many LAN addresses at
   once, and integrity enforcement quality (only observe mode is exercised in a browser).
 
-## Bench dead-window guard (W1-4) — checked on PR #59, not integrated
+## Bench dead-window guard (W1-4) — integrated
+
+**Current status (2026-10-03): integrated.** PR #59 (PR merge `4931e24`) reached `main` through merge-train batch PR #65, merged to `main` at `1f9d10d` on 2026-10-03. Main CI run 37086722080 on `1f9d10d` failed: the arcade template's active bench window drew no frame (perf inconclusive), the ended-visit defect later fixed by PR #75. The next main CI, run 37088378582 on `2fb6e69` (which contains batch 7), passed. Not in any release: v0.2.0 (`071e3c2`) predates it. "Integrated" is source delivery; the evidence scope below is unchanged and the candidate-era status is kept as history.
 
 - Implemented: per-scene `activeKeys` in `budgets.json`; the bench reads the game's input
   rows in Node and records `heldKeys`, `heldKeysDrive` and `heldKeysSource` per active
@@ -743,17 +866,21 @@ Status: implemented, candidate (PR #61); not integrated. Guide:
   press nothing and the explorer template's press the character kit's move actions; a
   malformed `activeKeys` is refused. Local `npm run gate -- --game templates/expedition/game`.
 - Not established: pointer-only scenes (no driving key, so a dead window there is not
-  detected), player rebinding, physical devices. GitHub CI on PR #59 decides integration.
+  detected), player rebinding, physical devices. GitHub CI `check` passed on PR #59 before batch integration.
 
-## Spatial audio sources and occlusion (AUD-02) — candidate, not integrated
+## Spatial audio sources and occlusion (AUD-02) — integrated
+
+**Current status (2026-10-03): integrated.** PR #55 (PR merge `87c1a20`) reached `main` through merge-train batch PR #65, merged to `main` at `1f9d10d` on 2026-10-03. Main CI run 37086722080 on `1f9d10d` failed: the arcade template's active bench window drew no frame (perf inconclusive), the ended-visit defect later fixed by PR #75. The next main CI, run 37088378582 on `2fb6e69` (which contains batch 7), passed. Not in any release: v0.2.0 (`071e3c2`) predates it. "Integrated" is source delivery; the evidence scope below is unchanged and the candidate-era status is kept as history.
 
 | ID | Contract | State |
 |---|---|---|
-| AUD-02 | Optional `@kits/spatial-audio` over the integrated AUD-01 voices: bounded logical sources tracked without voices (virtual) until they rank, importance ranking (class × creator `importance()`) with fade-out stealing under hysteresis, fair rotation of equal scores (starvation credit across dropped emissions) and lateness drops, a voice cap that counts fading voices, HRTF claims for `localise` classes within a kit limit (with hysteresis), per-class distance curves with a hard cutoff and air low-pass, and occlusion through a creator `(from, to) => distance \| null` query (the camera kit's `obstruction` shape) under `raysPerPump`, stalest first, with aged results, driving the output's smoothed filter. [Kit README](../../src/kits/spatial-audio/README.md) | Implemented, candidate (public PR #55). Node unit tests and `npm run test:audio-browser` (kit over the real output in `OfflineAudioContext`, muted browser: occlusion ~24 dB at 3 kHz without steps, steal fades without a cut) pass on the branch. Re-verification fixes (fair rotation, cap including fades, `stats.rotated`, rays for new emissions at a budget of 1, honest `stale`/`unqueried`, HRTF hysteresis) have Node regressions that fail on the previous head `a95497e`. Round-3 fixes (a cut voice's replacement always starts, rotation opt-in and off by default, least-recently-served fairness, priority for free slots, HRTF cap counting fading voices, no voice leak on re-entrant cancel; seeded fuzz of the caps and leaks) have Node regressions that fail on `9eb9612`. Round-4 fixes (nothing plays late by default, opt-in `carryLate` bounded to one interval, honest `dropped`/`late`/`skipped` stats, HRTF cap never delays a repeat, reservation timeout after admission, rotation inside the 1% band) have Node regressions that fail on `158ff29`. Round-5 fixes (late `carryLate` emissions may rotate in again within their one-interval bound, a 64-setup fairness table test, lateness epsilon, docs on late starts after hitches) have Node regressions that fail on `be71bc7`. Not integrated; no template consumer. No listening trials, real level geometry or query cost, propagation, device cost or networking claim. |
+| AUD-02 | Optional `@kits/spatial-audio` over the integrated AUD-01 voices: bounded logical sources tracked without voices (virtual) until they rank, importance ranking (class × creator `importance()`) with fade-out stealing under hysteresis, fair rotation of equal scores (starvation credit across dropped emissions) and lateness drops, a voice cap that counts fading voices, HRTF claims for `localise` classes within a kit limit (with hysteresis), per-class distance curves with a hard cutoff and air low-pass, and occlusion through a creator `(from, to) => distance \| null` query (the camera kit's `obstruction` shape) under `raysPerPump`, stalest first, with aged results, driving the output's smoothed filter. [Kit README](../../src/kits/spatial-audio/README.md) | **Integrated 2026-10-03** (PR #55 merge `87c1a20`, batch PR #65, `main` `1f9d10d`). Before integration: implemented, candidate (public PR #55). Node unit tests and `npm run test:audio-browser` (kit over the real output in `OfflineAudioContext`, muted browser: occlusion ~24 dB at 3 kHz without steps, steal fades without a cut) pass on the branch. Re-verification fixes (fair rotation, cap including fades, `stats.rotated`, rays for new emissions at a budget of 1, honest `stale`/`unqueried`, HRTF hysteresis) have Node regressions that fail on the previous head `a95497e`. Round-3 fixes (a cut voice's replacement always starts, rotation opt-in and off by default, least-recently-served fairness, priority for free slots, HRTF cap counting fading voices, no voice leak on re-entrant cancel; seeded fuzz of the caps and leaks) have Node regressions that fail on `9eb9612`. Round-4 fixes (nothing plays late by default, opt-in `carryLate` bounded to one interval, honest `dropped`/`late`/`skipped` stats, HRTF cap never delays a repeat, reservation timeout after admission, rotation inside the 1% band) have Node regressions that fail on `158ff29`. Round-5 fixes (late `carryLate` emissions may rotate in again within their one-interval bound, a 64-setup fairness table test, lateness epsilon, docs on late starts after hitches) have Node regressions that fail on `be71bc7`. No template consumer. No listening trials, real level geometry or query cost, propagation, device cost or networking claim. |
 
-## Large edited worlds (GEN-02) — implemented, candidate
+## Large edited worlds (GEN-02) — integrated
 
-Status: implemented, candidate on `feat/gen02-chunk-store` (PR); not integrated. See the
+**Current status (2026-10-03): integrated.** PR #56 merged directly to `main` at `2fb6e69` on 2026-10-03; main CI run 37088378582 passed on that merge. The recipe's data-loss pattern (acknowledging a revision read after the await) was corrected by PR #95 (`0a09710`, main CI run 37150583760 passed) with the regression `GEN-02 acknowledging a pending save retains edits made after submission`. Not in any release: v0.2.0 (`071e3c2`) predates it. "Integrated" is source delivery; the evidence scope below is unchanged and the candidate-era status is kept as history.
+
+Status before integration: implemented, candidate on `feat/gen02-chunk-store` (PR); not integrated. See the
 [recipe](../recipes/store-large-world-records.md) and the [procgen kit](../../src/kits/procgen/README.md).
 
 - **Runtime-enforced:**
@@ -790,7 +917,9 @@ Status: implemented, candidate on `feat/gen02-chunk-store` (PR); not integrated.
   - multi-tab totals (in-memory accounting refreshes on reopen);
   - compression, whole-world export and crash consistency beyond IndexedDB's transaction atomicity.
 
-### Orphan import receipt correction (focused candidate)
+### Orphan import receipt correction — integrated
+
+**Current status (2026-10-03): integrated.** PR #77 merged to `main` at `24d7512`; the required `check` passed on the PR head, and the first completed main CI containing it, run 37148687488 on `5b12552`, passed. The evidence below remains MemoryBackend scope; no browser or physical durability acceptance is added by integration.
 
 The existing SaveStore now distinguishes exact retention, conflicting destination
 bytes and storage failure, with known writes completed before orphan receipts.
@@ -804,11 +933,13 @@ section in one file reports `orphan-superseded` instead of rejecting the file. F
 more regressions (rename/export/fresh import, newer alias-only payload, alias orphan
 beside the section, genuine conflict and retry beside a rename) fail on the first
 candidate; all 57 store tests pass under Node 22.23.3. This is MemoryBackend evidence, not browser or
-physical durability acceptance; hosted integration checks remain required. See
+physical durability acceptance; hosted integration checks were then still required (see current status above). See
 [the import recipe](../recipes/add-a-save-section.md#6-report-orphan-import-outcomes)
 for the expanded result union and recovery boundaries.
 
-### Author scene DPR-only redraw — reviewed candidate, 2026-10-03
+### Author scene DPR-only redraw — integrated (PR #83), 2026-10-03
+
+**Current status (2026-10-03): integrated.** PR #83 merged to `main` at `5b12552`; the required `check` passed on the PR head and main CI run 37148687488 passed on `5b12552` (all jobs and the aggregate `check`). The browser evidence below stays scoped to source `422975c`; no physical-device acceptance.
 
 The focused `fix/author-dpr-redraw` candidate connects the existing quality owner's
 resize notification to the visit-owned author resize callback. It guards retired
@@ -819,5 +950,5 @@ Evidence: eight focused resize/cleanup tests and a clean-source browser run at
 `422975c43904037e7895a5ebe96a4a9913f45b4c` passed. A quality DPR change with unchanged
 CSS produced one redraw and then idle rendering; the unchanged public runtime
 reproduced the missing redraw. See the [contract](render-resize-lifecycle.md) and
-[source-scoped receipt](../verification/dpr-redraw-20261003.md). This is candidate
-evidence, not public integration, a full local gate or physical-device acceptance.
+[source-scoped receipt](../verification/dpr-redraw-20261003.md). The receipt is candidate-source
+evidence; it is not a full local gate or physical-device acceptance.
