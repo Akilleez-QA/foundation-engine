@@ -57,7 +57,7 @@ export function browserTimers(): Timers {
 function legacyKeysBinding(keys: readonly string[]): LegacyBinding {
   return { keys: () => [...keys], fromVersion: 1, decode: raws => JSON.parse(raws.find(r => r !== null) ?? 'null') };
 }
-const normalised = new WeakMap<SaveSection<any>, SaveSection<any>>();
+const normalised = new WeakMap<SaveSection<unknown>, SaveSection<unknown>>();
 /** One stable object per definition, with `legacyKeys` turned into `legacy`, so identity checks keep working. */
 function normalise<T>(def: SaveSection<T>): SaveSection<T> {
   if (def.legacy || !def.legacyKeys?.length) return def;
@@ -87,7 +87,7 @@ export interface SaveStoreOptions {
   legacyFiles?: LegacyFileAdapter[];
   roster?: SaveSection<Roster>;          // defaults to playersSection
   /** The frozen `saveSections` registry (boot phase 4). Export, import and reset must know sections nobody has opened yet. */
-  sections?: readonly SaveSection<any>[];
+  sections?: readonly SaveSection<unknown>[];
 }
 
 export type Roster = { players: { id: PlayerId; name?: string }[]; active: PlayerId };
@@ -117,11 +117,11 @@ interface Envelope { v: number; by: string; lh?: string; data: unknown }
 class NewerError extends Error { constructor(readonly raw: string, readonly v: number) { super('Saved by a newer build (v' + v + ')'); } }
 
 interface Cell {
-  def: SaveSection<any>;
+  def: SaveSection<unknown>;
   player: PlayerId;                 // '' for profile and device scope
   key: string;
   port: StoragePort;
-  value: any;
+  value: unknown;
   status: SectionStatus;
   dirty: boolean;
   seen: boolean;                  // a read of `key` succeeded at least once
@@ -131,7 +131,7 @@ interface Cell {
   folded?: boolean;               // dirty only because another tab's legacy write was folded in: nothing local to keep
   pendingQuarantine?: { raw: string; from: string; reason: string };
   pendingBackup?: { raw: string; key: string };
-  subs: Set<(v: any) => void>;
+  subs: Set<(v: unknown) => void>;
 }
 
 const fnv = (s: string) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(36); };
@@ -148,13 +148,13 @@ export interface SavePending { dirty: number; eagerDirty: number; lazyDirty: num
 export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): StoreUsage; pending(): SavePending } {
   const timers: Timers = opts.timers ?? browserTimers();
   const idleMs = opts.idleMs ?? 1000, maxWaitMs = opts.maxWaitMs ?? 5000;
-  const defs = new Map<string, SaveSection<any>>();
+  const defs = new Map<string, SaveSection<unknown>>();
   const aliases = new Map<string, string>();
   const cells = new Map<string, Cell>();          // by storage key
   // legacy key → the import-mode cells that read it (drift from old tabs). Several sections may read one key, so every
   // reader hears the change.
   const legacyWatch = new Map<string, Set<Cell>>();
-  const activeSubs = new Set<{ def: SaveSection<any>; fn: (v: any) => void }>();
+  const activeSubs = new Set<{ def: SaveSection<unknown>; fn: (v: unknown) => void }>();
   const playerListeners = new Set<(id: PlayerId, prev: PlayerId) => void>();
   const legacyUnreadable: QuarantineEntry[] = [];
   let disposed = false;
@@ -167,18 +167,18 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
   const unsubs = [opts.local, opts.session].map(p => p.subscribe?.(key => external(key,p)) ?? (() => {}));
 
   // ------------------------------------------------------------------ keys and codecs
-  const tag = (def: SaveSection<any>, player: PlayerId) => (def.scope === 'player' ? 'p:' + player : def.scope);
-  const envKey = (def: SaveSection<any>, player: PlayerId, id = def.id) => ENVELOPE_PREFIX + tag(def, player) + '|' + id;
-  const live = (def: SaveSection<any>) => def.legacy?.mode === 'live';
+  const tag = (def: SaveSection<unknown>, player: PlayerId) => (def.scope === 'player' ? 'p:' + player : def.scope);
+  const envKey = (def: SaveSection<unknown>, player: PlayerId, id = def.id) => ENVELOPE_PREFIX + tag(def, player) + '|' + id;
+  const live = (def: SaveSection<unknown>) => def.legacy?.mode === 'live';
   /** The registered player section that reads `name` as a local-storage alias, if any. */
-  const playerAlias = (name: string): SaveSection<any> | undefined => {
+  const playerAlias = (name: string): SaveSection<unknown> | undefined => {
     const def = defs.get(aliases.get(name) ?? '');
     return def && def.scope === 'player' && !live(def) && portFor(def) === opts.local ? def : undefined;
   };
-  const portFor = (def: SaveSection<any>) => ((def.storage === 'session' || (live(def) && def.legacy?.session)) ? opts.session : opts.local);
-  const legacyPort = (def: SaveSection<any>) => (def.legacy?.session ? opts.session : opts.local);
+  const portFor = (def: SaveSection<unknown>) => ((def.storage === 'session' || (live(def) && def.legacy?.session)) ? opts.session : opts.local);
+  const legacyPort = (def: SaveSection<unknown>) => (def.legacy?.session ? opts.session : opts.local);
 
-  function upgrade(def: SaveSection<any>, data: unknown, from: number): any {
+  function upgrade(def: SaveSection<unknown>, data: unknown, from: number): unknown {
     if (!Number.isInteger(from) || from < 1) throw Error(def.id + ': bad version ' + from);
     let d = clone(data);
     for (let v = from; v < def.version; v++) {
@@ -188,7 +188,7 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
     }
     return def.parse(d);
   }
-  function decodeStored(cell: Cell, raw: string): { value: any; from: number; lh?: string } {
+  function decodeStored(cell: Cell, raw: string): { value: unknown; from: number; lh?: string } {
     const def = cell.def;
     if (live(def)) return { value: upgrade(def, def.legacy!.decode([raw]), def.legacy!.fromVersion), from: def.version };
     const env = JSON.parse(raw) as Envelope;
@@ -226,7 +226,7 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
   }
 
   // ------------------------------------------------------------------ loading
-  function cellFor(def: SaveSection<any>, player: PlayerId): Cell {
+  function cellFor(def: SaveSection<unknown>, player: PlayerId): Cell {
     const owner = def.scope === 'player' ? player : '';
     const key = live(def) ? def.legacy!.keys(owner)[0] : envKey(def, owner);
     const port=portFor(def),identity=port.kind+':'+key;
@@ -498,7 +498,7 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
   // ------------------------------------------------------------------ players
   function rosterCell() { return cellFor(roster, ''); }
   function activePlayer(): PlayerId { requireOpen(); return (rosterCell().value as Roster).active; }
-  function register(def: SaveSection<any>) {
+  function register(def: SaveSection<unknown>) {
     def = normalise(def);
     const known = defs.get(def.id);
     if (known && known !== def) throw Error('Two sections share the id ' + def.id);
@@ -530,7 +530,7 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
       return c.status;
     };
     return {
-      get: () => freeze(cell().value),
+      get: () => freeze(cell().value as T),
       update: (fn, o) => {
         const c = cell(), draft = clone(c.value) as T;
         const r = fn(draft);
@@ -540,8 +540,10 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
       replace: (v, o) => { const c = cell(); return write(c, def.parse(clone(v)), o?.now); },
       subscribe(fn) {
         requireOpen();
-        if (def.scope === 'player' && player === undefined) { const s = { def, fn }; activeSubs.add(s); return () => { activeSubs.delete(s); }; }
-        const c = cell(); c.subs.add(fn); return () => { c.subs.delete(fn); };
+        // A cell's subscribers hear only that cell's section, whose values are this handle's T.
+        const listener = fn as (v: unknown) => void;
+        if (def.scope === 'player' && player === undefined) { const s = { def, fn: listener }; activeSubs.add(s); return () => { activeSubs.delete(s); }; }
+        const c = cell(); c.subs.add(listener); return () => { c.subs.delete(listener); };
       },
       status: () => cell().status,
       of: id => handle(def, id),
@@ -633,7 +635,7 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
         incoming = adapter.convert(value, text); format = 'legacy';
       }
       // Phase 1: validate everything; any readable-but-invalid known section rejects the whole file.
-      const staged: [SaveSection<any>, any][] = [], report: ImportReport = { format, sections: {} };
+      const staged: [SaveSection<unknown>, unknown][] = [], report: ImportReport = { format, sections: {} };
       const knownIncoming = new Set<string>();
       for (const [id, entry] of Object.entries(incoming)) {
         const def = defs.get(id) ?? defs.get(aliases.get(id) ?? '');

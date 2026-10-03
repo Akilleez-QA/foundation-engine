@@ -122,7 +122,7 @@ export const settings: SaveSection<Settings> = {
   },
 };
 
-export const allSections: SaveSection<any>[] = [look, voice, journal, wallet, records, stories, best, liveRecord, settings];
+export const allSections: SaveSection<unknown>[] = [look, voice, journal, wallet, records, stories, best, liveRecord, settings];
 
 /** A pre-store export format ({format: 'game-legacy-file', version: 1, …}) converted to sections. */
 export const legacyProfileFile: LegacyFileAdapter = {

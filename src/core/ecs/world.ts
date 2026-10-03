@@ -28,10 +28,15 @@ export function component<T extends object>(id: string, initial: T): ComponentTy
   const make = (partial?: Partial<T>): ComponentInit<T> => ({ type: type as ComponentType<T>, value: { ...structuredClone(initial), ...partial } });
   const type = Object.assign(make, { id, initial: () => structuredClone(initial) });
   Object.defineProperty(type, 'name', { value: id });
-  return type as unknown as ComponentType<T>;
+  return type;
 }
 
-type Values<Q extends readonly ComponentType<any>[]> = { [K in keyof Q]: Q[K] extends ComponentType<infer T> ? T : never };
+type Values<Q extends readonly ComponentType<object>[]> = { [K in keyof Q]: Q[K] extends ComponentType<infer T> ? T : never };
+
+/** A query row is built untyped; each store holds exactly its component type's values, so the row matches `Q`. */
+function queryRow<Q extends readonly ComponentType<object>[]>(row: unknown[]): [Entity, ...Values<Q>] {
+  return row as [Entity, ...Values<Q>];
+}
 
 export interface EntityMetadataRequest {
   afterId?: number;
@@ -92,19 +97,19 @@ export class World {
   touch(): void { this.version++; }
 
   /** Entities with every listed component, in spawn order, with their live component values. */
-  *query<Q extends readonly ComponentType<any>[]>(...types: Q): Generator<[Entity, ...Values<Q>]> {
-    if (!types.length) { for (const e of this.alive) yield [e] as unknown as [Entity, ...Values<Q>]; return; }
+  *query<Q extends readonly ComponentType<object>[]>(...types: Q): Generator<[Entity, ...Values<Q>]> {
+    if (!types.length) { for (const e of this.alive) yield queryRow<Q>([e]); return; }
     const stores = types.map(t => this.stores.get(t.id));
     if (stores.some(s => !s)) return;
     const [first, ...rest] = [...stores as Map<Entity, object>[]].sort((a, b) => a.size - b.size);
     const order = [...first.keys()].sort((a, b) => a - b);
     for (const e of order) {
       if (!rest.every(s => s.has(e))) continue;
-      yield [e, ...stores.map(s => s!.get(e))] as unknown as [Entity, ...Values<Q>];
+      yield queryRow<Q>([e, ...stores.map(s => s!.get(e))]);
     }
   }
   /** The first entity with every listed component, or undefined. */
-  first<Q extends readonly ComponentType<any>[]>(...types: Q): [Entity, ...Values<Q>] | undefined {
+  first<Q extends readonly ComponentType<object>[]>(...types: Q): [Entity, ...Values<Q>] | undefined {
     for (const row of this.query(...types)) return row;
     return undefined;
   }
