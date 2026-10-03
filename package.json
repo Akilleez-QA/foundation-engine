@@ -78,7 +78,8 @@
     "bench:dmath": "node --import tsx tools/dmath-bench/bench.mjs",
     "dmath:golden": "node --import tsx scripts/dmath-golden.mjs",
     "test:particle-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/particle-check.mjs playtest/particles",
-    "test:sound-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/sound-check.mjs playtest/sound"
+    "test:sound-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/sound-check.mjs playtest/sound",
+    "test:first-use-browser": "GAME_DIR=templates/explorer/game node scripts/generate.mjs && GAME_DIR=templates/explorer/game node -r ./scripts/silent-browser.cjs scripts/play/first-use-check.mjs playtest/first-use"
   },
   "dependencies": {
     "three": "^0.186.1"
