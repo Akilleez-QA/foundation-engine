@@ -61,3 +61,5 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0075](0075-opt-in-lazy-scene-bodies.md) | Optional scene bodies stay outside eager definition discovery | Author tooling / Loading | Accepted |
 | [0076](0076-engine-creator-agent-contract.md) | Bounded framework guarantees, creator authority and implementation-agent obligations | Author contract / Governance | Accepted |
+
+| [0077](0077-candidate-verification-evidence.md) | Public contributor setup, candidate gate evidence and recorded sole-maintainer review exceptions | Process / Governance | Proposed |
