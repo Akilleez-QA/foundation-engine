@@ -1,14 +1,90 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Foundation · Allocation workbench</title></head>
-<body><main id="app" class="app-root" aria-label="Allocation workbench world"><div id="summary"><div><strong>Allocation workbench</strong><p id="compact-status">Preparing scene…</p></div><button id="open">Inspect choices</button></div></main>
-<template id="details-template"><section id="details" role="dialog" aria-modal="true" aria-labelledby="details-title"><header><div><span class="eyebrow">OPTIONAL DESKTOP CONSUMER</span><h1 id="details-title">Your choices, explicit consequences</h1></div><button id="close">Close</button></header>
-<div class="sheet-scroll" tabindex="0" role="region" aria-label="Allocation details"><p class="note">These four choices, costs and respec rules are authored example data. Surrender refunds allocation only. Desktop keyboard and pointer profile.</p>
-<div class="columns"><section><h2>Prepare a choice</h2><label for="choice">Authored choice</label><select id="choice"><option value="alpha">Alpha</option><option value="beta">Beta</option><option value="advanced">Advanced</option><option value="delta">Delta</option></select>
-<div class="buttons"><button id="learn">Preview learn</button><button id="surrender">Preview surrender</button></div><div id="eligibility" class="facts"></div>
-<h2>Candidate — not yet accepted</h2><pre id="preview">No preview.</pre><div class="buttons"><button id="commit">Accept candidate</button><button id="cancel">Discard candidate</button></div>
-<h2>Creator-selected supporting actions</h2><div class="buttons"><button id="free">Free award capacity</button><button id="voucher">Add respec voucher</button><button id="earn">Accept practice event</button><button id="use">Use one resource unit</button><button id="fraction">Use fractional resource</button></div>
-<p class="note">Supporting actions are accepted separately. They invalidate previously prepared document tickets.</p></section>
-<section><h2>Accepted document</h2><pre id="accepted"></pre><h2>Accepted grant contributors</h2><pre id="sources"></pre><h2>Accepted calculation and resources</h2><pre id="trace"></pre></section></div>
-<section class="storage"><h2>Local persistence</h2><p id="persistence"></p><label class="checkbox"><input id="fail-storage" type="checkbox">Diagnostic: refuse writes to this document</label><div class="buttons"><button id="save">Retry latest accepted save</button><button id="reload">Reload durable document</button></div><p class="note">A failed write retains a complete accepted document in this session. Reload restores the last durable document. This finite consumer refuses concurrent writers.</p></section>
-<p id="message" role="status" aria-live="polite"></p></div></section></template>
-<script type="module" src="./entry.mjs"></script></body></html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>Foundation · Allocation workbench</title>
+  </head>
+  <body>
+    <main id="app" class="app-root" aria-label="Allocation workbench world">
+      <div id="summary">
+        <div>
+          <strong>Allocation workbench</strong>
+          <p id="compact-status">Preparing scene…</p>
+        </div>
+        <button id="open">Inspect choices</button>
+      </div>
+    </main>
+    <template id="details-template"
+      ><section id="details" role="dialog" aria-modal="true" aria-labelledby="details-title">
+        <header>
+          <div>
+            <span class="eyebrow">OPTIONAL DESKTOP CONSUMER</span>
+            <h1 id="details-title">Your choices, explicit consequences</h1>
+          </div>
+          <button id="close">Close</button>
+        </header>
+        <div class="sheet-scroll" tabindex="0" role="region" aria-label="Allocation details">
+          <p class="note">
+            These four choices, costs and respec rules are authored example data. Surrender refunds allocation only.
+            Desktop keyboard and pointer profile.
+          </p>
+          <div class="columns">
+            <section>
+              <h2>Prepare a choice</h2>
+              <label for="choice">Authored choice</label
+              ><select id="choice">
+                <option value="alpha">Alpha</option>
+                <option value="beta">Beta</option>
+                <option value="advanced">Advanced</option>
+                <option value="delta">Delta</option>
+              </select>
+              <div class="buttons">
+                <button id="learn">Preview learn</button><button id="surrender">Preview surrender</button>
+              </div>
+              <div id="eligibility" class="facts"></div>
+              <h2>Candidate — not yet accepted</h2>
+              <pre id="preview">No preview.</pre>
+              <div class="buttons">
+                <button id="commit">Accept candidate</button><button id="cancel">Discard candidate</button>
+              </div>
+              <h2>Creator-selected supporting actions</h2>
+              <div class="buttons">
+                <button id="free">Free award capacity</button><button id="voucher">Add respec voucher</button
+                ><button id="earn">Accept practice event</button><button id="use">Use one resource unit</button
+                ><button id="fraction">Use fractional resource</button>
+              </div>
+              <p class="note">
+                Supporting actions are accepted separately. They invalidate previously prepared document tickets.
+              </p>
+            </section>
+            <section>
+              <h2>Accepted document</h2>
+              <pre id="accepted"></pre>
+              <h2>Accepted grant contributors</h2>
+              <pre id="sources"></pre>
+              <h2>Accepted calculation and resources</h2>
+              <pre id="trace"></pre>
+            </section>
+          </div>
+          <section class="storage">
+            <h2>Local persistence</h2>
+            <p id="persistence"></p>
+            <label class="checkbox"
+              ><input id="fail-storage" type="checkbox" />Diagnostic: refuse writes to this document</label
+            >
+            <div class="buttons">
+              <button id="save">Retry latest accepted save</button><button id="reload">Reload durable document</button>
+            </div>
+            <p class="note">
+              A failed write retains a complete accepted document in this session. Reload restores the last durable
+              document. This finite consumer refuses concurrent writers.
+            </p>
+          </section>
+          <p id="message" role="status" aria-live="polite"></p>
+        </div></section
+    ></template>
+    <script type="module" src="./entry.mjs"></script>
+  </body>
+</html>

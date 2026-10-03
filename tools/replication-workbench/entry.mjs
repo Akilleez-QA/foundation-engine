@@ -1,25 +1,17 @@
 import '../../src/app/styles.ts';
 import './style.css';
-import { createApp } from '../../src/core/app.ts';
-import { appFeatures } from '../../src/core/settings/app-features.ts';
-import { layerModules } from '../../src/app/layer-modules.ts';
-import { compileGame } from '../../src/author/compile.ts';
-import {
-  defineBuild,
-  defineGame,
-  defineScene,
-  defineSystem,
-  Name,
-  Transform,
-  Shape,
-} from '../../src/author/index.ts';
-import { createTestApi } from '../../src/dev/test-api.ts';
-import { appLayers } from '../../src/platform/ui/runtime.ts';
-import { createBrowserTransport } from '../../src/platform/network/browser-transport.ts';
-import { createViewReceiver } from '../../src/kits/network/index.ts';
-import { createReplicaProjection, Replica } from './projection.mjs';
+import {createApp} from '../../src/core/app.ts';
+import {appFeatures} from '../../src/core/settings/app-features.ts';
+import {layerModules} from '../../src/app/layer-modules.ts';
+import {compileGame} from '../../src/author/compile.ts';
+import {defineBuild, defineGame, defineScene, defineSystem, Name, Transform, Shape} from '../../src/author/index.ts';
+import {createTestApi} from '../../src/dev/test-api.ts';
+import {appLayers} from '../../src/platform/ui/runtime.ts';
+import {createBrowserTransport} from '../../src/platform/network/browser-transport.ts';
+import {createViewReceiver} from '../../src/kits/network/index.ts';
+import {createReplicaProjection, Replica} from './projection.mjs';
 
-const el = (id) => document.getElementById(id);
+const el = id => document.getElementById(id);
 const viewLimits = {
   maxBytes: 65536,
   maxNodes: 4096,
@@ -49,9 +41,8 @@ let activity = null,
 let adoptionCount = 0,
   adoptionTotalMs = 0,
   adoptionMaxMs = 0;
-const hideCanvas = (hidden) => {
-  for (const canvas of el('app').querySelectorAll('canvas'))
-    canvas.style.visibility = hidden ? 'hidden' : '';
+const hideCanvas = hidden => {
+  for (const canvas of el('app').querySelectorAll('canvas')) canvas.style.visibility = hidden ? 'hidden' : '';
 };
 function render() {
   const state = receiver?.read();
@@ -66,13 +57,9 @@ function render() {
   });
   if (current === lastDisplay) return;
   lastDisplay = current;
-  el('status').textContent = principal
-    ? `${principal} · ${state?.state ?? 'waiting'}`
-    : 'disconnected';
+  el('status').textContent = principal ? `${principal} · ${state?.state ?? 'waiting'}` : 'disconnected';
   el('result').textContent = message;
-  el('fields').textContent = state?.view
-    ? JSON.stringify(state.view.entities, null, 2)
-    : '';
+  el('fields').textContent = state?.view ? JSON.stringify(state.view.entities, null, 2) : '';
   el('connect').disabled = !eligible;
   el('refresh').disabled = !eligible || !session;
 }
@@ -143,7 +130,7 @@ function receive(raw) {
       throw Error('authentication response');
     principal = frame.principal;
     session = frame.session;
-    receiver = createViewReceiver({ session, limits: viewLimits });
+    receiver = createViewReceiver({session, limits: viewLimits});
     message = 'Waiting for complete baseline';
     return;
   }
@@ -175,7 +162,7 @@ function receive(raw) {
     message = 'Host view unavailable';
   }
   if (['accepted', 'unavailable', 'duplicate'].includes(result.status)) {
-    credit = { session, sequence: state.sequence };
+    credit = {session, sequence: state.sequence};
     acknowledge();
   }
 }
@@ -188,7 +175,7 @@ const poll = defineSystem({
     if (transport.read().state === 'open' && credential !== null) {
       const token = credential;
       credential = null;
-      transmit({ v: 1, type: 'auth', token });
+      transmit({v: 1, type: 'auth', token});
     }
     for (const raw of transport.drain(2)) {
       try {
@@ -198,8 +185,7 @@ const poll = defineSystem({
         break;
       }
     }
-    if (transport.read().state === 'closed')
-      retire('Connection ended; reconnect required');
+    if (transport.read().state === 'closed') retire('Connection ended; reconnect required');
     render();
   },
 });
@@ -208,7 +194,7 @@ const sample = defineScene({
   title: 'Scoped views',
   systems: [poll],
   view: {
-    camera: { position: [9, 7, 11], target: [3, 0, 2] },
+    camera: {position: [9, 7, 11], target: [3, 0, 2]},
     background: 0x172738,
   },
   enter(ctx) {
@@ -221,9 +207,9 @@ const sample = defineScene({
       },
     });
     ctx.world.spawn(
-      Name({ name: 'local-ground' }),
-      Transform({ x: 3, y: -0.1, z: 2 }),
-      Shape({ kind: 'box', size: [9, 0.2, 8], color: 0x355065 }),
+      Name({name: 'local-ground'}),
+      Transform({x: 3, y: -0.1, z: 2}),
+      Shape({kind: 'box', size: [9, 0.2, 8], color: 0x355065}),
     );
     el('exit').disabled = false;
     el('return').disabled = true;
@@ -231,10 +217,7 @@ const sample = defineScene({
   },
   activity(_ctx, facts) {
     activity = facts;
-    eligible =
-      facts.phase === 'active' &&
-      facts.coverage === 'top' &&
-      !facts.documentHidden;
+    eligible = facts.phase === 'active' && facts.coverage === 'top' && !facts.documentHidden;
     if (!eligible) retire('Suspended; reconnect for a fresh baseline');
     render();
   },
@@ -254,7 +237,7 @@ const sample = defineScene({
 const retired = defineScene({
   id: 'retired',
   title: 'Retired scoped view',
-  view: { background: 0x172738 },
+  view: {background: 0x172738},
   enter(ctx) {
     context = ctx;
     eligible = false;
@@ -269,7 +252,7 @@ const retired = defineScene({
 el('connect').addEventListener('click', connect);
 el('disconnect').addEventListener('click', () => retire('Disconnected'));
 el('refresh').addEventListener('click', () => {
-  if (session) transmit({ v: 1, type: 'view-refresh', session });
+  if (session) transmit({v: 1, type: 'view-refresh', session});
 });
 el('release-credit').addEventListener('click', () => {
   el('hold-credit').checked = false;
@@ -325,8 +308,7 @@ const brief = defineBuild({
   success: [
     {
       id: 'S1',
-      check:
-        'Only current complete authorized views appear and retired disclosure is cleared',
+      check: 'Only current complete authorized views appear and retired disclosure is cleared',
       how: 'playtest',
       by: 'scripts/play/replication-workbench-check.mjs',
     },
@@ -338,10 +320,10 @@ const game = defineGame({
   title: 'Scoped views',
   firstScene: 'sample',
 });
-const compiled = compileGame({ brief, game, defs: [sample, retired] });
+const compiled = compileGame({brief, game, defs: [sample, retired]});
 const app = createApp([...layerModules(game, brief), ...compiled.modules], {
   mode: 'test',
-  flag: (id) => appFeatures().enabled(id),
+  flag: id => appFeatures().enabled(id),
   probes: true,
 });
 const booted = app.boot();

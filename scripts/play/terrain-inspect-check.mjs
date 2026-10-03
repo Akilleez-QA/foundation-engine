@@ -12,22 +12,33 @@ import {launch} from '../perf/bench-browser.mjs';
 
 const out = resolve(process.argv[2] ?? '/tmp/foundation-terrain-inspect-browser');
 mkdirSync(out, {recursive: true});
-const html = '<!doctype html><html><head><link rel="icon" href="data:,"><title>Terrain inspection diagnostic</title></head><body><h1>Prepared versus selected terrain</h1><p id="selection"></p><canvas width="400" height="400"></canvas><script type="module" src="/scripts/play/fixtures/terrain-inspect-entry.mjs"></script></body></html>';
+const html =
+  '<!doctype html><html><head><link rel="icon" href="data:,"><title>Terrain inspection diagnostic</title></head><body><h1>Prepared versus selected terrain</h1><p id="selection"></p><canvas width="400" height="400"></canvas><script type="module" src="/scripts/play/fixtures/terrain-inspect-entry.mjs"></script></body></html>';
 const server = await createServer({
-  root: ROOT, logLevel: 'error',
-  plugins: [{name: 'terrain-inspect-diagnostic', configureServer(s) {
-    s.middlewares.use((req, res, next) => {
-      if (!req.url?.startsWith('/__terrain-inspect-check.html')) return next();
-      res.setHeader('Content-Type', 'text/html');
-      res.end(html);
-    });
-  }}],
+  root: ROOT,
+  logLevel: 'error',
+  plugins: [
+    {
+      name: 'terrain-inspect-diagnostic',
+      configureServer(s) {
+        s.middlewares.use((req, res, next) => {
+          if (!req.url?.startsWith('/__terrain-inspect-check.html')) return next();
+          res.setHeader('Content-Type', 'text/html');
+          res.end(html);
+        });
+      },
+    },
+  ],
   server: {host: '127.0.0.1', port: 0},
 });
 const report = {
   revision: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).trim(),
-  passed: false, errors: [],
-  limitations: ['Finite diagnostic wireframe consumer, not application or GPU acceptance', 'Displayed variants are explicitly consumer-reported'],
+  passed: false,
+  errors: [],
+  limitations: [
+    'Finite diagnostic wireframe consumer, not application or GPU acceptance',
+    'Displayed variants are explicitly consumer-reported',
+  ],
 };
 let browser;
 try {
@@ -44,18 +55,52 @@ try {
       data: window.terrainInspect.inspect(),
       after: window.terrainInspect.state().epoch,
     }));
-    const target = {ownerId: 'terrain-diagnostic', epoch: String(observed.data.state.epoch), kind: 'terrain-inspection', id};
+    const target = {
+      ownerId: 'terrain-diagnostic',
+      epoch: String(observed.data.state.epoch),
+      kind: 'terrain-inspection',
+      id,
+    };
     const sourcePath = 'scripts/play/fixtures/terrain-inspect-entry.mjs';
     const hash = bytes => createHash('sha256').update(bytes).digest('hex');
     const result = captureDiagnosticSubjects({
       captureId: id,
       before: {available: true, token: String(observed.before)},
       after: {available: true, token: String(observed.after)},
-      digests: {build: {provenance: 'unavailable', value: null}, configuration: {provenance: 'observed', value: hash(JSON.stringify({viewport: [800, 600], silent: true, sample: [1, 1], limit: 1}))}},
-      records: [{target, provenance: 'observed', artifact: `snapshots.json#${id}`, completeness: {status: 'partial', counters: [{name: 'tilesReturned', value: observed.data.tiles.length}, {name: 'totalTiles', value: observed.data.total}]}}],
-      associations: [{subject: {namespace: 'terrain-fixture', subjectId: 'diagnostic', revision: String(observed.data.state.epoch)},
-        source: {path: sourcePath, selector: 'generation(revision)', digest: {provenance: 'observed', value: hash(readFileSync(resolve(ROOT, sourcePath)))}},
-        relationship: 'fixture generation defines this finite surface', provenance: 'declared', targets: [target]}],
+      digests: {
+        build: {provenance: 'unavailable', value: null},
+        configuration: {
+          provenance: 'observed',
+          value: hash(JSON.stringify({viewport: [800, 600], silent: true, sample: [1, 1], limit: 1})),
+        },
+      },
+      records: [
+        {
+          target,
+          provenance: 'observed',
+          artifact: `snapshots.json#${id}`,
+          completeness: {
+            status: 'partial',
+            counters: [
+              {name: 'tilesReturned', value: observed.data.tiles.length},
+              {name: 'totalTiles', value: observed.data.total},
+            ],
+          },
+        },
+      ],
+      associations: [
+        {
+          subject: {namespace: 'terrain-fixture', subjectId: 'diagnostic', revision: String(observed.data.state.epoch)},
+          source: {
+            path: sourcePath,
+            selector: 'generation(revision)',
+            digest: {provenance: 'observed', value: hash(readFileSync(resolve(ROOT, sourcePath)))},
+          },
+          relationship: 'fixture generation defines this finite surface',
+          provenance: 'declared',
+          targets: [target],
+        },
+      ],
     });
     assert.equal(result.ok, true);
     captures.push(result.sidecar);
@@ -85,7 +130,11 @@ try {
   await page.screenshot({path: resolve(out, 'published.png')});
   const before = await page.evaluate(() => window.terrainInspect.state());
   for (let i = 0; i < 3; i++) await page.evaluate(() => window.terrainInspect.inspect());
-  assert.deepEqual(await page.evaluate(() => window.terrainInspect.state()), before, 'inspection starts no build or rendering work');
+  assert.deepEqual(
+    await page.evaluate(() => window.terrainInspect.state()),
+    before,
+    'inspection starts no build or rendering work',
+  );
   await page.evaluate(() => window.terrainInspect.close());
   const closed = await page.evaluate(() => window.terrainInspect.inspect());
   assert.equal(closed.status, 'closed');
@@ -93,10 +142,15 @@ try {
   assert.equal(closed.state.requests, 0);
   assert.deepEqual(report.errors, []);
   writeFileSync(resolve(out, 'snapshots.json'), JSON.stringify({initial, pending, published, closed}, null, 2));
-  assert.deepEqual(captures.map(c => c.associations[0].subject.revision), ['1', '1', '2']);
+  assert.deepEqual(
+    captures.map(c => c.associations[0].subject.revision),
+    ['1', '1', '2'],
+  );
   assert.ok(captures.every(c => c.records[0].completeness.status === 'partial'));
   writeFileSync(resolve(out, 'subjects.json'), JSON.stringify(captures, null, 2));
-  report.limitations.push('Subject links are fixture declarations; source/configuration hashes are observed, executable build identity is unavailable for this Vite dev capture');
+  report.limitations.push(
+    'Subject links are fixture declarations; source/configuration hashes are observed, executable build identity is unavailable for this Vite dev capture',
+  );
   report.passed = true;
   console.log(`Terrain inspection export passed; evidence ${out}`);
 } catch (error) {
@@ -104,5 +158,9 @@ try {
   throw error;
 } finally {
   writeFileSync(resolve(out, 'report.json'), JSON.stringify(report, null, 2));
-  try { await browser?.close(); } finally { await server.close(); }
+  try {
+    await browser?.close();
+  } finally {
+    await server.close();
+  }
 }

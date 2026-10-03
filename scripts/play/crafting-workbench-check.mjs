@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { execFileSync } from 'node:child_process';
-import { createServer } from 'vite';
-import { ROOT } from './lib.mjs';
-import { launch } from '../perf/bench-browser.mjs';
-import { diagnosticReport } from './diagnostic-report.mjs';
+import {mkdirSync, writeFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+import {execFileSync} from 'node:child_process';
+import {createServer} from 'vite';
+import {ROOT} from './lib.mjs';
+import {launch} from '../perf/bench-browser.mjs';
+import {diagnosticReport} from './diagnostic-report.mjs';
 const out = resolve(process.argv[2] ?? 'playtest/crafting-workbench');
-mkdirSync(out, { recursive: true });
+mkdirSync(out, {recursive: true});
 const report = {
   revision: execFileSync('git', ['rev-parse', 'HEAD'], {
     cwd: ROOT,
@@ -28,22 +28,22 @@ const evidence = diagnosticReport(report, resolve(out, 'report.json')),
   server = await createServer({
     root: ROOT,
     logLevel: 'error',
-    server: { host: '127.0.0.1', port: 0 },
+    server: {host: '127.0.0.1', port: 0},
   });
 let browser;
 const snapshots = {};
 try {
   await server.listen();
-  browser = await launch({ width: 1440, height: 960, strictClose: true });
+  browser = await launch({width: 1440, height: 960, strictClose: true});
   const page = browser.page;
-  page.on('pageerror', (e) => report.errors.push(String(e)));
-  page.on('console', (m) => {
+  page.on('pageerror', e => report.errors.push(String(e)));
+  page.on('console', m => {
     if (m.type() === 'error') report.consoleErrors.push(m.text());
   });
   const read = () => page.evaluate(() => craftingWorkbench.read()),
     ui = () => page.evaluate(() => craftingWorkbench.ui()),
     world = () => page.evaluate(() => craftingWorkbench.world()),
-    click = (name) => page.locator('#' + name).click(),
+    click = name => page.locator('#' + name).click(),
     fill = (name, value) => page.locator('#' + name).fill(String(value)),
     select = (name, value) => page.locator('#' + name).selectOption(value);
   const ready = () =>
@@ -56,7 +56,7 @@ try {
           engine.state().scene.state === 'active' &&
           engine.loop().renders > 0,
       )
-      .catch(async (error) => {
+      .catch(async error => {
         report.startup = await page.evaluate(() => ({
           state: window.engine?.state(),
           loop: window.engine?.loop(),
@@ -70,22 +70,18 @@ try {
     if (!(await ui()).sheet) {
       await page.locator('#open').focus();
       await page.keyboard.press('Enter');
-      await page.locator('#details').waitFor({ state: 'visible' });
+      await page.locator('#details').waitFor({state: 'visible'});
     }
     await click('tab-' + pane);
   };
-  const shot = async (name) => {
+  const shot = async name => {
     const path = resolve(out, name + '.png');
-    await page.screenshot({ path });
+    await page.screenshot({path});
     report.screenshots.push(path);
   };
   const stock = async () => (await read()).runtime.view.stock;
-  const total = (state) =>
-    state.positions.reduce(
-      (sum, p) =>
-        sum + p.quantity * state.batches.find((b) => b.id === p.batch).massMg,
-      0,
-    );
+  const total = state =>
+    state.positions.reduce((sum, p) => sum + p.quantity * state.batches.find(b => b.id === p.batch).massMg, 0);
   const coherent = async () => {
     const state = (await read()).runtime,
       rows = await world();
@@ -95,55 +91,38 @@ try {
     }
     assert.equal(rows.length, state.view.stock.positions.length);
     for (const p of state.view.stock.positions) {
-      const row = rows.find((r) => r.id === `stock:${p.container}:${p.batch}`);
+      const row = rows.find(r => r.id === `stock:${p.container}:${p.batch}`);
       assert.ok(row);
       assert.equal(row.shape.kind, 'box');
       assert.equal(row.shape.size[1], 0.4 + p.quantity * 0.08);
       assert.equal(row.transform.y, 0.2 + p.quantity * 0.04);
     }
-    assert.equal(new Set(rows.map((r) => r.id)).size, rows.length);
+    assert.equal(new Set(rows.map(r => r.id)).size, rows.length);
   };
   const ack = async () => {
-    await page.waitForFunction(
-      () => craftingWorkbench.read().runtime.canAcknowledge,
-    );
+    await page.waitForFunction(() => craftingWorkbench.read().runtime.canAcknowledge);
     const previous = JSON.stringify(await world()),
       renders = await page.evaluate(() => engine.loop().renders);
     await click('ack-runtime');
-    assert.equal(
-      (await ui()).result.status,
-      'accepted',
-      JSON.stringify(await ui()),
-    );
+    assert.equal((await ui()).result.status, 'accepted', JSON.stringify(await ui()));
     await page.waitForFunction(() => !craftingWorkbench.ui().sheet);
-    if (JSON.stringify(await world()) !== previous)
-      await page.waitForFunction((n) => engine.loop().renders > n, renders);
+    if (JSON.stringify(await world()) !== previous) await page.waitForFunction(n => engine.loop().renders > n, renders);
     await coherent();
     await open();
   };
-  const publish = async (button) => {
+  const publish = async button => {
     await click(button);
-    assert.equal(
-      (await ui()).result.status,
-      'prepared',
-      JSON.stringify(await ui()),
-    );
+    assert.equal((await ui()).result.status, 'prepared', JSON.stringify(await ui()));
     await click('commit-runtime');
     assert.equal((await read()).runtime.pending, true);
     await ack();
   };
   const reload = async () => {
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'load' }),
-      click('reload'),
-    ]);
+    await Promise.all([page.waitForNavigation({waitUntil: 'load'}), click('reload')]);
     await ready();
     await open();
   };
-  await page.goto(
-    server.resolvedUrls.local[0] +
-      'tools/crafting-workbench/index.html?flags=dev.silent',
-  );
+  await page.goto(server.resolvedUrls.local[0] + 'tools/crafting-workbench/index.html?flags=dev.silent');
   await ready();
   await coherent();
   assert.equal(total(await stock()), 80);
@@ -153,9 +132,7 @@ try {
   // Hand arithmetic: equal1-unit grade400/800 -> ceiling600; initial500permille ->300.
   await click('preview-recipe');
   assert.equal((await ui()).result.status, 'prepared');
-  assert.deepEqual((await read()).editor.evaluation.values, [
-    { id: 'quality', ceiling: 600, value: 300 },
-  ]);
+  assert.deepEqual((await read()).editor.evaluation.values, [{id: 'quality', ceiling: 600, value: 300}]);
   assert.deepEqual((await read()).runtime.envelope, initial);
   await fill('slot-quantity', 0);
   await click('apply-fields');
@@ -175,7 +152,7 @@ try {
   await click('save-recipe');
   const constant = structuredClone((await read()).editor.recipe);
   constant.attributes = [];
-  constant.output.properties.grade = { base: 10, terms: [] };
+  constant.output.properties.grade = {base: 10, terms: []};
   await page.locator('summary').click();
   await fill('recipe-json', JSON.stringify(constant));
   await click('apply-json');
@@ -192,7 +169,7 @@ try {
   assert.equal((await read()).editor.recipe.attributes[0].initialPermille, 600);
   // Dirty SaveStore memory must not become accepted merely because the scene changes.
   const acceptedBeforeEntry = (await read()).runtime.envelope,
-    worldBeforeEntry = (await world()).map(({ entity, ...facts }) => facts);
+    worldBeforeEntry = (await world()).map(({entity, ...facts}) => facts);
   await page.locator('#fail-storage').check();
   await click('begin');
   assert.equal((await ui()).result.status, 'prepared');
@@ -211,17 +188,14 @@ try {
   const beforeDirtyReturn = await page.evaluate(() => engine.loop().renders);
   await click('reenter');
   await ready();
-  await page.waitForFunction(
-    (n) => engine.loop().renders > n,
-    beforeDirtyReturn,
-  );
+  await page.waitForFunction(n => engine.loop().renders > n, beforeDirtyReturn);
   await coherent();
   assert.deepEqual((await read()).runtime.envelope, acceptedBeforeEntry);
   assert.equal((await read()).runtime.pending, true);
   assert.equal((await read()).runtime.blocked, null);
   assert.equal((await read()).runtime.view.sessions.length, 0);
   assert.deepEqual(
-    (await world()).map(({ entity, ...facts }) => facts),
+    (await world()).map(({entity, ...facts}) => facts),
     worldBeforeEntry,
   );
   await shot('dirty-return-old-custody');
@@ -260,10 +234,7 @@ try {
   await publish('resize');
   await select('session', second);
   await publish('cancel-session');
-  assert.equal(
-    (await read()).runtime.view.sessions.find((s) => s.id === second).phase,
-    'cancelled',
-  );
+  assert.equal((await read()).runtime.view.sessions.find(s => s.id === second).phase, 'cancelled');
   assert.equal(total(await stock()), 80);
   // Same recipe id/version edit affects new definitions only; accepted selection stays600permille.
   await open('editor');
@@ -271,11 +242,7 @@ try {
   await click('apply-fields');
   await click('preview-recipe');
   await click('commit-recipe');
-  assert.equal(
-    (await read()).runtime.view.sessions[0].recipe.attributes[0]
-      .initialPermille,
-    600,
-  );
+  assert.equal((await read()).runtime.view.sessions[0].recipe.attributes[0].initialPermille, 600);
   await open();
   await select('session', first);
   await publish('experiment');
@@ -291,10 +258,7 @@ try {
   await publish('resize');
   await select('session', first);
   await publish('step');
-  assert.equal(
-    (await read()).runtime.view.machines.find((m) => m.id === 'm-a').completed,
-    0,
-  );
+  assert.equal((await read()).runtime.view.machines.find(m => m.id === 'm-a').completed, 0);
   assert.equal(total(await stock()), 80);
   await shot('protected-factory-work');
   await select('capacity-container', 'm-a.output');
@@ -316,22 +280,15 @@ try {
   await click('retry-runtime');
   await ack();
   r = (await read()).runtime;
-  assert.equal(r.view.machines.find((m) => m.id === 'm-a').completed, 1);
+  assert.equal(r.view.machines.find(m => m.id === 'm-a').completed, 1);
   assert.equal(total(r.view.stock), 80);
-  const output = r.view.stock.positions.filter(
-    (p) => p.container === 'm-a.output',
-  );
+  const output = r.view.stock.positions.filter(p => p.container === 'm-a.output');
   assert.equal(
     output.reduce((n, p) => n + p.quantity, 0),
     3,
   );
   assert.equal(
-    output.reduce(
-      (n, p) =>
-        n +
-        p.quantity * r.view.stock.batches.find((b) => b.id === p.batch).massMg,
-      0,
-    ),
+    output.reduce((n, p) => n + p.quantity * r.view.stock.batches.find(b => b.id === p.batch).massMg, 0),
     20,
   );
   await click('close');
@@ -339,10 +296,7 @@ try {
   await open();
   snapshots.produced = await read();
   await reload();
-  assert.deepEqual(
-    (await read()).runtime.envelope,
-    snapshots.produced.runtime.envelope,
-  );
+  assert.deepEqual((await read()).runtime.envelope, snapshots.produced.runtime.envelope);
   await select('session', first);
   await publish('repeat');
   const repeat = (await read()).runtime.view.sessions.at(-1);
@@ -353,28 +307,23 @@ try {
   await publish('assign');
   await select('session', repeat.id);
   await publish('step');
-  assert.equal(
-    (await read()).runtime.view.machines.find((m) => m.id === 'm-b').completed,
-    1,
-  );
+  assert.equal((await read()).runtime.view.machines.find(m => m.id === 'm-b').completed, 1);
   assert.equal(total(await stock()), 80);
   assert.equal(
-    (await stock()).positions
-      .filter((p) => p.batch === 'crafted-1')
-      .reduce((n, p) => n + p.quantity, 0),
+    (await stock()).positions.filter(p => p.batch === 'crafted-1').reduce((n, p) => n + p.quantity, 0),
     2,
   );
   await open('survey');
   await click('survey-start');
   await click('survey-step');
   assert.equal((await ui()).result.sampled, 8);
-  const oldFacts = (await stock()).batches.find((b) => b.id === 'input-a');
+  const oldFacts = (await stock()).batches.find(b => b.id === 'input-a');
   await publish('replace-spawn');
   await open('survey');
   await click('survey-late');
   assert.equal((await ui()).result.status, 'stale');
   assert.deepEqual(
-    (await stock()).batches.find((b) => b.id === 'input-a'),
+    (await stock()).batches.find(b => b.id === 'input-a'),
     oldFacts,
   );
   await click('survey-start');
@@ -400,16 +349,13 @@ try {
   const beforeReentry = await page.evaluate(() => engine.loop().renders);
   await click('reenter');
   await ready();
-  await page.waitForFunction((n) => engine.loop().renders > n, beforeReentry);
+  await page.waitForFunction(n => engine.loop().renders > n, beforeReentry);
   await open();
   await coherent();
   snapshots.final = await read();
   assert.deepEqual(report.errors, []);
   assert.deepEqual(report.consoleErrors, []);
-  writeFileSync(
-    resolve(out, 'snapshots.json'),
-    JSON.stringify(snapshots, null, 2),
-  );
+  writeFileSync(resolve(out, 'snapshots.json'), JSON.stringify(snapshots, null, 2));
   report.passed = true;
 } catch (error) {
   evidence.fail(error);

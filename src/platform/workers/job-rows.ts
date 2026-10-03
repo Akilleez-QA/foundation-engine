@@ -6,7 +6,7 @@
  * Kit rows use `src/kits/<owner>/workers/<name>.job.ts` and the distinct `job.kits.<owner>.<name>` namespace.
  * A new job is one file.
  */
-import type { JobLoaders, JobModule } from './job.ts';
+import type {JobLoaders, JobModule} from './job.ts';
 
 /** The row id of a domain job module's path (`…/domain/sim/workers/pathfind.job.ts` → `job.sim.pathfind`). */
 export function domainJobId(path: string): string | null {
@@ -14,13 +14,16 @@ export function domainJobId(path: string): string | null {
   return m ? `job.${m[1]}.${m[2]}` : null;
 }
 
-export function kitJobId(path:string):string|null {const m=/\/kits\/([\w-]+)\/workers\/([\w-]+)\.job\.ts$/.exec(path);return m ? `job.kits.${m[1]}.${m[2]}` : null;}
+export function kitJobId(path: string): string | null {
+  const m = /\/kits\/([\w-]+)\/workers\/([\w-]+)\.job\.ts$/.exec(path);
+  return m ? `job.kits.${m[1]}.${m[2]}` : null;
+}
 
 /** Vite expands the glob; under Node (the tests) there is no glob, and the domain rows are absent. */
 function domainRows(): Record<string, () => Promise<JobModule>> {
   let files: Record<string, () => Promise<unknown>>;
   try {
-    files = import.meta.glob(['../../domain/*/workers/*.job.ts', '../../kits/*/workers/*.job.ts'], { import: 'default' });
+    files = import.meta.glob(['../../domain/*/workers/*.job.ts', '../../kits/*/workers/*.job.ts'], {import: 'default'});
   } catch {
     return {};
   }

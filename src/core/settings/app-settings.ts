@@ -10,33 +10,56 @@
  *   frame never queries the platform; `calmScenes()` is `get('comfort.calm')`, an O(1) read.
  *   The number of `matchMedia` calls is on the test API (probe 'settings'), so a verifier can prove it stays at two.
  */
-import { appEvents } from '../app-events';
-import { appSaveStore, onAppSaveStoreRescened } from '../save/app-store';
-import { coreSettings, createSettings, settingsValuesSection, type Settings, type SettingDef, type SettingEnv, type SettingsStore, type StoredSettings } from './settings';
-import type { EngineProbes } from '../probe';
+import {appEvents} from '../app-events';
+import {appSaveStore, onAppSaveStoreRescened} from '../save/app-store';
+import {
+  coreSettings,
+  createSettings,
+  settingsValuesSection,
+  type Settings,
+  type SettingDef,
+  type SettingEnv,
+  type SettingsStore,
+  type StoredSettings,
+} from './settings';
+import type {EngineProbes} from '../probe';
 
 declare module '../probe' {
   interface EngineProbes {
     /** The settings service: how often the platform was queried, the effective Calm value, and what is stored. */
-    settings: { matchMediaCalls: number; calm: boolean; stored: Readonly<StoredSettings> };
+    settings: {matchMediaCalls: number; calm: boolean; stored: Readonly<StoredSettings>};
   }
 }
 
 let matchMediaCalls = 0;
 /** The platform side of the settings environment: each media query made once and followed through `change`. */
-function browserEnv(): { env: SettingEnv; watch(recheck: () => void): void } {
-  const env: SettingEnv = { prefersReducedMotion: false, coarsePointer: false };
-  const queries: [keyof SettingEnv, string][] = [['prefersReducedMotion', '(prefers-reduced-motion: reduce)'], ['coarsePointer', '(pointer: coarse)']];
+function browserEnv(): {env: SettingEnv; watch(recheck: () => void): void} {
+  const env: SettingEnv = {prefersReducedMotion: false, coarsePointer: false};
+  const queries: [keyof SettingEnv, string][] = [
+    ['prefersReducedMotion', '(prefers-reduced-motion: reduce)'],
+    ['coarsePointer', '(pointer: coarse)'],
+  ];
   const lists: [keyof SettingEnv, MediaQueryList][] = [];
   if (typeof matchMedia === 'function') {
     for (const [field, query] of queries) {
-      try { matchMediaCalls++; const list = matchMedia(query); env[field] = list.matches; lists.push([field, list]); } catch { /* no media queries: the default stays */ }
+      try {
+        matchMediaCalls++;
+        const list = matchMedia(query);
+        env[field] = list.matches;
+        lists.push([field, list]);
+      } catch {
+        /* no media queries: the default stays */
+      }
     }
   }
   return {
     env,
     watch(recheck) {
-      for (const [field, list] of lists) list.addEventListener?.('change', e => { env[field] = e.matches; recheck(); });
+      for (const [field, list] of lists)
+        list.addEventListener?.('change', e => {
+          env[field] = e.matches;
+          recheck();
+        });
     },
   };
 }
@@ -49,8 +72,15 @@ function appSettingsStore(): SettingsStore {
     update: (fn, o) => handle().update(fn, o),
     subscribe(fn) {
       let off = handle().subscribe(fn);
-      const moved = onAppSaveStoreRescened(() => { off(); off = handle().subscribe(fn); fn(handle().get()); });
-      return () => { off(); moved(); };
+      const moved = onAppSaveStoreRescened(() => {
+        off();
+        off = handle().subscribe(fn);
+        fn(handle().get());
+      });
+      return () => {
+        off();
+        moved();
+      };
     },
   };
 }
@@ -68,7 +98,11 @@ export function appSettings(): Settings {
   const platform = browserEnv();
   const body = () => (typeof document === 'undefined' ? undefined : document.body);
   instance = createSettings([...coreSettings, ...gameSettings], appSettingsStore(), platform.env, {
-    dom: { toggleClass: (c, on) => { body()?.classList?.toggle?.(c, on); } },
+    dom: {
+      toggleClass: (c, on) => {
+        body()?.classList?.toggle?.(c, on);
+      },
+    },
     events: appEvents,
     watchEnv: platform.watch,
   });
@@ -78,13 +112,19 @@ export function appSettings(): Settings {
 /** The `settings` probe (the composition root registers it on `s.probes`): undefined until the settings exist. */
 export function settingsProbe(): EngineProbes['settings'] | undefined {
   const s = instance;
-  return s && { matchMediaCalls, calm: s.get('comfort.calm'), stored: appSaveStore().section(settingsValuesSection).get() };
+  return (
+    s && {matchMediaCalls, calm: s.get('comfort.calm'), stored: appSaveStore().section(settingsValuesSection).get()}
+  );
 }
 
 /** Calm scenes, the one central value every motion system reads (STD-SET-2). */
 export const calmScenes = (): boolean => appSettings().get('comfort.calm');
 
 /** Tests: forget the service, so the next `appSettings()` builds a fresh one over the current store and platform. */
-export function resetAppSettingsForTests(): void { instance = undefined; matchMediaCalls = 0; gameSettings = []; }
+export function resetAppSettingsForTests(): void {
+  instance = undefined;
+  matchMediaCalls = 0;
+  gameSettings = [];
+}
 /** Tests: how many times the platform was queried. */
 export const settingsMatchMediaCalls = (): number => matchMediaCalls;

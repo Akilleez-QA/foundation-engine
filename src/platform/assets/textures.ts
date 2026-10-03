@@ -28,9 +28,9 @@
  * and draws the same pixels. The default loader stays three.js's ImageLoader for callers without a worker host.
  */
 import * as T from 'three';
-import { AbortError, LeaseCache, TEXELS_PER_PIXEL, chooseVariant, isAbortError, type AssetLease } from './lease-cache';
-import type { AssetDef, AssetVariant, QualityTier } from './manifest';
-import type { AssetResidencyPolicy } from './residency';
+import {AbortError, LeaseCache, TEXELS_PER_PIXEL, chooseVariant, isAbortError, type AssetLease} from './lease-cache';
+import type {AssetDef, AssetVariant, QualityTier} from './manifest';
+import type {AssetResidencyPolicy} from './residency';
 
 export interface TextureOptions {
   /** On-screen size in CSS pixels at the reference resolution (the widest the map is drawn). */
@@ -84,7 +84,7 @@ export interface TextureLibrary {
 }
 
 /** Decoded image data a `THREE.Texture` can take. */
-export type TextureImage = HTMLImageElement | ImageBitmap | { width: number; height: number };
+export type TextureImage = HTMLImageElement | ImageBitmap | {width: number; height: number};
 
 export interface TextureLibraryOptions {
   /** Resolves an asset id to its def. The composition root binds this to the content packs. */
@@ -94,7 +94,7 @@ export interface TextureLibraryOptions {
    * decoded with `IMAGE_BITMAP_OPTIONS` (`decode-image.ts`): the texture then turns `flipY` off. `hint` is the variant's
    * declared size, for the decoder's memory admission.
    */
-  loadImage?(url: string, signal: AbortSignal, hint: { width?: number; height?: number }): Promise<TextureImage>;
+  loadImage?(url: string, signal: AbortSignal, hint: {width?: number; height?: number}): Promise<TextureImage>;
   /** Prefix for variant paths (relative to `public/`). Default `/`. */
   base?: string;
   /** Bytes of released textures kept for a quick return. Default 0: released textures are disposed at once. */
@@ -106,7 +106,7 @@ export interface TextureLibraryOptions {
 }
 
 export type TextureWrap = 'clamp' | 'repeat' | 'mirror';
-const WRAPS = { clamp: T.ClampToEdgeWrapping, repeat: T.RepeatWrapping, mirror: T.MirroredRepeatWrapping } as const;
+const WRAPS = {clamp: T.ClampToEdgeWrapping, repeat: T.RepeatWrapping, mirror: T.MirroredRepeatWrapping} as const;
 
 interface Slot {
   readonly def: AssetDef;
@@ -125,12 +125,18 @@ const defaultLoadImage = (url: string): Promise<TextureImage> => new T.ImageLoad
 
 /** Mipmapped RGBA8: the four bytes per texel plus a third for the mip chain. */
 export function textureBytes(texture: T.Texture): number {
-  const image = texture.image as { width?: number; height?: number } | undefined;
+  const image = texture.image as {width?: number; height?: number} | undefined;
   return Math.round((image?.width ?? 0) * (image?.height ?? 0) * 4 * (4 / 3));
 }
 
 /** The cache key: asset id and variant, plus the sampler and colour space when they are not the defaults. */
-export function textureKey(id: string, variant: AssetVariant, anisotropy = 1, colorSpace?: 'srgb' | 'linear', wrap: TextureWrap = 'clamp'): string {
+export function textureKey(
+  id: string,
+  variant: AssetVariant,
+  anisotropy = 1,
+  colorSpace?: 'srgb' | 'linear',
+  wrap: TextureWrap = 'clamp',
+): string {
   return `${id}|${variant.path}${anisotropy === 1 ? '' : `|a${anisotropy}`}${colorSpace ? `|${colorSpace}` : ''}${wrap === 'clamp' ? '' : `|w${wrap}`}`;
 }
 
@@ -141,14 +147,14 @@ export function createTextureLibrary(options: TextureLibraryOptions): TextureLib
   const slots = new Map<string, Slot>();
   const url = (variant: AssetVariant) => base + variant.path;
 
-  const cache = new LeaseCache<{ slot: Slot; image: TextureImage }, T.Texture>(
+  const cache = new LeaseCache<{slot: Slot; image: TextureImage}, T.Texture>(
     {
       fetch: async (key, signal) => {
         const slot = slots.get(key)!;
-        const { width, height } = slot.variant;
-        return { slot, image: await load(url(slot.variant), signal, { width, height }) };
+        const {width, height} = slot.variant;
+        return {slot, image: await load(url(slot.variant), signal, {width, height})};
       },
-      upload: ({ slot, image }, key) => {
+      upload: ({slot, image}, key) => {
         // What TextureLoader did, plus the def's colour space and the requested sampler.
         const texture = new T.Texture(image as HTMLImageElement);
         texture.name = key;
@@ -162,16 +168,25 @@ export function createTextureLibrary(options: TextureLibraryOptions): TextureLib
         texture.needsUpdate = true;
         return texture;
       },
-      discard: ({ image }) => {
+      discard: ({image}) => {
         if (isImageBitmap(image)) image.close();
       },
       dispose: texture => {
         const image = texture.image;
         const errors: unknown[] = [];
-        try { texture.dispose(); } catch (error) { errors.push(error); }
+        try {
+          texture.dispose();
+        } catch (error) {
+          errors.push(error);
+        }
         // The decoded pixels go with the last lease; nothing else holds the bitmap.
         // Disposal listeners may throw or replace texture.image; retire the original pixels regardless.
-        if (isImageBitmap(image)) try { image.close(); } catch (error) { errors.push(error); }
+        if (isImageBitmap(image))
+          try {
+            image.close();
+          } catch (error) {
+            errors.push(error);
+          }
         if (errors.length) throw new AggregateError(errors, 'textures: cleanup failed');
       },
       // Retained after release: every renderer drops its GPU copy and its listener; the decoded image stays for a
@@ -179,7 +194,7 @@ export function createTextureLibrary(options: TextureLibraryOptions): TextureLib
       park: texture => texture.dispose(),
       bytes: textureBytes,
     },
-    { warmBytes: options.residency?.warmBytes ?? options.warmBytes ?? 0, residency: options.residency },
+    {warmBytes: options.residency?.warmBytes ?? options.warmBytes ?? 0, residency: options.residency},
   );
 
   async function resolve(id: string): Promise<AssetDef> {
@@ -189,7 +204,7 @@ export function createTextureLibrary(options: TextureLibraryOptions): TextureLib
     return def;
   }
 
-  const pick = (def: AssetDef, screenPx: number) => chooseVariant(def, { screenPx, tier });
+  const pick = (def: AssetDef, screenPx: number) => chooseVariant(def, {screenPx, tier});
 
   return {
     async texture(id, o) {
@@ -201,10 +216,16 @@ export function createTextureLibrary(options: TextureLibraryOptions): TextureLib
       const colorSpace = o.colorSpace ?? def.colorSpace ?? 'linear';
       const wrap = o.wrap ?? 'clamp';
       if (!(wrap in WRAPS)) throw new Error(`[assets] ${id}: unknown wrap ${String(wrap)}`);
-      const key = textureKey(id, variant, anisotropy, colorSpace === (def.colorSpace ?? 'linear') ? undefined : colorSpace, wrap);
-      if (!slots.has(key)) slots.set(key, { def, variant, anisotropy, colorSpace, wrap });
+      const key = textureKey(
+        id,
+        variant,
+        anisotropy,
+        colorSpace === (def.colorSpace ?? 'linear') ? undefined : colorSpace,
+        wrap,
+      );
+      if (!slots.has(key)) slots.set(key, {def, variant, anisotropy, colorSpace, wrap});
       const lease = await cache.acquire(key, o.signal);
-      return { value: lease.value, key: lease.key, id, variant, release: lease.release };
+      return {value: lease.value, key: lease.key, id, variant, release: lease.release};
     },
     async variant(id, screenPx) {
       return pick(await resolve(id), screenPx);
@@ -225,7 +246,7 @@ export function createTextureLibrary(options: TextureLibraryOptions): TextureLib
       pressure: cache.stats.pressure,
       cleanupFailures: cache.stats.cleanupFailures,
     }),
-    setResidency: ({ warmBytes, ...residency }) => cache.setResidency(warmBytes, residency),
+    setResidency: ({warmBytes, ...residency}) => cache.setResidency(warmBytes, residency),
   };
 }
 

@@ -7,10 +7,19 @@ import {createSceneEntityInspector} from './entity-inspection';
 
 test('scene entity inspection uses the real visit epoch and refuses ended/replaced ownership', () => {
   for (const end of ['visit', 'activity', 'supersede']) {
-    const world = new World(); world.spawn();
-    const visitAbort = new AbortController(), activity = new AbortController();
+    const world = new World();
+    world.spawn();
+    const visitAbort = new AbortController(),
+      activity = new AbortController();
     let current = true;
-    const visit: SceneVisit = {epoch: 7, scene: sceneId('sample'), params: {}, player: 'local', signal: visitAbort.signal, current: () => current};
+    const visit: SceneVisit = {
+      epoch: 7,
+      scene: sceneId('sample'),
+      params: {},
+      player: 'local',
+      signal: visitAbort.signal,
+      current: () => current,
+    };
     const inspect = createSceneEntityInspector(world, visit, activity.signal);
     assert.equal(inspect({expectedEpoch: 7}).status, 'ready');
     assert.deepEqual(inspect({expectedEpoch: 6}), {status: 'stale', epoch: 7});

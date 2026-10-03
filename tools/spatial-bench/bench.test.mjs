@@ -1,10 +1,11 @@
 // Work-count (not timing) checks for the spatial micro-benchmark: query cost follows local density, not population.
-import { test } from 'node:test';
+import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import { runCase, runInterestCase } from './bench.mjs';
+import {runCase, runInterestCase} from './bench.mjs';
 
 test('spatial bench: per-query work stays bounded from 1,000 to 10,000 entries', () => {
-  const small = runCase({ entries: 1000, ticks: 3 }), large = runCase({ entries: 10000, ticks: 3 });
+  const small = runCase({entries: 1000, ticks: 3}),
+    large = runCase({entries: 10000, ticks: 3});
   for (const c of [small, large]) {
     assert.equal(c.refused, 0, 'no query was too wide or truncated');
     assert.ok(c.perNeighbourQuery.cells <= 4, 'a radius-8 query touches at most 2 x 2 cells of 16');
@@ -18,7 +19,8 @@ test('spatial bench: per-query work stays bounded from 1,000 to 10,000 entries',
 });
 
 test('SC02 bench: per-observer interest work stays bounded from 1,000 to 10,000 entities', () => {
-  const small = runInterestCase({ entries: 1000, ticks: 3, observers: 20 }), large = runInterestCase({ entries: 10000, ticks: 3, observers: 20 });
+  const small = runInterestCase({entries: 1000, ticks: 3, observers: 20}),
+    large = runInterestCase({entries: 10000, ticks: 3, observers: 20});
   for (const c of [small, large]) {
     assert.equal(c.incompleteUpdates, 0, 'no scan was truncated or refused');
     assert.ok(c.perUpdate.relevant <= c.maxRelevant);

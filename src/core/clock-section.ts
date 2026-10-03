@@ -6,20 +6,27 @@
  * their clock has run, so every existing save loads unchanged and gains no key until then. Written at flush points
  * only ('lazy'): UT is recorded every few seconds of play, never per frame.
  */
-import type { SaveSection } from './save/section';
+import type {SaveSection} from './save/section';
 
 /** Persisted per player: UT (game seconds) and the last real time it was seen (ms since the Unix epoch, for catch-up). */
-export interface ClockState { ut: number; lastRealMs: number | null }
+export interface ClockState {
+  ut: number;
+  lastRealMs: number | null;
+}
 
 const finite = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 
 export const clockSection: SaveSection<ClockState | null> = {
-  id: 'core.clock', scope: 'player', version: 1, flush: 'lazy',
+  id: 'core.clock',
+  scope: 'player',
+  version: 1,
+  flush: 'lazy',
   initial: () => null,
   parse: raw => {
     if (raw === null) return null;
     const s = raw as ClockState;
-    if (!s || typeof s !== 'object' || !finite(s.ut) || (s.lastRealMs !== null && !finite(s.lastRealMs))) throw Error('Invalid clock state');
-    return { ut: s.ut, lastRealMs: s.lastRealMs };
+    if (!s || typeof s !== 'object' || !finite(s.ut) || (s.lastRealMs !== null && !finite(s.lastRealMs)))
+      throw Error('Invalid clock state');
+    return {ut: s.ut, lastRealMs: s.lastRealMs};
   },
 };

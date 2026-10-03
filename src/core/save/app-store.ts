@@ -10,15 +10,16 @@
  * Owners call `appSaveStore()` when they read or write, never at import, and never keep a handle across a player
  * switch (a handle without `of(player)` follows the active player anyway).
  */
-import type { SaveStore } from './section';
-import { browserPort, MemoryBackend, type StoragePort } from './storage-port';
-import { createSaveStore, DEFAULT_SAVE_NAMESPACE } from './store';
+import type {SaveStore} from './section';
+import {browserPort, MemoryBackend, type StoragePort} from './storage-port';
+import {createSaveStore, DEFAULT_SAVE_NAMESPACE} from './store';
 
-let installed: SaveStore | undefined, standIn = false;
-let standInOptions: { namespace: string; build: string } = { namespace: DEFAULT_SAVE_NAMESPACE, build: 'game@0.0.0' };
+let installed: SaveStore | undefined,
+  standIn = false;
+let standInOptions: {namespace: string; build: string} = {namespace: DEFAULT_SAVE_NAMESPACE, build: 'game@0.0.0'};
 /** The composition root names its namespace and build before anything asks for the store. */
-export function configureAppSaveStore(o: { namespace?: string; build?: string }): void {
-  standInOptions = { namespace: o.namespace ?? standInOptions.namespace, build: o.build ?? standInOptions.build };
+export function configureAppSaveStore(o: {namespace?: string; build?: string}): void {
+  standInOptions = {namespace: o.namespace ?? standInOptions.namespace, build: o.build ?? standInOptions.build};
 }
 const replaced = new Set<() => void>();
 
@@ -26,7 +27,8 @@ const replaced = new Set<() => void>();
 export function installAppSaveStore<S extends SaveStore>(store: S): S {
   const previous = installed;
   if (installed && installed !== store && standIn) installed.dispose();
-  installed = store; standIn = false;
+  installed = store;
+  standIn = false;
   if (previous && previous !== store) for (const fn of [...replaced]) fn();
   return store;
 }
@@ -37,18 +39,27 @@ export function installAppSaveStore<S extends SaveStore>(store: S): S {
  */
 export function onAppSaveStoreRescened(fn: () => void): () => void {
   replaced.add(fn);
-  return () => { replaced.delete(fn); };
+  return () => {
+    replaced.delete(fn);
+  };
 }
 
 /** The store owners read and write through. */
 export function appSaveStore(): SaveStore {
-  if (!installed) { installed = createStandIn(); standIn = true; }
+  if (!installed) {
+    installed = createStandIn();
+    standIn = true;
+  }
   return installed;
 }
 
 /** `localStorage` exists (a browser that blocks it throws on access: that still counts, see createStandIn). */
 function hasWebStorage(): boolean {
-  try { return (globalThis as { localStorage?: unknown }).localStorage !== undefined; } catch { return true; }
+  try {
+    return (globalThis as {localStorage?: unknown}).localStorage !== undefined;
+  } catch {
+    return true;
+  }
 }
 
 function createStandIn(): SaveStore {
@@ -56,10 +67,19 @@ function createStandIn(): SaveStore {
   // Only a runtime without a window and Web Storage (tests, tools) gets memory. Blocked storage in a browser stays the
   // browser port, whose reads throw, so the store treats it as unavailable and never as empty (STD-SAV-3). A test that
   // stubs `window` but no storage gets memory too: a browser port there would fail every write and retry it forever.
-  if (typeof window !== 'undefined' && hasWebStorage()) { local = browserPort('local'); session = browserPort('session'); }
-  else { local = new MemoryBackend().port(0, 'local'); session = new MemoryBackend().port(0, 'session'); }
-  return createSaveStore({ local, session, build: standInOptions.build, namespace: standInOptions.namespace });
+  if (typeof window !== 'undefined' && hasWebStorage()) {
+    local = browserPort('local');
+    session = browserPort('session');
+  } else {
+    local = new MemoryBackend().port(0, 'local');
+    session = new MemoryBackend().port(0, 'session');
+  }
+  return createSaveStore({local, session, build: standInOptions.build, namespace: standInOptions.namespace});
 }
 
 /** Tests: forget the installed store, so the next `appSaveStore()` makes a fresh one (or a test installs its own). */
-export function resetAppSaveStoreForTests(): void { installed?.dispose(); installed = undefined; standIn = false; }
+export function resetAppSaveStoreForTests(): void {
+  installed?.dispose();
+  installed = undefined;
+  standIn = false;
+}

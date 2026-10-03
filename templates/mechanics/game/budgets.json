@@ -3,9 +3,7 @@
   "app": {
     "firstLoadJsKiB": 704
   },
-  "largeChunkAllow": [
-    "index"
-  ],
+  "largeChunkAllow": ["index"],
   "scenes": {
     "lab": {
       "scene": "scene.lab",

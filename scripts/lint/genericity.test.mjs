@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import {check, hits} from './genericity.mjs';
 
 test('genericity: core, platform, author and the engine docs carry no genre vocabulary', () => {
-  assert.deepEqual(check().map(h => `${h.file}:${h.line} ${h.word}`), []);
+  assert.deepEqual(
+    check().map(h => `${h.file}:${h.line} ${h.word}`),
+    [],
+  );
 });
 
 test('genericity: genre words are caught; idioms and the opt-in audience flag are allowed', () => {

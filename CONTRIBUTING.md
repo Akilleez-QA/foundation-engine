@@ -85,6 +85,8 @@ During development:
 npm run check
 ```
 
+Run `npm run format` (Prettier) before committing; CI checks it through `npm run format:check`, which `npm run lint` and `npm run check` include. Markdown is not formatted.
+
 `check` selects affected tests from working-tree changes against HEAD, including untracked files. A clean committed tree can select **zero tests**; the output reports that explicitly, and a pass then does not establish that a regression test ran. Use `npm run check -- --base origin/main` (or your fork's upstream base) to include committed changes since the merge base, together with staged, unstaged and untracked changes. This selection is a local heuristic, not complete dependency coverage. Use `npm run check -- --all` to run the canonical `npm test` suite during the check. Invalid revisions and unknown selection options fail instead of silently selecting no tests.
 
 Run relevant tests explicitly before requesting review, including after a commit. For example, a game-directory argument change uses:

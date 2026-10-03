@@ -39,7 +39,7 @@ export interface LegacyBinding {
  * One migration step: version-n data to n+1. Method syntax makes the parameter bivariant, so an author's typed step
  * (`(old: { n: number }) => …`) is accepted while the store calls it with the untyped previous step's output.
  */
-export type Migration = { step(old: unknown): unknown }['step'];
+export type Migration = {step(old: unknown): unknown}['step'];
 
 export interface SaveSection<T> {
   // ---- core fields
@@ -73,12 +73,12 @@ export interface SaveSection<T> {
 }
 
 export type SectionStatus =
-  | 'saved'        // storage matches memory
-  | 'dirty'        // a write is scheduled
-  | 'session'      // the last write failed: kept in this tab, retried at every flush
-  | 'unavailable'  // storage could not be read: never written over until a read succeeds
-  | 'quarantined'  // stored data was unreadable: a copy is in the quarantine and play continues from `initial()`
-  | 'newer';       // written by a newer build: read-only here, never overwritten
+  | 'saved' // storage matches memory
+  | 'dirty' // a write is scheduled
+  | 'session' // the last write failed: kept in this tab, retried at every flush
+  | 'unavailable' // storage could not be read: never written over until a read succeeds
+  | 'quarantined' // stored data was unreadable: a copy is in the quarantine and play continues from `initial()`
+  | 'newer'; // written by a newer build: read-only here, never overwritten
 
 /** Handles share their store lifetime; operations throw after the store is disposed. */
 export interface SectionHandle<T> {
@@ -86,30 +86,41 @@ export interface SectionHandle<T> {
   /** Mutate a draft (a structured clone) or return a replacement. Marks dirty; autosave is debounced.
    * Both update and replace retain the target player selected before callbacks run. Reset/disposal during
    * those callbacks rejects the write rather than reviving the retired cell. */
-  update(fn: (draft: T) => T | void, opts?: { now?: boolean }): SectionStatus;
-  replace(value: T, opts?: { now?: boolean }): SectionStatus;
+  update(fn: (draft: T) => T | void, opts?: {now?: boolean}): SectionStatus;
+  replace(value: T, opts?: {now?: boolean}): SectionStatus;
   subscribe(fn: (value: Readonly<T>) => void): () => void;
   status(): SectionStatus;
   /** The same section for another player (player scope only). */
   of(player: PlayerId): SectionHandle<T>;
 }
 
-export interface QuarantineEntry { key: string; from: string; reason: string }
-export interface FlushReport { written: string[]; failed: string[]; skipped: string[] }
+export interface QuarantineEntry {
+  key: string;
+  from: string;
+  reason: string;
+}
+export interface FlushReport {
+  written: string[];
+  failed: string[];
+  skipped: string[];
+}
 export interface ImportReport {
   format: 'engine-profile@2' | 'legacy';
   /** Known sections: `saved` (written), `session` (held in memory; storage refused), `skipped-newer` (a later version).
    * Orphans (ids this build does not own): `orphan-kept` only after a successful write or exact stored-byte match;
    * `orphan-conflict` preserves different existing bytes; `orphan-failed` means storage access threw;
    * `orphan-superseded` is an alias id of a section the same file supplies (a pre-rename copy), not written. */
-  sections: Record<string, 'saved' | 'session' | 'skipped-newer' | 'orphan-kept' | 'orphan-conflict' | 'orphan-failed' | 'orphan-superseded'>;
+  sections: Record<
+    string,
+    'saved' | 'session' | 'skipped-newer' | 'orphan-kept' | 'orphan-conflict' | 'orphan-failed' | 'orphan-superseded'
+  >;
 }
 export interface ProfileFileV2 {
   format: 'engine-profile';
   version: 2;
   exportedBy: string;
-  player: { id: PlayerId; name?: string };
-  sections: Record<string, { v: number; data: unknown }>;
+  player: {id: PlayerId; name?: string};
+  sections: Record<string, {v: number; data: unknown}>;
   /** Sections this build does not know, or cannot read yet (newer): carried verbatim so nothing is lost. */
   orphans?: Record<string, unknown>;
   /** Unreadable data found on this device, for support. Never imported automatically. */
@@ -136,7 +147,7 @@ export interface SaveStore {
   batch(fn: () => void): void;
   exportPlayer(id?: PlayerId): ProfileFileV2;
   importPlayer(text: string, into?: PlayerId): ImportReport;
-  resetAll(): { removed: number; failed: string[] };
+  resetAll(): {removed: number; failed: string[]};
   quarantine(): QuarantineEntry[];
   onPlayerChanged(fn: (id: PlayerId, previous: PlayerId) => void): () => void;
   /** Terminal and idempotent. Attempts one final flush without retrying failures, detaches subscriptions,
@@ -145,12 +156,15 @@ export interface SaveStore {
   dispose(): void;
 }
 
-export interface StoreUsage { chars: number; sections: Record<string, number> }
+export interface StoreUsage {
+  chars: number;
+  sections: Record<string, number>;
+}
 
 // The `player` event area belongs to the save store: `player.changed {id, previous}`.
 declare module '../events' {
   interface EngineEvents {
     /** The active player changed. Emitted by the store's owner after the roster changed, never per frame. */
-    'player.changed': { id: PlayerId; previous: PlayerId };
+    'player.changed': {id: PlayerId; previous: PlayerId};
   }
 }

@@ -12,7 +12,10 @@ import {PROBE} from '../perf/probe-inject.mjs';
 import {budgetLine, budgetStatus, freshOut, homeScene, measure, open, serve, sleep, VIEWS, write} from './lib.mjs';
 
 const argv = process.argv.slice(2);
-const arg = f => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : undefined; };
+const arg = f => {
+  const i = argv.indexOf(f);
+  return i >= 0 ? argv[i + 1] : undefined;
+};
 const scene = arg('--scene') ?? homeScene();
 
 export async function snap({scene, mobile = false, url}) {
@@ -26,16 +29,43 @@ export async function snap({scene, mobile = false, url}) {
       const lines = await open(b, url, scene);
       const shot = write(dir, `${scene}-${name}.png`, await b.page.screenshot({type: 'png'}));
       const still = await measure(b, null, 600);
-      const moving = await measure(b, async () => { await b.key('ArrowUp', true); await sleep(500); await b.key('ArrowUp', false); await b.key('ArrowDown', true); await sleep(500); await b.key('ArrowDown', false); });
+      const moving = await measure(b, async () => {
+        await b.key('ArrowUp', true);
+        await sleep(500);
+        await b.key('ArrowUp', false);
+        await b.key('ArrowDown', true);
+        await sleep(500);
+        await b.key('ArrowDown', false);
+      });
       // Render on demand: a still scene draws nothing while keys it does not read are held. Ask for redraws through the
       // sanctioned test API path so the budget is judged on real frames, not on an empty window.
-      const redrawn = moving.renders ? null : await measure(b, async () => { for (let i = 0; i < 5; i++) { await b.evaluate('window.engine.redraw()'); await sleep(80); } }, 600);
+      const redrawn = moving.renders
+        ? null
+        : await measure(
+            b,
+            async () => {
+              for (let i = 0; i < 5; i++) {
+                await b.evaluate('window.engine.redraw()');
+                await sleep(80);
+              }
+            },
+            600,
+          );
       const judged = redrawn ?? moving;
-      probe.views[name] = {screenshot: shot, viewport: view, still, moving, ...(redrawn ? {redrawn} : {}), state: await b.evaluate('window.engine.state()'),
-        budget: {...budgetStatus(scene, judged), window: redrawn ? 'redrawn' : 'moving'}};
+      probe.views[name] = {
+        screenshot: shot,
+        viewport: view,
+        still,
+        moving,
+        ...(redrawn ? {redrawn} : {}),
+        state: await b.evaluate('window.engine.state()'),
+        budget: {...budgetStatus(scene, judged), window: redrawn ? 'redrawn' : 'moving'},
+      };
       probe.errors.push(...b.errors.map(e => `${name}: ${e}`));
       probe.console.push(...lines.filter(l => !l.startsWith('debug')).map(l => `${name}: ${l}`));
-    } finally { await b.close(); }
+    } finally {
+      await b.close();
+    }
   }
   write(dir, 'probe.json', probe);
   return probe;
@@ -43,14 +73,26 @@ export async function snap({scene, mobile = false, url}) {
 
 /** The console report of a snap: pictures, world, frames, the budget verdict (with what was measured) and errors. */
 function report(p) {
-  const d = p.views.desktop, st = d.state;
-  console.log(`play:snap ${p.scene}: ${Object.values(p.views).map(v => v.screenshot.replace(/^.*playtest/, 'playtest')).join(', ')}`);
+  const d = p.views.desktop,
+    st = d.state;
+  console.log(
+    `play:snap ${p.scene}: ${Object.values(p.views)
+      .map(v => v.screenshot.replace(/^.*playtest/, 'playtest'))
+      .join(', ')}`,
+  );
   const w = st.world;
-  console.log(`  world: ${w?.entities ?? 0} entities · state ${JSON.stringify(w?.state ?? {})}${w?.named?.player ? ` · player (${w.named.player.x}, ${w.named.player.z})` : ''}`);
+  console.log(
+    `  world: ${w?.entities ?? 0} entities · state ${JSON.stringify(w?.state ?? {})}${w?.named?.player ? ` · player (${w.named.player.x}, ${w.named.player.z})` : ''}`,
+  );
   const m = d.redrawn ?? d.moving;
-  console.log(`  moving: ${d.moving.renders} renders, ${d.moving.fps ?? '-'} fps (p95 ${d.moving.frameMsP95} ms) · still: ${d.still.renders} renders`);
-  console.log(`  budget (${d.budget.window === 'redrawn' ? 'forced redraws: the scene did not redraw on its own' : 'moving window'}): ${m.renders ? `${m.drawsPerFrame} draws, ${m.trisPerFrame} tris per rendered frame · ` : ''}${budgetLine(d.budget)}`);
-  for (const [name, v] of Object.entries(p.views)) if (name !== 'desktop') console.log(`  ${name} budget: ${budgetLine(v.budget)}`);
+  console.log(
+    `  moving: ${d.moving.renders} renders, ${d.moving.fps ?? '-'} fps (p95 ${d.moving.frameMsP95} ms) · still: ${d.still.renders} renders`,
+  );
+  console.log(
+    `  budget (${d.budget.window === 'redrawn' ? 'forced redraws: the scene did not redraw on its own' : 'moving window'}): ${m.renders ? `${m.drawsPerFrame} draws, ${m.trisPerFrame} tris per rendered frame · ` : ''}${budgetLine(d.budget)}`,
+  );
+  for (const [name, v] of Object.entries(p.views))
+    if (name !== 'desktop') console.log(`  ${name} budget: ${budgetLine(v.budget)}`);
   if (p.errors.length) console.log(`  page errors:\n    ${p.errors.join('\n    ')}`);
   console.log('  details: playtest/latest/probe.json');
   return p.errors.length || Object.values(p.views).some(v => v.budget.status === 'OVER BUDGET') ? 1 : 0;
@@ -58,9 +100,14 @@ function report(p) {
 
 if (process.argv[1] && process.argv[1].endsWith('snap.mjs')) {
   const server = await serve();
-  try { process.exitCode = report(await snap({scene, mobile: argv.includes('--mobile'), url: server.url})); }
-  catch (error) {
-    if (!(await import('../perf/bench-browser.mjs')).reportBrowserError(error)) { console.error(`play:snap ${scene}: ${error.message}`); process.exitCode = 1; }
+  try {
+    process.exitCode = report(await snap({scene, mobile: argv.includes('--mobile'), url: server.url}));
+  } catch (error) {
+    if (!(await import('../perf/bench-browser.mjs')).reportBrowserError(error)) {
+      console.error(`play:snap ${scene}: ${error.message}`);
+      process.exitCode = 1;
+    }
+  } finally {
+    await server.close();
   }
-  finally { await server.close(); }
 }

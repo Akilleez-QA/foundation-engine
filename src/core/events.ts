@@ -7,8 +7,8 @@
 
 /** Augmented per module. The kernel owns only the `app` area. */
 export interface EngineEvents {
-  'app.module-failed': { id: string; phase: BootPhase; error: string };
-  'app.started': { ms: number };
+  'app.module-failed': {id: string; phase: BootPhase; error: string};
+  'app.started': {ms: number};
 }
 
 export type BootPhase = 'discover' | 'register' | 'patch' | 'freeze' | 'validate' | 'install' | 'start';
@@ -34,7 +34,11 @@ export interface EventBus {
 /** Scalar diagnostics only: no payload or error object is handed to observers.
  * A rejected depth attempt has no completion. Returning a completion observes listener failures.
  */
-export type EmitObserver = (name: EventKey, depth: number, rejected: boolean) => ((listenerErrors: number) => void) | void;
+export type EmitObserver = (
+  name: EventKey,
+  depth: number,
+  rejected: boolean,
+) => ((listenerErrors: number) => void) | void;
 
 /** Dev console, test API and profiler only (dev/ imports it; features never do). */
 export interface EventBusDebug {
@@ -57,29 +61,45 @@ export function createEventBus(opts: EventBusOptions = {}): EventBus & EventBusD
   const taps = new Set<(k: EventKey, p: unknown, n: number) => void>();
   const maxDepth = opts.maxDepth ?? 32;
   const report = opts.onListenerError ?? ((k, e) => console.error(`[events] listener for ${k} threw`, e));
-  if (!Number.isSafeInteger(maxDepth) || maxDepth < 1) throw new RangeError('event maxDepth must be a positive safe integer');
-  let depth = 0, reporting = false, observing = false;
-  let observer: { begin: EmitObserver } | undefined;
+  if (!Number.isSafeInteger(maxDepth) || maxDepth < 1)
+    throw new RangeError('event maxDepth must be a positive safe integer');
+  let depth = 0,
+    reporting = false,
+    observing = false;
+  let observer: {begin: EmitObserver} | undefined;
   const diagnostic = <T>(fn: () => T): T | undefined => {
     observing = true;
-    try { return fn(); } catch { /* diagnostics never interrupt delivery */ }
-    finally { observing = false; }
+    try {
+      return fn();
+    } catch {
+      /* diagnostics never interrupt delivery */
+    } finally {
+      observing = false;
+    }
   };
   const reportSafely = (k: EventKey, error: unknown) => {
     if (reporting) return;
     reporting = true;
-    try { report(k, error); } catch { /* reporting must never interrupt delivery or report itself */ }
-    finally { reporting = false; }
+    try {
+      report(k, error);
+    } catch {
+      /* reporting must never interrupt delivery or report itself */
+    } finally {
+      reporting = false;
+    }
   };
   return {
     on(k, fn, signal) {
       if (signal?.aborted) return () => {};
       let set = listeners.get(k);
-      if (!set) listeners.set(k, set = new Set());
+      if (!set) listeners.set(k, (set = new Set()));
       const entry = fn as (p: unknown) => void;
       set.add(entry);
-      const off = () => { set!.delete(entry); signal?.removeEventListener('abort', off); };
-      signal?.addEventListener('abort', off, { once: true });
+      const off = () => {
+        set!.delete(entry);
+        signal?.removeEventListener('abort', off);
+      };
+      signal?.addEventListener('abort', off, {once: true});
       return off;
     },
     emit(k, p) {
@@ -89,27 +109,55 @@ export function createEventBus(opts: EventBusOptions = {}): EventBus & EventBusD
         throw new Error(`[events] ${k} re-emitted ${maxDepth} deep: an event loop`);
       }
       depth++;
-      let finish: ((errors: number) => void) | void = undefined, errors = 0;
+      let finish: ((errors: number) => void) | void = undefined,
+        errors = 0;
       try {
-        const set = listeners.get(k), debugSnapshot = [...taps], delivery = set ? [...set] : [];
+        const set = listeners.get(k),
+          debugSnapshot = [...taps],
+          delivery = set ? [...set] : [];
         if (trace) finish = diagnostic(() => trace.begin(k, depth, false));
         // Snapshot: a listener that unsubscribes (or subscribes) during emit does not change this delivery.
-        for (const fn of delivery) { try { fn(p); } catch (e) { errors++; reportSafely(k, e); } }
-        for (const t of debugSnapshot) { try { t(k, p, set?.size ?? 0); } catch { /* taps never break emit */ } }
+        for (const fn of delivery) {
+          try {
+            fn(p);
+          } catch (e) {
+            errors++;
+            reportSafely(k, e);
+          }
+        }
+        for (const t of debugSnapshot) {
+          try {
+            t(k, p, set?.size ?? 0);
+          } catch {
+            /* taps never break emit */
+          }
+        }
       } finally {
-        if (finish && observer === trace) { const complete = finish; diagnostic(() => complete(errors)); }
+        if (finish && observer === trace) {
+          const complete = finish;
+          diagnostic(() => complete(errors));
+        }
         depth--;
       }
     },
     observeEmits(begin) {
-      const binding = { begin };
+      const binding = {begin};
       observer = binding;
-      return () => { if (observer === binding) observer = undefined; };
+      return () => {
+        if (observer === binding) observer = undefined;
+      };
     },
-    tap(fn) { taps.add(fn); return () => { taps.delete(fn); }; },
+    tap(fn) {
+      taps.add(fn);
+      return () => {
+        taps.delete(fn);
+      };
+    },
     listenerCount(k) {
       if (k) return listeners.get(k)?.size ?? 0;
-      let n = 0; for (const s of listeners.values()) n += s.size; return n;
+      let n = 0;
+      for (const s of listeners.values()) n += s.size;
+      return n;
     },
   };
 }
