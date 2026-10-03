@@ -1,6 +1,6 @@
 /**
  * platform/render/pool-snapshot.ts: the renderer pool's `utility` role, `pool.snapshot` (
- * ADRs 0016, 0040; STD-REN-3, STD-REN-4). 
+ * ADRs 0016, 0040; STD-REN-3, STD-REN-4).
  *
  * Portraits, photo-booth pictures, costume thumbnails and the lander sprite are drawn here, off screen, instead of on
  * renderers of their own (a photo booth, thumbnails, sprites).
@@ -23,12 +23,15 @@
  * This module is not in the first-load file: the pool reaches it only through `attachUtility`.
  */
 import * as T from 'three';
-import { appRenderers, type PoolRenderer, type RendererPool } from './renderer-pool';
-import { markPresentedTarget } from './three-internals';
-import { anonymousOwner, appLoop } from '../ui/runtime';
+import {appRenderers, type PoolRenderer, type RendererPool} from './renderer-pool';
+import {markPresentedTarget} from './three-internals';
+import {anonymousOwner, appLoop} from '../ui/runtime';
 
 type GL = WebGL2RenderingContext;
-export interface SnapshotSize { width: number; height: number }
+export interface SnapshotSize {
+  width: number;
+  height: number;
+}
 /**
  * Draw one picture: `renderer.render(scene, camera)` draws into `target` (already bound and cleared to transparent).
  * The renderer starts with three's defaults (no tone mapping, exposure 1, sRGB output); set what the picture needs.
@@ -37,11 +40,12 @@ export interface SnapshotSize { width: number; height: number }
 export type SnapshotDraw = (renderer: T.WebGLRenderer, target: T.WebGLRenderTarget) => void;
 
 /** The renderer a snapshot needs (three's WebGLRenderer; a fake in tests). */
-export type SnapshotRenderer = PoolRenderer & Pick<T.WebGLRenderer, 'setRenderTarget' | 'readRenderTargetPixels' | 'setClearColor' | 'clear'>;
+export type SnapshotRenderer = PoolRenderer &
+  Pick<T.WebGLRenderer, 'setRenderTarget' | 'readRenderTargetPixels' | 'setClearColor' | 'clear'>;
 
 export interface SnapshotOptions {
   /** The utility context (a detached canvas). Throws when WebGL cannot start. */
-  createContext?(): { canvas: HTMLCanvasElement; gl: GL };
+  createContext?(): {canvas: HTMLCanvasElement; gl: GL};
   createTarget?(size: SnapshotSize): T.WebGLRenderTarget;
   /** Turn the read-back (bottom row first, premultiplied RGBA) into the picture. */
   output?(pixels: Uint8Array, size: SnapshotSize): HTMLCanvasElement | null;
@@ -56,12 +60,16 @@ export interface Snapshots {
   canvas(size: SnapshotSize, draw: SnapshotDraw): HTMLCanvasElement | null;
   /** `pool.snapshot`: the same picture as an ImageBitmap. */
   snapshot(size: SnapshotSize, draw: SnapshotDraw): Promise<ImageBitmap>;
-  stats(): { snapshots: number; onWorld: number; created: number; contexts: number };
+  stats(): {snapshots: number; onWorld: number; created: number; contexts: number};
 }
 
 /** A render target that stands in for a canvas's default framebuffer (see the header). */
 export function presentedTarget(size: SnapshotSize): T.WebGLRenderTarget {
-  const target = new T.WebGLRenderTarget(size.width, size.height, { samples: 4, depthBuffer: true, colorSpace: T.SRGBColorSpace });
+  const target = new T.WebGLRenderTarget(size.width, size.height, {
+    samples: 4,
+    depthBuffer: true,
+    colorSpace: T.SRGBColorSpace,
+  });
   target.texture.internalFormat = 'RGBA8';
   // three applies tone mapping and the target's output colour space only for the screen and XR's presented targets.
   markPresentedTarget(target);
@@ -69,14 +77,18 @@ export function presentedTarget(size: SnapshotSize): T.WebGLRenderTarget {
 }
 
 /** Read-back → 2D canvas: rows flipped, alpha un-premultiplied (what `drawImage` of a premultiplied WebGL canvas gives). */
-function toCanvas(pixels: Uint8Array, { width, height }: SnapshotSize): HTMLCanvasElement | null {
+function toCanvas(pixels: Uint8Array, {width, height}: SnapshotSize): HTMLCanvasElement | null {
   const canvas = document.createElement('canvas');
-  canvas.width = width; canvas.height = height;
+  canvas.width = width;
+  canvas.height = height;
   const g = canvas.getContext('2d');
   if (!g) return null;
-  const image = g.createImageData(width, height), out = image.data, row = width * 4;
+  const image = g.createImageData(width, height),
+    out = image.data,
+    row = width * 4;
   for (let y = 0; y < height; y++) {
-    const from = (height - 1 - y) * row, to = y * row;
+    const from = (height - 1 - y) * row,
+      to = y * row;
     for (let i = 0; i < row; i += 4) {
       const a = pixels[from + i + 3]!;
       out[to + i + 3] = a;
@@ -92,32 +104,49 @@ function toCanvas(pixels: Uint8Array, { width, height }: SnapshotSize): HTMLCanv
 }
 
 export function createSnapshots(pool: RendererPool, o: SnapshotOptions = {}): Snapshots {
-  const createContext = o.createContext ?? (() => {
-    const canvas = document.createElement('canvas');
-    // No MSAA or depth on the default framebuffer: every snapshot draws into its own multisampled target.
-    const gl = canvas.getContext('webgl2', { alpha: true, depth: false, stencil: false, antialias: false, premultipliedAlpha: true, preserveDrawingBuffer: false, powerPreference: 'default' });
-    if (!gl) throw Error('WebGL2 unavailable');
-    return { canvas, gl };
-  });
+  const createContext =
+    o.createContext ??
+    (() => {
+      const canvas = document.createElement('canvas');
+      // No MSAA or depth on the default framebuffer: every snapshot draws into its own multisampled target.
+      const gl = canvas.getContext('webgl2', {
+        alpha: true,
+        depth: false,
+        stencil: false,
+        antialias: false,
+        premultipliedAlpha: true,
+        preserveDrawingBuffer: false,
+        powerPreference: 'default',
+      });
+      if (!gl) throw Error('WebGL2 unavailable');
+      return {canvas, gl};
+    });
   const createTarget = o.createTarget ?? presentedTarget;
   const output = o.output ?? toCanvas;
   const lingerMs = o.lingerMs ?? 8000;
   const setTimer = o.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
   const clearTimer = o.clearTimer ?? (t => clearTimeout(t as ReturnType<typeof setTimeout>));
-  const counts = { snapshots: 0, onWorld: 0, created: 0 };
+  const counts = {snapshots: 0, onWorld: 0, created: 0};
   const lost = (gl: GL) => !!gl.isContextLost?.();
 
   /** The snapshot renderer and the context it is bound to. */
-  let borrowed: { gl: GL; renderer: SnapshotRenderer } | null = null;
-  let utility: { canvas: HTMLCanvasElement; gl: GL } | null = null, linger: unknown;
+  let borrowed: {gl: GL; renderer: SnapshotRenderer} | null = null;
+  let utility: {canvas: HTMLCanvasElement; gl: GL} | null = null,
+    linger: unknown;
 
   const drop = () => {
     const b = borrowed;
     borrowed = null;
-    if (b) try { b.renderer.dispose(); } catch { /* lost */ }
+    if (b)
+      try {
+        b.renderer.dispose();
+      } catch {
+        /* lost */
+      }
   };
   const retireUtility = () => {
-    clearTimer(linger); linger = undefined;
+    clearTimer(linger);
+    linger = undefined;
     const u = utility;
     if (!u) return;
     if (borrowed?.gl === u.gl) drop();
@@ -135,35 +164,53 @@ export function createSnapshots(pool: RendererPool, o: SnapshotOptions = {}): Sn
   const make = access.make as (canvas: HTMLCanvasElement, gl: GL) => SnapshotRenderer;
 
   /** The renderer to draw with, and the scene renderer to resync afterwards. */
-  const borrow = (): { r: SnapshotRenderer; leased: PoolRenderer | null } | null => {
+  const borrow = (): {r: SnapshotRenderer; leased: PoolRenderer | null} | null => {
     const world = access.world();
     if (world && !world.lost && !lost(world.gl)) {
       retireUtility();
-      if (borrowed?.gl !== world.gl) { drop(); borrowed = { gl: world.gl, renderer: make(world.canvas, world.gl) }; }
+      if (borrowed?.gl !== world.gl) {
+        drop();
+        borrowed = {gl: world.gl, renderer: make(world.canvas, world.gl)};
+      }
       counts.onWorld++;
-      return { r: borrowed.renderer, leased: world.leased ? world.renderer ?? null : null };
+      return {r: borrowed.renderer, leased: world.leased ? (world.renderer ?? null) : null};
     }
     if (utility && lost(utility.gl)) retireUtility();
-    if (!utility) { utility = createContext(); counts.created++; access.stats.created++; access.stats.contexts++; }
+    if (!utility) {
+      utility = createContext();
+      counts.created++;
+      access.stats.created++;
+      access.stats.contexts++;
+    }
     clearTimer(linger);
     linger = setTimer(retireUtility, lingerMs);
-    if (borrowed?.gl !== utility.gl) { drop(); borrowed = { gl: utility.gl, renderer: make(utility.canvas, utility.gl) }; }
-    return { r: borrowed.renderer, leased: null };
+    if (borrowed?.gl !== utility.gl) {
+      drop();
+      borrowed = {gl: utility.gl, renderer: make(utility.canvas, utility.gl)};
+    }
+    return {r: borrowed.renderer, leased: null};
   };
 
   const canvas = (size: SnapshotSize, draw: SnapshotDraw): HTMLCanvasElement | null => {
     let got: ReturnType<typeof borrow>;
-    try { got = borrow(); } catch { return null; }
+    try {
+      got = borrow();
+    } catch {
+      return null;
+    }
     if (!got) return null;
-    const { r, leased } = got;
+    const {r, leased} = got;
     const x = r as T.WebGLRenderer;
     let target: T.WebGLRenderTarget | null = null;
     try {
       // Another renderer (the scene's) drew on this context since: start from known GL state and three's defaults.
       r.resetState();
-      x.toneMapping = T.NoToneMapping; x.toneMappingExposure = 1; x.outputColorSpace = T.SRGBColorSpace;
+      x.toneMapping = T.NoToneMapping;
+      x.toneMappingExposure = 1;
+      x.outputColorSpace = T.SRGBColorSpace;
       if (x.shadowMap) x.shadowMap.enabled = false;
-      x.localClippingEnabled = false; x.autoClear = true;
+      x.localClippingEnabled = false;
+      x.autoClear = true;
       target = createTarget(size);
       r.setRenderTarget(target);
       r.setClearColor(0x000000, 0);
@@ -176,9 +223,21 @@ export function createSnapshots(pool: RendererPool, o: SnapshotOptions = {}): Sn
     } catch {
       return null;
     } finally {
-      try { r.setRenderTarget(null); target?.dispose(); r.resetState(); } catch { /* lost */ }
+      try {
+        r.setRenderTarget(null);
+        target?.dispose();
+        r.resetState();
+      } catch {
+        /* lost */
+      }
       // The scene's renderer cached GL state this renderer changed: resync it (and its viewport and scissor).
-      if (leased) try { leased.resetState(); (leased as Partial<T.WebGLRenderer>).setRenderTarget?.(null); } catch { /* lost */ }
+      if (leased)
+        try {
+          leased.resetState();
+          (leased as Partial<T.WebGLRenderer>).setRenderTarget?.(null);
+        } catch {
+          /* lost */
+        }
     }
   };
 
@@ -188,14 +247,14 @@ export function createSnapshots(pool: RendererPool, o: SnapshotOptions = {}): Sn
       const c = canvas(size, draw);
       return c ? createImageBitmap(c) : Promise.reject(Error('The picture could not be drawn (WebGL unavailable).'));
     },
-    stats: () => ({ ...counts, contexts: utility ? 1 : 0 }),
+    stats: () => ({...counts, contexts: utility ? 1 : 0}),
   };
 }
 
 let installed: Snapshots | null = null;
 /** The app's snapshots, on the app's renderer pool. */
 export function appSnapshots(): Snapshots {
-  return installed ??= createSnapshots(appRenderers());
+  return (installed ??= createSnapshots(appRenderers()));
 }
 /** Draw a picture now on the app's pool (`pool.snapshot`, synchronous form). Null when WebGL cannot start. */
 export function snapshotCanvas(size: SnapshotSize, draw: SnapshotDraw): HTMLCanvasElement | null {
@@ -207,6 +266,14 @@ export function snapshotCanvas(size: SnapshotSize, draw: SnapshotDraw): HTMLCanv
  * per frame, so a long batch never holds a frame up). Returns a cancel.
  */
 export function nextSnapshotFrame(fn: () => void): () => void {
-  const t = appLoop().add({ owner: anonymousOwner('pool-snapshot-queue'), mode: 'continuous', whenCovered: 'run', update() { t.remove(); fn(); } });
+  const t = appLoop().add({
+    owner: anonymousOwner('pool-snapshot-queue'),
+    mode: 'continuous',
+    whenCovered: 'run',
+    update() {
+      t.remove();
+      fn();
+    },
+  });
   return () => t.remove();
 }

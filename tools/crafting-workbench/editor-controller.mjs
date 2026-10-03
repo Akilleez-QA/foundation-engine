@@ -1,28 +1,12 @@
-import { createAuthoredDocument } from '../../src/kits/authoring/document.ts';
-import { createAuthoringSession } from '../../src/kits/authoring/session.ts';
-import {
-  captureRecipe,
-  initialRecipe,
-  recipeLimits,
-  evaluateRecipe,
-  recipeSectionDefinition,
-} from './recipe.mjs';
-export { recipeSectionDefinition, recipeStorageKey } from './recipe.mjs';
-const json = (value) => JSON.stringify(value);
+import {createAuthoredDocument} from '../../src/kits/authoring/document.ts';
+import {createAuthoringSession} from '../../src/kits/authoring/session.ts';
+import {captureRecipe, initialRecipe, recipeLimits, evaluateRecipe, recipeSectionDefinition} from './recipe.mjs';
+export {recipeSectionDefinition, recipeStorageKey} from './recipe.mjs';
+const json = value => JSON.stringify(value);
 /** Creator-owned recipe editor. Preview runs cannot access the accepted craftingtime or its persistence. */
-export function createEditorController({
-  saveHandle,
-  readPersisted,
-  saveBuild,
-}) {
-  if (
-    typeof saveBuild !== 'string' ||
-    !saveBuild.length ||
-    saveBuild.length > 256
-  )
-    throw Error('saveBuild required');
-  if (typeof readPersisted !== 'function')
-    throw Error('readPersisted required');
+export function createEditorController({saveHandle, readPersisted, saveBuild}) {
+  if (typeof saveBuild !== 'string' || !saveBuild.length || saveBuild.length > 256) throw Error('saveBuild required');
+  if (typeof readPersisted !== 'function') throw Error('readPersisted required');
   let recipe = initialRecipe(),
     blocked = null,
     retired = false,
@@ -33,7 +17,7 @@ export function createEditorController({
     parsedRaw,
     parsedRecipe,
     terminal;
-  const physical = (raw) => {
+  const physical = raw => {
     if (raw !== parsedRaw) {
       if (
         typeof raw !== 'string' ||
@@ -50,14 +34,11 @@ export function createEditorController({
   };
   try {
     const status = saveHandle.status();
-    if (['newer', 'quarantined', 'unavailable'].includes(status))
-      throw Error(`recovery-required:${status}`);
+    if (['newer', 'quarantined', 'unavailable'].includes(status)) throw Error(`recovery-required:${status}`);
     recipe = captureRecipe(saveHandle.get());
     lastRaw = readPersisted();
-    if (lastRaw !== null && json(physical(lastRaw)) !== json(recipe))
-      throw Error('external-conflict');
-    if (lastRaw === null && json(recipe) !== json(initialRecipe()))
-      throw Error('missing-envelope');
+    if (lastRaw !== null && json(physical(lastRaw)) !== json(recipe)) throw Error('external-conflict');
+    if (lastRaw === null && json(recipe) !== json(initialRecipe())) throw Error('missing-envelope');
   } catch (error) {
     blocked = error.message;
   }
@@ -65,7 +46,7 @@ export function createEditorController({
     id: 'authored-recipe',
     json: json(recipe),
     limits: recipeLimits,
-    validate: (value) => {
+    validate: value => {
       try {
         captureRecipe(value);
         return true;
@@ -98,29 +79,21 @@ export function createEditorController({
       durable = false;
     try {
       saveStatus = saveHandle.status();
-      if (['newer', 'quarantined', 'unavailable'].includes(saveStatus))
-        blocked ??= `recovery-required:${saveStatus}`;
+      if (['newer', 'quarantined', 'unavailable'].includes(saveStatus)) blocked ??= `recovery-required:${saveStatus}`;
       const memory = handleJson();
-      if (memory !== expectedHandle && memory !== writingTarget)
-        blocked ??= 'external-conflict';
+      if (memory !== expectedHandle && memory !== writingTarget) blocked ??= 'external-conflict';
       const raw = readPersisted();
       if (raw !== null) {
         const stored = physical(raw);
-        if (
-          raw !== lastRaw &&
-          json(stored) !== expectedHandle &&
-          json(stored) !== writingTarget
-        )
+        if (raw !== lastRaw && json(stored) !== expectedHandle && json(stored) !== writingTarget)
           blocked ??= 'external-conflict';
         lastRaw = raw;
-        durable =
-          saveStatus === 'saved' && json(stored) === document.read().json;
-      } else if (lastRaw !== null && lastRaw !== undefined)
-        blocked ??= 'external-conflict';
+        durable = saveStatus === 'saved' && json(stored) === document.read().json;
+      } else if (lastRaw !== null && lastRaw !== undefined) blocked ??= 'external-conflict';
     } catch (error) {
       blocked ??= error.message;
     }
-    return { saveStatus, durable: durable && !blocked };
+    return {saveStatus, durable: durable && !blocked};
   };
   const read = () => {
     if (terminal) return terminal;
@@ -138,18 +111,18 @@ export function createEditorController({
       ...persistence,
     });
   };
-  const guard = (fn) => {
-    if (retired) return { status: 'retired' };
-    if (busy) return { status: 'busy' };
+  const guard = fn => {
+    if (retired) return {status: 'retired'};
+    if (busy) return {status: 'busy'};
     busy = true;
     try {
       observe();
-      if (retired) return { status: 'retired' };
-      if (blocked) return { status: 'refused', reason: blocked };
+      if (retired) return {status: 'retired'};
+      if (blocked) return {status: 'refused', reason: blocked};
       return fn();
     } catch (error) {
       message = error.message;
-      return { status: 'rejected', reason: message };
+      return {status: 'rejected', reason: message};
     } finally {
       busy = false;
     }
@@ -159,24 +132,22 @@ export function createEditorController({
     const recipe = session.readPreview()?.value ?? document.read().value;
     let evaluation;
     try {
-      evaluation = { status: 'evaluated', ...evaluateRecipe(recipe) };
+      evaluation = {status: 'evaluated', ...evaluateRecipe(recipe)};
     } catch (error) {
-      evaluation = { status: 'incompatible', reason: error.message };
+      evaluation = {status: 'incompatible', reason: error.message};
     }
-    preview = { recipe, evaluation: Object.freeze(evaluation) };
-    return { status: 'started', evaluation: preview.evaluation };
+    preview = {recipe, evaluation: Object.freeze(evaluation)};
+    return {status: 'started', evaluation: preview.evaluation};
   };
   return {
     read,
-    preview: (raw) =>
+    preview: raw =>
       guard(() => {
         stop();
         session.cancel();
         const recipe = captureRecipe(raw);
-        if (retired) return { status: 'retired' };
-        const result = session.preview(document.read().ticket, () =>
-          json(recipe),
-        );
+        if (retired) return {status: 'retired'};
+        const result = session.preview(document.read().ticket, () => json(recipe));
         if (result.status === 'prepared') {
           start();
           message = 'Provisional recipe and runtime only.';
@@ -187,10 +158,7 @@ export function createEditorController({
       guard(() => {
         stop();
         const result = session.commit();
-        message =
-          result.status === 'accepted'
-            ? 'Recipe committed; accepted crafting unchanged.'
-            : result.status;
+        message = result.status === 'accepted' ? 'Recipe committed; accepted crafting unchanged.' : result.status;
         return result;
       }),
     cancel: () =>
@@ -218,7 +186,7 @@ export function createEditorController({
     stopPreview: () =>
       guard(() => {
         stop();
-        return { status: 'stopped' };
+        return {status: 'stopped'};
       }),
     save: () =>
       guard(() => {
@@ -236,11 +204,11 @@ export function createEditorController({
         writingTarget = accepted.json;
         try {
           saveHandle.update(
-            (draft) => {
+            draft => {
               for (const key of Object.keys(draft)) delete draft[key];
               Object.assign(draft, structuredClone(accepted.value));
             },
-            { now: true },
+            {now: true},
           );
         } finally {
           try {
@@ -251,12 +219,10 @@ export function createEditorController({
             writingTarget = null;
           }
         }
-        if (retired) return { status: 'retired' };
+        if (retired) return {status: 'retired'};
         const state = observe();
-        message = state.durable
-          ? 'Authored recipe saved; accepted crafting unchanged.'
-          : 'Recipe remains unsaved.';
-        return { status: state.durable ? 'saved' : 'unsaved', ...state };
+        message = state.durable ? 'Authored recipe saved; accepted crafting unchanged.' : 'Recipe remains unsaved.';
+        return {status: state.durable ? 'saved' : 'unsaved', ...state};
       }),
     dispose() {
       if (retired) return;

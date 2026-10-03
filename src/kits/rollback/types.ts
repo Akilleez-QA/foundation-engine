@@ -47,22 +47,38 @@ export interface RollbackOptions {
 }
 
 export type RollbackStatus = 'running' | 'desynced' | 'failed' | 'retired';
-export type RollbackRefusal = Readonly<{ status: 'busy' | 'failed' | 'desynced' | 'retired'; reason: string | null }>;
-export type RollbackChecksum = Readonly<{ frame: number; checksum: number }>;
-export type RollbackDesync = Readonly<{ frame: number; player: number; local: number; remote: number }>;
+export type RollbackRefusal = Readonly<{status: 'busy' | 'failed' | 'desynced' | 'retired'; reason: string | null}>;
+export type RollbackChecksum = Readonly<{frame: number; checksum: number}>;
+export type RollbackDesync = Readonly<{frame: number; player: number; local: number; remote: number}>;
 
-export type RollbackLocalResult = Readonly<{ status: 'queued'; frame: number; input: string }>
-  | Readonly<{ status: 'full' | 'invalid'; frame: number }> | RollbackRefusal;
-export type RollbackRemoteResult = Readonly<{ status: 'accepted' | 'duplicate'; rollbackFrom: number | null }>
+export type RollbackLocalResult =
+  | Readonly<{status: 'queued'; frame: number; input: string}>
+  | Readonly<{status: 'full' | 'invalid'; frame: number}>
   | RollbackRefusal;
-export type RollbackChecksumResult = Readonly<{ status: 'match' | 'pending' | 'inconclusive' }>
-  | Readonly<{ status: 'desynced'; desync: RollbackDesync }> | RollbackRefusal;
+export type RollbackRemoteResult =
+  Readonly<{status: 'accepted' | 'duplicate'; rollbackFrom: number | null}> | RollbackRefusal;
+export type RollbackChecksumResult =
+  | Readonly<{status: 'match' | 'pending' | 'inconclusive'}>
+  | Readonly<{status: 'desynced'; desync: RollbackDesync}>
+  | RollbackRefusal;
 export type RollbackAdvanceResult =
-  | Readonly<{ status: 'advanced'; frame: number; resimulated: number; predicted: boolean; checksums: readonly RollbackChecksum[] }>
-  | Readonly<{ status: 'stalled'; frame: number; resimulated: number; waitingFor: readonly number[]; checksums: readonly RollbackChecksum[] }>
-  | Readonly<{ status: 'needs-local-input'; frame: number; resimulated: number; checksums: readonly RollbackChecksum[] }>
+  | Readonly<{
+      status: 'advanced';
+      frame: number;
+      resimulated: number;
+      predicted: boolean;
+      checksums: readonly RollbackChecksum[];
+    }>
+  | Readonly<{
+      status: 'stalled';
+      frame: number;
+      resimulated: number;
+      waitingFor: readonly number[];
+      checksums: readonly RollbackChecksum[];
+    }>
+  | Readonly<{status: 'needs-local-input'; frame: number; resimulated: number; checksums: readonly RollbackChecksum[]}>
   /** `checksums` still lists what this call recorded, so the host can tell its peers before it stops. */
-  | Readonly<{ status: 'desynced'; desync: RollbackDesync; checksums: readonly RollbackChecksum[] }>
+  | Readonly<{status: 'desynced'; desync: RollbackDesync; checksums: readonly RollbackChecksum[]}>
   | RollbackRefusal;
 
 export interface RollbackStats {
@@ -134,13 +150,18 @@ export interface SyncTestOptions {
   readonly signal?: AbortSignal;
 }
 export type SyncTestResult =
-  | Readonly<{ status: 'checked'; frame: number; resimulated: number }>
-  | Readonly<{ status: 'desynced'; frame: number; expected: number; actual: number }>
-  | Readonly<{ status: 'invalid' }>
+  | Readonly<{status: 'checked'; frame: number; resimulated: number}>
+  | Readonly<{status: 'desynced'; frame: number; expected: number; actual: number}>
+  | Readonly<{status: 'invalid'}>
   | RollbackRefusal;
 export interface SyncTest {
   /** Step one frame with these inputs, then roll back `checkDistance` frames and compare resimulated checksums. */
   advance(inputs: readonly string[]): SyncTestResult;
-  read(): Readonly<{ status: RollbackStatus; reason: string | null; frame: number; desync: Readonly<{ frame: number; expected: number; actual: number }> | null }>;
+  read(): Readonly<{
+    status: RollbackStatus;
+    reason: string | null;
+    frame: number;
+    desync: Readonly<{frame: number; expected: number; actual: number}> | null;
+  }>;
   dispose(): void;
 }

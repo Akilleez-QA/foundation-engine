@@ -19,15 +19,24 @@ import {fileURLToPath} from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DEPS = process.env.LOOKALIKE_DEPS;
-if (!DEPS) { console.error('Set LOOKALIKE_DEPS to a folder with sharp and simple-icons installed (see the header of this file).'); process.exit(2); }
+if (!DEPS) {
+  console.error('Set LOOKALIKE_DEPS to a folder with sharp and simple-icons installed (see the header of this file).');
+  process.exit(2);
+}
 const fromDeps = createRequire(join(DEPS, 'package.json'));
-const sharp = fromDeps('sharp'), icons = fromDeps('simple-icons');
+const sharp = fromDeps('sharp'),
+  icons = fromDeps('simple-icons');
 const siVersion = JSON.parse(readFileSync(join(DEPS, 'node_modules/simple-icons/package.json'), 'utf8')).version;
 const {Resvg} = createRequire(import.meta.url)('@resvg/resvg-js');
 
 const N = 9;
 async function dhash(png) {
-  const p = await sharp(png).flatten({background: '#fff'}).grayscale().resize(N, N - 1, {fit: 'contain', background: '#fff'}).raw().toBuffer();
+  const p = await sharp(png)
+    .flatten({background: '#fff'})
+    .grayscale()
+    .resize(N, N - 1, {fit: 'contain', background: '#fff'})
+    .raw()
+    .toBuffer();
   let s = '';
   for (let y = 0; y < N - 1; y++) for (let x = 0; x < N - 1; x++) s += p[y * N + x] < p[y * N + x + 1] ? '1' : '0';
   return s;
@@ -39,24 +48,38 @@ let corpus;
 if (existsSync(cache)) corpus = JSON.parse(readFileSync(cache, 'utf8'));
 else {
   corpus = [];
-  for (const icon of Object.values(icons)) if (icon?.svg) corpus.push([icon.title, await dhash(new Resvg(icon.svg, {fitTo: {mode: 'width', value: 64}}).render().asPng())]);
+  for (const icon of Object.values(icons))
+    if (icon?.svg)
+      corpus.push([icon.title, await dhash(new Resvg(icon.svg, {fitTo: {mode: 'width', value: 64}}).render().asPng())]);
   writeFileSync(cache, JSON.stringify(corpus));
 }
 
 async function silhouette(file, rotate) {
-  const png = new Resvg(readFileSync(file, 'utf8'), {fitTo: {mode: 'width', value: 64}, background: '#ffffff'}).render().asPng();
+  const png = new Resvg(readFileSync(file, 'utf8'), {fitTo: {mode: 'width', value: 64}, background: '#ffffff'})
+    .render()
+    .asPng();
   let img = sharp(png).flatten({background: '#fff'}).grayscale().threshold(250);
   if (rotate) img = img.rotate(rotate, {background: '#fff'});
   return img.png().toBuffer();
 }
 
 const files = process.argv.slice(2);
-const candidates = files.length ? files : ['assets/brand/logo-mark.svg', 'assets/brand/icon.svg'].map(f => join(ROOT, f));
+const candidates = files.length
+  ? files
+  : ['assets/brand/logo-mark.svg', 'assets/brand/icon.svg'].map(f => join(ROOT, f));
 console.log(`Lookalike sanity check (not a trademark search), ${new Date().toISOString().slice(0, 10)}`);
-console.log(`dHash 64 bits of a thresholded silhouette vs Simple Icons ${siVersion} (${corpus.length} marks); flag at 10 or less.`);
-for (const file of candidates) for (const rotate of [0, 90]) {
-  const h = await dhash(await silhouette(file, rotate));
-  const rows = corpus.map(([title, ch]) => [hamming(h, ch), title]).sort((a, b) => a[0] - b[0]);
-  const name = file.replace(ROOT, '') + (rotate ? ' (rotated 90)' : '');
-  console.log(`${name}: ${rows.slice(0, 5).map(([d, t]) => `${t} ${d}`).join(', ')}${rows[0][0] <= 10 ? '  FLAG: review by eye' : ''}`);
-}
+console.log(
+  `dHash 64 bits of a thresholded silhouette vs Simple Icons ${siVersion} (${corpus.length} marks); flag at 10 or less.`,
+);
+for (const file of candidates)
+  for (const rotate of [0, 90]) {
+    const h = await dhash(await silhouette(file, rotate));
+    const rows = corpus.map(([title, ch]) => [hamming(h, ch), title]).sort((a, b) => a[0] - b[0]);
+    const name = file.replace(ROOT, '') + (rotate ? ' (rotated 90)' : '');
+    console.log(
+      `${name}: ${rows
+        .slice(0, 5)
+        .map(([d, t]) => `${t} ${d}`)
+        .join(', ')}${rows[0][0] <= 10 ? '  FLAG: review by eye' : ''}`,
+    );
+  }

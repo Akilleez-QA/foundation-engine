@@ -1,56 +1,88 @@
-import { qualityModule } from '../platform/render/quality-module';
-import type { BuildBrief } from '../author/build';
-import { workerModule } from '../platform/workers/module';
-import { textureModule } from '../platform/assets/texture-module';
-import { modelModule } from '../platform/assets/model-module';
-import { publicUrl } from '../platform/assets/public-base';
-import { soundBudgets } from '../platform/audio/sound-files';
-import { musicBudgets } from '../platform/audio/music-clock';
+import {qualityModule} from '../platform/render/quality-module';
+import type {BuildBrief} from '../author/build';
+import {workerModule} from '../platform/workers/module';
+import {textureModule} from '../platform/assets/texture-module';
+import {modelModule} from '../platform/assets/model-module';
+import {publicUrl} from '../platform/assets/public-base';
+import {soundBudgets} from '../platform/audio/sound-files';
+import {musicBudgets} from '../platform/audio/music-clock';
 /**
  * app/layer-modules.ts: the core and platform modules (ADR 0036). A short hand-kept list; kits come with the game
  * (`defineGame({ kits })`) and features and packs are discovered by folder (app/modules.ts). Kept free of Vite-only
  * code and CSS so app/registries.test.ts boots it in node. The kernel orders modules by `requires` (then layer, then
  * id), never by list position.
  */
-import type { EngineModule } from '../core/module';
-import type { GameDefinition } from '../author/defs';
-import { sceneId } from '../author/ids';
-import { saveModule } from '../core/save/module';
-import { settingsModule } from '../core/settings/module';
+import type {EngineModule} from '../core/module';
+import type {GameDefinition} from '../author/defs';
+import {sceneId} from '../author/ids';
+import {saveModule} from '../core/save/module';
+import {settingsModule} from '../core/settings/module';
 import features from '../core/settings/features-module';
-import { routerModule } from '../core/router/module';
-import { inputModule } from '../platform/input/module';
-import { audioModule, spatialAudioSettings } from '../platform/audio/module';
-import { shellModule } from '../platform/ui/shell-module';
+import {routerModule} from '../core/router/module';
+import {inputModule} from '../platform/input/module';
+import {audioModule, spatialAudioSettings} from '../platform/audio/module';
+import {shellModule} from '../platform/ui/shell-module';
 
 /** The save namespace is the game's id (every stored key starts with it; never renamed). */
-export function layerModules(game: GameDefinition, brief?: Pick<BuildBrief, 'quality'> & Partial<Pick<BuildBrief, 'devices'>>): EngineModule[] {
+export function layerModules(
+  game: GameDefinition,
+  brief?: Pick<BuildBrief, 'quality'> & Partial<Pick<BuildBrief, 'devices'>>,
+): EngineModule[] {
   return [
-    saveModule({ namespace: game.id, build: `${game.id}@${game.version}` }),
-    settingsModule({ game: spatialAudioSettings(game.audio) }),
-    qualityModule({ initialPreset: brief?.quality.tier ?? 'reference', build: `${game.id}@${game.version}` }),
+    saveModule({namespace: game.id, build: `${game.id}@${game.version}`}),
+    settingsModule({game: spatialAudioSettings(game.audio)}),
+    qualityModule({initialPreset: brief?.quality.tier ?? 'reference', build: `${game.id}@${game.version}`}),
     features,
-    routerModule({ fallbackScene: sceneId(game.firstScene) }),
+    routerModule({fallbackScene: sceneId(game.firstScene)}),
     inputModule(),
     // A game's sound files: `defineAsset({ type: 'audio' })` rows, served under the build's public base; memory bounds
     // follow the brief's minimum device (sound-files.ts, soundBudgets; music on the audio clock: music-clock.ts, musicBudgets).
-    audioModule(game.audio, { files: soundBudgets(brief?.devices?.minimum), musicFiles: musicBudgets(brief?.devices?.minimum), sound: (s, id) => {
-      const a = s.registries.assets.get(id); if (!a || a.type !== 'audio') return undefined;
-      if (!/^\/?[a-zA-Z0-9_./-]+\.(?:mp3|m4a|ogg|wav)$/i.test(a.url) || a.url.includes('..') || a.url.startsWith('//')) throw Error('audio: expected a local mp3, m4a, ogg or wav file');
-      return publicUrl(a.url);
-    } }),
+    audioModule(game.audio, {
+      files: soundBudgets(brief?.devices?.minimum),
+      musicFiles: musicBudgets(brief?.devices?.minimum),
+      sound: (s, id) => {
+        const a = s.registries.assets.get(id);
+        if (!a || a.type !== 'audio') return undefined;
+        if (
+          !/^\/?[a-zA-Z0-9_./-]+\.(?:mp3|m4a|ogg|wav)$/i.test(a.url) ||
+          a.url.includes('..') ||
+          a.url.startsWith('//')
+        )
+          throw Error('audio: expected a local mp3, m4a, ogg or wav file');
+        return publicUrl(a.url);
+      },
+    }),
     workerModule(),
-    textureModule((s,id)=>{
-      const a=s.registries.assets.get(id);if(!a||a.type!=='texture')return undefined;
-      const format=a.url.match(/\.(png|jpg|webp)$/)?.[1] as 'png'|'jpg'|'webp'|undefined;
-      if(!format||!/^\/?[a-zA-Z0-9_./-]+$/.test(a.url)||a.url.includes('..')||a.url.startsWith('//'))throw Error('assets: expected local texture');
-      return {id:a.id,kind:'texture',title:a.id,licence:a.licence==='original'?'original':`other:${a.licence}`,provenance:{author:a.author,credit:a.licence+': '+a.source},colorSpace:'srgb',variants:[{path:a.url.replace(/^\//,''),format,width:a.width,height:a.height}]};
-    },game.residency),
-    modelModule((s, id) => {
-      const a = s.registries.assets.get(id); if (!a || a.type !== 'model') return undefined;
-      if (!/^\/?[a-zA-Z0-9_./-]+\.glb$/.test(a.url) || a.url.includes('..') || a.url.startsWith('//')) throw Error('models: expected local GLB');
-      return { id: a.id, kind: 'model', title: a.id, licence: a.licence === 'original' ? 'original' : `other:${a.licence}`, provenance: { author: a.author, credit: a.licence + ': ' + a.source }, variants: [{ path: a.url.replace(/^\//, ''), format: 'glb' }] };
+    textureModule((s, id) => {
+      const a = s.registries.assets.get(id);
+      if (!a || a.type !== 'texture') return undefined;
+      const format = a.url.match(/\.(png|jpg|webp)$/)?.[1] as 'png' | 'jpg' | 'webp' | undefined;
+      if (!format || !/^\/?[a-zA-Z0-9_./-]+$/.test(a.url) || a.url.includes('..') || a.url.startsWith('//'))
+        throw Error('assets: expected local texture');
+      return {
+        id: a.id,
+        kind: 'texture',
+        title: a.id,
+        licence: a.licence === 'original' ? 'original' : `other:${a.licence}`,
+        provenance: {author: a.author, credit: a.licence + ': ' + a.source},
+        colorSpace: 'srgb',
+        variants: [{path: a.url.replace(/^\//, ''), format, width: a.width, height: a.height}],
+      };
     }, game.residency),
-    shellModule({ home: sceneId(game.firstScene) }),
+    modelModule((s, id) => {
+      const a = s.registries.assets.get(id);
+      if (!a || a.type !== 'model') return undefined;
+      if (!/^\/?[a-zA-Z0-9_./-]+\.glb$/.test(a.url) || a.url.includes('..') || a.url.startsWith('//'))
+        throw Error('models: expected local GLB');
+      return {
+        id: a.id,
+        kind: 'model',
+        title: a.id,
+        licence: a.licence === 'original' ? 'original' : `other:${a.licence}`,
+        provenance: {author: a.author, credit: a.licence + ': ' + a.source},
+        variants: [{path: a.url.replace(/^\//, ''), format: 'glb'}],
+      };
+    }, game.residency),
+    shellModule({home: sceneId(game.firstScene)}),
   ];
 }

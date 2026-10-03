@@ -7,9 +7,13 @@ window.engine = createTestApi(app, booted);
 window.traceCheck = async () => {
   await window.engine.ready();
   const capture = window.engine.eventTrace({capacity: 16});
-  const off = app.events.on('app.started', () => app.events.emit('app.module-failed', {
-    id: 'diagnostic-child', phase: 'start', error: 'scalar capture excludes this payload',
-  }));
+  const off = app.events.on('app.started', () =>
+    app.events.emit('app.module-failed', {
+      id: 'diagnostic-child',
+      phase: 'start',
+      error: 'scalar capture excludes this payload',
+    }),
+  );
   try {
     app.events.emit('app.started', {ms: 0});
     capture.dispose();

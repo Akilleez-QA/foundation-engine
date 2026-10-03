@@ -1,37 +1,21 @@
 const principals = new Set(['alpha', 'beta']);
-const validId = (id) =>
-  typeof id === 'string' &&
-  id.length > 0 &&
-  id.length <= 32 &&
-  /^[a-zA-Z0-9_-]+$/.test(id);
+const validId = id => typeof id === 'string' && id.length > 0 && id.length <= 32 && /^[a-zA-Z0-9_-]+$/.test(id);
 const exact = (frame, keys) =>
   frame !== null &&
   typeof frame === 'object' &&
   !Array.isArray(frame) &&
   Object.keys(frame).length === keys.length &&
-  keys.every((key) => Object.hasOwn(frame, key));
+  keys.every(key => Object.hasOwn(frame, key));
 
 /** Validate this reference protocol only; the caller applies a response after validation. */
-export function decodeResponse(raw, { principal, pending }) {
-  if (
-    typeof raw !== 'string' ||
-    raw.length > 1024 ||
-    new TextEncoder().encode(raw).length > 1024
-  )
+export function decodeResponse(raw, {principal, pending}) {
+  if (typeof raw !== 'string' || raw.length > 1024 || new TextEncoder().encode(raw).length > 1024)
     throw Error('response size');
-  if (
-    !(pending instanceof Map) ||
-    (principal !== null && !principals.has(principal))
-  )
-    throw Error('response context');
+  if (!(pending instanceof Map) || (principal !== null && !principals.has(principal))) throw Error('response context');
   const frame = JSON.parse(raw);
   if (!frame || frame.v !== 1) throw Error('response version');
   if (frame.type === 'authenticated') {
-    if (
-      !exact(frame, ['v', 'type', 'principal']) ||
-      !principals.has(frame.principal) ||
-      principal !== null
-    )
+    if (!exact(frame, ['v', 'type', 'principal']) || !principals.has(frame.principal) || principal !== null)
       throw Error('authentication response');
     return Object.freeze({
       v: 1,
@@ -65,10 +49,7 @@ export function decodeResponse(raw, { principal, pending }) {
   if (frame.type === 'refused') {
     const identified = Object.hasOwn(frame, 'id');
     if (
-      !exact(
-        frame,
-        identified ? ['v', 'type', 'reason', 'id'] : ['v', 'type', 'reason'],
-      ) ||
+      !exact(frame, identified ? ['v', 'type', 'reason', 'id'] : ['v', 'type', 'reason']) ||
       typeof frame.reason !== 'string' ||
       frame.reason.length > 128 ||
       (identified && (!validId(frame.id) || !pending.has(frame.id)))
@@ -78,7 +59,7 @@ export function decodeResponse(raw, { principal, pending }) {
       v: 1,
       type: 'refused',
       reason: frame.reason,
-      ...(identified ? { id: frame.id } : {}),
+      ...(identified ? {id: frame.id} : {}),
     });
   }
   if (frame.type === 'drain') {

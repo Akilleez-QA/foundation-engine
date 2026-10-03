@@ -9,14 +9,15 @@
  * an `<audio>` element. Pure apart from reading the page's base URI; without a document (node tests) a relative base is
  * returned unchanged.
  */
-import { PUBLIC_BASE } from '../../core/env';
+import {PUBLIC_BASE} from '../../core/env';
 
-const pageBase = (): string | undefined => (globalThis as { document?: { baseURI?: string } }).document?.baseURI;
+const pageBase = (): string | undefined => (globalThis as {document?: {baseURI?: string}}).document?.baseURI;
 
 /** The `public/` prefix, ending in `/`. `base` defaults to the build's (`import.meta.env.BASE_URL`). */
 export function publicBase(base: string = PUBLIC_BASE, page: string | undefined = pageBase()): string {
   const prefix = !base ? './' : base.endsWith('/') ? base : base + '/';
-  if (/^[a-z][a-z0-9+.-]*:/i.test(prefix) || prefix.startsWith('//')) throw Error('assets: the public base must be a path on this site');
+  if (/^[a-z][a-z0-9+.-]*:/i.test(prefix) || prefix.startsWith('//'))
+    throw Error('assets: the public base must be a path on this site');
   return prefix.startsWith('/') || !page ? prefix : new URL(prefix, page).href;
 }
 

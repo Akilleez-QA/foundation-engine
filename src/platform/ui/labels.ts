@@ -25,10 +25,23 @@
  */
 import * as THREE from 'three';
 
-export interface LabelSize { readonly width: number; readonly height: number }
-export interface LabelViewport { readonly width: number; readonly height: number }
+export interface LabelSize {
+  readonly width: number;
+  readonly height: number;
+}
+export interface LabelViewport {
+  readonly width: number;
+  readonly height: number;
+}
 /** Inline style a label's policy may write. Unset properties are left alone. */
-export interface LabelStyle { left?: string; top?: string; width?: string; height?: string; transform?: string; visibility?: string }
+export interface LabelStyle {
+  left?: string;
+  top?: string;
+  width?: string;
+  height?: string;
+  transform?: string;
+  visibility?: string;
+}
 
 export interface WorldLabelSpec<K = unknown> {
   readonly element: HTMLElement;
@@ -78,8 +91,16 @@ export interface LabelLayer<K = unknown> {
 }
 
 /** The subset of `ResizeObserver` the layer uses (injectable for tests). */
-export interface SizeObserver { observe(el: Element): void; unobserve(el: Element): void; disconnect(): void }
-export interface SizeEntry { readonly target: Element; readonly width: number; readonly height: number }
+export interface SizeObserver {
+  observe(el: Element): void;
+  unobserve(el: Element): void;
+  disconnect(): void;
+}
+export interface SizeEntry {
+  readonly target: Element;
+  readonly width: number;
+  readonly height: number;
+}
 
 export interface LabelLayerOptions {
   /** The size state a label is in right now (default ''); the cache keeps one size per state. */
@@ -93,18 +114,28 @@ export interface LabelLayerOptions {
   observer?(onSizes: (entries: readonly SizeEntry[]) => void): SizeObserver | null;
 }
 
-const showForMeasure = (el: HTMLElement): () => void => {
+const showForMeasure = (el: HTMLElement): (() => void) => {
   if (!el.hidden) return () => {};
   el.hidden = false;
-  return () => { el.hidden = true; };
+  return () => {
+    el.hidden = true;
+  };
 };
 
 function browserObserver(onSizes: (entries: readonly SizeEntry[]) => void): SizeObserver | null {
   if (typeof ResizeObserver === 'undefined') return null;
-  return new ResizeObserver(entries => onSizes(entries.map(e => {
-    const box = e.borderBoxSize?.[0];
-    return { target: e.target, width: box ? box.inlineSize : e.contentRect.width, height: box ? box.blockSize : e.contentRect.height };
-  })));
+  return new ResizeObserver(entries =>
+    onSizes(
+      entries.map(e => {
+        const box = e.borderBoxSize?.[0];
+        return {
+          target: e.target,
+          width: box ? box.inlineSize : e.contentRect.width,
+          height: box ? box.blockSize : e.contentRect.height,
+        };
+      }),
+    ),
+  );
 }
 
 interface Entry<K> extends ScenedLabel<K> {
@@ -114,10 +145,14 @@ interface Entry<K> extends ScenedLabel<K> {
 }
 
 export function createLabelLayer<K = unknown>(options: LabelLayerOptions = {}): LabelLayer<K> {
-  const stateOf = options.stateOf ?? (() => ''), measureAs = options.measureAs ?? ((el: HTMLElement) => showForMeasure(el));
-  const entries: Entry<K>[] = [], byElement = new Map<HTMLElement, Entry<K>>();
-  let lastWidth = NaN, lastFrame: { camera: THREE.Camera; viewport: LabelViewport; arrange: LabelArrange<K> } | null = null;
-  let placing = false, disposed = false;
+  const stateOf = options.stateOf ?? (() => ''),
+    measureAs = options.measureAs ?? ((el: HTMLElement) => showForMeasure(el));
+  const entries: Entry<K>[] = [],
+    byElement = new Map<HTMLElement, Entry<K>>();
+  let lastWidth = NaN,
+    lastFrame: {camera: THREE.Camera; viewport: LabelViewport; arrange: LabelArrange<K>} | null = null;
+  let placing = false,
+    disposed = false;
 
   const observer = (options.observer ?? browserObserver)(sizes => {
     if (disposed) return;
@@ -126,9 +161,10 @@ export function createLabelLayer<K = unknown>(options: LabelLayerOptions = {}): 
       const e = byElement.get(s.target as HTMLElement);
       // A hidden label reports 0 × 0: keep the size it had when it was shown.
       if (!e || s.width <= 0 || s.height <= 0) continue;
-      const state = stateOf(e.element), known = e.sizes.get(state);
+      const state = stateOf(e.element),
+        known = e.sizes.get(state);
       if (known && known.width === s.width && known.height === s.height) continue;
-      e.sizes.set(state, { width: s.width, height: s.height });
+      e.sizes.set(state, {width: s.width, height: s.height});
       if (!e.element.hidden) shownChanged = true;
     }
     // Scene the last frame again with the real sizes, before the paint (the observer runs after layout).
@@ -137,7 +173,8 @@ export function createLabelLayer<K = unknown>(options: LabelLayerOptions = {}): 
 
   function measure(e: Entry<K>, state: string): LabelSize {
     const restore = measureAs(e.element, state);
-    const r = e.element.getBoundingClientRect(), size = { width: r.width, height: r.height };
+    const r = e.element.getBoundingClientRect(),
+      size = {width: r.width, height: r.height};
     restore();
     if (size.width > 0 && size.height > 0) e.sizes.set(state, size);
     return size;
@@ -146,7 +183,8 @@ export function createLabelLayer<K = unknown>(options: LabelLayerOptions = {}): 
   function write(e: Entry<K>): void {
     const el = e.element;
     if (e.hidden !== undefined && el.hidden !== e.hidden) el.hidden = e.hidden;
-    const style = e.style as Record<string, string | undefined>, written = e.written as Record<string, string | undefined>;
+    const style = e.style as Record<string, string | undefined>,
+      written = e.written as Record<string, string | undefined>;
     for (const prop in style) {
       const v = style[prop];
       if (v === undefined || written[prop] === v) continue;
@@ -155,8 +193,9 @@ export function createLabelLayer<K = unknown>(options: LabelLayerOptions = {}): 
     }
     for (const name in e.data) {
       const v = e.data[name];
-      if (v === null) { if (el.dataset[name] !== undefined) delete el.dataset[name]; }
-      else if (el.dataset[name] !== v) el.dataset[name] = v;
+      if (v === null) {
+        if (el.dataset[name] !== undefined) delete el.dataset[name];
+      } else if (el.dataset[name] !== v) el.dataset[name] = v;
     }
   }
 
@@ -164,7 +203,10 @@ export function createLabelLayer<K = unknown>(options: LabelLayerOptions = {}): 
     placing = true;
     try {
       // A new width can reflow every label (media queries, wrapping): forget the sizes.
-      if (viewport.width !== lastWidth) { if (!Number.isNaN(lastWidth)) for (const e of entries) e.sizes.clear(); lastWidth = viewport.width; }
+      if (viewport.width !== lastWidth) {
+        if (!Number.isNaN(lastWidth)) for (const e of entries) e.sizes.clear();
+        lastWidth = viewport.width;
+      }
       for (const e of entries) {
         e.hidden = undefined;
         for (const k in e.style) delete (e.style as Record<string, unknown>)[k];
@@ -175,34 +217,62 @@ export function createLabelLayer<K = unknown>(options: LabelLayerOptions = {}): 
       }
       arrange(entries, viewport);
       for (const e of entries) write(e);
-    } finally { placing = false; }
+    } finally {
+      placing = false;
+    }
   }
 
   return {
     add(spec) {
       const e: Entry<K> = {
-        spec, element: spec.element, key: spec.key, projected: false, world: new THREE.Vector3(), ndc: new THREE.Vector3(),
-        style: {}, data: {}, sizes: new Map(), written: {}, removed: false,
-        size(state = stateOf(spec.element)) { return e.sizes.get(state) ?? measure(e, state); },
+        spec,
+        element: spec.element,
+        key: spec.key,
+        projected: false,
+        world: new THREE.Vector3(),
+        ndc: new THREE.Vector3(),
+        style: {},
+        data: {},
+        sizes: new Map(),
+        written: {},
+        removed: false,
+        size(state = stateOf(spec.element)) {
+          return e.sizes.get(state) ?? measure(e, state);
+        },
       };
-      entries.push(e); byElement.set(spec.element, e); observer?.observe(spec.element);
+      entries.push(e);
+      byElement.set(spec.element, e);
+      observer?.observe(spec.element);
       return {
         element: spec.element,
-        setText(text) { if (spec.element.textContent === text) return; spec.element.textContent = text; e.sizes.clear(); },
+        setText(text) {
+          if (spec.element.textContent === text) return;
+          spec.element.textContent = text;
+          e.sizes.clear();
+        },
         remove() {
-          if (e.removed) return; e.removed = true;
-          const i = entries.indexOf(e); if (i >= 0) entries.splice(i, 1);
-          byElement.delete(spec.element); observer?.unobserve(spec.element);
+          if (e.removed) return;
+          e.removed = true;
+          const i = entries.indexOf(e);
+          if (i >= 0) entries.splice(i, 1);
+          byElement.delete(spec.element);
+          observer?.unobserve(spec.element);
         },
       };
     },
     scene(camera, viewport, arrange) {
       if (disposed) return;
-      lastFrame = { camera, viewport, arrange };
+      lastFrame = {camera, viewport, arrange};
       run(camera, viewport, arrange, true);
     },
     last: el => byElement.get(el),
-    dispose() { disposed = true; observer?.disconnect(); entries.length = 0; byElement.clear(); lastFrame = null; },
+    dispose() {
+      disposed = true;
+      observer?.disconnect();
+      entries.length = 0;
+      byElement.clear();
+      lastFrame = null;
+    },
   };
 }
 
@@ -210,8 +280,26 @@ export function createLabelLayer<K = unknown>(options: LabelLayerOptions = {}): 
  * Map labels (a map view): a label sits beside a visible anchor, offset by
  * (dx, dy) and kept 4 px inside the view; an anchor outside the view hides its label rather than pinning it to an edge.
  */
-export function clampLabelToView(point: { x: number; y: number; z: number }, width: number, height: number, labelWidth: number, labelHeight: number, dx = 0, dy = 0): { visible: boolean; x: number; y: number } {
-  const visible = [point.x, point.y, point.z, width, height].every(Number.isFinite) && width > 0 && height > 0 && Math.abs(point.x) <= 1 && Math.abs(point.y) <= 1 && Math.abs(point.z) <= 1;
-  if (!visible) return { visible: false, x: 0, y: 0 };
-  return { visible: true, x: Math.max(4, Math.min(width - labelWidth - 4, (point.x + 1) * width / 2 + dx)), y: Math.max(4, Math.min(height - labelHeight - 4, (1 - point.y) * height / 2 + dy)) };
+export function clampLabelToView(
+  point: {x: number; y: number; z: number},
+  width: number,
+  height: number,
+  labelWidth: number,
+  labelHeight: number,
+  dx = 0,
+  dy = 0,
+): {visible: boolean; x: number; y: number} {
+  const visible =
+    [point.x, point.y, point.z, width, height].every(Number.isFinite) &&
+    width > 0 &&
+    height > 0 &&
+    Math.abs(point.x) <= 1 &&
+    Math.abs(point.y) <= 1 &&
+    Math.abs(point.z) <= 1;
+  if (!visible) return {visible: false, x: 0, y: 0};
+  return {
+    visible: true,
+    x: Math.max(4, Math.min(width - labelWidth - 4, ((point.x + 1) * width) / 2 + dx)),
+    y: Math.max(4, Math.min(height - labelHeight - 4, ((1 - point.y) * height) / 2 + dy)),
+  };
 }

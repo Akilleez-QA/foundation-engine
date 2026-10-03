@@ -1,9 +1,13 @@
 /** Renderer contracts only; safe for shell diagnostics without loading GPU implementation. */
 import type * as T from 'three';
-import type { StageSurfaceRequest } from './pool-stage';
-import type { ShadowTechnique } from './shadow-technique';
+import type {StageSurfaceRequest} from './pool-stage';
+import type {ShadowTechnique} from './shadow-technique';
 
-declare module '../../core/probe' { interface EngineProbes { 'render.pool': PoolStats } }
+declare module '../../core/probe' {
+  interface EngineProbes {
+    'render.pool': PoolStats;
+  }
+}
 
 export type SurfaceRole = 'world' | 'stage' | 'utility';
 
@@ -12,7 +16,7 @@ export interface RenderProfile {
   toneMapping: T.ToneMapping;
   toneMappingExposure: number;
   outputColorSpace: T.ColorSpace;
-  shadowMap: { enabled: boolean; type: T.ShadowMapType };
+  shadowMap: {enabled: boolean; type: T.ShadowMapType};
   clearColor: T.ColorRepresentation;
   clearAlpha: number;
   localClippingEnabled: boolean;
@@ -26,7 +30,7 @@ export interface SurfaceRequest {
   /** Where in `host`: appended (default) or prepended. */
   insert?: 'append' | 'prepend';
   /** Owner's lifetime: when given, the lease is released with it. */
-  ctx?: { own<D extends { dispose(): void }>(d: D): D };
+  ctx?: {own<D extends {dispose(): void}>(d: D): D};
   /** The ceiling for the quality pixel ratio (applied live until release). */
   maxPixelRatio?: number | undefined;
   profile?: Partial<RenderProfile>;
@@ -47,14 +51,19 @@ export interface RenderSurface {
   /** Ends the lease (idempotent). The renderer must not be used afterwards. */
   /** World leases only: readiness of currently tracked programs after compile; no shadow/upload guarantee. */
   /** Wait for preceding GPU commands after an actual initial draw; never a presentation guarantee. */
-  frameReady?(signal:AbortSignal):Promise<'ready'|'retired'>;
+  frameReady?(signal: AbortSignal): Promise<'ready' | 'retired'>;
   programsReady?(signal: AbortSignal): Promise<import('./program-readiness').ProgramReadiness>;
   release(): void;
   dispose(): void;
 }
 
 /** One release's leak audit: what the renderer still counted, and the GL objects the pool had to delete. */
-export interface LeaseAudit { textures: number; geometries: number; programs: number; glObjects: number }
+export interface LeaseAudit {
+  textures: number;
+  geometries: number;
+  programs: number;
+  glObjects: number;
+}
 
 export interface PoolStats {
   /** WebGL contexts the pool created (world, overflow, stage and utility). */
@@ -71,7 +80,11 @@ export interface PoolStats {
 }
 
 /** Tier caps for the recycle valve. */
-export interface RecycleValve { textures: number; geometries: number; every: number }
+export interface RecycleValve {
+  textures: number;
+  geometries: number;
+  every: number;
+}
 
 export interface HeldFrame {
   /** Cross-fade the held image out over `ms` (0: at once), then remove it. */
@@ -94,7 +107,7 @@ export interface RendererPool {
   stats(): PoolStats;
   /** Plug the `utility` role in (pool-snapshot.ts). `worldChanged` runs before the world context changes hands
    *  (a lease, a release, a retire), so the role drops anything bound to it. */
-  attachUtility(u: { worldChanged(): void }): UtilityAccess;
+  attachUtility(u: {worldChanged(): void}): UtilityAccess;
 }
 
 /** What the `utility` role (pool-snapshot.ts) may use: the pool's renderer factory, its stats (the role counts
@@ -102,12 +115,22 @@ export interface RendererPool {
 export interface UtilityAccess {
   make(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext): PoolRenderer;
   stats: PoolStats;
-  world(): { canvas: HTMLCanvasElement; gl: WebGL2RenderingContext; leased: boolean; lost: boolean; renderer?: PoolRenderer | null } | null;
+  world(): {
+    canvas: HTMLCanvasElement;
+    gl: WebGL2RenderingContext;
+    leased: boolean;
+    lost: boolean;
+    renderer?: PoolRenderer | null;
+  } | null;
 }
 
 type GL = WebGL2RenderingContext;
 /** The renderer the pool needs (three's WebGLRenderer; a fake in tests). */
-export type PoolRenderer = Pick<T.WebGLRenderer, 'domElement' | 'getContext' | 'dispose' | 'forceContextLoss' | 'resetState' | 'info'> & Partial<T.WebGLRenderer>;
+export type PoolRenderer = Pick<
+  T.WebGLRenderer,
+  'domElement' | 'getContext' | 'dispose' | 'forceContextLoss' | 'resetState' | 'info'
+> &
+  Partial<T.WebGLRenderer>;
 export interface RendererPoolOptions {
   /** World renderers: test/dev defaults to full Three diagnostics; production validates links without success logs. */
   programDiagnostics?: 'full' | 'failure-only';
@@ -122,6 +145,5 @@ export interface RendererPoolOptions {
   nextFrame?(fn: () => void): () => void;
   holdTimeoutMs?: number;
   /** The `stage` role's shared context: a detached canvas and its WebGL2 context. */
-  createStageContext?(antialias: boolean): { canvas: HTMLCanvasElement; gl: GL };
+  createStageContext?(antialias: boolean): {canvas: HTMLCanvasElement; gl: GL};
 }
-

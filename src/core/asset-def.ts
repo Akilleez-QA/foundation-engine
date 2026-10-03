@@ -4,7 +4,7 @@
 // and domain (STD-LAY-1; the `content-is-data` layer rule). `platform/assets/manifest.ts` re-exports them and owns the
 // validation.
 
-import type { QualityPreset } from './tiers.ts';
+import type {QualityPreset} from './tiers.ts';
 
 export type AssetKind =
   | 'texture'
@@ -63,7 +63,7 @@ export interface AssetProvenance {
   readonly author?: string;
   /** Text shown in notices and credits. */
   readonly credit?: string;
-  readonly source?: { readonly url: string; readonly page?: string; readonly retrieved?: string };
+  readonly source?: {readonly url: string; readonly page?: string; readonly retrieved?: string};
   /** Edits made after retrieval (crop, re-encode, LOD). */
   readonly changes?: string;
   /** The script that produced the shipped files, if any. */
@@ -101,7 +101,7 @@ export interface AssetDef {
   readonly licence: LicenceId;
   readonly provenance: AssetProvenance;
   readonly colorSpace?: 'srgb' | 'linear';
-  readonly budget?: { readonly triangles?: number; readonly draws?: number; readonly textureMiB?: number };
+  readonly budget?: {readonly triangles?: number; readonly draws?: number; readonly textureMiB?: number};
   readonly variants: readonly AssetVariant[];
 }
 

@@ -20,35 +20,69 @@ export interface BrowserTransportOptions {
   /** Trusted construction seam; the returned socket is exclusively owned by this adapter. */
   socketFactory?: ((url: string, protocols: readonly string[]) => BrowserSocket) | undefined;
 }
-export type BrowserTransportReason = 'disposed' | 'remote-close' | 'socket-error' | 'socket-state'
-  | 'unavailable' | 'construction-error' | 'message-type' | 'message-too-large' | 'queue-overflow' | 'send-error';
-export type BrowserSendResult = Readonly<{ status: 'sent' } | {
-  status: 'refused'; reason: 'not-open' | 'busy' | 'message-type' | 'message-too-large' | 'backpressure' | 'send-error';
-}>;
+export type BrowserTransportReason =
+  | 'disposed'
+  | 'remote-close'
+  | 'socket-error'
+  | 'socket-state'
+  | 'unavailable'
+  | 'construction-error'
+  | 'message-type'
+  | 'message-too-large'
+  | 'queue-overflow'
+  | 'send-error';
+export type BrowserSendResult = Readonly<
+  | {status: 'sent'}
+  | {
+      status: 'refused';
+      reason: 'not-open' | 'busy' | 'message-type' | 'message-too-large' | 'backpressure' | 'send-error';
+    }
+>;
 /**
  * What the remote peer said when it closed, after validation. Both fields are untrusted remote input:
  * `code` is an integer in [1000, 4999] or null; `reason` is a bounded token matching
  * `CLOSE_REASON_TOKEN` or null (absent, oversized or not a token). Never render it as markup.
  */
-export type BrowserRemoteClose = Readonly<{ code: number | null; reason: string | null }>;
+export type BrowserRemoteClose = Readonly<{code: number | null; reason: string | null}>;
 /** At most 64 ASCII letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit. */
 export const CLOSE_REASON_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
 export const MAX_CLOSE_REASON_LENGTH = 64;
 /** Bound and validate a native close event; never throws and never retains the raw event or text. */
 export function parseRemoteClose(event: unknown): BrowserRemoteClose {
-  let code: unknown = null, text: unknown = null;
-  try { code = (event as CloseEvent).code; } catch { code = null; }
-  try { text = (event as CloseEvent).reason; } catch { text = null; }
+  let code: unknown = null,
+    text: unknown = null;
+  try {
+    code = (event as CloseEvent).code;
+  } catch {
+    code = null;
+  }
+  try {
+    text = (event as CloseEvent).reason;
+  } catch {
+    text = null;
+  }
   return Object.freeze({
     code: typeof code === 'number' && Number.isInteger(code) && code >= 1000 && code <= 4999 ? code : null,
     // Check type and length before the pattern so an oversized remote string is never scanned.
-    reason: typeof text === 'string' && text.length > 0 && text.length <= MAX_CLOSE_REASON_LENGTH
-      && CLOSE_REASON_TOKEN.test(text) ? text : null,
+    reason:
+      typeof text === 'string' &&
+      text.length > 0 &&
+      text.length <= MAX_CLOSE_REASON_LENGTH &&
+      CLOSE_REASON_TOKEN.test(text)
+        ? text
+        : null,
   });
 }
-const capabilities = Object.freeze({ ordered: true, reliable: true, text: true, binary: false, incomingBackpressure: false });
+const capabilities = Object.freeze({
+  ordered: true,
+  reliable: true,
+  text: true,
+  binary: false,
+  incomingBackpressure: false,
+});
 const positive = (n: number): number => {
-  if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 1) throw Error('network: positive safe integer required');
+  if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 1)
+    throw Error('network: positive safe integer required');
   return n;
 };
 /** Native data is already allocated; scan at most the configured number of code units, without another byte buffer. */
@@ -59,9 +93,16 @@ function bytes(text: string, limit: number): number {
     const unit = text.charCodeAt(i);
     if (unit < 0x80) size++;
     else if (unit < 0x800) size += 2;
-    else if (unit >= 0xd800 && unit <= 0xdbff && i + 1 < text.length
-      && text.charCodeAt(i + 1) >= 0xdc00 && text.charCodeAt(i + 1) <= 0xdfff) { size += 4; i++; }
-    else size += 3;
+    else if (
+      unit >= 0xd800 &&
+      unit <= 0xdbff &&
+      i + 1 < text.length &&
+      text.charCodeAt(i + 1) >= 0xdc00 &&
+      text.charCodeAt(i + 1) <= 0xdfff
+    ) {
+      size += 4;
+      i++;
+    } else size += 3;
     if (size > limit) return Infinity;
   }
   return size;
@@ -76,8 +117,10 @@ export function createBrowserTransport(options: BrowserTransportOptions) {
     throw Error('network: invalid endpoint');
   const source = options.limits;
   const limits = Object.freeze({
-    maxMessageBytes: positive(source.maxMessageBytes), maxQueuedMessages: positive(source.maxQueuedMessages),
-    maxQueuedBytes: positive(source.maxQueuedBytes), maxBufferedBytes: positive(source.maxBufferedBytes),
+    maxMessageBytes: positive(source.maxMessageBytes),
+    maxQueuedMessages: positive(source.maxQueuedMessages),
+    maxQueuedBytes: positive(source.maxQueuedBytes),
+    maxBufferedBytes: positive(source.maxBufferedBytes),
   });
   const requested = options.protocols ?? [];
   if (!Array.isArray(requested)) throw Error('network: invalid protocols');
@@ -86,49 +129,91 @@ export function createBrowserTransport(options: BrowserTransportOptions) {
   const protocols: string[] = [];
   for (let i = 0; i < length; i++) {
     const protocol = requested[i];
-    if (typeof protocol !== 'string' || protocol.length < 1 || protocol.length > 128
-      || !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(protocol) || protocols.includes(protocol)) throw Error('network: invalid protocol');
+    if (
+      typeof protocol !== 'string' ||
+      protocol.length < 1 ||
+      protocol.length > 128 ||
+      !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(protocol) ||
+      protocols.includes(protocol)
+    )
+      throw Error('network: invalid protocol');
     protocols.push(protocol);
   }
   Object.freeze(protocols);
   let state: 'connecting' | 'open' | 'closed' | 'disposed' = 'connecting';
   let reason: BrowserTransportReason | null = null;
   let remoteClose: BrowserRemoteClose | null = null;
-  let socket: BrowserSocket | null = null, sending = false;
-  let queue: { text: string; bytes: number }[] = [], queuedBytes = 0;
-  let receivedMessages = 0, receivedBytes = 0, sentMessages = 0, sentBytes = 0, refusedSends = 0;
+  let socket: BrowserSocket | null = null,
+    sending = false;
+  let queue: {text: string; bytes: number}[] = [],
+    queuedBytes = 0;
+  let receivedMessages = 0,
+    receivedBytes = 0,
+    sentMessages = 0,
+    sentBytes = 0,
+    refusedSends = 0;
   const registered: [string, EventListener][] = [];
   const live = () => state === 'connecting' || state === 'open';
   function finish(why: BrowserTransportReason, closeSocket = true) {
     if (!live()) return;
-    state = why === 'disposed' ? 'disposed' : 'closed'; reason = why;
-    queue = []; queuedBytes = 0;
+    state = why === 'disposed' ? 'disposed' : 'closed';
+    reason = why;
+    queue = [];
+    queuedBytes = 0;
     const owned = socket;
     // Revoke authority before invoking injected/native cleanup that may reenter.
     for (const [type, listener] of registered.splice(0)) {
-      try { owned?.removeEventListener(type, listener); } catch { /* Continue releasing every listener. */ }
+      try {
+        owned?.removeEventListener(type, listener);
+      } catch {
+        /* Continue releasing every listener. */
+      }
     }
     if (closeSocket) {
-      try { owned?.close(1000, 'transport retired'); } catch { /* Terminal even if native cleanup fails. */ }
+      try {
+        owned?.close(1000, 'transport retired');
+      } catch {
+        /* Terminal even if native cleanup fails. */
+      }
     }
     socket = null;
   }
   const open: EventListener = () => {
     if (state !== 'connecting') return;
-    try { if (socket?.readyState === 1 && live()) state = 'open'; else finish('socket-state'); }
-    catch { finish('socket-error'); }
+    try {
+      if (socket?.readyState === 1 && live()) state = 'open';
+      else finish('socket-state');
+    } catch {
+      finish('socket-error');
+    }
   };
   const message: EventListener = event => {
     if (state !== 'open') return;
     let data: unknown;
-    try { data = (event as MessageEvent<unknown>).data; } catch { finish('message-type'); return; }
+    try {
+      data = (event as MessageEvent<unknown>).data;
+    } catch {
+      finish('message-type');
+      return;
+    }
     if (state !== 'open') return;
-    if (typeof data !== 'string') { finish('message-type'); return; }
+    if (typeof data !== 'string') {
+      finish('message-type');
+      return;
+    }
     const size = bytes(data, limits.maxMessageBytes);
-    if (!Number.isFinite(size)) { finish('message-too-large'); return; }
-    if (queue.length >= limits.maxQueuedMessages || size > limits.maxQueuedBytes - queuedBytes) { finish('queue-overflow'); return; }
-    queue.push({ text: data, bytes: size }); queuedBytes += size;
-    receivedMessages = saturate(receivedMessages); receivedBytes = saturate(receivedBytes, size);
+    if (!Number.isFinite(size)) {
+      finish('message-too-large');
+      return;
+    }
+    if (queue.length >= limits.maxQueuedMessages || size > limits.maxQueuedBytes - queuedBytes) {
+      finish('queue-overflow');
+      return;
+    }
+    queue.push({text: data, bytes: size});
+    queuedBytes += size;
+    receivedMessages = saturate(receivedMessages);
+    receivedBytes = saturate(receivedBytes, size);
   };
   const closed: EventListener = event => {
     if (!live()) return;
@@ -144,15 +229,23 @@ export function createBrowserTransport(options: BrowserTransportOptions) {
       const initial = socket.readyState;
       if (initial === 1) state = 'open';
       else if (initial !== 0) finish('socket-state');
-      for (const row of [['open', open], ['message', message], ['close', closed], ['error', error]] as [string, EventListener][]) {
+      for (const row of [
+        ['open', open],
+        ['message', message],
+        ['close', closed],
+        ['error', error],
+      ] as [string, EventListener][]) {
         if (!live()) break;
         registered.push(row);
         socket!.addEventListener(...row);
       }
     }
-  } catch { finish('construction-error'); }
-  const refuse = (why: Extract<BrowserSendResult, { status: 'refused' }>['reason']): BrowserSendResult => {
-    refusedSends = saturate(refusedSends); return Object.freeze({ status: 'refused', reason: why });
+  } catch {
+    finish('construction-error');
+  }
+  const refuse = (why: Extract<BrowserSendResult, {status: 'refused'}>['reason']): BrowserSendResult => {
+    refusedSends = saturate(refusedSends);
+    return Object.freeze({status: 'refused', reason: why});
   };
   return Object.freeze({
     capabilities,
@@ -164,32 +257,64 @@ export function createBrowserTransport(options: BrowserTransportOptions) {
       if (!Number.isFinite(size)) return refuse('message-too-large');
       sending = true;
       try {
-        const owned = socket, buffered = owned.bufferedAmount, ready = owned.readyState;
+        const owned = socket,
+          buffered = owned.bufferedAmount,
+          ready = owned.readyState;
         if (state !== 'open' || socket !== owned) return refuse('not-open');
-        if (ready !== 1) { finish('socket-state'); return refuse('not-open'); }
-        if (!Number.isSafeInteger(buffered) || buffered < 0) { finish('socket-error'); return refuse('send-error'); }
+        if (ready !== 1) {
+          finish('socket-state');
+          return refuse('not-open');
+        }
+        if (!Number.isSafeInteger(buffered) || buffered < 0) {
+          finish('socket-error');
+          return refuse('send-error');
+        }
         if (size > limits.maxBufferedBytes - buffered) return refuse('backpressure');
         owned.send(text);
         if (state !== 'open' || socket !== owned) return refuse('not-open');
-        sentMessages = saturate(sentMessages); sentBytes = saturate(sentBytes, size);
-        return Object.freeze({ status: 'sent' });
-      } catch { finish('send-error'); return refuse('send-error'); }
-      finally { sending = false; }
+        sentMessages = saturate(sentMessages);
+        sentBytes = saturate(sentBytes, size);
+        return Object.freeze({status: 'sent'});
+      } catch {
+        finish('send-error');
+        return refuse('send-error');
+      } finally {
+        sending = false;
+      }
     },
     drain(maxMessages: number): readonly string[] {
-      if (typeof maxMessages !== 'number' || !Number.isSafeInteger(maxMessages) || maxMessages < 0
-        || maxMessages > limits.maxQueuedMessages) throw Error('network: drain budget');
+      if (
+        typeof maxMessages !== 'number' ||
+        !Number.isSafeInteger(maxMessages) ||
+        maxMessages < 0 ||
+        maxMessages > limits.maxQueuedMessages
+      )
+        throw Error('network: drain budget');
       const rows = queue.splice(0, maxMessages);
       for (const row of rows) queuedBytes -= row.bytes;
       return Object.freeze(rows.map(row => row.text));
     },
     read() {
-      return Object.freeze({ state, reason, remoteClose, queuedMessages: queue.length, queuedBytes,
-        receivedMessages, receivedBytes, sentMessages, sentBytes, refusedSends, limits, capabilities });
+      return Object.freeze({
+        state,
+        reason,
+        remoteClose,
+        queuedMessages: queue.length,
+        queuedBytes,
+        receivedMessages,
+        receivedBytes,
+        sentMessages,
+        sentBytes,
+        refusedSends,
+        limits,
+        capabilities,
+      });
     },
     dispose() {
       if (live()) finish('disposed');
-      else if (state !== 'disposed') { state = 'disposed'; /* Preserve the terminal cause. */ }
+      else if (state !== 'disposed') {
+        state = 'disposed'; /* Preserve the terminal cause. */
+      }
     },
   });
 }

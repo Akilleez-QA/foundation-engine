@@ -17,27 +17,64 @@ test('a GAME_DIR without game.ts is one line that lists the template game folder
   assert.equal(gameDirProblem({GAME_DIR: 'templates/arcade/game'}), null);
   assert.equal(gameDir({GAME_DIR: 'templates/arcade/game'}), join(ROOT, 'templates/arcade/game'));
   const problem = gameDirProblem({GAME_DIR: 'templates/nope/game'});
-  assert.ok(problem && !problem.includes('\n') && problem.includes('templates/nope/game') && problem.includes('templates/blank/game'));
-  assert.throws(() => gameDir({GAME_DIR: 'templates/nope/game'}), e => e.code === 'ENGINE_GAME_DIR' && e.message === problem);
+  assert.ok(
+    problem &&
+      !problem.includes('\n') &&
+      problem.includes('templates/nope/game') &&
+      problem.includes('templates/blank/game'),
+  );
+  assert.throws(
+    () => gameDir({GAME_DIR: 'templates/nope/game'}),
+    e => e.code === 'ENGINE_GAME_DIR' && e.message === problem,
+  );
 });
 
 test('an entry point given a wrong game stops with that one line and no stack; --game reaches child processes', () => {
   const lib = new URL('./game-dir.mjs', import.meta.url).href;
-  const bad = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(lib)})`, '--', 'entry.mjs', '--game', 'templates/nope/game'], {encoding: 'utf8', env: {...process.env, GAME_DIR: ''}});
+  const bad = spawnSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `await import(${JSON.stringify(lib)})`,
+      '--',
+      'entry.mjs',
+      '--game',
+      'templates/nope/game',
+    ],
+    {encoding: 'utf8', env: {...process.env, GAME_DIR: ''}},
+  );
   assert.equal(bad.status, 2);
   assert.equal(bad.stderr.trim().split('\n').length, 1, bad.stderr);
   assert.match(bad.stderr, /^GAME_DIR templates\/nope\/game has no game\.ts\. .*templates\/blank\/game/);
-  const good = spawnSync(process.execPath, ['--input-type=module', '-e',
-    `await import(${JSON.stringify(lib)}); const {execFileSync} = await import('node:child_process'); process.stdout.write(execFileSync(process.execPath, ['-p', 'process.env.GAME_DIR'], {encoding: 'utf8'}))`,
-    '--', 'entry.mjs', '--game', 'templates/arcade/game'], {encoding: 'utf8', env: {...process.env, GAME_DIR: ''}});
+  const good = spawnSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `await import(${JSON.stringify(lib)}); const {execFileSync} = await import('node:child_process'); process.stdout.write(execFileSync(process.execPath, ['-p', 'process.env.GAME_DIR'], {encoding: 'utf8'}))`,
+      '--',
+      'entry.mjs',
+      '--game',
+      'templates/arcade/game',
+    ],
+    {encoding: 'utf8', env: {...process.env, GAME_DIR: ''}},
+  );
   assert.equal(good.status, 0, good.stderr);
   assert.equal(good.stdout.trim(), 'templates/arcade/game');
 });
 
 test('--game without a folder stops with one line instead of silently building the default game', () => {
   const lib = new URL('./game-dir.mjs', import.meta.url).href;
-  const r = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(lib)})`, '--', 'entry.mjs', '--game'], {encoding: 'utf8', env: {...process.env, GAME_DIR: ''}});
+  const r = spawnSync(
+    process.execPath,
+    ['--input-type=module', '-e', `await import(${JSON.stringify(lib)})`, '--', 'entry.mjs', '--game'],
+    {encoding: 'utf8', env: {...process.env, GAME_DIR: ''}},
+  );
   assert.equal(r.status, 2);
-  assert.match(r.stderr, /^--game needs a folder, e\.g\. --game templates\/blank\/game\. One of: .*templates\/arcade\/game/);
+  assert.match(
+    r.stderr,
+    /^--game needs a folder, e\.g\. --game templates\/blank\/game\. One of: .*templates\/arcade\/game/,
+  );
   assert.equal(r.stderr.trim().split('\n').length, 1);
 });

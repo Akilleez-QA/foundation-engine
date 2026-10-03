@@ -51,7 +51,9 @@ export interface WindowFacts {
   heldKeysDrive?: boolean;
 }
 
-export interface ClassifiedUpload extends UploadFact { purpose: UploadPurpose }
+export interface ClassifiedUpload extends UploadFact {
+  purpose: UploadPurpose;
+}
 
 export interface WindowClassification {
   kind: WindowKind;
@@ -68,19 +70,24 @@ export interface WindowClassification {
  * - a new texture met on the active script's route is **firstUse**;
  * - a new texture in a still window after loading finished is **unknown**: nobody has attributed it.
  */
-export function uploadPurpose(u: UploadFact, f: Pick<WindowFacts, 'mode' | 'pendingAtStart' | 'requestsDuring'>): UploadPurpose {
+export function uploadPurpose(
+  u: UploadFact,
+  f: Pick<WindowFacts, 'mode' | 'pendingAtStart' | 'requestsDuring'>,
+): UploadPurpose {
   if (!u.firstEver) return 'recurring';
   if (f.pendingAtStart > 0 || f.requestsDuring > 0) return 'initial';
   return f.mode === 'active' ? 'firstUse' : 'unknown';
 }
 
 /** The reason an active window that drew nothing is 'inconclusive' (shared by the bench, the gate and perf:derive). */
-export const NO_FRAME_ACTIVE = 'active window rendered no frame while input was held: the scene probably ended (game over, frozen run or pause), so its counts are 0 by observation, not measured';
+export const NO_FRAME_ACTIVE =
+  'active window rendered no frame while input was held: the scene probably ended (game over, frozen run or pause), so its counts are 0 by observation, not measured';
 /** The reason an active window that drew nothing is still valid: its held keys press nothing the game binds. */
-export const NO_FRAME_UNDRIVEN = 'active window rendered no frame, but the held keys press no game action: a still window (render on demand), counts are 0 by observation';
+export const NO_FRAME_UNDRIVEN =
+  'active window rendered no frame, but the held keys press no game action: a still window (render on demand), counts are 0 by observation';
 
-export function classifyWindow(f: WindowFacts): { classification: WindowClassification; uploads: ClassifiedUpload[] } {
-  const uploads = f.uploads.map(u => ({ ...u, purpose: uploadPurpose(u, f) }));
+export function classifyWindow(f: WindowFacts): {classification: WindowClassification; uploads: ClassifiedUpload[]} {
+  const uploads = f.uploads.map(u => ({...u, purpose: uploadPurpose(u, f)}));
   const count = (p: UploadPurpose) => uploads.filter(u => u.purpose === p).length;
   const reasons: string[] = [];
   let kind: WindowKind;
@@ -110,6 +117,15 @@ export function classifyWindow(f: WindowFacts): { classification: WindowClassifi
   if (f.renderedFrames === 0 && kind !== 'invalid' && f.mode === 'active' && f.heldKeysDrive !== false) {
     reasons.push(NO_FRAME_ACTIVE);
     kind = 'inconclusive';
-  } else if (f.renderedFrames === 0 && kind !== 'invalid') reasons.push(f.mode === 'active' ? NO_FRAME_UNDRIVEN : 'no rendered frame: counts are 0 by observation');
-  return { classification: { kind, version: CLASSIFICATION_VERSION, reasons, comparable: kind !== 'invalid' && kind !== 'unclassified' && kind !== 'inconclusive' }, uploads };
+  } else if (f.renderedFrames === 0 && kind !== 'invalid')
+    reasons.push(f.mode === 'active' ? NO_FRAME_UNDRIVEN : 'no rendered frame: counts are 0 by observation');
+  return {
+    classification: {
+      kind,
+      version: CLASSIFICATION_VERSION,
+      reasons,
+      comparable: kind !== 'invalid' && kind !== 'unclassified' && kind !== 'inconclusive',
+    },
+    uploads,
+  };
 }

@@ -6,4 +6,4 @@
 import brief from '@game/build.brief';
 import game from '@game/game';
 
-export { brief, game };
+export {brief, game};

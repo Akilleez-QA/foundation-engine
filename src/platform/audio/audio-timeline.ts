@@ -32,7 +32,7 @@ export interface AudioClockReading {
   /** `AudioContext.baseLatency` in seconds; 0 where unreported. */
   readonly baseLatency: number;
   /** `getOutputTimestamp()` when the browser reports a usable pair: the context time audible at `performanceTime`. */
-  readonly output: { readonly contextTime: number; readonly performanceTime: number } | null;
+  readonly output: {readonly contextTime: number; readonly performanceTime: number} | null;
 }
 
 /**
@@ -46,7 +46,7 @@ export interface AudioCalibration {
   readonly visualMs: number;
 }
 export const MAX_CALIBRATION_MS = 500;
-export const NO_CALIBRATION: AudioCalibration = Object.freeze({ inputMs: 0, visualMs: 0 });
+export const NO_CALIBRATION: AudioCalibration = Object.freeze({inputMs: 0, visualMs: 0});
 
 export interface TimelineEvent<T> {
   readonly id: number;
@@ -135,7 +135,8 @@ const MAX_TIME = 1e7;
 
 const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
 const ranged = (name: string, value: number, min: number, max: number, open = false) => {
-  if (!finite(value) || value > max || (open ? value <= min : value < min)) throw Error(`audio timeline: ${name} out of range`);
+  if (!finite(value) || value > max || (open ? value <= min : value < min))
+    throw Error(`audio timeline: ${name} out of range`);
   return value;
 };
 const integer = (name: string, value: number, min: number, max: number) => {
@@ -146,53 +147,99 @@ export function validateCalibration(c: AudioCalibration): AudioCalibration {
   if (!c || typeof c !== 'object') throw Error('audio timeline: invalid calibration');
   ranged('inputMs', c.inputMs, -MAX_CALIBRATION_MS, MAX_CALIBRATION_MS);
   ranged('visualMs', c.visualMs, -MAX_CALIBRATION_MS, MAX_CALIBRATION_MS);
-  return Object.freeze({ inputMs: c.inputMs, visualMs: c.visualMs });
+  return Object.freeze({inputMs: c.inputMs, visualMs: c.visualMs});
 }
 
 /** A usable reading: finite, non-negative times and latencies. Anything else counts as no sample. */
 function usable(r: AudioClockReading | null): r is AudioClockReading {
-  if (!r || !finite(r.currentTime) || r.currentTime < 0 || !finite(r.performanceTime) || r.performanceTime < 0) return false;
+  if (!r || !finite(r.currentTime) || r.currentTime < 0 || !finite(r.performanceTime) || r.performanceTime < 0)
+    return false;
   if (!finite(r.outputLatency) || r.outputLatency < 0 || !finite(r.baseLatency) || r.baseLatency < 0) return false;
-  return r.output === null || (finite(r.output.contextTime) && r.output.contextTime >= 0 && finite(r.output.performanceTime) && r.output.performanceTime >= 0);
+  return (
+    r.output === null ||
+    (finite(r.output.contextTime) &&
+      r.output.contextTime >= 0 &&
+      finite(r.output.performanceTime) &&
+      r.output.performanceTime >= 0)
+  );
 }
 
-interface Pending<T> { id: number; at: number; payload: T; live: boolean; off?: (() => void) | undefined }
+interface Pending<T> {
+  id: number;
+  at: number;
+  payload: T;
+  live: boolean;
+  off?: (() => void) | undefined;
+}
 
 export function createAudioTimeline<T = unknown>(o: AudioTimelineOptions<T>): AudioTimeline<T> {
-  if (typeof o.read !== 'function' || typeof o.now !== 'function' || typeof o.dispatch !== 'function') throw Error('audio timeline: read, now and dispatch are required');
+  if (typeof o.read !== 'function' || typeof o.now !== 'function' || typeof o.dispatch !== 'function')
+    throw Error('audio timeline: read, now and dispatch are required');
   const fallback = o.fallback ?? 'performance';
   if (fallback !== 'performance' && fallback !== 'none') throw Error('audio timeline: invalid fallback');
-  const lookahead = ranged('lookahead', o.lookahead ?? .1, 0, 1, true);
-  const lateTolerance = ranged('lateTolerance', o.lateTolerance ?? .03, 0, 1);
+  const lookahead = ranged('lookahead', o.lookahead ?? 0.1, 0, 1, true);
+  const lateTolerance = ranged('lateTolerance', o.lateTolerance ?? 0.03, 0, 1);
   const maxPending = integer('maxPending', o.maxPending ?? 512, 1, 16384);
   const maxDispatch = integer('maxDispatch', o.maxDispatch ?? 64, 1, 4096);
-  const resyncThreshold = ranged('resyncThreshold', o.resyncThreshold ?? .05, .005, 1);
-  const smoothing = ranged('smoothing', o.smoothing ?? .1, 0, 1, true);
-  const maxLatency = ranged('maxLatency', o.maxLatency ?? .5, 0, 2);
+  const resyncThreshold = ranged('resyncThreshold', o.resyncThreshold ?? 0.05, 0.005, 1);
+  const smoothing = ranged('smoothing', o.smoothing ?? 0.1, 0, 1, true);
+  const maxLatency = ranged('maxLatency', o.maxLatency ?? 0.5, 0, 2);
   let calibration = validateCalibration(o.calibration ?? NO_CALIBRATION);
 
   // Mapping: render clock (context seconds) at page time p (ms) = p / 1000 + offset; heard = render - latency.
-  let source: TimelineSource | null = null, origin = 0, offset = 0, latency = 0, synced = false, stalled = false;
-  let lastPageMs = 0, framePosition = 0, closed = false, pumping = false, sequence = 0;
-  let dispatched = 0, droppedCount = 0, resyncs = 0, run = 0;
+  let source: TimelineSource | null = null,
+    origin = 0,
+    offset = 0,
+    latency = 0,
+    synced = false,
+    stalled = false;
+  let lastPageMs = 0,
+    framePosition = 0,
+    closed = false,
+    pumping = false,
+    sequence = 0;
+  let dispatched = 0,
+    droppedCount = 0,
+    resyncs = 0,
+    run = 0;
   // Time-ordered queue with lazy deletion: `head` advances past resolved records; cancelled records inside the queue
   // are dead until compaction, which runs once they outnumber live ones, so the queue holds O(maxPending) records.
-  let queue: Pending<T>[] = [], head = 0, live = 0;
+  let queue: Pending<T>[] = [],
+    head = 0,
+    live = 0;
   const byId = new Map<number, Pending<T>>();
 
-  const readNow = () => { const ms = o.now(); if (!finite(ms) || ms < 0 || ms > MAX_TIME * 1000) throw Error('audio timeline: now() must be finite page milliseconds'); return ms; };
+  const readNow = () => {
+    const ms = o.now();
+    if (!finite(ms) || ms < 0 || ms > MAX_TIME * 1000)
+      throw Error('audio timeline: now() must be finite page milliseconds');
+    return ms;
+  };
   const sampleAudio = (): boolean => {
     let r: AudioClockReading | null;
-    try { r = o.read(); } catch { r = null; }
-    if (!usable(r)) { stalled = true; return false; }
+    try {
+      r = o.read();
+    } catch {
+      r = null;
+    }
+    if (!usable(r)) {
+      stalled = true;
+      return false;
+    }
     const measured = r.currentTime - r.performanceTime / 1000;
-    const heardLag = r.output ? measured - (r.output.contextTime - r.output.performanceTime / 1000) : r.baseLatency + r.outputLatency;
+    const heardLag = r.output
+      ? measured - (r.output.contextTime - r.output.performanceTime / 1000)
+      : r.baseLatency + r.outputLatency;
     const lag = Math.min(maxLatency, Math.max(0, finite(heardLag) ? heardLag : 0));
     if (!synced || stalled || Math.abs(measured - offset) > resyncThreshold) {
       if (synced) resyncs++;
-      offset = measured; latency = lag; synced = true; stalled = false;
+      offset = measured;
+      latency = lag;
+      synced = true;
+      stalled = false;
     } else {
-      offset += smoothing * (measured - offset); latency += smoothing * (lag - latency);
+      offset += smoothing * (measured - offset);
+      latency += smoothing * (lag - latency);
     }
     return true;
   };
@@ -206,50 +253,92 @@ export function createAudioTimeline<T = unknown>(o: AudioTimelineOptions<T>): Au
   const heardAt = (ms: number) => ms / 1000 + offset - latency - origin;
   const renderAt = (ms: number) => ms / 1000 + offset - origin;
 
-  const removeAt = (record: Pending<T>) => { record.live = false; record.off?.(); record.off = undefined; byId.delete(record.id); live--; };
+  const removeAt = (record: Pending<T>) => {
+    record.live = false;
+    record.off?.();
+    record.off = undefined;
+    byId.delete(record.id);
+    live--;
+  };
   const compact = () => {
     if (pumping) return; // the pump compacts once its loop ends
     const dead = queue.length - live; // resolved records before `head` plus cancelled ones after it
-    if (dead > 64 && dead > live) { queue = queue.slice(head).filter(r => r.live); head = 0; }
+    if (dead > 64 && dead > live) {
+      queue = queue.slice(head).filter(r => r.live);
+      head = 0;
+    }
   };
-  const clearAll = () => { for (const record of queue.slice(head)) if (record.live) removeAt(record); queue = []; head = 0; };
+  const clearAll = () => {
+    for (const record of queue.slice(head)) if (record.live) removeAt(record);
+    queue = [];
+    head = 0;
+  };
   const event = (record: Pending<T>, lateBy: number): TimelineEvent<T> =>
-    Object.freeze({ id: record.id, at: record.at, when: source === 'audio' ? origin + record.at : null, lateBy, payload: record.payload });
+    Object.freeze({
+      id: record.id,
+      at: record.at,
+      when: source === 'audio' ? origin + record.at : null,
+      lateBy,
+      payload: record.payload,
+    });
 
   const timeline: AudioTimeline<T> = {
-    start(lead = lookahead + .05) {
+    start(lead = lookahead + 0.05) {
       if (closed) throw Error('audio timeline: disposed');
       if (source) throw Error('audio timeline: already running');
       ranged('lead', lead, 0, 60);
       const ms = readNow();
-      synced = false; stalled = false; latency = 0; offset = 0;
+      synced = false;
+      stalled = false;
+      latency = 0;
+      offset = 0;
       if (sampleAudio()) source = 'audio';
-      else if (fallback === 'performance') { source = 'performance'; stalled = false; offset = 0; latency = 0; lastPageMs = ms; }
-      else { stalled = false; return null; }
+      else if (fallback === 'performance') {
+        source = 'performance';
+        stalled = false;
+        offset = 0;
+        latency = 0;
+        lastPageMs = ms;
+      } else {
+        stalled = false;
+        return null;
+      }
       origin = ms / 1000 + offset + lead; // never relative to a previous run's origin
       // The listener hears the start `lead` seconds from now; until then positions are negative.
       framePosition = heardAt(ms) + calibration.visualMs / 1000;
       run++;
       return source;
     },
-    stop() { source = null; stalled = false; run++; clearAll(); },
-    get running() { return source !== null; },
+    stop() {
+      source = null;
+      stalled = false;
+      run++;
+      clearAll();
+    },
+    get running() {
+      return source !== null;
+    },
     pump() {
       if (closed || !source || pumping) return 0;
       pumping = true;
       let errors: unknown[] | null = null;
-      let count = 0, resolved = 0;
+      let count = 0,
+        resolved = 0;
       const epoch = run;
       try {
         const ms = readNow();
-        if (source === 'audio') { if (!sampleAudio()) return 0; }
-        else samplePage(ms);
+        if (source === 'audio') {
+          if (!sampleAudio()) return 0;
+        } else samplePage(ms);
         framePosition = Math.max(framePosition, heardAt(ms) + calibration.visualMs / 1000);
         const now = renderAt(ms);
         // A handler that stops or restarts the run ends this loop: `now` belonged to the old run.
         while (head < queue.length && resolved < maxDispatch && !closed && source && run === epoch) {
           const record = queue[head]!; // head < queue.length (loop condition)
-          if (!record.live) { head++; continue; }
+          if (!record.live) {
+            head++;
+            continue;
+          }
           if (record.at > now + lookahead) break;
           head++;
           const lateBy = now - record.at;
@@ -258,47 +347,110 @@ export function createAudioTimeline<T = unknown>(o: AudioTimelineOptions<T>): Au
           resolved++;
           if (lateBy > lateTolerance) {
             droppedCount++;
-            try { o.dropped?.(e); } catch (error) { (errors ??= []).push(error); }
+            try {
+              o.dropped?.(e);
+            } catch (error) {
+              (errors ??= []).push(error);
+            }
           } else {
-            dispatched++; count++;
-            try { o.dispatch(e); } catch (error) { (errors ??= []).push(error); }
+            dispatched++;
+            count++;
+            try {
+              o.dispatch(e);
+            } catch (error) {
+              (errors ??= []).push(error);
+            }
           }
         }
-      } finally { pumping = false; }
+      } finally {
+        pumping = false;
+      }
       compact();
       if (errors?.length === 1) throw errors[0];
       if (errors) throw new AggregateError(errors, 'audio timeline dispatch failed');
       return count;
     },
-    get position() { return source ? framePosition : NaN; },
-    positionAt(ms) { if (!finite(ms)) throw Error('audio timeline: invalid timestamp'); return source ? heardAt(ms) : NaN; },
-    inputPosition(ms) { return timeline.positionAt(ms) - calibration.inputMs / 1000; },
-    contextTime(at) { if (!finite(at)) throw Error('audio timeline: invalid position'); return source === 'audio' ? origin + at : null; },
+    get position() {
+      return source ? framePosition : NaN;
+    },
+    positionAt(ms) {
+      if (!finite(ms)) throw Error('audio timeline: invalid timestamp');
+      return source ? heardAt(ms) : NaN;
+    },
+    inputPosition(ms) {
+      return timeline.positionAt(ms) - calibration.inputMs / 1000;
+    },
+    contextTime(at) {
+      if (!finite(at)) throw Error('audio timeline: invalid position');
+      return source === 'audio' ? origin + at : null;
+    },
     schedule(at, payload, signal) {
       if (!finite(at) || Math.abs(at) > MAX_TIME) throw Error('audio timeline: invalid event time');
       if (closed || signal?.aborted || live >= maxPending) return null;
-      const record: Pending<T> = { id: ++sequence, at, payload, live: true };
+      const record: Pending<T> = {id: ++sequence, at, payload, live: true};
       // Binary search among pending records: equal times keep admission order.
-      let lo = head, hi = queue.length;
-      while (lo < hi) { const mid = (lo + hi) >>> 1; if (queue[mid]!.at <= at) /* head <= lo <= mid < hi <= queue.length */ lo = mid + 1; else hi = mid; }
-      queue.splice(lo, 0, record); byId.set(record.id, record); live++;
+      let lo = head,
+        hi = queue.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >>> 1;
+        if (queue[mid]!.at <= at) /* head <= lo <= mid < hi <= queue.length */ lo = mid + 1;
+        else hi = mid;
+      }
+      queue.splice(lo, 0, record);
+      byId.set(record.id, record);
+      live++;
       if (signal) {
-        const abort = () => { if (record.live) { removeAt(record); compact(); } };
-        signal.addEventListener('abort', abort, { once: true });
+        const abort = () => {
+          if (record.live) {
+            removeAt(record);
+            compact();
+          }
+        };
+        signal.addEventListener('abort', abort, {once: true});
         record.off = () => signal.removeEventListener('abort', abort);
       }
       return record.id;
     },
-    cancel(id) { const record = byId.get(id); if (!record) return false; removeAt(record); compact(); return true; },
-    get calibration() { return calibration; },
-    set calibration(value) { calibration = validateCalibration(value); },
-    get stats() { return Object.freeze({ source, stalled: source === 'audio' && stalled, pending: live, retained: queue.length, dispatched, dropped: droppedCount, resyncs, latency: source === 'audio' ? latency : 0 }); },
-    dispose() { if (closed) return; closed = true; source = null; clearAll(); },
+    cancel(id) {
+      const record = byId.get(id);
+      if (!record) return false;
+      removeAt(record);
+      compact();
+      return true;
+    },
+    get calibration() {
+      return calibration;
+    },
+    set calibration(value) {
+      calibration = validateCalibration(value);
+    },
+    get stats() {
+      return Object.freeze({
+        source,
+        stalled: source === 'audio' && stalled,
+        pending: live,
+        retained: queue.length,
+        dispatched,
+        dropped: droppedCount,
+        resyncs,
+        latency: source === 'audio' ? latency : 0,
+      });
+    },
+    dispose() {
+      if (closed) return;
+      closed = true;
+      source = null;
+      clearAll();
+    },
   };
   return timeline;
 }
 
-export interface OffsetEstimate { readonly offsetMs: number; readonly spreadMs: number; readonly used: number }
+export interface OffsetEstimate {
+  readonly offsetMs: number;
+  readonly spreadMs: number;
+  readonly used: number;
+}
 
 /**
  * Calibration from taps: `deltasMs` are (input position - target position) in ms for a tap-along test. Samples that
@@ -313,12 +465,20 @@ export function estimateOffset(deltasMs: readonly number[], min = 8): OffsetEsti
   const usableDeltas = deltasMs.filter(d => finite(d) && Math.abs(d) <= 1000);
   if (usableDeltas.length < min) return null;
   // xs holds at least min >= 1 samples, so m and m - 1 are in range.
-  const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2; };
+  const median = (xs: number[]) => {
+    const s = [...xs].sort((a, b) => a - b),
+      m = s.length >> 1;
+    return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
+  };
   const m0 = median(usableDeltas);
   const mad = median(usableDeltas.map(d => Math.abs(d - m0)));
   const kept = usableDeltas.filter(d => Math.abs(d - m0) <= Math.max(5, 3 * mad));
   if (kept.length < min) return null;
   const offsetMs = median(kept);
   const spreadMs = median(kept.map(d => Math.abs(d - offsetMs)));
-  return Object.freeze({ offsetMs: Math.max(-MAX_CALIBRATION_MS, Math.min(MAX_CALIBRATION_MS, offsetMs)), spreadMs, used: kept.length });
+  return Object.freeze({
+    offsetMs: Math.max(-MAX_CALIBRATION_MS, Math.min(MAX_CALIBRATION_MS, offsetMs)),
+    spreadMs,
+    used: kept.length,
+  });
 }

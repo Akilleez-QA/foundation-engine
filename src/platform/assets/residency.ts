@@ -5,8 +5,8 @@
  * the current quality preset and apply it to their library's existing `LeaseCache` (`setResidency`). This file holds
  * the shape, its validation and the per-preset resolution, so the boot chunk carries only these few lines.
  */
-import type { PortPreset, Ported, QualityPreset } from '../../core/tiers';
-import type { LeaseResidency, ResidencyPressure } from './lease-cache';
+import type {PortPreset, Ported, QualityPreset} from '../../core/tiers';
+import type {LeaseResidency, ResidencyPressure} from './lease-cache';
 
 /** Estimated bytes, per library. Omitted fields: no ceiling (`residentBytes`), nothing kept unpinned (`warmBytes`). */
 export interface AssetResidencyBudget {
@@ -46,7 +46,8 @@ function checkBudget(where: string, b: unknown): void {
   for (const [k, v] of Object.entries(b)) {
     if (k === 'ports' && !where.includes('.ports.')) continue;
     if (k !== 'residentBytes' && k !== 'warmBytes') throw Error(`residency: ${where}.${k} is not a budget field`);
-    if (!Number.isSafeInteger(v) || (v as number) < 0) throw Error(`residency: ${where}.${k} must be a nonnegative safe integer of bytes`);
+    if (!Number.isSafeInteger(v) || (v as number) < 0)
+      throw Error(`residency: ${where}.${k} must be a nonnegative safe integer of bytes`);
   }
 }
 
@@ -63,7 +64,8 @@ export function validateResidency(input: AssetResidencyInput): AssetResidencyInp
     if (row.ports === undefined) continue;
     if (row.ports === null || typeof row.ports !== 'object') throw Error(`residency: ${kind}.ports must be an object`);
     for (const [preset, port] of Object.entries(row.ports)) {
-      if (!(PORTS as readonly string[]).includes(preset)) throw Error(`residency: ${kind}.ports.${preset} is not a lighter preset`);
+      if (!(PORTS as readonly string[]).includes(preset))
+        throw Error(`residency: ${kind}.ports.${preset} is not a lighter preset`);
       checkBudget(`${kind}.ports.${preset}`, port);
     }
   }
@@ -73,28 +75,36 @@ export function validateResidency(input: AssetResidencyInput): AssetResidencyInp
     }
     if (new Set(input.pinned).size !== input.pinned.length) throw Error('residency: an asset id is pinned twice');
   }
-  if (input.onPressure !== undefined && typeof input.onPressure !== 'function') throw Error('residency: onPressure must be a function');
+  if (input.onPressure !== undefined && typeof input.onPressure !== 'function')
+    throw Error('residency: onPressure must be a function');
   return input;
 }
 
 /** The budget row for `preset`: reference values with the preset's port applied. */
-export function residencyBudget(input: AssetResidencyInput, kind: AssetResidencyKind, preset: QualityPreset): AssetResidencyBudget {
+export function residencyBudget(
+  input: AssetResidencyInput,
+  kind: AssetResidencyKind,
+  preset: QualityPreset,
+): AssetResidencyBudget {
   const row = input[kind];
   if (!row) return {};
-  const { ports, ...reference } = row;
-  return preset === 'reference' ? reference : { ...reference, ...ports?.[preset] };
+  const {ports, ...reference} = row;
+  return preset === 'reference' ? reference : {...reference, ...ports?.[preset]};
 }
 
 /** Cache keys start with the asset id (`id|variant…`), so a pin covers every variant of that asset. */
-export const assetIdOfKey = (key: string): string => { const bar = key.indexOf('|'); return bar < 0 ? key : key.slice(0, bar); };
+export const assetIdOfKey = (key: string): string => {
+  const bar = key.indexOf('|');
+  return bar < 0 ? key : key.slice(0, bar);
+};
 
 export interface ResidencyBinding {
   readonly kind: AssetResidencyKind;
   readonly input: AssetResidencyInput;
   /** The current preset's source; omitted (no quality service): the reference row. */
-  quality?: { readonly preset: QualityPreset; subscribe(fn: () => void, signal?: AbortSignal): () => void } | undefined;
+  quality?: {readonly preset: QualityPreset; subscribe(fn: () => void, signal?: AbortSignal): () => void} | undefined;
   signal: AbortSignal;
-  log: { warn(msg: string, data?: unknown): void; error(msg: string, data?: unknown): void };
+  log: {warn(msg: string, data?: unknown): void; error(msg: string, data?: unknown): void};
   /** Applies the resolved policy to the library (now, and after each preset change). */
   apply(policy: AssetResidencyPolicy): void;
 }
@@ -113,9 +123,13 @@ export function bindResidency(b: ResidencyBinding): void {
       residentBytes: budget.residentBytes,
       pinned: pins.size ? key => pins.has(assetIdOfKey(key)) : undefined,
       onPressure: report => {
-        const full: AssetResidencyPressure = { ...report, kind: b.kind, preset };
+        const full: AssetResidencyPressure = {...report, kind: b.kind, preset};
         b.log.warn(`residency: ${b.kind} over budget with every remaining asset in use or pinned`, full);
-        try { b.input.onPressure?.(full); } catch (error) { b.log.error('residency: onPressure failed', error); }
+        try {
+          b.input.onPressure?.(full);
+        } catch (error) {
+          b.log.error('residency: onPressure failed', error);
+        }
       },
       onCleanupError: error => b.log.error(`residency: ${b.kind} eviction cleanup failed`, error),
     });

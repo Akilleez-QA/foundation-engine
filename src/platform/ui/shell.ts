@@ -1,6 +1,6 @@
 import copyCatalog from './strings/shell/en.json';
-import {appI18n as copyI18n,h as copyHtml} from '../../core/i18n/app-i18n';
-copyI18n.addCatalog('en',copyCatalog);
+import {appI18n as copyI18n, h as copyHtml} from '../../core/i18n/app-i18n';
+copyI18n.addCatalog('en', copyCatalog);
 /**
  * platform/ui/shell.ts: the shell button registry (ADR 0020, STD-RUN-23).
  *
@@ -39,9 +39,12 @@ export interface ShellButtonHandle {
   remove(): void;
 }
 
-interface Mounted { def: ShellButtonDef; seq: number }
+interface Mounted {
+  def: ShellButtonDef;
+  seq: number;
+}
 
-const ZONE_SELECTOR: Readonly<Record<ShellZone, string>> = { header: '.header-right', menu: '.shell-menu-content' };
+const ZONE_SELECTOR: Readonly<Record<ShellZone, string>> = {header: '.header-right', menu: '.shell-menu-content'};
 
 export class Shell {
   private readonly rows = new Map<string, Mounted>();
@@ -52,9 +55,15 @@ export class Shell {
   onMenu(listener: (menu: HTMLDetailsElement) => void): () => void {
     this.menuListeners.add(listener);
     const menu = this.doc.querySelector<HTMLDetailsElement>('details.shell-menu');
-    try { if (menu) listener(menu); }
-    catch (error) { this.menuListeners.delete(listener); throw error; }
-    return () => { this.menuListeners.delete(listener); };
+    try {
+      if (menu) listener(menu);
+    } catch (error) {
+      this.menuListeners.delete(listener);
+      throw error;
+    }
+    return () => {
+      this.menuListeners.delete(listener);
+    };
   }
 
   constructor(private readonly doc: Document) {}
@@ -62,10 +71,10 @@ export class Shell {
   /** Adds a row and places its element. A second row with the same id is a programming error. */
   add(def: ShellButtonDef): ShellButtonHandle {
     if (this.rows.has(def.id)) throw Error(`Shell button ${def.id} is already registered`);
-    const row: Mounted = { def, seq: this.seq++ };
+    const row: Mounted = {def, seq: this.seq++};
     this.rows.set(def.id, row);
     this.place(row);
-    return { id: def.id, remove: () => this.remove(def.id) };
+    return {id: def.id, remove: () => this.remove(def.id)};
   }
 
   remove(id: string): void {
@@ -81,7 +90,8 @@ export class Shell {
   }
 
   private sorted(zone: ShellZone): Mounted[] {
-    return [...this.rows.values()].filter(r => r.def.zone === zone)
+    return [...this.rows.values()]
+      .filter(r => r.def.zone === zone)
       .sort((a, b) => a.def.order - b.def.order || a.seq - b.seq);
   }
 
@@ -89,8 +99,12 @@ export class Shell {
   private place(row: Mounted): void {
     const container = this.zone(row.def.zone);
     if (!container) return;
-    const rows = this.sorted(row.def.zone), at = rows.indexOf(row);
-    const next = rows.slice(at + 1).map(r => r.def.element).find(el => el.parentNode === container);
+    const rows = this.sorted(row.def.zone),
+      at = rows.indexOf(row);
+    const next = rows
+      .slice(at + 1)
+      .map(r => r.def.element)
+      .find(el => el.parentNode === container);
     if (next) next.before(row.def.element);
     else container.append(row.def.element);
   }
@@ -108,10 +122,14 @@ export class Shell {
     const doc = this.doc;
     const menu = doc.createElement('details') as HTMLDetailsElement;
     menu.className = 'shell-menu';
-    menu.innerHTML = `<summary>${copyHtml("engine.shell.menu")}</summary><div class="shell-menu-content"></div>`;
-    menu.addEventListener('click', event => { if ((event.target as Element).closest('button')) menu.open = false; });
-    doc.addEventListener('click', event => { if (!menu.contains(event.target as Node)) menu.open = false; });
-    this.add({ id: 'shell.menu', zone: 'header', order: 30, element: menu, level: 'detailed' });
+    menu.innerHTML = `<summary>${copyHtml('engine.shell.menu')}</summary><div class="shell-menu-content"></div>`;
+    menu.addEventListener('click', event => {
+      if ((event.target as Element).closest('button')) menu.open = false;
+    });
+    doc.addEventListener('click', event => {
+      if (!menu.contains(event.target as Node)) menu.open = false;
+    });
+    this.add({id: 'shell.menu', zone: 'header', order: 30, element: menu, level: 'detailed'});
     for (const listener of [...this.menuListeners]) {
       if (this.menuListeners.has(listener)) listener(menu);
     }
@@ -123,6 +141,9 @@ const shells = new WeakMap<Document, Shell>();
 /** The app's one shell (created on first use), one per document so node tests with a fresh fake document get their own. */
 export function appShell(doc: Document = document): Shell {
   let shell = shells.get(doc);
-  if (!shell) { shell = new Shell(doc); shells.set(doc, shell); }
+  if (!shell) {
+    shell = new Shell(doc);
+    shells.set(doc, shell);
+  }
   return shell;
 }

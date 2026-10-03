@@ -18,46 +18,72 @@
  * Pure: no DOM, no clock, no globals beyond `Intl`.
  */
 export type Part =
-  | { kind: 'text'; text: string }
-  | { kind: 'var'; name: string }
-  | { kind: 'plural'; name: string; forms: Readonly<Record<string, readonly Part[]>>; ordinal?: true }
-  | { kind: 'select'; name: string; forms: Readonly<Record<string, readonly Part[]>> };
+  | {kind: 'text'; text: string}
+  | {kind: 'var'; name: string}
+  | {kind: 'plural'; name: string; forms: Readonly<Record<string, readonly Part[]>>; ordinal?: true}
+  | {kind: 'select'; name: string; forms: Readonly<Record<string, readonly Part[]>>};
 
 export type Vars = Readonly<Record<string, string | number>>;
 
-export const MESSAGE_LIMITS = Object.freeze({ maxLength: 16384, maxDepth: 8, maxParts: 1024 });
+export const MESSAGE_LIMITS = Object.freeze({maxLength: 16384, maxDepth: 8, maxParts: 1024});
 const PLURAL_CATEGORIES = new Set(['zero', 'one', 'two', 'few', 'many', 'other']);
 
 /** Parse a message. Throws with the offending position on unbalanced or malformed braces, or over the limits. */
 export function parseMessage(message: string): Part[] {
   if (typeof message !== 'string') throw new TypeError('A message must be a string');
-  if (message.length > MESSAGE_LIMITS.maxLength) throw new Error(`Message longer than ${MESSAGE_LIMITS.maxLength} characters`);
-  let i = 0, count = 0;
-  const fail = (why: string): never => { throw new Error(`${why} at ${i} in message ${JSON.stringify(message.length > 200 ? message.slice(0, 200) + '…' : message)}`); };
-  const push = (out: Part[], p: Part) => { if (++count > MESSAGE_LIMITS.maxParts) fail(`More than ${MESSAGE_LIMITS.maxParts} parts`); out.push(p); };
+  if (message.length > MESSAGE_LIMITS.maxLength)
+    throw new Error(`Message longer than ${MESSAGE_LIMITS.maxLength} characters`);
+  let i = 0,
+    count = 0;
+  const fail = (why: string): never => {
+    throw new Error(
+      `${why} at ${i} in message ${JSON.stringify(message.length > 200 ? message.slice(0, 200) + '…' : message)}`,
+    );
+  };
+  const push = (out: Part[], p: Part) => {
+    if (++count > MESSAGE_LIMITS.maxParts) fail(`More than ${MESSAGE_LIMITS.maxParts} parts`);
+    out.push(p);
+  };
   function parts(depth: number, untilClose: boolean): Part[] {
     const out: Part[] = [];
     let text = '';
-    const flush = () => { if (text) push(out, { kind: 'text', text }); text = ''; };
+    const flush = () => {
+      if (text) push(out, {kind: 'text', text});
+      text = '';
+    };
     while (i < message.length) {
       const c = message[i];
-      if (c === '}') { if (!untilClose) fail('Unexpected "}"'); flush(); return out; }
-      if (c !== '{') { text += c; i++; continue; }
-      flush(); i++;
+      if (c === '}') {
+        if (!untilClose) fail('Unexpected "}"');
+        flush();
+        return out;
+      }
+      if (c !== '{') {
+        text += c;
+        i++;
+        continue;
+      }
+      flush();
+      i++;
       const head = /^\s*([A-Za-z_]\w*)\s*(?:,\s*(plural|selectordinal|select)\s*,)?/.exec(message.slice(i, i + 256));
       if (!head) fail('Expected a variable name after "{"');
       i += head![0].length;
-      const name = head![1]!, type = head![2]; // group 1 is not optional, so it matched
+      const name = head![1]!,
+        type = head![2]; // group 1 is not optional, so it matched
       if (!type) {
         if (message[i] !== '}') fail(`Expected "}" after {${name}`);
-        i++; push(out, { kind: 'var', name }); continue;
+        i++;
+        push(out, {kind: 'var', name});
+        continue;
       }
       if (depth >= MESSAGE_LIMITS.maxDepth) fail(`Arguments nested deeper than ${MESSAGE_LIMITS.maxDepth}`);
       const select = type === 'select';
       // Null prototype: a case named `__proto__` (or `constructor`) is an ordinary case, never the prototype.
       const forms: Record<string, Part[]> = Object.create(null);
       for (;;) {
-        const sel = (select ? /^\s*([A-Za-z0-9_][\w-]*)\s*\{/ : /^\s*(=\d+|[a-z]+)\s*\{/).exec(message.slice(i, i + 256));
+        const sel = (select ? /^\s*([A-Za-z0-9_][\w-]*)\s*\{/ : /^\s*(=\d+|[a-z]+)\s*\{/).exec(
+          message.slice(i, i + 256),
+        );
         if (!sel) break;
         i += sel[0].length;
         const key = sel[1]!; // group 1 is not optional, so it matched
@@ -69,8 +95,16 @@ export function parseMessage(message: string): Part[] {
       const close = /^\s*\}/.exec(message.slice(i, i + 256));
       if (!close) fail(`Expected "}" to close the ${type} {${name}}`);
       i += close![0].length;
-      if (!Object.hasOwn(forms, 'other')) fail(`${type.charAt(0).toUpperCase() + type.slice(1)} {${name}} needs an "other" form`);
-      push(out, select ? { kind: 'select', name, forms } : type === 'selectordinal' ? { kind: 'plural', name, forms, ordinal: true } : { kind: 'plural', name, forms });
+      if (!Object.hasOwn(forms, 'other'))
+        fail(`${type.charAt(0).toUpperCase() + type.slice(1)} {${name}} needs an "other" form`);
+      push(
+        out,
+        select
+          ? {kind: 'select', name, forms}
+          : type === 'selectordinal'
+            ? {kind: 'plural', name, forms, ordinal: true}
+            : {kind: 'plural', name, forms},
+      );
     }
     if (untilClose) fail('Unclosed "{"');
     flush();
@@ -80,11 +114,15 @@ export function parseMessage(message: string): Part[] {
 }
 
 /** The variables a message uses. Plural and ordinal variables are numbers; the others take a string or a number. */
-export function messageVars(parts: readonly Part[], into = new Map<string, 'number' | 'text'>()): Map<string, 'number' | 'text'> {
+export function messageVars(
+  parts: readonly Part[],
+  into = new Map<string, 'number' | 'text'>(),
+): Map<string, 'number' | 'text'> {
   for (const p of parts) {
     if (p.kind === 'text') continue;
-    if (p.kind === 'var') { if (!into.has(p.name)) into.set(p.name, 'text'); }
-    else {
+    if (p.kind === 'var') {
+      if (!into.has(p.name)) into.set(p.name, 'text');
+    } else {
       if (p.kind === 'plural') into.set(p.name, 'number');
       else if (!into.has(p.name)) into.set(p.name, 'text');
       for (const f of Object.values(p.forms)) messageVars(f, into);
@@ -100,18 +138,28 @@ const numberFormats = new Map<string, Intl.NumberFormat>();
  * (`xx`, `tlh`) would silently use the host's default locale, so the same catalogue would render differently on
  * different machines. A malformed tag also resolves to `en` instead of throwing while rendering.
  */
-function supported(tag: string, service: { supportedLocalesOf(l: string): string[] }): string {
-  try { return service.supportedLocalesOf(tag)[0] ?? 'en'; } catch { return 'en'; }
+function supported(tag: string, service: {supportedLocalesOf(l: string): string[]}): string {
+  try {
+    return service.supportedLocalesOf(tag)[0] ?? 'en';
+  } catch {
+    return 'en';
+  }
 }
 const rulesFor = (l: string, ordinal: boolean) => {
   const key = l + '\u0000' + (ordinal ? 'o' : 'c');
   let v = pluralRules.get(key);
-  if (!v) { v = new Intl.PluralRules(supported(l, Intl.PluralRules), { type: ordinal ? 'ordinal' : 'cardinal' }); pluralRules.set(key, v); }
+  if (!v) {
+    v = new Intl.PluralRules(supported(l, Intl.PluralRules), {type: ordinal ? 'ordinal' : 'cardinal'});
+    pluralRules.set(key, v);
+  }
   return v;
 };
 const numbersFor = (l: string) => {
   let v = numberFormats.get(l);
-  if (!v) { v = new Intl.NumberFormat(supported(l, Intl.NumberFormat)); numberFormats.set(l, v); }
+  if (!v) {
+    v = new Intl.NumberFormat(supported(l, Intl.NumberFormat));
+    numberFormats.set(l, v);
+  }
   return v;
 };
 
@@ -130,7 +178,10 @@ export function renderMessage(parts: readonly Part[], vars: Vars | undefined, lo
       const n = Number(vars?.[p.name] ?? 0);
       const exact = '=' + n;
       const category = rulesFor(locale, p.ordinal === true).select(n);
-      const form = (Object.hasOwn(p.forms, exact) ? p.forms[exact] : undefined) ?? (Object.hasOwn(p.forms, category) ? p.forms[category] : undefined) ?? p.forms.other!; // `other` exists, as above
+      const form =
+        (Object.hasOwn(p.forms, exact) ? p.forms[exact] : undefined) ??
+        (Object.hasOwn(p.forms, category) ? p.forms[category] : undefined) ??
+        p.forms.other!; // `other` exists, as above
       out += renderMessage(form, vars, locale, n);
     }
   }

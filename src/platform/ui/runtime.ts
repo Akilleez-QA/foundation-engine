@@ -1,5 +1,5 @@
-import { TEST_API } from '../../core/env';
-import { monotonicNow } from '../../core/clock';
+import {TEST_API} from '../../core/env';
+import {monotonicNow} from '../../core/clock';
 /**
  * platform/ui/runtime.ts: the app's one frame loop, installed once and shared (STD-RUN-1).
  *
@@ -17,22 +17,31 @@ import { monotonicNow } from '../../core/clock';
  * `inputActions` rows and the app's layers, fed by one capture keydown and one capture keyup listener on window, with
  * blur cancelling held input. Keyboard dispatch uses the event's `timeStamp`; polled inputs use the monotonic clock.
  */
-import { ActivityHost } from '../../core/activity/activity';
-import { FrameLoop, type FrameLoopOptions } from '../../core/activity/loop';
-import type { LayerPort } from '../../core/activity/ports';
-import { LayerManager } from './layers';
-import { calmScenes } from '../../core/settings/app-settings';
-import type { Registry } from '../../core/registry';
-import { CORE_INPUT_ACTIONS, inputActionRegistry, InputActions, type ActionLayers, type ActionOverrides, type InputActionDef } from '../input/actions';
+import {ActivityHost} from '../../core/activity/activity';
+import {FrameLoop, type FrameLoopOptions} from '../../core/activity/loop';
+import type {LayerPort} from '../../core/activity/ports';
+import {LayerManager} from './layers';
+import {calmScenes} from '../../core/settings/app-settings';
+import type {Registry} from '../../core/registry';
+import {
+  CORE_INPUT_ACTIONS,
+  inputActionRegistry,
+  InputActions,
+  type ActionLayers,
+  type ActionOverrides,
+  type InputActionDef,
+} from '../input/actions';
 
 /** Coverage where there is no document (node tests): nothing covers any owner. */
-export const NO_LAYERS: Pick<LayerPort, 'coverage' | 'onChange'> = { coverage: () => 'top', onChange: () => () => {} };
+export const NO_LAYERS: Pick<LayerPort, 'coverage' | 'onChange'> = {coverage: () => 'top', onChange: () => () => {}};
 
 /**
  * Calm scenes: the settings value `comfort.calm` (STD-SET-2), whose default is the OS reduced-motion
  * preference, followed live. One O(1) read, never a media query or a DOM query; false in node tests (no platform).
  */
-export function calm(): boolean { return calmScenes(); }
+export function calm(): boolean {
+  return calmScenes();
+}
 
 /**
  * A ticker that throws is removed and reported as an uncaught error would be (the legacy frame callback threw out
@@ -45,7 +54,7 @@ function reportTicker(owner: string, error: unknown): void {
 
 /** A loop with the app's defaults; `overrides` swaps the scheduler (tests) or the layers. */
 export function createLoop(overrides: Partial<FrameLoopOptions> = {}): FrameLoop {
-  return new FrameLoop({ layers: NO_LAYERS, calm, report: reportTicker, ...overrides });
+  return new FrameLoop({layers: NO_LAYERS, calm, report: reportTicker, ...overrides});
 }
 
 const managers = new WeakMap<Document, LayerManager>();
@@ -56,7 +65,7 @@ const managers = new WeakMap<Document, LayerManager>();
 export function appLayers(doc: Document = document): LayerManager {
   let manager = managers.get(doc);
   if (!manager) {
-    manager = new LayerManager(doc, { shell: () => Array.from(doc.querySelectorAll<HTMLElement>('header.topbar')) });
+    manager = new LayerManager(doc, {shell: () => Array.from(doc.querySelectorAll<HTMLElement>('header.topbar'))});
     managers.set(doc, manager);
   }
   return manager;
@@ -66,11 +75,23 @@ let shared: FrameLoop | null = null;
 /** The app's one frame loop (created on first use), with coverage from the app's layers. */
 export function appLoop(): FrameLoop {
   if (!shared) {
-    shared = createLoop(typeof document === 'undefined' ? {} : { layers: appLayers(), visibility: {
-      hidden:()=>document.hidden,
-      onChange(fn){const changed=()=>fn(document.hidden);document.addEventListener('visibilitychange',changed);return ()=>document.removeEventListener('visibilitychange',changed);},
-    } });
-    if (TEST_API && typeof location !== 'undefined' && new URLSearchParams(location.search).has('engine-capture')) shared.holdFrames(true);
+    shared = createLoop(
+      typeof document === 'undefined'
+        ? {}
+        : {
+            layers: appLayers(),
+            visibility: {
+              hidden: () => document.hidden,
+              onChange(fn) {
+                const changed = () => fn(document.hidden);
+                document.addEventListener('visibilitychange', changed);
+                return () => document.removeEventListener('visibilitychange', changed);
+              },
+            },
+          },
+    );
+    if (TEST_API && typeof location !== 'undefined' && new URLSearchParams(location.search).has('engine-capture'))
+      shared.holdFrames(true);
   }
   return shared;
 }
@@ -85,7 +106,9 @@ export function appActivities(doc: Document = document): ActivityHost {
   let host = hosts.get(doc);
   if (!host) {
     host = new ActivityHost({
-      loop: appLoop(), layers: appLayers(doc), calm,
+      loop: appLoop(),
+      layers: appLayers(doc),
+      calm,
       report: (id, error) => console.error(`Activity ${id} failed`, error),
     });
     hosts.set(doc, host);
@@ -103,8 +126,14 @@ export const anonymousOwner = (prefix = 'frames'): string => `${prefix}#${++seri
 export function afterFrames(n: number, fn: () => void, loop: FrameLoop = appLoop()): () => void {
   let seen = 0;
   const ticker = loop.add({
-    owner: anonymousOwner('after-frames'), mode: 'continuous', whenCovered: 'run',
-    update() { if (++seen < n) return; ticker.remove(); fn(); },
+    owner: anonymousOwner('after-frames'),
+    mode: 'continuous',
+    whenCovered: 'run',
+    update() {
+      if (++seen < n) return;
+      ticker.remove();
+      fn();
+    },
   });
   return () => ticker.remove();
 }
@@ -120,24 +149,61 @@ export type InputWindow = Pick<EventTarget, 'addEventListener'>;
  * A dispatcher over the app's rows and `layers`, fed by one capture keydown and one capture keyup listener on `win`,
  * with blur and pagehide cancelling held input. Keyboard dispatch uses the event's `timeStamp`; other inputs use the supplied monotonic clock.
  */
-export function createInput(win: InputWindow, layers: ActionLayers, signal?: AbortSignal, registry: Registry<InputActionDef> = inputActionRegistry(APP_INPUT_ACTIONS), now: () => number = monotonicNow): InputActions {
+export function createInput(
+  win: InputWindow,
+  layers: ActionLayers,
+  signal?: AbortSignal,
+  registry: Registry<InputActionDef> = inputActionRegistry(APP_INPUT_ACTIONS),
+  now: () => number = monotonicNow,
+): InputActions {
   let stamp: number | undefined;
-  const actions = new InputActions({ registry, layers, now: () => stamp ?? now(), overrides: APP_INPUT_OVERRIDES }, signal);
-  const dispatchKey = (e: Event, dispatch: () => void) => { const previous = stamp; stamp = e.timeStamp; try { dispatch(); } finally { stamp = previous; } };
+  const actions = new InputActions(
+    {registry, layers, now: () => stamp ?? now(), overrides: APP_INPUT_OVERRIDES},
+    signal,
+  );
+  const dispatchKey = (e: Event, dispatch: () => void) => {
+    const previous = stamp;
+    stamp = e.timeStamp;
+    try {
+      dispatch();
+    } finally {
+      stamp = previous;
+    }
+  };
   // Listener options omit an absent signal: the DOM treats a missing and an undefined `signal` member alike.
-  const listen = signal === undefined ? {} : { signal };
-  win.addEventListener('keydown', e => dispatchKey(e, () => { actions.keyDown(e as KeyboardEvent); }), { capture: true, ...listen });
-  win.addEventListener('keyup', e => dispatchKey(e, () => { actions.keyUp(e as KeyboardEvent); }), { capture: true, ...listen });
+  const listen = signal === undefined ? {} : {signal};
+  win.addEventListener(
+    'keydown',
+    e =>
+      dispatchKey(e, () => {
+        actions.keyDown(e as KeyboardEvent);
+      }),
+    {capture: true, ...listen},
+  );
+  win.addEventListener(
+    'keyup',
+    e =>
+      dispatchKey(e, () => {
+        actions.keyUp(e as KeyboardEvent);
+      }),
+    {capture: true, ...listen},
+  );
   const cancel = () => actions.cancel('blur');
-  win.addEventListener('blur', cancel, { ...listen });
-  win.addEventListener('pagehide', cancel, { ...listen });
+  win.addEventListener('blur', cancel, {...listen});
+  win.addEventListener('pagehide', cancel, {...listen});
   return actions;
 }
 
 /** Share the document's existing dispatcher owner; visibility must not depend on optional adapters. */
 function createDocumentInput(doc: Document, registry?: Registry<InputActionDef>, signal?: AbortSignal): InputActions {
   const actions = createInput(doc.defaultView ?? doc, appLayers(doc), signal, registry);
-  doc.addEventListener('visibilitychange', () => { if (doc.hidden) actions.cancel('blur'); }, signal === undefined ? {} : { signal });
+  doc.addEventListener(
+    'visibilitychange',
+    () => {
+      if (doc.hidden) actions.cancel('blur');
+    },
+    signal === undefined ? {} : {signal},
+  );
   return actions;
 }
 
@@ -163,6 +229,12 @@ export function appInput(doc: Document = document): InputActions {
 export function installAppInput(doc: Document, registry: Registry<InputActionDef>, signal?: AbortSignal): InputActions {
   const actions = createDocumentInput(doc, registry, signal);
   inputs.set(doc, actions);
-  signal?.addEventListener('abort', () => { if (inputs.get(doc) === actions) inputs.delete(doc); }, { once: true });
+  signal?.addEventListener(
+    'abort',
+    () => {
+      if (inputs.get(doc) === actions) inputs.delete(doc);
+    },
+    {once: true},
+  );
   return actions;
 }

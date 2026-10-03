@@ -1,6 +1,6 @@
 # Template: blank
 
-The smallest complete game: one scene, one entity, one input, one test. Start here for any genre that no other template fits.
+The smallest complete game: one scene, one entity, one input, one test file. Start here for any genre that no other template fits.
 
 ```
 npm run new-game -- --template blank --id my-game --title "My game"

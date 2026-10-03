@@ -15,29 +15,42 @@
 //   area <id>                      (explore kit) a scene to move around in: walls, player, camera, prompt
 //   lesson <id>                    (learn kit) an outline-first lesson: data, scene, test, words
 import './lib/node-version.mjs';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
-import { gameDir, ROOT } from './lib/game-dir.mjs';
-import { loadGame } from '../src/app/game-files';
-import { freeAxisBinding, freeButtonBinding } from '../src/author/input-registry';
+import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {dirname, join, relative} from 'node:path';
+import {gameDir, ROOT} from './lib/game-dir.mjs';
+import {loadGame} from '../src/app/game-files';
+import {freeAxisBinding, freeButtonBinding} from '../src/author/input-registry';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
-export const pascal = (id: string) => id.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
-export const camel = (id: string) => { const p = pascal(id); return p.charAt(0).toLowerCase() + p.slice(1); };
+export const pascal = (id: string) =>
+  id
+    .split('-')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join('');
+export const camel = (id: string) => {
+  const p = pascal(id);
+  return p.charAt(0).toLowerCase() + p.slice(1);
+};
 const today = () => new Date().toISOString().slice(0, 10);
 
-export interface Generated { files: string[]; next: string[] }
+export interface Generated {
+  files: string[];
+  next: string[];
+}
 type Brief = Awaited<ReturnType<typeof loadGame>>['brief'];
 
 function write(file: string, text: string, made: string[]) {
-  if (existsSync(file)) throw Error(`${relative(ROOT, file)} already exists; choose another id (generators never overwrite)`);
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, text); made.push(relative(ROOT, file).split('\\').join('/'));
+  if (existsSync(file))
+    throw Error(`${relative(ROOT, file)} already exists; choose another id (generators never overwrite)`);
+  mkdirSync(dirname(file), {recursive: true});
+  writeFileSync(file, text);
+  made.push(relative(ROOT, file).split('\\').join('/'));
 }
 
 /** GAME.md with `row` added as the last row of its '## Changelog' table (appended at the end when it has none). */
 export function withChangelogRow(md: string, row: string): string {
-  const lines = md.split('\n'), h = lines.findIndex(l => /^##\s+Changelog\b/i.test(l));
+  const lines = md.split('\n'),
+    h = lines.findIndex(l => /^##\s+Changelog\b/i.test(l));
   if (h < 0) return md.replace(/\n*$/, '\n') + row + '\n';
   // A line past the end reads as '', which neither starts a table row nor a heading: the same stops as `i < length`.
   const line = (k: number) => lines[k] ?? '';
@@ -46,7 +59,7 @@ export function withChangelogRow(md: string, row: string): string {
   if (i < lines.length && line(i).startsWith('|')) {
     while (i < lines.length && line(i).startsWith('|')) i++;
     lines.splice(i, 0, row);
-  } else lines.splice(h + 1, 0, '', '| Date | Change | Budgets |', '|---|---|---|', row);   // a heading with no table yet
+  } else lines.splice(h + 1, 0, '', '| Date | Change | Budgets |', '|---|---|---|', row); // a heading with no table yet
   return lines.join('\n');
 }
 
@@ -63,12 +76,20 @@ function addBudgetRow(dir: string, id: string, brief: Brief, made: string[]) {
   if (data.scenes[id]) return;
   const c = brief.performance.perScene;
   data.scenes[id] = {
-    scene: `scene.${id}`, route: `#scene/${id}`, active: true,
+    scene: `scene.${id}`,
+    route: `#scene/${id}`,
+    active: true,
     // No loadMiB: a missing metric is unmeasured and the gate skips it (docs/recipes/add-a-budget.md). The bench never
     // measures the start scene's entry cost, so a guessed number would fail the gate, and removing it would count as a
     // raise. perf:derive supplies a measured loadMiB later; adding a metric is not a raise.
-    budget: { draws: c.draws, triangles: c.triangles, textureMiB: c.textureMiB, heapMiB: c.heapMiB, contexts: 1 },
-    provenance: { measured: `unmeasured: the brief's ceiling for a ${brief.devices.minimum}`, run: 'measure with npm run bench -- --only <first>,' + id + ', then npm run perf:derive, lower these numbers and add loadMiB unless this is the start scene' },
+    budget: {draws: c.draws, triangles: c.triangles, textureMiB: c.textureMiB, heapMiB: c.heapMiB, contexts: 1},
+    provenance: {
+      measured: `unmeasured: the brief's ceiling for a ${brief.devices.minimum}`,
+      run:
+        'measure with npm run bench -- --only <first>,' +
+        id +
+        ', then npm run perf:derive, lower these numbers and add loadMiB unless this is the start scene',
+    },
   };
   writeFileSync(file, JSON.stringify(data, null, 2) + '\n');
   made.push(relative(ROOT, file).split('\\').join('/') + ` (row ${id})`);
@@ -76,38 +97,62 @@ function addBudgetRow(dir: string, id: string, brief: Brief, made: string[]) {
 
 const phone = (b: Brief) => b.devices.targets.includes('phone') || b.devices.targets.includes('tablet');
 
-export async function generate(kind: string, id: string, opts: Record<string, string | boolean> = {}, dir = gameDir()): Promise<Generated> {
+export async function generate(
+  kind: string,
+  id: string,
+  opts: Record<string, string | boolean> = {},
+  dir = gameDir(),
+): Promise<Generated> {
   if (!KEBAB.test(id ?? '')) throw Error(`the id '${id}' must be lowercase kebab-case`);
-  const { brief, game, defs } = await loadGame(dir);
-  const files: string[] = [], next: string[] = [];
-  const P = pascal(id), c = camel(id);
+  const {brief, game, defs} = await loadGame(dir);
+  const files: string[] = [],
+    next: string[] = [];
+  const P = pascal(id),
+    c = camel(id);
   switch (kind) {
     case 'scene': {
       const lazyBody = opts['lazy-body'] === true;
-      if (lazyBody) for (const name of [`${id}.ts`, `${id}.body.mts`, `${id}.test.ts`]) {
-        if (existsSync(join(dir, name))) throw Error(`${name} already exists; choose another id (generators never overwrite)`);
-      }
-      write(join(dir, `${id}.ts`), `// ${P}: ${String(opts.title ?? P)}. Add entities and systems; see docs/recipes/add-a-scene.md.
+      if (lazyBody)
+        for (const name of [`${id}.ts`, `${id}.body.mts`, `${id}.test.ts`]) {
+          if (existsSync(join(dir, name)))
+            throw Error(`${name} already exists; choose another id (generators never overwrite)`);
+        }
+      write(
+        join(dir, `${id}.ts`),
+        `// ${P}: ${String(opts.title ?? P)}. Add entities and systems; see docs/recipes/add-a-scene.md.
 import { ${lazyBody ? 'defineScene' : 'defineScene, Name, Shape, Transform'} } from '@engine';
 
 export default defineScene({
   id: '${id}', title: '${String(opts.title ?? P)}', type: '${String(opts.type ?? 'scene')}',
   view: { camera: { position: [0, 8, 10], target: [0, 0, 0]${phone(brief) ? ', minWidthFov: 50' : ''} }, background: 0x141a24 },
-${lazyBody ? `  body: () => import('./${id}.body.mts'),` : `  entities: [
+${
+  lazyBody
+    ? `  body: () => import('./${id}.body.mts'),`
+    : `  entities: [
     [Name({ name: 'floor' }), Transform(), Shape({ kind: 'plane', size: [10, 0, 10], color: 0x2a3342 })],
   ],
-  systems: [],`}
+  systems: [],`
+}
 });
-`, files);
-      if (lazyBody) write(join(dir, `${id}.body.mts`), `// Loaded through the scene's body callback; keep body-only dependencies here.
+`,
+        files,
+      );
+      if (lazyBody)
+        write(
+          join(dir, `${id}.body.mts`),
+          `// Loaded through the scene's body callback; keep body-only dependencies here.
 import { Name, Shape, Transform, type SceneBody } from '@engine';
 
 export default {
   entities: [[Name({ name: 'floor' }), Transform(), Shape({ kind: 'plane', size: [10, 0, 10], color: 0x2a3342 })]],
   systems: [],
 } satisfies SceneBody;
-`, files);
-      write(join(dir, `${id}.test.ts`), `import { test } from 'node:test';
+`,
+          files,
+        );
+      write(
+        join(dir, `${id}.test.ts`),
+        `import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { testScene } from '@engine';
 import game from './game';
@@ -118,31 +163,47 @@ test('${id}: the scene starts and runs a second without errors', async () => {
   t.run(1);
   assert.ok(t.world.count > 0);
 });
-`, files);
+`,
+        files,
+      );
       addBudgetRow(dir, id, brief, files);
       changelog(dir, `Added scene \`${id}\``, files);
-      next.push(`Go there: ctx.scene.goto('${id}') or #scene/${id}`, `See it: npm run play:snap -- --scene ${id}${phone(brief) ? ' --mobile' : ''}`, `Measure and lower its budget: docs/recipes/add-a-budget.md`);
+      next.push(
+        `Go there: ctx.scene.goto('${id}') or #scene/${id}`,
+        `See it: npm run play:snap -- --scene ${id}${phone(brief) ? ' --mobile' : ''}`,
+        `Measure and lower its budget: docs/recipes/add-a-budget.md`,
+      );
       break;
     }
     case 'entity':
-      write(join(dir, `${id}.ts`), `// The ${id} prefab. Spawn it with ctx.spawn(${c}) or list it in a scene's entities.
+      write(
+        join(dir, `${id}.ts`),
+        `// The ${id} prefab. Spawn it with ctx.spawn(${c}) or list it in a scene's entities.
 import { defineEntity, Name, Shape, Transform } from '@engine';
 
 export default defineEntity({ id: '${id}', components: [Name({ name: '${id}' }), Transform({ y: 0.5 }), Shape({ kind: 'box', size: [1, 1, 1], color: 0xcccccc })] });
-`, files);
+`,
+        files,
+      );
       next.push(`Use it: import ${c} from './${id}'; add it to a scene's entities`);
       break;
     case 'component':
-      write(join(dir, `${id}.ts`), `// The ${P} component: data only; systems give it behaviour (docs/recipes/add-an-entity-and-component.md).
+      write(
+        join(dir, `${id}.ts`),
+        `// The ${P} component: data only; systems give it behaviour (docs/recipes/add-an-entity-and-component.md).
 import { defineComponent } from '@engine';
 
 export const ${P} = defineComponent('${id}', { value: 0 });
-`, files);
+`,
+        files,
+      );
       next.push(`Use it: ${P}({ value: 1 }) in an entity; ctx.world.query(${P}) in a system`);
       break;
     case 'system': {
       const phase = opts.frame ? 'frame' : 'fixed';
-      write(join(dir, `${id}.ts`), `// The ${id} system (${phase === 'fixed' ? 'fixed 60 Hz step: deterministic' : 'once per frame: presentation'}). Add it to a scene's systems.
+      write(
+        join(dir, `${id}.ts`),
+        `// The ${id} system (${phase === 'fixed' ? 'fixed 60 Hz step: deterministic' : 'once per frame: presentation'}). Add it to a scene's systems.
 import { defineSystem } from '@engine';
 
 export const ${c} = defineSystem({
@@ -152,8 +213,12 @@ export const ${c} = defineSystem({
     void ctx; void dt;
   },
 });
-`, files);
-      write(join(dir, `${id}.test.ts`), `import { test } from 'node:test';
+`,
+        files,
+      );
+      write(
+        join(dir, `${id}.test.ts`),
+        `import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defineScene, testScene } from '@engine';
 import game from './game';
@@ -164,7 +229,9 @@ test('${id}: runs on an empty world', async () => {
   t.run(1);
   assert.equal(t.world.count, 0);
 });
-`, files);
+`,
+        files,
+      );
       next.push(`Add it: systems: [..., ${c}] in the scene that needs it`);
       break;
     }
@@ -180,19 +247,30 @@ test('${id}: runs on an empty world', async () => {
         const b = freeButtonBinding(game, defs, id);
         body = `keys: ${list(b.keys)}, pad: ${list(b.pad)}${touch ? ', tap: true' : ''},`;
       }
-      write(join(dir, `${id}.ts`), `// The ${id} ${opts.axis ? 'axis (-1…1)' : 'action'}. Change the bindings; every action needs a key and a pad input.
+      write(
+        join(dir, `${id}.ts`),
+        `// The ${id} ${opts.axis ? 'axis (-1…1)' : 'action'}. Change the bindings; every action needs a key and a pad input.
 import { defineInput } from '@engine';
 
 export default defineInput({
   id: '${id}', label: '${P.replace(/([a-z])([A-Z])/g, '$1 $2')}',
   ${body}
 });
-`, files);
-      next.push(opts.axis ? `Read it: ctx.input.axis('${id}')` : `Read it: ctx.input.pressed('${id}') or ctx.input.held('${id}')`, 'The bindings were free when generated; npm run check (lint:brief) reports any later clash with the engine or another input');
+`,
+        files,
+      );
+      next.push(
+        opts.axis
+          ? `Read it: ctx.input.axis('${id}')`
+          : `Read it: ctx.input.pressed('${id}') or ctx.input.held('${id}')`,
+        'The bindings were free when generated; npm run check (lint:brief) reports any later clash with the engine or another input',
+      );
       break;
     }
     case 'save-section':
-      write(join(dir, `${id}.ts`), `// Saved state '${game.id}.${id}'. The id is save data: never rename it. Add migrate[n] when the shape changes.
+      write(
+        join(dir, `${id}.ts`),
+        `// Saved state '${game.id}.${id}'. The id is save data: never rename it. Add migrate[n] when the shape changes.
 import { defineSaveSection } from '@engine';
 
 export default defineSaveSection({
@@ -200,12 +278,19 @@ export default defineSaveSection({
   initial: { count: 0 },
   merge: (a, b) => ({ count: Math.max(a.count, b.count) }),
 });
-`, files);
-      next.push(`Use it: ctx.save(${c}).update(d => { d.count++; })`, 'Test that it survives a reload: createTestSaves() and saves.reload() (docs/recipes/add-a-save-section.md, step 5)');
+`,
+        files,
+      );
+      next.push(
+        `Use it: ctx.save(${c}).update(d => { d.count++; })`,
+        'Test that it survives a reload: createTestSaves() and saves.reload() (docs/recipes/add-a-save-section.md, step 5)',
+      );
       break;
     case 'kit': {
       const kdir = join(ROOT, 'src', 'kits', id);
-      write(join(kdir, 'index.ts'), `/**
+      write(
+        join(kdir, 'index.ts'),
+        `/**
  * kits/${id}: <what it is for>. Cost: <draws, per-frame work>.
  */
 import { defineKit, defineSystem, type KitDefinition, type SystemDefinition } from '../../author';
@@ -215,8 +300,12 @@ export function ${c}System(): SystemDefinition {
 }
 
 export function ${c}(): KitDefinition { return defineKit({ id: '${id}' }); }
-`, files);
-      write(join(kdir, 'README.md'), `# kits/${id}
+`,
+        files,
+      );
+      write(
+        join(kdir, 'README.md'),
+        `# kits/${id}
 
 <Authorized creator requirement and reusable extension seam.>
 
@@ -234,8 +323,12 @@ record before claiming the kit is ready; placeholders are not passing evidence.
 | Failure and recovery | <Partial work, cleanup failures and recoverable state> |
 | Evidence | <Consumer, tests, measured budgets and manual acceptance> |
 | Limits | <Unsupported behavior and unverified claims> |
-`, files);
-      write(join(kdir, `${id}.test.ts`), `import { test } from 'node:test';
+`,
+        files,
+      );
+      write(
+        join(kdir, `${id}.test.ts`),
+        `import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defineScene, testScene } from '../../author';
 import { ${c}System } from './index';
@@ -245,13 +338,20 @@ test('${id} kit: its system runs', async () => {
   t.run(0.1);
   assert.equal(t.world.count, 0);
 });
-`, files);
-      next.push(`Use it from a game: import { ${c} } from '@kits/${id}'; kits: [${c}()]`, 'Follow docs/recipes/add-a-kit.md');
+`,
+        files,
+      );
+      next.push(
+        `Use it from a game: import { ${c} } from '@kits/${id}'; kits: [${c}()]`,
+        'Follow docs/recipes/add-a-kit.md',
+      );
       break;
     }
     case 'interactable': {
       const door = typeof opts.door === 'string' ? opts.door : '';
-      write(join(dir, `${id}.ts`), `// ${door ? `A door to '${door}'` : `A thing to use: '${id}'`} (explore kit). Put ${c}At(x, z) in a scene's entities; react to
+      write(
+        join(dir, `${id}.ts`),
+        `// ${door ? `A door to '${door}'` : `A thing to use: '${id}'`} (explore kit). Put ${c}At(x, z) in a scene's entities; react to
 // ctx.world.read('interact') with id '${id}'${door ? '' : ' in a system'}. Its label is the string key game.use.${id}.
 import { Shape, Transform } from '@engine';
 import { Solid } from '@kits/character';
@@ -261,12 +361,19 @@ export const ${c}At = (x: number, z: number) => [
   Transform({ x, y: 0.5, z }), Shape({ kind: 'box', size: [1, 1, 1], color: ${door ? '0x4a2f1c' : '0xc9a46a'} }),${door ? '' : ' Solid({ halfX: 0.5, halfZ: 0.5 }),'}
   Interactable({ id: '${id}', label: 'game.use.${id}'${door ? `, to: '${door}', toX: 0, toZ: 0` : ''} }),
 ];
-`, files);
-      next.push(`Add the text: strings.en['game.use.${id}'] in game.ts`, `Place it: ${c}At(2, 0) in a scene's entities`);
+`,
+        files,
+      );
+      next.push(
+        `Add the text: strings.en['game.use.${id}'] in game.ts`,
+        `Place it: ${c}At(2, 0) in a scene's entities`,
+      );
       break;
     }
     case 'area': {
-      write(join(dir, `${id}.ts`), `// ${P}: a scene to move around in (explore kit): walls, the player, a camera and the use prompt.
+      write(
+        join(dir, `${id}.ts`),
+        `// ${P}: a scene to move around in (explore kit): walls, the player, a camera and the use prompt.
 import { defineScene, Name, Shape, Transform } from '@engine';
 import { cameraSystem } from '@kits/camera';
 import { Character, characterSystem, Walls } from '@kits/character';
@@ -282,14 +389,20 @@ export default defineScene({
   ],
   systems: [characterSystem(), exploreSystem(), cameraSystem('orbit', { distance: 11, pitch: 0.95 })],
 });
-`, files);
+`,
+        files,
+      );
       addBudgetRow(dir, id, brief, files);
       changelog(dir, `Added area \`${id}\``, files);
-      next.push(`Needs the kits ui, camera, character and explore in game.ts`, `Add things: npm run new -- interactable <id>`, `See it: npm run play:snap -- --scene ${id}`);
+      next.push(
+        `Needs the kits ui, camera, character and explore in game.ts`,
+        `Add things: npm run new -- interactable <id>`,
+        `See it: npm run play:snap -- --scene ${id}`,
+      );
       break;
     }
     case 'lesson': {
-      const { generateLesson } = await import('../src/kits/learn/generate');
+      const {generateLesson} = await import('../src/kits/learn/generate');
       const made = generateLesson(dir, id, brief, ROOT);
       for (const f of made.files) {
         const text = made.text[f];
@@ -302,18 +415,58 @@ export default defineScene({
       next.push(...made.next);
       break;
     }
-    default: throw Error(`unknown kind '${kind}': scene, entity, component, system, input, save-section, kit, interactable, area, lesson`);
+    default:
+      throw Error(
+        `unknown kind '${kind}': scene, entity, component, system, input, save-section, kit, interactable, area, lesson`,
+      );
   }
-  return { files, next };
+  await formatMade(files);
+  return {files, next};
+}
+
+/** Format what a generator wrote or changed with the repository's Prettier settings, so `npm run check` (which runs
+ *  format:check) stays green after a generator. Entries may carry a note (`budgets.json (row x)`); files Prettier does
+ *  not format, or that .prettierignore excludes (Markdown), are left as written. */
+async function formatMade(made: string[]) {
+  const prettier = await import('prettier');
+  const options = (await prettier.resolveConfig(join(ROOT, 'package.json'))) ?? {};
+  for (const entry of new Set(made.map(f => f.replace(/ \(.*\)$/, '')))) {
+    const file = join(ROOT, entry);
+    if (!existsSync(file)) continue;
+    const info = await prettier.getFileInfo(file, {ignorePath: join(ROOT, '.prettierignore')});
+    if (info.ignored || !info.inferredParser) continue;
+    const text = readFileSync(file, 'utf8');
+    const formatted = await prettier.format(text, {...options, filepath: file});
+    if (formatted !== text) writeFileSync(file, formatted);
+  }
 }
 
 if (process.argv[1]?.endsWith('new.ts')) {
   const [kind, id, ...rest] = process.argv.slice(2);
   const opts: Record<string, string | boolean> = {};
-  for (let i = 0; i < rest.length; i++) { const arg = rest[i]!; /* i < rest.length */ if (arg.startsWith('--')) { const v = rest[i + 1]; if (v && !v.startsWith('--')) { opts[arg.slice(2)] = v; i++; } else opts[arg.slice(2)] = true; } }
-  if (!kind || !id) { console.log('usage: npm run new -- <scene|entity|component|system|input|save-section|kit|interactable|area|lesson> <id> [options]'); process.exit(kind ? 1 : 0); }
+  for (let i = 0; i < rest.length; i++) {
+    const arg = rest[i]!; // i < rest.length
+    if (arg.startsWith('--')) {
+      const v = rest[i + 1];
+      if (v && !v.startsWith('--')) {
+        opts[arg.slice(2)] = v;
+        i++;
+      } else opts[arg.slice(2)] = true;
+    }
+  }
+  if (!kind || !id) {
+    console.log(
+      'usage: npm run new -- <scene|entity|component|system|input|save-section|kit|interactable|area|lesson> <id> [options]',
+    );
+    process.exit(kind ? 1 : 0);
+  }
   try {
     const r = await generate(kind, id, opts);
-    console.log(`new ${kind} ${id}:\n${r.files.map(f => '  + ' + f).join('\n')}\nNext:\n${r.next.map(n => '  - ' + n).join('\n')}`);
-  } catch (e) { console.error('new: ' + (e as Error).message); process.exitCode = 1; }
+    console.log(
+      `new ${kind} ${id}:\n${r.files.map(f => '  + ' + f).join('\n')}\nNext:\n${r.next.map(n => '  - ' + n).join('\n')}`,
+    );
+  } catch (e) {
+    console.error('new: ' + (e as Error).message);
+    process.exitCode = 1;
+  }
 }

@@ -15,18 +15,43 @@
  * - Particles are presentation: they never change the world, except `despawn: true`, which removes the entity at a
  *   time computed from the data alone (identical on every preset).
  */
-import { component, type ComponentInit, type Entity, type World } from '../core/ecs/world';
-import { EMITTER_ID, PARTICLE_LIMITS, type EmitterData } from './particle-contract';
-export { PARTICLE_LIMITS, type EmitterData, type EmitterMode, type EmitterBlending } from './particle-contract';
+import {component, type ComponentInit, type Entity, type World} from '../core/ecs/world';
+import {EMITTER_ID, PARTICLE_LIMITS, type EmitterData} from './particle-contract';
+export {PARTICLE_LIMITS, type EmitterData, type EmitterMode, type EmitterBlending} from './particle-contract';
 
 export const EMITTER_DEFAULTS: Readonly<EmitterData> = Object.freeze({
-  mode: 'burst', max: 64, rate: 20, count: 16, bursts: 0, playing: true,
-  lifetime: [.5, 1], speed: [1, 3], direction: [0, 1, 0], spread: Math.PI / 4, gravity: [0, 0, 0], drag: 0,
-  size: [.2], color: [0xffffff], opacity: [1, 0], texture: '', blending: 'additive', essential: false, despawn: false,
+  mode: 'burst',
+  max: 64,
+  rate: 20,
+  count: 16,
+  bursts: 0,
+  playing: true,
+  lifetime: [0.5, 1],
+  speed: [1, 3],
+  direction: [0, 1, 0],
+  spread: Math.PI / 4,
+  gravity: [0, 0, 0],
+  drag: 0,
+  size: [0.2],
+  color: [0xffffff],
+  opacity: [1, 0],
+  texture: '',
+  blending: 'additive',
+  essential: false,
+  despawn: false,
 } as EmitterData);
 
-const copy = (d: Readonly<EmitterData>): EmitterData => ({ ...d, lifetime: [...d.lifetime], speed: [...d.speed], direction: [...d.direction],
-  gravity: [...d.gravity], size: [...d.size], color: [...d.color], opacity: [...d.opacity] } as EmitterData);
+const copy = (d: Readonly<EmitterData>): EmitterData =>
+  ({
+    ...d,
+    lifetime: [...d.lifetime],
+    speed: [...d.speed],
+    direction: [...d.direction],
+    gravity: [...d.gravity],
+    size: [...d.size],
+    color: [...d.color],
+    opacity: [...d.opacity],
+  }) as EmitterData;
 
 /** The emitter component. Use {@link defineEmitter} for a checked initialiser. */
 export const Emitter = /* @__PURE__ */ component<EmitterData>(EMITTER_ID, copy(EMITTER_DEFAULTS));
@@ -34,8 +59,14 @@ export const Emitter = /* @__PURE__ */ component<EmitterData>(EMITTER_ID, copy(E
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const num = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
 const within = (n: unknown, lo: number, hi: number) => num(n) && n >= lo && n <= hi;
-const vec3 = (v: unknown, limit: number) => Array.isArray(v) && v.length === 3 && within(v[0], -limit, limit) && within(v[1], -limit, limit) && within(v[2], -limit, limit);
-const pair = (v: unknown, lo: number, hi: number) => Array.isArray(v) && v.length === 2 && within(v[0], lo, hi) && within(v[1], lo, hi) && v[0] <= v[1];
+const vec3 = (v: unknown, limit: number) =>
+  Array.isArray(v) &&
+  v.length === 3 &&
+  within(v[0], -limit, limit) &&
+  within(v[1], -limit, limit) &&
+  within(v[2], -limit, limit);
+const pair = (v: unknown, lo: number, hi: number) =>
+  Array.isArray(v) && v.length === 2 && within(v[0], lo, hi) && within(v[1], lo, hi) && v[0] <= v[1];
 function keys(v: unknown, ok: (n: unknown) => boolean): boolean {
   if (!Array.isArray(v) || v.length < 1 || v.length > PARTICLE_LIMITS.keys) return false;
   for (let i = 0; i < v.length; i++) if (!ok(v[i])) return false;
@@ -52,21 +83,33 @@ const sized = (n: unknown) => within(n, 0, PARTICLE_LIMITS.size);
 export function emitterProblem(d: EmitterData): string | null {
   if (!d || typeof d !== 'object') return 'emitter: data must be an object';
   if (d.mode !== 'burst' && d.mode !== 'continuous') return 'emitter: mode must be burst or continuous';
-  if (!Number.isInteger(d.max) || d.max < 1 || d.max > PARTICLE_LIMITS.perEmitter) return `emitter: max must be an integer in [1, ${PARTICLE_LIMITS.perEmitter}]`;
+  if (!Number.isInteger(d.max) || d.max < 1 || d.max > PARTICLE_LIMITS.perEmitter)
+    return `emitter: max must be an integer in [1, ${PARTICLE_LIMITS.perEmitter}]`;
   if (!within(d.rate, 0, PARTICLE_LIMITS.rate)) return `emitter: rate must be in [0, ${PARTICLE_LIMITS.rate}]`;
-  if (!Number.isInteger(d.count) || d.count < 0 || d.count > d.max) return 'emitter: count must be an integer in [0, max]';
+  if (!Number.isInteger(d.count) || d.count < 0 || d.count > d.max)
+    return 'emitter: count must be an integer in [0, max]';
   if (!Number.isInteger(d.bursts) || d.bursts < 0) return 'emitter: bursts must be a non-negative integer';
   if (typeof d.playing !== 'boolean') return 'emitter: playing must be boolean';
-  if (!pair(d.lifetime, 0, PARTICLE_LIMITS.lifetime) || !(d.lifetime[0] > 0)) return `emitter: lifetime must be [min, max] with 0 < min <= max <= ${PARTICLE_LIMITS.lifetime}`;
-  if (!pair(d.speed, 0, PARTICLE_LIMITS.speed)) return `emitter: speed must be [min, max] with 0 <= min <= max <= ${PARTICLE_LIMITS.speed}`;
-  if (!vec3(d.direction, 1e6) || (d.direction[0] === 0 && d.direction[1] === 0 && d.direction[2] === 0)) return 'emitter: direction must be a non-zero [x, y, z]';
+  if (!pair(d.lifetime, 0, PARTICLE_LIMITS.lifetime) || !(d.lifetime[0] > 0))
+    return `emitter: lifetime must be [min, max] with 0 < min <= max <= ${PARTICLE_LIMITS.lifetime}`;
+  if (!pair(d.speed, 0, PARTICLE_LIMITS.speed))
+    return `emitter: speed must be [min, max] with 0 <= min <= max <= ${PARTICLE_LIMITS.speed}`;
+  if (!vec3(d.direction, 1e6) || (d.direction[0] === 0 && d.direction[1] === 0 && d.direction[2] === 0))
+    return 'emitter: direction must be a non-zero [x, y, z]';
   if (!within(d.spread, 0, Math.PI)) return 'emitter: spread must be in [0, π] radians';
-  if (!vec3(d.gravity, PARTICLE_LIMITS.gravity)) return `emitter: gravity must be [x, y, z], each within ±${PARTICLE_LIMITS.gravity}`;
+  if (!vec3(d.gravity, PARTICLE_LIMITS.gravity))
+    return `emitter: gravity must be [x, y, z], each within ±${PARTICLE_LIMITS.gravity}`;
   if (!within(d.drag, 0, PARTICLE_LIMITS.drag)) return `emitter: drag must be in [0, ${PARTICLE_LIMITS.drag}]`;
-  if (!keys(d.size, sized)) return `emitter: size must be 1 to ${PARTICLE_LIMITS.keys} keys in [0, ${PARTICLE_LIMITS.size}] metres`;
+  if (!keys(d.size, sized))
+    return `emitter: size must be 1 to ${PARTICLE_LIMITS.keys} keys in [0, ${PARTICLE_LIMITS.size}] metres`;
   if (!keys(d.color, rgb)) return `emitter: color must be 1 to ${PARTICLE_LIMITS.keys} 24-bit RGB keys`;
   if (!keys(d.opacity, unit)) return `emitter: opacity must be 1 to ${PARTICLE_LIMITS.keys} keys in [0, 1]`;
-  if (typeof d.texture !== 'string' || d.texture.length > PARTICLE_LIMITS.textureId || (d.texture !== '' && !KEBAB.test(d.texture))) return 'emitter: texture must be \'\' or a kebab-case texture asset id';
+  if (
+    typeof d.texture !== 'string' ||
+    d.texture.length > PARTICLE_LIMITS.textureId ||
+    (d.texture !== '' && !KEBAB.test(d.texture))
+  )
+    return "emitter: texture must be '' or a kebab-case texture asset id";
   if (d.blending !== 'additive' && d.blending !== 'normal') return 'emitter: blending must be additive or normal';
   if (typeof d.essential !== 'boolean') return 'emitter: essential must be boolean';
   if (typeof d.despawn !== 'boolean') return 'emitter: despawn must be boolean';
@@ -84,7 +127,7 @@ export function defineEmitter(input: Partial<EmitterData>): ComponentInit<Emitte
   const base = copy(EMITTER_DEFAULTS);
   // An omitted burst size never exceeds the pool it is given.
   const count = input.count ?? (Number.isInteger(input.max) ? Math.min(base.count, input.max!) : base.count);
-  const data = copy({ ...base, ...input, count } as EmitterData);
+  const data = copy({...base, ...input, count} as EmitterData);
   validateEmitter(data);
   return Emitter(data);
 }
@@ -93,6 +136,7 @@ export function defineEmitter(input: Partial<EmitterData>): ComponentInit<Emitte
 export function burst(world: World, entity: Entity, n = 1): boolean {
   const e = world.get(entity, Emitter);
   if (!e || !Number.isInteger(n) || n < 1) return false;
-  e.bursts += n; world.touch();
+  e.bursts += n;
+  world.touch();
   return true;
 }

@@ -11,16 +11,14 @@
     "retainedCanvasMiBAfterTour": 4,
     "retainedHeapMiBAfterTour": 8
   },
-  "largeChunkAllow": [
-    "index"
-  ],
+  "largeChunkAllow": ["index"],
   "scenes": {
     "play": {
       "scene": "scene.play",
       "route": "#scene/play",
       "active": true,
       "activeKeys": ["ArrowLeft", "ArrowRight"],
-      "activeRestart": { "when": ".hud-banner:not([hidden])", "key": "Space", "timeoutMs": 30000 },
+      "activeRestart": {"when": ".hud-banner:not([hidden])", "key": "Space", "timeoutMs": 30000},
       "budget": {
         "draws": 10,
         "triangles": 10000,

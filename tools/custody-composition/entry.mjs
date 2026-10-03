@@ -4,28 +4,365 @@ import {createApp} from '../../src/core/app.ts';
 import {appFeatures} from '../../src/core/settings/app-features.ts';
 import {layerModules} from '../../src/app/layer-modules.ts';
 import {compileGame} from '../../src/author/compile.ts';
-import {defineBuild,defineGame,defineScene,defineSaveSection,Name,Transform,Shape} from '../../src/author/index.ts';
+import {
+  defineBuild,
+  defineGame,
+  defineScene,
+  defineSaveSection,
+  Name,
+  Transform,
+  Shape,
+} from '../../src/author/index.ts';
 import {createTestApi} from '../../src/dev/test-api.ts';
 import {saveModule} from '../../src/core/save/module.ts';
 import {browserPort} from '../../src/core/save/storage-port.ts';
-import {createCustodyController,createCustodyStoragePort,sectionDefinition,storageKey} from './controller.mjs';
-const section=defineSaveSection({...sectionDefinition,initial:sectionDefinition.initial()});section.section=sectionDefinition;
-const brief=defineBuild({goal:'Keep each unique instance in one accepted authored location across refusal and durable publication.',genre:'diagnostic',pitch:'Optional custody composition proof.',coreLoop:['Prepare','Inspect','Publish','Acknowledge'],devices:{targets:['desktop'],minimum:'desktop',input:['keyboard','pointer']},success:[{id:'S1',check:'World custody changes only with acknowledged coherent envelopes and retries never duplicate identity.',how:'playtest',by:'scripts/play/custody-composition-check.mjs'}]});
-const game=defineGame({id:'custody-composition',version:'0.1.0',title:'Custody composition',firstScene:'sample'});
-const storage=createCustodyStoragePort(browserPort('local')),failureKey='custody-diagnostic-refuse-write';
-const port={...storage,set(key,value){if(key===storageKey&&sessionStorage.getItem(failureKey)==='yes')throw Error('Intentional custody storage refusal');storage.set(key,value);}};
-const el=id=>document.getElementById(id),json=value=>JSON.stringify(value,null,2);
-let context,controller,life,sheet=null,prepared=null,remembered=null,lastResult=null,message='',openError='',signature='',projected=[],projectionSignature='',prior,retainDiagnosticPreview=false;
-const colors={blocker:0x9aa4b5,a:0x63d8dc,b:0xe5b95e,crafted:0xc196ed};
-function visibleRows(view){if(!view)return [];return [...view.world.map((row,i)=>({id:row.id,location:'world',position:Array.isArray(row.position)?row.position:[-3,.5,i*1.4-1]})),...view.bag.map((row,i)=>({id:row.id,location:'bag',position:[0,.5,i*1.4]})),...view.equipped.map((row,i)=>({id:row.id,location:'equipped',position:[3,.8,i*1.4]}))];}
-function project(){const state=controller.read(),rows=state.blocked?[]:visibleRows(state.view),key=JSON.stringify(rows);if(key===projectionSignature)return;const next=[];try{for(const row of rows){const [x,y,z]=row.position;const entity=context.world.spawn(Name({name:row.id}),Transform({x,y,z}),Shape({kind:'box',size:[.7,.7,.7],color:colors[row.id]}));next.push({...row,entity});}}catch(error){for(const row of next)context.world.despawn(row.entity);throw error;}for(const row of projected)context.world.despawn(row.entity);projected=next;projectionSignature=key;context.world.touch();}
-function render(){if(!controller)return;const s=controller.read();el('compact-status').textContent=openError|| (s.blocked?'Saved envelope needs recovery':`Accepted revision ${s.envelope.revision} · ${s.pending?'Pending publication — old world retained':s.durable?'Durable':'Not yet saved'}`);if(!el('details'))return;el('accepted').textContent=json(s.envelope);el('projection').textContent=json(projected.map(({entity,...row})=>row));el('materials').textContent=json({reservation:s.view?.reservation,stock:s.view?.stock,issued:s.view?.issued});el('candidate').textContent=prepared?json({request:prepared.request,baseRevision:prepared.baseRevision,acceptedRevision:s.envelope.revision,pending:s.pending}):'No local candidate.';el('message').textContent=message||s.message;el('persistence').textContent=`${s.saveStatus} · ${s.pending?'Attempted candidate retained; cancel forbidden.':s.durable?'Accepted envelope matches durable storage.':'No durable acknowledgement yet.'}`;el('commit').disabled=!prepared||s.blocked||s.retired||s.pending;el('cancel').disabled=!prepared||s.pending;el('retry').disabled=!s.pending||s.blocked||s.retired;el('acknowledge').disabled=!s.canAcknowledge||s.blocked||s.retired;for(const id of operations)el(id).disabled=s.blocked||s.retired||s.pending;el('fail-storage').checked=sessionStorage.getItem(failureKey)==='yes';}
-function act(fn){try{lastResult=fn();message=json(lastResult?{status:lastResult.status,reason:lastResult.reason}:lastResult);project();}catch(error){lastResult={status:'exception',reason:error.message};message=error.message;}render();}
-function request(payload){return {epoch:controller.read().envelope.epoch,id:crypto.randomUUID(),payload};}
-const operations=['pickup','drop','equip','unequip','reserve','settle','cancel-reservation','checkpoint'];
-function payload(kind){if(['pickup','drop','equip','unequip'].includes(kind))return {kind,item:el('item').value};if(['settle','cancel-reservation'].includes(kind))return {kind,request:controller.read().view.reservation};return {kind};}
-function previewRequest(command){if(prepared&&!controller.read().pending)controller.cancel(prepared.candidate);prepared=null;const baseRevision=controller.read().envelope.revision,result=controller.preview(command);if(result.status==='prepared')prepared={candidate:result.candidate,request:command,baseRevision};return result;}
-async function open(){if(sheet||!context)return;openError='';const fragment=document.importNode(el('details-template').content,true),element=fragment.querySelector('#details');try{sheet=context.view.openReadingSheet({id:'custody-details',element,initialFocus:()=>el('item'),returnFocus:()=>el('open')});const opened=sheet;opened.signal.addEventListener('abort',()=>{if(prepared&&!controller.read().pending&&!retainDiagnosticPreview){controller.cancel(prepared.candidate);prepared=null;}if(sheet===opened)sheet=null;},{once:true});await opened.ready;if(opened.signal.aborted)return;el('item').innerHTML=Object.keys(colors).map(id=>`<option>${id}</option>`).join('');el('operations').innerHTML=operations.map(id=>`<button id="${id}">Preview ${id}</button>`).join('');const bind=(id,fn)=>el(id).addEventListener('click',fn,{signal:opened.signal});for(const kind of operations)bind(kind,()=>act(()=>previewRequest(request(payload(kind)))));bind('close',()=>opened.close());bind('commit',()=>act(()=>prepared?controller.commit(prepared.candidate):{status:'empty'}));bind('cancel',()=>act(()=>{const result=prepared?controller.cancel(prepared.candidate):{status:'empty'};if(!controller.read().pending)prepared=null;return result;}));bind('retry',()=>act(()=>controller.retry()));bind('acknowledge',()=>act(()=>{const r=controller.acknowledge();if(!controller.read().pending)prepared=null;if(r.status==='accepted')opened.close();return r;}));bind('remember',()=>act(()=>{remembered=prepared?.request??remembered;return {status:remembered?'remembered':'empty'};}));bind('replay',()=>act(()=>remembered?previewRequest(remembered):{status:'empty'}));bind('stale',()=>act(()=>{const r=controller.preview(request({kind:'reserve'}));if(r.status!=='prepared')return r;const result=controller.commit(r.candidate);if(controller.read().canAcknowledge){const acknowledged=controller.acknowledge();if(acknowledged.status==='accepted'){retainDiagnosticPreview=true;try{opened.close();}finally{retainDiagnosticPreview=false;}}return acknowledged;}return result;}));bind('retire',()=>act(()=>{prior={controller,candidate:prepared?.candidate};controller.dispose();return prior.candidate?controller.commit(prior.candidate):{status:'retired'};}));bind('reload',()=>location.reload());el('fail-storage').addEventListener('change',()=>{sessionStorage.setItem(failureKey,el('fail-storage').checked?'yes':'no');render();},{signal:opened.signal});el('item').addEventListener('change',()=>{if(prepared&&!controller.read().pending){controller.cancel(prepared.candidate);prepared=null;}render();},{signal:opened.signal});render();}catch(error){openError=error.message;sheet=null;render();}}
-function refresh(){if(!controller)return;const s=controller.read(),next=JSON.stringify({revision:s.envelope?.revision,pending:s.pending,status:s.saveStatus,ack:s.canAcknowledge,durable:s.durable,blocked:s.blocked,retired:s.retired});if(next!==signature){signature=next;project();render();}}
-const scene=defineScene({id:'sample',title:'Unique custody',systems:[],view:{camera:{position:[7,7,10],target:[0,0,0]},background:0x172738},enter(ctx){context=ctx;life=new AbortController();controller=createCustodyController({saveHandle:ctx.save(section),readPersisted:()=>storage.get(storageKey)});prepared=null;signature='';projectionSignature='';projected=[];for(const [x,color]of [[-3,0x294c62],[0,0x3a495d],[3,0x494262]])ctx.world.spawn(Transform({x,y:-.1}),Shape({kind:'box',size:[2.2,.2,4],color}));project();el('open').addEventListener('click',open,{signal:life.signal});render();const timer=setInterval(refresh,150);life.signal.addEventListener('abort',()=>clearInterval(timer),{once:true});},exit(){life.abort();sheet?.close();sheet=null;controller.dispose();context=null;projected=[];}});
-const compiled=compileGame({brief,game,defs:[scene,section]});const modules=layerModules(game,brief).map(m=>m.id==='core.save'?saveModule({namespace:game.id,build:'custody@0.1.0',storage:()=>({local:port,session:browserPort('session')})}):m);const app=createApp([...modules,...compiled.modules],{mode:'test',flag:id=>appFeatures().enabled(id),probes:true});const booted=app.boot();window.engine=createTestApi(app,booted);window.custody={read:()=>controller?.read(),ui:()=>({message,openError,result:lastResult,prepared:prepared?{request:prepared.request,baseRevision:prepared.baseRevision}:null,sheet:!!sheet}),world:()=>context?[...context.world.query(Name)].map(([entity,name])=>({entity,id:name.name,transform:context.world.get(entity,Transform)?{...context.world.get(entity,Transform)}:null,shape:context.world.get(entity,Shape)?structuredClone(context.world.get(entity,Shape)):null})):[],retired:()=>prior?.candidate?prior.controller.commit(prior.candidate):null,dispose(){app.dispose();}};await booted;
+import {createCustodyController, createCustodyStoragePort, sectionDefinition, storageKey} from './controller.mjs';
+const section = defineSaveSection({...sectionDefinition, initial: sectionDefinition.initial()});
+section.section = sectionDefinition;
+const brief = defineBuild({
+  goal: 'Keep each unique instance in one accepted authored location across refusal and durable publication.',
+  genre: 'diagnostic',
+  pitch: 'Optional custody composition proof.',
+  coreLoop: ['Prepare', 'Inspect', 'Publish', 'Acknowledge'],
+  devices: {targets: ['desktop'], minimum: 'desktop', input: ['keyboard', 'pointer']},
+  success: [
+    {
+      id: 'S1',
+      check: 'World custody changes only with acknowledged coherent envelopes and retries never duplicate identity.',
+      how: 'playtest',
+      by: 'scripts/play/custody-composition-check.mjs',
+    },
+  ],
+});
+const game = defineGame({
+  id: 'custody-composition',
+  version: '0.1.0',
+  title: 'Custody composition',
+  firstScene: 'sample',
+});
+const storage = createCustodyStoragePort(browserPort('local')),
+  failureKey = 'custody-diagnostic-refuse-write';
+const port = {
+  ...storage,
+  set(key, value) {
+    if (key === storageKey && sessionStorage.getItem(failureKey) === 'yes')
+      throw Error('Intentional custody storage refusal');
+    storage.set(key, value);
+  },
+};
+const el = id => document.getElementById(id),
+  json = value => JSON.stringify(value, null, 2);
+let context,
+  controller,
+  life,
+  sheet = null,
+  prepared = null,
+  remembered = null,
+  lastResult = null,
+  message = '',
+  openError = '',
+  signature = '',
+  projected = [],
+  projectionSignature = '',
+  prior,
+  retainDiagnosticPreview = false;
+const colors = {blocker: 0x9aa4b5, a: 0x63d8dc, b: 0xe5b95e, crafted: 0xc196ed};
+function visibleRows(view) {
+  if (!view) return [];
+  return [
+    ...view.world.map((row, i) => ({
+      id: row.id,
+      location: 'world',
+      position: Array.isArray(row.position) ? row.position : [-3, 0.5, i * 1.4 - 1],
+    })),
+    ...view.bag.map((row, i) => ({id: row.id, location: 'bag', position: [0, 0.5, i * 1.4]})),
+    ...view.equipped.map((row, i) => ({id: row.id, location: 'equipped', position: [3, 0.8, i * 1.4]})),
+  ];
+}
+function project() {
+  const state = controller.read(),
+    rows = state.blocked ? [] : visibleRows(state.view),
+    key = JSON.stringify(rows);
+  if (key === projectionSignature) return;
+  const next = [];
+  try {
+    for (const row of rows) {
+      const [x, y, z] = row.position;
+      const entity = context.world.spawn(
+        Name({name: row.id}),
+        Transform({x, y, z}),
+        Shape({kind: 'box', size: [0.7, 0.7, 0.7], color: colors[row.id]}),
+      );
+      next.push({...row, entity});
+    }
+  } catch (error) {
+    for (const row of next) context.world.despawn(row.entity);
+    throw error;
+  }
+  for (const row of projected) context.world.despawn(row.entity);
+  projected = next;
+  projectionSignature = key;
+  context.world.touch();
+}
+function render() {
+  if (!controller) return;
+  const s = controller.read();
+  el('compact-status').textContent =
+    openError ||
+    (s.blocked
+      ? 'Saved envelope needs recovery'
+      : `Accepted revision ${s.envelope.revision} · ${s.pending ? 'Pending publication — old world retained' : s.durable ? 'Durable' : 'Not yet saved'}`);
+  if (!el('details')) return;
+  el('accepted').textContent = json(s.envelope);
+  el('projection').textContent = json(projected.map(({entity, ...row}) => row));
+  el('materials').textContent = json({reservation: s.view?.reservation, stock: s.view?.stock, issued: s.view?.issued});
+  el('candidate').textContent = prepared
+    ? json({
+        request: prepared.request,
+        baseRevision: prepared.baseRevision,
+        acceptedRevision: s.envelope.revision,
+        pending: s.pending,
+      })
+    : 'No local candidate.';
+  el('message').textContent = message || s.message;
+  el('persistence').textContent =
+    `${s.saveStatus} · ${s.pending ? 'Attempted candidate retained; cancel forbidden.' : s.durable ? 'Accepted envelope matches durable storage.' : 'No durable acknowledgement yet.'}`;
+  el('commit').disabled = !prepared || s.blocked || s.retired || s.pending;
+  el('cancel').disabled = !prepared || s.pending;
+  el('retry').disabled = !s.pending || s.blocked || s.retired;
+  el('acknowledge').disabled = !s.canAcknowledge || s.blocked || s.retired;
+  for (const id of operations) el(id).disabled = s.blocked || s.retired || s.pending;
+  el('fail-storage').checked = sessionStorage.getItem(failureKey) === 'yes';
+}
+function act(fn) {
+  try {
+    lastResult = fn();
+    message = json(lastResult ? {status: lastResult.status, reason: lastResult.reason} : lastResult);
+    project();
+  } catch (error) {
+    lastResult = {status: 'exception', reason: error.message};
+    message = error.message;
+  }
+  render();
+}
+function request(payload) {
+  return {epoch: controller.read().envelope.epoch, id: crypto.randomUUID(), payload};
+}
+const operations = ['pickup', 'drop', 'equip', 'unequip', 'reserve', 'settle', 'cancel-reservation', 'checkpoint'];
+function payload(kind) {
+  if (['pickup', 'drop', 'equip', 'unequip'].includes(kind)) return {kind, item: el('item').value};
+  if (['settle', 'cancel-reservation'].includes(kind)) return {kind, request: controller.read().view.reservation};
+  return {kind};
+}
+function previewRequest(command) {
+  if (prepared && !controller.read().pending) controller.cancel(prepared.candidate);
+  prepared = null;
+  const baseRevision = controller.read().envelope.revision,
+    result = controller.preview(command);
+  if (result.status === 'prepared') prepared = {candidate: result.candidate, request: command, baseRevision};
+  return result;
+}
+async function open() {
+  if (sheet || !context) return;
+  openError = '';
+  const fragment = document.importNode(el('details-template').content, true),
+    element = fragment.querySelector('#details');
+  try {
+    sheet = context.view.openReadingSheet({
+      id: 'custody-details',
+      element,
+      initialFocus: () => el('item'),
+      returnFocus: () => el('open'),
+    });
+    const opened = sheet;
+    opened.signal.addEventListener(
+      'abort',
+      () => {
+        if (prepared && !controller.read().pending && !retainDiagnosticPreview) {
+          controller.cancel(prepared.candidate);
+          prepared = null;
+        }
+        if (sheet === opened) sheet = null;
+      },
+      {once: true},
+    );
+    await opened.ready;
+    if (opened.signal.aborted) return;
+    el('item').innerHTML = Object.keys(colors)
+      .map(id => `<option>${id}</option>`)
+      .join('');
+    el('operations').innerHTML = operations.map(id => `<button id="${id}">Preview ${id}</button>`).join('');
+    const bind = (id, fn) => el(id).addEventListener('click', fn, {signal: opened.signal});
+    for (const kind of operations) bind(kind, () => act(() => previewRequest(request(payload(kind)))));
+    bind('close', () => opened.close());
+    bind('commit', () => act(() => (prepared ? controller.commit(prepared.candidate) : {status: 'empty'})));
+    bind('cancel', () =>
+      act(() => {
+        const result = prepared ? controller.cancel(prepared.candidate) : {status: 'empty'};
+        if (!controller.read().pending) prepared = null;
+        return result;
+      }),
+    );
+    bind('retry', () => act(() => controller.retry()));
+    bind('acknowledge', () =>
+      act(() => {
+        const r = controller.acknowledge();
+        if (!controller.read().pending) prepared = null;
+        if (r.status === 'accepted') opened.close();
+        return r;
+      }),
+    );
+    bind('remember', () =>
+      act(() => {
+        remembered = prepared?.request ?? remembered;
+        return {status: remembered ? 'remembered' : 'empty'};
+      }),
+    );
+    bind('replay', () => act(() => (remembered ? previewRequest(remembered) : {status: 'empty'})));
+    bind('stale', () =>
+      act(() => {
+        const r = controller.preview(request({kind: 'reserve'}));
+        if (r.status !== 'prepared') return r;
+        const result = controller.commit(r.candidate);
+        if (controller.read().canAcknowledge) {
+          const acknowledged = controller.acknowledge();
+          if (acknowledged.status === 'accepted') {
+            retainDiagnosticPreview = true;
+            try {
+              opened.close();
+            } finally {
+              retainDiagnosticPreview = false;
+            }
+          }
+          return acknowledged;
+        }
+        return result;
+      }),
+    );
+    bind('retire', () =>
+      act(() => {
+        prior = {controller, candidate: prepared?.candidate};
+        controller.dispose();
+        return prior.candidate ? controller.commit(prior.candidate) : {status: 'retired'};
+      }),
+    );
+    bind('reload', () => location.reload());
+    el('fail-storage').addEventListener(
+      'change',
+      () => {
+        sessionStorage.setItem(failureKey, el('fail-storage').checked ? 'yes' : 'no');
+        render();
+      },
+      {signal: opened.signal},
+    );
+    el('item').addEventListener(
+      'change',
+      () => {
+        if (prepared && !controller.read().pending) {
+          controller.cancel(prepared.candidate);
+          prepared = null;
+        }
+        render();
+      },
+      {signal: opened.signal},
+    );
+    render();
+  } catch (error) {
+    openError = error.message;
+    sheet = null;
+    render();
+  }
+}
+function refresh() {
+  if (!controller) return;
+  const s = controller.read(),
+    next = JSON.stringify({
+      revision: s.envelope?.revision,
+      pending: s.pending,
+      status: s.saveStatus,
+      ack: s.canAcknowledge,
+      durable: s.durable,
+      blocked: s.blocked,
+      retired: s.retired,
+    });
+  if (next !== signature) {
+    signature = next;
+    project();
+    render();
+  }
+}
+const scene = defineScene({
+  id: 'sample',
+  title: 'Unique custody',
+  systems: [],
+  view: {camera: {position: [7, 7, 10], target: [0, 0, 0]}, background: 0x172738},
+  enter(ctx) {
+    context = ctx;
+    life = new AbortController();
+    controller = createCustodyController({saveHandle: ctx.save(section), readPersisted: () => storage.get(storageKey)});
+    prepared = null;
+    signature = '';
+    projectionSignature = '';
+    projected = [];
+    for (const [x, color] of [
+      [-3, 0x294c62],
+      [0, 0x3a495d],
+      [3, 0x494262],
+    ])
+      ctx.world.spawn(Transform({x, y: -0.1}), Shape({kind: 'box', size: [2.2, 0.2, 4], color}));
+    project();
+    el('open').addEventListener('click', open, {signal: life.signal});
+    render();
+    const timer = setInterval(refresh, 150);
+    life.signal.addEventListener('abort', () => clearInterval(timer), {once: true});
+  },
+  exit() {
+    life.abort();
+    sheet?.close();
+    sheet = null;
+    controller.dispose();
+    context = null;
+    projected = [];
+  },
+});
+const compiled = compileGame({brief, game, defs: [scene, section]});
+const modules = layerModules(game, brief).map(m =>
+  m.id === 'core.save'
+    ? saveModule({
+        namespace: game.id,
+        build: 'custody@0.1.0',
+        storage: () => ({local: port, session: browserPort('session')}),
+      })
+    : m,
+);
+const app = createApp([...modules, ...compiled.modules], {
+  mode: 'test',
+  flag: id => appFeatures().enabled(id),
+  probes: true,
+});
+const booted = app.boot();
+window.engine = createTestApi(app, booted);
+window.custody = {
+  read: () => controller?.read(),
+  ui: () => ({
+    message,
+    openError,
+    result: lastResult,
+    prepared: prepared ? {request: prepared.request, baseRevision: prepared.baseRevision} : null,
+    sheet: !!sheet,
+  }),
+  world: () =>
+    context
+      ? [...context.world.query(Name)].map(([entity, name]) => ({
+          entity,
+          id: name.name,
+          transform: context.world.get(entity, Transform) ? {...context.world.get(entity, Transform)} : null,
+          shape: context.world.get(entity, Shape) ? structuredClone(context.world.get(entity, Shape)) : null,
+        }))
+      : [],
+  retired: () => (prior?.candidate ? prior.controller.commit(prior.candidate) : null),
+  dispose() {
+    app.dispose();
+  },
+};
+await booted;

@@ -1,55 +1,99 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { installContextRecovery, type ContextRecoveryOptions, type RecoveryEvent } from './context-recovery';
+import {installContextRecovery, type ContextRecoveryOptions, type RecoveryEvent} from './context-recovery';
 
 /** Manual timers: `advance(ms)` runs everything due, in order. */
 function fakeTimers() {
-  let now = 0, seq = 0;
-  const due = new Map<number, { at: number; fn: () => void }>();
+  let now = 0,
+    seq = 0;
+  const due = new Map<number, {at: number; fn: () => void}>();
   return {
-    set(fn: () => void, ms: number) { const id = ++seq; due.set(id, { at: now + ms, fn }); return id; },
-    clear(h: unknown) { due.delete(h as number); },
+    set(fn: () => void, ms: number) {
+      const id = ++seq;
+      due.set(id, {at: now + ms, fn});
+      return id;
+    },
+    clear(h: unknown) {
+      due.delete(h as number);
+    },
     advance(ms: number) {
       const end = now + ms;
       for (;;) {
-        const next = [...due.entries()].filter(([, t]) => t.at <= end).sort((a, b) => a[1].at - b[1].at || a[0] - b[0])[0];
+        const next = [...due.entries()]
+          .filter(([, t]) => t.at <= end)
+          .sort((a, b) => a[1].at - b[1].at || a[0] - b[0])[0];
         if (!next) break;
-        due.delete(next[0]); now = next[1].at; next[1].fn();
+        due.delete(next[0]);
+        now = next[1].at;
+        next[1].fn();
       }
       now = end;
     },
-    get pending() { return due.size; },
+    get pending() {
+      return due.size;
+    },
   };
 }
 
 interface FakeCanvas {
-  isConnected: boolean; parked: boolean; exempt: boolean; visible: boolean; engine: boolean; lost: boolean; ext: { loseContext(): void; restoreContext(): void };
-  closest(sel: string): object | null; getClientRects(): unknown[]; getContext(kind: string): unknown;
+  isConnected: boolean;
+  parked: boolean;
+  exempt: boolean;
+  visible: boolean;
+  engine: boolean;
+  lost: boolean;
+  ext: {loseContext(): void; restoreContext(): void};
+  closest(sel: string): object | null;
+  getClientRects(): unknown[];
+  getContext(kind: string): unknown;
 }
 
 function harness(extra: Partial<ContextRecoveryOptions> = {}) {
-  const listeners: { type: string; fn: (e: unknown) => void; signal?: AbortSignal | undefined }[] = [];
+  const listeners: {type: string; fn: (e: unknown) => void; signal?: AbortSignal | undefined}[] = [];
   const canvases: FakeCanvas[] = [];
   const doc = {
-    addEventListener(type: string, fn: (e: unknown) => void, o: { capture?: boolean; signal?: AbortSignal }) {
+    addEventListener(type: string, fn: (e: unknown) => void, o: {capture?: boolean; signal?: AbortSignal}) {
       assert.equal(o.capture, true, 'context events do not bubble: the layer listens in the capture phase');
-      listeners.push({ type, fn, signal: o.signal });
+      listeners.push({type, fn, signal: o.signal});
     },
-    querySelectorAll: (sel: string) => { assert.match(sel, /data-engine/); return canvases.filter(c => c.engine); },
+    querySelectorAll: (sel: string) => {
+      assert.match(sel, /data-engine/);
+      return canvases.filter(c => c.engine);
+    },
   } as unknown as Document;
   const dispatch = (type: string, target: FakeCanvas) => {
     let prevented = false;
-    const e = { type, target, preventDefault() { prevented = true; } };
+    const e = {
+      type,
+      target,
+      preventDefault() {
+        prevented = true;
+      },
+    };
     for (const l of [...listeners]) if (l.type === type && !l.signal?.aborted) l.fn(e);
     return prevented;
   };
   const canvas = (o: Partial<FakeCanvas> = {}): FakeCanvas => {
     const c: FakeCanvas = {
-      isConnected: true, parked: false, exempt: false, visible: true, engine: true, lost: false,
-      ext: { loseContext() { c.lost = true; dispatch('webglcontextlost', c); }, restoreContext() { c.lost = false; dispatch('webglcontextrestored', c); } },
+      isConnected: true,
+      parked: false,
+      exempt: false,
+      visible: true,
+      engine: true,
+      lost: false,
+      ext: {
+        loseContext() {
+          c.lost = true;
+          dispatch('webglcontextlost', c);
+        },
+        restoreContext() {
+          c.lost = false;
+          dispatch('webglcontextrestored', c);
+        },
+      },
       closest: sel => (sel.includes('renderer-pool') && c.parked ? {} : null),
       getClientRects: () => (c.visible ? [{}] : []),
-      getContext: kind => (kind === 'webgl2' ? { isContextLost: () => c.lost, getExtension: () => c.ext } : null),
+      getContext: kind => (kind === 'webgl2' ? {isContextLost: () => c.lost, getExtension: () => c.ext} : null),
       ...o,
     };
     canvases.push(c);
@@ -57,21 +101,47 @@ function harness(extra: Partial<ContextRecoveryOptions> = {}) {
   };
   const timers = fakeTimers();
   const events: RecoveryEvent[] = [];
-  let recreated = 0, steppedDown = 0, hidden = 0;
+  let recreated = 0,
+    steppedDown = 0,
+    hidden = 0;
   let retry: (() => void) | null = null;
   const recovery = installContextRecovery({
-    doc, timers,
-    recreate: () => { recreated++; },
+    doc,
+    timers,
+    recreate: () => {
+      recreated++;
+    },
     exempt: c => (c as unknown as FakeCanvas).exempt,
-    stepDown: () => { steppedDown++; },
-    showBreak: r => { retry = r; return () => { hidden++; }; },
+    stepDown: () => {
+      steppedDown++;
+    },
+    showBreak: r => {
+      retry = r;
+      return () => {
+        hidden++;
+      };
+    },
     emit: e => events.push(e),
     ...extra,
   });
   return {
-    recovery, timers, events, canvas, dispatch,
-    get recreated() { return recreated; }, get steppedDown() { return steppedDown; }, get hidden() { return hidden; },
-    get retry() { return retry; },
+    recovery,
+    timers,
+    events,
+    canvas,
+    dispatch,
+    get recreated() {
+      return recreated;
+    },
+    get steppedDown() {
+      return steppedDown;
+    },
+    get hidden() {
+      return hidden;
+    },
+    get retry() {
+      return retry;
+    },
   };
 }
 
@@ -86,7 +156,7 @@ test('a loss restored within 3 s: lost then restored, nothing recreated', () => 
   h.timers.advance(5000);
   assert.deepEqual(h.events, ['lost', 'restored']);
   assert.equal(h.recreated, 0);
-  assert.deepEqual({ ...h.recovery.stats() }, { losses: 1, restored: 1, recreated: 0, breaks: 0, ignored: 0, pending: 0 });
+  assert.deepEqual({...h.recovery.stats()}, {losses: 1, restored: 1, recreated: 0, breaks: 0, ignored: 0, pending: 0});
 });
 
 test('no restore within 3 s: the scene is entered again (recreate)', () => {
@@ -121,7 +191,8 @@ test('a deliberate release (forceContextLoss, then the canvas removed in the sam
 
 test('parked pool canvases and exempt (staged) canvases are left alone', () => {
   const h = harness();
-  const parked = h.canvas({ parked: true }), staged = h.canvas({ exempt: true });
+  const parked = h.canvas({parked: true}),
+    staged = h.canvas({exempt: true});
   assert.equal(h.dispatch('webglcontextlost', parked), false);
   assert.equal(h.dispatch('webglcontextlost', staged), false, 'the staged scene handles (and prevents) its own loss');
   h.timers.advance(10_000);
@@ -170,7 +241,7 @@ test('failures more than 60 s apart each just recreate', () => {
 });
 
 test('without a break layer the second failure still steps down and recreates', () => {
-  const h = harness({ showBreak: undefined });
+  const h = harness({showBreak: undefined});
   h.dispatch('webglcontextlost', h.canvas());
   h.timers.advance(3001);
   h.dispatch('webglcontextlost', h.canvas());
@@ -181,8 +252,12 @@ test('without a break layer the second failure still steps down and recreates', 
 
 test('loseContext loses the frontmost visible three.js canvas the layer owns and returns its restore', () => {
   const h = harness();
-  const back = h.canvas(), front = h.canvas();
-  h.canvas({ visible: false }); h.canvas({ exempt: true }); h.canvas({ engine: false }); h.canvas({ parked: true });
+  const back = h.canvas(),
+    front = h.canvas();
+  h.canvas({visible: false});
+  h.canvas({exempt: true});
+  h.canvas({engine: false});
+  h.canvas({parked: true});
   const restore = h.recovery.loseContext();
   assert.ok(restore);
   assert.equal(front.lost, true);

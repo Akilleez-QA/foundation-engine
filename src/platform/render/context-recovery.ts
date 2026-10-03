@@ -1,6 +1,6 @@
 /**
  * platform/render/context-recovery.ts: the one generic GPU context-loss recovery layer (STD-REN-5;
- * ADR 0045 5). 
+ * ADR 0045 5).
  *
  * One capture-phase listener on the document hears `webglcontextlost` and `webglcontextrestored` for every canvas in
  * the page (context events do not bubble, but capture still runs on the ancestors), so pooled leases, panel stages
@@ -25,7 +25,10 @@
  * app (src/graphics-recovery.ts).
  */
 
-export interface RecoveryTimers { set(fn: () => void, ms: number): unknown; clear(handle: unknown): void }
+export interface RecoveryTimers {
+  set(fn: () => void, ms: number): unknown;
+  clear(handle: unknown): void;
+}
 
 export type RecoveryEvent = 'lost' | 'restored' | 'recreated' | 'break';
 
@@ -46,7 +49,14 @@ export interface ContextRecoveryOptions {
   failureWindowMs?: number;
 }
 
-export interface RecoveryStats { losses: number; restored: number; recreated: number; breaks: number; ignored: number; pending: number }
+export interface RecoveryStats {
+  losses: number;
+  restored: number;
+  recreated: number;
+  breaks: number;
+  ignored: number;
+  pending: number;
+}
 
 export interface ContextRecovery {
   /**
@@ -59,79 +69,133 @@ export interface ContextRecovery {
   dispose(): void;
 }
 
-const globalTimers: RecoveryTimers = { set: (fn, ms) => setTimeout(fn, ms), clear: h => clearTimeout(h as ReturnType<typeof setTimeout>) };
+const globalTimers: RecoveryTimers = {
+  set: (fn, ms) => setTimeout(fn, ms),
+  clear: h => clearTimeout(h as ReturnType<typeof setTimeout>),
+};
 /** The pool's hidden parking element (renderer-pool.ts): canvases there belong to no scene. */
 const PARKED = '[data-renderer-pool="parking"]';
 
-type LoseExt = { loseContext(): void; restoreContext(): void };
+type LoseExt = {loseContext(): void; restoreContext(): void};
 const webgl = (c: HTMLCanvasElement): WebGLRenderingContext | WebGL2RenderingContext | null => {
-  try { return (c.getContext('webgl2') as WebGL2RenderingContext | null) ?? (c.getContext('webgl') as WebGLRenderingContext | null); } catch { return null; }
+  try {
+    return (
+      (c.getContext('webgl2') as WebGL2RenderingContext | null) ??
+      (c.getContext('webgl') as WebGLRenderingContext | null)
+    );
+  } catch {
+    return null;
+  }
 };
 
 export function installContextRecovery(o: ContextRecoveryOptions): ContextRecovery {
   const timers = o.timers ?? globalTimers;
-  const restoreMs = o.restoreTimeoutMs ?? 3000, windowMs = o.failureWindowMs ?? 60_000;
-  const stats: RecoveryStats = { losses: 0, restored: 0, recreated: 0, breaks: 0, ignored: 0, pending: 0 };
-  const pending = new Map<HTMLCanvasElement, { timer: unknown; counted: boolean }>();
+  const restoreMs = o.restoreTimeoutMs ?? 3000,
+    windowMs = o.failureWindowMs ?? 60_000;
+  const stats: RecoveryStats = {losses: 0, restored: 0, recreated: 0, breaks: 0, ignored: 0, pending: 0};
+  const pending = new Map<HTMLCanvasElement, {timer: unknown; counted: boolean}>();
   const windowTimers = new Set<unknown>();
-  let failures = 0, hideBreak: (() => void) | null = null, disposed = false;
+  let failures = 0,
+    hideBreak: (() => void) | null = null,
+    disposed = false;
   const off = new AbortController();
 
   const ours = (c: HTMLCanvasElement) => !c.closest?.(PARKED) && !o.exempt?.(c);
   const drop = (c: HTMLCanvasElement) => {
     const p = pending.get(c);
-    if (p) { timers.clear(p.timer); pending.delete(c); stats.pending = pending.size; }
+    if (p) {
+      timers.clear(p.timer);
+      pending.delete(c);
+      stats.pending = pending.size;
+    }
   };
   const recreate = (c: HTMLCanvasElement) => {
     // A superseded loss (the scene already left) must not re-enter whatever scene is showing now.
     for (const other of [...pending.keys()]) drop(other);
-    stats.recreated++; o.emit?.('recreated', c); o.recreate();
+    stats.recreated++;
+    o.emit?.('recreated', c);
+    o.recreate();
   };
   const showBreak = (c: HTMLCanvasElement) => {
     for (const other of [...pending.keys()]) drop(other);
-    stats.breaks++; o.emit?.('break', c);
+    stats.breaks++;
+    o.emit?.('break', c);
     o.stepDown?.();
     hideBreak?.();
-    hideBreak = o.showBreak?.(() => { hideBreak?.(); hideBreak = null; recreate(c); }) ?? null;
+    hideBreak =
+      o.showBreak?.(() => {
+        hideBreak?.();
+        hideBreak = null;
+        recreate(c);
+      }) ?? null;
     if (!o.showBreak) recreate(c);
   };
 
-  o.doc.addEventListener('webglcontextlost', e => {
-    const c = e.target as HTMLCanvasElement;
-    if (disposed || !ours(c) || pending.has(c)) return;
-    e.preventDefault();
-    const entry = { timer: undefined as unknown, counted: false };
-    pending.set(c, entry); stats.pending = pending.size;
-    // One task later: a canvas its scene removed was a deliberate release, not a failure.
-    entry.timer = timers.set(() => {
-      if (pending.get(c) !== entry) return;
-      if (!c.isConnected || c.closest?.(PARKED)) { drop(c); stats.ignored++; return; }
-      entry.counted = true; stats.losses++; o.emit?.('lost', c);
-      failures++;
-      const t = timers.set(() => { windowTimers.delete(t); failures = Math.max(0, failures - 1); }, windowMs);
-      windowTimers.add(t);
-      if (failures >= 2) { failures = 0; for (const w of windowTimers) timers.clear(w); windowTimers.clear(); showBreak(c); return; }
+  o.doc.addEventListener(
+    'webglcontextlost',
+    e => {
+      const c = e.target as HTMLCanvasElement;
+      if (disposed || !ours(c) || pending.has(c)) return;
+      e.preventDefault();
+      const entry = {timer: undefined as unknown, counted: false};
+      pending.set(c, entry);
+      stats.pending = pending.size;
+      // One task later: a canvas its scene removed was a deliberate release, not a failure.
       entry.timer = timers.set(() => {
         if (pending.get(c) !== entry) return;
-        drop(c);
-        if (c.isConnected) recreate(c);
-      }, restoreMs);
-    }, 0);
-  }, { capture: true, signal: off.signal });
+        if (!c.isConnected || c.closest?.(PARKED)) {
+          drop(c);
+          stats.ignored++;
+          return;
+        }
+        entry.counted = true;
+        stats.losses++;
+        o.emit?.('lost', c);
+        failures++;
+        const t = timers.set(() => {
+          windowTimers.delete(t);
+          failures = Math.max(0, failures - 1);
+        }, windowMs);
+        windowTimers.add(t);
+        if (failures >= 2) {
+          failures = 0;
+          for (const w of windowTimers) timers.clear(w);
+          windowTimers.clear();
+          showBreak(c);
+          return;
+        }
+        entry.timer = timers.set(() => {
+          if (pending.get(c) !== entry) return;
+          drop(c);
+          if (c.isConnected) recreate(c);
+        }, restoreMs);
+      }, 0);
+    },
+    {capture: true, signal: off.signal},
+  );
 
-  o.doc.addEventListener('webglcontextrestored', e => {
-    const c = e.target as HTMLCanvasElement;
-    const p = pending.get(c);
-    if (disposed || !p) return;
-    drop(c);
-    if (p.counted) { stats.restored++; o.emit?.('restored', c); }
-  }, { capture: true, signal: off.signal });
+  o.doc.addEventListener(
+    'webglcontextrestored',
+    e => {
+      const c = e.target as HTMLCanvasElement;
+      const p = pending.get(c);
+      if (disposed || !p) return;
+      drop(c);
+      if (p.counted) {
+        stats.restored++;
+        o.emit?.('restored', c);
+      }
+    },
+    {capture: true, signal: off.signal},
+  );
 
   return {
     loseContext(canvas) {
       const doc = o.doc;
       // Only canvases three drew on (it marks them `data-engine`): asking a blank canvas for a context would create one.
-      const candidates = canvas ? [canvas] : Array.from(doc.querySelectorAll<HTMLCanvasElement>('canvas[data-engine^="three.js"]')).reverse();
+      const candidates = canvas
+        ? [canvas]
+        : Array.from(doc.querySelectorAll<HTMLCanvasElement>('canvas[data-engine^="three.js"]')).reverse();
       for (const c of candidates) {
         if (!c.isConnected || !ours(c) || !c.getClientRects().length) continue;
         const gl = webgl(c);
@@ -139,16 +203,25 @@ export function installContextRecovery(o: ContextRecoveryOptions): ContextRecove
         const ext = gl.getExtension('WEBGL_lose_context') as LoseExt | null;
         if (!ext) continue;
         ext.loseContext();
-        return () => { try { ext.restoreContext(); } catch { /* already restored or recreated */ } };
+        return () => {
+          try {
+            ext.restoreContext();
+          } catch {
+            /* already restored or recreated */
+          }
+        };
       }
       return null;
     },
-    stats: () => ({ ...stats }),
+    stats: () => ({...stats}),
     dispose() {
-      disposed = true; off.abort();
+      disposed = true;
+      off.abort();
       for (const c of [...pending.keys()]) drop(c);
-      for (const w of windowTimers) timers.clear(w); windowTimers.clear();
-      hideBreak?.(); hideBreak = null;
+      for (const w of windowTimers) timers.clear(w);
+      windowTimers.clear();
+      hideBreak?.();
+      hideBreak = null;
     },
   };
 }

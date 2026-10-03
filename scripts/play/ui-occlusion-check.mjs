@@ -36,46 +36,94 @@ window.sample=()=>{const viewport={x:0,y:0,width:innerWidth,height:innerHeight},
 };
 window.ready=true;
 </script>`;
-const server = await createServer({root, configFile:false, optimizeDeps:{noDiscovery:true,entries:[]}, logLevel:'error', server:{host:'127.0.0.1',port:0}});
-const report = {kind:'synthetic-dom-geometry', revision:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(), dirtyWorktree:execFileSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8'}).trim().length>0,
-  sourceSha256:Object.fromEntries(['src/platform/ui/occlusion.ts','scripts/play/ui-occlusion-check.mjs'].map(path=>[path,createHash('sha256').update(readFileSync(resolve(root,path))).digest('hex')])),
-  limitations:['Not a game layout','Not physical-device evidence','No thermal, hand obstruction, comprehension or comfort claim','Text enlargement is CSS font scaling, not browser zoom'], cases:[]};
-const evidence=diagnosticReport(report,resolve(output,'report.json'));
+const server = await createServer({
+  root,
+  configFile: false,
+  optimizeDeps: {noDiscovery: true, entries: []},
+  logLevel: 'error',
+  server: {host: '127.0.0.1', port: 0},
+});
+const report = {
+  kind: 'synthetic-dom-geometry',
+  revision: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim(),
+  dirtyWorktree: execFileSync('git', ['status', '--porcelain'], {cwd: root, encoding: 'utf8'}).trim().length > 0,
+  sourceSha256: Object.fromEntries(
+    ['src/platform/ui/occlusion.ts', 'scripts/play/ui-occlusion-check.mjs'].map(path => [
+      path,
+      createHash('sha256')
+        .update(readFileSync(resolve(root, path)))
+        .digest('hex'),
+    ]),
+  ),
+  limitations: [
+    'Not a game layout',
+    'Not physical-device evidence',
+    'No thermal, hand obstruction, comprehension or comfort claim',
+    'Text enlargement is CSS font scaling, not browser zoom',
+  ],
+  cases: [],
+};
+const evidence = diagnosticReport(report, resolve(output, 'report.json'));
 try {
   await server.listen();
-  const url=server.resolvedUrls.local[0];
-  for (const profile of [{name:'phone',width:390,height:844,mobile:true},{name:'tablet',width:820,height:1180,mobile:true},{name:'desktop',width:1280,height:800}]) {
-    const b=await launch({...profile,strictClose:true});
+  const url = server.resolvedUrls.local[0];
+  for (const profile of [
+    {name: 'phone', width: 390, height: 844, mobile: true},
+    {name: 'tablet', width: 820, height: 1180, mobile: true},
+    {name: 'desktop', width: 1280, height: 800},
+  ]) {
+    const b = await launch({...profile, strictClose: true});
     try {
-      await b.page.route('**/ui-occlusion-fixture*',route=>route.fulfill({contentType:'text/html',body:html}));
-      await b.goto(`${url}ui-occlusion-fixture?flags=dev.silent`); await b.wait('window.ready === true');
-      const record={profile,browser:b.version,launchArguments:b.launchArguments,states:[]};
-      for(const state of ['normal','text-200','resized']) {
-        if(state==='text-200')await b.page.evaluate(()=>document.body.style.fontSize='32px');
-        if(state==='resized')await b.page.setViewportSize({width:profile.height,height:profile.width});
-        await b.page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
-        const sample=await b.page.evaluate(()=>window.sample());
-        assert.equal(sample.report.criticalRegions[0].occupiedRatio,1,'transparent blocker must cover target');
-        assert.equal(sample.hitElement,'blocker');
-        assert.equal(sample.report.criticalRegions[1].occupiedRatio,0);
-        assert.equal(sample.partialVisibleFraction,0.25,'zero obstruction still leaves target mostly offscreen');
-        const r=sample.rectangles.target;
-        const prior=sample.hits.blocker;
-        await b.page.mouse.click(r.x+r.width/2,r.y+r.height/2);
-        const hits=await b.page.evaluate(()=>({...window.hits}));
-        assert.equal(hits.blocker,prior+1);assert.equal(hits.target,0);
-        const screenshot=resolve(output,`${profile.name}-${state}.png`);
-        await b.page.screenshot({path:screenshot});record.states.push({state,...sample,hitsAfterClick:hits,screenshot});
+      await b.page.route('**/ui-occlusion-fixture*', route => route.fulfill({contentType: 'text/html', body: html}));
+      await b.goto(`${url}ui-occlusion-fixture?flags=dev.silent`);
+      await b.wait('window.ready === true');
+      const record = {profile, browser: b.version, launchArguments: b.launchArguments, states: []};
+      for (const state of ['normal', 'text-200', 'resized']) {
+        if (state === 'text-200') await b.page.evaluate(() => (document.body.style.fontSize = '32px'));
+        if (state === 'resized') await b.page.setViewportSize({width: profile.height, height: profile.width});
+        await b.page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+        const sample = await b.page.evaluate(() => window.sample());
+        assert.equal(sample.report.criticalRegions[0].occupiedRatio, 1, 'transparent blocker must cover target');
+        assert.equal(sample.hitElement, 'blocker');
+        assert.equal(sample.report.criticalRegions[1].occupiedRatio, 0);
+        assert.equal(sample.partialVisibleFraction, 0.25, 'zero obstruction still leaves target mostly offscreen');
+        const r = sample.rectangles.target;
+        const prior = sample.hits.blocker;
+        await b.page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
+        const hits = await b.page.evaluate(() => ({...window.hits}));
+        assert.equal(hits.blocker, prior + 1);
+        assert.equal(hits.target, 0);
+        const screenshot = resolve(output, `${profile.name}-${state}.png`);
+        await b.page.screenshot({path: screenshot});
+        record.states.push({state, ...sample, hitsAfterClick: hits, screenshot});
       }
-      assert.ok(record.states[1].rectangles.panel.height>record.states[0].rectangles.panel.height,'enlarged text must reflow');
-      await b.page.evaluate(()=>document.getElementById('blocker').style.pointerEvents='none');
-      const final=await b.page.evaluate(()=>window.sample());const r=final.rectangles.target;
-      assert.equal(final.hitElement,'target');
-      await b.page.mouse.click(r.x+r.width/2,r.y+r.height/2);
-      assert.equal(await b.page.evaluate(()=>window.hits.target),1,'pointer route restored without changing visual footprint');
-      assert.deepEqual(b.errors,[]);record.errors=b.errors;record.pointerRecovery=true;report.cases.push(record);
-    }finally{await evidence.close(b,`${profile.name} browser cleanup`);}
+      assert.ok(
+        record.states[1].rectangles.panel.height > record.states[0].rectangles.panel.height,
+        'enlarged text must reflow',
+      );
+      await b.page.evaluate(() => (document.getElementById('blocker').style.pointerEvents = 'none'));
+      const final = await b.page.evaluate(() => window.sample());
+      const r = final.rectangles.target;
+      assert.equal(final.hitElement, 'target');
+      await b.page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
+      assert.equal(
+        await b.page.evaluate(() => window.hits.target),
+        1,
+        'pointer route restored without changing visual footprint',
+      );
+      assert.deepEqual(b.errors, []);
+      record.errors = b.errors;
+      record.pointerRecovery = true;
+      report.cases.push(record);
+    } finally {
+      await evidence.close(b, `${profile.name} browser cleanup`);
+    }
   }
-  report.passed=true;
-}catch(error){evidence.fail(error);}finally{await evidence.close(server,'server cleanup');evidence.finish();}
+  report.passed = true;
+} catch (error) {
+  evidence.fail(error);
+} finally {
+  await evidence.close(server, 'server cleanup');
+  evidence.finish();
+}
 console.log(`UI geometry diagnostic: ${report.cases.length} profiles, 9 states passed. Evidence: ${output}`);

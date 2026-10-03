@@ -10,21 +10,29 @@ import {launch} from '../perf/bench-browser.mjs';
 
 const out = resolve(process.argv[2] ?? '/tmp/foundation-event-trace-browser');
 mkdirSync(out, {recursive: true});
-const html = '<!doctype html><html><head><link rel="icon" href="data:,"><title>Event trace diagnostic</title></head><body><script type="module" src="/scripts/play/fixtures/event-trace-entry.mjs"></script></body></html>';
+const html =
+  '<!doctype html><html><head><link rel="icon" href="data:,"><title>Event trace diagnostic</title></head><body><script type="module" src="/scripts/play/fixtures/event-trace-entry.mjs"></script></body></html>';
 const server = await createServer({
-  root: ROOT, logLevel: 'error',
-  plugins: [{name: 'event-trace-diagnostic', configureServer(s) {
-    s.middlewares.use((req, res, next) => {
-      if (!req.url?.startsWith('/__event-trace-check.html')) return next();
-      res.setHeader('Content-Type', 'text/html');
-      res.end(html);
-    });
-  }}],
+  root: ROOT,
+  logLevel: 'error',
+  plugins: [
+    {
+      name: 'event-trace-diagnostic',
+      configureServer(s) {
+        s.middlewares.use((req, res, next) => {
+          if (!req.url?.startsWith('/__event-trace-check.html')) return next();
+          res.setHeader('Content-Type', 'text/html');
+          res.end(html);
+        });
+      },
+    },
+  ],
   server: {host: '127.0.0.1', port: 0},
 });
 const report = {
   revision: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).trim(),
-  passed: false, errors: [],
+  passed: false,
+  errors: [],
   limitations: ['Synchronous app bus elapsed intervals only', 'No external trace viewer import exercised'],
 };
 let browser;

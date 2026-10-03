@@ -122,6 +122,7 @@ notes outside publishable documentation.
 - Each success criterion checked by a test has a test named after its id (`test('S2: …')`).
 - Never delete or weaken a test, a budget or a tolerance to make a check pass.
 - No `any`: use a real type, `unknown` with narrowing, or a generic. No `as unknown as` outside tests; an unavoidable cast lives in one typed helper with `// lint:allow-unknown-cast <reason>` (`npm run lint:types`).
+- Run `npm run format` (Prettier) before committing; CI checks it (`format:check`, part of `lint` and `check`). Markdown is not formatted.
 
 ## Teaching (learn mode)
 
@@ -152,7 +153,8 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 | `npm run play:snap [-- --scene <id>] [--mobile]` | Muted, isolated browser: screenshots and `playtest/latest/probe.json`; the budget verdict is judged on rendered frames (a still scene is redrawn on request) and says `not measured` when none rendered |
 | `npm run play:script -- <file.json>` | A scripted playtest (goto, key, press, teleport, wait, snap, expect, waitUntil, reload; [format](docs/recipes/write-a-playtest-script.md), checked before the browser starts); a game keeps its scripts in `game/playtest/`, evidence goes to `playtest/latest/` |
 | `npm run play:criteria [-- --gate]` | The brief's success criteria, checked and tabled |
-| `npm test` / `npm run lint` | All tests / all lints (layers, game, arch, css, generic, brief, budgets) |
+| `npm test` / `npm run lint` | All tests / all lints (format, layers, game, arch, css, generic, brief, budgets) |
+| `npm run format` / `npm run format:check` | Format code with Prettier / check it (Markdown excluded) |
 | `npm run gate` / `npm run gate:templates` | The integration gate for this game / for every template |
 | `npm run gate:ci [-- --from <step> \| --only <step> \| --list]` | Every checking `run:` step of `.github/workflows/ci.yml`, with its env; reproduces all work jobs serially and derives the final aggregate. Partial selections are not full CI acceptance |
 | `npm run bench`, `npm run perf:derive` | Measure scenes; derive budgets |

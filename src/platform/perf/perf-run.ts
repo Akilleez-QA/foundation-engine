@@ -1,7 +1,7 @@
 import type {ScriptedWindow} from './scripted-window';
 // platform/perf/perf-run.ts: the `PerfRun` file (schema 1), written by scripts/perf/bench.mjs to
 // perf/runs/ and read by the gate. Types only. Everything here is local: no number leaves the device (D8).
-import type { WindowClassification } from './window-class';
+import type {WindowClassification} from './window-class';
 
 export type Harness = 'swiftshader' | 'gpu';
 export type SampleMode = 'idle' | 'active';
@@ -46,8 +46,8 @@ export type PerfSample = {
   /** Where the page was at the end of the window. */
   hash?: string;
   classification?: WindowClassification;
-  scriptedWindow?:ScriptedWindow;
-  readiness?:{start:Record<string,unknown>;end:Record<string,unknown>};
+  scriptedWindow?: ScriptedWindow;
+  readiness?: {start: Record<string, unknown>; end: Record<string, unknown>};
   windowMs?: number;
   frames?: number;
   renderedFrames?: number;
@@ -101,7 +101,7 @@ export interface PerfRun {
   /** True when the tree had uncommitted changes: such a run never becomes a baseline. */
   dirty: boolean;
   harness: Harness;
-  viewport: { width: number; height: number; dpr: number };
+  viewport: {width: number; height: number; dpr: number};
   gpu: string;
   browser: string;
   when: string;
@@ -110,12 +110,12 @@ export interface PerfRun {
   /** Hash of the experiment descriptor (ADR 0046); the cache key also covers the build. */
   descriptor: string;
   /** The build the bench made and served (null when it was given a base URL): the ADR 0046 whole-build key. */
-  build?: { digest: string; files: number } | null;
+  build?: {digest: string; files: number} | null;
   /** 'hermetic': requests leaving the served origin were blocked (counted here by origin). 'live': they went out. */
-  network?: { mode: 'hermetic' | 'live'; external: Record<string, number> };
+  network?: {mode: 'hermetic' | 'live'; external: Record<string, number>};
   startup: StartupSample | null;
   samples: PerfSample[];
-  afterTour: { textureMiB: number; canvasMiB: number; heapMB: number; liveContexts: number } | null;
+  afterTour: {textureMiB: number; canvasMiB: number; heapMB: number; liveContexts: number} | null;
   chunks: Record<string, number>;
   pageErrors?: string[];
 }

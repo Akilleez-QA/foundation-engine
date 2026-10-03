@@ -32,7 +32,14 @@
  * LayerManager in platform/ui/layers.ts declares `implements ActionLayers`, so the compiler checks the two agree.
  * No clock is read here: callers pass `now`.
  */
-import { adminOf, defineRegistry, type AdminRegistry, type EntryProblem, type Registry, type RegistryOptions } from '../../core/registry';
+import {
+  adminOf,
+  defineRegistry,
+  type AdminRegistry,
+  type EntryProblem,
+  type Registry,
+  type RegistryOptions,
+} from '../../core/registry';
 
 // ─────────────── vocabulary ───────────────
 
@@ -53,17 +60,57 @@ export const REACH_DEVICES: readonly ReachDevice[] = ['keyboard', 'pad'];
 export type KeyChord = string;
 /** Standard-mapping pad inputs, named by position (glyphs come from the pad family, not from these names). */
 export const PAD_INPUTS = [
-  'a', 'b', 'x', 'y', 'lb', 'rb', 'lt', 'rt', 'view', 'menu', 'l3', 'r3',
-  'dpad-up', 'dpad-down', 'dpad-left', 'dpad-right', 'home',
-  'ls-up', 'ls-down', 'ls-left', 'ls-right', 'rs-up', 'rs-down', 'rs-left', 'rs-right',
+  'a',
+  'b',
+  'x',
+  'y',
+  'lb',
+  'rb',
+  'lt',
+  'rt',
+  'view',
+  'menu',
+  'l3',
+  'r3',
+  'dpad-up',
+  'dpad-down',
+  'dpad-left',
+  'dpad-right',
+  'home',
+  'ls-up',
+  'ls-down',
+  'ls-left',
+  'ls-right',
+  'rs-up',
+  'rs-down',
+  'rs-left',
+  'rs-right',
 ] as const;
-export type PadInput = typeof PAD_INPUTS[number];
+export type PadInput = (typeof PAD_INPUTS)[number];
 /** W3C standard gamepad button index for each button input (sticks are axes and have none). */
 export const PAD_BUTTON_INDEX: Readonly<Partial<Record<PadInput, number>>> = {
-  a: 0, b: 1, x: 2, y: 3, lb: 4, rb: 5, lt: 6, rt: 7, view: 8, menu: 9, l3: 10, r3: 11,
-  'dpad-up': 12, 'dpad-down': 13, 'dpad-left': 14, 'dpad-right': 15, home: 16,
+  a: 0,
+  b: 1,
+  x: 2,
+  y: 3,
+  lb: 4,
+  rb: 5,
+  lt: 6,
+  rt: 7,
+  view: 8,
+  menu: 9,
+  l3: 10,
+  r3: 11,
+  'dpad-up': 12,
+  'dpad-down': 13,
+  'dpad-left': 14,
+  'dpad-right': 15,
+  home: 16,
 };
-export interface ActionBindings { readonly keys?: readonly KeyChord[] | undefined; readonly pad?: readonly PadInput[] | undefined }
+export interface ActionBindings {
+  readonly keys?: readonly KeyChord[] | undefined;
+  readonly pad?: readonly PadInput[] | undefined;
+}
 
 /** A point-in-time description, not a claim that a handler exists or an action is reachable. */
 export interface ActionDescription {
@@ -84,7 +131,7 @@ export interface InputActionDef {
   /** For scope 'layer': the layer kinds or layer ids it applies in. Omitted: every layer. */
   context?: readonly string[];
   /** A declared focus/menu path per device, first step reachable on that device (ADR 0047). */
-  via?: { readonly keyboard?: readonly ActionId[]; readonly pad?: readonly ActionId[] };
+  via?: {readonly keyboard?: readonly ActionId[]; readonly pad?: readonly ActionId[]};
   /** Default 'every-device'. The exception needs `reason`, and stays visible in the reach report. */
   reachability?: 'every-device' | 'pointer-only-by-design';
   reason?: string;
@@ -120,7 +167,10 @@ export type ActionOverrides = Readonly<Record<ActionId, ActionBindings>>;
 // ─────────────── the layer view the dispatcher needs (LayerManager implements it) ───────────────
 
 export interface ActionLayerInfo {
-  readonly id: string; readonly kind: string; readonly owner?: string | undefined; readonly modal: 'page' | 'scope' | false;
+  readonly id: string;
+  readonly kind: string;
+  readonly owner?: string | undefined;
+  readonly modal: 'page' | 'scope' | false;
 }
 export interface ActionLayers {
   /** Live interactive layers, top first. */
@@ -138,8 +188,13 @@ export interface ActionLayers {
 
 // ─────────────── core rows ───────────────
 
-export const PAGE_NEXT = 'core.page-next', PAGE_PREV = 'core.page-prev';
-export const CONFIRM = 'core.confirm', BACK = 'core.back', FOCUS_NEXT = 'core.focus-next', FOCUS_PREV = 'core.focus-prev', SHELL_MENU = 'shell.menu';
+export const PAGE_NEXT = 'core.page-next',
+  PAGE_PREV = 'core.page-prev';
+export const CONFIRM = 'core.confirm',
+  BACK = 'core.back',
+  FOCUS_NEXT = 'core.focus-next',
+  FOCUS_PREV = 'core.focus-prev',
+  SHELL_MENU = 'shell.menu';
 const MODAL_KINDS = ['panel', 'sheet', 'modal'] as const;
 /**
  * The genre-free rows owned by platform: back, pause, mute, focus and the shell menu. Every gameplay action (move,
@@ -147,23 +202,84 @@ const MODAL_KINDS = ['panel', 'sheet', 'modal'] as const;
  * collide with an engine default. `shell.menu` on X and the menu paths follow ADR 0047.
  */
 export const CORE_INPUT_ACTIONS: readonly InputActionDef[] = [
-  { id: BACK, label: 'input.back', scope: 'layer', kind: 'press', inText: true, defaults: { keys: ['Escape'], pad: ['b'] } },
-  { id: 'core.pause', label: 'input.pause', scope: 'global', kind: 'press', defaults: { keys: ['p'], pad: ['menu'] } },
-  { id: 'core.mute', label: 'input.mute', scope: 'always', kind: 'press', passThrough: true, defaults: { keys: ['m'] }, via: { pad: [SHELL_MENU] } },
-  { id: FOCUS_NEXT, label: 'input.focus-next', scope: 'layer', context: MODAL_KINDS, kind: 'press', inText: true, defaults: { keys: ['Tab'], pad: ['dpad-down'] } },
-  { id: FOCUS_PREV, label: 'input.focus-prev', scope: 'layer', context: MODAL_KINDS, kind: 'press', inText: true, defaults: { keys: ['Shift+Tab'], pad: ['dpad-up'] } },
-  { id: CONFIRM, label: 'input.confirm', scope: 'layer', context: MODAL_KINDS, kind: 'press', defaults: { keys: ['Enter'], pad: ['a'] } },
-  { id: PAGE_NEXT, label: 'input.page-next', scope: 'layer', context: MODAL_KINDS, kind: 'press', defaults: { keys: ['PageDown'], pad: ['rb'] } },
-  { id: PAGE_PREV, label: 'input.page-prev', scope: 'layer', context: MODAL_KINDS, kind: 'press', defaults: { keys: ['PageUp'], pad: ['lb'] } },
-  { id: SHELL_MENU, label: 'shell.menu', scope: 'global', kind: 'press', defaults: { pad: ['x'] }, via: { keyboard: [FOCUS_NEXT] } },
+  {
+    id: BACK,
+    label: 'input.back',
+    scope: 'layer',
+    kind: 'press',
+    inText: true,
+    defaults: {keys: ['Escape'], pad: ['b']},
+  },
+  {id: 'core.pause', label: 'input.pause', scope: 'global', kind: 'press', defaults: {keys: ['p'], pad: ['menu']}},
+  {
+    id: 'core.mute',
+    label: 'input.mute',
+    scope: 'always',
+    kind: 'press',
+    passThrough: true,
+    defaults: {keys: ['m']},
+    via: {pad: [SHELL_MENU]},
+  },
+  {
+    id: FOCUS_NEXT,
+    label: 'input.focus-next',
+    scope: 'layer',
+    context: MODAL_KINDS,
+    kind: 'press',
+    inText: true,
+    defaults: {keys: ['Tab'], pad: ['dpad-down']},
+  },
+  {
+    id: FOCUS_PREV,
+    label: 'input.focus-prev',
+    scope: 'layer',
+    context: MODAL_KINDS,
+    kind: 'press',
+    inText: true,
+    defaults: {keys: ['Shift+Tab'], pad: ['dpad-up']},
+  },
+  {
+    id: CONFIRM,
+    label: 'input.confirm',
+    scope: 'layer',
+    context: MODAL_KINDS,
+    kind: 'press',
+    defaults: {keys: ['Enter'], pad: ['a']},
+  },
+  {
+    id: PAGE_NEXT,
+    label: 'input.page-next',
+    scope: 'layer',
+    context: MODAL_KINDS,
+    kind: 'press',
+    defaults: {keys: ['PageDown'], pad: ['rb']},
+  },
+  {
+    id: PAGE_PREV,
+    label: 'input.page-prev',
+    scope: 'layer',
+    context: MODAL_KINDS,
+    kind: 'press',
+    defaults: {keys: ['PageUp'], pad: ['lb']},
+  },
+  {
+    id: SHELL_MENU,
+    label: 'shell.menu',
+    scope: 'global',
+    kind: 'press',
+    defaults: {pad: ['x']},
+    via: {keyboard: [FOCUS_NEXT]},
+  },
 ];
 /** `settings.nintendoSwap` as a preset of overrides: the bottom face button goes back (a game swaps its own confirm). */
-export const NINTENDO_SWAP: ActionOverrides = { [BACK]: { pad: ['a'] }, [CONFIRM]: { pad: ['b'] } };
+export const NINTENDO_SWAP: ActionOverrides = {[BACK]: {pad: ['a']}, [CONFIRM]: {pad: ['b']}};
 
 // ─────────────── registry ───────────────
 
 declare module '../../core/registry' {
-  interface Registries { inputActions: Registry<InputActionDef> }
+  interface Registries {
+    inputActions: Registry<InputActionDef>;
+  }
 }
 
 const ID = /^[a-z][a-z0-9-]*(\.[a-z0-9][a-z0-9/-]*)+$/;
@@ -189,10 +305,12 @@ export function actionRowProblems(def: InputActionDef): string[] {
  */
 export const inputActionRegistryOptions: RegistryOptions<InputActionDef> = {
   validate: actionRowProblems,
-  problems: all => reachOf(all).problems.map((p): string | EntryProblem => {
-    const at = p.indexOf(': '), id = p.slice(0, at);
-    return at > 0 && all.some(d => d.id === id) ? { id, problem: p.slice(at + 2) } : p;
-  }),
+  problems: all =>
+    reachOf(all).problems.map((p): string | EntryProblem => {
+      const at = p.indexOf(': '),
+        id = p.slice(0, at);
+      return at > 0 && all.some(d => d.id === id) ? {id, problem: p.slice(at + 2)} : p;
+    }),
 };
 /** A standalone `inputActions` registry (the kernel builds the app's from `inputActionRegistryOptions` in `defines`). */
 export function defineInputActions(owner = 'core'): AdminRegistry<InputActionDef> {
@@ -208,11 +326,15 @@ const turnedAway = new WeakMap<Registry<InputActionDef>, readonly string[]>();
  * `checkReach` reports it ('<id>: registered twice').
  */
 export function inputActionRegistry(rows: readonly InputActionDef[] = [], source = 'core'): Registry<InputActionDef> {
-  const registry = defineInputActions(), issues: string[] = [];
+  const registry = defineInputActions(),
+    issues: string[] = [];
   for (const def of rows) {
     const own = actionRowProblems(def);
     if (registry.find(def.id)) own.push('registered twice');
-    if (own.length) { issues.push(...own.map(p => `${def.id}: ${p}`)); continue; }
+    if (own.length) {
+      issues.push(...own.map(p => `${def.id}: ${p}`));
+      continue;
+    }
     registry.add(def, source);
   }
   adminOf(registry).freeze();
@@ -221,22 +343,39 @@ export function inputActionRegistry(rows: readonly InputActionDef[] = [], source
 }
 
 /** Effective bindings: an override replaces the device it names and keeps the other device's defaults. */
-export function effectiveBindings(def: InputActionDef, overrides: ActionOverrides = {}): { readonly keys: readonly KeyChord[]; readonly pad: readonly PadInput[] } {
+export function effectiveBindings(
+  def: InputActionDef,
+  overrides: ActionOverrides = {},
+): {readonly keys: readonly KeyChord[]; readonly pad: readonly PadInput[]} {
   const o = overrides[def.id];
-  return { keys: o?.keys ?? def.defaults.keys ?? [], pad: o?.pad ?? def.defaults.pad ?? [] };
+  return {keys: o?.keys ?? def.defaults.keys ?? [], pad: o?.pad ?? def.defaults.pad ?? []};
 }
 
 // ─────────────── key normalisation ───────────────
 
 export interface KeyEventLike {
-  key: string; code?: string; shiftKey?: boolean; ctrlKey?: boolean; altKey?: boolean; metaKey?: boolean;
-  repeat?: boolean; isComposing?: boolean; target?: EventTarget | null; defaultPrevented?: boolean;
-  preventDefault(): void; stopPropagation(): void;
+  key: string;
+  code?: string;
+  shiftKey?: boolean;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+  metaKey?: boolean;
+  repeat?: boolean;
+  isComposing?: boolean;
+  target?: EventTarget | null;
+  defaultPrevented?: boolean;
+  preventDefault(): void;
+  stopPropagation(): void;
 }
 /** The chord a key event matches by `key`: 'm', 'Escape', 'Space', 'Shift+Tab', 'Ctrl+s'. */
 export function comboOf(e: Pick<KeyEventLike, 'key' | 'shiftKey' | 'ctrlKey' | 'altKey' | 'metaKey'>): KeyChord {
   const key = e.key === ' ' ? 'Space' : e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  const mods = [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.metaKey && 'Meta', e.shiftKey && key.length > 1 && 'Shift'].filter(Boolean);
+  const mods = [
+    e.ctrlKey && 'Ctrl',
+    e.altKey && 'Alt',
+    e.metaKey && 'Meta',
+    e.shiftKey && key.length > 1 && 'Shift',
+  ].filter(Boolean);
   return [...mods, key].join('+');
 }
 /** The chord a key event matches by physical position: 'code:KeyW'. Modified presses never match a code chord. */
@@ -248,7 +387,12 @@ export function isTyping(target: EventTarget | null | undefined): boolean {
   if ((el as HTMLElement).isContentEditable === true) return true;
   if (el.closest('textarea,select,[contenteditable=true]')) return true;
   const input = el.closest('input') as HTMLInputElement | null;
-  return !!input && !['range', 'checkbox', 'radio', 'button', 'submit', 'reset'].includes((input.getAttribute('type') ?? 'text').toLowerCase());
+  return (
+    !!input &&
+    !['range', 'checkbox', 'radio', 'button', 'submit', 'reset'].includes(
+      (input.getAttribute('type') ?? 'text').toLowerCase(),
+    )
+  );
 }
 const MODIFIER = /^(Ctrl|Alt|Meta)\+/;
 const singleCharacter = (chord: KeyChord) => chord.length === 1 && chord !== ' ';
@@ -256,9 +400,19 @@ const singleCharacter = (chord: KeyChord) => chord.length === 1 && chord !== ' '
 // ─────────────── dispatcher ───────────────
 
 export type ActionHandler = (e: ActionEvent) => void | boolean;
-interface Subscription { action: ActionId; fn: ActionHandler; layer?: string | undefined; owner?: string | undefined }
-type Target = { kind: 'sub'; sub: Subscription } | { kind: 'queue'; owner: string };
-interface Down { action: ActionId; epoch: number; target: Target; kind: ActionKind }
+interface Subscription {
+  action: ActionId;
+  fn: ActionHandler;
+  layer?: string | undefined;
+  owner?: string | undefined;
+}
+type Target = {kind: 'sub'; sub: Subscription} | {kind: 'queue'; owner: string};
+interface Down {
+  action: ActionId;
+  epoch: number;
+  target: Target;
+  kind: ActionKind;
+}
 
 export interface InputActionsOptions {
   registry: Registry<InputActionDef>;
@@ -283,19 +437,19 @@ function subscriptionLifetime(cleanup: () => void, signal?: AbortSignal): () => 
     signal?.removeEventListener('abort', off);
     cleanup();
   };
-  signal?.addEventListener('abort', off, { once: true });
+  signal?.addEventListener('abort', off, {once: true});
   if (signal?.aborted) off();
   return off;
 }
 
 export class InputActions {
-  private sourceAdmission?: { count: number; serial: number };
+  private sourceAdmission?: {count: number; serial: number};
   private overrides: ActionOverrides;
   private remapRevision = 0;
   private remapping = false;
   private subs: Subscription[] = [];
   private frameOwners = new Set<string>();
-  private queue: { owner: string; event: ActionEvent }[] = [];
+  private queue: {owner: string; event: ActionEvent}[] = [];
   /** Sources down and accepted, keyed by source identity. */
   private down = new Map<string, Down>();
   /** Sources that were down across a cancel: ignored until released (the neutral gate). */
@@ -306,21 +460,29 @@ export class InputActions {
   /** The row that took the current key press (or its repeat) asked not to consume the event. */
   private passing = false;
 
-  constructor(private readonly opts: InputActionsOptions, signal?: AbortSignal) {
+  constructor(
+    private readonly opts: InputActionsOptions,
+    signal?: AbortSignal,
+  ) {
     this.overrides = opts.overrides ?? {};
     this.topKey = this.currentTopKey();
     opts.layers.onChange(() => {
       const key = this.currentTopKey();
-      if (key !== this.topKey) { this.topKey = key; this.cancel('owner'); }
+      if (key !== this.topKey) {
+        this.topKey = key;
+        this.cancel('owner');
+      }
     }, signal);
   }
 
   /** The current owner epoch. */
-  get epoch(): number { return this.epochValue; }
+  get epoch(): number {
+    return this.epochValue;
+  }
 
-  effective(id: ActionId): { readonly keys: readonly KeyChord[]; readonly pad: readonly PadInput[] } {
+  effective(id: ActionId): {readonly keys: readonly KeyChord[]; readonly pad: readonly PadInput[]} {
     const def = this.opts.registry.find(id);
-    return def ? effectiveBindings(def, this.overrides) : { keys: [], pad: [] };
+    return def ? effectiveBindings(def, this.overrides) : {keys: [], pad: []};
   }
   /**
    * Describe a known action using current remaps and layer scope. Hidden rows remain available to explicit
@@ -334,7 +496,10 @@ export class InputActions {
     let blocked = false;
     for (const layer of this.opts.layers.fromTop()) {
       if (def.scope === 'layer' && inContext(def, layer)) matches = true;
-      if (layer.modal !== false) { blocked = true; break; }
+      if (layer.modal !== false) {
+        blocked = true;
+        break;
+      }
     }
     if (def.scope === 'global') matches = !blocked;
     return Object.freeze({
@@ -347,20 +512,31 @@ export class InputActions {
   /** Remap: replaces the stored overrides. Held and queued input is cancelled first (a remap while held never leaks). */
   setOverrides(overrides: ActionOverrides): void {
     const revision = ++this.remapRevision;
-    if (this.remapping) { this.overrides = overrides; return; }
+    if (this.remapping) {
+      this.overrides = overrides;
+      return;
+    }
     this.remapping = true;
     try {
       this.cancel('remap');
       if (revision === this.remapRevision) this.overrides = overrides;
-    } finally { this.remapping = false; }
+    } finally {
+      this.remapping = false;
+    }
   }
 
   /** DOM-side delivery. Unscoped: for 'always'/'global' rows. Scoped: only while traversing that layer or owner. */
-  onAction(action: ActionId, fn: ActionHandler, scope: { layer?: string; owner?: string; signal?: AbortSignal } = {}): () => void {
+  onAction(
+    action: ActionId,
+    fn: ActionHandler,
+    scope: {layer?: string; owner?: string; signal?: AbortSignal} = {},
+  ): () => void {
     if (scope.signal?.aborted) return () => {};
-    const sub: Subscription = { action, fn, layer: scope.layer, owner: scope.owner };
+    const sub: Subscription = {action, fn, layer: scope.layer, owner: scope.owner};
     this.subs.push(sub);
-    return subscriptionLifetime(() => { this.subs = this.subs.filter(s => s !== sub); }, scope.signal);
+    return subscriptionLifetime(() => {
+      this.subs = this.subs.filter(s => s !== sub);
+    }, scope.signal);
   }
   /** Frame-side delivery: the owner reads its actions with `drain(owner)` once per frame. */
   claimFrames(owner: string, signal?: AbortSignal): () => void {
@@ -373,24 +549,29 @@ export class InputActions {
   }
   /** Actions addressed to `owner` in the current epoch, oldest first. Old-epoch leftovers are discarded. */
   drain(owner: string): ActionEvent[] {
-    const mine: ActionEvent[] = [], rest: typeof this.queue = [];
+    const mine: ActionEvent[] = [],
+      rest: typeof this.queue = [];
     for (const q of this.queue) {
       if (q.event.ownerEpoch !== this.epochValue) continue;
-      if (q.owner === owner) mine.push(q.event); else rest.push(q);
+      if (q.owner === owner) mine.push(q.event);
+      else rest.push(q);
     }
     this.queue = rest;
     return mine;
   }
   /** True while a hold action is held in the current epoch. */
   held(action: ActionId): boolean {
-    for (const d of this.down.values()) if (d.action === action && d.kind !== 'press' && d.epoch === this.epochValue) return true;
+    for (const d of this.down.values())
+      if (d.action === action && d.kind !== 'press' && d.epoch === this.epochValue) return true;
     return false;
   }
   /** Adapters (the gamepad reader's requireNeutral, pointer capture) hook the cancel here. */
   onCancel(fn: (reason: CancelReason) => void, signal?: AbortSignal): () => void {
     if (signal?.aborted) return () => {};
     this.cancelListeners.add(fn);
-    return subscriptionLifetime(() => { this.cancelListeners.delete(fn); }, signal);
+    return subscriptionLifetime(() => {
+      this.cancelListeners.delete(fn);
+    }, signal);
   }
 
   /**
@@ -413,14 +594,23 @@ export class InputActions {
     if (e.defaultPrevented || e.isComposing) return false;
     // Native activation outside modal routing belongs to the focused control, not the scene below.
     // Modified chords remain authored actions; modal confirm retains its owned one-press handling.
-    if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && (e.key === 'Enter' || e.key === ' ')
-      && !this.opts.layers.fromTop().some(layer => layer.modal !== false)) {
+    if (
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.metaKey &&
+      !e.shiftKey &&
+      (e.key === 'Enter' || e.key === ' ') &&
+      !this.opts.layers.fromTop().some(layer => layer.modal !== false)
+    ) {
       const target = e.target as Element | null;
-      const selector = 'button,summary,input[type="button"],input[type="submit"],input[type="reset"]'
-        + (e.key === 'Enter' ? ',a[href]' : ',input[type="checkbox"],input[type="radio"]');
+      const selector =
+        'button,summary,input[type="button"],input[type="submit"],input[type="reset"]' +
+        (e.key === 'Enter' ? ',a[href]' : ',input[type="checkbox"],input[type="radio"]');
       if (target && typeof target.closest === 'function' && target.closest(selector)) return false;
     }
-    const code = codeChordOf(e), combo = comboOf(e), source = 'key:' + (e.code || e.key);
+    const code = codeChordOf(e),
+      combo = comboOf(e),
+      source = 'key:' + (e.code || e.key);
     const rows = this.rowsFor(def => {
       const keys = this.effective(def.id).keys;
       if (code && keys.includes(code)) return true;
@@ -431,25 +621,42 @@ export class InputActions {
     const consumed = this.input(rows, source, 'keyboard-mouse', !!e.repeat, isTyping(e.target));
     // A swallowed repeat after a cancel names no row: it passes when every row the key could mean passes.
     if (consumed && (this.passing || rows.every(r => r.passThrough === true))) return false;
-    if (consumed) { e.preventDefault(); e.stopPropagation(); }
+    if (consumed) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     return consumed;
   }
-  keyUp(e: Pick<KeyEventLike, 'key' | 'code'>): void { this.release('key:' + (e.code || e.key)); }
+  keyUp(e: Pick<KeyEventLike, 'key' | 'code'>): void {
+    this.release('key:' + (e.code || e.key));
+  }
 
   /** One pad edge from the pad adapter (after dead zones and hysteresis). */
   pad(input: PadInput, pressed: boolean): boolean {
     const source = 'pad:' + input;
-    if (!pressed) { this.release(source); return false; }
-    return this.input(this.rowsFor(def => this.effective(def.id).pad.includes(input)), source, 'gamepad', false, false);
+    if (!pressed) {
+      this.release(source);
+      return false;
+    }
+    return this.input(
+      this.rowsFor(def => this.effective(def.id).pad.includes(input)),
+      source,
+      'gamepad',
+      false,
+      false,
+    );
   }
   /**
    * The edges of one pad poll, in order. When an earlier edge changes the owner (a press opens a menu), the
    * remaining presses were addressed to the old epoch and are discarded; releases still clear bookkeeping.
    */
-  padFrame(edges: readonly { input: PadInput; pressed: boolean }[]): void {
+  padFrame(edges: readonly {input: PadInput; pressed: boolean}[]): void {
     const epoch = this.epochValue;
     for (const edge of edges) {
-      if (edge.pressed && this.epochValue !== epoch) { this.blocked.add('pad:' + edge.input); continue; }
+      if (edge.pressed && this.epochValue !== epoch) {
+        this.blocked.add('pad:' + edge.input);
+        continue;
+      }
       this.pad(edge.input, edge.pressed);
     }
   }
@@ -458,11 +665,15 @@ export class InputActions {
     return {
       registry: this.opts.registry,
       limit: this.opts.maxOwnedSources ?? 128,
-      admission: this.sourceAdmission ??= { count: 0, serial: 0 },
-      press: (row: InputActionDef, source: string, device: DeviceFamily, valid: () => boolean) => this.input([row], source, device, false, false, valid),
+      admission: (this.sourceAdmission ??= {count: 0, serial: 0}),
+      press: (row: InputActionDef, source: string, device: DeviceFamily, valid: () => boolean) =>
+        this.input([row], source, device, false, false, valid),
       release: (source: string) => this.release(source),
       /** The source's press was accepted in the current epoch and is still down. */
-      accepted: (source: string) => { const d = this.down.get(source); return d !== undefined && d.epoch === this.epochValue; },
+      accepted: (source: string) => {
+        const d = this.down.get(source);
+        return d !== undefined && d.epoch === this.epochValue;
+      },
     };
   }
 
@@ -478,18 +689,27 @@ export class InputActions {
   // ── help ──
 
   /** Rows reachable right now with their effective bindings, for generated help and glyph prompts (STD-RUN-29). */
-  help(): { id: ActionId; label: string; keys: readonly KeyChord[]; pad: readonly PadInput[] }[] {
-    const rows: InputActionDef[] = [], seen = new Set<string>();
-    const add = (d: InputActionDef) => { if (!d.hidden && !seen.has(d.id)) { seen.add(d.id); rows.push(d); } };
+  help(): {id: ActionId; label: string; keys: readonly KeyChord[]; pad: readonly PadInput[]}[] {
+    const rows: InputActionDef[] = [],
+      seen = new Set<string>();
+    const add = (d: InputActionDef) => {
+      if (!d.hidden && !seen.has(d.id)) {
+        seen.add(d.id);
+        rows.push(d);
+      }
+    };
     const all = this.opts.registry.all();
     all.filter(d => d.scope === 'always').forEach(add);
     let blocked = false;
     for (const layer of this.opts.layers.fromTop()) {
       all.filter(d => d.scope === 'layer' && inContext(d, layer)).forEach(add);
-      if (layer.modal !== false) { blocked = true; break; }
+      if (layer.modal !== false) {
+        blocked = true;
+        break;
+      }
     }
     if (!blocked) all.filter(d => d.scope === 'global').forEach(add);
-    return rows.map(d => ({ id: d.id, label: d.label, ...this.effective(d.id) }));
+    return rows.map(d => ({id: d.id, label: d.label, ...this.effective(d.id)}));
   }
 
   // ── internals ──
@@ -508,11 +728,19 @@ export class InputActions {
   }
 
   /** Route one press to one consumer. Returns true when it was consumed. */
-  private input(rows: readonly InputActionDef[], source: string, device: DeviceFamily, repeat: boolean, typing: boolean, valid?: () => boolean): boolean {
+  private input(
+    rows: readonly InputActionDef[],
+    source: string,
+    device: DeviceFamily,
+    repeat: boolean,
+    typing: boolean,
+    valid?: () => boolean,
+  ): boolean {
     if (!rows.length) return false;
     const usable = rows.filter(d => (!typing || d.inText) && d.kind !== 'axis');
     if (!usable.length) return false;
-    const epoch = this.epochValue, layers = this.opts.layers;
+    const epoch = this.epochValue,
+      layers = this.opts.layers;
     const focusRow = usable.find(d => d.id === FOCUS_NEXT || d.id === FOCUS_PREV);
     if (repeat) {
       // Held Tab keeps moving focus inside the trap, as native Tab does.
@@ -521,14 +749,15 @@ export class InputActions {
         // A non-modal layer that traps Tab itself (a panel card, a minigame) decides each repeat as it decides a
         // press: it wraps at either end and otherwise leaves the key to native Tab.
         const sub = this.focusSubscriber(focusRow.id);
-        if (sub) return this.deliver({ kind: 'sub', sub }, this.event(focusRow.id, 'repeat', source, device));
+        if (sub) return this.deliver({kind: 'sub', sub}, this.event(focusRow.id, 'repeat', source, device));
       }
       return this.repeat(source, device);
     }
     // A fresh press proves the old one was released (a lost keyup after blur): it rearms the source.
     this.blocked.delete(source);
     if (this.down.has(source)) this.release(source);
-    const tryRow = (d: InputActionDef, target: Target | null) => target !== null && this.press(d, target, source, device, epoch, valid);
+    const tryRow = (d: InputActionDef, target: Target | null) =>
+      target !== null && this.press(d, target, source, device, epoch, valid);
 
     // 1. always
     for (const d of usable) if (d.scope === 'always' && tryRow(d, this.unscoped(d.id))) return true;
@@ -551,10 +780,18 @@ export class InputActions {
       }
       for (const d of usable) {
         if (d.scope === 'always') continue;
-        const sub = this.subs.find(s => s.action === d.id && (s.layer === layer.id || (s.owner !== undefined && s.owner === layer.owner)));
-        if (sub && tryRow(d, { kind: 'sub', sub })) return true;
-        if (d.scope === 'layer' && inContext(d, layer) && layer.owner && this.frameOwners.has(layer.owner) && d.id !== BACK) {
-          if (tryRow(d, { kind: 'queue', owner: layer.owner })) return true;
+        const sub = this.subs.find(
+          s => s.action === d.id && (s.layer === layer.id || (s.owner !== undefined && s.owner === layer.owner)),
+        );
+        if (sub && tryRow(d, {kind: 'sub', sub})) return true;
+        if (
+          d.scope === 'layer' &&
+          inContext(d, layer) &&
+          layer.owner &&
+          this.frameOwners.has(layer.owner) &&
+          d.id !== BACK
+        ) {
+          if (tryRow(d, {kind: 'queue', owner: layer.owner})) return true;
         }
       }
       const back = usable.some(d => d.id === BACK);
@@ -563,7 +800,7 @@ export class InputActions {
       if (back && layer.kind !== 'scene' && this.escape(source)) return true;
       if (back && layer.kind === 'scene' && layer.owner && this.frameOwners.has(layer.owner)) {
         const d = usable.find(r => r.id === BACK)!;
-        if (tryRow(d, { kind: 'queue', owner: layer.owner })) return true;
+        if (tryRow(d, {kind: 'queue', owner: layer.owner})) return true;
       }
     }
     // 4. global: an unscoped subscriber, else the frame queue of the topmost frame owner
@@ -571,7 +808,7 @@ export class InputActions {
     for (const d of usable) {
       if (d.scope !== 'global') continue;
       if (tryRow(d, this.unscoped(d.id))) return true;
-      if (frameOwner && tryRow(d, { kind: 'queue', owner: frameOwner })) return true;
+      if (frameOwner && tryRow(d, {kind: 'queue', owner: frameOwner})) return true;
     }
     return false;
   }
@@ -586,7 +823,9 @@ export class InputActions {
   /** The topmost layer-scoped subscriber of a focus row, above the first modal layer. */
   private focusSubscriber(action: ActionId): Subscription | null {
     for (const layer of this.opts.layers.fromTop()) {
-      const sub = this.subs.find(s => s.action === action && (s.layer === layer.id || (s.owner !== undefined && s.owner === layer.owner)));
+      const sub = this.subs.find(
+        s => s.action === action && (s.layer === layer.id || (s.owner !== undefined && s.owner === layer.owner)),
+      );
       if (sub) return sub;
       if (layer.modal !== false) return null;
     }
@@ -595,19 +834,29 @@ export class InputActions {
 
   private unscoped(action: ActionId): Target | null {
     const sub = this.subs.find(s => s.action === action && s.layer === undefined && s.owner === undefined);
-    return sub ? { kind: 'sub', sub } : null;
+    return sub ? {kind: 'sub', sub} : null;
   }
 
-  private press(d: InputActionDef, target: Target, source: string, device: DeviceFamily, epoch: number, valid?: () => boolean): boolean {
+  private press(
+    d: InputActionDef,
+    target: Target,
+    source: string,
+    device: DeviceFamily,
+    epoch: number,
+    valid?: () => boolean,
+  ): boolean {
     if ((valid && !valid()) || this.epochValue !== epoch) return true;
     const event = this.event(d.id, 'press', source, device);
     const ok = this.deliver(target, event);
     if (valid && !valid()) return true;
-    if (this.epochValue !== epoch) { this.blocked.add(source); return true; }
+    if (this.epochValue !== epoch) {
+      this.blocked.add(source);
+      return true;
+    }
     if (!ok) return false;
     this.passing = d.passThrough === true;
     // A handler that changed the owner ended this press's epoch: nothing of it survives into the new owner.
-    if (this.epochValue === epoch) this.down.set(source, { action: d.id, epoch, target, kind: d.kind });
+    if (this.epochValue === epoch) this.down.set(source, {action: d.id, epoch, target, kind: d.kind});
     else this.blocked.add(source);
     return true;
   }
@@ -626,28 +875,36 @@ export class InputActions {
   private deliver(target: Target, event: ActionEvent): boolean {
     if (target.kind === 'queue') {
       if (!this.frameOwners.has(target.owner)) return false;
-      this.queue.push({ owner: target.owner, event });
+      this.queue.push({owner: target.owner, event});
       return true;
     }
     if (!this.subs.includes(target.sub)) return false;
     let result: unknown;
-    this.safely(() => { result = target.sub.fn(event); });
+    this.safely(() => {
+      result = target.sub.fn(event);
+    });
     return result !== false;
   }
 
   private event(action: ActionId, phase: ActionPhase, source: string, device: DeviceFamily): ActionEvent {
-    return { action, phase, t: this.opts.now(), device, ownerEpoch: this.epochValue, source };
+    return {action, phase, t: this.opts.now(), device, ownerEpoch: this.epochValue, source};
   }
-  private deviceOf(source: string): DeviceFamily { return source.startsWith('pad:') ? 'gamepad' : source.startsWith('touch:') ? 'touch' : 'keyboard-mouse'; }
+  private deviceOf(source: string): DeviceFamily {
+    return source.startsWith('pad:') ? 'gamepad' : source.startsWith('touch:') ? 'touch' : 'keyboard-mouse';
+  }
   private currentTopKey(): string | null {
     const top = this.opts.layers.fromTop()[0];
     return top ? `${top.id}\u0000${top.owner ?? ''}` : null;
   }
   private safely(fn: () => void) {
-    try { fn(); }
-    catch (err) {
-      try { (this.opts.report ?? console.error)(err); }
-      catch { /* Diagnostics must not interrupt sibling ownership cleanup. */ }
+    try {
+      fn();
+    } catch (err) {
+      try {
+        (this.opts.report ?? console.error)(err);
+      } catch {
+        /* Diagnostics must not interrupt sibling ownership cleanup. */
+      }
     }
   }
 }
@@ -662,7 +919,7 @@ export interface ReachReport {
   /** Failures: the check passes only when this is empty. */
   problems: string[];
   /** Pointer-only exceptions with their reasons, always shown in the report. */
-  exceptions: { id: ActionId; reason: string }[];
+  exceptions: {id: ActionId; reason: string}[];
   /** How each action is reached per device: 'direct' or the path. */
   routes: Record<ActionId, Record<ReachDevice, 'direct' | readonly ActionId[] | null>>;
 }
@@ -675,13 +932,13 @@ export interface ReachReport {
  */
 export function checkReach(registry: Registry<InputActionDef>, overrides: ActionOverrides = {}): ReachReport {
   const report = reachOf(registry.all(), overrides);
-  report.problems.unshift(...turnedAway.get(registry) ?? []);
+  report.problems.unshift(...(turnedAway.get(registry) ?? []));
   return report;
 }
 
 /** The reach graph over `rows` with `overrides` applied (the registry's `problems` uses the defaults). */
 function reachOf(rows: readonly InputActionDef[], overrides: ActionOverrides = {}): ReachReport {
-  const report: ReachReport = { problems: [], exceptions: [], routes: {} };
+  const report: ReachReport = {problems: [], exceptions: [], routes: {}};
   const byId = new Map(rows.map(d => [d.id, d]));
   const direct = (d: InputActionDef, device: ReachDevice) => {
     const b = effectiveBindings(d, overrides);
@@ -693,7 +950,10 @@ function reachOf(rows: readonly InputActionDef[], overrides: ActionOverrides = {
     if (memo.has(key)) return memo.get(key)!;
     const d = byId.get(id);
     if (!d || d.reachability === 'pointer-only-by-design') return false;
-    if (direct(d, device)) { memo.set(key, true); return true; }
+    if (direct(d, device)) {
+      memo.set(key, true);
+      return true;
+    }
     const path = d.via?.[device];
     if (!path?.length || visiting.has(id)) return false; // no route, or a cycle with no entry
     visiting.add(id);
@@ -703,25 +963,36 @@ function reachOf(rows: readonly InputActionDef[], overrides: ActionOverrides = {
     return ok;
   };
   for (const d of rows) {
-    const routes: ReachReport['routes'][ActionId] = { keyboard: null, pad: null };
+    const routes: ReachReport['routes'][ActionId] = {keyboard: null, pad: null};
     report.routes[d.id] = routes;
-    if (d.reachability === 'pointer-only-by-design') { report.exceptions.push({ id: d.id, reason: d.reason ?? '' }); continue; }
+    if (d.reachability === 'pointer-only-by-design') {
+      report.exceptions.push({id: d.id, reason: d.reason ?? ''});
+      continue;
+    }
     for (const device of REACH_DEVICES) {
       const path = d.via?.[device];
-      if (reachable(d.id, device, new Set())) { routes[device] = direct(d, device) ? 'direct' : path!; continue; }
+      if (reachable(d.id, device, new Set())) {
+        routes[device] = direct(d, device) ? 'direct' : path!;
+        continue;
+      }
       const b = effectiveBindings(d, overrides);
       if (device === 'keyboard' && b.keys.length && b.keys.every(k => MODIFIER.test(k)) && !path?.length) {
         report.problems.push(`${d.id}: a modifier chord is the only keyboard route`);
       } else if (path?.length) {
         const missing = path.filter(step => !byId.has(step));
-        report.problems.push(missing.length ? `${d.id}: ${device} path names unregistered ${missing.join(', ')}`
-          : `${d.id}: ${device} path ${path.join(' → ')} has no reachable entry (cycle or unreachable first step)`);
+        report.problems.push(
+          missing.length
+            ? `${d.id}: ${device} path names unregistered ${missing.join(', ')}`
+            : `${d.id}: ${device} path ${path.join(' → ')} has no reachable entry (cycle or unreachable first step)`,
+        );
       } else report.problems.push(`${d.id}: unreachable by ${device}`);
     }
   }
   const back = byId.get(BACK);
   if (!back) report.problems.push(`${BACK}: no Back action registered`);
-  else for (const device of REACH_DEVICES) if (!direct(back, device)) report.problems.push(`${BACK}: no direct ${device} Back route`);
+  else
+    for (const device of REACH_DEVICES)
+      if (!direct(back, device)) report.problems.push(`${BACK}: no direct ${device} Back route`);
   report.problems.push(...bindingConflicts(rows, overrides));
   return report;
 }
@@ -732,19 +1003,27 @@ function reachOf(rows: readonly InputActionDef[], overrides: ActionOverrides = {
  * (the layer traversal runs first), not a conflict.
  */
 export function bindingConflicts(rows: readonly InputActionDef[], overrides: ActionOverrides = {}): string[] {
-  const out: string[] = [], by = new Map<string, InputActionDef[]>();
+  const out: string[] = [],
+    by = new Map<string, InputActionDef[]>();
   for (const d of rows) {
     const b = effectiveBindings(d, overrides);
     for (const k of b.keys) push(by, 'key ' + k, d);
     for (const p of b.pad) push(by, 'pad ' + p, d);
   }
-  for (const [input, list] of by) for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
-    const a = list[i]!, b = list[j]!; // i < j < list.length
-    if (overlaps(a, b)) out.push(`${input}: ${a.id} (${a.scope}) and ${b.id} (${b.scope}) overlap`);
-  }
+  for (const [input, list] of by)
+    for (let i = 0; i < list.length; i++)
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i]!,
+          b = list[j]!; // i < j < list.length
+        if (overlaps(a, b)) out.push(`${input}: ${a.id} (${a.scope}) and ${b.id} (${b.scope}) overlap`);
+      }
   return out;
 }
-function push<K, V>(m: Map<K, V[]>, k: K, v: V) { const l = m.get(k); if (l) l.push(v); else m.set(k, [v]); }
+function push<K, V>(m: Map<K, V[]>, k: K, v: V) {
+  const l = m.get(k);
+  if (l) l.push(v);
+  else m.set(k, [v]);
+}
 function overlaps(a: InputActionDef, b: InputActionDef): boolean {
   if (a.scope === 'always' || b.scope === 'always') return true;
   if (a.scope !== b.scope) return false;

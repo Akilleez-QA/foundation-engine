@@ -6,7 +6,7 @@
  *
  * Pure apart from the injected `fetchCatalog`: no DOM, no globals.
  */
-import type { Catalog, I18n } from './i18n';
+import type {Catalog, I18n} from './i18n';
 
 export interface CatalogLoader {
   /** Resolves once the catalogue is in the i18n instance. Rejects when this attempt failed. */
@@ -15,16 +15,25 @@ export interface CatalogLoader {
   loaded(): boolean;
 }
 
-export function createCatalogLoader<P>(i18n: I18n<P>, locale: string, fetchCatalog: () => Promise<Catalog>): CatalogLoader {
-  let pending: Promise<void> | null = null, done = false;
+export function createCatalogLoader<P>(
+  i18n: I18n<P>,
+  locale: string,
+  fetchCatalog: () => Promise<Catalog>,
+): CatalogLoader {
+  let pending: Promise<void> | null = null,
+    done = false;
   return {
     load() {
       pending ??= (async () => {
         const catalog = await fetchCatalog();
-        if (!catalog || typeof catalog !== 'object' || Array.isArray(catalog)) throw new Error(`The ${locale} catalogue is not an object of key → text`);
+        if (!catalog || typeof catalog !== 'object' || Array.isArray(catalog))
+          throw new Error(`The ${locale} catalogue is not an object of key → text`);
         i18n.addCatalog(locale, catalog);
         done = true;
-      })().catch(error => { pending = null; throw error; });
+      })().catch(error => {
+        pending = null;
+        throw error;
+      });
       return pending;
     },
     loaded: () => done,
