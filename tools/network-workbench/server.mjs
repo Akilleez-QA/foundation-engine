@@ -1,7 +1,7 @@
-import { randomBytes } from 'node:crypto';
-import { performance } from 'node:perf_hooks';
-import { pathToFileURL } from 'node:url';
-import { WebSocketServer, WebSocket } from 'ws';
+import {randomBytes} from 'node:crypto';
+import {performance} from 'node:perf_hooks';
+import {pathToFileURL} from 'node:url';
+import {WebSocketServer, WebSocket} from 'ws';
 import {
   createConnectionDrain,
   createIntegrity,
@@ -21,8 +21,8 @@ export const hostLimits = Object.freeze({
   maxQueuedMessages: 32,
   maxQueuedBytes: 16384,
   maxPumpOperations: 4,
-  message: { maxBytes: 1024, maxNodes: 32, maxDepth: 4 },
-  principal: { maxBytes: 256, maxNodes: 8, maxDepth: 2 },
+  message: {maxBytes: 1024, maxNodes: 32, maxDepth: 4},
+  principal: {maxBytes: 256, maxNodes: 8, maxDepth: 2},
 });
 const MAX_BUFFERED = 8192,
   ACTIVE_IDLE_MS = 15000,
@@ -50,13 +50,10 @@ function createIntegrityExample() {
         id: 'counter-rate',
         // Host milliseconds stand in for ticks here.
         perTick: integrityExample.perSecond / 1000,
-        current: ({ state, command }) => state.counters[command.target],
-        proposed: ({ state, command }) =>
-          state.counters[command.target] + command.delta,
-        elapsedTicks: ({ state, command }) =>
-          state.changedAt[command.target] === null
-            ? null
-            : state.now - state.changedAt[command.target],
+        current: ({state, command}) => state.counters[command.target],
+        proposed: ({state, command}) => state.counters[command.target] + command.delta,
+        elapsedTicks: ({state, command}) =>
+          state.changedAt[command.target] === null ? null : state.now - state.changedAt[command.target],
       }),
     ],
     limits: {
@@ -76,18 +73,14 @@ function createIntegrityExample() {
     },
   });
 }
-const stringify = (value) => JSON.stringify(value);
+const stringify = value => JSON.stringify(value);
 const exact = (value, keys) =>
   value !== null &&
   typeof value === 'object' &&
   !Array.isArray(value) &&
   Object.keys(value).length === keys.length &&
-  keys.every((k) => Object.hasOwn(value, k));
-const validId = (id) =>
-  typeof id === 'string' &&
-  id.length > 0 &&
-  id.length <= 32 &&
-  /^[a-zA-Z0-9_-]+$/.test(id);
+  keys.every(k => Object.hasOwn(value, k));
+const validId = id => typeof id === 'string' && id.length > 0 && id.length <= 32 && /^[a-zA-Z0-9_-]+$/.test(id);
 
 /** Loopback-only ephemeral reference. Returned controls are trusted operator APIs, never HTTP endpoints. */
 export async function startNetworkWorkbench({
@@ -100,9 +93,7 @@ export async function startNetworkWorkbench({
 } = {}) {
   if (
     (maxQueuedAgeMs !== undefined &&
-      (!Number.isSafeInteger(maxQueuedAgeMs) ||
-        maxQueuedAgeMs < 1 ||
-        maxQueuedAgeMs > 60000)) ||
+      (!Number.isSafeInteger(maxQueuedAgeMs) || maxQueuedAgeMs < 1 || maxQueuedAgeMs > 60000)) ||
     !Number.isSafeInteger(port) ||
     port < 0 ||
     port > 65535 ||
@@ -115,9 +106,7 @@ export async function startNetworkWorkbench({
     alpha: randomBytes(32).toString('base64url'),
     beta: randomBytes(32).toString('base64url'),
   });
-  const tokens = new Map(
-    Object.entries(credentials).map(([principal, token]) => [token, principal]),
-  );
+  const tokens = new Map(Object.entries(credentials).map(([principal, token]) => [token, principal]));
   const revoked = new Set(),
     blockedSends = new Set(),
     peers = new Map(),
@@ -125,9 +114,9 @@ export async function startNetworkWorkbench({
   let hold = false,
     closed = false,
     timer;
-  const counters = { alpha: 0, beta: 0 },
+  const counters = {alpha: 0, beta: 0},
     // Host time of each counter's last authoritative change; read only by the optional integrity rule.
-    changedAt = { alpha: null, beta: null },
+    changedAt = {alpha: null, beta: null},
     metrics = {
       receivedFrames: 0,
       dispatched: 0,
@@ -152,17 +141,20 @@ export async function startNetworkWorkbench({
   });
   const now = () => performance.now();
   // Optional planned drain and capped lifetime (NW-08); absent unless the operator configures it.
-  const drainPlan = drainOptions === undefined ? null : createConnectionDrain({
-    limits: {
-      maxKeys: hostLimits.maxConnections,
-      maxNoticeMs: 60000,
-      maxReconnectAfterMs: 60000,
-      maxActionsPerPoll: 16,
-      ...(drainOptions?.lifetime ? { lifetime: drainOptions.lifetime } : {}),
-    },
-    ...(drainOptions?.lifetime ? { random: drainOptions.random ?? Math.random } : {}),
-  });
-  const drainClose = (reason) => reason === 'drain' || reason === 'lifetime';
+  const drainPlan =
+    drainOptions === undefined
+      ? null
+      : createConnectionDrain({
+          limits: {
+            maxKeys: hostLimits.maxConnections,
+            maxNoticeMs: 60000,
+            maxReconnectAfterMs: 60000,
+            maxActionsPerPoll: 16,
+            ...(drainOptions?.lifetime ? {lifetime: drainOptions.lifetime} : {}),
+          },
+          ...(drainOptions?.lifetime ? {random: drainOptions.random ?? Math.random} : {}),
+        });
+  const drainClose = reason => reason === 'drain' || reason === 'lifetime';
   // One bucket per live intake peer; the intake connection bound bounds the keys.
   const frameRate = createRateAdmission({
     maxKeys: hostLimits.maxConnections,
@@ -170,27 +162,20 @@ export async function startNetworkWorkbench({
     refillPerSecond: MAX_FRAMES_PER_SECOND,
   });
   // Optional NW-06 queue age (off by default): aged commands are shed before authorize/dispatch.
-  const limits =
-    maxQueuedAgeMs === undefined
-      ? hostLimits
-      : { ...hostLimits, maxQueuedAgeMs };
+  const limits = maxQueuedAgeMs === undefined ? hostLimits : {...hostLimits, maxQueuedAgeMs};
   const integrity = integrityEnabled ? createIntegrityExample() : null;
   const intake = createNetworkIntake({
     limits,
     ports: {
-      authenticate({ peer, credential, complete }) {
+      authenticate({peer, credential, complete}) {
         const finish = () => {
           const principal = tokens.get(credential?.token);
-          complete(
-            principal && !revoked.has(principal)
-              ? stringify({ id: principal, target: principal })
-              : null,
-          );
+          complete(principal && !revoked.has(principal) ? stringify({id: principal, target: principal}) : null);
         };
         if (hold) held.set(peer, finish);
         else finish();
       },
-      authorize({ peer, principal, command }) {
+      authorize({peer, principal, command}) {
         const allowed =
           principal &&
           !revoked.has(principal.id) &&
@@ -205,7 +190,7 @@ export async function startNetworkWorkbench({
         const time = now();
         const decision = integrity.check(
           principal.id,
-          { command, state: { counters, changedAt, now: time }, tick: null },
+          {command, state: {counters, changedAt, now: time}, tick: null},
           time,
         );
         if (decision.action === 'allow') return true;
@@ -214,7 +199,7 @@ export async function startNetworkWorkbench({
         else refuse(peer, 'integrity', command.id);
         return false;
       },
-      dispatch({ peer, command }) {
+      dispatch({peer, command}) {
         counters[command.target] += command.delta;
         changedAt[command.target] = now();
         metrics.dispatched++;
@@ -230,7 +215,7 @@ export async function startNetworkWorkbench({
       ...(maxQueuedAgeMs === undefined
         ? {}
         : {
-            stale({ peer, command }) {
+            stale({peer, command}) {
               // Correlation only: authorization is not rechecked for this notice.
               metrics.stale++;
               refuse(peer, 'stale', command.id);
@@ -274,7 +259,7 @@ export async function startNetworkWorkbench({
       return false;
     }
     try {
-      state.socket.send(json, (error) => {
+      state.socket.send(json, error => {
         if (error) intake.close(peer, 'send-failed');
       });
       metrics.sentBytes += bytes;
@@ -295,16 +280,13 @@ export async function startNetworkWorkbench({
       v: 1,
       type: 'refused',
       reason,
-      ...(validId(id) ? { id } : {}),
+      ...(validId(id) ? {id} : {}),
     };
     if (intake.read(peer)?.state === 'active') return send(peer, value);
     const json = stringify(value);
-    if (
-      Buffer.byteLength(json) > hostLimits.message.maxBytes ||
-      !transportSend(peer, json)
-    )
+    if (Buffer.byteLength(json) > hostLimits.message.maxBytes || !transportSend(peer, json))
       intake.close(peer, 'send-refused');
-    return { status: 'refused', reason };
+    return {status: 'refused', reason};
   }
   function notify(peer, value) {
     if (intake.read(peer)?.state === 'active') return send(peer, value);
@@ -327,8 +309,7 @@ export async function startNetworkWorkbench({
     metrics.driverRounds++;
     const time = now();
     for (const [peer, state] of peers) {
-      if (time - state.lastFrame >= ACTIVE_IDLE_MS)
-        intake.close(peer, 'idle-timeout');
+      if (time - state.lastFrame >= ACTIVE_IDLE_MS) intake.close(peer, 'idle-timeout');
     }
     intake.pump(time);
     for (const peer of peers.keys()) announce(peer);
@@ -337,11 +318,11 @@ export async function startNetworkWorkbench({
       if (step.action === 'close') intake.close(step.key, step.cause === 'lifetime' ? 'lifetime' : 'drain');
       else if (peers.has(step.key)) {
         metrics.drainNotices++;
-        notify(step.key, { v: 1, type: 'drain', ...step.notice });
+        notify(step.key, {v: 1, type: 'drain', ...step.notice});
       }
     }
   }
-  wss.on('connection', (socket) => {
+  wss.on('connection', socket => {
     socket.on('error', () => {});
     const result = intake.open(now());
     if (result.status !== 'opened') {
@@ -360,12 +341,12 @@ export async function startNetworkWorkbench({
       return;
     }
     const state = {
-        socket,
-        announced: false,
-        lastFrame: now(),
-        preAuthFrames: 0,
-        message: null,
-      };
+      socket,
+      announced: false,
+      lastFrame: now(),
+      preAuthFrames: 0,
+      message: null,
+    };
     peers.set(peer, state);
     state.message = (data, binary) => {
       if (closed || !peers.has(peer)) return;
@@ -382,10 +363,7 @@ export async function startNetworkWorkbench({
         return;
       }
       const before = intake.read(peer);
-      if (
-        before?.state !== 'active' &&
-        ++state.preAuthFrames > hostLimits.maxPreAuthMessages
-      ) {
+      if (before?.state !== 'active' && ++state.preAuthFrames > hostLimits.maxPreAuthMessages) {
         intake.close(peer, 'preauth-capacity');
         return;
       }
@@ -407,11 +385,7 @@ export async function startNetworkWorkbench({
         typeof frame.token === 'string' &&
         frame.token.length <= 128
       ) {
-        const outcome = intake.authenticate(
-          peer,
-          stringify({ token: frame.token }),
-          time,
-        );
+        const outcome = intake.authenticate(peer, stringify({token: frame.token}), time);
         if (outcome.status === 'refused') refuse(peer, outcome.reason);
         announce(peer);
         return;
@@ -431,13 +405,8 @@ export async function startNetworkWorkbench({
           refuse(peer, 'draining', frame.id);
           return;
         }
-        const outcome = intake.receive(
-          peer,
-          stringify({ id: frame.id, target: frame.target, delta: frame.delta }),
-          time,
-        );
-        if (outcome.status === 'refused')
-          refuse(peer, outcome.reason, frame.id);
+        const outcome = intake.receive(peer, stringify({id: frame.id, target: frame.target, delta: frame.delta}), time);
+        if (outcome.status === 'refused') refuse(peer, outcome.reason, frame.id);
         return;
       }
       refuse(peer, 'schema', frame?.id);
@@ -459,9 +428,9 @@ export async function startNetworkWorkbench({
       return {
         ephemeral: true,
         maxQueuedAgeMs: maxQueuedAgeMs ?? null,
-        counters: { ...counters },
-        metrics: { ...metrics },
-        closeReasons: { ...closeReasons },
+        counters: {...counters},
+        metrics: {...metrics},
+        closeReasons: {...closeReasons},
         intake: intake.stats(),
         peers: [...peers].map(([peer, state]) => ({
           state: intake.read(peer)?.state,
@@ -513,8 +482,7 @@ export async function startNetworkWorkbench({
     revoke(principal) {
       if (!['alpha', 'beta'].includes(principal)) throw Error('principal');
       revoked.add(principal);
-      for (const [peer] of peers)
-        if (intake.read(peer)?.principal?.id === principal) intake.revoke(peer);
+      for (const [peer] of peers) if (intake.read(peer)?.principal?.id === principal) intake.revoke(peer);
     },
     close() {
       if (closePromise) return closePromise;
@@ -526,24 +494,21 @@ export async function startNetworkWorkbench({
       integrity?.dispose();
       held.clear();
       for (const socket of wss.clients) socket.terminate();
-      closePromise = new Promise((resolve) => wss.close(resolve));
+      closePromise = new Promise(resolve => wss.close(resolve));
       return closePromise;
     },
   };
   return controls;
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   // `--drain` opts in to operator drain; `--drain=<lifetime JSON>` also caps connection lifetime (NW-08).
   // `--integrity` opts in to the command integrity example (SEC-01).
-  const drainArg = process.argv.slice(2).find((arg) => arg === '--drain' || arg.startsWith('--drain='));
+  const drainArg = process.argv.slice(2).find(arg => arg === '--drain' || arg.startsWith('--drain='));
   const host = await startNetworkWorkbench({
     ...(drainArg === undefined
       ? {}
-      : { drain: drainArg === '--drain' ? {} : { lifetime: JSON.parse(drainArg.slice('--drain='.length)) } }),
+      : {drain: drainArg === '--drain' ? {} : {lifetime: JSON.parse(drainArg.slice('--drain='.length))}}),
     integrity: process.argv.includes('--integrity'),
   });
   if (process.send)
@@ -552,11 +517,8 @@ if (
       url: host.url,
       credentials: host.credentials,
     });
-  else
-    process.stdout.write(
-      `${JSON.stringify({ type: 'ready', url: host.url, credentials: host.credentials })}\n`,
-    );
-  process.on('message', async (request) => {
+  else process.stdout.write(`${JSON.stringify({type: 'ready', url: host.url, credentials: host.credentials})}\n`);
+  process.on('message', async request => {
     if (!request || !validId(request.id)) return;
     try {
       let value;
@@ -571,7 +533,7 @@ if (
         host.blockSends(request.principal, request.value);
         value = host.read();
       } else if (request.method === 'drain') {
-        host.drain({ noticeMs: request.noticeMs, reconnectAfterMs: request.reconnectAfterMs });
+        host.drain({noticeMs: request.noticeMs, reconnectAfterMs: request.reconnectAfterMs});
         value = host.read();
       } else if (request.method === 'resume') {
         host.resume();
@@ -584,12 +546,12 @@ if (
         value = host.read();
       } else if (request.method === 'close') {
         await host.close();
-        value = { closed: true };
+        value = {closed: true};
       } else throw Error('operator-method');
-      process.send?.({ type: 'reply', id: request.id, value });
+      process.send?.({type: 'reply', id: request.id, value});
       if (request.method === 'close') process.disconnect?.();
     } catch (error) {
-      process.send?.({ type: 'reply', id: request.id, error: error.message });
+      process.send?.({type: 'reply', id: request.id, error: error.message});
     }
   });
   process.once('SIGTERM', async () => {

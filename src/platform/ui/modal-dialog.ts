@@ -16,8 +16,8 @@
  * - A native close (its × button, a form, the pad's B as a close request) closes the layer too; closing the layer
  *   closes the dialog.
  */
-import type { LayerHandle, LayerInfo, LayerManager } from './layers';
-import { appLayers } from './runtime';
+import type {LayerHandle, LayerInfo, LayerManager} from './layers';
+import {appLayers} from './runtime';
 
 export interface ModalDialogOptions {
   /** The layer id, `modal.<name>`. */
@@ -28,7 +28,9 @@ export interface ModalDialogOptions {
   layers?: LayerManager;
 }
 
-interface Opening { layer?: LayerHandle }
+interface Opening {
+  layer?: LayerHandle;
+}
 const open = new WeakMap<HTMLDialogElement, Opening>();
 const watched = new WeakSet<HTMLDialogElement>();
 const rendered = (e: HTMLElement | null | undefined): boolean => !!e && e.isConnected && e.getClientRects().length > 0;
@@ -36,7 +38,7 @@ const rendered = (e: HTMLElement | null | undefined): boolean => !!e && e.isConn
 function returnTarget(opener: HTMLElement | null): HTMLElement | null {
   if (!opener || rendered(opener)) return opener;
   const menu = opener.closest('details');
-  const summary = menu && Array.from(menu.children).find(c => c.tagName === 'SUMMARY') as HTMLElement | undefined;
+  const summary = menu && (Array.from(menu.children).find(c => c.tagName === 'SUMMARY') as HTMLElement | undefined);
   return summary && rendered(summary) ? summary : opener;
 }
 const shown = (d: HTMLDialogElement) => (typeof d.showModal === 'function' ? d.open : d.hasAttribute('open'));
@@ -45,7 +47,8 @@ const shown = (d: HTMLDialogElement) => (typeof d.showModal === 'function' ? d.o
 export function openModalDialog(dialog: HTMLDialogElement, o: ModalDialogOptions): LayerHandle {
   const live = open.get(dialog);
   if (live?.layer && !live.layer.closed) return live.layer;
-  const doc = dialog.ownerDocument, layers = o.layers ?? appLayers(doc);
+  const doc = dialog.ownerDocument,
+    layers = o.layers ?? appLayers(doc);
   // The opener is read before showModal moves focus into the dialog.
   const active = doc.activeElement as HTMLElement | null;
   const opener = active && active !== doc.body && !dialog.contains(active) ? active : null;
@@ -53,18 +56,22 @@ export function openModalDialog(dialog: HTMLDialogElement, o: ModalDialogOptions
     watched.add(dialog);
     // The close event is queued as a task: one from an earlier closing can arrive after the dialog reopened, so only
     // a dialog that is really shut closes its layer.
-    dialog.addEventListener('close', () => { if (!shown(dialog)) open.get(dialog)?.layer?.close('exit'); });
+    dialog.addEventListener('close', () => {
+      if (!shown(dialog)) open.get(dialog)?.layer?.close('exit');
+    });
   }
   const opening: Opening = {};
   open.set(dialog, opening);
   let admitted: LayerInfo | undefined;
   const closeNative = () => {
     if (!shown(dialog)) return;
-    if (typeof dialog.close === 'function') dialog.close(); else dialog.removeAttribute('open');
+    if (typeof dialog.close === 'function') dialog.close();
+    else dialog.removeAttribute('open');
   };
   try {
     if (!shown(dialog)) {
-      if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
+      if (typeof dialog.showModal === 'function') dialog.showModal();
+      else dialog.setAttribute('open', '');
     }
     // Native focus can synchronously open a replacement before this layer exists.
     if (open.get(dialog) !== opening) {
@@ -73,11 +80,19 @@ export function openModalDialog(dialog: HTMLDialogElement, o: ModalDialogOptions
       throw Error('modal opening lost ownership');
     }
     const layer = layers.open({
-      id: o.id, kind: 'modal', element: dialog, cover: 'scrim', modal: 'page',
+      id: o.id,
+      kind: 'modal',
+      element: dialog,
+      cover: 'scrim',
+      modal: 'page',
       initialFocus: () => {
         // Capture the admitted identity before authored focus can replace it or throw.
         admitted = layers.stack().find(layer => layer.id === o.id && layer.element === dialog);
-        return o.initialFocus ? o.initialFocus() : (dialog.contains(doc.activeElement) ? doc.activeElement as HTMLElement : null);
+        return o.initialFocus
+          ? o.initialFocus()
+          : dialog.contains(doc.activeElement)
+            ? (doc.activeElement as HTMLElement)
+            : null;
       },
       returnFocus: () => returnTarget(opener),
       onClose: () => {
@@ -99,11 +114,21 @@ export function openModalDialog(dialog: HTMLDialogElement, o: ModalDialogOptions
     const ownsDialog = open.get(dialog) === opening;
     // open() may throw before returning a handle. Retire only this captured layer,
     // including a stale outer layer whose different-id replacement is now live.
-    const owned = admitted ?? (ownsDialog ? layers.stack().find(layer => layer.id === o.id && layer.element === dialog) : undefined);
-    try { if (owned) layers.close(owned, ownsDialog ? 'program' : 'replaced'); } catch (cleanup) { errors.push(cleanup); }
+    const owned =
+      admitted ??
+      (ownsDialog ? layers.stack().find(layer => layer.id === o.id && layer.element === dialog) : undefined);
+    try {
+      if (owned) layers.close(owned, ownsDialog ? 'program' : 'replaced');
+    } catch (cleanup) {
+      errors.push(cleanup);
+    }
     if (open.get(dialog) === opening) {
       open.delete(dialog);
-      try { closeNative(); } catch (cleanup) { errors.push(cleanup); }
+      try {
+        closeNative();
+      } catch (cleanup) {
+        errors.push(cleanup);
+      }
     }
     if (errors.length > 1) throw new AggregateError(errors, 'modal opening failed');
     throw error;

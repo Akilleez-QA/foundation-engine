@@ -24,11 +24,22 @@ export function gameArg(argv = process.argv.slice(2)) {
 /** The template game folders, relative to the root (templates/<name>/game). */
 export function templateGameDirs(root = ROOT) {
   const dir = join(root, 'templates');
-  return existsSync(dir) ? readdirSync(dir).filter(n => existsSync(join(dir, n, 'game', 'game.ts'))).sort().map(n => `templates/${n}/game`) : [];
+  return existsSync(dir)
+    ? readdirSync(dir)
+        .filter(n => existsSync(join(dir, n, 'game', 'game.ts')))
+        .sort()
+        .map(n => `templates/${n}/game`)
+    : [];
 }
 
-const resolveDir = env => env.GAME_DIR ? (isAbsolute(env.GAME_DIR) ? env.GAME_DIR : join(ROOT, env.GAME_DIR))
-  : existsSync(join(ROOT, 'game', 'game.ts')) ? join(ROOT, 'game') : join(ROOT, DEFAULT_TEMPLATE);
+const resolveDir = env =>
+  env.GAME_DIR
+    ? isAbsolute(env.GAME_DIR)
+      ? env.GAME_DIR
+      : join(ROOT, env.GAME_DIR)
+    : existsSync(join(ROOT, 'game', 'game.ts'))
+      ? join(ROOT, 'game')
+      : join(ROOT, DEFAULT_TEMPLATE);
 
 /** Why the selected game folder cannot be used (one line), or null. */
 export function gameDirProblem(env = process.env) {
@@ -48,9 +59,15 @@ export const gameDirLabel = (dir = gameDir()) => relative(ROOT, dir).split('\\')
 // Command-line entry points import this module, so `--game` and a wrong GAME_DIR are handled once, before any work and
 // before any child process starts (children inherit the environment).
 const fromArg = gameArg();
-if (fromArg === '') { console.error(`--game needs a folder, e.g. --game templates/blank/game. One of: ${templateGameDirs().join(', ')}`); process.exit(2); }
+if (fromArg === '') {
+  console.error(`--game needs a folder, e.g. --game templates/blank/game. One of: ${templateGameDirs().join(', ')}`);
+  process.exit(2);
+}
 if (fromArg) process.env.GAME_DIR = fromArg;
 if (process.env.GAME_DIR) {
   const problem = gameDirProblem();
-  if (problem) { console.error(problem); process.exit(2); }
+  if (problem) {
+    console.error(problem);
+    process.exit(2);
+  }
 }

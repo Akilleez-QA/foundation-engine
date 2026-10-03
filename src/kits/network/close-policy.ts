@@ -4,7 +4,11 @@
  * and codes are terminal; a consumer stops automatic reconnects on `terminal` and may pace a retry on `transient`.
  * See docs/guides/network-retry.md.
  */
-import { CLOSE_REASON_TOKEN, MAX_CLOSE_REASON_LENGTH, type BrowserRemoteClose } from '../../platform/network/browser-transport';
+import {
+  CLOSE_REASON_TOKEN,
+  MAX_CLOSE_REASON_LENGTH,
+  type BrowserRemoteClose,
+} from '../../platform/network/browser-transport';
 
 /** Credential refusals by the stock network intake: retrying the same credential cannot succeed. */
 export const DEFAULT_TERMINAL_CLOSE_REASONS: readonly string[] = Object.freeze(['auth-rejected', 'revoked']);
@@ -22,7 +26,7 @@ export type CloseClass = 'terminal' | 'transient';
 export interface ClosePolicy {
   /** `terminal` when the code or reason is configured terminal; anything else, including no close record, is `transient`. */
   classify(remote: BrowserRemoteClose | null | undefined): CloseClass;
-  read(): Readonly<{ terminalReasons: readonly string[]; terminalCodes: readonly number[] }>;
+  read(): Readonly<{terminalReasons: readonly string[]; terminalCodes: readonly number[]}>;
 }
 
 function capture<T>(value: unknown, fallback: readonly T[], valid: (entry: unknown) => entry is T): readonly T[] {
@@ -42,16 +46,20 @@ const closeCode = (entry: unknown): entry is number =>
   typeof entry === 'number' && Number.isInteger(entry) && entry >= 1000 && entry <= 4999;
 
 export function createClosePolicy(options: ClosePolicyOptions = {}): ClosePolicy {
-  if (options === null || typeof options !== 'object' || Array.isArray(options)
-    || Object.keys(options).some(key => key !== 'terminalReasons' && key !== 'terminalCodes'))
+  if (
+    options === null ||
+    typeof options !== 'object' ||
+    Array.isArray(options) ||
+    Object.keys(options).some(key => key !== 'terminalReasons' && key !== 'terminalCodes')
+  )
     throw Error('close policy: invalid options');
   const terminalReasons = capture(options.terminalReasons, DEFAULT_TERMINAL_CLOSE_REASONS, reasonToken);
   const terminalCodes = capture(options.terminalCodes, DEFAULT_TERMINAL_CLOSE_CODES, closeCode);
-  const snapshot = Object.freeze({ terminalReasons, terminalCodes });
+  const snapshot = Object.freeze({terminalReasons, terminalCodes});
   return Object.freeze({
     classify(remote: BrowserRemoteClose | null | undefined): CloseClass {
       if (!remote) return 'transient';
-      const { code, reason } = remote;
+      const {code, reason} = remote;
       if (closeCode(code) && terminalCodes.includes(code)) return 'terminal';
       if (reasonToken(reason) && terminalReasons.includes(reason)) return 'terminal';
       return 'transient';

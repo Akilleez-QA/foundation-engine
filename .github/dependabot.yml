@@ -16,16 +16,16 @@ updates:
       # version-checked adapter over private renderer state; vite majors change
       # the build; @types/node tracks the Node 22 minimum that CI runs.
       - dependency-name: typescript
-        update-types: ["version-update:semver-major"]
+        update-types: ['version-update:semver-major']
       - dependency-name: vite
-        update-types: ["version-update:semver-major"]
+        update-types: ['version-update:semver-major']
       # three is 0.x, so a minor release is a breaking release.
       - dependency-name: three
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
-      - dependency-name: "@types/three"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
-      - dependency-name: "@types/node"
-        update-types: ["version-update:semver-major"]
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: '@types/three'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:

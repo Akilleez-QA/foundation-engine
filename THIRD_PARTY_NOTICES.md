@@ -6,7 +6,7 @@ does not replace those notices. The original generated diagnostic assets listed
 below are separately dedicated under **CC0-1.0**.
 
 This inventory was checked against `package-lock.json` and installed package
-license files on 2026-10-02. It records pinned versions, not semver ranges.
+license files on 2026-10-02, and again for the Prettier addition on 2026-10-03. It records pinned versions, not semver ranges.
 Update it when the dependency graph or shipped assets change.
 
 ## Optional network reference host dependency
@@ -27,6 +27,17 @@ their SVG sources. It is not imported by the engine, templates or player builds.
 [Pinned source](https://github.com/thx/resvg-js/tree/v2.6.2). MPL-2.0 is compatible
 with GPL-3.0-only use here; the rendered images carry no license from the tool.
 The brand assets themselves are original work listed in [docs/brand.md](docs/brand.md).
+
+## Code formatter dependency
+
+Added and checked on 2026-10-03: **prettier 3.9.9**, MIT, an exact-pinned
+development dependency used only by `npm run format`, `npm run format:check`,
+`npm run check` and the after-edit hook to format the project's own source. It is
+not imported by the engine, templates or player builds and emits no code into them.
+[Pinned source](https://github.com/prettier/prettier/tree/3.9.9). It has no
+dependencies of its own in the lockfile; its bundled third-party code is credited in
+the installed `node_modules/prettier/LICENSE`, which begins "Copyright © James Long
+and contributors".
 
 ## Code distributed in browser builds
 
@@ -107,7 +118,7 @@ SOFTWARE.
 
 ## Locked dependency inventory
 
-The lockfile contains 94 dependency entries. Its declared licenses are 63 MIT,
+The lockfile contains 95 dependency entries. Its declared licenses are 64 MIT,
 25 MPL-2.0 (Lightning CSS, resvg-js and their platform binaries), four Apache-2.0, one
 BSD-3-Clause, and one ISC. These include transitive tools,
 types, and optional platform binaries; the table is not a statement that all
@@ -202,6 +213,7 @@ lockfile metadata only.
 | `picomatch` | 4.0.7 | MIT | Required by dependency graph |
 | `playwright-core` | 1.56.1 | Apache-2.0 | Required by dependency graph |
 | `postcss` | 8.5.28 | MIT | Required by dependency graph |
+| `prettier` | 3.9.9 | MIT | Development only: code formatter |
 | `rolldown` | 1.2.12 | MIT | Required by dependency graph |
 | `source-map-js` | 1.2.1 | BSD-3-Clause | Required by dependency graph |
 | `three` | 0.186.1 | MIT | Required by dependency graph |
@@ -228,6 +240,8 @@ installed notice paths include:
   renderer for `scripts/brand/build.mjs`; its native `@resvg/resvg-js-<platform>`
   subpackages carry the same license).
 - `node_modules/playwright-core/LICENSE` and `NOTICE` (Apache-2.0).
+- `node_modules/prettier/LICENSE` (MIT, the development-only code formatter,
+  including the notices of the dependencies it bundles).
 - `node_modules/source-map-js/LICENSE` (BSD-3-Clause).
 - `node_modules/picocolors/LICENSE` (ISC).
 - Other installed MIT packages' `LICENSE` or `LICENSE.md` files.

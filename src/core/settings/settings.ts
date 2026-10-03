@@ -7,13 +7,13 @@
  * A game adds its own settings by augmenting `SettingValues` and appending definitions to the list it hands to
  * `createSettings` (the app settings service takes `coreSettings` plus the game's rows).
  */
-import type { EventBus } from '../events';
-import type { SaveSection, SectionHandle } from '../save/section';
+import type {EventBus} from '../events';
+import type {SaveSection, SectionHandle} from '../save/section';
 
 declare module '../events' {
   interface EngineEvents {
     /** Area `settings`, owner core.settings: one per effective value change. */
-    'settings.changed': { id: SettingId; value: unknown };
+    'settings.changed': {id: SettingId; value: unknown};
   }
 }
 
@@ -23,13 +23,22 @@ export type I18nKey = string;
 
 /** Typed values, augmented per module (like EngineEvents). */
 export interface SettingValues {
-  'sound.muted': boolean; 'sound.music': number; 'sound.effects': number; 'sound.voice': number; 'sound.captions': boolean;
-  'comfort.calm': boolean; 'comfort.large-type': boolean;
+  'sound.muted': boolean;
+  'sound.music': number;
+  'sound.effects': number;
+  'sound.voice': number;
+  'sound.captions': boolean;
+  'comfort.calm': boolean;
+  'comfort.large-type': boolean;
 }
 export type SettingId = keyof SettingValues;
 
 interface Base<K extends SettingId> {
-  id: K; section: SettingSection; label: I18nKey; help?: I18nKey; order?: number;
+  id: K;
+  section: SettingSection;
+  label: I18nKey;
+  help?: I18nKey;
+  order?: number;
   scope: 'device' | 'player';
   /** A function when the default comes from the platform (calm ← prefers-reduced-motion). */
   default: SettingValues[K] | ((env: SettingEnv) => SettingValues[K]);
@@ -45,14 +54,17 @@ interface Base<K extends SettingId> {
   keepDefault?: boolean;
 }
 export type SettingDef<K extends SettingId = SettingId> =
-  | (Base<K> & { type: 'bool' })
-  | (Base<K> & { type: 'range'; range: { min: number; max: number; step: number } })
-  | (Base<K> & { type: 'choice'; choices: readonly SettingValues[K][] });
-export interface SettingEnv { prefersReducedMotion: boolean; coarsePointer: boolean }
+  | (Base<K> & {type: 'bool'})
+  | (Base<K> & {type: 'range'; range: {min: number; max: number; step: number}})
+  | (Base<K> & {type: 'choice'; choices: readonly SettingValues[K][]});
+export interface SettingEnv {
+  prefersReducedMotion: boolean;
+  coarsePointer: boolean;
+}
 
 export interface Settings {
   get<K extends SettingId>(id: K): SettingValues[K];
-  set<K extends SettingId>(id: K, value: SettingValues[K]): void;       // validates against the def; emits 'settings.changed'
+  set<K extends SettingId>(id: K, value: SettingValues[K]): void; // validates against the def; emits 'settings.changed'
   reset(section?: SettingSection): void;
   subscribe<K extends SettingId>(id: K, fn: (v: SettingValues[K]) => void, signal?: AbortSignal): () => void;
   defs(section?: SettingSection): readonly SettingDef[];
@@ -60,13 +72,63 @@ export interface Settings {
 
 /** The engine's own settings, as data. A game appends its rows. */
 export const coreSettings: SettingDef[] = [
-  { id: 'sound.muted', section: 'sound', type: 'bool', label: 'settings.sound.muted', scope: 'device', default: false },
-  { id: 'sound.music', section: 'sound', type: 'range', range: { min: 0, max: 1, step: 0.01 }, label: 'settings.sound.music', scope: 'device', default: 0.24 },
-  { id: 'sound.effects', section: 'sound', type: 'range', range: { min: 0, max: 1, step: 0.01 }, label: 'settings.sound.effects', scope: 'device', default: 0.36 },
-  { id: 'sound.voice', section: 'sound', type: 'range', range: { min: 0, max: 1, step: 0.01 }, label: 'settings.sound.voice', scope: 'device', default: 0.8 },
-  { id: 'sound.captions', section: 'sound', type: 'bool', label: 'settings.sound.captions', scope: 'device', default: true },
-  { id: 'comfort.calm', section: 'comfort', type: 'bool', label: 'settings.comfort.calm', help: 'settings.comfort.calm.help', order: 2, scope: 'device', default: env => env.prefersReducedMotion, bodyClass: 'still-mode' },
-  { id: 'comfort.large-type', section: 'comfort', type: 'bool', label: 'settings.comfort.large-type', order: 1, scope: 'device', default: false, bodyClass: 'large-type' },
+  {id: 'sound.muted', section: 'sound', type: 'bool', label: 'settings.sound.muted', scope: 'device', default: false},
+  {
+    id: 'sound.music',
+    section: 'sound',
+    type: 'range',
+    range: {min: 0, max: 1, step: 0.01},
+    label: 'settings.sound.music',
+    scope: 'device',
+    default: 0.24,
+  },
+  {
+    id: 'sound.effects',
+    section: 'sound',
+    type: 'range',
+    range: {min: 0, max: 1, step: 0.01},
+    label: 'settings.sound.effects',
+    scope: 'device',
+    default: 0.36,
+  },
+  {
+    id: 'sound.voice',
+    section: 'sound',
+    type: 'range',
+    range: {min: 0, max: 1, step: 0.01},
+    label: 'settings.sound.voice',
+    scope: 'device',
+    default: 0.8,
+  },
+  {
+    id: 'sound.captions',
+    section: 'sound',
+    type: 'bool',
+    label: 'settings.sound.captions',
+    scope: 'device',
+    default: true,
+  },
+  {
+    id: 'comfort.calm',
+    section: 'comfort',
+    type: 'bool',
+    label: 'settings.comfort.calm',
+    help: 'settings.comfort.calm.help',
+    order: 2,
+    scope: 'device',
+    default: env => env.prefersReducedMotion,
+    bodyClass: 'still-mode',
+  },
+  {
+    id: 'comfort.large-type',
+    section: 'comfort',
+    type: 'bool',
+    label: 'settings.comfort.large-type',
+    order: 1,
+    scope: 'device',
+    default: false,
+    bodyClass: 'large-type',
+  },
 ];
 
 /** What is stored: only values that differ from their default. */
@@ -80,18 +142,28 @@ const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
  * through `settingsValuesSectionWith(binding)`.
  */
 export const settingsValuesSection: SaveSection<StoredSettings> = {
-  id: 'settings.values', scope: 'device', version: 1,
+  id: 'settings.values',
+  scope: 'device',
+  version: 1,
   initial: () => ({}),
   parse: raw => {
     if (!isObject(raw)) throw Error('Invalid settings');
     const out: StoredSettings = {};
-    for (const [k, v] of Object.entries(raw)) if (/^[a-z][a-z0-9.-]{0,63}$/.test(k) && ['boolean', 'number', 'string'].includes(typeof v) && !(typeof v === 'number' && !Number.isFinite(v))) out[k] = v as boolean | number | string;
+    for (const [k, v] of Object.entries(raw))
+      if (
+        /^[a-z][a-z0-9.-]{0,63}$/.test(k) &&
+        ['boolean', 'number', 'string'].includes(typeof v) &&
+        !(typeof v === 'number' && !Number.isFinite(v))
+      )
+        out[k] = v as boolean | number | string;
     return out;
   },
-  merge: (a, b) => ({ ...a, ...b }),
+  merge: (a, b) => ({...a, ...b}),
 };
 /** The same section with a game's legacy import (identity matters to the store: build it once, at boot). */
-export const settingsValuesSectionWith = (legacy: NonNullable<SaveSection<StoredSettings>['legacy']>): SaveSection<StoredSettings> => ({ ...settingsValuesSection, legacy });
+export const settingsValuesSectionWith = (
+  legacy: NonNullable<SaveSection<StoredSettings>['legacy']>,
+): SaveSection<StoredSettings> => ({...settingsValuesSection, legacy});
 
 /** The slice of the 'settings.values' save handle that settings use: `store.section(settingsValuesSection)` fits. */
 export type SettingsStore = Pick<SectionHandle<StoredSettings>, 'get' | 'update' | 'subscribe'>;
@@ -99,7 +171,7 @@ export type SettingsStore = Pick<SectionHandle<StoredSettings>, 'get' | 'update'
 export type SettingsEvents = Pick<EventBus, 'emit'>;
 export interface SettingsOptions {
   /** Projects `bodyClass` settings onto <body>. The settings service is the ONE writer of `still-mode` and `large-type`. */
-  dom?: { toggleClass(c: string, on: boolean): void };
+  dom?: {toggleClass(c: string, on: boolean): void};
   events?: SettingsEvents;
   /**
    * Called once with a re-check: the owner of `env` calls it after an environment value changed (the OS reduced-motion
@@ -110,7 +182,8 @@ export interface SettingsOptions {
 
 /** Problems in a set of definitions (the registry's validation): unique ids, legal ranges and choices, valid defaults. */
 export function settingProblems(defs: readonly SettingDef[], env: SettingEnv): string[] {
-  const out: string[] = [], seen = new Set<string>();
+  const out: string[] = [],
+    seen = new Set<string>();
   for (const d of defs) {
     if (seen.has(d.id)) out.push(`${d.id}: duplicate id`);
     seen.add(d.id);
@@ -122,28 +195,49 @@ export function settingProblems(defs: readonly SettingDef[], env: SettingEnv): s
   return out;
 }
 function validSetting(d: SettingDef, v: unknown): boolean {
-  return d.type === 'bool' ? typeof v === 'boolean'
-    : d.type === 'range' ? typeof v === 'number' && Number.isFinite(v) && v >= d.range.min && v <= d.range.max
+  return d.type === 'bool'
+    ? typeof v === 'boolean'
+    : d.type === 'range'
+      ? typeof v === 'number' && Number.isFinite(v) && v >= d.range.min && v <= d.range.max
       : (d.choices as readonly unknown[]).includes(v);
 }
-const defaultOf = (d: SettingDef, env: SettingEnv): unknown => (typeof d.default === 'function' ? (d.default as (e: SettingEnv) => unknown)(env) : d.default);
+const defaultOf = (d: SettingDef, env: SettingEnv): unknown =>
+  typeof d.default === 'function' ? (d.default as (e: SettingEnv) => unknown)(env) : d.default;
 
-export function createSettings(defs: readonly SettingDef[], store: SettingsStore, env: SettingEnv, opts: SettingsOptions = {}): Settings {
+export function createSettings(
+  defs: readonly SettingDef[],
+  store: SettingsStore,
+  env: SettingEnv,
+  opts: SettingsOptions = {},
+): Settings {
   const dom = opts.dom;
   const byId = new Map(defs.map(d => [d.id, d] as [SettingId, SettingDef]));
   const listeners = new Map<SettingId, Set<(v: never) => void>>();
   const valid = validSetting;
   const fallback = (d: SettingDef) => defaultOf(d, env);
-  const read = (id: SettingId): unknown => { const d = byId.get(id); if (!d) throw Error('Unknown setting ' + id); const v = store.get()[id]; return valid(d, v) ? v : fallback(d); };
+  const read = (id: SettingId): unknown => {
+    const d = byId.get(id);
+    if (!d) throw Error('Unknown setting ' + id);
+    const v = store.get()[id];
+    return valid(d, v) ? v : fallback(d);
+  };
   const last = new Map<SettingId, unknown>(defs.map(d => [d.id, read(d.id)]));
-  const project = () => { for (const d of defs) if (d.bodyClass) dom?.toggleClass(d.bodyClass, read(d.id) === true); };
+  const project = () => {
+    for (const d of defs) if (d.bodyClass) dom?.toggleClass(d.bodyClass, read(d.id) === true);
+  };
   project();
   // Bounded by registered setting IDs; versions invalidate only same-setting nested deliveries.
   const versions = new Map<SettingId, number>();
   let version = 0;
   const check = () => {
     const errors: unknown[] = [];
-    const attempt = (fn: () => void) => { try { fn(); } catch (error) { errors.push(error); } };
+    const attempt = (fn: () => void) => {
+      try {
+        fn();
+      } catch (error) {
+        errors.push(error);
+      }
+    };
     for (const d of defs) {
       const v = read(d.id);
       if (v === last.get(d.id)) continue;
@@ -151,37 +245,60 @@ export function createSettings(defs: readonly SettingDef[], store: SettingsStore
       const current = ++version;
       versions.set(d.id, current);
       const subscribers = [...(listeners.get(d.id) ?? [])];
-      attempt(() => { opts.events?.emit('settings.changed', { id: d.id, value: v }); });
+      attempt(() => {
+        opts.events?.emit('settings.changed', {id: d.id, value: v});
+      });
       for (const fn of subscribers) {
         // A nested change delivered the replacement value; do not follow it with stale outer data.
         if (versions.get(d.id) !== current) break;
-        if (listeners.get(d.id)?.has(fn)) attempt(() => { (fn as (x: unknown) => void)(v); });
+        if (listeners.get(d.id)?.has(fn))
+          attempt(() => {
+            (fn as (x: unknown) => void)(v);
+          });
       }
     }
     // Read again after callbacks: preferences may have changed reentrantly.
-    for (const d of defs) if (d.bodyClass) attempt(() => { dom?.toggleClass(d.bodyClass!, read(d.id) === true); });
+    for (const d of defs)
+      if (d.bodyClass)
+        attempt(() => {
+          dom?.toggleClass(d.bodyClass!, read(d.id) === true);
+        });
     if (errors.length === 1) throw errors[0];
     if (errors.length) throw new AggregateError(errors, 'Settings observers failed');
   };
-  store.subscribe(check);   // one path for local sets, other tabs and imports
+  store.subscribe(check); // one path for local sets, other tabs and imports
   opts.watchEnv?.(check);
   return {
     get: <K extends SettingId>(id: K) => read(id) as SettingValues[K],
     set(id, value) {
-      const d = byId.get(id); if (!d) throw Error('Unknown setting ' + id);
+      const d = byId.get(id);
+      if (!d) throw Error('Unknown setting ' + id);
       if (!valid(d, value)) throw Error(`Invalid value for ${id}`);
-      const drop = value === fallback(d) && !d.keepDefault, held = store.get()[id];   // sparse: defaults are not stored
-      if (drop ? held === undefined : held === value) return;                            // unchanged: nothing to write
-      store.update(s => { if (drop) delete s[id]; else s[id] = value; });
+      const drop = value === fallback(d) && !d.keepDefault,
+        held = store.get()[id]; // sparse: defaults are not stored
+      if (drop ? held === undefined : held === value) return; // unchanged: nothing to write
+      store.update(s => {
+        if (drop) delete s[id];
+        else s[id] = value;
+      });
     },
-    reset(section) { store.update(s => { for (const d of defs) if (!section || d.section === section) delete s[d.id]; }); },
+    reset(section) {
+      store.update(s => {
+        for (const d of defs) if (!section || d.section === section) delete s[d.id];
+      });
+    },
     subscribe(id, fn, signal) {
-      let set = listeners.get(id); if (!set) listeners.set(id, set = new Set());
-      set.add(fn as (v: never) => void); const off = () => { set!.delete(fn as (v: never) => void); };
-      if (signal?.aborted) off(); else signal?.addEventListener('abort', off, { once: true });
+      let set = listeners.get(id);
+      if (!set) listeners.set(id, (set = new Set()));
+      set.add(fn as (v: never) => void);
+      const off = () => {
+        set!.delete(fn as (v: never) => void);
+      };
+      if (signal?.aborted) off();
+      else signal?.addEventListener('abort', off, {once: true});
       return off;
     },
-    defs: section => defs.filter(d => !section || d.section === section).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    defs: section =>
+      defs.filter(d => !section || d.section === section).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
   };
 }
-

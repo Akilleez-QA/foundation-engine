@@ -26,16 +26,40 @@ import {ROOT} from './lib.mjs';
 import {launch} from '../perf/bench-browser.mjs';
 import {diagnosticReport} from './diagnostic-report.mjs';
 
-const args = process.argv.slice(2), only = [];
+const args = process.argv.slice(2),
+  only = [];
 let out = null;
-for (let i = 0; i < args.length; i++) { if (args[i] === '--template') only.push(args[++i]); else out = args[i]; }
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--template') only.push(args[++i]);
+  else out = args[i];
+}
 out = resolve(out ?? join(tmpdir(), 'foundation-subpath-browser'));
 mkdirSync(out, {recursive: true});
-const templates = readdirSync(join(ROOT, 'templates')).filter(n => existsSync(join(ROOT, 'templates', n, 'game', 'game.ts')) && (!only.length || only.includes(n))).sort();
+const templates = readdirSync(join(ROOT, 'templates'))
+  .filter(n => existsSync(join(ROOT, 'templates', n, 'game', 'game.ts')) && (!only.length || only.includes(n)))
+  .sort();
 if (only.some(n => !templates.includes(n))) throw Error(`subpath-check: unknown template in ${only.join(', ')}`);
 
-const TYPES = {'.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.glb': 'model/gltf-binary', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.txt': 'text/plain', '.wasm': 'application/wasm'};
-const walk = dir => readdirSync(dir, {withFileTypes: true}).flatMap(e => e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]);
+const TYPES = {
+  '.html': 'text/html',
+  '.js': 'text/javascript',
+  '.mjs': 'text/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.glb': 'model/gltf-binary',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.mp3': 'audio/mpeg',
+  '.txt': 'text/plain',
+  '.wasm': 'application/wasm',
+};
+const walk = dir =>
+  readdirSync(dir, {withFileTypes: true}).flatMap(e =>
+    e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)],
+  );
 
 /** Every `defineAsset({... url: '...'})` path a template's game folder declares. */
 export function declaredAssets(dir) {
@@ -43,7 +67,8 @@ export function declaredAssets(dir) {
   for (const file of walk(dir).filter(f => /\.(?:ts|mts)$/.test(f) && !/\.test\.ts$/.test(f))) {
     const text = readFileSync(file, 'utf8');
     for (const m of text.matchAll(/defineAsset\(\s*\{([^}]*)\}/g)) {
-      const id = m[1].match(/\bid:\s*'([^']+)'/)?.[1], url = m[1].match(/\burl:\s*'([^']+)'/)?.[1];
+      const id = m[1].match(/\bid:\s*'([^']+)'/)?.[1],
+        url = m[1].match(/\burl:\s*'([^']+)'/)?.[1];
       if (id && url) found.set(id, url.replace(/^\/+/, ''));
     }
   }
@@ -54,30 +79,72 @@ export function declaredAssets(dir) {
 function host(dir, prefix) {
   const server = createServer((req, res) => {
     const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-    if (!path.startsWith(prefix)) { res.statusCode = 404; res.end('outside the sub-path'); return; }
-    const rel = path.slice(prefix.length) || 'index.html', file = normalize(join(dir, rel));
-    if (!file.startsWith(dir + sep) || !existsSync(file) || !statSync(file).isFile()) { res.statusCode = 404; res.end('not found'); return; }
+    if (!path.startsWith(prefix)) {
+      res.statusCode = 404;
+      res.end('outside the sub-path');
+      return;
+    }
+    const rel = path.slice(prefix.length) || 'index.html',
+      file = normalize(join(dir, rel));
+    if (!file.startsWith(dir + sep) || !existsSync(file) || !statSync(file).isFile()) {
+      res.statusCode = 404;
+      res.end('not found');
+      return;
+    }
     res.setHeader('Content-Type', TYPES[extname(file)] ?? 'application/octet-stream');
     res.end(readFileSync(file));
   });
-  return new Promise(done => server.listen(0, '127.0.0.1', () => done({origin: `http://127.0.0.1:${server.address().port}`, close: () => new Promise(r => { server.close(() => r()); server.closeAllConnections(); })})));
+  return new Promise(done =>
+    server.listen(0, '127.0.0.1', () =>
+      done({
+        origin: `http://127.0.0.1:${server.address().port}`,
+        close: () =>
+          new Promise(r => {
+            server.close(() => r());
+            server.closeAllConnections();
+          }),
+      }),
+    ),
+  );
 }
 
 function build(template, base, outDir) {
   const env = {...process.env, GAME_DIR: `templates/${template}/game`};
-  for (const argv of [['scripts/generate.mjs'], ['node_modules/vite/bin/vite.js', 'build', '--base', base, '--outDir', outDir, '--emptyOutDir', '--logLevel', 'error']]) {
+  for (const argv of [
+    ['scripts/generate.mjs'],
+    [
+      'node_modules/vite/bin/vite.js',
+      'build',
+      '--base',
+      base,
+      '--outDir',
+      outDir,
+      '--emptyOutDir',
+      '--logLevel',
+      'error',
+    ],
+  ]) {
     const r = spawnSync(process.execPath, argv, {cwd: ROOT, env, encoding: 'utf8'});
     if (r.status !== 0) throw Error(`${template}: ${argv.join(' ')} failed\n${r.stdout}\n${r.stderr}`);
   }
 }
 
-const report = {passed: false, templates: [], limitations: ['Desktop Chromium emulation with software GL only; no physical device.', 'Static hosting is a local sub-path server; no real GitHub Pages, itch.io or CDN upload.', 'Only the first scene of each template is opened; declared assets it does not load are fetched by the page.']};
+const report = {
+  passed: false,
+  templates: [],
+  limitations: [
+    'Desktop Chromium emulation with software GL only; no physical device.',
+    'Static hosting is a local sub-path server; no real GitHub Pages, itch.io or CDN upload.',
+    'Only the first scene of each template is opened; declared assets it does not load are fetched by the page.',
+  ],
+};
 const evidence = diagnosticReport(report, join(out, 'report.json'));
 let browser;
 try {
   browser = await launch({width: 1280, height: 800, strictClose: true});
   const page = browser.page;
-  page.setDefaultTimeout(60000); page.setDefaultNavigationTimeout(60000);
+  page.setDefaultTimeout(60000);
+  page.setDefaultNavigationTimeout(60000);
   for (const template of templates) {
     const game = join(ROOT, 'templates', template, 'game');
     const scene = Object.keys(JSON.parse(readFileSync(join(game, 'budgets.json'), 'utf8')).scenes ?? {})[0];
@@ -86,28 +153,60 @@ try {
     const prefix = `/sub/${template}/`;
     for (const base of assets.length ? ['./', prefix] : ['./']) {
       const dir = mkdtempSync(join(tmpdir(), 'engine-subpath-'));
-      const row = {template, base, scene, assets: assets.map(a => a.path), loaded: [], pageFetched: [], requests: 0, errors: []};
+      const row = {
+        template,
+        base,
+        scene,
+        assets: assets.map(a => a.path),
+        loaded: [],
+        pageFetched: [],
+        requests: 0,
+        errors: [],
+      };
       report.templates.push(row);
       let served;
       try {
         build(template, base, dir);
         for (const a of assets) assert.ok(existsSync(join(dir, a.path)), `${template}: ${a.path} is not in the build`);
         served = await host(dir, prefix);
-        const responses = [], requests = [];
-        const onRequest = r => requests.push(r.url()), onResponse = r => responses.push({url: r.url(), status: r.status()});
-        const onError = e => row.errors.push(String(e?.message ?? e)), onConsole = m => { if (m.type() === 'error') row.errors.push(m.text()); };
-        page.on('request', onRequest); page.on('response', onResponse); page.on('pageerror', onError); page.on('console', onConsole);
+        const responses = [],
+          requests = [];
+        const onRequest = r => requests.push(r.url()),
+          onResponse = r => responses.push({url: r.url(), status: r.status()});
+        const onError = e => row.errors.push(String(e?.message ?? e)),
+          onConsole = m => {
+            if (m.type() === 'error') row.errors.push(m.text());
+          };
+        page.on('request', onRequest);
+        page.on('response', onResponse);
+        page.on('pageerror', onError);
+        page.on('console', onConsole);
         try {
           await page.goto(`${served.origin}${prefix}index.html?flags=dev.silent#scene/${scene}`);
           await page.waitForSelector(`#app[data-scene="scene.${scene}"][data-scene-state="active"]`, {timeout: 60000});
           await page.waitForLoadState('networkidle', {timeout: 30000});
           const missing = assets.filter(a => !responses.some(r => r.url === `${served.origin}${prefix}${a.path}`));
           // Wait briefly for in-flight engine loads the idle heuristic missed.
-          for (let i = 0; i < 20 && missing.some(a => !responses.some(r => r.url === `${served.origin}${prefix}${a.path}`)); i++) await new Promise(r => setTimeout(r, 250));
+          for (
+            let i = 0;
+            i < 20 && missing.some(a => !responses.some(r => r.url === `${served.origin}${prefix}${a.path}`));
+            i++
+          )
+            await new Promise(r => setTimeout(r, 250));
           for (const a of assets) {
             const hit = responses.find(r => r.url === `${served.origin}${prefix}${a.path}`);
-            if (hit) { assert.ok(hit.status >= 200 && hit.status < 300, `${template} (${base}): ${a.path} answered ${hit.status}`); row.loaded.push(a.path); continue; }
-            const status = await page.evaluate(path => fetch(new URL(path, document.baseURI)).then(r => r.status), a.path);
+            if (hit) {
+              assert.ok(
+                hit.status >= 200 && hit.status < 300,
+                `${template} (${base}): ${a.path} answered ${hit.status}`,
+              );
+              row.loaded.push(a.path);
+              continue;
+            }
+            const status = await page.evaluate(
+              path => fetch(new URL(path, document.baseURI)).then(r => r.status),
+              a.path,
+            );
             assert.equal(status, 200, `${template} (${base}): ${a.path} is not served from the sub-path`);
             row.pageFetched.push(a.path);
           }
@@ -118,16 +217,29 @@ try {
           assert.deepEqual(failed, [], `${template} (${base}): failed responses`);
           assert.deepEqual(row.errors, [], `${template} (${base}): page errors`);
           const shot = join(out, `${template}-${base === './' ? 'relative' : 'absolute'}.png`);
-          await page.screenshot({path: shot}); row.screenshot = shot;
+          await page.screenshot({path: shot});
+          row.screenshot = shot;
           row.passed = true;
-          console.log(`subpath ${template} (base ${base}): scene.${scene} active; ${row.loaded.length} asset(s) loaded by the engine, ${row.pageFetched.length} fetched by the page; ${requests.length} requests, none outside ${prefix}`);
-        } finally { page.off('request', onRequest); page.off('response', onResponse); page.off('pageerror', onError); page.off('console', onConsole); await page.goto('about:blank'); }
-      } finally { await served?.close(); rmSync(dir, {recursive: true, force: true}); }
+          console.log(
+            `subpath ${template} (base ${base}): scene.${scene} active; ${row.loaded.length} asset(s) loaded by the engine, ${row.pageFetched.length} fetched by the page; ${requests.length} requests, none outside ${prefix}`,
+          );
+        } finally {
+          page.off('request', onRequest);
+          page.off('response', onResponse);
+          page.off('pageerror', onError);
+          page.off('console', onConsole);
+          await page.goto('about:blank');
+        }
+      } finally {
+        await served?.close();
+        rmSync(dir, {recursive: true, force: true});
+      }
     }
   }
   report.passed = report.templates.every(r => r.passed);
-} catch (error) { evidence.fail(error); }
-finally {
+} catch (error) {
+  evidence.fail(error);
+} finally {
   await evidence.close(browser, 'browser close');
   // Leave the generated catalogues for the checkout's own game, as every other script expects.
   spawnSync(process.execPath, ['scripts/generate.mjs'], {cwd: ROOT, stdio: 'ignore'});

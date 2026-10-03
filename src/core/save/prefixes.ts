@@ -16,11 +16,15 @@ export interface SavePrefixes {
 
 /** The prefixes of one store namespace, plus any legacy prefixes the game still reads. */
 export function savePrefixes(namespace: string = DEFAULT_SAVE_NAMESPACE, legacy: readonly string[] = []): SavePrefixes {
-  if (!NAMESPACE.test(namespace)) throw Error(`save namespace '${namespace}' must be lower kebab-case, at most 32 characters`);
+  if (!NAMESPACE.test(namespace))
+    throw Error(`save namespace '${namespace}' must be lower kebab-case, at most 32 characters`);
   return Object.freeze({
-    envelope: namespace + '|', quarantine: namespace + '-q|', backup: namespace + '-bak|',
+    envelope: namespace + '|',
+    quarantine: namespace + '-q|',
+    backup: namespace + '-bak|',
     reset: Object.freeze([namespace + '|', namespace + '-', ...legacy]),
   });
 }
 
-export const isSaveKey = (key: string, prefixes: SavePrefixes = savePrefixes()) => prefixes.reset.some(prefix => key.startsWith(prefix));
+export const isSaveKey = (key: string, prefixes: SavePrefixes = savePrefixes()) =>
+  prefixes.reset.some(prefix => key.startsWith(prefix));

@@ -10,20 +10,26 @@
  * content, write it together with a new seed, and compare on load (`record.contentVersion !== current`) to choose
  * between keeping old-version content, starting fresh, or a migration of your own.
  */
-import { defineSaveSection, type SaveSectionDef } from '../../author';
+import {defineSaveSection, type SaveSectionDef} from '../../author';
 
-export interface GenerationSeedRecord { seed: number | null; contentVersion: number }
+export interface GenerationSeedRecord {
+  seed: number | null;
+  contentVersion: number;
+}
 
 const u32 = (n: unknown) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n <= 0xffffffff;
 
 export function parseGenerationSeed(raw: unknown): GenerationSeedRecord {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || Object.getPrototypeOf(raw) !== Object.prototype) throw Error('generation seed: not a plain object');
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || Object.getPrototypeOf(raw) !== Object.prototype)
+    throw Error('generation seed: not a plain object');
   const keys = Object.keys(raw).sort();
-  if (keys.length !== 2 || keys[0] !== 'contentVersion' || keys[1] !== 'seed') throw Error('generation seed: unexpected fields');
-  const { seed, contentVersion } = raw as { seed: unknown; contentVersion: unknown };
+  if (keys.length !== 2 || keys[0] !== 'contentVersion' || keys[1] !== 'seed')
+    throw Error('generation seed: unexpected fields');
+  const {seed, contentVersion} = raw as {seed: unknown; contentVersion: unknown};
   if (seed !== null && !u32(seed)) throw Error('generation seed: not an unsigned 32-bit integer');
-  if (!(typeof contentVersion === 'number' && Number.isSafeInteger(contentVersion) && contentVersion >= 0)) throw Error('generation seed: invalid content version');
-  return { seed: seed as number | null, contentVersion };
+  if (!(typeof contentVersion === 'number' && Number.isSafeInteger(contentVersion) && contentVersion >= 0))
+    throw Error('generation seed: invalid content version');
+  return {seed: seed as number | null, contentVersion};
 }
 
 export interface GenerationSeedSectionOptions {
@@ -34,8 +40,17 @@ export interface GenerationSeedSectionOptions {
 }
 
 /** `id` is `<owner>.<name>` and is never renamed. */
-export function defineGenerationSeedSection(id: string, options: GenerationSeedSectionOptions = {}): SaveSectionDef<GenerationSeedRecord> {
-  const { scope = 'player', contentVersion = 0 } = options;
-  if (!Number.isSafeInteger(contentVersion) || contentVersion < 0) throw Error('generation seed: invalid content version');
-  return defineSaveSection<GenerationSeedRecord>({ id, scope, initial: { seed: null, contentVersion }, parse: parseGenerationSeed });
+export function defineGenerationSeedSection(
+  id: string,
+  options: GenerationSeedSectionOptions = {},
+): SaveSectionDef<GenerationSeedRecord> {
+  const {scope = 'player', contentVersion = 0} = options;
+  if (!Number.isSafeInteger(contentVersion) || contentVersion < 0)
+    throw Error('generation seed: invalid content version');
+  return defineSaveSection<GenerationSeedRecord>({
+    id,
+    scope,
+    initial: {seed: null, contentVersion},
+    parse: parseGenerationSeed,
+  });
 }

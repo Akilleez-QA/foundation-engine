@@ -1,6 +1,6 @@
 /**
  * platform/render/pool-stage.ts: the renderer pool's `stage` role (ADR 0040; STD-REN-3,
- * STD-REN-4). 
+ * STD-REN-4).
  *
  * `stage` is everything drawn over a covered scene: minigames, panel 3D, inspector views, the
  * panorama and the galaxy survey. They share ONE WebGL context (per antialias setting), however many views are open:
@@ -30,13 +30,30 @@
  * stops and resumes drawing. `onLost`/`onRestored` hear it too. A lost context is never handed to a new lease.
  */
 import type * as T from 'three';
-import { glDelete } from './gl-interop';
+import {glDelete} from './gl-interop';
 
 type GL = WebGL2RenderingContext;
 // renderer-pool.ts imports this module, so the shapes it shares are restated here (structurally the same).
-type PoolRenderer = Pick<T.WebGLRenderer, 'domElement' | 'getContext' | 'dispose' | 'forceContextLoss' | 'resetState' | 'info'> & Partial<T.WebGLRenderer>;
-interface LeaseAudit { textures: number; geometries: number; programs: number; glObjects: number }
-interface Stats { created: number; contexts: number; leases: number; losses: number; recreations: number; recycles: number; lastRelease: LeaseAudit | null }
+type PoolRenderer = Pick<
+  T.WebGLRenderer,
+  'domElement' | 'getContext' | 'dispose' | 'forceContextLoss' | 'resetState' | 'info'
+> &
+  Partial<T.WebGLRenderer>;
+interface LeaseAudit {
+  textures: number;
+  geometries: number;
+  programs: number;
+  glObjects: number;
+}
+interface Stats {
+  created: number;
+  contexts: number;
+  leases: number;
+  losses: number;
+  recreations: number;
+  recycles: number;
+  lastRelease: LeaseAudit | null;
+}
 /** A stage lease (renderer-pool's `RenderSurface` with `role: 'stage'`). */
 export interface StageSurface {
   readonly renderer: T.WebGLRenderer;
@@ -56,7 +73,7 @@ export interface StageSurfaceRequest<P = object> {
   insert?: 'append' | 'prepend';
   /** Use this element as the view canvas (a caller that builds its canvas first); default: a new canvas. */
   canvas?: HTMLCanvasElement;
-  ctx?: { own<D extends { dispose(): void }>(d: D): D };
+  ctx?: {own<D extends {dispose(): void}>(d: D): D};
   maxPixelRatio?: number;
   /** MSAA on the shared context (default true). Views with and without it use different stage contexts. */
   antialias?: boolean;
@@ -67,12 +84,12 @@ export interface StageSurfaceRequest<P = object> {
 
 export interface StagePoolDeps<P> {
   stats: Stats;
-  valve: { textures: number; geometries: number };
+  valve: {textures: number; geometries: number};
   /** renderer-pool's GL object tracker (what a context created and has not deleted). */
-  track(gl: GL): { live: Map<object, string>; validation?: {clear():void} };
+  track(gl: GL): {live: Map<object, string>; validation?: {clear(): void}};
   doc(): Document | undefined;
   /** Make the shared context (a detached canvas). Throws when WebGL cannot start. */
-  createContext(antialias: boolean): { canvas: HTMLCanvasElement; gl: GL };
+  createContext(antialias: boolean): {canvas: HTMLCanvasElement; gl: GL};
   /** Make a lease's renderer on its view canvas and the shared context. */
   createRenderer(view: HTMLCanvasElement, gl: GL): PoolRenderer;
   pixelRatio(r: PoolRenderer, max: number | undefined): void;
@@ -84,7 +101,7 @@ export interface StagePool<P> {
   /** Retire every stage context with no lease. */
   settle(): void;
   /** Live stage contexts and leased views (tests and the probe). */
-  counts(): { contexts: number; views: number };
+  counts(): {contexts: number; views: number};
 }
 
 interface View {
@@ -99,7 +116,7 @@ interface StageSlot {
   key: boolean;
   canvas: HTMLCanvasElement;
   gl: GL;
-  tracker: { live: Map<object, string>; validation?: {clear():void} };
+  tracker: {live: Map<object, string>; validation?: {clear(): void}};
   views: Set<View>;
   /** The view whose renderer's state cache matches the context. */
   drawer: View | null;
@@ -110,7 +127,22 @@ interface StageSlot {
 }
 
 /** The three.js entry points that touch GL state; a view that calls one takes the context first. */
-const ENTRIES = ['render', 'clear', 'clearColor', 'clearDepth', 'clearStencil', 'setRenderTarget', 'compile', 'compileAsync', 'initTexture', 'initRenderTarget', 'readRenderTargetPixels', 'readRenderTargetPixelsAsync', 'copyFramebufferToTexture', 'copyTextureToTexture'] as const;
+const ENTRIES = [
+  'render',
+  'clear',
+  'clearColor',
+  'clearDepth',
+  'clearStencil',
+  'setRenderTarget',
+  'compile',
+  'compileAsync',
+  'initTexture',
+  'initRenderTarget',
+  'readRenderTargetPixels',
+  'readRenderTargetPixelsAsync',
+  'copyFramebufferToTexture',
+  'copyTextureToTexture',
+] as const;
 
 export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
   const slots = new Map<boolean, StageSlot>();
@@ -119,28 +151,63 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
     if (slots.get(slot.key) === slot) slots.delete(slot.key);
     slot.off.abort();
     if (lose && !slot.lost) (slot.gl.getExtension?.('WEBGL_lose_context') as WEBGL_lose_context | null)?.loseContext();
-    slot.tracker.live.clear();slot.tracker.validation?.clear();
+    slot.tracker.live.clear();
+    slot.tracker.validation?.clear();
     d.stats.contexts = Math.max(0, d.stats.contexts - 1);
   };
 
   const forward = (slot: StageSlot, type: 'webglcontextlost' | 'webglcontextrestored') => {
     for (const v of [...slot.views]) {
-      if (typeof Event === 'function') { try { v.canvas.dispatchEvent(new Event(type, { cancelable: true })); } catch { /* a detached test canvas */ } }
+      if (typeof Event === 'function') {
+        try {
+          v.canvas.dispatchEvent(new Event(type, {cancelable: true}));
+        } catch {
+          /* a detached test canvas */
+        }
+      }
       for (const f of [...(type === 'webglcontextlost' ? v.lost : v.restored)]) f();
     }
   };
 
   const newSlot = (key: boolean): StageSlot => {
-    const { canvas, gl } = d.createContext(key);
-    const slot: StageSlot = { key, canvas, gl, tracker: d.track(gl), views: new Set(), drawer: null, pending: null, lost: false, off: new AbortController() };
-    d.stats.created++; d.stats.contexts++;
+    const {canvas, gl} = d.createContext(key);
+    const slot: StageSlot = {
+      key,
+      canvas,
+      gl,
+      tracker: d.track(gl),
+      views: new Set(),
+      drawer: null,
+      pending: null,
+      lost: false,
+      off: new AbortController(),
+    };
+    d.stats.created++;
+    d.stats.contexts++;
     const signal = slot.off.signal;
-    canvas.addEventListener('webglcontextlost', e => {
-      e.preventDefault();
-      slot.lost = true;slot.tracker.live.clear();slot.tracker.validation?.clear(); slot.pending = null; slot.drawer = null; d.stats.losses++;
-      if (slot.views.size) forward(slot, 'webglcontextlost'); else retire(slot, false);
-    }, { signal });
-    canvas.addEventListener('webglcontextrestored', () => { slot.lost = false; forward(slot, 'webglcontextrestored'); }, { signal });
+    canvas.addEventListener(
+      'webglcontextlost',
+      e => {
+        e.preventDefault();
+        slot.lost = true;
+        slot.tracker.live.clear();
+        slot.tracker.validation?.clear();
+        slot.pending = null;
+        slot.drawer = null;
+        d.stats.losses++;
+        if (slot.views.size) forward(slot, 'webglcontextlost');
+        else retire(slot, false);
+      },
+      {signal},
+    );
+    canvas.addEventListener(
+      'webglcontextrestored',
+      () => {
+        slot.lost = false;
+        forward(slot, 'webglcontextrestored');
+      },
+      {signal},
+    );
     slots.set(key, slot);
     return slot;
   };
@@ -150,9 +217,10 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
     const v = slot.pending;
     slot.pending = null;
     if (!v || slot.lost) return;
-    const w = v.canvas.width, h = v.canvas.height;
+    const w = v.canvas.width,
+      h = v.canvas.height;
     if (!w || !h) return;
-    const g = v.g2d ??= (v.canvas.getContext?.('2d') as CanvasRenderingContext2D | null) ?? null;
+    const g = (v.g2d ??= (v.canvas.getContext?.('2d') as CanvasRenderingContext2D | null) ?? null);
     if (!g) return;
     g.globalCompositeOperation = 'copy';
     g.drawImage(slot.canvas, 0, slot.canvas.height - h, w, h, 0, 0, w, h);
@@ -173,7 +241,13 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
       slot.drawer = v;
       const x = v.r as T.WebGLRenderer;
       const target = x.getRenderTarget?.() ?? null;
-      if (!slot.lost) { try { x.resetState(); } catch { /* lost mid-call */ } }
+      if (!slot.lost) {
+        try {
+          x.resetState();
+        } catch {
+          /* lost mid-call */
+        }
+      }
       if (target) x.setRenderTarget?.(target);
     }
   };
@@ -192,7 +266,10 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
         if (name === 'render' && !(v.r as T.WebGLRenderer).getRenderTarget?.()) {
           const first = slot.pending !== v;
           slot.pending = v;
-          if (first) queueMicrotask(() => { if (slot.pending === v) flush(slot); });
+          if (first)
+            queueMicrotask(() => {
+              if (slot.pending === v) flush(slot);
+            });
         }
         return out;
       };
@@ -201,13 +278,30 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
 
   /** Everything the context held, freed when no view is left; the context kept unless the valve says otherwise. */
   const idle = (slot: StageSlot, audit: LeaseAudit) => {
-    slot.drawer = null; slot.pending = null;
-    for (const [obj, del] of [...slot.tracker.live]) { audit.glObjects++; try { glDelete(slot.gl, del, obj); } catch { /* lost */ } }
-    slot.tracker.live.clear();slot.tracker.validation?.clear();
-    if (slot.lost || slot.gl.isContextLost?.()) { retire(slot, false); return; }
-    if (audit.textures > d.valve.textures || audit.geometries > d.valve.geometries) { d.stats.recycles++; retire(slot, true); return; }
+    slot.drawer = null;
+    slot.pending = null;
+    for (const [obj, del] of [...slot.tracker.live]) {
+      audit.glObjects++;
+      try {
+        glDelete(slot.gl, del, obj);
+      } catch {
+        /* lost */
+      }
+    }
+    slot.tracker.live.clear();
+    slot.tracker.validation?.clear();
+    if (slot.lost || slot.gl.isContextLost?.()) {
+      retire(slot, false);
+      return;
+    }
+    if (audit.textures > d.valve.textures || audit.geometries > d.valve.geometries) {
+      d.stats.recycles++;
+      retire(slot, true);
+      return;
+    }
     // An idle stage keeps its context but not its (possibly large) drawing buffer.
-    slot.canvas.width = 1; slot.canvas.height = 1;
+    slot.canvas.width = 1;
+    slot.canvas.height = 1;
   };
 
   const lease = (req: StageSurfaceRequest<P>): StageSurface | null => {
@@ -215,7 +309,8 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
     let slot = slots.get(key) ?? null;
     if (slot && (slot.lost || slot.gl.isContextLost?.())) {
       // Never hand on a lost context. One with views still on it lives until they release.
-      if (!slot.views.size) retire(slot, false); else slots.delete(key);
+      if (!slot.views.size) retire(slot, false);
+      else slots.delete(key);
       d.stats.recreations++;
       slot = null;
     }
@@ -228,40 +323,65 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
     try {
       slot ??= newSlot(key);
       r = d.createRenderer(canvas, slot.gl);
-    } catch { return null; }
+    } catch {
+      return null;
+    }
     const s = slot;
     d.stats.leases++;
-    const v: View = { canvas, r, g2d: null, lost: new Set(), restored: new Set(), released: false };
+    const v: View = {canvas, r, g2d: null, lost: new Set(), restored: new Set(), released: false};
     s.views.add(v);
     // As three does for a renderer made with `alpha: false` (its contexts always have an alpha channel).
     if (!req.alpha) (r as T.WebGLRenderer).setClearColor?.(0x000000, 1);
     wrap(s, v);
     const dispose = r.dispose.bind(r);
     // `renderer.dispose()` (an owner's existing teardown) ends the lease; `forceContextLoss` must not end the context.
-    (r as { dispose(): void }).dispose = () => { if (!v.released) surface.release(); else dispose(); };
-    (r as { forceContextLoss(): void }).forceContextLoss = () => {};
+    (r as {dispose(): void}).dispose = () => {
+      if (!v.released) surface.release();
+      else dispose();
+    };
+    (r as {forceContextLoss(): void}).forceContextLoss = () => {};
     d.pixelRatio(r, req.maxPixelRatio);
     d.applyProfile(r, req.profile);
-    if (req.host) { if (req.insert === 'prepend') req.host.prepend(canvas); else req.host.append(canvas); }
+    if (req.host) {
+      if (req.insert === 'prepend') req.host.prepend(canvas);
+      else req.host.append(canvas);
+    }
     const surface: StageSurface = {
-      renderer: r as T.WebGLRenderer, canvas, role: 'stage', pooled: true,
-      onLost(fn) { v.lost.add(fn); return () => v.lost.delete(fn); },
-      onRestored(fn) { v.restored.add(fn); return () => v.restored.delete(fn); },
+      renderer: r as T.WebGLRenderer,
+      canvas,
+      role: 'stage',
+      pooled: true,
+      onLost(fn) {
+        v.lost.add(fn);
+        return () => v.lost.delete(fn);
+      },
+      onRestored(fn) {
+        v.restored.add(fn);
+        return () => v.restored.delete(fn);
+      },
       release() {
         if (v.released) return;
         v.released = true;
         if (s.pending === v) flush(s);
-        v.lost.clear(); v.restored.clear();
-        const m = r.info.memory as { textures: number; geometries: number };
-        const audit: LeaseAudit = { textures: m.textures, geometries: m.geometries, programs: (r.info as { programs?: unknown[] | null }).programs?.length ?? 0, glObjects: 0 };
+        v.lost.clear();
+        v.restored.clear();
+        const m = r.info.memory as {textures: number; geometries: number};
+        const audit: LeaseAudit = {
+          textures: m.textures,
+          geometries: m.geometries,
+          programs: (r.info as {programs?: unknown[] | null}).programs?.length ?? 0,
+          glObjects: 0,
+        };
         if (s.drawer === v) s.drawer = null;
         // The outermost dispose (a `livePixelRatio` wrapper unsubscribes there) reaches three's own dispose last.
-        (r as { dispose(): void }).dispose();
+        (r as {dispose(): void}).dispose();
         s.views.delete(v);
         d.stats.lastRelease = audit;
         if (!s.views.size) idle(s, audit);
       },
-      dispose() { surface.release(); },
+      dispose() {
+        surface.release();
+      },
     };
     req.ctx?.own(surface);
     return surface;
@@ -269,8 +389,13 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
 
   return {
     lease,
-    settle() { for (const s of [...slots.values()]) if (!s.views.size) retire(s, true); },
-    counts() { let views = 0; for (const s of slots.values()) views += s.views.size; return { contexts: slots.size, views }; },
+    settle() {
+      for (const s of [...slots.values()]) if (!s.views.size) retire(s, true);
+    },
+    counts() {
+      let views = 0;
+      for (const s of slots.values()) views += s.views.size;
+      return {contexts: slots.size, views};
+    },
   };
 }
-

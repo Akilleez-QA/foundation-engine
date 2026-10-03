@@ -27,7 +27,7 @@ cd ../foundation-engine-my-change
 npm ci
 ```
 
-Here **`origin` is the canonical upstream; `fork` is your personal repository**. This is intentional: history and budget checks compare against `origin/main`. If you already cloned your fork as `origin`, rename that remote with `git remote rename origin fork`, add the canonical URL with `git remote add origin https://github.com/Akilleez-QA/foundation-engine.git`, and fetch it before creating the task worktree. Keep each worktree's own dependencies; do not reuse another contributor's `node_modules`.
+Here **`origin` is the canonical upstream; `fork` is your personal repository**. This is intentional: history and budget checks compare against `origin/main`. If you already cloned your fork as `origin`, rename that remote with `git remote rename origin fork`, add the canonical URL with `git remote add origin https://github.com/Akilleez-QA/foundation-engine.git`, and fetch it before creating the task worktree. Keep each worktree's own dependencies; do not reuse another contributor's `node_modules`. A new dependency with an install script needs a reviewed `allowScripts` entry in `package.json` (`npm approve-scripts <pkg>` or `npm deny-scripts <pkg>` on npm 12 or newer); `scripts/install-scripts.test.mjs` fails until it has one.
 
 For a first contribution, a small reproduction, test, recipe correction or accessibility finding is useful. Choose the relevant existing contract and avoid unrelated cleanup. Making your own game instead? Follow [getting started](docs/guides/getting-started.md); game branches are not engine pull requests.
 
@@ -84,6 +84,8 @@ During development:
 ```sh
 npm run check
 ```
+
+Run `npm run format` (Prettier) before committing; CI checks it through `npm run format:check`, which `npm run lint` and `npm run check` include. Markdown is not formatted.
 
 `check` selects affected tests from working-tree changes against HEAD, including untracked files. A clean committed tree can select **zero tests**; the output reports that explicitly, and a pass then does not establish that a regression test ran. Use `npm run check -- --base origin/main` (or your fork's upstream base) to include committed changes since the merge base, together with staged, unstaged and untracked changes. This selection is a local heuristic, not complete dependency coverage. Use `npm run check -- --all` to run the canonical `npm test` suite during the check. Invalid revisions and unknown selection options fail instead of silently selecting no tests.
 

@@ -13,13 +13,13 @@ export interface InputHistoryOptions {
    * the cleaned history records: neither (`neutral`), the more recently pressed one (`last`), the earlier one
    * (`first`), or always `a` / always `b`. `last` and `first` resolve a same-frame tie to neutral.
    */
-  readonly opposites?: readonly Readonly<{ a: string; b: string; policy: OppositePolicy }>[];
+  readonly opposites?: readonly Readonly<{a: string; b: string; policy: OppositePolicy}>[];
 }
 
 export type RecordResult =
-  | Readonly<{ status: 'recorded'; frame: number; held: number; pressed: number; released: number }>
+  | Readonly<{status: 'recorded'; frame: number; held: number; pressed: number; released: number}>
   /** `stale`: frame at or before the latest recorded one. `gap`: a frame was skipped. `invalid`: bad frame or mask. */
-  | Readonly<{ status: 'stale' | 'gap' | 'invalid' }>;
+  | Readonly<{status: 'stale' | 'gap' | 'invalid'}>;
 
 /** One step of a sequence: conditions that must all hold on a single frame. Names are action ids. */
 export interface SequenceStep {
@@ -103,7 +103,7 @@ export interface InputHistory {
   /** Compile a sequence once; reuse the result for every query. */
   sequence(steps: readonly SequenceStep[]): InputSequence;
   /** The match with the latest end frame inside the window, or null. Work is at most steps × within. */
-  match(sequence: InputSequence, options: MatchOptions): Readonly<{ start: number; end: number }> | null;
+  match(sequence: InputSequence, options: MatchOptions): Readonly<{start: number; end: number}> | null;
   /** Detached plain data for a simulation's saved state. */
   save(): InputHistorySnapshot;
   /** Replace the whole history with a validated snapshot; throws RangeError and changes nothing when invalid. */

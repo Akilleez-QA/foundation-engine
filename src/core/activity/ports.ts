@@ -14,13 +14,13 @@
 export type Coverage = 'top' | 'scrim' | 'opaque' | 'hidden';
 
 /** What a ticker does under a scrim: stop (default), keep running at full rate, or throttle to `hz`. */
-export type WhenCovered = 'pause' | 'run' | { readonly hz: number };
+export type WhenCovered = 'pause' | 'run' | {readonly hz: number};
 
 export type FrameMode = 'continuous' | 'on-demand';
 
 /** `core/tiers.ts` owns it; re-exported for the activity host's callers. */
-import type { QualityPreset } from '../tiers';
-export type { QualityPreset };
+import type {QualityPreset} from '../tiers';
+export type {QualityPreset};
 
 export type LayerKind = 'scene' | 'panel' | 'sheet' | 'modal' | 'toast';
 export type LayerCover = 'none' | 'scrim' | 'opaque';
@@ -80,7 +80,7 @@ export interface VisibilityPort {
  * holder (STD-RUN-5): it advances the clock once per frame and tells it when the tab comes back.
  */
 export interface ClockDriverPort {
-  advance(realDt: number): { readonly to: number };
+  advance(realDt: number): {readonly to: number};
   resumeFromAway(reason: 'load' | 'visible'): void;
 }
 

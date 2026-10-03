@@ -17,7 +17,10 @@ export interface ComponentType<T extends object> {
   /** An initialiser for `spawn`/`add`: the defaults with `partial` over them. */
   (partial?: Partial<T>): ComponentInit<T>;
 }
-export interface ComponentInit<T extends object> { readonly type: ComponentType<T>; readonly value: T }
+export interface ComponentInit<T extends object> {
+  readonly type: ComponentType<T>;
+  readonly value: T;
+}
 export type Entity = number;
 
 const COMPONENT_ID = /^[a-z][a-z0-9]*(?:[-.][a-z0-9]+)*$/;
@@ -25,13 +28,18 @@ const COMPONENT_ID = /^[a-z][a-z0-9]*(?:[-.][a-z0-9]+)*$/;
 /** Define a component type. `initial` is copied for each entity (structured clone), so defaults are never shared. */
 export function component<T extends object>(id: string, initial: T): ComponentType<T> {
   if (!COMPONENT_ID.test(id)) throw Error(`component id '${id}' must be lowercase kebab-case`);
-  const make = (partial?: Partial<T>): ComponentInit<T> => ({ type: type as ComponentType<T>, value: { ...structuredClone(initial), ...partial } });
-  const type = Object.assign(make, { id, initial: () => structuredClone(initial) });
-  Object.defineProperty(type, 'name', { value: id });
+  const make = (partial?: Partial<T>): ComponentInit<T> => ({
+    type: type as ComponentType<T>,
+    value: {...structuredClone(initial), ...partial},
+  });
+  const type = Object.assign(make, {id, initial: () => structuredClone(initial)});
+  Object.defineProperty(type, 'name', {value: id});
   return type;
 }
 
-type Values<Q extends readonly ComponentType<object>[]> = { [K in keyof Q]: Q[K] extends ComponentType<infer T> ? T : never };
+type Values<Q extends readonly ComponentType<object>[]> = {
+  [K in keyof Q]: Q[K] extends ComponentType<infer T> ? T : never;
+};
 
 /** A query row is built untyped; each store holds exactly its component type's values, so the row matches `Q`. */
 function queryRow<Q extends readonly ComponentType<object>[]>(row: unknown[]): [Entity, ...Values<Q>] {
@@ -79,29 +87,44 @@ export class World {
     for (const store of this.stores.values()) store.delete(e);
     this.version++;
   }
-  exists(e: Entity): boolean { return this.alive.has(e); }
-  get count(): number { return this.alive.size; }
+  exists(e: Entity): boolean {
+    return this.alive.has(e);
+  }
+  get count(): number {
+    return this.alive.size;
+  }
 
   add<T extends object>(e: Entity, init: ComponentInit<T>): T {
     if (!this.alive.has(e)) throw Error(`entity ${e} does not exist`);
     let store = this.stores.get(init.type.id);
-    if (!store) this.stores.set(init.type.id, store = new Map());
+    if (!store) this.stores.set(init.type.id, (store = new Map()));
     store.set(e, init.value);
     this.version++;
     return init.value;
   }
-  remove(e: Entity, type: ComponentType<object>): void { if (this.stores.get(type.id)?.delete(e)) this.version++; }
-  get<T extends object>(e: Entity, type: ComponentType<T>): T | undefined { return this.stores.get(type.id)?.get(e) as T | undefined; }
-  has(e: Entity, type: ComponentType<object>): boolean { return !!this.stores.get(type.id)?.has(e); }
+  remove(e: Entity, type: ComponentType<object>): void {
+    if (this.stores.get(type.id)?.delete(e)) this.version++;
+  }
+  get<T extends object>(e: Entity, type: ComponentType<T>): T | undefined {
+    return this.stores.get(type.id)?.get(e) as T | undefined;
+  }
+  has(e: Entity, type: ComponentType<object>): boolean {
+    return !!this.stores.get(type.id)?.has(e);
+  }
   /** Mark a change made in place (a renderer that syncs on `version` then draws the next frame). */
-  touch(): void { this.version++; }
+  touch(): void {
+    this.version++;
+  }
 
   /** Entities with every listed component, in spawn order, with their live component values. */
   *query<Q extends readonly ComponentType<object>[]>(...types: Q): Generator<[Entity, ...Values<Q>]> {
-    if (!types.length) { for (const e of this.alive) yield queryRow<Q>([e]); return; }
+    if (!types.length) {
+      for (const e of this.alive) yield queryRow<Q>([e]);
+      return;
+    }
     const stores = types.map(t => this.stores.get(t.id));
     if (stores.some(s => !s)) return;
-    const [first, ...rest] = [...stores as Map<Entity, object>[]].sort((a, b) => a.size - b.size);
+    const [first, ...rest] = [...(stores as Map<Entity, object>[])].sort((a, b) => a.size - b.size);
     const order = [...first!.keys()].sort((a, b) => a - b); // types.length > 0, so `stores` (and `first`) exist
     for (const e of order) {
       if (!rest.every(s => s.has(e))) continue;
@@ -118,30 +141,54 @@ export class World {
   inspectMetadata(request: EntityMetadataRequest = {}): EntityMetadataPage {
     const {afterId = 0, limit = 32, maxChecks = 512, maxLabelLength = 120} = request;
     for (const n of [afterId, limit, maxChecks, maxLabelLength]) {
-      if (!Number.isSafeInteger(n) || n < 0) throw new RangeError('entity inspection: bounds must be nonnegative safe integers');
+      if (!Number.isSafeInteger(n) || n < 0)
+        throw new RangeError('entity inspection: bounds must be nonnegative safe integers');
     }
     if (maxLabelLength === 0) throw new RangeError('entity inspection: label length must be positive');
     const entities: EntityMetadataPage['entities'] = [];
     const highWater = this.next - 1;
-    let cursor = afterId, checks = 0;
+    let cursor = afterId,
+      checks = 0;
     while (cursor < highWater && entities.length < limit && checks < maxChecks) {
-      cursor++; checks++;
+      cursor++;
+      checks++;
       if (!this.alive.has(cursor)) continue;
       const components: EntityMetadataPage['entities'][number]['components'] = [];
       let componentStoresExamined = 0;
       for (const [id, store] of this.stores) {
         if (checks >= maxChecks) break;
-        checks++; componentStoresExamined++;
-        if (store.has(cursor)) components.push({label: id.slice(0, maxLabelLength), truncated: id.length > maxLabelLength});
+        checks++;
+        componentStoresExamined++;
+        if (store.has(cursor))
+          components.push({label: id.slice(0, maxLabelLength), truncated: id.length > maxLabelLength});
       }
-      entities.push({id: cursor, components, componentStoresExamined, componentsComplete: componentStoresExamined === this.stores.size});
+      entities.push({
+        id: cursor,
+        components,
+        componentStoresExamined,
+        componentsComplete: componentStoresExamined === this.stores.size,
+      });
     }
-    return {version: this.version, total: this.alive.size, checks, nextAfterId: cursor < highWater ? cursor : null, entities};
+    return {
+      version: this.version,
+      total: this.alive.size,
+      checks,
+      nextAfterId: cursor < highWater ? cursor : null,
+      entities,
+    };
   }
 
   /** Queue an event for this frame's later systems; `read` returns (and keeps) this frame's events of a type. */
-  emit(type: string, payload: unknown = null): void { let q = this.events.get(type); if (!q) this.events.set(type, q = []); q.push(payload); }
-  read<T = unknown>(type: string): readonly T[] { return (this.events.get(type) ?? []) as T[]; }
+  emit(type: string, payload: unknown = null): void {
+    let q = this.events.get(type);
+    if (!q) this.events.set(type, (q = []));
+    q.push(payload);
+  }
+  read<T = unknown>(type: string): readonly T[] {
+    return (this.events.get(type) ?? []) as T[];
+  }
   /** Called by the runner at the end of each frame. */
-  clearEvents(): void { this.events.clear(); }
+  clearEvents(): void {
+    this.events.clear();
+  }
 }

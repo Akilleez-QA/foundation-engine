@@ -9,20 +9,40 @@ import {ROOT} from './lib.mjs';
 import {launch} from '../perf/bench-browser.mjs';
 const out = resolve(process.argv[2] ?? 'playtest/touch-sources');
 mkdirSync(out, {recursive: true});
-const html = '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Touch sources diagnostic</title></head><body><header class="shell-header"><div class="header-left"></div><div class="header-right"></div></header><main id="app" class="app-root"></main><script type="module" src="/scripts/play/fixtures/touch-sources-entry.mjs"></script></body></html>';
-const server = await createServer({root: ROOT, logLevel: 'error', plugins: [{name: 'touch-sources-diagnostic', configureServer(s) {
-  s.middlewares.use((req, res, next) => {
-    if (req.url?.startsWith('/__touch-sources.html')) { res.setHeader('Content-Type', 'text/html'); res.end(html); }
-    else next();
-  });
-}}], server: {host: '127.0.0.1', port: 0}});
+const html =
+  '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Touch sources diagnostic</title></head><body><header class="shell-header"><div class="header-left"></div><div class="header-right"></div></header><main id="app" class="app-root"></main><script type="module" src="/scripts/play/fixtures/touch-sources-entry.mjs"></script></body></html>';
+const server = await createServer({
+  root: ROOT,
+  logLevel: 'error',
+  plugins: [
+    {
+      name: 'touch-sources-diagnostic',
+      configureServer(s) {
+        s.middlewares.use((req, res, next) => {
+          if (req.url?.startsWith('/__touch-sources.html')) {
+            res.setHeader('Content-Type', 'text/html');
+            res.end(html);
+          } else next();
+        });
+      },
+    },
+  ],
+  server: {host: '127.0.0.1', port: 0},
+});
 await server.listen();
-const report = {revision: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).trim(), passed: false, limitations: ['Chromium CDP touch emulation; not physical-device evidence'], errors: []};
+const report = {
+  revision: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).trim(),
+  passed: false,
+  limitations: ['Chromium CDP touch emulation; not physical-device evidence'],
+  errors: [],
+};
 const browser = await launch({width: 390, height: 844, mobile: true, hasTouch: true});
 const p = browser.page;
 await browser.cdp.send('Emulation.setTouchEmulationEnabled', {enabled: true, maxTouchPoints: 2});
 try {
-  await p.goto(`${server.resolvedUrls.local[0]}__touch-sources.html?touch-sources=1&flags=dev.silent&quality=reference#scene/sample`);
+  await p.goto(
+    `${server.resolvedUrls.local[0]}__touch-sources.html?touch-sources=1&flags=dev.silent&quality=reference#scene/sample`,
+  );
   await p.waitForFunction(() => window.touchCheck && window.hudCheck.state().world?.state.frames > 2);
   report.maxTouchPoints = await p.evaluate(() => navigator.maxTouchPoints);
   assert.equal(report.maxTouchPoints, 2);
@@ -39,7 +59,11 @@ try {
   await send('touchStart', [movement, details]);
   await p.waitForFunction(() => window.touchCheck.presses() === 1);
   assert.equal(await p.evaluate(() => window.touchCheck.presses()), 1);
-  assert.equal(await p.evaluate(() => window.touchCheck.held()), true, 'independent second contact does not release movement');
+  assert.equal(
+    await p.evaluate(() => window.touchCheck.held()),
+    true,
+    'independent second contact does not release movement',
+  );
   await send('touchEnd', [details]);
   assert.equal(await p.evaluate(() => window.touchCheck.held()), true, 'releasing action contact preserves movement');
   await p.evaluate(() => window.touchCheck.enableModal());
@@ -63,7 +87,15 @@ try {
   assert.ok(report.holdButton.width >= 48 && report.holdButton.height >= 48, 'touch button is at least 48 CSS px');
   const hold = await point(3, '.touch-button');
   const holdState = () => p.evaluate(() => window.touchCheck.holdState());
-  const frames = n => p.evaluate(n => new Promise(r => { const step = k => k ? requestAnimationFrame(() => step(k - 1)) : r(); step(n); }), n);
+  const frames = n =>
+    p.evaluate(
+      n =>
+        new Promise(r => {
+          const step = k => (k ? requestAnimationFrame(() => step(k - 1)) : r());
+          step(n);
+        }),
+      n,
+    );
   await send('touchStart', [hold]);
   await p.waitForFunction(() => window.touchCheck.holdState().ticks > 6);
   report.holdHeld = await holdState();
@@ -72,13 +104,21 @@ try {
   assert.equal(report.holdHeld.down, true);
   await send('touchMove', [{...hold, x: hold.x + 4}]);
   await frames(3);
-  assert.deepEqual([(await holdState()).presses, (await holdState()).held], [1, true], 'moving on the button keeps one held press');
+  assert.deepEqual(
+    [(await holdState()).presses, (await holdState()).held],
+    [1, true],
+    'moving on the button keeps one held press',
+  );
   await send('touchMove', [{...hold, x: hold.x - 200}]);
   await frames(2);
   assert.equal((await holdState()).held, false, 'sliding off releases');
   await send('touchMove', [hold]);
   await frames(2);
-  assert.deepEqual([(await holdState()).presses, (await holdState()).held], [1, false], 'sliding back does not re-press');
+  assert.deepEqual(
+    [(await holdState()).presses, (await holdState()).held],
+    [1, false],
+    'sliding back does not re-press',
+  );
   await send('touchEnd', []);
   await send('touchStart', [hold]);
   await p.waitForFunction(() => window.touchCheck.holdState().presses === 2);
@@ -86,7 +126,11 @@ try {
   await send('touchEnd', []);
   await frames(2);
   report.holdReleased = await holdState();
-  assert.deepEqual([report.holdReleased.presses, report.holdReleased.held, report.holdReleased.down], [2, false, false], 'lift releases');
+  assert.deepEqual(
+    [report.holdReleased.presses, report.holdReleased.held, report.holdReleased.down],
+    [2, false, false],
+    'lift releases',
+  );
   // Hold movement again so owner disposal below still releases a held contact.
   await send('touchStart', [movement]);
   assert.equal(await p.evaluate(() => window.touchCheck.held()), true);
@@ -103,7 +147,13 @@ try {
   report.passed = true;
 } catch (error) {
   console.error(browser.errors);
-  console.error(await p.evaluate(() => ({contacts: window.touchCheck?.contacts(), held: window.touchCheck?.held(), layers: window.hudCheck?.state().layers})));
+  console.error(
+    await p.evaluate(() => ({
+      contacts: window.touchCheck?.contacts(),
+      held: window.touchCheck?.held(),
+      layers: window.hudCheck?.state().layers,
+    })),
+  );
   await p.screenshot({path: resolve(out, 'failure.png')});
   throw error;
 } finally {
