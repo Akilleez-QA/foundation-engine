@@ -45,3 +45,12 @@ Browser:21 samples passed; workflow parser:6 tests passed. Syntax, final-documen
 ## Historical development evidence
 
 The earlier samples recorded on local candidate `1be7ba7` and its diagnostic branches are historical and are not the current public-main baseline. They remain in Git history. The first development run retained its initial context during subsequent sample groups, creating asymmetric background workload; review corrected this by closing every context and asserting one live context during each group and zero before the next. The corrected candidate run passed at 2026-10-03T17:41:45Z. Both sets of candidate timings are superseded here by the exact-head public-main-based run above. No claim that the candidate's additional runtime changes were needed for this diagnostic is made.
+
+## Review follow-up
+
+All 21 retained samples reported `unsupported` program readiness; they do not
+exercise the parallel-compilation extension path. A subsequent diagnostic change
+retains per-context browser errors and checks them through context retirement and
+final cleanup. The default evidence directory is now ignored so repeat runs do not
+mark an otherwise unchanged checkout dirty. The historical sample revision remains
+unchanged; the updated diagnostic requires a fresh browser run before publication.

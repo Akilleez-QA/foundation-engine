@@ -10,7 +10,7 @@ import {launch} from '../perf/bench-browser.mjs';
 import {diagnosticReport} from './diagnostic-report.mjs';
 const out=resolve(process.argv[2]??'playtest/first-use');mkdirSync(out,{recursive:true});
 const git=args=>execFileSync('git',args,{cwd:ROOT,encoding:'utf8'}).trim();
-const report={revision:git(['rev-parse','HEAD']),dirtyWorktree:!!git(['status','--porcelain']),game:gameDirLabel(),samples:[],resources:[],limitations:[
+const report={revision:git(['rev-parse','HEAD']),dirtyWorktree:!!git(['status','--porcelain']),game:gameDirLabel(),samples:[],resources:[],browserErrors:[],limitations:[
   'Advisory raw timings, no latency budget or statistical percentile claim. Three fresh contexts in one isolated Chromium process; browser/driver caches may remain warm.',
   'Vite development consumer, not a production bundle, download benchmark, hardware/device or thermal result. Same-page warm visits may still reconstruct renderer programs.',
   'MutationObserver timestamps observe batched DOM changes. Shell active follows the engine submitted-picture contract; it does not prove display presentation.',
@@ -28,7 +28,7 @@ try{
   const context=index===0?browser.context:(extraContext=await browser.browser.newContext({viewport:{width:1280,height:800},locale:'en-US',timezoneId:'UTC'}));
   assert.equal(browser.browser.contexts().length,1,'exactly one live context during each sample group');
   const page=index===0?browser.page:await context.newPage();currentPage=page;
-  const errors=[];page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+  const errors=[];report.browserErrors.push({context:index+1,errors});page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
   await page.addInitScript(()=>{
    performance.setResourceTimingBufferSize(1024);
    const marks=[],seen=new WeakMap();
@@ -89,8 +89,11 @@ try{
   // Retire the first context too: no earlier app may keep running during the next sample.
   await context.close();extraContext=undefined;currentPage=undefined;
   assert.equal(browser.browser.contexts().length,0,'previous app retired before the next context');
+  assert.deepEqual(errors,[],'no page errors through context retirement');
  }
  assert.equal(report.samples.length,21);report.passed=true;
 }catch(error){evidence.fail(error);try{await currentPage?.screenshot({path:resolve(out,'failure.png')});}catch(captureError){report.failureScreenshotError=String(captureError);}}
-finally{await evidence.close(extraContext,'extra context cleanup');await evidence.close(browser,'browser cleanup');await evidence.close(server,'server cleanup');evidence.finish();}
+finally{await evidence.close(extraContext,'extra context cleanup');await evidence.close(browser,'browser cleanup');await evidence.close(server,'server cleanup');
+ for(const {context,errors} of report.browserErrors){if(errors.length)evidence.fail(new Error(`context ${context} browser errors: ${errors.join('; ')}`));}
+ evidence.finish();}
 console.log(`First-use observations: PASS (advisory timings); ${out}`);
