@@ -48,3 +48,17 @@ The browser diagnostic now uses the existing `diagnosticReport` owner: a browser
 `node --test tools/blender-export/verify.test.mjs scripts/play/diagnostic-report.test.mjs` passes **9/9** (five asset tests and four existing cleanup-owner tests). The new decoded-position regression was separately run against the old non-precise expression and failed with the expected missing rejection, then passed with the corrected expression. This supersedes the original four-test-only count and the stronger original decoded-bound claim.
 
 The consumer browser command was rerun on corrected source `c3f2740`: PASS, no scenario or cleanup failures, model ready, exactly one HTTP-200 model response and rotation 0→π/2. Browser and server closed normally. This is the final source-level browser evidence; the subsequent receipt-only commit does not change the diagnostic.
+
+## Standalone public-main branch validation
+
+This example was isolated onto public `origin/main` at `2fb6e6918e1a5e647260854daa4c8f4b871e1b47`, independently confirmed against the remote head. Only the three asset commits were transplanted; the sole conflict was resolved by adding only the asset diagnostic's ignore entry. No broader candidate changes or new runtime dependencies were included.
+
+At standalone source head `93979e3a4f13ea17075b4eb3b35e514633fd8023`, own-checkout `npm ci --no-audit --no-fund`, the nine focused tests, the sample GLB validator, scoped consumer TypeScript check and all repository lints passed. The browser command above was then run on that head: PASS, `failures: []`, one successful model response, ready state and actual rotation readback 0→π/2. Its screenshot was inspected: blue block, gold top and base resting on the floor. Browser and server closed normally. This establishes consumer compatibility with this public-main base, superseding the earlier candidate-only runtime boundary; it is still not complete CI or physical-device acceptance.
+
+Validated source hashes (SHA-256):
+
+- Browser diagnostic: `1c028b849042410d9a16d017d53a9c38d337875b71c53b54ac0207cfd7fe2816`.
+- Consumer scene: `430c11fafc04446207095d6d70594496f490918da09b8fa749eb2e77f612df44`.
+- Model: `fcc71461117220b6ac0f5452d00beabb5b419ba1eeb3c09f5d0ea956d18823cb`.
+
+The following receipt-only commit does not change those sources. No remote write was performed during this validation.
