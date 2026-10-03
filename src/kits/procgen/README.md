@@ -179,6 +179,48 @@ The save store quarantines the bytes, and play continues from the initial value.
 permadeath policy are game decisions. Edited-world deltas are not stored here (see
 limitations).
 
+## Edited worlds: cell edits and the chunk store (GEN-02)
+
+Save sections cannot hold a large edited world (262,144 characters each, in Web
+Storage). The kit re-exports a bounded binary record store and adds a sparse edit
+layer. Recipe: [store large world records](../../../docs/recipes/store-large-world-records.md).
+
+- **`createCellEdits(baseline, {saved?, revision?, limits?})`** wraps a regenerated grid.
+  - `set` keeps only cells that differ from the baseline and returns `changed`,
+    `unchanged` or `full`. The default edit limit is 65,536; values are 0–65535.
+  - `revision` increments on each change and is used as the store revision; `dirty`
+    and `markSaved` track what has been written.
+  - `materialize()` returns the edited copy, and `encode()` returns canonical compact
+    bytes: a 24-byte header with the grid dimensions and the baseline's CRC-32, then a
+    minimal varint index delta and a u16 value per edit.
+  - `decodeCellEdits` validates magic, format, grid dimensions, baseline checksum,
+    count, ordering, overlong or oversized varints, range and trailing bytes. A
+    malformed list, or edits made against a different shape or different content,
+    throws and nothing is applied.
+- **`openChunkStore({name, schema, limits?, evictable?, factory?})`** is the owner,
+  implemented in `src/core/save/chunk-store.ts`. It also provides `clear()`, `destroy()`,
+  `deleteChunkDatabase` and `listChunkDatabases` for world resets, which the save
+  store's reset and export do not cover.
+  - Storage is durable IndexedDB, or a `session` memory store when IndexedDB is missing
+    or refuses to open.
+  - Each `write` call is atomic, and a revision is accepted only if strictly newer,
+    compared inside the transaction.
+  - The creator's schema is stored: older records are returned for migration, newer
+    ones are read-only.
+  - CRC-32 and envelope checks quarantine unreadable records. Their bytes are copied
+    aside before any overwrite, and writes are refused when the quarantine is full.
+  - Keys, record bytes, record count, total bytes, batch size, pending operations and
+    quarantine rows are bounded.
+  - Eviction is opt-in (`evictable`; least recently used in this session). Victims
+    are validated in the transaction: unreadable ones are quarantined, newer ones kept.
+  - Operations run one at a time. A throwing callback fails only its own operation
+    (`failed`). `close` resolves queued work as `closed` before it reaches storage.
+  - A newer build's database (VersionError) rejects with `newer-format`, a pending
+    deletion in this tab with `deleting`, and an open the browser queues past
+    `openTimeoutMs` with `blocked`. None of these falls back.
+  - Record and byte limits are counted per store instance, so other tabs' writes are
+    not seen until reopen.
+
 ## Evidence
 
 The focused tests are `src/core/rng.test.ts` (GEN-01 rows),
@@ -204,6 +246,30 @@ cover:
   - real SaveStore round trip with `contentVersion`, and quarantine of twelve corrupt or
     unversioned seed records.
 - **Browser:** `scripts/play/procgen-worker-check.mjs` checks real worker transport.
+- **GEN-02:** `src/core/save/chunk-store.test.ts` runs against an in-repo IndexedDB fake
+  (`src/core/save/fake-idb.ts`) and the memory port. It covers:
+  - the CRC-32 vector and round trip plus reopen;
+  - atomic multi-record rollback on quota;
+  - a cross-tab stale revision;
+  - six corruption kinds quarantined, including the full-quarantine refusal;
+  - schema migrate and read-only paths, limits, LRU eviction of marked records only,
+    the pending bound and close;
+  - fallback and version change.
+
+  The suite also covers the review regressions:
+  - a throwing `evictable`;
+  - victims quarantined or kept during eviction;
+  - close never reporting `closed` for committed work;
+  - concurrent tabs with a single winner;
+  - clear, destroy and listing;
+  - `newer-format` and newer-envelope refusal.
+
+  `cell-edits.test.ts` covers an edit → store → reopen → regenerate → apply round trip
+  over a cellular grid, canonical encoding, the edit bound, eleven malformed encodings,
+  a last-index edit at `GRID_MAX_CELLS`, five-byte varints and a refused cross-seed
+  load.
+  `scripts/play/chunk-store-check.mjs`, in `test:framework-browser`, runs the same
+  flows against real Chromium IndexedDB.
 
 ## Limitations
 
@@ -211,10 +277,20 @@ cover:
   the cancel deadline terminates it. In main-thread fallback it blocks the page. Work
   between yields is not time-limited, and allocation is not sandboxed. Determinism
   holds only if the generator avoids `Math.random`, time and mutable outside state.
-- Grids are dense `Uint16Array` values. This slice provides no chunk residency,
-  streaming, runtime edit deltas, meshing (greedy or surface nets) or edited-world
-  persistence. Save sections are capped at 256 k characters, so large edited worlds
-  need a separate bounded delta store (research note, slice 2).
+- Grids are dense `Uint16Array` values. There is no chunk residency, streaming or
+  meshing (greedy or surface nets).
+- The chunk store is a single-origin browser store, and a second persistence owner:
+  - The save store's `resetAll`, profile export and import, and `engine.reset` do not
+    touch it; creators call `clear`, `destroy` or `deleteChunkDatabase`.
+  - `session` fallback data is lost on close or unload.
+  - Its in-memory totals do not see another tab's growth until reopen, although
+    revisions are still compared inside each transaction. Prefer one writer per world.
+  - Reads also use a readwrite transaction.
+  - Payloads are not compressed.
+  - Browser-initiated storage eviction, private-mode behaviour and real quota
+    exhaustion vary by browser and are not covered by the desktop Chromium check.
+  - There is no cross-device sync, export of whole worlds, or crash-consistency
+    evidence beyond IndexedDB's own transaction atomicity.
 - Browser evidence is one desktop Chromium module-worker check
   (`scripts/play/procgen-worker-check.mjs`, part of `npm run test:framework-browser`).
   It shows that the discovered row loads, that worker, fallback and direct output are
