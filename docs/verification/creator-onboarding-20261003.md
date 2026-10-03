@@ -90,3 +90,35 @@ try {
 }finally{await browser?.close();await server.close();writeFileSync('evidence/production-subpath.json',JSON.stringify(report,null,2));}
 console.log(JSON.stringify(report));
 ```
+
+## Public-main follow-up rehearsal
+
+The standalone onboarding documentation was rebased onto public main
+`2fb6e6918e1a5e647260854daa4c8f4b871e1b47`, without the unpublished engine
+candidate changes. A fresh, independent local clone of documentation head
+`aafa158` was exercised with Node **22.23.3** and npm **10.9.9**, its own
+`node_modules`, a warm package cache and the existing isolated browser. The
+clone's `origin/main` comparison ref was set to that exact public-main commit.
+This verifies the documented workflow on public-main engine code; it is still
+an agent rehearsal, not a first-time human or cold-download timing trial.
+
+Passed in that disposable clone:
+
+- `npm ci --no-audit --no-fund`; generate arcade using the documented command
+  and commit `game/` plus `GAME.md` on the new `my-game` branch.
+- `npm run check` on the clean game commit: PASS, zero tests selected.
+- Change the ball colour to cyan; `npm run check`: PASS, one test file selected.
+- `node --import tsx --test game/play.test.ts`: four tests passed, none skipped.
+- `npm run build -- --base /my-game/`: PASS, including license notices.
+- `npm run play:script -- game/playtest/restart.json`: PASS; collision then
+  restart, score zero and best score three.
+- The production subpath probe above: active play scene, no page/console errors,
+  no failed responses or requests outside `/my-game/`, and no `window.engine`.
+
+The start and production screenshots were inspected: cyan ball, dark lane and
+readable counters/hint; the production capture also showed a red obstacle.
+Both automated runs were serial, muted and used the existing 1280×800
+software-GL launcher. Browser and server processes exited normally.
+No public deployment, physical-device trial, manual terminal play/preview trial
+or complete integration gate was performed. The earlier candidate-specific
+receipt remains separate evidence and is not relabeled as public-main coverage.
