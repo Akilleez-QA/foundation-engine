@@ -8,8 +8,19 @@ import {browserPort} from '../../../src/core/save/storage-port.ts';
 import {createTestApi} from '../../../src/dev/test-api.ts';
 import {createAppearanceDocument} from '../../../src/kits/character/appearance.ts';
 import {createAuthoringSession} from '../../../src/kits/authoring/session.ts';
+import {BufferGeometry,Material,Texture} from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+// Test-only accounting for decode-cancellation cycles: every dispose is remembered by identity, and while a cycle is
+// armed each parse result's geometry, materials, textures and decoded bitmaps are recorded for that cycle.
+const disposedResources=new WeakSet(),decodeTrack={cycle:null,parsed:{}};
+for(const proto of [BufferGeometry.prototype,Material.prototype,Texture.prototype]){const dispose=proto.dispose;proto.dispose=function(){disposedResources.add(this);return dispose.call(this);};}
+{const parseAsync=GLTFLoader.prototype.parseAsync;GLTFLoader.prototype.parseAsync=async function(...args){
+  const cycle=decodeTrack.cycle,result=await parseAsync.apply(this,args);if(cycle===null)return result;
+  const found={geometry:new Set(),material:new Set(),texture:new Set(),bitmap:new Set()};
+  result.scene.traverse(node=>{if(node.geometry)found.geometry.add(node.geometry);for(const material of [node.material??[]].flat()){found.material.add(material);for(const value of Object.values(material))if(value?.isTexture){found.texture.add(value);if(typeof value.image?.close==='function')found.bitmap.add(value.image);}}});
+  (decodeTrack.parsed[cycle]??=[]).push(found);return result;};}
 const initial={version:1,parts:{form:'first'},parameters:{}};
-const names=['first','second','slow','failed','missing'];
+const names=['first','second','slow','failed','missing','decoded'];
 const intake=value=>createAppearanceDocument({id:'preview-model',json:JSON.stringify(value),version:1,
   limits:{maxBytes:1024,maxNodes:16,maxDepth:4,maxParts:1,maxParameters:0},
   validate:v=>Object.keys(v.parts).length===1&&names.includes(v.parts.form)});
@@ -64,5 +75,10 @@ const scene=defineScene({id:'sample',title:'Asynchronous candidates',systems:[fr
 const compiled=compileGame({brief,game,defs:[scene,frame,section,...assets]});
 const app=createApp([...layerModules(game,brief),...compiled.modules],{mode:'test',flag:id=>appFeatures().enabled(id),probes:true});
 let models;const booted=app.boot();window.engine=createTestApi(app,booted);
-window.modelPreview={read,resources:()=>models?.stats(),queryRepeated(){for(let i=0;i<100;i++){if(accepted!==null)ctx.modelState(accepted);if(candidate!==null)ctx.modelState(candidate);}},dispose(){app.dispose();}};
+window.modelPreview={read,resources:()=>models?.stats(),queryRepeated(){for(let i=0;i<100;i++){if(accepted!==null)ctx.modelState(accepted);if(candidate!==null)ctx.modelState(candidate);}},dispose(){app.dispose();},
+  decodeTrack:{
+    arm(cycle){decodeTrack.cycle=cycle;},disarm(){decodeTrack.cycle=null;},
+    read(cycle){const parsed=decodeTrack.parsed[cycle]??[],held=new Set(window.__decodeHold.held.filter(h=>h.cycle===cycle).map(h=>h.bitmap)),count=kind=>{const all=parsed.flatMap(p=>[...p[kind]]);return {total:all.length,released:all.filter(r=>kind==='bitmap'?r.width===0&&r.height===0:disposedResources.has(r)).length};};
+      return {parses:parsed.length,geometry:count('geometry'),material:count('material'),texture:count('texture'),bitmap:count('bitmap'),heldBitmapsInParse:parsed.flatMap(p=>[...p.bitmap]).filter(b=>held.has(b)).length};},
+  }};
 await booted;models=app.services.models;
