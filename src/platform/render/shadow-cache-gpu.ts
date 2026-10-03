@@ -28,15 +28,17 @@ export function createShadowGPUCache(renderer:T.WebGLRenderer, options:ShadowGPU
  const targets=new Map<ShadowLight,T.WebGLRenderTarget>(),owners=new Map<ShadowLight,T.Scene>();
  const stats={staticRebuildDraws:0,dynamicDraws:0,compositeDraws:0,fullDraws:0,failures:0};
  let composite:T.Mesh<T.BufferGeometry,T.ShaderMaterial>|null=null;
+ /** The composite material's one uniform (shared by reference with its `uniforms`). */
+ const staticDepth:T.IUniform<T.Texture|null>={value:null};
  let lost=false,disposed=false,failed=false,restoredPass=false,lastType=renderer.shadowMap.type;
- const release=(light:ShadowLight)=>{const t=targets.get(light);if(t){if(composite?.material.uniforms.staticDepth.value===t.depthTexture)composite.material.uniforms.staticDepth.value=null;t.dispose();targets.delete(light);owners.delete(light);}cache.invalidate();};
- const releaseAll=()=>{if(composite)composite.material.uniforms.staticDepth.value=null;for(const t of targets.values())t.dispose();targets.clear();owners.clear();cache.invalidate();};
+ const release=(light:ShadowLight)=>{const t=targets.get(light);if(t){if(composite&&staticDepth.value===t.depthTexture)staticDepth.value=null;t.dispose();targets.delete(light);owners.delete(light);}cache.invalidate();};
+ const releaseAll=()=>{if(composite)staticDepth.value=null;for(const t of targets.values())t.dispose();targets.clear();owners.clear();cache.invalidate();};
  const getComposite=()=>{
   if(composite)return composite;
   const geometry=new T.BufferGeometry();
   geometry.setAttribute('position',new T.Float32BufferAttribute([-1,-1,0,3,-1,0,-1,3,0],3));
   const material=new T.ShaderMaterial({
-   uniforms:{staticDepth:{value:null}},side:T.DoubleSide,shadowSide:T.DoubleSide,depthFunc:T.AlwaysDepth,blending:T.NoBlending,
+   uniforms:{staticDepth},side:T.DoubleSide,shadowSide:T.DoubleSide,depthFunc:T.AlwaysDepth,blending:T.NoBlending,
    vertexShader:'void main(){gl_Position=vec4(position.xy,0.,1.);}',
    fragmentShader:'uniform sampler2D staticDepth; void main(){gl_FragDepth=texelFetch(staticDepth,ivec2(gl_FragCoord.xy),0).r;gl_FragColor=vec4(1.);}',
   });
@@ -99,7 +101,7 @@ export function createShadowGPUCache(renderer:T.WebGLRenderer, options:ShadowGPU
    if(cache.pathForPresent(plan)!=='composite')throw new Error('stale static generation');
    const movers=new Set(plan.movingCasters);for(const o of flags.keys())o.castShadow=movers.has(o);
    quad=getComposite();quad.layers.mask=camera.layers.mask;
-   (quad.material as T.ShaderMaterial).uniforms.staticDepth.value=target.depthTexture;
+   staticDepth.value=target.depthTexture;
    // Only the shadow traversal sees this first child. The colour render list already exists.
    scene.children.unshift(quad);quad.parent=scene;
    draw(pass,scene,camera,light,'composite');

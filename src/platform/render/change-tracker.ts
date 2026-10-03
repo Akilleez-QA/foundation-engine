@@ -132,12 +132,12 @@ export class Signature{
   }
   if(i<count){
    while(end>this.data.length)this.grow();
-   const d=this.data;for(;i<count;i++,n++)d[n]=src[i];
+   const d=this.data;for(;i<count;i++,n++)d[n]=src[i]!; // i < count: the first count values of src
   }
   this.n=end;
  }
  private grow(){const grown=new Float64Array(this.data.length*2);grown.set(this.data);this.data=grown;}
- matrix(m:T.Matrix4|T.Matrix3){const e=m.elements;for(let i=0;i<e.length;i++)this.push(e[i]);}
+ matrix(m:T.Matrix4|T.Matrix3){const e=m.elements;for(let i=0;i<e.length;i++)this.push(e[i]!);} // loop indices are bounded by the array length (matrices: 16 or elements.length)
  /** After writing: identical to the signature passed to `begin` (same length, every value equal). */
  same(){return this.match===this.base&&this.n===this.base;}
  /** Equal length and every value identical (NaN equals NaN). */
@@ -194,7 +194,7 @@ export class Observer{
  /** Make room for `n` direct stores (n ≤ RECORD); returns the index to store from. */
  room(n:number){if(this.k+n>RECORD)this.flush();return this.k;}
  push(v:number){if(this.k===RECORD)this.flush();this.rec[this.k++]=v;}
- matrix(m:T.Matrix4|T.Matrix3){const e=m.elements,n=e.length,r=this.rec;let k=this.room(n);for(let i=0;i<n;i++)r[k++]=e[i];this.k=k;}
+ matrix(m:T.Matrix4|T.Matrix3){const e=m.elements,n=e.length,r=this.rec;let k=this.room(n);for(let i=0;i<n;i++)r[k++]=e[i]!;this.k=k;} // loop indices are bounded by the array length (matrices: 16 or elements.length)
  /** The authoritative local transform, including manually managed matrices. */
  local(o:T.Object3D){
   const r=this.rec;let k=this.room(37);r[k++]=o.id;
@@ -205,9 +205,9 @@ export class Observer{
    const p=o.position,q=o.quaternion,s=o.scale;r[k++]=p.x;r[k++]=p.y;r[k++]=p.z;r[k++]=q.x;r[k++]=q.y;r[k++]=q.z;r[k++]=q.w;r[k++]=s.x;r[k++]=s.y;r[k++]=s.z;
    // `updateMatrix` rotates and scales about the pivot when one is set.
    if(pivot){r[k++]=pivot.x;r[k++]=pivot.y;r[k++]=pivot.z;}
-  }else{const e=o.matrix.elements;for(let i=0;i<16;i++)r[k++]=e[i];}
+  }else{const e=o.matrix.elements;for(let i=0;i<16;i++)r[k++]=e[i]!;} // loop indices are bounded by the array length (matrices: 16 or elements.length)
   // A world matrix managed by hand is itself an input; one updated automatically is implied by the locals.
-  if(world){const e=o.matrixWorld.elements;for(let i=0;i<16;i++)r[k++]=e[i];}
+  if(world){const e=o.matrixWorld.elements;for(let i=0;i<16;i++)r[k++]=e[i]!;} // loop indices are bounded by the array length (matrices: 16 or elements.length)
   this.k=k;
  }
  texture(t:T.Texture|null|undefined){
@@ -226,7 +226,7 @@ export class Observer{
  /** A geometry's draw inputs, read once per scan after its id (`geometry`). */
  geometryBody(g:T.BufferGeometry){
   // The attribute list ends in -1 (never an attribute id) and morph lists carry counts: self-delimiting encodings.
-  for(const key in g.attributes){const a=g.attributes[key];this.push(attributeId(a));this.push(attributeVersion(a));this.push(a.count);}
+  for(const key in g.attributes){const a=g.attributes[key]!;this.push(attributeId(a));this.push(attributeVersion(a));this.push(a.count);} // key comes from iterating g.attributes
   this.push(-1);
   const morphs=g.morphAttributes as Record<string,(T.BufferAttribute|T.InterleavedBufferAttribute)[]>;
   let lists=0;for(const key in morphs)if(morphs[key])lists++;
@@ -448,9 +448,9 @@ export function createColourTracker(){
   if(m.customProgramCacheKey!==customKey&&!safe(m.onBeforeCompile))obs.force('custom program key');
   const record=materialRecord(m);let f=fields.get(m);
   if(!f||f.version!==m.version)fields.set(m,f=planMaterial(m));
-  const readers=f.readers;obs.push(readers.length);for(let i=0;i<readers.length;i++)readers[i].read(record,obs);
+  const readers=f.readers;obs.push(readers.length);for(let i=0;i<readers.length;i++)readers[i]!.read(record,obs); // loop indices are bounded by the array length (matrices: 16 or elements.length)
   // The key lists are cached per version.
-  const numbers=f.numbers;obs.push(numbers.length);for(let i=0;i<numbers.length;i++)obs.push(+(record[numbers[i]] as number));
+  const numbers=f.numbers;obs.push(numbers.length);for(let i=0;i<numbers.length;i++)obs.push(+(record[numbers[i]!] as number)); // loop indices are bounded by the array length (matrices: 16 or elements.length)
   for(const key of f.colors)colourOf(obs,record[key]);
   for(const key of f.textures)textureOf(obs,record[key]);
   for(const key of f.other)value(record[key]);
@@ -463,7 +463,7 @@ export function createColourTracker(){
   // A single material is -1 and an array its length: an array draws by geometry groups, so the two differ.
   if(Array.isArray(materials)){obs.push(materials.length);for(const m of materials)material(m);}else{obs.push(-1);material(materials);}
   obs.push(mesh.castShadow?1:0);obs.push(mesh.receiveShadow?1:0);
-  const morph=mesh.morphTargetInfluences;if(morph){obs.push(morph.length);for(let i=0;i<morph.length;i++)obs.push(morph[i]);}else obs.push(-1);
+  const morph=mesh.morphTargetInfluences;if(morph){obs.push(morph.length);for(let i=0;i<morph.length;i++)obs.push(morph[i]!);}else obs.push(-1); // loop indices are bounded by the array length (matrices: 16 or elements.length)
   if(mesh.isInstancedMesh){obs.push(mesh.count);obs.push(mesh.instanceMatrix.version);obs.push(attributeVersion(mesh.instanceColor));obs.texture(mesh.morphTexture);}
   if(mesh.isSkinnedMesh)obs.skeleton(mesh,root,false);
   if(batched)obs.batch(o as T.BatchedMesh,true);
@@ -498,8 +498,8 @@ export function createColourTracker(){
   if(auto){
    const p=o.position,q=o.quaternion,s=o.scale;r[k++]=p.x;r[k++]=p.y;r[k++]=p.z;r[k++]=q.x;r[k++]=q.y;r[k++]=q.z;r[k++]=q.w;r[k++]=s.x;r[k++]=s.y;r[k++]=s.z;
    if(pivot){r[k++]=pivot.x;r[k++]=pivot.y;r[k++]=pivot.z;}
-  }else{const e=o.matrix.elements;for(let i=0;i<16;i++)r[k++]=e[i];}
-  if(world){const e=o.matrixWorld.elements;for(let i=0;i<16;i++)r[k++]=e[i];}
+  }else{const e=o.matrix.elements;for(let i=0;i<16;i++)r[k++]=e[i]!;} // loop indices are bounded by the array length (matrices: 16 or elements.length)
+  if(world){const e=o.matrixWorld.elements;for(let i=0;i<16;i++)r[k++]=e[i]!;} // loop indices are bounded by the array length (matrices: 16 or elements.length)
   r[k++]=o.renderOrder;obs.k=k;
   if(o.onBeforeRender!==objectRenderHook&&!safe(o.onBeforeRender))obs.force('object render hook');
   const geometry=o.geometry,materials=o.material;
@@ -515,9 +515,9 @@ export function createColourTracker(){
     const mid=materialId(materials);k=obs.room(1);r[k++]=-1-flags-8*mid;obs.k=k;
     const ms=obs.materialStamps;if((mid>=ms.length||ms[mid]!==stamp)&&obs.firstMaterial(materials))materialBody(materials);
    }
-   if(morph){obs.push(morph.length);for(let i=0;i<morph.length;i++)obs.push(morph[i]);}
+   if(morph){obs.push(morph.length);for(let i=0;i<morph.length;i++)obs.push(morph[i]!);} // loop indices are bounded by the array length (matrices: 16 or elements.length)
   }
-  for(let i=0;i<n;i++)visit(children[i],o,root,mask);
+  for(let i=0;i<n;i++)visit(children[i]!,o,root,mask); // loop indices are bounded by the array length (matrices: 16 or elements.length)
  }
  function visitNode(o:T.Object3D,parent:T.Object3D,root:T.Object3D,mask:number){
   // A hidden node is one marker (-1; ids are never negative), so the pre-order record stays self-delimiting.
@@ -535,11 +535,11 @@ export function createColourTracker(){
   if(auto){
    const p=o.position,q=o.quaternion,s=o.scale;r[k++]=p.x;r[k++]=p.y;r[k++]=p.z;r[k++]=q.x;r[k++]=q.y;r[k++]=q.z;r[k++]=q.w;r[k++]=s.x;r[k++]=s.y;r[k++]=s.z;
    if(pivot){r[k++]=pivot.x;r[k++]=pivot.y;r[k++]=pivot.z;}
-  }else{const e=o.matrix.elements;for(let i=0;i<16;i++)r[k++]=e[i];}
-  if(world){const e=o.matrixWorld.elements;for(let i=0;i<16;i++)r[k++]=e[i];}
+  }else{const e=o.matrix.elements;for(let i=0;i<16;i++)r[k++]=e[i]!;} // loop indices are bounded by the array length (matrices: 16 or elements.length)
+  if(world){const e=o.matrixWorld.elements;for(let i=0;i<16;i++)r[k++]=e[i]!;} // loop indices are bounded by the array length (matrices: 16 or elements.length)
   r[k++]=o.renderOrder;obs.k=k;
   if(o.onBeforeRender!==objectRenderHook&&!safe(o.onBeforeRender))obs.force('object render hook');
-  for(let i=0;i<n;i++)visit(children[i],o,root,mask);
+  for(let i=0;i<n;i++)visit(children[i]!,o,root,mask); // loop indices are bounded by the array length (matrices: 16 or elements.length)
  }
  function visitAny(o:T.Object3D,parent:T.Object3D,root:T.Object3D,mask:number){
   // A hidden node is one marker (-1; ids are never negative), so the pre-order record stays self-delimiting.
@@ -557,8 +557,8 @@ export function createColourTracker(){
   if(auto){
    const p=o.position,q=o.quaternion,s=o.scale;r[k++]=p.x;r[k++]=p.y;r[k++]=p.z;r[k++]=q.x;r[k++]=q.y;r[k++]=q.z;r[k++]=q.w;r[k++]=s.x;r[k++]=s.y;r[k++]=s.z;
    if(pivot){r[k++]=pivot.x;r[k++]=pivot.y;r[k++]=pivot.z;}
-  }else{const e=o.matrix.elements;for(let i=0;i<16;i++)r[k++]=e[i];}
-  if(world){const e=o.matrixWorld.elements;for(let i=0;i<16;i++)r[k++]=e[i];}
+  }else{const e=o.matrix.elements;for(let i=0;i<16;i++)r[k++]=e[i]!;} // loop indices are bounded by the array length (matrices: 16 or elements.length)
+  if(world){const e=o.matrixWorld.elements;for(let i=0;i<16;i++)r[k++]=e[i]!;} // loop indices are bounded by the array length (matrices: 16 or elements.length)
   r[k++]=o.renderOrder;obs.k=k;
   const batched=(o as T.BatchedMesh).isBatchedMesh===true;
   if(!batched&&o.onBeforeRender!==objectRenderHook&&!safe(o.onBeforeRender))obs.force('object render hook');
@@ -576,7 +576,7 @@ export function createColourTracker(){
   }
   // A LOD picks its visible level from the camera distance while rendering: its levels are inputs.
   const lod=o as T.LOD;if(lod.isLOD){obs.push(lod.autoUpdate?1:0);obs.push(lod.levels.length);for(const x of lod.levels){obs.push(x.distance);obs.push(x.hysteresis);obs.push(x.object.id);}}
-  for(let i=0;i<n;i++)visit(children[i],o,root,mask);
+  for(let i=0;i<n;i++)visit(children[i]!,o,root,mask); // loop indices are bounded by the array length (matrices: 16 or elements.length)
  }
  function light(l:T.Light){
   const x=l as T.SpotLight&T.HemisphereLight&T.DirectionalLight&T.RectAreaLight&T.PointLight;
@@ -603,7 +603,7 @@ export function createColourTracker(){
      if(scene.overrideMaterial)material(scene.overrideMaterial);else obs.push(-1);
      if(scene.onBeforeRender!==objectRenderHook&&!safe(scene.onBeforeRender))obs.force('scene render hook');
     }
-    const children=root.children,n=children.length;obs.push(n);for(let i=0;i<n;i++)visit(children[i],root,root,camera.layers.mask);
+    const children=root.children,n=children.length;obs.push(n);for(let i=0;i<n;i++)visit(children[i]!,root,root,camera.layers.mask); // loop indices are bounded by the array length (matrices: 16 or elements.length)
    }
    const sig=obs.sig;stats.values=sig.n;
    const due=!valid||obs.forcedBy!==null||!sig.same();
@@ -629,7 +629,7 @@ export type ShadowScanOptions={
 export function observeCaster(obs:Observer,o:T.Mesh|T.Line|T.Points,root:T.Object3D){
  const m=o as T.Mesh&T.InstancedMesh&T.SkinnedMesh,r=obs.rec,w=o.matrixWorld.elements;
  // Depth depends on where a caster is, not on which parent put it there: world matrix, no structure.
- let k=obs.room(19);r[k++]=o.id;for(let i=0;i<16;i++)r[k++]=w[i];r[k++]=o.layers.mask;r[k++]=(o.frustumCulled?1:0)+(o.castShadow?2:0);obs.k=k;
+ let k=obs.room(19);r[k++]=o.id;for(let i=0;i<16;i++)r[k++]=w[i]!;r[k++]=o.layers.mask;r[k++]=(o.frustumCulled?1:0)+(o.castShadow?2:0);obs.k=k; // loop indices are bounded by the array length (matrices: 16 or elements.length)
  obs.geometry(m.geometry);
  const materials=m.material;
  if(Array.isArray(materials)){obs.push(materials.length);for(const x of materials)depthMaterial(obs,x);}else{obs.push(-1);depthMaterial(obs,materials);}
@@ -640,7 +640,7 @@ export function observeCaster(obs:Observer,o:T.Mesh|T.Line|T.Points,root:T.Objec
  else if(o.onBeforeShadow!==objectShadowHook&&!safe(o.onBeforeShadow))obs.force('object shadow hook');
  if(o.onAfterShadow!==T.Object3D.prototype.onAfterShadow&&!safe(o.onAfterShadow))obs.force('object after-shadow hook');
  if(m.isInstancedMesh){obs.push(m.count);obs.push(m.instanceMatrix.version);obs.texture(m.morphTexture);}
- const morph=m.morphTargetInfluences;if(morph){obs.push(morph.length);for(let i=0;i<morph.length;i++)obs.push(morph[i]);}else obs.push(-1);
+ const morph=m.morphTargetInfluences;if(morph){obs.push(morph.length);for(let i=0;i<morph.length;i++)obs.push(morph[i]!);}else obs.push(-1); // loop indices are bounded by the array length (matrices: 16 or elements.length)
  if(m.isSkinnedMesh)obs.skeleton(m,root,true);
  cullingSphere(obs,o);
 }
@@ -696,7 +696,7 @@ export function createShadowTracker(){
  // The depth pass stops at an invisible node, exactly as `WebGLShadowMap.renderObject` does.
  function visitNode(o:T.Object3D,root:T.Object3D,mask:number,vsm:boolean){
   if(!o.visible)return;
-  const children=o.children,n=children.length;for(let i=0;i<n;i++)visit(children[i],root,mask,vsm);
+  const children=o.children,n=children.length;for(let i=0;i<n;i++)visit(children[i]!,root,mask,vsm); // loop indices are bounded by the array length (matrices: 16 or elements.length)
  }
  function visitMesh(o:T.Mesh,root:T.Object3D,mask:number,vsm:boolean){
   if(!o.visible)return;
@@ -704,7 +704,7 @@ export function createShadowTracker(){
    // `observeCaster` for a plain Mesh: no batch, instance, skeleton or object culling sphere (see `visit`).
    const r=obs.rec,w=o.matrixWorld.elements,morph=o.morphTargetInfluences;
    // Packed exactly: three flag bits over the 32-bit layer mask; a single material is -1 - its id.
-   let k=obs.room(19);r[k++]=o.id;for(let i=0;i<16;i++)r[k++]=w[i];r[k++]=(o.frustumCulled?1:0)+(o.castShadow?2:0)+(morph?4:0)+8*(o.layers.mask>>>0);obs.k=k;
+   let k=obs.room(19);r[k++]=o.id;for(let i=0;i<16;i++)r[k++]=w[i]!;r[k++]=(o.frustumCulled?1:0)+(o.castShadow?2:0)+(morph?4:0)+8*(o.layers.mask>>>0);obs.k=k; // loop indices are bounded by the array length (matrices: 16 or elements.length)
    const stamp=obs.stamp,geometry=o.geometry,gid=geometry.id;k=obs.room(1);r[k++]=gid;obs.k=k;
    const gs=obs.geometryStamps;if((gid>=gs.length||gs[gid]!==stamp)&&obs.firstGeometry(geometry))obs.geometryBody(geometry);
    const materials=o.material;
@@ -716,9 +716,9 @@ export function createShadowTracker(){
    if(o.customDepthMaterial||o.customDistanceMaterial)obs.force('custom depth material');
    if(o.onBeforeShadow!==objectShadowHook&&!safe(o.onBeforeShadow))obs.force('object shadow hook');
    if(o.onAfterShadow!==T.Object3D.prototype.onAfterShadow&&!safe(o.onAfterShadow))obs.force('object after-shadow hook');
-   if(morph){obs.push(morph.length);for(let i=0;i<morph.length;i++)obs.push(morph[i]);}
+   if(morph){obs.push(morph.length);for(let i=0;i<morph.length;i++)obs.push(morph[i]!);} // loop indices are bounded by the array length (matrices: 16 or elements.length)
   }
-  const children=o.children,n=children.length;for(let i=0;i<n;i++)visit(children[i],root,mask,vsm);
+  const children=o.children,n=children.length;for(let i=0;i<n;i++)visit(children[i]!,root,mask,vsm); // loop indices are bounded by the array length (matrices: 16 or elements.length)
  }
  function visitAny(o:T.Object3D,root:T.Object3D,mask:number,vsm:boolean){
   if(!o.visible)return;
@@ -731,7 +731,7 @@ export function createShadowTracker(){
   }
   const m=o as T.Mesh;
   if((m.isMesh||(o as T.Line).isLine||(o as T.Points).isPoints)&&(m.castShadow||vsm&&m.receiveShadow)&&(o.layers.mask&mask)!==0)observeCaster(obs,m,root);
-  const children=o.children,n=children.length;for(let i=0;i<n;i++)visit(children[i],root,mask,vsm);
+  const children=o.children,n=children.length;for(let i=0;i<n;i++)visit(children[i]!,root,mask,vsm); // loop indices are bounded by the array length (matrices: 16 or elements.length)
  }
  return {
   stats,

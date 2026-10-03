@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createAudioTimeline, estimateOffset, MAX_CALIBRATION_MS, type AudioClockReading, type TimelineEvent } from './audio-timeline';
+import {must} from '../../testing/must';
 
 /**
  * A simulated output device: a context clock that drifts against the page clock, advances in render quanta,
@@ -188,7 +189,7 @@ test('without a clock sample a run uses the clamped page clock; it keeps that so
   timeline.schedule(.2, 'p');
   assert.equal(timeline.start(0), 'performance');
   for (let i = 0; i < 30; i++) { dev.advance(16); timeline.pump(); }
-  assert.equal(got[0].when, null, 'no context time on the fallback');
+  assert.equal(must(got[0]).when, null, 'no context time on the fallback');
   assert.ok(Math.abs(timeline.position - .48) < 1e-9);
   dev.advance(60_000); timeline.pump(); // a hidden tab: one clamped step, not a minute
   assert.ok(Math.abs(timeline.position - .73) < 1e-9);

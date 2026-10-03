@@ -6,6 +6,7 @@ import * as T from 'three';
 import { createTextureLibrary, dressTexture, keepWidth, type TextureImage } from './textures';
 import { isAbortError } from './lease-cache';
 import type { AssetDef } from './manifest';
+import {must} from '../../testing/must';
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
@@ -50,15 +51,15 @@ test('fourteen users of one variant share one load and one Texture; the last rel
   const got = await Promise.all(leases);
   assert.deepEqual(loads, ['/textures/stone/wall-2048.jpg']);
   assert.equal(new Set(got.map(l => l.value)).size, 1);
-  const texture = got[0].value;
+  const texture = must(got[0]).value;
   assert.equal(texture.colorSpace, T.SRGBColorSpace);
   assert.equal(texture.userData.shared, true, 'disposeOwnedTree and the other module-lifetime guards spare it');
   assert.ok(library.owns(texture));
-  assert.equal(got[0].variant.width, 2048);
+  assert.equal(must(got[0]).variant.width, 2048);
   let disposed = 0;
   texture.addEventListener('dispose', () => disposed++);
   got.slice(0, 13).forEach(l => l.release());
-  owners[13].abort(); // an owner's abort releases its lease too
+  must(owners[13]).abort(); // an owner's abort releases its lease too
   assert.equal(disposed, 1);
   assert.equal(library.owns(texture), false);
   assert.deepEqual({ ...library.stats(), residentMiB: 0 }, { residentMiB: 0, warmMiB: 0, loads: 1, hits: 13, uploads: 1, lateDrops: 0, disposed: 1, pinnedMiB: 0, evictions: 0, reloads: 0, pressure: 0, cleanupFailures: 0 });
@@ -77,6 +78,7 @@ test('variants: the site size picks the file; each variant and each sampler is i
   const d = library.texture('asset.texture.stone-wall', { screenPx: keepWidth(2048), signal, colorSpace: 'linear' });
   await arrive();
   const [ta, tb, tc, td] = (await Promise.all([a, b, c, d])).map(l => l.value);
+  assert.ok(tc); assert.ok(td);
   assert.equal(new Set([ta, tb, tc, td]).size, 4);
   assert.deepEqual(loads, ['/textures/stone/wall-2048.jpg', '/textures/stone/wall-4096.jpg', '/textures/stone/wall-2048.jpg', '/textures/stone/wall-2048.jpg']);
   assert.equal(tc.anisotropy, 8);

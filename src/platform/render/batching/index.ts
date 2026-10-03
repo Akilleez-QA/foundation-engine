@@ -36,7 +36,7 @@ export function batchStaticMeshes(group:T.Group,keep=new Set<T.Object3D>(),owner
    // Indexed parts stay indexed (a sphere de-indexed is ~5× the vertices); a non-indexed part gets a sequential index.
    const indexed=meshes.some(o=>o.geometry.index),transformed=meshes.map(o=>{const g=o.geometry.clone();if(indexed&&!g.index)g.setIndex([...Array(g.getAttribute('position').count).keys()]);g.applyMatrix4(o.matrix);return g;});
    const merged=mergeGeometries(transformed);transformed.forEach(g=>g.dispose());if(!merged)continue;
-   const first=meshes[0],batched=new T.Mesh(merged,material);batched.name='Batched static surface';batched.visible=first.visible;batched.castShadow=first.castShadow;batched.receiveShadow=first.receiveShadow;batched.renderOrder=first.renderOrder;batched.layers.mask=first.layers.mask;batched.frustumCulled=first.frustumCulled;parent.add(batched);
+   const first=meshes[0]!/* meshes.length >= 2 */,batched=new T.Mesh(merged,material);batched.name='Batched static surface';batched.visible=first.visible;batched.castShadow=first.castShadow;batched.receiveShadow=first.receiveShadow;batched.renderOrder=first.renderOrder;batched.layers.mask=first.layers.mask;batched.frustumCulled=first.frustumCulled;parent.add(batched);
    for(const o of meshes){parent.remove(o);const remaining=(references.get(o.geometry)??1)-1;references.set(o.geometry,remaining);if(remaining===0&&!owner.owns(o.geometry))o.geometry.dispose();}
   }
  }
@@ -74,7 +74,7 @@ export function bakeStaticMeshes(scope:T.Object3D,moving:ReadonlySet<T.Object3D>
   const indexed=batch.some(m=>m.geometry.index);
   const parts=batch.map(m=>{const g=m.geometry.clone();if(indexed&&!g.index)g.setIndex([...Array(g.getAttribute('position').count).keys()]);return g.applyMatrix4(inverse.clone().multiply(m.matrixWorld));});
   const geometry=mergeGeometries(parts);parts.forEach(g=>g.dispose());if(!geometry)continue;
-  const first=batch[0],mesh=new T.Mesh(geometry,first.material);mesh.name='Baked static surface';mesh.castShadow=first.castShadow;mesh.receiveShadow=first.receiveShadow;mesh.layers.mask=first.layers.mask;mesh.frustumCulled=first.frustumCulled;scope.add(mesh);
+  const first=batch[0]!/* batch.length >= 2 */,mesh=new T.Mesh(geometry,first.material);mesh.name='Baked static surface';mesh.castShadow=first.castShadow;mesh.receiveShadow=first.receiveShadow;mesh.layers.mask=first.layers.mask;mesh.frustumCulled=first.frustumCulled;scope.add(mesh);
   for(const m of batch){m.removeFromParent();const left=(references.get(m.geometry)??1)-1;references.set(m.geometry,left);if(left===0&&!owner.owns(m.geometry))m.geometry.dispose();}
   merged+=batch.length;
  }

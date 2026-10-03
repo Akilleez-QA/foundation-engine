@@ -111,7 +111,7 @@ export function createInput(options:CreateInputOptions){
    const out=latch.drain(),keys=world?heldVector(held):{x:0,y:0},move=toDisc(keys.x+padMove.x,keys.y+padMove.y);
    const start=lookClock;lookClock+=step;if(out.look.x||out.look.y)spreading.push({x:out.look.x,y:out.look.y,from:start});
    const spread={x:0,y:0};
-   for(let i=spreading.length-1;i>=0;i--){const e=spreading[i],share=spreadShare(lookClock-e.from)-spreadShare(start-e.from);
+   for(let i=spreading.length-1;i>=0;i--){const e=spreading[i]!/* i < spreading.length */,share=spreadShare(lookClock-e.from)-spreadShare(start-e.from);
     spread.x+=e.x*share;spread.y+=e.y*share;if(lookClock-e.from>=2*LOOK_SPREAD_S-1e-9)spreading.splice(i,1);}
    const k=settings.lookSensitivity??1,look={x:(spread.x+padLook.x)*k*(settings.invertX?-1:1),y:(spread.y+padLook.y)*k*(settings.invertY?-1:1)};
    const pressed=new Set<ButtonAction>(out.actions.map(a=>a.action)),mine=!!top&&top===base;

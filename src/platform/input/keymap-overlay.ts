@@ -18,14 +18,15 @@ import type {LayerHandle,LayerKind} from '../ui/layers';
 export type TabWrap=(active:Element,list:readonly HTMLElement[],backwards:boolean)=>HTMLElement|null;
 /** The panel card's rule: wrap at either end. */
 export const wrapAtEnds:TabWrap=(active,list,backwards)=>{
- if(backwards)return active===list[0]?list[list.length-1]:null;
- return active===list[list.length-1]?list[0]:null;
+ // Matching an end means the list is non-empty, so the other end exists.
+ if(backwards)return active===list[0]?list[list.length-1]!:null;
+ return active===list[list.length-1]?list[0]!:null;
 };
 /** `trapFocus`'s rule (src/input/ui-nav.ts): wrap at either end, or when focus is on nothing in the list. */
 export const wrapByIndex:TabWrap=(active,list,backwards)=>{
  const i=list.indexOf(active as HTMLElement);
- if(backwards)return i<=0?list[list.length-1]:null;
- return i===list.length-1||i<0?list[0]:null;
+ if(backwards)return i<=0?list[list.length-1]??null:null;
+ return i===list.length-1||i<0?list[0]??null:null;
 };
 
 export type TabTrap={
