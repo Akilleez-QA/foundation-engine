@@ -401,6 +401,9 @@ streaming and looping are out of scope. Sound files share AUD-01's voice chain (
 distance models, cutoff, filter) through `ctx.playVoice`. Candidate in PR #57 (not integrated):
 `testScene` validates `playVoice` options as the output does and records them in `t.voices`,
 so game tests can assert spatial choices; this checks options only, never audible output.
+`testScene` also refuses a `ctx.play` / `ctx.playVoice` id that is neither a built-in cue
+(`BUILT_IN_CUES`) nor one of the scene's `sounds` (or its `sounds` option), where a browser
+only warns; candidate, not integrated. Unit-tested only; `ctx.playMusic` ids are not checked.
 
 ## Audio-clock timeline (AU-01) — integrated in v0.2.0
 

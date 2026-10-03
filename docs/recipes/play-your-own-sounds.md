@@ -30,7 +30,24 @@ const voice = ctx.playVoice('door-open', { gain: .5, rate: .8 }); // a handle yo
 Bad options throw (in `testScene` too), naming the field. In tests, `t.plays` lists every play with its options, and
 `t.voices` lists every `ctx.playVoice` with a copy of its options (`gain`, `rate`, `variant`, `wait`, `at`, the full
 `spatial` block with panning, distance model and cutoff, and `filter`; not `onEnded`), checked as the audio output checks
-them. A headless voice never plays: `playVoice` returns `null` there.
+them. A headless voice never plays: `playVoice` returns `null` there. An id that is neither a [built-in cue](#built-in-cues)
+nor one of the scene's `sounds` throws in `testScene` ([test a scene](test-a-scene.md#4-cue-and-sound-ids-are-checked)).
+
+## Built-in cues
+
+Every game has these short synthesised interface cues; `ctx.play` and `ctx.playVoice` take their ids without any file.
+`BUILT_IN_CUES` (from `@engine`) is the same list. An id that is neither one of these nor one of your sounds plays
+nothing in a browser (a console warning) and fails a [`testScene`](test-a-scene.md#4-cue-and-sound-ids-are-checked) test.
+
+<!-- built-in-cues:begin (generated from CORE_CUES by src/author/test-a-scene-recipe.test.ts; FOUNDATION_WRITE_DOCS=1 rewrites it) -->
+| Id | Caption (English) | Length |
+|---|---|---|
+| `ui.click` | Soft tap | 80 ms |
+| `ui.success` | Discovery chime | 850 ms |
+| `ui.arrive` | Arrival chime | 900 ms |
+| `ui.count` | Countdown beep | 190 ms |
+| `ui.bump` | Soft bump | 200 ms |
+<!-- built-in-cues:end -->
 
 ## What the engine does
 

@@ -45,6 +45,9 @@ export const CORE_CUES: readonly CueDef[] = [
   { id: 'ui.bump', caption: 'audio.cue.bump', duration: .2, steps: [{ tone: { at: 0, duration: .12, hz: 170, end: 90, gain: .2 } }, { air: { at: 0, duration: .09, cutoff: 1400, gain: .12 } }] },
 ];
 
+/** The ids of `CORE_CUES`, in order: what `ctx.play` / `ctx.playVoice` accept in every game besides its own sounds. */
+export const BUILT_IN_CUES: readonly string[] = Object.freeze(CORE_CUES.map(c => c.id));
+
 /** Bound authored synthesis work before allocating or registering output resources. */
 function validateCue(cue: CueDef): void {
   if (typeof cue.id !== 'string' || !cue.id || cue.id.length > 256 || !Number.isFinite(cue.duration) || cue.duration <= 0 || cue.duration > 60 || !Array.isArray(cue.steps) || cue.steps.length > 128) throw Error('invalid audio cue');

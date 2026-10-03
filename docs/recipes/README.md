@@ -29,6 +29,7 @@ Short, checked how-tos. Start with [getting started](../guides/getting-started.m
 | keep progress across reloads | [add a save section](add-a-save-section.md) |
 | write counts, positions (1st, 2nd) and variants in text | [plurals, ordinals and variants](write-plurals-ordinals-and-variants.md) |
 | branch a conversation on variables and visits | [add branching dialogue](add-branching-dialogue.md) |
+| test a scene without a browser: presses, plays, scene changes, saves | [test a scene](test-a-scene.md) |
 | measure or lower a scene's performance budget | [add a budget](add-a-budget.md) |
 | check a scene replays exactly, ignoring cosmetic motion | [replay with your own digest](replay-with-your-own-digest.md) |
 

@@ -22,6 +22,12 @@ Every new framework below is optional: a game that does not use it is unchanged.
   slide-off, blur or the visit's end; presses keep the exactly-once fixed-tick delivery. Touch only,
   at least 48 CSS px. `bindPointerControl` gains `leave: 'release'` and `onContact`; `ctx.view.signal`
   aborts when the visit ends. Emulated browser evidence only.
+- **`testScene` refuses unknown cue and sound ids.** `ctx.play` / `ctx.playVoice` with an id that is
+  neither a built-in cue nor one of the scene's `sounds` now throws in `testScene`, naming the id and
+  the built-in cues (a browser only warns in the console). `testScene({ sounds })` adds ids a scene
+  plays without listing them. `BUILT_IN_CUES` lists the cue ids; the
+  [test a scene](docs/recipes/test-a-scene.md) recipe documents every option and result field, and
+  the built-in cue table in the sounds recipe is generated from the cue definitions and checked.
 - **`testScene` records `playVoice` options.** `t.voices` lists each voice with a copy of its options
   (gain, rate, variant, wait, at, spatial, filter), checked as the audio output checks them
   (`normalizeCueVoiceOptions`, shared with the real `playVoice`). `t.cues` is unchanged; invalid options now throw in tests, as they do
