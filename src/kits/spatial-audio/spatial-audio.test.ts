@@ -343,18 +343,31 @@ test('equal-score repeaters started together share the voices fairly under defau
   assert.equal(audio.stats.stolen, 0, 'equal sources rotate; nothing is stolen'); assert.ok(audio.stats.rotated > 0);
 });
 
-test('opt-in rotation and carryLate: equal-score repeaters out of phase with long voices share them fairly', () => {
-  const output = fakeOutput(); const audio = createSpatialAudio({ output, classes: flat, limits: { maxVoices: 4, rotateAfter: .25 } });
-  const xs: string[] = [];
-  for (let i = 0; i <= 600; i++) {
-    const t = i / 60;
-    if (i % 4 === 0 && xs.length < 8) { const p = ring(xs.length, 8); xs.push(key(p)); audio.emit({ cue: 'r', class: 'weak', position: p, every: .5, carryLate: true }, t); }
-    audio.pump(t, origin); assert.ok(output.playing().length <= 4);
+test('opt-in rotation and carryLate: equal repeaters on long voices share them fairly across join patterns and frame rates', () => {
+  // 8 equal repeaters every 0.5 s with never-ending voices on 4 voices, 20 s each: staggered joins of 1 to 12 frames
+  // and 20 seeded random join times within 2 s, at 60 and 30 fps pumps (64 setups). Measured at this head: worst
+  // spread 5 (30 fps, staggers 11 and 12: the first to join gets a head start), worst minimum 0.90 of the fair share.
+  const rng = (seed: number) => () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 2 ** 32; };
+  const run = (frames: number[], fps: number) => {
+    const output = fakeOutput(); const audio = createSpatialAudio({ output, classes: flat, limits: { maxVoices: 4, rotateAfter: .25 } });
+    const keys: string[] = [];
+    for (let i = 0, e = 0; i <= 20 * fps; i++) {
+      while (e < 8 && frames[e] <= i) { const p = ring(e, 8); keys.push(key(p)); audio.emit({ cue: 'r', class: 'weak', position: p, every: .5, carryLate: true }, i / fps); e++; }
+      audio.pump(i / fps, origin); assert.ok(output.playing().length <= 4);
+    }
+    const n = startsByX(output); return keys.map(k => n.get(k) ?? 0);
+  };
+  const failures: string[] = [];
+  for (const fps of [60, 30]) {
+    const setups: [string, number[]][] = [];
+    for (let st = 1; st <= 12; st++) setups.push([`stagger ${st}`, Array.from({ length: 8 }, (_, k) => k * st)]);
+    for (let seed = 1; seed <= 20; seed++) { const g = rng(seed); setups.push([`seed ${seed}`, Array.from({ length: 8 }, () => Math.floor(g() * 2 * fps)).sort((x, y) => x - y)]); }
+    for (const [name, frames] of setups) {
+      const plays = run(frames, fps), fair = plays.reduce((x, y) => x + y) / 8;
+      if (Math.max(...plays) - Math.min(...plays) > 6 || Math.min(...plays) < .85 * fair) failures.push(`${fps} fps ${name}: ${plays}`);
+    }
   }
-  const plays = xs.map(x => startsByX(output).get(x) ?? 0);
-  // Long voices never free a slot, so a late emission must carry over to the next voice it can take (measured
-  // spread 1 at 10, 20 and 60 s and staggers of 3 to 7 frames; without carryLate, out-of-phase shares are uneven).
-  assert.ok(Math.min(...plays) >= 10 && Math.max(...plays) - Math.min(...plays) <= 1, `plays ${plays}`);
+  assert.deepEqual(failures, []);
 });
 
 test('opt-in rotation: equal one-shots get turns against older long voices, without cutting each other', () => {
@@ -699,4 +712,11 @@ test('skipped counts beats lost to a pump gap; the source plays once and keeps i
   audio.emit({ cue: 'r', class: 'weak', position: [2, 0, 0], every: .5 }, 0); audio.pump(0, origin);
   out.time = 2; audio.pump(2, origin);
   assert.deepEqual([out.voices.length, audio.stats.skipped, audio.stats.dropped, audio.stats.late], [2, 3, 0, 0]);
+});
+
+test('a start exactly at maxLateness is on time (float epsilon), neither late nor dropped', () => {
+  const out = timedOutput(); const audio = createSpatialAudio({ output: out, classes: flat });
+  audio.emit({ cue: 'x', class: 'weak', position: [2, 0, 0] }, .3);
+  out.time = .45; audio.pump(.45, origin);   // .45 - .3 === 0.15000000000000002
+  assert.equal(out.voices.length, 1); assert.deepEqual([audio.stats.late, audio.stats.dropped], [0, 0]);
 });

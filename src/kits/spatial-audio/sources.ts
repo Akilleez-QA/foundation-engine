@@ -125,7 +125,10 @@ export interface SpatialAudioStats {
    * reservation timed out, or the output refused them.
    */
   readonly dropped: number;
-  /** Emissions that played, but more than `maxLateness` after they were due (a reservation after a slow pump, or `carryLate`). */
+  /**
+   * Emissions that played, but more than `maxLateness` after they were due: a sound that had already taken a voice
+   * before a hitch or with slow pumps (up to the hitch plus one fade), an opt-in rotation, or `carryLate`.
+   */
   readonly late: number;
   /** Beats a repeating source never emitted because its pumps stopped for longer than `maxLateness` (a long frame, a hidden tab). */
   readonly skipped: number;
@@ -320,7 +323,7 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
   /** Start the source's due emission. A previous voice of the same source is replaced (faded; the fade holds a slot). */
   const start = (s: Source, now: number): boolean => {
     if (closed || sources.get(s.id) !== s) return false;
-    const wasLate = s.dueAt !== null && now - s.dueAt > maxLateness;
+    const wasLate = s.dueAt !== null && now - s.dueAt > maxLateness + 1e-9;
     if (s.late) s.nextAt = now + s.input.every!;
     // HRTF only within the cap counting this kit's fading HRTF voices too (they still hold an HRTF panner). A repeat
     // overlapping its own voice never waits for HRTF: at the cap it starts equal-power (hrtfDeferred). A deferred
@@ -437,7 +440,7 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
             if (every === undefined) { s.dueAt = s.nextAt; s.nextAt = Infinity; }
             // A repeating source that missed its slot by more than the lateness (a long frame, a hidden tab) emits
             // once now and restarts its rhythm from now, instead of replaying or dropping the missed ones.
-            else if (now - s.nextAt > maxLateness) { stats.skipped += Math.floor((now - s.nextAt) / every); s.dueAt = now; s.nextAt = now + every; }
+            else if (now - s.nextAt > maxLateness + 1e-9) { stats.skipped += Math.floor((now - s.nextAt) / every); s.dueAt = now; s.nextAt = now + every; }
             else { s.dueAt = s.nextAt; s.nextAt += every; }
           }
           if (s.dueAt !== null && s.gain === 0) { stats.culled++; settle(s); s.waitingSince = null; }
@@ -445,7 +448,7 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
           // Lateness (reservations are checked after admission, so a slot that frees on this pump is used first).
           if (s.dueAt !== null && !s.reserved) {
             const waited = now - s.dueAt;
-            if (s.late ? waited > s.input.every! : waited > maxLateness) {
+            if (s.late ? waited > s.input.every! + 1e-9 : waited > maxLateness + 1e-9) {
               if (!s.late && s.input.carryLate && s.input.every !== undefined) s.late = true;
               else { stats.dropped++; settle(s); }
             }
@@ -504,7 +507,13 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
         // `maxLateness` after one fade and one pump, or that became due since the last pump (so slow pumps can still
         // steal; such a start may land after `maxLateness` and is counted in `late`). Otherwise the emission waits for a
         // free slot or is dropped, and no voice is cut for it.
-        const fits = (s: Source) => { const waited = now - s.dueAt!; return waited + FADE_HOLD + step <= maxLateness || waited <= step + 1e-9; };
+        // A late `carryLate` emission may cut a voice while its start (one fade and one pump later) stays within its
+        // one-interval bound, so carried loops can still rotate or take a yielding slot.
+        const fits = (s: Source) => {
+          const waited = now - s.dueAt!;
+          if (s.late) return waited + FADE_HOLD + step <= s.input.every! + 1e-9;
+          return waited + FADE_HOLD + step <= maxLateness + 1e-9 || waited <= step + 1e-9;
+        };
         for (const s of inside) {
           if (s.dueAt === null || sources.get(s.id) !== s) continue;
           if (holds(s)) {
@@ -524,7 +533,7 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
             // Opt-in rotation may also reserve while the emission is still within `maxLateness` (it then starts up to one
             // fade and one pump after it, counted in `late`): it needs the wait to find a voice old enough to rotate.
             const k = victims.findIndex(v => (s.score > v.score * stealRatio && fits(s))
-              || (Math.abs(s.score - v.score) <= v.score * TIE && now - v.startedAt >= rotateAfter && now - s.dueAt! <= maxLateness));
+              || (Math.abs(s.score - v.score) <= v.score * TIE && now - v.startedAt >= rotateAfter && (s.late ? fits(s) : now - s.dueAt! <= maxLateness + 1e-9)));
             if (k < 0) break;
             const [victim] = victims.splice(k, 1);
             if (s.score > victim.score * stealRatio) stats.stolen++; else stats.rotated++;

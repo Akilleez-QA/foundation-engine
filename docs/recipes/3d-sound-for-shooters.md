@@ -94,8 +94,10 @@ sound.pump(ctx.time.t, ctx.camera.position);
   Equal sounds take turns through free slots. For a shooter's short, frequent cues, opt in to
   `limits.rotateAfter` (0.25 to 1 s) so newer equal shots get turns against older voices; leave it
   off for ambience and loops. By default a sound that cannot start within `maxLateness` is dropped
-  (`stats.dropped`), never played late; for long equal loops that should take turns, set
-  `carryLate: true` on those sources (they may start up to one interval late, `stats.late`).
+  (`stats.dropped`): sounds start on time at a steady frame rate; after a hitch or with slow pumps,
+  a sound that already took a voice may start late (counted in `stats.late`). For long equal loops
+  that should take turns, set `carryLate: true` on those sources (they may start up to one interval
+  late, `stats.late`).
   Keep `raysPerPump` at 2 or more when sounds start every frame.
 
 ## 4. Check it
