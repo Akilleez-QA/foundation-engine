@@ -30,7 +30,8 @@ import { EMITTER_ID, type ParticleField } from './particle-contract';
  *  - particles: entities with `Transform` and `Emitter` are simulated by the engine's fixed system `engine.particles`
  *    (after the scene's own fixed systems) and drawn as one instanced draw per emitter, interpolated between steps
  *    (particle-sim.ts, scene-particles.ts). A scene without emitters creates nothing for them;
- *  - `enter` runs once the visit is active (ADR 0045); `exit` when it is left. Everything the visit creates is owned
+ *  - `enter` runs once the visit is active (ADR 0045), before any of the visit's systems step; `exit` when it is left.
+ *    Everything the visit creates is owned
  *    by the run and released in reverse order when it leaves.
  */
 import * as T from 'three';
@@ -110,6 +111,8 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
   let ctxRef: SceneContext | null = null;
   let activityStart: (() => void) | undefined;
   let tapArrive: (() => void) | undefined;
+  // Set once arrival has run `enter`: no system of this visit steps before it, on a first entry or a re-entry.
+  let arrived = false;
   const activity = {
     id: sceneId(scene.id), kind: 'scene' as const,
     enter(actx: ActivityContext, { mount }: SceneParams): ActivityRun {
@@ -444,8 +447,8 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       // Async asset replacements still own their later preparation; this is not a GPU upload/shadow guarantee.
       let programsPrepared=false,preparationVersion=0;
       let programFailed=false;
-      // Systems start only once initial preparation settles, as before this preparation existed:
-      // the router's first-render frames then precede arrival, so systems never run long before enter().
+      // Systems start only once initial preparation settles and the visit has arrived: the router's first-render
+      // frames draw the spawned entities, but no system steps until `enter()` has set up the visit's state.
       let simulating=false;
       const failPrograms=(error:ProgramLinkError|FrameReadinessError)=>{
         if(programFailed||actx.leaving()||actx.signal.aborted)return;
@@ -490,7 +493,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
         frameMode: live ? 'continuous' : 'on-demand',
         update(f: FrameInfo) {
           if(programFailed)return;
-          if(!simulating){pressed.clear();gestures.pointer.pressed=false;return;}
+          if(!simulating||!arrived){pressed.clear();gestures.pointer.pressed=false;return;}
           try{
           frame++; t += f.dt; calm = f.calm; frameMs = f.t * 1000;
           gestures.sync();
@@ -542,6 +545,6 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
   };
   return enterActivity({
     host: s.shell.activities, mount: s.shell.mount, activity, visit,
-    arrive: () => { if (ctxRef) { scene.enter?.(ctxRef); activityStart?.(); tapArrive?.(); } },
+    arrive: () => { if (ctxRef) { try { scene.enter?.(ctxRef); } finally { arrived = true; } activityStart?.(); tapArrive?.(); } },
   });
 }

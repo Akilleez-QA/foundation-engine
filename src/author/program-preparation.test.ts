@@ -11,12 +11,15 @@ const prepare=source.slice(source.indexOf('      let programsPrepared=false,'),s
 const restore=source.slice(source.indexOf('        contextRestored() {'),source.indexOf('\n      };\n    },',source.indexOf('        contextRestored() {')));
 const draw=source.slice(source.indexOf('        render() {'),source.indexOf('        activate() {'));
 const step=source.slice(source.indexOf('        update(f: FrameInfo) {'),source.indexOf('        render() {'));
-function fixture(frameReady?:()=>Promise<string>,tap:{running():boolean}|null=null){
+// The runtime's own arrival callback (it runs the scene's enter()), cut from the enterActivity call.
+const arriveAt=source.indexOf('    arrive: () =>'),arrival=source.slice(arriveAt,source.indexOf('\n',arriveAt)).replace(/,$/,'');
+function fixture(frameReady?:()=>Promise<string>,tap:{running():boolean}|null=null,arrive=true){
  const cards:any[]=[],layers:any[]=[];let compileError:Error|undefined,renderError:Error|undefined;
  const doc={createElement:()=>({children:[] as any[],setAttribute(){},addEventListener(){},append(...nodes:any[]){this.children.push(...nodes);},remove(){}})};
  const pending:{resolve:(result:string)=>void;reject:(error:Error)=>void}[]=[],owner=new AbortController(),view={dataset:{} as Record<string,string>,append:(node:unknown)=>cards.push(node)},log:unknown[]=[];let compiled=0,invalidated=0,lost=false;
- const run=ts.transpile(`let dirty=true,frame=0,t=0,calm=false,frameMs=0,steps=0;const pressed={clear(){},endFrame(){}},gestures={sync(){},pointer:{pressed:false}},runner={frame(){steps++;},alpha:0},ctx={},particles={interpolate:()=>false};const three={},camera={},visit={current:()=>true};${prepare}\nreturn {ready,state:()=>programsPrepared,steps:()=>steps,${step}${draw}${restore}};`,{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None});
+ const run=ts.transpile(`let dirty=true,frame=0,t=0,calm=false,frameMs=0,steps=0;const pressed={clear(){},endFrame(){}},gestures={sync(){},pointer:{pressed:false}},runner={frame(){steps++;},alpha:0},ctx={},particles={interpolate:()=>false};const three={},camera={},visit={current:()=>true};let arrived=false,activityStart,tapArrive,ctxRef=ctx,enteredAt=-1;scene.enter=()=>{enteredAt=steps;};${prepare}\nreturn {ready,state:()=>programsPrepared,steps:()=>steps,enteredAt:()=>enteredAt,${arrival},${step}${draw}${restore}};`,{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None});
  const api=new Function('actx','view','renderer','surface','sync','s','scene','ProgramLinkError','doc','failureText','FrameReadinessError','tap',run)({signal:owner.signal,leaving:()=>owner.signal.aborted,invalidate:()=>invalidated++,own:()=>{},layer:(l:unknown)=>layers.push(l),runId:'run-test'},view,{compile:()=>{compiled++;if(compileError)throw compileError;},render:()=>{if(renderError)throw renderError;},getContext:()=>({isContextLost:()=>lost})},{frameReady,programsReady:()=>new Promise<string>((resolve,reject)=>pending.push({resolve,reject}))},()=>{}, {log:{error:(...args:unknown[])=>log.push(args)}},{id:'test'},ProgramLinkError,doc,(key:string)=>key,FrameReadinessError,tap);
+ if(arrive)api.arrive();
  return {api,pending,owner,view,log,cards,layers,compileThrows:(e:Error)=>{compileError=e;},renderThrows:(e:Error)=>{renderError=e;},lose:()=>{lost=true;},get compiled(){return compiled;},get invalidated(){return invalidated;}};
 }
 const turn=()=>new Promise<void>(resolve=>setImmediate(resolve));
@@ -71,4 +74,14 @@ test('a dev/test tick tap holds the fixed lane until it reports running (SIM-01)
  f.api.update({dt:.016,calm:false});assert.equal(f.api.steps(),0,'held before arrival');
  running=true;f.api.update({dt:.016,calm:false});assert.equal(f.api.steps(),1);
  running=false;f.api.update({dt:.016,calm:false});assert.equal(f.api.steps(),1,'held again after a replay ends');
+});
+
+test('no system steps before arrival runs enter(), on a first entry or a re-entry, even once preparation settled',async()=>{
+ // Re-entering a scene (goto to itself, restart, the next level) is a fresh visit with fresh state, like a first entry:
+ // the router's first-render frames run update() between preparation and arrival, and must not step systems there.
+ const f=fixture(undefined,null,false);f.pending[0]!.resolve('ready');await f.api.ready;
+ for(let i=0;i<3;i++)f.api.update({dt:.016,calm:false});
+ assert.equal(f.api.steps(),0,'first-render frames before arrival step no system');
+ f.api.arrive();assert.equal(f.api.enteredAt(),0,'enter() ran before any step');
+ f.api.update({dt:.016,calm:false});assert.equal(f.api.steps(),1,'systems step once arrived');
 });

@@ -24,7 +24,7 @@ export default defineScene({
 - **title**: English; it becomes the string key `game.scene.<id>.title`, so it can be translated.
 - **type**: open (`level`, `menu`, `world`, …); tools and kits may read it.
 - **body**: heavy content goes in `body: () => import('./level.body.mts')`, which loads with the scene, not with the game.
-- **enter / exit**: once per visit, when the scene becomes active and when it is left.
+- **enter / exit**: once per visit, when the scene becomes active and when it is left. `enter` runs before any of the visit's systems step, in the browser as in `testScene`, so systems may rely on the state it sets. A re-entry (`ctx.scene.goto` to the same scene, `restart`, a retry) is a new visit: fresh `ctx.state`, then `enter`, then systems.
 
 Every `.ts` default export in the game folder is picked up (except tests, `build.brief.ts` and `game.ts`); nothing else needs editing.
 
