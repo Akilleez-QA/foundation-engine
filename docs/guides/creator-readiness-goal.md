@@ -29,7 +29,7 @@ records for implementation details rather than creating another capability inven
 
 | Outcome | Completion evidence |
 | --- | --- |
-| Discover and start | Clear routes to making a game and contributing; public prerequisites and runnable example; two fresh setup trials, including a newcomer when available. Target first playable result within 15 minutes on a declared reference setup, with prerequisite downloads timed separately. |
+| Discover and start | Clear routes to making a game and contributing; public prerequisites and runnable example; two fresh setup trials, including the owner-selected fresh-context agent acting as a first-time creator. Record this as a simulated newcomer trial. Target first playable result within 15 minutes on a declared reference setup, with prerequisite downloads timed separately. |
 | Change and share | Make a meaningful edit, run the relevant checks, build and serve the output from a subpath using documented steps without engine edits. |
 | Reliable local session | A representative consumer composes start, play, settings, focus interruption, scene replacement, save, reload and retirement. Refused/interrupted operations and retry have explicit consumer evidence; separate unit coverage remains labeled separately. |
 | Optional shared session | Within its declared local scope: admission, baseline, disconnect/reconnect, fresh-state recovery and terminal refusal. No broader network claim without corresponding evidence. |
@@ -40,9 +40,9 @@ records for implementation details rather than creating another capability inven
 | Release candidate | Required checks run on the named candidate; changelog, support limits, notices and reproducible build instructions agree. Release preparation and publication remain distinct. |
 
 These are acceptance targets, not measured results. Record any target revision and
-its rationale explicitly. A simulated trial cannot certify a real newcomer or
-physical device; missing evidence keeps that criterion open while independent work
-continues.
+its rationale explicitly. The owner selected an agent persona for this milestone’s newcomer exercise.
+That trial can satisfy the stated exercise, but cannot certify human experience or
+physical devices. Keep those evidence limits explicit.
 
 ## Sequence and parallel work
 
