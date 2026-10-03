@@ -91,7 +91,13 @@ export async function startSessionServer({ rules, port = DEFAULT_PORT, host = '1
     socket.on('message', (data, binary) => session.message(socket, binary ? '\u0000binary' : data.toString('utf8'), now()));
     socket.on('close', () => session.disconnected(socket, now()));
   });
-  await new Promise((resolve, reject) => { wss.once('listening', resolve); wss.once('error', reject); });
+  try { await new Promise((resolve, reject) => { wss.once('listening', resolve); wss.once('error', reject); }); }
+  catch (error) {
+    // Nothing started: release the session and the half-open server so the caller's exit is clean.
+    session.dispose();
+    wss.close();
+    throw error;
+  }
   const timer = setInterval(() => session.pump(now()), driverMs);
   const bound = wss.address().port;
   let closing;
@@ -131,7 +137,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const server = await startSessionServer({
     rules, port, host: lan ? '0.0.0.0' : '127.0.0.1', integrity, lan, ...(joinCodeArg === undefined ? {} : { joinCode: joinCodeArg }),
     log: ({ event, player, reason }) => console.log(`  ${stamp()} ${event}${player ? ' ' + player : ''}${reason ? ` (${reason})` : ''}`),
-  }).catch(error => { console.error(`\n  Could not start the host: ${error.message}\n`); process.exit(1); });
+  }).catch(error => {
+    if (error.code === 'EADDRINUSE') console.error(`\n  npm run host: port ${port} is busy; try npm run host -- --port ${port + 1}\n`);
+    else console.error(`\n  Could not start the host: ${error.message}\n`);
+    process.exit(1);
+  });
   const scene = (await import(pathToFileURL(join(gameDir(), 'game.ts')).href)).default?.firstScene ?? '';
   const link = (address) => `http://${address}:${playPort}/?host=${server.port}&join=${server.joinCode}${scene ? `#scene/${scene}` : ''}`;
   const lines = [

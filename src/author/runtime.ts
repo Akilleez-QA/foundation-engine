@@ -3,7 +3,7 @@ import {ProgramLinkError} from '../platform/render/program-validation';
 import {t as failureText} from '../core/i18n/app-i18n';
 import { createSceneActivity } from './scene-activity';
 import { normalizeModelPoseLinkLimits } from './model-pose-link';
-import { createSceneModelInspector } from './model-inspection';
+import { createSceneModelInspector, inspectModel } from './model-inspection';
 import { authorSaveHandle } from './save-handle';
 import { createViewSize } from './view-size';
 import { createReadingSheets } from './reading-sheet';
@@ -272,7 +272,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       };
       actx.own(appLayers(doc).onChange(() => { syncListener(); gestures.sync(); }));
       const maskOf = (e: Entity) => validateRenderMask(world.get(e, RenderMask)?.mask ?? 1);
-      const models = createSceneModels({ poseLinks: scene.modelPoseLinks === undefined ? undefined : normalizeModelPoseLinkLimits(scene.modelPoseLinks), inspection: TEST_API,world, scene: three, library: s.models, signal: actx.signal,
+      const models = createSceneModels({ poseLinks: scene.modelPoseLinks === undefined ? undefined : normalizeModelPoseLinkLimits(scene.modelPoseLinks), inspection: TEST_API ? inspectModel : undefined, world, scene: three, library: s.models, signal: actx.signal,
         mask: maskOf, invalidate: () => { dirty = true; actx.invalidate(); }, report: error => s.log.error(`${scene.id}: model failed`, error)});
       actx.own(() => models.dispose());
       // Particles (FX-01): the field is pure and visit-owned and steps on the fixed lane; its renderer (one hidden mesh
