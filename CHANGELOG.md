@@ -7,6 +7,16 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Accurate orphan import receipts.** Unknown payloads report `orphan-kept` only
+  after a successful write or exact stored-byte match. Different existing bytes
+  remain untouched and report `orphan-conflict`; storage exceptions report
+  `orphan-failed`. Known writes finish before orphan receipts are issued. A
+  renamed section's old alias key is no longer exported as an orphan, and an
+  alias orphan beside its section in one file reports `orphan-superseded` (not
+  written), so files exported after a rename import again. Profile format v2 is
+  unchanged; exhaustive import-report consumers must handle the three new
+  outcomes. Retain source files for explicit reconciliation or retry.
+
 - **Held touch buttons.** `touchButton(ctx, input, { label })` in `@kits/ui` presses a game input on
   touch, holds a `hold: true` input while the finger stays on it, and releases on lift, cancel,
   slide-off, blur or the visit's end; presses keep the exactly-once fixed-tick delivery. Touch only,

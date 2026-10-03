@@ -36,11 +36,37 @@ npx --no-install playwright-core install chromium
 
 Linux CI may also need browser system dependencies (`npx --no-install playwright-core install --with-deps chromium`). The harness accepts `ENGINE_CHROMIUM` as an executable path, then tries Playwright's installed browser, then an installed Chrome or Chromium in its usual folder for the OS (`ENGINE_CHROMIUM_SYSTEM=0` skips those); without one it stops with the install command. Test browsers are isolated and muted; do not change system audio or use a personal browser profile for automation.
 
+For the current improvement milestone, see the [creator-readiness goal](docs/guides/creator-readiness-goal.md): acceptance criteria, task cards, parallel ownership and evidence requirements.
+
 ## Propose a change
 
 For substantial changes, open an issue describing the problem, a minimal consumer, and the proposed contract before investing in an implementation. A bug report should include a commit/version, browser/device, steps, expected and actual behavior, and a small reproduction. Remove credentials, private assets, personal information, and unrelated application code. Follow SECURITY.md for suspected vulnerabilities.
 
 Explain ownership and disposal, asynchronous cancellation, finite work/memory bounds, and compatibility with existing callers where relevant. An optional kit must stay optional. Do not import kits into core, platform, or the author API; game code imports only `@engine`, `@kits/<name>`, its own files, and JSON. Use existing scheduling, asset, worker, input, and save mechanisms instead of introducing parallel subsystems.
+
+## Describe systems and patterns
+
+Use system and pattern names instead of external game titles, franchise names,
+their acronyms, or references to their source projects in contribution titles, issues, proposals,
+pull requests, goals, documentation, code comments, and examples. Describe the
+behavior and reusable contract directly: for example, sectioned persistence,
+scene ownership, authoritative replication, data-driven crafting, or bounded
+asset streaming. State requirements and acceptance evidence so the submission
+stands on its own without familiarity with another game.
+
+Study mechanics, architecture and behavior as reusable systems and patterns;
+this repository does not require inspiration credits or game-name citations for
+independently implemented mechanics. Describe our own requirements, design and
+verification evidence.
+
+Do not submit proprietary source excerpts, source links, or private study notes.
+Attribution and license notices apply to third-party material actually included
+or adapted in a contribution, such as code, assets or documentation, and to
+dependencies. Preserve required notices for that material. A change of programming
+language alone does not make adapted code an independent implementation.
+Foundation's own template names and reproducible file/API identifiers remain
+appropriate when needed to explain or verify a change. Reviewers should request
+neutral system/pattern wording before accepting a submission.
 
 ## Make and validate the change
 
@@ -52,7 +78,7 @@ During development:
 npm run check
 ```
 
-`check` selects affected tests from working-tree changes against HEAD, including untracked files. After committing, a clean tree can select **zero tests**. Read its test summary; a pass then does not establish a regression test ran.
+`check` selects affected tests from working-tree changes against HEAD, including untracked files. A clean committed tree can select **zero tests**; the output reports that explicitly, and a pass then does not establish that a regression test ran. Use `npm run check -- --base origin/main` (or your fork's upstream base) to include committed changes since the merge base, together with staged, unstaged and untracked changes. This selection is a local heuristic, not complete dependency coverage. Use `npm run check -- --all` to run the canonical `npm test` suite during the check. Invalid revisions and unknown selection options fail instead of silently selecting no tests.
 
 Run relevant tests explicitly before requesting review, including after a commit. For example, a game-directory argument change uses:
 
@@ -60,7 +86,7 @@ Run relevant tests explicitly before requesting review, including after a commit
 node --import tsx --test scripts/lib/game-dir.test.mjs
 ```
 
-Use the test files for your actual change, not this example by default. Record the test count and result. Also run the ordinary source checks:
+Use the test files for your actual change, not this example by default. Record the test count and result. Before requesting review, also run the complete source checks:
 
 ```sh
 npm run typecheck

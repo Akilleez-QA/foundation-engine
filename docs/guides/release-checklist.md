@@ -20,7 +20,17 @@ npx --no-install playwright-core install --with-deps chromium
 npm run gate:ci
 ```
 
-`npm run gate:ci` runs every `run:` step of `.github/workflows/ci.yml` in order with the same env, GitHub's `bash -eo pipefail` shell and `CI=true`: the browser regression suites, `gate:templates` and the phone smoke. It skips only the setup steps (`npm ci`, the browser install), stops at the first failure with the step, exit code and duration, and resumes with `--from <step>` or narrows with `--only <step>` (`--list` shows the step ids). It refuses a Node major other than the workflow's unless given `--any-node`. A workflow construct it cannot mirror (a second job, `if:`, `shell:`, a matrix) is an error, and `scripts/gate-ci.test.mjs` fails when the workflow gains a step it would not run. It reproduces CI's commands, not CI's machine: a pass does not certify a different browser build, hardware or timing. `npm run gate:templates` remains the template gates alone.
+`npm run gate:ci` reproduces every checking command from `.github/workflows/ci.yml`
+serially with the job/step environment, GitHub's `bash -eo pipefail` shell and
+`CI=true`. Setup steps (`npm ci` and the browser install) remain explicit. A failure
+stops that job; independent jobs continue, and the terminal aggregate uses their
+actual results. `--from` and `--only` select partial runs, which cannot establish
+full CI acceptance; `--list` shows job-qualified step IDs. The runner rejects
+unsupported workflow graphs, conditions, shell overrides, matrices and expressions,
+and requires the workflow's Node major unless given `--any-node`. See
+[Complete CI and template shards](#complete-ci-and-template-shards) below.
+A pass reproduces commands, not GitHub's machine, browser build or physical-device
+performance. `npm run gate:templates` remains the complete template gates alone.
 
 The browser installation may need administrator privileges for operating-system libraries. It is explicit: `npm ci` installs the locked packages, while the browser command installs the matching Chromium. Tests use a fresh, muted browser profile and software rendering by default. `ENGINE_CHROMIUM` can select an existing compatible executable; no developer-specific executable path is required.
 
@@ -116,3 +126,26 @@ commit, tree identity, checks and remaining limitations before publication.
 The deletion/recreation suggestion in an earlier PR is not a completed step.
 Hosted records, permissions and redirects require separate migration decisions;
 do not delete a repository merely because an orphan export has been prepared.
+
+## Complete CI and template shards
+
+Hosted CI runs framework/browser checks serially in `browser`, alongside two
+isolated template runners. Each sorted discovered template belongs to exactly one
+shard; each still runs the complete gate (including full tests) and phone smoke.
+The terminal required check remains `check` and accepts only explicit success from
+all three work jobs. Failure, cancellation, skipped or missing results do not pass.
+Existing budgets, runner permissions, pinned actions and timeouts are unchanged.
+
+On a suitable local machine, `npm run gate:ci` reads this workflow and executes all
+work jobs serially, then checks their actual results. A failed step stops its job;
+other independent jobs still execute. Install dependencies and Chromium first as
+shown above. This reproduces the checks, not GitHub runner isolation or hardware.
+Unsupported job graphs, conditions and expressions fail before execution.
+
+`npm run gate:ci -- --list` prints job-qualified step IDs. `--from` and `--only`
+produce partial results and omit the terminal aggregate; they cannot establish full
+CI acceptance. For a focused template run use
+`npm run gate:templates -- --shard 1/2 --phone` (or `2/2`). Unknown template names,
+invalid shard arguments and empty selections fail. Templates are rediscovered on
+each run, so additions need no maintained name list. Hosted elapsed-time improvement
+must be measured after integration; the sharding change does not reduce total tests.

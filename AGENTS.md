@@ -30,6 +30,18 @@ workflow rules do not prescribe the design or tooling of every independent game.
 - Agent identity changes no runtime rule or budget. These are authority and workflow
   responsibilities, not a sandbox, permission system or authorship-dependent API.
 
+## Contribution language
+
+Follow [Describe systems and patterns](CONTRIBUTING.md#describe-systems-and-patterns)
+for all repository contributions and submissions. Use system and pattern names
+instead of external game names, their acronyms, or references to their source projects, including
+in goals, proposals, comments and examples. Explain the behavior, contract and
+acceptance evidence directly. Do not publish proprietary source or private study
+notes. Independently implemented mechanics need no inspiration credits under this
+repository rule. Preserve required attribution and license notices for third-party
+material actually included or adapted, plus accurate dependency and reproduction
+identifiers. Changing languages alone does not establish independent implementation.
+
 ## Building your own game (solo or build day)
 
 Most people clone this repository to make a game, not to change the engine. Then:
@@ -122,7 +134,7 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 | `npm run play:criteria [-- --gate]` | The brief's success criteria, checked and tabled |
 | `npm test` / `npm run lint` | All tests / all lints (layers, arch, css, generic, brief, budgets) |
 | `npm run gate` / `npm run gate:templates` | The integration gate for this game / for every template |
-| `npm run gate:ci [-- --from <step> \| --only <step> \| --list]` | Every `run:` step of `.github/workflows/ci.yml`, in order with its env (browser suites, `gate:templates`, phone smoke); stops at the first failure and tables the steps |
+| `npm run gate:ci [-- --from <step> \| --only <step> \| --list]` | Every checking `run:` step of `.github/workflows/ci.yml`, with its env; reproduces all work jobs serially and derives the final aggregate. Partial selections are not full CI acceptance |
 | `npm run bench`, `npm run perf:derive` | Measure scenes; derive budgets |
 | `npm run quality:guard` | Picture comparison of two builds |
 | `npm run deploy:production` | The only production release path for this repository's `main` (a game is shared with `npm run build` and static hosting) |
