@@ -25,6 +25,10 @@ export interface BenchScene {
    * Without them the arrow keys are held and drive the scene only if they press one of the game's own input actions.
    */
   activeKeys?: string[];
+  /** Before each active attempt, wait for this visible in-scene marker, press the native restart key,
+   * then require the old marker to detach and the same scene to become active. Bounded setup is outside
+   * measurement; no gameplay mutation, redraw forcing or budget exemption. */
+  activeRestart?: { when: string; key: string; timeoutMs: number };
   budget: Ported<Partial<SceneBudgetValues>>;
   provenance?: { measured: string; run: string; note?: string };
 }
