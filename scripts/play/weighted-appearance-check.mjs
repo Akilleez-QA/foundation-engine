@@ -9,7 +9,7 @@ import {launch} from '../perf/bench-browser.mjs';
 import {diagnosticReport} from './diagnostic-report.mjs';
 import {fixture,expectedVertices} from '../../tools/weighted-appearance/fixtures.mjs';
 const out=resolve(process.argv[2]??'playtest/weighted-appearance');mkdirSync(out,{recursive:true});
-const report={revision:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),passed:false,errors:[],consoleErrors:[],screenshots:[],limitations:['Desktop Chromium 1440×960 keyboard/pointer diagnostic only; phone/tablet and physical hardware unverified.','Independent scalar three-vertex oracle observes actual adopted GLB skinning. No arbitrary retargeting, shared palette or skeleton fusion claim.','Delayed transport may abort before decode; runtime adversarial tests cover stale decoded adoption.']};
+const report={revision:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),dirtyWorktree:!!execFileSync('git',['status','--porcelain'],{cwd:ROOT,encoding:'utf8'}).trim(),passed:false,errors:[],consoleErrors:[],screenshots:[],limitations:['Desktop Chromium 1440×960 keyboard/pointer diagnostic only; phone/tablet and physical hardware unverified.','Independent scalar three-vertex oracle observes actual adopted GLB skinning. No arbitrary retargeting, shared palette or skeleton fusion claim.','Delayed transport may abort before decode; runtime adversarial tests cover stale decoded adoption.']};
 const evidence=diagnosticReport(report,resolve(out,'report.json'));let held=[],browser;const release=()=>{for(const send of held.splice(0))send();};
 const server=await createServer({root:ROOT,logLevel:'error',plugins:[{name:'weighted-original-fixtures',configureServer(s){s.middlewares.use((req,res,next)=>{const match=/^\/__weighted-appearance\/([a-z]+)\.glb$/.exec(req.url??'');if(!match)return next();const send=()=>{if(res.destroyed)return;if(match[1]==='failed'){res.statusCode=503;res.end('Injected unavailable model');return;}res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','model/gltf-binary');res.end(match[1]==='failed'?Buffer.from('intentional invalid GLB'):fixture(match[1]));};if(match[1]==='slow')held.push(send);else send();});}}],server:{host:'127.0.0.1',port:0}});
 const snapshots={};
@@ -45,8 +45,35 @@ try{
  for(const id of ['missing','badbind']){const old=(await read()).accepted;await preview(id);await page.waitForFunction(()=>weightedAppearance.read().candidate?.link.status==='incompatible');assert.equal((await read()).accepted.part,old.part);assert.equal(await page.locator('#commit').isDisabled(),true);await check(0,-2);await shot(id);await click('cancel');}
  const accepted=(await read()).accepted;await preview('failed');await page.waitForFunction(()=>weightedAppearance.read().candidate?.partState.status==='failed');assert.equal((await read()).accepted.part,accepted.part);assert.equal(await page.locator('#commit').isDisabled(),true);await click('cancel');
  await preview('slow');await page.waitForFunction(()=>weightedAppearance.read().candidate!==null);await page.evaluate(()=>weightedAppearance.keep());await click('cancel');release();await page.waitForTimeout(100);assert.equal((await read()).candidate,null);assert.equal(await page.evaluate(()=>weightedAppearance.previous().status),'absent');assert.equal((await read()).accepted.part,accepted.part);
- await preview('cyan');await waitCandidate();await click('commit');await click('fail-save');await click('save');assert.match((await read()).save,/unsaved/);snapshots.failedSave=await read();await shot('save-refused');await reload();await ready();await open();assert.equal((await read()).value.parts.surface,'reversed');
- await preview('cyan');await waitCandidate();await click('commit');await click('restore-save');await click('save');assert.equal((await read()).save,'saved');await click('undo');await waitCandidate();await click('commit');assert.equal((await read()).value.parts.surface,'reversed');await click('save');await reload();await ready();await open();assert.equal((await read()).value.parts.surface,'reversed');
+ // Refused persistence must be visible and preserve the exact last durable envelope.
+ const durable=()=>page.evaluate(()=>localStorage.getItem('weighted-appearance|device|appearance.profile'));
+ const assertUnsaved=async()=>{
+  assert.match(await page.locator('#summary').innerText(),/^unsaved/);
+  assert.match(await page.locator('#persistence').innerText(),/^Persistence: unsaved/);
+  assert.equal(await page.locator('#save').isVisible(),true);
+  assert.equal(await page.locator('#save').isEnabled(),true,'a refused write remains retryable');
+ };
+ const reversedRaw=await durable();assert.equal(JSON.parse(reversedRaw).data.parts.surface,'reversed');
+ await preview('cyan');await waitCandidate();await click('commit');await click('fail-save');await click('save');
+ await assertUnsaved();assert.equal(await durable(),reversedRaw);snapshots.failedSave=await read();await shot('save-refused');
+ await reload();await ready();await open();assert.equal((await read()).value.parts.surface,'reversed');await check(0,-2);
+ assert.equal(await durable(),reversedRaw,'reload retains the old durable record');
+ // Refuse again, then recover in the same live page. No reload may hide the failed state before retry.
+ await preview('cyan');await waitCandidate();await click('commit');await click('fail-save');await click('save');
+ await assertUnsaved();assert.equal(await durable(),reversedRaw);snapshots.retryRefused=await read();
+ await click('restore-save');assert.match(await page.locator('#message').innerText(),/^Writes restored; choose Save to retry\./);
+ await assertUnsaved();await click('save');
+ assert.equal(await page.locator('#summary').innerText(),'saved');
+ assert.equal(await page.locator('#persistence').innerText(),'Persistence: saved');
+ assert.equal(JSON.parse(await durable()).data.parts.surface,'cyan');snapshots.retrySaved=await read();await shot('save-recovered');
+ await reload();await ready();await open();assert.equal((await read()).value.parts.surface,'cyan');
+ assert.equal((await read()).accepted.part,'cyan');assert.equal(await page.locator('#summary').innerText(),'saved');
+ await check(0,-2);snapshots.retryReloaded=await read();await shot('recovered-reload');
+ // A reload deliberately clears history. Create fresh edits before exercising the existing undo branch.
+ await preview('reversed');await waitCandidate();await click('commit');
+ await preview('cyan');await waitCandidate();await click('commit');
+ await click('undo');await waitCandidate();await click('commit');assert.equal((await read()).value.parts.surface,'reversed');
+ await click('save');await reload();await ready();await open();assert.equal((await read()).value.parts.surface,'reversed');
  await click('animate');await page.waitForFunction(()=>weightedAppearance.source().model.playback.time>.2);await click('pause');await page.waitForTimeout(50);const playback=await page.evaluate(()=>weightedAppearance.source().model.playback.time);await check((playback<=1?playback:2-playback)*Math.PI/2,-2);snapshots.animated=await read();await shot('native-animated');
  // Same bounded window with native animation active, first accepted group alone,
  // then accepted plus a separately owned candidate. Keep the panel open in both.
