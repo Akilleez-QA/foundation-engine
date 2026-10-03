@@ -111,6 +111,8 @@ const decoded = textured();
 let secondUnavailable = false,
   secondMissing = false,
   held = [];
+// Server-side record of each decoded.glb response: bytes written and whether Node finished handing them to the socket.
+const decodedResponses = [];
 const release = () => {
   for (const respond of held.splice(0)) respond();
 };
@@ -153,6 +155,12 @@ const server = await createServer({
                     : second,
             );
           };
+          if (id === 'decoded') {
+            const row = {bytes: decoded.length, finished: false, closedEarly: false};
+            decodedResponses.push(row);
+            res.on('finish', () => (row.finished = true));
+            res.on('close', () => (row.closedEarly = !row.finished));
+          }
           if (id === 'slow') held.push(respond);
           else respond();
         });
@@ -215,11 +223,37 @@ try {
   // Decode hold (test-only): while armed, the real createImageBitmap decodes, then its result is withheld until released.
   await page.addInitScript(() => {
     const real = window.createImageBitmap.bind(window);
-    window.__decodeHold = {armed: false, cycle: null, decoded: [], held: [], releases: [], started: 0};
+    window.__decodeHold = {armed: false, cycle: null, decoded: [], held: [], releases: [], started: 0, startedAt: null};
+    // Page-side transfer record for the decoded model: a cloned body is read to the end, so its byte count and the
+    // time it completed come from the page itself rather than from the browser's network event bookkeeping.
+    const realFetch = window.fetch.bind(window);
+    window.__decodedTransfers = [];
+    window.fetch = function (input, init) {
+      const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+      const result = realFetch(input, init);
+      if (url.pathname !== '/__model-preview/decoded.glb') return result;
+      const row = {status: null, bytes: null, completedAt: null, error: null};
+      window.__decodedTransfers.push(row);
+      return result.then(response => {
+        row.status = response.status;
+        response
+          .clone()
+          .arrayBuffer()
+          .then(
+            body => {
+              row.bytes = body.byteLength;
+              row.completedAt = performance.now();
+            },
+            error => (row.error = String(error)),
+          );
+        return response;
+      });
+    };
     window.createImageBitmap = function (...args) {
       const hold = window.__decodeHold;
       if (!hold.armed) return real(...args);
       hold.started++;
+      hold.startedAt ??= performance.now();
       return real(...args).then(bitmap => {
         hold.decoded.push({width: bitmap.width, height: bitmap.height});
         hold.held.push({cycle: hold.cycle, bitmap});
@@ -464,7 +498,7 @@ try {
     const before = await resources(),
       prior = (await read()).accepted;
     await page.evaluate(cycle => {
-      Object.assign(window.__decodeHold, {armed: true, cycle, decoded: []});
+      Object.assign(window.__decodeHold, {armed: true, cycle, decoded: [], startedAt: null});
       modelPreview.decodeTrack.arm(cycle);
     }, cycle);
     // Subscribe to the exact request's terminal event inside its request event, before the immediate response can finish.
@@ -477,7 +511,17 @@ try {
     let transport = null;
     try {
       await choose('decoded');
+      // Wait for the decode to be held before reading any transfer evidence; no cancellation has happened yet.
+      await page.waitForFunction(
+        () =>
+          window.__decodeHold.decoded.length > 0 &&
+          window.__decodeHold.releases.length === window.__decodeHold.decoded.length,
+        null,
+        {timeout: 10000},
+      );
       if (cycle === 0) {
+        // Informational only: Chromium may report a fully consumed body as net::ERR_ABORTED when the renderer
+        // drops its loader before the network service's completion message, which raced under load in CI.
         const end = Date.now() + 5000;
         while (!terminal) {
           assert.ok(Date.now() < end, 'decoded model request observed');
@@ -488,17 +532,31 @@ try {
     } finally {
       page.off('request', onRequest);
     }
-    if (cycle === 0) {
-      assert.equal(transport.status, 'finished', 'decoded model response delivered in full');
-      assert.equal(transport.error, null);
-    }
+    // Transfer completion, asserted from the server and the page rather than from the browser's network event.
     await page.waitForFunction(
-      () =>
-        window.__decodeHold.decoded.length > 0 &&
-        window.__decodeHold.releases.length === window.__decodeHold.decoded.length,
+      () => window.__decodedTransfers.every(t => t.completedAt !== null || t.error !== null),
       null,
-      {timeout: 5000},
+      {
+        timeout: 5000,
+      },
     );
+    const transfers = await page.evaluate(() => window.__decodedTransfers.map(t => ({...t}))),
+      decodeStartedAt = await page.evaluate(() => window.__decodeHold.startedAt);
+    if (cycle === 0) {
+      assert.equal(decodedResponses.length, 1, 'one decoded model response served');
+      assert.deepEqual(
+        decodedResponses[0],
+        {bytes: decoded.length, finished: true, closedEarly: false},
+        'server sent the whole body',
+      );
+      assert.equal(transfers.length, 1, 'one page fetch of the decoded model');
+      assert.equal(transfers[0].error, null);
+      assert.equal(transfers[0].status, 200);
+      assert.equal(transfers[0].bytes, decoded.length, 'page received the whole body before cancellation');
+      // The decode itself proves full delivery too: the library parses only after validateEmbeddedGlb accepts a
+      // byte length equal to the GLB header's declared total, and the image decodes only inside that parse.
+      assert.ok(decodeStartedAt !== null, 'image decode started before cancellation');
+    } else assert.equal(transfers.length, 1, 'repeat cycles make no new page fetch');
     const decodedImages = await page.evaluate(() =>
       window.__decodeHold.decoded.map(d => ({width: d.width, height: d.height})),
     );
@@ -553,6 +611,9 @@ try {
     decodeCycles.push({
       cycle,
       transport,
+      transfers,
+      server: cycle === 0 ? decodedResponses[0] : null,
+      decodeStartedAt,
       decodedImages,
       pending: {candidate: pending.candidate, accepted: pending.accepted.entity},
       before,
@@ -573,7 +634,7 @@ try {
     end: decodeEnd,
     decodedFileBytes: decoded.length,
     scope:
-      "The GLB response finishes (requestfinished) and its embedded PNG is decoded to an ImageBitmap before cancellation; the decoded bitmap is withheld from GLTFLoader by a test-only createImageBitmap wrapper, so geometry/material creation and parse completion happen after cancellation. Cycles 2 and 3 decode the library's retained file bytes without a new request. The hold point is inside parsing, not between a completed parse and upload (that hop is a microtask in LeaseCache).",
+      "The server finishes sending the whole GLB and the page reads exactly that many bytes (a cloned body; the Playwright terminal event is recorded but not asserted), and its embedded PNG is decoded to an ImageBitmap before cancellation; the decoded bitmap is withheld from GLTFLoader by a test-only createImageBitmap wrapper, so geometry/material creation and parse completion happen after cancellation. Cycles 2 and 3 decode the library's retained file bytes without a new request. The hold point is inside parsing, not between a completed parse and upload (that hop is a microtask in LeaseCache).",
   };
   await shot('decode-cancellation');
   await shot('repeated-retirement');
