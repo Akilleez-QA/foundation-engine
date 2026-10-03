@@ -1,4 +1,4 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
   - name: Security reporting guidance
     url: https://github.com/Akilleez-QA/foundation-engine/blob/main/SECURITY.md

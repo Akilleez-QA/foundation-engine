@@ -170,6 +170,11 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
   const tag = (def: SaveSection<any>, player: PlayerId) => (def.scope === 'player' ? 'p:' + player : def.scope);
   const envKey = (def: SaveSection<any>, player: PlayerId, id = def.id) => ENVELOPE_PREFIX + tag(def, player) + '|' + id;
   const live = (def: SaveSection<any>) => def.legacy?.mode === 'live';
+  /** The registered player section that reads `name` as a local-storage alias, if any. */
+  const playerAlias = (name: string): SaveSection<any> | undefined => {
+    const def = defs.get(aliases.get(name) ?? '');
+    return def && def.scope === 'player' && !live(def) && portFor(def) === opts.local ? def : undefined;
+  };
   const portFor = (def: SaveSection<any>) => ((def.storage === 'session' || (live(def) && def.legacy?.session)) ? opts.session : opts.local);
   const legacyPort = (def: SaveSection<any>) => (def.legacy?.session ? opts.session : opts.local);
 
@@ -592,12 +597,21 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
         if (live(def) && !c.dirty) load(c);
         // Likewise an imported section notices a legacy write no event announced (same tab, a rollback, a script).
         else if (def.legacy && !c.dirty && c.status !== 'newer') checkDrift(c);
-        if (c.status === 'newer') { try { orphans[def.id] = JSON.parse(c.port.get(c.key) ?? 'null'); } catch { /* unreadable now: stays on disk */ } }
+        if (c.status === 'newer') {
+          try {
+            // load() falls back to an alias key when the canonical key is absent; export that payload under the canonical id.
+            let raw = c.port.get(c.key);
+            for (const a of live(def) ? [] : def.aliases ?? []) { if (raw !== null) break; raw = c.port.get(envKey(def, id, a)); }
+            orphans[def.id] = JSON.parse(raw ?? 'null');
+          } catch { /* unreadable now: stays on disk */ }
+        }
         else file.sections[def.id] = { v: def.version, data: clone(c.value) };
       }
       const mine = ENVELOPE_PREFIX + 'p:' + id + '|';
       for (const k of opts.local.keys()) {
-        if (k.startsWith(mine) && !defs.has(k.slice(mine.length))) { try { orphans[k.slice(mine.length)] = JSON.parse(opts.local.get(k) ?? 'null'); } catch { /* skip */ } }
+        // A key under a registered section's alias is that section's pre-rename copy (load() reads it but never
+        // deletes it): the section above already exports the current value, so the stale copy is not an orphan.
+        if (k.startsWith(mine) && !defs.has(k.slice(mine.length)) && !playerAlias(k.slice(mine.length))) { try { orphans[k.slice(mine.length)] = JSON.parse(opts.local.get(k) ?? 'null'); } catch { /* skip */ } }
         if (k.startsWith(QUARANTINE_PREFIX) && k.includes('p:' + id + '|')) { const raw = opts.local.get(k); if (raw !== null) quarantine[k] = raw; }
       }
       if (Object.keys(orphans).length) file.orphans = orphans;
@@ -620,13 +634,25 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
       }
       // Phase 1: validate everything; any readable-but-invalid known section rejects the whole file.
       const staged: [SaveSection<any>, any][] = [], report: ImportReport = { format, sections: {} };
+      const knownIncoming = new Set<string>();
       for (const [id, entry] of Object.entries(incoming)) {
         const def = defs.get(id) ?? defs.get(aliases.get(id) ?? '');
         if (!def || def.scope === 'profile') { orphans[id] = entry; continue; }
+        knownIncoming.add(def.id);
         if (!entry || !Number.isInteger(entry.v)) throw Error('Invalid section ' + id);
         if (entry.v > def.version) { report.sections[def.id] = 'skipped-newer'; continue; }
         try { staged.push([def, upgrade(def, entry.data, entry.v)]); }
         catch (e) { throw Error(`${def.id}: ${(e as Error).message}`); }
+      }
+      // One report slot cannot acknowledge both a known section and an opaque orphan under the same id: reject
+      // before publishing any staged values. An orphan under an *alias* of a section this file also supplies is
+      // that section's pre-rename copy (older exports carried it); the section supersedes it, so it is reported,
+      // not written and not a conflict. Engine exports after a rename must import again.
+      const superseded = new Set<string>();
+      for (const id of Object.keys(orphans)) {
+        const def = defs.get(id);
+        if (def && knownIncoming.has(def.id)) throw Error('Section also supplied as an orphan: ' + def.id);
+        if (!def && knownIncoming.has(playerAlias(id)?.id ?? '')) superseded.add(id);
       }
       // Phase 2: commit (merge progress, replace the rest), then write once.
       const touched: Cell[] = [];
@@ -640,13 +666,22 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
         c.value = next;
         c.imported = false; c.folded = false; markDirty(c); notify(c); requireOpen(); touched.push(c);
       }
-      for (const [id, entry] of Object.entries(orphans)) {
-        requireOpen();
-        const k = ENVELOPE_PREFIX + 'p:' + into + '|' + id;
-        try { if (opts.local.get(k) === null) opts.local.set(k, JSON.stringify(entry)); report.sections[id] = 'orphan-kept'; } catch { /* the file still has it */ }
-      }
+      // Complete known-owner callbacks/writes before issuing opaque retention receipts.
       flush('import');
       for (const c of touched) report.sections[c.def.id] = c.status === 'saved' ? 'saved' : 'session';
+      for (const [id, entry] of Object.entries(orphans)) {
+        requireOpen();
+        if (superseded.has(id)) { report.sections[id] = 'orphan-superseded'; continue; }
+        const k = ENVELOPE_PREFIX + 'p:' + into + '|' + id;
+        try {
+          const raw = JSON.stringify(entry), existing = opts.local.get(k);
+          if (existing !== null && existing !== raw) report.sections[id] = 'orphan-conflict';
+          else {
+            if (existing === null) opts.local.set(k, raw);
+            report.sections[id] = 'orphan-kept';
+          }
+        } catch { report.sections[id] = 'orphan-failed'; } // Retain the source file for retry/reconciliation.
+      }
       return report;
     },
     resetAll() {
