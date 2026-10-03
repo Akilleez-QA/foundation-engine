@@ -8,7 +8,7 @@ A layered TypeScript and three.js engine for browser games of any genre, with ex
 - **[Contribute to the engine](CONTRIBUTING.md)**: reproduce a problem, find the relevant contract and submit a focused change. Keep your own game on its own branch.
 - **[Explore the templates](#templates)** or [browse task recipes](docs/recipes/README.md). Foundation is distributed as source and tooling, not an npm library or visual editor.
 
-Try the arcade example without creating a game: after the [setup steps](#start), run `npm run play -- --game templates/arcade/game`. Steer with the arrow keys and press Space after a collision to restart. This runs locally; no hosted demo is required.
+Try the arcade example without creating a game: after cloning and running `npm ci`, run `npm run play -- --game templates/arcade/game`. Steer with the arrow keys and press Space after a collision to restart. This runs locally; no hosted demo is required.
 
 ## What's new in 0.2.0
 

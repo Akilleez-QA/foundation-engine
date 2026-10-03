@@ -50,10 +50,11 @@ After generating/editing the arcade game and building with `/my-game/`, save the
 
 ```js
 import assert from 'node:assert/strict';
-import {existsSync,readFileSync,statSync,writeFileSync} from 'node:fs';
+import {existsSync,readFileSync,statSync} from 'node:fs';
 import {createServer} from 'node:http';
 import {extname,join,normalize,sep,resolve} from 'node:path';
 import {launch} from './scripts/perf/bench-browser.mjs';
+import {diagnosticReport} from './scripts/play/diagnostic-report.mjs';
 const TYPES={'.html':'text/html','.js':'text/javascript','.css':'text/css','.txt':'text/plain'};
 function host(dir, prefix) {
   const server = createServer((req, res) => {
@@ -67,10 +68,11 @@ function host(dir, prefix) {
   return new Promise(done => server.listen(0, '127.0.0.1', () => done({origin: `http://127.0.0.1:${server.address().port}`, close: () => new Promise(r => { server.close(() => r()); server.closeAllConnections(); })})));
 }
 
-const server=await host(resolve('dist'),'/my-game/');
-let browser;
+let server,browser;
 const report={errors:[],badResponses:[],outside:[]};
+const evidence=diagnosticReport(report,'evidence/production-subpath.json');
 try {
+ server=await host(resolve('dist'),'/my-game/');
  browser=await launch({strictClose:true}); const page=browser.page;
  page.on('pageerror',e=>report.errors.push(e.message));
  page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});
@@ -87,7 +89,12 @@ try {
  assert.equal(report.testApiAbsent,true);
  assert.equal(report.errors.length+report.badResponses.length+report.outside.length,0);
  report.passed=true;
-}finally{await browser?.close();await server.close();writeFileSync('evidence/production-subpath.json',JSON.stringify(report,null,2));}
+}catch(error){evidence.fail(error);}
+finally{
+ await evidence.close(browser,'browser cleanup');
+ await evidence.close(server,'server cleanup');
+ evidence.finish();
+}
 console.log(JSON.stringify(report));
 ```
 
