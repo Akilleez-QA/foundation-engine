@@ -59,6 +59,8 @@ optional('SQLite external held writer refuses promptly and owner can retry after
   const {path}=await fixture(t),s=await openAuthorityStorage({path}),{DatabaseSync}=await import('node:sqlite');t.after(()=>s.close());const other=new DatabaseSync(path);t.after(()=>other.close());
   other.exec('BEGIN IMMEDIATE');assert.equal(await s.compareAndSwap(request()),'rejected');other.exec('ROLLBACK');assert.equal(await s.compareAndSwap(request()),'committed');
 });
+// A child that exits (for example after an open refusal) fails the test at once instead of waiting for the timeout.
+function reply(child){return new Promise((resolve,reject)=>{const onMessage=m=>{child.off('exit',onExit);resolve(m);},onExit=code=>{child.off('message',onMessage);reject(Error(`authority child exited (${code}) before replying`));};child.once('message',onMessage);child.once('exit',onExit);});}
 async function childWorker(dir,path,phase){
   const file=join(dir,`worker-${phase}-${Math.random().toString(16).slice(2)}.mjs`);
   writeFileSync(file,`import{openAuthorityStorage}from${JSON.stringify(new URL('./storage.mjs',import.meta.url).href)};
@@ -76,10 +78,12 @@ for(const phase of ['beforeCommit','afterCommit'])optional(`SQLite actual parent
   const reopened=await openAuthorityStorage({path});await reopened.settle();assert.equal(await reopened.read(),json(expected));reopened.close();
 });
 optional('SQLite separate processes with the same expected revision cannot both commit',async t=>{
-  const {dir,path}=await fixture(t),a=await childWorker(dir,path,'race'),b=await childWorker(dir,path,'race');
-  t.after(()=>{for(const c of[a,b])if(c.exitCode===null)c.kill('SIGKILL');});
-  await Promise.all([once(a,'message'),once(b,'message')]);const exits=[a,b].map(c=>once(c,'exit')),results=[once(a,'message'),once(b,'message')];a.send('go');b.send('go');
-  const outcomes=(await Promise.all(results)).map(([r])=>r.outcome).sort();assert.deepEqual(outcomes,['committed','rejected']);
+  const {dir,path}=await fixture(t),children=[];t.after(()=>{for(const c of children)if(c.exitCode===null)c.kill('SIGKILL');});
+  // Open is documented to refuse promptly under contention (zero busy timeout), so writers open one at a time;
+  // the contested operation under test is the same-revision CAS, released to both writers together.
+  for(let i=0;i<2;i++){const c=await childWorker(dir,path,'race');children.push(c);assert.equal((await reply(c)).type,'ready');}
+  const [a,b]=children,exits=children.map(c=>once(c,'exit')),results=children.map(reply);a.send('go');b.send('go');
+  const outcomes=(await Promise.all(results)).map(r=>r.outcome).sort();assert.deepEqual(outcomes,['committed','rejected']);
   // Read back only after both writers exit: closing the last WAL connection checkpoints under a lock, and readers also use zero busy timeout.
   await Promise.all(exits);assert.equal((await inspect(path)).revision,1);
 });
