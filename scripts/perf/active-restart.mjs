@@ -1,5 +1,5 @@
 // Optional, author-declared restart through the existing scene UI, before a timed active window.
-// Never changes gameplay state, drives input during a window, or excuses a missing render.
+// Uses native input rather than direct state mutation; never drives input inside a measured window or excuses a missing render.
 export function activeRestartPlan(row) {
   const plan = row.activeRestart;
   if (plan === undefined) return null;
