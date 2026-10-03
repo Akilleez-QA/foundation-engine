@@ -15,7 +15,11 @@ const started = await serve({port, host, watch: true}).catch(error => {
 });
 const {url, network} = started;
 const hash = `#scene/${homeScene()}`;
-const lan = isLoopback(host) ? '  Phone on the same Wi-Fi: npm run play -- --host\n'
-  : network.length ? `${network.map(u => `  Network: ${u}/${hash}`).join('\n')}\n  Warning: anyone on this network can open the dev server and its test API while it runs.\n`
-  : `  Listening on ${host === true ? 'all interfaces' : host}, but no network address was found (is Wi-Fi connected?).\n`;
-console.log(`\n  Play: ${url}/${hash}\n${lan}  Sound: press M to mute; test browsers are always muted.\n  Stop: Ctrl+C\n`);
+const lan = isLoopback(host)
+  ? '  Phone on the same Wi-Fi: npm run play -- --host\n'
+  : network.length
+    ? `${network.map(u => `  Network: ${u}/${hash}`).join('\n')}\n  Warning: anyone on this network can open the dev server and its test API while it runs.\n`
+    : `  Listening on ${host === true ? 'all interfaces' : host}, but no network address was found (is Wi-Fi connected?).\n`;
+console.log(
+  `\n  Play: ${url}/${hash}\n${lan}  Sound: press M to mute; test browsers are always muted.\n  Stop: Ctrl+C\n`,
+);

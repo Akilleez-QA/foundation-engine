@@ -17,8 +17,8 @@
  *
  * One cache serves one GPU context. Fetch/decode dedup is not cross-context GPU dedup (ADR 0040).
  */
-import type { AssetDef, AssetFormat, AssetVariant, QualityTier } from './manifest';
-import { tierAtOrBelow } from './manifest';
+import type {AssetDef, AssetFormat, AssetVariant, QualityTier} from './manifest';
+import {tierAtOrBelow} from './manifest';
 
 // ───────────────────────────── leases and errors ─────────────────────────────
 
@@ -161,10 +161,22 @@ export class LeaseCache<D, R extends object> {
   private pressured = false;
   private readonly evicted = new Set<string>();
   readonly stats: LeaseCacheStats = {
-    loads: 0, hits: 0, uploads: 0, lateDrops: 0, disposed: 0, failures: 0, evictions: 0, reloads: 0, pressure: 0, cleanupFailures: 0,
+    loads: 0,
+    hits: 0,
+    uploads: 0,
+    lateDrops: 0,
+    disposed: 0,
+    failures: 0,
+    evictions: 0,
+    reloads: 0,
+    pressure: 0,
+    cleanupFailures: 0,
   };
 
-  constructor(private readonly loader: LeaseLoader<D, R>, options: LeaseCacheOptions) {
+  constructor(
+    private readonly loader: LeaseLoader<D, R>,
+    options: LeaseCacheOptions,
+  ) {
     this.warmLimit = options.warmBytes;
     if (options.residency) this.residency = checkResidency(options.residency);
   }
@@ -177,9 +189,14 @@ export class LeaseCache<D, R extends object> {
    */
   acquire(key: string, signal: AbortSignal): Promise<Lease<R>> {
     if (signal.aborted) return Promise.reject(new AbortError());
-    let entry = this.entries.get(key), begin: (() => void) | undefined;
+    let entry = this.entries.get(key),
+      begin: (() => void) | undefined;
     if (entry) this.stats.hits++;
-    else { const pending = this.start(key); entry = pending.entry; begin = pending.begin; }
+    else {
+      const pending = this.start(key);
+      entry = pending.entry;
+      begin = pending.begin;
+    }
     const held = entry;
     if (held.state === 'ready' && held.refs === 0) {
       this.warmTotal -= held.bytes;
@@ -199,10 +216,14 @@ export class LeaseCache<D, R extends object> {
         if (done) return;
         done = true;
         const error = new AbortError();
-        try { this.drop(held); } catch (cleanup) { error.cause = cleanup; }
+        try {
+          this.drop(held);
+        } catch (cleanup) {
+          error.cause = cleanup;
+        }
         reject(error);
       };
-      signal.addEventListener('abort', onAbort, { once: true });
+      signal.addEventListener('abort', onAbort, {once: true});
       held.ready.then(
         resource => {
           if (done) return;
@@ -240,20 +261,26 @@ export class LeaseCache<D, R extends object> {
 
   info(key: string): EntryInfo | undefined {
     const e = this.entries.get(key);
-    return e && { state: e.state, refs: e.refs, bytes: e.bytes };
+    return e && {state: e.state, refs: e.refs, bytes: e.bytes};
   }
 
   refs(key: string): number {
     return this.entries.get(key)?.refs ?? 0;
   }
 
-  residentBytes(): number { return this.residentTotal; }
+  residentBytes(): number {
+    return this.residentTotal;
+  }
 
   /** Released bytes kept, pinned included. */
-  warmBytes(): number { return this.warmTotal; }
+  warmBytes(): number {
+    return this.warmTotal;
+  }
 
   /** Released bytes kept because they are pinned. */
-  pinnedBytes(): number { return this.pinnedWarm; }
+  pinnedBytes(): number {
+    return this.pinnedWarm;
+  }
 
   /** Changes the warm budget (a tier change). Live leases are untouched; warm entries over budget are evicted. */
   setWarmBytes(bytes: number): void {
@@ -267,7 +294,8 @@ export class LeaseCache<D, R extends object> {
    */
   setResidency(warmBytes: number, residency: LeaseResidency = {}): void {
     const next = checkResidency(residency);
-    if (!Number.isSafeInteger(warmBytes) || warmBytes < 0) throw new RangeError('lease cache: warm bytes must be a nonnegative safe integer');
+    if (!Number.isSafeInteger(warmBytes) || warmBytes < 0)
+      throw new RangeError('lease cache: warm bytes must be a nonnegative safe integer');
     this.warmLimit = warmBytes;
     this.residency = next;
     this.pinnedWarm = 0;
@@ -281,7 +309,9 @@ export class LeaseCache<D, R extends object> {
   }
 
   /** Disposes every released resource (for example before a context recycle). Live leases are untouched. */
-  evictWarm(): void { this.trim(true); }
+  evictWarm(): void {
+    this.trim(true);
+  }
 
   private isPinned(key: string): boolean {
     return this.residency.pinned?.(key) === true;
@@ -298,27 +328,51 @@ export class LeaseCache<D, R extends object> {
 
   /** Trims without letting a third party's cleanup failure fail the caller's unrelated operation. */
   private trimQuietly(needsSpace?: () => boolean): void {
-    try { this.trim(false, needsSpace); } catch (error) {
+    try {
+      this.trim(false, needsSpace);
+    } catch (error) {
       this.stats.cleanupFailures++;
       // The report is advisory: a throwing reporter must not unwind the caller's accounting either.
-      try { this.residency.onCleanupError?.(error); } catch { /* contained */ }
+      try {
+        this.residency.onCleanupError?.(error);
+      } catch {
+        /* contained */
+      }
     }
   }
 
-  private start(key: string): { entry: Entry<R>; begin(): void } {
+  private start(key: string): {entry: Entry<R>; begin(): void} {
     const controller = new AbortController();
     let resolve!: (resource: R) => void, reject!: (error: unknown) => void;
-    const ready = new Promise<R>((yes, no) => { resolve = yes; reject = no; });
-    const entry: Entry<R> = { key, state: 'pending', refs: 0, bytes: 0, lastUsed: 0, pinned: false, retained: false, controller, ready };
+    const ready = new Promise<R>((yes, no) => {
+      resolve = yes;
+      reject = no;
+    });
+    const entry: Entry<R> = {
+      key,
+      state: 'pending',
+      refs: 0,
+      bytes: 0,
+      lastUsed: 0,
+      pinned: false,
+      retained: false,
+      controller,
+      ready,
+    };
     ready.catch(() => {});
     this.entries.set(key, entry);
     this.stats.loads++;
     if (this.evicted.delete(key)) this.stats.reloads++;
-    return { entry, begin: () => { void this.load(entry).then(resolve, reject); } };
+    return {
+      entry,
+      begin: () => {
+        void this.load(entry).then(resolve, reject);
+      },
+    };
   }
 
   private async load(entry: Entry<R>): Promise<R> {
-    const { key, controller } = entry;
+    const {key, controller} = entry;
     const current = () => !controller.signal.aborted && this.entries.get(key) === entry;
     let decoded: D;
     try {
@@ -361,8 +415,11 @@ export class LeaseCache<D, R extends object> {
       this.stats.failures++;
       if (resource !== undefined) {
         this.stats.disposed++;
-        try { this.loader.dispose(resource); }
-        catch (cleanup) { throw new AggregateError([error, cleanup], 'lease cache: publication and cleanup failed'); }
+        try {
+          this.loader.dispose(resource);
+        } catch (cleanup) {
+          throw new AggregateError([error, cleanup], 'lease cache: publication and cleanup failed');
+        }
       }
       throw error;
     }
@@ -380,11 +437,20 @@ export class LeaseCache<D, R extends object> {
     this.warmTotal += entry.bytes;
     if (entry.pinned) this.pinnedWarm += entry.bytes;
     const errors: unknown[] = [];
-    try { this.trim(); } catch (error) { errors.push(error); }
+    try {
+      this.trim();
+    } catch (error) {
+      errors.push(error);
+    }
     // Still retained after trimming (and not re-acquired by a disposer): release its per-context GPU copies.
     if (entry.resource !== undefined && this.entries.get(entry.key) === entry && entry.refs === 0) {
       entry.retained = true;
-      if (this.loader.park) try { this.loader.park(entry.resource); } catch (error) { errors.push(error); }
+      if (this.loader.park)
+        try {
+          this.loader.park(entry.resource);
+        } catch (error) {
+          errors.push(error);
+        }
     }
     if (errors.length === 1) throw errors[0];
     if (errors.length) throw new AggregateError(errors, 'lease cache: cleanup failed');
@@ -392,7 +458,10 @@ export class LeaseCache<D, R extends object> {
 
   private trim(all = false, needsSpace?: () => boolean): void {
     // A disposer can reenter cache operations. The outer pass revalidates its finite candidate snapshot.
-    if (this.trimming) { this.trimAll ||= all; return; }
+    if (this.trimming) {
+      this.trimAll ||= all;
+      return;
+    }
     this.trimming = true;
     this.trimAll = all;
     const errors: unknown[] = [];
@@ -400,18 +469,28 @@ export class LeaseCache<D, R extends object> {
       const idle = [...this.entries.values()].filter(e => e.state === 'ready');
       const remaining = new Set(idle);
       const limit = this.residency.residentBytes;
-      const over = () => this.trimAll || this.warmLimit <= 0 || this.warmTotal - this.pinnedWarm > this.warmLimit
-        || (limit !== undefined && this.residentTotal > limit) || needsSpace?.() === true;
+      const over = () =>
+        this.trimAll ||
+        this.warmLimit <= 0 ||
+        this.warmTotal - this.pinnedWarm > this.warmLimit ||
+        (limit !== undefined && this.residentTotal > limit) ||
+        needsSpace?.() === true;
       // Ordinary eviction sorts once. Reentrant release of an already visited live entry needs a further pass;
       // each extra pass must retire an original candidate, so callback-generated loads cannot extend this drain.
       while (remaining.size && over()) {
         let retired = false;
         for (const e of [...remaining].sort((a, b) => a.lastUsed - b.lastUsed)) {
           if (!over()) break;
-          if (this.entries.get(e.key) !== e || e.state !== 'ready') { remaining.delete(e); continue; }
+          if (this.entries.get(e.key) !== e || e.state !== 'ready') {
+            remaining.delete(e);
+            continue;
+          }
           if (e.refs !== 0) continue;
           // A pin outlives every budget; only teardown (`evictWarm`) retires it.
-          if (e.pinned && !this.trimAll) { remaining.delete(e); continue; }
+          if (e.pinned && !this.trimAll) {
+            remaining.delete(e);
+            continue;
+          }
           remaining.delete(e);
           this.entries.delete(e.key);
           this.warmTotal -= e.bytes;
@@ -427,12 +506,19 @@ export class LeaseCache<D, R extends object> {
           if (e.resource !== undefined) {
             this.byResource.delete(e.resource);
             this.stats.disposed++;
-            try { this.loader.dispose(e.resource); } catch (error) { errors.push(error); }
+            try {
+              this.loader.dispose(e.resource);
+            } catch (error) {
+              errors.push(error);
+            }
           }
         }
         if (!retired) break;
       }
-    } finally { this.trimming = false; this.trimAll = false; }
+    } finally {
+      this.trimming = false;
+      this.trimAll = false;
+    }
     this.notePressure(errors);
     if (errors.length) throw new AggregateError(errors, 'lease cache: cleanup failed');
   }
@@ -441,25 +527,34 @@ export class LeaseCache<D, R extends object> {
   private notePressure(errors: unknown[]): void {
     const limit = this.residency.residentBytes;
     const over = limit !== undefined && this.residentTotal > limit;
-    if (!over) { this.pressured = false; return; }
+    if (!over) {
+      this.pressured = false;
+      return;
+    }
     if (this.pressured) return;
     this.pressured = true;
     this.stats.pressure++;
     const warm = this.warmTotal - this.pinnedWarm;
     const report: ResidencyPressure = {
-      residentBytes: this.residentTotal, limitBytes: limit, liveBytes: this.residentTotal - this.warmTotal,
-      pinnedBytes: this.pinnedWarm, warmBytes: warm,
+      residentBytes: this.residentTotal,
+      limitBytes: limit,
+      liveBytes: this.residentTotal - this.warmTotal,
+      pinnedBytes: this.pinnedWarm,
+      warmBytes: warm,
     };
-    try { this.residency.onPressure?.(report); } catch (error) { errors.push(error); }
+    try {
+      this.residency.onPressure?.(report);
+    } catch (error) {
+      errors.push(error);
+    }
   }
-
 }
 
 function checkResidency(r: LeaseResidency): LeaseResidency {
   if (r.residentBytes !== undefined && (!Number.isSafeInteger(r.residentBytes) || r.residentBytes < 0)) {
     throw new RangeError('lease cache: resident bytes must be a nonnegative safe integer');
   }
-  return { ...r };
+  return {...r};
 }
 
 /**
@@ -467,7 +562,7 @@ function checkResidency(r: LeaseResidency): LeaseResidency {
  * Replaces `userData.shared`, `isKitMaterial` and `preserveMaterial`-style flags.
  */
 export function disposeUnowned<T>(
-  caches: readonly { owns(resource: unknown): boolean }[],
+  caches: readonly {owns(resource: unknown): boolean}[],
   resource: T,
   dispose: (resource: T) => void,
 ): boolean {
@@ -517,11 +612,13 @@ function preferred(a: AssetVariant, b: AssetVariant): number {
 export function chooseVariant(def: AssetDef, q: VariantQuery): AssetVariant {
   const usable = eligible(def, q);
   if (usable.length === 0) throw new Error(`${def.id}: no variant usable on tier '${q.tier}'`);
-  const capped = q.maxWidth === undefined ? usable : usable.filter(v => v.width === undefined || v.width <= q.maxWidth!);
+  const capped =
+    q.maxWidth === undefined ? usable : usable.filter(v => v.width === undefined || v.width <= q.maxWidth!);
   // A cap below every variant keeps the smallest one rather than failing.
   // usable is non-empty (checked above), so pool is non-empty.
   const pool = capped.length > 0 ? [...capped].sort(preferred) : [[...usable].sort(preferred)[0]!];
-  const first = pool[0]!, last = pool[pool.length - 1]!;
+  const first = pool[0]!,
+    last = pool[pool.length - 1]!;
   if (q.screenPx === undefined) return last.width === undefined ? first : last;
   const need = q.screenPx * (q.pixelRatio ?? 1) * TEXELS_PER_PIXEL;
   const wide = pool.find(v => (v.width ?? 0) >= need);
@@ -563,11 +660,15 @@ export function assetKey(id: string, variant: AssetVariant): string {
 
 export class AssetLeases<D, R extends object> {
   private readonly defs = new Map<string, AssetDef>();
-  private readonly cache: LeaseCache<{ def: AssetDef; variant: AssetVariant; decoded: D }, R>;
+  private readonly cache: LeaseCache<{def: AssetDef; variant: AssetVariant; decoded: D}, R>;
   private tier: QualityTier;
   private maxWidth: number | undefined;
 
-  constructor(defs: readonly AssetDef[], private readonly loader: AssetLoader<D, R>, options: AssetLeasesOptions) {
+  constructor(
+    defs: readonly AssetDef[],
+    private readonly loader: AssetLoader<D, R>,
+    options: AssetLeasesOptions,
+  ) {
     for (const def of defs) {
       if (this.defs.has(def.id)) throw new Error(`duplicate asset id ${def.id}`);
       this.defs.set(def.id, def);
@@ -578,20 +679,20 @@ export class AssetLeases<D, R extends object> {
       const bar = key.indexOf('|');
       const def = this.defs.get(key.slice(0, bar))!;
       const variant = def.variants.find(v => v.path === key.slice(bar + 1))!;
-      return { def, variant };
+      return {def, variant};
     };
     this.cache = new LeaseCache(
       {
         fetch: async (key, signal) => {
-          const { def, variant } = locate(key);
-          return { def, variant, decoded: await loader.fetch(def, variant, signal) };
+          const {def, variant} = locate(key);
+          return {def, variant, decoded: await loader.fetch(def, variant, signal)};
         },
-        upload: ({ def, variant, decoded }) => loader.upload(decoded, def, variant),
-        discard: ({ decoded }) => loader.discard(decoded),
+        upload: ({def, variant, decoded}) => loader.upload(decoded, def, variant),
+        discard: ({decoded}) => loader.discard(decoded),
         dispose: resource => loader.dispose(resource),
         bytes: resource => loader.bytes(resource),
       },
-      { warmBytes: options.warmBytes },
+      {warmBytes: options.warmBytes},
     );
   }
 
@@ -621,14 +722,14 @@ export class AssetLeases<D, R extends object> {
     const target = chooseVariant(def, query);
     const variant = this.resident(def, target, query) ?? target;
     const lease = await this.cache.acquire(assetKey(id, variant), o.signal);
-    return { value: lease.value, key: lease.key, id, variant, release: lease.release };
+    return {value: lease.value, key: lease.key, id, variant, release: lease.release};
   }
 
   /**
    * Changes the tier, its width cap and its warm budget. Affects later choices only: a live lease is never
    * downgraded (STD-REN-32).
    */
-  setTier(tier: QualityTier, options: { warmBytes: number; maxWidth?: number }): void {
+  setTier(tier: QualityTier, options: {warmBytes: number; maxWidth?: number}): void {
     this.tier = tier;
     this.maxWidth = options.maxWidth;
     this.cache.setWarmBytes(options.warmBytes);

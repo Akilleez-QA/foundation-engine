@@ -6,7 +6,8 @@ import type {SceneEntitiesRequest, SceneEntitiesResult} from './play';
 export function createSceneEntityInspector(world: World, visit: SceneVisit, activitySignal: AbortSignal) {
   return (request: SceneEntitiesRequest): SceneEntitiesResult => {
     if (activitySignal.aborted || visit.signal.aborted || !visit.current()) return {status: 'unavailable'};
-    if (!Number.isSafeInteger(request.expectedEpoch) || request.expectedEpoch < 0) throw new RangeError('entity inspection: invalid scene epoch');
+    if (!Number.isSafeInteger(request.expectedEpoch) || request.expectedEpoch < 0)
+      throw new RangeError('entity inspection: invalid scene epoch');
     if (request.expectedEpoch !== visit.epoch) return {status: 'stale', epoch: visit.epoch};
     return {status: 'ready', epoch: visit.epoch, page: world.inspectMetadata(request)};
   };

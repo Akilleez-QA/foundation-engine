@@ -10,7 +10,7 @@
  * section's value, the same shape `read` returns. The composition root provides this in DEV and test builds only
  * (TEST_API); production builds do not contain it.
  */
-import type { PlayerId, SaveSection, SaveStore, SectionStatus } from './section';
+import type {PlayerId, SaveSection, SaveStore, SectionStatus} from './section';
 
 export interface SaveTestAdapter {
   /** Every section id the game registers. */
@@ -29,19 +29,21 @@ export interface SaveTestAdapter {
 
 export function createSaveTestAdapter(store: SaveStore, sections: readonly SaveSection<unknown>[]): SaveTestAdapter {
   const find = (name: string, player: PlayerId): SaveSection<unknown> => {
-    const def = sections.find(d => d.id === name || d.aliases?.includes(name))
-      ?? sections.find(d => d.legacyKeys?.includes(name) || safeKeys(d, player).includes(name));
+    const def =
+      sections.find(d => d.id === name || d.aliases?.includes(name)) ??
+      sections.find(d => d.legacyKeys?.includes(name) || safeKeys(d, player).includes(name));
     if (!def) throw new Error(`engine.save: no section '${name}' (known: ${sections.map(d => d.id).join(', ')})`);
     return def;
   };
   const handle = (name: string, player?: PlayerId) => {
-    const p = player ?? store.activePlayer(), def = find(name, p);
+    const p = player ?? store.activePlayer(),
+      def = find(name, p);
     return def.scope === 'player' ? store.section(def).of(p) : store.section(def);
   };
   return {
     sections: () => sections.map(d => d.id),
     read: (section, player) => handle(section, player).get(),
-    seed: (section, value, player) => handle(section, player).replace(value, { now: true }),
+    seed: (section, value, player) => handle(section, player).replace(value, {now: true}),
     export: player => store.exportPlayer(player),
     import: (file, player) => store.importPlayer(typeof file === 'string' ? file : JSON.stringify(file), player),
     flush: () => store.flush('test'),
@@ -50,5 +52,9 @@ export function createSaveTestAdapter(store: SaveStore, sections: readonly SaveS
 
 /** A section's legacy keys for one player; a binding that cannot name them (it throws) has none. */
 function safeKeys(def: SaveSection<unknown>, player: PlayerId): string[] {
-  try { return def.legacy?.keys(def.scope === 'player' ? player : '') ?? []; } catch { return []; }
+  try {
+    return def.legacy?.keys(def.scope === 'player' ? player : '') ?? [];
+  } catch {
+    return [];
+  }
 }

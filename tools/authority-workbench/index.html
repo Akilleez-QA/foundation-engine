@@ -9,42 +9,18 @@
   <body>
     <main id="app" class="app-root">
       <header id="summary">
-        <strong>Durable authority workbench</strong
-        ><span id="status">Preparing…</span><button id="exit">Exit scene</button
-        ><button id="return" disabled>Return</button>
+        <strong>Durable authority workbench</strong><span id="status">Preparing…</span
+        ><button id="exit">Exit scene</button><button id="return" disabled>Return</button>
       </header>
       <section id="controls" aria-label="Authority diagnostic controls">
-        <label
-          >Host endpoint<input
-            id="endpoint"
-            placeholder="ws://127.0.0.1:…/socket"
-        /></label>
-        <label
-          >Operator credential<input
-            id="credential"
-            type="password"
-            autocomplete="off"
-        /></label>
-        <div>
-          <button id="connect">Connect</button
-          ><button id="disconnect">Disconnect</button>
-        </div>
-        <label
-          >Add integer<input
-            id="amount"
-            type="number"
-            min="-10"
-            max="10"
-            value="2"
-        /></label>
+        <label>Host endpoint<input id="endpoint" placeholder="ws://127.0.0.1:…/socket" /></label>
+        <label>Operator credential<input id="credential" type="password" autocomplete="off" /></label>
+        <div><button id="connect">Connect</button><button id="disconnect">Disconnect</button></div>
+        <label>Add integer<input id="amount" type="number" min="-10" max="10" value="2" /></label>
         <button id="predict">Predict input</button
-        ><label
-          ><input id="hold-send" type="checkbox" /> Hold outgoing
-          commands</label
-        >
+        ><label><input id="hold-send" type="checkbox" /> Hold outgoing commands</label>
         <div>
-          <button id="send-next">Send first pending</button
-          ><button id="retry">Retry last exact command</button>
+          <button id="send-next">Send first pending</button><button id="retry">Retry last exact command</button>
         </div>
         <button id="cover-open">Cover scene</button>
         <output id="result" aria-live="polite">No baseline</output>
@@ -62,17 +38,10 @@
         </dl>
       </section>
       <aside id="legend">
-        Optional data prediction. Only a committed checkpoint is authoritative.
-        Desktop diagnostic.
+        Optional data prediction. Only a committed checkpoint is authoritative. Desktop diagnostic.
       </aside>
     </main>
-    <section
-      id="cover"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Scene suspended"
-      hidden
-    >
+    <section id="cover" role="dialog" aria-modal="true" aria-label="Scene suspended" hidden>
       <p>Control retired. Close, then reconnect for a trusted baseline.</p>
       <button id="cover-close">Close</button>
     </section>

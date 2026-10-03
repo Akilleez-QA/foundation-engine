@@ -9,14 +9,32 @@ import {ROOT} from './lib.mjs';
 import {launch} from '../perf/bench-browser.mjs';
 const out = resolve(process.argv[2] ?? '/tmp/foundation-primitive-retention');
 mkdirSync(out, {recursive: true});
-const html = '<!doctype html><html><head><link rel="icon" href="data:,"><title>Primitive retention diagnostic</title></head><body><header class="shell-header"><div class="header-left"></div><div class="header-right"></div></header><main id="app" class="app-root"></main><script type="module" src="/scripts/play/fixtures/primitive-retention-entry.mjs"></script></body></html>';
-const server = await createServer({root: ROOT, logLevel: 'error', plugins: [{name: 'primitive-diagnostic', configureServer(s) {
-  s.middlewares.use((req, res, next) => {
-    if (req.url?.startsWith('/__primitive.html')) { res.setHeader('Content-Type', 'text/html'); res.end(html); }
-    else next();
-  });
-}}], server: {host: '127.0.0.1', port: 0}});
-const report = {revision: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).trim(), passed: false, samples: [], limitations: ['Instrumented Chromium composition; not physical-device performance evidence']};
+const html =
+  '<!doctype html><html><head><link rel="icon" href="data:,"><title>Primitive retention diagnostic</title></head><body><header class="shell-header"><div class="header-left"></div><div class="header-right"></div></header><main id="app" class="app-root"></main><script type="module" src="/scripts/play/fixtures/primitive-retention-entry.mjs"></script></body></html>';
+const server = await createServer({
+  root: ROOT,
+  logLevel: 'error',
+  plugins: [
+    {
+      name: 'primitive-diagnostic',
+      configureServer(s) {
+        s.middlewares.use((req, res, next) => {
+          if (req.url?.startsWith('/__primitive.html')) {
+            res.setHeader('Content-Type', 'text/html');
+            res.end(html);
+          } else next();
+        });
+      },
+    },
+  ],
+  server: {host: '127.0.0.1', port: 0},
+});
+const report = {
+  revision: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).trim(),
+  passed: false,
+  samples: [],
+  limitations: ['Instrumented Chromium composition; not physical-device performance evidence'],
+};
 let browser;
 try {
   await server.listen();
@@ -35,7 +53,10 @@ try {
   for (let step = 0; step < 30; step++) {
     const width = 1.1 + step / 100;
     await p.evaluate(width => window.primitiveCheck.resize(width), width);
-    await p.waitForFunction(width => window.primitiveCheck.snapshot().active.some(m => m.name === 'subject' && m.width === width), width);
+    await p.waitForFunction(
+      width => window.primitiveCheck.snapshot().active.some(m => m.name === 'subject' && m.width === width),
+      width,
+    );
     const state = await snapshot();
     assert.equal(state.seen.filter(g => g.disposals === 0).length, 2);
     assert.ok(state.seen.every(g => g.disposals <= 1));
@@ -61,7 +82,11 @@ try {
   report.error = String(error);
   throw error;
 } finally {
-  try { await browser?.close(); } finally { await server.close(); }
+  try {
+    await browser?.close();
+  } finally {
+    await server.close();
+  }
   writeFileSync(resolve(out, 'report.json'), JSON.stringify(report, null, 2) + '\n');
 }
 console.log(`Primitive geometry retention passed; evidence ${out}`);

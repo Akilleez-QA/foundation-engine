@@ -11,9 +11,7 @@
     "retainedCanvasMiBAfterTour": 4,
     "retainedHeapMiBAfterTour": 8
   },
-  "largeChunkAllow": [
-    "index"
-  ],
+  "largeChunkAllow": ["index"],
   "scenes": {
     "garden": {
       "scene": "scene.garden",

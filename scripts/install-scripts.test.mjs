@@ -8,16 +8,30 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 
 const read = file => JSON.parse(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'));
-const pkg = read('package.json'), lock = read('package-lock.json');
+const pkg = read('package.json'),
+  lock = read('package-lock.json');
 const nameOf = path => path.slice(path.lastIndexOf('node_modules/') + 'node_modules/'.length);
-const scripted = [...new Set(Object.entries(lock.packages).filter(([path, p]) => path && p.hasInstallScript).map(([path]) => nameOf(path)))].sort();
+const scripted = [
+  ...new Set(
+    Object.entries(lock.packages)
+      .filter(([path, p]) => path && p.hasInstallScript)
+      .map(([path]) => nameOf(path)),
+  ),
+].sort();
 const entryName = key => key.replace(/(?<=.)@.*$/, '');
 
 test('every dependency install script has a reviewed allowScripts entry, and every entry names such a dependency', () => {
   const entries = Object.keys(pkg.allowScripts ?? {});
-  assert.deepEqual(scripted.filter(name => !entries.some(key => entryName(key) === name)), [],
-    'review the install script, then run npm approve-scripts <pkg> or npm deny-scripts <pkg> (npm 12+)');
-  assert.deepEqual(entries.filter(key => !scripted.includes(entryName(key))), [], 'remove allowScripts entries for packages without install scripts');
+  assert.deepEqual(
+    scripted.filter(name => !entries.some(key => entryName(key) === name)),
+    [],
+    'review the install script, then run npm approve-scripts <pkg> or npm deny-scripts <pkg> (npm 12+)',
+  );
+  assert.deepEqual(
+    entries.filter(key => !scripted.includes(entryName(key))),
+    [],
+    'remove allowScripts entries for packages without install scripts',
+  );
 });
 
 test('esbuild runs without its postinstall: the platform binary comes from its optional dependency', async () => {

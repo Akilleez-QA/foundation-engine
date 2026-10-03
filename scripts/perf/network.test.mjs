@@ -13,8 +13,12 @@ test('the ledger counts requests, bytes and what is still in flight', () => {
   assert.equal(l.snapshot().pending, 2, 'inline data and streams never count as loading');
   l.finish({requestId: '1', encodedDataLength: 1000});
   l.finish({requestId: '2'}, true);
-  assert.deepEqual({...l.snapshot(), revision: 0}, {requests: 2, bytes: 1000, failures: 1, pending: 0, revision: 0, urls: []});
-  l.request(req('5', 'http://127.0.0.1:4000/a.js')); l.request(req('5', 'http://127.0.0.1:4000/a.js'));
+  assert.deepEqual(
+    {...l.snapshot(), revision: 0},
+    {requests: 2, bytes: 1000, failures: 1, pending: 0, revision: 0, urls: []},
+  );
+  l.request(req('5', 'http://127.0.0.1:4000/a.js'));
+  l.request(req('5', 'http://127.0.0.1:4000/a.js'));
   assert.equal(l.snapshot().requests, 3, 'a redirect of the same request counts once');
 });
 

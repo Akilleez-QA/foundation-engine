@@ -40,8 +40,9 @@ export function typeSourceFiles(root = ROOT) {
   const walk = dir => {
     for (const name of readdirSync(dir)) {
       const p = join(dir, name);
-      if (statSync(p).isDirectory()) { if (!SKIP_DIRS.has(name)) walk(p); }
-      else if (/\.[cm]?tsx?$/.test(name) && !/\.gen\.ts$/.test(name)) out.add(toPosix(relative(root, p)));
+      if (statSync(p).isDirectory()) {
+        if (!SKIP_DIRS.has(name)) walk(p);
+      } else if (/\.[cm]?tsx?$/.test(name) && !/\.gen\.ts$/.test(name)) out.add(toPosix(relative(root, p)));
     }
   };
   for (const r of roots) if (existsSync(join(root, r))) walk(join(root, r));
@@ -50,7 +51,9 @@ export function typeSourceFiles(root = ROOT) {
 
 /** True when the line, or the line above, has `<marker> <reason>` in a comment. */
 function escaped(lines, line, marker) {
-  const re = new RegExp(`//.*\\b${marker.replace(/[:-]/g, '\\$&')}\\s+\\S.*$|/\\*.*\\b${marker.replace(/[:-]/g, '\\$&')}\\s+[^*\\s]`);
+  const re = new RegExp(
+    `//.*\\b${marker.replace(/[:-]/g, '\\$&')}\\s+\\S.*$|/\\*.*\\b${marker.replace(/[:-]/g, '\\$&')}\\s+[^*\\s]`,
+  );
   return re.test(lines[line] ?? '') || re.test(lines[line - 1] ?? '');
 }
 
@@ -60,7 +63,9 @@ function doubleCast(node) {
   if (!ts.isAsExpression(node) && !ts.isTypeAssertionExpression(node)) return false;
   let inner = node.expression;
   while (ts.isParenthesizedExpression(inner)) inner = inner.expression;
-  return (ts.isAsExpression(inner) || ts.isTypeAssertionExpression(inner)) && isUnknown(inner.type) && !isUnknown(node.type);
+  return (
+    (ts.isAsExpression(inner) || ts.isTypeAssertionExpression(inner)) && isUnknown(inner.type) && !isUnknown(node.type)
+  );
 }
 
 /** The findings of one file's text: [{rule, line (1-based), escaped}]. */
@@ -89,20 +94,25 @@ const shardName = folder => folder.replace(/\//g, '-');
 function readShards() {
   const shards = {};
   if (!existsSync(BASELINE)) return shards;
-  for (const f of readdirSync(BASELINE)) if (f.endsWith('.json')) {
-    const body = JSON.parse(readFileSync(join(BASELINE, f), 'utf8'));
-    shards[body.folder] = body;
-  }
+  for (const f of readdirSync(BASELINE))
+    if (f.endsWith('.json')) {
+      const body = JSON.parse(readFileSync(join(BASELINE, f), 'utf8'));
+      shards[body.folder] = body;
+    }
   return shards;
 }
 
 /** Problems for a set of files: strict findings, and test-file unknown casts above the folder baseline. */
 export function check(files = typeSourceFiles(), {root = ROOT, shards = readShards()} = {}) {
-  const failures = [], counts = {};
+  const failures = [],
+    counts = {};
   let escapes = 0;
   for (const rel of files) {
     for (const f of scan(readFileSync(join(root, rel), 'utf8'), rel)) {
-      if (f.escaped) { escapes++; continue; }
+      if (f.escaped) {
+        escapes++;
+        continue;
+      }
       if (f.rule === 'unknown-cast' && isTest(rel)) {
         const bucket = (counts[folderOf(rel)] ??= {count: 0, files: {}, hits: []});
         bucket.count++;
@@ -110,18 +120,29 @@ export function check(files = typeSourceFiles(), {root = ROOT, shards = readShar
         bucket.hits.push(`${rel}:${f.line}`);
         continue;
       }
-      failures.push(`${f.rule}: ${rel}:${f.line}` + (f.rule === 'explicit-any'
-        ? ' (use a real type, `unknown` with narrowing, or a generic)'
-        : ' (use a type guard or a typed helper; an unavoidable cast needs `// lint:allow-unknown-cast <reason>`)'));
+      failures.push(
+        `${f.rule}: ${rel}:${f.line}` +
+          (f.rule === 'explicit-any'
+            ? ' (use a real type, `unknown` with narrowing, or a generic)'
+            : ' (use a type guard or a typed helper; an unavoidable cast needs `// lint:allow-unknown-cast <reason>`)'),
+      );
     }
   }
   const lowered = [];
   for (const folder of new Set([...Object.keys(shards), ...Object.keys(counts)])) {
-    const now = counts[folder] ?? {count: 0, files: {}, hits: []}, was = shards[folder]?.count ?? 0;
+    const now = counts[folder] ?? {count: 0, files: {}, hits: []},
+      was = shards[folder]?.count ?? 0;
     if (now.count > was) {
-      const grew = Object.entries(now.files).filter(([f, n]) => n > (shards[folder]?.files?.[f] ?? 0)).map(([f]) => f);
-      failures.push(`unknown-cast in test files of ${folder}/: ${now.count} > baseline ${was} (grew in: ${grew.join(', ')})\n      ` +
-        now.hits.filter(h => grew.some(f => h.startsWith(f + ':'))).slice(0, 12).join('\n      '));
+      const grew = Object.entries(now.files)
+        .filter(([f, n]) => n > (shards[folder]?.files?.[f] ?? 0))
+        .map(([f]) => f);
+      failures.push(
+        `unknown-cast in test files of ${folder}/: ${now.count} > baseline ${was} (grew in: ${grew.join(', ')})\n      ` +
+          now.hits
+            .filter(h => grew.some(f => h.startsWith(f + ':')))
+            .slice(0, 12)
+            .join('\n      '),
+      );
     } else if (now.count < was) lowered.push(folder);
   }
   return {failures, counts, lowered, escapes};
@@ -130,26 +151,38 @@ export function check(files = typeSourceFiles(), {root = ROOT, shards = readShar
 function writeShard(folder, bucket) {
   mkdirSync(BASELINE, {recursive: true});
   const files = Object.fromEntries(Object.entries(bucket.files).sort(([a], [b]) => a.localeCompare(b)));
-  writeFileSync(join(BASELINE, `${shardName(folder)}.json`), `${JSON.stringify({rule: 'unknown-cast', folder, count: bucket.count, files}, null, 2)}\n`);
+  writeFileSync(
+    join(BASELINE, `${shardName(folder)}.json`),
+    `${JSON.stringify({rule: 'unknown-cast', folder, count: bucket.count, files}, null, 2)}\n`,
+  );
 }
 
 function main() {
   const lower = process.argv.includes('--lower');
   if (process.argv.includes('--init')) {
-    if (Object.keys(readShards()).length) { console.error('lint:types: shards exist; --init never rewrites them (use --lower)'); process.exit(1); }
+    if (Object.keys(readShards()).length) {
+      console.error('lint:types: shards exist; --init never rewrites them (use --lower)');
+      process.exit(1);
+    }
     const {counts} = check(typeSourceFiles(), {shards: {}});
     for (const [folder, bucket] of Object.entries(counts)) writeShard(folder, bucket);
   }
   const {failures, counts, lowered, escapes} = check();
   const total = Object.values(counts).reduce((a, b) => a + b.count, 0);
-  console.log(`Type escapes: explicit any fails everywhere; double casts through unknown fail outside tests and may only fall in tests (${total} in tests; ${escapes} escape(s) with a written reason).`);
+  console.log(
+    `Type escapes: explicit any fails everywhere; double casts through unknown fail outside tests and may only fall in tests (${total} in tests; ${escapes} escape(s) with a written reason).`,
+  );
   if (lowered.length) {
-    if (lower) for (const folder of lowered) {
-      if (counts[folder]?.count) writeShard(folder, counts[folder]);
-      else rmSync(join(BASELINE, `${shardName(folder)}.json`), {force: true});
-    }
-    console.log(lower ? `lint:types: lowered ${lowered.length} shard(s): ${lowered.join(', ')}`
-      : `lint:types: ${lowered.length} shard(s) can be lowered (run \`npm run lint:types -- --lower\`): ${lowered.join(', ')}`);
+    if (lower)
+      for (const folder of lowered) {
+        if (counts[folder]?.count) writeShard(folder, counts[folder]);
+        else rmSync(join(BASELINE, `${shardName(folder)}.json`), {force: true});
+      }
+    console.log(
+      lower
+        ? `lint:types: lowered ${lowered.length} shard(s): ${lowered.join(', ')}`
+        : `lint:types: ${lowered.length} shard(s) can be lowered (run \`npm run lint:types -- --lower\`): ${lowered.join(', ')}`,
+    );
   }
   if (failures.length) {
     console.error(`\nlint:types: FAILED — ${failures.length} problem(s):`);

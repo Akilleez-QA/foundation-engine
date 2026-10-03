@@ -1,2 +1,77 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Foundation · Custody composition</title><link rel="icon" href="data:,"></head><body><main id="app" class="app-root"><header id="summary"><div><strong>Custody composition</strong><p id="compact-status">Preparing scene…</p></div><button id="open">Inspect custody</button></header><aside id="legend">World · left / Bag · centre / Equipped · right</aside></main>
-<template id="details-template"><section id="details" role="dialog" aria-modal="true" aria-labelledby="details-title"><header><h1 id="details-title">One identity, one accepted location</h1><button id="close">Close</button></header><div class="sheet-scroll" tabindex="0" role="region" aria-label="Custody controls"><p>This finite desktop example chooses its identities, capacity, placement and equipment slot. It does not prescribe a game inventory.</p><div class="columns"><section><h2>Prepare an action</h2><label for="item">Unique instance</label><select id="item"></select><div id="operations" class="buttons"></div><h2>Candidate</h2><pre id="candidate">No candidate.</pre><div class="buttons"><button id="commit">Attempt publication</button><button id="cancel">Discard unattempted candidate</button><button id="retry">Retry exact pending candidate</button><button id="acknowledge">Acknowledge matching durable candidate</button></div><h2>Diagnostic requests</h2><div class="buttons"><button id="remember">Remember current request</button><button id="replay">Replay remembered request</button><button id="stale">Prepare competing revision</button><button id="retire">Retire candidate owner</button></div></section><section><h2>Accepted custody</h2><pre id="accepted"></pre><h2>Visible locations</h2><pre id="projection"></pre><h2>Reservation and materials</h2><pre id="materials"></pre></section></div><section><h2>Persistence boundary</h2><p id="persistence"></p><label><input id="fail-storage" type="checkbox">Refuse diagnostic writes (persists through reload)</label><div class="buttons"><button id="reload">Reload durable envelope</button></div><p>Attempted publication cannot be cancelled. Failed writes keep the previous accepted world visible. Reload uses whichever coherent envelope actually became durable.</p></section><p id="message" role="status" aria-live="polite"></p></div></section></template><script type="module" src="./entry.mjs"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Foundation · Custody composition</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <main id="app" class="app-root">
+      <header id="summary">
+        <div>
+          <strong>Custody composition</strong>
+          <p id="compact-status">Preparing scene…</p>
+        </div>
+        <button id="open">Inspect custody</button>
+      </header>
+      <aside id="legend">World · left / Bag · centre / Equipped · right</aside>
+    </main>
+    <template id="details-template"
+      ><section id="details" role="dialog" aria-modal="true" aria-labelledby="details-title">
+        <header>
+          <h1 id="details-title">One identity, one accepted location</h1>
+          <button id="close">Close</button>
+        </header>
+        <div class="sheet-scroll" tabindex="0" role="region" aria-label="Custody controls">
+          <p>
+            This finite desktop example chooses its identities, capacity, placement and equipment slot. It does not
+            prescribe a game inventory.
+          </p>
+          <div class="columns">
+            <section>
+              <h2>Prepare an action</h2>
+              <label for="item">Unique instance</label
+              ><select id="item"></select>
+              <div id="operations" class="buttons"></div>
+              <h2>Candidate</h2>
+              <pre id="candidate">No candidate.</pre>
+              <div class="buttons">
+                <button id="commit">Attempt publication</button
+                ><button id="cancel">Discard unattempted candidate</button
+                ><button id="retry">Retry exact pending candidate</button
+                ><button id="acknowledge">Acknowledge matching durable candidate</button>
+              </div>
+              <h2>Diagnostic requests</h2>
+              <div class="buttons">
+                <button id="remember">Remember current request</button
+                ><button id="replay">Replay remembered request</button
+                ><button id="stale">Prepare competing revision</button
+                ><button id="retire">Retire candidate owner</button>
+              </div>
+            </section>
+            <section>
+              <h2>Accepted custody</h2>
+              <pre id="accepted"></pre>
+              <h2>Visible locations</h2>
+              <pre id="projection"></pre>
+              <h2>Reservation and materials</h2>
+              <pre id="materials"></pre>
+            </section>
+          </div>
+          <section>
+            <h2>Persistence boundary</h2>
+            <p id="persistence"></p>
+            <label><input id="fail-storage" type="checkbox" />Refuse diagnostic writes (persists through reload)</label>
+            <div class="buttons"><button id="reload">Reload durable envelope</button></div>
+            <p>
+              Attempted publication cannot be cancelled. Failed writes keep the previous accepted world visible. Reload
+              uses whichever coherent envelope actually became durable.
+            </p>
+          </section>
+          <p id="message" role="status" aria-live="polite"></p>
+        </div></section
+    ></template>
+    <script type="module" src="./entry.mjs"></script>
+  </body>
+</html>

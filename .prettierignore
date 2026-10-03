@@ -1,0 +1,58 @@
+# Prettier formats code and data only: ts, tsx, mts, mjs, js, cjs, json, css, yml, html.
+# Markdown is excluded: GAME.md must mirror the brief exactly (lint:brief), and docs keep hand-made tables and ASCII art.
+*.md
+
+# Generated output (also in .gitignore).
+src/generated/
+**/keys.gen.ts
+dist/
+playtest/
+perf/runs/
+perf/cache/
+node_modules/
+
+# Lockfiles.
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Binary and asset formats Prettier must never touch.
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.glb
+*.gltf
+*.bin
+*.wav
+*.ogg
+*.mp3
+*.ktx2
+*.svg
+*.py
+*.txt
+*.log
+
+# Game public assets are served byte-for-byte.
+templates/*/game/public/
+game/public/
+
+# Byte-exact fixtures and provenance-hashed files. Their bytes are hashed or compared exactly; never reformat them.
+# - Blender export: metre-block.provenance.json records hashes of export.py and the asset.
+tools/blender-export/export.py
+tools/blender-export/game/public/
+# - Retained compatibility snapshot: manifest.json pins the sha256 of each copied source file.
+scripts/fixtures/compatibility/
+# - Save migration envelopes: old bytes are preserved deliberately.
+src/core/save/fixtures/
+# - Deterministic maths golden vectors: `npm run dmath:golden` compares the file text exactly.
+src/core/dmath.golden.json
+
+# Recorded verification evidence is an archived output, not source.
+docs/verification/
+templates/*/verification/
+
+# Recipe tests: their `recipe:begin`...`recipe:end` blocks must appear verbatim in the (unformatted) Markdown recipe.
+src/author/particles-recipe.test.ts
+src/author/test-a-scene-recipe.test.ts

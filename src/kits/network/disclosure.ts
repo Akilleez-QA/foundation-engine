@@ -17,18 +17,21 @@ export const MAX_DISCLOSURE_LEAKS = 64;
 /** Returns at most 64 leaks, in projection order. Throws for a projection that is not the view shape. */
 export function findDisclosureLeaks(projectJson: string, allowed: DisclosurePredicate): readonly DisclosureLeak[] {
   const projection = JSON.parse(projectJson) as unknown;
-  const entities = (projection as { entities?: unknown } | null)?.entities;
+  const entities = (projection as {entities?: unknown} | null)?.entities;
   if (!Array.isArray(entities) || typeof allowed !== 'function') throw Error('disclosure: not a view projection');
   const leaks: DisclosureLeak[] = [];
   const leak = (id: string, path: string) => {
-    if (leaks.length < MAX_DISCLOSURE_LEAKS) leaks.push(Object.freeze({ id, path }));
+    if (leaks.length < MAX_DISCLOSURE_LEAKS) leaks.push(Object.freeze({id, path}));
   };
   for (const entity of entities) {
-    const id = (entity as { id?: unknown })?.id;
+    const id = (entity as {id?: unknown})?.id;
     if (typeof id !== 'string') throw Error('disclosure: entity without id');
-    if (!allowed(id, '')) { leak(id, ''); continue; }
+    if (!allowed(id, '')) {
+      leak(id, '');
+      continue;
+    }
     // Iterative walk over leaves, so deep data cannot exhaust the call stack.
-    const pending: [unknown, string][] = [[(entity as { fields?: unknown }).fields, '']];
+    const pending: [unknown, string][] = [[(entity as {fields?: unknown}).fields, '']];
     while (pending.length) {
       const [value, path] = pending.pop()!;
       if (value !== null && typeof value === 'object') {
@@ -45,5 +48,6 @@ export function findDisclosureLeaks(projectJson: string, allowed: DisclosurePred
 /** Throws an Error listing leaked `id:path` entries when the projection discloses anything not allowed. */
 export function assertDisclosure(projectJson: string, allowed: DisclosurePredicate): void {
   const leaks = findDisclosureLeaks(projectJson, allowed);
-  if (leaks.length) throw Error(`disclosure: ${leaks.length} leak(s): ${leaks.map(l => `${l.id}:${l.path || '(entity)'}`).join(', ')}`);
+  if (leaks.length)
+    throw Error(`disclosure: ${leaks.length} leak(s): ${leaks.map(l => `${l.id}:${l.path || '(entity)'}`).join(', ')}`);
 }

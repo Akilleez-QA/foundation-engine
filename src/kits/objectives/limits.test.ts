@@ -1,2 +1,12 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {createObjectiveRun} from './index';import {must} from '../../testing/must';
-test('bounded event admission preserves existing deduplication',()=>{const r=createObjectiveRun({runId:'r',maxEvents:1,requirements:[{id:'a',event:'a',target:3}]});const e={runId:'r',eventId:'1',event:'a',amount:1};assert.equal(r.record(e),'accepted');assert.equal(r.record({...e,eventId:'2'}),'saturated');assert.equal(r.record(e),'duplicate');assert.equal(must(r.progress()[0]).count,1);});
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {createObjectiveRun} from './index';
+import {must} from '../../testing/must';
+test('bounded event admission preserves existing deduplication', () => {
+  const r = createObjectiveRun({runId: 'r', maxEvents: 1, requirements: [{id: 'a', event: 'a', target: 3}]});
+  const e = {runId: 'r', eventId: '1', event: 'a', amount: 1};
+  assert.equal(r.record(e), 'accepted');
+  assert.equal(r.record({...e, eventId: '2'}), 'saturated');
+  assert.equal(r.record(e), 'duplicate');
+  assert.equal(must(r.progress()[0]).count, 1);
+});

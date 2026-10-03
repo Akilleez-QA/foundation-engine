@@ -1,14 +1,14 @@
 name: Bug report
 description: A reproducible engine, kit, or template defect.
-title: "[Bug]: "
-labels: ["needs-triage", "bug"]
+title: '[Bug]: '
+labels: ['needs-triage', 'bug']
 body:
   - type: markdown
     attributes:
-      value: "Describe systems and patterns instead of external game names or source-project references. Keep required attribution and exact reproduction identifiers. See CONTRIBUTING.md, Describe systems and patterns."
+      value: 'Describe systems and patterns instead of external game names or source-project references. Keep required attribution and exact reproduction identifiers. See CONTRIBUTING.md, Describe systems and patterns.'
   - type: markdown
     attributes:
-      value: "For suspected vulnerabilities, read SECURITY.md first. Do not post exploits, secrets, private assets, or personal information."
+      value: 'For suspected vulnerabilities, read SECURITY.md first. Do not post exploits, secrets, private assets, or personal information.'
   - type: textarea
     id: problem
     attributes:

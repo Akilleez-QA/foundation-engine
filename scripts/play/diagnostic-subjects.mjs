@@ -1,14 +1,25 @@
 /** Optional report-side association only. No runtime imports or retained state. */
 export const DIAGNOSTIC_SUBJECT_LIMITS = Object.freeze({
-  associations: 128, records: 512, references: 32, counters: 16,
-  identityBytes: 256, textBytes: 2048, outputBytes: 262144,
+  associations: 128,
+  records: 512,
+  references: 32,
+  counters: 16,
+  identityBytes: 256,
+  textBytes: 2048,
+  outputBytes: 262144,
 });
 
 const classifications = ['declared', 'observed', 'estimated', 'derived', 'consumer-reported', 'unavailable'];
 class Invalid extends Error {
-  constructor(code, path) { super(code); this.code = code; this.path = path; }
+  constructor(code, path) {
+    super(code);
+    this.code = code;
+    this.path = path;
+  }
 }
-const fail = (code, path) => { throw new Invalid(code, path); };
+const fail = (code, path) => {
+  throw new Invalid(code, path);
+};
 
 /**
  * Accept plain data snapshots, not adapters or arbitrary generic payloads.
@@ -17,8 +28,13 @@ const fail = (code, path) => { throw new Invalid(code, path); };
 export function captureDiagnosticSubjects(input, limits = {}) {
   try {
     const object = (value, fields, path) => {
-      if (!value || typeof value !== 'object' || Array.isArray(value)
-        || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) fail('invalid', path);
+      if (
+        !value ||
+        typeof value !== 'object' ||
+        Array.isArray(value) ||
+        ![Object.prototype, null].includes(Object.getPrototypeOf(value))
+      )
+        fail('invalid', path);
       const keys = Reflect.ownKeys(value);
       if (keys.length > fields.length) fail('invalid', path);
       const copy = Object.create(null);
@@ -108,21 +124,29 @@ export function captureDiagnosticSubjects(input, limits = {}) {
         return {name, value: counter.value};
       });
       return {
-        target, provenance: choice(r.provenance, classifications, `${path}.provenance`),
+        target,
+        provenance: choice(r.provenance, classifications, `${path}.provenance`),
         artifact: string(r.artifact, `${path}.artifact`, cap.textBytes),
-        completeness: {status: choice(c.status, ['complete', 'partial', 'unavailable'], `${path}.completeness.status`), counters},
+        completeness: {
+          status: choice(c.status, ['complete', 'partial', 'unavailable'], `${path}.completeness.status`),
+          counters,
+        },
       };
     });
     const associations = array(root.associations, cap.associations, 'capture.associations', (value, path) => {
       const a = object(value, ['subject', 'source', 'relationship', 'provenance', 'targets'], path);
       const s = object(a.subject, ['namespace', 'subjectId', 'revision'], `${path}.subject`);
-      const subject = Object.fromEntries(['namespace', 'subjectId', 'revision'].map(key => [key, string(s[key], `${path}.subject.${key}`)]));
+      const subject = Object.fromEntries(
+        ['namespace', 'subjectId', 'revision'].map(key => [key, string(s[key], `${path}.subject.${key}`)]),
+      );
       let source = null;
       if (a.source !== null) {
         const src = object(a.source, ['path', 'selector', 'digest'], `${path}.source`);
-        source = {path: string(src.path, `${path}.source.path`, cap.textBytes),
+        source = {
+          path: string(src.path, `${path}.source.path`, cap.textBytes),
           selector: string(src.selector, `${path}.source.selector`, cap.textBytes),
-          digest: digest(src.digest, `${path}.source.digest`)};
+          digest: digest(src.digest, `${path}.source.digest`),
+        };
       }
       const seen = new Set();
       const targets = array(a.targets, cap.references, `${path}.targets`, (value, path) => {
@@ -134,8 +158,13 @@ export function captureDiagnosticSubjects(input, limits = {}) {
         return target;
       });
       if (!targets.length) fail('invalid', `${path}.targets`);
-      return {subject, source, relationship: string(a.relationship, `${path}.relationship`),
-        provenance: choice(a.provenance, classifications, `${path}.provenance`), targets};
+      return {
+        subject,
+        source,
+        relationship: string(a.relationship, `${path}.relationship`),
+        provenance: choice(a.provenance, classifications, `${path}.provenance`),
+        targets,
+      };
     });
     const sidecar = {schema: 'diagnostic-subjects/1', captureId, token: before, digests, records, associations};
     if (Buffer.byteLength(JSON.stringify(sidecar), 'utf8') > cap.outputBytes) fail('overlimit', 'sidecar');
@@ -144,7 +173,9 @@ export function captureDiagnosticSubjects(input, limits = {}) {
     // Do not stringify arbitrary thrown objects or retain caller references.
     try {
       if (error instanceof Invalid) return {ok: false, error: {code: error.code, path: error.path}};
-    } catch { /* A thrown proxy may itself reject inspection. */ }
+    } catch {
+      /* A thrown proxy may itself reject inspection. */
+    }
     return {ok: false, error: {code: 'unavailable', path: 'capture'}};
   }
 }

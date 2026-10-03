@@ -13,42 +13,27 @@
           <strong>Crafting workbench</strong>
           <p id="compact-status">Preparing scene…</p>
         </div>
-        <button id="open" disabled>Open workbench</button
-        ><button id="exit-scene" disabled>Exit scene</button
+        <button id="open" disabled>Open workbench</button><button id="exit-scene" disabled>Exit scene</button
         ><button id="reenter" disabled>Return to workbench</button
         ><button id="retired-survey" disabled>Invoke retired survey</button>
       </header>
-      <aside id="legend">
-        Accepted material custody · sources → holding → machine → output
-      </aside>
+      <aside id="legend">Accepted material custody · sources → holding → machine → output</aside>
     </main>
     <template id="details-template"
-      ><section
-        id="details"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="title"
-      >
+      ><section id="details" role="dialog" aria-modal="true" aria-labelledby="title">
         <header>
           <h1 id="title">Recipes and accepted production</h1>
           <button id="close">Close</button>
         </header>
-        <div
-          class="sheet-scroll"
-          tabindex="0"
-          role="region"
-          aria-label="Crafting editor and production controls"
-        >
+        <div class="sheet-scroll" tabindex="0" role="region" aria-label="Crafting editor and production controls">
           <p id="revisions"></p>
           <nav class="tabs" aria-label="Workbench sections">
-            <button id="tab-editor">Recipe editor</button
-            ><button id="tab-runtime">Production</button
+            <button id="tab-editor">Recipe editor</button><button id="tab-runtime">Production</button
             ><button id="tab-survey">Survey</button>
           </nav>
           <section id="editor-pane">
             <p>
-              Preview an authored recipe without reserving material. Committed
-              edits do not rewrite accepted sessions.
+              Preview an authored recipe without reserving material. Committed edits do not rewrite accepted sessions.
             </p>
             <div class="columns">
               <section>
@@ -56,64 +41,36 @@
                 <label
                   >Slot
                   <select id="slot"></select></label
-                ><label
-                  >Materials (comma separated)<input
-                    id="slot-materials" /></label
+                ><label>Materials (comma separated)<input id="slot-materials" /></label
                 ><label>Unit <input id="slot-unit" /></label
-                ><label
-                  >Required quantity
-                  <input id="slot-quantity" type="number" min="1"
-                /></label>
+                ><label>Required quantity <input id="slot-quantity" type="number" min="1" /></label>
                 <h2>Experiment attribute</h2>
                 <label
                   >Attribute
                   <select id="attribute"></select></label
                 ><label
-                  >Weight mapping (slot / property / weight)<textarea
-                    id="attribute-weights"
-                    rows="3"
-                  ></textarea></label
-                ><label
-                  >Initial permille
-                  <input id="attribute-initial" type="number" /></label
-                ><label
-                  >Gain per point, permille
-                  <input id="attribute-gain" type="number" /></label
-                ><label
-                  >Authored effect permille
-                  <input id="attribute-effect" type="number" /></label
-                ><label
-                  >Point limit
-                  <input id="point-limit" type="number" min="0" max="16"
-                /></label>
+                  >Weight mapping (slot / property / weight)<textarea id="attribute-weights" rows="3"></textarea></label
+                ><label>Initial permille <input id="attribute-initial" type="number" /></label
+                ><label>Gain per point, permille <input id="attribute-gain" type="number" /></label
+                ><label>Authored effect permille <input id="attribute-effect" type="number" /></label
+                ><label>Point limit <input id="point-limit" type="number" min="0" max="16" /></label>
               </section>
               <section>
                 <h2>Output affine property</h2>
                 <label
                   >Property
                   <select id="output-property"></select></label
-                ><label
-                  >Base value <input id="output-base" type="number" /></label
-                ><label
-                  >Terms (attribute / coefficient)<textarea
-                    id="output-terms"
-                    rows="3"
-                  ></textarea>
-                </label>
+                ><label>Base value <input id="output-base" type="number" /></label
+                ><label>Terms (attribute / coefficient)<textarea id="output-terms" rows="3"></textarea></label>
                 <p>
-                  Integer affine model: base + sum(floor(attribute × coefficient
-                  / 1000)). These are authored units, not a universal quality
-                  score.
+                  Integer affine model: base + sum(floor(attribute × coefficient / 1000)). These are authored units, not
+                  a universal quality score.
                 </p>
                 <button id="apply-fields">Apply fields to draft</button>
                 <p id="draft-status"></p>
                 <details>
                   <summary>Advanced complete recipe</summary>
-                  <textarea
-                    id="recipe-json"
-                    rows="10"
-                    aria-label="Complete recipe JSON"
-                  ></textarea
+                  <textarea id="recipe-json" rows="10" aria-label="Complete recipe JSON"></textarea
                   ><button id="apply-json">Use JSON draft</button>
                 </details>
                 <h2>Isolated evaluated values</h2>
@@ -122,59 +79,32 @@
               </section>
             </div>
             <div class="buttons">
-              <button id="preview-recipe">Validate and preview</button
-              ><button id="commit-recipe">Commit recipe</button
-              ><button id="discard-recipe">Discard draft</button
-              ><button id="undo">Undo</button><button id="redo">Redo</button
-              ><button id="save-recipe">Save recipe</button>
+              <button id="preview-recipe">Validate and preview</button><button id="commit-recipe">Commit recipe</button
+              ><button id="discard-recipe">Discard draft</button><button id="undo">Undo</button
+              ><button id="redo">Redo</button><button id="save-recipe">Save recipe</button>
             </div>
           </section>
           <section id="runtime-pane" hidden>
             <p>
-              Each session reserves exact selected batches in holding custody.
-              Publication requires a matching durable envelope; failed writes
-              keep accepted stock unchanged.
+              Each session reserves exact selected batches in holding custody. Publication requires a matching durable
+              envelope; failed writes keep accepted stock unchanged.
             </p>
             <div class="columns">
               <section>
                 <h2>Explicit selection</h2>
-                <label
-                  >Source A quantity
-                  <input
-                    id="quantity-a"
-                    type="number"
-                    min="0"
-                    value="1" /></label
+                <label>Source A quantity <input id="quantity-a" type="number" min="0" value="1" /></label
+                ><label>Source B quantity <input id="quantity-b" type="number" min="0" value="1" /></label
                 ><label
-                  >Source B quantity
-                  <input
-                    id="quantity-b"
-                    type="number"
-                    min="0"
-                    value="1" /></label
-                ><label
-                  >Experiment point budget
-                  <input
-                    id="point-budget"
-                    type="number"
-                    min="0"
-                    max="16"
-                    value="4" /></label
+                  >Experiment point budget <input id="point-budget" type="number" min="0" max="16" value="4" /></label
                 ><button id="begin">Prepare reservation</button
                 ><label
                   >Accepted session
                   <select id="session"></select></label
-                ><label
-                  >Experiment points
-                  <input id="experiment-points" type="number" min="1" value="1"
-                /></label>
+                ><label>Experiment points <input id="experiment-points" type="number" min="1" value="1" /></label>
                 <div class="buttons">
-                  <button id="experiment">Prepare experiment</button
-                  ><button id="lock">Prepare manifest lock</button
+                  <button id="experiment">Prepare experiment</button><button id="lock">Prepare manifest lock</button
                   ><button id="repeat">Prepare repeat with fresh supply</button
-                  ><button id="cancel-session">
-                    Prepare session cancellation
-                  </button>
+                  ><button id="cancel-session">Prepare session cancellation</button>
                 </div>
                 <div id="sessions"></div>
               </section>
@@ -187,12 +117,8 @@
                     <option>m-b</option>
                   </select></label
                 ><button id="assign">Prepare machine assignment</button
-                ><label
-                  >Caller ticks
-                  <input id="ticks" type="number" min="1" value="10" /></label
-                ><label
-                  >Caller power
-                  <input id="power" type="number" min="0" value="10" /></label
+                ><label>Caller ticks <input id="ticks" type="number" min="1" value="10" /></label
+                ><label>Caller power <input id="power" type="number" min="0" value="10" /></label
                 ><button id="step">Prepare powered step</button>
                 <div id="machines"></div>
                 <h2>Unowned stock and capacity</h2>
@@ -205,29 +131,13 @@
                 ><label
                   >Batch
                   <select id="batch"></select></label
-                ><label
-                  >Transfer units
-                  <input
-                    id="transfer-quantity"
-                    type="number"
-                    min="1"
-                    value="1" /></label
+                ><label>Transfer units <input id="transfer-quantity" type="number" min="1" value="1" /></label
                 ><button id="transfer">Prepare transfer</button
                 ><label
                   >Capacity container
                   <select id="capacity-container"></select></label
-                ><label
-                  >Mass capacity (mg)<input
-                    id="capacity-mass"
-                    type="number"
-                    min="0"
-                    value="1000" /></label
-                ><label
-                  >Volume capacity (µL)<input
-                    id="capacity-volume"
-                    type="number"
-                    min="0"
-                    value="1000" /></label
+                ><label>Mass capacity (mg)<input id="capacity-mass" type="number" min="0" value="1000" /></label
+                ><label>Volume capacity (µL)<input id="capacity-volume" type="number" min="0" value="1000" /></label
                 ><button id="resize">Prepare capacity change</button>
               </section>
             </div>
@@ -246,9 +156,8 @@
           </section>
           <section id="survey-pane" hidden>
             <p>
-              Survey points are observations, not reservation or collection
-              authority. Explicit spawn replacement invalidates old survey
-              callbacks; harvested batch facts remain.
+              Survey points are observations, not reservation or collection authority. Explicit spawn replacement
+              invalidates old survey callbacks; harvested batch facts remain.
             </p>
             <label
               >Spawn
@@ -263,26 +172,13 @@
               ><button id="replace-spawn">Prepare explicit replacement</button>
             </div>
             <p id="survey-status" role="status"></p>
-            <svg
-              id="survey-map"
-              viewBox="0 0 320 320"
-              role="img"
-              aria-label="Accepted survey samples"
-            ></svg
-            ><label
-              >Explicit authority time
-              <input id="clock" type="number" min="0" value="1" /></label
+            <svg id="survey-map" viewBox="0 0 320 320" role="img" aria-label="Accepted survey samples"></svg
+            ><label>Explicit authority time <input id="clock" type="number" min="0" value="1" /></label
             ><button id="advance">Prepare time advance</button
             ><label
               >Harvest destination
               <select id="harvest-container"></select></label
-            ><label
-              >Harvest quantity
-              <input
-                id="harvest-quantity"
-                type="number"
-                min="1"
-                value="1" /></label
+            ><label>Harvest quantity <input id="harvest-quantity" type="number" min="1" value="1" /></label
             ><button id="harvest">Prepare harvest</button>
           </section>
           <section class="publication">
@@ -294,16 +190,12 @@
               ><button id="retry-runtime">Retry exact pending candidate</button
               ><button id="ack-runtime">Acknowledge durable candidate</button>
             </div>
-            <label
-              ><input id="fail-storage" type="checkbox" />Refuse runtime
-              writes</label
-            >
+            <label><input id="fail-storage" type="checkbox" />Refuse runtime writes</label>
             <p id="persistence"></p>
             <button id="reload">Reload saved sections</button>
             <p>
-              Independent definition and runtime saves. Desktop keyboard/pointer
-              sample; no distributed transaction or physical-device
-              certification.
+              Independent definition and runtime saves. Desktop keyboard/pointer sample; no distributed transaction or
+              physical-device certification.
             </p>
           </section>
           <p id="message" role="status" aria-live="polite"></p>

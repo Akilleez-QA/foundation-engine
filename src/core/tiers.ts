@@ -8,7 +8,7 @@ export type QualityPreset = 'reference' | 'high' | 'medium' | 'low';
 /** The lighter presets: the keys of a `Ported<T>`'s `ports`. */
 export type PortPreset = Exclude<QualityPreset, 'reference'>;
 /** Flat fields are the reference values; `ports` override them for lighter presets (ADR 0030). */
-export type Ported<T> = T & { ports?: Partial<Record<PortPreset, Partial<T>>> };
+export type Ported<T> = T & {ports?: Partial<Record<PortPreset, Partial<T>>>};
 
 /** Presets, best first (display order on the Graphics screen, and the asset tier order). */
 export const QUALITY_PRESETS = ['reference', 'high', 'medium', 'low'] as const satisfies readonly QualityPreset[];

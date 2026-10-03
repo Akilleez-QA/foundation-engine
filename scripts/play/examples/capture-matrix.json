@@ -21,7 +21,19 @@
     }
   ],
   "cases": [
-    {"id": "compact-entry", "profile": "compact-touch", "scene": "main", "task": "Inspect initial scene visibility", "criteria": ["The authored essential world region remains visible"]},
-    {"id": "hybrid-entry", "profile": "windowed-hybrid", "scene": "main", "task": "Inspect windowed scene visibility", "criteria": ["The authored essential world region remains visible"]}
+    {
+      "id": "compact-entry",
+      "profile": "compact-touch",
+      "scene": "main",
+      "task": "Inspect initial scene visibility",
+      "criteria": ["The authored essential world region remains visible"]
+    },
+    {
+      "id": "hybrid-entry",
+      "profile": "windowed-hybrid",
+      "scene": "main",
+      "task": "Inspect windowed scene visibility",
+      "criteria": ["The authored essential world region remains visible"]
+    }
   ]
 }
