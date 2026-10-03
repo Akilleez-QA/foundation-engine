@@ -58,6 +58,13 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
 
 ### Changes
 
+- **Explorer journey failure paths and dev/test `engine.dispose()`.** `npm run test:creator-journey-browser`
+  now also refuses localStorage writes through a labelled test switch (the discovery stays on the HUD, the
+  durable bytes stay byte-identical, the save store's own scheduled retry writes it once storage accepts
+  writes), supersedes a pending garden→shed change with a newer `goto`, blurs the window while a door change
+  is pending, and finally retires the app. The new dev/test-only `engine.dispose()` calls the existing kernel
+  `App.dispose()` and reports any remaining scene handle, probe getters and the renderer pool's release
+  audit; after it, `engine.clock.step()` refuses. Production builds have no test API, so they are unchanged.
 - **Fixed (docs): world-edit saves acknowledge only the submitted revision.** The
   [large world records](docs/recipes/store-large-world-records.md) recipe captures the revision
   before awaiting `store.write` and passes it to `markSaved`, so edits made while a save is
