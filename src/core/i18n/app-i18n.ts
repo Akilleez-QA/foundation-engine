@@ -9,9 +9,9 @@
  */
 import { DEV } from '../env';
 import { createCatalogLoader } from './catalog-loader';
-import { createI18n, type TArgs } from './i18n';
+import { createI18n, runtimeT, type TArgs } from './i18n';
 import { escapeHtml, markupString } from './html';
-import type { NarrationCatalogKey, StringKey, StringParams } from './keys.gen';
+import type { StringKey, StringParams } from './keys.gen';
 
 const reported = new Set<string>();
 /**
@@ -46,7 +46,7 @@ export const narrationCatalog = createCatalogLoader(appI18n, 'en', async () => {
 export const hasNarrationLine = (key: string): boolean => appI18n.has(`narration.${key}`);
 
 /** The narration line for a key, exactly as authored; '' when there is none (or before the catalogue loads). */
-export const narrationLine = (key: string): string => hasNarrationLine(key) ? appI18n.t(`narration.${key}` as NarrationCatalogKey, ...([] as unknown as TArgs<StringParams, NarrationCatalogKey>)) : '';
+export const narrationLine = (key: string): string => hasNarrationLine(key) ? runtimeT(appI18n, `narration.${key}`) : '';
 
 /** A string by key, with exactly the variables its `en` text uses. */
 export const t = <K extends StringKey>(key: K, ...args: TArgs<StringParams, K>): string => appI18n.t(key, ...args);

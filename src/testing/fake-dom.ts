@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * A tiny DOM for node tests of DOM-building modules . It covers only what those
  * modules use: elements, text, attributes, dataset, a simple selector engine (tag, .class, [attr], [attr=value],
@@ -12,34 +11,43 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import {appInput} from '../platform/ui/runtime';
-type Listener={type:string;fn:(event:any)=>void;capture:boolean};
+/** An event as the fake delivers it: the dispatched object itself, given a target and propagation state. */
+export interface FakeEvent{type:string;target:FakeNode;currentTarget?:FakeNode;defaultPrevented:boolean;stopped:boolean;preventDefault():void;stopPropagation():void;[key:string]:unknown}
+/** What a test dispatches: a plain object with a type (plus any event fields), or a real Event. */
+export type FakeEventInit={type:string;[key:string]:unknown};
+/** A listener names the event fields it reads; the fake delivers whatever object the test dispatched. */
+type FakeListener<E=FakeEvent>=(event:E)=>void;
+type Listener={type:string;fn:FakeListener;capture:boolean};
+const isEvent=(value:unknown):value is Event=>typeof Event==='function'&&value instanceof Event;
+type FakeStyle=Record<string,string>&{setProperty(k:string,v:string):void;getPropertyValue(k:string):string};
+const fakeStyle=():FakeStyle=>Object.assign({} as Record<string,string>,{setProperty(this:Record<string,string>,k:string,v:string){this[k]=v;},getPropertyValue(this:Record<string,string>,k:string){return this[k]??'';}});
 export const live={listeners:0,observers:0,frames:0};
 class FakeNode{
- parentNode:FakeElement|FakeDocument|null=null;childNodes:FakeNode[]=[];ownerDocument!:FakeDocument;
+ parentNode:FakeNode|null=null;childNodes:FakeNode[]=[];ownerDocument!:FakeDocument;
  private listeners:Listener[]=[];
  get parentElement():FakeElement|null{return this.parentNode instanceof FakeElement?this.parentNode:null;}
  get isConnected():boolean{let node:FakeNode|null=this;while(node){if(node instanceof FakeDocument)return true;node=node.parentNode;}return false;}
  get textContent():string{return this.childNodes.map(c=>c.textContent).join('');}
  set textContent(value:string){this.replaceChildren();if(value)this.append(this.ownerDocument.createTextNode(value));}
- append(...nodes:(FakeNode|string)[]){for(const n of nodes){const node=typeof n==='string'?this.ownerDocument.createTextNode(n):n;node.remove();node.parentNode=this as any;this.childNodes.push(node);}}
+ append(...nodes:(FakeNode|string)[]){for(const n of nodes){const node=typeof n==='string'?this.ownerDocument.createTextNode(n):n;node.remove();node.parentNode=this;this.childNodes.push(node);}}
  /** Inserts nodes before this one in its parent. */
  before(...nodes:FakeNode[]){const p=this.parentNode;if(!p)return;for(const node of nodes){if(node===this)continue;node.remove();node.parentNode=p;p.childNodes.splice(p.childNodes.indexOf(this),0,node);}}
  replaceChildren(...nodes:FakeNode[]){for(const c of [...this.childNodes])c.remove();this.append(...nodes);}
  remove(){const p=this.parentNode;if(!p)return;p.childNodes.splice(p.childNodes.indexOf(this),1);this.parentNode=null;if(this.ownerDocument.activeElement&&this.contains(this.ownerDocument.activeElement))this.ownerDocument.activeElement=this.ownerDocument.body;}
- contains(node:any):boolean{for(let n=node;n;n=n.parentNode)if(n===this)return true;return false;}
- addEventListener(type:string,fn:(event:any)=>void,options?:boolean|{capture?:boolean;signal?:AbortSignal}){
+ contains(node:FakeNode|null|undefined):boolean{for(let n=node;n;n=n.parentNode)if(n===this)return true;return false;}
+ addEventListener<E=FakeEvent>(type:string,fn:FakeListener<E>,options?:boolean|{capture?:boolean;signal?:AbortSignal}){
   const capture=typeof options==='boolean'?options:!!options?.capture,signal=typeof options==='object'?options.signal:undefined;
   if(signal?.aborted)return;if(this.listeners.some(l=>l.type===type&&l.fn===fn&&l.capture===capture))return;
-  const entry={type,fn,capture};this.listeners.push(entry);live.listeners++;
+  const entry={type,fn:fn as FakeListener,capture};this.listeners.push(entry);live.listeners++;
   signal?.addEventListener('abort',()=>this.drop(entry),{once:true});
  }
- removeEventListener(type:string,fn:(event:any)=>void,options?:boolean|{capture?:boolean}){const capture=typeof options==='boolean'?options:!!options?.capture;const entry=this.listeners.find(l=>l.type===type&&l.fn===fn&&l.capture===capture);if(entry)this.drop(entry);}
+ removeEventListener<E=FakeEvent>(type:string,fn:FakeListener<E>,options?:boolean|{capture?:boolean}){const capture=typeof options==='boolean'?options:!!options?.capture;const entry=this.listeners.find(l=>l.type===type&&l.fn===fn&&l.capture===capture);if(entry)this.drop(entry);}
  private drop(entry:Listener){const i=this.listeners.indexOf(entry);if(i>=0){this.listeners.splice(i,1);live.listeners--;}}
  /** Capture from the document down, then bubble back up (every event bubbles here). Returns !defaultPrevented. */
- dispatchEvent(init:any){
+ dispatchEvent(init:FakeEventInit|Event){
   // A real Event (a CustomEvent the module dispatches) has read-only fields: carry its type and detail instead.
-  if(typeof Event==='function'&&init instanceof Event)init={type:init.type,detail:(init as CustomEvent).detail};
-  const event:any=Object.assign(init,{target:this,defaultPrevented:false,stopped:false,preventDefault(){event.defaultPrevented=true;},stopPropagation(){event.stopped=true;}});
+  const source:FakeEventInit=isEvent(init)?{type:init.type,detail:(init as CustomEvent).detail}:init;
+  const event:FakeEvent=Object.assign(source,{target:this as FakeNode,defaultPrevented:false,stopped:false,preventDefault(){event.defaultPrevented=true;},stopPropagation(){event.stopped=true;}});
   const path:FakeNode[]=[];for(let n:FakeNode|null=this;n;n=n.parentNode)path.push(n);
   const fire=(node:FakeNode,capture:boolean)=>{for(const l of [...node.listeners])if(l.type===event.type&&(l.capture===capture||node===this)&&node.listeners.includes(l)){event.currentTarget=node;l.fn(event);}};
   for(const node of [...path].reverse()){if(node===this)break;fire(node,true);if(event.stopped)return !event.defaultPrevented;}
@@ -52,7 +60,7 @@ const camel=(name:string)=>name.slice(5).replace(/-([a-z])/g,(_,c)=>c.toUpperCas
 const kebab=(key:string)=>'data-'+key.replace(/[A-Z]/g,c=>'-'+c.toLowerCase());
 export class FakeElement extends FakeNode{
  attributes=new Map<string,string>();hidden=false;disabled=false;type='';value='';min='';max='';src='';alt='';decoding='';
- style:any={setProperty(this:any,k:string,v:string){this[k]=v;},getPropertyValue(this:any,k:string){return this[k]??'';}};
+ style=fakeStyle();
  rect={left:0,top:0,width:400,height:300};private tab:number|null=null;
  dataset:Record<string,string>;
  constructor(public tagName:string){super();const el=this;
@@ -115,21 +123,24 @@ export class FakeDocument extends FakeNode{
  querySelector(selector:string){return this.querySelectorAll(selector)[0]??null;}
  hidden=false;
 }
+/** The fake stands in wherever a module under test takes a Document; it implements only the subset those modules use. */
+// lint:allow-unknown-cast FakeDocument is a structural subset of Document, not a Document
+const asDocument=(doc:FakeDocument):Document=>doc as unknown as Document;
 /** Install the fake as globalThis.document (plus rAF and ResizeObserver). Returns {document, flushFrames, restore}. */
 export function installFakeDom(){
- const doc=new FakeDocument(),saved=new Map<string,PropertyDescriptor|undefined>(),g=globalThis as any;
+ const doc=new FakeDocument(),saved=new Map<string,PropertyDescriptor|undefined>();
  let nextFrame=1;const frames=new Map<number,(t:number)=>void>();
- const set=(key:string,value:unknown)=>{saved.set(key,Object.getOwnPropertyDescriptor(g,key));Object.defineProperty(g,key,{configurable:true,writable:true,value});};
+ const set=(key:string,value:unknown)=>{saved.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{configurable:true,writable:true,value});};
  set('document',doc);
  set('requestAnimationFrame',(fn:(t:number)=>void)=>{const id=nextFrame++;frames.set(id,fn);live.frames++;return id;});
  set('cancelAnimationFrame',(id:number)=>{if(frames.delete(id))live.frames--;});
  set('ResizeObserver',class{private on=false;constructor(private fn:()=>void){}observe(){if(!this.on){this.on=true;live.observers++;}}unobserve(){}disconnect(){if(this.on){this.on=false;live.observers--;}}trigger(){this.fn();}});
  // The app's keymap listens on the document itself: it is the root every fake event travels through.
- appInput(doc as unknown as Document);
+ appInput(asDocument(doc));
  return {document:doc,
   /** Run the pending animation frames once, at time `now`. */
   flushFrames(now=performance.now()){const due=[...frames];frames.clear();live.frames-=due.length;for(const [,fn] of due)fn(now);},
-  restore(){for(const [key,d] of saved){if(d)Object.defineProperty(g,key,d);else delete g[key];}}};
+  restore(){for(const [key,d] of saved){if(d)Object.defineProperty(globalThis,key,d);else Reflect.deleteProperty(globalThis,key);}}};
 }
 /** A key event for dispatchEvent. */
 export const keyEvent=(key:string,extra:Record<string,unknown>={})=>({type:'keydown',key,code:key,shiftKey:false,...extra});

@@ -27,10 +27,10 @@ function retained(file:string, read = (f:string) => readFileSync(new URL(f, dir)
   return bytes.toString('utf8');
 }
 const timers:Timers = {now:()=>0, set:()=>0, clear:()=>{}};
-function owner(backend:MemoryBackend, namespace:string, sections:SaveSection<any>[]) {
+function owner(backend:MemoryBackend, namespace:string, sections:SaveSection<unknown>[]) {
   return createSaveStore({local:backend.port(), session:new MemoryBackend().port(0, 'session'), namespace, build:`${namespace}@current`, timers, sections});
 }
-const cases: {file:string; ns:string; section:SaveSection<any>; expected:unknown}[] = [
+const cases: {file:string; ns:string; section:SaveSection<unknown>; expected:unknown}[] = [
   {file:'arcade-run-best.json', ns:'arcade', section:best.section, expected:{score:42, runs:7}},
   {file:'arcade-settings-values.json', ns:'arcade', section:settingsValuesSection, expected:{'sound.music':0.5, 'comfort.large-type':true}},
   {file:'explorer-explore-progress.json', ns:'explorer', section:progress.section, expected:{used:['garden/shed-door'], visited:['garden', 'shed'], last:'garden/shed-door'}},

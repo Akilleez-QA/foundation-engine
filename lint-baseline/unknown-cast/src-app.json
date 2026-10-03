@@ -1,0 +1,9 @@
+{
+  "rule": "unknown-cast",
+  "folder": "src/app",
+  "count": 2,
+  "files": {
+    "src/app/first-scene.test.ts": 1,
+    "src/app/game-files.test.ts": 1
+  }
+}

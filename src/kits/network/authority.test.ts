@@ -7,6 +7,24 @@ import {
   type AuthorityStorage,
 } from './authority';
 import { captureAuthorityEnvelope } from './authority-envelope';
+import type { DocumentValue } from '../authoring/document';
+
+/** A mutable view of the stored envelope wire shape, for tests that read or corrupt it. */
+interface WireEnvelope {
+  version: number;
+  lineage: string;
+  schema: string;
+  revision: number;
+  state: unknown;
+  streams: {
+    id: string;
+    through: number;
+    receipts: { sequence: number; revision: number; input: unknown; result: unknown }[];
+  }[];
+  extra?: boolean;
+}
+const isRecord = (v: DocumentValue | undefined): v is { readonly [key: string]: DocumentValue } =>
+  v !== null && typeof v === 'object' && !Array.isArray(v);
 
 const json = { maxBytes: 65536, maxNodes: 4096, maxDepth: 12 };
 const limits = {
@@ -103,14 +121,14 @@ test('literal two-stream durable oracle, domain rejection, suffix eviction and e
   await f.owner.submit(command('b', 1, 4));
   await f.owner.submit(command('a', 2, -1));
   await f.owner.submit(command('a', 3, 2));
-  const saved = JSON.parse(f.raw!);
+  const saved: WireEnvelope = JSON.parse(f.raw!);
   assert.equal(saved.revision, 4);
   assert.equal(saved.state, 9);
   assert.deepEqual(
-    saved.streams.map((s: any) => [
+    saved.streams.map((s) => [
       s.id,
       s.through,
-      s.receipts.map((r: any) => [r.sequence, r.revision, r.result]),
+      s.receipts.map((r) => [r.sequence, r.revision, r.result]),
     ]),
     [
       [
@@ -158,18 +176,18 @@ test('recovery rejects independently corrupted coupled envelope fields without w
   await f.owner.submit(command('a', 1, 1));
   await f.owner.submit(command('a', 2, 2));
   await f.owner.submit(command('b', 1, 3));
-  const base = JSON.parse(f.raw!);
-  const mutants = [
-    (e: any) => e.streams.push(e.streams[0]),
-    (e: any) => e.streams[0].receipts.pop(),
-    (e: any) => (e.streams[0].receipts[0].sequence = 2),
-    (e: any) => (e.streams[0].through = 0),
-    (e: any) => (e.revision = 4),
-    (e: any) => (e.streams[0].receipts[0].revision = 4),
-    (e: any) => (e.streams[1].receipts[0].revision = 2),
-    (e: any) => (e.lineage = 'foreign'),
-    (e: any) => (e.schema = 'other'),
-    (e: any) => (e.extra = true),
+  const base: WireEnvelope = JSON.parse(f.raw!);
+  const mutants: ((e: WireEnvelope) => unknown)[] = [
+    (e) => e.streams.push(e.streams[0]),
+    (e) => e.streams[0].receipts.pop(),
+    (e) => (e.streams[0].receipts[0].sequence = 2),
+    (e) => (e.streams[0].through = 0),
+    (e) => (e.revision = 4),
+    (e) => (e.streams[0].receipts[0].revision = 4),
+    (e) => (e.streams[1].receipts[0].revision = 2),
+    (e) => (e.lineage = 'foreign'),
+    (e) => (e.schema = 'other'),
+    (e) => (e.extra = true),
   ];
   for (const mutate of mutants) {
     const e = structuredClone(base);
@@ -179,11 +197,11 @@ test('recovery rejects independently corrupted coupled envelope fields without w
   assert.equal(f.writes, 3);
 });
 test('canonical retries match object order and normalized numeric wire values', async () => {
-  let reduced: any;
+  const seen: { input?: DocumentValue } = {};
   const f = fixture({
     validateInput: () => true,
     reduce(c) {
-      reduced = c.input;
+      seen.input = c.input;
       return { stateJson: '1', resultJson: '1' };
     },
   });
@@ -193,6 +211,8 @@ test('canonical retries match object order and normalized numeric wire values', 
     sequence: 1,
     inputJson: '{"b":1e0,"a":-0}',
   });
+  const reduced = seen.input;
+  assert.ok(isRecord(reduced));
   assert.equal(Object.is(reduced.a, -0), false);
   assert.equal(
     (

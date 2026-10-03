@@ -23,6 +23,13 @@ export interface MaterializationSnapshot {
 export interface MaterializationOptions {inventory: RetirementInventoryOptions; initialInventory?: RetirementInventorySnapshot; maxPending: number; maxReceipts: number; limits: DocumentLimits}
 export interface MaterializationCandidate {readonly kind: 'materialization-candidate'}
 const copy = <T>(value: T): T => structuredClone(value);
+/**
+ * The owner's document only holds JSON text of a MaterializationSnapshot and `validate` checks every field before a
+ * value is accepted (inside `validate`, the view is what is being checked). The snapshot interfaces have no
+ * DocumentValue index signature, so the view needs the one cast.
+ */
+// lint:allow-unknown-cast document values are validated snapshots; interfaces lack a DocumentValue index signature
+const snapshotView = (value: DocumentValue): MaterializationSnapshot => value as unknown as MaterializationSnapshot;
 const safe = (v: number) => Number.isSafeInteger(v) && v >= 0;
 function id(value: string): string {if (typeof value !== 'string' || !value.length || value.length > 128) throw Error('materialization: invalid ID'); return value;}
 function serial(value: number): number {if (!safe(value)) throw Error('materialization: invalid counter'); return value;}
@@ -62,7 +69,7 @@ export function createMaterializationOwner(input: MaterializationOptions, saved?
   const options = copy(input);
   if (![options.maxPending, options.maxReceipts].every(v => Number.isSafeInteger(v) && v > 0)) throw Error('materialization: invalid bounds');
   const validate = (raw: DocumentValue): raw is DocumentValue => {
-    const state = raw as unknown as MaterializationSnapshot;
+    const state = snapshotView(raw);
     if (!state || state.version !== 1 || !state.inventory || !safe(state.nextRequest) || !Array.isArray(state.requests) || state.requests.length > options.maxPending || !Array.isArray(state.receipts) || state.receipts.length > options.maxReceipts) throw Error('materialization: invalid envelope');
     const stock = createRetirementInventory(options.inventory, state.inventory);
     const active = new Map<string, InventoryAmount[]>();
@@ -117,12 +124,12 @@ export function createMaterializationOwner(input: MaterializationOptions, saved?
   const initial: MaterializationSnapshot = saved === undefined ? {version: 1, inventory: createRetirementInventory(options.inventory, options.initialInventory).snapshot(), nextRequest: 0, requests: [], receipts: []} : copy(saved);
   const document = createAuthoredDocument({id: 'materialization', json: JSON.stringify(initial), limits: options.limits, validate});
   let pending: {token: MaterializationCandidate; prepared: PreparedDocument<DocumentValue>; result: MaterializationReceipt; attempted: boolean} | undefined, busy = false, closed = false;
-  const state = () => copy(document.read().value) as unknown as MaterializationSnapshot;
+  const state = () => snapshotView(copy(document.read().value));
   const guarded = <T>(work: () => T): T => {if (busy) throw Error('materialization: reentrant mutation'); busy = true; try {return work();} finally {busy = false;}};
   const rejected = (reason: string) => ({status: 'rejected' as const, reason});
   return {
     snapshot: state,
-    get epoch() {return (document.read().value as unknown as MaterializationSnapshot).inventory.checkpoint.epoch;},
+    get epoch() {return snapshotView(document.read().value).inventory.checkpoint.epoch;},
     prepare(epoch: number, raw: MaterializationCommand) {
       return guarded(() => {
         if (closed) return rejected('retired');
@@ -184,7 +191,7 @@ export function createMaterializationOwner(input: MaterializationOptions, saved?
       return guarded(() => {
         if (!pending || pending.token !== candidate) return rejected('stale-candidate');
         const staged = pending; staged.attempted = true;
-        if (accept(copy(staged.prepared.value) as unknown as MaterializationSnapshot) !== true) return {status: 'pending' as const};
+        if (accept(snapshotView(copy(staged.prepared.value))) !== true) return {status: 'pending' as const};
         const accepted = document.publish(staged.prepared);
         if (accepted.status !== 'accepted') return rejected(accepted.status);
         pending = undefined; return {status: 'accepted' as const, result: copy(staged.result)};

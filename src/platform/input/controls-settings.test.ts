@@ -7,7 +7,8 @@ import { installFakeDom } from '../../testing/fake-dom';
 import { inputModule } from './module';
 import { controlsSettingsModule } from './controls-settings-module';
 import { bindControlsSettings, controlsSettingsSection } from './controls-settings';
-import { BACK } from './actions';
+import { BACK, type ActionOverrides } from './actions';
+import type { SaveSection } from '../../core/save/section';
 
 const timers = { set: () => 0, clear() {}, now: () => 0 };
 const options = { id: 'preferences.controls', scope: 'player' as const };
@@ -122,7 +123,8 @@ test('binding lifetime handles abort before or inside subscription, reading and 
   const { app } = setup(fake.document as unknown as Document);
   try {
     await app.boot();
-    const section = app.registries.saveSections.get(options.id);
+    // The registry holds sections of every shape; this id is the controls section registered above.
+    const section = app.registries.saveSections.get(options.id) as SaveSection<ActionOverrides>;
     const handle = app.services.save.section(section);
     for (const at of ['before', 'subscribe', 'get', 'apply']) {
       const owner = new AbortController();

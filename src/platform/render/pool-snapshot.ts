@@ -24,6 +24,7 @@
  */
 import * as T from 'three';
 import { appRenderers, type PoolRenderer, type RendererPool } from './renderer-pool';
+import { markPresentedTarget } from './three-internals';
 import { anonymousOwner, appLoop } from '../ui/runtime';
 
 type GL = WebGL2RenderingContext;
@@ -63,7 +64,7 @@ export function presentedTarget(size: SnapshotSize): T.WebGLRenderTarget {
   const target = new T.WebGLRenderTarget(size.width, size.height, { samples: 4, depthBuffer: true, colorSpace: T.SRGBColorSpace });
   target.texture.internalFormat = 'RGBA8';
   // three applies tone mapping and the target's output colour space only for the screen and XR's presented targets.
-  (target as unknown as { isXRRenderTarget: boolean }).isXRRenderTarget = true;
+  markPresentedTarget(target);
   return target;
 }
 
@@ -155,7 +156,7 @@ export function createSnapshots(pool: RendererPool, o: SnapshotOptions = {}): Sn
     try { got = borrow(); } catch { return null; }
     if (!got) return null;
     const { r, leased } = got;
-    const x = r as unknown as T.WebGLRenderer;
+    const x = r as T.WebGLRenderer;
     let target: T.WebGLRenderTarget | null = null;
     try {
       // Another renderer (the scene's) drew on this context since: start from known GL state and three's defaults.

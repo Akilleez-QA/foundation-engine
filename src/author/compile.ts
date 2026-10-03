@@ -13,7 +13,7 @@
 import { defineModule, type EngineModule } from '../core/module';
 import type { Registry } from '../core/registry';
 import { appI18n } from '../core/i18n/app-i18n';
-import { label, type LocalizedLabel } from '../core/i18n/label';
+import { label, type LabelKey, type LocalizedLabel } from '../core/i18n/label';
 import type { SceneId } from '../core/router/resolve';
 import type { SceneRow } from '../core/router/scenes';
 import type { InputActionDef } from '../platform/input/actions';
@@ -52,8 +52,8 @@ export function gameCatalog(defs: readonly AuthorDef[]): Record<string, string> 
 /** The input action rows of a definition: one press row for a button (a hold row with `hold: true`), two hold rows for an axis. */
 export function actionRows(i: InputDefinition): InputActionDef[] {
   const labelKey = `game.input.${i.id}`;
-  if (!i.axis) return [{ id: actionOf(i.id), label: labelKey, scope: 'global', kind: i.hold ? 'hold' : 'press', defaults: { keys: i.keys, pad: i.pad } } as unknown as InputActionDef];
-  return (['negative', 'positive'] as const).map(side => ({ id: actionOf(i.id, side), label: labelKey, scope: 'global', kind: 'hold', defaults: { keys: i.axis![side].keys, pad: i.axis![side].pad } } as unknown as InputActionDef));
+  if (!i.axis) return [{ id: actionOf(i.id), label: labelKey, scope: 'global', kind: i.hold ? 'hold' : 'press', defaults: { keys: i.keys, pad: i.pad } }];
+  return (['negative', 'positive'] as const).map(side => ({ id: actionOf(i.id, side), label: labelKey, scope: 'global', kind: 'hold', defaults: { keys: i.axis![side].keys, pad: i.axis![side].pad } }));
 }
 
 /** Every catalogue the game runs with: derived keys, then each kit's strings, then the game's own (which win). */
@@ -63,7 +63,8 @@ export function mergedStrings(game: GameDefinition, defs: readonly AuthorDef[]):
   return out;
 }
 
-const localized = (key: string, fallback: string) => ({ key, fallback }) as unknown as LocalizedLabel;
+/** A derived game key (`gameCatalog`): registered at run time, so outside the generated engine LabelKey union. */
+const localized = (key: string, fallback: string): LocalizedLabel => ({ key: key as LabelKey, fallback });
 
 export interface CompiledGame { modules: EngineModule[]; scenes: SceneDefinition[]; first: SceneId; namespace: string }
 
