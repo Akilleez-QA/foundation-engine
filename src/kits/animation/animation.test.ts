@@ -2,14 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMarkerTrack, createSocketRig, defineMarkerClip } from './index';
 import { Matrix4 } from 'three';
+import { must } from '../../testing/must';
 const clip = { id: 'walk', duration: 1, markers: [{ id: 'step', at: .5 }, { id: 'boundary', at: 0 }] };
 test('markers cross skipped frames and loop boundaries once per action occurrence', () => {
   const t = createMarkerTrack(clip, { action: 'actor:1', loop: true });
   assert.deepEqual(t.advance(.5).map(e => [e.marker, e.cycle]), [['step', 0]]);
   assert.deepEqual(t.advance(2).map(e => [e.marker, e.cycle]), [['boundary', 1], ['step', 1], ['boundary', 2]]);
   assert.deepEqual(t.advance(2), []);
-  const a = createMarkerTrack(clip, { action: 'actor:2' }).advance(.5)[0];
-  assert.notEqual(a.key, createMarkerTrack(clip, { action: 'actor:1' }).advance(.5)[0].key);
+  const a = must(createMarkerTrack(clip, { action: 'actor:2' }).advance(.5)[0]);
+  assert.notEqual(a.key, must(createMarkerTrack(clip, { action: 'actor:1' }).advance(.5)[0]).key);
 });
 test('seek and teleport suppress crossed markers; cancellation ends events', () => {
   const t = createMarkerTrack(clip, { action: 'a', loop: true }); t.seek(9.8);
@@ -22,7 +23,7 @@ test('event budget rejects huge catch-up before changing cursor', () => {
 });
 test('definition snapshot cannot be changed after creation and nonlooping clips stop', () => {
   const source = { id: 'x', duration: 1, markers: [{ id: 'm', at: .2 }] }; const t = createMarkerTrack(source, { action: 'a' });
-  source.markers[0].at = .9; assert.equal(t.advance(.3).length, 1); assert.ok(Object.isFrozen(t.clip.markers[0]));
+  must(source.markers[0]).at = .9; assert.equal(t.advance(.3).length, 1); assert.ok(Object.isFrozen(t.clip.markers[0]));
   assert.deepEqual(t.advance(10), []); assert.equal(t.time, 1);
   assert.throws(() => defineMarkerClip({ ...clip, duration: 0 }));
   assert.throws(() => defineMarkerClip({ ...clip, markers: [{ id: 'x', at: 1 }] }));
@@ -40,7 +41,7 @@ test('named attachment survives LOD changes and carries the coordinate-frame ide
 test('attachment composition respects parent rotation and snapshots definitions', () => {
   const local = translate(1); const rig = createSocketRig([{ id: 'only', sockets: { hand: local } }]); local[12] = 999;
   rig.attach('tool', 'hand'); const p = rig.sample('tool', 'only', { id: 'room', matrix: new Matrix4().makeRotationZ(Math.PI / 2).toArray() });
-  assert.ok(Math.abs(p.matrix[12]) < 1e-12); assert.ok(Math.abs(p.matrix[13] - 1) < 1e-12); assert.ok(Object.isFrozen(p.matrix));
+  assert.ok(Math.abs(must(p.matrix[12])) < 1e-12); assert.ok(Math.abs(must(p.matrix[13]) - 1) < 1e-12); assert.ok(Object.isFrozen(p.matrix));
 });
 test('rig rejects missing LOD sockets, duplicate ownership, bad matrices and excess attachments', () => {
   assert.throws(() => createSocketRig([{ id: 'high', sockets: { hand: translate(0) } }, { id: 'low', sockets: {} }]));

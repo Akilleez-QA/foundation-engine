@@ -41,8 +41,8 @@ export function captureJson(json: string, input: JsonLimits, validate: (value: D
       const record = entry as { readonly [key: string]: DocumentValue };
       const keys = Object.keys(record).sort();
       for (let i = keys.length - 1; i >= 0; i--) {
-        const key = keys[i];
-        pending.push({ value: record[key] }, { text: ':' }, { text: JSON.stringify(key) });
+        const key = keys[i]!; // 0 <= i < keys.length, an own key of record
+        pending.push({ value: record[key]! }, { text: ':' }, { text: JSON.stringify(key) });
         if (i > 0) pending.push({ text: ',' });
       }
       pending.push({ text: '{' });

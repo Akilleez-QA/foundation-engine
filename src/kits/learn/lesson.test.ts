@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defineLesson, defineLessonSceneType, lessonProblems, longestPassiveRun, patchScene, type LessonInput } from './lesson';
 import { LessonDirector } from './director';
+import { must } from '../../testing/must';
 
 export const tiny: LessonInput = {
   id: 'tiny', version: 1, title: 'Tiny', ages: [8, 10],
@@ -28,7 +29,7 @@ test('lesson: a valid lesson passes; it is plain data that survives JSON', () =>
 test('lesson: objectives must be taught and checked; unknown types, cast and targets are named', () => {
   const broken: LessonInput = structuredClone(tiny);
   broken.objectives.push({ id: 'o2', text: 'Count to three' });
-  broken.scenes.b.timeline.push({ do: 'draw', target: 'nothing' }, { do: 'say', who: 'ghost', text: 'boo' });
+  must(broken.scenes.b).timeline.push({ do: 'draw', target: 'nothing' }, { do: 'say', who: 'ghost', text: 'boo' });
   broken.outline.push({ id: 'x', type: 'dance', objective: 'o1' }); broken.scenes.x = { type: 'dance', title: 'X', timeline: [] };
   const p = lessonProblems(broken).join('\n');
   assert.match(p, /objective o2 is taught by no scene/);
@@ -41,11 +42,11 @@ test('lesson: objectives must be taught and checked; unknown types, cast and tar
 test('lesson: pacing: no more than N passive actions in a row, along every branch; kind feedback; hints before answers', () => {
   assert.equal(longestPassiveRun([{ do: 'say', who: 't', text: 'a' }, { do: 'branch', if: { answer: 'q', is: 'a' }, then: [{ do: 'say', who: 't', text: 'b' }, { do: 'say', who: 't', text: 'c' }], else: [] }, { do: 'wait-for', event: 'next' }]), 3);
   const slow: LessonInput = structuredClone(tiny);
-  slow.scenes.b.timeline.splice(3, 0, { do: 'reveal', target: 'one' });
+  must(slow.scenes.b).timeline.splice(3, 0, { do: 'reveal', target: 'one' });
   assert.match(lessonProblems(slow, { maxPassive: 3 }).join(), /b: 4 passive actions in a row/);
   assert.deepEqual(lessonProblems(slow, { maxPassive: 4 }), []);
   const harsh: LessonInput = structuredClone(tiny);
-  harsh.scenes.q.quiz!.questions[0].feedback.retry = 'Wrong!'; harsh.scenes.q.quiz!.questions[0].hints = [];
+  must(must(harsh.scenes.q).quiz?.questions[0]).feedback.retry = 'Wrong!'; must(must(harsh.scenes.q).quiz?.questions[0]).hints = [];
   const p = lessonProblems(harsh).join('\n');
   assert.match(p, /feedback is kind/); assert.match(p, /hints before answers/);
 });
@@ -53,7 +54,7 @@ test('lesson: pacing: no more than N passive actions in a row, along every branc
 test('lesson: patchScene is atomic: a valid patch bumps the version, an invalid one changes nothing', () => {
   const l = defineLesson(tiny);
   const ok = patchScene(l, 'b', s => ({ ...s, title: 'Counting' }));
-  assert.deepEqual(ok.problems, []); assert.equal(ok.lesson.version, 2); assert.equal(ok.lesson.scenes.b.title, 'Counting'); assert.equal(l.scenes.b.title, 'Board');
+  assert.deepEqual(ok.problems, []); assert.equal(ok.lesson.version, 2); assert.equal(must(ok.lesson.scenes.b).title, 'Counting'); assert.equal(must(l.scenes.b).title, 'Board');
   const bad = patchScene(l, 'q', s => ({ ...s, quiz: { questions: [] } }));
   assert.equal(bad.lesson, l); assert.match(bad.problems.join(), /a quiz needs questions/);
 });

@@ -186,9 +186,10 @@ export function createSpatialGrid(input: GridLimits): SpatialGrid {
     if (!range) return finish(res, 'complete', 0, 0, 0);
     if (tooWide(range)) return finish(res, 'too-wide', 0, 0, 0);
     const cap = out.length, h = head!;
+    const col0 = range[0]!, row0 = range[1]!, col1 = range[2]!, row1 = range[3]!; // range is the 4-cell span
     let count = 0, cells = 0, examined = 0;
-    for (let row = range[1]; row <= range[3]; row++) {
-      for (let col = range[0]; col <= range[2]; col++) {
+    for (let row = row0; row <= row1; row++) {
+      for (let col = col0; col <= col1; col++) {
         cells++;
         for (let s = h[row * columns + col]!; s >= 0; s = next[s]!) {
           examined++;
@@ -270,9 +271,10 @@ export function createSpatialGrid(input: GridLimits): SpatialGrid {
       if (tooWide(range)) return finish(result, 'too-wide', 0, 0, 0);
       const k = Math.min(out.length, maxEntries), r2 = maxDistance * maxDistance;
       const d = scratch, h = head;
+      const col0 = range[0]!, row0 = range[1]!, col1 = range[2]!, row1 = range[3]!; // range is the 4-cell span
       let count = 0, cells = 0, examined = 0;
-      for (let row = range[1]; row <= range[3]; row++) {
-        for (let col = range[0]; col <= range[2]; col++) {
+      for (let row = row0; row <= row1; row++) {
+        for (let col = col0; col <= col1; col++) {
           cells++;
           for (let s = h[row * columns + col]!; s >= 0; s = next[s]!) {
             examined++;

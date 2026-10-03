@@ -12,13 +12,16 @@ const inverseWith = (m: ScalarMath) => (a: RootDelta): RootDelta => {const c=m.c
 export function createRootMotion(input: RootClip, loop=false, options: { math?: ScalarMathMode } = {}) {
   const m=scalarMath(options.math),compose=composeWith(m),inverse=inverseWith(m);
   const clip=structuredClone(input);
-  if(!Number.isFinite(clip.duration)||clip.duration<=0||!clip.keys.length||clip.keys.length>4096||clip.keys[0].at!==0||clip.keys.at(-1)!.at!==clip.duration)throw Error('root motion: invalid clip');
+  // keys[0] and the last key are read only after the non-empty check.
+  if(!Number.isFinite(clip.duration)||clip.duration<=0||!clip.keys.length||clip.keys.length>4096||clip.keys[0]!.at!==0||clip.keys[clip.keys.length-1]!.at!==clip.duration)throw Error('root motion: invalid clip');
+  const first=clip.keys[0]!;
   let previous=-1;
   for(const key of clip.keys){if(![key.at,key.x,key.z,key.yaw].every(Number.isFinite)||key.at<=previous||key.at>clip.duration||[key.x,key.z,key.yaw].some(v=>Math.abs(v)>1e6))throw Error('root motion: invalid key');previous=key.at;}
-  const origin=inverse(clip.keys[0]);
+  const origin=inverse(first);
   const at=(time:number):RootDelta=>{
-    let lo=0,hi=clip.keys.length-1;while(hi-lo>1){const mid=(lo+hi)>>>1;if(clip.keys[mid].at<=time)lo=mid;else hi=mid;}
-    const a=clip.keys[lo],b=clip.keys[hi],u=(time-a.at)/(b.at-a.at);
+    // lo <= mid <= hi stay in 0..keys.length-1 (keys is non-empty).
+    let lo=0,hi=clip.keys.length-1;while(hi-lo>1){const mid=(lo+hi)>>>1;if(clip.keys[mid]!.at<=time)lo=mid;else hi=mid;}
+    const a=clip.keys[lo]!,b=clip.keys[hi]!,u=(time-a.at)/(b.at-a.at);
     return compose(origin,{x:a.x+(b.x-a.x)*u,z:a.z+(b.z-a.z)*u,yaw:a.yaw+(b.yaw-a.yaw)*u});
   };
   const end=at(clip.duration);

@@ -137,7 +137,7 @@ export function compareDigests(a: DigestSnapshot, b: DigestSnapshot, options: { 
     if (theirs === undefined) continue;
     if (from < 0) from = tick;
     if (theirs !== digest) {
-      const evicted = (s: DigestSnapshot) => s.dropped > 0 && s.entries.length > 0 && s.entries[0][0] <= tick;
+      const evicted = (s: DigestSnapshot) => s.dropped > 0 && s.entries.length > 0 && s.entries[0]![0] <= tick; // non-empty: checked first
       return Object.freeze({ status: 'diverged', tick, after, exact: !evicted(a) && !evicted(b) && a.firstTick === b.firstTick,
         a: digest, b: theirs, detail: Object.freeze({ a: detailOf(a, tick), b: detailOf(b, tick) }) });
     }

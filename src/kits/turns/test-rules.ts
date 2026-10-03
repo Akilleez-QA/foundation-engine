@@ -19,12 +19,13 @@ export function cardRules(id = 'test-cards@1', bonus = 0): TurnRules<Table, Move
     reduce({ state, command, random }) {
       if (command.type === 'shuffle') {
         const deck = [...state.deck];
-        for (let i = deck.length - 1; i > 0; i--) { const j = random.int(0, i); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+        for (let i = deck.length - 1; i > 0; i--) { const j = random.int(0, i); [deck[i], deck[j]] = [deck[j]!, deck[i]!]; } // 0 <= j <= i < deck.length
         return { accept: true, state: { ...state, deck, turn: state.turn + 1 } };
       }
       if (command.type === 'draw') {
-        if (!state.deck.length) return { accept: false, reason: 'deck empty' };
-        return { accept: true, state: { ...state, deck: state.deck.slice(1), hand: [...state.hand, state.deck[0]], turn: state.turn + 1 } };
+        const [top, ...rest] = state.deck;
+        if (top === undefined) return { accept: false, reason: 'deck empty' };
+        return { accept: true, state: { ...state, deck: rest, hand: [...state.hand, top], turn: state.turn + 1 } };
       }
       if (!state.hand.includes(command.card)) return { accept: false, reason: 'card not in hand' };
       return { accept: true, state: { ...state, hand: state.hand.filter(c => c !== command.card), score: state.score + command.card + bonus, turn: state.turn + 1 } };

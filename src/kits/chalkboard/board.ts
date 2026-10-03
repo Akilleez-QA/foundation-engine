@@ -50,7 +50,8 @@ export function lengthOf(i: BoardItem): number {
     case 'rect': return 2 * (i.w + i.h);
     case 'axes': return i.w + i.h;
     case 'number-line': return d(i.from, i.to) + 3 * (Math.round((i.max - i.min) / i.step) + 1);
-    case 'path': return i.points.slice(1).reduce((s, p, k) => s + d(i.points[k], p), 0) + (i.closed && i.points.length > 2 ? d(i.points[i.points.length - 1], i.points[0]) : 0);
+    // k indexes the point before p; the closing edge needs more than two points.
+    case 'path': return i.points.slice(1).reduce((s, p, k) => s + d(i.points[k]!, p), 0) + (i.closed && i.points.length > 2 ? d(i.points[i.points.length - 1]!, i.points[0]!) : 0);
     default: return 0;
   }
 }
