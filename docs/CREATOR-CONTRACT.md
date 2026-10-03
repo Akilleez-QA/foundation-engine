@@ -85,8 +85,10 @@ frozen result protect a declaration from accidental mutation, not arbitrary
 application behavior. Creators can change their requirements and produce a new
 `defineBuild` snapshot; immutability does not lock their design choices. This field is not supplied in the example's `BuildInput`.
 
-The brief also supports audience, performance, visual comparison views, pedagogy and
-kid-safe options. Defaults are real choices to inspect, not evidence of suitability.
+The brief also supports audience, performance, visual comparison views, pedagogy,
+kid-safe options and the [render backend](guides/render-backend.md) (`render.backend`:
+`'webgl2'` by default; `'webgpu'` is refused as not available yet). Defaults are real
+choices to inspect, not evidence of suitability.
 The selected minimum device influences derived budgets. Actual simulation equations,
 units, numerical tolerances, asset lists, interaction layouts and physical hardware
 models belong in the application specification and implementation; they are not

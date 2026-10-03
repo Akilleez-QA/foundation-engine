@@ -30,7 +30,7 @@
  * stops and resumes drawing. `onLost`/`onRestored` hear it too. A lost context is never handed to a new lease.
  */
 import type * as T from 'three';
-import {glDelete} from './gl-interop';
+import type {ContextObjects, RenderBackend} from './render-backend';
 
 type GL = WebGL2RenderingContext;
 // renderer-pool.ts imports this module, so the shapes it shares are restated here (structurally the same).
@@ -85,8 +85,12 @@ export interface StageSurfaceRequest<P = object> {
 export interface StagePoolDeps<P> {
   stats: Stats;
   valve: {textures: number; geometries: number};
-  /** renderer-pool's GL object tracker (what a context created and has not deleted). */
-  track(gl: GL): {live: Map<object, string>; validation?: {clear(): void}};
+  /** renderer-pool's render backend: object tracking (what a context created and has not deleted), loss and its
+   *  events. */
+  backend: Pick<
+    RenderBackend<GL, PoolRenderer>,
+    'track' | 'deleteObject' | 'isLost' | 'lose' | 'lostEvent' | 'restoredEvent'
+  >;
   doc(): Document | undefined;
   /** Make the shared context (a detached canvas). Throws when WebGL cannot start. */
   createContext(antialias: boolean): {canvas: HTMLCanvasElement; gl: GL};
@@ -116,7 +120,7 @@ interface StageSlot {
   key: boolean;
   canvas: HTMLCanvasElement;
   gl: GL;
-  tracker: {live: Map<object, string>; validation?: {clear(): void}};
+  tracker: ContextObjects;
   views: Set<View>;
   /** The view whose renderer's state cache matches the context. */
   drawer: View | null;
@@ -150,13 +154,14 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
   const retire = (slot: StageSlot, lose: boolean) => {
     if (slots.get(slot.key) === slot) slots.delete(slot.key);
     slot.off.abort();
-    if (lose && !slot.lost) (slot.gl.getExtension?.('WEBGL_lose_context') as WEBGL_lose_context | null)?.loseContext();
+    if (lose && !slot.lost) d.backend.lose(slot.gl);
     slot.tracker.live.clear();
-    slot.tracker.validation?.clear();
+    slot.tracker.validation.clear();
     d.stats.contexts = Math.max(0, d.stats.contexts - 1);
   };
 
-  const forward = (slot: StageSlot, type: 'webglcontextlost' | 'webglcontextrestored') => {
+  const forward = (slot: StageSlot, lost: boolean) => {
+    const type = lost ? d.backend.lostEvent : d.backend.restoredEvent;
     for (const v of [...slot.views]) {
       if (typeof Event === 'function') {
         try {
@@ -165,7 +170,7 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
           /* a detached test canvas */
         }
       }
-      for (const f of [...(type === 'webglcontextlost' ? v.lost : v.restored)]) f();
+      for (const f of [...(lost ? v.lost : v.restored)]) f();
     }
   };
 
@@ -175,7 +180,7 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
       key,
       canvas,
       gl,
-      tracker: d.track(gl),
+      tracker: d.backend.track(gl),
       views: new Set(),
       drawer: null,
       pending: null,
@@ -186,25 +191,25 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
     d.stats.contexts++;
     const signal = slot.off.signal;
     canvas.addEventListener(
-      'webglcontextlost',
+      d.backend.lostEvent,
       e => {
         e.preventDefault();
         slot.lost = true;
         slot.tracker.live.clear();
-        slot.tracker.validation?.clear();
+        slot.tracker.validation.clear();
         slot.pending = null;
         slot.drawer = null;
         d.stats.losses++;
-        if (slot.views.size) forward(slot, 'webglcontextlost');
+        if (slot.views.size) forward(slot, true);
         else retire(slot, false);
       },
       {signal},
     );
     canvas.addEventListener(
-      'webglcontextrestored',
+      d.backend.restoredEvent,
       () => {
         slot.lost = false;
-        forward(slot, 'webglcontextrestored');
+        forward(slot, false);
       },
       {signal},
     );
@@ -283,14 +288,14 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
     for (const [obj, del] of [...slot.tracker.live]) {
       audit.glObjects++;
       try {
-        glDelete(slot.gl, del, obj);
+        d.backend.deleteObject(slot.gl, del, obj);
       } catch {
         /* lost */
       }
     }
     slot.tracker.live.clear();
-    slot.tracker.validation?.clear();
-    if (slot.lost || slot.gl.isContextLost?.()) {
+    slot.tracker.validation.clear();
+    if (slot.lost || d.backend.isLost(slot.gl)) {
       retire(slot, false);
       return;
     }
@@ -307,7 +312,7 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
   const lease = (req: StageSurfaceRequest<P>): StageSurface | null => {
     const key = req.antialias ?? true;
     let slot = slots.get(key) ?? null;
-    if (slot && (slot.lost || slot.gl.isContextLost?.())) {
+    if (slot && (slot.lost || d.backend.isLost(slot.gl))) {
       // Never hand on a lost context. One with views still on it lives until they release.
       if (!slot.views.size) retire(slot, false);
       else slots.delete(key);
