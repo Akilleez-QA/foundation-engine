@@ -31,6 +31,30 @@ For substantial changes, open an issue describing the problem, a minimal consume
 
 Explain ownership and disposal, asynchronous cancellation, finite work/memory bounds, and compatibility with existing callers where relevant. An optional kit must stay optional. Do not import kits into core, platform, or the author API; game code imports only `@engine`, `@kits/<name>`, its own files, and JSON. Use existing scheduling, asset, worker, input, and save mechanisms instead of introducing parallel subsystems.
 
+## Describe systems and patterns
+
+Use system and pattern names instead of external game titles, franchise names,
+their acronyms, or references to their source projects in contribution titles, issues, proposals,
+pull requests, goals, documentation, code comments, and examples. Describe the
+behavior and reusable contract directly: for example, sectioned persistence,
+scene ownership, authoritative replication, data-driven crafting, or bounded
+asset streaming. State requirements and acceptance evidence so the submission
+stands on its own without familiarity with another game.
+
+Study mechanics, architecture and behavior as reusable systems and patterns;
+this repository does not require inspiration credits or game-name citations for
+independently implemented mechanics. Describe our own requirements, design and
+verification evidence.
+
+Do not submit proprietary source excerpts, source links, or private study notes.
+Attribution and license notices apply to third-party material actually included
+or adapted in a contribution, such as code, assets or documentation, and to
+dependencies. Preserve required notices for that material. A change of programming
+language alone does not make adapted code an independent implementation.
+Foundation's own template names and reproducible file/API identifiers remain
+appropriate when needed to explain or verify a change. Reviewers should request
+neutral system/pattern wording before accepting a submission.
+
 ## Make and validate the change
 
 Follow the per-task branch/worktree and integration rules in AGENTS.md. Contributors without write access can work from a fork and submit a pull request. Keep changes focused and preserve other contributors' work. Update a template's GAME.md/build brief when changing its behavior; changes to audience, minimum device, or budget ceilings need explicit agreement.
