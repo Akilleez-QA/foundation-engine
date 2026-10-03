@@ -67,7 +67,9 @@ export default defineConfig({
   // `npm run dev` and `npm run preview` listen on this machine only. `npm run dev -- --host` (Vite's own flag) or
   // ENGINE_HOST=1 listens on the local network too, e.g. to open the game on a phone on the same Wi-Fi; everyone on
   // that network can then reach the dev server. `npm run play -- --host` does the same for the play server.
-  server: {host: devHost(process.env.ENGINE_HOST)},
+  // ENGINE_WATCH=0 starts no file watcher (`server.watch: null`): the browser-check preload (scripts/silent-browser.cjs)
+  // sets it, because those servers never see an edit; `npm run dev` and `npm run play` keep watching.
+  server: {host: devHost(process.env.ENGINE_HOST), ...(process.env.ENGINE_WATCH === '0' ? {watch: null} : {})},
   preview: {host: devHost(process.env.ENGINE_HOST)},
   optimizeDeps: {entries: ['index.html']},
   // src/author/index.ts is a pure re-export barrel (scripts/vite-config.test.mjs keeps it so). Declaring it free of
