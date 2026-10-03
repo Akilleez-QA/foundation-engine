@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {launch} from '../../scripts/perf/bench-browser.mjs';
+import {PROBE} from '../../scripts/perf/probe-inject.mjs';
 import {diagnosticReport} from '../../scripts/play/diagnostic-report.mjs';
 import {serve, open, measure, budgetStatus} from '../../scripts/play/lib.mjs';
 const out = resolve(process.argv[2] ?? 'playtest/blender-export');
@@ -12,6 +13,7 @@ const evidence = diagnosticReport(report, resolve(out,'report.json'));
 let server,browser;
 try {
  server=await serve(); browser=await launch({strictClose:true});
+ await browser.page.addInitScript(PROBE);
  browser.page.on('pageerror',e=>report.errors.push(e.message));
  browser.page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});
  const requests=[]; browser.page.on('response',r=>{if(new URL(r.url()).pathname.endsWith('.glb'))requests.push({url:new URL(r.url()).pathname,status:r.status()});});
@@ -33,6 +35,8 @@ try {
  },500);
  report.budget=budgetStatus('main',report.renderCounts);
  assert.ok(report.renderCounts.renders>0,'count budget requires actual rendered frames');
+ assert.equal(report.renderCounts.drawsPerFrame,3,'two model primitives and one floor draw');
+ assert.equal(report.renderCounts.trisPerFrame,14,'twelve model triangles plus two floor triangles');
  assert.equal(report.budget.status,'within budget');
  assert.deepEqual(report.errors,[]); report.passed=true;
 } catch (error) {
