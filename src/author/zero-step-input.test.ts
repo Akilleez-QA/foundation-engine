@@ -23,7 +23,7 @@ function fixture(tapRunning?:()=>boolean){
  const bindScenePointer=(_canvas:unknown,options:any)=>{gestureOptions=options;return {pointer:rawPointer,sync(){},cancel(){options.canceled();},dispose(){}};};
  const read=(lane:'fixed'|'frame')=>(ctx:any)=>{const jump=ctx.input.pressed('jump'),tap=ctx.input.pointer.pressed;if(jump||tap)seen.push({tick,frame:frameNo,lane,jump,tap});};
  const systems=[{id:'fixed-reader',run:(ctx:any)=>{tick++;read('fixed')(ctx);}},{id:'frame-reader',phase:'frame' as const,run:read('frame')}];
- const run=ts.transpile(`let programFailed=false,simulating=true,frame=0,t=0,calm=false,frameMs=0;const FIXED_STEP=1/60,tap=tapRunning?{running:tapRunning,beforeTick(){},afterTick(){},get input(){return liveInput;}}:null;const timing=undefined,body={systems},world={clearEvents(){}},scene={id:'test'};
+ const run=ts.transpile(`let programFailed=false,simulating=true,arrived=true,frame=0,t=0,calm=false,frameMs=0;const FIXED_STEP=1/60,tap=tapRunning?{running:tapRunning,beforeTick(){},afterTick(){},get input(){return liveInput;}}:null;const timing=undefined,body={systems},world={clearEvents(){}},scene={id:'test'};
 ${wiring}
 ${runnerLine}
 ${liveInputLine}
