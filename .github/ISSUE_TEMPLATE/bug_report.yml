@@ -1,6 +1,7 @@
 name: Bug report
 description: A reproducible engine, kit, or template defect.
 title: "[Bug]: "
+labels: ["needs-triage", "bug"]
 body:
   - type: markdown
     attributes:
