@@ -64,7 +64,7 @@ export function createDialogue(definition: DialogueDefinition, session: string, 
       if (!r.visits || typeof r.visits !== 'object' || Array.isArray(r.visits)) throw Error('dialogue: invalid snapshot visits');
       for (const [k, v] of Object.entries(r.visits)) { if (!nodes.has(k) || !Number.isSafeInteger(v) || v < 0) throw Error('dialogue: invalid snapshot visits'); visits[k] = v; }
     }
-    if (r.node !== null && !(visits[r.node] >= 1)) throw Error('dialogue: invalid snapshot visits');
+    if (r.node !== null && !((visits[r.node] ?? 0) >= 1)) throw Error('dialogue: invalid snapshot visits');
     state = { definition: d.id, session, node: r.node, revision: r.revision, variables: restoreVariables(declared, r.variables), visits };
   } else {
     const visits: Record<string, number> = Object.create(null); visits[d.start] = 1;
@@ -75,7 +75,7 @@ export function createDialogue(definition: DialogueDefinition, session: string, 
     (o.requires ?? []).every(f => facts.has(f)) && (o.when === undefined || evaluate(o.when, { variables: state.variables, visits: visitsOf, facts }));
   const snapshot = (): DialogueState => {
     // fromEntries defines own properties, so a node id such as `__proto__` keeps its count.
-    const visits: Record<string, number> = Object.fromEntries(Object.keys(state.visits).sort().map(k => [k, state.visits[k]]));
+    const visits: Record<string, number> = Object.fromEntries(Object.keys(state.visits).sort().map(k => [k, state.visits[k]!])); // k is an own key
     return { definition: state.definition, session: state.session, node: state.node, revision: state.revision, variables: { ...state.variables }, visits };
   };
   return {

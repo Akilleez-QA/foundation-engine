@@ -9,12 +9,13 @@ export const INPUTS = ['n', 'l', 'r', 'a'] as const;
 /** Interactions between bodies make a wrong prediction visibly change later state. */
 export function toyStep(state: Toy, inputs: readonly string[], frame: number): void {
   if (state.frame !== frame) throw Error(`toy: stepped frame ${frame} at ${state.frame}`);
+  // i and (i + 1) % length index x; v has the same length (toyStart).
   for (let i = 0; i < state.x.length; i++) {
     const input = inputs[i];
-    if (input === 'l') state.v[i] -= 1; else if (input === 'r') state.v[i] += 1;
-    else if (input === 'a' && Math.abs(state.x[i] - state.x[(i + 1) % state.x.length]) < 20) state.hits += i + 1;
-    state.v[i] = Math.max(-4, Math.min(4, state.v[i]));
-    state.x[i] = Math.max(-100, Math.min(100, state.x[i] + state.v[i]));
+    if (input === 'l') state.v[i]! -= 1; else if (input === 'r') state.v[i]! += 1;
+    else if (input === 'a' && Math.abs(state.x[i]! - state.x[(i + 1) % state.x.length]!) < 20) state.hits += i + 1;
+    state.v[i] = Math.max(-4, Math.min(4, state.v[i]!));
+    state.x[i] = Math.max(-100, Math.min(100, state.x[i]! + state.v[i]!));
   }
   state.frame++;
 }
@@ -74,35 +75,37 @@ export function runPeers(o: { limits?: Partial<RollbackLimits>; ticks: number; s
   const published = Array.from({ length: n }, () => new Map<number, number>());
   const results: string[][] = Array.from({ length: n }, () => []);
   let maxWorkPerAdvance = 0;
+  // Every per-peer array (sessions, ports, inbox, lastAt rows, queued, published, results) has length n; from, to, i < n.
   const send = (from: number, tick: number, m: Payload) => {
     for (let to = 0; to < n; to++) if (to !== from) {
-      const at = Math.max(lastAt[from][to], tick + rng.int(o.minDelay, o.maxDelay));
-      lastAt[from][to] = at;
-      inbox[to].push({ ...m, at });
+      const row = lastAt[from]!;
+      const at = Math.max(row[to]!, tick + rng.int(o.minDelay, o.maxDelay));
+      row[to] = at;
+      inbox[to]!.push({ ...m, at });
     }
   };
   const done = () => sessions.every(s => s.read().status !== 'running' || s.read().confirmedFrame >= o.ticks + limits.inputDelay);
   for (let tick = 0; tick < o.ticks * 4 + 200 && !done(); tick++) {
     for (let i = 0; i < n; i++) {
-      const s = sessions[i];
-      const due = inbox[i].filter(m => m.at <= tick);
-      inbox[i] = inbox[i].filter(m => m.at > tick);
+      const s = sessions[i]!, box = inbox[i]!, result = results[i]!, port = ports[i]!;
+      const due = box.filter(m => m.at <= tick);
+      inbox[i] = box.filter(m => m.at > tick);
       for (const m of due) {
         const r = m.kind === 'input' ? s.remote(m.player, m.frame, m.input) : s.remoteChecksum(m.player, m.frame, m.checksum);
-        results[i].push(`${m.kind}:${r.status}`);
+        result.push(`${m.kind}:${r.status}`);
       }
       if (i === 1 && tick < (o.late ?? 0)) continue;
       if (o.pace !== undefined && Math.max(...s.read().frameAdvantage) > o.pace) continue;
-      const input = tick < o.ticks ? INPUTS[rng.int(0, 3)] : 'n';
+      const input = tick < o.ticks ? INPUTS[rng.int(0, 3)]! : 'n'; // rng.int(0, 3) indexes the four INPUTS
       const l = s.local(input);
-      if (l.status === 'queued') { queued[i].set(l.frame, l.input); send(i, tick, { kind: 'input', player: i, frame: l.frame, input: l.input }); }
-      const before = { ...ports[i].calls };
+      if (l.status === 'queued') { queued[i]!.set(l.frame, l.input); send(i, tick, { kind: 'input', player: i, frame: l.frame, input: l.input }); }
+      const before = { ...port.calls };
       const a = s.advance();
-      const work = ports[i].calls.step - before.step;
+      const work = port.calls.step - before.step;
       if (work > maxWorkPerAdvance) maxWorkPerAdvance = work;
-      results[i].push(a.status);
+      result.push(a.status);
       if ('checksums' in a) for (const c of a.checksums as readonly RollbackChecksum[]) {
-        published[i].set(c.frame, c.checksum);
+        published[i]!.set(c.frame, c.checksum);
         send(i, tick, { kind: 'checksum', player: i, frame: c.frame, checksum: c.checksum });
       }
     }
@@ -116,7 +119,7 @@ export function referenceChecksums(run: PeerRun, frames: number, inputDelay: num
   const n = run.queued.length, state = toyStart(n), out: number[] = [];
   for (let f = 0; f <= frames + 1000; f++) {
     out.push(checksum(JSON.stringify(state)));
-    const inputs = Array.from({ length: n }, (_, p) => f < inputDelay ? 'n' : run.queued[p].get(f));
+    const inputs = Array.from({ length: n }, (_, p) => f < inputDelay ? 'n' : run.queued[p]!.get(f)); // p < n = queued.length
     if (inputs.some(i => i === undefined)) break;
     toyStep(state, inputs as string[], f);
   }

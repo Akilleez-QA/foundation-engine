@@ -5,6 +5,7 @@ import {
   createSession, createSessionHost, defineSessionRules, integrityRules, isLocalNetworkHost, sessionEndpointFromPage,
   type Session, type SessionClientOptions, type SessionHost, type SessionHostIntegrity, type SessionIntegrityState, type SessionRulesInput, type SessionWorld,
 } from './index.ts';
+import { must } from '../../testing/must';
 
 type Step = { dx: number };
 const isStep = (value: unknown): value is Step => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -304,7 +305,7 @@ test('MP01: idle sockets without the join code cannot lock players out (per-addr
   for (let i = 0; i < 300 && a.read().status !== 'joined'; i++) { flood(['10.0.2.1', '10.0.2.2', '10.0.2.3', '10.0.2.4']); net.step(25); }
   assert.equal(a.read().status, 'joined', 'the returning player rejoined, not retry-exhausted');
   assert.equal(a.read().player, player);
-  assert.ok(net.host.read().metrics.reserveConnections >= 1);
+  assert.ok(must(net.host.read().metrics.reserveConnections) >= 1);
   // A brand-new player is not admitted through the reserve.
   const late = new Link(); late.readyState = 1;
   for (const address of ['10.0.3.1', '10.0.3.2', '10.0.3.3', '10.0.3.4']) net.host.connect(new Link(), net.now, address);
@@ -335,7 +336,7 @@ test('MP01: act() on every 60 Hz tick is paced by the client: no rate-limit clos
   assert.equal(net.host.read().closeReasons['rate-limit'], undefined);
   assert.equal(a.read().reconnects, 0);
   assert.equal(a.read().pending, 0);
-  assert.equal(net.host.read().metrics.applied + net.host.read().metrics.rejected >= predicted, true);
+  assert.equal(must(net.host.read().metrics.applied) + must(net.host.read().metrics.rejected) >= predicted, true);
   assert.equal(xOf(a.read().world, p), xOf(net.host.read().world, p));
   void busy;
 });

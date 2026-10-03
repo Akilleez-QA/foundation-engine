@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {inspectProgressionChange,prepareProgressionChange,deriveProgressionGrants,deriveProgressionGrantSources,
   type ProgressionRules,type ProgressionBounds,type ProgressionState,type ProgressionChange,type ProgressionFailure} from './progression';
+import { must } from '../../testing/must';
 const bounds:ProgressionBounds={xpTypes:2,skills:4,prerequisites:4,grants:8,learned:4};
 const rules:ProgressionRules={id:'inspection-v1',allocationLimit:3,xpTypes:[{id:'practice',maxBalance:20},{id:'other',maxBalance:20}],skills:[
   {id:'a',xpType:'practice',xpCost:3,pointCost:1,requires:[],certificates:['shared'],schematics:['shared']},
@@ -44,7 +45,7 @@ test('validation order remains bounds, rules, state, then command; invalid inspe
   [state(),{kind:'learn',skill:'missing'},rules,bounds,'unknown'],
   [state(),{kind:'earn',xpType:'practice',amount:0},rules,bounds,'invalid'],
   [{...state(),rulesId:'wrong'},null,rules,bounds,'rules-mismatch'],
-  [null,null,{...rules,skills:[{...rules.skills[0],requires:['a']}]},bounds,'cycle'],
+  [null,null,{...rules,skills:[{...must(rules.skills[0]),requires:['a']}]},bounds,'cycle'],
   [null,null,rules,{...bounds,learned:-1},'invalid'],
   [state(),{kind:'learn',skill:'a',extra:1},rules,bounds,'invalid'],
   [state(),{kind:'earn',xpType:'missing',amount:1},rules,bounds,'unknown'],
@@ -59,8 +60,8 @@ test('source projection uses kind and id, retains shared skill contributors, and
  assert.deepEqual(union.schematics,before.filter(s=>s.kind==='schematic').map(s=>s.id));
  const next=prepareProgressionChange(accepted,{kind:'surrender',skill:'b'},rules,bounds);assert.ok(next.ok);
  assert.deepEqual(deriveProgressionGrantSources(next.state,rules,bounds),[{kind:'certificate',id:'shared',skills:['a']},{kind:'schematic',id:'shared',skills:['a']}]);
- assert.deepEqual(before[0].skills,['a','b']);assert.ok(Object.isFrozen(before));assert.ok(Object.isFrozen(before[0]));assert.ok(Object.isFrozen(before[0].skills));
- assert.throws(()=>{(before[0].skills as string[]).push('invented');});
+ const first=must(before[0]);assert.deepEqual(first.skills,['a','b']);assert.ok(Object.isFrozen(before));assert.ok(Object.isFrozen(first));assert.ok(Object.isFrozen(first.skills));
+ assert.throws(()=>{(first.skills as string[]).push('invented');});
  const last=prepareProgressionChange(next.state,{kind:'surrender',skill:'a'},rules,bounds);assert.ok(last.ok);assert.deepEqual(deriveProgressionGrantSources(last.state,rules,bounds),[]);
 });
 test('capture reads each caller field once and never reruns getters to apply or explain',()=>{

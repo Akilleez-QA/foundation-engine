@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createJumpFeel, deriveJump, type JumpFeelConfig } from './jump';
+import { must } from '../../testing/must';
 
 const RATES = [30, 60, 120, 144, 165, 240];
 /** 1/6 s is a whole number of ticks at 30, 60, 120, 144 and 240 Hz (165 Hz is checked separately with one-tick tolerance). */
@@ -26,7 +27,7 @@ function simulate(config: JumpFeelConfig, hz: number, seconds: number, script: (
   }
   return { ...out, apex, jumps, landedAt };
 }
-const at = (run: Run, time: number) => run.y[Math.round(time * (run.y.length / run.t[run.t.length - 1])) - 1];
+const at = (run: Run, time: number) => must(run.y[Math.round(time * (run.y.length / must(run.t[run.t.length - 1]))) - 1], `sample at ${time} s`);
 const pressOnce = (when = 0) => (t: number, dt: number) => ({ pressed: t <= when && when < t + dt - 1e-12, held: t >= when - 1e-12 });
 
 test('MV-01: derivation reproduces the height/time parabola and stays exact with apex modulation', () => {

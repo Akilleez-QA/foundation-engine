@@ -200,7 +200,7 @@ function fromLattice(lattice:Lattice,preparedNormals?:Float64Array):Surface {
       // Traverse only cells intersected by the XZ projection. Axis coordinates are
       // the actual Float32 render lattice, not an assumed perfectly uniform grid.
       let enter = 0, exit = maxDistance;
-      for (const [at, velocity, min, max] of [[origin.x, rx, xs[0]!, xs[cellsX]!], [origin.z, rz, zs[0]!, zs[cellsZ]!]]) {
+      for (const [at, velocity, min, max] of [[origin.x, rx, xs[0]!, xs[cellsX]!], [origin.z, rz, zs[0]!, zs[cellsZ]!]] as const) {
         if (velocity === 0) { if (at < min || at > max) return null; continue; }
         const a = (min - at) / velocity, b = (max - at) / velocity;
         enter = Math.max(enter, Math.min(a, b)); exit = Math.min(exit, Math.max(a, b));
@@ -301,7 +301,7 @@ export function adoptPatchWire(previous:Surface,result:PatchWire):SurfacePatch {
   const {data,bounds}=result,old=lattices.get(previous);
   if(!old || data.id!==previous.id||!Number.isSafeInteger(data.revision)||data.revision<=previous.revision||data.cellsX!==old.cellsX||data.cellsZ!==old.cellsZ||data.spacing!==old.spacing||!(data.normals instanceof Float64Array)||data.normals.length!==old.heights.length*3||!(data.heights instanceof Float32Array)||data.heights.length!==old.heights.length||!(data.materials instanceof Uint16Array)||data.materials.length!==old.materials.length||!(data.exclusions instanceof Uint8Array)||data.exclusions.length!==old.exclusions.length)throw Error('terrain: mismatched worker patch');
   for(const [axis,expected] of [[data.xs,old.xs],[data.zs,old.zs]] as const)if(!(axis instanceof Float32Array)||axis.length!==expected.length||axis.some((v,i)=>v!==expected[i]))throw Error('terrain: worker topology changed');
-  for(const [n,max] of [[bounds.minX,old.cellsX],[bounds.maxX,old.cellsX],[bounds.minZ,old.cellsZ],[bounds.maxZ,old.cellsZ]])integer(n,'worker patch bound',max);
+  for(const [n,max] of [[bounds.minX,old.cellsX],[bounds.maxX,old.cellsX],[bounds.minZ,old.cellsZ],[bounds.maxZ,old.cellsZ]] as const)integer(n,'worker patch bound',max);
   if(bounds.minX>bounds.maxX||bounds.minZ>bounds.maxZ)throw Error('terrain: invalid worker patch bounds');
   for(let i=0;i<data.heights.length;i++){
     finite(data.heights[i]!,'worker height');if(data.exclusions[i]!>1)throw Error('terrain: invalid worker exclusion');

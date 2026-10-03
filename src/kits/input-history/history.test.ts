@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createRng } from '../../core/rng';
 import { createInputHistory } from './history';
 import type { InputHistory, InputHistoryOptions, SequenceStep } from './types';
+import { must } from '../../testing/must';
 
 const ACTIONS = ['up', 'down', 'left', 'right', 'p', 'k'] as const;
 const make = (o: Partial<InputHistoryOptions> = {}) => createInputHistory({ actions: ACTIONS, capacity: 32, ...o });
@@ -157,7 +158,7 @@ function bruteForce(h: InputHistory, steps: SequenceStep[], lo: number, hi: numb
   const ends = (i: number, prev: number): number[] => {
     const out: number[] = [];
     for (let f = i === 0 ? lo : prev + 1; f <= (i === 0 ? hi : Math.min(hi, prev + maxGap)); f++)
-      if (ok(steps[i], f)) out.push(...(i === steps.length - 1 ? [f] : ends(i + 1, f)));
+      if (ok(must(steps[i]), f)) out.push(...(i === steps.length - 1 ? [f] : ends(i + 1, f)));
     return out;
   };
   const all = ends(0, -1);

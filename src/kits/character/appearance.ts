@@ -32,7 +32,7 @@ export function createAppearanceDocument(options: AppearanceOptions): AuthoredDo
     validate(value: DocumentValue): value is AppearanceValue {
       if (!record(value) || Object.keys(value).length !== 3 || value.version !== version
         || !Object.hasOwn(value, 'version') || !Object.hasOwn(value, 'parts') || !Object.hasOwn(value, 'parameters')
-        || !record(value.parts) || !record(value.parameters)) return false;
+        || !record(value.parts!) || !record(value.parameters!)) return false; // own keys checked just before
       const parts = Object.entries(value.parts), parameters = Object.entries(value.parameters);
       if (parts.length > maxParts || parameters.length > maxParameters) return false;
       for (const [key, part] of parts) if (!key || typeof part !== 'string' || !part) return false;

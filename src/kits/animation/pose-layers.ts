@@ -10,7 +10,7 @@ export function blendPoseLayers(base: readonly JointPose[], layers: readonly Pos
     if(!Number.isFinite(layer.weight)||layer.weight<0||layer.weight>1||layer.pose.length>128||layer.mask.length>128||new Set(layer.pose.map(p=>p.joint)).size!==layer.pose.length)throw Error('pose layers: invalid layer');
     const mask=new Set(layer.mask);for(const id of mask)if(!result.has(id))throw Error('pose layers: unknown masked joint');
     for(const p of layer.pose){valid(p);if(!mask.has(p.joint))continue;const from=result.get(p.joint)!;
-      result.set(p.joint,{joint:p.joint,position:from.position.map((v,i)=>v+(p.position[i]-v)*layer.weight) as [number,number,number],rotation:new Quaternion(...from.rotation).slerp(new Quaternion(...p.rotation).normalize(),layer.weight).toArray()});
+      result.set(p.joint,{joint:p.joint,position:from.position.map((v,i)=>v+(p.position[i]!-v)*layer.weight/* i < 3: positions are validated triples */) as [number,number,number],rotation:new Quaternion(...from.rotation).slerp(new Quaternion(...p.rotation).normalize(),layer.weight).toArray()});
     }
   }
   return [...result.values()];

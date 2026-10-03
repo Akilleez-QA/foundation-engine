@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { defineScene, defineSystem, testScene } from '../../author';
 import { hud } from './index';
 import { createViewSize } from '../../author/view-size';
+import { must } from '../../testing/must';
 
 test('ui kit: the HUD keeps lines, a banner and a prompt per scene visit, readable without a DOM', async () => {
   const show = defineSystem({ id: 'show', phase: 'frame', run(ctx) { hud(ctx).line('score', `Score ${ctx.time.frame}`); hud(ctx).banner(ctx.time.frame > 2 ? 'Over' : null); } });
@@ -69,8 +70,8 @@ test('HUD disclosure keeps essential state visible and preserves inline defaults
   assert.match(trigger.style.cssText, /min-width:48px;min-height:48px/);
   trigger.dispatchEvent(new Event('click')); h.details(true);
   assert.equal(requests.length, 1, 'repeated open does not allocate another sheet');
-  const sheet = requests[0].options.element as unknown as HudElement;
-  assert.equal(sheet.children[0].children[1].children[0].textContent, '<img onerror=bad>', 'content remains literal text');
+  const sheet = must(requests[0]).options.element as unknown as HudElement;
+  assert.equal(must(must(must(sheet.children[0]).children[1]).children[0]).textContent, '<img onerror=bad>', 'content remains literal text');
   assert.deepEqual(h.read(), { lines: { essential: 'Keep visible', detail: '<img onerror=bad>' }, banner: null, prompt: null });
 });
 
@@ -78,10 +79,10 @@ test('HUD last-detail removal and inline transition close before leaving focus o
   const { h, requests, doc, find } = domHud();
   h.line('secondary', 'More', { importance: 'detail' }); h.present({ mode: 'disclose', label: 'Details', closeLabel: 'Close' });
   h.details(true); h.line('secondary', null);
-  assert.equal(requests[0].abort.signal.aborted, true); assert.equal(find('hud-details-trigger').hidden, true);
+  assert.equal(must(requests[0]).abort.signal.aborted, true); assert.equal(find('hud-details-trigger').hidden, true);
   assert.equal(doc.focus, doc.root, 'removed trigger restores scene focus');
   h.line('secondary', 'More', { importance: 'detail' }); h.details(true); h.present({ mode: 'inline' });
-  assert.equal(requests[1].abort.signal.aborted, true); assert.equal(doc.focus, doc.root);
+  assert.equal(must(requests[1]).abort.signal.aborted, true); assert.equal(doc.focus, doc.root);
   assert.deepEqual(find('hud-lines').children.map(x => x.textContent), ['More']);
 });
 
@@ -93,11 +94,11 @@ test('HUD importance-only changes update disclosure and identical presentations 
   const focus = doc.focus; h.present({ mode: 'disclose', label: 'Details', closeLabel: 'Close' });
   h.present({ mode: 'disclose', label: 'Information', closeLabel: 'Return' });
   assert.equal(requests.length, 1); assert.equal(doc.focus, focus);
-  assert.equal((requests[0].options.element as unknown as HudElement).attributes.get('aria-label'), 'Information');
+  assert.equal((must(requests[0]).options.element as unknown as HudElement).attributes.get('aria-label'), 'Information');
   assert.equal(focus?.attributes.get('aria-label'), 'Information');
   assert.equal(find('hud-details-close').textContent, 'Return');
   h.line('row', 'Same');
-  assert.equal(requests[0].abort.signal.aborted, true, 'two-argument line restores essential default');
+  assert.equal(must(requests[0]).abort.signal.aborted, true, 'two-argument line restores essential default');
   assert.deepEqual(find('hud-lines').children.map(x => x.textContent), ['Same']);
 });
 
@@ -105,14 +106,14 @@ test('HUD close, aborted entry and stale ready rejection leave later sheets inta
   const { h, requests, find } = domHud();
   h.line('row', 'Detail', { importance: 'detail' }); h.present({ mode: 'disclose', label: 'Details', closeLabel: 'Close' });
   h.details(true); h.details(false); h.details(true);
-  requests[0].reject(new Error('late failure')); await Promise.resolve();
+  must(requests[0]).reject(new Error('late failure')); await Promise.resolve();
   assert.equal(find('hud-details-trigger').attributes.get('aria-expanded'), 'true');
-  assert.equal(requests[1].abort.signal.aborted, false);
-  const sheet = requests[1].options.element as unknown as HudElement;
-  sheet.children[1].dispatchEvent(new Event('click'));
-  assert.equal(requests[1].abort.signal.aborted, true);
+  assert.equal(must(requests[1]).abort.signal.aborted, false);
+  const sheet = must(requests[1]).options.element as unknown as HudElement;
+  must(sheet.children[1]).dispatchEvent(new Event('click'));
+  assert.equal(must(requests[1]).abort.signal.aborted, true);
   assert.equal(find('hud-details-trigger').attributes.get('aria-expanded'), 'false');
-  h.details(true); requests[2].abort.abort();
+  h.details(true); must(requests[2]).abort.abort();
   assert.equal(find('hud-details-trigger').attributes.get('aria-expanded'), 'false');
   assert.equal(find('hud-details-sheet'), undefined);
 });
@@ -132,8 +133,8 @@ test('HUD reading starts at the named paging region and retains Close and focus 
   const { h, requests, doc, find } = domHud();
   h.line('row', 'Long reading content', { importance: 'detail' });
   h.present({ mode: 'disclose', label: 'Details', closeLabel: 'Close' }); h.details(true);
-  const sheet = requests[0].options.element as unknown as HudElement;
-  const scroll = sheet.children[0], close = sheet.children[1];
+  const sheet = must(requests[0]).options.element as unknown as HudElement;
+  const scroll = must(sheet.children[0], 'reading region'), close = must(sheet.children[1], 'Close');
   assert.equal(doc.focus, scroll, 'opening starts on the explicit paging surface');
   assert.equal(scroll.tabIndex, 0, 'reading region remains part of the tab sequence');
   assert.equal(sheet.attributes.get('aria-modal'), undefined, 'scope sheet does not claim whole-page modality');
@@ -149,7 +150,7 @@ test('HUD reading starts at the named paging region and retains Close and focus 
   assert.equal(requests.length, 1, 'translation updates the existing keyboard surface');
   assert.equal(doc.focus, scroll, 'translation does not steal reading focus');
   close.dispatchEvent(new Event('click'));
-  assert.equal(requests[0].abort.signal.aborted, true);
+  assert.equal(must(requests[0]).abort.signal.aborted, true);
   assert.equal(doc.focus, find('hud-details-trigger'), 'closing returns focus to the invoking action');
 });
 
@@ -166,9 +167,9 @@ test('creator layout selection preserves sheets, closes through the existing own
   h.details(true);
   resize(400);
   assert.equal(requests.length, 1);
-  assert.equal(requests[0].abort.signal.aborted, false);
+  assert.equal(must(requests[0]).abort.signal.aborted, false);
   resize(900);
-  assert.equal(requests[0].abort.signal.aborted, true);
+  assert.equal(must(requests[0]).abort.signal.aborted, true);
   assert.equal(find('hud-details-trigger').hidden, true);
   h.present({ mode: 'inline' });
   resize(390);
