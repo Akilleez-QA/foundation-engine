@@ -29,7 +29,7 @@ const testApi: Plugin = {
 const licenseNotices: Plugin = {
   name: 'engine-license-notices', apply: 'build',
   generateBundle() {
-    for (const [source, fileName] of [['LICENSE','LICENSE.txt'],['COPYRIGHT','COPYRIGHT.txt'],['THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.txt']]) {
+    for (const [source, fileName] of [['LICENSE','LICENSE.txt'],['COPYRIGHT','COPYRIGHT.txt'],['THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.txt']] as const) {
       this.emitFile({type:'asset',fileName,source:readFileSync(fileURLToPath(new URL(source,import.meta.url)),'utf8')});
     }
   },

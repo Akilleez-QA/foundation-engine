@@ -11,6 +11,7 @@ import { ROOT } from './lib/game-dir.mjs';
 import { loadGame } from '../src/app/game-files';
 import { compileGame } from '../src/author/compile';
 import { gameInputProblems } from '../src/author/input-registry';
+import { must } from '../src/testing/must';
 
 test('new: a lesson is generated outline-first into the learn template and passes the pedagogy rules', async () => {
   const tmp = mkdtempSync(join(tmpdir(), 'engine-gen-learn-'));
@@ -114,7 +115,7 @@ test('new: the free-key choice never picks a letter already bound by code (f whe
   const game = { kind: 'game', id: 'g', title: 'G', version: '1', firstScene: 'x' } as never;
   assert.throws(() => freeButtonBinding(game, defs, 'jump'), /no free key/);
   const some = [defineInput({ id: 'one', label: 'One', keys: ['code:KeyF'], pad: ['y'] })];
-  assert.notEqual(keyIdentity(freeButtonBinding(game, some, 'jump').keys[0]), 'f');
+  assert.notEqual(keyIdentity(must(freeButtonBinding(game, some, 'jump').keys[0], 'a free key')), 'f');
 });
 
 test('new: a generated scene row passes the budget check when it becomes the start scene', async () => {
