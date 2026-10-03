@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { check, checkGame } from './brief';
 import { ROOT } from './layers.mjs';
+import { must } from '../../src/testing/must';
 
 test('brief: every game in the checkout matches its brief', async () => {
   assert.deepEqual(await check(), []);
@@ -81,7 +82,7 @@ test('brief: malformed budget documents return actionable problems instead of th
       assert.ok((await checkGame(join(tmp, 'game'))).length > 0, text);
     }
     rmSync(file);
-    assert.match((await checkGame(join(tmp, 'game')))[0], /budgets.json could not be read as JSON/);
+    assert.match(must((await checkGame(join(tmp, 'game')))[0], 'a brief problem'), /budgets.json could not be read as JSON/);
   } finally { rmSync(tmp, { recursive: true, force: true }); }
 });
 

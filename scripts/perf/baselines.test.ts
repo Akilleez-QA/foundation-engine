@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { PerfRun, PerfSample } from '../../src/platform/perf/perf-run';
 import { baselineFromBenches, NonComparableBaseline, writeBaseline } from './baselines';
+import { must } from '../../src/testing/must';
 
 const steady = { kind: 'steady' as const, version: 1, reasons: [], comparable: true };
 const unknown = { kind: 'unclassified' as const, version: 1, reasons: ['3 upload(s) of unknown provenance'], comparable: false };
@@ -30,7 +31,7 @@ test('benching re-samples until every scene is comparable, each scene from a run
   const runs = [run([sample('lab', 'lab', 222, false), sample('hall', 'hall', 57)], '1'.repeat(40)),
     run([sample('lab', 'lab', 246), sample('hall', 'hall', 57, false)], '2'.repeat(40))];
   let calls = 0;
-  await baselineFromBenches(async () => runs[calls++], ['lab', 'hall'], { runs: 1, attempts: 3 }, dir);
+  await baselineFromBenches(async () => must(runs[calls++], 'a bench run'), ['lab', 'hall'], { runs: 1, attempts: 3 }, dir);
   assert.equal(calls, 2, 'stopped as soon as every scene had a comparable run');
   const shard = (p: string) => JSON.parse(readFileSync(join(dir, `${p}.json`), 'utf8')).runs['swiftshader@1280x800'];
   assert.equal(shard('lab').samples[0].drawsPerRenderedFrame, 246);
@@ -66,7 +67,7 @@ for (const field of ['build', 'descriptor', 'harness', 'viewport', 'browser', 'g
     else if (field === 'harness') second.harness = 'gpu';
     else second[field] += '-changed';
     let i = 0;
-    await assert.rejects(baselineFromBenches(async () => [first, second][i++], ['hall'], { runs: 2, attempts: 2 }, dir), /mixes executable builds or experiments/);
+    await assert.rejects(baselineFromBenches(async () => must([first, second][i++], 'a bench run'), ['hall'], { runs: 2, attempts: 2 }, dir), /mixes executable builds or experiments/);
     assert.deepEqual(readdirSync(dir), []);
   }));
 }

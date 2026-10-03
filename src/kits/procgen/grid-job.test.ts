@@ -256,6 +256,6 @@ test('GEN-01 adoption refuses oversized, offset or shared backing buffers and re
     const error = await pending.catch(e => e);
     assert.ok(error instanceof GridJobError); assert.equal(error.stage, 'execution'); assert.ok(error.cause instanceof WorkerJobError);
   } finally { h.dispose(); }
-  const thrown = (() => { try { job.generateNow({ ...recipe, cellsX: 0 }); } catch (e) { return e; } })();
+  const thrown = (() => { try { job.generateNow({ ...recipe, cellsX: 0 }); } catch (e) { return e; } return undefined; })();
   assert.ok(thrown instanceof GridJobError); assert.equal((thrown as GridJobError).stage, 'recipe');
 });

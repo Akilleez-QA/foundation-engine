@@ -118,7 +118,8 @@ export async function baselineFromBenches(bench: (attempt: number) => Promise<Pe
   const latest = last!;
   const samples = scenes.flatMap(p => {
     const runs = good.get(p)!;
-    const ids = [...new Set(runs[0].samples.filter(s => s.scene === p).map(s => s.id))];
+    // `short()` came back empty, so every scene has at least one comparable run.
+    const ids = [...new Set(runs[0]!.samples.filter(s => s.scene === p).map(s => s.id))];
     return ids.map(id => envelope(runs.map(r => r.samples.find(s => s.id === id)!).filter(Boolean)));
   });
   const env: PerfRun = { ...latest, samples,

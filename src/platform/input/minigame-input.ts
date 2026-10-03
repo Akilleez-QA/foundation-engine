@@ -53,7 +53,7 @@ export type MinigameInput=ReturnType<typeof minigameInput>;
  * `back` in the game's frame.
  */
 export function minigameEscape(id:string,root:HTMLElement,signal:AbortSignal,menu:{readonly menuOpen:boolean;closeMenu():void},close:()=>void):void{
- openOverlayLayer({id:'minigame:'+id,element:root,signal,onEscape:()=>{if(modalDialogAbove(root))return false;if(menu.menuOpen)menu.closeMenu();else close();}});
+ openOverlayLayer({id:'minigame:'+id,element:root,signal,onEscape:()=>{if(modalDialogAbove(root))return false;if(menu.menuOpen)menu.closeMenu();else close();return undefined;}});
 }
 
 /**

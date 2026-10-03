@@ -13,7 +13,7 @@ const learnOf = (t: Awaited<ReturnType<typeof testScene>>) => t.ctx.state.learn 
 const next = (t: Awaited<ReturnType<typeof testScene>>) => { t.press('learn-next'); t.run(1 / 60); t.run(15); };
 
 test('S1: every objective is taught and checked, and no scene has more than three passive steps in a row', () => {
-  assert.deepEqual(lessonProblems(lesson, { maxPassive: brief.pedagogy.maxPassiveActions, ages: brief.audience.ages, text: k => game.strings!.en[k] ?? k }), []);
+  assert.deepEqual(lessonProblems(lesson, { maxPassive: brief.pedagogy.maxPassiveActions, ages: brief.audience.ages, text: k => game.strings?.en?.[k] ?? k }), []);
 });
 
 test('S2: turning the Earth past half a turn puts the flag in night and meets the second objective', async () => {

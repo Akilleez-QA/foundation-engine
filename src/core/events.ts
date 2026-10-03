@@ -64,6 +64,7 @@ export function createEventBus(opts: EventBusOptions = {}): EventBus & EventBusD
     observing = true;
     try { return fn(); } catch { /* diagnostics never interrupt delivery */ }
     finally { observing = false; }
+    return undefined;
   };
   const reportSafely = (k: EventKey, error: unknown) => {
     if (reporting) return;
