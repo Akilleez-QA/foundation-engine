@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import { createAudioTimeline, defineScene, defineSystem, testScene, type AudioClockReading, type AudioTimeline, type SceneContext } from './index';
 
 /**
@@ -64,7 +65,7 @@ test('ctx.time.now is the frame timestamp in milliseconds, and a default press i
   const scene = await testScene(defineScene({ id: 'clock', title: 'clock', systems: [defineSystem({ id: 'read', phase: 'frame', run(ctx) { seen.push({ now: ctx.time.now, at: ctx.input.pressedAt('hit') }); } })] }));
   scene.run(1 / 60); scene.press('hit'); scene.press('hit', 999); scene.run(1 / 60);
   assert.equal(seen.length, 2);
-  assert.ok(Math.abs(seen[0].now - 1000 / 60) < 1e-9);
-  assert.ok(Math.abs(seen[1].at! - 1000 / 60) < 1e-9, 'the first press in a frame wins');
+  assert.ok(Math.abs(must(seen[0], 'first frame').now - 1000 / 60) < 1e-9);
+  assert.ok(Math.abs(must(seen[1], 'second frame').at! - 1000 / 60) < 1e-9, 'the first press in a frame wins');
   scene.dispose();
 });

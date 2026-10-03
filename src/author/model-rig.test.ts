@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import * as T from 'three';
 import { captureModelRig, resolveModelRig, restoreModelRigNodes, type ModelRig } from './model-rig';
 import { captureModelPoseLink, normalizeModelPoseLinkLimits } from './model-pose-link';
@@ -24,9 +25,9 @@ const relation=(names=['A','B'])=>captureModelPoseLink({source:1,nodes:names.map
 test('rig immutable baseline survives live animation and inverse-bind mutation; no asset rewrite during capture/resolve',()=>{
   const f=fixture(),rig=captured(f.root),before=f.skeleton.boneInverses.map(m=>m.toArray());
   assert.deepEqual(f.skeleton.boneInverses.map(m=>m.toArray()),before);
-  f.b.position.x=4;f.skeleton.boneInverses[1].elements[12]=8;
-  assert.equal(rig.nodes.find(n=>n.name==='B')!.position[0],1);assert.equal(rig.skins[0].inverses[1][12],-1);
-  assert.ok(Object.isFrozen(rig)&&Object.isFrozen(rig.nodes)&&Object.isFrozen(rig.skins[0].inverses[0]));
+  f.b.position.x=4;must(f.skeleton.boneInverses[1],'inverse 1').elements[12]=8;
+  assert.equal(rig.nodes.find(n=>n.name==='B')!.position[0],1);assert.equal(must(must(rig.skins[0],'skin').inverses[1],'inverse 1')[12],-1);
+  assert.ok(Object.isFrozen(rig)&&Object.isFrozen(rig.nodes)&&Object.isFrozen(must(rig.skins[0],'skin').inverses[0]));
 });
 test('mapped independently owned rigs deform A-only B-only and mixed vertices with reordered palettes',()=>{
   const source=fixture(),target=fixture(true),a=captured(source.root),b=captured(target.root),result=resolveModelRig(a,b,relation(),limits);
@@ -35,7 +36,7 @@ test('mapped independently owned rigs deform A-only B-only and mixed vertices wi
   for(const pair of result.pairs){pair.target.position.copy(pair.source.position);pair.target.quaternion.copy(pair.source.quaternion);pair.target.scale.copy(pair.source.scale);}
   target.root.updateMatrixWorld(true);
   const expected=[[0,1,0],[1,1,0],[1.5,.5,0]];
-  for(let i=0;i<3;i++){const value=new T.Vector3().fromBufferAttribute(target.mesh.geometry.getAttribute('position'),i);target.mesh.applyBoneTransform(i,value);value.toArray().forEach((v,j)=>assert.ok(Math.abs(v-expected[i][j])<1e-6));}
+  for(let i=0;i<3;i++){const value=new T.Vector3().fromBufferAttribute(target.mesh.geometry.getAttribute('position'),i);target.mesh.applyBoneTransform(i,value);const want=must(expected[i],`expected ${i}`);value.toArray().forEach((v,j)=>assert.ok(Math.abs(v-must(want[j]))<1e-6));}
   assert.notStrictEqual(source.skeleton,target.skeleton);assert.notStrictEqual(source.b,target.b);
 });
 test('mapping requires all skin joints and non-bone ancestor closure',()=>{
@@ -58,12 +59,12 @@ test('mapped local scale and nonidentity matching asset roots preserve numeric w
 test('compatible names cannot conceal rest, hierarchy or inverse-bind disagreement',()=>{
   const source=captured(fixture().root);
   const rest=fixture();rest.b.position.y=1;assert.deepEqual(resolveModelRig(source,captured(rest.root),relation(),limits),{ok:false,reason:'rest'});
-  const bind=fixture();bind.skeleton.boneInverses[1].elements[12]=-.5;assert.deepEqual(resolveModelRig(source,captured(bind.root),relation(),limits),{ok:false,reason:'bind'});
+  const bind=fixture();must(bind.skeleton.boneInverses[1],'inverse 1').elements[12]=-.5;assert.deepEqual(resolveModelRig(source,captured(bind.root),relation(),limits),{ok:false,reason:'bind'});
   const hierarchy=fixture();hierarchy.root.add(hierarchy.b);assert.deepEqual(resolveModelRig(source,captured(hierarchy.root),relation(),limits),{ok:false,reason:'hierarchy'});
   const duplicate=fixture();const copy=new T.Object3D();copy.name='A';duplicate.root.add(copy);assert.deepEqual(resolveModelRig(source,captured(duplicate.root),relation(),limits),{ok:false,reason:'mapping'});
 });
 test('source occurrences with inconsistent bind matrices fail instead of choosing one skin',()=>{
-  const source=fixture(),extra=new T.SkinnedMesh(source.mesh.geometry,source.mesh.material);extra.bind(new T.Skeleton([source.a,source.b]),new T.Matrix4());extra.skeleton.boneInverses[1].elements[12]=-.5;source.root.add(extra);
+  const source=fixture(),extra=new T.SkinnedMesh(source.mesh.geometry,source.mesh.material);extra.bind(new T.Skeleton([source.a,source.b]),new T.Matrix4());must(extra.skeleton.boneInverses[1],'inverse 1').elements[12]=-.5;source.root.add(extra);
   assert.deepEqual(resolveModelRig(captured(source.root),captured(fixture().root),relation(),limits),{ok:false,reason:'bind'});
 });
 test('capture admits aggregate skin vertices before scanning and node/joint caps before facts',()=>{
@@ -88,7 +89,7 @@ test('malformed weights indices modes morphs and singular binds are observed ref
   for(const [change,reason]of cases){const f=fixture();change(f);assert.deepEqual(captureModelRig(f.root,limits),{ok:false,reason});}
 });
 test('restoration restores only touched locals including scale and never changes inverse arrays',()=>{
-  const f=fixture(),rig=captured(f.root),inverse=f.skeleton.boneInverses[0],values=inverse.toArray();
+  const f=fixture(),rig=captured(f.root),inverse=must(f.skeleton.boneInverses[0],'inverse 0'),values=inverse.toArray();
   f.b.scale.set(3,2,1);f.b.position.x=7;f.a.position.y=5;
   assert.equal(restoreModelRigNodes(rig,[f.b]),true);assert.equal(f.b.position.x,1);assert.deepEqual(f.b.scale.toArray(),[1,1,1]);assert.equal(f.a.position.y,5);assert.equal(restoreModelRigNodes(rig,[f.b]),false);
   assert.strictEqual(f.skeleton.boneInverses[0],inverse);assert.deepEqual(inverse.toArray(),values);

@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import * as T from 'three';
 import { World } from '../core/ecs/world';
 import { mulberry32 } from '../core/rng';
@@ -47,8 +48,9 @@ test('one hidden instanced mesh per emitter; drawn only while particles live; up
   t.world.spawn(Transform(), defineEmitter({ mode: 'burst', count: 5, bursts: 1, lifetime: [.1, .1] }));
   t.world.spawn(Transform(), defineEmitter({ mode: 'burst', count: 3, bursts: 0 }));
   t.field.step(t.world, 1 / 60);
-  const [a, b] = t.meshes();
-  assert.equal(t.meshes().length, 2);
+  const meshes = t.meshes();
+  assert.equal(meshes.length, 2);
+  const a = must(meshes[0], 'first mesh'), b = must(meshes[1], 'second mesh');
   assert.equal(a.visible, false, 'hidden until written');
   t.field.interpolate(1);
   assert.equal(a.visible, true); assert.equal(b.visible, false, 'an emitter with nothing live costs no draw');
@@ -70,7 +72,7 @@ test('normal blending maps to three.js normal blending', () => {
   const t = setup();
   t.world.spawn(Transform(), defineEmitter({ blending: 'normal' }));
   t.field.step(t.world, 1 / 60);
-  assert.equal(t.meshes()[0].material.blending, T.NormalBlending);
+  assert.equal(must(t.meshes()[0], 'mesh').material.blending, T.NormalBlending);
   t.field.dispose(); t.view.dispose();
 });
 
@@ -79,11 +81,11 @@ test('a particle texture is leased under the visit, applied when it arrives, rel
   let disposed = 0; t.lib!.shared.addEventListener('dispose', () => { disposed++; });
   const e = t.world.spawn(Transform(), defineEmitter({ texture: 'spark' }));
   t.field.step(t.world, 1 / 60);
-  const m = t.meshes()[0];
-  assert.equal(m.material.uniforms.useMap.value, 0, 'a soft dot until the texture arrives');
-  assert.equal(t.lib!.requests[0].colorSpace, 'srgb');
+  const m = must(t.meshes()[0], 'mesh');
+  assert.equal(must(m.material.uniforms.useMap, 'useMap').value, 0, 'a soft dot until the texture arrives');
+  assert.equal(must(t.lib!.requests[0], 'texture request').colorSpace, 'srgb');
   await flush();
-  assert.equal(m.material.uniforms.map.value, t.lib!.shared); assert.equal(m.material.uniforms.useMap.value, 1);
+  assert.equal(must(m.material.uniforms.map, 'map').value, t.lib!.shared); assert.equal(must(m.material.uniforms.useMap, 'useMap').value, 1);
   assert.equal(t.changed, 0, 'a hidden emitter (nothing alive) needs no redraw when its texture arrives'); assert.equal(t.lib!.live, 1);
   assert.equal(t.view.stats.leases, 1); assert.equal(t.view.stats.requested, 1);
   t.world.despawn(e); t.field.step(t.world, 1 / 60);
@@ -98,7 +100,7 @@ test('a failed texture is reported once and the emitter keeps drawing its dot; a
   t.field.step(t.world, 1 / 60);
   await flush();
   assert.equal(t.errors.length, 1); assert.equal(t.view.stats.failed, 1);
-  assert.equal(t.meshes()[0].material.uniforms.useMap.value, 0);
+  assert.equal(must(must(t.meshes()[0], 'mesh').material.uniforms.useMap, 'useMap').value, 0);
   const open = t.lib!.hold();
   const e = t.world.spawn(Transform(), defineEmitter({ texture: 'spark' }));
   t.field.step(t.world, 1 / 60);
@@ -124,7 +126,7 @@ test('no texture library: textures never load and emitters still draw', () => {
   const t = setup(null);
   t.world.spawn(Transform(), defineEmitter({ texture: 'spark', bursts: 1 }));
   t.field.step(t.world, 1 / 60); t.field.interpolate(0);
-  assert.equal(t.meshes()[0].visible, true);
+  assert.equal(must(t.meshes()[0], 'mesh').visible, true);
   t.field.dispose(); t.view.dispose();
 });
 
@@ -132,7 +134,7 @@ test('a texture arriving for an emitter with live particles redraws once', async
   const t = setup();
   t.world.spawn(Transform(), defineEmitter({ texture: 'spark', bursts: 1, lifetime: [5, 5] }));
   t.field.step(t.world, 1 / 60); t.field.interpolate(1);
-  assert.equal(t.meshes()[0].visible, true);
+  assert.equal(must(t.meshes()[0], 'mesh').visible, true);
   await flush();
   assert.equal(t.changed, 1);
   t.field.dispose(); t.view.dispose();

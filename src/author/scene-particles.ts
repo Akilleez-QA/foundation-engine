@@ -68,9 +68,13 @@ export interface ParticleDrawing extends ParticleRenderer {
   dispose(): void;
 }
 
+// A type alias (not an interface) so it fits ShaderMaterial's indexed `uniforms`.
+type ParticleUniforms = { map: T.IUniform<T.Texture | null>; useMap: T.IUniform<number> };
 interface View {
   mesh: T.Mesh<T.InstancedBufferGeometry, T.ShaderMaterial>;
   attrs: T.InstancedBufferAttribute[];
+  /** The material's own uniforms object (ShaderMaterial keeps the one it was given). */
+  uniforms: ParticleUniforms;
   life: AbortController;
   lease?: AssetLease<T.Texture>;
 }
@@ -88,7 +92,7 @@ export function createSceneParticles(o: SceneParticleOptions): ParticleDrawing {
     view.life.abort();
     const errors: unknown[] = [];
     try { o.scene.remove(view.mesh); } catch (error) { errors.push(error); }
-    try { view.mesh.material.uniforms.map.value = null; view.mesh.material.dispose(); } catch (error) { errors.push(error); }
+    try { view.uniforms.map.value = null; view.mesh.material.dispose(); } catch (error) { errors.push(error); }
     try { view.mesh.geometry.dispose(); } catch (error) { errors.push(error); }
     try { if (view.lease) { stats.leases--; view.lease.release(); } } catch (error) { errors.push(error); }
     view.lease = undefined;
@@ -104,18 +108,20 @@ export function createSceneParticles(o: SceneParticleOptions): ParticleDrawing {
       geometry.setIndex([0, 1, 2, 0, 2, 3]);
       geometry.setAttribute('position', new T.Float32BufferAttribute([-.5, -.5, 0, .5, -.5, 0, .5, .5, 0, -.5, .5, 0], 3));
       geometry.setAttribute('uv', new T.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
-      const attrs = [new T.InstancedBufferAttribute(p.offset, 3), new T.InstancedBufferAttribute(p.size, 1), new T.InstancedBufferAttribute(p.tint, 4)];
-      ['offset', 'size', 'tint'].forEach((name, i) => { attrs[i].setUsage(T.DynamicDrawUsage); geometry.setAttribute(name, attrs[i]); });
+      const named = [['offset', new T.InstancedBufferAttribute(p.offset, 3)], ['size', new T.InstancedBufferAttribute(p.size, 1)], ['tint', new T.InstancedBufferAttribute(p.tint, 4)]] as const;
+      const attrs = named.map(([, attr]) => attr);
+      for (const [name, attr] of named) { attr.setUsage(T.DynamicDrawUsage); geometry.setAttribute(name, attr); }
       geometry.instanceCount = 0;
+      const uniforms: ParticleUniforms = { map: { value: null }, useMap: { value: 0 } };
       const material = new T.ShaderMaterial({
         vertexShader: VERTEX, fragmentShader: FRAGMENT, transparent: true, depthWrite: false, toneMapped: false,
         blending: slot.blending === 'additive' ? T.AdditiveBlending : T.NormalBlending,
-        uniforms: { map: { value: null }, useMap: { value: 0 } },
+        uniforms,
       });
       const mesh = new T.Mesh(geometry, material);
       mesh.name = `particles:e${slot.entity}`;
       mesh.frustumCulled = false; mesh.matrixAutoUpdate = false; mesh.visible = false;
-      const view: View = { mesh, attrs, life: new AbortController() };
+      const view: View = { mesh, attrs, uniforms, life: new AbortController() };
       try { o.scene.add(mesh); }
       catch (error) {
         // Never tracked: dispose what was made here at once, so a failed bind leaks nothing.
@@ -130,7 +136,7 @@ export function createSceneParticles(o: SceneParticleOptions): ParticleDrawing {
         o.library.texture(slot.texture, { screenPx: SPRITE_PX, signal: life.signal, colorSpace: 'srgb' }).then(lease => {
           if (life.signal.aborted || !views.has(view)) { lease.release(); return; }
           view.lease = lease; stats.leases++;
-          material.uniforms.map.value = lease.value; material.uniforms.useMap.value = 1;
+          uniforms.map.value = lease.value; uniforms.useMap.value = 1;
           stats.applied++;
           // A hidden emitter (nothing alive) shows the texture with its next particles: no redraw now.
           if (mesh.visible) o.changed();

@@ -12,7 +12,7 @@ export function createPrimitiveGeometries(resources: ReturnType<typeof createSce
   const entries = new Map<string, { geometry: T.BufferGeometry; references: number }>();
   let closed = false;
   return {
-    acquire(kind: string, [w, h, d]: readonly number[]): PrimitiveGeometryLease {
+    acquire(kind: string, [w, h, d]: readonly [number, number, number]): PrimitiveGeometryLease {
       if (closed) throw Error('primitive geometries already disposed');
       const key = `${kind}:${w},${h},${d}`;
       let entry = entries.get(key);
