@@ -28,10 +28,11 @@ import type {} from '../input/module';
 import { publicUrl } from '../assets/public-base';
 import { CORE_CUES, createAudioOutput, type AudioOutput, type AudioStats, type CueDef } from './audio-output';
 import type { SoundFileOptions, SoundFileStats } from './sound-files';
+import type { MusicStats } from './music-clock';
 
 declare module '../../core/registry' { interface Registries { cues: Registry<CueDef> } }
 declare module '../../core/services' { interface Services { readonly audio: AudioOutput } }
-declare module '../../core/probe' { interface EngineProbes { audio: { silent: boolean; headphone3d: boolean | null; sounds: SoundFileStats } & AudioStats } }
+declare module '../../core/probe' { interface EngineProbes { audio: { silent: boolean; headphone3d: boolean | null; sounds: SoundFileStats; music: MusicStats & { files: SoundFileStats } } & AudioStats } }
 declare module '../../core/settings/settings' { interface SettingValues { 'sound.headphone-3d': boolean } }
 
 export const AUDIO_MODULE_ID = 'platform.audio';
@@ -77,10 +78,12 @@ export interface SoundFileModuleOptions {
   sound?(services: Services, id: string): string | undefined;
   /** Sound-file bounds (`soundBudgets(minimum device)` in the app). */
   files?: Omit<SoundFileOptions, 'report'>;
+  /** Bounds for music on the audio clock (`musicBudgets(minimum device)` in the app). */
+  musicFiles?: Omit<SoundFileOptions, 'report'>;
 }
 
 export function audioModule(spatial?: SpatialAudioOptions, soundFiles: SoundFileModuleOptions = {}): EngineModule {
-  const { sound, files } = soundFiles;
+  const { sound, files, musicFiles } = soundFiles;
   validateSpatialAudioOptions(spatial);
   return defineModule({
     id: AUDIO_MODULE_ID, version: '1.0.0', requires: ['core.settings', 'core.features'], optional: ['platform.input', 'platform.quality'], serviceKeys: ['audio'],
@@ -101,7 +104,7 @@ export function audioModule(spatial?: SpatialAudioOptions, soundFiles: SoundFile
         },
         cues: s.registries.cues.all(), report: m => s.log.warn(m),
         maxHrtfVoices: hrtfLimitFor(spatial, 'reference'), smoothing: spatial?.smoothing ?? 0,
-        ...(sound ? { sound: (id: string) => sound(s, id) } : {}), ...(files ? { files } : {}),
+        ...(sound ? { sound: (id: string) => sound(s, id) } : {}), ...(files ? { files } : {}), ...(musicFiles ? { musicFiles } : {}),
       });
       s.provide('audio', audio);
       const quality = s.app.has('platform.quality') ? s.quality : null;
@@ -120,7 +123,7 @@ export function audioModule(spatial?: SpatialAudioOptions, soundFiles: SoundFile
         document.addEventListener('visibilitychange', () => audio.setHidden(document.hidden), { signal: s.signal });
       }
       s.probes.register('audio', () => ({ silent: silent(), headphone3d: headphone3d(), contexts: audio.stats.contexts, played: audio.stats.played, skipped: audio.stats.skipped,
-        active: audio.stats.active, hrtfActive: audio.stats.hrtfActive, hrtfLimit: audio.stats.hrtfLimit, downgraded: audio.stats.downgraded, culled: audio.stats.culled, sounds: { ...audio.sounds } }), s.signal);
+        active: audio.stats.active, hrtfActive: audio.stats.hrtfActive, hrtfLimit: audio.stats.hrtfLimit, downgraded: audio.stats.downgraded, culled: audio.stats.culled, sounds: { ...audio.sounds }, music: audio.musicStats }), s.signal);
       return { dispose: () => audio.dispose() };
     },
   });

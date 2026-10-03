@@ -477,6 +477,12 @@ loopback browser workflow are its only evidence. See the
 | SIM-01 | Optional `@kits/replay`: bounded tick-input log and player (explicit truncation; version, identity and corruption refusal), creator-digest traces with first-divergence comparison, and a prediction-versus-authority agreement check over the existing owners. Dev/test-only `engine.replay` uses the stock scene fixed lane and `?seed=`. [Contract](replay-divergence.md) | Integrated in v0.2.0 (PR #17, merged to main at `49047ae`). Focused tests and the arcade `?seed=` browser replay passed on the PR head. No cross-device or cross-browser floating-point determinism, physical-device or multiplayer claim. |
 | SIM-02 | Creator-chosen replay digest and divergence detail (backlog W1-1; demo finding F1). Optional `defineScene({replay: {digest}})`, `@kits/replay` `replayDigest`/`selectWorldState` (selected components, excluded tags, chosen resources) and `explainDivergence`; dev/test-only `engine.replay.start({digest, detail})` and a bounded `divergence` report naming the first differing entity, component and field. Default digest and identities unchanged. [Contract](replay-divergence.md#choose-what-a-replay-must-reproduce-sim-02), [recipe](../recipes/replay-with-your-own-digest.md) | Implemented, candidate (PR #58), not integrated. Focused tests (including the demo's frame-phase orb case: default diverges and names the orb, a digest excluding the cosmetic tag replays exactly) and `npm run test:replay-browser` (arcade, desktop Chromium software GL) passed on the branch. No cross-browser floating-point, physical-device, production-build or multiplayer claim. |
 
+## Deterministic scalar maths (W1-2) — candidate
+
+| ID | Contract | State |
+|---|---|---|
+| W1-2 | Optional `dmath` from `@engine` (`src/core/dmath.ts`): `sin`, `cos`, `atan`, `atan2`, `exp`, `log`, `pow`, `sqrt`, `hypot`, built only from correctly rounded operations, so the bits are the same in every engine. `platformMath`/`scalarMath` select it. The character, locomotion and root-motion kits take `math: 'deterministic'` (default `'platform'`, unchanged). Golden vectors are committed as hex (`src/core/dmath.golden.json`). [Guide](deterministic-math.md) | Implemented, candidate (PR #60), not integrated. Checked: focused tests (golden bits, correctly rounded `Math.sqrt` and `hypot` proved in integers, special values, at most 1 ulp to V8 `Math` over 16 ranges, kit options within 10⁻⁹ of `Math` and repeating exactly) and `npm run test:dmath-browser`: 1,075 vectors (including huge `sin`/`cos` arguments up to about 10³⁰⁸) and a 3,000-tick character-kit workload bit-identical in Chromium 152 and Node 22, where `Math` differed. Cost is about 1–2.5× `Math` per call (`pow` up to 4× in Chromium). Not established: Firefox/WebKit, physical devices, a browser-recorded character-scene replay in Node (camera-relative yaw and default pointer picking stay on `Math`), and the RB-01/SEC-01 slice B consumers. |
+
 ## Sustained-session recorder — PERF-01 integrated in v0.2.0
 
 | Slice | Capability and actual seam | State | What remains outside the claim |
@@ -695,3 +701,39 @@ fighting-game genre study: saving random state, and frame-exact buffered and
 sequence input. Implemented, candidate (PR #52, `feat/rng-state-input-history`);
 not integrated. Evidence is focused headless tests and fixed-lane and rollback
 consumers; controller and feel acceptance are open.
+
+## Moving platforms — MV-02 implemented, candidate
+
+`createPlatforms`, `platformSystem` and new `jumpSystem` options (locomotion kit) let creators
+add moving support surfaces described as functions of time. Riders follow each tick's exact
+displacement. Leaving keeps the platform's velocity per a Godot-style `onLeave` policy, and
+platforms are one-way in their own frame. Paths, sizes, speed limits and policies are
+creator-chosen and bounded. Implemented as a candidate (`feat/mv02-moving-platforms`,
+PR #53), not integrated. Evidence is focused unit tests only. See the
+[kit README](../../src/kits/locomotion/README.md#moving-platforms-mv-02), the
+[recipe](../recipes/add-moving-platforms.md) and the [ledger](upgrade-acceptance-ledger.md).
+
+## Music on the audio clock (AU-02) — implemented, candidate
+
+Optional [`playMusic`](music-on-clock.md) plays a decoded song on the audio context's
+clock: exact start, stop, seek and native loop points, `songTime` for charts, a music
+bus following the music volume and mute, music-sized decode bounds per minimum device,
+and skip-ahead for late decodes. Status: implemented, candidate (PR #54); not
+integrated. Evidence is fake-context unit tests only; no browser, device or audible
+verification.
+
+## Newcomer shared session — MP-01 implemented, candidate
+
+Game code could not import the browser transport and there was no runnable shared
+world. `@kits/network` now exports `defineSessionRules` (one pure rules file for page
+and host), `createSession` (a per-visit page owner: local play without an endpoint;
+otherwise transport, complete views, prediction reconciled on the view sequence and the
+host's `processed` count, paced reconnect and terminal close classification, never
+resending lost actions) and `createSessionHost` (transport-neutral authority over the
+intake, one view publisher per connection, a frame token bucket and integrity in
+observe mode). `npm run host` is a development-only loopback/LAN `ws` host that loads a
+game's `session.ts`; the `shared-world` template is the representative consumer. No
+existing owner changed behaviour. Status: implemented, candidate (PR #61); not
+integrated. Evidence is unit, loopback socket and one desktop headless Chromium
+two-context check; see the [guide](multiplayer-session.md) and the
+[ledger](upgrade-acceptance-ledger.md#newcomer-shared-session-mp-01--implemented-candidate).

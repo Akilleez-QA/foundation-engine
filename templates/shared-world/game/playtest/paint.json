@@ -1,0 +1,15 @@
+{
+  "name": "paint",
+  "scene": "world",
+  "seed": 1,
+  "steps": [
+    {"snap": "start"},
+    {"expect": {"path": "scene.state", "equals": "active"}},
+    {"expect": {"path": "world.state.session", "equals": "local"}},
+    {"key": "ArrowRight", "ms": 300},
+    {"press": " "},
+    {"wait": 600},
+    {"expect": {"path": "world.state.painted", "equals": 1}},
+    {"snap": "painted"}
+  ]
+}

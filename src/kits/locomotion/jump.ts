@@ -39,7 +39,11 @@ export interface JumpFeelDerived {
 }
 
 /** One tick of caller-observed facts. `pressed` must be true on exactly one tick per physical press. */
-export interface JumpFeelInput { pressed: boolean; held: boolean; grounded: boolean }
+export interface JumpFeelInput {
+  pressed: boolean; held: boolean; grounded: boolean;
+  /** Vertical velocity (m/s) added to the launch speed if this tick jumps, e.g. a rising platform's: [-1000, 1000]. Default 0. */
+  boost?: number;
+}
 export interface JumpFeelStep {
   /** Vertical displacement this tick (m, +up). */
   readonly dy: number;
@@ -100,6 +104,8 @@ export function createJumpFeel(config: JumpFeelConfig) {
   let pressAge: number | null = null, fresh = false;
   // Integration results, written by integrate() to avoid a per-step tuple.
   let outDy = 0, outPeak = 0;
+  // One saved copy of the state for save()/restore(), kept in place so a transactional caller allocates nothing.
+  let sVy = 0, sGrounded = false, sFromJump = false, sReleased = false, sSince: number | null = null, sPress: number | null = null, sFresh = false;
 
   const gravityAt = (v: number, held: boolean) => {
     // Evaluated for the open interval just below v: velocity only decreases under gravity.
@@ -145,6 +151,8 @@ export function createJumpFeel(config: JumpFeelConfig) {
     step(dt: number, input: JumpFeelInput): JumpFeelStep {
       if (typeof dt !== 'number' || !Number.isFinite(dt) || dt < 0 || dt > maxDt) throw new RangeError(`jump: step must be within [0, ${maxDt}] seconds`);
       if (!input || typeof input.pressed !== 'boolean' || typeof input.held !== 'boolean' || typeof input.grounded !== 'boolean') throw new RangeError('jump: pressed, held and grounded must be booleans');
+      const boost = input.boost ?? 0;
+      if (typeof boost !== 'number' || !Number.isFinite(boost) || Math.abs(boost) > 1000) throw new RangeError('jump: boost must be finite and within ±1000 m/s');
       if (dt === 0) { if (input.pressed) { pressAge = 0; fresh = true; } return { dy: 0, vy, peak: 0, jumped: false }; }
       // Age the pending press and the support window to this tick, then apply this tick's facts.
       if (input.pressed) pressAge = 0;
@@ -158,7 +166,7 @@ export function createJumpFeel(config: JumpFeelConfig) {
       const canJump = grounded || sinceSupport !== null;
       let jumped = false;
       if (pressAge !== null && canJump) {
-        vy = d.launchSpeed; jumped = true; grounded = false; fromJump = true; released = false; pressAge = null; sinceSupport = null;
+        vy = d.launchSpeed + boost; jumped = true; grounded = false; fromJump = true; released = false; pressAge = null; sinceSupport = null;
       }
       if (fromJump && vy > 0 && !input.held) released = true;
       integrate(dt, input.held);
@@ -166,13 +174,23 @@ export function createJumpFeel(config: JumpFeelConfig) {
     },
     /** Caller hit a ceiling: drop upward velocity. */
     ceiling() { if (vy > 0) vy = 0; },
-    /** External vertical velocity (a spring, a knockback). Not a jump: release gravity does not apply. */
-    setVelocity(v: number) {
+    /**
+     * External vertical velocity (a spring, a knockback). Not a jump: release gravity does not apply. An upward launch
+     * ends the coyote window unless `keepGrace` is true (velocity inherited from a support the actor just left).
+     */
+    setVelocity(v: number, keepGrace = false) {
       if (!Number.isFinite(v) || Math.abs(v) > 1000) throw new RangeError('jump: velocity must be finite and within ±1000 m/s');
-      vy = v; fromJump = false; released = false; if (v > 0) { grounded = false; sinceSupport = null; }
+      vy = v; fromJump = false; released = false; if (v > 0) { grounded = false; if (!keepGrace) sinceSupport = null; }
     },
     /** Drop a pending press (a menu opened, control moved elsewhere). */
     cancelPress() { pressAge = null; fresh = false; },
+    /**
+     * Remember the whole state in the controller's single save slot (overwriting any earlier save). With `restore()`
+     * a caller can make a tick transactional: save, step, and restore if anything later in the tick fails.
+     */
+    save() { sVy = vy; sGrounded = grounded; sFromJump = fromJump; sReleased = released; sSince = sinceSupport; sPress = pressAge; sFresh = fresh; },
+    /** Return to the state of the last `save()` (the initial state if there was none). */
+    restore() { vy = sVy; grounded = sGrounded; fromJump = sFromJump; released = sReleased; sinceSupport = sSince; pressAge = sPress; fresh = sFresh; },
     /** Clear everything: an authority change, a teleport, a respawn. */
     reset() { vy = 0; grounded = false; fromJump = false; released = false; sinceSupport = null; pressAge = null; fresh = false; },
   };

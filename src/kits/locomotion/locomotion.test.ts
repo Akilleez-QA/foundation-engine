@@ -18,3 +18,16 @@ test('turn-in-place applies yaw without translation and rejected ground never mo
  applyRootMotion(t.ctx,e,track.advance(1),{owns:()=>true});assert.equal(t.world.get(e,Transform)!.ry,1);
  applyRootMotion(t.ctx,e,{x:1,z:0,yaw:0},{owns:()=>true,ground:()=>null});assert.equal(t.world.get(e,Transform)!.x,0);
 });
+
+test('locomotion: root motion and its application accept the deterministic math option', async () => {
+  const run = async (math?: 'deterministic') => {
+    const t = await testScene(defineScene({ id: 'rm', title: 'Root motion', entities: [[Name({ name: 'a' }), Transform({ ry: 0.4 })]], systems: [] }));
+    const e = t.ctx.named('a')!, track = createRootMotion({ duration: 1, keys: [{ at: 0, x: 0, z: 0, yaw: 0 }, { at: 1, x: 1, z: 0.2, yaw: 0.5 }] }, true, { math });
+    for (const time of [0.3, 0.9, 1.7, 2.2]) applyRootMotion(t.ctx, e, track.advance(time), { owns: () => true, math });
+    const tr = t.world.get(e, Transform)!; return [tr.x, tr.z, tr.ry];
+  };
+  const a = await run(), b = await run('deterministic');
+  for (let i = 0; i < 3; i++) assert.ok(Math.abs(a[i]! - b[i]!) < 1e-12, `${a[i]} vs ${b[i]}`);
+  assert.deepEqual(await run('deterministic'), b);
+  assert.throws(() => createRootMotion({ duration: 1, keys: [{ at: 0, x: 0, z: 0, yaw: 0 }, { at: 1, x: 1, z: 0, yaw: 0 }] }, false, { math: 'x' as never }), RangeError);
+});

@@ -22,6 +22,7 @@ import type { CueVoice, CueVoiceOptions } from '../platform/audio/audio-output';
 import { validateResidency, type AssetResidencyInput } from '../platform/assets/residency';
 import { validateSpatialAudioOptions, type SpatialAudioOptions } from '../platform/audio/module';
 import type { AudioClockReading } from '../platform/audio/audio-timeline';
+import type { MusicOptions, MusicVoice } from '../platform/audio/music-clock';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const need = (ok: boolean, message: string) => { if (!ok) throw Error(message); };
@@ -160,6 +161,11 @@ export interface SceneContext {
   /** One sample of the audio context clock for an audio timeline (`createAudioTimeline`), or null when silent,
    *  locked, hidden or headless. Never creates or resumes audio. */
   audioClock(): AudioClockReading | null;
+  /** A song on the audio clock (a `defineAsset({ type: 'audio' })` id), started, sought, looped and stopped at exact
+   *  context times; stopped on scene exit. Null when silent, locked, hidden or headless. */
+  playMusic(id: string, options?: MusicOptions): MusicVoice | null;
+  /** Fetch and decode a song ahead, owned by this visit. False when silent, headless, locked before any audio, failed. */
+  loadMusic(id: string): Promise<boolean>;
   /** An engine or kit service (`ctx.service('progression')`), for kits' helper functions. */
   service<K extends keyof Services>(key: K): Services[K];
 }

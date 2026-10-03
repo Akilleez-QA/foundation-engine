@@ -77,7 +77,9 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | NW-07 | Overload and goodput acceptance probe (study N4), tools only | Integrated in v0.2.0 (PR #27; batch PR #46). `npm run probe:network` forks the network and replication reference hosts and drives them over real loopback WebSockets: offered-load ramp past saturation (FIFO and queue-age variants), flooder/wrong-credential/over-bound adversaries, a physical paused-socket non-reader, and a host-restart reconnect storm paced by `createRetrySchedule`. Three default runs at `0744509` (load average 94 to 113, niceness 15): FIFO goodput plateaued at the host's achieved capacity (67.9 to 84.1/s at 89 to 119/s offered); all 27 flooders retired `rate-capacity`; no healthy peer closed; the non-reader was retired `send-refused` by the replication host's buffered cap in 2 of 3 runs (host buffered at most 127,213 of 131,072 bytes) and stayed bounded in the third; jitter cut the peak accepted reconnects per 100 ms bin from 6 to 8 to 2. Finding (then): a queue age shorter than the real queued wait collapsed goodput (300 ms: final/peak 0.09 to 0.31). It is resolved by the NW-06 follow-up (PR #33), and the probe now asserts queue-age plateaus. Loopback/process scope only: no WAN, browser, multi-machine or physical-device claim. [Guide](network-overload.md), [evidence](../verification/network-overload-20261002/README.md). |
 | SEC-01 | Command integrity (anti-cheat) at the authoritative host | Slice A integrated in v0.2.0 (PR #20; batch PR #47). Optional `createIntegrity` in the network kit ([guide](integrity.md), [recipe](../recipes/add-command-integrity.md)): pure `assess` validity usable inside the authority reducer (invalid sequenced commands consumed as domain rejections, so no `gap` and prediction reconciles), separate `admit`/`record` policy (decaying per-key scores, tick-rate budget on rate admission, throttle, windowed close with terminal `integrity-violation`, per-rule ceilings, owner/rule observe mode), key table that never refuses new keys, bounded local audit with export, tick-addressed generic helpers and an `assertDisclosure` test helper. Network workbench opt-in example (`--integrity`). Focused unit tests (including an in-memory authority/prediction composition) and loopback host tests only; no browser composition, load, WAN, physical-device, detection-quality or real-world cheat-resistance claim. Slice B (verified runs via the SIM-01 replay kit) is designed in the guide and not built; its SIM-01 dependency (PR #17) is merged. |
 | SIM-02 | Creator-chosen replay digest and divergence detail (backlog W1-1) | Implemented, candidate (PR #58), not integrated. See the SIM-01 section below and the [replay guide](replay-divergence.md#choose-what-a-replay-must-reproduce-sim-02). Focused tests and the arcade browser replay passed on the branch; no physical-device, cross-browser or multiplayer claim. |
+| MP-01 | Newcomer shared session: game-facing `@kits/network` session helpers, `npm run host`, `shared-world` template | Implemented, candidate (PR #61); not integrated. `defineSessionRules`, `createSession` and transport-neutral `createSessionHost` compose existing owners (intake, NW-02 views, prediction, NW-04 retry, close policy, NW-05 rate admission, SEC-01 integrity in observe mode). Unit, loopback socket and one desktop headless Chromium two-context check; template gate passed. Evidence and limits are in the MP-01 section below. LAN/loopback only: no accounts, matchmaking, NAT traversal, WAN, TLS, physical-device or scalability claim. |
 | AU-01 | Audio-clock timeline: audio↔frame time mapping with drift correction, bounded lookahead scheduling, input timestamps in audio time, stored latency calibration | Integrated in v0.2.0 (PR #31; batch PR #47). Optional `createAudioTimeline` ([guide](audio-timeline.md), [recipe](../recipes/sync-gameplay-to-music.md)) reads the one audio output through new `AudioOutput.clock()`; adds `CueVoiceOptions.at`, `ctx.audioClock()`, `ctx.time.now`, `ctx.input.pressedAt()` and audio unlock on scene action presses. Focused unit tests with a simulated drifting, quantised device; author-API scene tests with an injected clock and on the silent fallback. No real-browser output timing, Bluetooth, physical-device or audible verification (test browsers are muted). Streamed music remains off the context clock. |
+| AU-02 | Music on the audio clock: decoded songs started, sought, looped and stopped at exact context times | Implemented, candidate (PR #54); not integrated. `ctx.playMusic` / `AudioOutput.playMusic` ([guide](music-on-clock.md), [recipe](../recipes/sync-gameplay-to-music.md#1b-play-the-song-on-the-same-clock)) on a music bus that follows the music volume and mute, with its own sound-file store under `musicBudgets(minimum device)` (file budget = decoded budget ÷ 24, timeout scaled to the file budget); late decodes skip ahead (or drop) to keep sync; hand-offs re-time on repeated seeks and respect a scheduled stop; scene-owned voices. Focused fake-context tests, including a chart on the AU-01 timeline equal to song seconds. No real-browser timing, device decode-cost, memory-pressure or audible verification. The `music(url)` element path is unchanged. |
 | TR-01 | Regional terrain worker and ordinary-surface integration | Integrated in PR #109 at 99e6255. Canonical regional Surface and halo patches, bounded WorkerHost generation/patch adapters, independent geometric oracles and finite coherent render/query consumer passed at 891eb7; all seven template gates passed (1,648 tests, 129 performance checks, zero breaches/regressions, four advisory heap warnings). Combined main tests/build passed. Physical-device performance and unbounded/global streaming are not established. |
 | GEN-01 | Deterministic seed derivation and bounded seeded generation jobs | Integrated in v0.2.0 (PR #38; batch PR #45). Pure integer-only `deriveSeed` in `src/core/rng.ts` and the optional `procgen` kit: `createGridGenerationJob` on the existing WorkerHost, the example `job.kits.procgen.cellular` row, and a strict root-seed save section. Evidence and limits are in the GEN-01 section below. No chunk residency, edit deltas, meshing, physical-device or generation-quality claim. |
 | DV-01 | Supported-device experience and sustained performance evidence | In progress. The stock matrix, lesson visit cleanup and compact layout repair are integrated in v0.2.0 (PR #9, merged to main at `97288f8`); DV-01 itself remains open. [Stock matrix](../kits/stock-device-acceptance-matrix.md) covers all seven declarations. The [first receipt](../verification/stock-device-20261001/README.md) records 16 passing emulated target/tap checks and a compact lesson content overlap; lesson visit cleanup and a measured learn layout seam repair it, with a fake-DOM regression and emulated separation checks across board, sim and quiz at four profiles ([layout receipt](../verification/stock-device-20261002/README.md)). Full consumer workflows, in-panel touch scrolling, 200% text, named minimum devices and sustained physical evidence remain open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. No physical-device or accessibility certification. |
@@ -116,7 +118,15 @@ with `npm run check`, `npm run lint`, `npm test` and a blank-template build only
 Still open after 0.2.0: DV-01 physical-device acceptance and minimum device
 profiles; multiplayer beyond loopback/LAN; human listening and device cost for
 AUD-01, AU-01 and sound files; SEC-01 slice B; cross-browser floating-point
-determinism for replay, rollback and turn logs.
+determinism for replay, rollback and turn logs. The arithmetic part has a candidate,
+[W1-2](#deterministic-scalar-maths-w1-2--candidate). Consumers and other browsers
+remain open.
+
+## Deterministic scalar maths (W1-2) — candidate
+
+| ID | Contract | State |
+|---|---|---|
+| W1-2 | Optional `dmath` from `@engine` (`src/core/dmath.ts`): `sin`, `cos`, `atan`, `atan2`, `exp`, `log`, `pow`, `sqrt`, `hypot`, built only from correctly rounded operations, so the bits are the same in every engine. `platformMath`/`scalarMath` select it. The character, locomotion and root-motion kits take `math: 'deterministic'` (default `'platform'`, unchanged). Golden vectors are committed as hex (`src/core/dmath.golden.json`). [Guide](deterministic-math.md) | Implemented, candidate (PR #60), not integrated. Checked: focused tests (golden bits, correctly rounded `Math.sqrt` and `hypot` proved in integers, special values, at most 1 ulp to V8 `Math` over 16 ranges, kit options within 10⁻⁹ of `Math` and repeating exactly) and `npm run test:dmath-browser`: 1,075 vectors (including huge `sin`/`cos` arguments up to about 10³⁰⁸) and a 3,000-tick character-kit workload bit-identical in Chromium 152 and Node 22, where `Math` differed. Cost is about 1–2.5× `Math` per call (`pow` up to 4× in Chromium). Not established: Firefox/WebKit, physical devices, a browser-recorded character-scene replay in Node (camera-relative yaw and default pointer picking stay on `Math`), and the RB-01/SEC-01 slice B consumers. |
 
 ## Goal continuity
 
@@ -634,3 +644,83 @@ integrated. These are slices 3 and 4 of the fighting-game genre study. See the
   - charge-input helpers;
   - ordering of several actions inside one tick (`ctx.input.pressedAt` timestamps are not consumed by this kit);
   - physical controllers, arcade sticks and feel.
+
+## MV-02: moving platforms — candidate
+
+Status: implemented, candidate (`feat/mv02-moving-platforms`, PR #53); not integrated.
+
+- Runtime-enforced:
+  - Registry bounds: `maxPlatforms` [1, 1024]; footprints (0, 1000] m; `maxSpeed`
+    (0, 1000] m/s; path poses finite within ±1e7; `advance` steps (0, 0.25] s.
+  - `advance` samples every path before committing and refuses a non-finite pose or an
+    over-speed move without moving any platform. `cut` admits one declared discontinuity
+    with zero delta.
+  - Riding requires the platform's pose to be unchanged since the actor last rode, or
+    advanced by exactly its reported delta. Anything else detaches the actor with no
+    velocity.
+  - Boosts are clamped to ±1000 m/s. Carried planar motion slides in sub-steps of at most
+    half the radius, and is refused above 1,024 sub-steps per tick.
+  - Each adapter tick is a transaction: if any query or limit throws, the jump controller
+    and adapter state are restored and the Transform is not written, so the tick has the
+    effect of a skipped tick (regression: a ground query that throws once mid-fall at
+    30 and 60 Hz, before and after the controller steps, mid-fall and on flat and diagonal
+    lifts, matches the skipped-tick run exactly; removing either half of the rollback fails it).
+  - Default `Walls` stop at ±1e6 m while platform poses are accepted to ±1e7; beyond
+    ±1e6 riders are not carried unless the scene has wider `Walls` (documented, not
+    changed).
+- Checked:
+  - The regression tests run at 30, 60, 120, 165 and 240 Hz ticks: exact riding including a
+    20 m/s descent; jump apex from vertical, diagonal and descending lifts within g·dt²/8 of
+    (v0 + v)²/2g; leave policies and removal; one-way pick-up and pass-through.
+  - Also at those five rates, for the review fixes: frozen, missing and late platform
+    systems; detaching on cut, restart, re-add and an external lift; `when` pauses;
+    riding-tick sweeps (floor, step, overtaking platform); coyote after moving off; a thin
+    solid, walls, and an atomic failed tick.
+  - Narrower runs: identical arcs at aligned times at 30, 60, 120 and 240 Hz; the boost
+    policy at 120 Hz; the 1000 m/s clamp and the sub-step refusal at 60 Hz.
+  - Mutation checks: reverting each review fix fails its regression test. The fixes are the
+    jump-tick base, the frozen delta, the continuity and attachment checks, riding while
+    paused, the riding sweep, coyote grace, the boost clamp and the sub-step refusal.
+- Not established: feel on any device, any template or browser consumer, rotating or
+  sloped platforms, side pushing, and render interpolation between ticks (the next slice).
+
+## Newcomer shared session (MP-01) — implemented, candidate
+
+Status: implemented, candidate (PR #61); not integrated. Guide:
+[shared session](multiplayer-session.md); recipe:
+[two players in one world](../recipes/two-players-one-world.md).
+
+- Runtime-enforced: rules validated and frozen at definition (token id, positive
+  version, 1-16 players, functions present, a valid initial world); every world a
+  creator function returns is checked against id syntax, `maxEntities` and JSON bounds
+  before it is adopted or published; join code (16-128 URL-safe characters, compared
+  without early exit; `--join` also needs 10 distinct characters), rules id/version
+  match, player slots, joining-connection pool with a per-address cap (2) and a
+  resume-only reserve with a 500 ms deadline, 1.5 s join deadline and pre-join frame
+  count, per-connection frame token bucket (credit-releasing acks free), client action
+  pacing (30/s) and pending bound equal to the host queue (16), raw frame size,
+  per-connection and global queued actions, exact action sequence, one view credit per
+  connection under view limits, idle and away timeouts; client pending-action bound,
+  view-sized inbound queue, retry schedule and budget, terminal close classification,
+  and page endpoints limited to loopback and private LAN hosts. `npm run host` binds
+  127.0.0.1 unless `--lan`, accepts only loopback browser origins in loopback mode (LAN
+  origins too with `--lan`) and prints a development-only warning.
+- Checked: `src/kits/network/session.test.ts` (15 tests, in-memory sockets, including an
+  idle-socket flood probe, a 60 Hz `act` regression and a queue-size burst),
+  `scripts/host.test.mjs` (4 tests, real loopback WebSockets),
+  `templates/shared-world/game/world.test.ts` (S1: local play and host core give the
+  same world), `npm run test:session-browser` (two isolated headless Chromium contexts,
+  SwiftShader, one loopback host: join, move and paint seen by the other page, host
+  restart on the same port with the same join code ridden out by paced reconnects, wrong join code terminal
+  with one attempt, integrity observe-only, no page errors). The template gate
+  (`npm run gate -- --game templates/shared-world/game`) passed with 2,518 tests and 11
+  performance checks at the first candidate. After review the board became one mesh:
+  the measured worst case (four joined players, all 49 cells painted, SwiftShader) is
+  6 draws and 1,764 triangles, within the derived `world` budget of 10 draws (lowered
+  from the first candidate's 60).
+  Exact revisions are recorded in the PR description.
+- Not established: LAN between separate devices, WAN, TLS, NAT traversal, accounts,
+  matchmaking, persistence across host restarts, drain (NW-08) on this path, host
+  liveness detection by clients, physical-device input or performance, touch, more than
+  four players, load or scalability, a joining-socket flood from many LAN addresses at
+  once, and integrity enforcement quality (only observe mode is exercised in a browser).

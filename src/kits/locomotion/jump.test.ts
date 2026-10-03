@@ -172,3 +172,16 @@ test('MV-01: coyote and buffer windows admit exactly floor(window × rate) ticks
     assert.equal(admittedBuffer(window, hz), want, `buffer ${window} at ${hz} Hz`);
   }
 });
+
+test('MV-01: restore() returns the controller exactly to its last save()', () => {
+  const feel = createJumpFeel({ height: 2, timeToApex: 0.4 }), dt = 1 / 30;
+  feel.step(dt, { pressed: false, held: false, grounded: true });
+  feel.step(dt, { pressed: true, held: true, grounded: true });
+  feel.save();
+  const saved = feel.state, ref = createJumpFeel({ height: 2, timeToApex: 0.4 });
+  ref.step(dt, { pressed: false, held: false, grounded: true }); ref.step(dt, { pressed: true, held: true, grounded: true });
+  feel.step(dt, { pressed: false, held: false, grounded: false }); feel.setVelocity(5); feel.cancelPress();
+  feel.restore();
+  assert.deepEqual(feel.state, saved);
+  for (let i = 0; i < 20; i++) assert.deepEqual(feel.step(dt, { pressed: i === 3, held: i < 5, grounded: i > 10 }), ref.step(dt, { pressed: i === 3, held: i < 5, grounded: i > 10 }));
+});

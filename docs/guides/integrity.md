@@ -393,8 +393,10 @@ submitted to a host instead of trusting them.
 - **Floating-point determinism**: basic arithmetic and `sqrt` are correctly rounded
   everywhere, but `Math.sin`, `exp`, `pow` and similar are implementation-approximated
   and may differ across engines. Verify on the host's engine and keep simulation math
-  deterministic (avoid those functions or use a pure-JS implementation); treat a
-  cross-engine difference as a determinism bug, not a tolerance to widen silently.
+  deterministic (avoid those functions, or use the optional
+  [deterministic maths](deterministic-math.md), `dmath` from `@engine`, and the kits'
+  `math: 'deterministic'` option); treat a cross-engine difference as a determinism
+  bug, not a tolerance to widen silently.
 - **Replay cost**: about one full simulation per verification. Bound ticks per pump,
   total ticks, pending verifications and deadlines, with per-principal rate admission.
 - **Log size**: cap bytes, ticks and runs before parsing (`openReplay` limits and intake

@@ -16,6 +16,21 @@ Every new framework below is optional: a game that does not use it is unchanged.
   (gain, rate, variant, wait, at, spatial, filter), checked as the audio output checks them
   (`normalizeCueVoiceOptions`, shared with the real `playVoice`). `t.cues` is unchanged; invalid options now throw in tests, as they do
   in the browser.
+- **Deterministic scalar maths (W1-2), optional.** `dmath` from `@engine` gives `sin`,
+  `cos`, `atan`, `atan2`, `exp`, `log`, `pow`, `sqrt` and `hypot` results that are the
+  same bits in every JavaScript engine. It is built only from correctly rounded
+  operations and is within 1 ulp of V8's `Math`. Golden vectors are committed as hex,
+  and `npm run test:dmath-browser` compares Chromium with Node. The character,
+  locomotion and root-motion kits take `math: 'deterministic'`; the default is
+  unchanged. See [deterministic maths](docs/guides/deterministic-math.md).
+- **Two players in one world (MP-01, candidate, #61).** `@kits/network` now exports a
+  game-facing shared session: `defineSessionRules` (one pure rules file shared by the
+  page and the host), `createSession` (join, predict, reconcile, paced reconnect, close
+  policy) and the transport-neutral `createSessionHost` (intake, scoped views, frame
+  rate limit, integrity in observe mode). `npm run host` runs a game's `session.ts` on a
+  development loopback/LAN WebSocket host, and the `shared-world` template plus the
+  [recipe](docs/recipes/two-players-one-world.md) put two browser tabs in one world.
+  LAN/loopback only: no accounts, matchmaking, NAT traversal or WAN certification.
 
 ## 0.2.0 — 2026-10-03
 

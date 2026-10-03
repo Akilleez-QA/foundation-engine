@@ -5,6 +5,7 @@ import { textureModule } from '../platform/assets/texture-module';
 import { modelModule } from '../platform/assets/model-module';
 import { publicUrl } from '../platform/assets/public-base';
 import { soundBudgets } from '../platform/audio/sound-files';
+import { musicBudgets } from '../platform/audio/music-clock';
 /**
  * app/layer-modules.ts: the core and platform modules (ADR 0036). A short hand-kept list; kits come with the game
  * (`defineGame({ kits })`) and features and packs are discovered by folder (app/modules.ts). Kept free of Vite-only
@@ -32,8 +33,8 @@ export function layerModules(game: GameDefinition, brief?: Pick<BuildBrief, 'qua
     routerModule({ fallbackScene: sceneId(game.firstScene) }),
     inputModule(),
     // A game's sound files: `defineAsset({ type: 'audio' })` rows, served under the build's public base; memory bounds
-    // follow the brief's minimum device (sound-files.ts, soundBudgets).
-    audioModule(game.audio, { files: soundBudgets(brief?.devices?.minimum), sound: (s, id) => {
+    // follow the brief's minimum device (sound-files.ts, soundBudgets; music on the audio clock: music-clock.ts, musicBudgets).
+    audioModule(game.audio, { files: soundBudgets(brief?.devices?.minimum), musicFiles: musicBudgets(brief?.devices?.minimum), sound: (s, id) => {
       const a = s.registries.assets.get(id); if (!a || a.type !== 'audio') return undefined;
       if (!/^\/?[a-zA-Z0-9_./-]+\.(?:mp3|m4a|ogg|wav)$/i.test(a.url) || a.url.includes('..') || a.url.startsWith('//')) throw Error('audio: expected a local mp3, m4a, ogg or wav file');
       return publicUrl(a.url);
