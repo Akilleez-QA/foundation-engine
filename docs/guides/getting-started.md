@@ -1,6 +1,6 @@
 # Getting started: your first game
 
-From a fresh clone to a game you can share, by hand or with a coding agent. Each step says what you should see. Allow about half an hour, most of it downloads.
+From a fresh clone to a game you can share, by hand or with a coding agent. Each step says what you should see. You will run a lane-dodging game, change its player colour, check the change and build a static site. Download time depends on your connection; no paid tool or AI account is required.
 
 ## 1. Get the code and the tools
 
@@ -14,9 +14,9 @@ npm ci
 
 `npm ci` installs exactly the versions in `package-lock.json`.
 
-## 2. Install the test browser
+## 2. Prepare automated browser checks (optional for first play)
 
-`npm run play:snap`, the bench and the gate drive a muted Chromium of their own. Install Playwright's copy once:
+You can play in your ordinary browser immediately after step 3. For step 7, `npm run play:snap`, scripted playtests, the bench and the gate drive a muted Chromium of their own. Install Playwright's copy once:
 
 ```
 npx --no-install playwright-core install chromium
@@ -45,6 +45,8 @@ The id becomes the save namespace, so choose it once. The title goes into `game/
 
 `--id` is your game's save namespace; choose it once. The command writes `game/` (with the template's scripted playtests in `game/playtest/`) and `GAME.md` into this checkout. Every command now builds your `game/` (without one, they build `templates/blank/game`).
 
+If `game/` already exists, keep it and continue working there, or clone into a different empty directory to try another template. Do not use `--force` as a setup repair: it deletes the current game and brief.
+
 Commit them on a branch of your own straight away:
 
 ```
@@ -61,11 +63,13 @@ Keep working in this checkout. A fresh `git worktree` made from `origin/main` wo
 npm run play
 ```
 
-It prints an address such as `http://127.0.0.1:5173/#scene/play`; open it in your browser. Edits to files in `game/` reload the page. Press `M` to mute. Stop the server with Ctrl+C.
+It prints an address such as `http://127.0.0.1:5173/#scene/play`; open it in your browser. You should see a yellow ball on a dark lane, score and best-score counters, and a steering hint. Use ← / → or A / D to dodge blocks; after a hit, press Space or Enter to restart. Press `M` to mute.
+
+Leave this terminal running while editing: changes in `game/` reload the page. Use a second terminal in this same checkout for checks, or stop the server with Ctrl+C before running the next command. The server command does not return until stopped.
 
 ## 5. Change something
 
-Open `game/` and change one thing: a colour in a `Shape`, a speed, a word in `game/game.ts`. Each template's README lists what to change first. The [cookbook](../recipes/README.md) has recipes for models, HUD and buttons, collision and picking, camera and lighting, and sharing your build.
+For the arcade template, open `game/components.ts`. In the `ball` definition, replace `color: 0xffcc33` with `color: 0x66ddff`. Save the file: the ball should turn cyan, while movement and scoring keep working. This edits your game; no engine change is needed. Each template's README lists other changes to try. The [cookbook](../recipes/README.md) has recipes for models, HUD and buttons, collision and picking, camera and lighting, and sharing your build.
 
 The rules that keep a game healthy are short (all in [AGENTS.md](../../AGENTS.md)): game code imports only `@engine`, `@kits/<name>`, its own files and JSON; systems read actions, never keys; words go in string keys; randomness is `ctx.random()`.
 
@@ -77,22 +81,38 @@ Your own models, textures and sounds go in `game/public/` (`game/public/models/s
 npm run check
 ```
 
-Types, lints, the brief and the tests your change affects. It ends with `check: PASS` or the first problem to fix.
+This checks types, lints and the brief, and selects tests affected by uncommitted changes. The colour edit should select the game test file. It ends with `check: PASS` or the first problem to fix. A clean committed checkout can select **zero tests**; a passing check then does not mean tests ran.
+
+Run the arcade tests explicitly, including after a commit:
+
+```sh
+node --import tsx --test game/play.test.ts
+```
+
+Expect four passing tests: steering, collision/restart, saved best score and deterministic replay. Other templates have different test files and counts; consult their README.
 
 ## 7. Look at it
 
 ```
 npm run play:snap
-npm run play:snap -- --scene <id> --mobile
+npm run play:snap -- --scene play --mobile
 ```
 
 Screenshots and `probe.json` land in `playtest/latest/`: open the pictures, and read the probe for page errors, frame rate, draws and triangles against your budget. `play:snap` fails on page errors or an over-budget scene. Some mistakes only show up here: for example, two actions bound to the same key stop the game at boot (`inputActions: … overlap`), while `npm run check` still passes.
+
+For arcade, also exercise the copied restart scenario:
+
+```sh
+npm run play:script -- game/playtest/restart.json
+```
+
+It steers, waits for a collision, restarts and checks score/best state. Evidence goes to `playtest/latest/restart/`. The mobile command above emulates a phone viewport; it does not establish physical-phone acceptance. Other templates use their own scene IDs and scripts.
 
 Commit when it looks right:
 
 ```
 git add game GAME.md
-git commit -m "Faster blocks"
+git commit -m "Give the player a cyan colour"
 ```
 
 (`playtest/latest/` is ignored by Git.)
@@ -104,7 +124,16 @@ npm run build
 npm run preview
 ```
 
-`dist/` is a static website. Upload it to a static host; [share your build](../recipes/share-your-build.md) explains which hosts work as built today (the root of a domain or subdomain) and what happens under a sub-path.
+Open the URL printed by preview and play again. Stop it with Ctrl+C. `dist/` is a static website; the default build expects the root of a domain or subdomain.
+
+For a known folder, such as a GitHub Pages project site, rebuild and preview with the same base:
+
+```sh
+npm run build -- --base /my-game/
+npm run preview -- --base /my-game/
+```
+
+Open the printed origin followed by `/my-game/` (keep the trailing slash), then check that the scene and controls still work. For a build that can live in any folder, use `npm run build -- --base ./` instead. Upload the **contents** of `dist/` and provide the corresponding source and license notices; [share your build](../recipes/share-your-build.md) covers hosting and licensing details. `npm run deploy:production` is the engine repository's release guard, not the route for sharing your game.
 
 ## With a coding agent
 
@@ -120,4 +149,5 @@ Run Claude Code, Codex or another agent in the repository folder. It reads [AGEN
 | commands show the blue cube, not your game | there is no `game/` folder in this checkout (see step 3) |
 | `play:snap` says OVER BUDGET | the scene draws more than `game/budgets.json` allows; see the fix-budget skill |
 | `npm run play` says the port is in use | another server has 5173: `PORT=5174 npm run play` |
-| `./game already exists` | you already started a game; `--force` replaces it, so commit or copy it first |
+| `./game already exists` | continue that game, or use a separate clone to try a template; do not overwrite existing work |
+| `git commit` asks who you are | configure your Git name/email following its message, then retry the commit |
