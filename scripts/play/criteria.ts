@@ -28,10 +28,14 @@ export async function checkCriteria(o: { gate?: boolean; dir?: string } = {}): P
         row.status = r.status === 0 ? 'pass' : 'fail';
         row.detail = r.status === 0 ? `${c.by}: ${ran ?? '?'} test(s) named ${c.id}` : `${c.by}: ${(r.stdout + r.stderr).split('\n').filter(l => /not ok|error:|expected|actual/.test(l)).slice(0, 4).join(' | ')}`;
       } else if (c.how === 'playtest' && c.by) {
+        const script = JSON.parse(readFileSync(join(gameRoot, c.by), 'utf8'));
+        const { scriptProblems } = await import('./script-schema.mjs');
+        const problems = scriptProblems(script);
+        // A malformed script fails here, before any server or browser starts.
+        if (problems.length) { row.status = 'fail'; row.detail = `${c.by}: ${problems.join('; ')}`; out.push(row); continue; }
         const { serve } = await import('./lib.mjs');
         const { runScript } = await import('./script.mjs');
         server ??= await serve();
-        const script = JSON.parse(readFileSync(join(gameRoot, c.by), 'utf8'));
         const r = await runScript(script, server.url);
         row.status = r.pass ? 'pass' : 'fail';
         row.detail = `${c.by}: ${r.steps.filter((s: { step: { expect?: unknown } }) => s.step.expect).length} expectation(s); evidence playtest/latest/${script.name}/`;

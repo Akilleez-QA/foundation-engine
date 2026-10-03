@@ -118,7 +118,7 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 | `npm run play [-- --host] [--game <dir>]` | Dev server with the test API; prints the URL (`--host`: also on the local network, for a phone) |
 | `npm run check` | Focused check: typecheck, lints, brief, affected tests; duration depends on the checkout and hardware |
 | `npm run play:snap [-- --scene <id>] [--mobile]` | Muted, isolated browser: screenshots and `playtest/latest/probe.json`; the budget verdict is judged on rendered frames (a still scene is redrawn on request) and says `not measured` when none rendered |
-| `npm run play:script -- <file.json>` | A scripted playtest (goto, key, press, teleport, wait, snap, expect); a game keeps its scripts in `game/playtest/`, evidence goes to `playtest/latest/` |
+| `npm run play:script -- <file.json>` | A scripted playtest (goto, key, press, teleport, wait, snap, expect, waitUntil, reload; [format](docs/recipes/write-a-playtest-script.md), checked before the browser starts); a game keeps its scripts in `game/playtest/`, evidence goes to `playtest/latest/` |
 | `npm run play:criteria [-- --gate]` | The brief's success criteria, checked and tabled |
 | `npm test` / `npm run lint` | All tests / all lints (layers, arch, css, generic, brief, budgets) |
 | `npm run gate` / `npm run gate:templates` | The integration gate for this game / for every template |

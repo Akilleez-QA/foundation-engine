@@ -199,7 +199,7 @@ export default defineSaveSection({
   merge: (a, b) => ({ count: Math.max(a.count, b.count) }),
 });
 `, files);
-      next.push(`Use it: ctx.save(${c}).update(d => { d.count++; })`);
+      next.push(`Use it: ctx.save(${c}).update(d => { d.count++; })`, 'Test that it survives a reload: createTestSaves() and saves.reload() (docs/recipes/add-a-save-section.md, step 5)');
       break;
     case 'kit': {
       const kdir = join(ROOT, 'src', 'kits', id);

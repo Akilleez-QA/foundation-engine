@@ -106,7 +106,7 @@ For arcade, also exercise the copied restart scenario:
 npm run play:script -- game/playtest/restart.json
 ```
 
-It steers, waits for a collision, restarts and checks score/best state. Evidence goes to `playtest/latest/restart/`. The mobile command above emulates a phone viewport; it does not establish physical-phone acceptance. Other templates use their own scene IDs and scripts.
+It steers, waits for a collision, restarts and checks score/best state. Evidence goes to `playtest/latest/restart/`. `game/playtest/best-reload.json` also reloads the page and checks that the best score is still there. The step format is in [write a playtest script](../recipes/write-a-playtest-script.md). The mobile command above emulates a phone viewport; it does not establish physical-phone acceptance. Other templates use their own scene IDs and scripts.
 
 Commit when it looks right:
 

@@ -90,18 +90,44 @@ can replace the whole envelope. The authoring workflow assumes one writer.
 
 ## 5. Test the same save path
 
+A value that must survive a reload is tested in a game test with `createTestSaves()` from `@engine`:
+in-memory storage shared by every store it opens. Start the scene on its `store`, dispose the scene,
+call `reload()` and start the scene again on the new store:
+
+```ts
+import { createTestSaves, testScene } from '@engine';
+
+test('S4: the best score survives a reload', async () => {
+  const saves = createTestSaves();
+  const t = await testScene(play, { game, services: { save: saves.store } });
+  // … play until the game saves the best score …
+  t.dispose();                                                  // exit may still write: dispose the scene first
+  const after = await testScene(play, { game, services: { save: saves.reload() } });
+  assert.equal(after.ctx.state.best, 12);                       // read back from storage by a fresh store
+  after.dispose();
+  saves.dispose();
+});
+```
+
+`reload()` flushes the current store, as a page's `pagehide` flush point does, then disposes it and opens a fresh
+store over the same storage. Old handles throw afterwards, as they would after a page reload. `reload({ flush: false })`
+is a reload that never reached its flush, such as a crash or a killed tab: writes that were still pending are lost, and
+writes already flushed (`{ now: true }`, `flush()`) are kept. No real timers run, so a debounced write is pending until
+one of those flush points. The arcade template's `S4` test is a complete example. In a browser, the
+[playtest script](write-a-playtest-script.md#3-reloading) `{"reload": true}` step reloads the real page.
+
 `testScene(scene,{services:{save}})` uses the injected real SaveStore for both
 `ctx.save(...)` and `ctx.service('save')`. The injected store stays caller-owned;
-dispose it explicitly after testing. Failure-injectable `MemoryBackend` ports can
-exercise quota/read failure, retry and fresh-store reload without browser storage.
-These are memory-backend observations, not physical disk durability evidence.
+dispose it explicitly after testing (`createTestSaves().dispose()` does this). Engine and kit tests that import the save
+store directly can use failure-injectable `MemoryBackend` ports to exercise quota/read failure and retry; game code
+cannot import those. These are memory-backend observations, not physical disk durability evidence.
 
 Without injection, `testScene` owns a real SaveStore backed by separate memory
 ports. Its timer seam schedules no real timer and retains no callback: eager writes
 remain dirty until `{now:true}`, an explicit `ctx.service('save').flush()`, or helper
 disposal. Simulated frame time does not advance autosave. Supply a store with a
 controlled timer seam when testing debounce behavior. Fresh helper instances do not
-share saved data; inject stores over a shared backend for reload tests.
+share saved data; use `createTestSaves()` (above) for reload tests.
 
 Call `test.dispose()` when finished. It invokes scene exit once and disposes only
 its default save store, including when exit throws. An enter/prepare failure also

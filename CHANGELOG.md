@@ -7,6 +7,15 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Reload tests and checked playtest scripts.** `createTestSaves()` from `@engine` gives game tests
+  in-memory storage shared across `testScene` runs: `reload()` flushes the store as a page's
+  `pagehide` does and re-opens it over the same storage (`{ flush: false }` loses pending writes, as a
+  crash would). `play:script` gains a `{"reload": true}` step that reloads the real page. Scripts
+  are now validated before any server or browser starts (unknown steps, fields and matchers, bad
+  arguments: exit 64, one line per problem), by `npm run check` (lint:brief, every
+  `game/playtest/*.json`, including scene names) and by `play:criteria`. The format is in the
+  [write a playtest script](docs/recipes/write-a-playtest-script.md) recipe. The arcade template
+  tests S4 across a reload, headless and in `playtest/best-reload.json`.
 - **Accurate orphan import receipts.** Unknown payloads report `orphan-kept` only
   after a successful write or exact stored-byte match. Different existing bytes
   remain untouched and report `orphan-conflict`; storage exceptions report
