@@ -270,6 +270,9 @@ export function defineScene(s: SceneInput): SceneDefinition {
 
 // ------------------------------------------------------------------ save sections
 
+/** One save migration. The old value comes from storage, so its true type is `unknown`; the method form lets authors
+ *  annotate the shape they expect (`(old: { best: number }) => …`) without a cast. */
+export type SaveMigration = { migrate(old: unknown): unknown }['migrate'];
 export interface SaveSectionInput<T> {
   /** '<owner>.<name>' ('run.best'); it is save data and never renamed. */
   id: string;
@@ -278,7 +281,7 @@ export interface SaveSectionInput<T> {
   scope?: SaveScope;
   /** One migration per older version: `migrate[n]` turns version-n data into n+1. The version is one past the highest
    *  key (no migrations: version 1). */
-  migrate?: Record<number, (old: any) => unknown>;
+  migrate?: Record<number, SaveMigration>;
   /** How two copies combine (import, two tabs). Progress never un-happens: take maxima and unions. */
   merge?(stored: T, incoming: T): T;
   /** Custom validation; the default checks the value has `initial`'s shape. Throw on unreadable data. */
@@ -400,5 +403,5 @@ export function defineGame(g: GameInput): GameDefinition {
   return { ...g, kind: 'game' };
 }
 
-export type AuthorDef = SceneDefinition | EntityDefinition | SystemDefinition | SaveSectionDef<any> | InputDefinition | AssetDefinition | ModeDefinition | KitDefinition | GameDefinition;
+export type AuthorDef = SceneDefinition | EntityDefinition | SystemDefinition | SaveSectionDef<unknown> | InputDefinition | AssetDefinition | ModeDefinition | KitDefinition | GameDefinition;
 export type { ComponentType, ComponentInit, Entity, World };

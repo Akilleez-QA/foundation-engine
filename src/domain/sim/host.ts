@@ -83,15 +83,15 @@ export function orderTerms<T extends { id: string; order: number }>(terms: reado
 
 /**
  * Build an Rhs from ordered force terms: dy = [v, Σa, ṁ, 0…]. The scratch buffers and the context are created
- * once, here, and reused by every evaluation.
+ * once (the context on the first evaluation) and reused by every evaluation.
  */
 export function forcesRhs<P>(terms: readonly ForceTerm<P>[], params: () => P): Rhs {
   const sorted = orderTerms(terms);
   const acc = new Float64Array(3), dm = { value: 0 };
-  const ctx: ForceCtx<P> = { t: 0, y: new Float64Array(0), params: undefined as unknown as P };
+  let ctx: ForceCtx<P> | undefined;
   return (t, y, dy) => {
     acc[0] = acc[1] = acc[2] = 0; dm.value = 0;
-    ctx.t = t; ctx.y = y; ctx.params = params();
+    if (ctx) { ctx.t = t; ctx.y = y; ctx.params = params(); } else ctx = { t, y, params: params() };
     for (let i = 0; i < sorted.length; i++) sorted[i].accumulate(ctx, acc, dm);   // indexed: no iterator object
     dy[0] = y[3]; dy[1] = y[4]; dy[2] = y[5];
     dy[3] = acc[0]; dy[4] = acc[1]; dy[5] = acc[2];

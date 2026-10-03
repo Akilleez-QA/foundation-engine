@@ -86,6 +86,8 @@ const SESSION_KEY = Symbol.for('foundation.dev.session-recording');
 type SessionHolder = { [SESSION_KEY]?: SessionRecording };
 const activeSession = () => (globalThis as SessionHolder)[SESSION_KEY];
 
+/** A registry as the test API reads it: something that lists its entries. */
+const isListable = (r: unknown): r is { all(): readonly unknown[] } => typeof r === 'object' && r !== null && typeof (r as { all?: unknown }).all === 'function';
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const CODES: Record<string, string> = { ' ': 'Space', Enter: 'Enter', Escape: 'Escape', Tab: 'Tab' };
 const codeOf = (key: string) => CODES[key] ?? (/^[a-z]$/i.test(key) ? `Key${key.toUpperCase()}` : /^\d$/.test(key) ? `Digit${key}` : key);
@@ -103,8 +105,8 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
     probe,
     probes: () => app.probes.names(),
     registry(name) {
-      const r = (app.registries as unknown as Record<string, { all(): readonly unknown[] } | undefined>)[name];
-      if (!r) throw Error(`engine.registry: no registry '${name}'`);
+      const r: unknown = Reflect.get(app.registries, name);
+      if (!isListable(r)) throw Error(`engine.registry: no registry '${name}'`);
       return r.all();
     },
     state: () => ({ scene: scene(), world: probe('world'), game: probe('game') }),
