@@ -178,7 +178,7 @@ the merge.
 | [blender-export-20261003.md](../verification/blender-export-20261003.md) | #74 (`40b9c70`) | Focused: two repeatable Blender 5.2.1 exports, validator tests, last local browser pass at source `4ff2058`. CI: main run 37149365823 passed on `40b9c70`, including `test:blender-export-browser`. | Other Blender versions, textured or animated art, physical devices. |
 | [save-recovery-20261003.md](../verification/save-recovery-20261003.md) | #76 (`1a32601`) | Focused: `test:weighted-appearance-browser` at clean `6a22639` (base `2fb6e69`): visible refusal, durable retry, reload. | Injected refusal, not real quota or power loss. |
 | [model-retirement-20261003.md](../verification/model-retirement-20261003.md) | #78 (`b5fbe8d`) | Focused: three transport cancellations and reentry cycles at clean `c750dd0` (base `5a68f06`), plus disposal with a pending request. | Heap and listener audit (counters only). |
-| [decode-cancellation-20261003.md](../verification/decode-cancellation-20261003.md) | #116 (`6dc111a`), card B5 | Focused: three browser cycles cancelling after a fully delivered response and a decoded image, with ownership back at baseline. Main CI run 37157174423 on `6dc111a` **failed** this check (request ended `failed`, not `finished`). | Counters only, no whole-heap or listener audit; no physical device. |
+| [decode-cancellation-20261003.md](../verification/decode-cancellation-20261003.md) | #116 (`6dc111a`), card B5 | Focused: three browser cycles cancelling after a fully delivered response and a decoded image, with ownership back at baseline. Main CI run 37157174423 on `6dc111a` **failed** this check (request ended `failed`, not `finished`); PR #119 (`6da7951`) then asserted delivery from the fixture server and the page instead of the racing network event. | Counters only, no whole-heap or listener audit; no physical device. |
 | [contributor-rehearsal-20261003.md](../verification/contributor-rehearsal-20261003.md) | #80 (`7f4dee4`) | Simulated: public clone at `5a68f06`, local bare repository as the fork, test-only change, `check`, tests and `lint`. | Ran before #67 and #80 changed the instructions; no real GitHub fork or fork-PR CI. |
 | [dpr-redraw-20261003.md](../verification/dpr-redraw-20261003.md) | #83 (`5b12552`) | Focused: eight resize and cleanup tests and a browser run at clean `422975c`. CI: main run 37148687488 passed on `5b12552`. | Physical high-DPR displays. |
 | [session-recovery-20261003.md](../verification/session-recovery-20261003.md) | #97 (`e1bdc31`), card B2 | Focused and CI: `test:session-browser` asserts a fresh world after host restart before any action, a client-only drop that resumes the same player, and bounded attempts on both pages. Main run 37151563604 passed on `e1bdc31`. | Loopback only: no LAN between machines, no WAN. |
@@ -200,7 +200,7 @@ the merge.
 | `createTestSaves` and the `reload` playtest step | #94 (`d4d92ac`) | Unit and playtest-script tests. |
 | Documentation and contributor entry points | #69, #71, #88, #89, #91, #109 | Documentation only. |
 | Strict types: remove `any` | #99 (`52e3d7e`) | Typecheck and tests. Main CI run 37152653292 passed. |
-| `noUncheckedIndexedAccess` slices 1 to 4 | #103 (`7238410`), #105 (`00e4a31`), #106 (`2a48e35`), #107 (`2cec0d0`) | Typecheck and tests per slice. Slice 5 (scripts, templates, enabling the flags) is PR #114, **open, not integrated**. |
+| `noUncheckedIndexedAccess` slices 1 to 4 | #103 (`7238410`), #105 (`00e4a31`), #106 (`2a48e35`), #107 (`2cec0d0`) | Typecheck and tests per slice. Slice 5 (scripts, templates, enabling `noUncheckedIndexedAccess`, `noImplicitOverride` and `noImplicitReturns`) was open when this section was drafted; it was integrated afterwards in PR #114 (`6af76a4`). |
 | Prettier formatting | #101 (`305dc6a`) | `format:check` in `npm run lint`; Markdown is excluded. Main CI run 37155979128 passed on `305dc6a`. |
 | Runtime bundle: GLSL without comments, test-only classes out of the scene runtime | #100 (`f1c2057`), #102 (`0b2af56`) | `perf:bundle`. Main CI run 37155164464 passed on `0b2af56`. |
 | Port-busy hint, npm 12 `allowScripts`, no file watcher for non-interactive servers | #110 (`99edd16`), #111 (`758f8d6`), #112 (`5c1ba4a`) | Unit tests and CI. |
@@ -215,8 +215,12 @@ push, so those merges have no full-CI result of their own. Completed green main 
 containing #112, #113, #115 and #116) **failed**: both template jobs passed, but the
 browser job's `test:model-preview-browser` failed the new decode-cancellation
 assertion "decoded model response delivered in full" (the request ended `failed`, not
-`finished`), so the aggregate `check` failed. The B5 evidence therefore has a focused
-pass on its branch and a failed main CI; it is open until main CI passes it.
+`finished`), so the aggregate `check` failed. PR #119 (`6da7951`) found the cause:
+under load, Chromium can report a fully consumed body as `requestfailed`
+(`net::ERR_ABORTED`) before any cancellation. It now asserts delivery from the fixture
+server and a page-side read instead. Afterwards PR #114 (`6af76a4`) integrated slice 5
+of the strict-type series. The B5 browser evidence counts as passing on `main` only
+once a main CI run that includes #119 passes.
 
 ### Scorecard status (2026-10-03, after the audit)
 
@@ -228,7 +232,7 @@ pass on its branch and a failed main CI; it is open until main CI passes it.
 | 4 | Reliable session | Evidence added | Composed explorer journey with refusal, retry, interruption and disposal (#98); data-loss recipe fix (#95); re-entry ordering (#92). | Real storage quota and OS tab suspension on devices. |
 | 5 | Optional network path | Evidence added, loopback scope | Fresh baseline after restart and client-only drop (#97); host CLI fix (#70). | LAN with two physical machines (author or devices). |
 | 6 | Assets | Met | #74, receipt, and main CI run 37149365823 passed on `40b9c70`. | Other Blender versions, textured or animated art. |
-| 7 | Performance | Evidence added, advisory; decode cancellation failing on main CI | Production and warm first use (#104); decode cancellation (#116, focused pass, but main CI run 37157174423 failed it); bench lifecycle (#75); budgets enforced by CI gates. Retention is declared as counters only. | Physical-device, thermal and sustained performance. |
+| 7 | Performance | Evidence added, advisory | Production and warm first use (#104); decode cancellation (#116; main CI run 37157174423 failed it, and #119 fixed the racing assertion); bench lifecycle (#75); budgets enforced by CI gates. Retention is declared as counters only. | Physical-device, thermal and sustained performance. |
 | 8 | Compatibility | Evidence added | Retained v0.2.0 consumer and released saves, upgrade notes (#96); synthetic migrations (#79); `c0e73c9` consumer (#81). | A complete changelog for the candidate (card E2). |
 | 9 | Contribution | Partial | Contributor rehearsal (#80) and entry points (#88). | Re-rehearse the current `check -- --base` and `--all` path (card C2). Real GitHub fork, fork PR and fork CI need a second account (author). |
 | 10 | Release | Not met | Ledgers reconciled (this section). | Named candidate with full green CI, support matrix for eight templates, archive build rehearsal, release notes (card E2). Version, tag and release (author). |
