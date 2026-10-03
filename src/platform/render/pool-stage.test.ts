@@ -5,7 +5,7 @@ import { createRendererPool, type PoolRenderer } from './renderer-pool';
 /** A canvas stand-in: size, listeners, a recording 2D context. */
 class Canvas {
   width = 300; height = 150; parent: Host | null = null; style: Record<string, string> = {};
-  listeners: { type: string; fn: (e: { preventDefault(): void }) => void; signal?: AbortSignal }[] = [];
+  listeners: { type: string; fn: (e: { preventDefault(): void }) => void; signal?: AbortSignal | undefined }[] = [];
   draws: unknown[][] = [];
   ctx2d = { globalCompositeOperation: 'source-over', drawImage: (...a: unknown[]) => { this.draws.push(a); } };
   getContext(kind: string) { return kind === '2d' ? this.ctx2d : null; }

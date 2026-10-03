@@ -21,7 +21,7 @@ export const isEditable=(t:KeyTarget|null)=>!!t&&(/^(INPUT|TEXTAREA|SELECT)$/.te
 export const isActivatable=(t:KeyTarget|null)=>!!t&&(/^(BUTTON|SUMMARY)$/.test(t.tagName??'')||t.tagName==='A'&&!!t.getAttribute?.('href')||/^(button|link|checkbox|switch|menuitem|tab|option|radio)$/.test(t.getAttribute?.('role')??''));
 export const isSingleCharacter=(key:string)=>key.length===1&&key!==' ';
 
-export type KeyboardOptions={bindings?:KeyBindings;now?:()=>number;singleKeyShortcuts?:()=>boolean};
+export type KeyboardOptions={bindings?:KeyBindings|undefined;now?:()=>number;singleKeyShortcuts?:()=>boolean};
 /** The keyboard state machine, DOM-free for tests. `down` returns true when it consumed the key. */
 export class KeyboardInput{
  private bindings:KeyBindings;private now:()=>number;private lastRepeatZoom=-Infinity;private shortcuts:()=>boolean;

@@ -156,7 +156,7 @@ function usable(r: AudioClockReading | null): r is AudioClockReading {
   return r.output === null || (finite(r.output.contextTime) && r.output.contextTime >= 0 && finite(r.output.performanceTime) && r.output.performanceTime >= 0);
 }
 
-interface Pending<T> { id: number; at: number; payload: T; live: boolean; off?: () => void }
+interface Pending<T> { id: number; at: number; payload: T; live: boolean; off?: (() => void) | undefined }
 
 export function createAudioTimeline<T = unknown>(o: AudioTimelineOptions<T>): AudioTimeline<T> {
   if (typeof o.read !== 'function' || typeof o.now !== 'function' || typeof o.dispatch !== 'function') throw Error('audio timeline: read, now and dispatch are required');

@@ -28,11 +28,11 @@ export interface SurfaceRequest {
   /** Owner's lifetime: when given, the lease is released with it. */
   ctx?: { own<D extends { dispose(): void }>(d: D): D };
   /** The ceiling for the quality pixel ratio (applied live until release). */
-  maxPixelRatio?: number;
+  maxPixelRatio?: number | undefined;
   profile?: Partial<RenderProfile>;
   /** The shadow technique at `ultra`: `reference` (default) gives the scene's sun cascades; a staged area keeps
    *  its authored map (ADR 0061). */
-  shadows?: ShadowTechnique;
+  shadows?: ShadowTechnique | undefined;
 }
 
 export interface RenderSurface {

@@ -83,7 +83,7 @@ export interface TestScene {
 /** `particleScale` is the `effects.particles` quality knob (default 1, the reference preset). */
 /** `sounds` adds ids `ctx.play` / `ctx.playVoice` may use besides `BUILT_IN_CUES` and the scene's own `sounds`: an
  *  audio asset the scene plays without listing it, or a cue registered by a module the test composes. */
-export async function testScene(scene: SceneDefinition, o: { particleScale?: number; sounds?: readonly string[]; brief?: BuildBrief; game?: GameDefinition; inputs?: readonly InputDefinition[]; calm?: boolean; params?: Record<string, string>; seed?: number; systems?: readonly SystemDefinition[]; services?: Partial<Services>; input?: InputSource; audioClock?: (nowMs: number) => AudioClockReading | null } = {}): Promise<TestScene> {
+export async function testScene(scene: SceneDefinition, o: { particleScale?: number; sounds?: readonly string[]; brief?: BuildBrief; game?: GameDefinition | undefined; inputs?: readonly InputDefinition[]; calm?: boolean; params?: Record<string, string>; seed?: number; systems?: readonly SystemDefinition[]; services?: Partial<Services>; input?: InputSource; audioClock?: (nowMs: number) => AudioClockReading | null } = {}): Promise<TestScene> {
   const body = await bodyOf(scene);
   const hintSource = o.services?.input;
   const describe = sceneActionHints(o.inputs ?? [], hintSource ? id => hintSource.describeAction(id) : defaultActionHints(o.inputs ?? []));

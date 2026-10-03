@@ -24,7 +24,7 @@ export const resourceStationSave = defineSaveSection({ id: 'expedition.resources
 } });
 export default resourceStationSave;
 type Survey = ReturnType<typeof createSurvey>;
-interface Owner { survey?: Survey; model: ReturnType<typeof createProduction>; active?: 'harvest' | 'craft'; changed(): void }
+interface Owner { survey?: Survey | undefined; model: ReturnType<typeof createProduction>; active?: 'harvest' | 'craft' | undefined; changed(): void }
 const owners = new WeakMap<SceneContext['world'], Owner>();
 export function enterResources(ctx: SceneContext, changed: () => void): void {
   owners.set(ctx.world, { model: createProduction(productionOptions, ctx.save(resourceStationSave).get().production), changed });

@@ -8,7 +8,7 @@ import {must} from '../../testing/must';
 
 /** A fake context clock with recording buffer sources. */
 function fakeContext(now = 10) {
-  const sources: { when?: number; offset?: number; stops: (number | undefined)[]; loop: boolean; loopStart: number; loopEnd: number; onended: (() => void) | null; disconnected: boolean; buffer: unknown }[] = [];
+  const sources: { when?: number | undefined; offset?: number | undefined; stops: (number | undefined)[]; loop: boolean; loopStart: number; loopEnd: number; onended: (() => void) | null; disconnected: boolean; buffer: unknown }[] = [];
   const gains: { gain: { value: number }; disconnected: boolean }[] = [];
   const ctx = {
     currentTime: now, state: 'running' as AudioContextState, sampleRate: 48000, destination: {},

@@ -7,10 +7,10 @@ import {ModelPoseLink,captureModelPoseLink,type ModelPoseLinkData,type ModelPose
 import {resolveModelRig,restoreModelRigNodes,type ModelRigCapture,type ModelRigResolution} from './model-rig';
 import type {AttachmentSlot,PoseRelationHooks} from './scene-model-attachments';
 export interface PoseLinkPresentation {
-  input:ModelPoseLinkData;relation?:ModelPoseLinkData;state:ModelPoseLinkState;
-  sourcePoseInput?:ModelPoseLinkData;sourceAttachmentInput?:unknown;sourceModel?:ModelData;targetModel?:ModelData;resolution?:{source:PoseLinkSlot;result:ModelRigResolution};sourceSlot?:PoseLinkSlot;pairs?:readonly {source:T.Object3D;target:T.Object3D}[];touched?:readonly T.Object3D[];
+  input:ModelPoseLinkData;relation?:ModelPoseLinkData|undefined;state:ModelPoseLinkState;
+  sourcePoseInput?:ModelPoseLinkData|undefined;sourceAttachmentInput?:unknown;sourceModel?:ModelData|undefined;targetModel?:ModelData|undefined;resolution?:{source:PoseLinkSlot;result:ModelRigResolution}|undefined;sourceSlot?:PoseLinkSlot|undefined;pairs?:readonly {source:T.Object3D;target:T.Object3D}[]|undefined;touched?:readonly T.Object3D[]|undefined;
 }
-export interface PoseLinkSlot extends AttachmentSlot {instance?:T.Object3D;rig?:ModelRigCapture;poseLink?:PoseLinkPresentation}
+export interface PoseLinkSlot extends AttachmentSlot {instance?:T.Object3D;rig?:ModelRigCapture;poseLink?:PoseLinkPresentation|undefined}
 /** A node's local position (3), quaternion (4) and scale (3). */
 type Pose=[number,number,number,number,number,number,number,number,number,number];
 const state=(status:ModelPoseLinkState['status'],reason:ModelPoseLinkState['reason']=null):ModelPoseLinkState=>Object.freeze({status,reason});

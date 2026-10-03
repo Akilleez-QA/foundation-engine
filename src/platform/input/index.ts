@@ -22,13 +22,13 @@ export type CreateInputOptions={
  surface:EventTarget&{setPointerCapture?(id:number):void};
  signal:AbortSignal;
  /** Share one stack between screens; defaults to a private one. */
- contexts?:InputContextStack;
+ contexts?:InputContextStack|undefined;
  /** Mirror viewOwnsInput(host) and .view-covered into a 'modal' context. */
  host?:HTMLElement;
  /** Classes on the host or an ancestor that cover the world, e.g. '.view-covered,.atlas-exploring'. */
  covered?:string;
  label?:string;
- settings?:InputSettings;
+ settings?:InputSettings|undefined;
  bindings?:KeyBindings;
  pointer?:PointerOptions;
  getPads?:GamepadOptions['getPads'];

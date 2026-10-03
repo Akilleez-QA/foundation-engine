@@ -23,7 +23,7 @@ test('pose link default constructor accepts configured mapping sizes above defau
 });
 test('pose link rejects malformed mappings, duplicate identities and omitted policies', () => {
   const input={source:1,nodes:[{source:'a',target:'b'}],inheritVisibility:true};
-  for(const bad of [{source:0},{source:NaN},{nodes:[]},{nodes:[{source:'',target:'b'}]},{nodes:[{source:'a',target:'b'},{source:'a',target:'c'}]},{nodes:[{source:'a',target:'b'},{source:'c',target:'b'}]},{inheritVisibility:undefined}])assert.throws(()=>ModelPoseLink({...input,...bad}),/pose link/);
+  for(const bad of [{source:0},{source:NaN},{nodes:[]},{nodes:[{source:'',target:'b'}]},{nodes:[{source:'a',target:'b'},{source:'a',target:'c'}]},{nodes:[{source:'a',target:'b'},{source:'c',target:'b'}]},{inheritVisibility:undefined as never}])assert.throws(()=>ModelPoseLink({...input,...bad}),/pose link/);
 });
 test('pose link limits snapshot configurable zero boundaries and explicit constructor ceiling', () => {
   const input={maxLinks:0,maxMappedNodesPerLink:256,restTolerance:0};const limits=normalizeModelPoseLinkLimits(input);input.maxLinks=3;

@@ -25,7 +25,7 @@ export interface SceneTickFacts {
   readonly pressed?: readonly string[];
   readonly held?: readonly string[];
   readonly axes?: Readonly<Record<string, number>>;
-  readonly pointer?: Readonly<{ x: number; y: number; down: boolean; pressed: boolean }>;
+  readonly pointer?: Readonly<{ x: number; y: number; down: boolean; pressed: boolean }> | undefined;
 }
 
 /** The configuration identity of a scene replay: the scene id and its declared input signature (sorted). */

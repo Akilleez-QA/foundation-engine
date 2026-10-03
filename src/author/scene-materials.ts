@@ -62,7 +62,7 @@ export interface SceneSurfaces {
 interface View {
   refs: number;
   texture: T.Texture | null;
-  lease?: AssetLease<T.Texture>;
+  lease?: AssetLease<T.Texture> | undefined;
   life: AbortController;
   failed: boolean;
   waiting: Set<(texture: T.Texture) => void>;

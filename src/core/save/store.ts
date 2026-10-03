@@ -40,7 +40,7 @@ export function browserTimers(): Timers {
   const g = globalThis as typeof globalThis & { requestIdleCallback?: Idle; cancelIdleCallback?: (h: number) => void };
   return {
     set(fn, ms) {
-      const h: { t?: ReturnType<typeof setTimeout>; idle?: number } = {};
+      const h: { t?: ReturnType<typeof setTimeout> | undefined; idle?: number } = {};
       h.t = setTimeout(() => { h.t = undefined; if (g.requestIdleCallback) h.idle = g.requestIdleCallback(fn, { timeout: 200 }); else fn(); }, ms);
       return h;
     },
@@ -78,10 +78,10 @@ export interface SaveStoreOptions {
   /** Key namespace: every key this store writes starts with it (default 'game'). One namespace per game. */
   namespace?: string;
   /** Extra prefixes `resetAll` also clears: keys a game wrote before it adopted the store (read via LegacyBinding). */
-  legacyPrefixes?: readonly string[];
+  legacyPrefixes?: readonly string[] | undefined;
   /** Keys matching this are listed by `quarantine()` as set aside by an older build. */
   legacyQuarantine?: RegExp;
-  timers?: Timers;
+  timers?: Timers | undefined;
   idleMs?: number;                       // debounce: write this long after the last change (default 1000)
   maxWaitMs?: number;                    // but never later than this after the first change (default 5000)
   legacyFiles?: LegacyFileAdapter[];
@@ -126,11 +126,11 @@ interface Cell {
   dirty: boolean;
   seen: boolean;                  // a read of `key` succeeded at least once
   lastRaw: string | null;         // what storage held when we last read or wrote it
-  lh?: string;                    // hash of the legacy raws this value already includes
+  lh?: string | undefined;        // hash of the legacy raws this value already includes
   imported?: boolean;             // dirty only because the legacy keys were just imported: nothing local to keep yet
   folded?: boolean;               // dirty only because another tab's legacy write was folded in: nothing local to keep
-  pendingQuarantine?: { raw: string; from: string; reason: string };
-  pendingBackup?: { raw: string; key: string };
+  pendingQuarantine?: { raw: string; from: string; reason: string } | undefined;
+  pendingBackup?: { raw: string; key: string } | undefined;
   subs: Set<(v: unknown) => void>;
 }
 
@@ -188,7 +188,7 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
     }
     return def.parse(d);
   }
-  function decodeStored(cell: Cell, raw: string): { value: unknown; from: number; lh?: string } {
+  function decodeStored(cell: Cell, raw: string): { value: unknown; from: number; lh?: string | undefined } {
     const def = cell.def;
     if (live(def)) return { value: upgrade(def, def.legacy!.decode([raw]), def.legacy!.fromVersion), from: def.version };
     const env = JSON.parse(raw) as Envelope;

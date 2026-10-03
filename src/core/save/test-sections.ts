@@ -28,7 +28,7 @@ export const voice: SaveSection<Voice> = {
   legacy: importRaw(p => 'game-voice-' + p, { mirror: true }),
 };
 
-export interface Journal { version: 1; entries: Record<string, { completed?: boolean; assisted?: boolean }> }
+export interface Journal { version: 1; entries: Record<string, { completed?: boolean | undefined; assisted?: boolean }> }
 export const journal: SaveSection<Journal> = {
   id: 'demo.journal', scope: 'player', version: 1, initial: () => ({ version: 1, entries: {} }),
   parse: raw => {

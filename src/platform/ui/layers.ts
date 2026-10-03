@@ -36,7 +36,7 @@ export interface LayerSpec extends LayerRequest {
   kind: LayerKind;
   element: HTMLElement;
   /** Activity run that owns the layer; the loop asks coverage() by this key. */
-  owner?: string;
+  owner?: string | undefined;
   /** What this layer does to the activities beneath it. 'none' = a stage window (VAB benches) or a toast. */
   cover?: LayerCover;
   modal?: LayerModality;
@@ -58,11 +58,11 @@ export interface LayerSpec extends LayerRequest {
   returnFocus?: () => HTMLElement | null | undefined;
   /** Escape on this layer. Default: close('escape'). Return false to let Escape fall to the layer below. */
   onEscape?: () => void | boolean;
-  onClose?: (reason: CloseReason) => void;
+  onClose?: ((reason: CloseReason) => void) | undefined;
 }
 export interface LayerInfo {
-  readonly id: string; readonly kind: LayerKind; readonly element: HTMLElement; readonly owner?: string;
-  readonly cover: LayerCover; readonly modal: LayerModality; readonly narration?: string; readonly music?: string;
+  readonly id: string; readonly kind: LayerKind; readonly element: HTMLElement; readonly owner?: string | undefined;
+  readonly cover: LayerCover; readonly modal: LayerModality; readonly narration?: string | undefined; readonly music?: string | undefined;
   readonly dormant: boolean;
 }
 export interface LayerHandle extends LayerInfo, PortLayerHandle {
@@ -77,7 +77,7 @@ export interface LayerChange { top: LayerInfo | null; reason: 'push' | 'close' |
 
 interface Entry extends LayerHandle {
   spec: LayerSpec; seq: number; opener: HTMLElement | null; abort: AbortController;
-  cover: LayerCover; narration?: string; music?: string; dormant: boolean;
+  cover: LayerCover; narration?: string | undefined; music?: string | undefined; dormant: boolean;
 }
 
 const FOCUSABLE = 'button,a,input,select,textarea,summary,[tabindex]';

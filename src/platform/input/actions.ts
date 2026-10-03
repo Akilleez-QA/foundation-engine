@@ -63,7 +63,7 @@ export const PAD_BUTTON_INDEX: Readonly<Partial<Record<PadInput, number>>> = {
   a: 0, b: 1, x: 2, y: 3, lb: 4, rb: 5, lt: 6, rt: 7, view: 8, menu: 9, l3: 10, r3: 11,
   'dpad-up': 12, 'dpad-down': 13, 'dpad-left': 14, 'dpad-right': 15, home: 16,
 };
-export interface ActionBindings { readonly keys?: readonly KeyChord[]; readonly pad?: readonly PadInput[] }
+export interface ActionBindings { readonly keys?: readonly KeyChord[] | undefined; readonly pad?: readonly PadInput[] | undefined }
 
 /** A point-in-time description, not a claim that a handler exists or an action is reachable. */
 export interface ActionDescription {
@@ -120,7 +120,7 @@ export type ActionOverrides = Readonly<Record<ActionId, ActionBindings>>;
 // ─────────────── the layer view the dispatcher needs (LayerManager implements it) ───────────────
 
 export interface ActionLayerInfo {
-  readonly id: string; readonly kind: string; readonly owner?: string; readonly modal: 'page' | 'scope' | false;
+  readonly id: string; readonly kind: string; readonly owner?: string | undefined; readonly modal: 'page' | 'scope' | false;
 }
 export interface ActionLayers {
   /** Live interactive layers, top first. */
@@ -221,7 +221,7 @@ export function inputActionRegistry(rows: readonly InputActionDef[] = [], source
 }
 
 /** Effective bindings: an override replaces the device it names and keeps the other device's defaults. */
-export function effectiveBindings(def: InputActionDef, overrides: ActionOverrides = {}): Required<ActionBindings> {
+export function effectiveBindings(def: InputActionDef, overrides: ActionOverrides = {}): { readonly keys: readonly KeyChord[]; readonly pad: readonly PadInput[] } {
   const o = overrides[def.id];
   return { keys: o?.keys ?? def.defaults.keys ?? [], pad: o?.pad ?? def.defaults.pad ?? [] };
 }
@@ -256,7 +256,7 @@ const singleCharacter = (chord: KeyChord) => chord.length === 1 && chord !== ' '
 // ─────────────── dispatcher ───────────────
 
 export type ActionHandler = (e: ActionEvent) => void | boolean;
-interface Subscription { action: ActionId; fn: ActionHandler; layer?: string; owner?: string }
+interface Subscription { action: ActionId; fn: ActionHandler; layer?: string | undefined; owner?: string | undefined }
 type Target = { kind: 'sub'; sub: Subscription } | { kind: 'queue'; owner: string };
 interface Down { action: ActionId; epoch: number; target: Target; kind: ActionKind }
 
@@ -318,7 +318,7 @@ export class InputActions {
   /** The current owner epoch. */
   get epoch(): number { return this.epochValue; }
 
-  effective(id: ActionId): Required<ActionBindings> {
+  effective(id: ActionId): { readonly keys: readonly KeyChord[]; readonly pad: readonly PadInput[] } {
     const def = this.opts.registry.find(id);
     return def ? effectiveBindings(def, this.overrides) : { keys: [], pad: [] };
   }

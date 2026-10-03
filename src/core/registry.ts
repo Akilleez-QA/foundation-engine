@@ -81,13 +81,13 @@ export type BehaviourRegistryName = { [K in RegistryName]: EntryOf<K> extends { 
 // ---- provenance and problems ----
 
 /** One record per entry change, shown by the dev console ("which pack touched this?"). */
-export interface Provenance { source: string; action: 'add' | 'patch' | 'remove' | 'drop' | 'restore'; note?: string }
+export interface Provenance { source: string; action: 'add' | 'patch' | 'remove' | 'drop' | 'restore'; note?: string | undefined }
 
 export interface RegistryProblem {
   registry: string;
   id?: string;
   /** The module that added the row. */
-  source?: string;
+  source?: string | undefined;
   /** The latest module that patched the row, when that is not its source. */
   patchedBy?: string;
   problem: string;

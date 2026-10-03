@@ -51,7 +51,7 @@ test('benching errors after N attempts when a scene stays non-comparable, and wr
 test('the baseline is the per-metric maximum over K comparable runs (level triangles 158.6k..183k by animation phase)', () => withDir(async dir => {
   const tris = [158586, 180088, 172003];
   let i = 0;
-  await baselineFromBenches(async () => run([{ ...sample('level', 'level', 110), trisPerRenderedFrame: tris[i++] }]), ['level'], { runs: 3, attempts: 5 }, dir);
+  await baselineFromBenches(async () => run([{ ...sample('level', 'level', 110), trisPerRenderedFrame: must(tris[i++]) }]), ['level'], { runs: 3, attempts: 5 }, dir);
   assert.equal(i, 3);
   const s = JSON.parse(readFileSync(join(dir, 'level.json'), 'utf8')).runs['swiftshader@1280x800'].samples[0];
   assert.equal(s.trisPerRenderedFrame, 180088);

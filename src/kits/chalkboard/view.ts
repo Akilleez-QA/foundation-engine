@@ -2,7 +2,7 @@
 import { BOARD, lengthOf, pathOf, tickLabels, type BoardItem } from './board';
 
 export interface BoardItemState { visible: boolean; progress: number; spotlight: boolean }
-export interface BoardState { items: Record<string, BoardItemState>; caption: { who: string; text: string; color?: string } | null; pointer: string | null }
+export interface BoardState { items: Record<string, BoardItemState>; caption: { who: string; text: string; color?: string | undefined } | null; pointer: string | null }
 export interface BoardView { readonly root: HTMLElement; update(s: BoardState): void; destroy(): void }
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -27,7 +27,7 @@ export function createBoardView(host: HTMLElement, items: readonly BoardItem[], 
   root.append(svg, caption);
   host.prepend(root);   // under the lesson's cards and controls
 
-  const nodes = new Map<string, { g: SVGGElement; stroke?: SVGPathElement; len: number; last: string }>();
+  const nodes = new Map<string, { g: SVGGElement; stroke?: SVGPathElement | undefined; len: number; last: string }>();
   for (const i of items) {
     const g = doc.createElementNS(SVG, 'g') as SVGGElement;
     g.dataset.item = i.id;

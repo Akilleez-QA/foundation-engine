@@ -8,12 +8,12 @@ export type Vec2={x:number;y:number};
 export type Direction='up'|'down'|'left'|'right';
 export type DeviceFamily='keyboard-mouse'|'touch'|'gamepad';
 export type ZoomSource='wheel'|'trackpad'|'pinch'|'key'|'repeat'|'pad';
-export type ZoomStep={notches:number;source:ZoomSource;t:number;momentum?:boolean};
+export type ZoomStep={notches:number;source:ZoomSource;t:number;momentum?:boolean|undefined};
 /** cycle: V / View. anchor: R3, Roblox order third → first → overhead. */
 export type CameraModeRequest='cycle'|'anchor'|'first'|'third'|'overhead';
 export type QuickSlot='slot1'|'slot2'|'slot3'|'slot4'|'slot5'|'slot6';
 export type ButtonAction='interact'|'back'|'cameraMode'|'recentre'|'pause'|'mute'|QuickSlot;
-export type ActionEvent={action:ButtonAction;t:number;device:DeviceFamily;mode?:CameraModeRequest};
+export type ActionEvent={action:ButtonAction;t:number;device:DeviceFamily;mode?:CameraModeRequest|undefined};
 export type WorldTap={x:number;y:number;t:number;duration:number;pointerType:string};
 
 export const NOTCH_PX=100,LINE_PX=16,PAGE_FRACTION=.9,MAX_NOTCHES_PER_EVENT=1.5,TRACKPAD_GAIN=.8;

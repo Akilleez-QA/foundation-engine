@@ -47,7 +47,7 @@ export class UiNav{
 
 /** Traps Tab inside `scope`, focuses its first (or `initial`) control, and on release restores
  * focus to the opener, or to `fallback` when the opener is gone. Native modal dialogs already trap. */
-export function trapFocus(scope:El,options:{doc?:Document;initial?:El|null;fallback?:()=>El|null;signal?:AbortSignal}={}){
+export function trapFocus(scope:El,options:{doc?:Document;initial?:El|null|undefined;fallback?:(()=>El|null)|undefined;signal?:AbortSignal}={}){
  const doc=options.doc??globalThis.document,opener=doc.activeElement as El|null,abort=new AbortController();
  const first=options.initial??focusables(scope)[0]??scope;first.focus({preventScroll:true});
  scope.addEventListener('keydown',e=>{if(e.key!=='Tab'||e.defaultPrevented)return;const items=focusables(scope);if(!items.length){e.preventDefault();return;}const i=items.indexOf(doc.activeElement as El),next=e.shiftKey?(i<=0?items.at(-1)!:null):(i===items.length-1||i<0?items[0]:null);if(next){e.preventDefault();next.focus();}},{signal:abort.signal});

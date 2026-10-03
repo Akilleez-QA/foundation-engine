@@ -30,7 +30,7 @@ interface TileState { desired: 1 | 2; current: 1 | 2; variants: Map<number, Mesh
 const layout = tiles.map(tile => ({ key: tile.id, ...tile, cellsX: 24, cellsZ: 24, stride: 1 as const }));
 const initialGeneration = prepareTerrainGeneration(region, layout);
 interface State { lifetime:AbortController; preparing:boolean; tiles: TileState[]; builds: number; publications: number; closed: boolean;
-  owner: ReturnType<typeof createTerrainOwner>; pending?: { builder: ReturnType<typeof createTerrainGenerationBuilder>; resolve(generation: TerrainGeneration): void; reject(error: Error): void }; views?: MeshData[];
+  owner: ReturnType<typeof createTerrainOwner>; pending?: { builder: ReturnType<typeof createTerrainGenerationBuilder>; resolve(generation: TerrainGeneration): void; reject(error: Error): void } | undefined; views?: MeshData[] | undefined;
 }
 const states = new WeakMap<SceneContext['world'], State>();
 export function enterChunks(ctx: SceneContext): void {

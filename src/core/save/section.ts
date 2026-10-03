@@ -24,9 +24,9 @@ export interface LegacyBinding {
    */
   encode?(value: unknown): (string | null | undefined)[];
   /** Dual-write the legacy keys for one or two releases, so unmigrated readers and a rollback keep working. */
-  mirror?: boolean;
+  mirror?: boolean | undefined;
   /** The legacy value lives in sessionStorage. */
-  session?: boolean;
+  session?: boolean | undefined;
   /**
    * Hash each key separately (import mode, with a union `merge`, never mirrored): when one legacy key changes, `decode`
    * sees only that key's raw (the others as null) and the result is merged in. A reader of many independent records
@@ -108,7 +108,7 @@ export interface ProfileFileV2 {
   format: 'engine-profile';
   version: 2;
   exportedBy: string;
-  player: { id: PlayerId; name?: string };
+  player: { id: PlayerId; name?: string | undefined };
   sections: Record<string, { v: number; data: unknown }>;
   /** Sections this build does not know, or cannot read yet (newer): carried verbatim so nothing is lost. */
   orphans?: Record<string, unknown>;

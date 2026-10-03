@@ -44,7 +44,7 @@ export function disposeLesson(ctx: SceneContext): void {
   if (errors.length) throw new AggregateError(errors, 'Lesson UI cleanup failed');
 }
 
-export function directorSystem(lesson: Lesson | LessonInput, o: { provider?: DiscussProvider } = {}): SystemDefinition {
+export function directorSystem(lesson: Lesson | LessonInput, o: { provider?: DiscussProvider | undefined } = {}): SystemDefinition {
   return defineSystem({
     id: 'learn-director', phase: 'frame',
     run(ctx, dt) {
@@ -149,7 +149,7 @@ function render(ctx: SceneContext, v: Visit, view: LessonView) {
 
 /** A caption line for scenes without a board (sim, quiz): who speaks, what they say. */
 const captions = new WeakMap<HTMLElement, { el: HTMLElement; last: string }>();
-function captionLine(overlay: HTMLElement, cap: { who: string; text: string; color?: string } | null): HTMLElement {
+function captionLine(overlay: HTMLElement, cap: { who: string; text: string; color?: string | undefined } | null): HTMLElement {
   let c = captions.get(overlay);
   if (!c) {
     const el = overlay.ownerDocument.createElement('p'); el.setAttribute('aria-live', 'polite');
@@ -163,6 +163,6 @@ function captionLine(overlay: HTMLElement, cap: { who: string; text: string; col
 }
 
 /** The lesson's scene body: the director first, then the game's sim systems, then the concept explorer. */
-export function lessonBody(lesson: Lesson | LessonInput, extra: SceneBody = {}, o: { provider?: DiscussProvider } = {}): SceneBody {
+export function lessonBody(lesson: Lesson | LessonInput, extra: SceneBody = {}, o: { provider?: DiscussProvider | undefined } = {}): SceneBody {
   return { entities: [...extra.entities ?? []], systems: [directorSystem(lesson, o), ...extra.systems ?? [], explorerSystem()] };
 }

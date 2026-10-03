@@ -9,7 +9,7 @@ const inverseWith = (m: ScalarMath) => (a: RootDelta): RootDelta => {const c=m.c
  * Authored planar root motion, independent of skeletal playback. Yaw is unwrapped radians. `math`: 'platform'
  * (default, Math.*) or 'deterministic' (dmath: the same bits in every JavaScript engine).
  */
-export function createRootMotion(input: RootClip, loop=false, options: { math?: ScalarMathMode } = {}) {
+export function createRootMotion(input: RootClip, loop=false, options: { math?: ScalarMathMode | undefined } = {}) {
   const m=scalarMath(options.math),compose=composeWith(m),inverse=inverseWith(m);
   const clip=structuredClone(input);
   // keys[0] and the last key are read only after the non-empty check.

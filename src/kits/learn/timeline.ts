@@ -25,7 +25,7 @@ export interface TimelineState {
 }
 export interface TimelineOptions {
   text?: (key: string) => string;
-  reducedMotion?: boolean;
+  reducedMotion?: boolean | undefined;
   answers?: () => Readonly<Record<string, string>>;
   params?: () => Readonly<Record<string, number>>;
 }

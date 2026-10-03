@@ -17,10 +17,10 @@ export interface ModelInspectionRequest {
   skinVertices?: readonly { mesh: string; vertex: number }[];
 }
 export interface ModelInspectionSource {
-  requested?: ModelData;
+  requested?: ModelData | undefined;
   slot?: { asset: string; ready?: boolean; failed?: boolean; root?: T.Object3D;
-    lease?: AssetLease<ModelTemplate>; action?: T.AnimationAction; animationKey?: string;
-    poseKey?: string; overrides?: Set<T.Object3D>; nodes?: Map<string, T.Object3D | null> };
+    lease?: AssetLease<ModelTemplate> | undefined; action?: T.AnimationAction | undefined; animationKey?: string;
+    poseKey?: string; overrides?: Set<T.Object3D>; nodes?: Map<string, T.Object3D | null> } | undefined;
 }
 export interface CachedModelBounds {
   basis: 'cached-geometry-and-world-matrices'; status: 'available' | 'partial' | 'unavailable';

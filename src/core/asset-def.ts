@@ -78,8 +78,8 @@ export interface AssetVariant {
   readonly path: string;
   readonly format: AssetFormat;
   /** Pixel width (textures) used for variant choice by on-screen size. */
-  readonly width?: number;
-  readonly height?: number;
+  readonly width?: number | undefined;
+  readonly height?: number | undefined;
   /**
    * The best tier this variant may serve. A lossy port variant (ETC1S for `low`) sets `maxTier: 'low'` and is never
    * chosen on a better tier. Omitted means every tier.

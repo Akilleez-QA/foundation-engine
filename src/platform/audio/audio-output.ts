@@ -176,15 +176,15 @@ export interface SpatialCue {
    */
   maxDistance?: number;
   /** [0, 100], default 1. The 'linear' model clamps it to [0, 1] (spec). */
-  rolloffFactor?: number;
+  rolloffFactor?: number | undefined;
   /**
    * Default 'equalpower' (unchanged). 'HRTF' is granted while the output has a free HRTF slot (`maxHrtfVoices`);
    * otherwise the voice plays with 'equalpower' and `stats.downgraded` counts it. HRTF never refuses playback. A full
    * limit first reclaims the slot of a voice its cutoff has kept silent for 50 ms or more (that voice stays equal-power).
    */
-  panning?: PanningModel;
+  panning?: PanningModel | undefined;
   /** Default 'inverse' (unchanged). */
-  distanceModel?: DistanceModel;
+  distanceModel?: DistanceModel | undefined;
   /**
    * Audible cutoff for any model: [refDistance, 1e6], default none. A start beyond it is refused (`stats.culled`); a
    * playing voice that moves (or whose listener moves) beyond it fades to silence and returns when back in range.
@@ -215,7 +215,7 @@ export interface CueVoice {
   stop(): void;
 }
 export interface CueVoiceOptions {
-  variant?: number; gain?: number; spatial?: SpatialCue; onEnded?: () => void;
+  variant?: number | undefined; gain?: number | undefined; spatial?: SpatialCue; onEnded?: () => void;
   /** Adds the filter stage, starting at these values (no ramp at start). */
   filter?: CueFilter;
   /** Playback rate, 0.25…4: 2 is an octave up and twice as fast. Default 1. */
@@ -223,7 +223,7 @@ export interface CueVoiceOptions {
   /** A sound file still loading may start up to this many ms late (0…5000; default 0: dropped instead). */
   wait?: number;
   /** Context seconds to start at (an audio timeline's `when`); omitted or past: now. A pending voice holds its slot. */
-  at?: number;
+  at?: number | undefined;
 }
 /** Playback rate bounds (`CueVoiceOptions.rate`). */
 export const RATE_LIMITS = { min: .25, max: 4 } as const;

@@ -28,11 +28,11 @@ export interface JumpSystemOptions {
   /** Transform centre height above the feet (m), [0, 100]. Default 0. */
   groundOffset?: number;
   /** A supported actor climbs onto a surface up to this much higher (m), [0, 10]. Default 0. */
-  stepHeight?: number;
+  stepHeight?: number | undefined;
   /** A supported, non-rising actor stays attached to a surface up to this much lower (m), [0, 10]. Default 0. */
   snapDistance?: number;
   /** Only while this returns true. A false tick drops any pending press. */
-  when?: (ctx: SceneContext) => boolean;
+  when?: ((ctx: SceneContext) => boolean) | undefined;
   /**
    * Moving platforms (MV-02). Run `platformSystem(platforms)` earlier in the same fixed lane. A supported actor rides
    * its platform's exact displacement each tick; platforms are one-way in their own frame and may pick up an actor
@@ -40,9 +40,9 @@ export interface JumpSystemOptions {
    */
   platforms?: Platforms;
   /** What leaving a platform keeps. Default 'add-velocity'. */
-  onLeave?: PlatformLeave;
+  onLeave?: PlatformLeave | undefined;
   /** Body radius for sliding carried motion against walls and solids (m), (0, 10]. Default 0.35. */
-  radius?: number;
+  radius?: number | undefined;
 }
 
 interface Body {

@@ -9,7 +9,7 @@ export type PadFamily='xbox'|'playstation'|'nintendo'|'steamdeck'|'generic';
 export type PadEdge='confirm'|'back'|'pause'|'view'|'anchor'|'recentre';
 export type PadFrame={connected:boolean;family:PadFamily|null;move:Vec2;look:Vec2;edges:PadEdge[];zoom:ZoomStep[];nav:Direction|null;meaningful:boolean;disconnected:boolean};
 export type GamepadOptions={
- getPads?:()=>readonly (PadLike|null)[];
+ getPads?:(()=>readonly (PadLike|null)[])|undefined;
  /** Nintendo layout: the right face button confirms and the bottom one goes back. */
  nintendoSwap?:()=>boolean;
  /** 'zoom': d-pad up/down zooms; 'move': the d-pad moves, for digital-only play. LB/RB zoom either way. */

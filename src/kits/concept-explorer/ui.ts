@@ -65,7 +65,7 @@ export function createLayerToggles(overlay: HTMLElement, layers: { id: string; l
   return { show(on) { showEl(box, on); } };
 }
 
-export interface QuizPanelView { prompt: string; options: { id: string; text: string }[]; hints: string[]; feedback: string | null; state: 'asking' | 'right' | 'revealed'; chosen: string | null; answer?: string; index: number; count: number }
+export interface QuizPanelView { prompt: string; options: { id: string; text: string }[]; hints: string[]; feedback: string | null; state: 'asking' | 'right' | 'revealed'; chosen: string | null; answer?: string | undefined; index: number; count: number }
 export interface QuizPanel { readonly root: HTMLElement; set(v: QuizPanelView | null): void; onAnswer(fn: (id: string) => void): void; destroy(): void }
 export function createQuizPanel(overlay: HTMLElement, o: { questionOf: (i: number, n: number) => string; hintLabel: string }): QuizPanel {
   const doc = overlay.ownerDocument, box = doc.createElement('section');

@@ -40,7 +40,7 @@ export interface LessonSceneOptions {
   /** The 3D content of sim and explore scenes: a lazy import of a SceneBody (entities with `Part`, systems). */
   sim?: () => Promise<SceneBody | { default: SceneBody }>;
   /** Who answers in discuss scenes (default: the lesson's authored interrupts). */
-  provider?: DiscussProvider;
+  provider?: DiscussProvider | undefined;
 }
 export type LessonSceneDefinition = SceneDefinition & { readonly lesson: LessonInput };
 

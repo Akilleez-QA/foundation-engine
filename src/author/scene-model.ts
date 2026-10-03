@@ -13,9 +13,9 @@ import type { AssetLease } from '../platform/assets/lease-cache';
 import { isAbortError } from '../platform/assets/lease-cache';
 import { Model, validateModel, type ModelData, type ModelSocketPose } from './model';
 import { Transform } from './defs';
-interface Slot { rig?: ModelRigCapture; poseLink?: PoseLinkPresentation; attachment?: AttachmentPresentation; ready?: boolean; asset: string; life: AbortController; root?: T.Object3D; instance?: T.Object3D; lease?: AssetLease<ModelTemplate>; mixer?: T.AnimationMixer; action?: T.AnimationAction; animationKey?: string; nodes?: Map<string, T.Object3D | null>; failed?: boolean; mask?: number; poseKey?: string; overrides?: Set<T.Object3D>; rest?: Map<T.Object3D, { position: T.Vector3; quaternion: T.Quaternion }> }
+interface Slot { rig?: ModelRigCapture; poseLink?: PoseLinkPresentation; attachment?: AttachmentPresentation; ready?: boolean; asset: string; life: AbortController; root?: T.Object3D; instance?: T.Object3D; lease?: AssetLease<ModelTemplate> | undefined; mixer?: T.AnimationMixer; action?: T.AnimationAction | undefined; animationKey?: string; nodes?: Map<string, T.Object3D | null>; failed?: boolean; mask?: number; poseKey?: string; overrides?: Set<T.Object3D>; rest?: Map<T.Object3D, { position: T.Vector3; quaternion: T.Quaternion }> }
 /** One owner for async model instances, skeletal playback and named-node queries in a scene visit. */
-export function createSceneModels(o: { world: World; scene: T.Scene; library: ModelLibrary; signal: AbortSignal; invalidate(): void; report(error: unknown): void; maxInstances?: number; inspection?: boolean; poseLinks?: ModelPoseLinkLimits; mask?(entity: Entity): number }) {
+export function createSceneModels(o: { world: World; scene: T.Scene; library: ModelLibrary; signal: AbortSignal; invalidate(): void; report(error: unknown): void; maxInstances?: number; inspection?: boolean; poseLinks?: ModelPoseLinkLimits | undefined; mask?(entity: Entity): number }) {
   const slots = new Map<Entity, Slot>(); let closed = false, syncing = false;
   const limit = o.maxInstances ?? 64;
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1024) throw Error('model: invalid scene instance budget');

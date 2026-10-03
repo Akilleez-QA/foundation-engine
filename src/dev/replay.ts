@@ -33,7 +33,7 @@ export interface ReplayDevRequest {
    * resources?, count?, id?}` (component ids or types). Default: the scene's `replay.digest`, else every Transform and
    * the resources. A replay must use the digest its log was recorded with, or it is refused (`incompatible-digest`).
    */
-  readonly digest?: ReplayDigestInput;
+  readonly digest?: ReplayDigestInput | undefined;
   /**
    * Record: keep each sampled tick's canonical state text in the log for ticks `from`..`to` (default the whole run), up
    * to `maxChars` (default 1 MiB, later detail is dropped), so a replay can name the first differing entity, component

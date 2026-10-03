@@ -119,7 +119,7 @@ export const sceneSizeFor = (ages?: readonly [number, number]) => !ages ? 20 : a
 const UNKIND = /\b(wrong|stupid|dumb|bad|fail(ed|ure)?|idiot|lazy|terrible|no!)\b/i;
 
 /** `pacing: false` checks structure only (defineLesson); the brief lint checks pacing with the brief's numbers. */
-export interface LessonCheckOptions { maxPassive?: number; ages?: readonly [number, number]; text?: (key: Key) => string; kids?: boolean; pacing?: boolean }
+export interface LessonCheckOptions { maxPassive?: number; ages?: readonly [number, number] | undefined; text?: (key: Key) => string; kids?: boolean; pacing?: boolean }
 
 export function lessonProblems(l: LessonInput, o: LessonCheckOptions = {}): string[] {
   const out: string[] = [];

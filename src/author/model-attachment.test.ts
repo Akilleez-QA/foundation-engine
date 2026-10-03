@@ -48,7 +48,7 @@ test('attachment constructor detaches affine input and requires explicit finite 
   const captured = ModelAttachment(input).value; matrix[12] = 99; input.parent = 2;
   assert.equal(captured.offset[12], 0); assert.equal(captured.parent, 1);
   assert.ok(Object.isFrozen(captured)); assert.ok(Object.isFrozen(captured.offset));
-  for (const bad of [{ parent: 0 }, { socket: '' }, { unavailable: undefined }, { inheritVisibility: undefined }, { offset: [1] }, { offset: identity().map((n, i) => i === 3 ? 1 : n) }, { offset: identity().map((n, i) => i === 12 ? Infinity : n) }]) {
+  for (const bad of [{ parent: 0 }, { socket: '' }, { unavailable: undefined as never }, { inheritVisibility: undefined as never }, { offset: [1] }, { offset: identity().map((n, i) => i === 3 ? 1 : n) }, { offset: identity().map((n, i) => i === 12 ? Infinity : n) }]) {
     assert.throws(() => ModelAttachment({ ...input, ...bad }), /attachment/);
   }
   Object.defineProperty(matrix, 'every', { value: () => { throw Error('caller method'); } });

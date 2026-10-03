@@ -6,7 +6,7 @@ export function locomotion(){return defineKit({id:'locomotion',requires:['charac
  * Commit bounded authored animation displacement through the existing character collision resolver. `math`:
  * 'platform' (default, Math.*) or 'deterministic' (dmath: the same bits in every JavaScript engine).
  */
-export function applyRootMotion(ctx: SceneContext, entity: Entity, delta: RootDelta, options: { owns(): boolean; radius?: number; maxStep?: number; maxSteps?: number; ground?: (x:number,z:number)=>number|null; math?: ScalarMathMode }) {
+export function applyRootMotion(ctx: SceneContext, entity: Entity, delta: RootDelta, options: { owns(): boolean; radius?: number; maxStep?: number; maxSteps?: number; ground?: (x:number,z:number)=>number|null; math?: ScalarMathMode | undefined }) {
   const m=scalarMath(options.math);
   if(!options.owns())return {applied:false,x:0,z:0,yaw:0};
   const tr=ctx.world.get(entity,Transform);if(!tr)return {applied:false,x:0,z:0,yaw:0};

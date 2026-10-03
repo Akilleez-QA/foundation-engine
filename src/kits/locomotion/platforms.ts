@@ -18,7 +18,7 @@ export interface PlatformsOptions {
   /** Most platforms at once, [1, 1024]. Default 64. */
   maxPlatforms?: number;
   /** Fastest accepted platform motion in m/s, (0, 1000]. Default 100. A faster path throws; declare a jump with `cut`. */
-  maxSpeed?: number;
+  maxSpeed?: number | undefined;
 }
 export interface PlatformDelta { readonly dx: number; readonly dy: number; readonly dz: number }
 

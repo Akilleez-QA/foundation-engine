@@ -27,7 +27,7 @@ const fakeScatter: KnobDef<'test.fake-scatter'> = {
   floor: { value: 0.25, reason: 'scatter density ≥ 0.25' }, applies: 'reenter-scene',
 };
 
-function memoryStore(initial?: GraphicsSettings): GraphicsChoiceStore & { value?: GraphicsSettings; writes: number } {
+function memoryStore(initial?: GraphicsSettings): GraphicsChoiceStore & { value?: GraphicsSettings | undefined; writes: number } {
   const s = { value: initial, writes: 0, read: () => s.value && structuredClone(s.value), write(next: GraphicsSettings) { s.writes++; s.value = structuredClone(next); } };
   return s;
 }

@@ -122,11 +122,11 @@ const bounded = <T>(work: Promise<T>, signal: AbortSignal): Promise<T> => new Pr
 
 interface Entry {
   url: string;
-  bytes?: ArrayBuffer;
-  fetching?: Promise<ArrayBuffer>;
-  buffer?: AudioBuffer;
+  bytes?: ArrayBuffer | undefined;
+  fetching?: Promise<ArrayBuffer> | undefined;
+  buffer?: AudioBuffer | undefined;
   decodedBytes: number;
-  decoding?: Promise<AudioBuffer>;
+  decoding?: Promise<AudioBuffer> | undefined;
 }
 
 /** A first-in, first-out admission gate for `limit` concurrent jobs; `close()` rejects every waiter. */

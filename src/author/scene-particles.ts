@@ -76,7 +76,7 @@ interface View {
   /** The material's own uniforms object (ShaderMaterial keeps the one it was given). */
   uniforms: ParticleUniforms;
   life: AbortController;
-  lease?: AssetLease<T.Texture>;
+  lease?: AssetLease<T.Texture> | undefined;
 }
 
 export function createSceneParticles(o: SceneParticleOptions): ParticleDrawing {

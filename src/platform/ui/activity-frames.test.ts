@@ -16,7 +16,7 @@ test('an activity closed from inside its frame never schedules another frame',()
  loop.start();callback(0);assert.equal(requests,1);
 });
 test('every app activity runs through the one frame loop: one frame request serves them all',()=>{
- const g=globalThis as unknown as {requestAnimationFrame?:(cb:FrameRequestCallback)=>number;cancelAnimationFrame?:(id:number)=>void};
+ const g=globalThis as unknown as {requestAnimationFrame?:((cb:FrameRequestCallback)=>number)|undefined;cancelAnimationFrame?:((id:number)=>void)|undefined};
  const saved={request:g.requestAnimationFrame,cancel:g.cancelAnimationFrame};
  const pending=new Map<number,FrameRequestCallback>();let serial=0;
  g.requestAnimationFrame=cb=>{pending.set(++serial,cb);return serial;};g.cancelAnimationFrame=id=>{pending.delete(id);};
@@ -31,7 +31,7 @@ test('every app activity runs through the one frame loop: one frame request serv
  }finally{g.requestAnimationFrame=saved.request;g.cancelAnimationFrame=saved.cancel;}
 });
 test('a converted hand loop and a one-shot run on the one frame loop with the frame timestamp',async()=>{
- const g=globalThis as unknown as {requestAnimationFrame?:(cb:FrameRequestCallback)=>number;cancelAnimationFrame?:(id:number)=>void};
+ const g=globalThis as unknown as {requestAnimationFrame?:((cb:FrameRequestCallback)=>number)|undefined;cancelAnimationFrame?:((id:number)=>void)|undefined};
  const saved={request:g.requestAnimationFrame,cancel:g.cancelAnimationFrame};
  const pending=new Map<number,FrameRequestCallback>();let serial=0;
  g.requestAnimationFrame=cb=>{pending.set(++serial,cb);return serial;};g.cancelAnimationFrame=id=>{pending.delete(id);};

@@ -124,18 +124,20 @@ export function createInput(win: InputWindow, layers: ActionLayers, signal?: Abo
   let stamp: number | undefined;
   const actions = new InputActions({ registry, layers, now: () => stamp ?? now(), overrides: APP_INPUT_OVERRIDES }, signal);
   const dispatchKey = (e: Event, dispatch: () => void) => { const previous = stamp; stamp = e.timeStamp; try { dispatch(); } finally { stamp = previous; } };
-  win.addEventListener('keydown', e => dispatchKey(e, () => { actions.keyDown(e as KeyboardEvent); }), { capture: true, signal });
-  win.addEventListener('keyup', e => dispatchKey(e, () => { actions.keyUp(e as KeyboardEvent); }), { capture: true, signal });
+  // Listener options omit an absent signal: the DOM treats a missing and an undefined `signal` member alike.
+  const listen = signal === undefined ? {} : { signal };
+  win.addEventListener('keydown', e => dispatchKey(e, () => { actions.keyDown(e as KeyboardEvent); }), { capture: true, ...listen });
+  win.addEventListener('keyup', e => dispatchKey(e, () => { actions.keyUp(e as KeyboardEvent); }), { capture: true, ...listen });
   const cancel = () => actions.cancel('blur');
-  win.addEventListener('blur', cancel, { signal });
-  win.addEventListener('pagehide', cancel, { signal });
+  win.addEventListener('blur', cancel, { ...listen });
+  win.addEventListener('pagehide', cancel, { ...listen });
   return actions;
 }
 
 /** Share the document's existing dispatcher owner; visibility must not depend on optional adapters. */
 function createDocumentInput(doc: Document, registry?: Registry<InputActionDef>, signal?: AbortSignal): InputActions {
   const actions = createInput(doc.defaultView ?? doc, appLayers(doc), signal, registry);
-  doc.addEventListener('visibilitychange', () => { if (doc.hidden) actions.cancel('blur'); }, { signal });
+  doc.addEventListener('visibilitychange', () => { if (doc.hidden) actions.cancel('blur'); }, signal === undefined ? {} : { signal });
   return actions;
 }
 

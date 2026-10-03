@@ -94,7 +94,7 @@ export interface TextureLibraryOptions {
    * decoded with `IMAGE_BITMAP_OPTIONS` (`decode-image.ts`): the texture then turns `flipY` off. `hint` is the variant's
    * declared size, for the decoder's memory admission.
    */
-  loadImage?(url: string, signal: AbortSignal, hint: { width?: number; height?: number }): Promise<TextureImage>;
+  loadImage?(url: string, signal: AbortSignal, hint: { width?: number | undefined; height?: number | undefined }): Promise<TextureImage>;
   /** Prefix for variant paths (relative to `public/`). Default `/`. */
   base?: string;
   /** Bytes of released textures kept for a quick return. Default 0: released textures are disposed at once. */
@@ -102,7 +102,7 @@ export interface TextureLibraryOptions {
   /** Default `reference`. */
   tier?: QualityTier;
   /** Optional residency policy (RES-01). Its `warmBytes` replaces `warmBytes`. */
-  residency?: AssetResidencyPolicy;
+  residency?: AssetResidencyPolicy | undefined;
 }
 
 export type TextureWrap = 'clamp' | 'repeat' | 'mirror';

@@ -26,7 +26,7 @@ export interface SessionRecordingDeps {
   /** The current quality preset, if the quality module is installed. */
   preset(): string | null;
   /** Subscribe to quality changes; returns an unsubscribe. */
-  onQuality?(fn: () => void, signal: AbortSignal): void;
+  onQuality?: ((fn: () => void, signal: AbortSignal) => void) | undefined;
   doc?: Document;
 }
 

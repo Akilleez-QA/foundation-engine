@@ -21,7 +21,7 @@ export function recordingSink():RecordingSink{
  return sink;
 }
 export const env=()=>({win:Object.assign(new EventTarget(),{innerHeight:1000}),doc:Object.assign(new EventTarget(),{hidden:false,body:{dataset:{} as DOMStringMap},activeElement:null})});
-export type FakePad={index:number;id:string;mapping:string;connected:boolean;axes:number[];buttons:{pressed:boolean;value:number}[];vibrationActuator?:PadLike['vibrationActuator']};
+export type FakePad={index:number;id:string;mapping:string;connected:boolean;axes:number[];buttons:{pressed:boolean;value:number}[];vibrationActuator?:Exclude<PadLike['vibrationActuator'],undefined>};
 export function fakePad(index=0,id='Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)',mapping='standard'):FakePad&{press(i:number,value?:number):void;release(i:number):void;stick(i:number,x:number,y:number):void}{
  const pad={index,id,mapping,connected:true,axes:[0,0,0,0],buttons:Array.from({length:17},()=>({pressed:false,value:0})),
   press(i:number,value=1){pad.buttons[i]={pressed:value>.5,value};},release(i:number){pad.buttons[i]={pressed:false,value:0};},stick(i:number,x:number,y:number){pad.axes[i*2]=x;pad.axes[i*2+1]=y;}};

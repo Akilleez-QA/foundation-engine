@@ -306,7 +306,7 @@ test('reach rejects unreachable actions, broken or cyclic paths, chord-only rout
   const pointerOnly: InputActionDef = { id: 'pack.draw', label: 'd', scope: 'global', kind: 'press', defaults: {}, reachability: 'pointer-only-by-design', reason: 'free drawing' };
   const report = checkReach(inputActionRegistry([...CORE_ROWS, pointerOnly]));
   assert.deepEqual(report.problems, []); assert.deepEqual(report.exceptions, [{ id: 'pack.draw', reason: 'free drawing' }]);
-  assert.ok(problems([...CORE_ROWS, { ...pointerOnly, reason: undefined }]).includes('pack.draw: a pointer-only exception needs a reason'));
+  assert.ok(problems([...CORE_ROWS, { ...pointerOnly, reason: undefined as never }]).includes('pack.draw: a pointer-only exception needs a reason'));
   assert.ok(problems([...CORE_ROWS, must(CORE_ROWS[0])]).includes('core.back: registered twice'));
   assert.deepEqual(bindingConflicts(CORE_ROWS), [], 'the core defaults do not overlap');
 });
