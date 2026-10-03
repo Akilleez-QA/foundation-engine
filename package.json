@@ -14,7 +14,7 @@
     "preview": "vite preview",
     "generate": "node scripts/generate.mjs",
     "typecheck": "node scripts/generate.mjs && tsc --noEmit",
-    "test": "node scripts/generate.mjs && tsx --test \"src/**/*.test.ts\" \"game/**/*.test.ts\" \"templates/*/game/**/*.test.ts\" \"scripts/**/*.test.mjs\" \"scripts/**/*.test.ts\" \"tools/**/*.test.mjs\"",
+    "test": "node scripts/generate.mjs && tsx --test \"src/**/*.test.ts\" \"game/**/*.test.ts\" \"game/**/*.test.mjs\" \"templates/*/game/**/*.test.ts\" \"templates/*/game/**/*.test.mjs\" \"scripts/**/*.test.mjs\" \"scripts/**/*.test.ts\" \"tools/**/*.test.mjs\"",
     "lint": "npm run --silent lint:layers && npm run --silent lint:arch && npm run --silent lint:css && npm run --silent lint:generic && npm run --silent lint:brief && npm run --silent lint:budgets",
     "lint:layers": "node scripts/lint/layers.mjs",
     "lint:arch": "node scripts/lint/architecture.mjs",
@@ -77,6 +77,7 @@
     "test:dmath-browser": "node --import tsx -r ./scripts/silent-browser.cjs scripts/play/dmath-check.mjs playtest/dmath",
     "bench:dmath": "node --import tsx tools/dmath-bench/bench.mjs",
     "dmath:golden": "node --import tsx scripts/dmath-golden.mjs",
+    "test:particle-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/particle-check.mjs playtest/particles",
     "test:sound-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/sound-check.mjs playtest/sound"
   },
   "dependencies": {

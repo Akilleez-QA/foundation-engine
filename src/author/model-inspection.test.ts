@@ -80,7 +80,7 @@ test('visit epochs, supersession and request-accessor retirement cannot expose a
   f.library.dispose();
 });
 test('original beacon uses default GLB parser; inspection borrows real adopted variant, clip and skeleton', async () => {
-  const bytes=readFileSync(new URL('../../public/models/mechanics/beacon.glb',import.meta.url));
+  const bytes=readFileSync(new URL('../../templates/mechanics/game/public/models/mechanics/beacon.glb',import.meta.url));
   const world=new World(),scene=new T.Scene(),life=new AbortController();
   const library=createModelLibrary({def:()=>({id:'beacon',kind:'model',title:'Beacon',licence:'original',provenance:{},variants:[{path:'models/mechanics/beacon.glb',format:'glb'}]}),fetchBytes:async()=>bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)});
   const owner=createSceneModels({world,scene,library,signal:life.signal,inspection:true,invalidate(){},report(error){throw error;}});

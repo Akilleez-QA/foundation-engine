@@ -31,6 +31,45 @@ Every new framework below is optional: a game that does not use it is unchanged.
   development loopback/LAN WebSocket host, and the `shared-world` template plus the
   [recipe](docs/recipes/two-players-one-world.md) put two browser tabs in one world.
   LAN/loopback only: no accounts, matchmaking, NAT traversal or WAN certification.
+- **Each game ships only its own static files.** A game keeps its models, textures and
+  sounds in `game/public/` (served and built at the same paths); a build no longer
+  carries the mechanics template's files. The mechanics fixtures moved to
+  `templates/mechanics/game/public/`. `game/public/` is Vite's public folder, so the
+  dev server and the build serve the same files the same way; a game without one falls
+  back to the root `public/`, which the engine leaves empty. The dev server and the
+  build stop on files left in the root `public/` beside a `game/public/`, on a symbolic
+  link, and on the names the build writes itself (`index.html`, `LICENSE.txt`,
+  `COPYRIGHT.txt`, `THIRD_PARTY_NOTICES.txt`) (W1-5).
+  **Migration:** the root `public/models/mechanics/`, `public/textures/mechanics/` and
+  `public/sounds/mechanics/` files are gone. A game made from the mechanics template,
+  or one that followed the old load-a-model recipe and points at those files, should
+  copy `templates/mechanics/game/public/` into its own `game/public/`
+  (`cp -r templates/mechanics/game/public game/`) and keep its asset URLs as they are.
+- **A home for a game's asset-making scripts.** Build-time Node scripts go in
+  `game/tools/`: `lint:layers` lets them import `node:` modules, game code may not
+  import them (`game-imports-no-tools`), and neither the build nor the game's
+  definitions include them. The mechanics generators moved to
+  `templates/mechanics/game/tools/`. New recipe: [where your game's files
+  go](docs/recipes/your-game-files.md) (W1-6).
+- **The bench no longer measures a scene that has ended.** An active window whose held
+  keys drive the scene but that renders no frame is classified `inconclusive`: the gate
+  fails it as "perf inconclusive" even when its zeros would pass, and `perf:derive`
+  derives no budget for that scene. The keys drive the scene when its `budgets.json` row
+  names them (new `activeKeys`) or when they press one of the game's own inputs; an
+  active window whose keys press nothing in the game is a still window, like an idle one
+  (classification version 3) (W1-4).
+- **Particle emitters (FX-01), optional.** `Emitter`/`defineEmitter`/`burst` in the author
+  API, drawn in scenes that opt in with `defineScene({ particles: sceneParticles() })`: burst and continuous emitters with lifetime, speed, direction/spread, gravity, drag
+  and size/colour/opacity curves, an optional texture asset and additive or normal
+  blending. Each emitter is one instanced draw (two triangles per live particle) and
+  nothing while idle; simulation is on the fixed step with its own seeded random stream
+  (never `ctx.random`, so effects cannot shift a game's random sequence or replays).
+  Over-limit one-shot effects are dropped and counted, never fired late. Bounded per emitter (`max`) and per scene (`sceneParticles({ max, emitters })`,
+  default 16 emitters and 4,096 particles), with counted drops and reported refusals; a new
+  `effects.particles` quality knob thins non-essential emitters on medium and low (not yet
+  shown on the Graphics screen). `testScene` steps emitters and exposes their counters.
+  [Recipe](docs/recipes/hit-sparks-and-pickups.md), [guide](docs/guides/particles.md),
+  `npm run test:particle-browser`. Desktop software-GL evidence only (#63).
 
 ## 0.2.0 — 2026-10-03
 

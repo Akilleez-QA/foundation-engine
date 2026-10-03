@@ -185,9 +185,11 @@ Without `audio`, the HRTF limit is 8 and smoothing is 0. Because voices default 
 - **iOS silent switch.** iOS routes Web Audio to the ambient session, which the silent
   switch mutes on the speaker. This change does not alter that; opting into a playback
   session is a separate creator decision.
-- **Not included:** occlusion raycasts, sound propagation, reverb, Doppler, cones,
-  priority or virtual voices, networked sound, sampled-sound decoding. The audio mixer
-  kit's `CueRequest` still cannot carry `spatial`.
+- **Not included in the platform:** occlusion queries, sound propagation, reverb, Doppler,
+  cones, priority or virtual voices, networked sound. The optional
+  [spatial-audio kit](../../src/kits/spatial-audio/README.md) adds virtual sources,
+  importance ranking, class cutoffs and budgeted occlusion on top of these voices. The
+  audio mixer kit's `CueRequest` still cannot carry `spatial`.
 - Firefox listener updates are not ramped. Safari HRTF quality and behaviour while
   parameters change are unverified.
 - The cutoff uses straight-line distance from the listener; it does not know about

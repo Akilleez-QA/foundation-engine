@@ -9,10 +9,10 @@ import {launch} from '../perf/bench-browser.mjs';
 import {diagnosticReport} from './diagnostic-report.mjs';
 const out=resolve(process.argv[2]??'/tmp/foundation-model-inspect-browser');mkdirSync(out,{recursive:true});
 const html=`<!doctype html><html><head><meta charset="utf-8"><link rel="icon" href="data:,"><title>Model inspection</title><style>body{margin:0}.workspace{display:grid;grid-template-columns:2fr 1fr;height:85vh}#app{position:relative;min-width:0}aside{padding:12px;overflow:auto;background:#eee;color:#111}button{padding:10px;margin:3px}pre{white-space:pre-wrap;font-size:12px}</style></head><body><header class="shell-header"><div class="header-left">Original beacon · cached model diagnostics</div><div class="header-right"></div></header><main class="workspace"><div id="app" class="app-root"></div><aside>${['inspect','play','pause','restart','replace','pose','clear-pose'].map(id=>`<button id="${id}">${id}</button>`).join('')}<pre id="inspection"></pre></aside></main><script type="module" src="/scripts/play/fixtures/model-inspect-entry.mjs"></script></body></html>`;
-const server=await createServer({root:ROOT,logLevel:'error',plugins:[{name:'model-inspect-fixture',configureServer(s){s.middlewares.use((req,res,next)=>{
+const server=await createServer({root:ROOT,logLevel:'error',publicDir:resolve(ROOT,'templates/mechanics/game/public'),plugins:[{name:'model-inspect-fixture',configureServer(s){s.middlewares.use((req,res,next)=>{
   if(req.url?.startsWith('/__model-inspect-check.html')){res.setHeader('Content-Type','text/html');res.end(html);return;}
   // Second registered variant path, identical original bytes; the real loader still parses both.
-  if(req.url==='/__model-inspect/beacon.glb'){res.setHeader('Content-Type','model/gltf-binary');res.end(readFileSync(resolve(ROOT,'public/models/mechanics/beacon.glb')));return;}
+  if(req.url==='/__model-inspect/beacon.glb'){res.setHeader('Content-Type','model/gltf-binary');res.end(readFileSync(resolve(ROOT,'templates/mechanics/game/public/models/mechanics/beacon.glb')));return;}
   next();
 });}}],server:{host:'127.0.0.1',port:0}});
 const report={revision:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),passed:false,errors:[],screenshots:[],limitations:['Desktop Chromium emulation only; no physical device or performance acceptance.','Both paths serve the same original GLB; no visual difference between asset variants is asserted.','Bounds intentionally exclude skinned geometry; they are not animated silhouette bounds.']};

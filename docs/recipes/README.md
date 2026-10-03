@@ -6,11 +6,13 @@ Short, checked how-tos. Start with [getting started](../guides/getting-started.m
 
 | I want to… | Recipe |
 |---|---|
+| know where my models, textures, sounds and asset-making scripts go | [where your game's files go](your-game-files.md) |
 | show a `.glb` model and play its animation | [load a model](load-a-model.md) |
 | show a score, messages, a tap action and a button | [HUD text and buttons](hud-and-buttons.md) |
 | collect things by touching them, block movement, click or tap the ground | [collision and picking](collision-and-picking.md) |
 | follow the player with the camera, change light, sky colour and haze | [camera and lighting](camera-and-lighting.md) |
 | texture a shape, make it shiny, glowing or see-through | [give a shape a material](give-a-shape-a-material.md) |
+| show hit sparks, pickup glitter and bursts, trails or smoke | [hit sparks and pickups](hit-sparks-and-pickups.md) |
 | play my own sound effects, with volume, pitch and position | [play your own sound files](play-your-own-sounds.md) |
 | put my game on the web | [share your build](share-your-build.md) |
 | host it in a folder (GitHub Pages project site, itch.io) | [host a build under a sub-path](host-under-a-sub-path.md) |

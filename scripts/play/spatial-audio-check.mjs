@@ -40,6 +40,7 @@ try {
   await page.waitForFunction(() => window.spatialAudioReady === true);
   const r = await page.evaluate(() => window.spatialAudio.run());
   report.results = r;
+  const db = (a, b) => 20 * Math.log10((a + 1e-12) / (b + 1e-12));
   const close = (a, b, tolerance, what) => assert.ok(Math.abs(a - b) <= tolerance, `${what}: ${a} vs ${b} (±${tolerance})`);
 
   // Panning model selection and the HRTF limit, on the nodes and in the signal.
@@ -80,6 +81,17 @@ try {
     assert.ok(run.startRightOverLeftDb > 6 && run.settledRightOverLeftDb < -6, 'right before, left after');
     close(run.finalX, -5, .01, 'final position');
   }
+  // spatial-audio kit over the real output: occlusion ramps the filter, a stolen voice fades.
+  const occ = r.kitOcclusion;
+  assert.equal(occ.blocked.occluded, true); assert.equal(occ.clear.occluded, false);
+  assert.ok(db(occ.clear.after, occ.blocked.after) > 15, `occluded 3 kHz is >15 dB quieter (${db(occ.clear.after, occ.blocked.after)} dB)`);
+  close(occ.clear.after, occ.clear.before, .02 * occ.clear.before, 'a clear path is unchanged');
+  assert.ok(occ.blocked.worstBlockStepDb < 4, `occlusion ramps without a step (worst ${occ.blocked.worstBlockStepDb} dB per block)`);
+  const steal = r.kitSteal;
+  assert.equal(steal.stolen, 1); assert.equal(steal.voices, 1, 'the stolen voice was stopped after its fade; the new one plays');
+  assert.ok(db(steal.before, steal.faded) > 30, `the stolen voice faded (${db(steal.before, steal.faded)} dB)`);
+  assert.ok(steal.worstFadeStepDb < 6, `faded, not cut (worst ${steal.worstFadeStepDb} dB per block)`);
+  assert.ok(steal.after > steal.before, 'the stronger emission plays after the steal');
   assert.deepEqual(report.errors, []);
   report.passed = true;
 } catch (error) { evidence.fail(error); }

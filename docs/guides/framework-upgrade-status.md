@@ -636,6 +636,26 @@ texture change keeps the old view until the new one arrives. Overload: none beyo
 physics, a game-facing multiplayer session, normal/roughness maps and `Mesh` texture
 coordinates.
 
+## Particle emitters — FX-01, implemented, candidate (PR #63)
+
+Optional author component `Emitter` with `defineEmitter`, `validateEmitter` and `burst`, and
+a per-scene opt-in `defineScene({ particles: sceneParticles({ max, emitters }) })`. Owner: the
+scene visit; a pure field (`author/particle-sim.ts`) steps in the engine fixed system
+`engine.particles` after the scene's fixed systems, and `author/scene-particles.ts` (a lazy
+chunk) draws one instanced quad mesh per admitted emitter from pools allocated once. Bounds: `max` ≤ 4,096 per emitter, default 16
+emitters and 4,096 reserved particles per scene (caps 256 and 65,536), 4 bursts per emitter
+per step. Overload: full-pool and per-step excess dropped and counted; over-limit emitters
+refused and counted by cause (first refusal of each cause per visit reported): refused bursts are dropped, refused one-shots
+removed, refused continuous emitters admitted when capacity frees. Particles use their own seeded stream, never
+`ctx.random`. Cancellation: visit exit disposes
+meshes, geometries and materials and releases texture leases; late textures are released.
+Quality: knob `effects.particles` (reference/high 1, medium 0.75, low 0.5) thins
+non-essential emitters to a deterministic subset without changing the random stream.
+Evidence: unit tests, the recipe's code as a test, and `npm run test:particle-browser`
+(desktop headless Chromium, software GL). Status: implemented, candidate; not integrated. No
+physical-device, GPU timing, fill-rate or visual-quality acceptance. See the
+[guide](particles.md).
+
 ## Game sound files — DX P1-10, integrated in v0.2.0
 
 `ctx.play(id, options?)` accepts a game sound id as well as a cue id (`PlayOptions`:
@@ -737,3 +757,19 @@ existing owner changed behaviour. Status: implemented, candidate (PR #61); not
 integrated. Evidence is unit, loopback socket and one desktop headless Chromium
 two-context check; see the [guide](multiplayer-session.md) and the
 [ledger](upgrade-acceptance-ledger.md#newcomer-shared-session-mp-01--implemented-candidate).
+
+## Bench dead-window guard (W1-4) — perf gate behaviour change, checked on PR #59, not integrated
+
+An active window that draws no frame fails the gate as "perf inconclusive" only when its
+held keys drive the scene (`activeKeys` in the scene's `budgets.json` row, or a game or kit
+input action bound to them). Keys that press nothing in the game make it a still window,
+comparable like an idle one; the expedition template's active windows are of this kind.
+A rejected window, an epoch break or an incomplete window stays invalid whatever the keys.
+Evidence: unit tests (`window-class`, `input-registry`, `bench-keys`) and a local expedition
+gate run; GitHub CI on PR #59 is the integration gate. Not integrated.
+
+## Spatial audio sources and occlusion (AUD-02) — candidate, not integrated
+
+| ID | Contract | State |
+|---|---|---|
+| AUD-02 | Optional `@kits/spatial-audio` over the integrated AUD-01 voices: bounded logical sources tracked without voices (virtual) until they rank, importance ranking (class × creator `importance()`) with fade-out stealing under hysteresis, fair rotation of equal scores (starvation credit across dropped emissions) and lateness drops, a voice cap that counts fading voices, HRTF claims for `localise` classes within a kit limit (with hysteresis), per-class distance curves with a hard cutoff and air low-pass, and occlusion through a creator `(from, to) => distance \| null` query (the camera kit's `obstruction` shape) under `raysPerPump`, stalest first, with aged results, driving the output's smoothed filter. [Kit README](../../src/kits/spatial-audio/README.md) | Implemented, candidate (public PR #55). Node unit tests and `npm run test:audio-browser` (kit over the real output in `OfflineAudioContext`, muted browser: occlusion ~24 dB at 3 kHz without steps, steal fades without a cut) pass on the branch. Re-verification fixes (fair rotation, cap including fades, `stats.rotated`, rays for new emissions at a budget of 1, honest `stale`/`unqueried`, HRTF hysteresis) have Node regressions that fail on the previous head `a95497e`. Round-3 fixes (a cut voice's replacement always starts, rotation opt-in and off by default, least-recently-served fairness, priority for free slots, HRTF cap counting fading voices, no voice leak on re-entrant cancel; seeded fuzz of the caps and leaks) have Node regressions that fail on `9eb9612`. Round-4 fixes (nothing plays late by default, opt-in `carryLate` bounded to one interval, honest `dropped`/`late`/`skipped` stats, HRTF cap never delays a repeat, reservation timeout after admission, rotation inside the 1% band) have Node regressions that fail on `158ff29`. Round-5 fixes (late `carryLate` emissions may rotate in again within their one-interval bound, a 64-setup fairness table test, lateness epsilon, docs on late starts after hitches) have Node regressions that fail on `be71bc7`. Not integrated; no template consumer. No listening trials, real level geometry or query cost, propagation, device cost or networking claim. |

@@ -14,6 +14,7 @@
  *   defineKit          (for kits) a kit's modules and definitions
  *   Transform, Shape, Name   the built-in components the renderer and tools read
  *   Material, defineMaterial a shape's texture, repeat/wrap, roughness, metalness, emission and transparency
+ *   Emitter, defineEmitter, burst, sceneParticles   optional particles: one instanced draw per emitter, fixed-step, seeded
  *
  * Budgets are data in game/budgets.json (the ratchet compares them across revisions without running code).
  */
@@ -35,6 +36,9 @@ export { distanceGain, audibleGain } from '../platform/audio/audio-output';
 export type { SpatialAudioOptions } from '../platform/audio/module';
 export { Material, defineMaterial, validateMaterial, MATERIAL_DEFAULTS, MATERIAL_LIMITS, type MaterialData, type MaterialWrap } from './material';
 export { musicBudgets, MUSIC_START_MARGIN, type MusicOptions, type MusicVoice, type MusicState, type MusicStats } from '../platform/audio/music-clock';
+export { Emitter, defineEmitter, validateEmitter, burst, EMITTER_DEFAULTS, PARTICLE_LIMITS, type EmitterData, type EmitterMode, type EmitterBlending } from './particles';
+export { sceneParticles } from './particle-sim';
+export type { ParticleStats, SceneParticles, SceneParticleLimits } from './particle-contract';
 export { createAudioTimeline, estimateOffset, validateCalibration, MAX_CALIBRATION_MS, NO_CALIBRATION, type AudioTimeline, type AudioTimelineOptions, type AudioTimelineStats, type AudioClockReading, type AudioCalibration, type TimelineEvent, type TimelineSource, type OffsetEstimate } from '../platform/audio/audio-timeline';
 
 export { dmath, platformMath, scalarMath, type ScalarMath, type ScalarMathMode } from '../core/dmath';

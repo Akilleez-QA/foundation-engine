@@ -14,7 +14,7 @@
  * chords here; the generator treats them as the same letter when it chooses a free key.
  */
 import { adminOf } from '../core/registry';
-import { bindingConflicts, CORE_INPUT_ACTIONS, defineInputActions, type InputActionDef, type KeyChord, type PadInput } from '../platform/input/actions';
+import { bindingConflicts, codeChordOf, comboOf, CORE_INPUT_ACTIONS, defineInputActions, type InputActionDef, type KeyChord, type PadInput } from '../platform/input/actions';
 import { actionRows, allDefinitions, GAME_MODULE_ID } from './compile';
 import type { AuthorDef, GameDefinition, InputDefinition } from './defs';
 
@@ -28,6 +28,26 @@ export function gameInputRows(game: GameDefinition, defs: readonly (AuthorDef | 
     ...CORE_INPUT_ACTIONS.map(row => ({ row, source: INPUT_MODULE_ID })),
     ...inputs.flatMap(i => actionRows(i).map(row => ({ row, source: GAME_MODULE_ID }))),
   ];
+}
+
+/** The `key` and `code` a browser-automation key name sends: 'ArrowUp' → ArrowUp/ArrowUp, 'KeyW' → w/KeyW, 'Digit1' → 1/Digit1, 'Space' → ' '/Space. */
+export function keyEventOf(name: string): { key: string; code: string } {
+  const letter = /^Key([A-Z])$/.exec(name), digit = /^Digit(\d)$/.exec(name);
+  if (letter) return { key: letter[1].toLowerCase(), code: name };
+  if (digit) return { key: digit[1], code: name };
+  if (name === 'Space' || name === ' ') return { key: ' ', code: 'Space' };
+  if (name.length === 1) return { key: name, code: /[a-z]/i.test(name) ? 'Key' + name.toUpperCase() : /\d/.test(name) ? 'Digit' + name : name };
+  return { key: name, code: name };
+}
+
+/**
+ * The game's own actions (its and its kits' input rows, never the engine's Back, pause or mute) that holding the key
+ * `name` presses, by default binding. The bench uses it to tell a still active window (the held keys press nothing the
+ * game reads) from a dead one (they do, yet nothing was drawn). Rebinding overrides are a player's, not the bench's.
+ */
+export function gameActionsPressedBy(rows: readonly { row: InputActionDef; source: string }[], name: string): string[] {
+  const e = keyEventOf(name), chords = new Set([comboOf(e), codeChordOf(e)].filter((c): c is KeyChord => c !== null));
+  return rows.filter(r => r.source === GAME_MODULE_ID && (r.row.defaults.keys ?? []).some(k => chords.has(k))).map(r => r.row.id);
 }
 
 /** Problems the boot's `inputActions` validation would report, as '<registry>[<row>] (from <module>): <problem>'. */

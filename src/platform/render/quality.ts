@@ -70,6 +70,11 @@ export const coreKnobs: readonly AnyKnobDef[] = [
     presets: { reference: 256, high: 96, medium: 32, low: 16 }, applies: 'live', owner: 'platform.render' },
   { id: 'post.mode', group: 'post', label: 'graphics.post.mode', control: { kind: 'choice', options: ['off', 'basic', 'full'] },
     presets: { reference: 'full', high: 'full', medium: 'basic', low: 'off' }, applies: 'live', owner: 'platform.render.post' },
+  // Particle density (FX-01): a lighter preset draws a deterministic subset of each non-essential emitter's particles
+  // and allocates a pool that much smaller. Essential emitters are never thinned (their content floor); unwired until
+  // a template reads it, like anisotropy (read by the scene runtime when a visit starts).
+  { id: 'effects.particles', group: 'effects', label: 'graphics.effects.particles', control: { kind: 'choice', options: [0.25, 0.5, 0.75, 1] },
+    presets: { reference: 1, high: 1, medium: 0.75, low: 0.5 }, applies: 'reenter-scene', owner: 'platform.render' },
   { id: 'frame-rate.cap', group: 'frame-rate', label: 'graphics.frame-rate.cap',
     control: { kind: 'choice', options: [0, 30, 60, 120], optionLabels: ['graphics.frame-rate.display', '30', '60', '120'] },
     presets: { reference: 0, high: 0, medium: 60, low: 30 }, applies: 'live', owner: 'core.activity' },

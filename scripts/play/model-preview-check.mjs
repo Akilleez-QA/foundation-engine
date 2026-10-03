@@ -8,7 +8,7 @@ import {ROOT} from './lib.mjs';
 import {launch} from '../perf/bench-browser.mjs';
 import {diagnosticReport} from './diagnostic-report.mjs';
 const out=resolve(process.argv[2]??'playtest/model-preview');mkdirSync(out,{recursive:true});
-const original=readFileSync(resolve(ROOT,'public/models/mechanics/beacon.glb'));
+const original=readFileSync(resolve(ROOT,'templates/mechanics/game/public/models/mechanics/beacon.glb'));
 // Derive visibly distinct original variants without changing shared asset files.
 function variant(missing=false){
   const length=original.readUInt32LE(12),json=JSON.parse(original.subarray(20,20+length).toString());

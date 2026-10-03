@@ -3,10 +3,17 @@
 // diagnostic. Nothing here drops a slow frame: recurring uploads and program work stay in the cost of play.
 
 /** Bumped whenever the rules below change; part of the ADR 0046 cache key. */
-export const CLASSIFICATION_VERSION = 1;
+export const CLASSIFICATION_VERSION = 3;
 
 export type UploadPurpose = 'initial' | 'recurring' | 'firstUse' | 'unknown';
-export type WindowKind = 'entry' | 'steady' | 'firstUse' | 'unclassified' | 'invalid';
+/**
+ * 'inconclusive': the window ran and was guarded, but what it observed cannot stand for the scene: an active window
+ * whose held keys drive the scene (they press a game action, or the scene row names them as its `activeKeys`) yet
+ * rendered no frame. The scene most likely ended (the player lost, the run froze, a pause), so its per-frame counts
+ * are 0 by observation, not a measurement of play. Never comparable; never a budget source. An active window whose
+ * held keys press nothing in the game is a still window, like an idle one (render on demand draws nothing).
+ */
+export type WindowKind = 'entry' | 'steady' | 'firstUse' | 'unclassified' | 'invalid' | 'inconclusive';
 
 /** One texture's uploads in a window, as the probe records them. */
 export interface UploadFact {
@@ -36,6 +43,12 @@ export interface WindowFacts {
   requestsDuring: number;
   uploads: readonly UploadFact[];
   programsCreated: number;
+  /**
+   * Active windows only: whether the held keys drive the scene. true when they press one of the game's own input
+   * actions (game or kit rows) or the scene row declares them as its `activeKeys`; false when they press none, so
+   * holding them cannot change the picture; undefined when unknown (treated as true: a dead window is never excused).
+   */
+  heldKeysDrive?: boolean;
 }
 
 export interface ClassifiedUpload extends UploadFact { purpose: UploadPurpose }
@@ -44,7 +57,7 @@ export interface WindowClassification {
   kind: WindowKind;
   version: number;
   reasons: string[];
-  /** False for 'unclassified' and 'invalid': such a window never compares against a baseline as steady play. */
+  /** False for 'unclassified', 'inconclusive' and 'invalid': such a window never compares against a baseline as steady play. */
   comparable: boolean;
 }
 
@@ -60,6 +73,11 @@ export function uploadPurpose(u: UploadFact, f: Pick<WindowFacts, 'mode' | 'pend
   if (f.pendingAtStart > 0 || f.requestsDuring > 0) return 'initial';
   return f.mode === 'active' ? 'firstUse' : 'unknown';
 }
+
+/** The reason an active window that drew nothing is 'inconclusive' (shared by the bench, the gate and perf:derive). */
+export const NO_FRAME_ACTIVE = 'active window rendered no frame while input was held: the scene probably ended (game over, frozen run or pause), so its counts are 0 by observation, not measured';
+/** The reason an active window that drew nothing is still valid: its held keys press nothing the game binds. */
+export const NO_FRAME_UNDRIVEN = 'active window rendered no frame, but the held keys press no game action: a still window (render on demand), counts are 0 by observation';
 
 export function classifyWindow(f: WindowFacts): { classification: WindowClassification; uploads: ClassifiedUpload[] } {
   const uploads = f.uploads.map(u => ({ ...u, purpose: uploadPurpose(u, f) }));
@@ -86,6 +104,12 @@ export function classifyWindow(f: WindowFacts): { classification: WindowClassifi
     if (count('recurring')) reasons.push(`${count('recurring')} recurring upload(s) kept in the cost`);
     kind = 'steady';
   }
-  if (f.renderedFrames === 0 && kind !== 'invalid') reasons.push('no rendered frame: counts are 0 by observation');
-  return { classification: { kind, version: CLASSIFICATION_VERSION, reasons, comparable: kind !== 'invalid' && kind !== 'unclassified' }, uploads };
+  // A still idle window that renders nothing is the on-demand renderer doing its job. An active window whose held keys
+  // drive the scene should draw; one that drew nothing has stopped (game over, frozen run, pause) and measured nothing.
+  // Keys that press no game action cannot move anything, so that window is still, exactly like an idle one.
+  if (f.renderedFrames === 0 && kind !== 'invalid' && f.mode === 'active' && f.heldKeysDrive !== false) {
+    reasons.push(NO_FRAME_ACTIVE);
+    kind = 'inconclusive';
+  } else if (f.renderedFrames === 0 && kind !== 'invalid') reasons.push(f.mode === 'active' ? NO_FRAME_UNDRIVEN : 'no rendered frame: counts are 0 by observation');
+  return { classification: { kind, version: CLASSIFICATION_VERSION, reasons, comparable: kind !== 'invalid' && kind !== 'unclassified' && kind !== 'inconclusive' }, uploads };
 }

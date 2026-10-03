@@ -4,7 +4,7 @@ A `Shape` draws a matte primitive in one colour. Add a `Material` to the same en
 wrap, roughness, metalness, emission and transparency.
 
 ```ts
-// game/crate.asset.ts: the file, under public/, with its provenance
+// game/crate.asset.ts: the file, under game/public/, with its provenance
 import { defineAsset } from '@engine';
 export default defineAsset({ id: 'crate', type: 'texture', url: '/textures/crate.png', width: 256, height: 256,
   licence: 'CC0-1.0', author: 'You', source: 'drawn for this game' });
@@ -24,7 +24,7 @@ import { defineMaterial, Shape, Transform } from '@engine';
 
 | Field | Default | Meaning |
 |---|---|---|
-| `texture` | `''` | A `defineAsset({ type: 'texture' })` id (png, jpg or webp under `public/`). Multiplied by `Shape.color`: use white to keep the texture's own colours. |
+| `texture` | `''` | A `defineAsset({ type: 'texture' })` id (png, jpg or webp under `game/public/`). Multiplied by `Shape.color`: use white to keep the texture's own colours. |
 | `repeat` | `[1, 1]` | Repeats across each face, `[u, v]`, each in (0, 1024]. |
 | `wrap` | `'repeat'` | `'repeat'`, `'clamp'` (stretch the edge) or `'mirror'`. |
 | `roughness` / `metalness` | `1` / `0` | 0…1, physically based. |

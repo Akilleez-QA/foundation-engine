@@ -30,6 +30,7 @@ export interface GraphicsKnobs {
   'textures.anisotropy': 1 | 4 | 8 | 16;
   'textures.canvas-budget-mib': 16 | 32 | 96 | 256;    // PaintedSurfaces
   'post.mode': 'off' | 'basic' | 'full';
+  'effects.particles': 0.25 | 0.5 | 0.75 | 1;           // share of non-essential particles drawn (FX-01)
   'frame-rate.cap': 0 | 30 | 60 | 120;                 // 0 = display rate
   'interface.backdrop-blur': boolean;
   'interface.live-contexts': 1 | 2 | 3 | 4;            // renderer pool ceiling

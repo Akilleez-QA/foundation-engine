@@ -69,6 +69,8 @@ Open `game/` and change one thing: a colour in a `Shape`, a speed, a word in `ga
 
 The rules that keep a game healthy are short (all in [AGENTS.md](../../AGENTS.md)): game code imports only `@engine`, `@kits/<name>`, its own files and JSON; systems read actions, never keys; words go in string keys; randomness is `ctx.random()`.
 
+Your own models, textures and sounds go in `game/public/` (`game/public/models/ship.glb` is the URL `/models/ship.glb`), and a script that makes them (an asset generator, a converter) goes in `game/tools/`, where it may use Node modules; game code never imports it. A build ships `game/public/` and nothing from other templates. See [where your game's files go](../recipes/your-game-files.md).
+
 ## 6. Check it
 
 ```

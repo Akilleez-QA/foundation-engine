@@ -84,11 +84,10 @@ Without a `game/` folder the blank template runs. `--game <dir>` selects another
 
 ## Not here yet (and workarounds)
 
-The current state as of 0.2.0 (October 2026). Textures and materials ([recipe](docs/recipes/give-a-shape-a-material.md)) and your own sound files ([recipe](docs/recipes/play-your-own-sounds.md)) are now supported; these are still missing:
+The current state as of 0.2.0 (October 2026). Textures and materials ([recipe](docs/recipes/give-a-shape-a-material.md)) and your own sound files ([recipe](docs/recipes/play-your-own-sounds.md)) are supported. After 0.2.0, optional particle emitters (hit sparks, pickups, trails, smoke: one draw per emitter; [recipe](docs/recipes/hit-sparks-and-pickups.md), [guide](docs/guides/particles.md)) are supported too, with desktop software-GL evidence only (FX-01 in the acceptance ledger). These are still missing:
 
 | Not here yet | What exists today | Workaround |
 |---|---|---|
-| Particles | Nothing dedicated | A few short-lived `Shape` entities that a system moves and despawns. Each shape is one draw, so keep the count small and watch `play:snap`'s draw count |
 | Rigid-body physics | Overlap tests in systems; the character kit's kinematic movement with `Walls` and `Solid` blocking | Write simple motion in a fixed-step system (velocity, gravity, stop at the ground); [collision and picking](docs/recipes/collision-and-picking.md) |
 | Internet multiplayer (WAN hosting, accounts, matchmaking, NAT traversal) | A LAN/loopback shared session: shared rules in `@kits/network`, a development `npm run host` and the `shared-world` template ([two players in one world](docs/recipes/two-players-one-world.md)); the network kit's admission, views, authority and prediction contracts underneath | Play on one machine or a trusted local network; a public deployment needs your own server, TLS, identity and hardening |
 

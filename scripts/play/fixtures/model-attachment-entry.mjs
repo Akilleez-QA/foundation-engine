@@ -8,7 +8,7 @@ import {createTestApi} from '../../../src/dev/test-api.ts';
 const brief=defineBuild({goal:'Keep optional rigid attachments on the current native pose with explicit failure policies.',genre:'diagnostic',pitch:'Current-pose model attachments.',coreLoop:['Animate','Inspect','Replace'],devices:{targets:['desktop'],minimum:'desktop',input:['keyboard','pointer']},success:[{id:'S1',check:'Rigid geometry follows current affine sockets and stale completions cannot revive retired attachments.',how:'playtest',by:'scripts/play/model-attachment-check.mjs'}]});
 const game=defineGame({id:'model-attachment',version:'0.1.0',title:'Model attachments',firstScene:'sample'});
 const names=['parent','missing','slow-parent','slow-exit','rigid','tail'];
-const assets=names.map(id=>defineAsset({id,type:'model',url:`/__model-attachment/${id}.glb`,licence:'CC0-1.0',author:'Foundation Engine contributors',source:'templates/mechanics/assets/generate-fixture.mjs'}));
+const assets=names.map(id=>defineAsset({id,type:'model',url:`/__model-attachment/${id}.glb`,licence:'CC0-1.0',author:'Foundation Engine contributors',source:'templates/mechanics/game/tools/generate-fixture.mjs'}));
 const c=Math.SQRT1_2,offset=[c,c,0,0,-c,c,0,0,0,0,1,0,.4,.1,0,1];
 let ctx,parent,child,tail,life,retired=true,models,prior;
 const attach=(entity,anchor,socket,offset,unavailable='hide')=>ctx.world.add(entity,ModelAttachment({parent:anchor,socket,offset,unavailable,inheritVisibility:true}));

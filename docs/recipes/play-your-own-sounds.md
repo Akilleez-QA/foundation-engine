@@ -4,7 +4,7 @@
 recordings, with a volume, a pitch and an optional position in the world.
 
 ```ts
-// game/door.asset.ts: the file, under public/, with its provenance (mp3, m4a, ogg or wav)
+// game/door.asset.ts: the file, under game/public/, with its provenance (mp3, m4a, ogg or wav)
 import { defineAsset } from '@engine';
 export default defineAsset({ id: 'door-open', type: 'audio', url: '/sounds/door-open.ogg',
   licence: 'CC0-1.0', author: 'You', source: 'recorded for this game' });

@@ -14,6 +14,8 @@ import { RenderMask, validateRenderMask } from './render-mask';
 import { bindEnvironment } from './scene-environment';
 import { Material, materialKey } from './material';
 import { createSceneSurfaces, type Surface } from './scene-materials';
+import { createParticleView } from './particle-view';
+import { EMITTER_ID, type ParticleField } from './particle-contract';
 /**
  * author/runtime.ts: a scene's lazy body, loaded the first time a scene is entered (never in the first-load bundle).
  *
@@ -25,6 +27,9 @@ import { createSceneSurfaces, type Surface } from './scene-materials';
  *    textured, physically based surface: scene-materials.ts). A frame is drawn only when something changed (a
  *    transform, a shape, a material or its arriving texture, the camera, the world's version): render on change
  *    (STD-RUN-9);
+ *  - particles: entities with `Transform` and `Emitter` are simulated by the engine's fixed system `engine.particles`
+ *    (after the scene's own fixed systems) and drawn as one instanced draw per emitter, interpolated between steps
+ *    (particle-sim.ts, scene-particles.ts). A scene without emitters creates nothing for them;
  *  - `enter` runs once the visit is active (ADR 0045); `exit` when it is left. Everything the visit creates is owned
  *    by the run and released in reverse order when it leaves.
  */
@@ -33,9 +38,9 @@ import type { Services } from '../core/services';
 import type { SceneRun, SceneVisit } from '../core/router/handover';
 import type { ActivityContext, ActivityRun } from '../core/activity/activity';
 import type { FrameInfo } from '../core/activity/loop';
-import { World, type Entity } from '../core/ecs/world';
+import { World, type ComponentType, type Entity } from '../core/ecs/world';
 import { createSystemRunner } from '../core/ecs/systems';
-import { createRng } from '../core/rng';
+import { createRng, deriveSeed } from '../core/rng';
 import { appI18n } from '../core/i18n/app-i18n';
 import { runRandom } from '../core/run-random';
 import { appRenderers } from '../platform/render/renderer-pool';
@@ -267,9 +272,29 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       const models = createSceneModels({ poseLinks: scene.modelPoseLinks === undefined ? undefined : normalizeModelPoseLinkLimits(scene.modelPoseLinks), inspection: TEST_API,world, scene: three, library: s.models, signal: actx.signal,
         mask: maskOf, invalidate: () => { dirty = true; actx.invalidate(); }, report: error => s.log.error(`${scene.id}: model failed`, error)});
       actx.own(() => models.dispose());
+      // Particles (FX-01): the field is pure and visit-owned and steps on the fixed lane; its renderer (one hidden mesh
+      // per admitted emitter) is a lazy chunk, requested by the first admitted emitter, or now when the scene's own
+      // entities have one. The density knob is 'reenter-scene': read once per visit.
+      const particleView = createParticleView({ scene: three, library: s.assets, signal: actx.signal, load: () => import('./scene-particles'),
+        changed: () => { dirty = true; actx.invalidate(); },
+        // Bound emitters draw from their next step's write; arrival itself changes no pixel.
+        ready: () => { actx.invalidate(); }, bindFailed: (slot, error) => particles?.bindFailed(slot, error),
+        report: error => s.log.error(`${scene.id}: particle drawing failed`, error) });
+      // Only a scene that opted in (`sceneParticles()`) has a field; elsewhere an emitter is reported once, never drawn.
+      // Particles draw from their own stream, never the gameplay one, so adding an effect cannot shift `ctx.random()`
+      // or an existing `?seed=` replay: derived from the seed when there is one, else the visit's named stream.
+      const particleRng = seed === null ? null : createRng(deriveSeed(seed >>> 0, 'particles'));
+      const particleSeed = () => (particleRng ?? runRandom.stream(`scene.${scene.id}.particles`)).next();
+      const particles: ParticleField | null = scene.particles ? scene.particles.createField({ scale: s.quality.knob('effects.particles'), seed: particleSeed,
+        report: error => s.log.error(`${scene.id}: particles`, error), renderer: particleView }) : null;
+      const emitterProbe = { id: EMITTER_ID } as ComponentType<object>;
+      let emittersReported = false;
+      // Preload whenever the scene opted in: a runtime-spawned first burst must not wait for (and miss) the chunk.
+      if (particles) particleView.preload();
+      actx.own(() => { try { particles?.dispose(); } finally { particleView.dispose(); } });
       const sync = (dt = 0) => {
         if (actx.signal.aborted) return;
-        actx.setFrameMode(body.systems.length || [...world.query(Model)].some(([,m])=>m.playing && !!m.clip && m.speed>0) ? 'continuous' : 'on-demand');
+        actx.setFrameMode(body.systems.length || [...world.query(Model)].some(([,m])=>m.playing && !!m.clip && m.speed>0) || !!particles?.busy(world) ? 'continuous' : 'on-demand');
         if (models.sync(dt)) dirty = true;
         const seen = new Set<Entity>();
         for (const [e, tr, sh] of world.query(Transform, Shape)) {
@@ -371,7 +396,13 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
           three.background = new T.Color(viewState.background); dirty = true;
         }
         if (cubes.sync(viewState.environment?.cube, viewState.environment?.reflection, viewState.environment?.background ?? viewState.background)) dirty = true;
-        if (world.version !== lastVersion) { lastVersion = world.version; dirty = true; }
+        if (world.version !== lastVersion) {
+          lastVersion = world.version; dirty = true;
+          if (!particles && !emittersReported && world.first(emitterProbe)) {
+            emittersReported = true;
+            s.log.error(`${scene.id}: an Emitter is not drawn: the scene has no particles (defineScene({ particles: sceneParticles() }))`);
+          }
+        }
       };
       const resize = () => {
         const w = Math.max(1, view.clientWidth), h = Math.max(1, view.clientHeight);
@@ -384,9 +415,11 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
 
       const timing = TEST_API ? createSystemTiming(body.systems, visit, actx.signal) : undefined;
       const fixedSystems = timing?.systems ?? body.systems;
-      const tapped = tap ? [{ id: 'engine-tick-tap-begin', run: () => tap.beforeTick() }, ...fixedSystems, { id: 'engine-tick-tap-end', run: () => tap.afterTick() }] : fixedSystems;
+      // The engine's particle step runs after the scene's own fixed systems, inside the replay tap's tick.
+      const stepped = particles ? [...fixedSystems, { id: 'engine.particles', run: (_: SceneContext, dt: number) => particles.step(world, dt) }] : fixedSystems;
+      const tapped = tap ? [{ id: 'engine-tick-tap-begin', run: () => tap.beforeTick() }, ...stepped, { id: 'engine-tick-tap-end', run: () => tap.afterTick() }] : stepped;
       const runner = createSystemRunner(tapped, { step: FIXED_STEP, report: (id, error) => s.log.error(`${scene.id}: system ${id} failed`, error), after: () => world.clearEvents(), beforeStep: pressed.beginStep, beforeFrameLane: pressed.beginFrameLane });
-      const live = body.systems.length > 0 || [...world.query(Model)].length > 0;
+      const live = body.systems.length > 0 || [...world.query(Model)].length > 0 || !!particles?.busy(world);
       const handle: SceneHandle = {
         state: () => {
           const named: Record<string, { x: number; y: number; z: number }> = {};
@@ -404,6 +437,7 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       if (TEST_API) handle.redraw = () => { if (actx.signal.aborted || actx.leaving()) return false; dirty = true; actx.invalidate(); return true; };
       if (TEST_API && models.inspect) handle.model = createSceneModelInspector(models.inspect, visit, actx.signal);
       if (TEST_API) handle.entities = createSceneEntityInspector(world, visit, actx.signal);
+      if (TEST_API && particles) handle.particles = () => ({ ...particles.stats, draws: particleView.stats.visible, textures: { requested: particleView.stats.requested, leases: particleView.stats.leases, applied: particleView.stats.applied, failed: particleView.stats.failed } });
       s.play.attach(handle, actx.signal);
 
       // Prepare authored resident materials before router activation/first render.
@@ -461,9 +495,14 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
           frame++; t += f.dt; calm = f.calm; frameMs = f.t * 1000;
           gestures.sync();
           // A held replay tap runs no tick: release live presses so none surfaces at replay tick 0.
-          if (!tap || tap.running()) runner.frame(ctx, f.dt); else pressed.clear();
+          let steps = 0;
+          if (!tap || tap.running()) steps = runner.frame(ctx, f.dt); else pressed.clear();
           pressed.endFrame(); gestures.pointer.pressed = false;
           sync(f.dt);
+          // Drawn at the latest fixed step, like Shape meshes (sync above), so particles never trail their emitter.
+          // Written only in a frame where a fixed step ran (60 Hz: on a 120/144 Hz display other frames redraw nothing
+          // for particles) and while particles are (or were just) live.
+          if (steps > 0 && particles?.interpolate(1)) dirty = true;
           }catch(error){if(error instanceof ProgramLinkError||error instanceof FrameReadinessError)failPrograms(error);else throw error;}
         },
         render() {

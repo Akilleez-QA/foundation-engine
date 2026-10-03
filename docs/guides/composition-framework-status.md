@@ -372,6 +372,22 @@ mechanics template demonstrates it with draws and triangles unchanged. No physic
 or visual-quality acceptance; `Mesh`/`Model` and texture maps beyond the colour map are out
 of scope.
 
+## Particle emitters (FX-01) — implemented, candidate (PR #63)
+
+`Emitter` / `defineEmitter` / `burst` (author API) give an entity with a `Transform` burst or
+continuous particles with lifetime, speed, spread, gravity, drag, size/colour/opacity curves,
+an optional texture and additive or normal blending, in scenes that opt in with
+`sceneParticles()`. Owner: the scene visit
+(`author/particle-sim.ts` on the fixed step, `author/scene-particles.ts` for drawing); one
+instanced draw per emitter with live particles, none while idle. Bounded per emitter and per
+scene with counted drops and reported refusals; the `effects.particles` knob thins
+non-essential emitters on lighter presets. See the
+[recipe](../recipes/hit-sparks-and-pickups.md) and [guide](particles.md). Status:
+implemented, candidate; not integrated. Evidence: unit tests and
+`npm run test:particle-browser` (desktop headless Chromium, software GL). No template uses it,
+so template budgets are unchanged. No physical-device, GPU timing or visual-quality
+acceptance.
+
 ## Game sound files (DX P1-10) — integrated in v0.2.0
 
 `defineAsset({ type: 'audio' })` files play through `ctx.play(id, { volume, pitch,
@@ -424,3 +440,24 @@ integrated. See the [ledger](upgrade-acceptance-ledger.md).
 `playMusic` composes with the one audio output (its own music store and bus, no second
 context) and the AU-01 timeline (start at `timeline.contextTime(0)`); scenes own their
 music voices. Candidate (PR #54); not integrated. See the [guide](music-on-clock.md).
+
+## Bench dead-window guard and per-game static files (W1-4, W1-5) — checked on PR #59, not integrated
+
+Perf gate behaviour change: an active bench window that renders no frame is `inconclusive`
+(and fails the gate as "perf inconclusive") only when its held keys drive the scene, that
+is, the scene's `budgets.json` row names them as `activeKeys`, or they press one of the
+game's own input actions; otherwise it is a still window (classification version 3). If
+the game's bindings cannot be read in Node, the keys are assumed to drive the scene.
+Owner: `scripts/perf/bench.mjs` (`heldKeyPlan`) and `platform/perf/window-class.ts`.
+Static files: Vite's `publicDir` is the game's own `public/` (root `public/` only for a game
+without one); the dev server and the build stop on reserved names, symbolic links and
+stranded root files (`scripts/lib/game-public.mjs`). Evidence: unit tests and a local
+`npm run gate -- --game templates/expedition/game` on the PR branch; not yet integrated.
+Limits: bindings are read from default bindings, not a player's rebinding; a scene that
+moves only by pointer gets no driving key, so its dead windows are not detected.
+
+## Spatial audio sources and occlusion (AUD-02) — candidate, not integrated
+
+| ID | Contract | State |
+|---|---|---|
+| AUD-02 | Optional `@kits/spatial-audio` over the integrated AUD-01 voices: bounded logical sources tracked without voices (virtual) until they rank, importance ranking (class × creator `importance()`) with fade-out stealing under hysteresis, fair rotation of equal scores (starvation credit across dropped emissions) and lateness drops, a voice cap that counts fading voices, HRTF claims for `localise` classes within a kit limit (with hysteresis), per-class distance curves with a hard cutoff and air low-pass, and occlusion through a creator `(from, to) => distance \| null` query (the camera kit's `obstruction` shape) under `raysPerPump`, stalest first, with aged results, driving the output's smoothed filter. [Kit README](../../src/kits/spatial-audio/README.md) | Implemented, candidate (public PR #55). Node unit tests and `npm run test:audio-browser` (kit over the real output in `OfflineAudioContext`, muted browser: occlusion ~24 dB at 3 kHz without steps, steal fades without a cut) pass on the branch. Re-verification fixes (fair rotation, cap including fades, `stats.rotated`, rays for new emissions at a budget of 1, honest `stale`/`unqueried`, HRTF hysteresis) have Node regressions that fail on the previous head `a95497e`. Round-3 fixes (a cut voice's replacement always starts, rotation opt-in and off by default, least-recently-served fairness, priority for free slots, HRTF cap counting fading voices, no voice leak on re-entrant cancel; seeded fuzz of the caps and leaks) have Node regressions that fail on `9eb9612`. Round-4 fixes (nothing plays late by default, opt-in `carryLate` bounded to one interval, honest `dropped`/`late`/`skipped` stats, HRTF cap never delays a repeat, reservation timeout after admission, rotation inside the 1% band) have Node regressions that fail on `158ff29`. Round-5 fixes (late `carryLate` emissions may rotate in again within their one-interval bound, a 64-setup fairness table test, lateness epsilon, docs on late starts after hitches) have Node regressions that fail on `be71bc7`. Not integrated; no template consumer. No listening trials, real level geometry or query cost, propagation, device cost or networking claim. |

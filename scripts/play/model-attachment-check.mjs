@@ -8,7 +8,7 @@ import {ROOT} from './lib.mjs';
 import {launch} from '../perf/bench-browser.mjs';
 import {diagnosticReport} from './diagnostic-report.mjs';
 const out=resolve(process.argv[2]??'playtest/model-attachment');mkdirSync(out,{recursive:true});
-const source=readFileSync(resolve(ROOT,'public/models/mechanics/beacon.glb'));
+const source=readFileSync(resolve(ROOT,'templates/mechanics/game/public/models/mechanics/beacon.glb'));
 function variant(kind){
   const length=source.readUInt32LE(12),json=JSON.parse(source.subarray(20,20+length));
   if(kind==='rigid'||kind==='tail'){
