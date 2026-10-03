@@ -25,7 +25,7 @@ Each file records one decision: its context, the decision and its consequences (
 | [0031](0031-layers-kits-packs-ports.md) | Layers with a presentation-kit layer, content packs and ports for upward needs | Structure | Accepted |
 | [0032](0032-activity-runs-coverage-preview.md) | Activities return a run; one loop renders on demand; coverage pauses; preview layers keep the scene live | Runtime | Accepted |
 | [0033](0033-game-clock-driver.md) | One game clock, driven only by the loop | Time | Accepted |
-| [0034](0034-one-webgl2-path.md) | One WebGL2 render path | Render | Accepted |
+| [0034](0034-one-webgl2-path.md) | One WebGL2 render path | Render | Superseded by 0078 |
 | [0035](0035-two-layer-shadow-maps.md) | Two-layer shadow maps: static casters cached, moving casters redrawn | Render | Accepted |
 | [0036](0036-feature-anatomy.md) | Feature anatomy: an eager manifest, a lazy body, discovered by folder; shared baselines are sharded | Structure | Accepted |
 | [0037](0037-shadow-cache-validity.md) | Static shadow depth is a versioned cache, never a full-pass copy | Render | Accepted |
@@ -63,3 +63,4 @@ Each file records one decision: its context, the decision and its consequences (
 | [0076](0076-engine-creator-agent-contract.md) | Bounded framework guarantees, creator authority and implementation-agent obligations | Author contract / Governance | Accepted |
 
 | [0077](0077-candidate-verification-evidence.md) | Public contributor setup, candidate gate evidence and recorded sole-maintainer review exceptions | Process / Governance | Proposed |
+| [0078](0078-creator-selectable-render-backend.md) | Creator-selectable render backend: WebGL2 by default, WebGPU opt-in and lazily loaded | Render | Accepted |

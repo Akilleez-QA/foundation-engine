@@ -47,7 +47,9 @@ The existing CI command already includes this consumer.
 
 This browser evidence covers **transport cancellation**: the delayed requests abort
 before their response is supplied. It does not prove decoded work completing after
-cancellation; the named unit tests remain separate evidence for that path. Model
+cancellation; the named unit tests remain separate evidence for that path. Browser
+evidence for cancellation after a delivered response and a completed image decode
+is recorded separately in [decode-cancellation-20261003.md](decode-cancellation-20261003.md). Model
 statistics are ownership estimates and counts, not measured driver memory or a
 complete heap/listener audit. A document-owned renderer pool may retain its context
 after application disposal; this test neither requires nor claims zero document

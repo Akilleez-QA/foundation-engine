@@ -71,7 +71,7 @@ Kernel modules the composition root installs:
 
 | Clause | Application |
 |---|---|
-| STD-REN-1 | The render path is WebGL2 through the renderer pool (`platform/render/renderer-pool.ts`) *(engine)* |
+| STD-REN-1 | The render backend is `<webgl2 (default) or webgpu>` (`defineBuild({ render: { backend } })`), created through the renderer pool (`platform/render/renderer-pool.ts`) *(engine)* |
 | STD-REN-11 | The light rigs of this game's scenes: `<per scene>`. A scene with `view.lights: 'default'` gets one hemisphere and one directional light (`src/author/runtime.ts`) |
 
 ## 9. Scenes and handover
