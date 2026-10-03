@@ -90,10 +90,13 @@ sound.pump(ctx.time.t, ctx.camera.position);
   results expire to `unknown`. If `sound.stats.stale` stays above 0, the budget cannot
   refresh every playing voice within `maxAge`.
 - Dispose the kit with the scene (`sound.dispose()`); `sound.stats` shows `voices`,
-  `waiting`, `dropped`, `culled`, `stolen`, `rotated`, `rays`, `raysDeferred` and `stale`.
+  `waiting`, `dropped`, `late`, `skipped`, `culled`, `stolen`, `rotated`, `rays`, `raysDeferred` and `stale`.
   Equal sounds take turns through free slots. For a shooter's short, frequent cues, opt in to
   `limits.rotateAfter` (0.25 to 1 s) so newer equal shots get turns against older voices; leave it
-  off for ambience and loops. Keep `raysPerPump` at 2 or more when sounds start every frame.
+  off for ambience and loops. By default a sound that cannot start within `maxLateness` is dropped
+  (`stats.dropped`), never played late; for long equal loops that should take turns, set
+  `carryLate: true` on those sources (they may start up to one interval late, `stats.late`).
+  Keep `raysPerPump` at 2 or more when sounds start every frame.
 
 ## 4. Check it
 

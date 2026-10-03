@@ -255,14 +255,19 @@ test('a repeater replaces its own voice within the voice cap: with no free slot 
 });
 
 test('HRTF is not flipped on repeats: a source replacing its own HRTF voice keeps HRTF', () => {
-  const output = fakeOutput(); const audio = createSpatialAudio({ output, classes: flat, limits: { maxHrtfVoices: 1 } });
+  // Cues shorter than the interval: each repeat starts with no voice of its own playing and keeps HRTF.
+  const short = timedOutput(() => .3); const audio = createSpatialAudio({ output: short, classes: flat, limits: { maxHrtfVoices: 1 } });
   audio.emit({ cue: 'r', class: 'near', position: [0, 0, -2], every: .5 }, 0);
-  for (let i = 0; i <= 100; i++) {
-    audio.pump(i / 60, origin);
-    assert.ok(output.playing().filter(v => v.panning === 'HRTF').length <= 1, 'the fading HRTF voice counts against the cap');
-  }
-  // At the HRTF cap the repeat fades its old HRTF voice first, then starts with HRTF (no crossfade over the cap).
-  assert.deepEqual(output.voices.map(v => v.options.spatial!.panning), ['HRTF', 'HRTF', 'HRTF', 'HRTF']);
+  for (let i = 0; i <= 100; i++) { short.time = i / 60; audio.pump(i / 60, origin); }
+  assert.deepEqual(short.voices.map(v => v.options.spatial!.panning), ['HRTF', 'HRTF', 'HRTF', 'HRTF']);
+  // Overlapping repeats at the HRTF cap: no wait for the HRTF fade (each starts on its beat); the first overlapping
+  // repeat starts equal-power and its overlapping repeats stay equal-power (one switch, no per-emission flip); the
+  // fading HRTF voice counts against the cap.
+  const long = timedOutput(); const over = createSpatialAudio({ output: long, classes: flat, limits: { maxHrtfVoices: 1 } });
+  over.emit({ cue: 'r', class: 'near', position: [0, 0, -2], every: .5 }, 0);
+  for (let i = 0; i <= 100; i++) { long.time = i / 60; over.pump(i / 60, origin); assert.ok(long.hrtf() <= 1); }
+  assert.deepEqual(long.voices.map(v => +v.startT.toFixed(3)), [0, .5, 1, 1.5]);
+  assert.deepEqual(long.voices.map(v => v.options.spatial!.panning), ['HRTF', 'equalpower', 'equalpower', 'equalpower']);
 });
 
 test('when full, admission work stays bounded: one failed steal ends the pass', () => {
@@ -338,18 +343,18 @@ test('equal-score repeaters started together share the voices fairly under defau
   assert.equal(audio.stats.stolen, 0, 'equal sources rotate; nothing is stolen'); assert.ok(audio.stats.rotated > 0);
 });
 
-test('opt-in rotation: equal-score repeaters out of phase with long voices share them fairly', () => {
+test('opt-in rotation and carryLate: equal-score repeaters out of phase with long voices share them fairly', () => {
   const output = fakeOutput(); const audio = createSpatialAudio({ output, classes: flat, limits: { maxVoices: 4, rotateAfter: .25 } });
   const xs: string[] = [];
   for (let i = 0; i <= 600; i++) {
     const t = i / 60;
-    if (i % 4 === 0 && xs.length < 8) { const p = ring(xs.length, 8); xs.push(key(p)); audio.emit({ cue: 'r', class: 'weak', position: p, every: .5 }, t); }
+    if (i % 4 === 0 && xs.length < 8) { const p = ring(xs.length, 8); xs.push(key(p)); audio.emit({ cue: 'r', class: 'weak', position: p, every: .5, carryLate: true }, t); }
     audio.pump(t, origin); assert.ok(output.playing().length <= 4);
   }
   const plays = xs.map(x => startsByX(output).get(x) ?? 0);
-  // Staggered beats make some voices younger than `rotateAfter` when a source is due, so shares are not exact.
-  // Victims are the longest-playing equal voices (not the most-served), so shares are a little less even.
-  assert.ok(Math.min(...plays) >= 12 && Math.max(...plays) - Math.min(...plays) <= 4, `plays ${plays}`);
+  // Long voices never free a slot, so a late emission must carry over to the next voice it can take (measured
+  // spread 1 at 10, 20 and 60 s and staggers of 3 to 7 frames; without carryLate, out-of-phase shares are uneven).
+  assert.ok(Math.min(...plays) >= 10 && Math.max(...plays) - Math.min(...plays) <= 1, `plays ${plays}`);
 });
 
 test('opt-in rotation: equal one-shots get turns against older long voices, without cutting each other', () => {
@@ -466,14 +471,19 @@ const cutsReplaced = (out: ReturnType<typeof timedOutput>, pump: number) => out.
   .every(v => out.voices.some(w => w !== v && w.startT >= v.cutAt! && w.startT <= v.cutAt! + .06 + pump + 1e-9));
 
 test('a victim is never cut unless its replacement starts: rotation at 60 Hz and a steal at 10 Hz', () => {
-  // One long voice A; an equal one-shot B at 0.15 s; opt-in rotation after 0.25 s with the default 0.15 s lateness.
-  const out = timedOutput(); const audio = createSpatialAudio({ output: out, classes: flat, limits: { maxVoices: 1, rotateAfter: .25 } });
-  audio.emit({ cue: 'A', class: 'weak', position: [2, 0, 0] }, 0); audio.pump(0, origin);
-  audio.emit({ cue: 'B', class: 'weak', position: [2, 0, 0] }, .15);
-  for (let i = 9; i <= 60; i++) { out.time = i / 60; audio.pump(i / 60, origin); }
-  const a = out.voices[0], b = out.voices.find(v => v.cue === 'B');
-  assert.ok(b, 'B started'); assert.ok(a.cutAt === null || b.startT >= a.cutAt, 'A cut only for B'); assert.ok(cutsReplaced(out, 1 / 60));
-  assert.equal(out.live().length, 1, 'never silent');
+  // One long voice A; an equal one-shot B at 0.15 s; opt-in rotation with the default 0.15 s lateness. A becomes
+  // rotatable at 0.2 s or 0.25 s while B is still within its lateness: A is cut for B and B starts, on time at .2, and
+  // at .25 one fade after its lateness (counted in `late`). Either way, never silent and nothing dropped.
+  for (const [rotateAfter, late] of [[.2, 0], [.25, 1]] as const) {
+    const out = timedOutput(); const audio = createSpatialAudio({ output: out, classes: flat, limits: { maxVoices: 1, rotateAfter } });
+    audio.emit({ cue: 'A', class: 'weak', position: [2, 0, 0] }, 0); audio.pump(0, origin);
+    audio.emit({ cue: 'B', class: 'weak', position: [2, 0, 0] }, .15);
+    for (let i = 9; i <= 60; i++) { out.time = i / 60; audio.pump(i / 60, origin); }
+    const a = out.voices[0], b = out.voices.find(v => v.cue === 'B');
+    assert.ok(a.cutAt !== null && b, 'A cut and B started'); assert.ok(b!.startT >= a.cutAt! && b!.startT - .15 <= .15 + .06 + 1 / 60, `B started ${b!.startT}`);
+    assert.ok(cutsReplaced(out, 1 / 60)); assert.equal(out.live().length, 1, 'never silent');
+    assert.deepEqual([audio.stats.dropped, audio.stats.late], [0, late]);
+  }
   // Defaults (rotation off): the long voice is never cut for an equal emission; B is dropped instead.
   const off = timedOutput(); const plain = createSpatialAudio({ output: off, classes: flat, limits: { maxVoices: 1 } });
   plain.emit({ cue: 'A', class: 'weak', position: [2, 0, 0] }, 0); plain.pump(0, origin);
@@ -502,19 +512,29 @@ test('10 equal loops a frame apart on 4 voices: never silent, every cut replaced
   }
 });
 
-test('rotation is off by default: long equal loops repeating every 4 s are not chopped, and all of them take turns', () => {
-  const out = timedOutput(() => 4); const audio = createSpatialAudio({ output: out, classes: flat, limits: { maxVoices: 4 } });
-  for (let i = 0, k = 0; i <= 40 * 60; i++) {
-    out.time = i / 60;
-    if (k < 10 && i >= Math.round(k * .37 * 60)) { audio.emit({ cue: String(k), class: 'weak', position: ring(k, 10), every: 4 }, i / 60); k++; }
-    audio.pump(i / 60, origin);
-  }
+test('rotation is off by default: long equal loops repeating every 4 s are not chopped; with carryLate all take turns', () => {
+  const run = (carryLate: boolean) => {
+    const out = timedOutput(() => 4); const audio = createSpatialAudio({ output: out, classes: flat, limits: { maxVoices: 4 } });
+    for (let i = 0, k = 0; i <= 40 * 60; i++) {
+      out.time = i / 60;
+      if (k < 10 && i >= Math.round(k * .37 * 60)) { audio.emit({ cue: String(k), class: 'weak', position: ring(k, 10), every: 4, carryLate }, i / 60); k++; }
+      audio.pump(i / 60, origin);
+    }
+    return { out, audio, plays: Array.from({ length: 10 }, (_, k) => out.voices.filter(v => v.cue === String(k)).length) };
+  };
+  // Without carryLate the loops that hold the voices keep them: the others' emissions are dropped on time.
+  const plain = run(false);
+  assert.equal(plain.out.voices.filter(v => v.cutAt !== null && v.cutAt < v.startT + 4 - 1 / 60).length, 0); assert.equal(plain.audio.stats.late, 0);
+  assert.equal(plain.plays.filter(p => p === 0).length, 6, `plays ${plain.plays}`);
+  const { out, audio } = run(true);
   // A repeat replacing its own voice right at the clip's end fades it within a frame of it; nothing is cut earlier.
   assert.equal(out.voices.filter(v => v.cutAt !== null && v.cutAt < v.startT + 4 - 1 / 60).length, 0, 'no voice cut early'); assert.equal(audio.stats.rotated, 0);
   assert.ok(out.voices.length >= 40);
-  // A late repeater keeps waiting (with its credit) and takes the slot an equal holder leaves on its own beat.
+  // carryLate: a late repeater keeps waiting (with its credit) up to one interval and takes the slot an equal holder
+  // leaves on its own beat; it never starts more than one interval late.
   const plays = Array.from({ length: 10 }, (_, k) => out.voices.filter(v => v.cue === String(k)).length);
   assert.ok(Math.min(...plays) >= 3 && Math.max(...plays) - Math.min(...plays) <= 1, `plays ${plays}`);
+  assert.ok(audio.stats.late > 0);
 });
 
 test('fair shares with fewer than twice as many sources as voices (served count breaks ties)', () => {
@@ -574,7 +594,7 @@ test('seeded fuzz: voice and HRTF caps hold on the output, nothing leaks, and ev
       if (x < .35) {
         const c = new AbortController(); controllers.push(c);
         const p: [number, number, number] = [r() * 30 - 15, 0, r() * 30 - 15];
-        const id = audio.emit({ cue: `k${step}`, class: 'abc'[Math.floor(r() * 3)], position: p, importance: r() < .3 ? () => r() * 2 : undefined, every: r() < .5 ? .05 + r() * .5 : undefined, signal: hostile && r() < .5 ? c.signal : undefined }, t);
+        const id = audio.emit({ cue: `k${step}`, class: 'abc'[Math.floor(r() * 3)], position: p, importance: r() < .3 ? () => r() * 2 : undefined, every: r() < .5 ? .05 + r() * .5 : undefined, carryLate: r() < .3, signal: hostile && r() < .5 ? c.signal : undefined }, t);
         if (id) ids.push(id);
       } else if (hostile && x < .42 && ids.length) audio.cancel(ids[Math.floor(r() * ids.length)]);
       else if (hostile && x < .47 && controllers.length) controllers[Math.floor(r() * controllers.length)].abort();
@@ -595,4 +615,88 @@ test('seeded fuzz: voice and HRTF caps hold on the output, nothing leaks, and ev
     assert.equal(out.live().length, 0, `seed ${seed}: leaked after cancel-all`); assert.equal(audio.stats.sources, 0);
     audio.dispose(); assert.equal(out.live().length, 0, `seed ${seed}: leaked after dispose`);
   }
+});
+
+// Round-4 re-verification regressions (PR #55).
+const gunRing = (k: number, c: number, r: number): [number, number, number] => [Math.cos(2 * Math.PI * k / c) * r, 0, Math.sin(2 * Math.PI * k / c) * r];
+
+test('by default nothing plays late: 8 equal guns every 0.1 s on 4 voices start within maxLateness, and stats account for every beat', () => {
+  const out = timedOutput(() => .3); const audio = createSpatialAudio({ output: out, classes: flat, limits: { maxVoices: 4 } });
+  const t0 = (j: number) => j * .007;
+  for (let j = 0; j < 8; j++) audio.emit({ cue: String(j), class: 'weak', position: gunRing(j, 8, 6), every: .1 }, t0(j));
+  for (let i = 0; i <= 600; i++) { out.time = i / 60; audio.pump(i / 60, origin); }
+  const st = audio.stats;
+  assert.deepEqual([st.late, st.skipped], [0, 0]);
+  // Every beat either started a voice, was dropped (never played), or is still waiting.
+  // (Beats within a float error of the last pump at 10 s may or may not be due yet, and a source whose emission is
+  // still waiting schedules its next beat when that one settles: at most one such beat per waiting source.)
+  const beats = (end: number) => Array.from({ length: 8 }, (_, j) => Math.floor((end - t0(j)) / .1) + 1).reduce((a, b) => a + b);
+  const accounted = out.voices.length + st.dropped + st.waiting;
+  assert.ok(accounted + st.waiting >= beats(9.999) && accounted <= beats(10.001), `${accounted} accounted (+${st.waiting} pending), ${beats(9.999)}..${beats(10.001)} beats`);
+  // A start is at most maxLateness after its beat, and never a beat behind (the rhythm is never shifted).
+  for (const v of out.voices) { const j = +v.cue, lag = v.startT - t0(j) - Math.floor((v.startT - t0(j) + 1e-9) / .1) * .1; assert.ok(lag <= .15 + 1e-9, `lag ${lag}`); }
+});
+
+test('carryLate is opt-in and bounded to one interval: the late emission starts when a slot frees, counted in late, not dropped', () => {
+  for (const carryLate of [false, true]) {
+    const out = timedOutput(); let queries = 0;
+    const audio = createSpatialAudio({ output: out, classes: flat, limits: { maxVoices: 1, raysPerPump: 1 }, occlusion: { query: () => { queries++; return null; }, unknown: 'blocked' } });
+    audio.emit({ cue: 'A', class: 'weak', position: [2, 0, 0] }, 0); out.time = 0; audio.pump(0, origin);
+    audio.emit({ cue: 'B', class: 'weak', position: [0, 0, 2], every: .5, carryLate }, 0);
+    for (let i = 1; i <= 120; i++) { out.time = i / 60; if (i === 78) out.voices[0].stop(); audio.pump(i / 60, origin); }
+    const b = out.voices.filter(v => v.cue === 'B');
+    if (carryLate) {
+      // Beats 0 and .5 waited one interval each and were dropped; beat 1.0 carried and started when A stopped at 1.3.
+      assert.equal(+b[0].startT.toFixed(3), 1.3); assert.ok(b[0].startT - 1 <= .5, 'at most one interval late');
+      assert.deepEqual([audio.stats.dropped, audio.stats.late], [2, 1]);
+      // The carried emission kept its ray priority while waiting: it started with its own (open) result.
+      assert.equal(b[0].options.filter!.gain, 1);
+    } else {
+      assert.equal(+b[0].startT.toFixed(3), 1.5, 'the next beat, on time'); assert.deepEqual([audio.stats.dropped, audio.stats.late], [3, 0]);
+    }
+    assert.ok(queries > 0);
+  }
+});
+
+test('localised repeats at the HRTF cap start on their beat (no fade-first wait) without per-emission flips', () => {
+  for (const maxHrtfVoices of [6, 8]) {
+    const out = timedOutput(() => .3); let peak = 0;
+    const audio = createSpatialAudio({ output: out, classes: { shot: { refDistance: 2, cutoffDistance: 80, importance: 2, localise: true } }, limits: { maxVoices: 24, maxHrtfVoices } });
+    for (let j = 0; j < 8; j++) audio.emit({ cue: String(j), class: 'shot', position: gunRing(j, 8, 6 + j), every: .1 }, 0);
+    for (let i = 0; i <= 600; i++) { out.time = i / 60; audio.pump(i / 60, origin); peak = Math.max(peak, out.hrtf()); }
+    const lags = out.voices.map(v => ((v.startT % .1) + .1) % .1).map(l => l > .1 - 1e-9 ? 0 : l).sort((a, b) => a - b);
+    assert.ok(lags[lags.length >> 1] <= 1 / 60 + 1e-9, `p50 lag ${lags[lags.length >> 1]}`);
+    assert.ok(peak <= maxHrtfVoices, `peak HRTF ${peak}`);
+    const flips = Array.from({ length: 8 }, (_, j) => { const p = out.voices.filter(v => v.cue === String(j)).map(v => v.panning); return p.slice(1).filter((m, k) => m !== p[k]).length; });
+    // At most about one switch per HRTF hold (1 s) per source, against one per emission without hysteresis.
+    assert.ok(Math.max(...flips) <= 10, `flips ${flips}`);
+    assert.ok(out.voices.filter(v => v.panning === 'HRTF').length > 200, 'spare HRTF capacity is still used');
+  }
+});
+
+test('a reservation survives a pump gap over 1 s: the slot that frees on that pump is used before the timeout is checked', () => {
+  const out = timedOutput(); const audio = createSpatialAudio({ output: out, classes: flat, limits: { maxVoices: 1 } });
+  audio.emit({ cue: 'A', class: 'weak', position: [2, 0, 0] }, 0); audio.pump(0, origin);
+  audio.emit({ cue: 'S', class: 'strong', position: [2, 0, 0] }, .1); out.time = .1; audio.pump(.1, origin);
+  assert.equal(audio.stats.stolen, 1);
+  out.time = 1.6; audio.pump(1.6, origin);   // a hidden tab: the next pump is 1.5 s later
+  assert.ok(out.voices.some(v => v.cue === 'S'), 'the stealer started'); assert.deepEqual([audio.stats.dropped, audio.stats.late], [0, 1]);
+});
+
+test('rotation stays inside the 1% tie band: a 1.2x stronger sound below stealRatio does not rotate a voice out', () => {
+  const out = timedOutput(); const audio = createSpatialAudio({ output: out, classes: flat, limits: { maxVoices: 1, rotateAfter: .25 } });
+  audio.emit({ cue: 'amb', class: 'weak', position: [2, 0, 0] }, 0); audio.pump(0, origin);
+  for (let i = 1; i <= 300; i++) {
+    out.time = i / 60;
+    if (i % 24 === 0) audio.emit({ cue: 'step', class: 'weak', position: [0, 0, 2], importance: () => 1.2 }, i / 60);
+    audio.pump(i / 60, origin);
+  }
+  assert.equal(out.voices[0].cutAt, null, 'the ambient voice is never rotated out'); assert.equal(audio.stats.rotated, 0);
+});
+
+test('skipped counts beats lost to a pump gap; the source plays once and keeps its rhythm from then', () => {
+  const out = timedOutput(); const audio = createSpatialAudio({ output: out, classes: flat });
+  audio.emit({ cue: 'r', class: 'weak', position: [2, 0, 0], every: .5 }, 0); audio.pump(0, origin);
+  out.time = 2; audio.pump(2, origin);
+  assert.deepEqual([out.voices.length, audio.stats.skipped, audio.stats.dropped, audio.stats.late], [2, 3, 0, 0]);
 });

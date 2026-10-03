@@ -107,16 +107,28 @@ export interface SourceInput {
   gain?: number;
   /** Aborting cancels the source (as `cancel(id)`). */
   signal?: AbortSignal;
+  /**
+   * Repeating sources only, opt-in (default false). Off, an emission that cannot start within `maxLateness` is
+   * dropped and the source plays its next beat on time: right for gunfire and steps, where a late sound is worse than a
+   * missing one. On, the late emission keeps waiting with its starvation credit for up to one interval (`every`), starts
+   * at the next slot it ranks for, and restarts the rhythm from that start: right for long equal loops (ambience,
+   * engines) that fill every voice and should still take turns. After one interval it is dropped.
+   */
+  carryLate?: boolean;
 }
 
 export interface SpatialAudioStats {
   /** `voices` counts every voice this kit holds on the output, fading ones included (`fading` of them). */
   readonly sources: number; readonly voices: number; readonly fading: number; readonly hrtf: number; readonly waiting: number;
   /**
-   * Emissions dropped: waited longer than maxLateness (a repeating source's late emission is counted once and keeps
-   * waiting virtually for its turn), or the output refused them.
+   * Emissions that never played: waited longer than `maxLateness` (or one interval with `carryLate`), their
+   * reservation timed out, or the output refused them.
    */
   readonly dropped: number;
+  /** Emissions that played, but more than `maxLateness` after they were due (a reservation after a slow pump, or `carryLate`). */
+  readonly late: number;
+  /** Beats a repeating source never emitted because its pumps stopped for longer than `maxLateness` (a long frame, a hidden tab). */
+  readonly skipped: number;
   /** Emissions skipped because the source was beyond its class cutoff. */
   readonly culled: number;
   /** Voices taken by a stronger emission (`stealRatio`). */
@@ -196,11 +208,16 @@ interface Source {
   /** The voice fading out for this reservation; the emission starts once it has stopped. */
   awaiting: CueVoice | null;
   /**
-   * A repeating source whose emission waited past `maxLateness` (counted once in `dropped`). It keeps waiting
-   * virtually with its starvation credit instead of losing its turn, starts at the next slot it ranks for, and restarts
-   * its rhythm from that start. One-shots are dropped instead.
+   * A `carryLate` source whose emission waited past `maxLateness`: it keeps waiting with its starvation credit for up
+   * to one interval, starts at the next slot it ranks for, and restarts its rhythm from that start.
    */
   late: boolean;
+  /**
+   * HRTF deferred (since `deferredAt`): a repeat that overlapped its own voice at the HRTF cap started equal-power.
+   * Its overlapping repeats get HRTF again only after `HRTF_HOLD` and with room for two HRTF voices (this one and its
+   * next crossfade); a repeat with no voice of its own playing clears it.
+   */
+  hrtfDeferred: boolean; deferredAt: number;
   /** When this source last started a voice (-Infinity before its first); the least recently served goes first among equals. */
   playedAt: number;
   /**
@@ -234,8 +251,8 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
   const sources = new Map<number, Source>();
   /** Voices fading out (~50 ms) before they are stopped. Every fade holds its slot in `maxVoices` until it stops. */
   const fading = new Map<CueVoice, { stopAt: number; owner: Source | null; hrtf: boolean }>();
-  const stats = { dropped: 0, culled: 0, stolen: 0, rotated: 0, rays: 0, raysDeferred: 0, errors: 0 };
-  let sequence = 0, clock = -Infinity, closed = false, pumping = false, listener: Point = [0, 0, 0];
+  const stats = { dropped: 0, late: 0, skipped: 0, culled: 0, stolen: 0, rotated: 0, rays: 0, raysDeferred: 0, errors: 0 };
+  let sequence = 0, step = 1 / 60, clock = -Infinity, closed = false, pumping = false, listener: Point = [0, 0, 0];
 
   /** Counts every failure; reports each kind of failure once per source. */
   const report = (s: Source | null, kind: string, message: string) => {
@@ -303,9 +320,18 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
   /** Start the source's due emission. A previous voice of the same source is replaced (faded; the fade holds a slot). */
   const start = (s: Source, now: number): boolean => {
     if (closed || sources.get(s.id) !== s) return false;
+    const wasLate = s.dueAt !== null && now - s.dueAt > maxLateness;
     if (s.late) s.nextAt = now + s.input.every!;
-    // HRTF only within the cap counting this kit's fading HRTF voices too (they still hold an HRTF panner).
-    const c = s.cls, target = hrtfTarget(s), hrtf = target !== null && hrtfOnOutput() < maxHrtf, f = filterFor(s, now);
+    // HRTF only within the cap counting this kit's fading HRTF voices too (they still hold an HRTF panner). A repeat
+    // overlapping its own voice never waits for HRTF: at the cap it starts equal-power (hrtfDeferred). A deferred
+    // source's overlapping repeats return to HRTF only after HRTF_HOLD and when the cap has room for this voice and its
+    // next crossfade too (hysteresis), so the panning model does not alternate per emission.
+    const own = playing(s);
+    if (!own) s.hrtfDeferred = false;
+    const c = s.cls, target = hrtfTarget(s), f = filterFor(s, now);
+    const held = own && s.hrtfDeferred;
+    const hrtf = target !== null && (!held || now - s.deferredAt >= HRTF_HOLD) && hrtfOnOutput() + (held ? 2 : 1) <= maxHrtf;
+    const deferred = target !== null && own && !hrtf;
     let voice: CueVoice | null = null;
     try {
       voice = o.output.playVoice(s.input.cue, {
@@ -319,6 +345,9 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
     // source that is gone is faded (or stopped, after dispose) instead of attached to it and leaked.
     if (voice && (closed || sources.get(s.id) !== s)) { fadeOut(voice, null, now); return false; }
     if (!voice) { stats.dropped++; return false; }
+    if (wasLate) stats.late++;
+    if (deferred && !s.hrtfDeferred) s.deferredAt = now;
+    s.hrtfDeferred = deferred;
     if (playing(s)) fadeOut(s.voice!, s, now);
     if (target !== null && target !== 'claim' && target !== s) target.hrtfClaim = false;
     if (hrtf) { s.hrtfClaim = true; s.claimScore = s.score; s.claimAt = now; }
@@ -375,11 +404,11 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
       if (!cls) throw new RangeError(`spatial-audio: unknown sound class '${input.class}'`);
       if (typeof input.cue !== 'string' || !input.cue || (typeof input.position !== 'function' && !finite3(input.position))
         || (input.every !== undefined && !numIn(input.every, .05, 3600)) || (input.gain !== undefined && !numIn(input.gain, 0, 1))
-        || !Number.isSafeInteger(input.variant ?? 0) || !Number.isFinite(now)) throw new RangeError('spatial-audio: invalid source');
+        || !Number.isSafeInteger(input.variant ?? 0) || (input.carryLate !== undefined && typeof input.carryLate !== 'boolean') || !Number.isFinite(now)) throw new RangeError('spatial-audio: invalid source');
       if (closed || sources.size >= maxSources || input.signal?.aborted) return null;
       const id = ++sequence;
       const s: Source = { id, input: { ...input }, cls, nextAt: now, dueAt: null, emitted: false, voice: null, hrtf: false, score: 0, weight: 0, gain: 0, distance: Infinity,
-        position: [0, 0, 0], sentPosition: null, sentFilter: null, ray: null, reported: new Set(), startedAt: now, reserved: false, reservedAt: 0, awaiting: null, late: false, playedAt: -Infinity,
+        position: [0, 0, 0], sentPosition: null, sentFilter: null, ray: null, reported: new Set(), startedAt: now, reserved: false, reservedAt: 0, awaiting: null, late: false, hrtfDeferred: false, deferredAt: 0, playedAt: -Infinity,
         waitingSince: null, served: 0, hrtfClaim: false, claimScore: 0, claimAt: now };
       if (input.signal) { const abort = () => cancel(id); input.signal.addEventListener('abort', abort, { once: true }); s.off = () => input.signal!.removeEventListener('abort', abort); }
       sources.set(id, s); return id;
@@ -391,7 +420,7 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
     pump(now: number, at: Point): PumpResult {
       if (!Number.isFinite(now) || now < clock || !finite3(at)) throw new RangeError('spatial-audio: pump needs a monotonic time and a finite listener');
       if (closed || pumping) return { realised: 0, waiting: 0, rays: 0, dropped: 0 };
-      pumping = true; clock = now; listener = [at[0], at[1], at[2]];
+      pumping = true; if (clock !== -Infinity && now > clock) step = Math.min(now - clock, 1); clock = now; listener = [at[0], at[1], at[2]];
       const droppedBefore = stats.dropped, raysBefore = stats.rays; let realised = 0;
       try {
         for (const [voice, f] of fading) if (voice.ended || now >= f.stopAt) { fading.delete(voice); stop(voice, f.owner); }
@@ -408,15 +437,18 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
             if (every === undefined) { s.dueAt = s.nextAt; s.nextAt = Infinity; }
             // A repeating source that missed its slot by more than the lateness (a long frame, a hidden tab) emits
             // once now and restarts its rhythm from now, instead of replaying or dropping the missed ones.
-            else if (now - s.nextAt > maxLateness) { s.dueAt = now; s.nextAt = now + every; }
+            else if (now - s.nextAt > maxLateness) { stats.skipped += Math.floor((now - s.nextAt) / every); s.dueAt = now; s.nextAt = now + every; }
             else { s.dueAt = s.nextAt; s.nextAt += every; }
           }
           if (s.dueAt !== null && s.gain === 0) { stats.culled++; settle(s); s.waitingSince = null; }
           if (claimLapsed(s, now)) s.hrtfClaim = false;
-          if (s.dueAt !== null && s.reserved && now - s.reservedAt > RESERVE_LIMIT) { stats.dropped++; settle(s); }
-          else if (s.dueAt !== null && !s.reserved && !s.late && now - s.dueAt > maxLateness) {
-            stats.dropped++;
-            if (s.input.every === undefined) settle(s); else s.late = true;
+          // Lateness (reservations are checked after admission, so a slot that frees on this pump is used first).
+          if (s.dueAt !== null && !s.reserved) {
+            const waited = now - s.dueAt;
+            if (s.late ? waited > s.input.every! : waited > maxLateness) {
+              if (!s.late && s.input.carryLate && s.input.every !== undefined) s.late = true;
+              else { stats.dropped++; settle(s); }
+            }
           }
           if (s.input.every === undefined && s.emitted && s.dueAt === null && !s.voice) { retire(s); continue; }
         }
@@ -431,7 +463,7 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
             if (s.gain <= 0) continue;
             s.score = s.gain * s.weight;
             if (playing(s)) live.push(s);
-            else if (s.dueAt !== null) (fresh(s, now) || s.late ? others : waiting).push(s);
+            else if (s.dueAt !== null) (fresh(s, now) ? others : waiting).push(s);
           }
           live.sort((a, b) => refreshAge(b, now) - refreshAge(a, now) || b.score - a.score || a.id - b.id);
           const neverFirst = (a: Source, b: Source) => (a.ray?.at ?? -Infinity) - (b.ray?.at ?? -Infinity) || b.score - a.score || a.id - b.id;
@@ -468,14 +500,19 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
         const slots = free + due.filter(holds).length;
         const inside = due.slice(0, slots), outside = due.slice(slots);
         const yielding = outside.filter(holds);
+        // A voice is cut (steal, yield, rotation, own fade-first) only for an emission that can still start within
+        // `maxLateness` after one fade and one pump, or that became due since the last pump (so slow pumps can still
+        // steal; such a start may land after `maxLateness` and is counted in `late`). Otherwise the emission waits for a
+        // free slot or is dropped, and no voice is cut for it.
+        const fits = (s: Source) => { const waited = now - s.dueAt!; return waited + FADE_HOLD + step <= maxLateness || waited <= step + 1e-9; };
         for (const s of inside) {
           if (s.dueAt === null || sources.get(s.id) !== s) continue;
           if (holds(s)) {
-            // Crossfade into a free slot, unless that would put one HRTF voice too many on the output; otherwise fade
-            // the old voice first and start when its slot frees (one fade plus a pump later).
-            if (free > 0 && !(s.hrtf && hrtfOnOutput() >= maxHrtf)) { free--; admit(s); } else cutFor(s, s, now);
+            // Crossfade into a free slot (at the HRTF cap the repeat starts equal-power, see start); with no free slot
+            // fade the old voice first and start when its slot frees (one fade plus a pump later).
+            if (free > 0) { free--; admit(s); } else if (fits(s)) cutFor(s, s, now);
           } else if (free > 0) { free--; admit(s); }
-          else { const y = yielding.shift(); if (y) { cutFor(s, y, now); stats.rotated++; } }
+          else if (fits(s)) { const y = yielding.shift(); if (y) { cutFor(s, y, now); stats.rotated++; } }
         }
         const candidates = outside.filter(s => s.dueAt !== null && !s.reserved && !holds(s));
         if (candidates.length) {
@@ -484,14 +521,21 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
             (a, b) => a.startedAt - b.startedAt || b.served - a.served || a.id - b.id);
           // Each candidate scans at most the (<= maxVoices) victims; the pass ends at the first candidate that takes none.
           for (const s of candidates) {
-            const k = victims.findIndex(v => s.score > v.score * stealRatio || (s.score >= v.score * (1 - TIE) && now - v.startedAt >= rotateAfter));
+            // Opt-in rotation may also reserve while the emission is still within `maxLateness` (it then starts up to one
+            // fade and one pump after it, counted in `late`): it needs the wait to find a voice old enough to rotate.
+            const k = victims.findIndex(v => (s.score > v.score * stealRatio && fits(s))
+              || (Math.abs(s.score - v.score) <= v.score * TIE && now - v.startedAt >= rotateAfter && now - s.dueAt! <= maxLateness));
             if (k < 0) break;
             const [victim] = victims.splice(k, 1);
             if (s.score > victim.score * stealRatio) stats.stolen++; else stats.rotated++;
             cutFor(s, victim, now);
           }
         }
-        for (const s of sources.values()) if (s.dueAt !== null) s.waitingSince ??= s.dueAt;
+        for (const s of sources.values()) {
+          if (s.dueAt === null) continue;
+          if (s.reserved && now - s.reservedAt > RESERVE_LIMIT) { stats.dropped++; settle(s); if (s.input.every === undefined && !s.voice) retire(s); continue; }
+          s.waitingSince ??= s.dueAt;
+        }
         // 4. Follow playing voices: position and filter, written only when they changed enough to matter.
         for (const s of sources.values()) {
           const v = s.voice; if (!v || v.ended || fading.has(v)) continue;
