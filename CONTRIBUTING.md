@@ -39,12 +39,19 @@ scene ownership, authoritative replication, data-driven crafting, or bounded
 asset streaming. State requirements and acceptance evidence so the submission
 stands on its own without familiarity with another game.
 
+Study mechanics, architecture and behavior as reusable systems and patterns;
+this repository does not require inspiration credits or game-name citations for
+independently implemented mechanics. Describe our own requirements, design and
+verification evidence.
+
 Do not submit proprietary source excerpts, source links, or private study notes.
-Keep required third-party attribution, license notices, and accurate dependency
-identifiers intact; neutral terminology must never conceal the origin of reused
-material. Foundation's own template names and reproducible file/API identifiers
-remain appropriate when needed to explain or verify a change. Reviewers should
-request neutral system/pattern wording before accepting a submission.
+Attribution and license notices apply to third-party material actually included
+or adapted in a contribution, such as code, assets or documentation, and to
+dependencies. Preserve required notices for that material. A change of programming
+language alone does not make adapted code an independent implementation.
+Foundation's own template names and reproducible file/API identifiers remain
+appropriate when needed to explain or verify a change. Reviewers should request
+neutral system/pattern wording before accepting a submission.
 
 ## Make and validate the change
 
