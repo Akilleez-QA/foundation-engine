@@ -784,3 +784,18 @@ Status: implemented, candidate on `feat/gen02-chunk-store` (PR); not integrated.
   - physical devices;
   - multi-tab totals (in-memory accounting refreshes on reopen);
   - compression, whole-world export and crash consistency beyond IndexedDB's transaction atomicity.
+
+
+### Author scene DPR-only redraw — reviewed candidate, 2026-10-03
+
+The focused `fix/author-dpr-redraw` candidate connects the existing quality owner's
+resize notification to the visit-owned author resize callback. It guards retired
+visits and removes the listener on cleanup. Existing quality defaults, creator
+profiles and on-demand rendering semantics are preserved.
+
+Evidence: eight focused resize/cleanup tests and a clean-source browser run at
+`422975c43904037e7895a5ebe96a4a9913f45b4c` passed. A quality DPR change with unchanged
+CSS produced one redraw and then idle rendering; the unchanged public runtime
+reproduced the missing redraw. See the [contract](render-resize-lifecycle.md) and
+[source-scoped receipt](../verification/dpr-redraw-20261003.md). This is candidate
+evidence, not public integration, a full local gate or physical-device acceptance.
