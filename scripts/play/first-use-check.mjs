@@ -26,6 +26,7 @@ try{
  report.environment={browser:browser.version,executable:browser.executable,arguments:browser.launchArguments,node:process.version,viewport:{width:1280,height:800}};
  for(let index=0;index<3;index++){
   const context=index===0?browser.context:(extraContext=await browser.browser.newContext({viewport:{width:1280,height:800},locale:'en-US',timezoneId:'UTC'}));
+  assert.equal(browser.browser.contexts().length,1,'exactly one live context during each sample group');
   const page=index===0?browser.page:await context.newPage();currentPage=page;
   const errors=[];page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
   await page.addInitScript(()=>{
@@ -85,7 +86,9 @@ try{
   report.resources.push({context:index+1,...await page.evaluate(()=>({navigation:performance.getEntriesByType('navigation').map(e=>e.toJSON()),resource:performance.getEntriesByType('resource').slice(0,1024).map(e=>e.toJSON()),resourceCount:performance.getEntriesByType('resource').length,resourceTimingTruncated:window.firstUse.resourceTimingTruncated}))});
   assert.deepEqual(errors,[]);
   if(index===0)await page.screenshot({path:resolve(out,'first-context.png')});
-  if(extraContext){await extraContext.close();extraContext=undefined;}
+  // Retire the first context too: no earlier app may keep running during the next sample.
+  await context.close();extraContext=undefined;currentPage=undefined;
+  assert.equal(browser.browser.contexts().length,0,'previous app retired before the next context');
  }
  assert.equal(report.samples.length,21);report.passed=true;
 }catch(error){evidence.fail(error);try{await currentPage?.screenshot({path:resolve(out,'failure.png')});}catch(captureError){report.failureScreenshotError=String(captureError);}}
