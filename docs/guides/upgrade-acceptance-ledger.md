@@ -791,9 +791,14 @@ The existing SaveStore now distinguishes exact retention, conflicting destinatio
 bytes and storage failure, with known writes completed before orphan receipts.
 No snapshot API or format migration is included. Six focused regressions cover
 both payload locations, duplicate/conflicting bytes, denied reads/writes and retry,
-known/alias overlap, pending writes and notification-time owner registration. Four
-of these fail against the unchanged public implementation; all 53 store tests pass
-with the fix under Node 22.23.3. This is MemoryBackend evidence, not browser or
+canonical-id known/orphan overlap, pending writes and notification-time owner
+registration. Four of these fail against the unchanged public implementation.
+A review follow-up keeps renamed sections round-tripping: export no longer writes a
+registered section's stale alias key as an orphan, and an alias orphan beside its
+section in one file reports `orphan-superseded` instead of rejecting the file. Four
+more regressions (rename/export/fresh import, newer alias-only payload, alias orphan
+beside the section, genuine conflict and retry beside a rename) fail on the first
+candidate; all 57 store tests pass under Node 22.23.3. This is MemoryBackend evidence, not browser or
 physical durability acceptance; hosted integration checks remain required. See
 [the import recipe](../recipes/add-a-save-section.md#6-report-orphan-import-outcomes)
 for the expanded result union and recovery boundaries.

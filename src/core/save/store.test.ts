@@ -268,24 +268,111 @@ test('orphan import reports read/write failures and can retry the retained sourc
   } finally { store.dispose(); }
 });
 
-test('known section/orphan overlap rejects before mutation, including aliases and newer versions', () => {
+test('known section/orphan overlap under the canonical id rejects before mutation, including aliases and newer versions', () => {
   const { store, backend } = setup();
   const aliased: SaveSection<number> = { id: 'demo.aliased', aliases: ['demo.old'], scope: 'player', version: 1, initial: () => 0, parse: raw => Number(raw) };
   const handle = store.section(aliased);
   try {
-    for (const [incomingId, orphanId] of [['demo.aliased', 'demo.aliased'], ['demo.old', 'demo.aliased'], ['demo.aliased', 'demo.old']]) {
+    // The orphan claims the section's own id: one report slot cannot hold both outcomes.
+    for (const incomingId of ['demo.aliased', 'demo.old']) {
       for (const v of [1, 2]) {
         const before = [...backend.data], writes = backend.writes;
         const file = JSON.stringify({ format: 'engine-profile', version: 2, sections: {
-          'demo.voice': { v: 1, data: 'brave' }, [incomingId!]: { v, data: 7 },
-        }, orphans: { [orphanId!]: { v: 3, data: 8 } } });
-        assert.throws(() => store.importPlayer(file), /also supplied as an orphan/);
+          'demo.voice': { v: 1, data: 'brave' }, [incomingId]: { v, data: 7 },
+        }, orphans: { 'demo.aliased': { v: 3, data: 8 } } });
+        assert.throws(() => store.importPlayer(file), /also supplied as an orphan: demo\.aliased/);
         assert.equal(store.section(S.voice).get(), 'calm', 'earlier valid section was not published');
         assert.equal(handle.get(), 0);
         assert.deepEqual([...backend.data], before);
         assert.equal(backend.writes, writes);
       }
     }
+  } finally { store.dispose(); }
+});
+
+const renamed: SaveSection<number> = { id: 'demo.aliased', aliases: ['demo.old'], scope: 'player', version: 1, initial: () => 0, parse: raw => Number(raw) };
+function setupRenamed(backend = new MemoryBackend()) {
+  const store = createSaveStore({ local: backend.port(0), session: new MemoryBackend().port(0, 'session'), build: 'game@test', timers: fakeTimers(), legacyFiles: [S.legacyProfileFile], sections: [...S.allSections, renamed] });
+  return { backend, store };
+}
+
+test('a renamed section round-trips: rename, export, import into a fresh store', () => {
+  const a = setupRenamed();
+  a.backend.data.set('game|p:1|demo.old', JSON.stringify({ v: 1, data: 5 }));   // written under the old id
+  let file;
+  try {
+    assert.equal(a.store.section(renamed).get(), 5, 'the alias key loads');
+    a.store.flush('test');
+    assert.equal(JSON.parse(a.backend.data.get('game|p:1|demo.aliased')!).data, 5, 'migrated to the canonical key');
+    assert.ok(a.backend.data.has('game|p:1|demo.old'), 'the pre-rename key is kept for rollback');
+    file = a.store.exportPlayer();
+    assert.deepEqual(file.sections['demo.aliased'], { v: 1, data: 5 });
+    assert.equal(file.orphans?.['demo.old'], undefined, 'the stale alias key is not exported as an orphan');
+    // The same file re-imports into the store that wrote it.
+    assert.equal(a.store.importPlayer(JSON.stringify(file)).sections['demo.aliased'], 'saved');
+  } finally { a.store.dispose(); }
+  const b = setupRenamed();
+  try {
+    const report = b.store.importPlayer(JSON.stringify(file));
+    assert.equal(report.sections['demo.aliased'], 'saved');
+    assert.equal(b.store.section(renamed).get(), 5);
+    assert.equal(b.backend.data.has('game|p:1|demo.old'), false);
+  } finally { b.store.dispose(); }
+});
+
+test('a newer payload found only under an alias key exports under the canonical id', () => {
+  const a = setupRenamed();
+  const future = { v: 2, data: 'future' };
+  a.backend.data.set('game|p:1|demo.old', JSON.stringify(future));
+  try {
+    assert.equal(a.store.section(renamed).get(), 0);
+    const file = a.store.exportPlayer();
+    assert.equal(file.sections['demo.aliased'], undefined);
+    assert.deepEqual(file.orphans?.['demo.aliased'], future);
+    assert.equal(file.orphans?.['demo.old'], undefined);
+  } finally { a.store.dispose(); }
+});
+
+test('an alias orphan beside its renamed section is superseded, not a conflict', () => {
+  const { store, backend } = setupRenamed();
+  const oldKey = 'game|p:1|demo.old';
+  try {
+    for (const [incomingId, v] of [['demo.aliased', 1], ['demo.old', 1], ['demo.aliased', 2]] as const) {
+      backend.data.set(oldKey, 'local pre-rename bytes');
+      const report = store.importPlayer(JSON.stringify({ format: 'engine-profile', version: 2,
+        sections: { [incomingId]: { v, data: 9 } }, orphans: { 'demo.old': { v: 1, data: 4 } } }));
+      assert.equal(report.sections['demo.old'], 'orphan-superseded');
+      assert.equal(report.sections['demo.aliased'], v === 1 ? 'saved' : 'skipped-newer');
+      assert.equal(backend.data.get(oldKey), 'local pre-rename bytes', 'a superseded orphan is never written');
+      if (v === 1) assert.equal(store.section(renamed).get(), 9);
+    }
+    // Without the section in the file, the alias payload is an ordinary orphan again.
+    backend.data.delete(oldKey);
+    const report = store.importPlayer(JSON.stringify({ format: 'engine-profile', version: 2, sections: {}, orphans: { 'demo.old': { v: 1, data: 4 } } }));
+    assert.equal(report.sections['demo.old'], 'orphan-kept');
+    assert.equal(backend.data.get(oldKey), JSON.stringify({ v: 1, data: 4 }));
+  } finally { store.dispose(); }
+});
+
+test('a genuine unknown orphan conflict still fails beside a renamed section, leaves bytes intact and retries', () => {
+  const { store, backend } = setupRenamed();
+  const key = 'game|p:1|demo.unknown', entry = { v: 1, data: 'incoming' };
+  const file = JSON.stringify({ format: 'engine-profile', version: 2, sections: { 'demo.aliased': { v: 1, data: 3 } },
+    orphans: { 'demo.old': { v: 1, data: 1 }, 'demo.unknown': entry } });
+  try {
+    backend.data.set(key, 'different local bytes');
+    let report = store.importPlayer(file);
+    assert.equal(report.sections['demo.unknown'], 'orphan-conflict');
+    assert.equal(report.sections['demo.old'], 'orphan-superseded');
+    assert.equal(backend.data.get(key), 'different local bytes');
+    backend.data.delete(key);
+    backend.failSet = k => k === key;
+    assert.equal(store.importPlayer(file).sections['demo.unknown'], 'orphan-failed');
+    assert.equal(backend.data.has(key), false);
+    backend.failSet = () => false;
+    report = store.importPlayer(file);
+    assert.equal(report.sections['demo.unknown'], 'orphan-kept');
+    assert.equal(backend.data.get(key), JSON.stringify(entry));
   } finally { store.dispose(); }
 });
 
