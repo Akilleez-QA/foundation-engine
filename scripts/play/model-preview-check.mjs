@@ -31,6 +31,15 @@ const server=await createServer({root:ROOT,logLevel:'error',plugins:[{name:'mode
 });}}],server:{host:'127.0.0.1',port:0}});
 const report={dirtyWorktree:!!execFileSync('git',['status','--porcelain'],{cwd:ROOT,encoding:'utf8'}).trim(),revision:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),passed:false,errors:[],consoleErrors:[],screenshots:[],limitations:['Desktop Chromium emulation only; no physical-device, phone or full accessibility acceptance.','Two original fixture variants; no skeletal fusion or retargeting claim.','Single-writer local save; readiness is separate from durable publication.']};
 const evidence=diagnosticReport(report,resolve(out,'report.json'));let browser;
+const assertExpectedErrors=()=>{
+ assert.deepEqual(report.errors,[]);
+ for(const id of ['failed','second']){
+   const resource=report.consoleErrors.filter(e=>e.url.endsWith(`/__model-preview/${id}.glb`)&&/^Failed to load resource:.*503/.test(e.text));
+   const runtime=report.consoleErrors.filter(e=>e.text.startsWith(`[feature.sample] sample: model failed Error: [assets] /__model-preview/${id}.glb: HTTP 503`));
+   assert.equal(resource.length,1,`${id} expected browser HTTP failure`);assert.equal(runtime.length,1,`${id} expected owned failure report`);
+ }
+ assert.equal(report.consoleErrors.length,4,'only the four explicit injected error reports are allowed');
+};
 try{
  await server.listen();browser=await launch({width:1440,height:960,strictClose:true});const page=browser.page;page.on('pageerror',e=>report.errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')report.consoleErrors.push({text:m.text(),url:m.location().url});});
  await page.addInitScript(()=>{window.__modelDraws=0;for(const ctor of [window.WebGLRenderingContext,window.WebGL2RenderingContext]){if(!ctor)continue;for(const name of ['drawElements','drawArrays','drawElementsInstanced','drawArraysInstanced']){const original=ctor.prototype[name];if(original)ctor.prototype[name]=function(...args){window.__modelDraws++;return original.apply(this,args);};}}});
@@ -110,13 +119,6 @@ try{
  assert.equal((await read()).retired,true);assert.equal((await read()).count,0);
  const released=await resources();assert.equal(released.instances,0);assert.equal(released.residentMiB,0);assert.equal(released.bytesKeptMiB,0);assert.equal(released.pinnedMiB,0);assert.equal(released.cleanupFailures,0);
  report.retirement={baseline,cycles,disposalTransport,released,scope:'Exact browser transport terminal events precede owned-resource assertions. Requests can abort before decode; this is not decoded-work completion or document-owned renderer disposal evidence.'};
- assert.deepEqual(report.errors,[]);
- for(const id of ['failed','second']){
-   const resource=report.consoleErrors.filter(e=>e.url.endsWith(`/__model-preview/${id}.glb`)&&/^Failed to load resource:.*503/.test(e.text));
-   const runtime=report.consoleErrors.filter(e=>e.text.startsWith(`[feature.sample] sample: model failed Error: [assets] /__model-preview/${id}.glb: HTTP 503`));
-   assert.equal(resource.length,1,`${id} expected browser HTTP failure`);assert.equal(runtime.length,1,`${id} expected owned failure report`);
- }
- assert.equal(report.consoleErrors.length,4,'only the four explicit injected error reports are allowed');
  writeFileSync(resolve(out,'snapshots.json'),JSON.stringify({initial,pending,preview,before,after,released},null,2));report.passed=true;
-}catch(error){evidence.fail(error);}finally{release();await evidence.close(browser,'browser close');await evidence.close(server,'server close');evidence.finish();}
+}catch(error){evidence.fail(error);}finally{release();await evidence.close(browser,'browser close');await evidence.close(server,'server close');try{assertExpectedErrors();}catch(error){evidence.fail(error);}evidence.finish();}
 console.log(`Model preview passed; evidence ${out}`);
