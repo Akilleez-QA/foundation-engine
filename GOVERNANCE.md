@@ -12,6 +12,14 @@
 - Changes to the author API (`@engine`), [docs/STANDARD.md](docs/STANDARD.md), a budget raise, or a new kit: an issue or discussion first, then an ADR in [docs/adr/](docs/adr/README.md) that records the decision. Maintainers aim for consensus. When there is none, the lead maintainer decides and records the reasoning in the ADR.
 - The standard's laws change only by an ADR that names the law, the reason and the migration.
 
+## Review and integration
+
+The normal route is a protected pull request with required checks passing and maintainer review. Record review findings and their resolution against the exact proposed head. Full hosted CI can supply the integration gate; a second local run of the same heavy suites is optional. A base update creates a new combined candidate that needs current evidence.
+
+When there is only one active human maintainer and GitHub cannot accept that person's approval of their own PR, the repository owner may explicitly authorize an administrative merge exception. Keep all required checks passing; do not use this exception to bypass a failing or missing CI result. Before merging, record the exact head/base, CI link, separate source review, resolved findings and why the human-approval rule needs the exception. Identify whether the separate reviewer is a person or an agent. An agent review is evidence, not a GitHub human approval, and a maintainer's own reread is not independent review.
+
+This exception does not authorize contributors to change branch protection, bypass checks, release packages or deploy. It is a recorded owner decision for the specified merge. See [ADR 0077](docs/adr/0077-candidate-verification-evidence.md).
+
 ## Becoming a maintainer
 
 A contributor with a steady record of merged work and useful reviews can be nominated by a maintainer. The existing maintainers agree by consensus, and the new maintainer is added to CODEOWNERS.

@@ -1,16 +1,21 @@
 # Release readiness
 
-Foundation Engine can be installed and tested without accounts or deployment credentials. The repository's examples use local assets. The package remains private until maintainers explicitly choose a distribution channel.
+Foundation Engine is distributed as public source. `package.json` uses `private: true` to prevent accidental npm publication; that setting does not make the Git repository private. Installation and checks require no paid AI tool or deployment credentials.
+
+For an ordinary contribution, start with [CONTRIBUTING.md](../../CONTRIBUTING.md). For a release from this public repository, use [Before making a release](#before-making-a-release). The [source-publication procedure](#source-publication-procedure) is only for a separately authorized repository/history migration, not a routine release.
 
 ## A new checkout
 
-Use Node.js 22.13 or newer in the 22.x line for the full checks (the optional
-SQLite authority host requires at least 22.13), and run:
+Use Node.js 22.18 or newer in the 22.x line to match the supported toolchain and CI. From a full Git checkout:
 
 ```sh
 npm ci
 npm run build
-npm test
+```
+
+Complete hosted CI on the reviewed revision supplies integration evidence. To reproduce that full workflow locally on a suitable runner (optional when hosted evidence exists):
+
+```sh
 npx --no-install playwright-core install --with-deps chromium
 npm run gate:ci
 ```
@@ -25,6 +30,8 @@ A source ZIP supports installation and builds. Budget comparison and other histo
 
 ## Contribution checks
 
+Full hosted CI on the reviewed candidate is the required coverage; contributors need not duplicate it locally. Follow the [public review policy](../../GOVERNANCE.md#review-and-integration), including exact-head evidence and any explicitly authorized sole-maintainer exception.
+
 The workflow runs on ordinary pull requests, including forks, with read-only repository permissions and no deployment secrets. Checkout credentials are not persisted. Actions are pinned to verified commits; update the pins deliberately when upgrading them. It runs the complete integration gate for every discovered template and a separate phone smoke for each template. Browser workers, scratch files and build output stay within the runner job; concurrent runs for the same ref replace obsolete runs.
 
 Do not change this workflow to execute unreviewed contributions through `pull_request_target`, add write permissions, or expose publishing credentials to test jobs. Tests and release publication are separate operations.
@@ -32,7 +39,7 @@ Do not change this workflow to execute unreviewed contributions through `pull_re
 ## Before making a release
 
 - Confirm the selected GPL-3.0-only license, package metadata and third-party notices agree, including bundled sample assets.
-- Confirm a fresh Node.js 22 installation and `npm run gate:ci` (which includes all template gates) pass on the exact reviewed commit.
+- Record the exact source commit/tree and successful complete hosted CI run (or equivalent `npm run gate:ci` result), including all template gates. Record fresh Node 22.18+ install/build evidence separately. Focused checks and an earlier head's pass do not establish acceptance of the release candidate.
 - Check the repository and release archive for credentials, private configuration and machine-specific paths. Ignoring local credential files prevents accidental additions; it does not replace review or remove historical material.
 - Inspect dependency and asset changes; retain source, license and attribution records.
 - Record known limitations, the tested platforms and any reference-performance warnings with the release.
@@ -45,6 +52,16 @@ On 2026-09-30 a fresh temporary source snapshot, without `node_modules`, generat
 
 
 ## Device experience claims
+
+Use these existing records instead of inventing a second support matrix:
+
+| Record | What it establishes |
+| --- | --- |
+| [Application device matrix](../APPLICATION.md#device-experience-acceptance-adr-0068) | Template for declaring each target, inputs, quality, reference hardware and evidence; placeholder rows remain unverified |
+| [Stock template device audit](../kits/stock-device-acceptance-matrix.md) | Historical seven-template source audit with later scoped receipts; not a current exhaustive list or physical-device certification |
+| [Current upgrade acceptance ledger](upgrade-acceptance-ledger.md) | Per-feature integration and evidence boundaries; consult the referenced revision/consumer before making a claim |
+
+For each release, identify its actual included templates and fill the chosen target rows from real evidence. A new template or a later integration is not automatically covered by an older audit.
 
 - Confirm author-selected targets, modes and edition scope. Single-target maximum
   quality and explicit cross-platform tradeoffs are valid; unsupported targets do
@@ -59,6 +76,8 @@ On 2026-09-30 a fresh temporary source snapshot, without `node_modules`, generat
   limitations explicitly; do not silently remove a target or weaken its thresholds.
 
 ## Source-publication procedure
+
+**Separate migration only.** The source is already public. Do not repeat history export, repository recreation, backup deletion or visibility changes for a normal release. The steps below apply only when the repository owner explicitly commissions a new publication/migration operation. The [historical publication record](release-preparation-status.md#publication-outcome-2026-10-01) documents the initial transition; its old pending checklist is not the current release checklist.
 
 Preparation does not change repository visibility. Record the selected source
 commit, tree identity, checks and remaining limitations before publication.
