@@ -16,7 +16,7 @@ npm ci
 
 ## 2. Prepare automated browser checks (optional for first play)
 
-You can play in your ordinary browser immediately after step 3. For step 7, `npm run play:snap`, scripted playtests, the bench and the gate drive a muted Chromium of their own. Install Playwright's copy once:
+You can play in your ordinary browser in step 4. For step 7, `npm run play:snap`, scripted playtests, the bench and the gate drive a muted Chromium of their own. Install Playwright's copy once:
 
 ```
 npx --no-install playwright-core install chromium
