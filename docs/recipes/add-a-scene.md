@@ -51,7 +51,7 @@ From a system: `ctx.scene.goto('level', { difficulty: 'hard' })` (the parameters
 ## 3. Budget and test
 
 - Add the scene to the game's `budgets.json` ([add-a-budget](add-a-budget.md)); the gate benches every listed scene.
-- Test its logic without a browser with `testScene` (see [add-a-system](add-a-system.md)), and look at it with `npm run play:snap -- --scene level`.
+- Test its logic without a browser with `testScene` (see [test a scene](test-a-scene.md)), and look at it with `npm run play:snap -- --scene level`.
 
 
 The expedition shelter demonstrates lazy lifecycle implementation as well as a lazy

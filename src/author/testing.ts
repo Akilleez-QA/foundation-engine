@@ -9,7 +9,7 @@ import { createSaveStore } from '../core/save/store';
 import { MemoryBackend } from '../core/save/storage-port';
 import { createWorkerHost } from '../platform/workers/host';
 import type { AudioClockReading } from '../platform/audio/audio-timeline';
-import { normalizeCueVoiceOptions, type CueVoiceOptions } from '../platform/audio/audio-output';
+import { BUILT_IN_CUES, normalizeCueVoiceOptions, type CueVoiceOptions } from '../platform/audio/audio-output';
 import type { MusicOptions } from '../platform/audio/music-clock';
 import { EMITTER_ID, type ParticleStats } from './particle-contract';
 import { createRng, deriveSeed } from '../core/rng';
@@ -55,9 +55,13 @@ export interface TestScene {
   release(action: string): void;
   /** Where the scene asked to go (`ctx.scene.goto` / `restart`), in order. */
   readonly went: string[];
-  /** Audio cues and sound ids played. */
+  /** Audio cues and sound ids played (`ctx.play` and `ctx.playVoice`), in order. */
   readonly cues: string[];
-  /** Every `ctx.play`, with its options (checked as the runtime checks them). */
+  /**
+   * Every `ctx.play`, with its options (checked as the runtime checks them). An id that is neither a built-in cue
+   * (`BUILT_IN_CUES`), one of the scene's `sounds`, nor one of `testScene`'s `sounds` throws, naming the id: the
+   * browser only warns `no cue or sound '<id>'` in the console and plays nothing.
+   */
   readonly plays: { id: string; options?: PlayOptions }[];
   /**
    * Every `ctx.playVoice`, in order, with a copy of its options, normalised and checked by the audio output's own
@@ -77,13 +81,22 @@ export interface TestScene {
 /** `inputs` enables local press-action hints. Defaults report inContext=true; inject services.input for remaps and modal context. */
 /** `input` replaces the scripted input with a caller-owned InputState (e.g. a replay log); press/hold/release then throw. */
 /** `particleScale` is the `effects.particles` quality knob (default 1, the reference preset). */
-export async function testScene(scene: SceneDefinition, o: { particleScale?: number; brief?: BuildBrief; game?: GameDefinition; inputs?: readonly InputDefinition[]; calm?: boolean; params?: Record<string, string>; seed?: number; systems?: readonly SystemDefinition[]; services?: Partial<Services>; input?: InputSource; audioClock?: (nowMs: number) => AudioClockReading | null } = {}): Promise<TestScene> {
+/** `sounds` adds ids `ctx.play` / `ctx.playVoice` may use besides `BUILT_IN_CUES` and the scene's own `sounds`: an
+ *  audio asset the scene plays without listing it, or a cue registered by a module the test composes. */
+export async function testScene(scene: SceneDefinition, o: { particleScale?: number; sounds?: readonly string[]; brief?: BuildBrief; game?: GameDefinition; inputs?: readonly InputDefinition[]; calm?: boolean; params?: Record<string, string>; seed?: number; systems?: readonly SystemDefinition[]; services?: Partial<Services>; input?: InputSource; audioClock?: (nowMs: number) => AudioClockReading | null } = {}): Promise<TestScene> {
   const body = await bodyOf(scene);
   const hintSource = o.services?.input;
   const describe = sceneActionHints(o.inputs ?? [], hintSource ? id => hintSource.describeAction(id) : defaultActionHints(o.inputs ?? []));
   const strings: Record<string, string> = Object.assign(Object.fromEntries((o.inputs ?? []).map(i => [`game.input.${i.id}`, i.label])), ...(o.game?.kits ?? []).map(k => k.strings.en ?? {}), o.game?.strings?.en ?? {});
   const world = new World();
   for (const e of body.entities) spawnInto(world, e);
+  if (o.sounds !== undefined && (!Array.isArray(o.sounds) || o.sounds.some(id => typeof id !== 'string' || !id))) throw Error('testScene: sounds must be a list of ids');
+  const playable = new Set([...BUILT_IN_CUES, ...scene.sounds ?? [], ...o.sounds ?? []]);
+  const known = (call: string, id: string) => {
+    if (playable.has(id)) return;
+    throw Error(`testScene: ${call}('${String(id)}'): no cue or sound '${String(id)}' in scene ${scene.id}. Built-in cues: ${BUILT_IN_CUES.join(', ')}. ` +
+      `A game sound needs defineAsset({ type: 'audio' }) and the scene's sounds (or testScene's sounds option).`);
+  };
   const pressed = new Map<string, number>(), held = new Map<string, number>(), went: string[] = [], cues: string[] = [], plays: { id: string; options?: PlayOptions }[] = [], voices: TestVoice[] = [], music: { id: string; options?: MusicOptions }[] = [];
   // No real timers or retained timer callbacks: headless saves flush explicitly.
   const injectedSave = o.services?.save;
@@ -107,7 +120,7 @@ export async function testScene(scene: SceneDefinition, o: { particleScale?: num
     named: name => { for (const [e, n] of world.query(Name)) if (n.name === name) return e as Entity; return undefined; },
     save: def => authorSaveHandle(save, def),
     text: (key, vars) => { const m = strings[key]; return m === undefined ? key : renderMessage(parseMessage(m), vars, 'en'); },
-    play: (cue, options) => { validatePlayOptions(options); cues.push(cue); plays.push({ id: cue, ...(options ? { options: structuredClone(options) } : {}) }); },
+    play: (cue, options) => { known('ctx.play', cue); validatePlayOptions(options); cues.push(cue); plays.push({ id: cue, ...(options ? { options: structuredClone(options) } : {}) }); },
     modelState: entity => {
       const requested = disposed || !world.has(entity, Transform) ? undefined : world.get(entity, Model);
       return Object.freeze({ status: requested ? 'loading' : 'absent', requestedAsset: requested?.asset ?? null, adoptedAsset: null });
@@ -115,7 +128,7 @@ export async function testScene(scene: SceneDefinition, o: { particleScale?: num
     modelAttachmentState: entity => Object.freeze({ status: disposed || !world.has(entity, Transform) || !world.has(entity, Model) ? 'absent' : world.has(entity, ModelAttachment) ? 'unresolved' : 'unattached', held: false }),
     modelPoseLinkState: entity => Object.freeze({ status: disposed || !world.has(entity, Transform) || !world.has(entity, Model) ? 'absent' : world.has(entity, ModelPoseLink) ? 'unresolved' : 'unlinked', reason: null }),
     modelSocket: () => null,
-    playVoice: (cue, options) => { const normal = normalizeCueVoiceOptions(options); cues.push(cue); voices.push({ id: cue, ...(options ? { options: voiceRecord(normal) } : {}) }); return null; },
+    playVoice: (cue, options) => { known('ctx.playVoice', cue); const normal = normalizeCueVoiceOptions(options); cues.push(cue); voices.push({ id: cue, ...(options ? { options: voiceRecord(normal) } : {}) }); return null; },
     audioClock: () => o.audioClock?.(t * 1000) ?? null,
     playMusic: (id, options) => { music.push({ id, ...(options ? { options: { ...options, ...(options.loop ? { loop: { ...options.loop } } : {}) } } : {}) }); return null; },
     loadMusic: async () => false,

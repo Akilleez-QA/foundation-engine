@@ -35,3 +35,5 @@ t.press('jump'); t.run(1 / 60);
 assert.ok(t.world.get(t.ctx.named('player')!, Transform)!.x > 2);
 assert.deepEqual(t.cues, ['ui.click']);
 ```
+
+Every option and result field of `testScene` (`went`, `plays`, `voices`, `music`, `particles`, …) is in [test a scene](test-a-scene.md).
