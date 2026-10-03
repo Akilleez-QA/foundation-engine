@@ -2,23 +2,25 @@
 
 The new `npm run test:first-use-browser` measures the existing explorer consumer through browser-observed shell/program state and real keyboard movement. No runtime implementation, budget or quality threshold changed. Timings are advisory; missing readiness, movement, bounded contexts, or clean completion fails the check.
 
-## Evidence identity
+## Latest evidence: standalone public-main branch
 
-Passed at 2026-10-03T17:41:45.446668+00:00 on base `5ef916e` with the context-lifetime fix uncommitted. Exact tested script SHA-256: `2cb0f41c909a3c1b6db6b37813bcd1f5ec0b366bd64512f13431f28c277a40e0`. The source was committed unchanged in `46949946a6a7ad7d4b40b3cd454704f2caa5d1ca`. This is working-tree evidence, not full-gate acceptance of the final commit.
+Passed at **2026-10-03T17:46:29.825425+00:00** on exact head `93cd618993e5fb7be0bd1863d31f499f052bad8f`, based directly on public main `2fb6e69`. Script SHA-256: `2cb0f41c909a3c1b6db6b37813bcd1f5ec0b366bd64512f13431f28c277a40e0`. The report records `dirtyWorktree: false`. This was a focused browser run, not full-gate acceptance. This receipt update changes documentation and samples only.
 
-[All 21 raw visit samples](samples.json) are retained. The local regenerable `playtest/first-use/report.json` additionally includes NavigationTiming and ResourceTiming entries; `first-context.png` was visually inspected (garden, player and Found 0 of 3 HUD visible). No page or cleanup failures occurred. Three contexts each retained 189 resource entries, without buffer truncation.
+The focused branch contains only the diagnostic, its npm/CI registration and evidence. No broader local integration candidate is included. The observed test APIs (`engine.goto`, `engine.state`, pool probe), browser launcher, explorer consumer and shell readiness markers already exist on public main.
 
-Environment: Linux, Node 26.8.1, Chromium 152.0.7977.82, muted isolated headless software GL, 1280×800/DPR1, Vite development server, seed1, niceness15. Three fresh browser contexts run serially inside one browser process. This is context/application-cold, not proof of cold disk/network/driver shader caches. Vite transformations and shared-machine scheduling contribute to the figures.
+[All 21 raw visit samples](samples.json) are retained from this public-main-based run. The local regenerable `playtest/first-use/report.json` additionally includes NavigationTiming and ResourceTiming entries; `first-context.png` was visually inspected (garden, player and Found 0 of 3 HUD visible). No page or cleanup failures occurred. Each context retained 185 resource entries, without buffer truncation.
+
+Environment: Linux, Node v26.8.1, Chromium 152.0.7977.82, muted isolated headless software GL, 1280×800/DPR1, Vite development server, seed1, niceness15. Three fresh browser contexts run serially inside one browser process. Exactly one context is asserted during each sample group and zero after each group closes. This is context/application-cold, not proof of cold disk/network/driver shader caches. Vite transformations and shared-machine scheduling contribute to the figures.
 
 ## Observations in milliseconds
 
 | Context | Navigation start → first garden active | Request → first shed active | Request → first return active |
 | --- | ---: | ---: | ---: |
-| 1 | 868.9 | 94.2 | 95.5 |
-| 2 | 458.4 | 79.9 | 94.7 |
-| 3 | 481.3 | 80.5 | 96.4 |
+| 1 | 978.5 | 93.4 | 95.1 |
+| 2 | 445.1 | 76.8 | 97.8 |
+| 3 | 439.4 | 92.9 | 78.5 |
 
-Two further round trips per context produced raw arrival intervals from 75.4–80.5ms. Browser keydown handler → observed changed player state ranged 10.1–12.0ms with a 10ms polling observer. These are observed aggregate intervals, not a percentile, latency guarantee, input-to-photon measurement or regression threshold. Each arrival held exactly one live pooled context and zero overflows.
+Two further round trips per context produced raw arrival intervals from 78.9–97.1ms. Browser keydown handler → observed changed player state ranged 10.0–33.4ms with a 10ms polling observer. These are observed aggregate intervals, not a percentile, latency guarantee, input-to-photon measurement or regression threshold. Each arrival held exactly one live pooled context and zero overflows.
 
 The first-use sample size is deliberately small. The variation in context-cold entries is a reason to retain cache/environment context, not evidence of an optimization. Same-page repeats can still recreate program objects as the renderer lease changes.
 
@@ -35,16 +37,11 @@ The input observer starts inside the browser keydown event handler and ends when
 ```sh
 nice -n 15 npm run test:first-use-browser
 node --import tsx --test scripts/gate-ci.test.mjs
+node scripts/lint/genericity.mjs
 ```
 
-Browser:21 samples passed; workflow parser:6 tests passed. Syntax and diff checks passed. CI is registered to repeat the diagnostic, but no remote CI, full integration gate or production-build comparison was performed for this slice.
+Browser:21 samples passed; workflow parser:6 tests passed. Syntax, final-document genericity and diff checks passed. CI is registered to repeat the diagnostic, but no remote CI, full integration gate or production-build comparison was performed for this slice.
 
+## Historical development evidence
 
-## Review correction
-
-The first run accidentally retained its initial browser context during subsequent context groups. Its numerical baseline is superseded by the samples above; the original receipt remains in Git history. The corrected script closes every context, including the initial context, and asserts exactly one live context during each sample group and zero before the next. All 21 refreshed samples passed. This removes background application workload from earlier groups without claiming browser/driver caches were cleared. Final documentation passed `node scripts/lint/genericity.mjs`; no full gate was run.
-
-
-## Standalone public-main preparation
-
-This focused branch is based directly on public main `2fb6e69`; it contains only the diagnostic, its npm/CI registration and this evidence. It does not include the broader local integration candidate. The observed test APIs (`engine.goto`, `engine.state`, pool probe), browser launcher, explorer consumer and shell readiness markers already exist on that base. The historical samples above were recorded on the earlier local candidate and must not be presented as timing measurements of public main. Browser acceptance of this rebased branch is pending; syntax, genericity and six workflow-parser tests passed after extraction.
+The earlier samples recorded on local candidate `1be7ba7` and its diagnostic branches are historical and are not the current public-main baseline. They remain in Git history. The first development run retained its initial context during subsequent sample groups, creating asymmetric background workload; review corrected this by closing every context and asserting one live context during each group and zero before the next. The corrected candidate run passed at 2026-10-03T17:41:45Z. Both sets of candidate timings are superseded here by the exact-head public-main-based run above. No claim that the candidate's additional runtime changes were needed for this diagnostic is made.
