@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { must } from '../../testing/must';
 
 const repo = new URL('../../../', import.meta.url).pathname;
 
@@ -33,7 +34,7 @@ test('the game instance fetches the narration catalogue once and then renders ev
     assert.equal(narrationLine('welcome'), '');
     await Promise.all([narrationCatalog.load(), narrationCatalog.load()]);
     assert.equal(asked.length, 1);
-    assert.match(asked[0], /\/generated\/strings\/en\/narration\.json$/);
+    assert.match(must(asked[0], 'the fetched URL'), /\/generated\/strings\/en\/narration\.json$/);
     for (const [key, text] of Object.entries(lines)) assert.equal(narrationLine(key), text, key);
     assert.equal(hasNarrationLine('no-such-line'), false);
   } finally { globalThis.fetch = realFetch; }

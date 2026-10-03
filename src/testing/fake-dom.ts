@@ -94,12 +94,12 @@ const decode=(t:string)=>t.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&q
 function parseInto(root:FakeElement,html:string){
  const stack:FakeElement[]=[root],doc=root.ownerDocument,token=/<!--[\s\S]*?-->|<\/([a-zA-Z][\w-]*)\s*>|<([a-zA-Z][\w-]*)((?:\s+[^\s=>\/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*(\/?)>|([^<]+)/g;
  for(const m of html.matchAll(token)){
-  const top=stack[stack.length-1];
+  const top=stack[stack.length-1]!;// root stays: closing tags truncate to length i >= 1
   if(m[5]!==undefined){top.append(doc.createTextNode(decode(m[5])));continue;}
-  if(m[1]){for(let i=stack.length-1;i>0;i--)if(stack[i].tagName===m[1].toUpperCase()){stack.length=i;break;}continue;}
+  if(m[1]){for(let i=stack.length-1;i>0;i--)if(stack[i]!.tagName===m[1].toUpperCase()){stack.length=i;break;}continue;}
   if(!m[2])continue;
   const el=doc.createElement(m[2]);top.append(el);
-  for(const a of (m[3]??'').matchAll(/([^\s=>\/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g))el.setAttribute(a[1],decode(a[2]??a[3]??a[4]??''));
+  for(const a of (m[3]??'').matchAll(/([^\s=>\/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g))el.setAttribute(a[1]!,decode(a[2]??a[3]??a[4]??''));
   if(el.hasAttribute('hidden'))el.hidden=true;
   if(!m[4]&&!voidTags.has(m[2].toLowerCase()))stack.push(el);
  }
@@ -109,7 +109,7 @@ function matchCompound(el:FakeElement,compound:string){
  const parts=compound.match(/^[a-z0-9-]+|\.[\w-]+|\[[^\]]+\]|:[\w-]+(\([^)]*\))?/gi);if(!parts||parts.join('')!==compound)return false;
  return parts.every(p=>{
   if(p.startsWith('.'))return el.classList.contains(p.slice(1));
-  if(p.startsWith('[')){const m=p.slice(1,-1).match(/^([\w-]+)(?:=["']?([^"']*)["']?)?$/);if(!m)return false;return m[2]===undefined?el.hasAttribute(m[1]):el.getAttribute(m[1])===m[2];}
+  if(p.startsWith('[')){const m=p.slice(1,-1).match(/^([\w-]+)(?:=["']?([^"']*)["']?)?$/);if(!m)return false;return m[2]===undefined?el.hasAttribute(m[1]!):el.getAttribute(m[1]!)===m[2];}// group 1 is not optional
   if(p.startsWith(':'))return p===':not([hidden])'?!el.hidden:false;
   return el.tagName===p.toUpperCase();
  });

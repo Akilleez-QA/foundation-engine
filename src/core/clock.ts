@@ -114,7 +114,7 @@ export function createClock(opts: ClockOptions = {}): { clock: GameClock; driver
     schedule(atUt, fn, signal) {
       if (signal?.aborted) return;
       // Stable order: events at the same UT fire in the order they were scheduled.
-      let i = events.length; while (i > 0 && events[i - 1].at > atUt) i--;
+      let i = events.length; while (i > 0 && events[i - 1]!.at > atUt) i--; // i - 1 in [0, length)
       events.splice(i, 0, { at: atUt, fn, signal });
     },
     pause(owner) { pauses.add(owner); },
@@ -150,7 +150,7 @@ export function createClock(opts: ClockOptions = {}): { clock: GameClock; driver
       if (timeline !== identity) return interrupted();
       const dt = Math.min(realDt, MAX_FRAME_S) * granted;
       let to = from + dt, clampedBy: number | undefined; const g0 = granted;
-      while (events.length && events[0].at <= to) {
+      while (events.length && events[0]!.at <= to) { // events[0] exists: length > 0
         const e = events.shift()!;
         if (e.signal?.aborted) continue;
         ut = Math.max(from, e.at);

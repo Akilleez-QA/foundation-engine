@@ -3,6 +3,7 @@ import {spawnSync} from 'node:child_process';
 import {existsSync, readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {compactKeys} from './scripts/compact-keys.mjs';
+import {threeGlsl} from './scripts/three-glsl.mjs';
 import {gameDir} from './scripts/lib/game-dir.mjs';
 import {gamePublic, gamePublicDir} from './scripts/lib/game-public.mjs';
 
@@ -58,7 +59,7 @@ export default defineConfig({
     {find: /^@kits\/([a-z-]+)$/, replacement: fileURLToPath(new URL('./src/kits/', import.meta.url)) + '$1/index.ts'},
     {find: /^@game\//, replacement: gameDir() + '/'},
   ]},
-  plugins: [engineStrings, lanWarning, licenseNotices, gamePublic(), compactKeys(fileURLToPath(new URL('./src/generated/strings/compact-ids.json', import.meta.url))), testApi],
+  plugins: [engineStrings, lanWarning, licenseNotices, gamePublic(), threeGlsl(), compactKeys(fileURLToPath(new URL('./src/generated/strings/compact-ids.json', import.meta.url))), testApi],
   // Static files: Vite's publicDir is the game's own `<game>/public/`, or the root `public/` for a game without one
   // (scripts/lib/game-public.mjs), so the dev server and the build serve the same files the same way. A build ships
   // only the game it builds, never another template's files; gamePublic() refuses reserved names and symbolic links.

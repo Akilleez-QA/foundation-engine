@@ -55,7 +55,7 @@ export function splitQuery(hash: string): [string, Record<string, string>] {
 /** A route hash with parameters as its query, keys sorted so one set of params always writes one address. */
 export function withQuery(hash: string, params: Readonly<Record<string, string>> = {}): string {
   const keys = Object.keys(params).sort();
-  return keys.length ? `${hash}?${new URLSearchParams(keys.map(k => [k, params[k]])).toString()}` : hash;
+  return keys.length ? `${hash}?${new URLSearchParams(keys.map(k => [k, params[k]!])) /* k is an own key of params */.toString()}` : hash;
 }
 
 /** Every route of every scene, canonical route first. */
