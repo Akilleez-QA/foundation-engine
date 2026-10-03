@@ -13,7 +13,7 @@ import type { EnvironmentState } from './environment';
  * optional kits built on this same surface.
  */
 import { component, type ComponentInit, type ComponentType, type Entity, type World } from '../core/ecs/world';
-import type { SaveSection, SaveScope, SectionStatus } from '../core/save/section';
+import type { Migration, SaveSection, SaveScope, SectionStatus } from '../core/save/section';
 import type { ActionDescription, KeyChord, PadInput } from '../platform/input/actions';
 import type { EngineModule } from '../core/module';
 import type { Services } from '../core/services';
@@ -270,9 +270,9 @@ export function defineScene(s: SceneInput): SceneDefinition {
 
 // ------------------------------------------------------------------ save sections
 
-/** One save migration. The old value comes from storage, so its true type is `unknown`; the method form lets authors
- *  annotate the shape they expect (`(old: { best: number }) => …`) without a cast. */
-export type SaveMigration = { migrate(old: unknown): unknown }['migrate'];
+/** One save migration (the store's `Migration`). The old value comes from storage, so its true type is `unknown`; the
+ *  method form lets authors annotate the shape they expect (`(old: { best: number }) => …`) without a cast. */
+export type SaveMigration = Migration;
 export interface SaveSectionInput<T> {
   /** '<owner>.<name>' ('run.best'); it is save data and never renamed. */
   id: string;

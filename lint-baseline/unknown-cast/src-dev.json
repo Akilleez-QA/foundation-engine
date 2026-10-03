@@ -1,0 +1,8 @@
+{
+  "rule": "unknown-cast",
+  "folder": "src/dev",
+  "count": 1,
+  "files": {
+    "src/dev/test-api.test.ts": 1
+  }
+}
