@@ -35,7 +35,21 @@ if (ctx.state.score > save.get().score) save.update(d => { d.score = ctx.state.s
 
 1. Add `migrate[<current version>]` returning the new shape.
 2. Update `initial`.
-3. Add a test that parses an old value through the migration.
+3. Retain an immutable, version-labelled stored envelope for **every supported
+   starting version**, not only the oldest (STD-SAV-7). Add new fixtures; do not
+   regenerate old ones from the latest serializer.
+4. Load each envelope through a fresh store owner, assert the migrated value,
+   flush, dispose, then reopen through another owner over the same backend.
+   Verify the current envelope and exact pre-migration backup bytes, and ensure
+   reload does not migrate again.
+5. Refuse backup or quarantine writes and prove the original bytes remain intact
+   until recovery succeeds. Keep failed writes retryable through the existing owner.
+
+See the [versioned example regression](../../src/core/save/migration-fixtures.test.ts)
+and its [retained envelopes](../../src/core/save/fixtures/migrations/). These are
+synthetic fixtures for an example section, not a claim that all historical game
+saves or a previous engine release have been tested. Each creator owns their
+section fixtures and declared supported versions.
 
 ## 4. Report persistence separately from edits
 
