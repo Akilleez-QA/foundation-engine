@@ -167,6 +167,7 @@ export function minigameEscape(
       if (modalDialogAbove(root)) return false;
       if (menu.menuOpen) menu.closeMenu();
       else close();
+      return undefined;
     },
   });
 }

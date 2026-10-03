@@ -608,6 +608,7 @@ test('GEN-01 adoption refuses oversized, offset or shared backing buffers and re
     } catch (e) {
       return e;
     }
+    return undefined;
   })();
   assert.ok(thrown instanceof GridJobError);
   assert.equal((thrown as GridJobError).stage, 'recipe');

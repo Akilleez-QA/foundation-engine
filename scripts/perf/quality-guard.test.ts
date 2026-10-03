@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {deflateSync} from 'node:zlib';
+import {must} from '../../src/testing/must';
 const load = (path: string) => import(path);
 const {encodePng, decodePng, comparePixels, crc32} = await load('./quality-png.mjs');
 const {validateViews, parseArgs, judge, reviewedSignOff} = await load('./quality-guard.mjs');
@@ -13,7 +14,7 @@ test('identical compares decoded pixels, including alpha, with zero tolerance', 
   const a = image(),
     b = image();
   assert.equal(comparePixels(a, b, 'identical').pass, true);
-  b.data[3]--;
+  b.data[3] = must(b.data[3], 'pixel byte 3') - 1;
   const r = comparePixels(a, b, 'identical');
   assert.equal(r.pass, false);
   assert.equal(r.different, 1);
@@ -82,7 +83,7 @@ test('PNG round-trip preserves all channels; corrupt or truncated evidence is re
   assert.deepEqual(decodePng(encodePng(a)), a);
   const png = encodePng(image(2, 2)),
     corrupt = Buffer.from(png);
-  corrupt[45] ^= 1;
+  corrupt[45] = must(corrupt[45], 'PNG byte 45') ^ 1;
   assert.throws(() => decodePng(corrupt), /CRC/);
   assert.throws(() => decodePng(png.subarray(0, -3)), /Truncated/);
   assert.throws(() => encodePng(image(0)), /dimensions/);

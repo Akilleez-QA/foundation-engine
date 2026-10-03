@@ -54,7 +54,7 @@ const licenseNotices: Plugin = {
       ['LICENSE', 'LICENSE.txt'],
       ['COPYRIGHT', 'COPYRIGHT.txt'],
       ['THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.txt'],
-    ]) {
+    ] as const) {
       this.emitFile({
         type: 'asset',
         fileName,

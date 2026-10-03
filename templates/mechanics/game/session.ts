@@ -14,6 +14,36 @@ import {createEquipment} from '@kits/equipment';
 import {createCapabilities} from '@kits/capabilities';
 import {createShots, resolveAction, sweep} from '@kits/combat';
 export const matrix = (x: number, y = 0, z = 0) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
+/** Element `i` of a 4x4 matrix (12, 13, 14 are its position); a shorter array is a broken pose. */
+const at = (m: readonly number[], i: number) => {
+  const v = m[i];
+  if (v === undefined) throw Error(`pose matrix has no element ${i}`);
+  return v;
+};
+const LABELS = [
+  'lab.ride',
+  'lab.exit',
+  'lab.claim',
+  'lab.equip',
+  'lab.fire',
+  'lab.place',
+  'lab.leave',
+  'lab.pack',
+  'lab.reset',
+] as const;
+const STATUSES = [
+  'lab.intro',
+  'lab.riding',
+  'lab.exited',
+  'lab.claimed',
+  'lab.equipped',
+  'lab.tagged',
+  'lab.occupied',
+  'lab.vacant',
+  'lab.packed',
+] as const;
+/** The lab's steps, in order: an index into LABELS and STATUSES. */
+type Phase = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export function createSession(ctx: SceneContext) {
   const owner = createControl(
     {owner: 'character', target: 'player', frame: {id: 'lab', generation: 1}},
@@ -71,7 +101,7 @@ export function createSession(ctx: SceneContext) {
   const shots = createShots(4);
   let track: ReturnType<typeof createMarkerTrack> | null = null,
     started = 0;
-  let phase = 0,
+  let phase: Phase = 0,
     tags = 0,
     markers = 0,
     flashUntil = 0;
@@ -139,7 +169,13 @@ export function createSession(ctx: SceneContext) {
         if (
           pose &&
           owner.transition({owner: 'character', target: 'player', frame: {id: 'lab', generation: 1}}, () =>
-            exitVehicle(ctx, player, fleet, matrix(pose[12], 0.7, 2), p => Math.abs(p[12]) < 7 && Math.abs(p[14]) < 5),
+            exitVehicle(
+              ctx,
+              player,
+              fleet,
+              matrix(at(pose, 12), 0.7, 2),
+              p => Math.abs(at(p, 12)) < 7 && Math.abs(at(p, 14)) < 5,
+            ),
           )
         )
           phase = 2;
@@ -248,14 +284,15 @@ export function createSession(ctx: SceneContext) {
       }
       const tool = ctx.world.get(ctx.named('probe')!, Transform)!,
         player = ctx.world.get(ctx.named('player')!, Transform)!;
-      const localPose = probePose.sample(track ? Math.max(0, ctx.time.t - started) : 0)[0];
+      const [localPose] = probePose.sample(track ? Math.max(0, ctx.time.t - started) : 0);
+      if (!localPose) throw Error('the probe pose has one joint');
       const handPose = hand.sample('probe-model', 'only', {
         id: 'lab',
         matrix: matrix(player.x, player.y, player.z),
       }).matrix;
-      tool.x = handPose[12];
-      tool.y = handPose[13] + localPose.position[1];
-      tool.z = handPose[14];
+      tool.x = at(handPose, 12);
+      tool.y = at(handPose, 13) + localPose.position[1];
+      tool.z = at(handPose, 14);
       ctx.world.get(ctx.named('probe')!, Shape)!.visible = canProbe();
       ctx.world.get(ctx.named('beam')!, Shape)!.visible = ctx.time.t < flashUntil;
       ctx.world.get(ctx.named('kiosk')!, Shape)!.visible = !property.snapshot().packed;
@@ -272,24 +309,8 @@ export function createSession(ctx: SceneContext) {
       shots.cancelOwner('player');
       hand.clear();
     },
-    label: () =>
-      ['lab.ride', 'lab.exit', 'lab.claim', 'lab.equip', 'lab.fire', 'lab.place', 'lab.leave', 'lab.pack', 'lab.reset'][
-        phase
-      ],
-    status: () =>
-      track && phase === 4
-        ? 'lab.wait'
-        : [
-            'lab.intro',
-            'lab.riding',
-            'lab.exited',
-            'lab.claimed',
-            'lab.equipped',
-            'lab.tagged',
-            'lab.occupied',
-            'lab.vacant',
-            'lab.packed',
-          ][phase],
+    label: () => LABELS[phase],
+    status: () => (track && phase === 4 ? 'lab.wait' : STATUSES[phase]),
   };
 }
 export type LabSession = ReturnType<typeof createSession>;

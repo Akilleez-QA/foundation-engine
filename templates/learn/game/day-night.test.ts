@@ -29,7 +29,7 @@ test('S1: every objective is taught and checked, and no scene has more than thre
     lessonProblems(lesson, {
       maxPassive: brief.pedagogy.maxPassiveActions,
       ages: brief.audience.ages,
-      text: k => game.strings!.en[k] ?? k,
+      text: k => game.strings?.en?.[k] ?? k,
     }),
     [],
   );
