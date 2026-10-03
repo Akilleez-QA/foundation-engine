@@ -486,18 +486,85 @@ test('HRTF is not flipped on repeats: a source replacing its own HRTF voice keep
   );
 });
 
+/**
+ * CPU time used by this thread, in ms. Not wall time: on a loaded machine wall time also counts the time the thread
+ * sat descheduled, which measures the OS scheduler rather than this code. `process.threadCpuUsage` (Node >= 22.19) is
+ * this thread only; the process-wide `process.cpuUsage` fallback also counts helper threads (GC, compiler), which can
+ * only add time, so it errs towards failing, never towards hiding a cost.
+ */
+const cpuMs = () => {
+  const u = typeof process.threadCpuUsage === 'function' ? process.threadCpuUsage() : process.cpuUsage();
+  return (u.user + u.system) / 1000;
+};
+
+/**
+ * A deterministic work counter: the elements every `Map#values()` iteration yields while `run` runs. The kit keeps its
+ * sources in a Map and every pass over them iterates `values()`, so this counts source visits per pump without
+ * touching the kit. Restored before returning, even on a throw.
+ */
+function mapVisits(run: () => void): number {
+  const values = Map.prototype.values;
+  let visits = 0;
+  Map.prototype.values = function* (this: Map<unknown, unknown>) {
+    for (const v of values.call(this)) {
+      visits++;
+      yield v;
+    }
+  } as typeof values;
+  try {
+    run();
+  } finally {
+    Map.prototype.values = values;
+  }
+  return visits;
+}
+
 test('when full, admission work stays bounded: one failed steal ends the pass', () => {
-  const output = fakeOutput();
-  const audio = createSpatialAudio({output, classes: flat, limits: {maxSources: 1024, maxVoices: 64, maxLateness: 2}});
-  for (let i = 0; i < 1024; i++) audio.emit({cue: 'w', class: 'weak', position: [0, 0, -2 - (i % 50)], every: 1}, 0);
-  audio.pump(0, origin);
-  assert.equal(output.voices.length, 64);
-  assert.equal(audio.stats.waiting, 960);
-  assert.equal(audio.stats.stolen, 0);
-  const t0 = performance.now();
-  for (let k = 1; k <= 20; k++) audio.pump(k / 1000, origin);
-  const ms = (performance.now() - t0) / 20;
-  assert.ok(ms < 8, `pump with 960 waiting took ${ms.toFixed(2)} ms`);
+  // A full kit: 64 voices playing and `sources - 64` emissions waiting, none strong enough to steal.
+  const full = (sources: number) => {
+    const output = fakeOutput();
+    const audio = createSpatialAudio({
+      output,
+      classes: flat,
+      limits: {maxSources: 1024, maxVoices: 64, maxLateness: 2},
+    });
+    for (let i = 0; i < sources; i++)
+      audio.emit({cue: 'w', class: 'weak', position: [0, 0, -2 - (i % 50)], every: 1}, 0);
+    audio.pump(0, origin);
+    assert.equal(output.voices.length, 64);
+    assert.equal(audio.stats.waiting, sources - 64);
+    assert.equal(audio.stats.stolen, 0);
+    // Pumps are 1 ms apart, far inside `every` and `maxLateness`, so every pump sees the same steady state.
+    let k = 0;
+    return () => audio.pump(++k / 1000, origin);
+  };
+  // 1. The complexity property, counted rather than timed: a pump visits each source a fixed number of times, so 4x
+  // the sources is 4x the visits. A pass that rescans every source per waiting emission would be ~16x.
+  const pumpSmall = full(256),
+    pumpBig = full(1024);
+  const perSource = (pump: () => void, sources: number) => mapVisits(pump) / sources;
+  const small = perSource(pumpSmall, 256),
+    big = perSource(pumpBig, 1024);
+  assert.ok(small >= 1, `each source is visited at least once per pump (${small})`);
+  assert.ok(
+    big <= small * 1.05,
+    `source visits per source per pump grew from ${small.toFixed(2)} to ${big.toFixed(2)}`,
+  );
+  // 2. The original claim, unchanged: a pump with 960 waiting costs under 8 ms. Only its estimator changed, to one a
+  // loaded machine cannot inflate past the bound while a real regression still crosses it:
+  // - CPU time, not wall time (see cpuMs).
+  // - The fastest of 7 batches of 20 pumps, after a warm-up batch (JIT, inline caches): the standard microbenchmark
+  //   estimator. Interference (preemption, cache and SMT contention, a GC pause) only ever adds time, while a real
+  //   regression raises every batch, the fastest included.
+  const batch = () => {
+    const t0 = cpuMs();
+    for (let j = 0; j < 20; j++) pumpBig();
+    return (cpuMs() - t0) / 20;
+  };
+  batch();
+  let ms = Infinity;
+  for (let r = 0; r < 7; r++) ms = Math.min(ms, batch());
+  assert.ok(ms < 8, `pump with 960 waiting took ${ms.toFixed(2)} ms of CPU (fastest of 7 batches of 20)`);
 });
 
 test('occlusion refresh of playing voices is not starved by new emissions; staleness is reported', () => {
