@@ -122,7 +122,8 @@ every other field may change every step.
   drawn.
 - **Scene limits:** `sceneParticles()` admits 16 emitters reserving 4,096 particles in total (the sum of their
   `max`). Change them with `sceneParticles({ emitters, max })`. An emitter beyond them is not drawn and is
-  counted; the first refusal of a visit is reported in the console. A refused burst is dropped (it never fires late)
+  counted (by cause: too many emitters, or too many reserved particles); the first refusal of each cause in a visit is
+  reported in the console. A refused burst is dropped (it never fires late)
   and a refused `despawn: true` one-shot removes itself at once; a refused continuous emitter starts when another
   emitter is removed. In a scene without
   `sceneParticles()`, emitters are not simulated or drawn, and the first one is reported once.
@@ -131,7 +132,8 @@ every other field may change every step.
   subset of the same particles; `essential: true` emitters are never thinned.
 - **Determinism:** particles have their own random stream (derived from `?seed=` when given), never `ctx.random()`,
   so adding effects never changes your game's random numbers; they step on the fixed 60 Hz step, so `?seed=` replays
-  them exactly, and are drawn at the latest step like shapes. Particles never change
+  them exactly, and are drawn at the latest step like shapes (so on a 120 or 144 Hz display they move at 60 Hz, as
+  shapes moved by fixed systems do). Particles never change
   the world, except `despawn`, whose timing depends only on the data.
 
 ## Test it

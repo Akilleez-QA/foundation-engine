@@ -645,7 +645,7 @@ scene visit; a pure field (`author/particle-sim.ts`) steps in the engine fixed s
 chunk) draws one instanced quad mesh per admitted emitter from pools allocated once. Bounds: `max` ≤ 4,096 per emitter, default 16
 emitters and 4,096 reserved particles per scene (caps 256 and 65,536), 4 bursts per emitter
 per step. Overload: full-pool and per-step excess dropped and counted; over-limit emitters
-refused and counted (first refusal per visit reported): refused bursts are dropped, refused one-shots
+refused and counted by cause (first refusal of each cause per visit reported): refused bursts are dropped, refused one-shots
 removed, refused continuous emitters admitted when capacity frees. Particles use their own seeded stream, never
 `ctx.random`. Cancellation: visit exit disposes
 meshes, geometries and materials and releases texture leases; late textures are released.

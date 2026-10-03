@@ -135,8 +135,9 @@ export async function testScene(scene: SceneDefinition, o: { particleScale?: num
   const failures: { id: string; error: unknown }[] = [];
   const particleReports: string[] = [];
   // Particles' own stream (as in a visit with `?seed=`): never the gameplay `ctx.random()`.
-  const particleRng = createRng(deriveSeed(o.seed ?? 1, 'particles'));
-  const particles = scene.particles?.createField({ scale: o.particleScale ?? 1, seed: () => particleRng.next(),
+  // Any number is a seed, wrapped to 32 bits as `ctx.random` and the browser treat it; the stream exists only with particles.
+  const particleRng = scene.particles ? createRng(deriveSeed((o.seed ?? 1) >>> 0, 'particles')) : null;
+  const particles = scene.particles?.createField({ scale: o.particleScale ?? 1, seed: () => particleRng!.next(),
     report: error => { particleReports.push(error.message); } }) ?? null;
   const emitterProbe = { id: EMITTER_ID } as ComponentType<object>;
   const stepParticles = particles ? [{ id: 'engine.particles', run: (_: SceneContext, dt: number) => particles.step(world, dt) }] : [];

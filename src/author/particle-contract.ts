@@ -123,6 +123,8 @@ export interface ParticleStats {
   readonly spawned: number; readonly thinned: number; readonly dropped: number;
   /** Admission refusals and invalid-data reports so far. */
   readonly refused: number; readonly invalid: number;
+  /** Refusals by cause: the emitter count limit, or the reserved-particle limit. */
+  readonly refusals: { readonly emitters: number; readonly particles: number };
 }
 
 export interface ParticleField {
@@ -133,6 +135,9 @@ export interface ParticleField {
   interpolate(alpha: number): boolean;
   /** Something will change without outside input: live particles, a playing emitter, a pending burst or despawn. */
   busy(world: World): boolean;
+  /** The renderer could not bind `slot` after all (a lazily loaded renderer): report once, release the slot and do not
+   *  admit that entity's emitter again this visit. */
+  bindFailed(slot: EmitterSlot, error: unknown): void;
   readonly stats: ParticleStats;
   dispose(): void;
 }

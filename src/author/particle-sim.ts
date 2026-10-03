@@ -10,7 +10,8 @@
  * Bounds and overload:
  * - per emitter: `max` live particles. A spawn into a full pool is dropped and counted (`dropped`), never recycled;
  * - per scene: admitted emitters' `max` sum to at most `limits.max`, and at most `limits.emitters` emitters (one draw
- *   each). An emitter that does not fit is refused and counted (the first refusal of a visit is reported) and not
+ *   each). An emitter that does not fit is refused and counted by cause (the first refusal of each cause in a visit is
+ *   reported) and not
  *   drawn. A refused burst is dropped and counted, and a refused `despawn` one-shot is removed, so a refused hit never
  *   fires late; a refused continuous emitter is admitted on a later step if
  *   capacity frees. Admission uses the unscaled `max`, so it is the same on every quality preset;
@@ -75,7 +76,9 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
   // Emitters waiting for admission this step (reused arrays): admitted after retired slots free their capacity.
   const waiting: Entity[] = [], waitingData: EmitterData[] = [];
   const counts = { spawned: 0, thinned: 0, dropped: 0, refused: 0, invalid: 0 };
-  let tick = 0, reserved = 0, disposed = false, refusalReported = false;
+  let tick = 0, reserved = 0, disposed = false;
+  // Refusals by cause; each cause is reported once per visit (a later refusal for the other cause is still reported).
+  const refusals = { emitters: 0, particles: 0 }, refusalReported = { emitters: false, particles: false };
   const report = (error: Error) => { try { o.report(error); } catch { /* Diagnostics cannot stop the step. */ } };
   // Per-step scratch (numbers only): the rotated launch axis and two perpendicular unit vectors.
   let ax = 0, ay = 1, az = 0, ux = 1, uy = 0, uz = 0, wx = 0, wy = 0, wz = 1;
@@ -89,13 +92,16 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
   };
 
   const admit = (e: Entity, d: EmitterData, note: Note): Slot | undefined => {
-    if (slots.size >= o.limits.emitters || reserved + d.max > o.limits.max) {
+    const cause = slots.size >= o.limits.emitters ? 'emitters' : reserved + d.max > o.limits.max ? 'particles' : null;
+    if (cause) {
       if (!note.refused) {
-        note.refused = true; counts.refused++;
-        // Once per visit: sustained overload must not flood the log; `stats.refused` keeps counting.
-        if (!refusalReported) {
-          refusalReported = true;
-          report(Error(`particles: emitter on entity ${e} refused (scene limit ${o.limits.emitters} emitters, ${o.limits.max} particles; ${slots.size} emitters and ${reserved} particles admitted). Further refusals this visit are counted in stats.refused, not reported`));
+        note.refused = true; counts.refused++; refusals[cause]++;
+        // Once per cause per visit: sustained overload must not flood the log; stats keep counting.
+        if (!refusalReported[cause]) {
+          refusalReported[cause] = true;
+          report(Error(cause === 'emitters'
+            ? `particles: emitter on entity ${e} refused: the scene's limit of ${o.limits.emitters} emitters is reached. Further refusals for this cause are counted in stats.refusals.emitters, not reported`
+            : `particles: emitter on entity ${e} refused: its max ${d.max} would exceed the scene's ${o.limits.max} reserved particles (${reserved} reserved). Further refusals for this cause are counted in stats.refusals.particles, not reported`));
         }
       }
       return undefined;
@@ -209,7 +215,7 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
     get stats() {
       let live = 0;
       for (const s of slots.values()) live += s.pool.live;
-      return { emitters: slots.size, live, reserved, ...counts };
+      return { emitters: slots.size, live, reserved, ...counts, refusals: { ...refusals } };
     },
     step(world, dt) {
       if (disposed || !(dt > 0)) return;
@@ -275,6 +281,12 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
         try { o.renderer?.draw(slot, n); } catch (error) { report(error instanceof Error ? error : Error(String(error))); }
       }
       return changed;
+    },
+    bindFailed(slot, error) {
+      const note = notes.get(slot.entity);
+      if (note) note.failed = true;
+      report(error instanceof Error ? error : Error(String(error)));
+      release(slot as Slot);
     },
     busy(world) {
       if (disposed) return false;

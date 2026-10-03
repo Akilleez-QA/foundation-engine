@@ -347,3 +347,44 @@ test('a renderer that cannot bind an emitter is reported once and not retried ev
   run(f, world, 30);
   assert.equal(binds, 1); assert.deepEqual(reports, ['no GPU']); assert.equal(f.stats.emitters, 0);
 });
+
+test('N1: testScene accepts any numeric seed (wrapped to 32 bits), with and without particles', async () => {
+  for (const seed of [Date.now(), -1, 2 ** 32, 2 ** 53 + 2, 1.5, 0]) {
+    for (const particles of [undefined, sceneParticles()]) {
+      const t = await testScene(defineScene({ id: 's', title: 'S', particles, entities: particles ? [[Transform(), defineEmitter({ mode: 'continuous', rate: 30 })]] as never : [] }), { seed });
+      t.run(2 / 60);
+      assert.equal(typeof t.ctx.random(), 'number');
+      t.dispose();
+    }
+  }
+  // Equal 32-bit seeds give equal particles.
+  const positions = async (seed: number) => {
+    const t = await testScene(defineScene({ id: 's', title: 'S', particles: sceneParticles(), entities: [[Transform(), defineEmitter({ mode: 'burst', count: 3, bursts: 1, spread: Math.PI })]] as never }), { seed });
+    t.run(1 / 60); const s = t.particles.stats!; t.dispose(); return s;
+  };
+  assert.deepEqual(await positions(2 ** 32 + 7), await positions(7));
+});
+
+test('refusals are reported once per cause and counted by cause', () => {
+  const world = new World(), { f, reports } = field({ limits: normalizeSceneParticles({ max: 100, emitters: 2 }) });
+  world.spawn(Transform(), defineEmitter({ max: 60 }));
+  world.spawn(Transform(), defineEmitter({ max: 60 }));   // particles: 120 > 100
+  world.spawn(Transform(), defineEmitter({ max: 70 }));   // particles again: counted, not reported
+  run(f, world, 2);
+  assert.equal(reports.length, 1); assert.match(reports[0], /reserved particles/);
+  world.spawn(Transform(), defineEmitter({ max: 10 }));   // fits: 2 emitters admitted
+  world.spawn(Transform(), defineEmitter({ max: 1 }));    // emitters limit: a different cause, reported
+  run(f, world, 2);
+  assert.equal(reports.length, 2); assert.match(reports[1], /limit of 2 emitters/);
+  assert.deepEqual(f.stats.refusals, { emitters: 1, particles: 2 }); assert.equal(f.stats.refused, 3);
+});
+
+test('bindFailed from a lazy renderer releases the slot and the emitter is not re-admitted', () => {
+  const world = new World(), r = recorder(), reports: string[] = [];
+  const f = createParticleField({ limits: normalizeSceneParticles(undefined), scale: 1, seed: mulberry32(1), report: e => reports.push(e.message), renderer: r.renderer });
+  world.spawn(Transform(), defineEmitter({ mode: 'continuous' }));
+  f.step(world, STEP);
+  f.bindFailed(r.bound[0], Error('late bind'));
+  run(f, world, 10);
+  assert.equal(f.stats.emitters, 0); assert.equal(r.bound.length, 1); assert.equal(r.released.length, 1); assert.deepEqual(reports, ['late bind']);
+});

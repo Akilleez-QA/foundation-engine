@@ -54,7 +54,7 @@ scene.
 | Particles per emitter | `max`, 1…4,096 (validated) | A spawn into a full pool is dropped and counted (`dropped`); no recycling |
 | Bursts per emitter per step | 4 | Further requested bursts in that step are dropped and counted |
 | Continuous spawns per emitter per step | `max` | The excess is dropped and counted |
-| Emitters per scene | default 16, cap 256 | Refused: not drawn, counted in `stats.refused`; the first refusal of a visit is reported. A refused burst is dropped and counted in `dropped` (never fired late), and a refused `despawn: true` one-shot is removed at once; a refused continuous emitter is admitted when capacity frees (same step) |
+| Emitters per scene | default 16, cap 256 | Refused: not drawn, counted in `stats.refused` and by cause in `stats.refusals` (`emitters` or `particles`); the first refusal of each cause in a visit is reported. A refused burst is dropped and counted in `dropped` (never fired late), and a refused `despawn: true` one-shot is removed at once; a refused continuous emitter is admitted when capacity frees (same step) |
 | Reserved particles per scene (sum of admitted `max`) | default 4,096, cap 65,536 | As above |
 | Curve keys, lifetime, speed, gravity, drag, rate | 8 keys, 30 s, 1,000 m/s, ±1,000 m/s², 10/s, 10,000/s | `defineEmitter` throws; mutated data freezes the emitter with one report until fixed |
 
@@ -71,8 +71,8 @@ CPU deadline: the per-step cost is proportional to live particles plus spawn att
 - One `InstancedBufferGeometry` (a unit quad: 4 vertices, 2 triangles) and one `ShaderMaterial` per admitted emitter;
   the vertex shader billboards each instance to the camera. Per-particle centre, size and linear colour with opacity
   are three `DynamicDrawUsage` instance attributes over the emitter's pool arrays, allocated once at admission.
-- Each frame with live particles writes the latest fixed step's values (the same state `Shape` meshes show, so
-  particles never trail their emitter) for
+- Each frame in which a fixed step ran writes the latest step's values while particles are (or were just) live (the
+  same state `Shape` meshes show, so particles never trail their emitter) for
   the live prefix only, and uploads that range (`addUpdateRange`). Nothing is rebuilt per frame (STD-REN-36) and the
   step, spawn and write paths do not allocate per particle (finding emitters uses the world's ordinary query, which
   allocates its iterator once per step).
@@ -97,11 +97,17 @@ a template that uses particles can wire it. Only the reference preset is gated (
 
 ## Determinism
 
+**Step rate.** Particles step on the fixed 60 Hz lane, like every fixed system. On a 120 or 144 Hz display they move
+every second (or so) displayed frame, the same as `Shape` entities moved by fixed systems; frames in between redraw
+nothing for particles. This is deliberate (identical simulation on every display) and not interpolated.
+
 Particles have their own random stream, separate from gameplay: with `?seed=` (or `testScene({ seed })`) it is
-`createRng(deriveSeed(seed, 'particles'))`, otherwise the visit's named stream `scene.<id>.particles`. Each admitted
-emitter seeds its own mulberry32 stream from one draw of it at admission, in spawn order, so
-with `?seed=` (or `testScene({ seed })`) and the same tick-addressed input a run's particles are identical after N
-ticks. Particles never feed back into game state and never draw from `ctx.random()`: adding, removing or rebuilding
+`createRng(deriveSeed(seed >>> 0, 'particles'))` (any number is accepted and wrapped to 32 bits, as for
+`ctx.random`; `testScene` creates it only for a scene with `sceneParticles()`), otherwise the visit's named stream `scene.<id>.particles`. Each admitted
+emitter seeds its own mulberry32 stream from one draw of it at admission, in spawn order. **An emitter's particles
+therefore depend on its admission order within the visit:** the same emitter admitted after a different set of earlier
+emitters (another spawn order, a refusal, a rebuild) gets a different stream. With the same seed and the same
+tick-addressed input that order, and so every stream, is reproduced: a run's particles are identical after N ticks. Particles never feed back into game state and never draw from `ctx.random()`: adding, removing or rebuilding
 an effect leaves the gameplay sequence and existing `?seed=` replays unchanged (regression test in
 `particles.test.ts`). Cross-browser floating-point identity is not claimed (as for replay and rollback).
 
@@ -113,6 +119,12 @@ an effect leaves the gameplay sequence and existing `?seed=` replays unchanged (
 
 - Leaving the visit aborts pending texture loads; a texture that arrives later is released, never applied. Leased
   textures are released, never disposed by the emitter (the library owns them).
+- A texture that arrives while its emitter has nothing alive is applied without a redraw (the next particles show it);
+  arriving while particles are live redraws once. The renderer chunk arriving redraws nothing by itself: bound
+  emitters draw from their next step.
+- A waiting emitter that cannot be bound when the renderer chunk arrives is handed back to the field
+  (`bindFailed`): reported once, its slot released, not admitted again this visit. If the scene refuses the mesh
+  (`scene.add` throws), its geometry and material are disposed at once and nothing is tracked.
 - A missing or failing texture is reported once; the emitter keeps drawing its soft dot. Nothing retries until the
   emitter is rebuilt or the scene is entered again.
 - Invalid data, admission refusal and renderer exceptions are reported and contained to that emitter; the step and

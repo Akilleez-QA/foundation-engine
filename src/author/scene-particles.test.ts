@@ -84,7 +84,7 @@ test('a particle texture is leased under the visit, applied when it arrives, rel
   assert.equal(t.lib!.requests[0].colorSpace, 'srgb');
   await flush();
   assert.equal(m.material.uniforms.map.value, t.lib!.shared); assert.equal(m.material.uniforms.useMap.value, 1);
-  assert.equal(t.changed, 1); assert.equal(t.lib!.live, 1);
+  assert.equal(t.changed, 0, 'a hidden emitter (nothing alive) needs no redraw when its texture arrives'); assert.equal(t.lib!.live, 1);
   assert.equal(t.view.stats.leases, 1); assert.equal(t.view.stats.requested, 1);
   t.world.despawn(e); t.field.step(t.world, 1 / 60);
   assert.equal(t.lib!.live, 0); assert.equal(disposed, 0, 'the shared texture belongs to the library');
@@ -126,4 +126,29 @@ test('no texture library: textures never load and emitters still draw', () => {
   t.field.step(t.world, 1 / 60); t.field.interpolate(0);
   assert.equal(t.meshes()[0].visible, true);
   t.field.dispose(); t.view.dispose();
+});
+
+test('a texture arriving for an emitter with live particles redraws once', async () => {
+  const t = setup();
+  t.world.spawn(Transform(), defineEmitter({ texture: 'spark', bursts: 1, lifetime: [5, 5] }));
+  t.field.step(t.world, 1 / 60); t.field.interpolate(1);
+  assert.equal(t.meshes()[0].visible, true);
+  await flush();
+  assert.equal(t.changed, 1);
+  t.field.dispose(); t.view.dispose();
+});
+
+test('a mesh the scene refuses to add is disposed at once and never tracked', () => {
+  const t = setup();
+  const disposed: string[] = [];
+  t.scene.add = () => { throw Error('scene closed'); };
+  const slot = { entity: 1, pool: { offset: new Float32Array(3), size: new Float32Array(1), tint: new Float32Array(4) }, blending: 'additive', texture: 'spark', view: undefined } as never;
+  const geometryDispose = T.InstancedBufferGeometry.prototype.dispose, materialDispose = T.ShaderMaterial.prototype.dispose;
+  T.InstancedBufferGeometry.prototype.dispose = function () { disposed.push('g'); return geometryDispose.call(this); };
+  T.ShaderMaterial.prototype.dispose = function () { disposed.push('m'); return materialDispose.call(this); };
+  try { assert.throws(() => t.view.bind(slot), /scene closed/); }
+  finally { T.InstancedBufferGeometry.prototype.dispose = geometryDispose; T.ShaderMaterial.prototype.dispose = materialDispose; }
+  assert.deepEqual(disposed.sort(), ['g', 'm']);
+  assert.equal(t.view.stats.bound, 0); assert.equal(t.lib!.requests.length, 0, 'no texture requested for a failed bind');
+  t.view.dispose();
 });

@@ -276,7 +276,9 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
       // per admitted emitter) is a lazy chunk, requested by the first admitted emitter, or now when the scene's own
       // entities have one. The density knob is 'reenter-scene': read once per visit.
       const particleView = createParticleView({ scene: three, library: s.assets, signal: actx.signal, load: () => import('./scene-particles'),
-        changed: () => { dirty = true; actx.invalidate(); }, ready: () => { dirty = true; actx.invalidate(); },
+        changed: () => { dirty = true; actx.invalidate(); },
+        // Bound emitters draw from their next step's write; arrival itself changes no pixel.
+        ready: () => { actx.invalidate(); }, bindFailed: (slot, error) => particles?.bindFailed(slot, error),
         report: error => s.log.error(`${scene.id}: particle drawing failed`, error) });
       // Only a scene that opted in (`sceneParticles()`) has a field; elsewhere an emitter is reported once, never drawn.
       // Particles draw from their own stream, never the gameplay one, so adding an effect cannot shift `ctx.random()`
@@ -493,12 +495,14 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
           frame++; t += f.dt; calm = f.calm; frameMs = f.t * 1000;
           gestures.sync();
           // A held replay tap runs no tick: release live presses so none surfaces at replay tick 0.
-          if (!tap || tap.running()) runner.frame(ctx, f.dt); else pressed.clear();
+          let steps = 0;
+          if (!tap || tap.running()) steps = runner.frame(ctx, f.dt); else pressed.clear();
           pressed.endFrame(); gestures.pointer.pressed = false;
           sync(f.dt);
-          // Drawn at the latest fixed step, like Shape meshes (sync above), so particles never trail their emitter;
-          // writes only while particles are (or were just) live.
-          if (particles?.interpolate(1)) dirty = true;
+          // Drawn at the latest fixed step, like Shape meshes (sync above), so particles never trail their emitter.
+          // Written only in a frame where a fixed step ran (60 Hz: on a 120/144 Hz display other frames redraw nothing
+          // for particles) and while particles are (or were just) live.
+          if (steps > 0 && particles?.interpolate(1)) dirty = true;
           }catch(error){if(error instanceof ProgramLinkError||error instanceof FrameReadinessError)failPrograms(error);else throw error;}
         },
         render() {

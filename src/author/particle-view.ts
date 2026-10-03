@@ -28,8 +28,10 @@ const NONE = Object.freeze({ bound: 0, visible: 0, requested: 0, leases: 0, appl
 
 export function createParticleView(o: SceneParticleOptions & {
   load: () => Promise<{ createSceneParticles(options: SceneParticleOptions): ParticleDrawing }>;
-  /** The renderer arrived and bound waiting emitters: draw again. */
+  /** The renderer arrived and bound waiting emitters (they draw from their next step). */
   ready(): void;
+  /** A waiting emitter could not be bound once the renderer arrived: the field releases it (`ParticleField.bindFailed`). */
+  bindFailed?(slot: EmitterSlot, error: unknown): void;
 }): ParticleView {
   let view: ParticleDrawing | null = null, state: ParticleView['state'] = 'idle', disposed = false;
   const waiting = new Set<EmitterSlot>();
@@ -42,7 +44,11 @@ export function createParticleView(o: SceneParticleOptions & {
       try { view = m.createSceneParticles(o); }
       catch (error) { state = 'failed'; waiting.clear(); report(error); return; }
       state = 'ready';
-      for (const slot of [...waiting]) { waiting.delete(slot); try { view.bind(slot); } catch (error) { report(error); } }
+      for (const slot of [...waiting]) {
+        waiting.delete(slot);
+        try { view.bind(slot); }
+        catch (error) { try { o.bindFailed?.(slot, error); } catch (e) { report(e); } if (!o.bindFailed) report(error); }
+      }
       o.ready();
     }, error => { if (disposed || o.signal.aborted) return; state = 'failed'; waiting.clear(); report(error); }).catch(report);
   };

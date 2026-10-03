@@ -62,3 +62,14 @@ test('a renderer that throws while being created moves to failed, reports once a
   assert.equal(t.errors.length, 1); assert.equal(t.loads, 1, 'no retry within the visit');
   t.view.dispose();
 });
+
+test('a waiting emitter that fails to bind when the renderer arrives is handed back to the field', async () => {
+  const failed: number[] = [];
+  const life = new AbortController(), errors: unknown[] = [];
+  const view = createParticleView({ scene: new T.Scene(), library: null, signal: life.signal, changed: () => {}, report: e => errors.push(e), ready: () => {},
+    bindFailed: s => { failed.push(s.entity); },
+    load: async () => ({ createSceneParticles: () => ({ ...drawing().d, bind: (s: EmitterSlot) => { if (s.entity === 2) throw Error('bind'); } }) }) });
+  view.bind(slot(1)); view.bind(slot(2)); await flush();
+  assert.deepEqual(failed, [2]); assert.deepEqual(errors, [], 'the field reports it');
+  view.dispose();
+});

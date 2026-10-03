@@ -39,8 +39,20 @@ try {
     await p.goto(`${server.resolvedUrls.local[0]}__particles.html?flags=dev.silent&quality=${quality}&seed=7#scene/sample`);
     await p.waitForFunction(() => window.particleCheck?.snapshot().particles !== null && window.particleCheck.snapshot().renders > 0, null, {timeout: 60000});
     const snap = () => p.evaluate(() => window.particleCheck.snapshot());
-    // Settle, then the baseline: the floor box only; the emitters are admitted but idle.
-    await sleep(400);
+    // Settle, then the baseline: the floor box only; the emitters are admitted but idle. Loading finishes first (the
+    // drawing chunk and the textured emitter's texture, applied while it is hidden), then the frame count must hold
+    // still for 500 ms, so the idle window below measures idleness, not late loading.
+    await p.waitForFunction(() => window.particleCheck.snapshot().particles.textures.applied === 1, null, {timeout: 30000});
+    const settle = async () => {
+      let last = (await snap()).renders;
+      for (let stable = 0, tries = 0; stable < 5; tries++) {
+        assert.ok(tries < 200, 'the scene settled within 20 s');
+        await sleep(100);
+        const now = (await snap()).renders;
+        stable = now === last ? stable + 1 : 0; last = now;
+      }
+    };
+    await settle();
     const base = await snap();
     run.base = base.last;
     assert.equal(base.particles.live, 0); assert.equal(base.particles.draws, 0, 'idle emitters issue no draw');
@@ -65,7 +77,6 @@ try {
     // A trail and a textured burst together: three emitters live at once are three draws.
     await p.evaluate(() => { window.particleCheck.trail(true); window.particleCheck.fire('glow'); window.particleCheck.fire('sparks'); });
     await p.waitForFunction(() => window.particleCheck.snapshot().particles.draws === 3);
-    await p.waitForFunction(() => window.particleCheck.snapshot().particles.textures.applied === 1, null, {timeout: 30000});
     const busy = await snap();
     await p.waitForFunction(n => window.particleCheck.snapshot().renders > n + 2, busy.renders);
     const three = await snap();

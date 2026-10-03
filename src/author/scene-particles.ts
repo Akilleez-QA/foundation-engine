@@ -116,8 +116,13 @@ export function createSceneParticles(o: SceneParticleOptions): ParticleDrawing {
       mesh.name = `particles:e${slot.entity}`;
       mesh.frustumCulled = false; mesh.matrixAutoUpdate = false; mesh.visible = false;
       const view: View = { mesh, attrs, life: new AbortController() };
+      try { o.scene.add(mesh); }
+      catch (error) {
+        // Never tracked: dispose what was made here at once, so a failed bind leaks nothing.
+        try { material.dispose(); geometry.dispose(); } catch { /* The add failure is the error to report. */ }
+        throw error;
+      }
       views.add(view); stats.bound = views.size;
-      o.scene.add(mesh);
       slot.view = view;
       if (slot.texture && o.library) {
         stats.requested++;
@@ -127,7 +132,8 @@ export function createSceneParticles(o: SceneParticleOptions): ParticleDrawing {
           view.lease = lease; stats.leases++;
           material.uniforms.map.value = lease.value; material.uniforms.useMap.value = 1;
           stats.applied++;
-          o.changed();
+          // A hidden emitter (nothing alive) shows the texture with its next particles: no redraw now.
+          if (mesh.visible) o.changed();
         }, error => {
           if (life.signal.aborted || isAbortError(error)) return;
           stats.failed++; report(error);
