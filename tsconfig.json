@@ -15,7 +15,7 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "verbatimModuleSyntax": false,
+    "verbatimModuleSyntax": true,
     "paths": {
       "@engine": ["./src/author/index.ts"],
       "@kits/*": ["./src/kits/*/index.ts"],
