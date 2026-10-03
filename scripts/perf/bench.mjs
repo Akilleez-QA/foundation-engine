@@ -27,6 +27,7 @@ import {ROOT, buildAndServe} from './build.mjs';
 import {observeNetwork} from './network.mjs';
 import {BENCH_SCENES, ACTIVE_SCENES} from '../../perf/budgets.ts';
 import {CLASSIFICATION_VERSION} from '../../src/platform/perf/window-class.ts';
+import {activeRestartPlan, restartActiveWindow, sampleAttempts} from './active-restart.mjs';
 import {gameActionsPressedBy} from '../../src/author/input-registry.ts';
 
 export const PERF_SCHEMA = 1;
@@ -36,7 +37,7 @@ export const WINDOW = {resample: 3, settleMs: 1500, quietMs: 1000, quietTimeoutM
 export const PINNED_QUALITY = 'reference';
 const SEARCH = `?quality=${PINNED_QUALITY}&flags=dev.silent`;
 /** Files whose content is part of every experiment (ADR 0046: all harness helpers). */
-export const HARNESS_FILES = ['scripts/perf/bench-browser.mjs', 'scripts/perf/network.mjs', 'scripts/perf/probe-inject.mjs', 'scripts/perf/bench.mjs', 'scripts/perf/build.mjs', 'src/platform/perf/window-class.ts'];
+export const HARNESS_FILES = ['scripts/perf/bench-browser.mjs', 'scripts/perf/network.mjs', 'scripts/perf/probe-inject.mjs', 'scripts/perf/bench.mjs', 'scripts/perf/active-restart.mjs', 'scripts/perf/build.mjs', 'src/platform/perf/window-class.ts'];
 
 export const sceneSelector = scene => `#app[data-scene="${scene}"]`;
 export const readySelector = scene => `#app[data-scene="${scene}"][data-scene-state="active"]`;
@@ -86,6 +87,7 @@ export function experimentDescriptor(o, {browser, gpuString, launchArguments = [
   return {schema: PERF_SCHEMA, harness: o.gpu ? 'gpu' : 'swiftshader', browser, backend: gpuString, viewport: {...o.view, dpr: 1}, quality: PINNED_QUALITY + ' (pinned)', calm: false,
     execution: {launchArguments}, locale: 'en-US', clock: 'wall', comparisonPolicy: 'strict-taxonomy-v1', route, routes: Object.fromEntries(BENCH_SCENES.map(p => [p.id, p.route])),
     active: o.active.filter(p => route.includes(p)), keys: o.keys,
+    activeRestart: Object.fromEntries(BENCH_SCENES.filter(p => route.includes(p.id) && activeRestartPlan(p)).map(p => [p.id, activeRestartPlan(p)])),
     activeKeys: Object.fromEntries(BENCH_SCENES.filter(p => p.activeKeys?.length && route.includes(p.id)).map(p => [p.id, p.activeKeys])), window: {...WINDOW, frames: o.frames}, network: o.liveNetwork ? 'live' : 'hermetic', classificationVersion: CLASSIFICATION_VERSION, readinessVersion: 1, helpers: harness};
 }
 
@@ -93,6 +95,7 @@ const GPU_STRING = `(()=>{const c=document.createElement('canvas');const g=c.get
 
 /** Runs the bench and returns the PerfRun. Never touches system audio: the browser is always muted and silent. */
 export async function runBench(o, {log = console.log} = {}) {
+  const restartPlans = new Map(BENCH_SCENES.map(row => [row.id, activeRestartPlan(row)]));
   if (!BENCH_SCENES.length) throw Error('game/budgets.json lists no scenes: add the game\'s scenes (docs/recipes/add-a-budget.md)');
   const {launch, sleep} = await import('./bench-browser.mjs');
   const {classifyWindow} = await import('../../src/platform/perf/window-class.ts');
@@ -116,14 +119,13 @@ export async function runBench(o, {log = console.log} = {}) {
 
     /** One window, re-sampled in its scene up to WINDOW.resample times while it is not comparable (ADR 0053). */
     async function sample(id, scene, row, mode, during, extra = {}) {
-      const earlier = []; let s;
-      for (let i = 0; i <= WINDOW.resample; i++) {
-        s = await measure(id, scene, row, mode, during, extra);
-        if (s.error || s.classification?.comparable !== false) break;
-        earlier.push(`${s.classification.kind}: ${s.classification.reasons.join('; ')}`);
-        if (i < WINDOW.resample) log(' '.repeat(20), `not comparable; re-sampling ${id} (${i + 1}/${WINDOW.resample})`);
-      }
-      if (earlier.length) s = {...s, resampled: earlier.length - (s.classification?.comparable === false ? 1 : 0), earlierAttempts: earlier};
+      const plan = mode === 'active' ? restartPlans.get(row.id) : null;
+      const s = await sampleAttempts({
+        measure: () => measure(id, scene, row, mode, during, extra),
+        prepare: plan ? () => restartActiveWindow(b.page, row, plan) : undefined,
+        resample: WINDOW.resample,
+        retry: i => log(' '.repeat(20), `not comparable; re-sampling ${id} (${i}/${WINDOW.resample})`),
+      });
       run.samples.push(s); return s;
     }
     async function measure(id, scene, row, mode, during, extra) {
