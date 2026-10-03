@@ -2,4 +2,4 @@
 import { jobLoaders } from './job-rows.ts';
 import { createWorkerRuntime, type WorkerPort } from './worker-runtime.ts';
 
-createWorkerRuntime(self as unknown as WorkerPort, jobLoaders);
+createWorkerRuntime(self as WorkerPort, jobLoaders);

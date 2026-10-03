@@ -317,6 +317,6 @@ export function benchResultOf(run: PerfRun): BenchResult {
   const out: Record<string, BenchSample | string> = { profile: `${run.harness}@${run.viewport.width}x${run.viewport.height}` };
   if (run.startup) out.startup = run.startup;
   if (run.afterTour) out.afterTour = run.afterTour;
-  for (const s of run.samples) out[s.id] = s as unknown as BenchSample;
+  for (const s of run.samples) out[s.id] = s;
   return out;
 }
