@@ -116,8 +116,8 @@ notes outside publishable documentation.
 - One scene at a time; a vertical slice before breadth.
 - Systems read actions (`ctx.input`), never keys or devices. Every action has a key and a pad binding; touch players get a tap or a drag.
 - State that must survive a reload is a save section; never rename its id.
-- Text is string keys (`defineGame({ strings })`, `ctx.text`); no literal UI text in systems.
-- Randomness is `ctx.random()`; with `?seed=` a run replays exactly.
+- Text is string keys (`defineGame({ strings })`, `ctx.text`); no literal UI text in systems (`npm run lint:game`).
+- Randomness is `ctx.random()`; with `?seed=` a run replays exactly (`npm run lint:game`; `<game>/tools/` and tests are exempt; a rare exception needs `// lint-game-allow <rule>: <reason>`).
 - Nothing redraws when nothing changed: only touch what moved.
 - Each success criterion checked by a test has a test named after its id (`test('S2: …')`).
 - Never delete or weaken a test, a budget or a tolerance to make a check pass.
@@ -151,7 +151,7 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 | `npm run play:snap [-- --scene <id>] [--mobile]` | Muted, isolated browser: screenshots and `playtest/latest/probe.json`; the budget verdict is judged on rendered frames (a still scene is redrawn on request) and says `not measured` when none rendered |
 | `npm run play:script -- <file.json>` | A scripted playtest (goto, key, press, teleport, wait, snap, expect); a game keeps its scripts in `game/playtest/`, evidence goes to `playtest/latest/` |
 | `npm run play:criteria [-- --gate]` | The brief's success criteria, checked and tabled |
-| `npm test` / `npm run lint` | All tests / all lints (layers, arch, css, generic, brief, budgets) |
+| `npm test` / `npm run lint` | All tests / all lints (layers, game, arch, css, generic, brief, budgets) |
 | `npm run gate` / `npm run gate:templates` | The integration gate for this game / for every template |
 | `npm run gate:ci [-- --from <step> \| --only <step> \| --list]` | Every checking `run:` step of `.github/workflows/ci.yml`, with its env; reproduces all work jobs serially and derives the final aggregate. Partial selections are not full CI acceptance |
 | `npm run bench`, `npm run perf:derive` | Measure scenes; derive budgets |
