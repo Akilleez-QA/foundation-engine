@@ -3,7 +3,7 @@ import { DEV, TEST_API } from '../env';
 import { appSaveStore } from '../save/app-store';
 import { createFeatures, featureOverridesSection, type FeatureDef, type Features } from './features';
 
-// ADR 0034: one WebGL2 render path. Do not add a flag for a second render path.
+// ADR 0078: the render backend is a brief setting (defineBuild({ render })). Do not add a flag for a render path.
 export const coreFeatures: readonly FeatureDef[] = [
   { id: 'dev.silent', stage: 'dev', default: false, description: 'Start without audio during verification (tests and benches)' },
   { id: 'dev.test-api', stage: 'dev', default: true, description: 'Verification API and inspection hooks' },
