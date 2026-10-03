@@ -4,7 +4,7 @@ import { poseLinkHooks, restoreObsoletePoseLinks, type PoseLinkPresentation } fr
 import type { ModelState } from './model-state';
 import { ModelAttachment, type ModelAttachmentState } from './model-attachment';
 import { reconcileModelAttachments, type AttachmentPresentation } from './scene-model-attachments';
-import { inspectModel, type ModelInspectionRequest } from './model-inspection';
+import type { inspectModel, ModelInspectionRequest } from './model-inspection';
 import * as T from 'three';
 import { updateWorldMatrixFromRoot } from '../platform/render/world-matrix';
 import type { World, Entity } from '../core/ecs/world';
@@ -15,9 +15,9 @@ import { Model, validateModel, type ModelData, type ModelSocketPose } from './mo
 import { Transform } from './defs';
 interface Slot { rig?: ModelRigCapture; poseLink?: PoseLinkPresentation; attachment?: AttachmentPresentation; ready?: boolean; asset: string; life: AbortController; root?: T.Object3D; instance?: T.Object3D; lease?: AssetLease<ModelTemplate>; mixer?: T.AnimationMixer; action?: T.AnimationAction; animationKey?: string; nodes?: Map<string, T.Object3D | null>; failed?: boolean; mask?: number; poseKey?: string; overrides?: Set<T.Object3D>; rest?: Map<T.Object3D, { position: T.Vector3; quaternion: T.Quaternion }> }
 /** One owner for async model instances, skeletal playback and named-node queries in a scene visit. */
-export function createSceneModels(o: { world: World; scene: T.Scene; library: ModelLibrary; signal: AbortSignal; invalidate(): void; report(error: unknown): void; maxInstances?: number; inspection?: boolean; poseLinks?: ModelPoseLinkLimits; mask?(entity: Entity): number }) {
+export function createSceneModels(o: { world: World; scene: T.Scene; library: ModelLibrary; signal: AbortSignal; invalidate(): void; report(error: unknown): void; maxInstances?: number; /** Diagnostics builds pass `inspectModel`; production leaves it out so the inspector is not bundled. */ inspection?: typeof inspectModel; poseLinks?: ModelPoseLinkLimits; mask?(entity: Entity): number }) {
   const slots = new Map<Entity, Slot>(); let closed = false, syncing = false;
-  const limit = o.maxInstances ?? 64;
+  const limit = o.maxInstances ?? 64, inspection = o.inspection;
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1024) throw Error('model: invalid scene instance budget');
   function report(error: unknown) { try { o.report(error); } catch { /* Reporting cannot strand scene-owned resources. */ } }
   const live = (e: Entity, slot: Slot) => !closed && !slot.life.signal.aborted && slots.get(e) === slot;
@@ -171,7 +171,7 @@ export function createSceneModels(o: { world: World; scene: T.Scene; library: Mo
       return meta.state;
     },
     /** Opt-in diagnostics borrow this owner; no additional leases or asynchronous work. */
-    inspect: o.inspection ? (request: ModelInspectionRequest) => inspectModel(request, entity => closed ? null : ({ requested: o.world.get(entity, Model), slot: slots.get(entity) })) : undefined,
+    inspect: inspection ? (request: ModelInspectionRequest) => inspection(request, entity => closed ? null : ({ requested: o.world.get(entity, Model), slot: slots.get(entity) })) : undefined,
     sync(dt = 0): boolean {
       // Cleanup and Three callbacks may synchronously request another sync; the active pass owns reconciliation.
       if (closed || syncing) return false;

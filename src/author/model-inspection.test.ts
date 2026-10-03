@@ -23,7 +23,7 @@ function fixture() {
   for (let i = 0; i < 2; i++) { const duplicate = new T.Group(); duplicate.name = 'duplicate'; source.add(duplicate); }
   const clip = new T.AnimationClip('wave', 1, [new T.VectorKeyframeTrack('hand.position', [0, 1], [0, 0, 0, 0, 2, 0])]);
   const library = createModelLibrary({ def: id => ({id,kind:'model',title:id,licence:'original',provenance:{},variants:[{path:`${id}.glb`,format:'glb'}]}),fetchBytes:async()=>new ArrayBuffer(16),parse:async()=>({scene:source.clone(true),animations:[clip]}) });
-  const owner = createSceneModels({world,scene,library,signal:signal.signal,inspection:true,invalidate(){},report(){}});
+  const owner = createSceneModels({world,scene,library,signal:signal.signal,inspection:inspectModel,invalidate(){},report(){}});
   const entity = world.spawn(Transform({x:3}),Model({asset:'first',clip:'wave',loop:false}));
   return {world,scene,signal,library,owner,entity};
 }
@@ -83,7 +83,7 @@ test('original beacon uses default GLB parser; inspection borrows real adopted v
   const bytes=readFileSync(new URL('../../templates/mechanics/game/public/models/mechanics/beacon.glb',import.meta.url));
   const world=new World(),scene=new T.Scene(),life=new AbortController();
   const library=createModelLibrary({def:()=>({id:'beacon',kind:'model',title:'Beacon',licence:'original',provenance:{},variants:[{path:'models/mechanics/beacon.glb',format:'glb'}]}),fetchBytes:async()=>bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)});
-  const owner=createSceneModels({world,scene,library,signal:life.signal,inspection:true,invalidate(){},report(error){throw error;}});
+  const owner=createSceneModels({world,scene,library,signal:life.signal,inspection:inspectModel,invalidate(){},report(error){throw error;}});
   const entity=world.spawn(Transform(),Model({asset:'beacon',clip:'pulse'}));owner.sync();await ready(owner,entity);owner.sync(.25);
   const value=observed(owner.inspect!({entity,sockets:['hand','shoulder']}));
   assert.equal(value.adopted!.path.value,'models/mechanics/beacon.glb');assert.equal(value.clips.items[0].name.value,'pulse');assert.equal(value.playback.clip!.value,'pulse');assert.ok(value.sockets.every(s=>s.status==='ready'));assert.ok(value.sockets[1].matrix![13]>.1);
@@ -102,7 +102,7 @@ test('adopted instanced models use only cached instance bounds and report missin
     if (cached) mesh.computeBoundingBox();
     const world = new World(), scene = new T.Scene(), life = new AbortController();
     const library = createModelLibrary({def: id => ({id,kind:'model',title:id,licence:'original',provenance:{},variants:[{path:'instances.glb',format:'glb'}]}),fetchBytes:async()=>new ArrayBuffer(1),parse:async()=>({scene:mesh,animations:[]})});
-    const owner = createSceneModels({world,scene,library,signal:life.signal,inspection:true,invalidate(){},report(error){throw error;}});
+    const owner = createSceneModels({world,scene,library,signal:life.signal,inspection:inspectModel,invalidate(){},report(error){throw error;}});
     try {
       const entity = world.spawn(Transform({x:3}),Model({asset:'instances'}));
       owner.sync(); await ready(owner,entity); owner.sync();
