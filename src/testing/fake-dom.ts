@@ -55,7 +55,7 @@ class FakeNode{
   return !event.defaultPrevented;
  }
 }
-class FakeText extends FakeNode{constructor(public data:string){super();}get textContent(){return this.data;}set textContent(v:string){this.data=v;}}
+class FakeText extends FakeNode{constructor(public data:string){super();}override get textContent(){return this.data;}override set textContent(v:string){this.data=v;}}
 const camel=(name:string)=>name.slice(5).replace(/-([a-z])/g,(_,c)=>c.toUpperCase());
 const kebab=(key:string)=>'data-'+key.replace(/[A-Z]/g,c=>'-'+c.toLowerCase());
 export class FakeElement extends FakeNode{

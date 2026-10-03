@@ -13,6 +13,9 @@
       "vite/client"
     ],
     "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
     "noEmit": true,
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
