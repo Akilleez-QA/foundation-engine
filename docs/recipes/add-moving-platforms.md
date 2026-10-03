@@ -2,7 +2,7 @@
 
 Use this when the creator wants actors to ride surfaces that move: lifts, conveyors
 of floating blocks, swinging decks. The locomotion kit supplies the mechanism (MV-02,
-candidate). The creator chooses every path, size and leave policy. Full contract:
+integrated through batch PR #64). The creator chooses every path, size and leave policy. Full contract:
 [locomotion kit](../../src/kits/locomotion/README.md#moving-platforms-mv-02).
 
 ## 1. Record the requirement

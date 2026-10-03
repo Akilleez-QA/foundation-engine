@@ -8,9 +8,10 @@ re-simulated in Node (SIM-01 replay, SEC-01 verified runs), and rollback peers
 (RB-01) on different browsers stay in agreement. Nothing uses it unless a creator
 opts in. Rendering, cameras, audio and other presentation code keep using `Math`.
 
-State: implemented on branch `feat/deterministic-math`, candidate (public PR #60; see the
-[acceptance ledger](upgrade-acceptance-ledger.md#deterministic-scalar-maths-w1-2--candidate)),
-not integrated. Backlog item W1-2.
+State (2026-10-03): integrated through batch PR #64 (`main` `3b449fa`; PR #60 merge `ca972b3`).
+It was implemented on branch `feat/deterministic-math` as a candidate; see the
+[acceptance ledger](upgrade-acceptance-ledger.md#deterministic-scalar-maths-w1-2--integrated).
+Backlog item W1-2.
 
 ## Why it exists
 
@@ -200,7 +201,7 @@ Transcendental calls on other paths, not switched:
 - **Pose layers and pose clips** (`animation/pose-layers.ts`, `pose-clip.ts`) use
   `Math.hypot` for quaternion validation and normalisation of presentation poses.
 
-## Evidence (candidate, not integrated)
+## Evidence (recorded on the candidate; integrated through batch PR #64)
 
 Implemented: `src/core/dmath.ts`, `src/core/dmath-vectors.ts`, the golden file
 `src/core/dmath.golden.json` (1,075 vectors as 16-digit hex bits; `sin` and `cos`
