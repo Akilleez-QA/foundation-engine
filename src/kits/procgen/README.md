@@ -191,11 +191,12 @@ layer. Recipe: [store large world records](../../../docs/recipes/store-large-wor
   - `revision` increments on each change and is used as the store revision; `dirty`
     and `markSaved` track what has been written.
   - `materialize()` returns the edited copy, and `encode()` returns canonical compact
-    bytes: a 16-byte header with the baseline's CRC-32, then a minimal varint index
-    delta and a u16 value per edit.
-  - `decodeCellEdits` validates magic, format, grid size, baseline checksum, count,
-    ordering, overlong or oversized varints, range and trailing bytes. A malformed list,
-    or edits made against different content, throws and nothing is applied.
+    bytes: a 24-byte header with the grid dimensions and the baseline's CRC-32, then a
+    minimal varint index delta and a u16 value per edit.
+  - `decodeCellEdits` validates magic, format, grid dimensions, baseline checksum,
+    count, ordering, overlong or oversized varints, range and trailing bytes. A
+    malformed list, or edits made against a different shape or different content,
+    throws and nothing is applied.
 - **`openChunkStore({name, schema, limits?, evictable?, factory?})`** is the owner,
   implemented in `src/core/save/chunk-store.ts`. It also provides `clear()`, `destroy()`,
   `deleteChunkDatabase` and `listChunkDatabases` for world resets, which the save
@@ -214,8 +215,11 @@ layer. Recipe: [store large world records](../../../docs/recipes/store-large-wor
     are validated in the transaction: unreadable ones are quarantined, newer ones kept.
   - Operations run one at a time. A throwing callback fails only its own operation
     (`failed`). `close` resolves queued work as `closed` before it reaches storage.
-  - A newer build's database (VersionError) rejects with `newer-format` instead of
-    falling back.
+  - A newer build's database (VersionError) rejects with `newer-format`, a pending
+    deletion in this tab with `deleting`, and an open the browser queues past
+    `openTimeoutMs` with `blocked`. None of these falls back.
+  - Record and byte limits are counted per store instance, so other tabs' writes are
+    not seen until reopen.
 
 ## Evidence
 

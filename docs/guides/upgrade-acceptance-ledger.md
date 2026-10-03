@@ -772,6 +772,12 @@ Status: implemented, candidate on `feat/gen02-chunk-store` (PR); not integrated.
   - **Test fake:** transactions are serialized, so concurrent tabs no longer lose updates there.
   - **Evidence:** 16 core tests, 6 cell-edit tests, and the browser check passing 3/3 with concurrent, newer-format and destroy cases.
   - **Reset gap:** the save store's reset and export still do not include chunk databases (documented in the recipe).
+- **Second review (PR #56):**
+  - Cell edits bind `cellsX/Y/Z` in a 24-byte header, so uniform content of another shape is refused.
+  - A blocked deletion stays tracked: opens in this tab reject `deleting`, and opens queued by the browser reject `blocked` after `openTimeoutMs`. The deferred deletion completes when the last connection closes.
+  - The IndexedDB fake fires `versionchange` before deleting and completes blocked deletes later, matching Chromium.
+  - Per-instance record and byte accounting across tabs is documented.
+  - Evidence: 17 core and 7 cell-edit tests; the Chromium check adds destroy with a sibling store open, and a blocked then deferred delete (3/3).
 - **Not established:**
   - real quota exhaustion and browser-initiated storage eviction;
   - private-mode behaviour per browser, Safari and Firefox;

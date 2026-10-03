@@ -38,6 +38,11 @@ if (store.stats().durability === 'session') showNotice('worlds.not-saved'); // p
   `openChunkStore` reject with `ChunkStoreError` reason `newer-format`. It does not
   silently fall back to an empty session store that would hide, then overwrite, that
   data.
+- **Two more refusals** do not fall back either:
+  - `deleting`: this tab's deletion of that name is still pending.
+  - `blocked`: the browser did not open the database within `openTimeoutMs` (default
+    5,000 ms), usually because another tab is deleting or upgrading it; browsers queue
+    such opens silently.
 
 - `schema` is your record format number. Older records come back with their `schema`,
   so you can migrate them. Records with a newer schema, or a newer envelope format from
@@ -81,9 +86,12 @@ const stored = await store.read(`region:${cx},${cz}`);
 ```
 
 The baseline must be the same content the edits were made against. The encoding carries
-a CRC-32 of the baseline (`edits.baseline`, `baselineChecksum`), so loading edits over
-different content throws `baseline mismatch` instead of applying them silently. That
-covers a new seed, a changed generator or different parameters. Store the root seed with
+the grid's `cellsX`, `cellsY` and `cellsZ` and a CRC-32 of its values (`edits.baseline`,
+`baselineChecksum`). Loading edits over a different shape throws `grid dimensions
+mismatch`, and over different values `baseline mismatch`, instead of applying them
+silently. Different values usually come from a new seed, generator or parameters. A
+baseline with the same shape and the same values is the same content, so the edits
+apply correctly. Store the root seed with
 its `contentVersion` and compare it on load, as the seeded content recipe describes, so
 the mismatch is a decision you make up front rather than an error.
 
@@ -93,13 +101,20 @@ the mismatch is a decision you make up front rather than an error.
 |---|---|---|
 | Key length | 256 | rejects (`ChunkStoreError`) |
 | Record bytes | 1 MiB (max 64 MiB) | rejects |
-| Records | 65,536 | `full`, or eviction |
-| Total bytes | 256 MiB | `full`, or eviction |
+| Records (per store instance; see below) | 65,536 | `full`, or eviction |
+| Total bytes (per store instance; see below) | 256 MiB | `full`, or eviction |
 | Records per write | 64 | rejects |
 | Queued operations | 64 | `busy` |
 | Quarantine rows | 32 | `quarantine-full` for writes over unreadable records |
 | Edits per grid (`createCellEdits`) | 65,536 | `full` from `set` |
 | Database name | 200 | rejects |
+| Open wait (`openTimeoutMs`) | 5,000 ms | rejects `blocked` |
+
+The record and byte limits are enforced against each store instance's own index. That
+index is read at open and updated by that instance's writes. Writes from another tab
+are not counted until reopen, so two tabs can together store up to twice the limit.
+Revisions are still compared inside every transaction, so this affects accounting, not
+correctness. Use one writer per world, or reopen to refresh the totals.
 
 - **Eviction:** only with `evictable(key)`. Records go least recently used first, where
   recency counts reads and writes in this session only; at open, the order is the
@@ -135,7 +150,17 @@ another tab. Wire them yourself:
 - **Clearing a world in place:** call `store.clear()`. It deletes every record and
   quarantine row in one transaction.
 - **Deleting a world:** call `store.destroy()`, or `deleteChunkDatabase(name)` when the
-  store is not open. `blocked` means another tab still has it open.
+  store is not open. Other engine stores on that database close themselves on the
+  resulting version change (`stats().available` becomes false), so the result is
+  normally `destroyed`. `blocked` means some other connection did not close, for
+  example code that opened the database directly. **The deletion still happens once
+  that connection closes.** Until then:
+  - `openChunkStore(name)` in this tab rejects with `deleting`, and
+    `chunkDatabaseDeleting(name)` reports it;
+  - in other tabs, the browser queues the open, and it rejects with `blocked` after
+    `openTimeoutMs`.
+
+  A world reopened after the deferred deletion is empty.
 - **Listing worlds:** `listChunkDatabases()` lists this origin's chunk databases where the
   browser supports `indexedDB.databases()`, and returns `unsupported` otherwise. Keep
   your own list of world names in a save section if you need it everywhere.

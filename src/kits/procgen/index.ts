@@ -5,6 +5,6 @@ export { deriveSeed, createRng, SEED_PATH_LIMITS, type SeedPart, type Rng } from
 export { createGridGenerationJob, parseGridParameters, GRID_DEFAULT_LIMITS, GRID_MAX_CELLS, type GridRecipe, type GridGenerator, type GridCells, type GridContext, type GridLimits, type GridParameter, type GridDescriptor, type GeneratedGrid, type GridPrepareResult, type GridJobInput, type GridWire, type GridDimensions, type GridPrepareOptions, type GridJobStage, GridJobError } from './grid-job';
 export { cellularGenerator, cellularGridJob, prepareCellularGrid, CELLULAR_CELLS_PER_SLICE } from './cellular';
 export { defineGenerationSeedSection, parseGenerationSeed, type GenerationSeedRecord, type GenerationSeedSectionOptions } from './seed-section';
-export { createCellEdits, decodeCellEdits, baselineChecksum, CELL_EDIT_DEFAULT_LIMITS, type CellEdits, type CellEditBaseline, type CellEditLimits } from './cell-edits';
-export { deleteChunkDatabase, listChunkDatabases } from '../../core/save/chunk-port';
+export { createCellEdits, decodeCellEdits, baselineChecksum, CELL_EDIT_DEFAULT_LIMITS, type CellEdits, type CellEditBaseline, type CellEditLimits, type CellEditDimensions } from './cell-edits';
+export { deleteChunkDatabase, listChunkDatabases, chunkDatabaseDeleting } from '../../core/save/chunk-port';
 export { openChunkStore, createChunkStore, ChunkStoreError, CHUNK_STORE_DEFAULT_LIMITS, type ChunkStore, type ChunkStoreOptions, type OpenChunkStoreOptions, type ChunkStoreLimits, type ChunkStoreStats, type ChunkReadResult, type ChunkWrite, type ChunkWriteResult, type ChunkRemoveResult, type ChunkQuarantineRow, type ChunkFailed, type ChunkStatus } from '../../core/save/chunk-store';

@@ -5,6 +5,9 @@
  * transactions overlap, but equivalent for overlapping readwrite scopes). A transaction sees the committed state at
  * the moment it starts, its requests settle in later macrotasks, it commits only after its last request settled with
  * nothing new queued, and an abort or failed request discards every staged change. Values are structured-cloned.
+ * Deleting a database fires `versionchange` at its open connections first; if any stays open the request reports
+ * `blocked` and completes later, when the last one closes. An `open` issued meanwhile waits behind the delete with no
+ * event (as browsers do), then opens a fresh database.
  * It is not a conformance implementation: no indexes, key ranges, durability, or upgrades beyond creation.
  */
 type Store = Map<IDBValidKey, unknown> & { auto?: number; autoIncrement?: boolean };
@@ -37,6 +40,11 @@ export function createFakeIdb(): { factory: IDBFactory; controls: FakeIdbControl
   const databases = new Map<string, Map<string, Store>>();
   const queues = new Map<string, { run(): void; done: boolean }[]>();
   const connections = new Set<{ onversionchange: (() => void) | null; name: string }>();
+  const deleting = new Map<string, { done: (() => void)[] }>();
+  const afterClose = (name: string) => {
+    const d = deleting.get(name);
+    if (d && ![...connections].some(c => c.name === name)) { deleting.delete(name); databases.delete(name); queues.delete(name); for (const f of d.done.splice(0)) later(f); }
+  };
   let running = 0;
   const controls: FakeIdbControls = {
     quotaOnPut: () => false, failOpen: false, newerVersionOnOpen: false, databases, commits: 0, maxConcurrent: 0,
@@ -57,7 +65,7 @@ export function createFakeIdb(): { factory: IDBFactory; controls: FakeIdbControl
       onversionchange: null as (() => void) | null,
       objectStoreNames: { contains: (s: string) => stores.has(s) },
       createObjectStore(s: string, options?: { autoIncrement?: boolean }) { const m: Store = new Map(); m.autoIncrement = !!options?.autoIncrement; m.auto = 0; stores.set(s, m); return {}; },
-      close() { closed = true; connections.delete(db); },
+      close() { closed = true; connections.delete(db); afterClose(name); },
       transaction(names: string[], mode: IDBTransactionMode) {
         if (closed) throw domError('InvalidStateError', 'connection is closing');
         for (const n of names) if (!stores.has(n)) throw domError('NotFoundError');
@@ -140,22 +148,32 @@ export function createFakeIdb(): { factory: IDBFactory; controls: FakeIdbControl
   const factory = {
     open(name: string, version: number) {
       const r = new FakeRequest<unknown>();
-      later(() => {
+      const attempt = () => {
+        if (deleting.has(name)) { deleting.get(name)!.done.push(attempt); return; } // waits silently behind a delete
         if (controls.failOpen) { controls.failOpen = false; r.error = domError('InvalidStateError', 'blocked in this mode'); r.onerror?.(); return; }
         if (controls.newerVersionOnOpen) { controls.newerVersionOnOpen = false; r.error = domError('VersionError', 'requested version is less than the existing version'); r.onerror?.(); return; }
         const fresh = !databases.has(name);
         if (fresh) { databases.set(name, new Map()); queues.set(name, []); }
+        const existing = (databases.get(name) as Map<string, Store> & { version?: number });
+        if (!fresh && (existing.version ?? 1) > version) { r.error = domError('VersionError'); r.onerror?.(); return; }
         r.result = connect(name);
         if (fresh && version >= 1) r.onupgradeneeded?.();
         r.onsuccess?.();
-      });
+      };
+      later(attempt);
       return r;
     },
     deleteDatabase(name: string) {
       const r = new FakeRequest<unknown>();
       later(() => {
-        if ([...connections].some(c => c.name === name)) { r.onblocked?.(); return; }
-        databases.delete(name); queues.delete(name); r.onsuccess?.();
+        for (const c of [...connections]) if (c.name === name) c.onversionchange?.();
+        later(() => {
+          const entry = deleting.get(name) ?? { done: [] };
+          entry.done.push(() => r.onsuccess?.());
+          deleting.set(name, entry);
+          if ([...connections].some(c => c.name === name)) r.onblocked?.(); // still pending: completes on last close
+          else afterClose(name);
+        });
       });
       return r;
     },

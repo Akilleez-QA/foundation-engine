@@ -1,6 +1,6 @@
 // Test fixture outside src/: lint:arch's indexed-db rule scans src/ only; the fixture corrupts records directly.
 import {openChunkStore} from '../../../src/core/save/chunk-store.ts';
-import {CHUNK_DB_PREFIX,listChunkDatabases} from '../../../src/core/save/chunk-port.ts';
+import {CHUNK_DB_PREFIX,chunkDatabaseDeleting,listChunkDatabases} from '../../../src/core/save/chunk-port.ts';
 import {deriveSeed} from '../../../src/core/rng.ts';
 import {cellularGridJob} from '../../../src/kits/procgen/cellular.ts';
 import {createCellEdits} from '../../../src/kits/procgen/cell-edits.ts';
@@ -41,7 +41,17 @@ window.runChunkStoreCheck=async()=>{
   out.listed=(await listChunkDatabases()).includes(name);
   await new Promise(r=>{const del=idb.deleteDatabase(CHUNK_DB_PREFIX+name);del.onsuccess=del.onerror=del.onblocked=()=>r();});
   const e=await openChunkStore({name,schema:1});await e.write([{key:'k',revision:1,data:new Uint8Array(1)}]);
-  out.destroy=(await e.destroy()).status;out.listedAfterDestroy=(await listChunkDatabases()).includes(name);
+  const sibling=await openChunkStore({name,schema:1}); // another engine store: closes itself on versionchange
+  out.destroy=(await e.destroy()).status;out.siblingAvailable=sibling.stats().available;sibling.close();
+  out.listedAfterDestroy=(await listChunkDatabases()).includes(name);
+  // a foreign connection that ignores versionchange blocks the delete; it stays pending and completes on close
+  const f=await openChunkStore({name,schema:1});await f.write([{key:'k',revision:1,data:new Uint8Array(1)}]);
+  const foreign=await done(idb.open(CHUNK_DB_PREFIX+name));
+  out.blockedDestroy=(await f.destroy()).status;
+  out.reopenWhileDeleting=await openChunkStore({name,schema:1}).then(()=>'opened',err=>err.reason??String(err));
+  foreign.close();
+  for(let i=0;i<100&&chunkDatabaseDeleting(name);i++)await new Promise(r=>setTimeout(r,10));
+  const g=await openChunkStore({name,schema:1});out.afterDeferredDelete=g.stats().records;g.close();
   const s=await openChunkStore({name:'unused',schema:1,factory:null});out.fallback=s.stats().durability;s.close();
   return out;
  }finally{await new Promise(r=>{const del=idb.deleteDatabase(CHUNK_DB_PREFIX+name);del.onsuccess=del.onerror=del.onblocked=()=>r();});}

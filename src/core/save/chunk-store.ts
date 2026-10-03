@@ -106,7 +106,7 @@ export interface ChunkStore {
 /** Rejected for caller errors (bad key, revision, data type, oversize). `reason` is set for open refusals. */
 export class ChunkStoreError extends Error {
   override readonly name = 'ChunkStoreError';
-  constructor(message: string, readonly reason?: 'newer-format') { super(message); }
+  constructor(message: string, readonly reason?: 'newer-format' | 'deleting' | 'blocked') { super(message); }
 }
 
 const FORMAT = 1;
@@ -341,6 +341,8 @@ export interface OpenChunkStoreOptions extends ChunkStoreOptions {
   readonly name: string;
   /** Test seam; defaults to `globalThis.indexedDB`. `null` forces the memory fallback. */
   readonly factory?: IDBFactory | null;
+  /** How long to wait for the browser to open the database before rejecting `blocked`. 1..60000, default 5000. */
+  readonly openTimeoutMs?: number;
 }
 
 /**
@@ -348,13 +350,19 @@ export interface OpenChunkStoreOptions extends ChunkStoreOptions {
  * open (some private modes). Check `stats().durability`: `session` data is lost when the store closes or the page
  * unloads, so tell the player instead of claiming the world is saved. A database written by a newer build rejects
  * with `ChunkStoreError` reason `newer-format` instead of falling back, so newer data is never hidden or replaced.
+ * Likewise `deleting` (this tab's deletion of `name` is still pending: it completes once other connections close) and
+ * `blocked` (the browser did not open it within `openTimeoutMs`) reject instead of returning an empty session store.
  */
 export async function openChunkStore(options: OpenChunkStoreOptions): Promise<ChunkStore> {
   if (typeof options.name !== 'string' || options.name.length < 1 || options.name.length > 200) throw new ChunkStoreError('chunk store: invalid database name');
+  const timeout = options.openTimeoutMs ?? 5000;
+  if (!int(timeout, 1, 60000)) throw new ChunkStoreError('chunk store: invalid openTimeoutMs');
   let port: ChunkPort;
-  try { port = options.factory === null ? memoryChunkPort() : await openIndexedDbChunkPort(options.name, options.factory); }
+  try { port = options.factory === null ? memoryChunkPort() : await openIndexedDbChunkPort(options.name, options.factory, timeout); }
   catch (e) {
     if (e instanceof ChunkPortError && e.reason === 'newer-format') throw new ChunkStoreError('chunk store: database written by a newer build', 'newer-format');
+    if (e instanceof ChunkPortError && e.reason === 'deleting') throw new ChunkStoreError('chunk store: a deletion of this database is pending; it completes when other connections close', 'deleting');
+    if (e instanceof ChunkPortError && e.reason === 'blocked') throw new ChunkStoreError('chunk store: the browser did not open the database in time (another tab may be deleting or upgrading it)', 'blocked');
     if (e instanceof ChunkPortError) port = memoryChunkPort(); else throw e;
   }
   try { return await createChunkStore(port, options); }

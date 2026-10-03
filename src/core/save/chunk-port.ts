@@ -21,10 +21,12 @@ export interface ChunkPlan {
   readonly clearAll?: boolean;
 }
 export type ChunkDecision<R> = { readonly result: R; readonly plan?: ChunkPlan };
-export type ChunkPortFailure = 'quota' | 'unavailable' | 'newer-format';
+export type ChunkPortFailure = 'quota' | 'unavailable' | 'newer-format' | 'deleting' | 'blocked';
 /**
  * The one error a port rejects with. `quota`: the browser refused the space; `newer-format`: the database was
- * created by a newer build (IndexedDB VersionError), so this build must not touch it; `unavailable`: anything else.
+ * created by a newer build (IndexedDB VersionError), so this build must not touch it; `deleting`: this tab asked to
+ * delete it and the deletion is still pending (it completes when other connections close); `blocked`: the open did
+ * not complete within its timeout (usually another tab's pending delete or upgrade); `unavailable`: anything else.
  */
 export class ChunkPortError extends Error {
   override readonly name = 'ChunkPortError';
@@ -112,15 +114,32 @@ const reason = (error: unknown): ChunkPortFailure => (error as { name?: string }
  */
 const defaultFactory = (): IDBFactory | undefined => (globalThis as { indexedDB?: IDBFactory }).indexedDB;
 
-/** Deletes chunk database `name` (prefix added). `blocked`: another tab still has it open. */
+/** Deletions this tab requested that are still pending, per factory and name. */
+const pendingDeletes = new WeakMap<object, Map<string, Promise<void>>>();
+/** True while this tab's deletion of `name` waits for other connections to close. */
+export function chunkDatabaseDeleting(name: string, factory: IDBFactory | undefined = defaultFactory()): boolean {
+  return !!factory && !!pendingDeletes.get(factory)?.has(name);
+}
+
+/**
+ * Deletes chunk database `name` (prefix added). Open engine stores close themselves on the resulting version change,
+ * so this usually resolves `deleted`. `blocked` means some connection did not close: **the deletion still happens**
+ * once it does, and until then opening `name` in this tab rejects with `deleting`.
+ */
 export function deleteChunkDatabase(name: string, factory: IDBFactory | undefined = defaultFactory()): Promise<'deleted' | 'blocked' | 'unavailable'> {
   return new Promise(resolve => {
     if (!factory) { resolve('unavailable'); return; }
     let request: IDBOpenDBRequest;
     try { request = factory.deleteDatabase(CHUNK_DB_PREFIX + name); } catch { resolve('unavailable'); return; }
-    request.onsuccess = () => resolve('deleted');
-    request.onerror = () => resolve('unavailable');
-    request.onblocked = () => resolve('blocked');
+    let map = pendingDeletes.get(factory);
+    if (!map) { map = new Map(); pendingDeletes.set(factory, map); }
+    let settle!: () => void;
+    const pending = new Promise<void>(r => { settle = r; });
+    map.set(name, pending);
+    const finish = () => { if (map!.get(name) === pending) map!.delete(name); settle(); };
+    request.onsuccess = () => { finish(); resolve('deleted'); };
+    request.onerror = () => { finish(); resolve('unavailable'); };
+    request.onblocked = () => resolve('blocked'); // stays pending until onsuccess/onerror
   });
 }
 
@@ -131,9 +150,20 @@ export async function listChunkDatabases(factory: IDBFactory | undefined = defau
   catch { return 'unsupported'; }
 }
 
-export function openIndexedDbChunkPort(name: string, factory: IDBFactory | undefined = defaultFactory()): Promise<ChunkPort> {
+/**
+ * Opens (or creates) chunk database `name`. Rejects `deleting` at once when this tab's deletion of it is pending, and
+ * `blocked` when the browser does not answer within `timeoutMs` (another tab's pending delete or upgrade queues opens
+ * silently); a connection that arrives after the timeout is closed immediately.
+ */
+export function openIndexedDbChunkPort(name: string, factory: IDBFactory | undefined = defaultFactory(), timeoutMs = 5000): Promise<ChunkPort> {
   return new Promise((resolve, reject) => {
     if (!factory) { reject(new ChunkPortError('unavailable', 'IndexedDB is not available')); return; }
+    if (chunkDatabaseDeleting(name, factory)) { reject(new ChunkPortError('deleting', 'a deletion of this database is pending in this tab')); return; }
+    let timedOut = false;
+    const rejectNow = reject;
+    const timer = setTimeout(() => { timedOut = true; rejectNow(new ChunkPortError('blocked', `open did not complete within ${timeoutMs} ms`)); }, timeoutMs);
+    const settle = <T>(fn: (v: T) => void) => (v: T) => { clearTimeout(timer); if (!timedOut) fn(v); };
+    resolve = settle(resolve); reject = settle(reject);
     let request: IDBOpenDBRequest;
     try { request = factory.open(CHUNK_DB_PREFIX + name, 1); } catch (e) { reject(new ChunkPortError('unavailable', String((e as Error)?.message ?? e))); return; }
     request.onupgradeneeded = () => {
@@ -144,6 +174,7 @@ export function openIndexedDbChunkPort(name: string, factory: IDBFactory | undef
     request.onerror = () => reject(new ChunkPortError(request.error?.name === 'VersionError' ? 'newer-format' : 'unavailable', String(request.error?.message ?? 'open failed')));
     request.onsuccess = () => {
       const db = request.result;
+      if (timedOut) { db.close(); return; }
       let closed = false;
       db.onversionchange = () => { closed = true; db.close(); };
       const txn = (mode: IDBTransactionMode, stores: readonly (typeof STORES[number])[] = STORES): IDBTransaction => {

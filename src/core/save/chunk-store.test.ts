@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createFakeIdb } from './fake-idb';
 import { CHUNK_DB_PREFIX, MemoryChunkDatabase, deleteChunkDatabase, listChunkDatabases, memoryChunkPort, openIndexedDbChunkPort, type ChunkPort } from './chunk-port';
 import { createChunkStore, crc32, openChunkStore, ChunkStoreError, type ChunkStore } from './chunk-store';
+import { chunkDatabaseDeleting } from './chunk-port';
 
 const bytes = (...v: number[]) => new Uint8Array(v);
 const fill = (n: number, v = 1) => new Uint8Array(n).fill(v);
@@ -274,13 +275,17 @@ test('GEN-02 clear, destroy and database listing give creators an explicit world
   assert.deepEqual(await store.clear(), { status: 'cleared' });
   assert.equal(store.stats().records, 0); assert.deepEqual(await store.read('a'), { status: 'missing' });
   await store.write([{ key: 'a', revision: 1, data: bytes(1) }]);
+  // another engine store on the same database closes itself on the version change, as in Chromium
   const other = await openChunkStore({ name: 'slot-1', schema: 1, factory: fake.factory });
-  assert.deepEqual(await store.destroy(), { status: 'blocked' }, 'another tab still has it open');
+  assert.deepEqual(await store.destroy(), { status: 'destroyed' });
+  assert.equal(other.stats().available, false, 'the other store closed on versionchange');
+  assert.deepEqual(await other.read('a'), { status: 'unavailable' });
   other.close();
-  assert.equal(await deleteChunkDatabase('slot-1', fake.factory), 'deleted');
   assert.deepEqual(await listChunkDatabases(fake.factory), []);
   assert.equal(store.stats().available, false);
   assert.deepEqual(await store.read('a'), { status: 'closed' });
+  const fresh = await openChunkStore({ name: 'slot-1', schema: 1, factory: fake.factory });
+  assert.equal(fresh.stats().records, 0); fresh.close();
   const mem = await openChunkStore({ name: 'x', schema: 1, factory: null });
   await mem.write([{ key: 'a', revision: 1, data: bytes(1) }]);
   assert.deepEqual(await mem.destroy(), { status: 'destroyed' });
@@ -302,4 +307,30 @@ test('GEN-02 data from a newer build is refused, never hidden behind a session f
   f2.controls.versionChange();
   assert.equal(store.stats().available, false, 'stats report the connection closed by another tab');
   store.close();
+});
+
+test('GEN-02 a blocked deletion stays pending: opens refuse with a reason instead of hanging, then it completes', async () => {
+  const fake = createFakeIdb();
+  const store = await openChunkStore({ name: 'slot', schema: 1, factory: fake.factory });
+  await store.write([{ key: 'a', revision: 1, data: bytes(1) }]);
+  // a foreign connection that ignores versionchange (not an engine store) keeps the database open
+  const foreign = await new Promise<{ close(): void }>(resolve => { const r = fake.factory.open(CHUNK_DB_PREFIX + 'slot', 1); r.onsuccess = () => resolve(r.result as never); });
+  assert.deepEqual(await store.destroy(), { status: 'blocked' });
+  assert.equal(chunkDatabaseDeleting('slot', fake.factory), true);
+  const here = await openChunkStore({ name: 'slot', schema: 1, factory: fake.factory }).catch(e => e);
+  assert.ok(here instanceof ChunkStoreError && here.reason === 'deleting', 'this tab refuses at once');
+  // another tab (another factory object over the same origin) is queued silently by the browser: bounded by a timeout
+  const otherTab = { open: fake.factory.open.bind(fake.factory), deleteDatabase: fake.factory.deleteDatabase.bind(fake.factory), databases: fake.factory.databases.bind(fake.factory) } as IDBFactory;
+  const started = Date.now();
+  const there = await openChunkStore({ name: 'slot', schema: 1, factory: otherTab, openTimeoutMs: 50 }).catch(e => e);
+  assert.ok(there instanceof ChunkStoreError && there.reason === 'blocked');
+  assert.ok(Date.now() - started < 2000, 'bounded wait');
+  await assert.rejects(openChunkStore({ name: 'slot', schema: 1, factory: otherTab, openTimeoutMs: 0 }), ChunkStoreError);
+  // once the foreign connection closes, the deferred deletion completes and the world is empty
+  foreign.close();
+  for (let i = 0; i < 20 && chunkDatabaseDeleting('slot', fake.factory); i++) await new Promise(r => setTimeout(r, 1));
+  assert.equal(chunkDatabaseDeleting('slot', fake.factory), false);
+  const after = await openChunkStore({ name: 'slot', schema: 1, factory: fake.factory });
+  assert.equal(after.stats().records, 0); assert.deepEqual(await after.read('a'), { status: 'missing' });
+  after.close();
 });
