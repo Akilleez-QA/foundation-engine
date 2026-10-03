@@ -1,5 +1,12 @@
 # Getting started: your first game
 
+```text
+      [##]          FOUNDATION ENGINE
+    [======]        =================
+  [==][==][==]      STAGE 1: FIRST GAME
+ [############]
+```
+
 From a fresh clone to a game you can share, by hand or with a coding agent. Each step says what you should see. You will run a lane-dodging game, change its player colour, check the change and build a static site. Download time depends on your connection; no paid tool or AI account is required.
 
 ## 1. Get the code and the tools

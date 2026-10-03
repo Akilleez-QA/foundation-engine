@@ -19,6 +19,15 @@ package. The installed license credits Einar Otto Stangvik (2011), Arnout Kazemi
 and contributors (2013), and Luigi Pinca and contributors (2016). No optional native
 WebSocket acceleration package is required by this integration.
 
+## Brand asset generator dependency
+
+Added and checked on 2026-10-03: **@resvg/resvg-js 2.6.2**, MPL-2.0, a development
+dependency used only by `scripts/brand/build.mjs` to render the brand PNGs from
+their SVG sources. It is not imported by the engine, templates or player builds.
+[Pinned source](https://github.com/thx/resvg-js/tree/v2.6.2). MPL-2.0 is compatible
+with GPL-3.0-only use here; the rendered images carry no license from the tool.
+The brand assets themselves are original work listed in [docs/brand.md](docs/brand.md).
+
 ## Code distributed in browser builds
 
 - **three 0.186.1**, MIT, Copyright © 2010–2026 three.js authors.
@@ -98,8 +107,8 @@ SOFTWARE.
 
 ## Locked dependency inventory
 
-The lockfile contains 81 dependency entries. Its declared licenses are 63 MIT,
-12 MPL-2.0 (Lightning CSS and its platform binaries), four Apache-2.0, one
+The lockfile contains 94 dependency entries. Its declared licenses are 63 MIT,
+25 MPL-2.0 (Lightning CSS, resvg-js and their platform binaries), four Apache-2.0, one
 BSD-3-Clause, and one ISC. These include transitive tools,
 types, and optional platform binaries; the table is not a statement that all
 packages ship in a browser build. The original 2026-09-30 audit installed 29 packages on its
@@ -152,6 +161,19 @@ lockfile metadata only.
 | `@rolldown/binding-win32-arm64-msvc` | 1.2.12 | MIT | Optional |
 | `@rolldown/binding-win32-x64-msvc` | 1.2.12 | MIT | Optional |
 | `@rolldown/pluginutils` | 1.0.1 | MIT | Required by dependency graph |
+| `@resvg/resvg-js` | 2.6.2 | MPL-2.0 | Development only: brand asset generator |
+| `@resvg/resvg-js-android-arm-eabi` | 2.6.2 | MPL-2.0 | Optional |
+| `@resvg/resvg-js-android-arm64` | 2.6.2 | MPL-2.0 | Optional |
+| `@resvg/resvg-js-darwin-arm64` | 2.6.2 | MPL-2.0 | Optional |
+| `@resvg/resvg-js-darwin-x64` | 2.6.2 | MPL-2.0 | Optional |
+| `@resvg/resvg-js-linux-arm-gnueabihf` | 2.6.2 | MPL-2.0 | Optional |
+| `@resvg/resvg-js-linux-arm64-gnu` | 2.6.2 | MPL-2.0 | Optional |
+| `@resvg/resvg-js-linux-arm64-musl` | 2.6.2 | MPL-2.0 | Optional |
+| `@resvg/resvg-js-linux-x64-gnu` | 2.6.2 | MPL-2.0 | Optional |
+| `@resvg/resvg-js-linux-x64-musl` | 2.6.2 | MPL-2.0 | Optional |
+| `@resvg/resvg-js-win32-arm64-msvc` | 2.6.2 | MPL-2.0 | Optional |
+| `@resvg/resvg-js-win32-ia32-msvc` | 2.6.2 | MPL-2.0 | Optional |
+| `@resvg/resvg-js-win32-x64-msvc` | 2.6.2 | MPL-2.0 | Optional |
 | `@tweenjs/tween.js` | 23.1.3 | MIT | Required by dependency graph |
 | `@types/node` | 22.20.4 | MIT | Required by dependency graph |
 | `@types/stats.js` | 0.17.4 | MIT | Required by dependency graph |
@@ -202,6 +224,9 @@ installed notice paths include:
   `node_modules/detect-libc/LICENSE` (Apache-2.0).
 - `node_modules/lightningcss/LICENSE` (MPL-2.0, a build-time CSS minifier; its
   native `lightningcss-<platform>` subpackages carry the same license).
+- `node_modules/@resvg/resvg-js/LICENSE` (MPL-2.0, the development-only SVG
+  renderer for `scripts/brand/build.mjs`; its native `@resvg/resvg-js-<platform>`
+  subpackages carry the same license).
 - `node_modules/playwright-core/LICENSE` and `NOTICE` (Apache-2.0).
 - `node_modules/source-map-js/LICENSE` (BSD-3-Clause).
 - `node_modules/picocolors/LICENSE` (ISC).
