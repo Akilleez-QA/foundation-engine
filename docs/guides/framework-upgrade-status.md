@@ -636,6 +636,26 @@ texture change keeps the old view until the new one arrives. Overload: none beyo
 physics, a game-facing multiplayer session, normal/roughness maps and `Mesh` texture
 coordinates.
 
+## Particle emitters — FX-01, implemented, candidate (PR #63)
+
+Optional author component `Emitter` with `defineEmitter`, `validateEmitter` and `burst`, and
+a per-scene opt-in `defineScene({ particles: sceneParticles({ max, emitters }) })`. Owner: the
+scene visit; a pure field (`author/particle-sim.ts`) steps in the engine fixed system
+`engine.particles` after the scene's fixed systems, and `author/scene-particles.ts` (a lazy
+chunk) draws one instanced quad mesh per admitted emitter from pools allocated once. Bounds: `max` ≤ 4,096 per emitter, default 16
+emitters and 4,096 reserved particles per scene (caps 256 and 65,536), 4 bursts per emitter
+per step. Overload: full-pool and per-step excess dropped and counted; over-limit emitters
+refused and counted by cause (first refusal of each cause per visit reported): refused bursts are dropped, refused one-shots
+removed, refused continuous emitters admitted when capacity frees. Particles use their own seeded stream, never
+`ctx.random`. Cancellation: visit exit disposes
+meshes, geometries and materials and releases texture leases; late textures are released.
+Quality: knob `effects.particles` (reference/high 1, medium 0.75, low 0.5) thins
+non-essential emitters to a deterministic subset without changing the random stream.
+Evidence: unit tests, the recipe's code as a test, and `npm run test:particle-browser`
+(desktop headless Chromium, software GL). Status: implemented, candidate; not integrated. No
+physical-device, GPU timing, fill-rate or visual-quality acceptance. See the
+[guide](particles.md).
+
 ## Game sound files — DX P1-10, integrated in v0.2.0
 
 `ctx.play(id, options?)` accepts a game sound id as well as a cue id (`PlayOptions`:

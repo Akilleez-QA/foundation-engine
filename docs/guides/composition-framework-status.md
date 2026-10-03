@@ -372,6 +372,22 @@ mechanics template demonstrates it with draws and triangles unchanged. No physic
 or visual-quality acceptance; `Mesh`/`Model` and texture maps beyond the colour map are out
 of scope.
 
+## Particle emitters (FX-01) — implemented, candidate (PR #63)
+
+`Emitter` / `defineEmitter` / `burst` (author API) give an entity with a `Transform` burst or
+continuous particles with lifetime, speed, spread, gravity, drag, size/colour/opacity curves,
+an optional texture and additive or normal blending, in scenes that opt in with
+`sceneParticles()`. Owner: the scene visit
+(`author/particle-sim.ts` on the fixed step, `author/scene-particles.ts` for drawing); one
+instanced draw per emitter with live particles, none while idle. Bounded per emitter and per
+scene with counted drops and reported refusals; the `effects.particles` knob thins
+non-essential emitters on lighter presets. See the
+[recipe](../recipes/hit-sparks-and-pickups.md) and [guide](particles.md). Status:
+implemented, candidate; not integrated. Evidence: unit tests and
+`npm run test:particle-browser` (desktop headless Chromium, software GL). No template uses it,
+so template budgets are unchanged. No physical-device, GPU timing or visual-quality
+acceptance.
+
 ## Game sound files (DX P1-10) — integrated in v0.2.0
 
 `defineAsset({ type: 'audio' })` files play through `ctx.play(id, { volume, pitch,

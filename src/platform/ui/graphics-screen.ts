@@ -47,6 +47,7 @@ const KNOB_WORDS: Readonly<Record<string, string>> = {
   'graphics.textures.anisotropy': 'Sharp textures at an angle',
   'graphics.textures.canvas-budget': 'Painted-surface memory',
   'graphics.post.mode': 'Post-processing',
+  'graphics.effects.particles': 'Particle density',
   'graphics.frame-rate.cap': 'Frame-rate cap',
   'graphics.frame-rate.display': 'Display rate',
   'graphics.interface.backdrop-blur': 'Blurred panel backgrounds',
@@ -72,6 +73,7 @@ export function optionWords(def: AnyKnobDef, value: unknown, index: number): str
     if (def.id === 'textures.max-size') return `${value} px`;
     if (def.id === 'textures.canvas-budget-mib') return `${value} MB`;
     if (def.id === 'textures.anisotropy') return `${value}×`;
+    if (def.id === 'effects.particles') return `${Math.round(value * 100)} %`;
     return String(value);
   }
   return String(value);
