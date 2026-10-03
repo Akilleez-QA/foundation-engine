@@ -60,18 +60,20 @@ export const RULES = [
   {name: 'local-storage', strict: true, re: /\b(?:localStorage|sessionStorage)\b/g, allow: ['core/save/']},
   // Large-world binary records belong to the chunk port beside it (docs/recipes/store-large-world-records.md).
   {name: 'indexed-db', strict: true, re: /\bindexedDB\b/g, allow: ['core/save/chunk-port.ts']},
-  // One render path (ADR 0034, STD-REN-1): WebGL2 only, contexts created only by the renderer pool.
+  // Creator-selectable render backend (ADR 0078, STD-REN-1): renderers are created only by the renderer pool's backends.
+  // WebGPU and TSL code lives only in the opt-in WebGPU backend folder, which the pool loads lazily; everywhere else
+  // (the rest of the engine, kits, and game code through lint:game) stays on the default WebGL2 path.
   {
     name: 'three-webgpu',
     strict: true,
     re: /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"`]three\/(?:webgpu|tsl)['"`]/g,
-    allow: [],
+    allow: ['platform/render/backends/webgpu/'],
   },
   {
     name: 'webgl-renderer',
     strict: true,
     re: /\bnew\s+(?:[\w$]+\.)?WebGLRenderer\s*\(/g,
-    allow: ['platform/render/renderer-pool.ts'],
+    allow: ['platform/render/renderer-pool.ts', 'platform/render/backends/webgl/'],
   },
   // GPU context loss is recovered once, in render (STD-REN-5).
   {

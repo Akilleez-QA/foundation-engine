@@ -461,7 +461,7 @@ A game adds its own domain systems (for example an economy or a world model) wit
 
 ### 9.2 The render path
 
-- **STD-REN-1.** The game MUST have one render path, created only by the renderer pool. [ADR 0034]
+- **STD-REN-1.** Renderers MUST be created only by the renderer pool, through its render backend. WebGL2 is the default backend. WebGPU is opt-in, selected by the creator in the brief, and loaded lazily; only the WebGPU backend imports `three/webgpu` or `three/tsl`, and three's WebGL fallback backend is never used. [ADR 0078]
 - **STD-REN-3.** The renderer pool MUST own contexts by role. Scene changes reuse the world context, and the number of live contexts is bounded. [ADR 0016]
 - **STD-REN-4.** The pool MUST reset render state on every acquire, audit leaks on release, and keep a recycle valve.
 - **STD-REN-5.** Context loss MUST be handled once, in the pool: an event, a restore hook on runs, recreation after a timeout, and one generic recovery layer.

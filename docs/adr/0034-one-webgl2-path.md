@@ -1,6 +1,6 @@
 # ADR 0034: One WebGL2 render path
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR 0078](0078-creator-selectable-render-backend.md)
 - **Date:** 2026-09-28
 - **Area:** Render
 

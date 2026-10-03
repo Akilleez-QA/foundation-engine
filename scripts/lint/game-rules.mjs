@@ -1,12 +1,15 @@
 #!/usr/bin/env node
-// scripts/lint/game-rules.mjs (`npm run lint:game`, part of `npm run check` and `npm run lint`): two of AGENTS.md's
-// short rules, enforced in game code. lint:arch holds the same rules for src/ only; this applies them to the active
-// game folder (GAME_DIR, default ./game) and to every templates/<name>/game.
+// scripts/lint/game-rules.mjs (`npm run lint:game`, part of `npm run check` and `npm run lint`): rules that
+// lint:arch holds for src/ only (two of AGENTS.md's short rules and the render-backend boundary), applied to the
+// active game folder (GAME_DIR, default ./game) and to every templates/<name>/game.
 //
 //   math-random      Math.random() in game code. Use ctx.random(): seeded, so a run with ?seed= replays exactly.
 //   literal-ui-text  a literal with words written where a player reads it: the UI kit's HUD (`.line(id, '…')`,
 //                    `.banner('…')`, `.prompt('…')`), DOM text and labels (`textContent`, `title`, `aria-label`, …)
 //                    and HTML (`innerHTML`, …). Use a string key: defineGame({ strings }) and ctx.text(key, vars).
+//   three-webgpu     an import of `three/webgpu` or `three/tsl` (ADR 0078). The render backend is a brief setting
+//                    (`defineBuild({ render: { backend } })`); only the engine's WebGPU backend imports these. This
+//                    rule has no escape.
 //
 // Not scanned: <game>/tools/ (build-time Node scripts), <game>/public/ (static files), and test files (*.test.*).
 // An explicit escape, on the offending line or the line above, with a reason after the colon:
@@ -25,6 +28,7 @@ export const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const HUD_SINK = /\.(?:line\s*\(\s*[^,()]*,\s*|banner\s*\(\s*|prompt\s*\(\s*)(?=['"`])/g;
 
 const MATH_RANDOM = ARCH_RULES.find(r => r.name === 'math-random');
+const THREE_WEBGPU = ARCH_RULES.find(r => r.name === 'three-webgpu');
 
 /** The rules for game code: name, matcher over comment-free source, and the fix an agent should apply. */
 export const GAME_RULES = [
@@ -42,6 +46,12 @@ export const GAME_RULES = [
       return hits.sort((a, b) => a.index - b.index);
     },
     fix: "literal text reaches the player: add a string key via defineGame({ strings: { en: { 'game.hud.coins': 'Coins {n}' } } }) and show ctx.text('game.hud.coins', { n })",
+  },
+  {
+    name: 'three-webgpu',
+    escapable: false,
+    match: code => ruleMatches(THREE_WEBGPU, code),
+    fix: "game code never imports three/webgpu or three/tsl (ADR 0078): choose the backend in the brief with defineBuild({ render: { backend: 'webgpu' } }) and keep game code on @engine",
   },
 ];
 
@@ -80,7 +90,7 @@ export function checkSource(text) {
   for (const r of GAME_RULES) {
     for (const m of r.match(code)) {
       const line = code.slice(0, m.index).split('\n').length;
-      if (!escaped(lines, line, r.name)) out.push({rule: r.name, line, fix: r.fix});
+      if (r.escapable === false || !escaped(lines, line, r.name)) out.push({rule: r.name, line, fix: r.fix});
     }
   }
   return out.sort((a, b) => a.line - b.line);
@@ -114,6 +124,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const v = dirs.flatMap(d => checkGameRules(d));
   if (process.argv.includes('--json')) console.log(JSON.stringify(v, null, 1));
   else if (v.length) console.error(`lint:game: ${v.length} violation(s)\n` + v.map(x => `  ${format(x)}`).join('\n'));
-  else console.log(`lint:game: ${dirs.length} game dir(s), no Math.random() or literal UI text`);
+  else console.log(`lint:game: ${dirs.length} game dir(s), no Math.random(), literal UI text or three/webgpu`);
   process.exitCode = v.length ? 1 : 0;
 }

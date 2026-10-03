@@ -60,12 +60,27 @@ export const portBusyHint = (port, retry) => `port ${port} is busy; try ${retry(
 /**
  * The dev server (test API included), on a free local port; `host` as in listenHost (default 127.0.0.1). A taken
  * `port` rejects with an error whose `code` is 'EADDRINUSE' and whose `port` names it, after closing the half-started
- * server; callers print portBusyHint instead of a stack trace.
+ * server; callers print portBusyHint instead of a stack trace. Only `npm run play` passes `watch: true`: a person
+ * edits while it runs, so changes reload the page. Every other caller (play:snap, play:script, play:criteria) is a
+ * short non-interactive run that never sees an edit, so it starts no file watcher (Vite `server.watch: null`) and
+ * spends none of the machine's inotify watches.
  */
-export async function serve({port, host = '127.0.0.1'} = {}) {
+export async function serve({port, host = '127.0.0.1', watch = false} = {}) {
   const {createServer} = await import('vite');
   const chosen = port ?? (await freePort());
-  const server = await createServer({root: ROOT, logLevel: 'error', server: {host, port: chosen, strictPort: true}});
+  // Vite's mergeConfig drops a null from inline config, so `server.watch: null` is set in a config hook instead.
+  const noWatch = {
+    name: 'engine-no-watch',
+    config(config) {
+      config.server = {...config.server, watch: null};
+    },
+  };
+  const server = await createServer({
+    root: ROOT,
+    logLevel: 'error',
+    server: {host, port: chosen, strictPort: true},
+    plugins: watch ? [] : [noWatch],
+  });
   try {
     await server.listen();
   } catch (error) {
@@ -81,7 +96,12 @@ export async function serve({port, host = '127.0.0.1'} = {}) {
     await server.close();
     throw Error(`the dev server reported no URL for host ${host === true ? 'all interfaces' : host}`);
   }
-  return {url: first.replace(/\/$/, ''), network: network.map(u => u.replace(/\/$/, '')), close: () => server.close()};
+  return {
+    url: first.replace(/\/$/, ''),
+    network: network.map(u => u.replace(/\/$/, '')),
+    watching: server.config.server.watch !== null,
+    close: () => server.close(),
+  };
 }
 
 export function readJson(file) {

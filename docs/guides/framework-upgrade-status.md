@@ -822,3 +822,13 @@ CSS produced one redraw and then idle rendering; the unchanged public runtime
 reproduced the missing redraw. See the [contract](render-resize-lifecycle.md) and
 [source-scoped receipt](../verification/dpr-redraw-20261003.md). This is candidate
 evidence, not public integration, a full local gate or physical-device acceptance.
+
+### Creator-selectable render backend (ADR 0078) — decision recorded, 2026-10-03
+
+[ADR 0078](../adr/0078-creator-selectable-render-backend.md) supersedes ADR 0034.
+WebGL2 stays the default backend; WebGPU becomes an opt-in, creator-selected and
+lazily loaded backend. The default changes only by a later author decision when the
+ADR's five measured criteria (C1–C5) hold. This entry records the decision and the
+narrowed `three-webgpu` lint (allowed only under `platform/render/backends/webgpu/`,
+banned in the rest of the engine, kits and game code). No renderer seam, WebGPU
+backend, per-backend budget or device evidence exists yet.
