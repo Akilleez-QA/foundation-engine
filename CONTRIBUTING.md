@@ -23,6 +23,8 @@ npx playwright-core install chromium
 
 Linux CI may also need browser system dependencies (`npx playwright-core install --with-deps chromium`). The harness accepts `ENGINE_CHROMIUM` as an executable path, then tries Playwright's installed browser, then an installed Chrome or Chromium in its usual folder for the OS (`ENGINE_CHROMIUM_SYSTEM=0` skips those); without one it stops with the install command. Test browsers are isolated and muted; do not change system audio or use a personal browser profile for automation.
 
+For the current improvement milestone, see the [creator-readiness goal](docs/guides/creator-readiness-goal.md): acceptance criteria, task cards, parallel ownership and evidence requirements.
+
 ## Propose a change
 
 For substantial changes, open an issue describing the problem, a minimal consumer, and the proposed contract before investing in an implementation. A bug report should include a commit/version, browser/device, steps, expected and actual behavior, and a small reproduction. Remove credentials, private assets, personal information, and unrelated application code. Follow SECURITY.md for suspected vulnerabilities.

@@ -5,6 +5,8 @@ standard and engine boundary. It does not turn research proposals into commitmen
 or claim that every goal has been fully demonstrated. [STANDARD.md](STANDARD.md)
 remains the normative engineering contract.
 
+The active [creator-readiness milestone](guides/creator-readiness-goal.md) turns these goals into a finite acceptance scorecard and contributor work sequence.
+
 ## Purpose
 
 Provide a reusable, genre-neutral browser game engine that enables independent
