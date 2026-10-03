@@ -10,9 +10,7 @@
       "isMobile": true,
       "hasTouch": true,
       "deviceScaleFactor": 1,
-      "inputs": [
-        "touch"
-      ],
+      "inputs": ["touch"],
       "support": "experimental"
     },
     {
@@ -24,9 +22,7 @@
       "isMobile": true,
       "hasTouch": true,
       "deviceScaleFactor": 1,
-      "inputs": [
-        "touch"
-      ],
+      "inputs": ["touch"],
       "support": "experimental"
     },
     {
@@ -38,10 +34,7 @@
       "isMobile": false,
       "hasTouch": false,
       "deviceScaleFactor": 1,
-      "inputs": [
-        "pointer",
-        "keyboard"
-      ],
+      "inputs": ["pointer", "keyboard"],
       "support": "experimental"
     }
   ],

@@ -15,8 +15,14 @@
  *
  * core/i18n/app-i18n.ts is the running game's instance; the narrator reads its lines through it.
  */
-import { parseMessage, renderMessage, type Part, type Vars } from './format';
-import { fillNarrationPattern, narrationKey, type NarrationFamilyDef, type NarrationKey, type NarrationVars } from './narration-families';
+import {parseMessage, renderMessage, type Part, type Vars} from './format';
+import {
+  fillNarrationPattern,
+  narrationKey,
+  type NarrationFamilyDef,
+  type NarrationKey,
+  type NarrationVars,
+} from './narration-families';
 
 export type ReadingLevel = 'standard' | 'detailed';
 export type Catalog = Readonly<Record<string, string>>;
@@ -29,16 +35,28 @@ export const MAX_LOCALE_CHAIN = 8;
  * time (RFC 4647 lookup, dropping a lone single-letter subtag with the one after it), then `base`. Duplicates are
  * removed case-insensitively; the result has at most MAX_LOCALE_CHAIN entries and always ends with `base`.
  */
-export function localeChain(locale: string, base: string, fallbacks: Readonly<Record<string, readonly string[]>> = {}): string[] {
-  const out: string[] = [], seen = new Set<string>();
+export function localeChain(
+  locale: string,
+  base: string,
+  fallbacks: Readonly<Record<string, readonly string[]>> = {},
+): string[] {
+  const out: string[] = [],
+    seen = new Set<string>();
   const add = (tag: string) => {
     if (typeof tag !== 'string' || !tag || tag.length > 64) return;
     const k = tag.toLowerCase();
-    if (!seen.has(k) && out.length < MAX_LOCALE_CHAIN - 1 && k !== base.toLowerCase()) { seen.add(k); out.push(tag); }
+    if (!seen.has(k) && out.length < MAX_LOCALE_CHAIN - 1 && k !== base.toLowerCase()) {
+      seen.add(k);
+      out.push(tag);
+    }
   };
   const truncations = (tag: string) => {
     const parts = tag.split(/[-_]/);
-    while (parts.length > 1) { parts.pop(); if (parts.length > 1 && parts[parts.length - 1]!.length === 1) parts.pop(); add(parts.join('-')); } // length > 1: last exists
+    while (parts.length > 1) {
+      parts.pop();
+      if (parts.length > 1 && parts[parts.length - 1]!.length === 1) parts.pop();
+      add(parts.join('-'));
+    } // length > 1: last exists
   };
   add(locale);
   const explicit = Object.hasOwn(fallbacks, locale) ? fallbacks[locale] : [];
@@ -50,7 +68,10 @@ export function localeChain(locale: string, base: string, fallbacks: Readonly<Re
 }
 
 /** Per-call options. `fallback` is the owner's text for an unknown key (STD-STR-4). */
-export interface TOptions { level?: ReadingLevel; fallback?: string }
+export interface TOptions {
+  level?: ReadingLevel;
+  fallback?: string;
+}
 
 /** A key whose parameters are `never` takes no variables; any other key must be given exactly its variables. */
 export type TArgs<P, K extends keyof P> = [P[K]] extends [never]
@@ -78,7 +99,9 @@ export interface I18n<P> {
 }
 
 /** `t` as the runtime implements it: any key, any variables. */
-interface RuntimeT { t(key: string, vars?: object): string }
+interface RuntimeT {
+  t(key: string, vars?: object): string;
+}
 /**
  * `t` for a key known only at run time (a composed narration key, a markup template's key with placeholder
  * variables). The typed `t` correlates each key with its variables, which a runtime string cannot express; an unknown
@@ -103,38 +126,48 @@ export interface I18nOptions {
 
 export function createI18n<P>(opts: I18nOptions): I18n<P> {
   const base = opts.baseLocale ?? 'en';
-  let locale = opts.locale, level: ReadingLevel = opts.level ?? 'standard';
-  const catalogs = new Map<string, Record<string, string>>(Object.entries(opts.catalogs).map(([l, c]) => [l, { ...c }]));
+  let locale = opts.locale,
+    level: ReadingLevel = opts.level ?? 'standard';
+  const catalogs = new Map<string, Record<string, string>>(Object.entries(opts.catalogs).map(([l, c]) => [l, {...c}]));
   const parsed = new Map<string, Part[]>();
   const fallbacks: Record<string, readonly string[]> = {};
-  for (const [tag, list] of Object.entries(opts.fallbacks ?? {})) fallbacks[tag] = Array.isArray(list) ? list.slice(0, MAX_LOCALE_CHAIN) : [];
-  let chainCache: { locale: string; chain: readonly string[] } | null = null;
+  for (const [tag, list] of Object.entries(opts.fallbacks ?? {}))
+    fallbacks[tag] = Array.isArray(list) ? list.slice(0, MAX_LOCALE_CHAIN) : [];
+  let chainCache: {locale: string; chain: readonly string[]} | null = null;
   const chain = (): readonly string[] => {
-    if (chainCache?.locale !== locale) chainCache = { locale, chain: Object.freeze(localeChain(locale, base, fallbacks)) };
+    if (chainCache?.locale !== locale)
+      chainCache = {locale, chain: Object.freeze(localeChain(locale, base, fallbacks))};
     return chainCache.chain;
   };
 
-  function lookup(key: string, want: ReadingLevel): { text: string; locale: string } | null {
+  function lookup(key: string, want: ReadingLevel): {text: string; locale: string} | null {
     for (const l of chain()) {
       const c = catalogs.get(l);
       if (!c) continue;
       // Each read follows an Object.hasOwn check of the same key; a catalog's own values are strings.
-      if (want === 'detailed' && Object.hasOwn(c, key + DETAILED_SUFFIX)) return { text: c[key + DETAILED_SUFFIX]!, locale: l };
-      if (Object.hasOwn(c, key)) return { text: c[key]!, locale: l };
+      if (want === 'detailed' && Object.hasOwn(c, key + DETAILED_SUFFIX))
+        return {text: c[key + DETAILED_SUFFIX]!, locale: l};
+      if (Object.hasOwn(c, key)) return {text: c[key]!, locale: l};
     }
     return null;
   }
   function parts(l: string, key: string, text: string): Part[] {
     const id = l + '\u0000' + key + '\u0000' + text;
     let p = parsed.get(id);
-    if (!p) { p = parseMessage(text); parsed.set(id, p); }
+    if (!p) {
+      p = parseMessage(text);
+      parsed.set(id, p);
+    }
     return p;
   }
 
   return {
     t(key, ...[vars, o]) {
       const found = lookup(key, o?.level ?? level);
-      if (!found) { opts.onMissing?.(key, locale); return o?.fallback ?? key; }
+      if (!found) {
+        opts.onMissing?.(key, locale);
+        return o?.fallback ?? key;
+      }
       // Literal labels already are their rendered value. Keeping a parsed text node and
       // a locale/key/text cache entry for each lazy catalog label retains needless strings.
       // Check both braces so malformed messages still reach the parser and throw.
@@ -144,12 +177,20 @@ export function createI18n<P>(opts: I18nOptions): I18n<P> {
     has: key => lookup(key, 'standard') !== null,
     locale: () => locale,
     localeChain: chain,
-    setLocale(l) { locale = l; },
+    setLocale(l) {
+      locale = l;
+    },
     level: () => level,
-    setLevel(l) { level = l; },
-    addCatalog(l, catalog) { catalogs.set(l, { ...catalogs.get(l), ...catalog }); },
+    setLevel(l) {
+      level = l;
+    },
+    addCatalog(l, catalog) {
+      catalogs.set(l, {...catalogs.get(l), ...catalog});
+    },
     narrationKey(family, vars) {
-      try { return narrationKey(family, vars); } catch (e) {
+      try {
+        return narrationKey(family, vars);
+      } catch (e) {
         const key = fillNarrationPattern(family, vars);
         opts.onBadNarrationKey?.(e instanceof Error ? e : new Error(String(e)), key);
         return key as NarrationKey;

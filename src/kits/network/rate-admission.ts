@@ -25,19 +25,28 @@ export interface RateLease {
 }
 
 export type RateAdmissionResult =
-  | { readonly status: 'admitted'; readonly lease: RateLease | null; readonly remaining: number }
-  | { readonly status: 'limited'; readonly reason: 'rate'; readonly retryAfterMs: number }
-  | { readonly status: 'limited'; readonly reason: 'concurrency'; readonly retryAfterMs: null }
-  | { readonly status: 'refused'; readonly reason: RateRefusalReason };
+  | {readonly status: 'admitted'; readonly lease: RateLease | null; readonly remaining: number}
+  | {readonly status: 'limited'; readonly reason: 'rate'; readonly retryAfterMs: number}
+  | {readonly status: 'limited'; readonly reason: 'concurrency'; readonly retryAfterMs: null}
+  | {readonly status: 'refused'; readonly reason: RateRefusalReason};
 
 export type RateRefusalReason = 'key-capacity' | 'invalid-key' | 'invalid-time' | 'invalid-cost' | 'disposed';
 
-export interface RateKeyState { readonly tokens: number; readonly inFlight: number }
+export interface RateKeyState {
+  readonly tokens: number;
+  readonly inFlight: number;
+}
 
 export interface RateAdmissionStats {
-  readonly keys: number; readonly inFlight: number; readonly admitted: number;
-  readonly limitedRate: number; readonly limitedConcurrency: number; readonly refusedKeyCapacity: number;
-  readonly reclaimed: number; readonly clockRegressions: number; readonly disposed: boolean;
+  readonly keys: number;
+  readonly inFlight: number;
+  readonly admitted: number;
+  readonly limitedRate: number;
+  readonly limitedConcurrency: number;
+  readonly refusedKeyCapacity: number;
+  readonly reclaimed: number;
+  readonly clockRegressions: number;
+  readonly disposed: boolean;
 }
 
 export interface RateAdmission {
@@ -53,17 +62,21 @@ export interface RateAdmission {
 }
 
 /** `backlog`: milliseconds of refill owed at time `at` (0 = full bucket, `span` = empty). Kept small so arithmetic stays exact. */
-type Bucket = { backlog: number; at: number; inFlight: number };
+type Bucket = {backlog: number; at: number; inFlight: number};
 /** Boundary tolerance as a fraction of one token's refill interval (never an absolute time). */
 const TOLERANCE = 1e-6;
 /** Upper bounds that keep `interval` and `span` far from floating-point resolution limits. */
-const MAX_REFILL_PER_SECOND = 1e6, MAX_CAPACITY = 1e9;
-const refusal = (reason: RateRefusalReason): RateAdmissionResult => Object.freeze({ status: 'refused', reason });
+const MAX_REFILL_PER_SECOND = 1e6,
+  MAX_CAPACITY = 1e9;
+const refusal = (reason: RateRefusalReason): RateAdmissionResult => Object.freeze({status: 'refused', reason});
 const REFUSED = {
-  'key-capacity': refusal('key-capacity'), 'invalid-key': refusal('invalid-key'),
-  'invalid-time': refusal('invalid-time'), 'invalid-cost': refusal('invalid-cost'), disposed: refusal('disposed'),
+  'key-capacity': refusal('key-capacity'),
+  'invalid-key': refusal('invalid-key'),
+  'invalid-time': refusal('invalid-time'),
+  'invalid-cost': refusal('invalid-cost'),
+  disposed: refusal('disposed'),
 } as const;
-const CONCURRENCY: RateAdmissionResult = Object.freeze({ status: 'limited', reason: 'concurrency', retryAfterMs: null });
+const CONCURRENCY: RateAdmissionResult = Object.freeze({status: 'limited', reason: 'concurrency', retryAfterMs: null});
 const positive = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) > 0;
 
 /**
@@ -74,25 +87,47 @@ const positive = (value: unknown): value is number => Number.isSafeInteger(value
  */
 export function createRateAdmission(input: RateAdmissionLimits): RateAdmission {
   const limits = Object.freeze({
-    maxKeys: input.maxKeys, capacity: input.capacity, refillPerSecond: input.refillPerSecond,
-    maxInFlight: input.maxInFlight, maxKeyLength: input.maxKeyLength ?? 256,
+    maxKeys: input.maxKeys,
+    capacity: input.capacity,
+    refillPerSecond: input.refillPerSecond,
+    maxInFlight: input.maxInFlight,
+    maxKeyLength: input.maxKeyLength ?? 256,
   });
-  if (!positive(limits.maxKeys) || !positive(limits.capacity) || limits.capacity > MAX_CAPACITY || !positive(limits.maxKeyLength))
+  if (
+    !positive(limits.maxKeys) ||
+    !positive(limits.capacity) ||
+    limits.capacity > MAX_CAPACITY ||
+    !positive(limits.maxKeyLength)
+  )
     throw Error('rate-admission: invalid limits');
-  if (typeof limits.refillPerSecond !== 'number' || !Number.isFinite(limits.refillPerSecond)
-    || limits.refillPerSecond <= 0 || limits.refillPerSecond > MAX_REFILL_PER_SECOND)
+  if (
+    typeof limits.refillPerSecond !== 'number' ||
+    !Number.isFinite(limits.refillPerSecond) ||
+    limits.refillPerSecond <= 0 ||
+    limits.refillPerSecond > MAX_REFILL_PER_SECOND
+  )
     throw Error('rate-admission: invalid refill rate');
   if (limits.maxInFlight !== undefined && !positive(limits.maxInFlight))
     throw Error('rate-admission: invalid concurrency limit');
-  const interval = 1000 / limits.refillPerSecond, span = limits.capacity * interval, tolerance = interval * TOLERANCE;
+  const interval = 1000 / limits.refillPerSecond,
+    span = limits.capacity * interval,
+    tolerance = interval * TOLERANCE;
   // Insertion order doubles as least-recently-attempted order: every admit call for a valid key re-inserts it.
   const buckets = new Map<RateKey, Bucket>();
-  let latest = 0, disposed = false, inFlight = 0;
-  let admitted = 0, limitedRate = 0, limitedConcurrency = 0, refusedKeyCapacity = 0, reclaimed = 0, clockRegressions = 0;
+  let latest = 0,
+    disposed = false,
+    inFlight = 0;
+  let admitted = 0,
+    limitedRate = 0,
+    limitedConcurrency = 0,
+    refusedKeyCapacity = 0,
+    reclaimed = 0,
+    clockRegressions = 0;
 
   const validKey = (key: unknown): key is RateKey =>
-    (typeof key === 'object' && key !== null) || typeof key === 'function'
-    || (typeof key === 'string' && key.length > 0 && key.length <= limits.maxKeyLength);
+    (typeof key === 'object' && key !== null) ||
+    typeof key === 'function' ||
+    (typeof key === 'string' && key.length > 0 && key.length <= limits.maxKeyLength);
   // Integral-precision range: beyond 2^53 ms adjacent readings collapse and elapsed time cannot be measured.
   const validTime = (now: unknown): now is number =>
     typeof now === 'number' && Number.isFinite(now) && now >= 0 && now <= Number.MAX_SAFE_INTEGER;
@@ -139,8 +174,11 @@ export function createRateAdmission(input: RateAdmissionLimits): RateAdmission {
       const t = latest;
       let bucket = buckets.get(key);
       if (bucket === undefined) {
-        if (buckets.size >= limits.maxKeys && !reclaim(t)) { refusedKeyCapacity++; return REFUSED['key-capacity']; }
-        bucket = { backlog: 0, at: t, inFlight: 0 };
+        if (buckets.size >= limits.maxKeys && !reclaim(t)) {
+          refusedKeyCapacity++;
+          return REFUSED['key-capacity'];
+        }
+        bucket = {backlog: 0, at: t, inFlight: 0};
       } else buckets.delete(key);
       buckets.set(key, bucket);
       if (limits.maxInFlight !== undefined && bucket.inFlight >= limits.maxInFlight) {
@@ -154,7 +192,7 @@ export function createRateAdmission(input: RateAdmissionLimits): RateAdmission {
       const excess = next - span;
       if (excess > tolerance) {
         limitedRate++;
-        return Object.freeze({ status: 'limited', reason: 'rate', retryAfterMs: Math.max(1, Math.ceil(excess)) });
+        return Object.freeze({status: 'limited', reason: 'rate', retryAfterMs: Math.max(1, Math.ceil(excess))});
       }
       bucket.backlog = next;
       admitted++;
@@ -164,7 +202,7 @@ export function createRateAdmission(input: RateAdmissionLimits): RateAdmission {
         inFlight++;
         issued = lease(key, bucket);
       }
-      return Object.freeze({ status: 'admitted', lease: issued, remaining: tokensAt(next) });
+      return Object.freeze({status: 'admitted', lease: issued, remaining: tokensAt(next)});
     },
     forget(key: RateKey): boolean {
       const bucket = buckets.get(key);
@@ -177,11 +215,23 @@ export function createRateAdmission(input: RateAdmissionLimits): RateAdmission {
       if (now !== undefined && !validTime(now)) return null;
       const bucket = buckets.get(key);
       if (bucket === undefined) return null;
-      return Object.freeze({ tokens: tokensAt(owed(bucket, Math.max(now ?? latest, latest))), inFlight: bucket.inFlight });
+      return Object.freeze({
+        tokens: tokensAt(owed(bucket, Math.max(now ?? latest, latest))),
+        inFlight: bucket.inFlight,
+      });
     },
     stats(): RateAdmissionStats {
-      return Object.freeze({ keys: buckets.size, inFlight, admitted, limitedRate, limitedConcurrency,
-        refusedKeyCapacity, reclaimed, clockRegressions, disposed });
+      return Object.freeze({
+        keys: buckets.size,
+        inFlight,
+        admitted,
+        limitedRate,
+        limitedConcurrency,
+        refusedKeyCapacity,
+        reclaimed,
+        clockRegressions,
+        disposed,
+      });
     },
     dispose(): void {
       if (disposed) return;

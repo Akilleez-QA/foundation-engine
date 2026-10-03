@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSaveStore } from '../../src/core/save/store.ts';
-import { MemoryBackend } from '../../src/core/save/storage-port.ts';
-import { authorSaveHandle } from '../../src/author/save-handle.ts';
+import {createSaveStore} from '../../src/core/save/store.ts';
+import {MemoryBackend} from '../../src/core/save/storage-port.ts';
+import {authorSaveHandle} from '../../src/author/save-handle.ts';
 import {
   captureRecipe,
   initialRecipe,
@@ -12,7 +12,7 @@ import {
   recipeStorageKey,
   createRecipeStoragePort,
 } from './recipe.mjs';
-import { createEditorController } from './editor-controller.mjs';
+import {createEditorController} from './editor-controller.mjs';
 function fixture(backend = new MemoryBackend()) {
   const raw = backend.port(0),
     port = createRecipeStoragePort(raw),
@@ -21,9 +21,9 @@ function fixture(backend = new MemoryBackend()) {
       build: 'test',
       local: port,
       session: new MemoryBackend().port(0, 'session'),
-      timers: { now: () => 0, set: () => 0, clear: () => {} },
+      timers: {now: () => 0, set: () => 0, clear: () => {}},
     }),
-    handle = authorSaveHandle(store, { section: recipeSectionDefinition }),
+    handle = authorSaveHandle(store, {section: recipeSectionDefinition}),
     c = createEditorController({
       saveHandle: handle,
       readPersisted: () => port.get(recipeStorageKey),
@@ -64,13 +64,7 @@ test('schema admission rejects bounds and bad references before preview; raw UTF
   r.attributes[0].effectPermille = 1001;
   assert.throws(() => captureRecipe(r));
   assert.throws(
-    () =>
-      captureRecipe(
-        '{"discard":"' +
-          '界'.repeat(50000) +
-          '",' +
-          JSON.stringify(initialRecipe()).slice(1),
-      ),
+    () => captureRecipe('{"discard":"' + '界'.repeat(50000) + '",' + JSON.stringify(initialRecipe()).slice(1)),
     /byte/,
   );
 });
@@ -98,10 +92,7 @@ test('author adapter save, undo/redo and reload preserve committed same-version 
   f.c.preview(changed());
   f.c.commit();
   assert.equal(f.c.save().status, 'saved');
-  assert.equal(
-    JSON.parse(f.raw.get(recipeStorageKey)).data.attributes[0].initialPermille,
-    750,
-  );
+  assert.equal(JSON.parse(f.raw.get(recipeStorageKey)).data.attributes[0].initialPermille, 750);
   f.c.undo();
   assert.equal(f.c.read().durable, false);
   assert.doesNotMatch(f.c.read().message, /saved/);
@@ -117,10 +108,7 @@ test('author adapter save, undo/redo and reload preserve committed same-version 
   }
 });
 test('newer and corrupt bytes block recovery without silently accepting initial economy', () => {
-  for (const raw of [
-    'broken',
-    JSON.stringify({ v: 99, by: 'new', data: initialRecipe() }),
-  ]) {
+  for (const raw of ['broken', JSON.stringify({v: 99, by: 'new', data: initialRecipe()})]) {
     const backend = new MemoryBackend();
     backend.port(0).set(recipeStorageKey, raw);
     const f = fixture(backend);
@@ -136,7 +124,7 @@ test('external bytes remain untouched through automatic flush and disposal', () 
   const f = fixture();
   f.c.preview(changed());
   f.c.commit();
-  const foreign = JSON.stringify({ v: 1, by: 'other', data: initialRecipe() });
+  const foreign = JSON.stringify({v: 1, by: 'other', data: initialRecipe()});
   f.raw.set(recipeStorageKey, foreign);
   assert.ok(f.c.read().blocked);
   f.store.flush();
@@ -200,10 +188,7 @@ test('observed external conflict remains latched when bytes return to previously
   backend.failSet = () => true;
   assert.equal(f.c.save().status, 'unsaved');
   backend.failSet = () => false;
-  f.raw.set(
-    recipeStorageKey,
-    JSON.stringify({ v: 1, by: 'external', data: initialRecipe() }),
-  );
+  f.raw.set(recipeStorageKey, JSON.stringify({v: 1, by: 'external', data: initialRecipe()}));
   assert.ok(f.c.read().blocked);
   f.raw.remove(recipeStorageKey);
   f.store.flush();
@@ -216,7 +201,7 @@ test('raw restored envelope UTF8 bound precedes canonical field discard', () => 
     raw = JSON.stringify({
       v: 1,
       by: 'test',
-      data: { ...initialRecipe(), ignored: '界'.repeat(50000) },
+      data: {...initialRecipe(), ignored: '界'.repeat(50000)},
     });
   assert.ok(raw.length < 131072);
   backend.port(0).set(recipeStorageKey, raw);
@@ -233,13 +218,10 @@ test('synthetic admission preserves prototype-named property facts accepted by r
   const recipe = structuredClone(initialRecipe()),
     stock = initialStock();
   recipe.attributes[0].weights[0].property = '__proto__';
-  for (const batch of stock.batches)
-    batch.properties = JSON.parse('{"__proto__":500}');
+  for (const batch of stock.batches) batch.properties = JSON.parse('{"__proto__":500}');
   const captured = captureRecipe(recipe);
   assert.equal(captured.attributes[0].weights[0].property, '__proto__');
-  assert.deepEqual(evaluateRecipe(captured, undefined, stock).values, [
-    { id: 'quality', ceiling: 500, value: 250 },
-  ]);
+  assert.deepEqual(evaluateRecipe(captured, undefined, stock).values, [{id: 'quality', ceiling: 500, value: 250}]);
 });
 test('storage port refuses oversized raw envelopes before SaveStore invokes recipe parser and remains latched', () => {
   for (const ignored of ['界'.repeat(50000), 'x'.repeat(140000)]) {
@@ -250,14 +232,14 @@ test('storage port refuses oversized raw envelopes before SaveStore invokes reci
       JSON.stringify({
         v: 1,
         by: 'test',
-        data: { ...initialRecipe(), ignored },
+        data: {...initialRecipe(), ignored},
       }),
     );
     const port = createRecipeStoragePort(raw);
     let parses = 0;
     const section = {
         ...recipeSectionDefinition,
-        parse: (value) => {
+        parse: value => {
           parses++;
           return captureRecipe(value);
         },
@@ -267,9 +249,9 @@ test('storage port refuses oversized raw envelopes before SaveStore invokes reci
         build: 'test',
         local: port,
         session: new MemoryBackend().port(0, 'session'),
-        timers: { now: () => 0, set: () => 0, clear: () => {} },
+        timers: {now: () => 0, set: () => 0, clear: () => {}},
       }),
-      handle = authorSaveHandle(store, { section });
+      handle = authorSaveHandle(store, {section});
     assert.equal(handle.status(), 'unavailable');
     assert.equal(parses, 0);
     raw.remove(recipeStorageKey);

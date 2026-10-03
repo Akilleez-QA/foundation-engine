@@ -15,8 +15,8 @@
  *   remaining groups observe current holds and registrations. A delivered group is consumed even if `show` throws.
  */
 
-import { appEvents } from '../../core/app-events';
-import type { EventBus } from '../../core/events';
+import {appEvents} from '../../core/app-events';
+import type {EventBus} from '../../core/events';
 
 export type NoticeChannel = 'celebrate' | 'hint' | 'story' | 'system';
 /** A t() key; checked against the string catalogues by the content test. */
@@ -36,11 +36,13 @@ export interface Notice {
   priority?: 0 | 1 | 2;
   /** Renderer metadata; the centre does not expire queued notices or start timers. */
   ttlMs?: number;
-  action?: { labelKey: NoticeKey; route?: string; hub?: string };
+  action?: {labelKey: NoticeKey; route?: string; hub?: string};
 }
 
 /** Draws one channel. `show` gets one merged group: every released notice with one merge key (or one unmerged notice). */
-export interface NoticeRenderer { show(notices: readonly Notice[]): void }
+export interface NoticeRenderer {
+  show(notices: readonly Notice[]): void;
+}
 
 export interface NotificationCenter {
   post(n: Notice): void;
@@ -61,24 +63,35 @@ export interface NotificationCenterOptions {
 
 /** Copy the public data shape at ownership boundaries; nested fields contain only scalar values. */
 function copyNotice(n: Notice): Notice {
-  return { ...n, ...(n.params ? { params: { ...n.params } } : {}), ...(n.action ? { action: { ...n.action } } : {}) };
+  return {...n, ...(n.params ? {params: {...n.params}} : {}), ...(n.action ? {action: {...n.action}} : {})};
 }
 
 export function createNotificationCenter(opts: NotificationCenterOptions = {}): NotificationCenter {
-  const defer = opts.defer ?? (fn => queueMicrotask(fn)), limit = opts.limit ?? 50;
-  if (!Number.isSafeInteger(limit) || limit < 1) throw new RangeError('notification limit must be a positive safe integer');
+  const defer = opts.defer ?? (fn => queueMicrotask(fn)),
+    limit = opts.limit ?? 50;
+  if (!Number.isSafeInteger(limit) || limit < 1)
+    throw new RangeError('notification limit must be a positive safe integer');
   // Registration identity is separate from renderer identity: stale removals cannot remove a later registration.
-  const renderers = new Map<NoticeChannel, { renderer: NoticeRenderer }>();
+  const renderers = new Map<NoticeChannel, {renderer: NoticeRenderer}>();
   const kept: Notice[] = [];
-  type Entry = { notice: Notice };
-  let queue: Entry[] = [], scheduled = false, releasing = false;
+  type Entry = {notice: Notice};
+  let queue: Entry[] = [],
+    scheduled = false,
+    releasing = false;
   const holds = new Set<AbortSignal>();
 
   function schedule(followup = false) {
     if (scheduled || releasing || holds.size || !queue.some(e => renderers.has(e.notice.channel))) return;
     scheduled = true;
-    try { (followup ? queueMicrotask : defer)(() => { scheduled = false; release(); }); }
-    catch (error) { scheduled = false; throw error; }
+    try {
+      (followup ? queueMicrotask : defer)(() => {
+        scheduled = false;
+        release();
+      });
+    } catch (error) {
+      scheduled = false;
+      throw error;
+    }
   }
   function release() {
     if (holds.size || releasing) return;
@@ -90,13 +103,19 @@ export function createNotificationCenter(opts: NotificationCenterOptions = {}): 
         const first = queue.find(e => burst.has(e) && renderers.has(e.notice.channel));
         if (!first) break;
         const n = first.notice;
-        const group = queue.filter(e => burst.has(e) && (e === first ||
-          (n.merge !== undefined && e.notice.channel === n.channel && e.notice.merge === n.merge)));
+        const group = queue.filter(
+          e =>
+            burst.has(e) &&
+            (e === first || (n.merge !== undefined && e.notice.channel === n.channel && e.notice.merge === n.merge)),
+        );
         const selected = new Set(group);
         queue = queue.filter(e => !selected.has(e));
         const registration = renderers.get(n.channel)!;
-        try { registration.renderer.show(group.map(e => copyNotice(e.notice))); }
-        catch (e) { console.error('[notify] a renderer failed', e); }
+        try {
+          registration.renderer.show(group.map(e => copyNotice(e.notice)));
+        } catch (e) {
+          console.error('[notify] a renderer failed', e);
+        }
       }
     } finally {
       releasing = false;
@@ -107,8 +126,11 @@ export function createNotificationCenter(opts: NotificationCenterOptions = {}): 
   return {
     post(n) {
       n = copyNotice(n);
-      if (n.channel === 'story') { kept.push(n); if (kept.length > limit) kept.splice(0, kept.length - limit); }
-      queue.push({ notice: n });
+      if (n.channel === 'story') {
+        kept.push(n);
+        if (kept.length > limit) kept.splice(0, kept.length - limit);
+      }
+      queue.push({notice: n});
       let excess = queue.filter(e => e.notice.channel === n.channel).length - limit;
       queue = queue.filter(e => e.notice.channel !== n.channel || excess-- <= 0);
       schedule();
@@ -117,13 +139,22 @@ export function createNotificationCenter(opts: NotificationCenterOptions = {}): 
     holdWhile(signal) {
       if (signal.aborted || holds.has(signal)) return;
       holds.add(signal);
-      signal.addEventListener('abort', () => { holds.delete(signal); schedule(); }, { once: true });
+      signal.addEventListener(
+        'abort',
+        () => {
+          holds.delete(signal);
+          schedule();
+        },
+        {once: true},
+      );
     },
     render(channel, renderer) {
-      const registration = { renderer };
+      const registration = {renderer};
       renderers.set(channel, registration);
       schedule();
-      return () => { if (renderers.get(channel) === registration) renderers.delete(channel); };
+      return () => {
+        if (renderers.get(channel) === registration) renderers.delete(channel);
+      };
     },
   };
 }
@@ -131,25 +162,41 @@ export function createNotificationCenter(opts: NotificationCenterOptions = {}): 
 declare module '../../core/events' {
   interface EngineEvents {
     /** The narrator started or stopped speaking. Sent on changes only. */
-    'narration.speaking': { speaking: boolean };
+    'narration.speaking': {speaking: boolean};
   }
 }
 
 /** Holds `center` for as long as `narration.speaking` says the narrator speaks; returns the unwiring. */
 export function holdWhileNarrating(bus: EventBus, center: NotificationCenter): () => void {
-  let hold: AbortController | null = null, disposed = false;
-  const off = bus.on('narration.speaking', ({ speaking }) => {
+  let hold: AbortController | null = null,
+    disposed = false;
+  const off = bus.on('narration.speaking', ({speaking}) => {
     if (disposed) return;
-    if (speaking && !hold) { hold = new AbortController(); center.holdWhile(hold.signal); }
-    else if (!speaking && hold) { const finished = hold; hold = null; finished.abort(); }
+    if (speaking && !hold) {
+      hold = new AbortController();
+      center.holdWhile(hold.signal);
+    } else if (!speaking && hold) {
+      const finished = hold;
+      hold = null;
+      finished.abort();
+    }
   });
-  return () => { disposed = true; off(); const finished = hold; hold = null; finished?.abort(); };
+  return () => {
+    disposed = true;
+    off();
+    const finished = hold;
+    hold = null;
+    finished?.abort();
+  };
 }
 
 let shared: NotificationCenter | null = null;
 /** The app's one notification centre (the `notify` service until the kernel boot is adopted, as `appShell` is).
  *  It holds while narration speaks. */
 export function appNotify(): NotificationCenter {
-  if (!shared) { shared = createNotificationCenter(); holdWhileNarrating(appEvents, shared); }
+  if (!shared) {
+    shared = createNotificationCenter();
+    holdWhileNarrating(appEvents, shared);
+  }
   return shared;
 }

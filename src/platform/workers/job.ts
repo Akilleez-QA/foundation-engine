@@ -1,5 +1,5 @@
 /**
- * Job vocabulary for the one worker host (ADR 0059 amended by ADR 0062; 
+ * Job vocabulary for the one worker host (ADR 0059 amended by ADR 0062;
  * STD-RUN-35 to STD-RUN-41).
  *
  * Noun-free by rule: this file knows job ids, payloads, transferables, keys, versions,
@@ -26,8 +26,7 @@ export type JobSlices<O> = Generator<void, O, void>;
  * `unavailable` settles as a recoverable, reported failure.
  */
 export type JobFallback<I, O> =
-  | { readonly mode: 'main-thread'; readonly slices: (input: I) => JobSlices<O> }
-  | { readonly mode: 'unavailable' };
+  {readonly mode: 'main-thread'; readonly slices: (input: I) => JobSlices<O>} | {readonly mode: 'unavailable'};
 
 /**
  * How a running job stops (ADR 0062 decision 2; STD-RUN-41).
@@ -35,9 +34,7 @@ export type JobFallback<I, O> =
  *   `cancel` and terminates the worker if the acknowledgement misses `deadlineMs` (Provisional).
  * - `unsliced`: the host terminates the worker at once and replaces it on demand.
  */
-export type JobCancellation =
-  | { readonly mode: 'sliced'; readonly deadlineMs: number }
-  | { readonly mode: 'unsliced' };
+export type JobCancellation = {readonly mode: 'sliced'; readonly deadlineMs: number} | {readonly mode: 'unsliced'};
 
 /** One registered job kind. A kind is a row: id, cancellation, fallback and cleanup. */
 export interface JobKind<I, O> {
@@ -101,15 +98,19 @@ export interface JobRequest<I, O> {
  * - `oversized`: the request alone exceeds the reserved-byte limit.
  */
 export type JobResult<O> =
-  | { readonly status: 'done'; readonly output: O }
-  | { readonly status: 'cancelled' | 'superseded' | 'preempted' | 'saturated' | 'oversized' };
+  | {readonly status: 'done'; readonly output: O}
+  | {readonly status: 'cancelled' | 'superseded' | 'preempted' | 'saturated' | 'oversized'};
 
 export type WorkerJobErrorReason = 'spawn' | 'threw' | 'terminated' | 'unavailable';
 
 /** The one named error the host rejects with. `unavailable` is recoverable: retry later. */
 export class WorkerJobError extends Error {
   override readonly name = 'WorkerJobError';
-  constructor(readonly reason: WorkerJobErrorReason, readonly kind: string, detail?: string) {
+  constructor(
+    readonly reason: WorkerJobErrorReason,
+    readonly kind: string,
+    detail?: string,
+  ) {
     super(`worker job ${kind} ${reason}${detail ? `: ${detail}` : ''}`);
   }
 }
@@ -148,7 +149,10 @@ export async function drainSlices<O>(slices: JobSlices<O>, ctx: JobContext, slic
     for (;;) {
       const step = slices.next();
       if (step.done) return step.value;
-      if (++n >= slicesPerCheck) { n = 0; await ctx.checkpoint(); }
+      if (++n >= slicesPerCheck) {
+        n = 0;
+        await ctx.checkpoint();
+      }
     }
   } finally {
     slices.return(undefined as never);
@@ -158,10 +162,10 @@ export async function drainSlices<O>(slices: JobSlices<O>, ctx: JobContext, slic
 // ------------------------------------------------------------------ message protocol (one shape)
 
 export type HostToWorker =
-  | { readonly type: 'run'; readonly job: number; readonly kind: string; readonly input: unknown }
-  | { readonly type: 'cancel'; readonly job: number };
+  | {readonly type: 'run'; readonly job: number; readonly kind: string; readonly input: unknown}
+  | {readonly type: 'cancel'; readonly job: number};
 
 export type WorkerToHost =
-  | { readonly type: 'done'; readonly job: number; readonly kind: string; readonly output: unknown }
-  | { readonly type: 'failed'; readonly job: number; readonly message: string }
-  | { readonly type: 'cancelled'; readonly job: number };
+  | {readonly type: 'done'; readonly job: number; readonly kind: string; readonly output: unknown}
+  | {readonly type: 'failed'; readonly job: number; readonly message: string}
+  | {readonly type: 'cancelled'; readonly job: number};

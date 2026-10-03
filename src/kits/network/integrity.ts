@@ -12,23 +12,26 @@
  * It constructs no timer, clock, socket, transport or telemetry; nothing leaves the host unless the creator sends it.
  * Nothing calls it unless the creator does. See docs/guides/integrity.md.
  */
-import type { DocumentValue } from '../authoring/document';
-import { CLOSE_REASON_TOKEN, MAX_CLOSE_REASON_LENGTH } from '../../platform/network/browser-transport';
-import { captureJson } from './captured-json';
-import { createRateAdmission, type RateAdmission, type RateKey } from './rate-admission';
+import type {DocumentValue} from '../authoring/document';
+import {CLOSE_REASON_TOKEN, MAX_CLOSE_REASON_LENGTH} from '../../platform/network/browser-transport';
+import {captureJson} from './captured-json';
+import {createRateAdmission, type RateAdmission, type RateKey} from './rate-admission';
 
 /** Default terminal close reason. Add it to `createClosePolicy({terminalReasons})` so clients stop reconnecting. */
 export const INTEGRITY_CLOSE_REASON = 'integrity-violation';
 export const MAX_INTEGRITY_RULES = 32;
 /** Largest weight one finding can add, and the per-key score ceiling. */
 export const MAX_INTEGRITY_WEIGHT = 1e6;
-const MAX_SCORE = 1e9, MAX_WINDOW = 64, MAX_SUBJECT = 128, MAX_STREAM = 256;
+const MAX_SCORE = 1e9,
+  MAX_WINDOW = 64,
+  MAX_SUBJECT = 128,
+  MAX_STREAM = 256;
 export const INTEGRITY_AUDIT_FORMAT = 'foundation.integrity-audit';
 
 export type IntegrityMode = 'enforce' | 'observe';
 export type IntegrityVerdict =
-  | { readonly kind: 'ok' }
-  | { readonly kind: 'reject' | 'flag'; readonly reason: string; readonly weight: number; readonly evidence?: unknown };
+  | {readonly kind: 'ok'}
+  | {readonly kind: 'reject' | 'flag'; readonly reason: string; readonly weight: number; readonly evidence?: unknown};
 
 /** What a rule sees. Deterministic inputs only: no score, connection or host clock. */
 export interface IntegrityInput<C, S> {
@@ -72,7 +75,11 @@ export interface IntegrityAssessment {
 }
 
 /** Optional review reference stored with audit entries. */
-export interface IntegrityRef { readonly stream?: string; readonly sequence?: number; readonly tick?: number }
+export interface IntegrityRef {
+  readonly stream?: string;
+  readonly sequence?: number;
+  readonly tick?: number;
+}
 
 export interface IntegrityLimits {
   /** Tracked keys. A new key at the bound evicts the least-recently-seen key (never refuses a key). */
@@ -102,11 +109,12 @@ export interface IntegrityOptions<C, S> {
   /** Exportable label for a key in audit entries (at most 128 chars). Default: string keys as is, else `anonymous`. */
   readonly subject?: (key: RateKey) => string;
   /** At or above `score`, a key's commands pass a token bucket first; limited ones are throttled. */
-  readonly throttle?: { readonly score: number; readonly capacity: number; readonly refillPerSecond: number };
+  readonly throttle?: {readonly score: number; readonly capacity: number; readonly refillPerSecond: number};
   /** At or above `score` (and, when set, at least `requires.violations` violations within `requires.withinMs`), close. */
   readonly close?: {
-    readonly score: number; readonly reason?: string;
-    readonly requires?: { readonly violations: number; readonly withinMs: number };
+    readonly score: number;
+    readonly reason?: string;
+    readonly requires?: {readonly violations: number; readonly withinMs: number};
   };
   /**
    * Tick-rate budget (anti speed-up): a bucket of `maxCatchUpTicks`, refilled at `ticksPerSecond * (1 + slack)` of
@@ -117,8 +125,12 @@ export interface IntegrityOptions<C, S> {
    * Set `maxCatchUpTicks` at least to the client's prediction `maxPending`.
    */
   readonly tickBudget?: {
-    readonly ticksPerSecond: number; readonly maxCatchUpTicks: number; readonly slack?: number;
-    readonly weight?: number; readonly maxScore?: number; readonly mode?: IntegrityMode;
+    readonly ticksPerSecond: number;
+    readonly maxCatchUpTicks: number;
+    readonly slack?: number;
+    readonly weight?: number;
+    readonly maxScore?: number;
+    readonly mode?: IntegrityMode;
   };
   /** Score added for a rule error (default 0: a broken rule never closes a player). */
   readonly ruleErrorWeight?: number;
@@ -126,22 +138,28 @@ export interface IntegrityOptions<C, S> {
   readonly onAudit?: (entry: IntegrityAuditEntry) => void;
 }
 
-export type IntegrityRefusalReason = 'invalid-time' | 'invalid-key' | 'invalid-assessment' | 'busy' | 'retired' | 'disposed';
+export type IntegrityRefusalReason =
+  'invalid-time' | 'invalid-key' | 'invalid-assessment' | 'busy' | 'retired' | 'disposed';
 
 export type IntegrityDecision =
   /** Proceed. `observed` names the action observe mode suppressed, if any. */
-  | { readonly action: 'allow'; readonly score: number; readonly observed: 'reject' | 'throttle' | 'close' | null }
+  | {readonly action: 'allow'; readonly score: number; readonly observed: 'reject' | 'throttle' | 'close' | null}
   /**
    * Do not apply; retrying the same command cannot succeed. From `check`: the command is invalid (unsequenced
    * commands only). From `admit`: an impossible tick claim (`tick-claim`); consume a sequenced command as a no-op.
    */
-  | { readonly action: 'reject'; readonly reason: string; readonly rule: string; readonly score: number }
+  | {readonly action: 'reject'; readonly reason: string; readonly rule: string; readonly score: number}
   /** Do not dispatch now; the same command may be retried after `retryAfterMs` (like a busy refusal). */
-  | { readonly action: 'throttle'; readonly reason: 'throttled' | 'tick-budget'; readonly retryAfterMs: number; readonly score: number }
+  | {
+      readonly action: 'throttle';
+      readonly reason: 'throttled' | 'tick-budget';
+      readonly retryAfterMs: number;
+      readonly score: number;
+    }
   /** Do not dispatch; close the connection with `reason`, a terminal close token. */
-  | { readonly action: 'close'; readonly reason: string; readonly score: number }
+  | {readonly action: 'close'; readonly reason: string; readonly score: number}
   /** Owner refusal: do not dispatch; nothing was scored. */
-  | { readonly action: 'refused'; readonly reason: IntegrityRefusalReason };
+  | {readonly action: 'refused'; readonly reason: IntegrityRefusalReason};
 
 export interface IntegrityAuditEntry {
   /** Monotonic per owner. */
@@ -168,11 +186,24 @@ export interface IntegrityKeyState {
 }
 
 export interface IntegrityStats {
-  readonly keys: number; readonly admitted: number; readonly recorded: number; readonly rejected: number;
-  readonly throttled: number; readonly closed: number; readonly flags: number; readonly ruleErrors: number;
-  readonly tickBudgetExceeded: number; readonly wouldReject: number; readonly wouldThrottle: number;
-  readonly wouldClose: number; readonly evicted: number; readonly evictedScored: number; readonly dropped: number;
-  readonly evidenceDropped: number; readonly clockRegressions: number; readonly auditErrors: number;
+  readonly keys: number;
+  readonly admitted: number;
+  readonly recorded: number;
+  readonly rejected: number;
+  readonly throttled: number;
+  readonly closed: number;
+  readonly flags: number;
+  readonly ruleErrors: number;
+  readonly tickBudgetExceeded: number;
+  readonly wouldReject: number;
+  readonly wouldThrottle: number;
+  readonly wouldClose: number;
+  readonly evicted: number;
+  readonly evictedScored: number;
+  readonly dropped: number;
+  readonly evidenceDropped: number;
+  readonly clockRegressions: number;
+  readonly auditErrors: number;
   /** Unscored refusal rows beyond a key's audit allowance (`limits.auditRowsPerKeyPerSecond`), counted instead of audited. */
   readonly auditSuppressed: number;
   readonly disposed: boolean;
@@ -190,12 +221,16 @@ export interface Integrity<C, S> {
   /** Pure validity verdict. Safe inside an authority reducer. The result may be passed to `record` once. */
   assess(input: IntegrityInput<C, S>): IntegrityAssessment;
   /** Policy before dispatch or submit: close state, throttle and the tick budget. Never throws. */
-  admit(key: RateKey, now: number, options?: IntegrityTickClaim & { readonly ref?: IntegrityRef }): IntegrityDecision;
+  admit(key: RateKey, now: number, options?: IntegrityTickClaim & {readonly ref?: IntegrityRef}): IntegrityDecision;
   /** Scores an assessment after its outcome is known (once per assessment), audits it, may return `close`. */
   record(key: RateKey, assessment: IntegrityAssessment, now: number, ref?: IntegrityRef): IntegrityDecision;
   /** Unsequenced convenience: admit, assess, record. Returns `reject` for an invalid command. */
-  check(key: RateKey, input: IntegrityInput<C, S>, now: number,
-    options?: IntegrityTickClaim & { readonly ref?: IntegrityRef }): IntegrityDecision;
+  check(
+    key: RateKey,
+    input: IntegrityInput<C, S>,
+    now: number,
+    options?: IntegrityTickClaim & {readonly ref?: IntegrityRef},
+  ): IntegrityDecision;
   read(key: RateKey, now?: number): IntegrityKeyState | null;
   /** Retained audit entries, oldest first. */
   audit(): readonly IntegrityAuditEntry[];
@@ -208,7 +243,7 @@ export interface Integrity<C, S> {
   dispose(): void;
 }
 
-const OK: IntegrityVerdict = Object.freeze({ kind: 'ok' });
+const OK: IntegrityVerdict = Object.freeze({kind: 'ok'});
 const token = (value: unknown): value is string =>
   typeof value === 'string' && value.length <= MAX_CLOSE_REASON_LENGTH && CLOSE_REASON_TOKEN.test(value);
 const weightOk = (value: unknown): value is number =>
@@ -223,41 +258,67 @@ const modeOk = (value: unknown): value is IntegrityMode | undefined =>
 export const integrityOk = (): IntegrityVerdict => OK;
 /** Marks the command invalid; `weight` (default 0) is scored when recorded. Optional JSON `evidence` for review. */
 export const integrityReject = (reason: string, weight = 0, evidence?: unknown): IntegrityVerdict =>
-  Object.freeze(evidence === undefined ? { kind: 'reject', reason, weight } : { kind: 'reject', reason, weight, evidence });
+  Object.freeze(evidence === undefined ? {kind: 'reject', reason, weight} : {kind: 'reject', reason, weight, evidence});
 /** Lets the command through but scores `weight` (default 1) when recorded. */
 export const integrityFlag = (reason: string, weight = 1, evidence?: unknown): IntegrityVerdict =>
-  Object.freeze(evidence === undefined ? { kind: 'flag', reason, weight } : { kind: 'flag', reason, weight, evidence });
+  Object.freeze(evidence === undefined ? {kind: 'flag', reason, weight} : {kind: 'flag', reason, weight, evidence});
 
 type Entry = {
-  score: number; at: number; violations: number; lastViolationAt: number | null;
-  history: IntegrityAuditEntry[]; window: number[]; caps: number[] | null;
+  score: number;
+  at: number;
+  violations: number;
+  lastViolationAt: number | null;
+  history: IntegrityAuditEntry[];
+  window: number[];
+  caps: number[] | null;
   /** Last admitted claimed tick (tick budget), and the host time before which a retry is early. */
-  lastTick: number | null; retryAt: number | null;
+  lastTick: number | null;
+  retryAt: number | null;
   /** Unscored refusal audit allowance: tokens and the host time they were last refilled. */
-  auditTokens: number; auditAt: number;
+  auditTokens: number;
+  auditAt: number;
 };
 
 export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrity<C, S> {
   if (options === null || typeof options !== 'object') throw Error('integrity: invalid options');
-  const { limits, decayPerSecond, throttle, close, tickBudget, onAudit } = options;
-  if (!Array.isArray(options.rules) || options.rules.length > MAX_INTEGRITY_RULES) throw Error('integrity: invalid rules');
+  const {limits, decayPerSecond, throttle, close, tickBudget, onAudit} = options;
+  if (!Array.isArray(options.rules) || options.rules.length > MAX_INTEGRITY_RULES)
+    throw Error('integrity: invalid rules');
   const rules: readonly IntegrityRule<C, S>[] = Object.freeze([...options.rules]);
   const ids = new Set<string>();
   const ruleCaps: (number | null)[] = [];
   for (const rule of rules) {
-    if (!rule || !token(rule.id) || ids.has(rule.id) || typeof rule.check !== 'function' || !modeOk(rule.mode)
-      || (rule.maxScore !== undefined && !scoreOk(rule.maxScore))) throw Error('integrity: invalid rule');
+    if (
+      !rule ||
+      !token(rule.id) ||
+      ids.has(rule.id) ||
+      typeof rule.check !== 'function' ||
+      !modeOk(rule.mode) ||
+      (rule.maxScore !== undefined && !scoreOk(rule.maxScore))
+    )
+      throw Error('integrity: invalid rule');
     ids.add(rule.id);
     ruleCaps.push(rule.maxScore ?? null);
   }
-  if (!limits || !positive(limits.maxKeys) || !positive(limits.maxHistoryPerKey) || !positive(limits.maxAudit)
-    || (limits.maxEvidenceBytes !== undefined && !positive(limits.maxEvidenceBytes))) throw Error('integrity: invalid limits');
-  const bounds = Object.freeze({ maxKeys: limits.maxKeys, maxHistoryPerKey: limits.maxHistoryPerKey,
-    maxAudit: limits.maxAudit, maxEvidenceBytes: limits.maxEvidenceBytes ?? 512 });
+  if (
+    !limits ||
+    !positive(limits.maxKeys) ||
+    !positive(limits.maxHistoryPerKey) ||
+    !positive(limits.maxAudit) ||
+    (limits.maxEvidenceBytes !== undefined && !positive(limits.maxEvidenceBytes))
+  )
+    throw Error('integrity: invalid limits');
+  const bounds = Object.freeze({
+    maxKeys: limits.maxKeys,
+    maxHistoryPerKey: limits.maxHistoryPerKey,
+    maxAudit: limits.maxAudit,
+    maxEvidenceBytes: limits.maxEvidenceBytes ?? 512,
+  });
   const auditRate = limits.auditRowsPerKeyPerSecond ?? 1;
   if (!finite(auditRate) || auditRate < 0 || auditRate > 1e6) throw Error('integrity: invalid audit rate');
-  const evidenceLimits = Object.freeze({ maxBytes: bounds.maxEvidenceBytes, maxNodes: 64, maxDepth: 4 });
-  if (!finite(decayPerSecond) || decayPerSecond <= 0 || decayPerSecond > MAX_SCORE) throw Error('integrity: invalid decay');
+  const evidenceLimits = Object.freeze({maxBytes: bounds.maxEvidenceBytes, maxNodes: 64, maxDepth: 4});
+  if (!finite(decayPerSecond) || decayPerSecond <= 0 || decayPerSecond > MAX_SCORE)
+    throw Error('integrity: invalid decay');
   const enforcement = options.enforcement ?? 'enforce';
   if (!modeOk(enforcement)) throw Error('integrity: invalid enforcement');
   const observing = enforcement === 'observe';
@@ -272,22 +333,54 @@ export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrit
   const closeReason = close?.reason ?? INTEGRITY_CLOSE_REASON;
   const requires = close?.requires ?? null;
   if (close !== undefined && (!scoreOk(closeAt) || !token(closeReason))) throw Error('integrity: invalid close');
-  if (requires !== null && (!positive(requires.violations) || requires.violations > MAX_WINDOW
-    || !finite(requires.withinMs) || requires.withinMs <= 0)) throw Error('integrity: invalid close window');
+  if (
+    requires !== null &&
+    (!positive(requires.violations) ||
+      requires.violations > MAX_WINDOW ||
+      !finite(requires.withinMs) ||
+      requires.withinMs <= 0)
+  )
+    throw Error('integrity: invalid close window');
   const throttleAt = throttle === undefined ? null : throttle.score;
   if (throttle !== undefined && !scoreOk(throttleAt)) throw Error('integrity: invalid throttle');
-  const tick = tickBudget === undefined ? null : Object.freeze({
-    weight: tickBudget.weight ?? 1, maxScore: tickBudget.maxScore ?? null, observe: tickBudget.mode === 'observe',
-    slack: tickBudget.slack ?? 0.05, capacity: tickBudget.maxCatchUpTicks });
-  if (tickBudget !== undefined && (!weightOk(tick!.weight) || !modeOk(tickBudget.mode)
-    || (tick!.maxScore !== null && !scoreOk(tick!.maxScore)) || !finite(tick!.slack) || tick!.slack < 0 || tick!.slack > 1
-    || !finite(tickBudget.ticksPerSecond))) throw Error('integrity: invalid tick budget');
+  const tick =
+    tickBudget === undefined
+      ? null
+      : Object.freeze({
+          weight: tickBudget.weight ?? 1,
+          maxScore: tickBudget.maxScore ?? null,
+          observe: tickBudget.mode === 'observe',
+          slack: tickBudget.slack ?? 0.05,
+          capacity: tickBudget.maxCatchUpTicks,
+        });
+  if (
+    tickBudget !== undefined &&
+    (!weightOk(tick!.weight) ||
+      !modeOk(tickBudget.mode) ||
+      (tick!.maxScore !== null && !scoreOk(tick!.maxScore)) ||
+      !finite(tick!.slack) ||
+      tick!.slack < 0 ||
+      tick!.slack > 1 ||
+      !finite(tickBudget.ticksPerSecond))
+  )
+    throw Error('integrity: invalid tick budget');
   // Both buckets reuse rate admission (NW-05). Their keys are a subset of tracked keys, so they never refuse capacity.
-  const throttleBucket: RateAdmission | null = throttle === undefined ? null
-    : createRateAdmission({ maxKeys: bounds.maxKeys, capacity: throttle.capacity, refillPerSecond: throttle.refillPerSecond });
-  const tickBucket: RateAdmission | null = tickBudget === undefined ? null
-    : createRateAdmission({ maxKeys: bounds.maxKeys, capacity: tickBudget.maxCatchUpTicks,
-      refillPerSecond: tickBudget.ticksPerSecond * (1 + tick!.slack) });
+  const throttleBucket: RateAdmission | null =
+    throttle === undefined
+      ? null
+      : createRateAdmission({
+          maxKeys: bounds.maxKeys,
+          capacity: throttle.capacity,
+          refillPerSecond: throttle.refillPerSecond,
+        });
+  const tickBucket: RateAdmission | null =
+    tickBudget === undefined
+      ? null
+      : createRateAdmission({
+          maxKeys: bounds.maxKeys,
+          capacity: tickBudget.maxCatchUpTicks,
+          refillPerSecond: tickBudget.ticksPerSecond * (1 + tick!.slack),
+        });
   // Contribution slots: one per rule with a ceiling, plus one for the tick budget.
   const TICK_SLOT = rules.length;
   const capped = ruleCaps.some(c => c !== null) || (tick !== null && tick.maxScore !== null);
@@ -296,32 +389,53 @@ export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrit
   const entries = new Map<RateKey, Entry>();
   const auditLog: IntegrityAuditEntry[] = [];
   const issued = new WeakSet<object>();
-  let latest = 0, busy = false, disposed = false, seq = 0;
-  let admitted = 0, recorded = 0, rejected = 0, throttled = 0, closed = 0, flags = 0, ruleErrors = 0;
-  let tickBudgetExceeded = 0, wouldReject = 0, wouldThrottle = 0, wouldClose = 0, evicted = 0, evictedScored = 0;
-  let dropped = 0, evidenceDropped = 0, clockRegressions = 0, auditErrors = 0, auditSuppressed = 0;
+  let latest = 0,
+    busy = false,
+    disposed = false,
+    seq = 0;
+  let admitted = 0,
+    recorded = 0,
+    rejected = 0,
+    throttled = 0,
+    closed = 0,
+    flags = 0,
+    ruleErrors = 0;
+  let tickBudgetExceeded = 0,
+    wouldReject = 0,
+    wouldThrottle = 0,
+    wouldClose = 0,
+    evicted = 0,
+    evictedScored = 0;
+  let dropped = 0,
+    evidenceDropped = 0,
+    clockRegressions = 0,
+    auditErrors = 0,
+    auditSuppressed = 0;
 
   const validKey = (key: unknown): key is RateKey =>
-    (typeof key === 'object' && key !== null) || typeof key === 'function'
-    || (typeof key === 'string' && key.length > 0 && key.length <= 256);
+    (typeof key === 'object' && key !== null) ||
+    typeof key === 'function' ||
+    (typeof key === 'string' && key.length > 0 && key.length <= 256);
   const validTime = (now: unknown): now is number =>
     typeof now === 'number' && Number.isFinite(now) && now >= 0 && now <= Number.MAX_SAFE_INTEGER;
   const decay = (value: number, elapsed: number): number => Math.max(0, value - (decayPerSecond * elapsed) / 1000);
-  const refused = (reason: IntegrityRefusalReason): IntegrityDecision => Object.freeze({ action: 'refused', reason });
+  const refused = (reason: IntegrityRefusalReason): IntegrityDecision => Object.freeze({action: 'refused', reason});
   const allow = (score: number, observed: 'reject' | 'throttle' | 'close' | null = null): IntegrityDecision =>
-    Object.freeze({ action: 'allow', score, observed });
+    Object.freeze({action: 'allow', score, observed});
 
   function subject(key: RateKey): string {
     if (!subjectOf) return typeof key === 'string' ? key.slice(0, MAX_SUBJECT) : 'anonymous';
     try {
       const label = subjectOf(key);
       return typeof label === 'string' && label.length <= MAX_SUBJECT ? label : 'invalid-subject';
-    } catch { return 'invalid-subject'; }
+    } catch {
+      return 'invalid-subject';
+    }
   }
   function captureRef(ref: unknown): IntegrityRef | null {
     if (ref === undefined || ref === null || typeof ref !== 'object') return null;
-    const { stream, sequence, tick: t } = ref as Record<string, unknown>;
-    const out: { stream?: string; sequence?: number; tick?: number } = {};
+    const {stream, sequence, tick: t} = ref as Record<string, unknown>;
+    const out: {stream?: string; sequence?: number; tick?: number} = {};
     if (typeof stream === 'string' && stream.length > 0 && stream.length <= MAX_STREAM) out.stream = stream;
     if (Number.isSafeInteger(sequence) && (sequence as number) >= 0) out.sequence = sequence as number;
     if (Number.isSafeInteger(t) && (t as number) >= 0) out.tick = t as number;
@@ -333,7 +447,10 @@ export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrit
       const json = JSON.stringify(value);
       if (typeof json !== 'string') throw Error('evidence');
       return captureJson(json, evidenceLimits).value;
-    } catch { evidenceDropped++; return null; }
+    } catch {
+      evidenceDropped++;
+      return null;
+    }
   }
 
   /** Clock high-water mark: a backwards reading is counted and grants no decay or refill. */
@@ -354,9 +471,19 @@ export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrit
         evicted++;
         if (decay(oldEntry.score, t - oldEntry.at) > 0) evictedScored++;
       }
-      entry = { score: 0, at: t, violations: 0, lastViolationAt: null, history: [], window: [],
-        caps: capped ? new Array<number>(rules.length + 1).fill(0) : null, lastTick: null, retryAt: null,
-        auditTokens: bounds.maxHistoryPerKey, auditAt: t };
+      entry = {
+        score: 0,
+        at: t,
+        violations: 0,
+        lastViolationAt: null,
+        history: [],
+        window: [],
+        caps: capped ? new Array<number>(rules.length + 1).fill(0) : null,
+        lastTick: null,
+        retryAt: null,
+        auditTokens: bounds.maxHistoryPerKey,
+        auditAt: t,
+      };
     } else entries.delete(key);
     entries.set(key, entry);
     const elapsed = Math.max(0, t - entry.at);
@@ -388,13 +515,34 @@ export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrit
     if (!requires) return true;
     return entry.window.length >= requires.violations && t - entry.window[0]! <= requires.withinMs;
   }
-  function audit(key: RateKey, entry: Entry, t: number, item: {
-    kind: IntegrityAuditEntry['kind']; rule: string | null; reason: string; weight: number;
-    observed: boolean; ref: IntegrityRef | null; evidence: DocumentValue | null;
-  }): void {
-    const row: IntegrityAuditEntry = Object.freeze({ seq: ++seq, at: t, subject: subject(key), config, kind: item.kind,
-      rule: item.rule, reason: item.reason, weight: item.weight, score: entry.score, observed: item.observed,
-      ref: item.ref, evidence: item.evidence });
+  function audit(
+    key: RateKey,
+    entry: Entry,
+    t: number,
+    item: {
+      kind: IntegrityAuditEntry['kind'];
+      rule: string | null;
+      reason: string;
+      weight: number;
+      observed: boolean;
+      ref: IntegrityRef | null;
+      evidence: DocumentValue | null;
+    },
+  ): void {
+    const row: IntegrityAuditEntry = Object.freeze({
+      seq: ++seq,
+      at: t,
+      subject: subject(key),
+      config,
+      kind: item.kind,
+      rule: item.rule,
+      reason: item.reason,
+      weight: item.weight,
+      score: entry.score,
+      observed: item.observed,
+      ref: item.ref,
+      evidence: item.evidence,
+    });
     entry.history.push(row);
     if (entry.history.length > bounds.maxHistoryPerKey) {
       // Evict the oldest unscored row first, so a key's own no-ops cannot push its scored evidence out.
@@ -402,8 +550,16 @@ export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrit
       entry.history.splice(i >= 0 ? i : 0, 1);
     }
     auditLog.push(row);
-    if (auditLog.length > bounds.maxAudit) { auditLog.shift(); dropped++; }
-    if (onAudit) try { onAudit(row); } catch { auditErrors++; }
+    if (auditLog.length > bounds.maxAudit) {
+      auditLog.shift();
+      dropped++;
+    }
+    if (onAudit)
+      try {
+        onAudit(row);
+      } catch {
+        auditErrors++;
+      }
   }
   /**
    * Audits a refusal or finding. Scored rows are always audited; unscored ones (weight 0: no-ops, throttles, repeated
@@ -412,10 +568,15 @@ export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrit
    */
   function auditOnce(key: RateKey, entry: Entry, t: number, item: Parameters<typeof audit>[3]): void {
     if (item.weight <= 0) {
-      entry.auditTokens = Math.min(bounds.maxHistoryPerKey,
-        entry.auditTokens + (Math.max(0, t - entry.auditAt) * auditRate) / 1000);
+      entry.auditTokens = Math.min(
+        bounds.maxHistoryPerKey,
+        entry.auditTokens + (Math.max(0, t - entry.auditAt) * auditRate) / 1000,
+      );
       entry.auditAt = t;
-      if (entry.auditTokens < 1) { auditSuppressed++; return; }
+      if (entry.auditTokens < 1) {
+        auditSuppressed++;
+        return;
+      }
       entry.auditTokens -= 1;
     }
     audit(key, entry, t, item);
@@ -423,17 +584,32 @@ export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrit
   /** Close decision at the current score; in observe mode it is audited and suppressed. */
   function closeDecision(key: RateKey, entry: Entry, t: number, ref: IntegrityRef | null): IntegrityDecision | null {
     if (!closing(entry, t)) return null;
-    auditOnce(key, entry, t, { kind: 'close', rule: null, reason: closeReason, weight: 0, observed: observing, ref, evidence: null });
-    if (observing) { wouldClose++; return allow(entry.score, 'close'); }
+    auditOnce(key, entry, t, {
+      kind: 'close',
+      rule: null,
+      reason: closeReason,
+      weight: 0,
+      observed: observing,
+      ref,
+      evidence: null,
+    });
+    if (observing) {
+      wouldClose++;
+      return allow(entry.score, 'close');
+    }
     closed++;
-    return Object.freeze({ action: 'close', reason: closeReason, score: entry.score });
+    return Object.freeze({action: 'close', reason: closeReason, score: entry.score});
   }
 
   function assess(input: IntegrityInput<C, S>): IntegrityAssessment {
-    const frozen: IntegrityInput<C, S> = Object.freeze({ command: input?.command, state: input?.state,
-      tick: Number.isSafeInteger(input?.tick) ? input.tick : null });
+    const frozen: IntegrityInput<C, S> = Object.freeze({
+      command: input?.command,
+      state: input?.state,
+      tick: Number.isSafeInteger(input?.tick) ? input.tick : null,
+    });
     const findings: IntegrityFinding[] = [];
-    let rule: string | null = null, reason: string | null = null;
+    let rule: string | null = null,
+      reason: string | null = null;
     for (const r of rules) {
       const observed = r.mode === 'observe';
       // Fields are read inside the guard, so a throwing getter is a rule error, not an owner exception.
@@ -441,42 +617,67 @@ export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrit
       try {
         const v = r.check(frozen) as unknown;
         if (v !== null && typeof v === 'object') {
-          ({ kind } = v as { kind: unknown });
-          if (kind === 'reject' || kind === 'flag') ({ reason: why, weight, evidence } = v as Record<string, unknown>);
+          ({kind} = v as {kind: unknown});
+          if (kind === 'reject' || kind === 'flag') ({reason: why, weight, evidence} = v as Record<string, unknown>);
         }
-      } catch { kind = undefined; }
+      } catch {
+        kind = undefined;
+      }
       if (kind === 'ok') continue;
       let finding: IntegrityFinding;
       if ((kind === 'reject' || kind === 'flag') && token(why) && weightOk(weight))
-        finding = Object.freeze({ rule: r.id, kind, reason: why, weight, observed, evidence: captureEvidence(evidence) });
-      else finding = Object.freeze({ rule: r.id, kind: 'rule-error', reason: 'rule-error', weight: ruleErrorWeight,
-        observed, evidence: null });
+        finding = Object.freeze({rule: r.id, kind, reason: why, weight, observed, evidence: captureEvidence(evidence)});
+      else
+        finding = Object.freeze({
+          rule: r.id,
+          kind: 'rule-error',
+          reason: 'rule-error',
+          weight: ruleErrorWeight,
+          observed,
+          evidence: null,
+        });
       findings.push(finding);
       // A reject or rule error from an enforced rule decides the command; observed rules never do.
-      if (finding.kind !== 'flag' && !observed) { rule = r.id; reason = finding.reason; break; }
+      if (finding.kind !== 'flag' && !observed) {
+        rule = r.id;
+        reason = finding.reason;
+        break;
+      }
     }
     const wouldBe = rule === null ? 'ok' : 'invalid';
-    const assessment: IntegrityAssessment = Object.freeze({ verdict: observing ? 'ok' : wouldBe, wouldBe, rule, reason,
-      findings: Object.freeze(findings) });
+    const assessment: IntegrityAssessment = Object.freeze({
+      verdict: observing ? 'ok' : wouldBe,
+      wouldBe,
+      rule,
+      reason,
+      findings: Object.freeze(findings),
+    });
     issued.add(assessment);
     return assessment;
   }
 
   /** The tick-budget cost of a claim, or null when it can never be admitted. Does not mutate. */
-  function tickCost(entry: Entry, claim: IntegrityTickClaim): { cost: number | null; claimed: number | null } {
+  function tickCost(entry: Entry, claim: IntegrityTickClaim): {cost: number | null; claimed: number | null} {
     if (claim.tick !== undefined) {
-      const claimed = Number.isSafeInteger(claim.tick) && (claim.tick as number) >= 0 ? claim.tick as number : null;
+      const claimed = Number.isSafeInteger(claim.tick) && (claim.tick as number) >= 0 ? (claim.tick as number) : null;
       // A gap larger than the bucket (a resynchronised or idle client) is charged a full bucket: rules must clamp
       // the movement one command may cover (maxElapsedTicks) to at most maxCatchUpTicks so it never exceeds its cost.
-      const cost = claimed === null ? null
-        : Math.min(tick!.capacity, entry.lastTick === null ? 1 : Math.max(1, claimed - entry.lastTick));
-      return { cost, claimed };
+      const cost =
+        claimed === null
+          ? null
+          : Math.min(tick!.capacity, entry.lastTick === null ? 1 : Math.max(1, claimed - entry.lastTick));
+      return {cost, claimed};
     }
     const n = claim.ticks;
-    return { cost: positive(n) && n <= tick!.capacity ? n : null, claimed: null };
+    return {cost: positive(n) && n <= tick!.capacity ? n : null, claimed: null};
   }
 
-  function admitAt(key: RateKey, t: number, claim: IntegrityTickClaim | undefined, ref: IntegrityRef | null): IntegrityDecision {
+  function admitAt(
+    key: RateKey,
+    t: number,
+    claim: IntegrityTickClaim | undefined,
+    ref: IntegrityRef | null,
+  ): IntegrityDecision {
     admitted++;
     const entry = touch(key, t);
     const closeNow = closeDecision(key, entry, t, ref);
@@ -485,34 +686,52 @@ export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrit
     if (throttleBucket && throttleAt !== null && entry.score >= throttleAt) {
       const r = throttleBucket.admit(key, t);
       if (r.status !== 'admitted') {
-        auditOnce(key, entry, t, { kind: 'throttle', rule: null, reason: 'throttled', weight: 0, observed: observing, ref, evidence: null });
+        auditOnce(key, entry, t, {
+          kind: 'throttle',
+          rule: null,
+          reason: 'throttled',
+          weight: 0,
+          observed: observing,
+          ref,
+          evidence: null,
+        });
         if (!observing) {
           throttled++;
-          return Object.freeze({ action: 'throttle', reason: 'throttled',
-            retryAfterMs: r.status === 'limited' && r.retryAfterMs !== null ? r.retryAfterMs : 1, score: entry.score });
+          return Object.freeze({
+            action: 'throttle',
+            reason: 'throttled',
+            retryAfterMs: r.status === 'limited' && r.retryAfterMs !== null ? r.retryAfterMs : 1,
+            score: entry.score,
+          });
         }
         wouldThrottle++;
         observed ??= 'throttle';
       }
     }
     if (tickBucket && tick && claim && (claim.tick !== undefined || claim.ticks !== undefined)) {
-      const { cost, claimed } = tickCost(entry, claim);
+      const {cost, claimed} = tickCost(entry, claim);
       const shadow = tick.observe;
       if (cost === null) {
         // Malformed or larger than the whole bucket: retrying cannot help, so it is not a throttle.
         tickBudgetExceeded++;
         const applied = shadow ? 0 : add(entry, tick.weight, TICK_SLOT, tick.maxScore);
         if (!shadow) violation(entry, t);
-        auditOnce(key, entry, t, { kind: 'tick-budget', rule: null, reason: 'tick-claim', weight: applied,
-          observed: shadow || observing, ref, evidence: captureEvidence({ tick: claim.tick ?? null, ticks: claim.ticks ?? null,
-            lastTick: entry.lastTick }) });
+        auditOnce(key, entry, t, {
+          kind: 'tick-budget',
+          rule: null,
+          reason: 'tick-claim',
+          weight: applied,
+          observed: shadow || observing,
+          ref,
+          evidence: captureEvidence({tick: claim.tick ?? null, ticks: claim.ticks ?? null, lastTick: entry.lastTick}),
+        });
         if (!shadow) {
           const after = closeDecision(key, entry, t, ref);
           if (after && after.action === 'close') return after;
           if (after) observed = 'close';
           if (!observing) {
             rejected++;
-            return Object.freeze({ action: 'reject', reason: 'tick-claim', rule: 'tick-budget', score: entry.score });
+            return Object.freeze({action: 'reject', reason: 'tick-claim', rule: 'tick-budget', score: entry.score});
           }
           wouldReject++;
           observed ??= 'reject';
@@ -527,15 +746,22 @@ export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrit
           entry.retryAt = t + retryAfterMs;
           const applied = early && !shadow ? add(entry, tick.weight, TICK_SLOT, tick.maxScore) : 0;
           if (early && !shadow) violation(entry, t);
-          auditOnce(key, entry, t, { kind: 'tick-budget', rule: null, reason: early ? 'tick-budget-early' : 'tick-budget',
-            weight: applied, observed: shadow || observing, ref, evidence: captureEvidence({ cost, retryAfterMs }) });
+          auditOnce(key, entry, t, {
+            kind: 'tick-budget',
+            rule: null,
+            reason: early ? 'tick-budget-early' : 'tick-budget',
+            weight: applied,
+            observed: shadow || observing,
+            ref,
+            evidence: captureEvidence({cost, retryAfterMs}),
+          });
           if (!shadow) {
             const after = closeDecision(key, entry, t, ref);
             if (after && after.action === 'close') return after;
             if (after) observed = 'close';
             if (!observing) {
               throttled++;
-              return Object.freeze({ action: 'throttle', reason: 'tick-budget', retryAfterMs, score: entry.score });
+              return Object.freeze({action: 'throttle', reason: 'tick-budget', retryAfterMs, score: entry.score});
             }
             wouldThrottle++;
             observed ??= 'throttle';
@@ -551,7 +777,12 @@ export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrit
     return allow(entry.score, observed);
   }
 
-  function recordAt(key: RateKey, assessment: IntegrityAssessment, t: number, ref: IntegrityRef | null): IntegrityDecision {
+  function recordAt(
+    key: RateKey,
+    assessment: IntegrityAssessment,
+    t: number,
+    ref: IntegrityRef | null,
+  ): IntegrityDecision {
     if (!issued.has(assessment)) return refused('invalid-assessment');
     issued.delete(assessment);
     recorded++;
@@ -562,11 +793,21 @@ export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrit
       const applied = finding.observed ? 0 : add(entry, finding.weight, index, ruleCaps[index] ?? null);
       // One recorded command is at most one violation, however many rules it tripped.
       // Only scored findings are violations: an unscored rejection (weight 0) is a no-op, not evidence.
-      if (!finding.observed && applied > 0 && !counted) { violation(entry, t); counted = true; }
+      if (!finding.observed && applied > 0 && !counted) {
+        violation(entry, t);
+        counted = true;
+      }
       if (finding.kind === 'flag') flags++;
       if (finding.kind === 'rule-error') ruleErrors++;
-      auditOnce(key, entry, t, { kind: finding.kind, rule: finding.rule, reason: finding.reason, weight: applied,
-        observed: finding.observed || observing, ref, evidence: finding.evidence });
+      auditOnce(key, entry, t, {
+        kind: finding.kind,
+        rule: finding.rule,
+        reason: finding.reason,
+        weight: applied,
+        observed: finding.observed || observing,
+        ref,
+        evidence: finding.evidence,
+      });
     }
     const suppressed = assessment.wouldBe === 'invalid' && assessment.verdict === 'ok';
     if (suppressed) wouldReject++;
@@ -582,17 +823,25 @@ export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrit
     if (!validTime(now)) return refused('invalid-time');
     if (!validKey(key)) return refused('invalid-key');
     busy = true;
-    try { return run(clock(now)); } finally { busy = false; }
+    try {
+      return run(clock(now));
+    } finally {
+      busy = false;
+    }
   }
 
   return Object.freeze({
     assess,
-    admit: (key: RateKey, now: number, opts?: IntegrityTickClaim & { readonly ref?: IntegrityRef }) =>
+    admit: (key: RateKey, now: number, opts?: IntegrityTickClaim & {readonly ref?: IntegrityRef}) =>
       guarded(key, now, t => admitAt(key, t, opts, captureRef(opts?.ref))),
     record: (key: RateKey, assessment: IntegrityAssessment, now: number, ref?: IntegrityRef) =>
       guarded(key, now, t => recordAt(key, assessment, t, captureRef(ref))),
-    check(key: RateKey, input: IntegrityInput<C, S>, now: number,
-      opts?: IntegrityTickClaim & { readonly ref?: IntegrityRef }): IntegrityDecision {
+    check(
+      key: RateKey,
+      input: IntegrityInput<C, S>,
+      now: number,
+      opts?: IntegrityTickClaim & {readonly ref?: IntegrityRef},
+    ): IntegrityDecision {
       return guarded(key, now, t => {
         const ref = captureRef(opts?.ref);
         const gate = admitAt(key, t, opts, ref);
@@ -605,31 +854,80 @@ export function createIntegrity<C, S>(options: IntegrityOptions<C, S>): Integrit
         if (decision.action !== 'allow') return decision;
         if (assessment.verdict === 'invalid') {
           rejected++;
-          return Object.freeze({ action: 'reject', reason: assessment.reason!, rule: assessment.rule!, score: decision.score });
+          return Object.freeze({
+            action: 'reject',
+            reason: assessment.reason!,
+            rule: assessment.rule!,
+            score: decision.score,
+          });
         }
-        return gate.action === 'allow' && gate.observed && !decision.observed ? allow(decision.score, gate.observed) : decision;
+        return gate.action === 'allow' && gate.observed && !decision.observed
+          ? allow(decision.score, gate.observed)
+          : decision;
       });
     },
     read(key: RateKey, now?: number): IntegrityKeyState | null {
       if (now !== undefined && !validTime(now)) return null;
       const entry = entries.get(key);
       if (entry === undefined) return null;
-      return Object.freeze({ score: decay(entry.score, Math.max(now ?? latest, latest) - entry.at),
-        violations: entry.violations, lastViolationAt: entry.lastViolationAt, history: Object.freeze([...entry.history]) });
+      return Object.freeze({
+        score: decay(entry.score, Math.max(now ?? latest, latest) - entry.at),
+        violations: entry.violations,
+        lastViolationAt: entry.lastViolationAt,
+        history: Object.freeze([...entry.history]),
+      });
     },
     audit: () => Object.freeze([...auditLog]),
-    exportAudit: () => JSON.stringify({ format: INTEGRITY_AUDIT_FORMAT, version: 1, config, enforcement, dropped,
-      entries: auditLog.map(e => ({ seq: e.seq, at: e.at, subject: e.subject, config: e.config, kind: e.kind,
-        rule: e.rule, reason: e.reason, weight: e.weight, score: e.score, observed: e.observed, ref: e.ref,
-        evidence: e.evidence })) }),
+    exportAudit: () =>
+      JSON.stringify({
+        format: INTEGRITY_AUDIT_FORMAT,
+        version: 1,
+        config,
+        enforcement,
+        dropped,
+        entries: auditLog.map(e => ({
+          seq: e.seq,
+          at: e.at,
+          subject: e.subject,
+          config: e.config,
+          kind: e.kind,
+          rule: e.rule,
+          reason: e.reason,
+          weight: e.weight,
+          score: e.score,
+          observed: e.observed,
+          ref: e.ref,
+          evidence: e.evidence,
+        })),
+      }),
     forget(key: RateKey): boolean {
       throttleBucket?.forget(key);
       tickBucket?.forget(key);
       return entries.delete(key);
     },
-    stats: (): IntegrityStats => Object.freeze({ keys: entries.size, admitted, recorded, rejected, throttled, closed,
-      flags, ruleErrors, tickBudgetExceeded, wouldReject, wouldThrottle, wouldClose, evicted, evictedScored, dropped,
-      evidenceDropped, clockRegressions, auditErrors, auditSuppressed, disposed }),
+    stats: (): IntegrityStats =>
+      Object.freeze({
+        keys: entries.size,
+        admitted,
+        recorded,
+        rejected,
+        throttled,
+        closed,
+        flags,
+        ruleErrors,
+        tickBudgetExceeded,
+        wouldReject,
+        wouldThrottle,
+        wouldClose,
+        evicted,
+        evictedScored,
+        dropped,
+        evidenceDropped,
+        clockRegressions,
+        auditErrors,
+        auditSuppressed,
+        disposed,
+      }),
     dispose(): void {
       if (disposed) return;
       disposed = true;
@@ -659,17 +957,28 @@ export interface IntegrityRuleBase {
 }
 type Select<C, S, T> = (input: IntegrityInput<C, S>) => T;
 
-function base<C, S>(spec: IntegrityRuleBase, check: (input: IntegrityInput<C, S>,
-  fail: (evidence?: unknown) => IntegrityVerdict) => IntegrityVerdict): IntegrityRule<C, S> {
+function base<C, S>(
+  spec: IntegrityRuleBase,
+  check: (input: IntegrityInput<C, S>, fail: (evidence?: unknown) => IntegrityVerdict) => IntegrityVerdict,
+): IntegrityRule<C, S> {
   if (!spec || !token(spec.id)) throw Error('integrity rule: invalid id');
-  const mode = spec.violation ?? 'reject', weight = spec.weight ?? 1;
-  if ((mode !== 'reject' && mode !== 'flag') || !weightOk(weight) || !modeOk(spec.mode)
-    || (spec.maxScore !== undefined && !scoreOk(spec.maxScore))) throw Error('integrity rule: invalid violation');
+  const mode = spec.violation ?? 'reject',
+    weight = spec.weight ?? 1;
+  if (
+    (mode !== 'reject' && mode !== 'flag') ||
+    !weightOk(weight) ||
+    !modeOk(spec.mode) ||
+    (spec.maxScore !== undefined && !scoreOk(spec.maxScore))
+  )
+    throw Error('integrity rule: invalid violation');
   const fail = (evidence?: unknown) =>
     mode === 'reject' ? integrityReject(spec.id, weight, evidence) : integrityFlag(spec.id, weight, evidence);
-  return Object.freeze({ id: spec.id, ...(spec.mode ? { mode: spec.mode } : {}),
-    ...(spec.maxScore !== undefined ? { maxScore: spec.maxScore } : {}),
-    check: (input: IntegrityInput<C, S>) => check(input, fail) });
+  return Object.freeze({
+    id: spec.id,
+    ...(spec.mode ? {mode: spec.mode} : {}),
+    ...(spec.maxScore !== undefined ? {maxScore: spec.maxScore} : {}),
+    check: (input: IntegrityInput<C, S>) => check(input, fail),
+  });
 }
 const MAX_DIMENSIONS = 16;
 function vector(value: unknown): number[] | null {
@@ -687,33 +996,49 @@ const nonNegative = (...values: unknown[]) => values.every(v => finite(v) && v >
  * yet, passes. Pair with the owner's `tickBudget` so a client cannot claim more ticks than host time allows.
  * Host time in place of ticks works but is jitter-sensitive (see the guide).
  */
-export function maxRateOfChange<C, S>(spec: IntegrityRuleBase & {
-  readonly current: Select<C, S, number | readonly number[] | null>;
-  readonly proposed: Select<C, S, number | readonly number[]>;
-  readonly elapsedTicks: Select<C, S, number | null>;
-  readonly perTick: number;
-  readonly allowance?: number;
-  readonly maxElapsedTicks?: number;
-}): IntegrityRule<C, S> {
-  const allowance = spec?.allowance ?? 0, maxElapsed = spec?.maxElapsedTicks ?? Number.MAX_SAFE_INTEGER;
-  if (!spec || !nonNegative(spec.perTick, allowance) || !(finite(maxElapsed) && maxElapsed >= 1)
-    || !fn(spec.current, spec.proposed, spec.elapsedTicks)) throw Error('integrity rule: invalid rate');
+export function maxRateOfChange<C, S>(
+  spec: IntegrityRuleBase & {
+    readonly current: Select<C, S, number | readonly number[] | null>;
+    readonly proposed: Select<C, S, number | readonly number[]>;
+    readonly elapsedTicks: Select<C, S, number | null>;
+    readonly perTick: number;
+    readonly allowance?: number;
+    readonly maxElapsedTicks?: number;
+  },
+): IntegrityRule<C, S> {
+  const allowance = spec?.allowance ?? 0,
+    maxElapsed = spec?.maxElapsedTicks ?? Number.MAX_SAFE_INTEGER;
+  if (
+    !spec ||
+    !nonNegative(spec.perTick, allowance) ||
+    !(finite(maxElapsed) && maxElapsed >= 1) ||
+    !fn(spec.current, spec.proposed, spec.elapsedTicks)
+  )
+    throw Error('integrity rule: invalid rate');
   return base(spec, (input, fail) => {
-    const was = spec.current(input), elapsed = spec.elapsedTicks(input);
+    const was = spec.current(input),
+      elapsed = spec.elapsedTicks(input);
     if (was === null || elapsed === null) return OK;
-    const from = vector(was), to = vector(spec.proposed(input));
+    const from = vector(was),
+      to = vector(spec.proposed(input));
     if (!finite(elapsed) || !from || !to || from.length !== to.length) return fail();
     let sum = 0;
     for (let i = 0; i < from.length; i++) sum += (to[i]! - from[i]!) ** 2;
-    const distance = Math.sqrt(sum), allowed = allowance + spec.perTick * Math.min(maxElapsed, Math.max(1, elapsed));
-    return distance <= allowed ? OK : fail({ distance, allowed });
+    const distance = Math.sqrt(sum),
+      allowed = allowance + spec.perTick * Math.min(maxElapsed, Math.max(1, elapsed));
+    return distance <= allowed ? OK : fail({distance, allowed});
   });
 }
 
 /** Requires a finite number within [min, max]; optionally an integer. */
-export function valueInRange<C, S>(spec: IntegrityRuleBase & {
-  readonly value: Select<C, S, unknown>; readonly min: number; readonly max: number; readonly integer?: boolean;
-}): IntegrityRule<C, S> {
+export function valueInRange<C, S>(
+  spec: IntegrityRuleBase & {
+    readonly value: Select<C, S, unknown>;
+    readonly min: number;
+    readonly max: number;
+    readonly integer?: boolean;
+  },
+): IntegrityRule<C, S> {
   if (!spec || !finite(spec.min) || !finite(spec.max) || spec.min > spec.max || !fn(spec.value))
     throw Error('integrity rule: invalid range');
   return base(spec, (input, fail) => {
@@ -723,29 +1048,43 @@ export function valueInRange<C, S>(spec: IntegrityRuleBase & {
 }
 
 /** Requires the value to be one of at most 256 allowed strings, numbers or booleans (strict equality). */
-export function valueInSet<C, S>(spec: IntegrityRuleBase & {
-  readonly value: Select<C, S, unknown>; readonly allowed: readonly (string | number | boolean)[];
-}): IntegrityRule<C, S> {
-  if (!spec || !Array.isArray(spec.allowed) || spec.allowed.length === 0 || spec.allowed.length > 256
-    || !spec.allowed.every(v => typeof v === 'string' || typeof v === 'boolean' || finite(v)) || !fn(spec.value))
+export function valueInSet<C, S>(
+  spec: IntegrityRuleBase & {
+    readonly value: Select<C, S, unknown>;
+    readonly allowed: readonly (string | number | boolean)[];
+  },
+): IntegrityRule<C, S> {
+  if (
+    !spec ||
+    !Array.isArray(spec.allowed) ||
+    spec.allowed.length === 0 ||
+    spec.allowed.length > 256 ||
+    !spec.allowed.every(v => typeof v === 'string' || typeof v === 'boolean' || finite(v)) ||
+    !fn(spec.value)
+  )
     throw Error('integrity rule: invalid set');
   const allowed = new Set<unknown>(spec.allowed);
-  return base(spec, (input, fail) => allowed.has(spec.value(input)) ? OK : fail());
+  return base(spec, (input, fail) => (allowed.has(spec.value(input)) ? OK : fail()));
 }
 
 /**
  * Requires a number to advance past the authoritative previous value: greater (strict, default) or equal, and by
  * at most `maxStep` when set. `previous` null: none yet, any finite value passes.
  */
-export function monotonic<C, S>(spec: IntegrityRuleBase & {
-  readonly value: Select<C, S, unknown>; readonly previous: Select<C, S, number | null>;
-  readonly strict?: boolean; readonly maxStep?: number;
-}): IntegrityRule<C, S> {
+export function monotonic<C, S>(
+  spec: IntegrityRuleBase & {
+    readonly value: Select<C, S, unknown>;
+    readonly previous: Select<C, S, number | null>;
+    readonly strict?: boolean;
+    readonly maxStep?: number;
+  },
+): IntegrityRule<C, S> {
   if (!spec || (spec.maxStep !== undefined && !nonNegative(spec.maxStep)) || !fn(spec.value, spec.previous))
     throw Error('integrity rule: invalid monotonic');
   const strict = spec.strict ?? true;
   return base(spec, (input, fail) => {
-    const v = spec.value(input), previous = spec.previous(input);
+    const v = spec.value(input),
+      previous = spec.previous(input);
     if (!finite(v)) return fail();
     if (previous === null) return OK;
     if (!finite(previous) || (strict ? v <= previous : v < previous)) return fail();
@@ -757,10 +1096,13 @@ export function monotonic<C, S>(spec: IntegrityRuleBase & {
  * Requires at least `cooldownTicks` between the authoritative last use (`lastTick`, null when never used) and the
  * command's tick (`tick`, default the input tick). A missing current tick is a violation.
  */
-export function cooldown<C, S>(spec: IntegrityRuleBase & {
-  readonly lastTick: Select<C, S, number | null>; readonly cooldownTicks: number;
-  readonly tick?: Select<C, S, number | null>;
-}): IntegrityRule<C, S> {
+export function cooldown<C, S>(
+  spec: IntegrityRuleBase & {
+    readonly lastTick: Select<C, S, number | null>;
+    readonly cooldownTicks: number;
+    readonly tick?: Select<C, S, number | null>;
+  },
+): IntegrityRule<C, S> {
   if (!spec || !nonNegative(spec.cooldownTicks) || !fn(spec.lastTick) || (spec.tick !== undefined && !fn(spec.tick)))
     throw Error('integrity rule: invalid cooldown');
   return base(spec, (input, fail) => {
@@ -778,24 +1120,45 @@ export function cooldown<C, S>(spec: IntegrityRuleBase & {
  * stale input after a stall, reconnect or jitter is normal for honest clients and must not close them. This bounds
  * latency compensation; the rewind itself is creator code.
  */
-export function claimedTickInBand<C, S>(spec: IntegrityRuleBase & {
-  readonly claimed: Select<C, S, unknown>; readonly hostTick?: Select<C, S, number | null>;
-  readonly maxBehindTicks: number; readonly maxAheadTicks: number; readonly behindWeight?: number;
-}): IntegrityRule<C, S> {
+export function claimedTickInBand<C, S>(
+  spec: IntegrityRuleBase & {
+    readonly claimed: Select<C, S, unknown>;
+    readonly hostTick?: Select<C, S, number | null>;
+    readonly maxBehindTicks: number;
+    readonly maxAheadTicks: number;
+    readonly behindWeight?: number;
+  },
+): IntegrityRule<C, S> {
   const behindWeight = spec?.behindWeight ?? 0;
-  if (!spec || !nonNegative(spec.maxBehindTicks, spec.maxAheadTicks) || !fn(spec.claimed) || !weightOk(behindWeight)
-    || (spec.hostTick !== undefined && !fn(spec.hostTick))) throw Error('integrity rule: invalid band');
+  if (
+    !spec ||
+    !nonNegative(spec.maxBehindTicks, spec.maxAheadTicks) ||
+    !fn(spec.claimed) ||
+    !weightOk(behindWeight) ||
+    (spec.hostTick !== undefined && !fn(spec.hostTick))
+  )
+    throw Error('integrity rule: invalid band');
   return base(spec, (input, fail) => {
-    const claimed = spec.claimed(input), host = spec.hostTick ? spec.hostTick(input) : input.tick;
+    const claimed = spec.claimed(input),
+      host = spec.hostTick ? spec.hostTick(input) : input.tick;
     if (!finite(claimed) || !finite(host)) return fail();
-    if (claimed > host + spec.maxAheadTicks) return fail({ claimed, host });
+    if (claimed > host + spec.maxAheadTicks) return fail({claimed, host});
     if (claimed < host - spec.maxBehindTicks) {
-      const evidence = { claimed, host, behind: true };
-      return spec.violation === 'flag' ? integrityFlag(spec.id, behindWeight, evidence) : integrityReject(spec.id, behindWeight, evidence);
+      const evidence = {claimed, host, behind: true};
+      return spec.violation === 'flag'
+        ? integrityFlag(spec.id, behindWeight, evidence)
+        : integrityReject(spec.id, behindWeight, evidence);
     }
     return OK;
   });
 }
 
 /** Generic rule helpers, grouped so their short names do not crowd the kit namespace. */
-export const integrityRules = Object.freeze({ maxRateOfChange, valueInRange, valueInSet, monotonic, cooldown, claimedTickInBand });
+export const integrityRules = Object.freeze({
+  maxRateOfChange,
+  valueInRange,
+  valueInSet,
+  monotonic,
+  cooldown,
+  claimedTickInBand,
+});

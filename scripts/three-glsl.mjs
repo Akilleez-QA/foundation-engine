@@ -17,7 +17,8 @@ export const THREE_GLSL_FILE = /[\\/]node_modules[\\/]three[\\/]src[\\/]renderer
 
 /** One shader text, rewritten exactly as three's build (utils/build/rollup.config.js, `glsl()`) rewrites it. */
 export function stripGlsl(text) {
-  return text.trim()
+  return text
+    .trim()
     .replace(/\r/g, '')
     .replace(/[ \t]*\/\/.*\n/g, '') // line comments, with their newline
     .replace(/[ \t]*\/\*[\s\S]*?\*\//g, '') // block comments
@@ -27,7 +28,8 @@ export function stripGlsl(text) {
 /** A `.glsl.js` module's source with every tagged literal stripped; a literal the rule cannot hold for is an error. */
 export function stripGlslModule(code, where = 'three shader module') {
   return code.replace(TAGGED, (_whole, text) => {
-    if (/[`\\]|\$\{/.test(text)) throw new Error(`${where}: a glsl literal holds an interpolation, backtick or backslash`);
+    if (/[`\\]|\$\{/.test(text))
+      throw new Error(`${where}: a glsl literal holds an interpolation, backtick or backslash`);
     return '`' + stripGlsl(text) + '`';
   });
 }
@@ -35,7 +37,8 @@ export function stripGlslModule(code, where = 'three shader module') {
 /** Vite plugin: production builds only, so the dev server keeps readable shader source for debugging. */
 export function threeGlsl() {
   return {
-    name: 'engine-three-glsl', apply: 'build',
+    name: 'engine-three-glsl',
+    apply: 'build',
     transform(code, id) {
       if (!THREE_GLSL_FILE.test(id)) return null;
       return {code: stripGlslModule(code, id), map: null};

@@ -5,7 +5,7 @@
  * caller holds the def (a pack imported for its data) and asks for the variant that fits the voice or locale. This is the
  * synchronous half of `AssetLibrary.url(id, o)`; the library resolves the id to its def and then calls this. Pure.
  */
-import type { AssetDef, AssetVariant } from '../../core/asset-def.ts';
+import type {AssetDef, AssetVariant} from '../../core/asset-def.ts';
 
 /** The base locale: a variant with no `locale` belongs to it (today's `en` files keep their paths). */
 export const BASE_LOCALE = 'en';
@@ -23,7 +23,7 @@ export interface AssetUrlOptions {
 export function urlVariant(def: AssetDef, o: AssetUrlOptions = {}): AssetVariant {
   const voiced = def.variants.filter(v => o.voice === undefined || v.voice === o.voice);
   const inLocale = (locale: string) => voiced.find(v => (v.locale ?? BASE_LOCALE) === locale);
-  const variant = o.locale === undefined ? voiced[0] : inLocale(o.locale) ?? inLocale(BASE_LOCALE);
+  const variant = o.locale === undefined ? voiced[0] : (inLocale(o.locale) ?? inLocale(BASE_LOCALE));
   if (!variant) throw new Error(`${def.id}: no variant`);
   return variant;
 }
