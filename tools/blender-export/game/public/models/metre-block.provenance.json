@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "author": "Foundation Engine contributors",
+  "licence": "GPL-3.0-only",
+  "source": "tools/blender-export/export.py",
+  "sourceSha256": "9b26ae6697d69d51f9b1afb3507df7a10fba972a2f62405a8c208736bcae1050",
+  "blender": "5.2.1 LTS",
+  "artifact": "metre-block.glb",
+  "sha256": "fcc71461117220b6ac0f5452d00beabb5b419ba1eeb3c09f5d0ea956d18823cb",
+  "units": "metres",
+  "up": "+Y",
+  "pivot": "base centre",
+  "bounds": [
+    [
+      -0.5,
+      0,
+      -0.5
+    ],
+    [
+      0.5,
+      1,
+      0.5
+    ]
+  ],
+  "materials": 2,
+  "triangles": 12,
+  "textures": 0,
+  "animation": "none"
+}

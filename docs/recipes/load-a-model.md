@@ -8,6 +8,8 @@ Files in your game's own `public/` folder are served from the site root (or the 
 
 The loader accepts **binary glTF (`.glb`) with everything embedded**: a `.gltf` with a separate `.bin` or image files is rejected (`models: GLB dependencies must be embedded`). Export from Blender with *glTF Binary (.glb)*. Textures embedded in the GLB are drawn. To texture a primitive `Shape` instead, see [give a shape a material](give-a-shape-a-material.md).
 
+For a reproducible Blender export with metre scale, a base-centre pivot, material bounds and an actual engine consumer, follow the [Blender export example](../../tools/blender-export/README.md). Its checked-in original asset runs without installing Blender.
+
 ## 2. Declare it as an asset
 
 Any `.ts` file in `game/` with a default export is a definition; the `.asset.ts` ending is only a naming habit. Every asset names its licence, author and source:
@@ -108,5 +110,5 @@ In the snap, the model should be visible and `probe.json` should have no page er
 
 - One GLB per asset; embedded buffers and images only. Large files cost load time and memory against the scene's budget (`npm run play:snap` reports draws and triangles).
 - Clips play one at a time per entity; there is no blending between clips in the `Model` component.
-- Model and texture URLs are fetched from the **site root**. A build hosted under a sub-path (for example `https://<user>.github.io/<repo>/`) cannot find them yet: see [share your build](share-your-build.md).
+- Asset URLs are resolved against the build base. For a sub-path, build with `npm run build -- --base ./` or a known prefix; see [host under a sub-path](host-under-a-sub-path.md). Arbitrary root-absolute URLs outside asset declarations still need your own base handling.
 - More: [model attachments](../guides/model-attachments.md), [model readiness](../guides/model-readiness.md), [model inspection](../guides/model-inspection.md), and the `mechanics` template, which uses this same fixture.
