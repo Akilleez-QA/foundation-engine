@@ -50,6 +50,8 @@ try {
   assert.equal((await state()).world.state.near,null);
   assert.match(await page.locator('.scene-overlay').innerText(),/Found 0 of 3/);
   const initial = await sample('start'); await shot('start');
+  assert.equal(initial.pool.contexts,1,'one live context at startup');
+  assert.equal(initial.pool.overflows,0,'no overflow at startup');
 
   // A held physical key must not survive the lifecycle interruption.
   await page.locator('.scene-view').focus();
@@ -92,6 +94,8 @@ try {
   await use(0,2.4,'to-garden'); await scene('garden');
   assert.equal((await state()).world.named.player.x,4);
   const returned = await sample('discovered and returned'); await shot('discovered');
+  assert.equal(returned.pool.contexts,1,'one live context after first round trip');
+  assert.equal(returned.pool.overflows,0,'no overflow after first round trip');
   assert.ok(returned.pool.leases>initial.pool.leases);
   assert.ok(returned.pool.lastRelease,'scene replacement records a renderer release');
 

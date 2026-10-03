@@ -17,7 +17,7 @@ Environment: Linux, Node 26.8.1, Chromium 152.0.7977.82, 1280×800 isolated head
 - Garden → shed → garden uses authored doors and checks arrival positions. All three discoveries are reflected in the HUD.
 - Three additional round trips retain one live pooled context and zero overflows. Lease count progresses 1 → 3 → 5 → 7 → 9; release audits are present. The last audit reports zero textures/geometries/programs and seven GL objects handled by the pool's release sweep. This is not a claim of zero sweep work or complete heap/listener leak freedom.
 - The test waits for actual localStorage envelopes containing all three discoveries and the setting, then reloads the same context and checks HUD plus sound setting.
-- Ten recorded states, no page errors, and no browser/server cleanup failures.
+- Nine recorded states, no page errors, and no browser/server cleanup failures.
 
 ## Validation
 
@@ -35,3 +35,7 @@ During development, two test assumptions failed before the passing run: expectin
 ## Remaining acceptance
 
 This does not close physical-device, OS suspension, gamepad, touch, auditory, accessibility or newcomer trials. It does not exercise actual quota exhaustion or rendered refused-save/retry UI; existing headless save tests remain that limited evidence. It does not certify full application disposal, heap/listener retention, WAN sessions, production-bundle behavior or combined-candidate full gates. Lamp visual state and player position are not promised persisted state. Public API and save formats are unchanged.
+
+## Review follow-up
+
+Strengthened startup and first-return assertions require exactly one live context and zero overflows, so a leak already present before repeated visits cannot become an accepted baseline. Rerun passed at 2026-10-03T17:37:27.471526+00:00 on base `45c8171` plus the reviewed assertions; 9 states, no failures. Exact tested script SHA-256: `9b940508dd0e41f78198102a8aa5d4854fa50cb118efea3a1d6bc6fe8b55edae`. The source is committed unchanged with this receipt. Browser and server closed successfully; no full integration gate was run.
