@@ -5,7 +5,7 @@ import {cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync} fr
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {ROOT} from './lib/game-dir.mjs';
-import {startGame, withHeading} from './new-game.mjs';
+import {quoted, startGame, withHeading} from './new-game.mjs';
 
 function scratch() {
   const root = mkdtempSync(join(tmpdir(), 'engine-new-game-'));
@@ -80,5 +80,15 @@ test("new-game: --title becomes GAME.md's heading as well as the game's title", 
     assert.equal(withHeading('## Brief\n', 'New'), '# New\n\n## Brief\n');
   } finally {
     rmSync(root, {recursive: true, force: true});
+  }
+});
+
+test('new-game: the renamed title is written the way Prettier prints it, so format:check stays green', async () => {
+  const prettier = await import('prettier');
+  const options = await prettier.resolveConfig(join(ROOT, 'package.json'));
+  for (const title of ['Orb Run', "Kim's run", 'The "best" run', `It's "odd"`, "a 'b' \"c\" 'd'", 'back\\slash']) {
+    const source = `export const game = {title: ${quoted(title)}};\n`;
+    assert.equal(await prettier.format(source, {...options, parser: 'typescript'}), source, title);
+    assert.equal(new Function(`return ${quoted(title)}`)(), title, title);
   }
 });

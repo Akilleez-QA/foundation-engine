@@ -414,7 +414,25 @@ export default defineScene({
         `unknown kind '${kind}': scene, entity, component, system, input, save-section, kit, interactable, area, lesson`,
       );
   }
+  await formatMade(files);
   return {files, next};
+}
+
+/** Format what a generator wrote or changed with the repository's Prettier settings, so `npm run check` (which runs
+ *  format:check) stays green after a generator. Entries may carry a note (`budgets.json (row x)`); files Prettier does
+ *  not format, or that .prettierignore excludes (Markdown), are left as written. */
+async function formatMade(made: string[]) {
+  const prettier = await import('prettier');
+  const options = (await prettier.resolveConfig(join(ROOT, 'package.json'))) ?? {};
+  for (const entry of new Set(made.map(f => f.replace(/ \(.*\)$/, '')))) {
+    const file = join(ROOT, entry);
+    if (!existsSync(file)) continue;
+    const info = await prettier.getFileInfo(file, {ignorePath: join(ROOT, '.prettierignore')});
+    if (info.ignored || !info.inferredParser) continue;
+    const text = readFileSync(file, 'utf8');
+    const formatted = await prettier.format(text, {...options, filepath: file});
+    if (formatted !== text) writeFileSync(file, formatted);
+  }
 }
 
 if (process.argv[1]?.endsWith('new.ts')) {

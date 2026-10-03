@@ -32,6 +32,13 @@ export function withHeading(md, title) {
 }
 
 /** Starts a game in `root` from template `name`. Throws with a message for the author on a bad request. */
+/** A string literal as Prettier prints it here (singleQuote): single quotes unless the text has more of them than
+ *  double quotes, so the renamed game.ts stays formatted and `npm run check` (format:check) passes. */
+export function quoted(text) {
+  const q = (text.match(/'/g)?.length ?? 0) > (text.match(/"/g)?.length ?? 0) ? '"' : "'";
+  return q + text.replace(/\\/g, '\\\\').replace(new RegExp(q, 'g'), '\\' + q) + q;
+}
+
 export function startGame({root = ROOT, name, id = 'my-game', title, force = false, log = console.log}) {
   const named = title !== undefined;
   title ??= 'My game';
@@ -62,7 +69,7 @@ export function startGame({root = ROOT, name, id = 'my-game', title, force = fal
     gameTs,
     readFileSync(gameTs, 'utf8')
       .replace(/id: '[^']*'/, `id: '${id}'`)
-      .replace(/title: '[^']*'/, `title: '${title.replace(/'/g, "\\'")}'`),
+      .replace(/title: '[^']*'/, () => `title: ${quoted(title)}`),
   );
   const scripts = existsSync(join(root, 'game', 'playtest'))
     ? readdirSync(join(root, 'game', 'playtest')).filter(f => f.endsWith('.json'))
