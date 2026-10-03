@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { defineScene, defineSystem, testScene } from '../../author';
 import { createTimedEffects, type TimedEffectInput, type EffectAdmission } from './timed-effects';
+import { must } from '../../testing/must';
 
 const effect = (key = 'source', expiresAt = 3): TimedEffectInput => ({ key, expiresAt, modifiers: [{ stat: 'speed', add: 2, multiply: 1 }] });
 const admitted = (result: EffectAdmission) => { assert.equal(result.kind, 'applied'); if (result.kind !== 'applied') throw Error(); return result.effect; };
@@ -112,7 +113,7 @@ test('headless scene consumes derived speed and retires temporary contributions 
   const scene = await testScene(defineScene({ id: 'effects-consumer', title: 'effects.title',
     systems: [defineSystem({ id: 'effects-consumer', phase: 'frame', run(ctx, dt) {
       effects.advance(ctx.time.t);
-      distance += effects.values().speed * dt;
+      distance += must(effects.values().speed) * dt;
     } })], exit() { effects.cancelAll(); },
   }));
   scene.run(.25);
@@ -140,9 +141,9 @@ test('source-key ordering is independent of admission order and total contributi
   assert.equal(forward.values().speed, 1);
   assert.deepEqual(reverse.values(), forward.values());
   const bounded = createTimedEffects({ base: { speed: 0 }, now: 0, maxModifiers: 1, maxEffects: 5 });
-  admitted(bounded.apply(inputs[0], 'stack'));
-  assert.equal(bounded.apply(inputs[1], 'stack').kind, 'capacity');
-  admitted(bounded.apply({ ...inputs[1], key: 'a' }, 'replace'));
+  admitted(bounded.apply(must(inputs[0]), 'stack'));
+  assert.equal(bounded.apply(must(inputs[1]), 'stack').kind, 'capacity');
+  admitted(bounded.apply({ ...must(inputs[1]), key: 'a' }, 'replace'));
   assert.equal(bounded.size, 1);
   assert.equal(bounded.values().speed, -1e16);
 });

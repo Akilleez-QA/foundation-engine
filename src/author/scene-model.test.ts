@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import * as T from 'three';
 import { World } from '../core/ecs/world';
 import { Transform } from './defs';
@@ -44,8 +45,8 @@ test('per-camera masks apply to animated descendants and update without mutating
   const f=fixture();f.owner.dispose();let mask=2;
   const owner=createSceneModels({world:f.world,scene:f.scene,library:f.library,signal:f.life.signal,invalidate(){},report:e=>f.errors.push(e),mask:()=>mask});
   owner.sync();await waitFor(() => owner.socket(f.e, 'hand') !== null);owner.sync(.1);
-  f.scene.children[0].traverse(node=>assert.equal(node.layers.mask,2));
-  mask=4;assert.equal(owner.sync(),true);f.scene.children[0].traverse(node=>assert.equal(node.layers.mask,4));owner.dispose();
+  must(f.scene.children[0],'model root').traverse(node=>assert.equal(node.layers.mask,2));
+  mask=4;assert.equal(owner.sync(),true);must(f.scene.children[0],'model root').traverse(node=>assert.equal(node.layers.mask,4));owner.dispose();
 });
 
 test('a scene aborted before loading completes never publishes a node', async () => {
@@ -61,8 +62,8 @@ test('a scene aborted before loading completes never publishes a node', async ()
 test('masked rotation overrides preserve native animated translation and removal restores clip pose',async()=>{
  const f=fixture();f.owner.sync();await waitFor(() => f.owner.socket(f.e, 'hand') !== null);f.owner.sync(.25);
  const data=f.world.get(f.e,Model)!;data.pose=[{node:'hand',rotation:[0,0,Math.sin(.25),Math.cos(.25)]}];
- f.owner.sync(.1);const posed=f.owner.socket(f.e,'hand')!.matrix;assert.ok(Math.abs(posed[13]-.7)<1e-6);assert.ok(Math.abs(posed[0]-Math.cos(.5))<1e-6);
- data.pose=[];f.owner.sync(0);const restored=f.owner.socket(f.e,'hand')!.matrix;assert.ok(Math.abs(restored[13]-.7)<1e-6);assert.equal(restored[0],1);f.owner.dispose();
+ f.owner.sync(.1);const posed=f.owner.socket(f.e,'hand')!.matrix;assert.ok(Math.abs(must(posed[13])-.7)<1e-6);assert.ok(Math.abs(must(posed[0])-Math.cos(.5))<1e-6);
+ data.pose=[];f.owner.sync(0);const restored=f.owner.socket(f.e,'hand')!.matrix;assert.ok(Math.abs(must(restored[13])-.7)<1e-6);assert.equal(restored[0],1);f.owner.dispose();
 });
 
 test('scene disposal drains all instances and leases after cleanup throws, and repeated disposal is inert', async () => {
@@ -265,7 +266,7 @@ test('cancelled model candidate capacity is reusable before new admission and la
     invalidate() {}, report: error => f.errors.push(error) });
   try {
     owner.sync(); await waitFor(() => owner.state(f.e).status === 'ready');
-    const acceptedRoot = f.scene.children[0];
+    const acceptedRoot = must(f.scene.children[0], 'accepted root');
     const candidate = f.world.spawn(Transform(), Model({ asset: 'candidate', visible: false }));
     owner.sync(); await waitFor(() => arrive !== undefined);
     f.world.despawn(candidate);

@@ -57,11 +57,12 @@ export function createReadoutHud<C>(slots: readonly HudSlot<C>[], opts: ReadoutH
       const stale = !sameVersion(version, nextVersion) || nextLevel !== level || nextLocale !== locale;
       if (stale) {
         const ctx = context();
+        // i < slots.length, j < s.rows.length; texts and shown are slot-aligned.
         for (let i = 0; i < slots.length; i++) {
-          const s = slots[i];
+          const s = slots[i]!;
           let text = '';
           for (let j = 0; j < s.rows.length; j++) {
-            const r = s.rows[j];
+            const r = s.rows[j]!;
             if (j) text += s.separator ?? ' · ';
             text += formatReadout(r, r.compute(ctx), nextLevel, opts.text, nextLocale);
           }
@@ -71,10 +72,10 @@ export function createReadoutHud<C>(slots: readonly HudSlot<C>[], opts: ReadoutH
       }
       let writes = 0;
       for (let i = 0; i < slots.length; i++) {
-        const el = slots[i].target();
+        const el = slots[i]!.target(), text = texts[i]!;
         if (!stale && el === shown[i]) continue;
         shown[i] = el;
-        if (el && el.textContent !== texts[i]) { el.textContent = texts[i]; writes++; }
+        if (el && el.textContent !== text) { el.textContent = text; writes++; }
       }
       return writes;
     },

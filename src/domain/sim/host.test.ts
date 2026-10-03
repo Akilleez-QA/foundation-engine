@@ -8,11 +8,13 @@ import {
   LOCAL_HITCH_S, type ForceTerm, type SimEvent, type Simulation,
 } from './host';
 import { dragTerm, gravityTerm, thrustTerm } from './forces';
+import { must } from '../../testing/must';
 
 const MU = 4e14, R = 6_400_000;
 const body = { mu: MU, radius: R, omega: 7.3e-5, density: (h: number) => 1.225 * Math.exp(-Math.max(0, h) / 8500) };
 const params = { body, cdA: 2.56 };
-const surface = { id: 'surface', g: (_t: number, y: Float64Array) => Math.sqrt(y[0] * y[0] + y[1] * y[1] + y[2] * y[2]) - R, direction: -1 as const, terminal: true };
+// The sim state is the 7-entry point-mass layout and `acc` the host's Float64Array(3), so fixed component reads are in range.
+const surface = { id: 'surface', g: (_t: number, y: Float64Array) => Math.sqrt(y[0]! * y[0]! + y[1]! * y[1]! + y[2]! * y[2]!) - R, direction: -1 as const, terminal: true };
 const makeProbe = (h = 1 / 60) => new PointMassSim('probe', h, new Float64Array([R + 120_000, 0, 0, 0, 7800, 0, 1000]), [gravityTerm, dragTerm()], 'rk4', [surface]);
 
 /** A deterministic local sim: integrates held input and counts commands, so tick input can be audited. */
@@ -110,7 +112,8 @@ test('events located inside a step reach the advance report; a terminal event st
   assert.equal(sim.stopped, 'surface');
   assert.equal(seen.length, 1);
   const g = MU / (R * R), tFall = Math.sqrt(2 * 100 / g);
-  assert.ok(Math.abs(seen[0].t - tFall) < 1e-3, `hit at ${seen[0].t}, expected ${tFall}`);
+  const hit = must(seen[0], 'the surface event');
+  assert.ok(Math.abs(hit.t - tFall) < 1e-3, `hit at ${hit.t}, expected ${tFall}`);
   const x = sim.state[0];
   host.advance(1 / 60, () => ({ body: { mu: MU, radius: R } }));
   assert.equal(sim.state[0], x, 'a stopped sim steps nothing');
@@ -119,7 +122,7 @@ test('events located inside a step reach the advance report; a terminal event st
 
 test('force terms run in (order, id) order, reject duplicate ids and compose into dy = [v, Σa, ṁ]', () => {
   const log: string[] = [];
-  const t = (id: string, order: number, ax: number): ForceTerm<null> => ({ id, order, accumulate(_c, acc) { log.push(id); acc[0] += ax; } });
+  const t = (id: string, order: number, ax: number): ForceTerm<null> => ({ id, order, accumulate(_c, acc) { log.push(id); acc[0]! += ax; } });
   assert.deepEqual(orderTerms([t('b', 5, 0), t('a', 5, 0), t('g', 0, 0), t('p', 1000, 0)]).map(x => x.id), ['g', 'a', 'b', 'p']);
   assert.throws(() => orderTerms([t('a', 0, 0), t('a', 1, 0)]), /duplicate/);
   const rhs = forcesRhs([t('two', 200, 2), t('one', 0, 1)], () => null);
@@ -134,7 +137,7 @@ test('force terms run in (order, id) order, reject duplicate ids and compose int
   const s = new Float64Array([R, 0, 0, 0, 0, 0, 1000]), d = new Float64Array(7);
   burn(0, s, d);
   assert.equal(d[3], 10);
-  assert.ok(Math.abs(d[6] + 10_000 / (300 * 9.80665)) < 1e-12);
+  assert.ok(Math.abs(d[6]! + 10_000 / (300 * 9.80665)) < 1e-12); // d is the Float64Array(7) above
   s[6] = 500; burn(0, s, d);
   assert.equal(d[3], 0, 'an empty tank has no thrust');
 });
@@ -143,10 +146,10 @@ test('drag opposes the air-relative velocity and vanishes outside the atmosphere
   const rhs = forcesRhs([dragTerm<typeof params>()], () => params), d = new Float64Array(7);
   rhs(0, new Float64Array([R + 10_000, 0, 0, 0, 1000, 0, 1000]), d);
   const vAir = 1000 - body.omega * (R + 10_000);
-  assert.ok(d[4] < 0 && Math.sign(d[4]) === -Math.sign(vAir) && d[3] === 0 && d[5] === 0);
+  assert.ok(d[4]! < 0 && Math.sign(d[4]!) === -Math.sign(vAir) && d[3] === 0 && d[5] === 0); // d: Float64Array(7) above
   rhs(0, new Float64Array([R + 10_000, 0, 0, 0, 1000, 0, 1000]), d);
   const rho = body.density(10_000), expect = -0.5 * rho * Math.abs(vAir) * 2.56 / 1000 * vAir;
-  assert.ok(Math.abs(d[4] - expect) < 1e-12 * Math.abs(expect));
+  assert.ok(Math.abs(d[4]! - expect) < 1e-12 * Math.abs(expect));
   const vacuum = { ...params, body: { ...body, density: () => 0 } };
   const rhs0 = forcesRhs([dragTerm<typeof vacuum>()], () => vacuum);
   rhs0(0, new Float64Array([R + 10_000, 0, 0, 0, 1000, 0, 1000]), d);
@@ -237,7 +240,7 @@ test('force composition rejects duplicate identities separated by another order 
   const term = (id: string, order: number): ForceTerm<null> => ({
     id, order, accumulate() { evaluated++; },
   });
-  const terms = [term('repeat', -2), term('between', 0), term('repeat', 3)];
+  const terms: [ForceTerm<null>, ForceTerm<null>, ForceTerm<null>] = [term('repeat', -2), term('between', 0), term('repeat', 3)];
   for (const input of [terms, [...terms].reverse(), [terms[1], terms[2], terms[0]]]) {
     assert.throws(() => orderTerms(input), /duplicate force term 'repeat'/);
     assert.throws(() => forcesRhs(input, () => null), /duplicate force term 'repeat'/);
@@ -249,7 +252,7 @@ test('force ordering preserves caller stages and deterministic id ties without m
   const log: string[] = [];
   const term = (id: string, order: number, acceleration: number, massRate: number): ForceTerm<null> => ({
     id, order,
-    accumulate(_ctx, acc, dm) { log.push(id); acc[0] += acceleration; dm.value += massRate; },
+    accumulate(_ctx, acc, dm) { log.push(id); acc[0]! += acceleration; dm.value += massRate; }, // acc: Float64Array(3)
   });
   const early = term('early', -1.5, -4, 2);
   const alpha = term('alpha', .25, 2, -3);

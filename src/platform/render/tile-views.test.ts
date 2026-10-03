@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createTileViews} from './tile-views';
 import {createTileQueue,createTileScheduler} from './tile-scheduler';
+import {must} from '../../testing/must';
 const settle=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
 
 test('a private scene switch while covered never resumes the previously drawn scene',()=>{
@@ -23,6 +24,6 @@ test('leaving and revisiting a view owns new queues; late decodes from the old v
  }
  const first=visit();await settle();assert.equal(pending.length,0);first.views.show(['lake']);await settle();assert.equal(pending.length,1);
  first.owner.abort();const second=visit();second.views.show(['lake']);await settle();assert.equal(pending.length,2);
- pending[0].resolve(100);pending[1].resolve(200);await settle();first.queue.update();second.queue.update();
+ must(pending[0]).resolve(100);must(pending[1]).resolve(200);await settle();first.queue.update();second.queue.update();
  assert.deepEqual(disposed,[100]);assert.deepEqual(uploaded,[200]);second.owner.abort();assert.equal(scheduler.resident('globe'),0);
 });

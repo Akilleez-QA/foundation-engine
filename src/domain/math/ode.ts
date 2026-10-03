@@ -49,25 +49,26 @@ export class FixedStepper {
   }
   /** y_out = step(t, y_in, h). y_out may alias y_in. */
   step(t: number, yIn: Float64Array, h: number, yOut: Float64Array): void {
+    // Indices < n = dim (k + i < 2·half <= dim): yIn/yOut are dim-long by contract, k1..k4/tmp are allocated dim-long.
     const n = this.dim, k1 = this.k1;
     if (this.method === 'symplectic-euler') {
       this.rhs(t, yIn, k1);
       const k = this.half;
-      if (yOut !== yIn) for (let i = 0; i < n; i++) yOut[i] = yIn[i];
-      for (let i = k; i < n; i++) yOut[i] = yIn[i] + h * k1[i];      // velocities (and extras) first
-      for (let i = 0; i < k; i++) yOut[i] = yIn[i] + h * yOut[k + i]; // positions with the NEW velocity
+      if (yOut !== yIn) for (let i = 0; i < n; i++) yOut[i] = yIn[i]!;
+      for (let i = k; i < n; i++) yOut[i] = yIn[i]! + h * k1[i]!;      // velocities (and extras) first
+      for (let i = 0; i < k; i++) yOut[i] = yIn[i]! + h * yOut[k + i]!; // positions with the NEW velocity
       return;
     }
     const k2 = this.k2, k3 = this.k3, k4 = this.k4, tmp = this.tmp, hh = 0.5 * h;
     this.rhs(t, yIn, k1);
-    for (let i = 0; i < n; i++) tmp[i] = yIn[i] + hh * k1[i];
+    for (let i = 0; i < n; i++) tmp[i] = yIn[i]! + hh * k1[i]!;
     this.rhs(t + hh, tmp, k2);
-    for (let i = 0; i < n; i++) tmp[i] = yIn[i] + hh * k2[i];
+    for (let i = 0; i < n; i++) tmp[i] = yIn[i]! + hh * k2[i]!;
     this.rhs(t + hh, tmp, k3);
-    for (let i = 0; i < n; i++) tmp[i] = yIn[i] + h * k3[i];
+    for (let i = 0; i < n; i++) tmp[i] = yIn[i]! + h * k3[i]!;
     this.rhs(t + h, tmp, k4);
     const h6 = h / 6;
-    for (let i = 0; i < n; i++) yOut[i] = yIn[i] + h6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
+    for (let i = 0; i < n; i++) yOut[i] = yIn[i]! + h6 * (k1[i]! + 2 * k2[i]! + 2 * k3[i]! + k4[i]!);
   }
 }
 
@@ -128,29 +129,30 @@ export class EventWorkspace {
 export function stepWithEvents(stepper: FixedStepper, ws: EventWorkspace, t: number, y: Float64Array, h: number,
   events: readonly OdeEvent[], tolT: number, onHit?: (hit: EventHit) => void): string | null {
   if (ws.dim !== stepper.dim || ws.nEvents < events.length) throw Error('stepWithEvents: workspace does not fit');
-  if (!ws.primed) { for (let k = 0; k < events.length; k++) ws.gPrev[k] = events[k].g(t, y); ws.primed = true; }
+  // k < events.length <= nEvents = gPrev.length; `first` is one of those k (checked >= 0 before use).
+  if (!ws.primed) { for (let k = 0; k < events.length; k++) ws.gPrev[k] = events[k]!.g(t, y); ws.primed = true; }
   const yStart = ws.yStart, yTry = ws.yTry, gPrev = ws.gPrev;
   yStart.set(y);
   stepper.step(t, yStart, h, y);
   let first = -1, firstTheta = Infinity;
   for (let k = 0; k < events.length; k++) {
-    const e = events[k], g1 = e.g(t + h, y);
-    if (crosses(e, gPrev[k], g1)) {
+    const e = events[k]!, g1 = e.g(t + h, y);
+    if (crosses(e, gPrev[k]!, g1)) {
       const phi = ws.phi;
       phi.stepper = stepper; phi.t = t; phi.yStart = yStart; phi.yTry = yTry; phi.event = e;
-      const theta = illinois(phi, h, gPrev[k], g1, tolT);
+      const theta = illinois(phi, h, gPrev[k]!, g1, tolT);
       if (theta < firstTheta) { firstTheta = theta; first = k; }
     }
     gPrev[k] = g1;
   }
   if (first < 0) return null;
-  const e = events[first];
+  const e = events[first]!;
   stepper.step(t, yStart, firstTheta, yTry);
   if (onHit) onHit({ id: e.id, t: t + firstTheta, y: yTry.slice() });
   if (e.terminal) {
     y.set(yTry); ws.hitT = t + firstTheta;
     // Re-prime from the event state so a resumed run does not re-detect the same crossing.
-    for (let k = 0; k < events.length; k++) gPrev[k] = events[k].g(ws.hitT, y);
+    for (let k = 0; k < events.length; k++) gPrev[k] = events[k]!.g(ws.hitT, y);
     return e.id;
   }
   return null;
@@ -195,14 +197,20 @@ export interface AdaptiveOpts {
 }
 export interface AdaptiveRunResult extends FixedRunResult { rejected: number }
 
+/** The seven DP5 stage derivatives k1..k7 (k[0] = f(t, y) on entry to a step, FSAL). */
+type Dp5Stages = [Float64Array, Float64Array, Float64Array, Float64Array, Float64Array, Float64Array, Float64Array];
+function dp5Stages(n: number): Dp5Stages {
+  return [new Float64Array(n), new Float64Array(n), new Float64Array(n), new Float64Array(n), new Float64Array(n), new Float64Array(n), new Float64Array(n)];
+}
+
 /** Owns every buffer a DP5 run needs, so a run allocates once and each step allocates nothing. */
 class Dp5Workspace implements Phi {
-  readonly k: Float64Array[] = []; readonly kTry: Float64Array[] = [];
+  readonly k: Dp5Stages; readonly kTry: Dp5Stages;
   readonly tmp: Float64Array; readonly yNew: Float64Array; readonly yTry: Float64Array;
   // φ state for event location
   rhs!: Rhs; t = 0; y!: Float64Array; event!: OdeEvent; rtol = 0; atol = 0;
   constructor(n: number) {
-    for (let i = 0; i < 7; i++) { this.k.push(new Float64Array(n)); this.kTry.push(new Float64Array(n)); }
+    this.k = dp5Stages(n); this.kTry = dp5Stages(n);
     this.tmp = new Float64Array(n); this.yNew = new Float64Array(n); this.yTry = new Float64Array(n);
   }
   at(theta: number): number {
@@ -213,24 +221,25 @@ class Dp5Workspace implements Phi {
 }
 
 /** One DP5 step from (t, y) of size h into yOut; returns the scaled error norm. k[0] must hold f(t, y). */
-function dpStep(rhs: Rhs, t: number, y: Float64Array, h: number, k: Float64Array[], tmp: Float64Array, yOut: Float64Array, rtol: number, atol: number): number {
+function dpStep(rhs: Rhs, t: number, y: Float64Array, h: number, k: Dp5Stages, tmp: Float64Array, yOut: Float64Array, rtol: number, atol: number): number {
+  // i < n = y.length; every stage, tmp and yOut are allocated y.length long by the workspace.
   const n = y.length, k1 = k[0], k2 = k[1], k3 = k[2], k4 = k[3], k5 = k[4], k6 = k[5], k7 = k[6];
-  for (let i = 0; i < n; i++) tmp[i] = y[i] + h * A21 * k1[i];
+  for (let i = 0; i < n; i++) tmp[i] = y[i]! + h * A21 * k1[i]!;
   rhs(t + C2 * h, tmp, k2);
-  for (let i = 0; i < n; i++) tmp[i] = y[i] + h * (A31 * k1[i] + A32 * k2[i]);
+  for (let i = 0; i < n; i++) tmp[i] = y[i]! + h * (A31 * k1[i]! + A32 * k2[i]!);
   rhs(t + C3 * h, tmp, k3);
-  for (let i = 0; i < n; i++) tmp[i] = y[i] + h * (A41 * k1[i] + A42 * k2[i] + A43 * k3[i]);
+  for (let i = 0; i < n; i++) tmp[i] = y[i]! + h * (A41 * k1[i]! + A42 * k2[i]! + A43 * k3[i]!);
   rhs(t + C4 * h, tmp, k4);
-  for (let i = 0; i < n; i++) tmp[i] = y[i] + h * (A51 * k1[i] + A52 * k2[i] + A53 * k3[i] + A54 * k4[i]);
+  for (let i = 0; i < n; i++) tmp[i] = y[i]! + h * (A51 * k1[i]! + A52 * k2[i]! + A53 * k3[i]! + A54 * k4[i]!);
   rhs(t + C5 * h, tmp, k5);
-  for (let i = 0; i < n; i++) tmp[i] = y[i] + h * (A61 * k1[i] + A62 * k2[i] + A63 * k3[i] + A64 * k4[i] + A65 * k5[i]);
+  for (let i = 0; i < n; i++) tmp[i] = y[i]! + h * (A61 * k1[i]! + A62 * k2[i]! + A63 * k3[i]! + A64 * k4[i]! + A65 * k5[i]!);
   rhs(t + h, tmp, k6);
-  for (let i = 0; i < n; i++) yOut[i] = y[i] + h * (A71 * k1[i] + A73 * k3[i] + A74 * k4[i] + A75 * k5[i] + A76 * k6[i]);
+  for (let i = 0; i < n; i++) yOut[i] = y[i]! + h * (A71 * k1[i]! + A73 * k3[i]! + A74 * k4[i]! + A75 * k5[i]! + A76 * k6[i]!);
   rhs(t + h, yOut, k7);
   let err = 0;
   for (let i = 0; i < n; i++) {
-    const e = h * (E1 * k1[i] + E3 * k3[i] + E4 * k4[i] + E5 * k5[i] + E6 * k6[i] + E7 * k7[i]);
-    const sc = atol + rtol * Math.max(Math.abs(y[i]), Math.abs(yOut[i]));
+    const e = h * (E1 * k1[i]! + E3 * k3[i]! + E4 * k4[i]! + E5 * k5[i]! + E6 * k6[i]! + E7 * k7[i]!);
+    const sc = atol + rtol * Math.max(Math.abs(y[i]!), Math.abs(yOut[i]!));
     err += (e / sc) * (e / sc);
   }
   return Math.sqrt(err / n);
@@ -250,8 +259,9 @@ export function integrateAdaptive(rhs: Rhs, t0: number, y: Float64Array, t1: num
   const SAFETY = 0.9, MINF = 0.2, MAXF = 10, BETA = 0.2 / 5, ALPHA = 1 / 5 - 0.75 * BETA;
   let t = t0, h = Math.min(hMax, opts.hInit ?? Math.max(1e-6, Math.abs(t1 - t0) * 1e-3));
   let lastNorm = 1e-4, steps = 0, rejected = 0, justRejected = false;
+  // j < events.length = gPrev.length; `first` is one of those j (checked >= 0 before use).
   const hits: EventHit[] = [], gPrev = new Float64Array(events.length);
-  for (let j = 0; j < events.length; j++) gPrev[j] = events[j].g(t0, y);
+  for (let j = 0; j < events.length; j++) gPrev[j] = events[j]!.g(t0, y);
   rhs(t, y, k[0]);
   const maxSteps = opts.maxSteps ?? 1_000_000;
   while (t < t1) {
@@ -267,16 +277,16 @@ export function integrateAdaptive(rhs: Rhs, t0: number, y: Float64Array, t1: num
     }
     let first = -1, firstTheta = Infinity;
     for (let j = 0; j < events.length; j++) {
-      const e = events[j], g1 = e.g(t + h, yNew);
-      if (crosses(e, gPrev[j], g1)) {
+      const e = events[j]!, g1 = e.g(t + h, yNew);
+      if (crosses(e, gPrev[j]!, g1)) {
         ws.t = t; ws.event = e;
-        const theta = illinois(ws, h, gPrev[j], g1, 1e-9 * Math.max(1, h));
+        const theta = illinois(ws, h, gPrev[j]!, g1, 1e-9 * Math.max(1, h));
         if (theta < firstTheta) { firstTheta = theta; first = j; }
       }
       gPrev[j] = g1;
     }
     if (first >= 0) {
-      const e = events[first];
+      const e = events[first]!;
       ws.kTry[0].set(k[0]);
       dpStep(rhs, t, y, firstTheta, ws.kTry, tmp, yTry, rtol, atol);
       hits.push({ id: e.id, t: t + firstTheta, y: yTry.slice() });

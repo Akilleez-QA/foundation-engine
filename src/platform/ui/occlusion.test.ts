@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { measureUiOcclusion, UI_OCCLUSION_LIMITS, type OcclusionRect } from './occlusion';
+import {must} from '../../testing/must';
 
 const rect = (x: number, y: number, width: number, height: number): OcclusionRect => ({ x, y, width, height });
 const viewport = rect(0, 0, 100, 100);
@@ -41,7 +42,7 @@ test('caller-supplied transparent hit blockers count fully and inputs stay uncha
   const inputs = Object.freeze([blocker]);
   const report = measureUiOcclusion(Object.freeze(viewport), inputs, Object.freeze([viewport]));
   assert.equal(report.occupiedArea, 2000);
-  assert.equal(report.criticalRegions[0].occupiedArea, 2000);
+  assert.equal(must(report.criticalRegions[0]).occupiedArea, 2000);
   assert.equal(blocker.opacity, 0);
   assert.ok(Object.isFrozen(report));
   assert.ok(Object.isFrozen(report.criticalRegions));

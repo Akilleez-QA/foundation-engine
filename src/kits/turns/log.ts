@@ -199,7 +199,7 @@ function openTurnLog<S extends DocumentValue, C extends DocumentValue>(
   const replayTo = (k: number): Captured | { reason: string } => {
     let state = initial;
     for (let i = 0; i < k; i++) {
-      const next = step(state, commands[i], base + i);
+      const next = step(state, commands[i]!, base + i); // callers pass k <= commands.length (cursor or a checked k)
       if ('reason' in next) return { reason: `command ${base + i}: ${next.reason}` };
       state = next;
     }
@@ -282,7 +282,7 @@ function openTurnLog<S extends DocumentValue, C extends DocumentValue>(
       const blocked = guard(true, expectedRevision); if (blocked) return blocked;
       if (cursor >= commands.length) return { status: 'empty' };
       return guarded((): TurnMoveResult<S> => {
-        const next = step(head, commands[cursor], base + cursor);
+        const next = step(head, commands[cursor]!, base + cursor); // cursor < commands.length (checked above)
         if ('reason' in next) return { status: 'diverged', reason: next.reason };
         if (retired) return { status: 'retired' };
         bump(); cursor++; head = next;

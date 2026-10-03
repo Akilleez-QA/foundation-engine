@@ -71,27 +71,30 @@ export function synthCue(cue: CueDef, rate: number, variant = 0): Float32Array<A
     if ('tone' in step) {
       const { at, duration, hz, end = hz, gain = .1 } = step.tone;
       let phase = 0;
+      // j < out.length (checked before each write).
       for (let i = 0; i < duration * rate; i++) {
         const j = Math.floor(at * rate) + i; if (j >= out.length) break;
         const t = i / rate, u = t / duration;
         phase += 2 * Math.PI * (hz + (end - hz) * u) / rate;
         const env = Math.min(1, t / .01) * Math.min(1, (duration - t) / .03);
-        out[j] += gain * Math.max(0, env) * Math.sin(phase);
+        out[j]! += gain * Math.max(0, env) * Math.sin(phase);
       }
     } else {
       const { at, duration, cutoff, gain } = step.air;
       let low = 0; const a = 1 - Math.exp(-2 * Math.PI * cutoff / rate);
+      // j < out.length (checked before each write).
       for (let i = 0; i < duration * rate; i++) {
         const j = Math.floor(at * rate) + i; if (j >= out.length) break;
         low += a * (random() - low);
         const t = i / rate, env = Math.min(1, t / .005) * Math.exp(-3 * t / duration);
-        out[j] += gain * env * low;
+        out[j]! += gain * env * low;
       }
     }
   }
   // Every buffer starts and ends at silence (no clicks).
   const edge = Math.min(Math.floor(rate * .004), Math.floor(out.length / 2));
-  for (let i = 0; i < edge; i++) { out[i] *= i / edge; out[out.length - 1 - i] *= i / edge; }
+  // i < edge <= out.length / 2: both ends in range.
+  for (let i = 0; i < edge; i++) { out[i]! *= i / edge; out[out.length - 1 - i]! *= i / edge; }
   return out;
 }
 
@@ -267,7 +270,8 @@ export function audibleGain(spatial: SpatialCue, listener: AudioVector): number 
 
 /** Arrays and typed arrays of three finite numbers are accepted (as before); the output keeps its own copy. */
 const vector = (p: ArrayLike<number>) => { if (!p || p.length !== 3 || ![0, 1, 2].every(i => Number.isFinite(p[i]))) throw Error('invalid audio position'); };
-const copy = (p: ArrayLike<number>): AudioVector => [p[0], p[1], p[2]];
+// p is an audio position of length 3 (callers validate with vector()).
+const copy = (p: ArrayLike<number>): AudioVector => [p[0]!, p[1]!, p[2]!];
 const within = (n: number | undefined, min: number, max: number) => n === undefined || (typeof n === 'number' && n >= min && n <= max);
 function validateSpatial(p: SpatialCue): void {
   vector(p.position);
@@ -425,7 +429,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
     const values=[...listener.position,...listener.forward,...listener.up],last=listenerWritten;
     if(last&&values.every((v,i)=>v===last[i]))return;
     const tau=last?smoothing:0;listenerWritten=values;
-    if(l.positionX){const params=[l.positionX,l.positionY,l.positionZ,l.forwardX,l.forwardY,l.forwardZ,l.upX,l.upY,l.upZ];params.forEach((p,i)=>{if(!last||last[i]!==values[i])write(p,values[i],tau);});}
+    if(l.positionX){const params=[l.positionX,l.positionY,l.positionZ,l.forwardX,l.forwardY,l.forwardZ,l.upX,l.upY,l.upZ];params.forEach((p,i)=>{if(!last||last[i]!==values[i])write(p,values[i]!,tau);/* values has the same 9 entries as params */});}
     else {l.setPosition(...listener.position);l.setOrientation(...listener.forward,...listener.up);}
   };
   const listenerPosition = (): AudioVector => listener?.position ?? [0, 0, 0];
@@ -489,7 +493,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
       const checkCutoff=()=>{if(!gate||!spatial||!target)return;const next=!beyond(spatial,target);if(next===inRange)return;inRange=next;
         slot.silentSince=next?null:c.currentTime;write(gate.gain,next?1:0,CUTOFF_TIME_CONSTANT);};
       const position=(value:AudioVector)=>{vector(value);if(!panner)return;const p=copy(value),last=target,tau=last?positionTau:0;target=p;
-        if(panner.positionX){const params=[panner.positionX,panner.positionY,panner.positionZ];for(let i=0;i<3;i++)if(!last||last[i]!==p[i])write(params[i],p[i],tau);}
+        if(panner.positionX){const params=[panner.positionX,panner.positionY,panner.positionZ];for(let i=0;i<3;i++)if(!last||last[i]!==p[i])write(params[i]!,p[i]!,tau);/* i < 3 */}
         else if(!last||p.some((v,i)=>v!==last[i]))panner.setPosition(...p);checkCutoff();};
       let panning:PanningModel|null=null;
       const slot={silentSince:null as number|null,downgrade(){if(!panner||panning!=='HRTF')return;panner.panningModel=panning='equalpower';hrtf.delete(slot);stats.downgraded++;}};
@@ -524,8 +528,9 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
       level.gain.value = options.gain ?? 1;
       source.buffer = buffer; if (options.rate !== undefined && options.rate !== 1) source.playbackRate.value = options.rate;
       source.connect(level);
-      for (let i = 1; i < stages.length; i++) stages[i - 1].connect(stages[i]);
-      stages[stages.length - 1].connect(master_); source.onended = finish;
+      // stages always holds level (non-empty); i < stages.length.
+      for (let i = 1; i < stages.length; i++) stages[i - 1]!.connect(stages[i]!);
+      stages[stages.length - 1]!.connect(master_); source.onended = finish;
       voices.add(voice); if (panning === 'HRTF') hrtf.add(slot); if (gate) cutoffChecks.add(checkCutoff);
       try { if (options.at !== undefined && options.at > c.currentTime) source.start(options.at); else source.start(); } catch (error) { finish(); throw error; }
       stats.played++; return voice;
@@ -584,7 +589,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
     setListener(position,forward,up){vector(position);vector(forward);vector(up);
       const fn=Math.hypot(forward[0],forward[1],forward[2]),un=Math.hypot(up[0],up[1],up[2]);if(!Number.isFinite(fn)||!Number.isFinite(un)||fn===0||un===0)throw Error('invalid audio orientation');
       const f:AudioVector=[forward[0]/fn,forward[1]/fn,forward[2]/fn],u:AudioVector=[up[0]/un,up[1]/un,up[2]/un];
-      if(Math.abs(f.reduce((sum,x,i)=>sum+x*u[i],0))>0.999)throw Error('parallel audio orientation');
+      if(Math.abs(f[0]*u[0]+f[1]*u[1]+f[2]*u[2])>0.999)throw Error('parallel audio orientation');
       listener={position:copy(position),forward:f,up:u};applyListener();
       for(const check of [...cutoffChecks])check();
     },

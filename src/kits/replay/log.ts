@@ -224,19 +224,21 @@ export function openReplay(text: string, limits: OpenLimits, expect: ReplayExpec
   if (h.step !== expect.step) return incompatible('step', expect.step, h.step);
   if (expect.seed !== undefined && expect.seed !== null && h.seed !== expect.seed) return incompatible('seed', expect.seed, h.seed);
   let cursor = 0;
+  // starts, values and data.runs are parallel (one entry per run); a tick below data.ticks means there is at least one
+  // run, and cursor, lo, mid and hi stay run indices.
   const runAt = (tick: number): number => {
     if (!counter(tick) || tick >= data.ticks) return -1;
-    const fits = (i: number) => tick >= starts[i] && tick < starts[i] + data.runs[i][0];
+    const fits = (i: number) => tick >= starts[i]! && tick < starts[i]! + data.runs[i]![0];
     if (fits(cursor)) return cursor;
     if (cursor + 1 < starts.length && fits(cursor + 1)) return ++cursor;
     let lo = 0, hi = starts.length - 1;
-    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts[mid] <= tick) lo = mid; else hi = mid - 1; }
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts[mid]! <= tick) lo = mid; else hi = mid - 1; }
     return cursor = lo;
   };
   const player: ReplayPlayer = Object.freeze({
     header: h, ticks: data.ticks, truncatedAt: data.truncatedAt, digests: data.digests,
     input(tick: number) { const i = runAt(tick); return i < 0 ? undefined : values[i]; },
-    json(tick: number) { const i = runAt(tick); return i < 0 ? undefined : data.runs[i][1]; },
+    json(tick: number) { const i = runAt(tick); return i < 0 ? undefined : data.runs[i]![1]; },
   });
   return Object.freeze({ status: 'ready', player });
 }

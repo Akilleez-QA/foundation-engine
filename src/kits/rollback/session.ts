@@ -38,6 +38,7 @@ export function createRollbackSession(options: RollbackOptions): RollbackSession
   let current = 0, rollbackFrom: number | null = null, recordedThrough = -1;
   let desync: RollbackDesync | null = null;
   let confirmed: { frame: number; state: string; checksum?: number } | null = null;
+  // Per-player arrays have length `players`; every index into them is `local`, a range-checked remote player or p < players.
   const lastConfirmed = new Array<number>(players).fill(D - 1);
   const lastInput = new Array<string>(players).fill(neutral);
   const inputs = Array.from({ length: players }, () => new Map<number, string>());
@@ -72,18 +73,18 @@ export function createRollbackSession(options: RollbackOptions): RollbackSession
   };
   const inputFor = (player: number, frame: number): string => {
     if (frame < D) return neutral;
-    if (frame <= lastConfirmed[player]) return inputs[player].get(frame)!;
-    return lastInput[player];
+    if (frame <= lastConfirmed[player]!) return inputs[player]!.get(frame)!;
+    return lastInput[player]!;
   };
   const gather = (frame: number) => {
     const out = new Array<string>(players);
     let predicted = false;
-    for (let p = 0; p < players; p++) { out[p] = inputFor(p, frame); if (frame > lastConfirmed[p]) predicted = true; }
+    for (let p = 0; p < players; p++) { out[p] = inputFor(p, frame); if (frame > lastConfirmed[p]!) predicted = true; }
     return { inputs: Object.freeze(out), predicted };
   };
   const confirmedFrame = () => {
     let min = Infinity;
-    for (let p = 0; p < players; p++) if (lastConfirmed[p] < min) min = lastConfirmed[p];
+    for (let p = 0; p < players; p++) if (lastConfirmed[p]! < min) min = lastConfirmed[p]!;
     return min;
   };
   const saveState = (): string | RollbackRefusal => {
@@ -134,7 +135,7 @@ export function createRollbackSession(options: RollbackOptions): RollbackSession
   const session: RollbackSession = {
     local(input: string): RollbackLocalResult {
       if (status !== 'running' || busy) return refusal();
-      const frame = lastConfirmed[local] + 1;
+      const frame = lastConfirmed[local]! + 1;
       if (frame > current + D) return Object.freeze({ status: 'full' as const, frame });
       busy = true;
       try {
@@ -142,7 +143,7 @@ export function createRollbackSession(options: RollbackOptions): RollbackSession
         try { admitted = admit(input); } catch { return fail('validate-failed'); }
         if (status !== 'running') return refusal();
         if (admitted === undefined) return Object.freeze({ status: 'invalid' as const, frame });
-        inputs[local].set(frame, admitted); lastConfirmed[local] = frame; lastInput[local] = admitted;
+        inputs[local]!.set(frame, admitted); lastConfirmed[local] = frame; lastInput[local] = admitted;
         return Object.freeze({ status: 'queued' as const, frame, input: admitted });
       } finally { busy = false; }
     },
@@ -151,13 +152,13 @@ export function createRollbackSession(options: RollbackOptions): RollbackSession
       if (status !== 'running' || busy) return refusal();
       if (!Number.isSafeInteger(player) || player < 0 || player >= players || player === local) return fail('remote-player');
       if (!frameNumber(frame) || frame < D) return fail('remote-frame');
-      if (frame <= lastConfirmed[player]) {
-        const stored = inputs[player].get(frame);
+      if (frame <= lastConfirmed[player]!) {
+        const stored = inputs[player]!.get(frame);
         // Pruned history cannot be re-verified; an equal resend is idempotent, a different one is a protocol fault.
         if (stored === undefined || stored === input) return Object.freeze({ status: 'duplicate' as const, rollbackFrom: null });
         return fail('remote-conflict');
       }
-      if (frame !== lastConfirmed[player] + 1) return fail('remote-gap');
+      if (frame !== lastConfirmed[player]! + 1) return fail('remote-gap');
       if (frame > current + maxLead) return fail('remote-lead');
       busy = true;
       try {
@@ -165,7 +166,7 @@ export function createRollbackSession(options: RollbackOptions): RollbackSession
         try { admitted = admit(input); } catch { return fail('validate-failed'); }
         if (status !== 'running') return refusal();
         if (admitted === undefined) return fail('remote-input-invalid');
-        inputs[player].set(frame, admitted); lastConfirmed[player] = frame; lastInput[player] = admitted;
+        inputs[player]!.set(frame, admitted); lastConfirmed[player] = frame; lastInput[player] = admitted;
         let from: number | null = null;
         if (frame < current && used.get(frame)?.[player] !== admitted) {
           from = frame;
@@ -222,7 +223,7 @@ export function createRollbackSession(options: RollbackOptions): RollbackSession
         }
         rollbackFrom = null;
         const frame = current;
-        if (lastConfirmed[local] < current) {
+        if (lastConfirmed[local]! < current) {
           const recorded = record();
           if ('status' in recorded) return recorded;
           return Object.freeze({ status: 'needs-local-input' as const, frame, resimulated, checksums: recorded.checksums });
@@ -232,7 +233,7 @@ export function createRollbackSession(options: RollbackOptions): RollbackSession
           const recorded = record();
           if ('status' in recorded) return recorded;
           const waitingFor: number[] = [];
-          for (let p = 0; p < players; p++) if (lastConfirmed[p] + 1 + P <= current) waitingFor.push(p);
+          for (let p = 0; p < players; p++) if (lastConfirmed[p]! + 1 + P <= current) waitingFor.push(p);
           return Object.freeze({ status: 'stalled' as const, frame, resimulated, waitingFor: Object.freeze(waitingFor), checksums: recorded.checksums });
         }
         const text = saveState();

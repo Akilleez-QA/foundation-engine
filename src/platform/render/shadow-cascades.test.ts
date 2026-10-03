@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as T from 'three';
 import {CASCADE_MAP_SIZE,cascadeShadows,directionalBlock,installCascadeChunks} from './shadow-cascades';
 import {scheduleShadows,type ShadowTechnique} from './shadows';
+import {must} from '../../testing/must';
 
 type Knob='ultra'|'high'|'medium'|'low'|'off';
 const ORIGINAL_LIGHTS=T.ShaderChunk.lights_fragment_begin,ORIGINAL_PARS=T.ShaderChunk.shadowmap_pars_fragment;
@@ -52,7 +53,7 @@ test('on a Reference renderer at ultra, three 4096² cascades stand in for the s
   // Every cascade shines the sun's way.
   const d=l.target.position.clone().sub(l.position).normalize(),s=sun.target.position.clone().sub(sun.position).normalize();assert.ok(d.dot(s)>.99999);
  }
- const widths=rig.lights.map(l=>l.shadow.camera.right-l.shadow.camera.left);assert.ok(widths[0]<widths[1]&&widths[1]<widths[2],'finer near the camera');
+ const widths=rig.lights.map(l=>l.shadow.camera.right-l.shadow.camera.left);assert.ok(must(widths[0])<must(widths[1])&&must(widths[1])<must(widths[2]),'finer near the camera');
 });
 
 test('a still view redraws nothing; a small drift redraws nothing; a caster redraws every cascade',()=>{

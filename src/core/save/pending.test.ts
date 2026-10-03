@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createSaveStore,type Timers} from './store';
 import {MemoryBackend} from './storage-port';
 import type {SaveSection} from './section';
+import { must } from '../../testing/must';
 
 function setup(){
  const disk=new MemoryBackend(),tasks=new Map<number,()=>void>();let id=0;
@@ -77,7 +78,7 @@ test('disposal saves dirty bytes once and is safe inside a notification or batch
   handle.subscribe(() => { laterNotifications++; handle.get(); });
   store.batch(() => handle.replace(7, { now: true }));
   assert.equal(disk.writes, 1);
-  assert.equal(JSON.parse([...disk.data.values()][0]).data, 7);
+  assert.equal(JSON.parse(must([...disk.data.values()][0], 'the written record')).data, 7);
   assert.equal(tasks.size, 0);
   assert.equal(laterNotifications, 0);
   store.dispose();

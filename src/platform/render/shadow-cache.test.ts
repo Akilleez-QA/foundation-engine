@@ -58,7 +58,7 @@ test('the cache invalidates when a static caster moves, and the first presented 
   ['side',()=>{(wall.material as T.Material).side=T.DoubleSide;}],
   ['displacement',()=>{(wall.material as T.MeshStandardMaterial).displacementScale=2;}],
   ['clipping',()=>{(wall.material as T.Material).clippingPlanes=[new T.Plane(new T.Vector3(0,1,0),0)];}],
-  ['geometry edited',()=>{wall.geometry.attributes.position.needsUpdate=true;}],
+  ['geometry edited',()=>{wall.geometry.getAttribute('position').needsUpdate=true;}],
   ['caster stops casting',()=>{wall.castShadow=false;}],
   ['caster casts again',()=>{wall.castShadow=true;}],
   ['demoted',()=>{cache.demote(wall);}],
@@ -79,7 +79,7 @@ test('the cache invalidates when a static caster moves, and the first presented 
 test('movers are never cached: undeclared, skinned, morphed, batched, hooked and custom-depth casters stay moving',()=>{
  const {scene,light,wall,cache,layer}=stage();
  const skinned=new T.SkinnedMesh(new T.BoxGeometry(),new T.MeshStandardMaterial());const bone=new T.Bone();skinned.add(bone);scene.add(skinned);scene.updateMatrixWorld(true);skinned.bind(new T.Skeleton([bone]));
- const morphed=new T.Mesh(new T.BoxGeometry(),new T.MeshStandardMaterial());morphed.geometry.morphAttributes.position=[morphed.geometry.attributes.position.clone()];morphed.updateMorphTargets();
+ const morphed=new T.Mesh(new T.BoxGeometry(),new T.MeshStandardMaterial());morphed.geometry.morphAttributes.position=[morphed.geometry.getAttribute('position').clone()];morphed.updateMorphTargets();
  const batch=new T.BatchedMesh(2,100,300,new T.MeshStandardMaterial());batch.addInstance(batch.addGeometry(new T.BoxGeometry()));
  const hooked=new T.Mesh(new T.BoxGeometry(),new T.MeshStandardMaterial());hooked.onBeforeShadow=()=>{};
  const custom=new T.Mesh(new T.BoxGeometry(),new T.MeshStandardMaterial());custom.customDepthMaterial=new T.MeshDepthMaterial();

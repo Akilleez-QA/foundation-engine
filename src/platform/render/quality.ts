@@ -258,7 +258,7 @@ export function pixelRatio(dpr: number, knobs: { maxPixelRatio: number; scale: n
 export function textureVariant(maxSize: number, variants: readonly number[], onScreenPx = Infinity): number {
   if (!variants.length) throw new Error('textureVariant needs at least one variant');
   const sorted = [...variants].sort((a, b) => a - b), allowed = sorted.filter(v => v <= maxSize), want = Math.min(maxSize, onScreenPx * 2);
-  return allowed.find(v => v >= want) ?? allowed[allowed.length - 1] ?? sorted[0];
+  return allowed.find(v => v >= want) ?? allowed[allowed.length - 1] ?? sorted[0]!; // sorted is non-empty (checked above)
 }
 
 // ------------------------------------------------------------------------------------------------ the governor
@@ -288,7 +288,7 @@ export class ResolutionGovernor {
     if (!s.rendered || s.hidden || s.sinceEnterMs < this.o.warmupMs || !(s.intervalMs > 0 && s.intervalMs < 250)) return null;
     this.window.push(s.intervalMs);
     if (this.window.length < this.o.frames) return null;
-    const sorted = this.window.sort((a, b) => a - b), p75 = sorted[Math.floor(sorted.length * 0.75)];
+    const sorted = this.window.sort((a, b) => a - b), p75 = sorted[Math.floor(sorted.length * 0.75)]!; // non-empty window; floor(0.75 n) < n
     this.window = [];
     if (p75 > this.budgetMs * this.o.slowFactor) {
       this.fast = 0;
@@ -452,7 +452,7 @@ export function createQuality(options: QualityOptions = {}): Quality {
     knobs: () => registry.list(),
     stats() {
       if (!intervals.length) return { p50Ms: 0, p95Ms: 0, fps: 0, draws: lastDraws, triangles: lastTriangles };
-      const s = [...intervals].sort((a, b) => a - b), at = (f: number) => s[Math.min(s.length - 1, Math.floor(s.length * f))];
+      const s = [...intervals].sort((a, b) => a - b), at = (f: number) => s[Math.min(s.length - 1, Math.floor(s.length * f))]!; // s is non-empty; index clamped below s.length
       const mean = s.reduce((a, b) => a + b, 0) / s.length;
       return { p50Ms: at(0.5), p95Ms: at(0.95), fps: mean > 0 ? 1000 / mean : 0, draws: lastDraws, triangles: lastTriangles };
     },

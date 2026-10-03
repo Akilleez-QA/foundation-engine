@@ -11,8 +11,10 @@ export interface PoseLinkPresentation {
   sourcePoseInput?:ModelPoseLinkData;sourceAttachmentInput?:unknown;sourceModel?:ModelData;targetModel?:ModelData;resolution?:{source:PoseLinkSlot;result:ModelRigResolution};sourceSlot?:PoseLinkSlot;pairs?:readonly {source:T.Object3D;target:T.Object3D}[];touched?:readonly T.Object3D[];
 }
 export interface PoseLinkSlot extends AttachmentSlot {instance?:T.Object3D;rig?:ModelRigCapture;poseLink?:PoseLinkPresentation}
+/** A node's local position (3), quaternion (4) and scale (3). */
+type Pose=[number,number,number,number,number,number,number,number,number,number];
 const state=(status:ModelPoseLinkState['status'],reason:ModelPoseLinkState['reason']=null):ModelPoseLinkState=>Object.freeze({status,reason});
-const same=(a:ModelPoseLinkData|undefined,b:ModelPoseLinkData)=>!!a&&a.source===b.source&&a.inheritVisibility===b.inheritVisibility&&a.nodes.length===b.nodes.length&&a.nodes.every((v,i)=>v.source===b.nodes[i].source&&v.target===b.nodes[i].target);
+const same=(a:ModelPoseLinkData|undefined,b:ModelPoseLinkData)=>!!a&&a.source===b.source&&a.inheritVisibility===b.inheritVisibility&&a.nodes.length===b.nodes.length&&a.nodes.every((v,i)=>{const w=b.nodes[i]!;return v.source===w.source&&v.target===w.target;}); // i < a.nodes.length = b.nodes.length
 const usable=(world:World,entity:Entity,slot:PoseLinkSlot|undefined)=>!!slot?.ready&&world.has(entity,Transform)&&world.get(entity,Model)?.asset===slot.asset;
 function restore(slot:PoseLinkSlot):boolean {
   const meta=slot.poseLink;let changed=false;
@@ -94,14 +96,14 @@ export function poseLinkHooks(world:World,slots:ReadonlyMap<Entity,PoseLinkSlot>
         meta.pairs=resolved.pairs;meta.sourceSlot=source;meta.touched=resolved.pairs.map(pair=>pair.target);
       }
       // Stage every scalar before touching a target. Finite local values alone do not imply finite matrices.
-      const poses=meta.pairs.map(({source:node})=>[node.position.x,node.position.y,node.position.z,node.quaternion.x,node.quaternion.y,node.quaternion.z,node.quaternion.w,node.scale.x,node.scale.y,node.scale.z]);
+      const poses=meta.pairs.map(({source:node}):Pose=>[node.position.x,node.position.y,node.position.z,node.quaternion.x,node.quaternion.y,node.quaternion.z,node.quaternion.w,node.scale.x,node.scale.y,node.scale.z]);
       const matrix=source!.root!.matrixWorld.clone(),container=slot.root!.parent;
       if(container){const determinant=container.matrixWorld.determinant();if(!Number.isFinite(determinant)||determinant===0){refuse(entity,'incompatible','nonfinite');return changed;}matrix.premultiply(container.matrixWorld.clone().invert());}
       if(!matrix.elements.every(Number.isFinite)||poses.some(p=>!p.every(Number.isFinite))){refuse(entity,'incompatible','nonfinite');return changed;}
       if(!valid())return changed;
       let poseChanged=false;
       for(let i=0;i<meta.pairs.length;i++){
-        const node=meta.pairs[i].target,p=poses[i];
+        const node=meta.pairs[i]!.target,p=poses[i]!; // i < meta.pairs.length = poses.length
         if(node.position.x!==p[0]||node.position.y!==p[1]||node.position.z!==p[2]||node.quaternion.x!==p[3]||node.quaternion.y!==p[4]||node.quaternion.z!==p[5]||node.quaternion.w!==p[6]||node.scale.x!==p[7]||node.scale.y!==p[8]||node.scale.z!==p[9]){node.position.set(p[0],p[1],p[2]);node.quaternion.set(p[3],p[4],p[5],p[6]);node.scale.set(p[7],p[8],p[9]);poseChanged=true;}
       }
       const root=slot.root!;root.matrixAutoUpdate=false;
@@ -130,7 +132,7 @@ export function poseLinkHooks(world:World,slots:ReadonlyMap<Entity,PoseLinkSlot>
           ||(has(parent)&&source?.poseLink?.state.status!=='ready')
           ||(world.has(parent,ModelAttachment)&&(source?.attachment?.input!==world.get(parent,ModelAttachment)||source?.attachment?.state?.status!=='ready')))enqueue(entity);
       }
-      for(let i=0;i<revoked.length;i++){refuse(revoked[i],'blocked');for(const child of dependents.get(revoked[i])??[])enqueue(child);}
+      for(const entity of revoked){refuse(entity,'blocked');for(const child of dependents.get(entity)??[])enqueue(child);} // also visits entities enqueued meanwhile
       return changed;
     },
   };

@@ -6,6 +6,7 @@ import { createSystemRunner } from '../../core/ecs/systems';
 import { createPressLatch } from '../../author/press-latch';
 import { InputActions, inputActionRegistry, type KeyEventLike } from '../../platform/input/actions';
 import { jumpSystem, jumpStateCount, resetJump } from './jump-system';
+import { must } from '../../testing/must';
 
 const config = { height: 2, timeToApex: 0.4, coyoteTime: 0.1, bufferTime: 0.1 };
 /** Floor at 0 everywhere; a one-way ledge at 1.5 for 2 <= x <= 4. */
@@ -156,20 +157,20 @@ test('MV-01: presses on adjacent ticks are two presses; the adapter adds no filt
 test('MV-01: hold buttons report held through the real action layer; plain buttons stay press-only', () => {
   const jump = defineInput({ id: 'jump', label: 'Jump', keys: ['Space'], pad: ['a'], hold: true });
   const plain = defineInput({ id: 'use', label: 'Use', keys: ['e'], pad: ['x'] });
-  assert.equal(actionRows(jump)[0].kind, 'hold'); assert.equal(actionRows(plain)[0].kind, 'press');
+  assert.equal(must(actionRows(jump)[0]).kind, 'hold'); assert.equal(must(actionRows(plain)[0]).kind, 'press');
   assert.throws(() => defineInput({ id: 'bad', label: 'Bad', keys: ['b'], pad: ['b'], hold: 'yes' as unknown as boolean }));
   const layers = { fromTop: () => [], escape: () => false, cycleFocus: () => false, onChange: () => () => {} };
   const actions = new InputActions({ registry: inputActionRegistry([...actionRows(jump), ...actionRows(plain)]), layers, now: () => 0 });
   const phases: string[] = [];
-  actions.onAction(actionRows(jump)[0].id, e => { phases.push(e.phase); return true; });
-  actions.onAction(actionRows(plain)[0].id, () => true);
+  actions.onAction(must(actionRows(jump)[0]).id, e => { phases.push(e.phase); return true; });
+  actions.onAction(must(actionRows(plain)[0]).id, () => true);
   const key = (k: string, code: string, repeat = false): KeyEventLike => ({ key: k, code, repeat, target: null, preventDefault() {}, stopPropagation() {} });
   actions.keyDown(key(' ', 'Space')); actions.keyDown(key(' ', 'Space', true));
-  assert.equal(actions.held(actionRows(jump)[0].id), true);
-  actions.keyDown(key('e', 'KeyE')); assert.equal(actions.held(actionRows(plain)[0].id), false);
+  assert.equal(actions.held(must(actionRows(jump)[0]).id), true);
+  actions.keyDown(key('e', 'KeyE')); assert.equal(actions.held(must(actionRows(plain)[0]).id), false);
   actions.keyUp(key(' ', 'Space'));
-  assert.equal(actions.held(actionRows(jump)[0].id), false);
+  assert.equal(actions.held(must(actionRows(jump)[0]).id), false);
   assert.deepEqual(phases, ['press', 'release'], 'one press edge, no repeat presses, one release');
   actions.keyDown(key(' ', 'Space')); actions.cancel('overlay');
-  assert.equal(actions.held(actionRows(jump)[0].id), false, 'cancellation releases a held button');
+  assert.equal(actions.held(must(actionRows(jump)[0]).id), false, 'cancellation releases a held button');
 });

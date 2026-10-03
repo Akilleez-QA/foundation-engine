@@ -62,9 +62,10 @@ function allocatePool(capacity: number): ParticlePool {
 const toLinear = (c: number) => c <= .04045 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4);
 /** A curve of 1…8 evenly spaced keys at t in [0, 1]. */
 function curve(keys: ArrayLike<number>, n: number, t: number, stride = 1, at = 0): number {
-  if (n <= 1) return keys[at];
+  // Hot path: callers pass n keys of `stride` values each (n ≥ 1), t in [0, 1], so every index is in range.
+  if (n <= 1) return keys[at]!;
   const x = t * (n - 1), i = x >= n - 1 ? n - 2 : Math.floor(x), f = x - i;
-  const a = keys[i * stride + at], b = keys[(i + 1) * stride + at];
+  const a = keys[i * stride + at]!, b = keys[(i + 1) * stride + at]!;
   return a + (b - a) * f;
 }
 /** Is spawn index k drawn at `scale`? Deterministic, preset-independent subset. */
@@ -161,28 +162,29 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
     const p = slot.pool;
     if (!slot.hasPos) { slot.ex = x; slot.ey = y; slot.ez = z; slot.hasPos = true; }
     const n = d.color.length;
+    // Hot path: i < n = d.color.length ≤ 8 keys (linear holds 8 × 3); pool indices below stay under p.live ≤ capacity.
     for (let i = 0; i < n; i++) {
-      const c = d.color[i];
+      const c = d.color[i]!;
       slot.linear[i * 3] = toLinear(((c >> 16) & 255) / 255); slot.linear[i * 3 + 1] = toLinear(((c >> 8) & 255) / 255); slot.linear[i * 3 + 2] = toLinear((c & 255) / 255);
     }
     // 1. Advance and retire (swap-remove keeps [0, live) packed).
     const gx = d.gravity[0] * dt, gy = d.gravity[1] * dt, gz = d.gravity[2] * dt, keep = Math.max(0, 1 - d.drag * dt);
     for (let i = 0; i < p.live;) {
-      p.age[i] += dt;
-      if (p.age[i] >= p.life[i]) {
+      const age = p.age[i] = p.age[i]! + dt;
+      if (age >= p.life[i]!) {
         const last = --p.live;
         if (i !== last) {
           const a = i * 3, b = last * 3;
-          for (let c = 0; c < 3; c++) { p.pos[a + c] = p.pos[b + c]; p.prev[a + c] = p.prev[b + c]; p.vel[a + c] = p.vel[b + c]; }
-          p.age[i] = p.age[last]; p.prevAge[i] = p.prevAge[last]; p.life[i] = p.life[last];
+          for (let c = 0; c < 3; c++) { p.pos[a + c] = p.pos[b + c]!; p.prev[a + c] = p.prev[b + c]!; p.vel[a + c] = p.vel[b + c]!; }
+          p.age[i] = p.age[last]!; p.prevAge[i] = p.prevAge[last]!; p.life[i] = p.life[last]!;
         }
         continue; // index i now holds the last particle, not yet advanced this step: process it next.
       }
-      p.prevAge[i] = p.age[i] - dt;
+      p.prevAge[i] = age - dt;
       const j = i * 3;
-      p.prev[j] = p.pos[j]; p.prev[j + 1] = p.pos[j + 1]; p.prev[j + 2] = p.pos[j + 2];
-      p.vel[j] = (p.vel[j] + gx) * keep; p.vel[j + 1] = (p.vel[j + 1] + gy) * keep; p.vel[j + 2] = (p.vel[j + 2] + gz) * keep;
-      p.pos[j] += p.vel[j] * dt; p.pos[j + 1] += p.vel[j + 1] * dt; p.pos[j + 2] += p.vel[j + 2] * dt;
+      const px = p.prev[j] = p.pos[j]!, py = p.prev[j + 1] = p.pos[j + 1]!, pz = p.prev[j + 2] = p.pos[j + 2]!;
+      const vx = p.vel[j] = (p.vel[j]! + gx) * keep, vy = p.vel[j + 1] = (p.vel[j + 1]! + gy) * keep, vz = p.vel[j + 2] = (p.vel[j + 2]! + gz) * keep;
+      p.pos[j] = px + vx * dt; p.pos[j + 1] = py + vy * dt; p.pos[j + 2] = pz + vz * dt;
       i++;
     }
     // 2. Spawn.
@@ -241,7 +243,8 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
       for (const [e, note] of notes) if (note.seen !== tick) notes.delete(e);
       // Admission in spawn order, after this step's retirements, so freed capacity is reused at once.
       for (let i = 0; i < waiting.length; i++) {
-        const e = waiting[i], d = waitingData[i], note = notes.get(e)!;
+        // i < waiting.length = waitingData.length (pushed together); every waiting entity got a note above.
+        const e = waiting[i]!, d = waitingData[i]!, note = notes.get(e)!;
         if (note.failed) continue;
         const slot = admit(e, d, note);
         if (!slot) {
@@ -268,12 +271,15 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
         if (n === 0 && slot.drawn === 0) continue;
         changed = true; slot.drawn = n;
         const sizes = d.size, sn = sizes.length, ops = d.opacity, on = ops.length, cn = d.color.length;
+        // Hot path: i < n = p.live ≤ capacity, so every pool index is in range.
         for (let i = 0; i < n; i++) {
           const j = i * 3, q = i * 4;
-          const age = p.prevAge[i] + (p.age[i] - p.prevAge[i]) * a, t = age <= 0 ? 0 : age >= p.life[i] ? 1 : age / p.life[i];
-          p.offset[j] = p.prev[j] + (p.pos[j] - p.prev[j]) * a;
-          p.offset[j + 1] = p.prev[j + 1] + (p.pos[j + 1] - p.prev[j + 1]) * a;
-          p.offset[j + 2] = p.prev[j + 2] + (p.pos[j + 2] - p.prev[j + 2]) * a;
+          const prevAge = p.prevAge[i]!, life = p.life[i]!;
+          const age = prevAge + (p.age[i]! - prevAge) * a, t = age <= 0 ? 0 : age >= life ? 1 : age / life;
+          const x0 = p.prev[j]!, y0 = p.prev[j + 1]!, z0 = p.prev[j + 2]!;
+          p.offset[j] = x0 + (p.pos[j]! - x0) * a;
+          p.offset[j + 1] = y0 + (p.pos[j + 1]! - y0) * a;
+          p.offset[j + 2] = z0 + (p.pos[j + 2]! - z0) * a;
           p.size[i] = curve(sizes, sn, t);
           p.tint[q] = curve(slot.linear, cn, t, 3, 0); p.tint[q + 1] = curve(slot.linear, cn, t, 3, 1); p.tint[q + 2] = curve(slot.linear, cn, t, 3, 2);
           p.tint[q + 3] = curve(ops, on, t);

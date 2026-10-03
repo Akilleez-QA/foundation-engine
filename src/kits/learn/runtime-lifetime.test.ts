@@ -6,6 +6,7 @@ import { installFakeDom, live } from '../../testing/fake-dom';
 import { lessonScene } from './index';
 import type { LessonInput } from './lesson';
 import { directorSystem, disposeLesson } from './runtime';
+import { must } from '../../testing/must';
 
 const lesson: LessonInput = {
   id: 'lifetime', version: 1, title: 'Lifetime',
@@ -89,7 +90,7 @@ test('board transition removes the previous nonboard caption and exit removes th
   // Only element construction is needed for this empty-board ownership assertion.
   Object.assign(fake.document, { createElementNS: (_ns: string, tag: string) => fake.document.createElement(tag) });
   const mixed = structuredClone(lesson);
-  mixed.outline[1].type = 'board';
+  must(mixed.outline[1]).type = 'board';
   mixed.scenes.other = { type: 'board', title: 'Board', board: { items: [] }, timeline: [{ do: 'wait-for', event: 'next' }] };
   const h = await testScene(defineScene({ id: 'lifetime', title: 'Lifetime', systems: [directorSystem(mixed)], exit: disposeLesson }));
   try {

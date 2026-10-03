@@ -68,7 +68,7 @@ function selectionState(world: World, s: Selection, counts?: (c: Counts) => void
   }
   if (counts) {
     const components: Record<string, number> = Object.fromEntries(s.components.map(c => [c.id, 0]));
-    for (const row of rows.values()) for (const id of Object.keys(row)) components[id]++;
+    for (const row of rows.values()) for (const id of Object.keys(row)) components[id]!++; // row keys are s.components ids
     counts({ entities: rows.size, components });
   }
   const out: Record<string, unknown> = { entities: [...rows].sort((a, b) => a[0] - b[0]) };

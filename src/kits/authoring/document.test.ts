@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { World } from '../../core/ecs/world';
 import { authoredReference, createAuthoredDocument, type DocumentValue } from './document';
+import { must } from '../../testing/must';
 const limits = { maxBytes: 4096, maxNodes: 128, maxDepth: 8 };
 type Placement = { objects: { id: string; incarnation: number; x: number }[] };
 const placement = (v: DocumentValue): v is Placement => {
@@ -31,7 +32,7 @@ test('A1 placement oracle: accepted/rejected/stale/reload preserve authored iden
   assert.equal(loaded.edit(current.ticket, () => null).status, 'stale');
   const first = new World(), second = new World(); second.spawn();
   const runtimeA = first.spawn(), runtimeB = second.spawn(); assert.notEqual(runtimeA, runtimeB);
-  assert.deepEqual(authoredReference('layout', current.value.objects[0].id, 0), authoredReference('layout', loaded.read().value.objects[0].id, 0));
+  assert.deepEqual(authoredReference('layout', must(current.value.objects[0]).id, 0), authoredReference('layout', must(loaded.read().value.objects[0]).id, 0));
   assert.notDeepEqual(authoredReference('layout', 'a', 0), authoredReference('layout', 'a', 1));
 });
 
@@ -47,7 +48,7 @@ test('A1 unrelated dialogue oracle needs no scene fields or transform schema', (
 
 test('detached deeply frozen values and callback failure cannot mutate committed data', () => {
   const owner = create(), before = owner.read();
-  assert.throws(() => owner.edit(before.ticket, value => { value.objects[0].x = 900; return '{}'; }), TypeError);
+  assert.throws(() => owner.edit(before.ticket, value => { must(value.objects[0]).x = 900; return '{}'; }), TypeError);
   assert.equal(owner.read(), before);
   assert.throws(() => owner.edit(before.ticket, () => { throw Error('creator failed'); }), /creator failed/);
   assert.equal(owner.edit(before.ticket, () => before.json).status, 'accepted');

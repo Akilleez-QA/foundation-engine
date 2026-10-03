@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { TimelinePlayer } from './timeline';
 import { kidSafeProblems, scriptedProvider } from './provider';
 import type { Action } from './lesson';
+import { must } from '../../testing/must';
 
 const script: Action[] = [
   { do: 'say', who: 'teacher', text: 'one two three four' },
@@ -21,9 +22,9 @@ test('timeline: deterministic, gated, scrubbable and replayable', () => {
   p.tick(10);
   assert.ok(Math.abs(p.time - 2.48) < 1e-9, 'time stops at the gate');
   assert.equal(p.state().waiting?.event, 'next');
-  assert.equal(p.state().items.earth.progress, 1);
+  assert.equal(must(p.state().items.earth).progress, 1);
   p.scrub(1.88);
-  assert.ok(Math.abs(p.state().items.earth.progress - 0.5) < 1e-9, 'half drawn half-way');
+  assert.ok(Math.abs(must(p.state().items.earth).progress - 0.5) < 1e-9, 'half drawn half-way');
   assert.equal(p.satisfy('next'), false, 'the gate is ahead of a scrubbed time');
   p.skip(); answers.q1 = 'a';
   assert.ok(p.satisfy('next'));
@@ -32,13 +33,13 @@ test('timeline: deterministic, gated, scrubbable and replayable', () => {
   answers.q1 = 'b';
   p.again(); p.tick(10);
   assert.equal(p.state().caption?.text, 'yes', 'a decided branch never changes');
-  assert.ok(p.state().items.sun.visible && p.state().done);
+  assert.ok(must(p.state().items.sun).visible && p.state().done);
 });
 
 test('timeline: reduced motion draws at once; pause holds time', () => {
   const p = new TimelinePlayer([{ do: 'draw', target: 'x' }, { do: 'wait-for', event: 'next' }], { reducedMotion: true });
   assert.equal(p.limit, 0);
-  assert.equal(p.state().items.x.progress, 1);
+  assert.equal(must(p.state().items.x).progress, 1);
   const q = new TimelinePlayer(script); q.pause(); q.tick(1); assert.equal(q.time, 0); q.resume(); q.tick(1); assert.equal(q.time, 1);
 });
 
@@ -65,6 +66,6 @@ test('timeline: the objectives card is up from the objectives action until the n
   assert.ok(p.satisfy('next'));
   assert.equal(p.state().objectives, false, 'Next puts the card away at once');
   p.tick(10);
-  assert.equal(p.state().items.sun.progress, 1);
+  assert.equal(must(p.state().items.sun).progress, 1);
   assert.equal(p.state().objectives, false, 'it does not come back over the drawing at the next gate');
 });

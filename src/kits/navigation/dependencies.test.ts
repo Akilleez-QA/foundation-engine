@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createLifetimeRouteQueue } from './lifetimes';
 import { createNavigationGraph } from './search';
 import { createRouteDependencies, type RouteScope } from './dependencies';
+import { must } from '../../testing/must';
 const scope = (id: string, revision = 0, ready = true, incarnation = 0): RouteScope => ({ id, revision, ready, incarnation });
 const graph = createNavigationGraph([{ id: 'start', edges: [{ to: 'finish', cost: 1 }] }, { id: 'finish', edges: [] }]);
 const request = (id: string) => ({ id, generation: 0, graph, start: 'start', goal: 'finish' });
@@ -32,9 +33,9 @@ test('west accepted obstacle change retires queued/adopted movement; east contin
   const replacement = t.offer({ ...request('A'), graph: detour }, [scope('west', 1)]); assert.equal(replacement.status, 'accepted');
   if (!('ticket' in replacement) || !replacement.ticket) throw Error(); q.pump(100);
   const result = t.result(replacement.ticket); assert.equal(result?.status, 'arrived');
-  const coordinates: Record<string, number[]> = { start: [0, 0], around: [0, 2], finish: [2, 2] }, visited: number[][] = [];
+  const coordinates: Record<string, [number, number]> = { start: [0, 0], around: [0, 2], finish: [2, 2] }, visited: number[][] = [];
   if (result?.status === 'arrived') for (const node of result.path) {
-    assert.equal(t.check(replacement.ticket), 'valid'); const target = coordinates[node];
+    assert.equal(t.check(replacement.ticket), 'valid'); const target = must(coordinates[node], `coordinates of ${node}`);
     // Independent contact oracle refuses the newly blocked horizontal segment y=0.
     assert.ok(!(positions.A[1] === 0 && target[1] === 0 && target[0] > 0)); positions.A = [...target]; visited.push([...target]);
   }

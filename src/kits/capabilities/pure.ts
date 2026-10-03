@@ -80,7 +80,7 @@ export function createCapabilities(definitions: readonly Capability[], saved?: C
     const count = restoredGrants.length;
     if (!Number.isSafeInteger(count) || count < 0 || count > 1024) throw Error('capabilities: saved limits exceeded');
     for (let i = 0; i < count; i++) {
-      const g = captureGrant(restoredGrants[i]);
+      const g = captureGrant(restoredGrants[i]!); // i < count = restoredGrants.length
       if (grants.has(g.capability)) throw Error('capabilities: duplicate saved grant');
       grants.set(g.capability, g);
     }

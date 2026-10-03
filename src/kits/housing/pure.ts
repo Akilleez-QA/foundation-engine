@@ -9,8 +9,8 @@ export function createStructure(initial:StructureSnapshot,limit=128) {
  for(const [id,grants]of Object.entries(state.grants))if(!validId(id)||!Array.isArray(grants)||grants.some(p=>!permissions.includes(p)))throw Error('housing: invalid grant');
  const validPlacement=(p:Placement)=>validId(p.id)&&[p.x,p.z,p.width,p.depth,p.height].every(Number.isFinite)&&p.width>0&&p.depth>0&&[p.x-p.width/2,p.x+p.width/2,p.z-p.depth/2,p.z+p.depth/2].every(Number.isFinite);
  if(state.placements.some(p=>!validPlacement(p))||state.occupants.some(id=>!validId(id))||(state.packed&&state.occupants.length))throw Error('housing: invalid contents');
- for(let i=0;i<state.placements.length;i++)for(let j=0;j<i;j++){const p=state.placements[i],q=state.placements[j];if(Math.abs(q.x-p.x)<q.width/2+p.width/2&&Math.abs(q.z-p.z)<q.depth/2+p.depth/2)throw Error('housing: overlapping saved placements');}
- const can=(actor:string,permission:Permission)=>!state.packed&&(actor===state.owner||Boolean(Object.hasOwn(state.grants,actor)&&state.grants[actor].includes(permission)));
+ for(let i=0;i<state.placements.length;i++)for(let j=0;j<i;j++){const p=state.placements[i]!,q=state.placements[j]!;/* j < i < length */if(Math.abs(q.x-p.x)<q.width/2+p.width/2&&Math.abs(q.z-p.z)<q.depth/2+p.depth/2)throw Error('housing: overlapping saved placements');}
+ const can=(actor:string,permission:Permission)=>!state.packed&&(actor===state.owner||Boolean(Object.hasOwn(state.grants,actor)&&state.grants[actor]!.includes(permission)));
  const advance=()=>{if(state.revision===Number.MAX_SAFE_INTEGER)throw Error('housing: revision exhausted');};
  return {
   can,

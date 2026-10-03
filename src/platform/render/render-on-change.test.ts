@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from 'three';
 import {createRenderOnChange,stillSafeHook} from './render-on-change';
+import {must} from '../../testing/must';
 const renderer={domElement:{width:800,height:600},toneMapping:T.NoToneMapping,toneMappingExposure:1} as unknown as T.WebGLRenderer;
 function viewer(){
  const scene=new T.Scene(),camera=new T.PerspectiveCamera(50,4/3,.1,50);camera.position.set(0,2,6);camera.lookAt(0,0,0);
@@ -18,7 +19,7 @@ test('a still viewer draws once, then only when something visible changes',()=>{
   ['colour',()=>material.color.set('#ff0000')],['opacity',()=>{material.opacity=.5;}],['emissive',()=>material.emissive.setRGB(.2,0,0)],['roughness',()=>{material.roughness=.2;}],
   ['texture upload',()=>{material.map=new T.CanvasTexture({width:4,height:4} as unknown as HTMLCanvasElement);}],['texture redraw',()=>{material.map!.needsUpdate=true;}],
   ['scrolling texture',()=>{material.map!.offset.x=.25;}],['hidden',()=>{puck.visible=false;}],['shown',()=>{puck.visible=true;}],
-  ['deformed',()=>{puck.geometry.attributes.position.needsUpdate=true;}],['light dims',()=>{light.intensity=1;}],['background',()=>{scene.background=new T.Color('#102030');}],
+  ['deformed',()=>{puck.geometry.getAttribute('position').needsUpdate=true;}],['light dims',()=>{light.intensity=1;}],['background',()=>{scene.background=new T.Color('#102030');}],
   ['canvas resized',()=>{(renderer.domElement as {width:number}).width=801;}],['added',()=>{scene.add(new T.Mesh(new T.BoxGeometry(),material));}],
  ];
  for(const [name,change] of checks){change();assert.equal(changed(),true,name);assert.ok(settles(changed),name+' settles');}
@@ -32,7 +33,7 @@ test('three bumping a two-pass transparent material each draw is not a change',(
 test('shader time uniforms count as changes; unknown per-frame hooks always redraw',()=>{
  const {scene,camera,frames}=viewer(),changed=()=>frames.changed(renderer,[scene,camera]);
  const glow=new T.ShaderMaterial({uniforms:{uTime:{value:0}}});scene.add(new T.Mesh(new T.PlaneGeometry(),glow));changed();assert.ok(settles(changed));
- glow.uniforms.uTime.value=.1;assert.equal(changed(),true);assert.ok(settles(changed));
+ must(glow.uniforms.uTime).value=.1;assert.equal(changed(),true);assert.ok(settles(changed));
  const holo=new T.MeshBasicMaterial();holo.onBeforeRender=()=>{};const sign=new T.Mesh(new T.PlaneGeometry(),holo);scene.add(sign);
  for(let i=0;i<5;i++)assert.equal(changed(),true);sign.visible=false;assert.ok(settles(changed));
  const safe=new T.Mesh(new T.PlaneGeometry(),new T.MeshBasicMaterial());safe.onBeforeRender=stillSafeHook(()=>{});scene.add(safe);changed();assert.ok(settles(changed));

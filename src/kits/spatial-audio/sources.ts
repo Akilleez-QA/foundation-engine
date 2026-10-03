@@ -392,7 +392,8 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
   const tiers = (list: Source[], same: (leader: Source, member: Source) => boolean, order: (a: Source, b: Source) => number): Source[] => {
     const out: Source[] = [];
     for (let i = 0; i < list.length;) {
-      let j = i + 1; while (j < list.length && same(list[i], list[j])) j++;
+      const leader = list[i]!; // i, j < list.length
+      let j = i + 1; while (j < list.length && same(leader, list[j]!)) j++;
       out.push(...list.slice(i, j).sort(order)); i = j;
     }
     return out;
@@ -535,7 +536,7 @@ export function createSpatialAudio(o: SpatialAudioOptions) {
             const k = victims.findIndex(v => (s.score > v.score * stealRatio && fits(s))
               || (Math.abs(s.score - v.score) <= v.score * TIE && now - v.startedAt >= rotateAfter && (s.late ? fits(s) : now - s.dueAt! <= maxLateness + 1e-9)));
             if (k < 0) break;
-            const [victim] = victims.splice(k, 1);
+            const victim = victims.splice(k, 1)[0]!; // k >= 0 from findIndex: one element removed
             if (s.score > victim.score * stealRatio) stats.stolen++; else stats.rotated++;
             cutFor(s, victim, now);
           }

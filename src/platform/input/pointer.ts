@@ -76,7 +76,7 @@ export class GestureRecognizer{
    if(rest){rest.role='primary';rest.dragging=true;}
   }
  }
- private spread(){const live=[...this.pointers.values()].filter(p=>p.role!=='ignored');return live.length<2?0:Math.hypot(live[0].x-live[1].x,live[0].y-live[1].y);}
+ private spread(){const live=[...this.pointers.values()].filter(p=>p.role!=='ignored');return live.length<2?0:Math.hypot(live[0]!.x-live[1]!.x,live[0]!.y-live[1]!.y);/* live.length >= 2 */}
 }
 
 type Env={win?:EventTarget;doc?:EventTarget&{hidden?:boolean}};

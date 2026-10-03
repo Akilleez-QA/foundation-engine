@@ -5,6 +5,7 @@ import { InputActions, inputActionRegistry, type ActionLayerInfo, type ActionLay
 import { FrameLoop, type TickerSpec } from '../../core/activity/loop';
 import { LayerManager } from '../ui/layers';
 import { installFakeDom } from '../../testing/fake-dom';
+import { must } from '../../testing/must';
 import type { PadLike } from './gamepad';
 
 function rig() {
@@ -44,7 +45,7 @@ test('focus, hidden pages, connection replacement and owner changes demand neutr
   r.button(0,1);r.tick();r.win.dispatchEvent(new Event('blur'));assert.equal(r.ticks.size,0);
   r.win.dispatchEvent(new Event('focus'));r.tick();assert.equal(r.edges.filter(e=>e.pressed).length,1);
   r.button(0,0);r.tick();r.button(0,1);r.tick();assert.equal(r.edges.filter(e=>e.pressed).length,2);
-  r.layer();assert.equal(r.ticks.size,1);assert.equal([...r.ticks][0].owner,'platform.input.gamepad');r.tick();assert.equal(r.edges.filter(e=>e.pressed).length,2);
+  r.layer();assert.equal(r.ticks.size,1);assert.equal(must([...r.ticks][0]).owner,'platform.input.gamepad');r.tick();assert.equal(r.edges.filter(e=>e.pressed).length,2);
   r.doc.hidden=true;r.doc.dispatchEvent(new Event('visibilitychange'));assert.equal(r.ticks.size,0);
   r.doc.hidden=false;r.doc.dispatchEvent(new Event('visibilitychange'));assert.equal(r.ticks.size,1);
   r.setPads([]);r.tick();assert.equal(r.ticks.size,0);assert.equal(r.adapter.family,null);
@@ -68,7 +69,7 @@ test('a reentrant owner change discards simultaneous presses and leaves one neut
   const original=r.actions.pad.bind(r.actions);let changed=false;
   r.actions.pad=(input,pressed)=>{const result=original(input,pressed);if(input==='a'&&pressed&&!changed){changed=true;r.layer();}return result;};
   r.button(0,1);r.button(2,1);r.tick();assert.equal(r.ticks.size,1);
-  assert.equal([...r.ticks][0].owner,'platform.input.gamepad');
+  assert.equal(must([...r.ticks][0]).owner,'platform.input.gamepad');
   r.button(0,0);r.button(2,0);r.tick();
   // A later discarded x edge must not stay blocked forever after the neutral sample.
   let presses=0;const before=r.actions.pad.bind(r.actions);

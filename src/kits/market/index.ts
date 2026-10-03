@@ -43,7 +43,7 @@ export function createMarket(initial:MarketSnapshot,limits={offers:1024,receipts
     },
     expire(now:number,maxWork:number){
       if(!Number.isFinite(now)||!integer(maxWork))throw Error('market: invalid expiry budget');let work=0;
-      while(work<maxWork&&cursor<deadlines.length&&deadlines[cursor].expires<=now){const o=deadlines[cursor++];offers.delete(o.id);work++;}return work;
+      while(work<maxWork&&cursor<deadlines.length&&deadlines[cursor]!.expires<=now){const o=deadlines[cursor++]!;offers.delete(o.id);work++;}return work;/* cursor < deadlines.length */
     },
     balance:(id:string)=>balances.get(id),
     snapshot:():MarketSnapshot=>({balances:Object.fromEntries(balances),offers:[...offers.values()].map(o=>structuredClone(o)),receipts:[...receipts.values()].map(r=>structuredClone(r))}),

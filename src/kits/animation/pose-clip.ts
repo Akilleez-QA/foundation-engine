@@ -16,8 +16,8 @@ export function definePoseClip(input:PoseClip):PoseClip {
    if(!Number.isFinite(k.at)||k.at<0||k.at>input.duration||k.at<=previous||k.position.length!==3||k.rotation.length!==4||!k.position.every(v=>Number.isFinite(v)&&Math.abs(v)<=1e12)||!k.rotation.every(Number.isFinite))throw Error('animation: invalid pose key');
    previous=k.at;if(++count>4096)throw Error('animation: key budget exceeded');
    const scale=Math.max(...k.rotation.map(Math.abs));if(scale===0)throw Error('animation: invalid rotation');
-   const scaled=k.rotation.map(v=>v/scale),length=Math.hypot(...scaled);
-   return Object.freeze({at:k.at,position:Object.freeze([...k.position]) as ClipVector,rotation:Object.freeze([scaled[0]/length,scaled[1]/length,scaled[2]/length,scaled[3]/length] as const)});
+   const scaled=k.rotation.map(v=>v/scale),length=Math.hypot(...scaled); // rotation.length checked === 4
+   return Object.freeze({at:k.at,position:Object.freeze([...k.position]) as ClipVector,rotation:Object.freeze([scaled[0]!/length,scaled[1]!/length,scaled[2]!/length,scaled[3]!/length] as const)});
   });
   return Object.freeze({joint:track.joint,keys:Object.freeze(keys)});
  });
@@ -29,10 +29,11 @@ export function createPoseSampler(input:PoseClip){
   if(!Number.isFinite(time)||time<0)throw Error('animation: invalid sample time');
   const t=loop?time%clip.duration:Math.min(time,clip.duration);
   return clip.tracks.map(track=>{
+   // keys is non-empty (definePoseClip); lo, mid, hi stay in 0..keys.length-1.
    const keys=track.keys;let lo=0,hi=keys.length-1;
-   if(t<=keys[0].at)hi=0;else if(t>=keys[hi].at)lo=hi;
-   else while(hi-lo>1){const mid=(lo+hi)>>>1;if(keys[mid].at<=t)lo=mid;else hi=mid;}
-   const a=keys[lo],b=keys[hi],u=a===b?0:(t-a.at)/(b.at-a.at);
+   if(t<=keys[0]!.at)hi=0;else if(t>=keys[hi]!.at)lo=hi;
+   else while(hi-lo>1){const mid=(lo+hi)>>>1;if(keys[mid]!.at<=t)lo=mid;else hi=mid;}
+   const a=keys[lo]!,b=keys[hi]!,u=a===b?0:(t-a.at)/(b.at-a.at);
    const rotation=new Quaternion(...a.rotation).slerp(new Quaternion(...b.rotation),u);
    const p=a.position,q=b.position;
    return {joint:track.joint,position:[p[0]*(1-u)+q[0]*u,p[1]*(1-u)+q[1]*u,p[2]*(1-u)+q[2]*u],rotation:[rotation.x,rotation.y,rotation.z,rotation.w]};

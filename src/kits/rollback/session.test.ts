@@ -4,6 +4,7 @@ import { captureRollbackLimits, rollbackChecksum, utf8BytesWithin } from './limi
 import { createRollbackSession } from './session';
 import { baseLimits, referenceChecksums, runPeers, toyPorts, type ToyPorts } from './test-harness';
 import type { RollbackLimits, RollbackOptions, RollbackSession } from './types';
+import { must } from '../../testing/must';
 
 const make = (o: Omit<Partial<RollbackOptions>, 'limits'> & { limits?: Partial<RollbackLimits> } = {}, ports: ToyPorts = toyPorts()) => {
   const session = createRollbackSession({ local: 0, neutralInput: 'n', ...o, limits: { ...baseLimits, ...o.limits }, ports: o.ports ?? ports });
@@ -55,13 +56,13 @@ for (const [name, limits, minDelay, maxDelay] of [
         const r = s.read();
         assert.equal(r.status, 'running', `peer ${i}: ${r.reason}`);
         assert.ok(r.confirmedFrame >= ticks, `peer ${i} confirmed ${r.confirmedFrame}`);
-        assert.ok(run.published[i].size >= ticks / merged.checksumInterval - 1);
-        for (const [frame, checksum] of run.published[i]) assert.equal(checksum, reference[frame], `peer ${i} frame ${frame}`);
+        assert.ok(must(run.published[i]).size >= ticks / merged.checksumInterval - 1);
+        for (const [frame, checksum] of must(run.published[i])) assert.equal(checksum, reference[frame], `peer ${i} frame ${frame}`);
         const confirmed = s.confirmedState()!;
         assert.equal(rollbackChecksum(confirmed.state), reference[confirmed.frame]);
         assert.equal(confirmed.checksum, reference[confirmed.frame]);
         assert.ok(r.stats.maxRollback <= merged.maxPredictionFrames);
-        assert.equal(run.results[i].filter(x => x.includes('desync') || x.includes('failed')).length, 0);
+        assert.equal(must(run.results[i]).filter(x => x.includes('desync') || x.includes('failed')).length, 0);
       }
       assert.ok(run.sessions.some(s => s.read().stats.rollbacks > 0), 'the scenario exercised rollback');
       assert.ok(run.results.flat().filter(r => r === 'checksum:match').length > 10, 'peers compared checksums');
@@ -77,8 +78,8 @@ test('ROLLBACK prediction 0 is lockstep: never predicts, never rolls back, still
   const reference = referenceChecksums(run, 120, 1, rollbackChecksum);
   for (const [i, s] of run.sessions.entries()) {
     assert.equal(s.read().stats.rollbacks, 0);
-    assert.equal(run.ports[i].calls.load, 0);
-    for (const [frame, checksum] of run.published[i]) assert.equal(checksum, reference[frame]);
+    assert.equal(must(run.ports[i]).calls.load, 0);
+    for (const [frame, checksum] of must(run.published[i])) assert.equal(checksum, reference[frame]);
   }
 });
 
@@ -297,15 +298,15 @@ test('ROLLBACK frame advantage: a late peer leaves the other at full rollback de
     const tail: number[] = [];
     let rollbacksAtHalf = 0;
     const run = runPeers({ ticks, seed: 6, minDelay: 0, maxDelay: 1, late, pace, observe: (tick, sessions) => {
-      if (tick === ticks / 2) rollbacksAtHalf = sessions[0].read().stats.resimulated;
-      if (tick >= ticks / 2 && tick < ticks) tail.push(sessions[0].read().frameAdvantage[1]);
+      if (tick === ticks / 2) rollbacksAtHalf = must(sessions[0]).read().stats.resimulated;
+      if (tick >= ticks / 2 && tick < ticks) tail.push(must(must(sessions[0]).read().frameAdvantage[1]));
     } });
     const reference = referenceChecksums(run, ticks, baseLimits.inputDelay, rollbackChecksum);
     for (const [i, s] of run.sessions.entries()) {
       assert.equal(s.read().status, 'running');
-      for (const [frame, checksum] of run.published[i]) assert.equal(checksum, reference[frame]);
+      for (const [frame, checksum] of must(run.published[i])) assert.equal(checksum, reference[frame]);
     }
-    return { maxTail: Math.max(...tail), lateResimulated: run.sessions[0].read().stats.resimulated - rollbacksAtHalf };
+    return { maxTail: Math.max(...tail), lateResimulated: must(run.sessions[0]).read().stats.resimulated - rollbacksAtHalf };
   };
   const unpaced = measure(), paced = measure(3);
   // Without pacing the early peer stays a full window ahead: every late input forces a deep rollback.
