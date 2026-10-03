@@ -33,8 +33,9 @@ function cachedBounds(root: T.Object3D, maxNodes: number): CachedModelBounds {
   const skipped = { skinned: 0, instanced: 0, morphed: 0, uncomputed: 0, nonfinite: 0 };
   let visited = 0, included = 0;
   const stack: { node: T.Object3D; child: number }[] = [{ node: root, child: -1 }];
+  // stack.length > 0 wherever its top is read; axis < 3 indexes the 3-element bounds and the 16-element matrix.
   while (stack.length && visited < maxNodes) {
-    const frame = stack[stack.length - 1];
+    const frame = stack[stack.length - 1]!;
     if (frame.child < 0) {
       visited++; frame.child = 0;
       const mesh = frame.node as T.Mesh;
@@ -51,16 +52,17 @@ function cachedBounds(root: T.Object3D, maxNodes: number): CachedModelBounds {
           const low = [Infinity, Infinity, Infinity], high = [-Infinity, -Infinity, -Infinity], m = mesh.matrixWorld.elements;
           for (let bits = 0; bits < 8; bits++) {
             const x = bits & 1 ? box.max.x : box.min.x, y = bits & 2 ? box.max.y : box.min.y, z = bits & 4 ? box.max.z : box.min.z;
-            for (let axis = 0; axis < 3; axis++) { const value = m[axis] * x + m[axis + 4] * y + m[axis + 8] * z + m[axis + 12]; low[axis] = Math.min(low[axis], value); high[axis] = Math.max(high[axis], value); }
+            for (let axis = 0; axis < 3; axis++) { const value = m[axis]! * x + m[axis + 4]! * y + m[axis + 8]! * z + m[axis + 12]!; low[axis] = Math.min(low[axis]!, value); high[axis] = Math.max(high[axis]!, value); }
           }
           if (![...low, ...high].every(Number.isFinite)) skipped.nonfinite++;
-          else { included++; for (let axis = 0; axis < 3; axis++) { min[axis] = Math.min(min[axis], low[axis]); max[axis] = Math.max(max[axis], high[axis]); } }
+          else { included++; for (let axis = 0; axis < 3; axis++) { min[axis] = Math.min(min[axis]!, low[axis]!); max[axis] = Math.max(max[axis]!, high[axis]!); } }
         }
       }
     }
     // Pop completed ancestors without visiting another node; exactly reaching the budget may be complete.
-    while (stack.length && stack[stack.length - 1].child >= stack[stack.length - 1].node.children.length) stack.pop();
-    if (stack.length && visited < maxNodes) { const parent = stack[stack.length - 1]; stack.push({ node: parent.node.children[parent.child++], child: -1 }); }
+    while (stack.length && stack[stack.length - 1]!.child >= stack[stack.length - 1]!.node.children.length) stack.pop();
+    // The top's child < children.length after the pops above.
+    if (stack.length && visited < maxNodes) { const parent = stack[stack.length - 1]!; stack.push({ node: parent.node.children[parent.child++]!, child: -1 }); }
   }
   const truncated = stack.length > 0, incomplete = truncated || Object.values(skipped).some(n => n > 0);
   return { basis: 'cached-geometry-and-world-matrices', status: !included ? 'unavailable' : incomplete ? 'partial' : 'available', min: included ? min : null, max: included ? max : null, visited, included, skipped, truncated };
@@ -72,8 +74,8 @@ function sameAppliedPose(poses: ModelData['pose'], key: string | undefined): boo
   let applied: unknown;
   try { applied = JSON.parse(key); } catch { return false; }
   if (!Array.isArray(applied) || applied.length !== poses.length) return false;
-  for (let i = 0; i < poses.length; i++) {
-    const wanted = poses[i], actual = applied[i];
+  for (const [i, wanted] of poses.entries()) {
+    const actual = applied[i];
     if (!actual || typeof actual !== 'object' || actual.node !== wanted.node) return false;
     for (const field of ['position', 'rotation'] as const) {
       const a = actual[field], b = wanted[field], size = field === 'position' ? 3 : 4;
@@ -112,13 +114,13 @@ export function inspectModel(request: ModelInspectionRequest, read: (entity: Ent
   const total = animations?.length ?? 0;
   if (clipOffset > total) throw RangeError('model inspection: clip offset outside list');
   const clips = [];
-  for (let i = clipOffset; i < Math.min(total, clipOffset + clipLimit); i++) { const clip = animations![i]; clips.push({ index: i, name: label(clip.name), duration: Number.isFinite(clip.duration) ? clip.duration : null }); }
+  for (let i = clipOffset; i < Math.min(total, clipOffset + clipLimit); i++) { const clip = animations![i]!; /* i < total = animations.length */ clips.push({ index: i, name: label(clip.name), duration: Number.isFinite(clip.duration) ? clip.duration : null }); }
   const key = slot?.animationKey, last = key?.lastIndexOf('|') ?? -1, previous = key?.lastIndexOf('|', last - 1) ?? -1;
   const action = slot?.action;
   const requestedPoses = requested?.pose ?? [];
   const poseNames = [];
-  for (let i = 0; i < Math.min(requestedPoses.length, 128); i++) {
-    const p = requestedPoses[i], node = slot?.nodes?.get(p.node);
+  for (let i = 0; i < Math.min(requestedPoses.length, 128); i++) { // i < requestedPoses.length
+    const p = requestedPoses[i]!, node = slot?.nodes?.get(p.node);
     poseNames.push({ name: label(p.node), status: !slot?.ready ? 'not-ready' : node === null ? 'ambiguous' : node === undefined ? 'absent' : slot.overrides?.has(node) ? 'applied' : 'not-applied' });
   }
   return {

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import * as T from 'three';
 import { createSceneResources } from './scene-resources';
 import { createPrimitiveGeometries } from './primitive-geometries';
@@ -31,7 +32,7 @@ test('visit cleanup drains all detach and resource callbacks while preserving ev
   const second = new T.Mesh(resources.own(new T.BufferGeometry()), resources.own(new T.MeshLambertMaterial()));
   const scene = new T.Scene(); scene.add(first, second);
   const counts = [0, 0, 0, 0];
-  [first.geometry, first.material, second.geometry, second.material].forEach((r, i) => r.addEventListener('dispose', () => { counts[i]++; }));
+  [first.geometry, first.material, second.geometry, second.material].forEach((r, i) => r.addEventListener('dispose', () => { counts[i] = must(counts[i]) + 1; }));
   first.addEventListener('removed', () => { throw Error('detach first'); });
   second.addEventListener('removed', () => { throw Error('detach second'); });
   first.geometry.addEventListener('dispose', () => { throw Error('geometry failed'); });

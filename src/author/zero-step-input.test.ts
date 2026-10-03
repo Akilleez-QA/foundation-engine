@@ -91,15 +91,15 @@ test('the per-tick latch hooks touch no empty Set or Map (no per-tick allocation
  const l=latch.createPressLatch(),calls:string[]=[];
  type Proto={clear:()=>void;values:()=>unknown;entries:()=>unknown;[Symbol.iterator]:()=>unknown};
  const protos:Proto[]=[Set.prototype,Map.prototype];
- const saved=protos.map(proto=>({clear:proto.clear,values:proto.values,entries:proto.entries,iterator:proto[Symbol.iterator]}));
- protos.forEach((proto,i)=>{
-  proto.clear=function(this:unknown){calls.push('clear');return saved[i].clear.call(this);};
-  proto.values=function(this:unknown){calls.push('iterate');return saved[i].values.call(this);};
-  proto.entries=function(this:unknown){calls.push('iterate');return saved[i].entries.call(this);};
-  proto[Symbol.iterator]=function(this:unknown){calls.push('iterate');return saved[i].iterator.call(this);};
+ const saved=protos.map(proto=>({proto,clear:proto.clear,values:proto.values,entries:proto.entries,iterator:proto[Symbol.iterator]}));
+ saved.forEach(original=>{const proto=original.proto;
+  proto.clear=function(this:unknown){calls.push('clear');return original.clear.call(this);};
+  proto.values=function(this:unknown){calls.push('iterate');return original.values.call(this);};
+  proto.entries=function(this:unknown){calls.push('iterate');return original.entries.call(this);};
+  proto[Symbol.iterator]=function(this:unknown){calls.push('iterate');return original.iterator.call(this);};
  });
  try{for(let i=0;i<3;i++){l.beginStep();l.beginStep();l.beginFrameLane();l.endFrame();}}
- finally{protos.forEach((proto,i)=>{proto.clear=saved[i].clear;proto.values=saved[i].values;proto.entries=saved[i].entries;proto[Symbol.iterator]=saved[i].iterator;});}
+ finally{saved.forEach(({proto,clear,values,entries,iterator})=>{proto.clear=clear;proto.values=values;proto.entries=entries;proto[Symbol.iterator]=iterator;});}
  assert.deepEqual(calls,[]);
  l.add('jump',5);l.beginStep();assert.equal(l.has('jump'),true);l.beginStep();assert.equal(l.has('jump'),false);
 });

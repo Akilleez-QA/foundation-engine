@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import { readFileSync } from 'node:fs';
 import * as T from 'three';
 import { World, type Entity } from '../core/ecs/world';
@@ -30,20 +31,20 @@ function fixture() {
 test('adopted variant, cached bounds, actual playback and explicit socket states follow the model owner', async () => {
   const f=fixture();
   assert.equal(observed(f.owner.inspect!({entity:f.entity})).state,'unrequested');
-  f.owner.sync(); assert.equal(observed(f.owner.inspect!({entity:f.entity,sockets:['hand']})).sockets[0].status,'not-ready');
+  f.owner.sync(); assert.equal(must(observed(f.owner.inspect!({entity:f.entity,sockets:['hand']})).sockets[0],'socket').status,'not-ready');
   await ready(f.owner,f.entity);f.owner.sync(.25);
   const read=()=>observed(f.owner.inspect!({entity:f.entity,sockets:['hand','missing','duplicate']}));
   const value=read();assert.equal(value.adopted!.path.value,'first.glb');assert.equal(value.playback.clip!.value,'wave');assert.equal(value.playback.appliedRestartRevision,0);assert.equal(value.playback.time,.25);
-  assert.deepEqual(value.sockets.map(s=>s.status),['ready','absent','ambiguous']);assert.equal(value.sockets[0].matrix![12],3);assert.equal(value.sockets[0].matrix![13],.5);
+  assert.deepEqual(value.sockets.map(s=>s.status),['ready','absent','ambiguous']);assert.equal(must(value.sockets[0],'socket 0').matrix![12],3);assert.equal(must(value.sockets[0],'socket 0').matrix![13],.5);
   assert.deepEqual(value.bounds!.min,[2,-1,-1]);assert.deepEqual(value.bounds!.max,[4,1,1]);assert.equal(value.bounds!.status,'available');
   const model=f.world.get(f.entity,Model)!;model.playing=false;f.owner.sync(.25);assert.equal(read().playback.time,.25);assert.equal(read().playback.paused,true);
   model.revision=1;f.owner.sync(0);assert.equal(read().playback.appliedRestartRevision,1);assert.equal(read().playback.time,0);
-  model.pose=[{node:'hand',position:[0,3,0]}];assert.equal(read().pose.complete,false);f.owner.sync(0);assert.equal(read().pose.complete,true);assert.equal(read().sockets[0].matrix![13],3);
+  model.pose=[{node:'hand',position:[0,3,0]}];assert.equal(read().pose.complete,false);f.owner.sync(0);assert.equal(read().pose.complete,true);assert.equal(must(read().sockets[0],'socket 0').matrix![13],3);
   // Inspection compares supported fields without invoking arbitrary authored serialization.
   Object.defineProperty(model.pose[0], 'toJSON', {value(){throw Error('inspection serialized authored pose');}});
   assert.equal(read().pose.complete,true);
   model.pose=[{node:'hand',position:[0,4,0]}];assert.equal(read().pose.complete,false);
-  value.sockets[0].matrix![12]=999;assert.equal(read().sockets[0].matrix![12],3);
+  must(value.sockets[0],'socket 0').matrix![12]=999;assert.equal(must(read().sockets[0],'socket 0').matrix![12],3);
   model.pose=[];f.owner.sync(0);assert.equal(read().pose.applied,0);
   model.clip='missing';f.owner.sync(0);assert.equal(read().playback.clip,null);assert.equal(read().playback.appliedRestartRevision,null);
   model.asset='second';assert.equal(read().replacementPending,true);assert.equal(read().adopted!.asset.value,'first');
@@ -64,7 +65,7 @@ test('node traversal, pages, socket reads and labels are bounded and report inco
   const data=observed(inspectModel({entity:0 as Entity,maxNodes:5},()=>source));
   assert.equal(data.bounds!.visited,5);assert.equal(data.bounds!.truncated,false);assert.equal(data.bounds!.status,'partial');assert.deepEqual(data.bounds!.skipped,{skinned:1,instanced:0,morphed:1,uncomputed:1,nonfinite:0});
   const names=['hand'];Object.defineProperty(names,'map',{get(){throw Error('caller map');}});
-  assert.equal(observed(f.owner.inspect!({entity:f.entity,sockets:names})).sockets[0].status,'ready');
+  assert.equal(must(observed(f.owner.inspect!({entity:f.entity,sockets:names})).sockets[0],'socket').status,'ready');
   for(const args of [{maxNodes:4097},{clipLimit:65},{maxLabelLength:257},{sockets:Array(33).fill('hand')}])assert.throws(()=>f.owner.inspect!({entity:f.entity,...args}),RangeError);
   const clips=observed(f.owner.inspect!({entity:f.entity,clipOffset:1})).clips;assert.equal(clips.items.length,0);assert.equal(clips.nextOffset,null);
   f.owner.dispose();f.library.dispose();geometry.dispose();morph.dispose();uncomputed.geometry.dispose();material.dispose();
@@ -86,7 +87,7 @@ test('original beacon uses default GLB parser; inspection borrows real adopted v
   const owner=createSceneModels({world,scene,library,signal:life.signal,inspection:true,invalidate(){},report(error){throw error;}});
   const entity=world.spawn(Transform(),Model({asset:'beacon',clip:'pulse'}));owner.sync();await ready(owner,entity);owner.sync(.25);
   const value=observed(owner.inspect!({entity,sockets:['hand','shoulder']}));
-  assert.equal(value.adopted!.path.value,'models/mechanics/beacon.glb');assert.equal(value.clips.items[0].name.value,'pulse');assert.equal(value.playback.clip!.value,'pulse');assert.ok(value.sockets.every(s=>s.status==='ready'));assert.ok(value.sockets[1].matrix![13]>.1);
+  assert.equal(value.adopted!.path.value,'models/mechanics/beacon.glb');assert.equal(must(value.clips.items[0],'clip').name.value,'pulse');assert.equal(value.playback.clip!.value,'pulse');assert.ok(value.sockets.every(s=>s.status==='ready'));assert.ok(must(must(value.sockets[1],'socket 1').matrix![13])>.1);
   assert.ok(value.bounds!.skipped.skinned>0);assert.notEqual(value.bounds!.status,'available');
   const before=library.stats();owner.inspect!({entity});assert.deepEqual(library.stats(),before);owner.dispose();assert.equal(library.stats().instances,0);library.dispose();
 });
@@ -106,7 +107,7 @@ test('adopted instanced models use only cached instance bounds and report missin
     try {
       const entity = world.spawn(Transform({x:3}),Model({asset:'instances'}));
       owner.sync(); await ready(owner,entity); owner.sync();
-      const adopted = scene.children[0].children[0] as T.InstancedMesh;
+      const adopted = must(must(scene.children[0],'model root').children[0],'adopted mesh') as T.InstancedMesh;
       assert.equal(adopted.isInstancedMesh,true);
       adopted.computeBoundingBox = () => { throw Error('inspection must not compute instance bounds'); };
       adopted.getMatrixAt = () => { throw Error('inspection must not enumerate instance transforms'); };
@@ -117,7 +118,7 @@ test('adopted instanced models use only cached instance bounds and report missin
         value.bounds!.min![0]=999;assert.deepEqual(observed(owner.inspect!({entity})).bounds!.min,[102,-1,-1]);
       } else {
         assert.equal(value.bounds!.status,'unavailable');assert.equal(value.bounds!.included,0);assert.equal(value.bounds!.skipped.instanced,1);assert.equal(value.bounds!.min,null);assert.equal(adopted.boundingBox,null);
-        const rigid = new T.Mesh(geometry,material);scene.children[0].add(rigid);scene.updateMatrixWorld(true);
+        const rigid = new T.Mesh(geometry,material);must(scene.children[0],'model root').add(rigid);scene.updateMatrixWorld(true);
         const mixed = observed(owner.inspect!({entity}));assert.equal(mixed.bounds!.status,'partial');assert.equal(mixed.bounds!.skipped.instanced,1);assert.deepEqual(mixed.bounds!.min,[2,-1,-1]);assert.deepEqual(mixed.bounds!.max,[4,1,1]);
       }
       assert.deepEqual(library.stats(),before);
