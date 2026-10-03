@@ -12,6 +12,9 @@ import {Model} from './model';
 import {createSceneModels} from './scene-model';
 import {RenderMask, validateRenderMask} from './render-mask';
 import {bindEnvironment} from './scene-environment';
+import {validateSceneOutput} from './scene-output';
+import {createOutputSync} from './scene-output-sync';
+import {applyOutput, outputProfile} from '../platform/render/backends/webgl/output';
 import {Material, materialKey} from './material';
 import {createSceneSurfaces, type Surface} from './scene-materials';
 import {createParticleView} from './particle-view';
@@ -167,12 +170,18 @@ export async function enterScene(o: {
         dormant: true,
       };
       const sceneLayer = actx.layer(sceneLayerSpec) as LayerHandle;
+      // Output (tone mapping, exposure) is part of the lease profile; the defaults are a fresh renderer's own values.
+      const initialOutput = validateSceneOutput(scene.view?.output);
       const surface = appRenderers().lease({
         role: 'world',
         host: view,
         insert: 'prepend',
         ctx: actx,
-        profile: {clearColor: scene.view?.background ?? 0x101820, outputColorSpace: T.SRGBColorSpace},
+        profile: {
+          clearColor: scene.view?.background ?? 0x101820,
+          outputColorSpace: T.SRGBColorSpace,
+          ...outputProfile(initialOutput),
+        },
       });
       if (!surface) throw Error(`${scene.id}: WebGL could not start`);
       const renderer = surface.renderer;
@@ -205,6 +214,7 @@ export async function enterScene(o: {
         },
         background: scene.view?.background ?? 0x101820,
         environment: scene.view?.environment,
+        output: {...initialOutput},
         overlay,
         signal: actx.signal,
         openReadingSheet: options => readingSheets.open(options),
@@ -213,6 +223,11 @@ export async function enterScene(o: {
         },
       };
 
+      const output = createOutputSync(
+        viewState.output,
+        next => applyOutput(renderer, next),
+        error => s.log.error(`${scene.id}: view.output refused`, error),
+      );
       let environment = scene.view?.environment ? bindEnvironment(three) : null;
       actx.own(() => environment?.dispose());
       const cubes = bindSceneCubes(
@@ -712,6 +727,7 @@ export async function enterScene(o: {
           three.background = new T.Color(viewState.background);
           dirty = true;
         }
+        if (output.sync(viewState.output)) dirty = true;
         if (
           cubes.sync(
             viewState.environment?.cube,

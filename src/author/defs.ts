@@ -2,6 +2,7 @@ import {normalizeModelPoseLinkLimits, type ModelPoseLinkLimits, type ModelPoseLi
 import type {ModelAttachmentState} from './model-attachment';
 import type {ModelState} from './model-state';
 import type {EnvironmentState} from './environment';
+import {validateSceneOutput, type SceneOutput} from './scene-output';
 /**
  * author/defs.ts: the author-facing definitions. Each `define*` checks its input and returns plain data tagged with a
  * `kind`; `compile.ts` turns the set into engine modules (registries, router, save, input). Nothing here runs a frame,
@@ -127,6 +128,10 @@ export interface ViewState {
   background: number;
   /** Replace this value to publish an environment change. */
   environment?: EnvironmentState | undefined;
+  /** Tone mapping and exposure (author/scene-output.ts). Replace the value to publish a change
+   *  (`ctx.view.output = { ...ctx.view.output, exposure: 1.2 }`): the next frame draws once with it. An invalid value
+   *  is reported once and the last valid output stays. */
+  output: SceneOutput;
   /** Width / height of the view (16/9 in node tests). */
   readonly aspect: number;
   /** An element over the view for HUD text and prompts (the UI kit uses it); null in node tests. */
@@ -290,6 +295,9 @@ export interface SceneInput extends SceneBody {
     background?: number;
     lights?: 'default' | 'none';
     environment?: EnvironmentState;
+    /** Opt-in tone mapping and exposure: `{ toneMapping: 'aces', exposure: 0.9 }`. Omitted: `'none'` and 1, the
+     *  picture every scene had before (docs/guides/scene-look.md). */
+    output?: Partial<SceneOutput>;
   };
   /** Sound files (audio asset ids) this scene plays: fetched while it loads, so their first play is on time. */
   sounds?: readonly string[];
@@ -321,6 +329,8 @@ export function defineScene(s: SceneInput): SceneDefinition {
       `scene ${s.id}: replay.digest needs an id (1-128 of A-Za-z0-9._:,;=+-) and a state(world) function`,
     );
   const captured = {...s};
+  if (captured.view?.output !== undefined)
+    captured.view = {...captured.view, output: validateSceneOutput(captured.view.output, `scene ${s.id}: view.output`)};
   if (captured.modelPoseLinks !== undefined)
     captured.modelPoseLinks = normalizeModelPoseLinkLimits(captured.modelPoseLinks);
   need(

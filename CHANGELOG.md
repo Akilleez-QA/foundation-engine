@@ -86,6 +86,10 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
 
 ### Changes
 
+- **Opt-in tone mapping and exposure per scene (VIS-01).** `defineScene({ view: { output: { toneMapping, exposure } } })`
+  with `'none'` (default), `'aces'`, `'agx'` or `'neutral'` and an exposure in (0, 16]; `ctx.view.output` changes at
+  run time with one redraw. A scene without `output` draws exactly as before (picture guard: identical). See the
+  [scene look guide](docs/guides/scene-look.md).
 - **The gate passes on Node 23 and newer.** Node 23 changed the test runner's default report for piped output
   from TAP (`# tests 4`) to spec (`ℹ tests 4`), so `scripts/compatibility.test.mjs` failed `npm test` and
   `npm run gate` for a fresh game on every Node newer than 22. Scripts that read test output now name the TAP

@@ -960,3 +960,13 @@ CSS produced one redraw and then idle rendering; the unchanged public runtime
 reproduced the missing redraw. See the [contract](render-resize-lifecycle.md) and
 [source-scoped receipt](../verification/dpr-redraw-20261003.md). The receipt is candidate-source
 evidence; it is not a full local gate or physical-device acceptance.
+
+## Scene look: output, local lights, shadows and sky (VIS) — in progress
+
+Creator requirement: a creator's agent can make a lit, atmospheric scene through `@engine` data without importing
+three.js. Each row is opt-in per scene, and a scene that does not opt in keeps its picture, draws and budgets. See the
+[scene look guide](scene-look.md).
+
+| ID | Contract | State |
+|---|---|---|
+| VIS-01 | Opt-in tone mapping and exposure per scene: `defineScene({ view: { output: { toneMapping, exposure } } })`, `'none'`/1 by default (a fresh renderer's own values). Owner: the scene visit through the renderer lease profile; `ctx.view.output` changes draw exactly one frame; an invalid run-time value is reported once and the last valid output stays. WebGL mapping in `platform/render/backends/webgl/output.ts`. | **Implemented and checked (candidate PR).** Evidence: unit tests (`scene-output.test.ts`, `backends/webgl/output.test.ts`), `npm run test:output-browser` (reference and low; desktop headless Chromium, software GL: an emissive-6 lantern clips under `'none'` and stays below clipping under `'aces'`; idle 0 frames; one frame per change), `quality:guard` *identical* on blank (`main`) and explorer (`garden`, `shed`). No physical-device or HDR-display acceptance. |
