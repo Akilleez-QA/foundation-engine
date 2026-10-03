@@ -17,10 +17,12 @@ consumer or every prior artifact.
 ## Version and source identity
 
 The first public source snapshot was `c0e73c9`, with package version `0.1.0`.
-It was not a tagged GitHub release. Public main at `5a68f06` declares `0.2.0`,
-while its changelog work remains **Unreleased**. A source commit, package manifest
-version, passing PR, merged change and published release are distinct facts.
-Do not label a source snapshot as a released compatibility baseline.
+It was not a tagged GitHub release. **v0.2.0 is released**: the GitHub release
+`v0.2.0` tags `071e3c2` (2026-10-03), and it is the first released compatibility
+baseline. Later work on main is listed under **Unreleased** in the changelog until
+the next tag. A source commit, package manifest version, passing PR, merged change
+and published release are distinct facts. Do not label an untagged source snapshot
+as a released compatibility baseline.
 
 Before 1.0, a minor version may introduce a documented breaking change; a patch
 should preserve the declared public contract. A minor version is not permission
@@ -64,3 +66,45 @@ This is a retained **public source** consumer, not a release certification. It d
 not cover kits, storage, renderer/browser lifecycle or packaged exports. Add focused
 fixtures when expanding those promises; do not infer blanket backward compatibility
 from this small test.
+
+## Retained v0.2.0 baseline
+
+Two fixtures are retained from the released tag `v0.2.0` (`071e3c2`). Each has a
+manifest that pins the revision and the sha256 of every file. A changed byte fails
+the manifest check.
+
+- **Consumer:** `scripts/fixtures/compatibility/v0.2.0/` holds the arcade template's
+  game files (`game.ts`, `best.ts`, `components.ts`, `play.ts`, `restart.ts`,
+  `steer.ts`, `build.brief.ts`, `play.test.ts`) exactly as tagged. The
+  compatibility test compiles them against today's `@engine` and `@kits/ui` and runs
+  their released tests (S1, S2, S4 and the same-seed replay).
+- **Saves:** `src/core/save/fixtures/v0.2.0/` holds envelopes that the v0.2.0 store
+  code wrote: the arcade best score (player scope), device settings (device scope),
+  the explore kit's progress (player scope), and an `engine-profile` v2 export.
+  `generate.mjs` in that folder made them by running the tag's own code, and its
+  header gives the command. The manifest records the generator's hash and the Node
+  version. `src/core/save/released-v0.2.0.test.ts` loads each envelope with current
+  code and checks that the bytes are not rewritten across a flush and a reload. It
+  also imports the profile export, quarantines a corrupted envelope with its
+  original bytes kept, and leaves a future-version envelope read-only.
+
+```sh
+node --test scripts/compatibility.test.mjs
+npx tsx --test src/core/save/released-v0.2.0.test.ts
+```
+
+**When a retained check fails.** Do not edit the retained bytes or their hashes.
+Either fix the engine, or document the break: add a changelog migration note
+(what changed, who is affected, what to do) and retain a separate migrated
+consumer beside the original. For saves, the recovery route that players already
+have still applies:
+
+- An unreadable envelope moves to `<namespace>-q|<key>` with its exact bytes.
+- A migrated envelope keeps one copy of its old bytes at `<namespace>-bak|<key>|v<n>`.
+- An envelope from a newer build is never overwritten (status `newer`).
+- A profile export from v0.2.0 imports with `importPlayer`.
+
+**Limits.** These fixtures cover one template, three sections and one export,
+under Node with in-memory storage. They do not certify browsers, real Web Storage
+quotas, other templates, kits beyond `ui` and `explore`, or games made before
+`c0e73c9`.

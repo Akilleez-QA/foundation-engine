@@ -7,6 +7,57 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+### Upgrading from 0.2.0
+
+Changes a v0.2.0 game or workflow can notice. Each says what changed, who is affected and what to do.
+
+- **Game code is linted for `Math.random()` and literal UI text (#90).** `npm run lint:game`, run by
+  `npm run check`, `npm run lint` and the gate, scans `game/` (or `GAME_DIR`) and every
+  `templates/*/game`. Previously only `src/` was checked, so a game that passed on 0.2.0 can now fail.
+  *Affected:* game code that calls `Math.random()`, or passes literal text to the UI kit's HUD
+  (`.line(id, '…')`, `.banner('…')`, `.prompt('…')`). *To do:* run `npm run lint:game`; each line names
+  the file, line, rule and fix. Use `ctx.random()` (seeded, replayable with `?seed=`), and move text to
+  `defineGame({ strings })` read with `ctx.text(...)`. Tests, `<game>/tools/` and `<game>/public/` are
+  exempt; a deliberate exception needs `// lint-game-allow <rule>: <reason>` on that line.
+- **A visit's `enter()` runs before any of its systems step (#92).** On 0.2.0 a browser visit (first
+  entry, `goto`, `restart`, retry) stepped one fixed and two frame ticks on an empty `ctx.state` before
+  `enter()`; `testScene` already ran `enter()` first. *Affected:* systems that guarded against
+  uninitialised state, or relied on running during the two first-render frames (camera or HUD systems
+  now take effect from the first step after `enter()`; those frames show the scene's authored `view`).
+  *To do:* nothing for most games. Initialise state in `enter()`; you may remove guards that only
+  existed for the early ticks.
+- **`npm run check` test selection (#67).** `check` selects tests from working-tree changes against
+  `HEAD`, so a clean committed branch selects zero tests (now reported explicitly). `--base <ref>`
+  adds committed changes since the merge base, and `--all` now runs the canonical `npm test` suite
+  (0.2.0's list omitted game and tools tests). Invalid refs and unknown options now fail instead of
+  selecting nothing. *Affected:* contributors and scripts that ran `check` on a committed branch or
+  passed unknown options. *To do:* use `npm run check -- --base origin/main` before a PR, and
+  `-- --all` for the full suite.
+- **`testScene` throws on unknown cue and sound ids (#91).** *Affected:* game tests whose scenes play an
+  id that is neither a built-in cue (`BUILT_IN_CUES`) nor in the scene's `sounds`; they passed on 0.2.0
+  and now fail, naming the id. The browser still only warns. *To do:* fix the id, add the sound to the
+  scene's `sounds`, or pass `testScene(scene, { sounds: [...] })` for ids a scene plays without listing.
+- **Playtest scripts are validated, and `reload` is a new step (#94).** `play:script`, `play:criteria`
+  and `npm run check` (`lint:brief`, every `game/playtest/*.json`) now refuse unknown steps, fields and
+  matchers, and unknown scene ids, before any browser starts (exit 64, one line per problem).
+  *Affected:* scripts that 0.2.0 accepted with a mistake, for example an unsupported matcher such as
+  `atMost`, or a step with two actions. *To do:* fix each reported line; the format is in
+  [write a playtest script](docs/recipes/write-a-playtest-script.md). `{"reload": true}` and
+  `createTestSaves()` are additive.
+- **Static scenes redraw after a resolution-only quality change (#83).** On 0.2.0, changing the live
+  graphics resolution with unchanged CSS size cleared the canvas and could leave an on-demand scene
+  undrawn until something moved. It now redraws once, then idles. *Affected:* none adversely; a
+  test or bench that counted renders across a DPR change sees one more. *To do:* nothing.
+- **Each game ships only its own static files (#59).** Root `public/` mechanics files moved; see the
+  migration in the entry below. *Affected:* games that load `models/mechanics/…`,
+  `textures/mechanics/…` or `sounds/mechanics/…`.
+- **Retained v0.2.0 baseline.** The tagged arcade template and save envelopes written by the v0.2.0 store
+  code (arcade best, device settings, explore progress, a profile v2 export) are retained with sha256
+  manifests and checked on every test run. See
+  [public compatibility](docs/guides/public-compatibility.md#retained-v020-baseline).
+
+### Changes
+
 - **Fixed (docs): world-edit saves acknowledge only the submitted revision.** The
   [large world records](docs/recipes/store-large-world-records.md) recipe captures the revision
   before awaiting `store.write` and passes it to `markSaved`, so edits made while a save is

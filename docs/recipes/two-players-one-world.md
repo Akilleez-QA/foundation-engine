@@ -123,5 +123,7 @@ Change the world shape, the actions and `apply` in `session.ts`; change `project
 
 LAN and loopback only: unencrypted `ws://`, one shared join code per run, an in-memory
 world that a host restart resets, no accounts, matchmaking, lobby, NAT traversal or
-Internet hardening, and no WAN or physical-device evidence. The template targets
+Internet hardening, and no WAN or physical-device evidence. The browser evidence
+(`npm run test:session-browser`: join, host restart with a fresh world, one client
+dropping and resuming its slot) is loopback only; LAN between devices is unverified. The template targets
 desktop and laptop with keyboard, pointer and gamepad; it has no touch movement.
