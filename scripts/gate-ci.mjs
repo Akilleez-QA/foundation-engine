@@ -6,13 +6,15 @@
 // `run:` steps listed in SETUP_ONLY are skipped and must be done once by hand (see their reasons). Anything in the
 // workflow this runner cannot mirror is an error. It accepts one ordinary job or the explicit browser/two-shard
 // graph with a terminal always-running check. Work jobs run serially locally; aggregate results come from those runs;
-// scripts/gate-ci.test.mjs fails when the workflow and this runner disagree.
+// scripts/gate-ci.test.mjs fails when the workflow and this runner disagree. Jobs may set different Node versions:
+// the first job's is the primary. A step whose job uses another Node major than this process is skipped (a partial
+// run, no aggregate) unless --any-node; run those under that Node, e.g. `--only node-current/test` there.
 //
 //   npm run gate:ci                       every job serially; a failed step stops its job, not independent jobs
 //   npm run gate:ci -- --list             the plan (ids, names, env) without running it
 //   npm run gate:ci -- --from <step>      resume at a step (id, 1-based number, or name)
 //   npm run gate:ci -- --only <step>[,<step>...]   just these steps (the option may repeat)
-//   npm run gate:ci -- --any-node         run although the local Node major differs from the workflow's
+//   npm run gate:ci -- --any-node         run every step, although the local Node major differs from a job's
 //
 // Each step runs in its own process group; on Ctrl-C or SIGTERM only that spawned group is signalled (TERM, then
 // KILL after 5 s). Browsers stay muted: the steps' own scripts preload scripts/silent-browser.cjs.
@@ -126,7 +128,8 @@ const envMap = (env, where) => {
 
 /**
  * The workflow as a plan: `steps` are the `run:` steps gate:ci executes, in order; `setup` the SETUP_ONLY ones;
- * `actions` the `uses:` steps; `node` the setup-node version. Each step: {n, id, name, run, env}.
+ * `actions` the `uses:` steps; `node` the primary (first job's) setup-node version and `nodes` each job's.
+ * Each step: {n, id, job, aggregate, name, run, env, node}.
  */
 export function planFromWorkflow(text) {
   const wf = parseYaml(text);
@@ -136,7 +139,7 @@ export function planFromWorkflow(text) {
   const graph = entries.length !== 1;
   if (graph) {
     const names = entries.map(([id]) => id);
-    if (names.length !== 4 || ![...WORK_JOBS, 'check'].every(id => names.includes(id))) throw Error(`${WORKFLOW}: unsupported job graph; expected ${[...WORK_JOBS, 'check'].join(', ')}`);
+    if (names.length !== WORK_JOBS.length + 1 || ![...WORK_JOBS, 'check'].every(id => names.includes(id))) throw Error(`${WORKFLOW}: unsupported job graph; expected ${[...WORK_JOBS, 'check'].join(', ')}`);
     const aggregate = wf.jobs.check;
     if (aggregate.if !== 'always()' || !Array.isArray(aggregate.needs)
       || aggregate.needs.length !== WORK_JOBS.length || new Set(aggregate.needs).size !== WORK_JOBS.length
@@ -147,6 +150,7 @@ export function planFromWorkflow(text) {
   if (!jobs.length) throw Error(`${WORKFLOW}: no jobs`);
   const steps = [], setup = [], actions = [];
   let node = null;
+  const nodes = {};
   for (const [jobName, job] of jobs) {
     const aggregate = graph && jobName === 'check';
     const allowed = new Set([...JOB_KEYS, ...(aggregate ? ['needs', 'if'] : [])]);
@@ -166,8 +170,9 @@ export function planFromWorkflow(text) {
         actions.push(s.uses);
         if (/^actions\/setup-node@/.test(s.uses)) {
           const version = String(s.with?.['node-version'] ?? '');
-          if (!/^\d+(?:\.\d+){0,2}$/.test(version) || node && node !== version) throw Error(`${where}: inconsistent or unsupported Node version`);
-          node = version;
+          if (!/^\d+(?:\.\d+){0,2}$/.test(version) || nodes[jobName] && nodes[jobName] !== version) throw Error(`${where}: inconsistent or unsupported Node version`);
+          nodes[jobName] = version;
+          node ??= version;
         }
         continue;
       }
@@ -184,14 +189,14 @@ export function planFromWorkflow(text) {
       const name = s.name ?? run.split('\n')[0];
       const id = !run.includes('\n') && new Set(scripts).size === 1 ? scripts[0] : slug(name);
       steps.push({n: steps.length + 1, id: graph ? `${jobName}/${id}` : id, job: jobName, aggregate, name, run,
-        env: {...base, ...stepEnv}});
+        env: {...base, ...stepEnv}, node: nodes[jobName] ?? null});
     }
     if (!jobRuns || aggregate && jobRuns !== 1) throw Error(`${WORKFLOW}: job ${jobName} needs ${aggregate ? 'exactly one aggregate' : 'at least one checking'} run step`);
   }
   const ids = steps.map(s => s.id);
   for (const s of steps) if (ids.indexOf(s.id) !== ids.lastIndexOf(s.id)) s.id = (graph ? s.job + '/' : '') + slug(s.name);
   if (new Set(steps.map(s => s.id)).size !== steps.length) throw Error(`${WORKFLOW}: two steps share an id; give them distinct names`);
-  return {steps, setup, actions, node, graph};
+  return {steps, setup, actions, node, nodes, graph};
 }
 
 /** The step a --from/--only argument names: its id, its 1-based number, its name, or its name's slug. */
@@ -229,7 +234,7 @@ const fmt = s => s < 60 ? `${s.toFixed(1)} s` : `${Math.floor(s / 60)} min ${Mat
 const pad = (s, w) => String(s).padEnd(w);
 
 function table(rows) {
-  const w = [3, Math.max(4, ...rows.map(r => r.id.length)), 7, 4];
+  const w = [3, Math.max(4, ...rows.map(r => r.id.length)), Math.max(7, ...rows.map(r => r.result.length)), 4];
   const line = cells => cells.map((c, k) => pad(c, w[k] ?? 0)).join('  ').trimEnd();
   console.log('\n' + line(['#', 'step', 'result', 'exit', 'time']));
   for (const r of rows) console.log(line([r.n, r.id, r.result, r.code ?? '', r.s == null ? '' : fmt(r.s)]));
@@ -260,8 +265,8 @@ function stopChild(state, signal) {
 export async function main(argv = process.argv.slice(2)) {
   const o = parseArgs(argv);
   const plan = planFromWorkflow(readFileSync(resolve(ROOT, o.workflow), 'utf8'));
-  const partial = Boolean(o.from || o.only.length);
-  const chosen = selectSteps(plan.steps, o).filter(s => !partial || !s.aggregate);
+  let partial = Boolean(o.from || o.only.length);
+  let chosen = selectSteps(plan.steps, o).filter(s => !partial || !s.aggregate);
   if (!chosen.length) throw Error('gate:ci: no executable steps; a partial selection cannot run the aggregate');
   if (o.list) {
     for (const s of plan.setup) console.log(`setup (not run): ${s.name}: ${s.reason}`);
@@ -269,17 +274,28 @@ export async function main(argv = process.argv.slice(2)) {
     return 0;
   }
   const major = process.versions.node.split('.')[0];
-  if (plan.node && plan.node.split('.')[0] !== major) {
-    const msg = `gate:ci: CI uses Node ${plan.node}, this is Node ${process.versions.node}`;
-    if (!o.anyNode) { console.error(`${msg}; run it with that Node (or pass --any-node to accept the difference).`); return 2; }
-    console.warn(`${msg} (--any-node: results may differ from CI).`);
+  const otherNode = chosen.filter(s => !s.aggregate && s.node && s.node.split('.')[0] !== major);
+  const otherNodeSkipped = new Set();
+  if (otherNode.length) {
+    const versions = [...new Set(otherNode.map(s => s.node))].join(', ');
+    const msg = `gate:ci: CI uses Node ${versions} for ${otherNode.length} selected step(s), this is Node ${process.versions.node}`;
+    if (o.anyNode) console.warn(`${msg} (--any-node: results may differ from CI).`);
+    else if (otherNode.some(s => s.node === plan.node) || otherNode.length === chosen.filter(s => !s.aggregate).length) {
+      console.error(`${msg}; run it with that Node (or pass --any-node to accept the difference).`); return 2;
+    } else {
+      // Primary-Node steps run here; another job's Node is reproduced only under that Node.
+      for (const s of otherNode) otherNodeSkipped.add(s);
+      partial = true;
+      chosen = chosen.filter(s => !otherNodeSkipped.has(s) && !s.aggregate);
+      console.warn(`${msg}; skipping them (a partial run). Under that Node: npm run gate:ci -- --only ${otherNode.map(s => s.id).join(',')}`);
+    }
   }
   console.log(`gate:ci: ${chosen.length} of ${plan.steps.length} step(s) from ${o.workflow}. Not run here (do them once yourself): ${plan.setup.map(s => s.run).join('; ') || 'none'}.`);
 
   const state = {child: null, stop: null};
   const onSignal = sig => { state.stop = sig; console.error(`\ngate:ci: ${sig}: stopping the current step`); stopChild(state, 'SIGTERM'); };
   process.on('SIGINT', onSignal); process.on('SIGTERM', onSignal);
-  const t0 = Date.now(), rows = plan.steps.map(s => ({n: s.n, id: s.id, result: chosen.includes(s) ? 'not run' : 'skipped'}));
+  const t0 = Date.now(), rows = plan.steps.map(s => ({n: s.n, id: s.id, result: chosen.includes(s) ? 'not run' : otherNodeSkipped.has(s) ? `skipped (Node ${s.node})` : 'skipped'}));
   let failed = null;
   const failedJobs = new Set();
   try {
