@@ -1,6 +1,7 @@
 # Particle emitters (FX-01)
 
-Status: implemented, candidate (PR #63); not integrated. Optional and opt-in per scene: only a scene with
+Status (2026-10-03): integrated through batch PR #65 (`main` `1f9d10d`; PR #63 merge `b7b5550`);
+earlier an implemented candidate. Optional and opt-in per scene: only a scene with
 `defineScene({ particles: sceneParticles() })` simulates and draws emitters. A game that never imports it carries no
 particle simulation or drawing code: the stock runtime keeps only the contract (`particle-contract.ts`) and a small
 lazy-loading proxy (about 3 kB minified in the scene runtime chunk), and its draws and budgets do not change. The how-to is the
