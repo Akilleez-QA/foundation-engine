@@ -73,3 +73,24 @@ test('SIM-01: engine.replay.start disarms when navigation fails or the scene nev
   assert.deepEqual([api.replay.read().status, api.replay.read().reason], ['stopped', 'arrival-timeout']);
   assert.equal(tapFor(), null);
 });
+
+test('engine.dispose retires the app through App.dispose once, reports what is left and refuses later clock steps', async () => {
+  const app = createApp([], {mode: 'test', log() {}, probes: true});
+  const booted = app.boot();
+  const api = createTestApi(app, booted);
+  await api.ready();
+  let disposals = 0;
+  const dispose = app.dispose.bind(app);
+  (app as { dispose(): void }).dispose = () => { disposals++; dispose(); };
+  const first = api.dispose();
+  assert.equal(disposals, 1, 'the existing kernel teardown path is used');
+  assert.equal(first.disposed, true);
+  assert.equal(first.running, false);
+  assert.deepEqual(first.probes, []);
+  assert.equal(first.poolReleased, false, 'nothing rendered, so no lease was returned');
+  const again = api.dispose();
+  assert.equal(again.disposed, false, 'idempotent');
+  assert.equal(disposals, 1);
+  assert.throws(() => api.clock.step(16), /disposed/);
+  assert.deepEqual(api.entities({expectedEpoch: 0}), {status: 'unavailable'});
+});
