@@ -301,9 +301,10 @@ export function installGraphicsScreen(o: GraphicsScreenOptions): GraphicsScreen 
     });
   };
 
+  const button = o.button ?? graphicsButton(doc);
   const screen: GraphicsScreen = {
     dialog,
-    button: null as unknown as HTMLButtonElement,
+    button,
     get isOpen() { return layer !== null; },
     open(from) {
       if (layer) return;
@@ -340,9 +341,7 @@ export function installGraphicsScreen(o: GraphicsScreenOptions): GraphicsScreen 
   // a dialog that is really shut closes the layer.
   dialog.addEventListener('close', () => { if (layer && !dialog.open) layer.close('escape'); });
 
-  const button = o.button ?? graphicsButton(doc);
   if (!o.button) button.addEventListener('click', () => screen.open());
-  (screen as { button: HTMLButtonElement }).button = button;
   // A shell row in the settings menu, unless the caller names a host or brings its own button.
   const row = o.button || o.menu !== undefined ? null : appShell(doc).add(GRAPHICS_ROW(button));
   if (!o.button) o.menu?.append(button);

@@ -77,6 +77,18 @@ export interface I18n<P> {
   narrationKey<H extends string>(family: NarrationFamilyDef<H>, vars: NarrationVars<H>): NarrationKey;
 }
 
+/** `t` as the runtime implements it: any key, any variables. */
+interface RuntimeT { t(key: string, vars?: object): string }
+/**
+ * `t` for a key known only at run time (a composed narration key, a markup template's key with placeholder
+ * variables). The typed `t` correlates each key with its variables, which a runtime string cannot express; an unknown
+ * key takes the usual missing-key path.
+ */
+export function runtimeT<P>(i18n: I18n<P>, key: string, vars?: object): string {
+  // lint:allow-unknown-cast TArgs<P, K> cannot be satisfied for a runtime string key; the implementation accepts any.
+  return (i18n as unknown as RuntimeT).t(key, vars);
+}
+
 export interface I18nOptions {
   locale: string;
   catalogs: Readonly<Record<string, Catalog>>;

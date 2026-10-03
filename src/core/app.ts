@@ -49,6 +49,20 @@ export class BootValidationError extends Error {
   }
 }
 
+/**
+ * The kernel keeps registries in a runtime table keyed by name; `Registries` is the declaration-merged view every
+ * module augments. Which names exist is checked at run time (an unknown name throws in the register view).
+ */
+function registriesView(table: Record<string, Registry<{ id: string }>>): Registries {
+  // lint:allow-unknown-cast a runtime table (or its Proxy) presented as the module-augmented Registries interface.
+  return table as unknown as Registries;
+}
+/** A Proxy that resolves kernel members and provided services by key, presented as the module-augmented `Services`. */
+function servicesView(view: object): Services {
+  // lint:allow-unknown-cast a Proxy over kernel members and provided services; keys are checked at run time.
+  return view as unknown as Services;
+}
+
 const FOUNDATIONAL = 'core.';
 const AREA = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -57,6 +71,7 @@ export function createApp(input: readonly EngineModule[], opts: AppOptions): App
   const sink = opts.log ?? ((level, source, msg, data) => console[level](`[${source}] ${msg}`, data ?? ''));
   const events = opts.events ?? createEventBus({ onListenerError: (k, e) => sink('error', 'core.events', `listener for ${k} threw`, e) });
   const registries: Record<string, Registry<{ id: string }>> = {};
+  const typedRegistries = registriesView(registries);
   const provided = new Map<string, { impl: unknown; by: string }>();
   const serviceClaims = new Map<string, string>();
   const areaClaims = new Map<string, string>(KERNEL_EVENT_AREAS.map(a => [a, 'core'] as const));
@@ -236,14 +251,14 @@ export function createApp(input: readonly EngineModule[], opts: AppOptions): App
     for (const id of order) {
       const m = byId.get(id)!; if (!alive(id) || !m.register) continue;
       const allowed = closure(m), t0 = now();
-      const view = new Proxy(registries, { get(t, k) {
+      const view = registriesView(new Proxy(registries, { get(t, k) {
         if (typeof k !== 'string') return undefined;
         const r = t[k];
         if (!r) throw new Error(`registry '${k}' does not exist (is its owner installed and required?)`);
         const owner = adminOf(r).owner;
         if (!allowed.has(owner) && owner !== 'core') warnings.push(`${id} uses registry '${k}' owned by ${owner} without requiring it`);
         return r;
-      } }) as unknown as Registries;
+      } }));
       try { m.register(view); }
       catch (e) {
         for (const r of Object.values(registries)) adminOf(r).rollback(id);
@@ -270,7 +285,7 @@ export function createApp(input: readonly EngineModule[], opts: AppOptions): App
     return import('./patch').then(({ applyPatches }) => {
       // Patch eligibility uses the candidate set: nothing has installed yet (ADR 0063).
       const has = (term: string) => term.startsWith('flag:') ? !!opts.flag?.(term.slice(5)) : hasCandidate(term);
-      patches = applyPatches(registries as unknown as Registries, all, order, has);
+      patches = applyPatches(registries, all, order, has);
       for (const e of patches.errors) warnings.push(`patch ${e.patch}${e.target ? ` on ${e.target}` : ''}: ${e.error}`);
     });
   }
@@ -325,7 +340,7 @@ export function createApp(input: readonly EngineModule[], opts: AppOptions): App
       const pending = { ctl, revoke: () => { for (const key of mine) if (provided.get(key)?.by === id) provided.delete(key); } };
       pendingInstalls.add(pending);
       const base = {
-        events: scopedEvents, registries: registries as unknown as Registries, log, app: appInfo, probes, signal: ctl.signal, availability,
+        events: scopedEvents, registries: typedRegistries, log, app: appInfo, probes, signal: ctl.signal, availability,
         provide(key: string, impl: unknown) {
           appCtl.signal.throwIfAborted(); ctl.signal.throwIfAborted();
           if (!claimedKeys.has(key)) throw new Error(`${id} provided service '${key}' without claiming it in serviceKeys${serviceClaims.has(key) ? ` (claimed by ${serviceClaims.get(key)})` : ''}`);
@@ -334,14 +349,14 @@ export function createApp(input: readonly EngineModule[], opts: AppOptions): App
         },
         bind: (registry: string, ids: readonly string[], signal: AbortSignal) => bind(id, registry, ids, signal),
       };
-      const s = new Proxy(base, { get(t, k) {
+      const s = servicesView(new Proxy(base, { get(t, k) {
         if (typeof k !== 'string') return undefined;
         if (k in t) return (t as Record<string, unknown>)[k];
         const p = provided.get(k);
         if (!p) throw new Error(`service '${k}' is not provided (is its owner installed, and does ${id} require it?)`);
         if (!allowed.has(p.by)) warnings.push(`${id} uses service '${k}' from ${p.by} without requiring it`);
         return p.impl;
-      } }) as unknown as Services;
+      } }));
       const installedAs = (d: void | Disposable) => {
         pendingInstalls.delete(pending);
         if (appCtl.signal.aborted || ctl.signal.aborted) {
@@ -469,14 +484,14 @@ export function createApp(input: readonly EngineModule[], opts: AppOptions): App
   }
 
   const kernel = {
-    events: events as EventBus, registries: registries as unknown as Registries, app: appInfo, probes, signal: appCtl.signal, availability,
+    events: events as EventBus, registries: typedRegistries, app: appInfo, probes, signal: appCtl.signal, availability,
     log: { info: (s: string) => sink('info', 'core', s), warn: (s: string) => sink('warn', 'core', s), error: (s: string) => sink('error', 'core', s) },
     provide() { throw new Error('the kernel view cannot provide services'); },
     bind: (registry: string, ids: readonly string[], signal: AbortSignal) => bind('core', registry, ids, signal),
   };
   return {
-    events, registries: registries as unknown as Registries, probes,
-    services: new Proxy(kernel, { get: (t, k) => typeof k !== 'string' ? undefined : k in t ? (t as Record<string, unknown>)[k] : provided.get(k)?.impl }) as unknown as Services,
+    events, registries: typedRegistries, probes,
+    services: servicesView(new Proxy(kernel, { get: (t, k) => typeof k !== 'string' ? undefined : k in t ? (t as Record<string, unknown>)[k] : provided.get(k)?.impl })),
     async boot() {
       if (booted) throw new Error('an app boots once; create a new app to boot again');
       booted = true;

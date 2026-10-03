@@ -121,6 +121,7 @@ notes outside publishable documentation.
 - Nothing redraws when nothing changed: only touch what moved.
 - Each success criterion checked by a test has a test named after its id (`test('S2: …')`).
 - Never delete or weaken a test, a budget or a tolerance to make a check pass.
+- No `any`: use a real type, `unknown` with narrowing, or a generic. No `as unknown as` outside tests; an unavoidable cast lives in one typed helper with `// lint:allow-unknown-cast <reason>` (`npm run lint:types`).
 
 ## Teaching (learn mode)
 

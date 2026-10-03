@@ -35,6 +35,12 @@ export interface LegacyBinding {
   perKey?: boolean;
 }
 
+/**
+ * One migration step: version-n data to n+1. Method syntax makes the parameter bivariant, so an author's typed step
+ * (`(old: { n: number }) => …`) is accepted while the store calls it with the untyped previous step's output.
+ */
+export type Migration = { step(old: unknown): unknown }['step'];
+
 export interface SaveSection<T> {
   // ---- core fields
   id: string;
@@ -42,7 +48,8 @@ export interface SaveSection<T> {
   version: number;
   initial(): T;
   parse(raw: unknown): T;
-  migrations?: Record<number, (old: any) => any>;
+  /** Typed per step by the author (`(old: V1) => V2`); the store calls each with the previous step's output. */
+  migrations?: Record<number, Migration>;
   /** Shorthand for `legacy: {keys: () => legacyKeys, fromVersion: 1, decode: raws => JSON.parse(first non-null raw)}`. */
   legacyKeys?: string[];
   /** Default true for player and profile scope, false for device scope. Only player sections are exported today. */

@@ -3,6 +3,7 @@ import * as T from 'three';
 // exports into an object in the entry chunk (7 KiB of first-load JS).
 import {Mesh,Group,Object3D,Bone,DoubleSide,DetachedBindMode} from 'three';
 import {isStillSafe} from './still-safe';
+import {batchedMeshInternals,materialId,materialRecord,type MaterialRecord} from './three-internals';
 
 /**
  * Render change detection that observes, never guesses (STD-REN-38; ADRs 0055, 0056, 0057).
@@ -86,7 +87,7 @@ export type BatchState={
 };
 /** Reads a batch's private draw state, or `null` if the engine no longer exposes it (then the batch is forced). */
 export function readBatchState(batch:T.BatchedMesh):BatchState|null{
- const b=batch as unknown as {_matricesTexture?:T.DataTexture|null;_colorsTexture?:T.DataTexture|null;_instanceInfo?:BatchState['instances'];_geometryInfo?:BatchState['geometries']};
+ const b=batchedMeshInternals(batch);
  const matrices=b._matricesTexture,instances=b._instanceInfo,geometries=b._geometryInfo;
  if(!matrices||!(matrices as T.Texture).isTexture||!Array.isArray(instances)||!Array.isArray(geometries)||b._colorsTexture===undefined)return null;
  return {matrices,colors:b._colorsTexture??null,instances,geometries};
@@ -148,7 +149,6 @@ const ids=new WeakMap<object,number>();let nextId=1;
 /** A stable numeric identity for objects three does not number (skeletons, sources, clipping planes). */
 const idOf=(o:object)=>{let id=ids.get(o);if(id===undefined)ids.set(o,id=nextId++);return id;};
 
-const materialId=(m:T.Material)=>(m as unknown as {id:number}).id;
 const attributeVersion=(a:T.BufferAttribute|T.InterleavedBufferAttribute|null|undefined)=>!a?-1:(a as T.InterleavedBufferAttribute).isInterleavedBufferAttribute?(a as T.InterleavedBufferAttribute).data.version:(a as T.BufferAttribute).version;
 const attributeId=(a:T.BufferAttribute|T.InterleavedBufferAttribute)=>idOf((a as T.InterleavedBufferAttribute).isInterleavedBufferAttribute?(a as T.InterleavedBufferAttribute).data:a);
 
@@ -335,7 +335,6 @@ export function observeValue(obs:Observer,v:unknown,depth=0):void{
 // proves the list against a recording proxy), and every key it does not cover is still read generically. Coverage
 // is decided per material and version, from the material's own keys, so nothing a reader omits is ever skipped.
 
-type MaterialRecord=Record<string,unknown>;
 type Reader={readonly numbers:readonly string[];readonly colors:readonly string[];readonly textures:readonly string[];readonly other:readonly string[];readonly read:(m:MaterialRecord,obs:Observer)=>void};
 
 const colourOf=(obs:Observer,c:unknown)=>{const x=c as T.Color|null;if(x&&x.isColor){obs.push(x.r);obs.push(x.g);obs.push(x.b);}else obs.push(-1);};
@@ -404,7 +403,7 @@ const basicReader:Reader={
 };
 /** The named readers that apply to a material (by its own class flags); the rest of its keys are read by key. */
 export const materialReaders=(m:T.Material):readonly Reader[]=>{
- const x=m as unknown as MaterialRecord,list:Reader[]=[baseReader];
+ const x=materialRecord(m),list:Reader[]=[baseReader];
  if(x.isMeshStandardMaterial===true)list.push(standardReader);
  if(x.isMeshPhysicalMaterial===true)list.push(physicalReader);
  if(x.isMeshBasicMaterial===true)list.push(basicReader);
@@ -417,7 +416,7 @@ type MaterialFields={version:number;readers:readonly Reader[];numbers:string[];c
 /** Plans a material's reads. The generic classification is the definition of completeness: a key goes to a reader
  *  only if that reader lists it under the same kind the generic pass gives it; everything else is read by key. */
 function planMaterial(m:T.Material):MaterialFields{
- const record=m as unknown as MaterialRecord,readers=materialReaders(m);
+ const record=materialRecord(m),readers=materialReaders(m);
  const f:MaterialFields={version:m.version,readers,numbers:[],colors:[],textures:[],other:[]};
  const covered=(kind:'numbers'|'colors'|'textures'|'other',key:string)=>{for(const r of readers)if(r[kind].includes(key))return true;return false;};
  for(const key of Object.keys(record)){
@@ -447,7 +446,7 @@ export function createColourTracker(){
   if(m.onBeforeRender!==materialHook&&!safe(m.onBeforeRender))obs.force('material render hook');
   if(m.onBeforeCompile!==compileHook&&!safe(m.onBeforeCompile))obs.force('material compile hook');
   if(m.customProgramCacheKey!==customKey&&!safe(m.onBeforeCompile))obs.force('custom program key');
-  const record=m as unknown as MaterialRecord;let f=fields.get(m);
+  const record=materialRecord(m);let f=fields.get(m);
   if(!f||f.version!==m.version)fields.set(m,f=planMaterial(m));
   const readers=f.readers;obs.push(readers.length);for(let i=0;i<readers.length;i++)readers[i].read(record,obs);
   // The key lists are cached per version.
@@ -636,8 +635,8 @@ export function observeCaster(obs:Observer,o:T.Mesh|T.Line|T.Points,root:T.Objec
  if(Array.isArray(materials)){obs.push(materials.length);for(const x of materials)depthMaterial(obs,x);}else{obs.push(-1);depthMaterial(obs,materials);}
  // A custom depth material may run arbitrary shader code: its inputs cannot be enumerated.
  if(m.customDepthMaterial||m.customDistanceMaterial)obs.force('custom depth material');
- const batched=(o as unknown as T.BatchedMesh).isBatchedMesh===true;
- if(batched)obs.batch(o as unknown as T.BatchedMesh,false);
+ const batched=(o as T.BatchedMesh).isBatchedMesh===true;
+ if(batched)obs.batch(o as T.BatchedMesh,false);
  else if(o.onBeforeShadow!==objectShadowHook&&!safe(o.onBeforeShadow))obs.force('object shadow hook');
  if(o.onAfterShadow!==T.Object3D.prototype.onAfterShadow&&!safe(o.onAfterShadow))obs.force('object after-shadow hook');
  if(m.isInstancedMesh){obs.push(m.count);obs.push(m.instanceMatrix.version);obs.texture(m.morphTexture);}

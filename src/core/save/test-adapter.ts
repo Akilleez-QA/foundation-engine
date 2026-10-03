@@ -27,8 +27,8 @@ export interface SaveTestAdapter {
   flush(): unknown;
 }
 
-export function createSaveTestAdapter(store: SaveStore, sections: readonly SaveSection<any>[]): SaveTestAdapter {
-  const find = (name: string, player: PlayerId): SaveSection<any> => {
+export function createSaveTestAdapter(store: SaveStore, sections: readonly SaveSection<unknown>[]): SaveTestAdapter {
+  const find = (name: string, player: PlayerId): SaveSection<unknown> => {
     const def = sections.find(d => d.id === name || d.aliases?.includes(name))
       ?? sections.find(d => d.legacyKeys?.includes(name) || safeKeys(d, player).includes(name));
     if (!def) throw new Error(`engine.save: no section '${name}' (known: ${sections.map(d => d.id).join(', ')})`);
@@ -49,6 +49,6 @@ export function createSaveTestAdapter(store: SaveStore, sections: readonly SaveS
 }
 
 /** A section's legacy keys for one player; a binding that cannot name them (it throws) has none. */
-function safeKeys(def: SaveSection<any>, player: PlayerId): string[] {
+function safeKeys(def: SaveSection<unknown>, player: PlayerId): string[] {
   try { return def.legacy?.keys(def.scope === 'player' ? player : '') ?? []; } catch { return []; }
 }

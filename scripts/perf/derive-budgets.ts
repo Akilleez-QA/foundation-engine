@@ -8,7 +8,7 @@
 // because the scene had ended: a worst-of over the remaining windows would understate it, and zeros are not counts.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { deriveBudget, isComparable, worstOf, type BenchSample, type BudgetMetric } from '../../src/platform/perf/budget-check';
+import { deriveBudget, isComparable, worstOf, type BudgetMetric } from '../../src/platform/perf/budget-check';
 import type { PerfRun } from '../../src/platform/perf/perf-run';
 import { NO_FRAME_HINT } from './budget-check';
 
@@ -33,7 +33,7 @@ export function refusalReasons(samples: readonly PerfRun['samples'][number][]): 
     const cls = s.classification as { kind?: string; reasons?: string[] } | undefined;
     if (s.error) out.push(`${s.id}: rejected (${s.error})`);
     else if (cls?.kind === 'inconclusive') out.push(`${s.id}: inconclusive: ${NO_FRAME_HINT}`);
-    else if (!isComparable(s as unknown as BenchSample)) out.push(`${s.id}: not comparable (${cls?.kind ?? 'unknown'}${cls?.reasons?.length ? ': ' + cls.reasons.join('; ') : ''})`);
+    else if (!isComparable({ ...s })) out.push(`${s.id}: not comparable (${cls?.kind ?? 'unknown'}${cls?.reasons?.length ? ': ' + cls.reasons.join('; ') : ''})`);
   }
   return out;
 }
@@ -48,7 +48,7 @@ export function deriveRun(run: PerfRun, headroom = 0.1): Derivation {
     // observation. Leave those metrics out (unmeasured, so the checker skips them) rather than invent a step-sized cap.
     const drew = samples.some(s => typeof s.renderedFrames === 'number' && s.renderedFrames > 0);
     if (!drew) notes[scene] = `no window drew a frame; ${PER_RENDERED_FRAME.join(' and ')} left unmeasured (bench an active window in which the scene draws)`;
-    rows[scene] = deriveBudget(worstOf(samples as unknown as BenchSample[]), drew ? DERIVED : DERIVED.filter(m => !PER_RENDERED_FRAME.includes(m)), headroom);
+    rows[scene] = deriveBudget(worstOf(samples.map(s => ({ ...s }))), drew ? DERIVED : DERIVED.filter(m => !PER_RENDERED_FRAME.includes(m)), headroom);
   }
   return { rows, refused, notes };
 }

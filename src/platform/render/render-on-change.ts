@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {materialId,materialRecord} from './three-internals';
 
 // Kept for areas not yet converted to scheduler change tracking (a migration aid, STD-RUN-8) until their adoption rows
 // (ADR 0061). Every other on-demand scene uses `onDemandFrames` in platform/render/shadows.ts (the observing trackers).
@@ -28,10 +29,10 @@ export function createRenderOnChange(){
  function texture(t:T.Texture){push(t.id);push(t.version);push(t.offset.x);push(t.offset.y);push(t.repeat.x);push(t.repeat.y);push(t.rotation);if((t as T.VideoTexture).isVideoTexture)force=true;}
  function material(m:T.Material){
   // three itself bumps the version of transparent double-sided materials on every draw (two passes).
-  push((m as unknown as {id:number}).id);if(seen.get(m)===frame)return;seen.set(m,frame);if(!(m.transparent&&m.side===T.DoubleSide&&!m.forceSinglePass))push(m.version);
+  push(materialId(m));if(seen.get(m)===frame)return;seen.set(m,frame);if(!(m.transparent&&m.side===T.DoubleSide&&!m.forceSinglePass))push(m.version);
   // A compile hook marked still-safe (a shader patch whose inputs live in `uniforms`, read below) does not force redraws.
   if(m.onBeforeRender!==materialHook||m.onBeforeCompile!==compileHook&&!(m.onBeforeCompile as {stillSafe?:boolean}).stillSafe)force=true;
-  const record=m as unknown as Record<string,unknown>;let f=fields.get(m);
+  const record=materialRecord(m);let f=fields.get(m);
   if(!f||f.version!==m.version){f={version:m.version,numbers:[],colors:[],textures:[],other:[]};for(const key of Object.keys(record)){const v=record[key] as {isColor?:boolean;isTexture?:boolean}|null;if(key==='uniforms'||key==='userData'||key==='version'||key[0]==='_'||typeof v==='string'||typeof v==='function')continue;(typeof v==='number'||typeof v==='boolean'?f.numbers:v?.isColor?f.colors:v?.isTexture||v===null&&/map$/i.test(key)?f.textures:f.other).push(key);}fields.set(m,f);}
   for(const key of f.numbers)push(+(record[key] as number));
   for(const key of f.colors){const c=record[key] as T.Color;push(c.r);push(c.g);push(c.b);}

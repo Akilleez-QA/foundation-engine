@@ -36,7 +36,7 @@ export interface UploadSummary {
   bytes: number;
 }
 
-export interface PerfSample {
+export type PerfSample = {
   /** Sample id the budgets bind to: `<scene>` (idle) and `<scene>:active`. */
   id: string;
   scene: string;
@@ -82,7 +82,7 @@ export interface PerfSample {
   heldKeysDrive?: boolean | null;
   heldKeysSource?: 'activeKeys' | 'bindings' | 'unknown';
   heldKeyActions?: string[];
-}
+};
 
 export interface StartupSample {
   appReadyMs: number;
