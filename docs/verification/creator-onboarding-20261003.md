@@ -129,3 +129,22 @@ software-GL launcher. Browser and server processes exited normally.
 No public deployment, physical-device trial, manual terminal play/preview trial
 or complete integration gate was performed. The earlier candidate-specific
 receipt remains separate evidence and is not relabeled as public-main coverage.
+
+### Reproducer cleanup correction and rerun
+
+Documentation head `93eccaf` clarifies that the no-game template tryout needs
+only cloning and `npm ci`. Its embedded production probe now uses the existing
+`diagnosticReport` helper: scenario failures are retained, both owners are
+closed independently, and cleanup/report failures prevent a passing receipt.
+No runtime code changed.
+
+The exact updated code block was extracted and rerun under Node 22.23.3 in the
+same disposable public-main-based clone against its existing `/my-game/` build.
+Probe SHA-256: `3bd5d8ea6dbae78fcf8e53b3a398579434a530ab869b0befa19298cf1c050706`.
+It passed with empty errors, failed responses, out-of-prefix requests and cleanup
+failures; the production test API was absent. The new screenshot was inspected.
+The existing `scripts/play/diagnostic-report.test.mjs` passed all four tests,
+including independent browser/server failures and stale-success invalidation.
+Browser and server exited. This rerun validates the updated reproducer against
+the previously built public-main engine; it is not a new full-build or full-gate
+claim for the documentation-only commit.
