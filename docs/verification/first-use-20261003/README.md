@@ -4,7 +4,7 @@ The new `npm run test:first-use-browser` measures the existing explorer consumer
 
 ## Latest evidence: standalone public-main branch
 
-Passed at **2026-10-03T17:46:29.825425+00:00** on exact head `93cd618993e5fb7be0bd1863d31f499f052bad8f`, based directly on public main `2fb6e69`. Script SHA-256: `2cb0f41c909a3c1b6db6b37813bcd1f5ec0b366bd64512f13431f28c277a40e0`. The report records `dirtyWorktree: false`. This was a focused browser run, not full-gate acceptance. This receipt update changes documentation and samples only.
+Passed at **2026-10-03T18:06:57.789589+00:00** on exact head `9bf1e2905827f505ee7ac839319221e18ce0a820`, based directly on public main `2fb6e69`. Script SHA-256: `1e8d8f21f781c21451e6ceae9f1b0f2d8bba4688073209c20bfcfc4ac4d9c6f9`. The report records `dirtyWorktree: false`. This was a focused browser run, not full-gate acceptance. This receipt update changes documentation and samples only.
 
 The focused branch contains only the diagnostic, its npm/CI registration and evidence. No broader local integration candidate is included. The observed test APIs (`engine.goto`, `engine.state`, pool probe), browser launcher, explorer consumer and shell readiness markers already exist on public main.
 
@@ -16,11 +16,11 @@ Environment: Linux, Node v26.8.1, Chromium 152.0.7977.82, muted isolated headles
 
 | Context | Navigation start → first garden active | Request → first shed active | Request → first return active |
 | --- | ---: | ---: | ---: |
-| 1 | 978.5 | 93.4 | 95.1 |
-| 2 | 445.1 | 76.8 | 97.8 |
-| 3 | 439.4 | 92.9 | 78.5 |
+| 1 | 895.7 | 94.7 | 78.2 |
+| 2 | 475.6 | 78.7 | 94.6 |
+| 3 | 460.9 | 80.5 | 79.2 |
 
-Two further round trips per context produced raw arrival intervals from 78.9–97.1ms. Browser keydown handler → observed changed player state ranged 10.0–33.4ms with a 10ms polling observer. These are observed aggregate intervals, not a percentile, latency guarantee, input-to-photon measurement or regression threshold. Each arrival held exactly one live pooled context and zero overflows.
+Two further round trips per context produced raw arrival intervals from 77.7–96.3ms. Browser keydown handler → observed changed player state ranged 10.1–34.5ms with a 10ms polling observer. These are observed aggregate intervals, not a percentile, latency guarantee, input-to-photon measurement or regression threshold. Each arrival held exactly one live pooled context and zero overflows.
 
 The first-use sample size is deliberately small. The variation in context-cold entries is a reason to retain cache/environment context, not evidence of an optimization. Same-page repeats can still recreate program objects as the renderer lease changes.
 
@@ -36,11 +36,11 @@ The input observer starts inside the browser keydown event handler and ends when
 
 ```sh
 nice -n 15 npm run test:first-use-browser
-node --import tsx --test scripts/gate-ci.test.mjs
+node --import tsx --test scripts/gate-ci.test.mjs scripts/play/diagnostic-report.test.mjs
 node scripts/lint/genericity.mjs
 ```
 
-Browser:21 samples passed; workflow parser:6 tests passed. Syntax, final-document genericity and diff checks passed. CI is registered to repeat the diagnostic, but no remote CI, full integration gate or production-build comparison was performed for this slice.
+Browser:21 samples passed; workflow parser and diagnostic cleanup:10 tests passed. Syntax, final-document genericity and diff checks passed. CI is registered to repeat the diagnostic, but no remote CI, full integration gate or production-build comparison was performed for this slice.
 
 ## Historical development evidence
 
@@ -48,9 +48,4 @@ The earlier samples recorded on local candidate `1be7ba7` and its diagnostic bra
 
 ## Review follow-up
 
-All 21 retained samples reported `unsupported` program readiness; they do not
-exercise the parallel-compilation extension path. A subsequent diagnostic change
-retains per-context browser errors and checks them through context retirement and
-final cleanup. The default evidence directory is now ignored so repeat runs do not
-mark an otherwise unchanged checkout dirty. The historical sample revision remains
-unchanged; the updated diagnostic requires a fresh browser run before publication.
+The latest 21 retained samples reported `unsupported` program readiness; they do not exercise the parallel-compilation extension path. The updated diagnostic retains per-context browser errors and checks them through context retirement and final cleanup. All three error arrays are empty in the new exact-head report above. The default evidence directory is ignored so repeat runs do not mark unchanged source dirty. The earlier public-main samples at `93cd618` remain historical in Git history and are not attributed to the updated script. Numeric samples are retained here; the full resource report remains regenerable locally rather than introducing an additional CI artifact action in this change.
