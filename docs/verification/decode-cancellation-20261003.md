@@ -18,11 +18,21 @@ used as the base colour texture. Each cycle then runs these steps:
    `createImageBitmap` decodes the image, but the wrapper holds back the resulting
    `ImageBitmap` until the test releases it. This makes `GLTFLoader`'s parse wait
    with the image already decoded.
-2. Preview the `decoded` candidate. In the first cycle the exact browser request is
-   correlated with its terminal event, and it must be `requestfinished` with no
-   error, not `ERR_ABORTED`. The fixture serves this file immediately, so the full
-   body is delivered. Cycles 2 and 3 decode the library's retained file bytes, so
-   they make no new request; the fetch count must stay at 1.
+2. Preview the `decoded` candidate and wait until its decode is held. Before
+   any cancellation, the first cycle checks full delivery from both ends. The
+   fixture server records that it finished writing all 3,516 bytes without the
+   connection closing early. A page-side `fetch` wrapper reads a clone of the
+   response and must receive status 200 and exactly 3,516 bytes. The decode is a
+   third proof: the library parses only after `validateEmbeddedGlb` accepts a
+   byte length equal to the GLB header's total, and the image decodes inside that
+   parse. Cycles 2 and 3 decode the library's retained file bytes, so they make
+   no new request; the fetch count must stay at 1.
+
+   The browser's own terminal event for the request is recorded but not
+   asserted. Under CPU load, Chromium sometimes reported the fully consumed body
+   as `requestfailed` with `net::ERR_ABORTED` before any cancellation. That made
+   the first version of this check fail on main CI after #116 (run `37157174423`),
+   and it reproduced locally in 1 of 5 runs.
 3. Wait until the 8×8 bitmap has decoded and is held. The candidate must still be
    `loading` and invisible, and the accepted entity must be unchanged.
 4. Cancel. The candidate entity is despawned. The scene's model owner retires that
@@ -101,3 +111,13 @@ owner's sync.
 ```sh
 nice -n 15 npm run test:model-preview-browser
 ```
+
+## Follow-up: transfer evidence without a network-event race
+
+The first version asserted Playwright's `requestfinished`. That event raced under
+load, as described in step 2. The check now asserts the server-side and page-side
+transfer records instead. With 16 competing busy processes, run under
+`flock ~/.cache/foundation-browser.lock` at niceness 15, the corrected check passed
+10 of 10 runs. In those runs it recorded server `finished: true` and 3,516 bytes,
+page status 200 and 3,516 bytes, and 1/1 geometry, material, texture and bitmap
+released in every cycle.

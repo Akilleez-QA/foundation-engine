@@ -49,19 +49,20 @@ export function checkBundle(
     problems.push(`missing emitted file ${file}`);
     return 0;
   };
-  const seen = new Set<string>();
+  const seen = new Map<string, ManifestChunk>();
   const walk = (key: string) => {
     if (seen.has(key)) return;
-    if (!manifest[key]) {
+    const chunk = manifest[key];
+    if (!chunk) {
       problems.push(`missing manifest dependency ${key}`);
       return;
     }
-    seen.add(key);
-    for (const i of manifest[key].imports ?? []) walk(i);
+    seen.set(key, chunk);
+    for (const i of chunk.imports ?? []) walk(i);
   };
   for (const [key, c] of Object.entries(manifest)) if (c.isEntry && key.endsWith('.html')) walk(key);
   if (!seen.size) problems.push('no HTML entry in the Vite manifest');
-  const firstLoadFiles = [...new Set([...seen].map(k => manifest[k].file).filter(f => f.endsWith('.js')))].sort();
+  const firstLoadFiles = [...new Set([...seen.values()].map(c => c.file).filter(f => f.endsWith('.js')))].sort();
   const firstLoadJsKiB = Math.round((firstLoadFiles.reduce((a, f) => a + size(f), 0) / KIB) * 10) / 10;
   const files = [
     ...new Set(
@@ -90,7 +91,9 @@ export function checkBundle(
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const argv = process.argv.slice(2);
   const di = argv.indexOf('--dir');
-  let dir = di >= 0 ? argv[di + 1] : 'dist',
+  const named = di >= 0 ? argv[di + 1] : 'dist';
+  if (named === undefined) throw Error('--dir needs a folder');
+  let dir = named,
     temp: string | null = null;
   if (argv.includes('--build')) {
     const {build} = await import('vite');

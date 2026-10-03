@@ -75,9 +75,11 @@ test('probe result emits one spatial cue at the committed impact position', asyn
   for (let i = 0; i < 5; i++) s.next(t.ctx);
   t.run(1);
   t.run(1);
+  const [cue] = played;
   assert.equal(played.length, 1);
-  assert.equal(played[0].cue, 'ui.success');
-  const point = played[0].options!.spatial!.position;
+  assert.ok(cue);
+  assert.equal(cue.cue, 'ui.success');
+  const point = cue.options!.spatial!.position;
   assert.ok(point.every(Number.isFinite));
   assert.ok(point[0] > 3 && point[0] < 4);
   assert.equal(point[1], 1);

@@ -11,6 +11,18 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 Changes a v0.2.0 game or workflow can notice. Each says what changed, who is affected and what to do.
 
+- **No explicit `any`; double casts through `unknown` need a reason (#99).** `npm run lint:types`, run by
+  `npm run check` and `npm run lint`, rejects the `any` type everywhere in `src/`, `templates/`, `scripts/`,
+  `perf/` and the game folder, and `as unknown as` outside test files. *Affected:* game code with `any` or
+  double casts; save migrations whose old-value parameter was left unannotated (it is now `unknown`, not
+  `any`). *To do:* use a real type, `unknown` with narrowing, or annotate the migration's old shape
+  (`(old: { best: number }) => …`). An unavoidable cast goes in one typed helper with
+  `// lint:allow-unknown-cast <reason>`.
+- **Stricter TypeScript: `noUncheckedIndexedAccess`, `noImplicitOverride` and `noImplicitReturns`.** Indexing
+  an array or a record now yields `T | undefined`. *Affected:* game code that reads `list[i]`, `record[key]`
+  or tuple-less matrix elements without a check. *To do:* run `npm run typecheck`; destructure, iterate with
+  `for…of`, check for `undefined`, or type fixed-length data as tuples. Use `!` only for a local, obvious
+  invariant, with a comment.
 - **Game code is linted for `Math.random()` and literal UI text (#90).** `npm run lint:game`, run by
   `npm run check`, `npm run lint` and the gate, scans `game/` (or `GAME_DIR`) and every
   `templates/*/game`. Previously only `src/` was checked, so a game that passed on 0.2.0 can now fail.

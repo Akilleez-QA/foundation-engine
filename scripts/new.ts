@@ -25,11 +25,11 @@ const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 export const pascal = (id: string) =>
   id
     .split('-')
-    .map(w => w[0].toUpperCase() + w.slice(1))
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
     .join('');
 export const camel = (id: string) => {
   const p = pascal(id);
-  return p[0].toLowerCase() + p.slice(1);
+  return p.charAt(0).toLowerCase() + p.slice(1);
 };
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -52,10 +52,12 @@ export function withChangelogRow(md: string, row: string): string {
   const lines = md.split('\n'),
     h = lines.findIndex(l => /^##\s+Changelog\b/i.test(l));
   if (h < 0) return md.replace(/\n*$/, '\n') + row + '\n';
+  // A line past the end reads as '', which neither starts a table row nor a heading: the same stops as `i < length`.
+  const line = (k: number) => lines[k] ?? '';
   let i = h + 1;
-  while (i < lines.length && !lines[i].startsWith('|') && !/^#/.test(lines[i])) i++;
-  if (i < lines.length && lines[i].startsWith('|')) {
-    while (i < lines.length && lines[i].startsWith('|')) i++;
+  while (i < lines.length && !line(i).startsWith('|') && !/^#/.test(line(i))) i++;
+  if (i < lines.length && line(i).startsWith('|')) {
+    while (i < lines.length && line(i).startsWith('|')) i++;
     lines.splice(i, 0, row);
   } else lines.splice(h + 1, 0, '', '| Date | Change | Budgets |', '|---|---|---|', row); // a heading with no table yet
   return lines.join('\n');
@@ -402,7 +404,11 @@ export default defineScene({
     case 'lesson': {
       const {generateLesson} = await import('../src/kits/learn/generate');
       const made = generateLesson(dir, id, brief, ROOT);
-      for (const f of made.files) write(join(ROOT, f), made.text[f], files);
+      for (const f of made.files) {
+        const text = made.text[f];
+        if (text === undefined) throw Error(`lesson generator listed ${f} without its text`);
+        write(join(ROOT, f), text, files);
+      }
       files.push(...made.strings);
       addBudgetRow(dir, id, brief, files);
       changelog(dir, `Added lesson \`${id}\``, files);
@@ -438,14 +444,16 @@ async function formatMade(made: string[]) {
 if (process.argv[1]?.endsWith('new.ts')) {
   const [kind, id, ...rest] = process.argv.slice(2);
   const opts: Record<string, string | boolean> = {};
-  for (let i = 0; i < rest.length; i++)
-    if (rest[i].startsWith('--')) {
+  for (let i = 0; i < rest.length; i++) {
+    const arg = rest[i]!; // i < rest.length
+    if (arg.startsWith('--')) {
       const v = rest[i + 1];
       if (v && !v.startsWith('--')) {
-        opts[rest[i].slice(2)] = v;
+        opts[arg.slice(2)] = v;
         i++;
-      } else opts[rest[i].slice(2)] = true;
+      } else opts[arg.slice(2)] = true;
     }
+  }
   if (!kind || !id) {
     console.log(
       'usage: npm run new -- <scene|entity|component|system|input|save-section|kit|interactable|area|lesson> <id> [options]',

@@ -76,6 +76,7 @@ export function createEventBus(opts: EventBusOptions = {}): EventBus & EventBusD
     } finally {
       observing = false;
     }
+    return undefined;
   };
   const reportSafely = (k: EventKey, error: unknown) => {
     if (reporting) return;
