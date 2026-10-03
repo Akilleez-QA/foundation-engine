@@ -103,7 +103,7 @@ export const playersSection: SaveSection<Roster> = {
       return p.name === undefined ? { id: p.id } : { id: p.id, name: p.name };
     });
     if (new Set(players.map(p => p.id)).size !== players.length) throw Error('Duplicate player');
-    return { players, active: players.some(p => p.id === r.active) ? r.active : players[0].id };
+    return { players, active: players.some(p => p.id === r.active) ? r.active : players[0]!.id }; // players.length >= 1 (checked above)
   },
   merge: (stored, incoming) => {
     const byId = new Map(stored.players.map(p => [p.id, { ...p }]));
@@ -228,7 +228,7 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
   // ------------------------------------------------------------------ loading
   function cellFor(def: SaveSection<unknown>, player: PlayerId): Cell {
     const owner = def.scope === 'player' ? player : '';
-    const key = live(def) ? def.legacy!.keys(owner)[0] : envKey(def, owner);
+    const key = live(def) ? def.legacy!.keys(owner)[0]! : envKey(def, owner); // a live binding's one legacy key is the storage
     const port=portFor(def),identity=port.kind+':'+key;
     let cell = cells.get(identity);
     if (!cell) {
@@ -331,7 +331,8 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
     const def = cell.def, b = def.legacy!, read = readLegacy(cell);
     if (read === 'unavailable') return undefined;
     // A key the binding only reads (encode gives undefined for it) keeps what it holds.
-    const fill = (w: (string | null | undefined)[]) => w.map((r, i) => (r === undefined ? read.raws[i] : r));
+    // encode gives one raw per key, as readLegacy does, so read.raws[i] exists (a string or null).
+    const fill = (w: (string | null | undefined)[]) => w.map((r, i) => (r === undefined ? read.raws[i] as string | null : r));
     const want = fill(b.encode!(cell.value));
     const keep = () => { cell.lh = legacyHash(cell, read.raws); return undefined; };
     let plan = want;
@@ -342,7 +343,7 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
       catch { return keep(); }
       // Key by key: an old key whose own value did not change keeps its bytes, so a multi-key binding (the five
       // settings stores) never reformats one key because another one changed.
-      plan = want.map((w, i) => (w === held[i] ? read.raws[i] : w));
+      plan = want.map((w, i) => (w === held[i] ? read.raws[i] as string | null : w)); // one raw per key, as above
       if (plan.every((p, i) => p === read.raws[i])) return keep();
     }
     cell.lh = legacyHash(cell, plan);
@@ -420,11 +421,11 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
       for (let i = 0; i < keys.length; i++) {
         if (!owned()) return 'skipped';
         try {
-          const k = keys[i], value = mirror[i], port = legacyPort(def);
+          const k = keys[i]!, value = mirror[i], port = legacyPort(def); // i < keys.length
           const previous = port.get(k);
           if (!owned()) return 'skipped';
           if (value === null) { if (previous !== null) port.remove(k); }
-          else if (previous !== value) port.set(k, value);
+          else if (previous !== value) port.set(k, value!); // mirrorPlan gives one raw per key: value is a string here
         } catch { missed = true; }
       }
       if (missed) { const read = readLegacy(cell); cell.lh = read === 'unavailable' ? undefined : legacyHash(cell, read.raws); raw = encode(cell); }

@@ -28,7 +28,7 @@ export function createFeatures(defs: readonly FeatureDef[], ctx: { dev: boolean;
     seen.add(id);
     let r: { on: boolean; source: FlagSource } =
       fromUrl.has(id) && (ctx.dev || d.stage !== 'dev') ? { on: fromUrl.get(id)!, source: 'url' }
-        : Object.hasOwn(ctx.overrides, id) ? { on: ctx.overrides[id], source: 'override' }
+        : Object.hasOwn(ctx.overrides, id) ? { on: ctx.overrides[id]!, source: 'override' } // own key just checked
           : d.detect ? { on: d.detect(), source: 'detected' }
             : { on: d.default, source: 'default' };
     if (r.on && d.stage === 'dev' && !ctx.dev && r.source !== 'url') r = { on: false, source: 'dev-only' };

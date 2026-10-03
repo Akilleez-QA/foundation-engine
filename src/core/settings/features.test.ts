@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createFeatures, featureOverridesSection, featureProblems, type FeatureDef } from './features';
+import { must } from '../../testing/must';
 
 const defs: FeatureDef[] = [
   { id: 'dev.test-api', stage: 'dev', default: true, description: 'window.engine' },
@@ -29,7 +30,7 @@ test('explain() names each source; overrides beat detection; unknown ids are off
   assert.equal(createFeatures(defs, { dev: false, url: 'https://game.test/?flags=dev.test-api', overrides: {} }).enabled('dev.test-api'), false, 'the URL cannot turn a dev flag on in production');
   assert.equal(createFeatures(defs, { dev: true, url: 'https://game.test/?flags=-dev.test-api', overrides: {} }).enabled('dev.test-api'), false, 'in DEV the URL can turn it off');
   assert.deepEqual(featureProblems(defs), []);
-  assert.match(featureProblems([{ ...defs[2], requires: ['nope'] }])[0], /requires unknown flag nope/);
+  assert.match(must(featureProblems([{ ...must(defs[2], 'the third flag'), requires: ['nope'] }])[0], 'a problem'), /requires unknown flag nope/);
   assert.deepEqual(featureOverridesSection.parse({ a: true, b: 'yes' }), { a: true });
 });
 

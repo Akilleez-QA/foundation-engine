@@ -47,7 +47,7 @@ export function parseMessage(message: string): Part[] {
       const head = /^\s*([A-Za-z_]\w*)\s*(?:,\s*(plural|selectordinal|select)\s*,)?/.exec(message.slice(i, i + 256));
       if (!head) fail('Expected a variable name after "{"');
       i += head![0].length;
-      const name = head![1], type = head![2];
+      const name = head![1]!, type = head![2]; // group 1 is not optional, so it matched
       if (!type) {
         if (message[i] !== '}') fail(`Expected "}" after {${name}`);
         i++; push(out, { kind: 'var', name }); continue;
@@ -60,7 +60,7 @@ export function parseMessage(message: string): Part[] {
         const sel = (select ? /^\s*([A-Za-z0-9_][\w-]*)\s*\{/ : /^\s*(=\d+|[a-z]+)\s*\{/).exec(message.slice(i, i + 256));
         if (!sel) break;
         i += sel[0].length;
-        const key = sel[1];
+        const key = sel[1]!; // group 1 is not optional, so it matched
         if (!select && !key.startsWith('=') && !PLURAL_CATEGORIES.has(key)) fail(`Unknown plural category "${key}"`);
         if (Object.hasOwn(forms, key)) fail(`Duplicate ${select ? 'select case' : 'plural form'} "${key}"`);
         forms[key] = parts(depth + 1, true);
@@ -69,7 +69,7 @@ export function parseMessage(message: string): Part[] {
       const close = /^\s*\}/.exec(message.slice(i, i + 256));
       if (!close) fail(`Expected "}" to close the ${type} {${name}}`);
       i += close![0].length;
-      if (!Object.hasOwn(forms, 'other')) fail(`${type[0].toUpperCase() + type.slice(1)} {${name}} needs an "other" form`);
+      if (!Object.hasOwn(forms, 'other')) fail(`${type.charAt(0).toUpperCase() + type.slice(1)} {${name}} needs an "other" form`);
       push(out, select ? { kind: 'select', name, forms } : type === 'selectordinal' ? { kind: 'plural', name, forms, ordinal: true } : { kind: 'plural', name, forms });
     }
     if (untilClose) fail('Unclosed "{"');
@@ -123,13 +123,14 @@ export function renderMessage(parts: readonly Part[], vars: Vars | undefined, lo
     else if (p.kind === 'var') out += vars && Object.hasOwn(vars, p.name) ? String(vars[p.name]) : `{${p.name}}`;
     else if (p.kind === 'select') {
       const value = vars && Object.hasOwn(vars, p.name) ? String(vars[p.name]) : 'other';
-      const form = (value !== '' && Object.hasOwn(p.forms, value) ? p.forms[value] : undefined) ?? p.forms.other;
+      // parseMessage rejects a select or plural without an `other` form, so the fallback exists.
+      const form = (value !== '' && Object.hasOwn(p.forms, value) ? p.forms[value] : undefined) ?? p.forms.other!;
       out += renderMessage(form, vars, locale, count);
     } else {
       const n = Number(vars?.[p.name] ?? 0);
       const exact = '=' + n;
       const category = rulesFor(locale, p.ordinal === true).select(n);
-      const form = (Object.hasOwn(p.forms, exact) ? p.forms[exact] : undefined) ?? (Object.hasOwn(p.forms, category) ? p.forms[category] : undefined) ?? p.forms.other;
+      const form = (Object.hasOwn(p.forms, exact) ? p.forms[exact] : undefined) ?? (Object.hasOwn(p.forms, category) ? p.forms[category] : undefined) ?? p.forms.other!; // `other` exists, as above
       out += renderMessage(form, vars, locale, n);
     }
   }

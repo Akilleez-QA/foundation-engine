@@ -70,7 +70,7 @@ test('GEN-02 revisions are compared inside the transaction, so a second tab cann
 
 test('GEN-02 unreadable records are quarantined; their bytes are copied aside before any overwrite', async () => {
   const corruptions: [string, (fake: ReturnType<typeof createFakeIdb>) => void][] = [
-    ['checksum', f => { record(f, 'k').data[1] ^= 0xff; }],
+    ['checksum', f => { record(f, 'k').data[1]! ^= 0xff; }], // the records below hold several bytes
     ['length', f => { const r = record(f, 'k'); r.data = r.data.subarray(0, 2).slice(); }],
     ['record envelope', f => { record(f, 'k').key = 'other'; }],
     ['record envelope', f => { f.controls.databases.get(CHUNK_DB_PREFIX + 'world')!.get('records')!.delete('k'); }],
@@ -88,7 +88,7 @@ test('GEN-02 unreadable records are quarantined; their bytes are copied aside be
     assert.equal(store.stats().quarantined, 1);
     // quarantine full: the next unreadable record is left untouched and writes over it are refused
     await store.write([{ key: 'k2', revision: 1, data: bytes(5) }]);
-    record(fake, 'k2').data[0] ^= 1;
+    record(fake, 'k2').data[0]! ^= 1; // bytes(5) above
     const before = structuredClone(record(fake, 'k2'));
     assert.deepEqual(await store.write([{ key: 'k2', revision: 5, data: bytes(6) }]), { status: 'quarantine-full', key: 'k2' });
     assert.deepEqual(await store.remove('k2'), { status: 'quarantine-full' });
@@ -208,7 +208,7 @@ test('GEN-02 eviction validates victims in the transaction: unreadable ones are 
   for (const free of [1, 0]) {
     const { fake, store } = await idbStore('world', { schema: 1, limits: { maxRecords: 1, maxQuarantine: 1 }, evictable: () => true });
     await store.write([{ key: 'a', revision: 1, data: bytes(1, 2, 3) }]);
-    record(fake, 'a').data[0] ^= 0xff;
+    record(fake, 'a').data[0]! ^= 0xff; // bytes(1, 2, 3) above
     assert.deepEqual(await store.read('a'), { status: 'quarantined' });
     if (free === 0) {
       // the single quarantine row is already taken
