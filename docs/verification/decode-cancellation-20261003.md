@@ -59,7 +59,7 @@ injected error reports, and no page errors.
 
 ## Evidence
 
-Passed twice on this branch with Node 22.23.3 and Chromium 152.0.7977.82
+Passed twice on a clean checkout of this branch at `fb3956c` (script SHA-256 `b78c48e793eb81464bf3880eb429e6c97dbba9f7c01a8b5ad44f4a70be017217`, fixture `5a2e26d077a91067bc4a86ed4324670ba28d334719b543729813c3866759e4d0`) with Node 22.23.3 and Chromium 152.0.7977.82
 (isolated, muted, headless, SwiftShader software GL), 1440×960, niceness 15.
 Each run produced identical counts:
 
