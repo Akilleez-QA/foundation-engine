@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import { createSystemRunner, type SystemSpec } from '../core/ecs/systems';
 import { createSystemTiming, type SystemTimingCapture } from './system-timing';
 import { sceneId } from './ids';
@@ -31,8 +32,8 @@ test('system timing attributes actual runner invocations, preserves errors and s
   assert.deepEqual(errors, [failure, failure]);
   assert.equal(siblings, 1);
   assert.deepEqual(runner.stats, { frames: 1, steps: 2, dropped: 0, errors: 2 });
-  assert.equal(capture.exportTrace().traceEvents[0].dur, 5000);
-  assert.equal(capture.exportTrace().traceEvents[1].args.failed, true);
+  assert.equal(must(capture.exportTrace().traceEvents[0], 'trace event 0').dur, 5000);
+  assert.equal(must(capture.exportTrace().traceEvents[1], 'trace event 1').args.failed, true);
 });
 
 test('system timing bounds completed rows and labels, detaches exports, and validates before replacement', () => {
@@ -45,11 +46,11 @@ test('system timing bounds completed rows and labels, detaches exports, and vali
   assert.equal(snapshot.droppedRecords, 2);
   assert.equal(snapshot.droppedLabels, 2);
   assert.equal(snapshot.truncatedLabels, 4);
-  snapshot.labels[0] = 'changed'; snapshot.records[0].ordinal = 99;
+  snapshot.labels[0] = 'changed'; must(snapshot.records[0], 'record').ordinal = 99;
   assert.equal(capture.snapshot().labels[0], 'long');
-  assert.equal(capture.snapshot().records[0].ordinal, 0);
-  const exported = capture.exportTrace(); exported.traceEvents[0].args.ordinal = 99;
-  assert.equal(capture.exportTrace().traceEvents[0].args.ordinal, 0);
+  assert.equal(must(capture.snapshot().records[0], 'record').ordinal, 0);
+  const exported = capture.exportTrace(); must(exported.traceEvents[0], 'trace event 0').args.ordinal = 99;
+  assert.equal(must(capture.exportTrace().traceEvents[0], 'trace event 0').args.ordinal, 0);
   assert.throws(() => timing.start({ capacity: 0 }), RangeError);
   assert.equal(capture.snapshot().disposed, false);
   capture.reset(); assert.equal(capture.snapshot().records.length, 0);
@@ -66,7 +67,7 @@ test('system timing owner loss, replacement and reset suppress pending completio
       if (operation === 'dispose') capture.dispose();
     } }]);
     capture = context.timing.start({ now: () => 0 })!;
-    context.timing.systems[0].run({}, 0);
+    must(context.timing.systems[0], 'timed system').run({}, 0);
     assert.equal(capture.snapshot().records.length, 0);
     assert.equal(capture.snapshot().disposed, operation !== 'reset');
     if (operation === 'visit' || operation === 'activity') assert.equal(context.timing.start(), null);
@@ -80,17 +81,17 @@ test('invalid or reentrant clocks cannot suppress authored execution or recurse 
   const options: { now: () => number } = { now: () => { throw Error('clock'); } };
   const capture = timing.start(options)!;
   options.now = () => 0;
-  timing.systems[0].run({}, 0);
+  must(timing.systems[0], 'timed system').run({}, 0);
   assert.equal(runs, 1);
   assert.equal(capture.snapshot().invalidClockSamples, 2);
   assert.equal(capture.exportTrace().metadata.invalidTimingRecords, 1);
   let times = 0;
-  const reentrant = timing.start({ now() { times++; timing.systems[0].run({}, 0); return times; } })!;
-  timing.systems[0].run({}, 0);
+  const reentrant = timing.start({ now() { times++; must(timing.systems[0], 'timed system').run({}, 0); return times; } })!;
+  must(timing.systems[0], 'timed system').run({}, 0);
   assert.equal(times, 2); assert.equal(runs, 4);
   assert.equal(reentrant.snapshot().records.length, 1);
   let reset!: SystemTimingCapture;
   reset = timing.start({ now() { reset.reset(); return 1; } })!;
-  timing.systems[0].run({}, 0);
+  must(timing.systems[0], 'timed system').run({}, 0);
   assert.equal(reset.snapshot().records.length, 0); assert.equal(runs, 5);
 });

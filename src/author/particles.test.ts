@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import { World } from '../core/ecs/world';
 import { mulberry32 } from '../core/rng';
 import { Transform, defineEntity, defineScene, defineSystem } from './defs';
@@ -50,7 +51,7 @@ test('a burst fires once per requested burst, at the emitter, and the pool is al
   const e = world.spawn(Transform({ x: 2, y: 1 }), defineEmitter({ mode: 'burst', count: 10, bursts: 1, lifetime: [1, 1], speed: [0, 0] }));
   g.step(world, STEP);
   assert.equal(g.stats.live, 10); assert.equal(r.bound.length, 1);
-  const slot = r.bound[0], arrays = [slot.pool.pos, slot.pool.offset, slot.pool.tint];
+  const slot = must(r.bound[0], 'bound slot 0'), arrays = [slot.pool.pos, slot.pool.offset, slot.pool.tint];
   assert.deepEqual(positions(slot).slice(0, 3), [2, 1, 0], 'zero speed: at the emitter');
   run(g, world, 10);
   assert.equal(g.stats.live, 10, 'no second burst without a request');
@@ -68,7 +69,7 @@ test('determinism: the same seed gives the same particles; a different seed does
     const f = createParticleField({ limits: normalizeSceneParticles(undefined), scale: 1, seed: mulberry32(seed), report: () => {}, renderer: r.renderer });
     world.spawn(Transform(), defineEmitter({ mode: 'continuous', rate: 120, max: 256, spread: Math.PI, gravity: [0, -9.8, 0], drag: .5 }));
     run(f, world, 90);
-    return positions(r.bound[0]);
+    return positions(must(r.bound[0], 'bound slot 0'));
   };
   const a = make(1), b = make(1), c = make(2);
   assert.ok(a.length > 0);
@@ -108,7 +109,7 @@ test('quality thinning draws a deterministic subset of the reference particles; 
     const f = createParticleField({ limits: normalizeSceneParticles(undefined), scale, seed: mulberry32(3), report: () => {}, renderer: r.renderer });
     const e = world.spawn(Transform(), defineEmitter({ mode: 'burst', count: 8, bursts: 1, max: 8, lifetime: [1, 1], speed: [1, 2], spread: Math.PI, despawn: true, essential }));
     f.step(world, STEP);
-    const pos = positions(r.bound[0]), capacity = r.bound[0].pool.capacity;
+    const pos = positions(must(r.bound[0], 'bound slot 0')), capacity = must(r.bound[0], 'bound slot 0').pool.capacity;
     let steps = 1; while (world.exists(e) && steps < 1000) { f.step(world, STEP); steps++; }
     return { pos, capacity, steps, stats: f.stats };
   };
@@ -142,7 +143,7 @@ test('scene admission refuses over-limit emitters once, draws nothing for them, 
   run(f, world, 5);
   assert.equal(f.stats.emitters, 2, 'a (60) and c (30) fit; b (60) does not');
   assert.equal(f.stats.reserved, 90);
-  assert.equal(reports.length, 1); assert.match(reports[0], /refused/);
+  assert.equal(reports.length, 1); assert.match(must(reports[0], 'report 0'), /refused/);
   world.despawn(a); f.step(world, STEP);
   assert.equal(f.stats.emitters, 2); assert.equal(f.stats.reserved, 90, 'b admitted with the capacity a freed');
   assert.equal(r.released.length, 1); assert.equal(reports.length, 1);
@@ -159,7 +160,7 @@ test('invalid data freezes the emitter with one report per problem, and it resum
   const before = f.stats.spawned;
   world.get(e, Emitter)!.rate = Number.NaN;
   run(f, world, 10);
-  assert.equal(f.stats.spawned, before); assert.equal(reports.length, 1); assert.match(reports[0], /rate/);
+  assert.equal(f.stats.spawned, before); assert.equal(reports.length, 1); assert.match(must(reports[0], 'report 0'), /rate/);
   world.get(e, Emitter)!.rate = 60;
   run(f, world, 10);
   assert.ok(f.stats.spawned > before); assert.equal(f.stats.invalid, 1);
@@ -171,9 +172,9 @@ test('changing max, texture or blending rebuilds the emitter; replacing the comp
   const e = world.spawn(Transform(), defineEmitter({ mode: 'continuous' }));
   run(f, world, 2);
   world.get(e, Emitter)!.blending = 'normal'; f.step(world, STEP);
-  assert.equal(r.bound.length, 2); assert.equal(r.released.length, 1); assert.equal(r.bound[1].blending, 'normal');
+  assert.equal(r.bound.length, 2); assert.equal(r.released.length, 1); assert.equal(must(r.bound[1], 'bound slot 1').blending, 'normal');
   world.add(e, defineEmitter({ mode: 'continuous', max: 8, count: 4 })); f.step(world, STEP);
-  assert.equal(r.bound.length, 3); assert.equal(r.bound[2].pool.capacity, 8);
+  assert.equal(r.bound.length, 3); assert.equal(must(r.bound[2], 'bound slot 2').pool.capacity, 8);
   world.remove(e, Emitter); f.step(world, STEP);
   assert.equal(r.released.length, 3); assert.equal(f.stats.emitters, 0);
   f.dispose(); f.dispose();
@@ -186,16 +187,16 @@ test('interpolation and curves: alpha blends the last two steps; size, colour an
     size: [1, 0], color: [0xffffff, 0x000000], opacity: [1, 0] }));
   assert.equal(f.interpolate(.5), false, 'nothing admitted yet');
   f.step(world, STEP); f.step(world, STEP);
-  const s = r.bound[0], p = s.pool;
+  const s = must(r.bound[0], 'bound slot 0'), p = s.pool;
   assert.ok(f.interpolate(0));
-  assert.ok(Math.abs(p.offset[0]) < 1e-6, 'alpha 0: the previous step (spawned there)');
+  assert.ok(Math.abs(must(p.offset[0])) < 1e-6, 'alpha 0: the previous step (spawned there)');
   f.interpolate(1);
-  assert.ok(Math.abs(p.offset[0] - .1) < 1e-6, 'alpha 1: the current step (6 m/s × 1/60 s)');
+  assert.ok(Math.abs(must(p.offset[0]) - .1) < 1e-6, 'alpha 1: the current step (6 m/s × 1/60 s)');
   f.interpolate(.5);
-  assert.ok(Math.abs(p.offset[0] - .05) < 1e-6);
+  assert.ok(Math.abs(must(p.offset[0]) - .05) < 1e-6);
   const t = .5 / 60;
-  assert.ok(Math.abs(p.size[0] - (1 - t)) < 1e-6); assert.ok(Math.abs(p.tint[3] - (1 - t)) < 1e-6);
-  assert.ok(p.tint[0] < 1 && p.tint[0] > .9, 'linear colour, between the keys');
+  assert.ok(Math.abs(must(p.size[0]) - (1 - t)) < 1e-6); assert.ok(Math.abs(must(p.tint[3]) - (1 - t)) < 1e-6);
+  assert.ok(must(p.tint[0]) < 1 && must(p.tint[0]) > .9, 'linear colour, between the keys');
   assert.deepEqual(r.draws.at(-1)!.slice(1), [1]);
   run(f, world, 60);
   assert.ok(f.interpolate(1), 'one write to hide the last particle');
@@ -209,11 +210,11 @@ test('direction follows the transform rotation', () => {
   const f = createParticleField({ limits: normalizeSceneParticles(undefined), scale: 1, seed: mulberry32(1), report: () => {}, renderer: r.renderer });
   world.spawn(Transform({ rz: -Math.PI / 2 }), defineEmitter({ mode: 'burst', count: 1, bursts: 1, speed: [60, 60], spread: 0, direction: [0, 1, 0] }));
   f.step(world, STEP);
-  const [x, y] = positions(r.bound[0]);
+  const [x, y] = positions(must(r.bound[0], 'bound slot 0'));
   assert.equal(x, 0); assert.equal(y, 0);
   f.step(world, STEP);
-  const [x2, y2] = positions(r.bound[0]);
-  assert.ok(Math.abs(x2 - 1) < 1e-9 && Math.abs(y2) < 1e-9, `up rotated -90° about z points along +x (${x2}, ${y2})`);
+  const [x2, y2] = positions(must(r.bound[0], 'bound slot 0'));
+  assert.ok(Math.abs(must(x2) - 1) < 1e-9 && Math.abs(must(y2)) < 1e-9, `up rotated -90° about z points along +x (${x2}, ${y2})`);
 });
 
 test('a moving continuous emitter spreads its spawns along its path (a trail)', () => {
@@ -223,7 +224,7 @@ test('a moving continuous emitter spreads its spawns along its path (a trail)', 
   f.step(world, STEP);
   world.get(e, Transform)!.x = 4;
   f.step(world, STEP);
-  const xs = positions(r.bound[0]).filter((_, i) => i % 3 === 0).slice(4).sort((a, b) => a - b);
+  const xs = positions(must(r.bound[0], 'bound slot 0')).filter((_, i) => i % 3 === 0).slice(4).sort((a, b) => a - b);
   assert.deepEqual(xs, [1, 2, 3, 4], 'four spawns spread over the 4 m moved');
 });
 
@@ -250,7 +251,7 @@ test('testScene steps particles like a visit: bursts, despawn, admission reports
   const none = await testScene(defineScene({ id: 'fx', title: 'FX', entities: [[...spark]] }), { seed: 5 });
   none.run(1);
   assert.equal(none.particles.stats, null); assert.equal(none.world.count, 1);
-  assert.equal(none.particles.reports.length, 1); assert.match(none.particles.reports[0], /no particles/);
+  assert.equal(none.particles.reports.length, 1); assert.match(must(none.particles.reports[0], 'report 0'), /no particles/);
   none.dispose();
 });
 
@@ -296,7 +297,7 @@ test('H2: sustained one-shot hits over the scene limit stay bounded: entities, r
   const stats = t.particles.stats!;
   // 16 admitted at a time, each living 1 s plus its own step: entities stay near the emitter limit.
   assert.ok(Math.max(...counts) <= 16 + 1, `entities bounded (${counts})`);
-  assert.ok(counts[9] <= counts[1] + 1, 'no growth over time');
+  assert.ok(must(counts[9]) <= must(counts[1]) + 1, 'no growth over time');
   assert.equal(t.particles.reports.length, 1, 'one refusal report per visit');
   assert.ok(stats.refused > 400 && stats.dropped === stats.refused * 8, 'every refused burst is dropped and counted');
   t.dispose();
@@ -327,7 +328,7 @@ test('H2: a refused burst never fires late at a stale position; a refused contin
 test('M1: rebuilding a burst emitter (blending, texture, max or a replaced component) never re-fires old bursts', async () => {
   const s = defineScene({ id: 's', title: 'S', particles: sceneParticles(), entities: [[Transform(), defineEmitter({ mode: 'burst', count: 10, max: 40, lifetime: [5, 5] })]] as never });
   const t = await testScene(s, { seed: 1 });
-  const [e] = [...t.world.query(Emitter)][0];
+  const [e] = must([...t.world.query(Emitter)][0], 'an emitter entity');
   burst(t.world, e, 3); t.run(1 / 60);
   assert.equal(t.particles.stats!.spawned, 30);
   t.world.get(e, Emitter)!.blending = 'normal'; t.run(1 / 60);
@@ -371,11 +372,11 @@ test('refusals are reported once per cause and counted by cause', () => {
   world.spawn(Transform(), defineEmitter({ max: 60 }));   // particles: 120 > 100
   world.spawn(Transform(), defineEmitter({ max: 70 }));   // particles again: counted, not reported
   run(f, world, 2);
-  assert.equal(reports.length, 1); assert.match(reports[0], /reserved particles/);
+  assert.equal(reports.length, 1); assert.match(must(reports[0], 'report 0'), /reserved particles/);
   world.spawn(Transform(), defineEmitter({ max: 10 }));   // fits: 2 emitters admitted
   world.spawn(Transform(), defineEmitter({ max: 1 }));    // emitters limit: a different cause, reported
   run(f, world, 2);
-  assert.equal(reports.length, 2); assert.match(reports[1], /limit of 2 emitters/);
+  assert.equal(reports.length, 2); assert.match(must(reports[1], 'report 1'), /limit of 2 emitters/);
   assert.deepEqual(f.stats.refusals, { emitters: 1, particles: 2 }); assert.equal(f.stats.refused, 3);
 });
 
@@ -384,7 +385,7 @@ test('bindFailed from a lazy renderer releases the slot and the emitter is not r
   const f = createParticleField({ limits: normalizeSceneParticles(undefined), scale: 1, seed: mulberry32(1), report: e => reports.push(e.message), renderer: r.renderer });
   world.spawn(Transform(), defineEmitter({ mode: 'continuous' }));
   f.step(world, STEP);
-  f.bindFailed(r.bound[0], Error('late bind'));
+  f.bindFailed(must(r.bound[0], 'bound slot 0'), Error('late bind'));
   run(f, world, 10);
   assert.equal(f.stats.emitters, 0); assert.equal(r.bound.length, 1); assert.equal(r.released.length, 1); assert.deepEqual(reports, ['late bind']);
 });

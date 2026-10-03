@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import { ModelPoseLink, captureModelPoseLink, normalizeModelPoseLinkLimits, MAX_MODEL_POSE_LINK_NODES } from './model-pose-link';
 
 test('pose link intake detaches node mappings and captures scalar policies without caller array methods', () => {
-  const nodes = [{source:'a',target:'b'}], input = {source:1,nodes,inheritVisibility:false};
+  const node = {source:'a',target:'b'}, nodes = [node], input = {source:1,nodes,inheritVisibility:false};
   Object.defineProperty(nodes,'map',{value:()=>{throw Error('caller method');}});
   const captured=ModelPoseLink(input).value;
-  nodes[0].source='changed';input.source=2;
-  assert.equal(captured.source,1);assert.equal(captured.nodes[0].source,'a');
+  node.source='changed';input.source=2;
+  assert.equal(captured.source,1);assert.equal(must(captured.nodes[0],'node').source,'a');
   assert.ok(Object.isFrozen(captured)&&Object.isFrozen(captured.nodes)&&Object.isFrozen(captured.nodes[0]));
 });
 test('pose link default constructor accepts configured mapping sizes above default scene limit', () => {

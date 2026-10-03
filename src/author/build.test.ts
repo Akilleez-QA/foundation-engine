@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import { briefProblems, defineBuild, TIER, type BuildInput } from './build';
 const input = (): BuildInput => ({
   goal: 'Build a precise experience',
@@ -156,7 +157,7 @@ test('success criteria accept terse numeric and non-space-delimited text without
     const b = input();
     b.success = [{ id: 'S1', check, how: 'test', by: 'game/acceptance.test.ts' }];
     assert.deepEqual(briefProblems(b), []);
-    assert.equal(defineBuild(b).success[0].check, check, 'authored text is preserved verbatim');
+    assert.equal(must(defineBuild(b).success[0], 'criterion').check, check, 'authored text is preserved verbatim');
     assert.ok(briefProblems({ ...b, success: [{ id: 'S1', check, how: 'test' }] }).some(p => p.includes('name the file')));
     assert.ok(briefProblems({ ...b, success: [{ id: 'invalid id', check, how: 'manual' }] }).some(p => p.includes('UPPER-KEBAB')));
     assert.ok(briefProblems({ ...b, success: [{ id: 'S1', check, how: 'unknown' }] }).some(p => p.includes('verification method')));

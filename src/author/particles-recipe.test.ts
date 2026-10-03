@@ -2,6 +2,7 @@
 // '@engine'). The last test checks that every `recipe:begin`…`recipe:end` block still appears in the recipe.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import { readFileSync } from 'node:fs';
 import { burst, defineEmitter, defineEntity, defineInput, defineScene, defineSystem, Emitter, Name, sceneParticles, Shape, testScene, Transform } from './index';
 
@@ -76,7 +77,7 @@ test('recipe: the definitions above are the recipe\'s code', () => {
   const recipe = readFileSync(new URL('../../docs/recipes/hit-sparks-and-pickups.md', import.meta.url), 'utf8');
   const code = norm([...recipe.matchAll(/```ts\n([\s\S]*?)```/g)].map(m => m[1]).join('\n'));
   const own = readFileSync(new URL(import.meta.url), 'utf8');
-  const blocks = [...own.matchAll(/\/\/ recipe:begin\n([\s\S]*?)\/\/ recipe:end/g)].map(m => m[1]);
+  const blocks = [...own.matchAll(/\/\/ recipe:begin\n([\s\S]*?)\/\/ recipe:end/g)].map(m => must(m[1], 'recipe block'));
   assert.equal(blocks.length, 6);
   for (const block of blocks) assert.ok(code.includes(norm(block)), `not in the recipe:\n${block}`);
 });

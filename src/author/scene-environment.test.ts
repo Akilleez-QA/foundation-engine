@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import * as T from 'three';
 import {defineEnvironment} from './environment';
 import {bindEnvironment} from './scene-environment';
@@ -12,7 +13,7 @@ test('environment translation follows its own camera without changing landmarks 
  assert.deepEqual(Array.from(geometry.getAttribute('position').array),[0,0,-100]);assert.equal((p.material as T.PointsMaterial).depthWrite,false);
  let disposed=0;geometry.addEventListener('dispose',()=>disposed++);aa.dispose();aa.dispose();assert.equal(disposed,1);assert.equal(a.children.length,0);bb.dispose();
 });
-test('environment validates boundaries and detaches authored data',()=>{const s=state(),copy=defineEnvironment(s);s.points[0].direction[0]=1;assert.equal(copy.points[0].direction[0],0);assert.throws(()=>defineEnvironment({...s,haze:{color:0,near:10,far:5}}));assert.throws(()=>defineEnvironment({...s,points:[{direction:[0,0,0],color:0}]}));});
+test('environment validates boundaries and detaches authored data',()=>{const s=state(),copy=defineEnvironment(s);must(s.points[0],'point').direction[0]=1;assert.equal(must(copy.points[0],'copied point').direction[0],0);assert.throws(()=>defineEnvironment({...s,haze:{color:0,near:10,far:5}}));assert.throws(()=>defineEnvironment({...s,points:[{direction:[0,0,0],color:0}]}));});
 test('environment retires changed GPU buffers and restores only its own scene state',()=>{
  const scene=new T.Scene(),original=new T.Color(0x123456);scene.background=original;const b=bindEnvironment(scene),camera=new T.PerspectiveCamera(),s=state();b.sync(s,camera);
  const points=scene.children.find(x=>x instanceof T.Points) as T.Points,geometry=points.geometry;let freed=0;geometry.addEventListener('dispose',()=>freed++);
