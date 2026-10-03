@@ -74,3 +74,10 @@ visibility change, package publication, deployment or Discord posting had occurr
 - The three.js 0.186 migration landed as public PR #29 (v0.2.0).
 - Private vulnerability reporting was re-checked through the GitHub API on
   2026-10-02 (`enabled: true`); [SECURITY.md](../../SECURITY.md) now points to it.
+
+## Release candidate (2026-10-03)
+
+A release-candidate bundle for `7c26db7` (proposed 0.3.0) is prepared in
+[docs/releases/candidate-7c26db7](../releases/candidate-7c26db7/README.md): release notes, upgrade guide,
+support matrix, reproducible build rehearsal, notices check and CI evidence. No tag, release or deployment
+was made; the bundle lists the steps only the author can take.

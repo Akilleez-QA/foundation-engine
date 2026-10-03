@@ -27,6 +27,7 @@ Start with one route; the rest is reference.
 - [Goals](GOALS.md) and [roadmap](ROADMAP.md): defined outcomes and what may come.
 - [Capability map](guides/composition-framework-status.md), [framework record](guides/framework-upgrade-status.md) and [acceptance ledger](guides/upgrade-acceptance-ledger.md): what is implemented, checked and integrated, and what is still unverified.
 - [Device experience policy](policy/DEVICE-EXPERIENCE.md): phone, tablet, laptop and desktop acceptance are separate.
+- [Release candidate `7c26db7`](releases/candidate-7c26db7/README.md): proposed 0.3.0 notes, upgrade guide, support matrix and evidence; prepared, not released.
 
 ## Project
 
