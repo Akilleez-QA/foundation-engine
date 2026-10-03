@@ -91,7 +91,11 @@ export interface QuarantineEntry { key: string; from: string; reason: string }
 export interface FlushReport { written: string[]; failed: string[]; skipped: string[] }
 export interface ImportReport {
   format: 'engine-profile@2' | 'legacy';
-  sections: Record<string, 'saved' | 'session' | 'skipped-newer' | 'orphan-kept'>;
+  /** Known sections: `saved` (written), `session` (held in memory; storage refused), `skipped-newer` (a later version).
+   * Orphans (ids this build does not own): `orphan-kept` only after a successful write or exact stored-byte match;
+   * `orphan-conflict` preserves different existing bytes; `orphan-failed` means storage access threw;
+   * `orphan-superseded` is an alias id of a section the same file supplies (a pre-rename copy), not written. */
+  sections: Record<string, 'saved' | 'session' | 'skipped-newer' | 'orphan-kept' | 'orphan-conflict' | 'orphan-failed' | 'orphan-superseded'>;
 }
 export interface ProfileFileV2 {
   format: 'engine-profile';
