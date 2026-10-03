@@ -49,10 +49,9 @@ export const BUDGET_FILE = join(gameDir(), 'budgets.json');
 export const BUDGET_DATA = JSON.parse(readFileSync(BUDGET_FILE, 'utf8')) as BudgetData;
 /** Short scene ids ('main'), in bench order: the first is where the app starts. */
 export const SCENE_IDS: readonly string[] = Object.keys(BUDGET_DATA.scenes);
-export const BENCH_SCENES: readonly (BenchScene & {id: string})[] = SCENE_IDS.map(id => ({
-  id,
-  ...BUDGET_DATA.scenes[id],
-}));
+export const BENCH_SCENES: readonly (BenchScene & {id: string})[] = Object.entries(BUDGET_DATA.scenes).map(
+  ([id, scene]) => ({id, ...scene}),
+);
 export const ACTIVE_SCENES: readonly string[] = BENCH_SCENES.filter(p => p.active).map(p => p.id);
 export const APP_BUDGET: AppBudget = BUDGET_DATA.app;
 export const LARGE_CHUNK_ALLOW: readonly string[] = BUDGET_DATA.largeChunkAllow;
@@ -84,7 +83,7 @@ export const BENCH_BINDINGS: SampleBinding[] = [
 
 /** Every budget in the checker's shape. The app budget sits under the pseudo-scenes 'app' and 'app-after-tour'. */
 export const CHECK_BUDGETS: Record<string, CheckBudget> = {
-  ...Object.fromEntries(SCENE_IDS.map(p => [p, toCheckBudget(BUDGET_DATA.scenes[p].budget)])),
+  ...Object.fromEntries(Object.entries(BUDGET_DATA.scenes).map(([p, scene]) => [p, toCheckBudget(scene.budget)])),
   app: {loadMiB: APP_BUDGET.startupMiB, heapMiB: APP_BUDGET.startupHeapMiB, firstLoadJsKiB: APP_BUDGET.firstLoadJsKiB},
   'app-after-tour': {canvasMiB: APP_BUDGET.retainedCanvasMiBAfterTour, heapMiB: APP_BUDGET.retainedHeapMiBAfterTour},
 };

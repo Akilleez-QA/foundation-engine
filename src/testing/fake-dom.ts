@@ -166,10 +166,10 @@ class FakeText extends FakeNode {
   constructor(public data: string) {
     super();
   }
-  get textContent() {
+  override get textContent() {
     return this.data;
   }
-  set textContent(v: string) {
+  override set textContent(v: string) {
     this.data = v;
   }
 }
