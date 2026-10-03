@@ -1,10 +1,6 @@
 # Release notes draft: Foundation Engine 0.2.0
 
-Draft for the GitHub Release and the community announcement. **Not published.**
-Tagging, creating the GitHub Release and posting the announcement need the author's
-go-ahead after the batch PRs (#42, #45, #46, #47) and the release-preparation PR
-merge and CI passes on the exact release commit. The full list with PR numbers is in
-the [changelog](../../CHANGELOG.md).
+The GitHub Release is published as [v0.2.0](https://github.com/Akilleez-QA/foundation-engine/releases/tag/v0.2.0), tagged `071e3c2` (pre-tag fixes for v0.2.0, #49). That commit's push to `main` passed CI, and its changelog still had an empty Unreleased section. The release body is the changelog's 0.2.0 section. This file remains the announcement draft; posting it is a separate step. The full list with PR numbers is in the [changelog](../../CHANGELOG.md).
 
 ---
 

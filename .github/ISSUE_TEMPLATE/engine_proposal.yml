@@ -1,6 +1,7 @@
 name: Engine proposal
 description: Propose a reusable contract or optional kit improvement.
 title: "[Proposal]: "
+labels: ["needs-triage", "proposal"]
 body:
   - type: markdown
     attributes:
