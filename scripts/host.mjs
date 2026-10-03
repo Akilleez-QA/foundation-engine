@@ -122,14 +122,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const lan = process.argv.includes('--lan');
   const port = flag('--port') === undefined ? DEFAULT_PORT : Number(flag('--port'));
   const integrity = flag('--integrity') ?? 'observe';
-  const join = flag('--join');
-  if (join !== undefined && checkJoinCode(join)) { console.error(`\n  --join: ${checkJoinCode(join)}\n`); process.exit(2); }
+  const joinCodeArg = flag('--join');
+  if (joinCodeArg !== undefined && checkJoinCode(joinCodeArg)) { console.error(`\n  --join: ${checkJoinCode(joinCodeArg)}\n`); process.exit(2); }
   const playPort = Number(process.env.PORT ?? 5173);
   let rules;
   try { rules = await loadSessionRules(); } catch (error) { console.error(`\n  ${error.message}\n`); process.exit(1); }
   const stamp = () => new Date().toISOString().slice(11, 19);
   const server = await startSessionServer({
-    rules, port, host: lan ? '0.0.0.0' : '127.0.0.1', integrity, lan, ...(join === undefined ? {} : { joinCode: join }),
+    rules, port, host: lan ? '0.0.0.0' : '127.0.0.1', integrity, lan, ...(joinCodeArg === undefined ? {} : { joinCode: joinCodeArg }),
     log: ({ event, player, reason }) => console.log(`  ${stamp()} ${event}${player ? ' ' + player : ''}${reason ? ` (${reason})` : ''}`),
   }).catch(error => { console.error(`\n  Could not start the host: ${error.message}\n`); process.exit(1); });
   const scene = (await import(pathToFileURL(join(gameDir(), 'game.ts')).href)).default?.firstScene ?? '';
@@ -138,7 +138,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     '',
     `  Shared-session host: rules ${rules.id} v${rules.version}, up to ${rules.maxPlayers} players, integrity ${integrity}`,
     `  Listening on ${lan ? `all interfaces, port ${server.port} (LAN)` : `ws://127.0.0.1:${server.port}/session (this machine only)`}`,
-    `  Join code: ${server.joinCode}  (${join === undefined ? 'new each run' : 'from --join'}; anyone with the code and network access can join)`,
+    `  Join code: ${server.joinCode}  (${joinCodeArg === undefined ? 'new each run' : 'from --join'}; anyone with the code and network access can join)`,
     `  To restart with the same code (open tabs then reconnect by themselves): npm run host -- --join ${server.joinCode}`,
     '',
     `  Start the game in another terminal (npm run play${lan ? ' -- --host' : ''}), then open this link in two tabs:`,
