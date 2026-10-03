@@ -9,9 +9,9 @@ The test changes no runtime behavior, budget or asset.
 ## Evidence
 
 The existing `test:model-preview-browser` command passed on clean
-`127af2f55349234088c0a7bece3dbb8b925d5713`, based on public main `5a68f06`, at
-2026-10-03T18:19:41.142286Z. Script SHA-256:
-`17dc4e66e787529ac727e7aeb2345bee501f42c6b1b605f6668178ec766ca1ba`.
+`c750dd0d746e95858214bb3aae0453aa7f9f1faa`, based on public main `5a68f06`, at
+2026-10-03T18:21:42Z. Script SHA-256:
+`445fa58ff4991f16d310d2ca60a0e6820b278f1c451f6447aae738aa2735e253`.
 This receipt is a documentation-only follow-up.
 
 Run with Node 22.23.3, isolated muted Chromium, desktop 1440×960 and software GL,
@@ -29,7 +29,8 @@ and the consumer reports its saved selection. Local regenerable evidence is in
 | Application disposal with another request pending | Exact request terminated with `net::ERR_ABORTED`; retired consumer and 0 entities, model instances, resident bytes, retained file bytes and pinned bytes; 0 cleanup failures |
 
 The existing unavailable-asset cases retain their four expected error reports;
-no additional page errors or scenario/cleanup failures were observed.
+the error verdict runs after browser and server cleanup. No additional page errors
+or scenario/cleanup failures were observed.
 
 ## Validation and boundary
 
