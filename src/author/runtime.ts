@@ -408,11 +408,16 @@ export async function enterScene(o: { s: Services; brief: BuildBrief; scene: Sce
         }
       };
       const resize = () => {
+        if (actx.signal.aborted || actx.leaving()) return;
         const w = Math.max(1, view.clientWidth), h = Math.max(1, view.clientHeight);
         renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); dirty = true; actx.invalidate();
         sizes.refresh();
       };
       if (typeof ResizeObserver === 'function') { const ro = new ResizeObserver(resize); ro.observe(view); actx.own(() => ro.disconnect()); }
+      // Quality DPR updates clear the drawing buffer without changing the observed CSS box.
+      const resizeWindow = doc.defaultView;
+      resizeWindow?.addEventListener('resize', resize);
+      actx.own(() => resizeWindow?.removeEventListener('resize', resize));
       resize();
       sync();
 
