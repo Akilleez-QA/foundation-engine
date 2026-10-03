@@ -11,7 +11,7 @@ From a fresh clone to a game you can share, by hand or with a coding agent. Each
 
 ## 1. Get the code and the tools
 
-You need Git and Node.js 22.18 or newer (CI uses Node.js 22; `node -v` prints your version). [nvm](https://github.com/nvm-sh/nvm), [fnm](https://github.com/Schniz/fnm) or [mise](https://mise.jdx.dev/) can install it next to other versions.
+You need Git and Node.js 22.18 or newer (CI uses Node.js 22 and also runs the tests on the newest Node.js, 26; `node -v` prints your version). [nvm](https://github.com/nvm-sh/nvm), [fnm](https://github.com/Schniz/fnm) or [mise](https://mise.jdx.dev/) can install it next to other versions.
 
 ```
 git clone https://github.com/Akilleez-QA/foundation-engine.git

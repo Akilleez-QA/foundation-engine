@@ -13,6 +13,7 @@ import {existsSync, readdirSync} from 'node:fs';
 import {dirname, join, relative} from 'node:path';
 import {gameDir, ROOT} from './lib/game-dir.mjs';
 import {toolCommand, npmCommand} from './lib/tool.mjs';
+import {TAP_REPORTER, childTestEnv, testTotals} from './lib/test-output.mjs';
 
 const t0 = Date.now();
 const rel = p => relative(ROOT, p).split('\\').join('/');
@@ -75,14 +76,15 @@ export function affectedTests(changed, game = GAME) {
 }
 
 const results = [];
-/** Retain canonical Node test totals without flooding the quick-check report. */
+/** Retain canonical Node test totals without flooding the quick-check report (TAP or spec output, any Node). */
 export function testSummary(output) {
-  return output.split('\n').filter(line => /^# (tests|pass|fail|cancelled|skipped|todo|duration_ms) /.test(line)).slice(-7).join('\n');
+  const totals = testTotals(output) ?? {};
+  return ['tests', 'pass', 'fail', 'cancelled', 'skipped', 'todo', 'duration_ms'].filter(k => k in totals).map(k => `# ${k} ${totals[k]}`).join('\n');
 }
 const run = (name, cmd, args = []) => {
   // A tool command from scripts/lib/tool.mjs (no npx, no shell: the same on Windows), or a plain `node` script.
   const c = typeof cmd === 'string' ? {command: cmd === 'node' ? process.execPath : cmd, args, shell: false} : cmd;
-  const t = Date.now(), r = spawnSync(c.command, c.args, {cwd: ROOT, encoding: 'utf8', env: process.env, shell: c.shell});
+  const t = Date.now(), r = spawnSync(c.command, c.args, {cwd: ROOT, encoding: 'utf8', env: childTestEnv(), shell: c.shell});
   const ok = r.status === 0;
   results.push({name, ok, s: (Date.now() - t) / 1000, out: ok ? (name.startsWith('tests (') ? testSummary(r.stdout) : '') : (r.stdout + r.stderr).trim().split('\n').filter(l => !/^\s*(#|ok |\.\.\.|---|duration_ms|type:)/.test(l)).slice(-40).join('\n')});
   return ok;
@@ -111,7 +113,7 @@ if (process.argv[1] && process.argv[1].endsWith('check.mjs')) {
   if (all) run('tests (complete npm test suite)', npmCommand(['test']));
   else if (tests.length) {
     console.log(`selected test files (${tests.length}):\n${tests.map(t => `  ${t}`).join('\n')}`);
-    run(`tests (${tests.length} file(s))`, toolCommand('tsx', ['--test', ...tests]));
+    run(`tests (${tests.length} file(s))`, toolCommand('tsx', ['--test', TAP_REPORTER, ...tests]));
   } else {
     console.log('No tests selected (0 files). This is not test-suite acceptance; use --base <ref>, --all, or run explicit tests.');
     results.push({name: 'tests (0 selected; not run)', ok: true, s: 0, out: ''});

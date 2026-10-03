@@ -17,20 +17,24 @@ test('gate:ci: every run step of ci.yml is executed locally, except the document
   const ids = plan.steps.map(s => s.id);
   assert.equal(new Set(ids).size, ids.length);
   assert.ok(ids.includes('browser/test:ui-browser') && ids.includes('templates-1/gate:templates') && ids.includes('templates-2/gate:templates'));
+  assert.deepEqual(plan.steps.filter(s => s.job === 'node-current').map(s => s.run), ['npm run test', 'npm run check'], 'the newest-Node job stays cheap: tests and the quick check, no browser');
   assert.equal(plan.steps.filter(s => s.aggregate).length, 1);
   assert.ok(plan.steps.some(s => /GAME_DIR=templates\/expedition\/game npm run test:framework-browser/.test(s.run)));
   assert.equal(plan.node, '22');
+  const newest = Number(plan.nodes['node-current']);
+  assert.ok(newest >= 26, 'one job tests the newest Node major');
+  assert.deepEqual(Object.entries(plan.nodes).filter(([job]) => job !== 'node-current').map(([, v]) => v), ['22', '22', '22', '22']);
   const parsed = parseYaml(ci);
   assert.deepEqual(parsed.permissions, {contents: 'read'});
   for (const id of ['browser','templates-1','templates-2']) {
     assert.equal(parsed.jobs[id]['timeout-minutes'], '30');
     assert.deepEqual(parsed.jobs[id].steps.slice(0,4), parsed.jobs.browser.steps.slice(0,4), 'each runner retains identical pinned setup');
   }
-  assert.deepEqual(parsed.jobs.check.needs, ['browser','templates-1','templates-2']);
+  assert.deepEqual(parsed.jobs.check.needs, ['browser','templates-1','templates-2','node-current']);
   assert.equal(parsed.jobs.check.if, 'always()');
   // Same order as the workflow.
   const order = [...ci.matchAll(/run: (?:GAME_DIR=\S+ )?npm run (?:-s )?([\w:.-]+)/g)].map(m => m[1]);
-  assert.deepEqual(plan.steps.filter(s => s.job === 'browser').map(s => s.id.split('/')[1]), order.filter(id => id !== 'gate:templates'));
+  assert.deepEqual(plan.steps.filter(s => s.job === 'browser').map(s => s.id.split('/')[1]), order.filter(id => !['gate:templates', 'test', 'check'].includes(id)));
   assert.deepEqual(plan.steps.filter(s => s.job.startsWith('templates-')).map(s => s.run), ['npm run gate:templates -- --shard 1/2 --phone', 'npm run gate:templates -- --shard 2/2 --phone']);
 });
 
@@ -127,10 +131,13 @@ test('gate:ci: an interrupt stops only the process group it spawned for the curr
   } finally { rmSync(dir, {recursive: true, force: true}); }
 });
 
-const graphWorkflow = (browser = 'echo browser', first = 'echo first', second = 'echo second') => `jobs:
+const graphWorkflow = (browser = 'echo browser', first = 'echo first', second = 'echo second', current = 'echo current', nodes = '') => `jobs:
   browser:
     runs-on: ubuntu-latest
-    steps:
+    steps:${nodes && `
+      - uses: actions/setup-node@abc
+        with:
+          node-version: ${nodes.split(',')[0]}`}
       - run: ${browser}
   templates-1:
     runs-on: ubuntu-latest
@@ -140,8 +147,15 @@ const graphWorkflow = (browser = 'echo browser', first = 'echo first', second = 
     runs-on: ubuntu-latest
     steps:
       - run: ${second}
+  node-current:
+    runs-on: ubuntu-latest
+    steps:${nodes && `
+      - uses: actions/setup-node@abc
+        with:
+          node-version: ${nodes.split(',')[1]}`}
+      - run: ${current}
   check:
-    needs: [browser, templates-1, templates-2]
+    needs: [browser, templates-1, templates-2, node-current]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -153,10 +167,11 @@ const graphWorkflow = (browser = 'echo browser', first = 'echo first', second = 
 
 test('bounded graph rejects missing dependencies, alternate conditions, aggregate changes and expressions', () => {
   const good = graphWorkflow();
-  assert.equal(planFromWorkflow(good).steps.length, 4);
+  assert.equal(planFromWorkflow(good).steps.length, 5);
   for (const [before, after] of [
-    ['needs: [browser, templates-1, templates-2]', 'needs: [browser, templates-1]'],
-    ['needs: [browser, templates-1, templates-2]', 'needs: [browser, templates-1, templates-1]'],
+    ['needs: [browser, templates-1, templates-2, node-current]', 'needs: [browser, templates-1, templates-2]'],
+    ['needs: [browser, templates-1, templates-2, node-current]', 'needs: [browser, templates-1, templates-2, templates-1]'],
+    ['  node-current:', '  newest-node:'],
     ['if: always()', 'if: success()'],
     ['    if: always()\n', ''],
     ['node scripts/ci-results.mjs', 'echo success'],
@@ -191,4 +206,28 @@ test('local graph executes independent jobs after failure and derives a refusing
     writeFileSync(file, graphWorkflow()); const passed = run([]);
     assert.equal(passed.status, 0, passed.stdout + passed.stderr); assert.match(passed.stdout, /check: every work job succeeded/);
   } finally { rmSync(dir, {recursive:true, force:true}); }
+});
+
+test('per-job Node: other-Node steps are skipped as a partial run, run under that Node, or with --any-node', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'gate-ci-node-'));
+  try {
+    const here = process.versions.node.split('.')[0], other = String(Number(here) + 1), file = join(dir, 'ci.yml');
+    const run = args => spawnSync(process.execPath, ['scripts/gate-ci.mjs', '--workflow', file, ...args], {cwd: ROOT, encoding: 'utf8'});
+    const text = graphWorkflow('echo BROWSER_RAN', 'echo first', 'echo second', 'echo CURRENT_RAN', `${here},${other}`);
+    assert.deepEqual(planFromWorkflow(text).nodes, {browser: here, 'node-current': other});
+    assert.equal(planFromWorkflow(text).node, here, 'the first job sets the primary Node');
+    writeFileSync(file, text);
+    const skipped = run([]);
+    assert.equal(skipped.status, 0, skipped.stdout + skipped.stderr);
+    assert.match(skipped.stdout, /BROWSER_RAN/); assert.doesNotMatch(skipped.stdout, /CURRENT_RAN/);
+    assert.match(skipped.stdout, new RegExp(`node-current/echo-current-ran\\s+skipped \\(Node ${other}\\)`));
+    assert.match(skipped.stdout, /PARTIAL PASS \(not full CI acceptance\)/);
+    assert.doesNotMatch(skipped.stdout, /check: every work job succeeded/, 'no aggregate without every job');
+    assert.match(skipped.stderr, /--only node-current\/echo-current-ran/);
+    assert.equal(run(['--only', 'node-current/echo-current-ran']).status, 2, 'only other-Node steps: run them under that Node');
+    const any = run(['--any-node']);
+    assert.equal(any.status, 0, any.stdout + any.stderr); assert.match(any.stdout, /CURRENT_RAN/); assert.match(any.stdout, /check: every work job succeeded/);
+    writeFileSync(file, graphWorkflow(undefined, undefined, undefined, undefined, `${other},${here}`));
+    assert.equal(run([]).status, 2, 'a primary-Node mismatch still refuses');
+  } finally { rmSync(dir, {recursive: true, force: true}); }
 });

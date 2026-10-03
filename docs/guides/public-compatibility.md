@@ -53,7 +53,7 @@ silently change a consumer that does not select it.
 The compatibility test retains the original blank scene, input definition and two
 behavior tests from `c0e73c9`. Its manifest records exact source paths and hashes.
 It compiles those bytes against today's `@engine` and runs the original scene tests.
-Run it with Node 22:
+Run it with Node 22.18 or newer (it names the TAP reporter for its child runner, so the Node 23+ default report does not matter):
 
 ```sh
 node --test scripts/compatibility.test.mjs
