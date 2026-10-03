@@ -1,7 +1,8 @@
 # Optional shared session for game code (MP-01)
 
-Ledger ID: MP-01. Status: implemented, candidate (see the
-[acceptance ledger](upgrade-acceptance-ledger.md#newcomer-shared-session-mp-01--implemented-candidate)); not integrated.
+Ledger ID: MP-01. Status (2026-10-03): integrated through batch PR #64 (`main` `3b449fa`; PR #61 merge
+`41d0261`); earlier an implemented candidate. See the
+[acceptance ledger](upgrade-acceptance-ledger.md#newcomer-shared-session-mp-01--integrated).
 
 The network kit already had bounded admission, a browser transport, complete scoped
 views (NW-02), prediction, reconnect pacing (NW-04), rate admission (NW-05), drain
@@ -196,7 +197,7 @@ empty world.
   observe mode, no page or console errors beyond the expected refused connections while
   the host was down. Keeping the old view after a reconnect makes the fresh-baseline
   assertion fail. See the [recovery receipt](../verification/session-recovery-20261003.md);
-  revisions and results are in the [ledger](upgrade-acceptance-ledger.md#newcomer-shared-session-mp-01--implemented-candidate).
+  revisions and results are in the [ledger](upgrade-acceptance-ledger.md#newcomer-shared-session-mp-01--integrated).
 
 ## Limits (honest)
 

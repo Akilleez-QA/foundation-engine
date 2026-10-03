@@ -2,7 +2,10 @@
 
 Tracking: [issue #66](https://github.com/Akilleez-QA/foundation-engine/issues/66).
 Status: **active goal; acceptance open**. This document defines the outcome and work
-sequence. It does not declare pending implementations, branches or releases accepted.
+sequence. Status update 2026-10-03: the evidence cards B1 to B6 are merged (#95, #97,
+#98, #104, #116, #96) and the status records are reconciled; the current scorecard is in
+the [acceptance ledger](upgrade-acceptance-ledger.md#creator-readiness-milestone-2026-10-03).
+No release candidate is named yet, so the release row is not met. It does not declare pending implementations, branches or releases accepted.
 The [creator contract](../CREATOR-CONTRACT.md), [standard](../STANDARD.md),
 [contribution workflow](../../CONTRIBUTING.md) and [governance](../../GOVERNANCE.md)
 continue to apply.

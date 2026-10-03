@@ -102,7 +102,7 @@ no browser, device or template consumer yet.
 ## Moving platforms (MV-02)
 
 Recipe: [add moving platforms](../../../docs/recipes/add-moving-platforms.md). Status:
-implemented, candidate (PR #53).
+integrated through batch PR #64 (PR #53; `main` `3b449fa`).
 
 `createPlatforms({ maxPlatforms?, maxSpeed? })` is a pure, bounded registry of moving
 support surfaces. Each platform is an axis-aligned footprint (`halfX`, `halfZ`). Its

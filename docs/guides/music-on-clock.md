@@ -9,7 +9,8 @@ context times. A chart scheduled on the
 optional and genre-neutral. The [recipe](../recipes/sync-gameplay-to-music.md)
 shows a scene using it.
 
-Status: implemented, candidate (PR #54); not integrated. Evidence is listed under
+Status (2026-10-03): integrated through batch PR #64 (`main` `3b449fa`; PR #54 merge `0aa5caf`);
+earlier an implemented candidate. Evidence is listed under
 [Evidence](#evidence).
 
 ## Inputs, outputs and owner

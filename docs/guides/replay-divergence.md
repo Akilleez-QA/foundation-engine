@@ -10,7 +10,8 @@ or not at all; a production build never contains the dev surface.
 
 State: SIM-01 is integrated in v0.2.0 (public PR #17, merged to `main` at `49047ae`). The
 creator-chosen replay digest and divergence detail (SIM-02, [below](#choose-what-a-replay-must-reproduce-sim-02))
-are implemented on branch `feat/replay-custom-digest`, candidate (PR #58), not integrated.
+were a candidate on branch `feat/replay-custom-digest` (PR #58) and are integrated through batch
+PR #62 (`main` `6485572`, PR merge `4943174`) since 2026-10-02.
 Evidence and limits are listed below; read [Limitations](#limitations-read-before-relying-on-a-result)
 before relying on a result.
 
@@ -329,7 +330,7 @@ Browser regression `npm run test:replay-browser`
 - a corrupted log is refused without re-entering the scene;
 - a log for another seed is refused at the visit.
 
-SIM-02 (candidate, not integrated), focused tests (`src/kits/replay/state.test.ts`,
+SIM-02 (recorded on the candidate, integrated through batch PR #62), focused tests (`src/kits/replay/state.test.ts`,
 `src/dev/replay.test.ts`):
 
 - the demo case: a cosmetic orb bobbed by a frame-phase system diverges under the
