@@ -713,8 +713,13 @@ Status: implemented, candidate (PR #61); not integrated. Guide:
   `templates/shared-world/game/world.test.ts` (S1: local play and host core give the
   same world), `npm run test:session-browser` (two isolated headless Chromium contexts,
   SwiftShader, one loopback host: join, move and paint seen by the other page, host
-  restart on the same port with the same join code ridden out by paced reconnects, wrong join code terminal
-  with one attempt, integrity observe-only, no page errors). The template gate
+  restart on the same port with the same join code ridden out by paced, bounded
+  reconnects on both pages, each page then showing the restarted host's fresh empty
+  world (host world revision restarted, no action applied) before any new action, a
+  drop of page B alone with A still playing and B resuming its slot and converging,
+  wrong join code terminal with one attempt, integrity observe-only, no page errors;
+  [recovery receipt](../verification/session-recovery-20261003.md)). All browser
+  evidence is loopback only. The template gate
   (`npm run gate -- --game templates/shared-world/game`) passed with 2,518 tests and 11
   performance checks at the first candidate. After review the board became one mesh:
   the measured worst case (four joined players, all 49 cells painted, SwiftShader) is
