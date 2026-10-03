@@ -2,6 +2,23 @@
 
 For any coding agent working here, and for people. [docs/STANDARD.md](docs/STANDARD.md) is the architecture standard; [docs/recipes/](docs/recipes/) shows how to add each kind of thing; [docs/guides/working-with-your-agent.md](docs/guides/working-with-your-agent.md) is the author's side of this manual.
 
+## Making a game? Read this, skip that
+
+Following every "read first" link literally costs about 28k tokens. For work only in `game/`, about 8k is enough before the task's own skill and recipe (sizes at ~4 bytes per token):
+
+- **Read:** this file (17 KB, ~4.3k, already loaded), [getting started](docs/guides/getting-started.md) (9 KB, ~2.3k), your template's `templates/<name>/README.md` (1.5–2.3 KB, ~0.5k) and the [recipes index](docs/recipes/README.md) (3 KB, ~0.7k). Then only the skill (`.claude/skills/*/SKILL.md`, 1–3 KB) and the recipe for the task in hand.
+- **Skip unless you change `src/`:** [STANDARD.md](docs/STANDARD.md) (65 KB, ~16k), [CREATOR-CONTRACT.md](docs/CREATOR-CONTRACT.md) (11 KB, ~2.7k), the status ledgers in `docs/guides/` (`composition-framework-status`, `framework-upgrade-status`, `upgrade-acceptance-ledger`; 49–91 KB each), and the sections below on the engine contract, capability documentation and worktree integration.
+- **Read when it applies:** [DEVICE-EXPERIENCE.md](docs/policy/DEVICE-EXPERIENCE.md) (22 KB, ~5.4k) for UI, control, camera, framing or quality changes on the brief's devices; [KID-SAFE.md](docs/policy/KID-SAFE.md) when the brief sets `kids: true`.
+- **First commands:**
+
+  ```sh
+  npm ci
+  npm run new-game -- --template <name> --id <game-id> --title "<Title>"
+  git switch -c <game-id> && git add game GAME.md && git commit -m "Start <game-id>"
+  npm run check
+  npm run play:snap          # add -- --mobile when phones are targets
+  ```
+
 ## Engine, creator and agent contract
 
 Read [CREATOR-CONTRACT.md](docs/CREATOR-CONTRACT.md) before proposing or changing
@@ -71,6 +88,7 @@ notes outside publishable documentation.
 
 - `game/build.brief.ts` (`defineBuild`) holds the goal, audience, genre, devices, quality, performance targets, modes, constraints and checkable success criteria. `GAME.md` mirrors it at the top; `npm run lint:brief` keeps them in step.
 - Change the brief only with the author. Record every change in GAME.md's changelog. A change of minimum device re-derives every per-scene ceiling.
+- **Retiring a success criterion** is a brief change: only with the author. Remove it from the brief and from GAME.md's mirror, delete or rename its `S<n>:` test, and give the reason in a changelog row. Never reuse a retired id; new criteria continue the numbering. A test may be re-measured (for example sampling the peak instead of a fixed time after a deliberate retune) only if the criterion's text and threshold stay the same; say so in the commit.
 - Budgets only fall. A raise needs the author's agreement and a `Perf-Budget: <key> <old> -> <new>: <reason>` commit trailer.
 - The audience is neutral by default. `kids: true` (the learn template sets it) turns on [the kid-safe profile](docs/policy/KID-SAFE.md); follow it.
 
@@ -104,6 +122,7 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 
 ## When a check fails
 
+- **Reading `npm run check`**: one line per step (`ok  <step> (N s)` or `FAIL <step>` followed by the last 40 lines of its output), then `check: PASS` or `check: FAIL (<steps>)`. The tests line counts files, not tests (`tests (2 file(s))`), and it selects only tests affected by uncommitted changes, so after a commit it can say `tests (nothing changed that has tests)`. To see each test and the counts, run `npx tsx --test "game/**/*.test.ts"` (`# tests`, `# pass`, `# fail` at the end).
 - **`npm run check` fails**: fix the first error; re-run. A layer error in game code means an import from outside `@engine` / `@kits`: use the author API instead.
 - **play:snap shows page errors**: they are bugs; fix them before showing anything.
 - **Over budget** (play:snap or the gate): recover in order: simplify, instance, bake, LOD ([fix-budget skill](.claude/skills/fix-budget/SKILL.md)). Measure again. Only if that is not enough, explain the cost to the author and ask; never raise a number on your own.

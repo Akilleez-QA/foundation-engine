@@ -12,7 +12,7 @@ Follow AGENTS.md exactly; this is its checklist. First decide which kind of chan
 1. All success criteria of the milestone: `npm run play:criteria`. Everything PASS, or the author has accepted what is not. `npm run gate` is recommended before sharing.
 2. GAME.md: milestone marked done; changelog rows for brief or budget changes.
 3. Commit on the game branch in the author's checkout. Do not rebase onto, merge into or push to this repository's `main`, and do not use `npm run deploy:production`.
-4. To share: `npm run build`, then `npm run preview` to try `dist/`. The author uploads `dist/` to a static host; follow docs/recipes/share-your-build.md (root-of-domain hosting works as built; under a sub-path, models and textures do not load yet).
+4. To share: `npm run build`, then `npm run preview` to try `dist/`. The author uploads `dist/` to a static host; follow docs/recipes/share-your-build.md (root-of-domain hosting works as built; under a sub-path such as GitHub Pages or itch.io, build with `npm run build -- --base ./` or `--base /<path>/` and models, textures and music load from it: docs/recipes/host-under-a-sub-path.md).
 5. Check the uploaded copy: the first scene opens, no console errors, no 404s.
 
 ## An engine contribution (this repository)
