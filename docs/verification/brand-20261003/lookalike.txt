@@ -1,0 +1,13 @@
+Lookalike sanity check (not a trademark search), 2026-10-03
+dHash 64 bits of a thresholded silhouette vs Simple Icons 16.33.0 (3463 marks); flag at 10 or less.
+assets/brand/logo-mark.svg: GNU Privacy Guard 11, Google Drive 11, iCloud 11, Inkdrop 11, Red 12
+assets/brand/logo-mark.svg (rotated 90): Accenture 15, Traefik Proxy 16, Zalando 16, Deutsche Welle 18, Magic 18
+assets/brand/icon.svg: Platform.sh 8, British Airways 12, Pexels 12, Cirrus CI 13, Elastic Stack 13  FLAG: review by eye
+assets/brand/icon.svg (rotated 90): Platform.sh 8, British Airways 12, Pexels 12, Cirrus CI 13, Elastic Stack 13  FLAG: review by eye
+
+Reviewed by eye, 2026-10-03:
+- icon.svg vs Platform.sh (8): the hash sees the icon's solid navy square tile, not the Plinth inside it; Platform.sh is
+  stacked horizontal bars in a square outline. A square-tile match, not a resemblance of the mark.
+- logo-mark.svg vs Red (12, a layered pyramid) and Google Drive (11, a triangle): silhouette proximity only; the
+  Plinth's stepped bricks and gold capstone differ in construction and colour. Not flagged.
+Not done: reverse image search (Google Lens, TinEye) and a WIPO Global Brand Database image search; these are human steps.
