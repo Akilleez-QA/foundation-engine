@@ -30,6 +30,16 @@ workflow rules do not prescribe the design or tooling of every independent game.
 - Agent identity changes no runtime rule or budget. These are authority and workflow
   responsibilities, not a sandbox, permission system or authorship-dependent API.
 
+## Contribution language
+
+Follow [Describe systems and patterns](CONTRIBUTING.md#describe-systems-and-patterns)
+for all repository contributions and submissions. Use system and pattern names
+instead of external game names, their acronyms, or references to their source projects, including
+in goals, proposals, comments and examples. Explain the behavior, contract and
+acceptance evidence directly. Do not publish proprietary source or private study
+notes. Preserve required attribution, license notices and accurate dependency or
+reproduction identifiers; never disguise reused material as original work.
+
 ## Building your own game (solo or build day)
 
 Most people clone this repository to make a game, not to change the engine. Then:
