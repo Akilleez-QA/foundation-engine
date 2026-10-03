@@ -17,7 +17,12 @@ export interface SystemSpec<C> {
   run(ctx: C, dt: number): void;
 }
 
-export interface RunnerStats { frames: number; steps: number; dropped: number; errors: number }
+export interface RunnerStats {
+  frames: number;
+  steps: number;
+  dropped: number;
+  errors: number;
+}
 
 export interface SystemRunner<C> {
   /** Advance by `dt` seconds of frame time; returns how many fixed steps ran. */
@@ -27,31 +32,61 @@ export interface SystemRunner<C> {
   readonly alpha: number;
 }
 
-export function createSystemRunner<C>(systems: readonly SystemSpec<C>[], o: { step?: number; maxSteps?: number; report?: (id: string, error: unknown) => void; after?: () => void; beforeStep?: () => void; beforeFrameLane?: () => void } = {}): SystemRunner<C> {
-  const step = o.step ?? 1 / 60, maxSteps = o.maxSteps ?? 5;
+export function createSystemRunner<C>(
+  systems: readonly SystemSpec<C>[],
+  o: {
+    step?: number;
+    maxSteps?: number;
+    report?: (id: string, error: unknown) => void;
+    after?: () => void;
+    beforeStep?: () => void;
+    beforeFrameLane?: () => void;
+  } = {},
+): SystemRunner<C> {
+  const step = o.step ?? 1 / 60,
+    maxSteps = o.maxSteps ?? 5;
   if (!(step > 0)) throw Error('the fixed step must be positive');
   const ids = new Set<string>();
-  for (const s of systems) { if (ids.has(s.id)) throw Error(`two systems are called ${s.id}`); ids.add(s.id); }
-  const fixed = systems.filter(s => (s.phase ?? 'fixed') === 'fixed'), perFrame = systems.filter(s => s.phase === 'frame');
-  const stats: RunnerStats = { frames: 0, steps: 0, dropped: 0, errors: 0 };
+  for (const s of systems) {
+    if (ids.has(s.id)) throw Error(`two systems are called ${s.id}`);
+    ids.add(s.id);
+  }
+  const fixed = systems.filter(s => (s.phase ?? 'fixed') === 'fixed'),
+    perFrame = systems.filter(s => s.phase === 'frame');
+  const stats: RunnerStats = {frames: 0, steps: 0, dropped: 0, errors: 0};
   let acc = 0;
   const run = (s: SystemSpec<C>, ctx: C, dt: number) => {
-    try { s.run(ctx, dt); }
-    catch (error) {
+    try {
+      s.run(ctx, dt);
+    } catch (error) {
       stats.errors++;
-      try { (o.report ?? ((id, e) => console.error(`system ${id} failed`, e)))(s.id, error); }
-      catch { /* Diagnostics must not interrupt sibling systems or accumulator bookkeeping. */ }
+      try {
+        (o.report ?? ((id, e) => console.error(`system ${id} failed`, e)))(s.id, error);
+      } catch {
+        /* Diagnostics must not interrupt sibling systems or accumulator bookkeeping. */
+      }
     }
   };
   return {
     stats,
-    get alpha() { return acc / step; },
+    get alpha() {
+      return acc / step;
+    },
     frame(ctx, dt) {
       stats.frames++;
       acc += Math.max(0, Math.min(dt, 1));
       let n = 0;
-      while (acc >= step - 1e-9 && n < maxSteps) { o.beforeStep?.(); for (const s of fixed) run(s, ctx, step); acc -= step; n++; }
-      if (acc >= step - 1e-9) { const extra = Math.floor(acc / step + 1e-9); stats.dropped += extra; acc -= extra * step; }
+      while (acc >= step - 1e-9 && n < maxSteps) {
+        o.beforeStep?.();
+        for (const s of fixed) run(s, ctx, step);
+        acc -= step;
+        n++;
+      }
+      if (acc >= step - 1e-9) {
+        const extra = Math.floor(acc / step + 1e-9);
+        stats.dropped += extra;
+        acc -= extra * step;
+      }
       stats.steps += n;
       o.beforeFrameLane?.();
       for (const s of perFrame) run(s, ctx, dt);

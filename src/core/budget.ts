@@ -2,7 +2,7 @@
 // `budgetFor`; the checker is platform/perf/budget-check.ts. They live in core (L0) because SceneDef holds a
 // SceneBudget. Flat fields are the reference preset's values; `ports` holds a lighter preset's overrides once
 // that port is built.
-import type { Ported, PortPreset, QualityPreset } from './tiers';
+import type {Ported, PortPreset, QualityPreset} from './tiers';
 
 export interface SceneBudgetValues {
   /** GL draws per rendered frame, shadow pass included (worst window of the scene). */
@@ -41,14 +41,14 @@ export interface SceneBudgetValues {
   worldDilation?: number;
 }
 
-export type SceneBudget = Ported<SceneBudgetValues> & { provenance: { measured: string; run: string } };
+export type SceneBudget = Ported<SceneBudgetValues> & {provenance: {measured: string; run: string}};
 
 /** App-wide numbers that are not per scene. */
 export interface AppBudget {
   firstLoadJsKiB: number;
   startupMiB: number;
   startupHeapMiB: number;
-  appReadyMs: { desktop: number };
+  appReadyMs: {desktop: number};
   retainedCanvasMiBAfterTour: number;
   retainedHeapMiBAfterTour: number;
 }
@@ -63,8 +63,8 @@ const CHAIN: Readonly<Record<QualityPreset, readonly PortPreset[]>> = {
 
 /** The values that apply at `preset` (low → medium → high → reference). */
 export function budgetFor<T extends object>(b: Ported<T>, preset: QualityPreset): T {
-  const { ports, ...flat } = b as Ported<T> & Record<string, unknown>;
-  const out: Record<string, unknown> = { ...flat };
+  const {ports, ...flat} = b as Ported<T> & Record<string, unknown>;
+  const out: Record<string, unknown> = {...flat};
   for (const port of [...CHAIN[preset]].reverse()) Object.assign(out, ports?.[port] ?? {});
   return out as T;
 }

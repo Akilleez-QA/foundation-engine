@@ -1,4 +1,4 @@
-import { captureJson, type JsonLimits } from '../network/captured-json';
+import {captureJson, type JsonLimits} from '../network/captured-json';
 
 const hex = (n: number) => (n >>> 0).toString(16).padStart(8, '0');
 
@@ -8,7 +8,8 @@ const hex = (n: number) => (n >>> 0).toString(16).padStart(8, '0');
  */
 export function hashText(text: string): string {
   if (typeof text !== 'string') throw TypeError('replay hash: text must be a string');
-  let a = 0xdeadbeef, b = 0x41c6ce57;
+  let a = 0xdeadbeef,
+    b = 0x41c6ce57;
   for (let i = 0; i < text.length; i++) {
     const c = text.charCodeAt(i);
     a = Math.imul(a ^ c, 2654435761);

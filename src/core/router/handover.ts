@@ -13,7 +13,7 @@
  * `load`: the module is fetched once per entry, a failed fetch is retried on the next navigation, `preload` fetches
  * without entering. A module that is already in (or a synchronous `load`, a hub scene) enters in the same call.
  */
-import type { SceneId } from './resolve';
+import type {SceneId} from './resolve';
 
 export type HandoverOutcome = 'activated' | 'superseded' | 'failed';
 /** Why a run is left: a newer request or the player changed before activation, it failed, or the player moved on. */
@@ -73,7 +73,9 @@ export interface HandoverDeps {
   report?(scene: SceneId, error: unknown): void;
 }
 
-export interface GoRequest { params?: Readonly<Record<string, string>> }
+export interface GoRequest {
+  params?: Readonly<Record<string, string>>;
+}
 
 export interface Handover {
   /** Navigate to `entry`: a new epoch that supersedes any pending one and leaves the current run. */
@@ -88,28 +90,42 @@ export interface Handover {
   loading(): boolean;
 }
 
-type Loaded = { sync: true; value: unknown } | { sync: false; promise: Promise<unknown> };
-const thenable = <T>(v: unknown): v is PromiseLike<T> => !!v && typeof (v as { then?: unknown }).then === 'function';
+type Loaded = {sync: true; value: unknown} | {sync: false; promise: Promise<unknown>};
+const thenable = <T>(v: unknown): v is PromiseLike<T> => !!v && typeof (v as {then?: unknown}).then === 'function';
 
 export function createHandover(deps: HandoverDeps): Handover {
   let serial = 0;
-  interface Pending { visit: SceneVisit; abort: AbortController; run: SceneRun | null; left: boolean }
+  interface Pending {
+    visit: SceneVisit;
+    abort: AbortController;
+    run: SceneRun | null;
+    left: boolean;
+  }
   let pending: Pending | null = null;
-  let active: { visit: SceneVisit; run: SceneRun; abort: AbortController } | null = null;
+  let active: {visit: SceneVisit; run: SceneRun; abort: AbortController} | null = null;
   let lastActivated: SceneVisit | null = null;
-  const modules = new Map<SceneId, { value?: unknown; has: boolean; promise?: Promise<unknown> }>();
+  const modules = new Map<SceneId, {value?: unknown; has: boolean; promise?: Promise<unknown>}>();
 
   const leaveRun = (scene: SceneId, run: SceneRun | null, reason: HandoverLeave) => {
     if (!run) return;
-    try { run.leave(reason); } catch (error) { deps.report?.(scene, error); }
+    try {
+      run.leave(reason);
+    } catch (error) {
+      deps.report?.(scene, error);
+    }
   };
   /** Abort a request and leave its run, if it has one yet, exactly once. A run that arrives later is left then. */
   const discard = (p: Pending, reason: HandoverLeave) => {
     if (pending === p) pending = null;
     if (!p.abort.signal.aborted) p.abort.abort(reason);
-    if (p.run && !p.left) { p.left = true; leaveRun(p.visit.scene, p.run, reason); }
+    if (p.run && !p.left) {
+      p.left = true;
+      leaveRun(p.visit.scene, p.run, reason);
+    }
   };
-  const abortPending = (reason: HandoverLeave) => { if (pending) discard(pending, reason); };
+  const abortPending = (reason: HandoverLeave) => {
+    if (pending) discard(pending, reason);
+  };
 
   const leaveActive = () => {
     const a = active;
@@ -121,34 +137,54 @@ export function createHandover(deps: HandoverDeps): Handover {
 
   const load = (entry: SceneEntry): Loaded => {
     let slot = modules.get(entry.id);
-    if (slot?.has) return { sync: true, value: slot.value };
-    if (slot?.promise) return { sync: false, promise: slot.promise };
+    if (slot?.has) return {sync: true, value: slot.value};
+    if (slot?.promise) return {sync: false, promise: slot.promise};
     const value = entry.load();
-    if (!thenable(value)) { modules.set(entry.id, { value, has: true }); return { sync: true, value }; }
-    slot = { has: false };
+    if (!thenable(value)) {
+      modules.set(entry.id, {value, has: true});
+      return {sync: true, value};
+    }
+    slot = {has: false};
     slot.promise = Promise.resolve(value).then(
-      v => { modules.set(entry.id, { value: v, has: true }); return v; },
-      error => { modules.delete(entry.id); throw error; },
+      v => {
+        modules.set(entry.id, {value: v, has: true});
+        return v;
+      },
+      error => {
+        modules.delete(entry.id);
+        throw error;
+      },
     );
     modules.set(entry.id, slot);
-    return { sync: false, promise: slot.promise };
+    return {sync: false, promise: slot.promise};
   };
 
   const go = (entry: SceneEntry, request: GoRequest = {}): Promise<HandoverOutcome> => {
     // 1. A new epoch, captured before anything else; the previous pending request and the current run go.
-    const epoch = ++serial, player = deps.player();
+    const epoch = ++serial,
+      player = deps.player();
     abortPending('superseded');
     if (!entry.prepare || (active && active.visit.player !== player)) leaveActive();
     const abort = new AbortController();
     const visit: SceneVisit = {
-      epoch, scene: entry.id, params: request.params ?? {}, player, signal: abort.signal,
-      current: () => (pending?.visit === visit || active?.visit === visit) && !abort.signal.aborted && deps.player() === player,
+      epoch,
+      scene: entry.id,
+      params: request.params ?? {},
+      player,
+      signal: abort.signal,
+      current: () =>
+        (pending?.visit === visit || active?.visit === visit) && !abort.signal.aborted && deps.player() === player,
     };
-    const self: Pending = { visit, abort, run: null, left: false };
+    const self: Pending = {visit, abort, run: null, left: false};
     pending = self;
 
     let loadingShown = false;
-    const settle = () => { if (loadingShown) { loadingShown = false; deps.settled?.(); } };
+    const settle = () => {
+      if (loadingShown) {
+        loadingShown = false;
+        deps.settled?.();
+      }
+    };
     /** Not current any more: a newer request (already aborted this one) or a player change (abort it here). */
     const stale = (): HandoverOutcome => {
       settle();
@@ -166,13 +202,21 @@ export function createHandover(deps: HandoverDeps): Handover {
     const activate = (): HandoverOutcome => {
       if (!visit.current()) return stale();
       const run = self.run!;
-      try { run.activate?.(); } catch (error) { return fail(error); }
+      try {
+        run.activate?.();
+      } catch (error) {
+        return fail(error);
+      }
       // The hook may have navigated (a newer request already left this run) or switched players.
       if (!visit.current()) return stale();
       pending = null;
-      active = { visit, run, abort };
+      active = {visit, run, abort};
       lastActivated = visit;
-      try { run.arrive?.(); } catch (error) { deps.report?.(entry.id, error); }
+      try {
+        run.arrive?.();
+      } catch (error) {
+        deps.report?.(entry.id, error);
+      }
       deps.entered?.(visit);
       return 'activated';
     };
@@ -180,7 +224,11 @@ export function createHandover(deps: HandoverDeps): Handover {
       if (!visit.current()) return stale();
       settle();
       let first: void | Promise<void>;
-      try { first = deps.firstRender(self.run!, visit); } catch (error) { return fail(error); }
+      try {
+        first = deps.firstRender(self.run!, visit);
+      } catch (error) {
+        return fail(error);
+      }
       return thenable(first) ? Promise.resolve(first).then(activate, fail) : activate();
     };
     const entered = (run: SceneRun): HandoverOutcome | Promise<HandoverOutcome> => {
@@ -195,7 +243,11 @@ export function createHandover(deps: HandoverDeps): Handover {
       leaveActive();
       if (!visit.current()) return stale(); // Disposal callbacks can navigate.
       let run: SceneRun | Promise<SceneRun>;
-      try { run = entry.enter(module, visit); } catch (error) { return fail(error); }
+      try {
+        run = entry.enter(module, visit);
+      } catch (error) {
+        return fail(error);
+      }
       return thenable<SceneRun>(run) ? Promise.resolve(run).then(entered, fail) : entered(run);
     };
 
@@ -203,9 +255,13 @@ export function createHandover(deps: HandoverDeps): Handover {
       if (!visit.current()) return stale();
       if (!entry.prepare) return enterPrepared(module);
       try {
-        const prepared=entry.prepare(module,visit);
-        return thenable(prepared) ? Promise.resolve(prepared).then(()=>enterPrepared(module),fail) : enterPrepared(module);
-      } catch(error){return fail(error);}
+        const prepared = entry.prepare(module, visit);
+        return thenable(prepared)
+          ? Promise.resolve(prepared).then(() => enterPrepared(module), fail)
+          : enterPrepared(module);
+      } catch (error) {
+        return fail(error);
+      }
     };
 
     let outcome: HandoverOutcome | Promise<HandoverOutcome>;
@@ -217,15 +273,25 @@ export function createHandover(deps: HandoverDeps): Handover {
         deps.loading?.(entry.label);
         outcome = loaded.promise.then(enter, fail);
       }
-    } catch (error) { outcome = fail(error); }
+    } catch (error) {
+      outcome = fail(error);
+    }
     return Promise.resolve(outcome);
   };
 
   return {
     go,
-    leave() { abortPending('superseded'); leaveActive(); },
+    leave() {
+      abortPending('superseded');
+      leaveActive();
+    },
     preload(entry) {
-      try { const l = load(entry); if (!l.sync) l.promise.catch(() => {}); } catch { /* the next go retries */ }
+      try {
+        const l = load(entry);
+        if (!l.sync) l.promise.catch(() => {});
+      } catch {
+        /* the next go retries */
+      }
     },
     current: () => lastActivated,
     loading: () => pending !== null,
@@ -236,10 +302,10 @@ export function createHandover(deps: HandoverDeps): Handover {
 declare module '../events' {
   interface EngineEvents {
     /** A visit was activated after its first successful render. Emitted once per navigation epoch. */
-    'scene.entered': { id: SceneId; epoch: number };
+    'scene.entered': {id: SceneId; epoch: number};
     /** A navigation inside the router's scenes is about to hand over to `to`: the run it covers pauses and saves. */
-    'scene.entering': { to: SceneId; from: SceneId | null };
+    'scene.entering': {to: SceneId; from: SceneId | null};
     /** The address left the router's scenes, so the shell no longer owns a scene. */
-    'scene.left': { scene: SceneId; reason: string };
+    'scene.left': {scene: SceneId; reason: string};
   }
 }

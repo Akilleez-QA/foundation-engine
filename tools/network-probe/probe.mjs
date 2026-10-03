@@ -7,21 +7,21 @@
 //
 // Evidence scope: one machine, loopback TCP, Node `ws` clients. Not WAN, not physical devices, not browsers,
 // not multiple machines. Host RSS is an observation, not a guarantee.
-import { fork, spawnSync } from 'node:child_process';
-import { once } from 'node:events';
-import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import {fork, spawnSync} from 'node:child_process';
+import {once} from 'node:events';
+import {writeFileSync, mkdirSync, readFileSync} from 'node:fs';
 import os from 'node:os';
-import { dirname, join } from 'node:path';
-import { performance } from 'node:perf_hooks';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { WebSocket } from 'ws';
-import { createClosePolicy, createRetrySchedule } from '../../src/kits/network/index.ts';
+import {dirname, join} from 'node:path';
+import {performance} from 'node:perf_hooks';
+import {fileURLToPath, pathToFileURL} from 'node:url';
+import {WebSocket} from 'ws';
+import {createClosePolicy, createRetrySchedule} from '../../src/kits/network/index.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 const HOST = join(HERE, 'host.mjs');
 const now = () => performance.now();
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 export const SCOPE = Object.freeze({
   evidence: 'loopback-process',
@@ -46,20 +46,20 @@ export const DEFAULTS = Object.freeze({
     nonReaderPerSecond: 8,
     drainMs: 600,
   },
-  nonReader: { entityCount: 64, healthyClients: 3, changeEveryMs: 20, settleMs: 1000, maxAttackMs: 20000 },
+  nonReader: {entityCount: 64, healthyClients: 3, changeEveryMs: 20, settleMs: 1000, maxAttackMs: 20000},
   storm: {
     variants: [
-      { policy: 'jitter', clients: 8 },
-      { policy: 'no-jitter', clients: 8 },
-      { policy: 'jitter', clients: 16 },
+      {policy: 'jitter', clients: 8},
+      {policy: 'no-jitter', clients: 8},
+      {policy: 'jitter', clients: 16},
     ],
     downtimeMs: 400,
     binMs: 100,
     observeMs: 9000,
-    retry: { baseMs: 250, capMs: 2000, maxAttempts: 6, budget: { capacity: 8, refillEveryMs: 15000 } },
+    retry: {baseMs: 250, capMs: 2000, maxAttempts: 6, budget: {capacity: 8, refillEveryMs: 15000}},
   },
   // readyTimeoutMs bounds a child host's start (module load under a loaded machine), not anything measured.
-  abort: { rssMb: 1024, readTimeoutMs: 3000, readyTimeoutMs: 30000 },
+  abort: {rssMb: 1024, readTimeoutMs: 3000, readyTimeoutMs: 30000},
 });
 
 /** Hard caps on any configuration, whatever the caller asks for. */
@@ -98,7 +98,7 @@ export function percentile(samples, p) {
   return sorted[Math.max(0, Math.ceil(sorted.length * p) - 1)];
 }
 const round = (x, digits = 2) => (x === null || x === undefined ? null : Number(x.toFixed(digits)));
-const latencySummary = (samples) => ({
+const latencySummary = samples => ({
   samples: samples.length,
   p50Ms: round(percentile(samples, 0.5)),
   p95Ms: round(percentile(samples, 0.95)),
@@ -112,7 +112,7 @@ const closePolicy = createClosePolicy();
 const describeClose = (code, reason) => ({
   code,
   reason,
-  class: closePolicy.classify({ code, reason }),
+  class: closePolicy.classify({code, reason}),
 });
 const capInt = (value, min, max, name) => {
   if (!Number.isSafeInteger(value) || value < min || value > max)
@@ -134,7 +134,7 @@ export function resolveConfig(options = {}) {
   capInt(o.healthyClients, 1, CAPS.healthyClients, 'overload.healthyClients');
   if (!Array.isArray(o.rampPerClient) || o.rampPerClient.length < 1 || o.rampPerClient.length > CAPS.steps)
     throw RangeError('probe config: overload.rampPerClient');
-  o.rampPerClient.forEach((r) => capInt(r, 1, CAPS.ratePerClient, 'overload.rampPerClient[]'));
+  o.rampPerClient.forEach(r => capInt(r, 1, CAPS.ratePerClient, 'overload.rampPerClient[]'));
   capInt(o.stepMs, 200, CAPS.stepMs, 'overload.stepMs');
   capInt(o.driverMs, 1, 1000, 'overload.driverMs');
   if (!Array.isArray(o.queueAgeVariants) || o.queueAgeVariants.length < 1 || o.queueAgeVariants.length > 3)
@@ -189,7 +189,7 @@ function createOwner() {
     sockets,
     started: () => started,
     socket(url) {
-      const socket = new WebSocket(url, { perMessageDeflate: false });
+      const socket = new WebSocket(url, {perMessageDeflate: false});
       started++;
       sockets.add(socket);
       socket.on('error', () => {});
@@ -201,30 +201,30 @@ function createOwner() {
       const open = [...sockets];
       for (const socket of open) socket.terminate();
       await Promise.race([
-        Promise.all(open.map((socket) => (socket.readyState === WebSocket.CLOSED ? null : once(socket, 'close')))),
+        Promise.all(open.map(socket => (socket.readyState === WebSocket.CLOSED ? null : once(socket, 'close')))),
         delay(2000),
       ]);
-      await Promise.all([...children].map((h) => h.close()));
+      await Promise.all([...children].map(h => h.close()));
     },
   };
 }
 
 /** Fork one reference host in a child process and speak its trusted IPC. */
 async function startHost(owner, kind, options, abort) {
-  const child = fork(HOST, [JSON.stringify({ kind, options })], {
+  const child = fork(HOST, [JSON.stringify({kind, options})], {
     cwd: ROOT,
     execArgv: ['--import', 'tsx'],
     stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
   });
   let stderr = '';
-  child.stderr.on('data', (d) => {
+  child.stderr.on('data', d => {
     stderr = (stderr + d).slice(-2000);
   });
-  const exited = new Promise((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
+  const exited = new Promise(resolve => child.once('exit', (code, signal) => resolve({code, signal})));
   const pending = new Map();
   let nextId = 1,
     closing = null;
-  child.on('message', (m) => {
+  child.on('message', m => {
     if (m?.type !== 'reply') return;
     const p = pending.get(m.id);
     if (!p) return;
@@ -238,15 +238,14 @@ async function startHost(owner, kind, options, abort) {
     pid: child.pid,
     call(method, payload, timeoutMs = abort.readTimeoutMs) {
       return new Promise((resolve, reject) => {
-        if (child.exitCode !== null || child.signalCode !== null || !child.connected)
-          return reject(Error('host-gone'));
+        if (child.exitCode !== null || child.signalCode !== null || !child.connected) return reject(Error('host-gone'));
         const id = nextId++;
         const timer = setTimeout(() => {
           pending.delete(id);
           reject(Error('host-read-timeout'));
         }, timeoutMs);
-        pending.set(id, { resolve, reject, timer });
-        child.send({ id, method, payload });
+        pending.set(id, {resolve, reject, timer});
+        child.send({id, method, payload});
       });
     },
     /** Graceful close, then SIGKILL to this exact child PID only if it has not exited within 2 s. */
@@ -271,8 +270,8 @@ async function startHost(owner, kind, options, abort) {
   owner.pids.push(child.pid);
   let readyTimer;
   const ready = await Promise.race([
-    new Promise((resolve) => {
-      const listen = (m) => {
+    new Promise(resolve => {
+      const listen = m => {
         if (m?.type === 'ready') {
           child.off('message', listen);
           resolve(m);
@@ -280,14 +279,17 @@ async function startHost(owner, kind, options, abort) {
       };
       child.on('message', listen);
     }),
-    exited.then((e) => {
+    exited.then(e => {
       throw Error(`probe host exited before ready (${e.code ?? e.signal}): ${stderr.trim()}`);
     }),
     new Promise((_, reject) => {
-      readyTimer = setTimeout(() => reject(Error(`probe host ready timeout (${abort.readyTimeoutMs} ms)`)), abort.readyTimeoutMs);
+      readyTimer = setTimeout(
+        () => reject(Error(`probe host ready timeout (${abort.readyTimeoutMs} ms)`)),
+        abort.readyTimeoutMs,
+      );
     }),
   ])
-    .catch(async (error) => {
+    .catch(async error => {
       await handle.close();
       throw error;
     })
@@ -300,7 +302,7 @@ async function startHost(owner, kind, options, abort) {
 
 /** Background sampler of host high-water marks; sets `state.abort` on an RSS breach or unresponsive host. */
 function sampleHost(host, cfg, state, observe) {
-  const high = { queuedMessages: 0, queuedBytes: 0, peerBufferedBytes: 0, connections: 0, samples: 0 };
+  const high = {queuedMessages: 0, queuedBytes: 0, peerBufferedBytes: 0, connections: 0, samples: 0};
   let busy = false,
     last = null;
   const timer = setInterval(async () => {
@@ -330,20 +332,20 @@ function sampleHost(host, cfg, state, observe) {
   };
 }
 
-const opened = (socket) =>
+const opened = socket =>
   socket.readyState === WebSocket.OPEN
     ? Promise.resolve(true)
-    : new Promise((resolve) => {
+    : new Promise(resolve => {
         socket.once('open', () => resolve(true));
         socket.once('close', () => resolve(false));
       });
 const closedWithin = (socket, ms) =>
-  new Promise((resolve) => {
+  new Promise(resolve => {
     if (socket.readyState === WebSocket.CLOSED) return resolve(socket._probeClose ?? null);
     const timer = setTimeout(() => resolve(null), ms);
     socket.once('close', (code, reason) => {
       clearTimeout(timer);
-      resolve({ code, reason: reason.toString() });
+      resolve({code, reason: reason.toString()});
     });
   });
 async function waitFor(check, ms, label) {
@@ -362,7 +364,7 @@ async function runOverload(cfg, owner, state) {
     if (state.abort) break;
     variants.push(await runOverloadRamp(cfg, owner, state, age));
   }
-  return { variants };
+  return {variants};
 }
 
 async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
@@ -370,7 +372,7 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
   const host = await startHost(
     owner,
     'network',
-    { driverMs: o.driverMs, ...(maxQueuedAgeMs === null ? {} : { maxQueuedAgeMs }) },
+    {driverMs: o.driverMs, ...(maxQueuedAgeMs === null ? {} : {maxQueuedAgeMs})},
     cfg.abort,
   );
   const sampler = sampleHost(host, cfg, state);
@@ -394,8 +396,8 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
     for (let i = 0; i < o.healthyClients; i++) {
       const principal = i % 2 ? 'beta' : 'alpha';
       const socket = owner.socket(host.url),
-        c = { socket, principal, n: 0, inflight: new Map(), authed: false, rate: 0, timer: null };
-      socket.on('message', (data) => {
+        c = {socket, principal, n: 0, inflight: new Map(), authed: false, rate: 0, timer: null};
+      socket.on('message', data => {
         const f = JSON.parse(data.toString());
         if (f.type === 'authenticated') c.authed = true;
         else if ((f.type === 'result' || f.type === 'refused') && c.inflight.has(f.id)) {
@@ -411,17 +413,17 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
         }
       });
       socket.once('close', (code, reason) => {
-        if (!state.stopping) unexpectedHealthyCloses.push({ client: i, ...describeClose(code, reason.toString()) });
+        if (!state.stopping) unexpectedHealthyCloses.push({client: i, ...describeClose(code, reason.toString())});
       });
       await opened(socket);
-      socket.send(JSON.stringify({ v: 1, type: 'auth', token: host.credentials[principal] }));
+      socket.send(JSON.stringify({v: 1, type: 'auth', token: host.credentials[principal]}));
       await waitFor(() => c.authed, 3000, 'healthy authentication');
       const tick = () => {
         if (state.stopping || state.abort || socket.readyState !== WebSocket.OPEN || current < 0) return;
         const id = `h${i}-${++c.n}`;
-        c.inflight.set(id, { at: now(), step: current });
+        c.inflight.set(id, {at: now(), step: current});
         steps[current].sent++;
-        socket.send(JSON.stringify({ v: 1, type: 'command', id, target: principal, delta: 1 }));
+        socket.send(JSON.stringify({v: 1, type: 'command', id, target: principal, delta: 1}));
         // Jittered period (seeded): 0.8x to 1.2x of 1000 / rate keeps every healthy peer inside its token bucket.
         c.timer = setTimeout(tick, (1000 / c.rate) * (0.8 + 0.4 * rng()));
       };
@@ -433,8 +435,15 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
     }
 
     // A physical non-reader: authenticates, then stops reading its socket while still sending commands.
-    const nonReader = { socket: owner.socket(host.url), authed: false, sent: 0, timer: null, backlogFrames: 0, backlogBytes: 0 };
-    nonReader.socket.on('message', (data) => {
+    const nonReader = {
+      socket: owner.socket(host.url),
+      authed: false,
+      sent: 0,
+      timer: null,
+      backlogFrames: 0,
+      backlogBytes: 0,
+    };
+    nonReader.socket.on('message', data => {
       const f = JSON.parse(data.toString());
       if (f.type === 'authenticated') {
         nonReader.authed = true;
@@ -446,12 +455,12 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
     });
     if (o.nonReaderPerSecond > 0) {
       await opened(nonReader.socket);
-      nonReader.socket.send(JSON.stringify({ v: 1, type: 'auth', token: host.credentials.beta }));
+      nonReader.socket.send(JSON.stringify({v: 1, type: 'auth', token: host.credentials.beta}));
       await waitFor(() => nonReader.authed, 3000, 'non-reader authentication');
       nonReader.timer = setInterval(() => {
         if (state.stopping || nonReader.socket.readyState !== WebSocket.OPEN) return;
         nonReader.socket.send(
-          JSON.stringify({ v: 1, type: 'command', id: `n-${++nonReader.sent}`, target: 'beta', delta: 1 }),
+          JSON.stringify({v: 1, type: 'command', id: `n-${++nonReader.sent}`, target: 'beta', delta: 1}),
         );
       }, 1000 / o.nonReaderPerSecond);
     }
@@ -463,12 +472,12 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
       const flood = owner.socket(host.url);
       let floodAuthed = false,
         floodSent = 0;
-      flood.on('message', (d) => {
+      flood.on('message', d => {
         if (JSON.parse(d.toString()).type === 'authenticated') floodAuthed = true;
       });
       const floodClosed = closedWithin(flood, 4000);
       await opened(flood);
-      flood.send(JSON.stringify({ v: 1, type: 'auth', token: host.credentials.alpha }));
+      flood.send(JSON.stringify({v: 1, type: 'auth', token: host.credentials.alpha}));
       await waitFor(() => floodAuthed || flood.readyState !== WebSocket.OPEN, 3000, 'flooder authentication');
       // Wrong credential, held open until the over-bound connection has been attempted.
       const bad = owner.socket(host.url),
@@ -478,24 +487,31 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
         excessClosed = closedWithin(excess, 4000);
       const excessOpened = await opened(excess);
       const excessClose = await excessClosed;
-      bad.send(JSON.stringify({ v: 1, type: 'auth', token: 'x'.repeat(43) }));
+      bad.send(JSON.stringify({v: 1, type: 'auth', token: 'x'.repeat(43)}));
       const badClose = await badClosed;
       const floodStart = now();
       // Catch up on elapsed time so a starved probe timer still offers the configured flood rate.
       const floodTimer = setInterval(() => {
         const due = Math.floor(((now() - floodStart) / 1000) * o.flooderPerSecond) - floodSent;
         for (let k = 0; k < Math.min(due, 200) && flood.readyState === WebSocket.OPEN; k++)
-          flood.send(JSON.stringify({ v: 1, type: 'command', id: `f-${++floodSent}`, target: 'alpha', delta: 1 }));
+          flood.send(JSON.stringify({v: 1, type: 'command', id: `f-${++floodSent}`, target: 'alpha', delta: 1}));
       }, 10);
       const floodClose = await floodClosed;
       clearInterval(floodTimer);
       for (const s of [flood, bad, excess]) s.terminate();
-      const label = (close) => (close ? describeClose(close.code, close.reason) : { code: null, reason: 'not closed within 4 s', class: null });
+      const label = close =>
+        close ? describeClose(close.code, close.reason) : {code: null, reason: 'not closed within 4 s', class: null};
       adversaries.push(
-        { step, kind: 'flooder', sentBeforeClose: floodSent, closeAfterMs: round(now() - floodStart),
-          achievedPerSecond: round(floodSent / Math.max(0.001, (now() - floodStart) / 1000)), ...label(floodClose) },
-        { step, kind: 'wrong-credential', ...label(badClose) },
-        { step, kind: 'over-connection-bound', transportOpened: excessOpened, ...label(excessClose) },
+        {
+          step,
+          kind: 'flooder',
+          sentBeforeClose: floodSent,
+          closeAfterMs: round(now() - floodStart),
+          achievedPerSecond: round(floodSent / Math.max(0.001, (now() - floodStart) / 1000)),
+          ...label(floodClose),
+        },
+        {step, kind: 'wrong-credential', ...label(badClose)},
+        {step, kind: 'over-connection-bound', transportOpened: excessOpened, ...label(excessClose)},
       );
       return now() - t;
     }
@@ -511,7 +527,9 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
         c.start();
       }
       const adv = o.adversaries
-        ? adversaryRound(step.index).catch((e) => adversaries.push({ step: step.index, kind: 'round-error', error: String(e?.message ?? e) }))
+        ? adversaryRound(step.index).catch(e =>
+            adversaries.push({step: step.index, kind: 'round-error', error: String(e?.message ?? e)}),
+          )
         : null;
       const end = now() + o.stepMs;
       while (now() < end && !state.abort) await delay(20);
@@ -527,7 +545,7 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
     // Peek at the non-reader's peer-side backlog: resume reading and count what the kernel had absorbed.
     const nonReaderHostBuffered = Math.max(
       0,
-      ...final.host.peers.filter((p) => p.principal === 'beta').map((p) => p.bufferedBytes),
+      ...final.host.peers.filter(p => p.principal === 'beta').map(p => p.bufferedBytes),
     );
     nonReader.socket.resume();
     await delay(300);
@@ -535,7 +553,7 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
     sampler.stop();
 
     const lost = healthy.reduce((n, c) => n + c.inflight.size, 0);
-    const stepRows = steps.map((s) => {
+    const stepRows = steps.map(s => {
       const secs = (s.durationMs ?? o.stepMs) / 1000;
       const dispatched = s.hostAfter && s.hostBefore ? s.hostAfter.dispatched - s.hostBefore.dispatched : null;
       return {
@@ -555,7 +573,7 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
         hostAttemptsPerSecond: dispatched === null ? null : round(dispatched / secs),
       };
     });
-    const goodputs = stepRows.map((r) => r.goodputPerSecond);
+    const goodputs = stepRows.map(r => r.goodputPerSecond);
     const capacityPerSecond = round((1000 / o.driverMs) * 4);
     // Time for the pump to drain a full global queue (32 messages) at its nominal attempt budget, and the
     // worst wait under fair per-peer rotation: a command 8th in its peer queue waits 8 rotations of every peer.
@@ -622,10 +640,10 @@ async function runOverloadRamp(cfg, owner, state, maxQueuedAgeMs) {
 
 async function runNonReader(cfg, owner, state) {
   const n = cfg.nonReader;
-  const host = await startHost(owner, 'replication', { entityCount: n.entityCount }, cfg.abort);
+  const host = await startHost(owner, 'replication', {entityCount: n.entityCount}, cfg.abort);
   let attacker = null; // { session, lastOutstanding, maxBuffered, retiredAt }
   const sampler = sampleHost(host, cfg, state);
-  const phases = { baseline: [], attack: [], after: [] };
+  const phases = {baseline: [], attack: [], after: []};
   let phase = 'baseline';
   const changes = []; // { value, at }
   const healthy = [];
@@ -638,9 +656,20 @@ async function runNonReader(cfg, owner, state) {
         // Client 0 (when there are two or more) acknowledges after a delay, so the credit check below is not trivial:
         // a view that arrives while its acknowledgement is still pending means the host sent past its one credit.
         slow = n.healthyClients >= 2 && i === 0,
-        c = { socket, session: null, views: 0, viewsByPhase: { baseline: 0, attack: 0, after: 0 }, adopted: 0, maxBytes: 0,
-          slow, ackPending: false, lastSequence: 0, creditViolations: 0, sequenceGaps: 0 };
-      socket.on('message', (data) => {
+        c = {
+          socket,
+          session: null,
+          views: 0,
+          viewsByPhase: {baseline: 0, attack: 0, after: 0},
+          adopted: 0,
+          maxBytes: 0,
+          slow,
+          ackPending: false,
+          lastSequence: 0,
+          creditViolations: 0,
+          sequenceGaps: 0,
+        };
+      socket.on('message', data => {
         const f = JSON.parse(data.toString());
         if (f.type === 'authenticated') c.session = f.session;
         else if (f.type === 'view') {
@@ -650,7 +679,7 @@ async function runNonReader(cfg, owner, state) {
           if (c.ackPending) c.creditViolations++;
           if (f.sequence !== c.lastSequence + 1) c.sequenceGaps++;
           c.lastSequence = f.sequence;
-          const value = f.entities.find((e) => e.id === 'entity-0')?.fields.value;
+          const value = f.entities.find(e => e.id === 'entity-0')?.fields.value;
           // Adoption latency: from the operator change to the first view that carries it (or a later value).
           // The deliberately slow acknowledger is excluded so its delay does not distort the percentiles.
           while (c.adopted < changes.length && changes[c.adopted].value <= value) {
@@ -660,7 +689,7 @@ async function runNonReader(cfg, owner, state) {
           const ack = () => {
             c.ackPending = false;
             if (socket.readyState === WebSocket.OPEN)
-              socket.send(JSON.stringify({ v: 1, type: 'view-ack', session: c.session, sequence: f.sequence }));
+              socket.send(JSON.stringify({v: 1, type: 'view-ack', session: c.session, sequence: f.sequence}));
           };
           if (c.slow) {
             c.ackPending = true;
@@ -669,10 +698,10 @@ async function runNonReader(cfg, owner, state) {
         }
       });
       socket.once('close', (code, reason) => {
-        if (!state.stopping) unexpectedHealthyCloses.push({ client: i, ...describeClose(code, reason.toString()) });
+        if (!state.stopping) unexpectedHealthyCloses.push({client: i, ...describeClose(code, reason.toString())});
       });
       await opened(socket);
-      socket.send(JSON.stringify({ v: 1, type: 'auth', token: host.credentials[principal] }));
+      socket.send(JSON.stringify({v: 1, type: 'auth', token: host.credentials[principal]}));
       await waitFor(() => c.session, 3000, 'replication authentication');
       healthy.push(c);
     }
@@ -680,9 +709,9 @@ async function runNonReader(cfg, owner, state) {
     const operate = async () => {
       if (state.stopping || state.abort) return;
       value++;
-      changes.push({ value, at: now(), phase });
+      changes.push({value, at: now(), phase});
       try {
-        await host.call('changeWorld', { id: 'entity-0', value });
+        await host.call('changeWorld', {id: 'entity-0', value});
       } catch (error) {
         if (!state.stopping) state.abort = `operator change: ${error.message}`;
         return;
@@ -697,8 +726,8 @@ async function runNonReader(cfg, owner, state) {
     // the worst case of a client that guesses sequences perfectly), so application credit never throttles it.
     phase = 'attack';
     const socket = owner.socket(host.url);
-    attacker = { session: null, acks: 0, lastAcked: 0, lastSequence: 0, maxBuffered: 0, retiredAfterMs: null };
-    socket.on('message', (data) => {
+    attacker = {session: null, acks: 0, lastAcked: 0, lastSequence: 0, maxBuffered: 0, retiredAfterMs: null};
+    socket.on('message', data => {
       const f = JSON.parse(data.toString());
       if (f.type === 'authenticated') {
         attacker.session = f.session;
@@ -706,12 +735,12 @@ async function runNonReader(cfg, owner, state) {
       }
     });
     await opened(socket);
-    socket.send(JSON.stringify({ v: 1, type: 'auth', token: host.credentials.alpha }));
+    socket.send(JSON.stringify({v: 1, type: 'auth', token: host.credentials.alpha}));
     await waitFor(() => attacker.session, 3000, 'non-reader authentication');
     const attackStart = now();
     while (now() - attackStart < n.maxAttackMs && !state.abort) {
       const r = await host.call('sample');
-      const peer = r.host.peers.find((p) => p.session === attacker.session);
+      const peer = r.host.peers.find(p => p.session === attacker.session);
       if (!peer) {
         attacker.retiredAfterMs = round(now() - attackStart);
         break;
@@ -722,7 +751,7 @@ async function runNonReader(cfg, owner, state) {
       // One acknowledgement per view, so the attacker stays inside the 256/s frame bucket: only the
       // buffered-send cap, not the rate bound, can retire it. Operator changes keep its view dirty.
       if (o && o.sequence > attacker.lastAcked && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ v: 1, type: 'view-ack', session: attacker.session, sequence: o.sequence }));
+        socket.send(JSON.stringify({v: 1, type: 'view-ack', session: attacker.session, sequence: o.sequence}));
         attacker.lastAcked = o.sequence;
         attacker.acks++;
       }
@@ -737,7 +766,7 @@ async function runNonReader(cfg, owner, state) {
     await delay(100);
     const final = await host.call('read');
     sampler.stop();
-    const viewMaxBytes = Math.max(...healthy.map((c) => c.maxBytes));
+    const viewMaxBytes = Math.max(...healthy.map(c => c.maxBytes));
     return {
       host: {
         kind: 'tools/replication-workbench (child process)',
@@ -763,8 +792,8 @@ async function runNonReader(cfg, owner, state) {
       },
       healthy: {
         clients: n.healthyClients,
-        viewsByPhase: healthy.map((c) => c.viewsByPhase),
-        slowAcknowledgerMs: healthy.some((c) => c.slow) ? 30 : null,
+        viewsByPhase: healthy.map(c => c.viewsByPhase),
+        slowAcknowledgerMs: healthy.some(c => c.slow) ? 30 : null,
         creditViolations: healthy.reduce((k, c) => k + c.creditViolations, 0),
         sequenceGaps: healthy.reduce((k, c) => k + c.sequenceGaps, 0),
         adoptionLatency: {
@@ -811,7 +840,7 @@ async function runStormVariant(cfg, owner, state, variant, index) {
   const attempts = []; // relative to the host close
   const accepted = [];
   const closes = {};
-  const outcomes = { reconnected: 0, exhausted: 0, 'budget-empty': 0, terminal: 0, unresolved: 0 };
+  const outcomes = {reconnected: 0, exhausted: 0, 'budget-empty': 0, terminal: 0, unresolved: 0};
   let t0 = 0,
     hostReadyAfterMs = null,
     driver = null,
@@ -820,7 +849,7 @@ async function runStormVariant(cfg, owner, state, variant, index) {
     hostReady = Promise.resolve(),
     releaseHostReady = () => {};
   try {
-    const connectOnce = (c) => {
+    const connectOnce = c => {
       const socket = owner.socket(host.url);
       c.socket = socket;
       c.authed = false;
@@ -828,9 +857,9 @@ async function runStormVariant(cfg, owner, state, variant, index) {
         if (t0) accepted.push(now() - t0);
         await hostReady;
         if (socket.readyState === WebSocket.OPEN && c.socket === socket)
-          socket.send(JSON.stringify({ v: 1, type: 'auth', token: host.credentials[c.principal] }));
+          socket.send(JSON.stringify({v: 1, type: 'auth', token: host.credentials[c.principal]}));
       });
-      socket.on('message', (data) => {
+      socket.on('message', data => {
         if (JSON.parse(data.toString()).type === 'authenticated') {
           c.authed = true;
           if (t0) {
@@ -860,19 +889,24 @@ async function runStormVariant(cfg, owner, state, variant, index) {
     };
     for (let i = 0; i < variant.clients; i++) {
       const random = variant.policy === 'jitter' ? seeded(cfg.seed * 1000 + index * 100 + i) : () => 0.9999;
-      const c = { i, principal: i % 2 ? 'beta' : 'alpha', state: 'initial', schedule: createRetrySchedule({ limits: s.retry, random }) };
+      const c = {
+        i,
+        principal: i % 2 ? 'beta' : 'alpha',
+        state: 'initial',
+        schedule: createRetrySchedule({limits: s.retry, random}),
+      };
       clients.push(c);
       connectOnce(c);
     }
     // Initial phase: up to the host's connection bound authenticate; the rest are refused (bounded), as in a full host.
     await delay(500);
-    const initiallyConnected = clients.filter((c) => c.authed).length;
+    const initiallyConnected = clients.filter(c => c.authed).length;
     for (const c of clients) if (!c.authed) c.socket.terminate();
     for (const c of clients) if (!c.authed) c.state = 'never-admitted';
 
     // Restart: close the host (terminates every socket), wait the downtime, start a fresh host on the same port.
     t0 = now();
-    hostReady = new Promise((resolve) => {
+    hostReady = new Promise(resolve => {
       releaseHostReady = resolve;
     });
     // Every client wants a session after the restart; the ones the full host never admitted start an episode too.
@@ -895,12 +929,12 @@ async function runStormVariant(cfg, owner, state, variant, index) {
         }
     }, 2);
     await delay(s.downtimeMs);
-    host = await startHost(owner, 'network', { port }, cfg.abort);
+    host = await startHost(owner, 'network', {port}, cfg.abort);
     hostReadyAfterMs = round(now() - t0);
     releaseHostReady();
     // Observe from host readiness, so a slow host start cannot cut short a client's remaining bounded schedule.
     const end = now() + s.observeMs;
-    while (now() < end && !state.abort && participants.some((c) => c.state === 'waiting' || c.state === 'attempting'))
+    while (now() < end && !state.abort && participants.some(c => c.state === 'waiting' || c.state === 'attempting'))
       await delay(20);
     clearInterval(driver);
     const final = await host.call('read');
@@ -913,10 +947,13 @@ async function runStormVariant(cfg, owner, state, variant, index) {
     for (const a of attempts) bump(bins, Math.floor(a / s.binMs) * s.binMs);
     const acceptedBins = {};
     for (const a of accepted) bump(acceptedBins, Math.floor(a / s.binMs) * s.binMs);
-    const reconnect = participants.filter((c) => c.reconnectedAt !== undefined).map((c) => c.reconnectedAt);
+    const reconnect = participants.filter(c => c.reconnectedAt !== undefined).map(c => c.reconnectedAt);
     return {
       policy: variant.policy,
-      randomPort: variant.policy === 'jitter' ? 'seeded mulberry32 stream per client' : 'constant 0.9999 (no jitter, same helper)',
+      randomPort:
+        variant.policy === 'jitter'
+          ? 'seeded mulberry32 stream per client'
+          : 'constant 0.9999 (no jitter, same helper)',
       clients: variant.clients,
       hostConnectionBound: 8,
       initiallyConnected,
@@ -937,19 +974,22 @@ async function runStormVariant(cfg, owner, state, variant, index) {
         p95: round(percentile(reconnect, 0.95)),
         last: round(reconnect.length ? Math.max(...reconnect) : null),
       },
-      maxAttemptsPerClient: Math.max(0, ...participants.map((c) => c.attempts ?? 0)),
+      maxAttemptsPerClient: Math.max(0, ...participants.map(c => c.attempts ?? 0)),
       // Load-independent accounting: a client that attempts after the host reported ready must reconnect when the
       // clients fit the connection bound; every other client must have stopped by its own bound before that.
-      attemptedAfterReady: participants.filter((c) => (c.lastAttemptAt ?? -1) >= hostReadyAfterMs).length,
-      attemptedAfterReadyReconnected: participants.filter((c) => (c.lastAttemptAt ?? -1) >= hostReadyAfterMs && c.state === 'connected').length,
+      attemptedAfterReady: participants.filter(c => (c.lastAttemptAt ?? -1) >= hostReadyAfterMs).length,
+      attemptedAfterReadyReconnected: participants.filter(
+        c => (c.lastAttemptAt ?? -1) >= hostReadyAfterMs && c.state === 'connected',
+      ).length,
       // Stopped by its own attempt bound or budget with its last attempt made before the host reported ready
       // (judged by attempt time, not by when the refusal's close event happened to be processed).
       stoppedBeforeReady: participants.filter(
-        (c) => (c.state === 'exhausted' || c.state === 'budget-empty') && (c.lastAttemptAt ?? -1) < hostReadyAfterMs,
+        c => (c.state === 'exhausted' || c.state === 'budget-empty') && (c.lastAttemptAt ?? -1) < hostReadyAfterMs,
       ).length,
       retryBudgetBoundPerClient: s.retry.budget.capacity + Math.floor(s.observeMs / s.retry.budget.refillEveryMs),
       attemptBoundPerClient: s.retry.maxAttempts,
-      attemptBoundNote: 'per episode; a client that reconnects and loses again starts a new episode, still within the budget',
+      attemptBoundNote:
+        'per episode; a client that reconnects and loses again starts a new episode, still within the budget',
       hostConnectionsAtEnd: final.host.intake.connections,
     };
   } finally {
@@ -984,21 +1024,36 @@ async function runStorm(cfg, owner, state) {
 
 export function invariants(report) {
   const rows = [];
-  const check = (id, ok, detail) => rows.push({ id, ok: !!ok, detail });
+  const check = (id, ok, detail) => rows.push({id, ok: !!ok, detail});
   for (const o of report.scenarios.overload?.variants ?? []) {
     const id = `overload[age=${o.host.maxQueuedAgeMs ?? 'none'}]`;
-    check(`${id}.healthy-never-closed`, o.unexpectedHealthyCloses.length === 0, `${o.unexpectedHealthyCloses.length} unexpected closes`);
-    const floods = o.adversaries.filter((a) => a.kind === 'flooder');
+    check(
+      `${id}.healthy-never-closed`,
+      o.unexpectedHealthyCloses.length === 0,
+      `${o.unexpectedHealthyCloses.length} unexpected closes`,
+    );
+    const floods = o.adversaries.filter(a => a.kind === 'flooder');
     if (floods.length) {
       // The host's own retirement reason is authoritative; the client-visible close frame can be lost (below).
-      check(`${id}.flooder-rate-limited`,
-        floods.every((a) => a.code !== null) && (o.highWater.hostCloseReasons['rate-capacity'] ?? 0) === floods.length,
+      check(
+        `${id}.flooder-rate-limited`,
+        floods.every(a => a.code !== null) && (o.highWater.hostCloseReasons['rate-capacity'] ?? 0) === floods.length,
         `host rate-capacity closes ${o.highWater.hostCloseReasons['rate-capacity'] ?? 0}/${floods.length}; client saw ` +
-          floods.map((a) => `${a.code} ${a.reason || '(no reason)'} after ${a.sentBeforeClose} frames at ${a.achievedPerSecond}/s`).join('; '));
-      const lost = o.adversaries.filter((a) => a.code === 1006);
+          floods
+            .map(
+              a =>
+                `${a.code} ${a.reason || '(no reason)'} after ${a.sentBeforeClose} frames at ${a.achievedPerSecond}/s`,
+            )
+            .join('; '),
+      );
+      const lost = o.adversaries.filter(a => a.code === 1006);
       if (lost.length)
-        rows.push({ id: `${id}.close-frame-lost`, ok: null, finding: true,
-          detail: `${lost.length} adversary close(s) arrived as 1006 without the host's code/reason (close then immediate terminate)` });
+        rows.push({
+          id: `${id}.close-frame-lost`,
+          ok: null,
+          finding: true,
+          detail: `${lost.length} adversary close(s) arrived as 1006 without the host's code/reason (close then immediate terminate)`,
+        });
     }
     const plateau = `final/peak goodput = ${o.derived.plateauRatio}`;
     // With or without queue age, goodput past saturation must plateau. Before the NW-06 follow-up (PR #33) each age
@@ -1009,67 +1064,135 @@ export function invariants(report) {
         achieved = last.hostAttemptsPerSecond / o.host.dispatchCapacityPerSecond;
       if (o.derived.plateauRatio < 0.8 && achieved < 0.8)
         // The host process itself was starved of CPU: the drop cannot be attributed to queueing behaviour.
-        rows.push({ id: `${id}.goodput-plateaus`, ok: null, inconclusive: true,
-          detail: `${plateau}; host dispatched ${last.hostAttemptsPerSecond} of ${o.host.dispatchCapacityPerSecond}/s (CPU-starved)` });
+        rows.push({
+          id: `${id}.goodput-plateaus`,
+          ok: null,
+          inconclusive: true,
+          detail: `${plateau}; host dispatched ${last.hostAttemptsPerSecond} of ${o.host.dispatchCapacityPerSecond}/s (CPU-starved)`,
+        });
       else
-        check(`${id}.goodput-plateaus`, o.derived.plateauRatio >= 0.8,
+        check(
+          `${id}.goodput-plateaus`,
+          o.derived.plateauRatio >= 0.8,
           `${plateau}; host dispatched ${last.hostAttemptsPerSecond}/s` +
-            (o.host.maxQueuedAgeMs === null ? '' : `; age ${o.host.maxQueuedAgeMs} ms, ${last.hostStaleShed} shed in the last step`));
+            (o.host.maxQueuedAgeMs === null
+              ? ''
+              : `; age ${o.host.maxQueuedAgeMs} ms, ${last.hostStaleShed} shed in the last step`),
+        );
     }
-    check(`${id}.global-queue-bound`, o.highWater.queuedMessages <= 32 && o.highWater.queuedBytes <= 16384,
-      `sampled high-water ${o.highWater.queuedMessages} messages / ${o.highWater.queuedBytes} bytes`);
-    check(`${id}.buffered-bound`, o.highWater.peerBufferedBytes <= 8192, `sampled ${o.highWater.peerBufferedBytes} bytes`);
-    const over = o.adversaries.filter((a) => a.kind === 'over-connection-bound');
-    check(`${id}.connection-bound`, o.highWater.connections <= 8 && over.every((a) => a.code !== null),
-      `sampled high-water ${o.highWater.connections} connections; over-bound attempts closed ${over.map((a) => a.code).join(',')}`);
-    const errors = o.adversaries.filter((a) => a.kind === 'round-error');
+    check(
+      `${id}.global-queue-bound`,
+      o.highWater.queuedMessages <= 32 && o.highWater.queuedBytes <= 16384,
+      `sampled high-water ${o.highWater.queuedMessages} messages / ${o.highWater.queuedBytes} bytes`,
+    );
+    check(
+      `${id}.buffered-bound`,
+      o.highWater.peerBufferedBytes <= 8192,
+      `sampled ${o.highWater.peerBufferedBytes} bytes`,
+    );
+    const over = o.adversaries.filter(a => a.kind === 'over-connection-bound');
+    check(
+      `${id}.connection-bound`,
+      o.highWater.connections <= 8 && over.every(a => a.code !== null),
+      `sampled high-water ${o.highWater.connections} connections; over-bound attempts closed ${over.map(a => a.code).join(',')}`,
+    );
+    const errors = o.adversaries.filter(a => a.kind === 'round-error');
     if (o.adversaries.length || errors.length)
-      check(`${id}.adversary-rounds-complete`, errors.length === 0 && floods.length === o.steps.length,
-        errors.length ? errors.map((e) => `step ${e.step}: ${e.error}`).join('; ') : `${floods.length} of ${o.steps.length} rounds`);
-    check(`${id}.host-rss-below-abort`, o.highWater.hostRssBytes <= report.config.abort.rssMb * 1048576,
-      `${Math.round(o.highWater.hostRssBytes / 1048576)} MiB`);
+      check(
+        `${id}.adversary-rounds-complete`,
+        errors.length === 0 && floods.length === o.steps.length,
+        errors.length
+          ? errors.map(e => `step ${e.step}: ${e.error}`).join('; ')
+          : `${floods.length} of ${o.steps.length} rounds`,
+      );
+    check(
+      `${id}.host-rss-below-abort`,
+      o.highWater.hostRssBytes <= report.config.abort.rssMb * 1048576,
+      `${Math.round(o.highWater.hostRssBytes / 1048576)} MiB`,
+    );
   }
   const n = report.scenarios.nonReader;
   if (n) {
     if (n.nonReader.retiredByHost)
-      check('non-reader.retired-by-buffered-cap', (n.highWater.hostCloseReasons['send-refused'] ?? 0) === 1,
-        `retired after ${n.nonReader.retiredAfterMs} ms; host close reasons ${JSON.stringify(n.highWater.hostCloseReasons)}`);
+      check(
+        'non-reader.retired-by-buffered-cap',
+        (n.highWater.hostCloseReasons['send-refused'] ?? 0) === 1,
+        `retired after ${n.nonReader.retiredAfterMs} ms; host close reasons ${JSON.stringify(n.highWater.hostCloseReasons)}`,
+      );
     else
-      rows.push({ id: 'non-reader.window-ended-before-cap', ok: null, finding: true,
-        detail: `${n.nonReader.viewsSentBeforeRetire} views (~${n.nonReader.approxBytesAbsorbedByKernelBeforeRetire} bytes) did not fill kernel buffers within the attack window` });
-    check('non-reader.buffered-bound', n.highWater.hostMaxBufferedBytesAtSend <= 131072, `${n.highWater.hostMaxBufferedBytesAtSend} bytes`);
-    check('non-reader.healthy-never-closed', n.healthy.unexpectedCloses.length === 0, `${n.healthy.unexpectedCloses.length}`);
-    check('non-reader.healthy-served-during-attack', n.healthy.viewsByPhase.every((v) => v.attack > 0),
-      n.healthy.viewsByPhase.map((v) => v.attack).join(','));
-    check('non-reader.one-credit-per-peer',
+      rows.push({
+        id: 'non-reader.window-ended-before-cap',
+        ok: null,
+        finding: true,
+        detail: `${n.nonReader.viewsSentBeforeRetire} views (~${n.nonReader.approxBytesAbsorbedByKernelBeforeRetire} bytes) did not fill kernel buffers within the attack window`,
+      });
+    check(
+      'non-reader.buffered-bound',
+      n.highWater.hostMaxBufferedBytesAtSend <= 131072,
+      `${n.highWater.hostMaxBufferedBytesAtSend} bytes`,
+    );
+    check(
+      'non-reader.healthy-never-closed',
+      n.healthy.unexpectedCloses.length === 0,
+      `${n.healthy.unexpectedCloses.length}`,
+    );
+    check(
+      'non-reader.healthy-served-during-attack',
+      n.healthy.viewsByPhase.every(v => v.attack > 0),
+      n.healthy.viewsByPhase.map(v => v.attack).join(','),
+    );
+    check(
+      'non-reader.one-credit-per-peer',
       n.healthy.creditViolations === 0 && n.healthy.sequenceGaps === 0 && n.nonReader.creditRespected,
       `slow acknowledger violations ${n.healthy.creditViolations}, sequence gaps ${n.healthy.sequenceGaps}; non-reader ` +
-        `${n.nonReader.viewsSentBeforeRetire} views for ${n.nonReader.acknowledgementsSent} acknowledgements`);
+        `${n.nonReader.viewsSentBeforeRetire} views for ${n.nonReader.acknowledgementsSent} acknowledgements`,
+    );
   }
   const s = report.scenarios.storm;
   if (s)
-    for (const v of s.variants)
-    {
+    for (const v of s.variants) {
       const id = `storm.${v.policy}.${v.clients}`;
-      check(`${id}.attempts-bounded`,
+      check(
+        `${id}.attempts-bounded`,
         v.maxAttemptsPerClient <= v.attemptBoundPerClient && v.attempts <= v.clients * v.attemptBoundPerClient,
-        `${v.attempts} attempts, max ${v.maxAttemptsPerClient} per client`);
-      check(`${id}.retry-budget`, v.maxAttemptsPerClient <= v.retryBudgetBoundPerClient,
-        `max ${v.maxAttemptsPerClient} per client, budget bound ${v.retryBudgetBoundPerClient}`);
-      check(`${id}.connection-bound`, v.hostConnectionsAtEnd <= v.hostConnectionBound && v.outcomes.reconnected <= v.hostConnectionBound,
-        `${v.hostConnectionsAtEnd} connections at end, ${v.outcomes.reconnected} reconnected`);
-      check(`${id}.no-terminal-or-stuck-client`, v.outcomes.terminal === 0 && v.outcomes.unresolved === 0, JSON.stringify(v.outcomes));
+        `${v.attempts} attempts, max ${v.maxAttemptsPerClient} per client`,
+      );
+      check(
+        `${id}.retry-budget`,
+        v.maxAttemptsPerClient <= v.retryBudgetBoundPerClient,
+        `max ${v.maxAttemptsPerClient} per client, budget bound ${v.retryBudgetBoundPerClient}`,
+      );
+      check(
+        `${id}.connection-bound`,
+        v.hostConnectionsAtEnd <= v.hostConnectionBound && v.outcomes.reconnected <= v.hostConnectionBound,
+        `${v.hostConnectionsAtEnd} connections at end, ${v.outcomes.reconnected} reconnected`,
+      );
+      check(
+        `${id}.no-terminal-or-stuck-client`,
+        v.outcomes.terminal === 0 && v.outcomes.unresolved === 0,
+        JSON.stringify(v.outcomes),
+      );
       if (v.clients <= v.hostConnectionBound) {
-        check(`${id}.no-capacity-refusal`, !v.closesDuringStorm['1013 connection-capacity'], JSON.stringify(v.closesDuringStorm));
-        check(`${id}.retrying-clients-reconnect`,
-          v.attemptedAfterReadyReconnected === v.attemptedAfterReady && v.outcomes.reconnected + v.stoppedBeforeReady === v.clients,
+        check(
+          `${id}.no-capacity-refusal`,
+          !v.closesDuringStorm['1013 connection-capacity'],
+          JSON.stringify(v.closesDuringStorm),
+        );
+        check(
+          `${id}.retrying-clients-reconnect`,
+          v.attemptedAfterReadyReconnected === v.attemptedAfterReady &&
+            v.outcomes.reconnected + v.stoppedBeforeReady === v.clients,
           `${v.attemptedAfterReadyReconnected}/${v.attemptedAfterReady} that attempted after ready reconnected; ` +
-            `${v.stoppedBeforeReady} stopped before ready (host ready after ${v.hostReadyAfterMs} ms)`);
+            `${v.stoppedBeforeReady} stopped before ready (host ready after ${v.hostReadyAfterMs} ms)`,
+        );
       }
     }
   if (n)
-    check('non-reader.host-rss-below-abort', n.highWater.hostRssBytes <= report.config.abort.rssMb * 1048576,
-      `${Math.round(n.highWater.hostRssBytes / 1048576)} MiB`);
+    check(
+      'non-reader.host-rss-below-abort',
+      n.highWater.hostRssBytes <= report.config.abort.rssMb * 1048576,
+      `${Math.round(n.highWater.hostRssBytes / 1048576)} MiB`,
+    );
   return rows;
 }
 
@@ -1080,8 +1203,8 @@ function environment() {
   let commit = null,
     dirty = null;
   try {
-    commit = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).stdout.trim() || null;
-    dirty = spawnSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' }).stdout.trim().length > 0;
+    commit = spawnSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).stdout.trim() || null;
+    dirty = spawnSync('git', ['status', '--porcelain'], {cwd: ROOT, encoding: 'utf8'}).stdout.trim().length > 0;
   } catch {
     /* not a checkout */
   }
@@ -1096,7 +1219,7 @@ function environment() {
     platform: `${os.platform()} ${os.release()} ${os.arch()}`,
     cpu: `${cpus.length} x ${cpus[0]?.model ?? 'unknown'}`,
     totalMemoryMiB: Math.round(os.totalmem() / 1048576),
-    loadAverageAtStart: os.loadavg().map((x) => round(x)),
+    loadAverageAtStart: os.loadavg().map(x => round(x)),
     niceness: (() => {
       try {
         return os.getPriority();
@@ -1115,7 +1238,7 @@ function environment() {
 export async function runNetworkProbe(options = {}) {
   const cfg = resolveConfig(options);
   const owner = createOwner();
-  const state = { abort: null, stopping: false };
+  const state = {abort: null, stopping: false};
   const started = now();
   const report = {
     probe: 'NW-07 network overload and goodput probe (study N4)',
@@ -1129,8 +1252,10 @@ export async function runNetworkProbe(options = {}) {
     state.abort = `total runtime cap ${CAPS.totalMs} ms`;
   }, CAPS.totalMs);
   try {
-    if (cfg.scenarios.includes('overload') && !state.abort) report.scenarios.overload = await runOverload(cfg, owner, state);
-    if (cfg.scenarios.includes('non-reader') && !state.abort) report.scenarios.nonReader = await runNonReader(cfg, owner, state);
+    if (cfg.scenarios.includes('overload') && !state.abort)
+      report.scenarios.overload = await runOverload(cfg, owner, state);
+    if (cfg.scenarios.includes('non-reader') && !state.abort)
+      report.scenarios.nonReader = await runNonReader(cfg, owner, state);
     if (cfg.scenarios.includes('storm') && !state.abort) report.scenarios.storm = await runStorm(cfg, owner, state);
   } finally {
     clearTimeout(guard);
@@ -1171,14 +1296,18 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     /* not permitted on this platform */
   }
   const args = parseArgs(process.argv.slice(2));
-  const report = await runNetworkProbe({ ...(args.config ?? {}), ...(args.seed !== undefined ? { seed: args.seed } : {}), ...(args.scenarios ? { scenarios: args.scenarios } : {}) });
+  const report = await runNetworkProbe({
+    ...(args.config ?? {}),
+    ...(args.seed !== undefined ? {seed: args.seed} : {}),
+    ...(args.scenarios ? {scenarios: args.scenarios} : {}),
+  });
   const text = `${JSON.stringify(report, null, 2)}\n`;
   if (args.out) {
-    mkdirSync(dirname(args.out), { recursive: true });
+    mkdirSync(dirname(args.out), {recursive: true});
     writeFileSync(args.out, text);
   }
   process.stdout.write(args.out ? summarize(report) : text);
-  process.exitCode = report.aborted || report.invariants.some((r) => r.ok === false) ? 1 : 0;
+  process.exitCode = report.aborted || report.invariants.some(r => r.ok === false) ? 1 : 0;
 }
 
 export function summarize(report) {
@@ -1190,9 +1319,14 @@ export function summarize(report) {
           `p50/p95/p99 ${s.admittedLatency.p50Ms}/${s.admittedLatency.p95Ms}/${s.admittedLatency.p99Ms} ms refused ${JSON.stringify(s.refusedByReason)}`,
       );
   const n = report.scenarios.nonReader;
-  if (n) lines.push(`non-reader: retired=${n.nonReader.retiredByHost} after ${n.nonReader.retiredAfterMs} ms (${JSON.stringify(n.highWater.hostCloseReasons)}); host max buffered ${n.highWater.hostMaxBufferedBytesAtSend} B; healthy adoption p99 ${n.healthy.adoptionLatency.duringAttack.p99Ms} ms during attack`);
+  if (n)
+    lines.push(
+      `non-reader: retired=${n.nonReader.retiredByHost} after ${n.nonReader.retiredAfterMs} ms (${JSON.stringify(n.highWater.hostCloseReasons)}); host max buffered ${n.highWater.hostMaxBufferedBytesAtSend} B; healthy adoption p99 ${n.healthy.adoptionLatency.duringAttack.p99Ms} ms during attack`,
+    );
   for (const v of report.scenarios.storm?.variants ?? [])
-    lines.push(`storm ${v.policy} x${v.clients}: ${v.attempts} attempts, peak ${v.peakAttemptsPerBin}/bin, accepted peak ${v.peakAcceptedOpensPerBin}/bin, ${JSON.stringify(v.outcomes)}`);
+    lines.push(
+      `storm ${v.policy} x${v.clients}: ${v.attempts} attempts, peak ${v.peakAttemptsPerBin}/bin, accepted peak ${v.peakAcceptedOpensPerBin}/bin, ${JSON.stringify(v.outcomes)}`,
+    );
   for (const r of report.invariants)
     lines.push(`${r.finding ? 'NOTE' : r.inconclusive ? 'INCONCLUSIVE' : r.ok ? 'ok  ' : 'FAIL'} ${r.id}: ${r.detail}`);
   lines.push(`aborted: ${report.aborted ?? 'no'} · ${Math.round(report.durationMs / 1000)} s`);

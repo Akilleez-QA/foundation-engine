@@ -7,27 +7,57 @@ const STREAMS = new Set(['Media', 'WebSocket', 'EventSource', 'Ping']);
 
 /** Pure accounting over CDP Network events. */
 export class RequestLedger {
-  requests = 0; bytes = 0; failures = 0; revision = 0;
+  requests = 0;
+  bytes = 0;
+  failures = 0;
+  revision = 0;
   pending = new Map();
   request(p) {
     if (/^(data|blob):/.test(p.request.url) || STREAMS.has(p.type)) return;
     if (!this.pending.has(p.requestId)) this.requests++;
-    this.pending.set(p.requestId, p.request.url); this.revision++;
+    this.pending.set(p.requestId, p.request.url);
+    this.revision++;
   }
   finish(p, failed = false) {
-    if (failed) this.failures++; else this.bytes += p.encodedDataLength ?? 0;
+    if (failed) this.failures++;
+    else this.bytes += p.encodedDataLength ?? 0;
     if (this.pending.delete(p.requestId)) this.revision++;
   }
-  snapshot() { return {requests: this.requests, bytes: this.bytes, failures: this.failures, pending: this.pending.size, revision: this.revision, urls: [...this.pending.values()]}; }
+  snapshot() {
+    return {
+      requests: this.requests,
+      bytes: this.bytes,
+      failures: this.failures,
+      pending: this.pending.size,
+      revision: this.revision,
+      urls: [...this.pending.values()],
+    };
+  }
 }
 
 /** Is `url` served by the bench's own origin (or inline data)? */
-export const isLocal = (url, origin) => { if (/^(data|blob):/.test(url)) return true; try { return new URL(url).origin === origin; } catch { return false; } };
+export const isLocal = (url, origin) => {
+  if (/^(data|blob):/.test(url)) return true;
+  try {
+    return new URL(url).origin === origin;
+  } catch {
+    return false;
+  }
+};
 
 /** Install before navigation: blocks (hermetic) or lets through (live) foreign requests, and feeds the ledger. */
 export async function observeNetwork(b, {base, liveNetwork = false}) {
-  const origin = new URL(base).origin, ledger = new RequestLedger(), external = new Map();
-  const note = url => { try { const k = new URL(url).origin; external.set(k, (external.get(k) ?? 0) + 1); } catch { /* not a URL */ } };
+  const origin = new URL(base).origin,
+    ledger = new RequestLedger(),
+    external = new Map();
+  const note = url => {
+    try {
+      const k = new URL(url).origin;
+      external.set(k, (external.get(k) ?? 0) + 1);
+    } catch {
+      /* not a URL */
+    }
+  };
   await b.page.route('**/*', route => {
     const url = route.request().url();
     if (isLocal(url, origin)) return route.continue();

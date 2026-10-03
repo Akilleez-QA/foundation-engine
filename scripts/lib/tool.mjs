@@ -34,14 +34,21 @@ export function toolCommand(name, args = [], {from = ROOT} = {}) {
 }
 
 /** The command for npm itself: npm's own CLI under this Node when npm started us, else the platform's npm. */
-export function npmCommand(args = [], {env = process.env, platform = process.platform, execPath = process.execPath, exists = existsSync} = {}) {
+export function npmCommand(
+  args = [],
+  {env = process.env, platform = process.platform, execPath = process.execPath, exists = existsSync} = {},
+) {
   const cli = env.npm_execpath;
   if (cli && /\.(c|m)?js$/.test(cli)) return {command: execPath, args: [cli, ...args], shell: false};
   if (platform === 'win32') {
     const bundled = win32.join(win32.dirname(execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
     if (exists(bundled)) return {command: execPath, args: [bundled, ...args], shell: false};
     // Last resort: cmd.exe joins the arguments with spaces, so quote each one (paths may contain spaces).
-    return {command: 'npm.cmd', args: args.map(a => /[\s"&|<>^]/.test(a) ? `"${a.replace(/"/g, '""')}"` : a), shell: true};
+    return {
+      command: 'npm.cmd',
+      args: args.map(a => (/[\s"&|<>^]/.test(a) ? `"${a.replace(/"/g, '""')}"` : a)),
+      shell: true,
+    };
   }
   return {command: 'npm', args, shell: false};
 }

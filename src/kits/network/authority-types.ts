@@ -1,5 +1,5 @@
-import type { DocumentValue } from '../authoring/document';
-import type { JsonLimits } from './captured-json';
+import type {DocumentValue} from '../authoring/document';
+import type {JsonLimits} from './captured-json';
 
 export interface AuthorityLimits {
   readonly envelope: JsonLimits;
@@ -84,17 +84,9 @@ export interface AuthorityOptions extends AuthorityValidation {
   /** Access permission, including current permission to disclose historical results. Not domain validation. */
   authorize(context: AuthorityReduction): boolean;
   /** Pure creator policy; unchanged state plus a result can represent a consumed domain rejection. */
-  reduce(
-    context: AuthorityReduction,
-  ): Readonly<{ stateJson: string; resultJson: string }>;
+  reduce(context: AuthorityReduction): Readonly<{stateJson: string; resultJson: string}>;
 }
-export type AuthorityStatus =
-  | 'unrecovered'
-  | 'ready'
-  | 'pending'
-  | 'unknown'
-  | 'unavailable'
-  | 'retired';
+export type AuthorityStatus = 'unrecovered' | 'ready' | 'pending' | 'unknown' | 'unavailable' | 'retired';
 export type AuthorityOutcome =
   | Readonly<{
       status: 'committed' | 'duplicate';
@@ -102,8 +94,8 @@ export type AuthorityOutcome =
       sequence: number;
       result: DocumentValue;
     }>
-  | Readonly<{ status: 'recovered'; revision: number }>
-  | Readonly<{ status: 'refused'; reason: string }>
+  | Readonly<{status: 'recovered'; revision: number}>
+  | Readonly<{status: 'refused'; reason: string}>
   | Readonly<{
       status:
         | 'busy'

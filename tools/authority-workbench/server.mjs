@@ -1,34 +1,28 @@
-import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { performance } from 'node:perf_hooks';
-import { WebSocketServer, WebSocket } from 'ws';
-import { createNetworkIntake } from '../../src/kits/network/intake.ts';
-import { createRateAdmission } from '../../src/kits/network/rate-admission.ts';
-import {
-  createDurableAuthority,
-  createAuthorityGenesis,
-} from '../../src/kits/network/authority.ts';
-import {
-  initializeAuthorityStorage,
-  openAuthorityStorage,
-} from './storage.mjs';
+import {randomBytes} from 'node:crypto';
+import {mkdir, readFile, writeFile} from 'node:fs/promises';
+import {join} from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {performance} from 'node:perf_hooks';
+import {WebSocketServer, WebSocket} from 'ws';
+import {createNetworkIntake} from '../../src/kits/network/intake.ts';
+import {createRateAdmission} from '../../src/kits/network/rate-admission.ts';
+import {createDurableAuthority, createAuthorityGenesis} from '../../src/kits/network/authority.ts';
+import {initializeAuthorityStorage, openAuthorityStorage} from './storage.mjs';
 
 const exact = (x, keys) =>
   x !== null &&
   typeof x === 'object' &&
   !Array.isArray(x) &&
   Object.keys(x).length === keys.length &&
-  keys.every((k) => Object.hasOwn(x, k));
+  keys.every(k => Object.hasOwn(x, k));
 const integer = Number.isSafeInteger;
 const MAX_FRAMES_PER_SECOND = 128;
-const json = { maxBytes: 65536, maxNodes: 4096, maxDepth: 12 };
+const json = {maxBytes: 65536, maxNodes: 4096, maxDepth: 12};
 export const authorityLimits = Object.freeze({
   envelope: json,
-  state: { maxBytes: 64, maxNodes: 1, maxDepth: 1 },
-  input: { maxBytes: 128, maxNodes: 4, maxDepth: 2 },
-  result: { maxBytes: 128, maxNodes: 4, maxDepth: 2 },
+  state: {maxBytes: 64, maxNodes: 1, maxDepth: 1},
+  input: {maxBytes: 128, maxNodes: 4, maxDepth: 2},
+  result: {maxBytes: 128, maxNodes: 4, maxDepth: 2},
   maxStreams: 3,
   maxReceiptsPerStream: 4,
 });
@@ -42,25 +36,21 @@ const intakeLimits = {
   maxQueuedMessages: 8,
   maxQueuedBytes: 8192,
   maxPumpOperations: 8,
-  message: { maxBytes: 1024, maxNodes: 16, maxDepth: 3 },
-  principal: { maxBytes: 128, maxNodes: 4, maxDepth: 2 },
+  message: {maxBytes: 1024, maxNodes: 16, maxDepth: 3},
+  principal: {maxBytes: 128, maxNodes: 4, maxDepth: 2},
 };
 const schema = 'numeric-total-v1';
 const random = () => randomBytes(24).toString('base64url');
 /** Explicit operator creation. Starting the service never manufactures a missing checkpoint. */
-export async function initializeAuthorityWorkbench({ directory }) {
-  await mkdir(directory, { recursive: true });
+export async function initializeAuthorityWorkbench({directory}) {
+  await mkdir(directory, {recursive: true});
   const identity = {
     version: 1,
     lineage: random(),
     schema,
-    credentials: { a: random(), b: random() },
+    credentials: {a: random(), b: random()},
   };
-  await writeFile(
-    join(directory, 'principals.json'),
-    JSON.stringify(identity),
-    { flag: 'wx', mode: 0o600 },
-  );
+  await writeFile(join(directory, 'principals.json'), JSON.stringify(identity), {flag: 'wx', mode: 0o600});
   await initializeAuthorityStorage({
     path: join(directory, 'world.db'),
     initialJson: createAuthorityGenesis({
@@ -107,7 +97,7 @@ export async function startAuthorityWorkbench({
     return hostTime;
   };
   // Trusted diagnostic observer (fault harness); never sees credentials.
-  const note = observe ? (event) => observe(Object.freeze(event)) : null;
+  const note = observe ? event => observe(Object.freeze(event)) : null;
   const raw = await readFile(join(directory, 'principals.json'), 'utf8');
   if (Buffer.byteLength(raw) > 2048) throw Error('operator-identity');
   const identity = JSON.parse(raw);
@@ -117,9 +107,7 @@ export async function startAuthorityWorkbench({
     identity.schema !== schema ||
     typeof identity.lineage !== 'string' ||
     !exact(identity.credentials, ['a', 'b']) ||
-    Object.values(identity.credentials).some(
-      (t) => typeof t !== 'string' || t.length !== 32,
-    ) ||
+    Object.values(identity.credentials).some(t => typeof t !== 'string' || t.length !== 32) ||
     identity.credentials.a === identity.credentials.b
   )
     throw Error('operator-identity');
@@ -139,7 +127,7 @@ export async function startAuthorityWorkbench({
     releaseCommit = null,
     inFlight = null,
     operator = false;
-  const metrics = { commits: 0, commands: 0, sent: 0, refused: 0 };
+  const metrics = {commits: 0, commands: 0, sent: 0, refused: 0};
   const storage = {
     settle: () => db.settle(),
     read: () => db.read(),
@@ -148,14 +136,14 @@ export async function startAuthorityWorkbench({
       if (result === 'committed') {
         metrics.commits++;
         if (heldCommit)
-          await new Promise((resolve) => {
+          await new Promise(resolve => {
             releaseCommit = resolve;
           });
       }
       return result;
     },
   };
-  const current = (s) =>
+  const current = s =>
     !closed &&
     peers.get(s.peer) === s &&
     controllers.get(s.principal) === s &&
@@ -167,19 +155,16 @@ export async function startAuthorityWorkbench({
     limits: authorityLimits,
     storage,
     validateState: integer,
-    validateInput: (x) =>
-      exact(x, ['add']) && integer(x.add) && x.add >= -10 && x.add <= 10,
-    validateResult: (x) => exact(x, ['value']) && integer(x.value),
-    authorize: ({ stream }) =>
-      stream === 'operator'
-        ? operator
-        : !!inFlight && inFlight.principal === stream && current(inFlight),
-    reduce: ({ state, input }) => {
+    validateInput: x => exact(x, ['add']) && integer(x.add) && x.add >= -10 && x.add <= 10,
+    validateResult: x => exact(x, ['value']) && integer(x.value),
+    authorize: ({stream}) =>
+      stream === 'operator' ? operator : !!inFlight && inFlight.principal === stream && current(inFlight),
+    reduce: ({state, input}) => {
       const value = state + input.add;
       if (!integer(value)) throw Error('total-overflow');
       return {
         stateJson: JSON.stringify(value),
-        resultJson: JSON.stringify({ value }),
+        resultJson: JSON.stringify({value}),
       };
     },
   });
@@ -198,18 +183,15 @@ export async function startAuthorityWorkbench({
   function send(s, frame) {
     if (!current(s)) return false;
     const raw = JSON.stringify(frame);
-    if (
-      Buffer.byteLength(raw) > 4096 ||
-      s.socket.bufferedAmount + Buffer.byteLength(raw) > 16384
-    ) {
+    if (Buffer.byteLength(raw) > 4096 || s.socket.bufferedAmount + Buffer.byteLength(raw) > 16384) {
       intake.close(s.peer, 'outgoing-capacity');
       return false;
     }
-    s.socket.send(raw, (error) => {
+    s.socket.send(raw, error => {
       if (error) intake.close(s.peer, 'send-failed');
     });
     metrics.sent++;
-    note?.({ type: 'sent', label: s.label, frame: raw });
+    note?.({type: 'sent', label: s.label, frame: raw});
     return true;
   }
   function baseline(s) {
@@ -222,8 +204,7 @@ export async function startAuthorityWorkbench({
       session: s.session,
       epoch: s.epoch,
       revision: e.revision,
-      processedThrough:
-        e.streams.find((x) => x.id === s.principal)?.through ?? 0,
+      processedThrough: e.streams.find(x => x.id === s.principal)?.through ?? 0,
       stateJson: JSON.stringify(e.state),
     };
   }
@@ -266,10 +247,8 @@ export async function startAuthorityWorkbench({
           epoch: s.epoch,
           sequence: c.sequence,
           status: out.status,
-          ...('revision' in out ? { revision: out.revision } : {}),
-          ...('result' in out
-            ? { resultJson: JSON.stringify(out.result) }
-            : {}),
+          ...('revision' in out ? {revision: out.revision} : {}),
+          ...('result' in out ? {resultJson: JSON.stringify(out.result)} : {}),
         });
       publishAll();
     } finally {
@@ -285,26 +264,17 @@ export async function startAuthorityWorkbench({
   const intake = createNetworkIntake({
     limits: intakeLimits,
     ports: {
-      authenticate({ credential, complete }) {
-        const p = Object.entries(identity.credentials).find(
-          ([, token]) => token === credential?.token,
-        )?.[0];
-        complete(p && !revoked.has(p) ? JSON.stringify({ id: p }) : null);
+      authenticate({credential, complete}) {
+        const p = Object.entries(identity.credentials).find(([, token]) => token === credential?.token)?.[0];
+        complete(p && !revoked.has(p) ? JSON.stringify({id: p}) : null);
       },
-      authorize({ peer, principal, command: c }) {
+      authorize({peer, principal, command: c}) {
         const s = peers.get(peer);
-        return (
-          !!s &&
-          s.principal === principal.id &&
-          current(s) &&
-          c.session === s.session &&
-          c.epoch === s.epoch
-        );
+        return !!s && s.principal === principal.id && current(s) && c.session === s.session && c.epoch === s.epoch;
       },
-      dispatch({ peer, command: c }) {
+      dispatch({peer, command: c}) {
         const s = peers.get(peer);
-        if (s)
-          void command(s, c).catch(() => intake.close(peer, 'command-error'));
+        if (s) void command(s, c).catch(() => intake.close(peer, 'command-error'));
       },
       send() {
         return false;
@@ -317,7 +287,7 @@ export async function startAuthorityWorkbench({
         if (controllers.get(s.principal) === s) controllers.delete(s.principal);
         s.socket.removeListener('message', s.message);
         s.socket.terminate();
-        note?.({ type: 'close', label: s.label });
+        note?.({type: 'close', label: s.label});
       },
     },
   });
@@ -343,8 +313,7 @@ export async function startAuthorityWorkbench({
   function pump() {
     if (closed) return;
     const time = now();
-    for (const s of peers.values())
-      if (time - s.lastFrame > 15000) intake.close(s.peer, 'idle');
+    for (const s of peers.values()) if (time - s.lastFrame > 15000) intake.close(s.peer, 'idle');
     intake.pump(time);
     for (const s of peers.values()) {
       announce(s);
@@ -359,7 +328,7 @@ export async function startAuthorityWorkbench({
     const admission = intake.open(now());
     if (admission.status !== 'opened') {
       socket.terminate();
-      note?.({ type: 'refused', label });
+      note?.({type: 'refused', label});
       return;
     }
     const s = {
@@ -373,15 +342,11 @@ export async function startAuthorityWorkbench({
       dirty: false,
     };
     peers.set(s.peer, s);
-    note?.({ type: 'open', label });
+    note?.({type: 'open', label});
     s.message = (bytes, binary) => {
       const time = now();
-      note?.({ type: 'frame', label });
-      if (
-        binary ||
-        bytes.length > 1024 ||
-        frameRate.admit(s.peer, time).status !== 'admitted'
-      ) {
+      note?.({type: 'frame', label});
+      if (binary || bytes.length > 1024 || frameRate.admit(s.peer, time).status !== 'admitted') {
         intake.close(s.peer, 'frame-limit');
         return;
       }
@@ -400,7 +365,7 @@ export async function startAuthorityWorkbench({
         typeof c.token === 'string' &&
         c.token.length <= 64
       ) {
-        intake.authenticate(s.peer, JSON.stringify({ token: c.token }), time);
+        intake.authenticate(s.peer, JSON.stringify({token: c.token}), time);
         announce(s);
         return;
       }
@@ -443,7 +408,7 @@ export async function startAuthorityWorkbench({
   if (autoDriver) timer = setInterval(pump, driverMs);
   const api = {
     url: `ws://127.0.0.1:${wss.address().port}/socket`,
-    credentials: Object.freeze({ ...identity.credentials }),
+    credentials: Object.freeze({...identity.credentials}),
     pump,
     read() {
       const state = owner.read();
@@ -451,11 +416,11 @@ export async function startAuthorityWorkbench({
         status: state.status,
         checkpoint: state.snapshot?.envelope ?? null,
         lastConfirmed: state.lastConfirmed?.envelope ?? null,
-        metrics: { ...metrics },
+        metrics: {...metrics},
         commitResponseHeld: releaseCommit !== null,
         connections: peers.size,
         intake: intake.stats(),
-        peers: [...controllers.values()].map((s) => ({
+        peers: [...controllers.values()].map(s => ({
           principal: s.principal,
           session: s.session,
           epoch: s.epoch,
@@ -465,10 +430,10 @@ export async function startAuthorityWorkbench({
     },
     /** Explicit operator recovery after a storage conflict or unknown commit outcome. */
     async recoverAuthority() {
-      if (closed) return { status: 'retired' };
-      if (inFlight || operator) return { status: 'busy' };
+      if (closed) return {status: 'retired'};
+      if (inFlight || operator) return {status: 'busy'};
       const status = owner.read().status;
-      if (status === 'ready') return { status: 'ready' };
+      if (status === 'ready') return {status: 'ready'};
       const out = await owner.recover();
       if (out.status === 'recovered') publishAll();
       return out;
@@ -488,7 +453,7 @@ export async function startAuthorityWorkbench({
       releaseCommit = null;
       release?.();
     },
-    holdDisclosure({ principal, enabled = true }) {
+    holdDisclosure({principal, enabled = true}) {
       if (!['a', 'b'].includes(principal)) throw Error('principal');
       if (enabled) held.add(principal);
       else {
@@ -498,25 +463,17 @@ export async function startAuthorityWorkbench({
       }
     },
     releaseDisclosure(principal) {
-      api.holdDisclosure({ principal, enabled: false });
+      api.holdDisclosure({principal, enabled: false});
     },
     captureBaseline(principal) {
       const s = controllers.get(principal);
       return s ? baseline(s) : null;
     },
-    deliverBaseline({ principal, baseline: frame }) {
+    deliverBaseline({principal, baseline: frame}) {
       const s = controllers.get(principal);
       if (
         !s ||
-        !exact(frame, [
-          'v',
-          'type',
-          'session',
-          'epoch',
-          'revision',
-          'processedThrough',
-          'stateJson',
-        ]) ||
+        !exact(frame, ['v', 'type', 'session', 'epoch', 'revision', 'processedThrough', 'stateJson']) ||
         frame.type !== 'baseline' ||
         frame.v !== 1 ||
         frame.session !== s.session ||
@@ -529,18 +486,16 @@ export async function startAuthorityWorkbench({
         return false;
       return send(s, frame);
     },
-    async operatorAdd({ add }) {
-      if (operator || inFlight || owner.read().status !== 'ready')
-        return { status: 'busy' };
+    async operatorAdd({add}) {
+      if (operator || inFlight || owner.read().status !== 'ready') return {status: 'busy'};
       operator = true;
       try {
         const e = owner.read().snapshot.envelope;
-        const sequence =
-          (e.streams.find((x) => x.id === 'operator')?.through ?? 0) + 1;
+        const sequence = (e.streams.find(x => x.id === 'operator')?.through ?? 0) + 1;
         const out = await owner.submit({
           stream: 'operator',
           sequence,
-          inputJson: JSON.stringify({ add }),
+          inputJson: JSON.stringify({add}),
         });
         publishAll();
         return out;
@@ -556,26 +511,21 @@ export async function startAuthorityWorkbench({
       intake.dispose();
       frameRate.dispose();
       api.releaseCommitResponse();
-      closing = new Promise((resolve) => wss.close(resolve)).then(() =>
-        db.close(),
-      );
+      closing = new Promise(resolve => wss.close(resolve)).then(() => db.close());
       return closing;
     },
   };
   return Object.freeze(api);
 }
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const host = await startAuthorityWorkbench();
   process.send?.({
     type: 'ready',
     url: host.url,
     credentials: host.credentials,
   });
-  process.on('message', async (request) => {
-    const { id, method } = request ?? {};
+  process.on('message', async request => {
+    const {id, method} = request ?? {};
     try {
       let value;
       switch (method) {
@@ -592,9 +542,7 @@ if (
           value = await host.recoverAuthority();
           break;
         case 'operatorAdd':
-          value = await host.operatorAdd(
-            request.payload ?? { add: request.add },
-          );
+          value = await host.operatorAdd(request.payload ?? {add: request.add});
           break;
         case 'holdCommitResponse':
           value = host.holdCommitResponse(request.enabled);
@@ -616,16 +564,14 @@ if (
           break;
         case 'close':
           await host.close();
-          process.send?.({ type: 'reply', id, value: true }, () =>
-            process.disconnect(),
-          );
+          process.send?.({type: 'reply', id, value: true}, () => process.disconnect());
           return;
         default:
           throw Error('control');
       }
-      process.send?.({ type: 'reply', id, value: value ?? null });
+      process.send?.({type: 'reply', id, value: value ?? null});
     } catch (error) {
-      process.send?.({ type: 'reply', id, error: error.message });
+      process.send?.({type: 'reply', id, error: error.message});
     }
   });
   process.once('disconnect', () => void host.close());

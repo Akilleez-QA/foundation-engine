@@ -1,15 +1,17 @@
 // core/module.ts: the module contract (KSPAddon startup scenes, MechJeb LoadComputerModules with per-assembly
 // isolation, kOS AddonManager, CKAN .ckan metadata, KSP-AVC .version). ADR 0003, 0036, 0043, 0063.
-import type { Registries, RegistryName, RegistryOptions, EntryOf } from './registry';
-import type { Services } from './services';
-import type { Patch } from './patch';
-import type { PortPreset, QualityPreset } from './tiers';
+import type {Registries, RegistryName, RegistryOptions, EntryOf} from './registry';
+import type {Services} from './services';
+import type {Patch} from './patch';
+import type {PortPreset, QualityPreset} from './tiers';
 
-export type { ModuleReport, ModuleStatus } from './types';
+export type {ModuleReport, ModuleStatus} from './types';
 
-export { satisfies, splitDep } from './version';
+export {satisfies, splitDep} from './version';
 
-export interface Disposable { dispose(): void }
+export interface Disposable {
+  dispose(): void;
+}
 
 /** ADR 0017/0029 presets. The reference preset is primary; the others are later ports. `core/tiers.ts` owns it. */
 export type ModulePreset = QualityPreset;
@@ -28,7 +30,11 @@ export interface ModuleBudget extends ModuleBudgetValues {
 }
 
 /** The value of one budget field for a preset, falling back upward: low → medium → high → reference. */
-export function moduleBudgetFor<K extends keyof ModuleBudgetValues>(b: ModuleBudget | undefined, key: K, preset: ModulePreset): ModuleBudgetValues[K] {
+export function moduleBudgetFor<K extends keyof ModuleBudgetValues>(
+  b: ModuleBudget | undefined,
+  key: K,
+  preset: ModulePreset,
+): ModuleBudgetValues[K] {
   if (!b) return undefined;
   const chain: ModulePreset[] = ['low', 'medium', 'high'];
   for (let i = chain.indexOf(preset); i >= 0 && i < chain.length; i++) {
@@ -56,10 +62,10 @@ export interface EngineModule {
   serviceKeys?: (keyof Services)[];
   /** Exclusive event areas: the only areas this module may `emit` in ('progression' covers 'progression.*'). ADR 0063. */
   eventAreas?: string[];
-  owner?: string;  // free-form maintainer label; the kernel never reads it (ADR 0061)
+  owner?: string; // free-form maintainer label; the kernel never reads it (ADR 0061)
   budget?: ModuleBudget;
   /** Registries this module owns. The kernel creates them per app so tests boot in isolation. */
-  defines?: { [K in RegistryName]?: RegistryOptions<EntryOf<K>> };
+  defines?: {[K in RegistryName]?: RegistryOptions<EntryOf<K>>};
   /** Phase 2: add definitions. Nothing runs, no DOM, no services. */
   register?(r: Registries): void;
   /** Phase 3: ordered edits to other modules' entries (ModuleManager semantics, see core/patch.ts). */
@@ -70,10 +76,19 @@ export interface EngineModule {
 }
 
 /** Identity helper: gives module literals full type checking (excess-property checks on defines/patches). */
-export function defineModule<M extends EngineModule>(m: M): M { return m; }
+export function defineModule<M extends EngineModule>(m: M): M {
+  return m;
+}
 
 /** Layer prefixes in boot tie-break order. */
-export const LAYER_PREFIXES: readonly string[] = Object.freeze(['core.', 'platform.', 'domain.', 'kits.', 'feature.', 'pack.']);
+export const LAYER_PREFIXES: readonly string[] = Object.freeze([
+  'core.',
+  'platform.',
+  'domain.',
+  'kits.',
+  'feature.',
+  'pack.',
+]);
 
 /** Rank of a module id's layer; ids without a known prefix sort after every layer. */
 export function layerRank(id: string): number {

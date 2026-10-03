@@ -1,20 +1,12 @@
 import '../../src/app/styles.ts';
 import './style.css';
-import { createApp } from '../../src/core/app.ts';
-import { appFeatures } from '../../src/core/settings/app-features.ts';
-import { layerModules } from '../../src/app/layer-modules.ts';
-import { compileGame } from '../../src/author/compile.ts';
-import {
-  defineBuild,
-  defineGame,
-  defineScene,
-  defineSystem,
-  Name,
-  Transform,
-  Shape,
-} from '../../src/author/index.ts';
-import { createTestApi } from '../../src/dev/test-api.ts';
-import { createBrowserTransport } from '../../src/platform/network/browser-transport.ts';
+import {createApp} from '../../src/core/app.ts';
+import {appFeatures} from '../../src/core/settings/app-features.ts';
+import {layerModules} from '../../src/app/layer-modules.ts';
+import {compileGame} from '../../src/author/compile.ts';
+import {defineBuild, defineGame, defineScene, defineSystem, Name, Transform, Shape} from '../../src/author/index.ts';
+import {createTestApi} from '../../src/dev/test-api.ts';
+import {createBrowserTransport} from '../../src/platform/network/browser-transport.ts';
 import {
   createClosePolicy,
   createDrainFollower,
@@ -22,12 +14,12 @@ import {
   DEFAULT_TERMINAL_CLOSE_REASONS,
   INTEGRITY_CLOSE_REASON,
 } from '../../src/kits/network/index.ts';
-import { createRng } from '../../src/core/rng.ts';
-import { runRandom } from '../../src/core/run-random.ts';
+import {createRng} from '../../src/core/rng.ts';
+import {runRandom} from '../../src/core/run-random.ts';
 
-import { decodeResponse } from './client-protocol.mjs';
+import {decodeResponse} from './client-protocol.mjs';
 
-const el = (id) => document.getElementById(id);
+const el = id => document.getElementById(id);
 const limits = {
   maxMessageBytes: 1024,
   maxQueuedMessages: 16,
@@ -50,7 +42,7 @@ const retryLimits = {
   baseMs: 250,
   capMs: 4000,
   maxAttempts: 5,
-  budget: { capacity: 8, refillEveryMs: 15000 },
+  budget: {capacity: 8, refillEveryMs: 15000},
 };
 // Which validated host close reasons/codes end reconnecting. The stock default (credential refusal, protocol
 // violation) applies while "Treat host refusals as final" is ticked; unticked, every loss is paced as transient.
@@ -69,15 +61,14 @@ let retry = null,
 // tab gets an independent stream so separate clients do not retry in lockstep.
 function retryRandom() {
   const seed = new URLSearchParams(location.search).get('seed');
-  if (seed !== null && /^\d+$/.test(seed))
-    return createRng(`network-workbench.reconnect:${seed}`).next;
+  if (seed !== null && /^\d+$/.test(seed)) return createRng(`network-workbench.reconnect:${seed}`).next;
   const stream = runRandom.stream('network-workbench.reconnect');
   return () => stream.next();
 }
 // Optional planned drain (NW-08). Off unless "Follow host drain notices" is ticked: then a notice stops new commands,
 // the client closes once pending replies settle (or at the notice deadline) and waits for the host's announced return
 // before the retry schedule paces a fresh, freshly authenticated attempt.
-const drainLimits = { maxNoticeMs: 60000, maxReconnectAfterMs: 60000 };
+const drainLimits = {maxNoticeMs: 60000, maxReconnectAfterMs: 60000};
 let follower = null,
   lastNotice = null,
   plannedCloses = 0;
@@ -95,8 +86,8 @@ function project() {
   if (principal && value !== null) {
     const height = 0.5 + Math.min(value, 20) * 0.1;
     actor = context.world.spawn(
-      Name({ name: `accepted:${principal}` }),
-      Transform({ x: 1.5, y: height / 2 }),
+      Name({name: `accepted:${principal}`}),
+      Transform({x: 1.5, y: height / 2}),
       Shape({
         kind: 'box',
         size: [1.2, height, 1.2],
@@ -147,7 +138,7 @@ function holdForDrain(reason, now) {
 }
 function openTransport(url, token) {
   try {
-    transport = createBrowserTransport({ url, limits });
+    transport = createBrowserTransport({url, limits});
     pendingCredential = token;
     transportsOpened++;
     return true;
@@ -176,8 +167,7 @@ function scheduleReconnect(now) {
   if (!active || !retry || reconnectCredential === null) return;
   const result = retry.next(now);
   lastRetry = result;
-  if (result.status === 'wait')
-    message = `${message}; reconnect attempt ${result.attempt} in ${result.delayMs} ms`;
+  if (result.status === 'wait') message = `${message}; reconnect attempt ${result.attempt} in ${result.delayMs} ms`;
   else if (result.status === 'budget-empty') {
     budgetRetryAt = result.refillAtMs;
     message = 'Offline: retry budget empty; waiting for it to refill';
@@ -196,8 +186,7 @@ function lost(reason, now) {
 /** A remote close is untrusted input: only the transport's validated token/code reach the policy and the text. */
 function closedByHost(read, now) {
   const remote = read.remoteClose;
-  const terminal =
-    el('final-refusals').checked && closePolicy.classify(remote) === 'terminal';
+  const terminal = el('final-refusals').checked && closePolicy.classify(remote) === 'terminal';
   lastClose = {
     code: remote?.code ?? null,
     reason: remote?.reason ?? null,
@@ -217,7 +206,7 @@ function closedByHost(read, now) {
   stopReconnect();
 }
 function receive(raw, now) {
-  const frame = decodeResponse(raw, { principal, pending });
+  const frame = decodeResponse(raw, {principal, pending});
   if (frame.type === 'drain') {
     lastNotice = frame;
     if (!el('follow-drain').checked) {
@@ -274,8 +263,7 @@ const poll = defineSystem({
           scheduleReconnect(now);
         }
       } else if (retry.due(now)) {
-        if (openTransport(reconnectEndpoint, reconnectCredential))
-          message = 'Reconnecting with fresh authentication';
+        if (openTransport(reconnectEndpoint, reconnectCredential)) message = 'Reconnecting with fresh authentication';
         else stopReconnect();
       }
     }
@@ -283,11 +271,8 @@ const poll = defineSystem({
     if (transport.read().state === 'open' && pendingCredential !== null) {
       const credential = pendingCredential;
       pendingCredential = null;
-      lastSend = transport.send(
-        JSON.stringify({ v: 1, type: 'auth', token: credential }),
-      );
-      if (lastSend.status !== 'sent')
-        lost('Authentication transport refused', now);
+      lastSend = transport.send(JSON.stringify({v: 1, type: 'auth', token: credential}));
+      if (lastSend.status !== 'sent') lost('Authentication transport refused', now);
     }
     for (const raw of transport.drain(4)) {
       try {
@@ -315,22 +300,19 @@ const scene = defineScene({
   title: 'Network connection',
   systems: [poll],
   view: {
-    camera: { position: [6, 5, 8], target: [1, 0.5, 0] },
+    camera: {position: [6, 5, 8], target: [1, 0.5, 0]},
     background: 0x172738,
   },
   enter(ctx) {
     active = true;
     context = ctx;
     // One schedule per scene visit; its budget spans every reconnect episode of this visit.
-    retry = createRetrySchedule({ limits: retryLimits, random: retryRandom() });
-    follower = createDrainFollower({ limits: drainLimits });
+    retry = createRetrySchedule({limits: retryLimits, random: retryRandom()});
+    follower = createDrainFollower({limits: drainLimits});
     actor = null;
     lastProjection = '';
     lastDisplay = '';
-    ctx.world.spawn(
-      Transform({ y: -0.1 }),
-      Shape({ kind: 'box', size: [7, 0.2, 5], color: 0x355065 }),
-    );
+    ctx.world.spawn(Transform({y: -0.1}), Shape({kind: 'box', size: [7, 0.2, 5], color: 0x355065}));
     el('exit').disabled = false;
     el('return').disabled = true;
     render();
@@ -352,7 +334,7 @@ const scene = defineScene({
 const retired = defineScene({
   id: 'retired',
   title: 'Retired connection',
-  view: { background: 0x172738 },
+  view: {background: 0x172738},
   enter(ctx) {
     context = ctx;
     render();
@@ -422,8 +404,7 @@ const brief = defineBuild({
   success: [
     {
       id: 'S1',
-      check:
-        'Only an active authenticated principal can change its authorized target',
+      check: 'Only an active authenticated principal can change its authorized target',
       how: 'playtest',
       by: 'scripts/play/network-workbench-check.mjs',
     },
@@ -435,10 +416,10 @@ const game = defineGame({
   title: 'Network workbench',
   firstScene: 'sample',
 });
-const compiled = compileGame({ brief, game, defs: [scene, retired] });
+const compiled = compileGame({brief, game, defs: [scene, retired]});
 const app = createApp([...layerModules(game, brief), ...compiled.modules], {
   mode: 'test',
-  flag: (id) => appFeatures().enabled(id),
+  flag: id => appFeatures().enabled(id),
   probes: true,
 });
 const booted = app.boot();

@@ -1,5 +1,5 @@
-import { hashSeed } from '../../core/rng';
-import type { RollbackLimits } from './types';
+import {hashSeed} from '../../core/rng';
+import type {RollbackLimits} from './types';
 
 /** Accepted range for each limit. These are engine safety ceilings, not recommended game values. */
 export const ROLLBACK_LIMIT_RANGES: Readonly<Record<keyof RollbackLimits, readonly [number, number]>> = Object.freeze({
@@ -18,10 +18,12 @@ const KEYS = Object.keys(ROLLBACK_LIMIT_RANGES) as (keyof RollbackLimits)[];
 export function captureRollbackLimits(input: RollbackLimits): RollbackLimits {
   if (input === null || typeof input !== 'object') throw Error('rollback: invalid limits');
   const supplied = Object.keys(input);
-  if (supplied.length !== KEYS.length || supplied.some(key => !(key in ROLLBACK_LIMIT_RANGES))) throw Error('rollback: invalid limits');
+  if (supplied.length !== KEYS.length || supplied.some(key => !(key in ROLLBACK_LIMIT_RANGES)))
+    throw Error('rollback: invalid limits');
   const out = {} as Record<keyof RollbackLimits, number>;
   for (const key of KEYS) {
-    const value = input[key], [min, max] = ROLLBACK_LIMIT_RANGES[key];
+    const value = input[key],
+      [min, max] = ROLLBACK_LIMIT_RANGES[key];
     if (!Number.isSafeInteger(value) || value < min || value > max) throw Error(`rollback: invalid limits (${key})`);
     out[key] = value;
   }
@@ -38,7 +40,10 @@ export function utf8BytesWithin(text: string, limit: number): number {
     else if (unit < 0x800) size += 2;
     else if (unit >= 0xd800 && unit <= 0xdbff && i + 1 < text.length) {
       const next = text.charCodeAt(i + 1);
-      if (next >= 0xdc00 && next <= 0xdfff) { size += 4; i++; } else size += 3;
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        size += 4;
+        i++;
+      } else size += 3;
     } else size += 3;
     if (size > limit) return Infinity;
   }

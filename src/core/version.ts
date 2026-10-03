@@ -30,7 +30,7 @@ export function satisfies(version: string, range: string | undefined): boolean {
 }
 
 /** 'domain.sim@^2' → { id: 'domain.sim', range: '^2' }; 'domain.sim' → { id: 'domain.sim' }. */
-export function splitDep(dep: string): { id: string; range?: string } {
+export function splitDep(dep: string): {id: string; range?: string} {
   const at = dep.lastIndexOf('@');
-  return at > 0 ? { id: dep.slice(0, at), range: dep.slice(at + 1) } : { id: dep };
+  return at > 0 ? {id: dep.slice(0, at), range: dep.slice(at + 1)} : {id: dep};
 }

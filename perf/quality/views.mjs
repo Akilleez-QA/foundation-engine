@@ -8,4 +8,10 @@ import {gameDir} from '../../scripts/lib/game-dir.mjs';
 
 export const viewport = {width: 1280, height: 800};
 const budgets = JSON.parse(readFileSync(join(gameDir(), 'budgets.json'), 'utf8'));
-export const views = Object.entries(budgets.scenes ?? {}).map(([id, row]) => ({id: `${id}-start`, scene: row.scene, route: row.route, mode: 'near', settleMs: 1500}));
+export const views = Object.entries(budgets.scenes ?? {}).map(([id, row]) => ({
+  id: `${id}-start`,
+  scene: row.scene,
+  route: row.route,
+  mode: 'near',
+  settleMs: 1500,
+}));

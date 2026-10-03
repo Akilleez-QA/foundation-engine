@@ -6,11 +6,14 @@
  *      catalogue and the compact ids, from the string shards.
  */
 import './lib/node-version.mjs';
-import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 for (const args of [['scripts/strings.mjs']]) {
-  const r = spawnSync(process.execPath, args, { cwd: root, stdio: 'inherit' });
-  if (r.status !== 0) { console.error(`generate: node ${args.join(' ')} failed`); process.exit(r.status ?? 1); }
+  const r = spawnSync(process.execPath, args, {cwd: root, stdio: 'inherit'});
+  if (r.status !== 0) {
+    console.error(`generate: node ${args.join(' ')} failed`);
+    process.exit(r.status ?? 1);
+  }
 }

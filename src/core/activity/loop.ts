@@ -21,8 +21,17 @@ import {withFrameTime} from './frame-time';
  * The frame source and the time source are injected; the defaults are the browser's.
  */
 import type {
-  ClockDriverPort, Coverage, FrameMode, FrameRecord, FrameSamplerPort, FrameScheduler, LayerPort, QualityPort, QualityPreset,
-  VisibilityPort, WhenCovered,
+  ClockDriverPort,
+  Coverage,
+  FrameMode,
+  FrameRecord,
+  FrameSamplerPort,
+  FrameScheduler,
+  LayerPort,
+  QualityPort,
+  QualityPreset,
+  VisibilityPort,
+  WhenCovered,
 } from './ports';
 
 export interface FrameInfo {
@@ -112,7 +121,7 @@ function browserScheduler(): FrameScheduler {
 }
 
 export class FrameLoop {
-  readonly stats: LoopStats = { frames: 0, updates: 0, renders: 0, skipped: 0 };
+  readonly stats: LoopStats = {frames: 0, updates: 0, renders: 0, skipped: 0};
   private tickers: Ticker[] = [];
   private handle: number | null = null;
   private hidden = false;
@@ -129,7 +138,15 @@ export class FrameLoop {
   private readonly now: () => number;
   private readonly unsubscribe: (() => void)[] = [];
   private sampler: FrameSamplerPort | undefined;
-  private readonly record: FrameRecord = { intervalMs: 0, rendered: false, hidden: false, sinceEnterMs: 0, timeMs: 0, workMs: 0, stepped: false };
+  private readonly record: FrameRecord = {
+    intervalMs: 0,
+    rendered: false,
+    hidden: false,
+    sinceEnterMs: 0,
+    timeMs: 0,
+    workMs: 0,
+    stepped: false,
+  };
 
   constructor(private readonly opts: FrameLoopOptions) {
     this.clock = opts.clock;
@@ -147,8 +164,14 @@ export class FrameLoop {
   attachClock(clock: ClockDriverPort): () => void {
     if (this.disposed) throw new Error('FrameLoop is disposed');
     if (this.clock) throw new Error('FrameLoop already has a clock driver');
-    this.clock = clock; this.lastTick = null;
-    return () => { if (this.clock === clock) { this.clock = undefined; this.lastTick = null; } };
+    this.clock = clock;
+    this.lastTick = null;
+    return () => {
+      if (this.clock === clock) {
+        this.clock = undefined;
+        this.lastTick = null;
+      }
+    };
   }
 
   /**
@@ -159,31 +182,62 @@ export class FrameLoop {
     if (this.disposed) throw new Error('FrameLoop is disposed');
     if (this.sampler) throw new Error('FrameLoop already has a frame sampler');
     this.sampler = sampler;
-    return () => { if (this.sampler === sampler) this.sampler = undefined; };
+    return () => {
+      if (this.sampler === sampler) this.sampler = undefined;
+    };
   }
-  get hasSampler(): boolean { return this.sampler !== undefined; }
+  get hasSampler(): boolean {
+    return this.sampler !== undefined;
+  }
 
   /** True while a frame is requested from the scheduler. */
-  get scheduled(): boolean { return this.handle !== null; }
-  get isHidden(): boolean { return this.hidden; }
+  get scheduled(): boolean {
+    return this.handle !== null;
+  }
+  get isHidden(): boolean {
+    return this.hidden;
+  }
 
   add(spec: TickerSpec): TickerHandle {
     if (spec.scope === 'application' && spec.render) throw new Error('application ticker cannot render');
     if (this.disposed) throw new Error('FrameLoop is disposed');
     const t: Ticker = {
-      spec, owner: spec.owner, whenCovered: spec.whenCovered ?? 'pause', priority: spec.priority ?? 0,
-      maxDt: spec.maxDt ?? 0.05, order: this.order++, mode: spec.mode ?? 'on-demand',
-      dirty: true, removed: false, last: null, acc: 0,
+      spec,
+      owner: spec.owner,
+      whenCovered: spec.whenCovered ?? 'pause',
+      priority: spec.priority ?? 0,
+      maxDt: spec.maxDt ?? 0.05,
+      order: this.order++,
+      mode: spec.mode ?? 'on-demand',
+      dirty: true,
+      removed: false,
+      last: null,
+      acc: 0,
     };
     this.tickers.push(t);
     this.tickers.sort((a, b) => a.priority - b.priority || a.order - b.order);
     this.wake();
     const loop = this;
     return {
-      invalidate() { if (!t.removed) { t.dirty = true; loop.wake(); } },
-      setMode(mode) { if (!t.removed && t.mode !== mode) { t.mode = mode; loop.wake(); } },
-      remove() { loop.drop(t); loop.wake(); },
-      get removed() { return t.removed; },
+      invalidate() {
+        if (!t.removed) {
+          t.dirty = true;
+          loop.wake();
+        }
+      },
+      setMode(mode) {
+        if (!t.removed && t.mode !== mode) {
+          t.mode = mode;
+          loop.wake();
+        }
+      },
+      remove() {
+        loop.drop(t);
+        loop.wake();
+      },
+      get removed() {
+        return t.removed;
+      },
     };
   }
 
@@ -192,13 +246,19 @@ export class FrameLoop {
     if (this.held === held) return;
     // Held frames continue from the loop's real time: event timestamps (Event.timeStamp, the audio clock) stay on the
     // same timebase as stepped frame times instead of being off by the page's age.
-    this.held = held; this.cancel(); this.lastTick = null; this.manualMs = held ? this.now() : 0;
+    this.held = held;
+    this.cancel();
+    this.lastTick = null;
+    this.manualMs = held ? this.now() : 0;
     if (!held) this.wake();
   }
-  get framesHeld(): boolean { return this.held; }
+  get framesHeld(): boolean {
+    return this.held;
+  }
   stepFrame(seconds: number): void {
     if (!this.held) throw Error('Hold frames before manual stepping');
-    if (!Number.isFinite(seconds) || seconds < 0 || seconds > .05) throw Error('Manual frame must be between 0 and .05 seconds');
+    if (!Number.isFinite(seconds) || seconds < 0 || seconds > 0.05)
+      throw Error('Manual frame must be between 0 and .05 seconds');
     this.manualMs += seconds * 1000;
     this.tick(this.manualMs);
   }
@@ -212,7 +272,7 @@ export class FrameLoop {
     this.lastTick = null;
     if (hidden) {
       this.cancel();
-      this.opts.quality?.frame({ intervalMs: 0, rendered: false, hidden: true, sinceEnterMs });
+      this.opts.quality?.frame({intervalMs: 0, rendered: false, hidden: true, sinceEnterMs});
       if (this.sampler) this.sample(this.now(), 0, false, true, sinceEnterMs, 0);
     } else {
       this.clock?.resumeFromAway('visible');
@@ -224,8 +284,9 @@ export class FrameLoop {
   wake(): void {
     if (this.held || this.inTick) return; // the frame re-evaluates once when it ends
     const want = !this.held && !this.hidden && !this.disposed && this.tickers.some(t => this.wants(t));
-    if (want) { if (this.handle === null) this.handle = this.scheduler.request(this.tick); }
-    else this.cancel(); // idle: nothing is scheduled, and every ticker resumes with dt = 0
+    if (want) {
+      if (this.handle === null) this.handle = this.scheduler.request(this.tick);
+    } else this.cancel(); // idle: nothing is scheduled, and every ticker resumes with dt = 0
   }
 
   dispose(): void {
@@ -239,13 +300,19 @@ export class FrameLoop {
   }
 
   private cancel(): void {
-    if (this.handle !== null) { this.scheduler.cancel(this.handle); this.handle = null; }
+    if (this.handle !== null) {
+      this.scheduler.cancel(this.handle);
+      this.handle = null;
+    }
     this.forget();
   }
 
   /** The loop went idle or hidden: every ticker resumes with dt = 0. */
   private forget(): void {
-    for (const t of this.tickers) { t.last = null; t.acc = 0; }
+    for (const t of this.tickers) {
+      t.last = null;
+      t.acc = 0;
+    }
     this.wokeAt = null;
     this.lastTick = null;
   }
@@ -269,7 +336,9 @@ export class FrameLoop {
   }
 
   private wants(t: Ticker): boolean {
-    return this.runs(t, this.opts.layers.coverage(t.owner), this.previewing(t.owner)) && (t.mode === 'continuous' || t.dirty);
+    return (
+      this.runs(t, this.opts.layers.coverage(t.owner), this.previewing(t.owner)) && (t.mode === 'continuous' || t.dirty)
+    );
   }
 
   private readonly tick = (timeMs: number): void => {
@@ -278,37 +347,59 @@ export class FrameLoop {
     const now = timeMs / 1000;
     const realDt = this.lastTick === null ? 0 : Math.max(0, now - this.lastTick);
     this.lastTick = now;
-    const wokeAt = this.wokeAt ??= now;
+    const wokeAt = (this.wokeAt ??= now);
     const ut = this.clock ? this.clock.advance(realDt).to : 0;
     this.frame++;
     this.stats.frames++;
     this.inTick = true;
     let rendered = false;
-    const sampling = this.sampler !== undefined, started = sampling ? this.now() : 0;
+    const sampling = this.sampler !== undefined,
+      started = sampling ? this.now() : 0;
     try {
-      rendered = withFrameTime(timeMs,()=>this.runTickers(timeMs, ut, this.opts.calm(), this.opts.quality?.preset() ?? 'reference'));
+      rendered = withFrameTime(timeMs, () =>
+        this.runTickers(timeMs, ut, this.opts.calm(), this.opts.quality?.preset() ?? 'reference'),
+      );
     } finally {
       this.inTick = false;
     }
     const workMs = sampling ? this.now() - started : 0;
     if (!rendered) this.stats.skipped++;
     const sinceEnterMs = Math.max(0, (now - wokeAt) * 1000);
-    this.opts.quality?.frame({ intervalMs: realDt * 1000, rendered, hidden: false, sinceEnterMs });
+    this.opts.quality?.frame({intervalMs: realDt * 1000, rendered, hidden: false, sinceEnterMs});
     if (sampling && this.sampler) this.sample(timeMs, realDt * 1000, rendered, false, sinceEnterMs, workMs);
     this.wake();
   };
 
   /** Fill the one reused record and hand it to the sampler. A throwing sampler is detached; the loop continues. */
-  private sample(timeMs: number, intervalMs: number, rendered: boolean, hidden: boolean, sinceEnterMs: number, workMs: number): void {
-    const sampler = this.sampler!, r = this.record;
-    r.timeMs = timeMs; r.intervalMs = intervalMs; r.rendered = rendered; r.hidden = hidden; r.sinceEnterMs = sinceEnterMs;
+  private sample(
+    timeMs: number,
+    intervalMs: number,
+    rendered: boolean,
+    hidden: boolean,
+    sinceEnterMs: number,
+    workMs: number,
+  ): void {
+    const sampler = this.sampler!,
+      r = this.record;
+    r.timeMs = timeMs;
+    r.intervalMs = intervalMs;
+    r.rendered = rendered;
+    r.hidden = hidden;
+    r.sinceEnterMs = sinceEnterMs;
     r.workMs = Number.isFinite(workMs) && workMs > 0 ? workMs : 0;
     r.stepped = this.held && !hidden;
-    try { sampler.frame(r); }
-    catch (error) {
+    try {
+      sampler.frame(r);
+    } catch (error) {
       if (this.sampler === sampler) this.sampler = undefined;
-      try { (this.opts.report ?? ((owner, e) => console.error(`${owner} threw and was detached`, e)))('frame-sampler', error); }
-      catch { /* A broken diagnostic sink cannot stop the shared frame. */ }
+      try {
+        (this.opts.report ?? ((owner, e) => console.error(`${owner} threw and was detached`, e)))(
+          'frame-sampler',
+          error,
+        );
+      } catch {
+        /* A broken diagnostic sink cannot stop the shared frame. */
+      }
     }
   }
 
@@ -318,8 +409,13 @@ export class FrameLoop {
     let rendered = false;
     for (const t of [...this.tickers]) {
       if (t.removed) continue;
-      const cov = this.opts.layers.coverage(t.owner), preview = this.previewing(t.owner);
-      if (!this.runs(t, cov, preview)) { t.last = null; t.acc = 0; continue; }
+      const cov = this.opts.layers.coverage(t.owner),
+        preview = this.previewing(t.owner);
+      if (!this.runs(t, cov, preview)) {
+        t.last = null;
+        t.acc = 0;
+        continue;
+      }
       const raw = t.last === null ? 0 : Math.max(0, (nowMs - t.last) / 1000);
       t.last = nowMs;
       let dt = Math.min(t.maxDt, raw);
@@ -330,20 +426,35 @@ export class FrameLoop {
         t.acc = 0;
       } else t.acc = 0;
       if (t.mode !== 'continuous' && !t.dirty) continue;
-      const f: FrameInfo = { dt, t: now, frame: this.frame, ut, calm, preset, coverage: cov };
+      const f: FrameInfo = {dt, t: now, frame: this.frame, ut, calm, preset, coverage: cov};
       try {
         t.dirty = false;
-        if (t.spec.update) { t.spec.update(f); this.stats.updates++; }
-        if (t.spec.scope !== 'application' && t.spec.render && !t.removed && t.spec.render(f) !== false) { this.stats.renders++; rendered = true; }
+        if (t.spec.update) {
+          t.spec.update(f);
+          this.stats.updates++;
+        }
+        if (t.spec.scope !== 'application' && t.spec.render && !t.removed && t.spec.render(f) !== false) {
+          this.stats.renders++;
+          rendered = true;
+        }
       } catch (error) {
         // One broken activity must not stop the others: drop its ticker and report once.
         this.drop(t);
         try {
-          (this.opts.report ?? ((owner, e) => console.error(`Ticker for ${owner} threw and was removed`, e)))(t.owner, error);
+          (this.opts.report ?? ((owner, e) => console.error(`Ticker for ${owner} threw and was removed`, e)))(
+            t.owner,
+            error,
+          );
         } catch (reportError) {
           // Preserve both failures when possible; diagnostics never own the shared frame's continuation.
-          try { console.error(`Ticker for ${t.owner} was removed; reporting failed`, new AggregateError([error, reportError])); }
-          catch { /* A broken diagnostic sink cannot freeze healthy owners. */ }
+          try {
+            console.error(
+              `Ticker for ${t.owner} was removed; reporting failed`,
+              new AggregateError([error, reportError]),
+            );
+          } catch {
+            /* A broken diagnostic sink cannot freeze healthy owners. */
+          }
         }
       }
     }
