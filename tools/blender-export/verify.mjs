@@ -7,6 +7,11 @@ import {resolve} from 'node:path';
 import {Box3, Vector3} from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+// Decoded geometry and materials of the checked-in export. A deliberate model change regenerates the
+// GLB and provenance and updates this pin in the same commit; rehashing an edited GLB alone cannot pass.
+export const EXPECTED_SEMANTIC_SHA256 = '2b74ca47d75e1fde93ab35ad467f0e20374902b116c32b72ab29143fd00dd901';
+const NODE_TRANSFORMS = ['translation', 'rotation', 'scale', 'matrix'];
+const MATERIAL_KEYS = ['doubleSided', 'name', 'pbrMetallicRoughness'], PBR_KEYS = ['baseColorFactor', 'metallicFactor'];
 const source = readFileSync(new URL('./export.py', import.meta.url));
 export async function verify(file) {
   assert.ok(statSync(file).size <= 65536, 'sample exceeds 64 KiB');
@@ -33,8 +38,14 @@ export async function verify(file) {
   assert.equal(json.materials.length, 2);
   assert.equal(json.extensionsRequired?.length ?? 0, 0);
   for (const mesh of json.meshes) for (const primitive of mesh.primitives) assert.equal(primitive.mode ?? 4,4,'triangle primitives only');
+  for (const node of json.nodes) for (const key of NODE_TRANSFORMS)
+    assert.equal(node[key], undefined, `node ${node.name} must not carry a ${key}: transforms are baked into mesh coordinates`);
   assert.deepEqual(json.materials.map(m=>m.name).sort(), ['body-blue','top-gold']);
   for (const m of json.materials) {
+    assert.deepEqual(Object.keys(m).sort(), MATERIAL_KEYS, `material ${m.name} has only the exported properties`);
+    assert.equal(m.doubleSided, true, `material ${m.name} keeps the exported doubleSided value`);
+    assert.deepEqual(Object.keys(m.pbrMetallicRoughness).sort(), PBR_KEYS, `material ${m.name} has only the exported PBR properties`);
+    assert.equal(m.pbrMetallicRoughness.metallicFactor, 0);
     assert.equal(m.alphaMode ?? 'OPAQUE','OPAQUE');
     const expected=m.name==='body-blue'?[.04,.35,.8,1]:[.9,.5,.03,1];
     assert.ok(m.pbrMetallicRoughness.baseColorFactor.every((v,i)=>Math.abs(v-expected[i])<1e-6),'material colour');
@@ -58,9 +69,17 @@ export async function verify(file) {
       material:{name:m.name,colour:m.color.toArray(),metalness:m.metalness,roughness:m.roughness}});
   });
   assert.equal(triangles,12); assert.equal(geometry.length,2);
+  const corner = (v,i) => i%3===1 ? (near(v,0) || near(v,1)) : near(Math.abs(v),.5);
+  for (const g of geometry) assert.ok(g.positions.every(corner), `${g.material.name} vertices lie on box corners`);
+  const top = geometry.filter(g=>g.positions.every((v,i)=>i%3!==1 || near(v,1)));
+  assert.equal(top.length, 1, 'exactly one primitive is the box top');
+  assert.equal(top[0].material.name, 'top-gold', 'the box top uses top-gold');
+  assert.equal((top[0].indices?.length ?? top[0].positions.length/3)/3, 2, 'the box top is two triangles');
+  const semanticSha256 = digest(JSON.stringify(geometry));
+  assert.equal(semanticSha256, EXPECTED_SEMANTIC_SHA256, 'decoded geometry or materials differ from the checked-in export');
   for (const o of asset.scene.children) o.traverse(n=>{ if(n.isMesh){n.geometry.dispose();n.material.dispose();} });
   return {bytes:bytes.length, triangles, primitives:geometry.length, materials:json.materials.length, textures:0,
-    bounds:[bounds.min.toArray(),bounds.max.toArray()], sha256:digest(bytes), semanticSha256:digest(JSON.stringify(geometry)), blender:manifest.blender};
+    bounds:[bounds.min.toArray(),bounds.max.toArray()], sha256:digest(bytes), semanticSha256, blender:manifest.blender};
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const files = process.argv.slice(2); assert.ok(files.length, 'pass one or two GLB paths');
