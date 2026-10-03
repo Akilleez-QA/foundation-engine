@@ -1,4 +1,4 @@
-import { createAuthoredDocument } from '../../src/kits/authoring/document.ts';
+import {createAuthoredDocument} from '../../src/kits/authoring/document.ts';
 import {
   initialRuntimeEnvelope,
   parseRuntimeEnvelope,
@@ -10,10 +10,7 @@ import {
   equal,
   freeze,
 } from './runtime-model.mjs';
-export {
-  initialRuntimeEnvelope,
-  parseRuntimeEnvelope,
-} from './runtime-model.mjs';
+export {initialRuntimeEnvelope, parseRuntimeEnvelope} from './runtime-model.mjs';
 export const runtimeStorageKey = 'crafting-workbench|device|crafting.runtime';
 export const runtimeSectionDefinition = {
   id: 'crafting.runtime',
@@ -28,7 +25,7 @@ export function createRuntimeStoragePort(port) {
   let seen = false,
     expected = null,
     conflict = false;
-  const bounded = (raw) => {
+  const bounded = raw => {
     if (
       raw !== null &&
       (typeof raw !== 'string' ||
@@ -40,7 +37,7 @@ export function createRuntimeStoragePort(port) {
     }
     return raw;
   };
-  const compare = (raw) => {
+  const compare = raw => {
     if (conflict || (seen && raw !== expected)) {
       conflict = true;
       throw Error('external-conflict');
@@ -79,16 +76,11 @@ export function createRuntimeStoragePort(port) {
       } else port.remove(key);
     },
     keys: () => port.keys(),
-    ...(port.subscribe ? { subscribe: (fn) => port.subscribe(fn) } : {}),
+    ...(port.subscribe ? {subscribe: fn => port.subscribe(fn)} : {}),
   };
 }
 const continuations = new WeakMap();
-export function createRuntimeController({
-  saveHandle,
-  readPersisted,
-  saveBuild,
-  resume,
-}) {
+export function createRuntimeController({saveHandle, readPersisted, saveBuild, resume}) {
   if (
     typeof readPersisted !== 'function' ||
     typeof saveBuild !== 'string' ||
@@ -106,7 +98,7 @@ export function createRuntimeController({
     lastRaw,
     retirementToken;
   let projectedValue, projectedView, parsedRaw, parsedValue;
-  const physical = (raw) => {
+  const physical = raw => {
     if (raw !== parsedRaw) {
       if (
         typeof raw !== 'string' ||
@@ -115,11 +107,7 @@ export function createRuntimeController({
       )
         throw Error('invalid-storage');
       const wrapper = JSON.parse(raw);
-      if (
-        wrapper.v !== 1 ||
-        Object.keys(wrapper).some((k) => !['v', 'by', 'data'].includes(k))
-      )
-        throw Error('version');
+      if (wrapper.v !== 1 || Object.keys(wrapper).some(k => !['v', 'by', 'data'].includes(k))) throw Error('version');
       parsedValue = parseRuntimeEnvelope(wrapper.data);
       parsedRaw = raw;
     }
@@ -128,22 +116,17 @@ export function createRuntimeController({
   let continuation;
   try {
     const status = saveHandle.status();
-    if (['quarantined', 'newer', 'unavailable'].includes(status))
-      throw Error(`recovery-required:${status}`);
+    if (['quarantined', 'newer', 'unavailable'].includes(status)) throw Error(`recovery-required:${status}`);
     lastRaw = readPersisted();
     starting = lastRaw === null ? initialRuntimeEnvelope() : physical(lastRaw);
     const memory = parseRuntimeEnvelope(saveHandle.get());
     if (resume !== undefined && resume !== null) {
       continuation = continuations.get(resume);
       continuations.delete(resume);
-      if (!continuation || continuation.saveBuild !== saveBuild)
-        throw Error('invalid-continuation');
+      if (!continuation || continuation.saveBuild !== saveBuild) throw Error('invalid-continuation');
       if (continuation.blocked) throw Error(continuation.blocked);
       const expected = continuation.pending ?? continuation.accepted;
-      if (
-        !equal(memory, expected) ||
-        (lastRaw !== continuation.lastRaw && !equal(starting, expected))
-      )
+      if (!equal(memory, expected) || (lastRaw !== continuation.lastRaw && !equal(starting, expected)))
         throw Error('external-conflict');
       starting = continuation.accepted;
     } else if (!equal(memory, starting)) throw Error('unacknowledged-memory');
@@ -155,7 +138,7 @@ export function createRuntimeController({
       id: 'crafting-runtime',
       json: JSON.stringify(starting),
       limits: runtimeLimits,
-      validate: (v) => {
+      validate: v => {
         try {
           parseRuntimeEnvelope(v);
           return true;
@@ -166,9 +149,7 @@ export function createRuntimeController({
     }),
     candidates = new WeakSet();
   if (continuation?.pending && !blocked) {
-    const prepared = document.prepare(document.read().ticket, () =>
-      JSON.stringify(continuation.pending),
-    );
+    const prepared = document.prepare(document.read().ticket, () => JSON.stringify(continuation.pending));
     if (prepared.status === 'prepared') {
       pending = prepared.candidate;
       candidates.add(pending);
@@ -180,8 +161,7 @@ export function createRuntimeController({
       canAcknowledge = false;
     try {
       saveStatus = saveHandle.status();
-      if (['quarantined', 'newer', 'unavailable'].includes(saveStatus))
-        blocked ??= `recovery-required:${saveStatus}`;
+      if (['quarantined', 'newer', 'unavailable'].includes(saveStatus)) blocked ??= `recovery-required:${saveStatus}`;
       const accepted = document.read().value,
         expected = pending?.value ?? accepted;
       if (!equal(saveHandle.get(), expected)) blocked ??= 'external-conflict';
@@ -193,8 +173,7 @@ export function createRuntimeController({
         durable = saveStatus === 'saved' && equal(stored, accepted);
         canAcknowledge = !!pending && saveStatus === 'saved' && matches;
         if (matches) lastRaw = raw;
-      } else if (lastRaw !== null && lastRaw !== undefined)
-        blocked ??= 'external-conflict';
+      } else if (lastRaw !== null && lastRaw !== undefined) blocked ??= 'external-conflict';
     } catch (error) {
       blocked ??= `recovery-required:${error.message}`;
     }
@@ -222,8 +201,8 @@ export function createRuntimeController({
       message,
     });
   };
-  const refused = (reason) => ({ status: 'refused', reason });
-  const guard = (fn) => {
+  const refused = reason => ({status: 'refused', reason});
+  const guard = fn => {
     if (retired) return refused('retired');
     if (busy) return refused('busy');
     busy = true;
@@ -243,32 +222,31 @@ export function createRuntimeController({
     const exact = pending;
     try {
       saveHandle.update(
-        (draft) => {
+        draft => {
           if (retired || pending !== exact) throw Error('retired');
           for (const key of Object.keys(draft)) delete draft[key];
           Object.assign(draft, structuredClone(exact.value));
         },
-        { now: true },
+        {now: true},
       );
     } catch (error) {
       message = error.message;
     }
     if (retired) return refused('retired');
-    return { status: 'pending', canAcknowledge: observe().canAcknowledge };
+    return {status: 'pending', canAcknowledge: observe().canAcknowledge};
   };
   return {
     read,
-    preview: (raw) =>
+    preview: raw =>
       guard(() => {
         if (pending) return refused('pending');
         const ticket = document.read().ticket,
           c = captureCommand(raw);
-        if (retired || document.read().ticket !== ticket)
-          return refused('retired');
+        if (retired || document.read().ticket !== ticket) return refused('retired');
         const next = transition(document.read().value, c);
-        if (!next) return { status: 'duplicate' };
+        if (!next) return {status: 'duplicate'};
         for (const future of [next, ...recoveryStates(next)]) {
-          const wrapper = JSON.stringify({ v: 1, by: saveBuild, data: future });
+          const wrapper = JSON.stringify({v: 1, by: saveBuild, data: future});
           if (
             wrapper.length > runtimeSectionDefinition.maxChars ||
             new TextEncoder().encode(wrapper).length > runtimeLimits.maxBytes
@@ -279,24 +257,20 @@ export function createRuntimeController({
         if (result.status === 'prepared') candidates.add(result.candidate);
         return result;
       }),
-    commit: (candidate) =>
+    commit: candidate =>
       guard(() => {
         if (pending) return refused('pending');
-        if (
-          !candidates.has(candidate) ||
-          candidate.ticket !== document.read().ticket
-        )
-          return { status: 'stale' };
+        if (!candidates.has(candidate) || candidate.ticket !== document.read().ticket) return {status: 'stale'};
         pending = candidate;
         return write();
       }),
-    cancel: (candidate) =>
+    cancel: candidate =>
       guard(() => {
         if (pending) return refused('pending');
-        if (!candidates.has(candidate)) return { status: 'stale' };
+        if (!candidates.has(candidate)) return {status: 'stale'};
         candidates.delete(candidate);
         document.discard(candidate);
-        return { status: 'cancelled' };
+        return {status: 'cancelled'};
       }),
     retry: () => guard(() => (pending ? write() : refused('no-pending'))),
     acknowledge: () =>
@@ -308,7 +282,7 @@ export function createRuntimeController({
           candidates.delete(pending);
           pending = null;
         }
-        return { status: result.status };
+        return {status: result.status};
       }),
     dispose() {
       if (retired) return retirementToken;

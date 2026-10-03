@@ -1,27 +1,299 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createActionController} from './controller.mjs';
-function fixture(policy){let target={token:{},revision:0,position:[2,0,0],radius:.5,enabled:true};const targets={capture:id=>target?Object.freeze({id,...target,position:Object.freeze([...target.position])}):null,same:c=>!!target&&c.token===target.token&&c.revision===target.revision&&c.radius===target.radius&&c.enabled===target.enabled&&c.position.every((n,i)=>n===target.position[i])};const controller=createActionController({targets,...(policy?{policy}:{})});return {controller,targets,get target(){return target;},replace(){target={...target,token:{}};},remove(){target=null;},admit(id='one',readyAt=0,expiresAt=10){return controller.admit({id,target:'target',amount:2,readyAt,expiresAt});}};}
-const good={eligible:()=>true,hit:()=>true,mitigate:n=>n};
-test('instant and delayed actions publish one coherent resource receipt; retry survives target removal',()=>{const f=fixture();assert.equal(f.admit().status,'admitted');assert.equal(f.controller.resolve('one').status,'accepted');assert.equal(f.controller.read().accepted.resources.target,2);f.remove();assert.equal(f.controller.resolve('one').status,'duplicate');assert.equal(f.controller.read().accepted.receipts.length,1);assert.equal(f.controller.admit({id:'one',target:'target',amount:3,readyAt:0,expiresAt:10}).reason,'conflict');const g=fixture();g.admit('delay',2,5);assert.equal(g.controller.resolve('delay').reason,'pending');g.controller.advance(2);assert.equal(g.controller.resolve('delay').status,'accepted');});
-test('target binding replacement, same-component scalar change and revision invalidate admission',()=>{for(const mutation of [f=>f.replace(),f=>f.remove(),f=>f.target.position[0]++,f=>f.target.enabled=false,f=>f.target.revision++,f=>f.target.radius++]){const f=fixture();f.admit();mutation(f);assert.equal(f.controller.resolve('one').reason,'stale');assert.deepEqual(f.controller.read().accepted,{resources:{},receipts:[]});}});
-test('each creator callback is followed by current-target revalidation',()=>{for(const point of ['eligible','hit','mitigate']){let f;const policy={...good,[point]:(...args)=>{f.target.position[1]++;return point==='mitigate'?args[0]:true;}};f=fixture(policy);f.admit();assert.equal(f.controller.resolve('one').reason,'stale');assert.equal(f.controller.read().accepted.receipts.length,0);}});
-test('callback cancellation, exact expiry, policy replacement and retirement revoke publication',()=>{for(const change of [c=>c.cancel('one'),c=>c.advance(10),c=>c.setPolicy(good),c=>c.applyEffect({key:'x',expiresAt:9,modifiers:[]},'replace'),c=>c.dispose()]){let f;f=fixture({...good,eligible:()=>{change(f.controller);return true;}});f.admit();assert.equal(f.controller.resolve('one').reason,'stale');assert.equal(f.controller.read().accepted.receipts.length,0);}});
-test('recursive resolution and admission are refused; thrown or nonliteral policy leaves no consequence',()=>{let f;f=fixture({...good,eligible:()=>{assert.equal(f.controller.resolve('one').reason,'busy');assert.equal(f.admit('nested').reason,'busy');return true;}});f.admit();assert.equal(f.controller.resolve('one').status,'accepted');for(const value of [()=>{throw Error('creator');},()=>1]){const g=fixture({...good,eligible:value});g.admit();assert.equal(g.controller.resolve('one').status,'refused');assert.equal(g.controller.read().accepted.receipts.length,0);}});
-test('temporary policy contributions preserve exact cancellation handles and expiry',()=>{const f=fixture(),a=f.controller.applyEffect({key:'boost',expiresAt:2,modifiers:[{stat:'amount',add:1,multiply:1}]},'replace'),b=f.controller.applyEffect({key:'boost',expiresAt:5,modifiers:[{stat:'amount',add:2,multiply:1}]},'replace');assert.equal(a.kind,'applied');assert.equal(b.kind,'applied');assert.equal(f.controller.cancelEffect(a.effect.handle).status,'missing');assert.equal(f.controller.cancelEffect({...b.effect.handle}).status,'missing');f.controller.advance(2);f.admit();f.controller.resolve('one');assert.equal(f.controller.read().accepted.resources.target,6);f.controller.advance(5);f.admit('two',5,8);f.controller.resolve('two');assert.equal(f.controller.read().accepted.resources.target,8);assert.equal(f.controller.read().effects.length,0);});
-test('effect count and total row bounds refuse without altering accepted state or existing effects',()=>{const f=fixture();for(let i=0;i<4;i++)assert.equal(f.controller.applyEffect({key:`e${i}`,expiresAt:5,modifiers:[{stat:'amount',add:0,multiply:1},{stat:'amount',add:0,multiply:1}]},'stack').kind,'applied');const before=f.controller.read();assert.equal(f.controller.applyEffect({key:'extra',expiresAt:5,modifiers:[]},'stack').kind,'capacity');assert.equal(f.controller.applyEffect({key:'e0',expiresAt:5,modifiers:Array.from({length:3},()=>({stat:'amount',add:0,multiply:1}))},'replace').kind,'capacity');assert.deepEqual(f.controller.read().effects,before.effects);assert.equal(f.controller.read().accepted,before.accepted);});
-test('invalid clocks and refused expiry arithmetic preserve authority time and handles',()=>{const f=fixture();for(const time of [NaN,Infinity,-1,'2'])assert.equal(f.controller.advance(time).status,'refused');assert.equal(f.controller.read().now,0);f.controller.applyEffect({key:'a',expiresAt:3,modifiers:[{stat:'amount',add:1e308,multiply:1}]},'stack');f.controller.applyEffect({key:'b',expiresAt:1,modifiers:[{stat:'amount',add:-1e308,multiply:1}]},'stack');f.controller.applyEffect({key:'c',expiresAt:3,modifiers:[{stat:'amount',add:0,multiply:1e308}]},'stack');const before=f.controller.read();const result=f.controller.advance(1);assert.equal(result.status,'refused');assert.equal(f.controller.read().now,0);assert.deepEqual(f.controller.read().effects,before.effects);assert.equal(before.effects.length,3);});
-test('terminal identities retain admission bounds and cancellation never undoes accepted consequences',()=>{const f=fixture();for(let i=0;i<32;i++){assert.equal(f.admit(`a${i}`).status,'admitted');f.controller.cancel(`a${i}`);}assert.equal(f.admit('overflow').reason,'capacity');const g=fixture();g.admit();g.controller.resolve('one');assert.equal(g.controller.cancel('one').status,'terminal');assert.equal(g.controller.read().accepted.resources.target,2);g.controller.dispose();assert.equal(g.controller.resolve('one').reason,'retired');assert.equal(g.controller.applyEffect({key:'late'},'stack').reason,'retired');});
-test('ineligible, missed and resource overflow results are not accepted receipts; no cue authority exists',()=>{for(const policy of [{...good,eligible:()=>false},{...good,hit:()=>false}]){const f=fixture(policy);f.admit();assert.equal(f.controller.resolve('one').status,'refused');assert.equal(f.controller.read().accepted.receipts.length,0);}const f=fixture();f.controller.admit({id:'large',target:'target',amount:100,readyAt:0,expiresAt:10});f.controller.resolve('large');f.admit();assert.equal(f.controller.resolve('one').reason,'range');assert.equal(f.controller.read().accepted.resources.target,100);assert.equal(f.controller.read().accepted.receipts.length,1);});
-test('accessor retirement during effect capture releases eventual contributions and refuses publication',()=>{const f=fixture();const result=f.controller.applyEffect({get key(){f.controller.dispose();return 'late';},expiresAt:2,modifiers:[{stat:'amount',add:1,multiply:1}]},'stack');assert.equal(result.reason,'retired');assert.equal(f.controller.read().retired,true);assert.deepEqual(f.controller.read().effects,[]);assert.deepEqual(f.controller.read().accepted,{resources:{},receipts:[]});});
-test('real ECS target and marker consumer keep cue omission, seek and overload independent of consequences',async()=>{
- const {World,component}=await import('../../src/core/ecs/world.ts');const {TargetState,createTargetAdapter,createPresentationAdapter}=await import('./adapters.mjs');
- const Transform=component('position',{x:0,y:0,z:0,scale:1}),Shape=component('shape',{kind:'box',size:[1,1,1],color:0,visible:true}),world=new World(),entity=world.spawn(Transform({x:2}),TargetState()),targets=createTargetAdapter({world,Transform});targets.bind('native',entity);
- const controller=createActionController({targets}),presentation=createPresentationAdapter({world,Transform,Shape});controller.admit({id:'a',target:'native',amount:3,readyAt:0,expiresAt:10});presentation.begin('a',{available:false});assert.equal(controller.resolve('a').status,'accepted');assert.equal(presentation.advance('a',.25).status,'skipped');assert.equal(controller.read().accepted.resources.native,3);controller.advance(2);assert.equal(presentation.advance('a',100).status,'refused');assert.equal(controller.read().now,2);assert.equal(presentation.read('a').time,.25);presentation.seek('a',100);assert.equal(controller.read().accepted.receipts.length,1);
- controller.admit({id:'b',target:'native',amount:3,readyAt:2,expiresAt:10});world.add(entity,TargetState());assert.equal(controller.resolve('b').reason,'stale');world.despawn(entity);assert.equal(controller.resolve('a').status,'duplicate');const late=()=>controller.resolve('b');controller.dispose();presentation.dispose();targets.dispose();assert.equal(late().reason,'retired');assert.equal(world.count,0);
+function fixture(policy) {
+  let target = {token: {}, revision: 0, position: [2, 0, 0], radius: 0.5, enabled: true};
+  const targets = {
+    capture: id => (target ? Object.freeze({id, ...target, position: Object.freeze([...target.position])}) : null),
+    same: c =>
+      !!target &&
+      c.token === target.token &&
+      c.revision === target.revision &&
+      c.radius === target.radius &&
+      c.enabled === target.enabled &&
+      c.position.every((n, i) => n === target.position[i]),
+  };
+  const controller = createActionController({targets, ...(policy ? {policy} : {})});
+  return {
+    controller,
+    targets,
+    get target() {
+      return target;
+    },
+    replace() {
+      target = {...target, token: {}};
+    },
+    remove() {
+      target = null;
+    },
+    admit(id = 'one', readyAt = 0, expiresAt = 10) {
+      return controller.admit({id, target: 'target', amount: 2, readyAt, expiresAt});
+    },
+  };
+}
+const good = {eligible: () => true, hit: () => true, mitigate: n => n};
+test('instant and delayed actions publish one coherent resource receipt; retry survives target removal', () => {
+  const f = fixture();
+  assert.equal(f.admit().status, 'admitted');
+  assert.equal(f.controller.resolve('one').status, 'accepted');
+  assert.equal(f.controller.read().accepted.resources.target, 2);
+  f.remove();
+  assert.equal(f.controller.resolve('one').status, 'duplicate');
+  assert.equal(f.controller.read().accepted.receipts.length, 1);
+  assert.equal(
+    f.controller.admit({id: 'one', target: 'target', amount: 3, readyAt: 0, expiresAt: 10}).reason,
+    'conflict',
+  );
+  const g = fixture();
+  g.admit('delay', 2, 5);
+  assert.equal(g.controller.resolve('delay').reason, 'pending');
+  g.controller.advance(2);
+  assert.equal(g.controller.resolve('delay').status, 'accepted');
 });
-test('target-port retirement during final validation cannot publish or acknowledge a consequence',()=>{
- const f=fixture();const original=f.targets.same;let calls=0;f.targets.same=snapshot=>{const matches=original(snapshot);if(++calls===7)f.controller.dispose();return matches;};
- // Admission one read; resolution initial + three policies + pre-prepare + pre-publish = six more.
- f.admit();assert.equal(f.controller.resolve('one').reason,'stale');assert.equal(calls,7);assert.equal(f.controller.read().retired,true);assert.deepEqual(f.controller.read().accepted,{resources:{},receipts:[]});assert.equal(f.controller.read().actions[0].state,'cancelled');
+test('target binding replacement, same-component scalar change and revision invalidate admission', () => {
+  for (const mutation of [
+    f => f.replace(),
+    f => f.remove(),
+    f => f.target.position[0]++,
+    f => (f.target.enabled = false),
+    f => f.target.revision++,
+    f => f.target.radius++,
+  ]) {
+    const f = fixture();
+    f.admit();
+    mutation(f);
+    assert.equal(f.controller.resolve('one').reason, 'stale');
+    assert.deepEqual(f.controller.read().accepted, {resources: {}, receipts: []});
+  }
+});
+test('each creator callback is followed by current-target revalidation', () => {
+  for (const point of ['eligible', 'hit', 'mitigate']) {
+    let f;
+    const policy = {
+      ...good,
+      [point]: (...args) => {
+        f.target.position[1]++;
+        return point === 'mitigate' ? args[0] : true;
+      },
+    };
+    f = fixture(policy);
+    f.admit();
+    assert.equal(f.controller.resolve('one').reason, 'stale');
+    assert.equal(f.controller.read().accepted.receipts.length, 0);
+  }
+});
+test('callback cancellation, exact expiry, policy replacement and retirement revoke publication', () => {
+  for (const change of [
+    c => c.cancel('one'),
+    c => c.advance(10),
+    c => c.setPolicy(good),
+    c => c.applyEffect({key: 'x', expiresAt: 9, modifiers: []}, 'replace'),
+    c => c.dispose(),
+  ]) {
+    let f;
+    f = fixture({
+      ...good,
+      eligible: () => {
+        change(f.controller);
+        return true;
+      },
+    });
+    f.admit();
+    assert.equal(f.controller.resolve('one').reason, 'stale');
+    assert.equal(f.controller.read().accepted.receipts.length, 0);
+  }
+});
+test('recursive resolution and admission are refused; thrown or nonliteral policy leaves no consequence', () => {
+  let f;
+  f = fixture({
+    ...good,
+    eligible: () => {
+      assert.equal(f.controller.resolve('one').reason, 'busy');
+      assert.equal(f.admit('nested').reason, 'busy');
+      return true;
+    },
+  });
+  f.admit();
+  assert.equal(f.controller.resolve('one').status, 'accepted');
+  for (const value of [
+    () => {
+      throw Error('creator');
+    },
+    () => 1,
+  ]) {
+    const g = fixture({...good, eligible: value});
+    g.admit();
+    assert.equal(g.controller.resolve('one').status, 'refused');
+    assert.equal(g.controller.read().accepted.receipts.length, 0);
+  }
+});
+test('temporary policy contributions preserve exact cancellation handles and expiry', () => {
+  const f = fixture(),
+    a = f.controller.applyEffect(
+      {key: 'boost', expiresAt: 2, modifiers: [{stat: 'amount', add: 1, multiply: 1}]},
+      'replace',
+    ),
+    b = f.controller.applyEffect(
+      {key: 'boost', expiresAt: 5, modifiers: [{stat: 'amount', add: 2, multiply: 1}]},
+      'replace',
+    );
+  assert.equal(a.kind, 'applied');
+  assert.equal(b.kind, 'applied');
+  assert.equal(f.controller.cancelEffect(a.effect.handle).status, 'missing');
+  assert.equal(f.controller.cancelEffect({...b.effect.handle}).status, 'missing');
+  f.controller.advance(2);
+  f.admit();
+  f.controller.resolve('one');
+  assert.equal(f.controller.read().accepted.resources.target, 6);
+  f.controller.advance(5);
+  f.admit('two', 5, 8);
+  f.controller.resolve('two');
+  assert.equal(f.controller.read().accepted.resources.target, 8);
+  assert.equal(f.controller.read().effects.length, 0);
+});
+test('effect count and total row bounds refuse without altering accepted state or existing effects', () => {
+  const f = fixture();
+  for (let i = 0; i < 4; i++)
+    assert.equal(
+      f.controller.applyEffect(
+        {
+          key: `e${i}`,
+          expiresAt: 5,
+          modifiers: [
+            {stat: 'amount', add: 0, multiply: 1},
+            {stat: 'amount', add: 0, multiply: 1},
+          ],
+        },
+        'stack',
+      ).kind,
+      'applied',
+    );
+  const before = f.controller.read();
+  assert.equal(f.controller.applyEffect({key: 'extra', expiresAt: 5, modifiers: []}, 'stack').kind, 'capacity');
+  assert.equal(
+    f.controller.applyEffect(
+      {key: 'e0', expiresAt: 5, modifiers: Array.from({length: 3}, () => ({stat: 'amount', add: 0, multiply: 1}))},
+      'replace',
+    ).kind,
+    'capacity',
+  );
+  assert.deepEqual(f.controller.read().effects, before.effects);
+  assert.equal(f.controller.read().accepted, before.accepted);
+});
+test('invalid clocks and refused expiry arithmetic preserve authority time and handles', () => {
+  const f = fixture();
+  for (const time of [NaN, Infinity, -1, '2']) assert.equal(f.controller.advance(time).status, 'refused');
+  assert.equal(f.controller.read().now, 0);
+  f.controller.applyEffect({key: 'a', expiresAt: 3, modifiers: [{stat: 'amount', add: 1e308, multiply: 1}]}, 'stack');
+  f.controller.applyEffect({key: 'b', expiresAt: 1, modifiers: [{stat: 'amount', add: -1e308, multiply: 1}]}, 'stack');
+  f.controller.applyEffect({key: 'c', expiresAt: 3, modifiers: [{stat: 'amount', add: 0, multiply: 1e308}]}, 'stack');
+  const before = f.controller.read();
+  const result = f.controller.advance(1);
+  assert.equal(result.status, 'refused');
+  assert.equal(f.controller.read().now, 0);
+  assert.deepEqual(f.controller.read().effects, before.effects);
+  assert.equal(before.effects.length, 3);
+});
+test('terminal identities retain admission bounds and cancellation never undoes accepted consequences', () => {
+  const f = fixture();
+  for (let i = 0; i < 32; i++) {
+    assert.equal(f.admit(`a${i}`).status, 'admitted');
+    f.controller.cancel(`a${i}`);
+  }
+  assert.equal(f.admit('overflow').reason, 'capacity');
+  const g = fixture();
+  g.admit();
+  g.controller.resolve('one');
+  assert.equal(g.controller.cancel('one').status, 'terminal');
+  assert.equal(g.controller.read().accepted.resources.target, 2);
+  g.controller.dispose();
+  assert.equal(g.controller.resolve('one').reason, 'retired');
+  assert.equal(g.controller.applyEffect({key: 'late'}, 'stack').reason, 'retired');
+});
+test('ineligible, missed and resource overflow results are not accepted receipts; no cue authority exists', () => {
+  for (const policy of [
+    {...good, eligible: () => false},
+    {...good, hit: () => false},
+  ]) {
+    const f = fixture(policy);
+    f.admit();
+    assert.equal(f.controller.resolve('one').status, 'refused');
+    assert.equal(f.controller.read().accepted.receipts.length, 0);
+  }
+  const f = fixture();
+  f.controller.admit({id: 'large', target: 'target', amount: 100, readyAt: 0, expiresAt: 10});
+  f.controller.resolve('large');
+  f.admit();
+  assert.equal(f.controller.resolve('one').reason, 'range');
+  assert.equal(f.controller.read().accepted.resources.target, 100);
+  assert.equal(f.controller.read().accepted.receipts.length, 1);
+});
+test('accessor retirement during effect capture releases eventual contributions and refuses publication', () => {
+  const f = fixture();
+  const result = f.controller.applyEffect(
+    {
+      get key() {
+        f.controller.dispose();
+        return 'late';
+      },
+      expiresAt: 2,
+      modifiers: [{stat: 'amount', add: 1, multiply: 1}],
+    },
+    'stack',
+  );
+  assert.equal(result.reason, 'retired');
+  assert.equal(f.controller.read().retired, true);
+  assert.deepEqual(f.controller.read().effects, []);
+  assert.deepEqual(f.controller.read().accepted, {resources: {}, receipts: []});
+});
+test('real ECS target and marker consumer keep cue omission, seek and overload independent of consequences', async () => {
+  const {World, component} = await import('../../src/core/ecs/world.ts');
+  const {TargetState, createTargetAdapter, createPresentationAdapter} = await import('./adapters.mjs');
+  const Transform = component('position', {x: 0, y: 0, z: 0, scale: 1}),
+    Shape = component('shape', {kind: 'box', size: [1, 1, 1], color: 0, visible: true}),
+    world = new World(),
+    entity = world.spawn(Transform({x: 2}), TargetState()),
+    targets = createTargetAdapter({world, Transform});
+  targets.bind('native', entity);
+  const controller = createActionController({targets}),
+    presentation = createPresentationAdapter({world, Transform, Shape});
+  controller.admit({id: 'a', target: 'native', amount: 3, readyAt: 0, expiresAt: 10});
+  presentation.begin('a', {available: false});
+  assert.equal(controller.resolve('a').status, 'accepted');
+  assert.equal(presentation.advance('a', 0.25).status, 'skipped');
+  assert.equal(controller.read().accepted.resources.native, 3);
+  controller.advance(2);
+  assert.equal(presentation.advance('a', 100).status, 'refused');
+  assert.equal(controller.read().now, 2);
+  assert.equal(presentation.read('a').time, 0.25);
+  presentation.seek('a', 100);
+  assert.equal(controller.read().accepted.receipts.length, 1);
+  controller.admit({id: 'b', target: 'native', amount: 3, readyAt: 2, expiresAt: 10});
+  world.add(entity, TargetState());
+  assert.equal(controller.resolve('b').reason, 'stale');
+  world.despawn(entity);
+  assert.equal(controller.resolve('a').status, 'duplicate');
+  const late = () => controller.resolve('b');
+  controller.dispose();
+  presentation.dispose();
+  targets.dispose();
+  assert.equal(late().reason, 'retired');
+  assert.equal(world.count, 0);
+});
+test('target-port retirement during final validation cannot publish or acknowledge a consequence', () => {
+  const f = fixture();
+  const original = f.targets.same;
+  let calls = 0;
+  f.targets.same = snapshot => {
+    const matches = original(snapshot);
+    if (++calls === 7) f.controller.dispose();
+    return matches;
+  };
+  // Admission one read; resolution initial + three policies + pre-prepare + pre-publish = six more.
+  f.admit();
+  assert.equal(f.controller.resolve('one').reason, 'stale');
+  assert.equal(calls, 7);
+  assert.equal(f.controller.read().retired, true);
+  assert.deepEqual(f.controller.read().accepted, {resources: {}, receipts: []});
+  assert.equal(f.controller.read().actions[0].state, 'cancelled');
 });

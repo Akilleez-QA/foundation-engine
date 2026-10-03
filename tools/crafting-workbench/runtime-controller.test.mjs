@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSaveStore } from '../../src/core/save/store.ts';
-import { authorSaveHandle } from '../../src/author/save-handle.ts';
-import { MemoryBackend } from '../../src/core/save/storage-port.ts';
-import { initialRecipe, initialSelections } from './recipe.mjs';
+import {createSaveStore} from '../../src/core/save/store.ts';
+import {authorSaveHandle} from '../../src/author/save-handle.ts';
+import {MemoryBackend} from '../../src/core/save/storage-port.ts';
+import {initialRecipe, initialSelections} from './recipe.mjs';
 import {
   createRuntimeController,
   createRuntimeStoragePort,
@@ -24,11 +24,11 @@ function fixture(backend = new MemoryBackend(), tab = 0) {
       session: new MemoryBackend().port(0, 'session'),
       timers: {
         now: () => 0,
-        set: (fn) => {
+        set: fn => {
           timers.set(++serial, fn);
           return serial;
         },
-        clear: (id) => timers.delete(id),
+        clear: id => timers.delete(id),
       },
     }),
     handle = authorSaveHandle(store, {
@@ -42,19 +42,15 @@ function fixture(backend = new MemoryBackend(), tab = 0) {
       readPersisted: () => port.get(runtimeStorageKey),
     });
   const preview = (payload, id = `cmd${++sequence}`) => {
-    const request = { id, payload },
+    const request = {id, payload},
       p = controller.preview(request);
     assert.equal(p.status, 'prepared', JSON.stringify(p));
-    return { ...p, request };
+    return {...p, request};
   };
   const accept = (payload, id) => {
     const p = preview(payload, id);
     assert.equal(controller.commit(p.candidate).status, 'pending');
-    assert.equal(
-      controller.acknowledge().status,
-      'accepted',
-      JSON.stringify(controller.read()),
-    );
+    assert.equal(controller.acknowledge().status, 'accepted', JSON.stringify(controller.read()));
     return p;
   };
   return {
@@ -84,24 +80,15 @@ const begin = (recipe = initialRecipe(), selections = initialSelections()) => ({
   pointBudget: recipe.pointLimit,
 });
 const qty = (f, container, batch) =>
-  f.controller
-    .read()
-    .view.stock.positions.find(
-      (p) => p.container === container && p.batch === batch,
-    )?.quantity ?? 0;
-const mass = (stock) =>
+  f.controller.read().view.stock.positions.find(p => p.container === container && p.batch === batch)?.quantity ?? 0;
+const mass = stock =>
   stock.positions.reduce(
-    (total, p) =>
-      total +
-      BigInt(p.quantity) *
-        BigInt(stock.batches.find((b) => b.id === p.batch).massMg),
+    (total, p) => total + BigInt(p.quantity) * BigInt(stock.batches.find(b => b.id === p.batch).massMg),
     0n,
   );
-const lock = (f, session = 'session-1') => f.accept({ kind: 'lock', session });
-const assign = (f, session = 'session-1', machine = 'm-a') =>
-  f.accept({ kind: 'assign', session, machine });
-const step = (f, session = 'session-1') =>
-  f.accept({ kind: 'step', session, ticks: 10, power: 10 });
+const lock = (f, session = 'session-1') => f.accept({kind: 'lock', session});
+const assign = (f, session = 'session-1', machine = 'm-a') => f.accept({kind: 'assign', session, machine});
+const step = (f, session = 'session-1') => f.accept({kind: 'step', session, ticks: 10, power: 10});
 test('pre-transfer selection retains original provenance; holding prevents overbooking and two sessions cancel independently', () => {
   const f = fixture();
   try {
@@ -109,10 +96,10 @@ test('pre-transfer selection retains original provenance; holding prevents overb
     const s = f.controller.read().view.sessions[0];
     assert.equal(s.phase, 'reserved');
     assert.deepEqual(
-      s.experiment.selections.map((s) => s.container),
+      s.experiment.selections.map(s => s.container),
       ['source-a', 'source-b'],
     );
-    assert.deepEqual(s.values, [{ id: 'quality', ceiling: 600, value: 300 }]);
+    assert.deepEqual(s.values, [{id: 'quality', ceiling: 600, value: 300}]);
     assert.equal(qty(f, 'source-a', 'input-a'), 3);
     assert.equal(qty(f, s.holding, 'input-a'), 1);
     const before = f.controller.read().envelope;
@@ -131,17 +118,11 @@ test('pre-transfer selection retains original provenance; holding prevents overb
     );
     assert.equal(f.controller.read().envelope, before);
     f.accept(begin());
-    assert.equal(
-      f.controller.preview({ id: 'third', payload: begin() }).reason,
-      'live-session-capacity',
-    );
-    f.accept({ kind: 'cancel-session', session: 'session-1' });
+    assert.equal(f.controller.preview({id: 'third', payload: begin()}).reason, 'live-session-capacity');
+    f.accept({kind: 'cancel-session', session: 'session-1'});
     assert.equal(qty(f, 'source-a', 'input-a'), 3);
     assert.equal(qty(f, 'holding-2', 'input-a'), 1);
-    assert.deepEqual(
-      parseRuntimeEnvelope(f.controller.read().envelope),
-      f.controller.read().envelope,
-    );
+    assert.deepEqual(parseRuntimeEnvelope(f.controller.read().envelope), f.controller.read().envelope);
   } finally {
     f.close();
   }
@@ -165,12 +146,12 @@ test('same batch selected across two original sources aggregates holding but ret
     });
     f.accept(
       begin(initialRecipe(), [
-        { slot: 'feed', container: 'source-a', batch: 'input-a', quantity: 1 },
-        { slot: 'feed', container: 'source-b', batch: 'input-a', quantity: 1 },
+        {slot: 'feed', container: 'source-a', batch: 'input-a', quantity: 1},
+        {slot: 'feed', container: 'source-b', batch: 'input-a', quantity: 1},
       ]),
     );
     assert.equal(qty(f, 'holding-1', 'input-a'), 2);
-    f.accept({ kind: 'cancel-session', session: 'session-1' });
+    f.accept({kind: 'cancel-session', session: 'session-1'});
     assert.equal(qty(f, 'source-a', 'input-a'), 3);
     assert.equal(qty(f, 'source-b', 'input-a'), 1);
   } finally {
@@ -197,7 +178,7 @@ test('return capacity refusal preserves exact custody both before and after assi
       assert.equal(
         f.controller.preview({
           id: 'cancel',
-          payload: { kind: 'cancel-session', session: 'session-1' },
+          payload: {kind: 'cancel-session', session: 'session-1'},
         }).reason,
         'capacity',
       );
@@ -209,7 +190,7 @@ test('return capacity refusal preserves exact custody both before and after assi
         batch: 'input-a',
         quantity: 1,
       });
-      f.accept({ kind: 'cancel-session', session: 'session-1' });
+      f.accept({kind: 'cancel-session', session: 'session-1'});
       assert.equal(qty(f, 'source-a', 'input-a'), 4);
     } finally {
       f.close();
@@ -228,7 +209,7 @@ test('machine input claimed before powered work; competing assignment and unrela
     assert.equal(
       f.controller.preview({
         id: 'claim',
-        payload: { kind: 'assign', session: 'session-2', machine: 'm-a' },
+        payload: {kind: 'assign', session: 'session-2', machine: 'm-a'},
       }).reason,
       'machine-claimed',
     );
@@ -246,10 +227,10 @@ test('machine input claimed before powered work; competing assignment and unrela
       'claimed-custody',
     );
     assert.equal(f.controller.read().envelope, before);
-    f.accept({ kind: 'step', session: 'session-1', ticks: 1, power: 10 });
+    f.accept({kind: 'step', session: 'session-1', ticks: 1, power: 10});
     assert.equal(f.controller.read().view.sessions[0].phase, 'working');
     assert.equal(qty(f, 'm-a.work', 'input-a'), 1);
-    f.accept({ kind: 'cancel-session', session: 'session-1' });
+    f.accept({kind: 'cancel-session', session: 'session-1'});
     assert.equal(qty(f, 'm-a.work', 'input-a'), 0);
     assign(f, 'session-2');
   } finally {
@@ -277,16 +258,12 @@ test('pinned same-version recipes preserve different numeric outcomes; conservat
     step(f);
     assert.equal(f.controller.read().view.sessions[0].phase, 'completed');
     assert.equal(qty(f, 'm-a.output', 'crafted-1'), 1);
-    assert.equal(
-      f.controller.read().view.stock.batches.find((b) => b.id === 'crafted-1')
-        .properties.grade,
-      450,
-    );
+    assert.equal(f.controller.read().view.stock.batches.find(b => b.id === 'crafted-1').properties.grade, 450);
     assert.equal(mass(f.controller.read().view.stock), beforeMass);
     assert.equal(
       f.controller.preview({
         id: 'cancel-done',
-        payload: { kind: 'cancel-session', session: 'session-1' },
+        payload: {kind: 'cancel-session', session: 'session-1'},
       }).reason,
       'phase',
     );
@@ -313,19 +290,12 @@ test('pinned same-version recipes preserve different numeric outcomes; conservat
     });
     const command = step(f, 'session-2');
     assert.equal(f.controller.read().view.machines[0].completed, 2);
-    assert.equal(
-      f.controller.read().view.stock.batches.find((b) => b.id === 'crafted-2')
-        .properties.grade,
-      600,
-    );
+    assert.equal(f.controller.read().view.stock.batches.find(b => b.id === 'crafted-2').properties.grade, 600);
     assert.equal(f.controller.preview(command.request).status, 'duplicate');
     assert.equal(qty(f, 'm-a.output', 'crafted-2'), 1);
     const reload = fixture(f.backend, 1);
     try {
-      assert.deepEqual(
-        reload.controller.read().envelope,
-        f.controller.read().envelope,
-      );
+      assert.deepEqual(reload.controller.read().envelope, f.controller.read().envelope);
     } finally {
       reload.close();
     }
@@ -348,11 +318,7 @@ test('spawn replacement retains historical harvested facts and uses one dimensio
       grade: 900,
     });
     assert.equal(f.controller.read().view.spawns[0].remaining, 3);
-    assert.equal(
-      f.controller.read().view.stock.batches.find((b) => b.id === 'input-a')
-        .properties.grade,
-      400,
-    );
+    assert.equal(f.controller.read().view.stock.batches.find(b => b.id === 'input-a').properties.grade, 400);
     assert.equal(
       f.controller.preview({
         id: 'old',
@@ -375,7 +341,7 @@ test('spawn replacement retains historical harvested facts and uses one dimensio
     });
     assert.equal(f.controller.read().view.spawns[0].remaining, 1);
     assert.equal(qty(f, 'buffer', 'harvest-1'), 2);
-    f.accept({ kind: 'advance', time: 20 });
+    f.accept({kind: 'advance', time: 20});
     assert.equal(
       f.controller.preview({
         id: 'expired',
@@ -389,10 +355,7 @@ test('spawn replacement retains historical harvested facts and uses one dimensio
       }).reason,
       'expired-spawn',
     );
-    assert.deepEqual(
-      parseRuntimeEnvelope(f.controller.read().envelope),
-      f.controller.read().envelope,
-    );
+    assert.deepEqual(parseRuntimeEnvelope(f.controller.read().envelope), f.controller.read().envelope);
   } finally {
     f.close();
   }
@@ -403,15 +366,12 @@ test('failed actual author-adapter save keeps old stock until exact retry readba
     assert.equal(f.controller.read().durable, false);
     const before = f.controller.read().envelope,
       p = f.preview(begin(), 'begin');
-    f.backend.failSet = (k) => k === runtimeStorageKey;
+    f.backend.failSet = k => k === runtimeStorageKey;
     f.controller.commit(p.candidate);
     assert.equal(f.controller.read().pending, true);
     assert.equal(f.controller.read().envelope, before);
     assert.equal(f.controller.acknowledge().reason, 'not-durable');
-    assert.equal(
-      f.controller.preview({ id: 'other', payload: begin() }).reason,
-      'pending',
-    );
+    assert.equal(f.controller.preview({id: 'other', payload: begin()}).reason, 'pending');
     f.backend.failSet = () => false;
     f.controller.retry();
     assert.equal(f.controller.read().envelope, before);
@@ -420,10 +380,7 @@ test('failed actual author-adapter save keeps old stock until exact retry readba
     assert.equal(f.controller.preview(p.request).status, 'duplicate');
     const reload = fixture(f.backend, 1);
     try {
-      assert.deepEqual(
-        reload.controller.read().envelope,
-        f.controller.read().envelope,
-      );
+      assert.deepEqual(reload.controller.read().envelope, f.controller.read().envelope);
     } finally {
       reload.close();
     }
@@ -432,16 +389,13 @@ test('failed actual author-adapter save keeps old stock until exact retry readba
   }
 });
 test('corrupt newer and externally removed storage never fabricate a fresh accepted economy', () => {
-  for (const raw of ['{broken', JSON.stringify({ v: 99, data: {} })]) {
+  for (const raw of ['{broken', JSON.stringify({v: 99, data: {}})]) {
     const backend = new MemoryBackend();
     backend.port(0).set(runtimeStorageKey, raw);
     const f = fixture(backend);
     try {
       assert.ok(f.controller.read().blocked);
-      assert.equal(
-        f.controller.preview({ id: 'begin', payload: begin() }).status,
-        'refused',
-      );
+      assert.equal(f.controller.preview({id: 'begin', payload: begin()}).status, 'refused');
     } finally {
       f.close();
     }
@@ -465,19 +419,19 @@ test('restore replay rejects changed facts, quantity, phase or recipe while exac
     f.accept(begin());
     const original = f.controller.read().envelope;
     for (const mutate of [
-      (s) => s.industry.stock.positions[0].quantity++,
-      (s) => s.sessions[0].recipe.attributes[0].initialPermille++,
-      (s) => (s.sessions[0].phase = 'completed'),
-      (s) => s.spawns[0].deposit.batch.properties.grade++,
+      s => s.industry.stock.positions[0].quantity++,
+      s => s.sessions[0].recipe.attributes[0].initialPermille++,
+      s => (s.sessions[0].phase = 'completed'),
+      s => s.spawns[0].deposit.batch.properties.grade++,
     ]) {
       const bad = structuredClone(original);
       mutate(bad);
       assert.throws(() => parseRuntimeEnvelope(bad));
     }
-    const proposal = f.preview({ kind: 'advance', time: 1 });
+    const proposal = f.preview({kind: 'advance', time: 1});
     f.controller.cancel(proposal.candidate);
     assert.equal(f.controller.commit(proposal.candidate).status, 'stale');
-    const late = f.preview({ kind: 'advance', time: 2 });
+    const late = f.preview({kind: 'advance', time: 2});
     f.controller.dispose();
     assert.equal(f.controller.commit(late.candidate).reason, 'retired');
   } finally {
@@ -503,12 +457,12 @@ test('joint batch saturation rejects lock without losing reserved custody or can
     assert.equal(
       f.controller.preview({
         id: 'lock',
-        payload: { kind: 'lock', session: 'session-1' },
+        payload: {kind: 'lock', session: 'session-1'},
       }).reason,
       'crafting: limit',
     );
     assert.equal(f.controller.read().envelope, before);
-    f.accept({ kind: 'cancel-session', session: 'session-1' });
+    f.accept({kind: 'cancel-session', session: 'session-1'});
     assert.equal(qty(f, 'source-a', 'input-a'), 4);
   } finally {
     f.close();
@@ -593,10 +547,7 @@ test('capture reentry retires pending authority and bounded arrays reject before
         return 'sample';
       },
     });
-    assert.equal(
-      f.controller.preview({ id: 'retire', payload: begin(recipe) }).reason,
-      'retired',
-    );
+    assert.equal(f.controller.preview({id: 'retire', payload: begin(recipe)}).reason, 'retired');
     assert.equal(f.controller.read().envelope.sessions.length, 0);
   } finally {
     f.close();
@@ -606,12 +557,11 @@ test('receipt bound rejects admission without mutating accepted values and exact
   const f = fixture();
   try {
     let last;
-    for (let i = 0; i < 64; i++)
-      last = f.accept({ kind: 'advance', time: i }, `clock-${i}`);
+    for (let i = 0; i < 64; i++) last = f.accept({kind: 'advance', time: i}, `clock-${i}`);
     assert.equal(
       f.controller.preview({
         id: 'over',
-        payload: { kind: 'advance', time: 64 },
+        payload: {kind: 'advance', time: 64},
       }).reason,
       'receipt-capacity',
     );
@@ -625,9 +575,9 @@ test('joint document UTF8 admission refuses before transferring stock or startin
   const f = fixture();
   try {
     const recipe = structuredClone(initialRecipe());
-    recipe.attributes = Array.from({ length: 4 }, (_, i) => ({
+    recipe.attributes = Array.from({length: 4}, (_, i) => ({
       id: `${i}${'Ω'.repeat(90)}`,
-      weights: Array.from({ length: 16 }, () => ({
+      weights: Array.from({length: 16}, () => ({
         slot: 'feed',
         property: 'grade',
         weight: 1,
@@ -637,11 +587,11 @@ test('joint document UTF8 admission refuses before transferring stock or startin
       effectPermille: 1000,
     }));
     recipe.output.properties = Object.fromEntries(
-      Array.from({ length: 8 }, (_, i) => [
+      Array.from({length: 8}, (_, i) => [
         `${i}${'Ψ'.repeat(90)}`,
         {
           base: 0,
-          terms: recipe.attributes.map((a) => ({
+          terms: recipe.attributes.map(a => ({
             attribute: a.id,
             coefficient: 1,
           })),
@@ -651,7 +601,7 @@ test('joint document UTF8 admission refuses before transferring stock or startin
     let refused = false;
     for (let i = 0; i < 16; i++) {
       const before = f.controller.read().envelope,
-        request = { id: `large-${i}`, payload: begin(recipe) },
+        request = {id: `large-${i}`, payload: begin(recipe)},
         candidate = f.controller.preview(request);
       if (candidate.status !== 'prepared') {
         assert.ok(['refused', 'rejected'].includes(candidate.status));
@@ -665,14 +615,8 @@ test('joint document UTF8 admission refuses before transferring stock or startin
       f.controller.acknowledge();
       const raw = f.port.get(runtimeStorageKey);
       assert.ok(raw.length <= 262144);
-      assert.ok(
-        new TextEncoder().encode(JSON.stringify(f.controller.read().envelope))
-          .length <= 262144,
-      );
-      f.accept(
-        { kind: 'cancel-session', session: `session-${i + 1}` },
-        `cancel-large-${i}`,
-      );
+      assert.ok(new TextEncoder().encode(JSON.stringify(f.controller.read().envelope)).length <= 262144);
+      f.accept({kind: 'cancel-session', session: `session-${i + 1}`}, `cancel-large-${i}`);
     }
     assert.equal(refused, true);
     assert.equal(qty(f, 'source-a', 'input-a'), 4);
@@ -684,7 +628,7 @@ test('observed storage conflict remains latched through ABA and blocks autonomou
   const f = fixture();
   try {
     const p = f.preview(begin());
-    f.backend.failSet = (k) => k === runtimeStorageKey;
+    f.backend.failSet = k => k === runtimeStorageKey;
     f.controller.commit(p.candidate);
     f.backend.failSet = () => false;
     f.backend.port(1).set(runtimeStorageKey, 'foreign');
@@ -711,10 +655,7 @@ test('raw UTF8 wrapper bytes are bounded before ignored metadata or canonical da
   const f = fixture(backend);
   try {
     assert.ok(f.controller.read().blocked);
-    assert.equal(
-      f.controller.preview({ id: 'begin', payload: begin() }).status,
-      'refused',
-    );
+    assert.equal(f.controller.preview({id: 'begin', payload: begin()}).status, 'refused');
   } finally {
     f.close();
   }
@@ -723,15 +664,10 @@ test('storage guard rejects oversized UTF8 bytes before SaveStore calls the sect
   const backend = new MemoryBackend(),
     data = initialRuntimeEnvelope();
   data.version = 999;
-  backend
-    .port(0)
-    .set(
-      runtimeStorageKey,
-      JSON.stringify({ v: 1, by: 'Ω'.repeat(140000), data }),
-    );
+  backend.port(0).set(runtimeStorageKey, JSON.stringify({v: 1, by: 'Ω'.repeat(140000), data}));
   const parse = runtimeSectionDefinition.parse;
   let entered = 0;
-  runtimeSectionDefinition.parse = (value) => {
+  runtimeSectionDefinition.parse = value => {
     if (value?.version === 999) entered++;
     return parse(value);
   };
@@ -762,7 +698,7 @@ test('receipt saturation reserves exact cancellation and source-capacity restora
       for (let i = 0; i < 64; i++) {
         const p = f.controller.preview({
           id: `fill-${i}`,
-          payload: { kind: 'advance', time: i },
+          payload: {kind: 'advance', time: i},
         });
         if (p.status !== 'prepared') {
           refusal = p;
@@ -777,28 +713,19 @@ test('receipt saturation reserves exact cancellation and source-capacity restora
         assert.equal(
           f.controller.preview({
             id: 'blocked-cancel',
-            payload: { kind: 'cancel-session', session: 'session-1' },
+            payload: {kind: 'cancel-session', session: 'session-1'},
           }).reason,
           'capacity',
         );
-        f.accept(
-          { kind: 'resize', container: 'source-a', mass: 50, volume: 25 },
-          'recovery-resize'.padEnd(96, '\u0000'),
-        );
+        f.accept({kind: 'resize', container: 'source-a', mass: 50, volume: 25}, 'recovery-resize'.padEnd(96, '\u0000'));
       }
-      f.accept(
-        { kind: 'cancel-session', session: 'session-1' },
-        'recovery-cancel'.padEnd(96, '\u0000'),
-      );
+      f.accept({kind: 'cancel-session', session: 'session-1'}, 'recovery-cancel'.padEnd(96, '\u0000'));
       assert.equal(qty(f, 'holding-1', 'input-a'), 0);
       assert.equal(f.controller.read().view.sessions[0].phase, 'cancelled');
       assert.ok(f.controller.read().envelope.receipts.length <= 64);
       const reload = fixture(f.backend, 1);
       try {
-        assert.equal(
-          reload.controller.read().view.sessions[0].phase,
-          'cancelled',
-        );
+        assert.equal(reload.controller.read().view.sessions[0].phase, 'cancelled');
       } finally {
         reload.close();
       }
@@ -811,9 +738,9 @@ test('joint byte saturation retains source resize and cancellation admission for
   const f = fixture();
   try {
     const recipe = structuredClone(initialRecipe());
-    recipe.attributes = Array.from({ length: 4 }, (_, i) => ({
+    recipe.attributes = Array.from({length: 4}, (_, i) => ({
       id: `${i}${'Ω'.repeat(90)}`,
-      weights: Array.from({ length: 16 }, () => ({
+      weights: Array.from({length: 16}, () => ({
         slot: 'feed',
         property: 'grade',
         weight: 1,
@@ -823,11 +750,11 @@ test('joint byte saturation retains source resize and cancellation admission for
       effectPermille: 1000,
     }));
     recipe.output.properties = Object.fromEntries(
-      Array.from({ length: 8 }, (_, i) => [
+      Array.from({length: 8}, (_, i) => [
         `${i}${'Ψ'.repeat(90)}`,
         {
           base: 0,
-          terms: recipe.attributes.map((a) => ({
+          terms: recipe.attributes.map(a => ({
             attribute: a.id,
             coefficient: 1,
           })),
@@ -842,10 +769,7 @@ test('joint byte saturation retains source resize and cancellation admission for
       if (p.status !== 'prepared') break;
       f.controller.commit(p.candidate);
       f.controller.acknowledge();
-      f.accept(
-        { kind: 'cancel-session', session: `session-${i + 1}` },
-        `cancel-fat-${i}`,
-      );
+      f.accept({kind: 'cancel-session', session: `session-${i + 1}`}, `cancel-fat-${i}`);
     }
     const p = f.preview(begin(), 'small-final');
     f.controller.commit(p.candidate);
@@ -864,17 +788,14 @@ test('joint byte saturation retains source resize and cancellation admission for
     for (let i = 0; i < 64; i++) {
       const p = f.controller.preview({
         id: `tail-${i}`,
-        payload: { kind: 'advance', time: i },
+        payload: {kind: 'advance', time: i},
       });
       if (p.status !== 'prepared') break;
       f.controller.commit(p.candidate);
       f.controller.acknowledge();
     }
-    f.accept(
-      { kind: 'resize', container: 'source-a', mass: 50, volume: 25 },
-      'resize-final',
-    );
-    f.accept({ kind: 'cancel-session', session }, 'cancel-final');
+    f.accept({kind: 'resize', container: 'source-a', mass: 50, volume: 25}, 'resize-final');
+    f.accept({kind: 'cancel-session', session}, 'cancel-final');
     assert.equal(f.controller.read().view.sessions.at(-1).phase, 'cancelled');
     assert.equal(f.controller.read().pending, false);
   } finally {
@@ -888,7 +809,7 @@ test('retirement explicitly hands exact failed or saved-unacknowledged candidate
     try {
       const accepted = f.controller.read().envelope,
         p = f.preview(begin(), 'pending-begin');
-      f.backend.failSet = (k) => k === runtimeStorageKey;
+      f.backend.failSet = k => k === runtimeStorageKey;
       f.controller.commit(p.candidate);
       const resume = f.controller.dispose();
       assert.equal(f.controller.dispose(), resume);
@@ -926,7 +847,7 @@ test('cold controller refuses dirty memory while displaying only physically acce
   const f = fixture();
   try {
     const p = f.preview(begin());
-    f.backend.failSet = (k) => k === runtimeStorageKey;
+    f.backend.failSet = k => k === runtimeStorageKey;
     f.controller.commit(p.candidate);
     f.controller.dispose();
     const cold = createRuntimeController({
@@ -958,9 +879,7 @@ test('pinned repeat permits identical batches relocated into a different selecti
     f.accept({
       kind: 'repeat',
       session: 'session-1',
-      selections: initialSelections().map((s) =>
-        s.batch === 'input-b' ? { ...s, container: 'buffer' } : s,
-      ),
+      selections: initialSelections().map(s => (s.batch === 'input-b' ? {...s, container: 'buffer'} : s)),
     });
     assert.equal(f.controller.read().view.sessions[1].phase, 'locked');
     assert.equal(qty(f, 'holding-2', 'input-b'), 1);
@@ -974,7 +893,7 @@ test('pinned repeat permits identical batches relocated into a different selecti
 test('idle machine work capacity can recover after an accepted zero-capacity admission and cancellation', () => {
   const f = fixture();
   try {
-    f.accept({ kind: 'resize', container: 'm-a.work', mass: 0, volume: 0 });
+    f.accept({kind: 'resize', container: 'm-a.work', mass: 0, volume: 0});
     f.accept(begin());
     lock(f);
     assign(f);
@@ -992,8 +911,8 @@ test('idle machine work capacity can recover after an accepted zero-capacity adm
       }).reason,
       'claimed-custody',
     );
-    f.accept({ kind: 'cancel-session', session: 'session-1' });
-    f.accept({ kind: 'resize', container: 'm-a.work', mass: 100, volume: 100 });
+    f.accept({kind: 'cancel-session', session: 'session-1'});
+    f.accept({kind: 'resize', container: 'm-a.work', mass: 100, volume: 100});
     f.accept(begin());
     lock(f, 'session-2');
     assign(f, 'session-2');
@@ -1007,21 +926,21 @@ test('continuation cannot clear a latched controller conflict or authorize a ret
   const f = fixture();
   try {
     f.accept(begin());
-    const candidate = f.preview({ kind: 'advance', time: 1 });
+    const candidate = f.preview({kind: 'advance', time: 1});
     const accepted = f.controller.read().envelope;
     f.handle.update(
-      (d) => {
+      d => {
         Object.assign(d, structuredClone(candidate.candidate.value));
       },
-      { now: false },
+      {now: false},
     );
     assert.equal(f.controller.read().blocked, 'external-conflict');
     const resume = f.controller.dispose();
     f.handle.update(
-      (d) => {
+      d => {
         Object.assign(d, structuredClone(accepted));
       },
-      { now: false },
+      {now: false},
     );
     const next = createRuntimeController({
       saveBuild: 'craft@test',

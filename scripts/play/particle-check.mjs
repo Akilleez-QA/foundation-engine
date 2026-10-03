@@ -22,42 +22,78 @@ import {launch} from '../perf/bench-browser.mjs';
 import {diagnosticReport} from './diagnostic-report.mjs';
 const out = resolve(process.argv[2] ?? '/tmp/foundation-particle-browser');
 mkdirSync(out, {recursive: true});
-const html = '<!doctype html><html><head><meta charset="utf-8"><link rel="icon" href="data:,"><title>Particle diagnostic</title></head><body><header class="shell-header"><div class="header-left"></div><div class="header-right"></div></header><main id="app" class="app-root"></main><script type="module" src="/scripts/play/fixtures/particle-entry.mjs"></script></body></html>';
-const server = await createServer({root: ROOT, logLevel: 'error', publicDir: resolve(ROOT, 'templates/mechanics/game/public'), plugins: [{name: 'particle-diagnostic', configureServer(s) {
-  s.middlewares.use((req, res, next) => { if (req.url?.startsWith('/__particles.html')) { res.setHeader('Content-Type', 'text/html'); res.end(html); } else next(); });
-}}], server: {host: '127.0.0.1', port: 0}});
-const report = {revision: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).trim(), passed: false, runs: [],
-  limitations: ['Desktop Chromium with software GL only; no physical device, GPU timing or visual-quality acceptance.', 'Counts are renderer.info per scene draw, not GPU work.']};
+const html =
+  '<!doctype html><html><head><meta charset="utf-8"><link rel="icon" href="data:,"><title>Particle diagnostic</title></head><body><header class="shell-header"><div class="header-left"></div><div class="header-right"></div></header><main id="app" class="app-root"></main><script type="module" src="/scripts/play/fixtures/particle-entry.mjs"></script></body></html>';
+const server = await createServer({
+  root: ROOT,
+  logLevel: 'error',
+  publicDir: resolve(ROOT, 'templates/mechanics/game/public'),
+  plugins: [
+    {
+      name: 'particle-diagnostic',
+      configureServer(s) {
+        s.middlewares.use((req, res, next) => {
+          if (req.url?.startsWith('/__particles.html')) {
+            res.setHeader('Content-Type', 'text/html');
+            res.end(html);
+          } else next();
+        });
+      },
+    },
+  ],
+  server: {host: '127.0.0.1', port: 0},
+});
+const report = {
+  revision: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).trim(),
+  passed: false,
+  runs: [],
+  limitations: [
+    'Desktop Chromium with software GL only; no physical device, GPU timing or visual-quality acceptance.',
+    'Counts are renderer.info per scene draw, not GPU work.',
+  ],
+};
 const evidence = diagnosticReport(report, resolve(out, 'report.json'));
 let browser;
 try {
   await server.listen();
   for (const quality of ['reference', 'low']) {
     browser = await launch({width: 960, height: 640, strictClose: true});
-    const p = browser.page, run = {quality};
+    const p = browser.page,
+      run = {quality};
     report.runs.push(run);
-    await p.goto(`${server.resolvedUrls.local[0]}__particles.html?flags=dev.silent&quality=${quality}&seed=7#scene/sample`);
-    await p.waitForFunction(() => window.particleCheck?.snapshot().particles !== null && window.particleCheck.snapshot().renders > 0, null, {timeout: 60000});
+    await p.goto(
+      `${server.resolvedUrls.local[0]}__particles.html?flags=dev.silent&quality=${quality}&seed=7#scene/sample`,
+    );
+    await p.waitForFunction(
+      () => window.particleCheck?.snapshot().particles !== null && window.particleCheck.snapshot().renders > 0,
+      null,
+      {timeout: 60000},
+    );
     const snap = () => p.evaluate(() => window.particleCheck.snapshot());
     // Settle, then the baseline: the floor box only; the emitters are admitted but idle. Loading finishes first (the
     // drawing chunk and the textured emitter's texture, applied while it is hidden), then the frame count must hold
     // still for 500 ms, so the idle window below measures idleness, not late loading.
-    await p.waitForFunction(() => window.particleCheck.snapshot().particles.textures.applied === 1, null, {timeout: 30000});
+    await p.waitForFunction(() => window.particleCheck.snapshot().particles.textures.applied === 1, null, {
+      timeout: 30000,
+    });
     const settle = async () => {
       let last = (await snap()).renders;
       for (let stable = 0, tries = 0; stable < 5; tries++) {
         assert.ok(tries < 200, 'the scene settled within 20 s');
         await sleep(100);
         const now = (await snap()).renders;
-        stable = now === last ? stable + 1 : 0; last = now;
+        stable = now === last ? stable + 1 : 0;
+        last = now;
       }
     };
     await settle();
     const base = await snap();
     run.base = base.last;
-    assert.equal(base.particles.live, 0); assert.equal(base.particles.draws, 0, 'idle emitters issue no draw');
+    assert.equal(base.particles.live, 0);
+    assert.equal(base.particles.draws, 0, 'idle emitters issue no draw');
     assert.equal(base.chunk, 1, 'the particle drawing chunk was fetched once');
-    const before = base.renders; await sleep(800);
+    const before = base.renders;
+    await sleep(800);
     assert.equal((await snap()).renders - before, 0, 'an idle scene with idle emitters draws no frames');
     // One burst: one more draw, two triangles per live particle.
     await p.evaluate(() => window.particleCheck.fire('sparks'));
@@ -68,20 +104,34 @@ try {
     await p.waitForFunction(n => window.particleCheck.snapshot().renders > n, live.renders);
     const drawn = await snap();
     assert.equal(drawn.last.calls, base.last.calls + 1, 'a live emitter is one draw');
-    assert.ok(drawn.last.triangles > base.last.triangles && (drawn.last.triangles - base.last.triangles) % 2 === 0, 'two triangles per particle');
+    assert.ok(
+      drawn.last.triangles > base.last.triangles && (drawn.last.triangles - base.last.triangles) % 2 === 0,
+      'two triangles per particle',
+    );
     assert.ok(drawn.last.triangles - base.last.triangles <= 2 * 48);
     const expectedFirst = quality === 'low' ? 24 : 48;
     assert.equal(live.particles.spawned, 48, 'spawn attempts are the same on every preset');
-    assert.equal(live.particles.spawned - live.particles.thinned, expectedFirst, `${quality} draws ${expectedFirst} of 48`);
+    assert.equal(
+      live.particles.spawned - live.particles.thinned,
+      expectedFirst,
+      `${quality} draws ${expectedFirst} of 48`,
+    );
     await p.screenshot({path: resolve(out, `burst-${quality}.png`)});
     // A trail and a textured burst together: three emitters live at once are three draws.
-    await p.evaluate(() => { window.particleCheck.trail(true); window.particleCheck.fire('glow'); window.particleCheck.fire('sparks'); });
+    await p.evaluate(() => {
+      window.particleCheck.trail(true);
+      window.particleCheck.fire('glow');
+      window.particleCheck.fire('sparks');
+    });
     await p.waitForFunction(() => window.particleCheck.snapshot().particles.draws === 3);
     const busy = await snap();
     await p.waitForFunction(n => window.particleCheck.snapshot().renders > n + 2, busy.renders);
     const three = await snap();
     run.three = {last: three.last, particles: three.particles};
-    assert.ok(three.last.calls >= base.last.calls + 2 && three.last.calls <= base.last.calls + 3, `two or three emitters live in the last draw (${three.last.calls})`);
+    assert.ok(
+      three.last.calls >= base.last.calls + 2 && three.last.calls <= base.last.calls + 3,
+      `two or three emitters live in the last draw (${three.last.calls})`,
+    );
     await p.screenshot({path: resolve(out, `trail-${quality}.png`)});
     // Stop: everything dies, one last draw without particles, then still.
     await p.evaluate(() => window.particleCheck.trail(false));
@@ -93,7 +143,9 @@ try {
     assert.equal(quiet.last.triangles, base.last.triangles);
     await sleep(800);
     assert.equal((await snap()).renders - quiet.renders, 0, 'still again after the particles die');
-    assert.equal(quiet.particles.emitters, 3); assert.equal(quiet.particles.refused, 0); assert.equal(quiet.particles.invalid, 0);
+    assert.equal(quiet.particles.emitters, 3);
+    assert.equal(quiet.particles.refused, 0);
+    assert.equal(quiet.particles.invalid, 0);
     run.quiet = {last: quiet.last, particles: quiet.particles};
     // Leave: every emitter geometry disposed and the texture released.
     await p.evaluate(() => window.particleCheck.goto('other'));
@@ -105,21 +157,32 @@ try {
     // On-demand frames: a scene without systems plays its own one-shot burst, removes it, and is still again.
     await p.evaluate(() => window.particleCheck.goto('still'));
     await p.waitForFunction(() => window.particleCheck.snapshot().scene === 'still');
-    await p.waitForFunction(() => (window.particleCheck.snapshot().particles?.spawned ?? 0) > 0, null, {timeout: 30000});
+    await p.waitForFunction(() => (window.particleCheck.snapshot().particles?.spawned ?? 0) > 0, null, {
+      timeout: 30000,
+    });
     await p.waitForFunction(() => window.particleCheck.snapshot().entities === 1, null, {timeout: 10000});
     await sleep(300);
     const still = await snap();
-    assert.equal(still.particles.live, 0); assert.equal(still.particles.draws, 0);
+    assert.equal(still.particles.live, 0);
+    assert.equal(still.particles.draws, 0);
     assert.equal(still.particles.spawned - still.particles.thinned, quality === 'low' ? 16 : 32);
     assert.ok(still.renders > left.renders, 'the burst was drawn');
     await sleep(800);
     assert.equal((await snap()).renders - still.renders, 0, 'on-demand scene still after its burst');
     run.still = {particles: still.particles, last: still.last};
     assert.deepEqual(browser.errors, []);
-    await browser.close(); browser = null;
-    console.log(`particles (${quality}): idle 0 draws and 0 frames; burst +1 draw (${drawn.last.triangles - base.last.triangles} triangles, ${expectedFirst}/48 particles); three emitters ${three.last.calls - base.last.calls} draws; still after; 3 geometries disposed and texture released on exit; on-demand scene played its burst, despawned it and went still`);
+    await browser.close();
+    browser = null;
+    console.log(
+      `particles (${quality}): idle 0 draws and 0 frames; burst +1 draw (${drawn.last.triangles - base.last.triangles} triangles, ${expectedFirst}/48 particles); three emitters ${three.last.calls - base.last.calls} draws; still after; 3 geometries disposed and texture released on exit; on-demand scene played its burst, despawned it and went still`,
+    );
   }
   report.passed = true;
-} catch (error) { evidence.fail(error); }
-finally { await evidence.close(browser, 'browser close'); await evidence.close(server, 'server close'); evidence.finish(); }
+} catch (error) {
+  evidence.fail(error);
+} finally {
+  await evidence.close(browser, 'browser close');
+  await evidence.close(server, 'server close');
+  evidence.finish();
+}
 console.log(`Particle emitters passed; evidence ${out}`);

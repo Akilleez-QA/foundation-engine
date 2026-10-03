@@ -7,13 +7,13 @@
  * reach the same scene with the same parameters. The shell reads the resolution in its route listener (`arrive()`) and
  * hands it to the scene's dispatch row through the ADR 0045 handover (core/router/handover.ts).
  */
-import { resolveRoute, routesOf, splitQuery, withQuery, type SceneId, type Resolved } from './resolve';
-import type { RouteTables } from './scenes';
+import {resolveRoute, routesOf, splitQuery, withQuery, type SceneId, type Resolved} from './resolve';
+import type {RouteTables} from './scenes';
 
 /** The parts of `window` the router uses (a fake stands in for it in node tests). */
 export interface RouterWindow {
-  location: { hash: string };
-  history: { replaceState(data: unknown, unused: string, url?: string | URL | null): void };
+  location: {hash: string};
+  history: {replaceState(data: unknown, unused: string, url?: string | URL | null): void};
   addEventListener(type: 'hashchange', listener: () => void): void;
 }
 
@@ -42,40 +42,65 @@ export interface HashRouter {
   listen(fn: () => void): () => void;
   /** For the route listener, once per route change: apply a rewriting redirect to the address (replaceState, keeping
    *  the query) and return the resolution. */
-  arrive(): { resolved: Resolved };
+  arrive(): {resolved: Resolved};
 }
 
 /** An explicit fallback uses that scene’s canonical route; omission retains first-route resolution. */
 export function createHashRouter(tables: RouteTables, win: RouterWindow, fallbackScene?: SceneId): HashRouter {
   const fallback = fallbackScene === undefined ? undefined : tables.scenes.get(fallbackScene).routes[0]?.hash;
-  if (fallbackScene !== undefined && fallback === undefined) throw Error(`router fallback ${fallbackScene} has no route`);
+  if (fallbackScene !== undefined && fallback === undefined)
+    throw Error(`router fallback ${fallbackScene} has no route`);
   const listeners: (() => void)[] = [];
   let attached = false;
-  const notify = () => { for (const fn of [...listeners]) fn(); };
-  const resolve = (hash = win.location.hash) => resolveRoute(hash, routesOf(tables.scenes.all()), tables.redirects.all(), fallback);
+  const notify = () => {
+    for (const fn of [...listeners]) fn();
+  };
+  const resolve = (hash = win.location.hash) =>
+    resolveRoute(hash, routesOf(tables.scenes.all()), tables.redirects.all(), fallback);
   const href = (to: SceneId, params?: Record<string, string>) => {
     const scene = tables.scenes.get(to);
     const keys = params ? Object.keys(params) : [];
     // A route whose fixed params are all given is used as is; the rest of `params` goes into the query.
-    const route = keys.length ? scene.routes.find(r => r.params && Object.keys(r.params).every(k => params![k] === r.params![k])) : undefined;
+    const route = keys.length
+      ? scene.routes.find(r => r.params && Object.keys(r.params).every(k => params![k] === r.params![k]))
+      : undefined;
     const rest = Object.fromEntries(keys.filter(k => route?.params?.[k] === undefined).map(k => [k, params![k]!])); // k is an own key of params
     return withQuery((route ?? scene.routes[0]).hash, rest);
   };
   const follow = (hash: string, o: Omit<GoOptions, 'params'> = {}) => {
-    if (o.replace) { win.history.replaceState(null, '', hash); notify(); return; }
-    if (win.location.hash === hash) { if (o.again === 'reenter') notify(); return; }
+    if (o.replace) {
+      win.history.replaceState(null, '', hash);
+      notify();
+      return;
+    }
+    if (win.location.hash === hash) {
+      if (o.again === 'reenter') notify();
+      return;
+    }
     win.location.hash = hash;
   };
   return {
     resolve,
     href,
-    go(to, o = {}) { follow(href(to, o.params), o); return Promise.resolve(); },
+    go(to, o = {}) {
+      follow(href(to, o.params), o);
+      return Promise.resolve();
+    },
     follow,
-    reenter() { notify(); return Promise.resolve(); },
+    reenter() {
+      notify();
+      return Promise.resolve();
+    },
     listen(fn) {
-      if (!attached) { attached = true; win.addEventListener('hashchange', notify); }
+      if (!attached) {
+        attached = true;
+        win.addEventListener('hashchange', notify);
+      }
       listeners.push(fn);
-      return () => { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); };
+      return () => {
+        const i = listeners.indexOf(fn);
+        if (i >= 0) listeners.splice(i, 1);
+      };
     },
     arrive() {
       const from = win.location.hash;
@@ -85,7 +110,7 @@ export function createHashRouter(tables: RouteTables, win: RouterWindow, fallbac
         const to = withQuery(resolved.hash, splitQuery(from)[1]);
         if (to !== from) win.history.replaceState(null, '', to);
       }
-      return { resolved };
+      return {resolved};
     },
   };
 }

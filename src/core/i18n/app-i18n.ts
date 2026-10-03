@@ -7,26 +7,39 @@
  * installs, before any line can be spoken, and `narrationCatalog.load()` is awaited by anything that needs a line
  * before then. Keys are typed by the generated `keys.gen.ts`: `scripts/strings.mjs` runs before `tsc`.
  */
-import { DEV } from '../env';
-import { createCatalogLoader } from './catalog-loader';
-import { createI18n, runtimeT, type TArgs } from './i18n';
-import { escapeHtml, markupString } from './html';
-import type { StringKey, StringParams } from './keys.gen';
+import {DEV} from '../env';
+import {createCatalogLoader} from './catalog-loader';
+import {createI18n, runtimeT, type TArgs} from './i18n';
+import {escapeHtml, markupString} from './html';
+import type {StringKey, StringParams} from './keys.gen';
 
 const reported = new Set<string>();
 /**
  * A composed narration key outside its family (STD-STR-4): a development build throws at the composing call site;
  * production logs each key once and carries on, and the narrator then uses the scene's own key.
  */
-export function badNarrationKeyHandler(dev: boolean, log: (message: string) => void = console.error, seen = new Set<string>()) {
+export function badNarrationKeyHandler(
+  dev: boolean,
+  log: (message: string) => void = console.error,
+  seen = new Set<string>(),
+) {
   return (error: Error, key: string) => {
     if (dev) throw error;
-    if (!seen.has(key)) { seen.add(key); log(`[narration] ${error.message} (built "${key}")`); }
+    if (!seen.has(key)) {
+      seen.add(key);
+      log(`[narration] ${error.message} (built "${key}")`);
+    }
   };
 }
 export const appI18n = createI18n<StringParams>({
-  locale: 'en', catalogs: { en: {} },
-  onMissing: key => { if (DEV && !reported.has(key)) { reported.add(key); console.error(`[i18n] Unknown string key "${key}"`); } },
+  locale: 'en',
+  catalogs: {en: {}},
+  onMissing: key => {
+    if (DEV && !reported.has(key)) {
+      reported.add(key);
+      console.error(`[i18n] Unknown string key "${key}"`);
+    }
+  },
   onBadNarrationKey: badNarrationKeyHandler(DEV),
 });
 
@@ -46,12 +59,16 @@ export const narrationCatalog = createCatalogLoader(appI18n, 'en', async () => {
 export const hasNarrationLine = (key: string): boolean => appI18n.has(`narration.${key}`);
 
 /** The narration line for a key, exactly as authored; '' when there is none (or before the catalogue loads). */
-export const narrationLine = (key: string): string => hasNarrationLine(key) ? runtimeT(appI18n, `narration.${key}`) : '';
+export const narrationLine = (key: string): string =>
+  hasNarrationLine(key) ? runtimeT(appI18n, `narration.${key}`) : '';
 
 /** A string by key, with exactly the variables its `en` text uses. */
 export const t = <K extends StringKey>(key: K, ...args: TArgs<StringParams, K>): string => appI18n.t(key, ...args);
 /** `t()` escaped for an HTML template. */
-export const h = <K extends StringKey>(key: K, ...args: TArgs<StringParams, K>): string => escapeHtml(appI18n.t(key, ...args));
+export const h = <K extends StringKey>(key: K, ...args: TArgs<StringParams, K>): string =>
+  escapeHtml(appI18n.t(key, ...args));
 /** A sentence with markup in its holes (core/i18n/html.ts `markupString`). */
-export const markup = <K extends StringKey>(key: K, holes: Readonly<Record<keyof StringParams[K] & string, string>>): string =>
-  markupString(appI18n, key, holes);
+export const markup = <K extends StringKey>(
+  key: K,
+  holes: Readonly<Record<keyof StringParams[K] & string, string>>,
+): string => markupString(appI18n, key, holes);

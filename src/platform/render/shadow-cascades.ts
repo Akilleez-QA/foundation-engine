@@ -44,23 +44,24 @@ import {appQuality} from './quality-runtime';
 import type {Quality} from './quality';
 import {stillSafe} from './change-tracker';
 
-export const CASCADES=3;
-export const CASCADE_MAP_SIZE=4096;
+export const CASCADES = 3;
+export const CASCADE_MAP_SIZE = 4096;
 /** A cascade's depth range as a multiple of its width (the shader constant ENGINE_DEPTH_PER_WIDTH). */
-export const DEPTH_PER_WIDTH=16;
+export const DEPTH_PER_WIDTH = 16;
 /** tan of the sun's apparent radius for the penumbra (1.5°: a soft sky-scattered sun; the shader's ENGINE_SUN_TAN). */
-export const SUN_TAN=Math.tan(1.5*Math.PI/180);
+export const SUN_TAN = Math.tan((1.5 * Math.PI) / 180);
 /** Each cascade is SLACK wider than its frustum slice, and its centre snaps to a grid of about SNAP of its width in
  *  whole texels (410 at 4096), less than the half-slack on each side, so the slice always stays inside. */
-export const SLACK=1.25,SNAP=.1;
+export const SLACK = 1.25,
+  SNAP = 0.1;
 /** The widest penumbra the filter searches for (m). */
-export const MAX_PENUMBRA_M=.15;
+export const MAX_PENUMBRA_M = 0.15;
 
 // --------------------------------------------------------------------------------------------------- the chunks
-const DIR_BLOCK_START='#if ( NUM_DIR_LIGHTS > 0 ) && defined( RE_Direct )\n';
-const CASCADE_GATE='defined( USE_SHADOWMAP ) && defined( SHADOWMAP_TYPE_BASIC ) && ( NUM_DIR_LIGHT_SHADOWS == 3 )';
+const DIR_BLOCK_START = '#if ( NUM_DIR_LIGHTS > 0 ) && defined( RE_Direct )\n';
+const CASCADE_GATE = 'defined( USE_SHADOWMAP ) && defined( SHADOWMAP_TYPE_BASIC ) && ( NUM_DIR_LIGHT_SHADOWS == 3 )';
 
-const PARS=/* glsl */`
+const PARS = /* glsl */ `
 #if ${CASCADE_GATE}
 	// Engine Reference shadows (platform/render/shadow-cascades.ts): PCSS over three cascades.
 	#define ENGINE_SUN_TAN ${SUN_TAN.toFixed(6)}
@@ -120,7 +121,7 @@ const PARS=/* glsl */`
 #endif
 `;
 
-const CASCADE_BRANCH=/* glsl */`
+const CASCADE_BRANCH = /* glsl */ `
 #if ( NUM_DIR_LIGHTS > 0 ) && defined( RE_Direct ) && ${CASCADE_GATE}
 	// The three shadow lights are the sun's cascades when they share one direction and colour.
 	bool engineCascaded = dot( directionalLights[ 0 ].direction, directionalLights[ 1 ].direction ) > 0.99999 && dot( directionalLights[ 0 ].direction, directionalLights[ 2 ].direction ) > 0.99999
@@ -146,158 +147,297 @@ __ORIGINAL__
 `;
 
 /** The directional-light block of three's `lights_fragment_begin`, or null when the text is not the pinned one. */
-export function directionalBlock(chunk:string):{start:number;end:number;text:string}|null{
- const start=chunk.indexOf(DIR_BLOCK_START);if(start<0||chunk.indexOf(DIR_BLOCK_START,start+1)>=0)return null;
- const loopEnd=chunk.indexOf('#pragma unroll_loop_end',start);if(loopEnd<0)return null;
- const endif=chunk.indexOf('#endif',loopEnd);if(endif<0)return null;
- const end=endif+'#endif'.length,text=chunk.slice(start,end);
- // The pinned r186 block (unchanged since r183): one unrolled loop over the directional lights with three's getShadow call.
- if(!text.includes('getShadow( directionalShadowMap[ i ]')||!text.includes('for ( int i = 0; i < NUM_DIR_LIGHTS; i ++ )'))return null;
- return {start,end,text};
+export function directionalBlock(chunk: string): {start: number; end: number; text: string} | null {
+  const start = chunk.indexOf(DIR_BLOCK_START);
+  if (start < 0 || chunk.indexOf(DIR_BLOCK_START, start + 1) >= 0) return null;
+  const loopEnd = chunk.indexOf('#pragma unroll_loop_end', start);
+  if (loopEnd < 0) return null;
+  const endif = chunk.indexOf('#endif', loopEnd);
+  if (endif < 0) return null;
+  const end = endif + '#endif'.length,
+    text = chunk.slice(start, end);
+  // The pinned r186 block (unchanged since r183): one unrolled loop over the directional lights with three's getShadow call.
+  if (
+    !text.includes('getShadow( directionalShadowMap[ i ]') ||
+    !text.includes('for ( int i = 0; i < NUM_DIR_LIGHTS; i ++ )')
+  )
+    return null;
+  return {start, end, text};
 }
 
-let patched:boolean|null=null;
+let patched: boolean | null = null;
 /** Patches the two chunks once. False (and nothing changed) when the engine's chunk text is not the pinned one. */
-export function installCascadeChunks():boolean{
- if(patched!==null)return patched;
- const lights=T.ShaderChunk.lights_fragment_begin,block=directionalBlock(lights);
- if(!block||T.ShaderChunk.shadowmap_pars_fragment.includes('engineCascadeShadow')){patched=false;return false;}
- T.ShaderChunk.lights_fragment_begin=lights.slice(0,block.start)+CASCADE_BRANCH.split('__ORIGINAL__').join(block.text)+lights.slice(block.end);
- T.ShaderChunk.shadowmap_pars_fragment=T.ShaderChunk.shadowmap_pars_fragment+PARS;
- patched=true;return true;
+export function installCascadeChunks(): boolean {
+  if (patched !== null) return patched;
+  const lights = T.ShaderChunk.lights_fragment_begin,
+    block = directionalBlock(lights);
+  if (!block || T.ShaderChunk.shadowmap_pars_fragment.includes('engineCascadeShadow')) {
+    patched = false;
+    return false;
+  }
+  T.ShaderChunk.lights_fragment_begin =
+    lights.slice(0, block.start) + CASCADE_BRANCH.split('__ORIGINAL__').join(block.text) + lights.slice(block.end);
+  T.ShaderChunk.shadowmap_pars_fragment = T.ShaderChunk.shadowmap_pars_fragment + PARS;
+  patched = true;
+  return true;
 }
 
 // ---------------------------------------------------------------------------------------------------- the rig
 /** The addon with its global chunk injection turned off (the chunks above are gated, not replaced) and a per-cascade
  *  light margin proportional to the cascade's width. */
-class SunCascades extends CSM{
- _injectInclude(){}
- override update(){
-  const camera=this.camera,dir=this.lightDirection;
-  orientation.lookAt(origin,dir,up);inverse.copy(orientation).invert();
-  // CSM keeps one light per frustum (i < frustums.length), and each frustum has 4 near and 4 far vertices (j < 4).
-  for(let i=0;i<this.frustums.length;i++){
-   const light=this.lights[i]!,cam=light.shadow.camera,width=cam.right-cam.left,step=Math.round(SNAP*this.shadowMapSize)*width/this.shadowMapSize;
-   cameraToLight.multiplyMatrices(inverse,camera.matrixWorld);this.frustums[i]!.toSpace(cameraToLight,lightFrustum);
-   box.makeEmpty();for(let j=0;j<4;j++){box.expandByPoint(lightFrustum.vertices.near[j]!);box.expandByPoint(lightFrustum.vertices.far[j]!);}
-   box.getCenter(center);
-   // Half the depth range lies sunward of the slice. The centre snaps to a grid of a tenth of the cascade's width (a
-   // whole number of texels) in all three axes; the cascade is `SLACK` wider than its slice, so the slice stays
-   // inside it and a camera that drifts or settles by less than a grid step moves no cascade and redraws none.
-   center.z=Math.ceil(box.max.z/step)*step+width*DEPTH_PER_WIDTH/2;center.x=Math.round(center.x/step)*step;center.y=Math.round(center.y/step)*step;
-   center.applyMatrix4(orientation);
-   light.position.copy(center);light.target.position.copy(center).add(dir);
-   if(cam.near!==0||cam.far!==width*DEPTH_PER_WIDTH){cam.near=0;cam.far=width*DEPTH_PER_WIDTH;cam.updateProjectionMatrix();}
+class SunCascades extends CSM {
+  _injectInclude() {}
+  override update() {
+    const camera = this.camera,
+      dir = this.lightDirection;
+    orientation.lookAt(origin, dir, up);
+    inverse.copy(orientation).invert();
+    // CSM keeps one light per frustum (i < frustums.length), and each frustum has 4 near and 4 far vertices (j < 4).
+    for (let i = 0; i < this.frustums.length; i++) {
+      const light = this.lights[i]!,
+        cam = light.shadow.camera,
+        width = cam.right - cam.left,
+        step = (Math.round(SNAP * this.shadowMapSize) * width) / this.shadowMapSize;
+      cameraToLight.multiplyMatrices(inverse, camera.matrixWorld);
+      this.frustums[i]!.toSpace(cameraToLight, lightFrustum);
+      box.makeEmpty();
+      for (let j = 0; j < 4; j++) {
+        box.expandByPoint(lightFrustum.vertices.near[j]!);
+        box.expandByPoint(lightFrustum.vertices.far[j]!);
+      }
+      box.getCenter(center);
+      // Half the depth range lies sunward of the slice. The centre snaps to a grid of a tenth of the cascade's width (a
+      // whole number of texels) in all three axes; the cascade is `SLACK` wider than its slice, so the slice stays
+      // inside it and a camera that drifts or settles by less than a grid step moves no cascade and redraws none.
+      center.z = Math.ceil(box.max.z / step) * step + (width * DEPTH_PER_WIDTH) / 2;
+      center.x = Math.round(center.x / step) * step;
+      center.y = Math.round(center.y / step) * step;
+      center.applyMatrix4(orientation);
+      light.position.copy(center);
+      light.target.position.copy(center).add(dir);
+      if (cam.near !== 0 || cam.far !== width * DEPTH_PER_WIDTH) {
+        cam.near = 0;
+        cam.far = width * DEPTH_PER_WIDTH;
+        cam.updateProjectionMatrix();
+      }
+    }
   }
- }
 }
-const origin=new T.Vector3(),up=new T.Vector3(0,1,0),center=new T.Vector3(),box=new T.Box3(),orientation=new T.Matrix4(),inverse=new T.Matrix4(),cameraToLight=new T.Matrix4();
-const lightFrustum=new CSMFrustum({webGL:true});
+const origin = new T.Vector3(),
+  up = new T.Vector3(0, 1, 0),
+  center = new T.Vector3(),
+  box = new T.Box3(),
+  orientation = new T.Matrix4(),
+  inverse = new T.Matrix4(),
+  cameraToLight = new T.Matrix4();
+const lightFrustum = new CSMFrustum({webGL: true});
 
 /** What the rig needs from the renderer's shadow scheduler (`shadows.ts`, which loads this module on demand). */
-export interface CascadeScheduler{invalidate(scene?:T.Object3D):void;apart(scene:T.Object3D,lights:readonly T.Light[]):void}
-export interface CascadeOptions{
- /** The renderer's shadow scheduler; the caller has checked that the renderer is leased for the Reference technique. */
- scheduler:CascadeScheduler;
- quality?:Pick<Quality,'knob'>;
- /** How far from the camera cascades reach (m). Default: the diagonal of the sun's authored shadow box. */
- maxFar?:number;
+export interface CascadeScheduler {
+  invalidate(scene?: T.Object3D): void;
+  apart(scene: T.Object3D, lights: readonly T.Light[]): void;
 }
-export interface CascadeRig{
- /** True while the cascades stand in for the sun. */
- readonly active:boolean;
- readonly lights:readonly T.DirectionalLight[];
- dispose():void;
+export interface CascadeOptions {
+  /** The renderer's shadow scheduler; the caller has checked that the renderer is leased for the Reference technique. */
+  scheduler: CascadeScheduler;
+  quality?: Pick<Quality, 'knob'>;
+  /** How far from the camera cascades reach (m). Default: the diagonal of the sun's authored shadow box. */
+  maxFar?: number;
+}
+export interface CascadeRig {
+  /** True while the cascades stand in for the sun. */
+  readonly active: boolean;
+  readonly lights: readonly T.DirectionalLight[];
+  dispose(): void;
 }
 
 /** Cascades for `sun` in `scene` while `shadows.quality` is `ultra`; null when the chunks could not be patched. Called
  *  through `referenceShadows` (shadows.ts) for a renderer leased for the Reference technique. */
-export function cascadeShadows(renderer:T.WebGLRenderer,scene:T.Scene,sun:T.DirectionalLight,o:CascadeOptions):CascadeRig|null{
- if(!installCascadeChunks())return null;
- const quality=o.quality??appQuality(),scheduler=o.scheduler;
- // The sun's authored shadow box and biases, read when the cascades are fitted (a scene may set them after the rig).
- const authored=()=>{
-  const b=sun.shadow.camera,width=b.right-b.left;
-  return {maxFar:o.maxFar??Math.hypot(width,b.top-b.bottom),bias:sun.shadow.bias*(b.far-b.near),normalTexels:sun.shadow.normalBias/(width/Math.max(1,sun.shadow.mapSize.x))};
- };
- let authoredType=renderer.shadowMap.type;
- let csm:SunCascades|null=null,active=false,disposed=false,lastCamera:T.Camera|null=null;
- const projection=new T.Matrix4();
- const ours=new WeakSet<T.WebGLRenderTarget>();
- const dir=new T.Vector3(),at=new T.Vector3();
+export function cascadeShadows(
+  renderer: T.WebGLRenderer,
+  scene: T.Scene,
+  sun: T.DirectionalLight,
+  o: CascadeOptions,
+): CascadeRig | null {
+  if (!installCascadeChunks()) return null;
+  const quality = o.quality ?? appQuality(),
+    scheduler = o.scheduler;
+  // The sun's authored shadow box and biases, read when the cascades are fitted (a scene may set them after the rig).
+  const authored = () => {
+    const b = sun.shadow.camera,
+      width = b.right - b.left;
+    return {
+      maxFar: o.maxFar ?? Math.hypot(width, b.top - b.bottom),
+      bias: sun.shadow.bias * (b.far - b.near),
+      normalTexels: sun.shadow.normalBias / (width / Math.max(1, sun.shadow.mapSize.x)),
+    };
+  };
+  let authoredType = renderer.shadowMap.type;
+  let csm: SunCascades | null = null,
+    active = false,
+    disposed = false,
+    lastCamera: T.Camera | null = null;
+  const projection = new T.Matrix4();
+  const ours = new WeakSet<T.WebGLRenderTarget>();
+  const dir = new T.Vector3(),
+    at = new T.Vector3();
 
- const build=(camera:T.Camera)=>{
-  const c=new SunCascades({camera,parent:scene,cascades:CASCADES,maxFar:authored().maxFar,mode:'practical',shadowMapSize:CASCADE_MAP_SIZE,lightDirection:new T.Vector3(0,-1,0),lightIntensity:sun.intensity,lightNear:0,lightFar:1,lightMargin:0});
-  c.lights.forEach((l,i)=>{markReferenceShadowLight(l);l.name=`${sun.name||'sun'} cascade ${i}`;l.visible=false;l.target.name=l.name+' target';});
-  return c;
- };
- /** A cascade's own map: 32-bit depth sampled raw (Basic), and the smallest colour attachment three accepts. */
- const map=(light:T.DirectionalLight)=>{
-  const rt=new T.WebGLRenderTarget(CASCADE_MAP_SIZE,CASCADE_MAP_SIZE,{format:T.RedFormat,type:T.UnsignedByteType,generateMipmaps:false});
-  rt.texture.name=light.name+'.shadowColour';
-  const depth=new T.DepthTexture(CASCADE_MAP_SIZE,CASCADE_MAP_SIZE,T.UnsignedIntType);depth.format=T.DepthFormat;depth.compareFunction=null;depth.minFilter=depth.magFilter=T.NearestFilter;depth.name=light.name+'.shadowMap';
-  rt.depthTexture=depth;ours.add(rt);return rt;
- };
- const release=(light:T.DirectionalLight)=>{const m=light.shadow.map;if(!m)return;m.depthTexture?.dispose();m.dispose();light.shadow.map=null;};
+  const build = (camera: T.Camera) => {
+    const c = new SunCascades({
+      camera,
+      parent: scene,
+      cascades: CASCADES,
+      maxFar: authored().maxFar,
+      mode: 'practical',
+      shadowMapSize: CASCADE_MAP_SIZE,
+      lightDirection: new T.Vector3(0, -1, 0),
+      lightIntensity: sun.intensity,
+      lightNear: 0,
+      lightFar: 1,
+      lightMargin: 0,
+    });
+    c.lights.forEach((l, i) => {
+      markReferenceShadowLight(l);
+      l.name = `${sun.name || 'sun'} cascade ${i}`;
+      l.visible = false;
+      l.target.name = l.name + ' target';
+    });
+    return c;
+  };
+  /** A cascade's own map: 32-bit depth sampled raw (Basic), and the smallest colour attachment three accepts. */
+  const map = (light: T.DirectionalLight) => {
+    const rt = new T.WebGLRenderTarget(CASCADE_MAP_SIZE, CASCADE_MAP_SIZE, {
+      format: T.RedFormat,
+      type: T.UnsignedByteType,
+      generateMipmaps: false,
+    });
+    rt.texture.name = light.name + '.shadowColour';
+    const depth = new T.DepthTexture(CASCADE_MAP_SIZE, CASCADE_MAP_SIZE, T.UnsignedIntType);
+    depth.format = T.DepthFormat;
+    depth.compareFunction = null;
+    depth.minFilter = depth.magFilter = T.NearestFilter;
+    depth.name = light.name + '.shadowMap';
+    rt.depthTexture = depth;
+    ours.add(rt);
+    return rt;
+  };
+  const release = (light: T.DirectionalLight) => {
+    const m = light.shadow.map;
+    if (!m) return;
+    m.depthTexture?.dispose();
+    m.dispose();
+    light.shadow.map = null;
+  };
 
- const activate=(camera:T.Camera)=>{
-  csm??=build(camera);authoredType=renderer.shadowMap.type;
-  sun.visible=false;release(sun);
-  for(const l of csm.lights)l.visible=true;
-  renderer.shadowMap.type=T.BasicShadowMap;active=true;lastCamera=null;scheduler.apart(scene,csm.lights);scheduler.invalidate(scene);
- };
- const deactivate=()=>{
-  if(!active)return;active=false;
-  sun.visible=true;renderer.shadowMap.type=authoredType;
-  if(csm)for(const l of csm.lights){l.visible=false;release(l);}
-  scheduler.apart(scene,[]);scheduler.invalidate(scene);
- };
+  const activate = (camera: T.Camera) => {
+    csm ??= build(camera);
+    authoredType = renderer.shadowMap.type;
+    sun.visible = false;
+    release(sun);
+    for (const l of csm.lights) l.visible = true;
+    renderer.shadowMap.type = T.BasicShadowMap;
+    active = true;
+    lastCamera = null;
+    scheduler.apart(scene, csm.lights);
+    scheduler.invalidate(scene);
+  };
+  const deactivate = () => {
+    if (!active) return;
+    active = false;
+    sun.visible = true;
+    renderer.shadowMap.type = authoredType;
+    if (csm)
+      for (const l of csm.lights) {
+        l.visible = false;
+        release(l);
+      }
+    scheduler.apart(scene, []);
+    scheduler.invalidate(scene);
+  };
 
- const step=(camera:T.Camera)=>{
-  const want=!disposed&&quality.knob('shadows.quality')==='ultra'&&sun.castShadow;
-  if(!want){deactivate();return;}
-  if(!active)activate(camera);
-  const c=csm!;
-  // Refit when the viewing camera or its projection changes (a resize, the overhead/eye switch).
-  if(camera!==lastCamera||!projection.equals(camera.projectionMatrix)){
-   const a=authored();
-   lastCamera=camera;projection.copy(camera.projectionMatrix);c.camera=camera;c.maxFar=Math.min(a.maxFar,(camera as T.PerspectiveCamera).far??a.maxFar);c.updateFrustums();
-   // Widen every cascade by the slack the snapping grid needs (the addon fits each to its slice exactly), rounded up
-   // to one of eight sizes per octave: a zoom or field-of-view easing that changes the slice a little keeps the size.
-   for(const l of c.lights){const k=l.shadow.camera,h=2**(Math.ceil(Math.log2((k.right-k.left)*SLACK)*8)/8)/2;k.left=k.bottom=-h;k.right=k.top=h;k.updateProjectionMatrix();}
-   for(const l of c.lights){
-    const width=l.shadow.camera.right-l.shadow.camera.left,texel=width/CASCADE_MAP_SIZE,range=width*DEPTH_PER_WIDTH;
-    // The authored world-space biases, carried to each cascade's texel size and depth range.
-    l.shadow.normalBias=Math.max(1,a.normalTexels*.6)*texel;l.shadow.bias=Math.min(a.bias,-1.5*texel)/range;
-    l.shadow.radius=width;l.shadow.intensity=sun.shadow.intensity;l.shadow.mapSize.set(CASCADE_MAP_SIZE,CASCADE_MAP_SIZE);
-   }
-  }
-  sun.getWorldPosition(dir);sun.target.getWorldPosition(at);c.lightDirection.copy(at).sub(dir).normalize();
-  c.update();
-  for(const l of c.lights){
-   l.color.copy(sun.color);l.intensity=sun.intensity;l.castShadow=true;
-   l.updateMatrixWorld();l.target.updateMatrixWorld();
-   if(!l.shadow.map||!ours.has(l.shadow.map as T.WebGLRenderTarget)){release(l);l.shadow.map=map(l);scheduler.invalidate(scene);}
-  }
- };
+  const step = (camera: T.Camera) => {
+    const want = !disposed && quality.knob('shadows.quality') === 'ultra' && sun.castShadow;
+    if (!want) {
+      deactivate();
+      return;
+    }
+    if (!active) activate(camera);
+    const c = csm!;
+    // Refit when the viewing camera or its projection changes (a resize, the overhead/eye switch).
+    if (camera !== lastCamera || !projection.equals(camera.projectionMatrix)) {
+      const a = authored();
+      lastCamera = camera;
+      projection.copy(camera.projectionMatrix);
+      c.camera = camera;
+      c.maxFar = Math.min(a.maxFar, (camera as T.PerspectiveCamera).far ?? a.maxFar);
+      c.updateFrustums();
+      // Widen every cascade by the slack the snapping grid needs (the addon fits each to its slice exactly), rounded up
+      // to one of eight sizes per octave: a zoom or field-of-view easing that changes the slice a little keeps the size.
+      for (const l of c.lights) {
+        const k = l.shadow.camera,
+          h = 2 ** (Math.ceil(Math.log2((k.right - k.left) * SLACK) * 8) / 8) / 2;
+        k.left = k.bottom = -h;
+        k.right = k.top = h;
+        k.updateProjectionMatrix();
+      }
+      for (const l of c.lights) {
+        const width = l.shadow.camera.right - l.shadow.camera.left,
+          texel = width / CASCADE_MAP_SIZE,
+          range = width * DEPTH_PER_WIDTH;
+        // The authored world-space biases, carried to each cascade's texel size and depth range.
+        l.shadow.normalBias = Math.max(1, a.normalTexels * 0.6) * texel;
+        l.shadow.bias = Math.min(a.bias, -1.5 * texel) / range;
+        l.shadow.radius = width;
+        l.shadow.intensity = sun.shadow.intensity;
+        l.shadow.mapSize.set(CASCADE_MAP_SIZE, CASCADE_MAP_SIZE);
+      }
+    }
+    sun.getWorldPosition(dir);
+    sun.target.getWorldPosition(at);
+    c.lightDirection.copy(at).sub(dir).normalize();
+    c.update();
+    for (const l of c.lights) {
+      l.color.copy(sun.color);
+      l.intensity = sun.intensity;
+      l.castShadow = true;
+      l.updateMatrixWorld();
+      l.target.updateMatrixWorld();
+      if (!l.shadow.map || !ours.has(l.shadow.map as T.WebGLRenderTarget)) {
+        release(l);
+        l.shadow.map = map(l);
+        scheduler.invalidate(scene);
+      }
+    }
+  };
 
- const previous=scene.onBeforeRender;
- const hook=function(this:T.Scene,...args:Parameters<T.Scene['onBeforeRender']>){
-  if(args[0]===renderer)step(args[2]);
-  previous.apply(this,args);
- };
- // The cascades follow the camera and the sun, which the colour tracker reads: the hook adds no hidden input. A hook
- // that was already there keeps forcing if it did.
- if(previous===T.Object3D.prototype.onBeforeRender||(previous as {stillSafe?:boolean}).stillSafe)stillSafe(hook);
- scene.onBeforeRender=hook;
+  const previous = scene.onBeforeRender;
+  const hook = function (this: T.Scene, ...args: Parameters<T.Scene['onBeforeRender']>) {
+    if (args[0] === renderer) step(args[2]);
+    previous.apply(this, args);
+  };
+  // The cascades follow the camera and the sun, which the colour tracker reads: the hook adds no hidden input. A hook
+  // that was already there keeps forcing if it did.
+  if (previous === T.Object3D.prototype.onBeforeRender || (previous as {stillSafe?: boolean}).stillSafe)
+    stillSafe(hook);
+  scene.onBeforeRender = hook;
 
- return {
-  get active(){return active;},
-  get lights(){return csm?.lights??[];},
-  dispose(){
-   if(disposed)return;disposed=true;deactivate();
-   if(scene.onBeforeRender===hook)scene.onBeforeRender=previous;
-   if(csm){for(const l of csm.lights)release(l);csm.remove();csm=null;}
-  },
- };
+  return {
+    get active() {
+      return active;
+    },
+    get lights() {
+      return csm?.lights ?? [];
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      deactivate();
+      if (scene.onBeforeRender === hook) scene.onBeforeRender = previous;
+      if (csm) {
+        for (const l of csm.lights) release(l);
+        csm.remove();
+        csm = null;
+      }
+    },
+  };
 }

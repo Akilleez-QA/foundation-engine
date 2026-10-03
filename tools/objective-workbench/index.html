@@ -1,6 +1,150 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Foundation · Objective workbench</title><link rel="icon" href="data:,"></head><body><main id="app" class="app-root"><header id="summary"><div><strong>Objective workbench</strong><p id="compact-status">Preparing scene…</p></div><button id="open">Open workbench</button></header><aside id="legend">Accepted consequence units · one block per unit</aside></main>
-<template id="details-template"><section id="details" role="dialog" aria-modal="true" aria-labelledby="title"><header><h1 id="title">Authored graph and adopted runs</h1><button id="close">Close</button></header><div class="sheet-scroll" tabindex="0" role="region" aria-label="Objective editing and runtime controls"><p id="revisions"></p><div class="tabs"><button id="tab-editor">Graph editor</button><button id="tab-runtime">Adopted runtime</button></div>
-<section id="editor-pane"><p>Edit the authored graph, test it in an isolated preview, then commit it. Live runs change only through explicit adoption.</p><div class="columns"><section><svg id="graph" viewBox="0 0 620 360" role="img" aria-label="Authored objective graph"></svg><p id="graph-summary"></p><div class="buttons"><button id="preview-graph">Validate and preview edits</button><button id="commit-graph">Commit graph</button><button id="cancel-graph">Discard edits</button><button id="undo">Undo graph</button><button id="redo">Redo graph</button><button id="save-graph">Save graph</button></div><p id="editor-message" role="status"></p><h2>Isolated preview</h2><p id="preview-status"></p><label>Preview event <input id="preview-event" value="work"></label><div class="buttons"><button id="start-preview">Restart isolated preview</button><button id="preview-emit">Deliver preview event</button><button id="preview-late">Deliver retained preview callback</button></div><label>Preview choice <select id="preview-choice"></select></label><button id="preview-choose">Choose in isolated preview</button></section>
-<section><h2>Authored fields</h2><label>Stage <select id="stage"></select></label><label>Stage ID <input id="stage-id"></label><div class="buttons"><button id="add-stage">Add stage</button><button id="remove-stage">Remove stage</button></div><label>Requirement event <input id="requirement-event"></label><label>Required count <input id="requirement-count" type="number" min="1" max="64"></label><label>Choice <select id="choice"></select></label><label>Choice ID <input id="choice-id"></label><label>Next stage (empty is terminal) <input id="edge-target" list="stage-ids"></label><datalist id="stage-ids"></datalist><label>Terminal outcome units <input id="outcome-units" type="number" min="0" max="8"></label><label>Terminal capability label <input id="outcome-capability"></label><button id="apply-fields">Apply fields to draft</button><p id="draft-status"></p></section></div></section>
-<section id="runtime-pane" hidden><p>Each adoption pins its own graph. Cancel one consumer without stopping the other. Captured callbacks retain their original lifetime authority.</p><p id="work-status"></p><div id="runs"></div><div class="columns"><section><h2>Related work</h2><label>Runtime event <input id="runtime-event" value="work"></label><div class="buttons"><button id="acquire-left">Acquire left work</button><button id="acquire-right">Acquire right work</button><button id="release-left">Release left work</button><button id="release-right">Release right work</button><button id="emit-work">Emit shared event</button><button id="reset-work">Reset completed work generation</button><button id="reconcile-work">Reconcile retained fact</button><button id="late-work">Deliver retained callback</button></div><label>Consumer <select id="consumer"><option>left</option><option>right</option></select></label><label>Runtime choice <select id="runtime-choice"></select></label><div class="buttons"><button id="choose-runtime">Prepare choice</button><button id="cancel-run">Prepare cancel consumer</button><button id="free">Prepare reward capacity</button></div></section><section><h2>Explicit adoption and publication</h2><button id="adopt">Prepare fresh adoption of committed graph</button><p id="runtime-candidate"></p><div class="buttons"><button id="commit-runtime">Attempt runtime publication</button><button id="cancel-runtime">Discard unattempted candidate</button><button id="retry-runtime">Retry exact pending candidate</button><button id="ack-runtime">Acknowledge durable candidate</button></div><p id="consequences"></p></section></div></section>
-<section><h2>Persistence</h2><label><input id="fail-storage" type="checkbox">Refuse runtime writes (persists across reload)</label><p id="persistence"></p><button id="reload">Reload saved sections</button><p>Graph and runtime are independent save sections; there is no atomic cross-section promise. Desktop keyboard and pointer only.</p></section><p id="message" role="status" aria-live="polite"></p></div></section></template><script type="module" src="./entry.mjs"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Foundation · Objective workbench</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <main id="app" class="app-root">
+      <header id="summary">
+        <div>
+          <strong>Objective workbench</strong>
+          <p id="compact-status">Preparing scene…</p>
+        </div>
+        <button id="open">Open workbench</button>
+      </header>
+      <aside id="legend">Accepted consequence units · one block per unit</aside>
+    </main>
+    <template id="details-template"
+      ><section id="details" role="dialog" aria-modal="true" aria-labelledby="title">
+        <header>
+          <h1 id="title">Authored graph and adopted runs</h1>
+          <button id="close">Close</button>
+        </header>
+        <div class="sheet-scroll" tabindex="0" role="region" aria-label="Objective editing and runtime controls">
+          <p id="revisions"></p>
+          <div class="tabs">
+            <button id="tab-editor">Graph editor</button><button id="tab-runtime">Adopted runtime</button>
+          </div>
+          <section id="editor-pane">
+            <p>
+              Edit the authored graph, test it in an isolated preview, then commit it. Live runs change only through
+              explicit adoption.
+            </p>
+            <div class="columns">
+              <section>
+                <svg id="graph" viewBox="0 0 620 360" role="img" aria-label="Authored objective graph"></svg>
+                <p id="graph-summary"></p>
+                <div class="buttons">
+                  <button id="preview-graph">Validate and preview edits</button
+                  ><button id="commit-graph">Commit graph</button><button id="cancel-graph">Discard edits</button
+                  ><button id="undo">Undo graph</button><button id="redo">Redo graph</button
+                  ><button id="save-graph">Save graph</button>
+                </div>
+                <p id="editor-message" role="status"></p>
+                <h2>Isolated preview</h2>
+                <p id="preview-status"></p>
+                <label>Preview event <input id="preview-event" value="work" /></label>
+                <div class="buttons">
+                  <button id="start-preview">Restart isolated preview</button
+                  ><button id="preview-emit">Deliver preview event</button
+                  ><button id="preview-late">Deliver retained preview callback</button>
+                </div>
+                <label
+                  >Preview choice
+                  <select id="preview-choice"></select></label
+                ><button id="preview-choose">Choose in isolated preview</button>
+              </section>
+              <section>
+                <h2>Authored fields</h2>
+                <label
+                  >Stage
+                  <select id="stage"></select></label
+                ><label>Stage ID <input id="stage-id" /></label>
+                <div class="buttons">
+                  <button id="add-stage">Add stage</button><button id="remove-stage">Remove stage</button>
+                </div>
+                <label>Requirement event <input id="requirement-event" /></label
+                ><label>Required count <input id="requirement-count" type="number" min="1" max="64" /></label
+                ><label
+                  >Choice
+                  <select id="choice"></select></label
+                ><label>Choice ID <input id="choice-id" /></label
+                ><label>Next stage (empty is terminal) <input id="edge-target" list="stage-ids" /></label
+                ><datalist id="stage-ids"></datalist
+                ><label>Terminal outcome units <input id="outcome-units" type="number" min="0" max="8" /></label
+                ><label>Terminal capability label <input id="outcome-capability" /></label
+                ><button id="apply-fields">Apply fields to draft</button>
+                <p id="draft-status"></p>
+              </section>
+            </div>
+          </section>
+          <section id="runtime-pane" hidden>
+            <p>
+              Each adoption pins its own graph. Cancel one consumer without stopping the other. Captured callbacks
+              retain their original lifetime authority.
+            </p>
+            <p id="work-status"></p>
+            <div id="runs"></div>
+            <div class="columns">
+              <section>
+                <h2>Related work</h2>
+                <label>Runtime event <input id="runtime-event" value="work" /></label>
+                <div class="buttons">
+                  <button id="acquire-left">Acquire left work</button
+                  ><button id="acquire-right">Acquire right work</button
+                  ><button id="release-left">Release left work</button
+                  ><button id="release-right">Release right work</button
+                  ><button id="emit-work">Emit shared event</button
+                  ><button id="reset-work">Reset completed work generation</button
+                  ><button id="reconcile-work">Reconcile retained fact</button
+                  ><button id="late-work">Deliver retained callback</button>
+                </div>
+                <label
+                  >Consumer
+                  <select id="consumer">
+                    <option>left</option>
+                    <option>right</option>
+                  </select></label
+                ><label
+                  >Runtime choice
+                  <select id="runtime-choice"></select
+                ></label>
+                <div class="buttons">
+                  <button id="choose-runtime">Prepare choice</button
+                  ><button id="cancel-run">Prepare cancel consumer</button
+                  ><button id="free">Prepare reward capacity</button>
+                </div>
+              </section>
+              <section>
+                <h2>Explicit adoption and publication</h2>
+                <button id="adopt">Prepare fresh adoption of committed graph</button>
+                <p id="runtime-candidate"></p>
+                <div class="buttons">
+                  <button id="commit-runtime">Attempt runtime publication</button
+                  ><button id="cancel-runtime">Discard unattempted candidate</button
+                  ><button id="retry-runtime">Retry exact pending candidate</button
+                  ><button id="ack-runtime">Acknowledge durable candidate</button>
+                </div>
+                <p id="consequences"></p>
+              </section>
+            </div>
+          </section>
+          <section>
+            <h2>Persistence</h2>
+            <label><input id="fail-storage" type="checkbox" />Refuse runtime writes (persists across reload)</label>
+            <p id="persistence"></p>
+            <button id="reload">Reload saved sections</button>
+            <p>
+              Graph and runtime are independent save sections; there is no atomic cross-section promise. Desktop
+              keyboard and pointer only.
+            </p>
+          </section>
+          <p id="message" role="status" aria-live="polite"></p>
+        </div></section
+    ></template>
+    <script type="module" src="./entry.mjs"></script>
+  </body>
+</html>

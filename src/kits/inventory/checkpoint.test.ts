@@ -1,12 +1,79 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {createCheckpointInventory} from './checkpoint';
-const options={capacities:{bag:10},maxOperations:3,maxMaterials:4};const batch={id:'ore',material:'ore',properties:{quality:5}};const deposit={kind:'exchange' as const,id:'deposit',consume:[],produce:[{container:'bag',batch,quantity:2}]};
-test('checkpoints bound history across long sessions and reject all prior-epoch replay',()=>{const l=createCheckpointInventory(options);for(let i=0;i<200;i++){const epoch=l.epoch;assert.equal(l.apply(epoch,deposit).ok,true);assert.equal(l.apply(epoch,{kind:'exchange',id:'use',consume:[{container:'bag',batchId:'ore',quantity:2}],produce:[]}).ok,true);l.checkpoint();assert.deepEqual(l.apply(epoch,deposit),{ok:false,reason:'stale-epoch'});assert.equal(l.snapshot().operations.length,0);assert.ok(l.snapshot().base.operations.length<=1);}assert.equal(l.quantity('bag','ore'),0);assert.deepEqual(createCheckpointInventory(options,l.snapshot()).snapshot(),l.snapshot());});
-test('active reservations and immutable material facts survive checkpoint and reload',()=>{let l=createCheckpointInventory(options);l.apply(0,deposit);l.apply(0,{kind:'reserve',id:'r',consume:[{container:'bag',batchId:'ore',quantity:1}]});l.checkpoint();l=createCheckpointInventory(options,l.snapshot());assert.equal(l.available('bag','ore'),1);assert.equal(l.apply(1,{kind:'commit',id:'consume',reservationId:'r',produce:[]}).ok,true);assert.equal(l.quantity('bag','ore'),1);assert.equal(l.apply(1,{...deposit,id:'changed',produce:[{container:'bag',batch:{...batch,properties:{quality:9}},quantity:1}]}).ok,false);});
-test('admission requests a checkpoint instead of silently dropping dedup IDs',()=>{const l=createCheckpointInventory({...options,maxOperations:1});l.apply(0,deposit);assert.deepEqual(l.apply(0,deposit),{ok:true,duplicate:true});assert.deepEqual(l.apply(0,{...deposit,id:'two'}),{ok:false,reason:'checkpoint-required'});});
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {createCheckpointInventory} from './checkpoint';
+const options = {capacities: {bag: 10}, maxOperations: 3, maxMaterials: 4};
+const batch = {id: 'ore', material: 'ore', properties: {quality: 5}};
+const deposit = {
+  kind: 'exchange' as const,
+  id: 'deposit',
+  consume: [],
+  produce: [{container: 'bag', batch, quantity: 2}],
+};
+test('checkpoints bound history across long sessions and reject all prior-epoch replay', () => {
+  const l = createCheckpointInventory(options);
+  for (let i = 0; i < 200; i++) {
+    const epoch = l.epoch;
+    assert.equal(l.apply(epoch, deposit).ok, true);
+    assert.equal(
+      l.apply(epoch, {
+        kind: 'exchange',
+        id: 'use',
+        consume: [{container: 'bag', batchId: 'ore', quantity: 2}],
+        produce: [],
+      }).ok,
+      true,
+    );
+    l.checkpoint();
+    assert.deepEqual(l.apply(epoch, deposit), {ok: false, reason: 'stale-epoch'});
+    assert.equal(l.snapshot().operations.length, 0);
+    assert.ok(l.snapshot().base.operations.length <= 1);
+  }
+  assert.equal(l.quantity('bag', 'ore'), 0);
+  assert.deepEqual(createCheckpointInventory(options, l.snapshot()).snapshot(), l.snapshot());
+});
+test('active reservations and immutable material facts survive checkpoint and reload', () => {
+  let l = createCheckpointInventory(options);
+  l.apply(0, deposit);
+  l.apply(0, {kind: 'reserve', id: 'r', consume: [{container: 'bag', batchId: 'ore', quantity: 1}]});
+  l.checkpoint();
+  l = createCheckpointInventory(options, l.snapshot());
+  assert.equal(l.available('bag', 'ore'), 1);
+  assert.equal(l.apply(1, {kind: 'commit', id: 'consume', reservationId: 'r', produce: []}).ok, true);
+  assert.equal(l.quantity('bag', 'ore'), 1);
+  assert.equal(
+    l.apply(1, {
+      ...deposit,
+      id: 'changed',
+      produce: [{container: 'bag', batch: {...batch, properties: {quality: 9}}, quantity: 1}],
+    }).ok,
+    false,
+  );
+});
+test('admission requests a checkpoint instead of silently dropping dedup IDs', () => {
+  const l = createCheckpointInventory({...options, maxOperations: 1});
+  l.apply(0, deposit);
+  assert.deepEqual(l.apply(0, deposit), {ok: true, duplicate: true});
+  assert.deepEqual(l.apply(0, {...deposit, id: 'two'}), {ok: false, reason: 'checkpoint-required'});
+});
 
-test('checkpoint retries use canonical operation fields and sorted material properties',()=>{
- const l=createCheckpointInventory(options);const op={...deposit,produce:[{container:'bag',batch:{...batch,properties:{quality:5,density:2}},quantity:2}]};
- assert.equal(l.apply(0,op).ok,true);
- assert.deepEqual(l.apply(0,{produce:[{quantity:2,batch:{properties:{density:2,quality:5},material:'ore',id:'ore'},container:'bag'}],consume:[],id:'deposit',kind:'exchange'}),{ok:true,duplicate:true});
- const restored=createCheckpointInventory(options,l.snapshot());assert.deepEqual(restored.apply(0,op),{ok:true,duplicate:true});
+test('checkpoint retries use canonical operation fields and sorted material properties', () => {
+  const l = createCheckpointInventory(options);
+  const op = {
+    ...deposit,
+    produce: [{container: 'bag', batch: {...batch, properties: {quality: 5, density: 2}}, quantity: 2}],
+  };
+  assert.equal(l.apply(0, op).ok, true);
+  assert.deepEqual(
+    l.apply(0, {
+      produce: [
+        {quantity: 2, batch: {properties: {density: 2, quality: 5}, material: 'ore', id: 'ore'}, container: 'bag'},
+      ],
+      consume: [],
+      id: 'deposit',
+      kind: 'exchange',
+    }),
+    {ok: true, duplicate: true},
+  );
+  const restored = createCheckpointInventory(options, l.snapshot());
+  assert.deepEqual(restored.apply(0, op), {ok: true, duplicate: true});
 });

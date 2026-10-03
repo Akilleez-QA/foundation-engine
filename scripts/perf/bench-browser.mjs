@@ -25,26 +25,45 @@ export const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /** Installed Chrome/Chromium executables per OS, in preference order (real binaries before launcher scripts). */
 export function systemChromiums(platform = process.platform, env = process.env) {
-  if (platform === 'darwin') return [
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    '/Applications/Chromium.app/Contents/MacOS/Chromium',
-    ...(env.HOME ? [`${env.HOME}/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`, `${env.HOME}/Applications/Chromium.app/Contents/MacOS/Chromium`] : []),
-  ];
-  if (platform === 'win32') return [env.PROGRAMFILES, env['PROGRAMFILES(X86)'], env.LOCALAPPDATA].filter(Boolean)
-    .flatMap(base => [`${base}\\Google\\Chrome\\Application\\chrome.exe`, `${base}\\Chromium\\Application\\chrome.exe`]);
+  if (platform === 'darwin')
+    return [
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium',
+      ...(env.HOME
+        ? [
+            `${env.HOME}/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`,
+            `${env.HOME}/Applications/Chromium.app/Contents/MacOS/Chromium`,
+          ]
+        : []),
+    ];
+  if (platform === 'win32')
+    return [env.PROGRAMFILES, env['PROGRAMFILES(X86)'], env.LOCALAPPDATA]
+      .filter(Boolean)
+      .flatMap(base => [
+        `${base}\\Google\\Chrome\\Application\\chrome.exe`,
+        `${base}\\Chromium\\Application\\chrome.exe`,
+      ]);
   return [
-    '/usr/lib/chromium/chromium', '/usr/lib64/chromium-browser/chromium-browser', '/usr/lib/chromium-browser/chromium-browser',
+    '/usr/lib/chromium/chromium',
+    '/usr/lib64/chromium-browser/chromium-browser',
+    '/usr/lib/chromium-browser/chromium-browser',
     '/opt/google/chrome/chrome',
-    '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome-stable', '/usr/bin/google-chrome', '/snap/bin/chromium',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome',
+    '/snap/bin/chromium',
   ];
 }
 
 /** The one message for a missing or unstartable test browser. */
-export const BROWSER_HELP = 'Install the test browser with `npx playwright-core install chromium` ' +
+export const BROWSER_HELP =
+  'Install the test browser with `npx playwright-core install chromium` ' +
   '(Linux may also need `npx playwright-core install-deps chromium`), or set ENGINE_CHROMIUM to a Chrome or Chromium executable.';
 
 /** The advice when a browser exists but does not start. */
-export const START_HELP = 'On Linux, missing system libraries are installed with `npx playwright-core install-deps chromium` (needs root); ' +
+export const START_HELP =
+  'On Linux, missing system libraries are installed with `npx playwright-core install-deps chromium` (needs root); ' +
   'or set ENGINE_CHROMIUM to a working Chrome or Chromium executable.';
 
 /** True when a launch failure means the executable itself is absent (rather than present but failing). */
@@ -61,22 +80,38 @@ export function reportBrowserError(error) {
 }
 
 /** The Chromium the bench drives, and where that choice came from (path null when none is found). */
-export function chromiumExecutable(env = process.env, exists = existsSync, bundled = defaultBundled, platform = process.platform) {
+export function chromiumExecutable(
+  env = process.env,
+  exists = existsSync,
+  bundled = defaultBundled,
+  platform = process.platform,
+) {
   if (env.ENGINE_CHROMIUM) return {path: env.ENGINE_CHROMIUM, source: 'ENGINE_CHROMIUM'};
   const own = bundled();
   if (own && exists(own)) return {path: own, source: 'playwright'};
-  if (env.ENGINE_CHROMIUM_SYSTEM !== '0') for (const path of systemChromiums(platform, env)) if (exists(path)) return {path, source: 'system'};
+  if (env.ENGINE_CHROMIUM_SYSTEM !== '0')
+    for (const path of systemChromiums(platform, env)) if (exists(path)) return {path, source: 'system'};
   return {path: null, source: 'none'};
 }
 function defaultBundled() {
-  try { return createRequire(import.meta.url)('playwright-core').chromium.executablePath(); } catch { return null; }
+  try {
+    return createRequire(import.meta.url)('playwright-core').chromium.executablePath();
+  } catch {
+    return null;
+  }
 }
 
 /** The command-line flags: muted and isolated always; software GL unless `gpu`; no sandbox only as root. */
 export function chromiumArgs({width = 1280, height = 800, gpu = false, root = process.getuid?.() === 0} = {}) {
   return [
-    '--mute-audio', '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--disable-background-networking',
-    '--enable-automation', '--ignore-gpu-blocklist', `--window-size=${width},${height}`,
+    '--mute-audio',
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--disable-extensions',
+    '--disable-background-networking',
+    '--enable-automation',
+    '--ignore-gpu-blocklist',
+    `--window-size=${width},${height}`,
     ...(gpu ? [] : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']),
     ...(root ? ['--no-sandbox'] : []),
   ];
@@ -86,52 +121,112 @@ export function chromiumArgs({width = 1280, height = 800, gpu = false, root = pr
  * Launch one muted, isolated headless page. Returns a small driver: `page` (Playwright), `cdp` (a CDP session for
  * metrics and heap), `evaluate`, `wait`, `key`, `errors` and `close`.
  */
-export async function launch(options = {},
-  launchBrowser = options => createRequire(import.meta.url)('playwright-core').chromium.launch(options)) {
-  const {width = 1280, height = 800, gpu = process.env.ENGINE_GPU === '1', mobile = false,
-    isMobile = mobile, hasTouch = mobile, deviceScaleFactor = 1, strictClose = false} = options;
+export async function launch(
+  options = {},
+  launchBrowser = options => createRequire(import.meta.url)('playwright-core').chromium.launch(options),
+) {
+  const {
+    width = 1280,
+    height = 800,
+    gpu = process.env.ENGINE_GPU === '1',
+    mobile = false,
+    isMobile = mobile,
+    hasTouch = mobile,
+    deviceScaleFactor = 1,
+    strictClose = false,
+  } = options;
   const exe = chromiumExecutable();
   const args = chromiumArgs({width, height, gpu});
   let browser;
   try {
-    browser = await launchBrowser({executablePath: exe.path ?? undefined, headless: true, args, ignoreDefaultArgs: ['--hide-scrollbars']});
+    browser = await launchBrowser({
+      executablePath: exe.path ?? undefined,
+      headless: true,
+      args,
+      ignoreDefaultArgs: ['--hide-scrollbars'],
+    });
   } catch (cause) {
-    const lines = String(cause?.message ?? cause).split('\n').map(l => l.trim()).filter(Boolean);
+    const lines = String(cause?.message ?? cause)
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
     let message;
-    if (!exe.path) message = `No test browser found (looked for ENGINE_CHROMIUM, Playwright's Chromium and an installed Chrome or Chromium). ${BROWSER_HELP}`;
-    else if (executableMissing(exe, cause)) message = `The test browser ${exe.path} (${exe.source}) does not exist. ${BROWSER_HELP}`;
-    else message = `Could not start the test browser ${exe.path} (${exe.source}):\n  ${(lines.length ? lines : ['unknown error']).slice(0, 8).join('\n  ')}\n${START_HELP}`;
+    if (!exe.path)
+      message = `No test browser found (looked for ENGINE_CHROMIUM, Playwright's Chromium and an installed Chrome or Chromium). ${BROWSER_HELP}`;
+    else if (executableMissing(exe, cause))
+      message = `The test browser ${exe.path} (${exe.source}) does not exist. ${BROWSER_HELP}`;
+    else
+      message = `Could not start the test browser ${exe.path} (${exe.source}):\n  ${(lines.length ? lines : ['unknown error']).slice(0, 8).join('\n  ')}\n${START_HELP}`;
     throw Object.assign(Error(message, {cause}), {code: 'ENGINE_NO_BROWSER'});
   }
   try {
-    const context = await browser.newContext({viewport: {width, height}, deviceScaleFactor, locale: 'en-US', timezoneId: 'UTC', isMobile, hasTouch});
+    const context = await browser.newContext({
+      viewport: {width, height},
+      deviceScaleFactor,
+      locale: 'en-US',
+      timezoneId: 'UTC',
+      isMobile,
+      hasTouch,
+    });
     const page = await context.newPage();
     const cdp = await context.newCDPSession(page);
     // Explicit capability requests use the existing session; some Chromium builds reset context touch emulation.
     // Legacy callers without hasTouch retain their previous setup sequence.
-    if (options.hasTouch !== undefined) await cdp.send('Emulation.setTouchEmulationEnabled', {enabled:hasTouch, maxTouchPoints:1});
+    if (options.hasTouch !== undefined)
+      await cdp.send('Emulation.setTouchEmulationEnabled', {enabled: hasTouch, maxTouchPoints: 1});
     const errors = [];
     page.on('pageerror', e => errors.push(String(e?.message ?? e)));
-    page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+    page.on('console', m => {
+      if (m.type() === 'error') errors.push(m.text());
+    });
     const evaluate = expression => page.evaluate(expression);
     const b = {
-      browser, context, page, cdp, errors, launchArguments: args, executable: exe,
+      browser,
+      context,
+      page,
+      cdp,
+      errors,
+      launchArguments: args,
+      executable: exe,
       version: browser.version(),
       send: (method, params = {}) => cdp.send(method, params),
       evaluate,
       /** Polls a page expression until truthy; throws with the expression on timeout. */
       async wait(expr, ms = 30000) {
-        const t = Date.now(); let last;
-        while (Date.now() - t < ms) { try { if (await evaluate(expr)) return true; } catch (e) { last = e; } await sleep(100); }
+        const t = Date.now();
+        let last;
+        while (Date.now() - t < ms) {
+          try {
+            if (await evaluate(expr)) return true;
+          } catch (e) {
+            last = e;
+          }
+          await sleep(100);
+        }
         throw Error(`timeout ${ms} ms: ${expr}${last ? ' (' + last.message + ')' : ''}`);
       },
-      async key(key, down = true) { if (down) await page.keyboard.down(key); else await page.keyboard.up(key); },
-      async goto(url) { await page.goto(url, {waitUntil: 'load'}); },
-      async close() { try { await browser.close(); } catch (error) { if (strictClose) throw error; /* Legacy callers permit an already-gone process. */ } },
+      async key(key, down = true) {
+        if (down) await page.keyboard.down(key);
+        else await page.keyboard.up(key);
+      },
+      async goto(url) {
+        await page.goto(url, {waitUntil: 'load'});
+      },
+      async close() {
+        try {
+          await browser.close();
+        } catch (error) {
+          if (strictClose) throw error; /* Legacy callers permit an already-gone process. */
+        }
+      },
     };
     return b;
   } catch (error) {
-    try { await browser.close(); } catch { /* Preserve the initialization error after attempting cleanup. */ }
+    try {
+      await browser.close();
+    } catch {
+      /* Preserve the initialization error after attempting cleanup. */
+    }
     throw error;
   }
 }

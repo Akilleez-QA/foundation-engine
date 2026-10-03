@@ -1,1 +1,5 @@
-{"input.confirm":"Confirm focused control","input.page-next":"Next reading page","input.page-prev":"Previous reading page"}
+{
+  "input.confirm": "Confirm focused control",
+  "input.page-next": "Next reading page",
+  "input.page-prev": "Previous reading page"
+}
