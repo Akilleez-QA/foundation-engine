@@ -243,6 +243,10 @@ project license; the generated asset dedication is independent. Template
 verification screenshots capture locally rendered diagnostic scenes and UI.
 See the [CC0 dedication](https://creativecommons.org/publicdomain/zero/1.0/).
 
+## Original Blender export example
+
+`tools/blender-export/game/public/models/metre-block.glb` is original project content, generated solely from `tools/blender-export/export.py`, with no external art inputs. Both are GPL-3.0-only; this sample does not use the CC0 exception for the earlier mechanics fixtures. Its adjacent provenance JSON records the exporter version and hashes. The model contains 12 triangles, two materials and no textures; see `tools/blender-export/README.md`.
+
 ## Provenance boundaries and release review
 
 [PROVENANCE.md](docs/PROVENANCE.md) describes the initial engine extraction.

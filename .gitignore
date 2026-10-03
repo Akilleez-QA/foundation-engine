@@ -61,3 +61,5 @@ playtest/sound/
 playtest/dmath/
 playtest/session/
 playtest/particles/
+
+playtest/blender-export/
