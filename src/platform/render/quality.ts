@@ -140,14 +140,14 @@ export interface KnobRegistry {
 export function createKnobRegistry(initial: readonly AnyKnobDef[] = coreKnobs): KnobRegistry {
   const rows = new Map<KnobId, AnyKnobDef>();
   let version = 0, sorted: AnyKnobDef[] | null = null;
+  const insert = (d: AnyKnobDef) => {
+    if (rows.has(d.id)) throw new Error(`graphics knob ${d.id} is already registered by ${rows.get(d.id)!.owner}`);
+    const problems = knobProblems([d]);
+    if (problems.length) throw new Error(`graphics knob ${d.id} rejected: ${problems.join('; ')}`);
+    rows.set(d.id, d); version++; sorted = null;
+  };
   const reg: KnobRegistry = {
-    add(def) {
-      const d = def as unknown as AnyKnobDef;
-      if (rows.has(d.id)) throw new Error(`graphics knob ${d.id} is already registered by ${rows.get(d.id)!.owner}`);
-      const problems = knobProblems([d]);
-      if (problems.length) throw new Error(`graphics knob ${d.id} rejected: ${problems.join('; ')}`);
-      rows.set(d.id, d); version++; sorted = null;
-    },
+    add(def) { insert(def as AnyKnobDef); },
     get: id => rows.get(id) as never,
     list() {
       if (!sorted) {
@@ -158,7 +158,7 @@ export function createKnobRegistry(initial: readonly AnyKnobDef[] = coreKnobs): 
     },
     get version() { return version; },
   };
-  for (const d of initial) reg.add(d as unknown as KnobDef);
+  for (const d of initial) insert(d);
   return reg;
 }
 
@@ -428,7 +428,7 @@ export function createQuality(options: QualityOptions = {}): Quality {
       emit({ preset: p, applies });
     },
     setKnob(id, v) {
-      const d = registry.get(id) as unknown as LooseDef | undefined;
+      const d: LooseDef | undefined = registry.get(id);
       if (!d) throw new Error(`graphics knob ${id} is not registered`);
       if (!legal(d, v)) throw new Error(`illegal value for graphics knob ${id}`);
       if (belowFloor(d, v) && !d.floor?.playerMayCross) throw new Error(`graphics knob ${id} cannot go below its content floor (${d.floor!.reason})`);

@@ -17,7 +17,7 @@ export function definePoseClip(input:PoseClip):PoseClip {
    previous=k.at;if(++count>4096)throw Error('animation: key budget exceeded');
    const scale=Math.max(...k.rotation.map(Math.abs));if(scale===0)throw Error('animation: invalid rotation');
    const scaled=k.rotation.map(v=>v/scale),length=Math.hypot(...scaled);
-   return Object.freeze({at:k.at,position:Object.freeze([...k.position]) as ClipVector,rotation:Object.freeze(scaled.map(v=>v/length)) as unknown as ClipRotation});
+   return Object.freeze({at:k.at,position:Object.freeze([...k.position]) as ClipVector,rotation:Object.freeze([scaled[0]/length,scaled[1]/length,scaled[2]/length,scaled[3]/length] as const)});
   });
   return Object.freeze({joint:track.joint,keys:Object.freeze(keys)});
  });
@@ -34,7 +34,8 @@ export function createPoseSampler(input:PoseClip){
    else while(hi-lo>1){const mid=(lo+hi)>>>1;if(keys[mid].at<=t)lo=mid;else hi=mid;}
    const a=keys[lo],b=keys[hi],u=a===b?0:(t-a.at)/(b.at-a.at);
    const rotation=new Quaternion(...a.rotation).slerp(new Quaternion(...b.rotation),u);
-   return {joint:track.joint,position:a.position.map((v,i)=>v*(1-u)+b.position[i]*u) as unknown as ClipVector,rotation:rotation.toArray() as unknown as ClipRotation};
+   const p=a.position,q=b.position;
+   return {joint:track.joint,position:[p[0]*(1-u)+q[0]*u,p[1]*(1-u)+q[1]*u,p[2]*(1-u)+q[2]*u],rotation:[rotation.x,rotation.y,rotation.z,rotation.w]};
   });
  }};
 }

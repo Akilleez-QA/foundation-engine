@@ -1,0 +1,11 @@
+{
+  "rule": "unknown-cast",
+  "folder": "src/core",
+  "count": 5,
+  "files": {
+    "src/core/i18n/select-ordinal.test.ts": 1,
+    "src/core/rng.test.ts": 2,
+    "src/core/router/service.test.ts": 1,
+    "src/core/settings/settings.test.ts": 1
+  }
+}

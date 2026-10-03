@@ -16,13 +16,15 @@ const liveInputLine=slice('      const liveInput = sceneInput(','\n');
 const inputLine=slice('        input: tap ? tap.input : liveInput,','\n');
 const update=slice('        update(f: FrameInfo) {','        render() {');
 const STEP=1/60;
+type GestureOptions={press():void;canceled():void};
+type ReaderContext={input:{pressed(action:string):boolean;pointer:{pressed:boolean}}};
 type Seen={tick:number;frame:number;lane:'fixed'|'frame';jump:boolean;tap:boolean};
 function fixture(tapRunning?:()=>boolean){
- const handlers=new Map<string,(e:{phase:string})=>boolean>(),seen:Seen[]=[];let gestureOptions:any,tick=0,frameNo=0;
+ const handlers=new Map<string,(e:{phase:string})=>boolean>(),seen:Seen[]=[];let gestureOptions:GestureOptions|undefined,tick=0,frameNo=0;
  const rawPointer={x:0,y:0,down:false,pressed:false};
- const bindScenePointer=(_canvas:unknown,options:any)=>{gestureOptions=options;return {pointer:rawPointer,sync(){},cancel(){options.canceled();},dispose(){}};};
- const read=(lane:'fixed'|'frame')=>(ctx:any)=>{const jump=ctx.input.pressed('jump'),tap=ctx.input.pointer.pressed;if(jump||tap)seen.push({tick,frame:frameNo,lane,jump,tap});};
- const systems=[{id:'fixed-reader',run:(ctx:any)=>{tick++;read('fixed')(ctx);}},{id:'frame-reader',phase:'frame' as const,run:read('frame')}];
+ const bindScenePointer=(_canvas:unknown,options:GestureOptions)=>{gestureOptions=options;return {pointer:rawPointer,sync(){},cancel(){options.canceled();},dispose(){}};};
+ const read=(lane:'fixed'|'frame')=>(ctx:ReaderContext)=>{const jump=ctx.input.pressed('jump'),tap=ctx.input.pointer.pressed;if(jump||tap)seen.push({tick,frame:frameNo,lane,jump,tap});};
+ const systems=[{id:'fixed-reader',run:(ctx:ReaderContext)=>{tick++;read('fixed')(ctx);}},{id:'frame-reader',phase:'frame' as const,run:read('frame')}];
  const run=ts.transpile(`let programFailed=false,simulating=true,arrived=true,frame=0,t=0,calm=false,frameMs=0;const FIXED_STEP=1/60,tap=tapRunning?{running:tapRunning,beforeTick(){},afterTick(){},get input(){return liveInput;}}:null;const timing=undefined,body={systems},world={clearEvents(){}},scene={id:'test'};
 ${wiring}
 ${runnerLine}
@@ -34,13 +36,13 @@ return {setSimulating:v=>{simulating=v;},${update}};`,{target:ts.ScriptTarget.ES
  const actx={invalidate(){},runId:'run-test',signal:new AbortController().signal,own(){},coverage:()=>'top',leaving:()=>false};
  const sceneActionHints=()=>()=>null;
  const api=new Function('s','o','actx','surface','view','bindScenePointer','actionOf','viewOwnsInput','createSystemRunner','sceneInput','createPressLatch','sceneActionHints','systems','tapRunning','sync','failPrograms','ProgramLinkError','FrameReadinessError','monotonicNow','particles',run)(
-  {app:{has:()=>false},input:{onAction:(action:string,fn:any)=>{handlers.set(action,fn);},cancel(){},held:()=>false,describeAction:()=>null},log:{error(){}}},{inputs:[{id:'jump'},{id:'tap',tap:true}]},actx,{canvas:{}},{closest:()=>null},
-  bindScenePointer,actionOf,()=>true,createSystemRunner,sceneInput,(latch as any).createPressLatch,sceneActionHints,systems,tapRunning,()=>{},()=>{},class extends Error{},class extends Error{},()=>1,{step(){},interpolate:()=>false});
+  {app:{has:()=>false},input:{onAction:(action:string,fn:(e:{phase:string})=>boolean)=>{handlers.set(action,fn);},cancel(){},held:()=>false,describeAction:()=>null},log:{error(){}}},{inputs:[{id:'jump'},{id:'tap',tap:true}]},actx,{canvas:{}},{closest:()=>null},
+  bindScenePointer,actionOf,()=>true,createSystemRunner,sceneInput,latch.createPressLatch,sceneActionHints,systems,tapRunning,()=>{},()=>{},class extends Error{},class extends Error{},()=>1,{step(){},interpolate:()=>false});
  return {
   seen,
   press:()=>handlers.get(actionOf('jump'))!({phase:'press'}),
-  tap:()=>{rawPointer.pressed=true;gestureOptions.press();},
-  cancel:()=>gestureOptions.canceled(),
+  tap:()=>{rawPointer.pressed=true;gestureOptions!.press();},
+  cancel:()=>gestureOptions!.canceled(),
   frame:(dt:number)=>{frameNo++;api.update({dt,calm:false});},
   setSimulating:api.setSimulating as (v:boolean)=>void,
   get ticks(){return tick;},
@@ -87,7 +89,8 @@ test('retention is bounded: cancellation and a non-simulating frame release a pe
 test('the per-tick latch hooks touch no empty Set or Map (no per-tick allocation when idle)', () => {
  // The latch keeps press timestamps in Maps (AU-01); guard both collection types so the check cannot pass vacuously.
  const l=latch.createPressLatch(),calls:string[]=[];
- const protos=[Set.prototype,Map.prototype] as any[];
+ type Proto={clear:()=>void;values:()=>unknown;entries:()=>unknown;[Symbol.iterator]:()=>unknown};
+ const protos:Proto[]=[Set.prototype,Map.prototype];
  const saved=protos.map(proto=>({clear:proto.clear,values:proto.values,entries:proto.entries,iterator:proto[Symbol.iterator]}));
  protos.forEach((proto,i)=>{
   proto.clear=function(this:unknown){calls.push('clear');return saved[i].clear.call(this);};

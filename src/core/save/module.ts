@@ -19,7 +19,7 @@ import { savePrefixes } from './prefixes';
 import { installAppSaveStore, configureAppSaveStore } from './app-store';
 
 declare module '../registry' {
-  interface Registries { saveSections: Registry<SaveSection<any> & { id: string }> }
+  interface Registries { saveSections: Registry<SaveSection<unknown> & { id: string }> }
 }
 declare module '../services' {
   interface Services { readonly save: SaveStore & { pending(): SavePending } }

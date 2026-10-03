@@ -164,7 +164,6 @@ export class ActivityHost {
     // Adopted before entering, so a parent that leaves mid-enter still stops this child first.
     parent?.children.add(running);
 
-    const self = { ctx: null as unknown as ActivityContext, children, stopped: () => stopped };
     const host = this;
     const ctx: ActivityContext = {
       id: activity.id, runId, signal: abort.signal, parent: parent?.ctx ?? null,
@@ -201,7 +200,8 @@ export class ActivityHost {
         return lease;
       },
     };
-    self.ctx = ctx;
+    // `start` reads this only after `ctx` exists.
+    const self = { ctx, children, stopped: () => stopped };
 
     let entered: ActivityRun;
     try {

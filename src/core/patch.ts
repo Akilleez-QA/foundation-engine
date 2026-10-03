@@ -5,7 +5,7 @@
 //             :HAS[...] → target predicate · wildcards * ? → target glob
 // Deliberate differences: module slots follow dependency order, not alphabetical names (no 'zzz' sort keys); there
 // is no :LAST; a skipped or unmatched patch is reported, never silent; a throwing patch leaves its entry untouched.
-import { adminOf, isLazy, type EntryOf, type Registries, type Registry, type RegistryName } from './registry';
+import { adminOf, isLazy, type EntryOf, type Registry, type RegistryName } from './registry';
 
 export type PatchPass = 'first' | 'default' | 'final' | { before: string } | { after: string };
 
@@ -49,7 +49,7 @@ export interface AnyPatch {
 
 /** Typed constructor: patch('shopSets', { id: 'x', target: 'set.*', op: { kind: 'merge', merge: { price: 3 } } }). */
 export function patch<K extends RegistryName>(registry: K, p: Omit<PatchOf<K>, 'registry'>): Patch {
-  return { ...p, registry } as unknown as Patch;
+  return { ...p, registry } as Patch;
 }
 
 export interface PatchRecord { patch: string; owner: string; pass: string; targets: string[] }
@@ -135,7 +135,7 @@ export function orderPatches(all: readonly OwnedPatch[], order: readonly string[
 }
 
 // ---- application ----
-export function applyPatches(registries: Registries, all: readonly OwnedPatch[], order: readonly string[], has: (term: string) => boolean, o: PatchOrderOptions = {}): PatchReport {
+export function applyPatches(registries: Readonly<Record<string, Registry<{ id: string }> | undefined>>, all: readonly OwnedPatch[], order: readonly string[], has: (term: string) => boolean, o: PatchOrderOptions = {}): PatchReport {
   const report: PatchReport = { applied: [], skipped: [], errors: [] };
   const { run, orphaned, rejected } = orderPatches(all, order, o);
   const name = (x: OwnedPatch) => `${x.owner}/${x.patch.id}`;
@@ -143,7 +143,7 @@ export function applyPatches(registries: Registries, all: readonly OwnedPatch[],
   for (const x of orphaned) report.skipped.push({ patch: name(x), owner: x.owner, reason: `${passName(x.patch.pass)}: that module is not installed` });
   for (const x of run) {
     const p = x.patch;
-    const reg = (registries as unknown as Record<string, Registry<{ id: string }> | undefined>)[p.registry];
+    const reg = registries[p.registry];
     if (!reg) { report.errors.push({ patch: name(x), owner: x.owner, error: `unknown registry '${p.registry}'` }); continue; }
     let ok: boolean;
     try { ok = evaluateNeeds(p.needs, has); } catch (e) { report.errors.push({ patch: name(x), owner: x.owner, error: String((e as Error).message) }); continue; }
@@ -167,7 +167,7 @@ export function applyPatches(registries: Registries, all: readonly OwnedPatch[],
             const copy = { ...draft, id: op.as }; const next = op.edit?.(copy) ?? copy;
             reg.add(next, x.owner); touched.push(op.as); continue;
           }
-          const next = op.kind === 'merge' ? (mergeInto(draft as unknown as Record<string, unknown>, op.merge as Record<string, unknown>), draft) : (op.edit(draft) ?? draft);
+          const next = op.kind === 'merge' ? (mergeInto(draft, op.merge as Record<string, unknown>), draft) : (op.edit(draft) ?? draft);
           admin.replace(id, next, x.owner, name(x)); touched.push(id);
         } catch (e) { report.errors.push({ patch: name(x), owner: x.owner, target: id, error: (e as Error).message }); }
       }

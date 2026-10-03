@@ -30,6 +30,7 @@
  * stops and resumes drawing. `onLost`/`onRestored` hear it too. A lost context is never handed to a new lease.
  */
 import type * as T from 'three';
+import { glDelete } from './gl-interop';
 
 type GL = WebGL2RenderingContext;
 // renderer-pool.ts imports this module, so the shapes it shares are restated here (structurally the same).
@@ -178,7 +179,7 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
   };
 
   const wrap = (slot: StageSlot, v: View) => {
-    const x = v.r as unknown as Record<string, unknown>;
+    const x: Partial<Record<(typeof ENTRIES)[number], unknown>> = v.r;
     for (const name of ENTRIES) {
       const f = x[name];
       if (typeof f !== 'function') continue;
@@ -201,8 +202,7 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
   /** Everything the context held, freed when no view is left; the context kept unless the valve says otherwise. */
   const idle = (slot: StageSlot, audit: LeaseAudit) => {
     slot.drawer = null; slot.pending = null;
-    const g = slot.gl as unknown as Record<string, (o: object) => void>;
-    for (const [obj, del] of [...slot.tracker.live]) { audit.glObjects++; try { g[del]!(obj); } catch { /* lost */ } }
+    for (const [obj, del] of [...slot.tracker.live]) { audit.glObjects++; try { glDelete(slot.gl, del, obj); } catch { /* lost */ } }
     slot.tracker.live.clear();slot.tracker.validation?.clear();
     if (slot.lost || slot.gl.isContextLost?.()) { retire(slot, false); return; }
     if (audit.textures > d.valve.textures || audit.geometries > d.valve.geometries) { d.stats.recycles++; retire(slot, true); return; }

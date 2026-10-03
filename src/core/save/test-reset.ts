@@ -2,7 +2,7 @@
  * Reset permanently retires the old store; callers reload immediately after seeding. */
 import type { SaveStore, SaveSection } from './section';
 import { createSaveTestAdapter } from './test-adapter';
-export function createTestReset(old: SaveStore, fresh: () => SaveStore, sections: readonly SaveSection<any>[], retire: () => void) {
+export function createTestReset(old: SaveStore, fresh: () => SaveStore, sections: readonly SaveSection<unknown>[], retire: () => void) {
  return (seed: readonly { section: string; value: unknown; player?: string }[]) => {
   retire();
   const result = old.resetAll();
