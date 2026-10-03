@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import * as T from 'three';
 import { createSceneResources } from './scene-resources';
 import { disposeOwnedTree } from '../platform/render/dispose-owned-tree';
@@ -9,7 +10,7 @@ test('shared primitives, replaced indexed geometry and materials dispose exactly
   const shared = owner.own(new T.BoxGeometry()), indexed = owner.own(new T.BufferGeometry());
   const materials = [owner.own(new T.MeshLambertMaterial()), owner.own(new T.MeshLambertMaterial())];
   const resources = [shared, indexed, ...materials]; const counts = resources.map(() => 0);
-  resources.forEach((r, i) => r.addEventListener('dispose', () => { counts[i]++; }));
+  resources.forEach((r, i) => r.addEventListener('dispose', () => { counts[i] = must(counts[i]) + 1; }));
   owner.own(shared);
   const meshes = [new T.Mesh(shared, materials[0]), new T.Mesh(shared, materials[1]), new T.Mesh(indexed, materials[0])];
   scene.add(...meshes); owner.release(indexed); owner.release(indexed);

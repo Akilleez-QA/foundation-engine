@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { clampLabelToView as scene, createLabelLayer, type SizeEntry } from './labels';
+import {must} from '../../testing/must';
 
 /** A label stand-in that logs every layout read and every write, in order. */
 function fakeLabel(log: string[], name: string, size = { width: 80, height: 30 }) {
@@ -49,7 +50,7 @@ test('a frame reads every size before it writes anything, and never reads after 
   layer.scene(camera(), { width: 400, height: 300 }, arrange);
   const firstWrite = log.findIndex(l => l.startsWith('write')), lastRead = log.map(l => l.startsWith('read')).lastIndexOf(true);
   assert.ok(lastRead < firstWrite, log.join('\n'));
-  assert.equal(labels[1].styles.left, `${(0.2 + 1) * 200 - 40}px`);
+  assert.equal(must(labels[1]).styles.left, `${(0.2 + 1) * 200 - 40}px`);
   // Second frame: sizes are cached, so no reads at all; unchanged values are not written again.
   log.length = 0;
   layer.scene(camera(), { width: 400, height: 300 }, arrange);
@@ -62,7 +63,7 @@ test('the observer feeds the cache, ignores hidden 0 × 0 reports and re-places 
   layer.add({ element: html(a), anchor: out => { out.set(0, 0, 0); return true; } });
   assert.ok(ro.observed.has(html(a)));
   let runs = 0;
-  const arrange = (all: readonly import('./labels').ScenedLabel[]) => { runs++; all[0].style.width = `${all[0].size().width}px`; };
+  const arrange = (all: readonly import('./labels').ScenedLabel[]) => { runs++; must(all[0]).style.width = `${must(all[0]).size().width}px`; };
   ro.report([{ target: html(a), width: 50, height: 20 }]);
   layer.scene(camera(), { width: 400, height: 300 }, arrange);
   assert.equal(a.styles.width, '50px');
@@ -77,7 +78,7 @@ test('the observer feeds the cache, ignores hidden 0 × 0 reports and re-places 
 test('a new viewport width or new text forgets the cached size', () => {
   const log: string[] = [], layer = createLabelLayer({ observer: () => null });
   const a = fakeLabel(log, 'a'), handle = layer.add({ element: html(a) });
-  const arrange = (all: readonly import('./labels').ScenedLabel[]) => { all[0].style.width = `${all[0].size().width}px`; };
+  const arrange = (all: readonly import('./labels').ScenedLabel[]) => { must(all[0]).style.width = `${must(all[0]).size().width}px`; };
   layer.scene(camera(), { width: 400, height: 300 }, arrange);
   a.size = { width: 120, height: 30 };
   log.length = 0; layer.scene(camera(), { width: 400, height: 300 }, arrange);
@@ -100,7 +101,7 @@ test('an unknown size is measured in the state asked for, then restored; a hidde
   const a = fakeLabel(log, 'a'); a.hidden = true; log.length = 0;
   layer.add({ element: html(a) });
   let size = { width: 0, height: 0 };
-  layer.scene(camera(), { width: 400, height: 300 }, all => { size = all[0].size('pin'); all[0].hidden = true; });
+  layer.scene(camera(), { width: 400, height: 300 }, all => { size = must(all[0]).size('pin'); must(all[0]).hidden = true; });
   assert.deepEqual(size, { width: 80, height: 30 });
   assert.equal(a.hidden, true);
   assert.equal(a.dataset.pin, undefined);
@@ -125,9 +126,9 @@ test('an anchor that returns false leaves the label unprojected; decisions reset
   let on = true;
   layer.add({ element: html(a), anchor: out => { out.set(0, 0, 0); return on; } });
   const flags: boolean[] = [];
-  layer.scene(camera(), { width: 10, height: 10 }, all => { flags.push(all[0].projected); all[0].data.pin = '→'; });
+  layer.scene(camera(), { width: 10, height: 10 }, all => { flags.push(must(all[0]).projected); must(all[0]).data.pin = '→'; });
   on = false;
-  layer.scene(camera(), { width: 10, height: 10 }, all => { flags.push(all[0].projected); assert.equal(all[0].data.pin, undefined); all[0].data.pin = null; });
+  layer.scene(camera(), { width: 10, height: 10 }, all => { flags.push(must(all[0]).projected); assert.equal(must(all[0]).data.pin, undefined); must(all[0]).data.pin = null; });
   assert.deepEqual(flags, [true, false]);
   assert.equal(a.dataset.pin, undefined);
 });

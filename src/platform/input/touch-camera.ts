@@ -16,4 +16,4 @@ export function dragTouchCamera(camera:Camera,target:Vector3,dx:number,dy:number
  }
 }
 export type TouchPoint={x:number;y:number};
-export function touchMetrics(points:TouchPoint[]){const a=points[0],b=points[1]??a;return {x:(a.x+b.x)/2,y:(a.y+b.y)/2,distance:Math.hypot(a.x-b.x,a.y-b.y)};}
+export function touchMetrics(points:TouchPoint[]){const a=points[0];if(!a)throw Error('touchMetrics: no points');const b=points[1]??a;return {x:(a.x+b.x)/2,y:(a.y+b.y)/2,distance:Math.hypot(a.x-b.x,a.y-b.y)};}

@@ -6,6 +6,7 @@ import { createKnobRegistry, createQuality, coreKnobs, type GraphicsSettings, ty
 import { LayerManager } from './layers';
 import { graphicsModel, installGraphicsScreen, optionWords } from './graphics-screen';
 import { installGraphicsButton } from './graphics-button';
+import {must} from '../../testing/must';
 
 declare module '../render/quality-knobs' { interface GraphicsKnobs { 'test.sparkle': 'off' | 'some' | 'lots' } }
 const sparkle: KnobDef<'test.sparkle'> = {
@@ -26,7 +27,7 @@ test('the screen is generated from the knob registry: a wired knob appears in it
   registry2.add({ ...sparkle, wired: { by: 'sparkle' } });
   const after = graphicsModel(createQuality({ registry: registry2 })), effects = after.find(g => g.group === 'effects')!;
   assert.deepEqual(after.map(g => g.group), ['resolution', 'shadows', 'effects']);
-  assert.equal(effects.knobs[0].label, 'Sparkle'); assert.equal(effects.knobs[0].value, 'lots');
+  assert.equal(must(effects.knobs[0]).label, 'Sparkle'); assert.equal(must(effects.knobs[0]).value, 'lots');
   assert.equal(optionWords(coreKnobs.find(k => k.id === 'frame-rate.cap')!, 0, 0), 'Display rate');
   assert.equal(optionWords(coreKnobs.find(k => k.id === 'resolution.max-pixel-ratio')!, 1.5, 1), '1.5×');
 });

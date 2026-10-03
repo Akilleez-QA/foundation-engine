@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { installFakeDom } from '../../testing/fake-dom';
 import { coreSettings, createSettings, type SettingDef, type StoredSettings } from '../../core/settings/settings';
 import { addSettingsBlock, renderSettingsPanel } from './settings-panel';
+import {must} from '../../testing/must';
 
 function memorySettings(defs: readonly SettingDef[] = coreSettings, data: StoredSettings = {}) {
   const subs = new Set<(v: StoredSettings) => void>();
@@ -28,9 +29,9 @@ test('the Comfort panel is generated from the comfort definitions, in order, wit
     assert.deepEqual(controls.map(c => c.type), ['checkbox', 'checkbox']);
     const children = Array.from(host.children);
     assert.deepEqual(children.map(k => k.tagName.toLowerCase()), ['label', 'label', 'p', 'h3'], 'controls, the help under Calm, then the block');
-    assert.equal(children[0].textContent, ' Bigger words');
-    assert.equal(children[1].textContent, ' Calm scenes · stop decorative spinning');
-    assert.equal(children[2].textContent, 'Calm help.');
+    assert.equal(must(children[0]).textContent, ' Bigger words');
+    assert.equal(must(children[1]).textContent, ' Calm scenes · stop decorative spinning');
+    assert.equal(must(children[2]).textContent, 'Calm help.');
   } finally { fake.restore(); }
 });
 
@@ -40,6 +41,7 @@ test('a toggle writes on change and follows other writers (another tab, an impor
     const m = memorySettings();
     const host = doc.createElement('div'); doc.body.append(host);
     const [large, calm] = renderSettingsPanel(host, { settings: m.settings, section: 'comfort', strings }) as HTMLInputElement[];
+    assert.ok(large); assert.ok(calm);
     assert.equal(calm.id, 'comfort-calm', 'default id: the setting id with dashes');
     calm.checked = true; calm.dispatchEvent(new Event('change'));
     assert.equal(m.settings.get('comfort.calm'), true);

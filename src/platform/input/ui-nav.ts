@@ -29,10 +29,10 @@ export class UiNav{
   if(target&&(target as Element).closest?.(ARROW_OWNERS))return false;
   const items=focusables(scope);if(!items.length)return false;
   const active=this.doc.activeElement as El|null,current=active&&scope.contains(active)&&items.includes(active)?active:null;
-  if(!current){this.focus(scope,this.remembered.get(scope)&&items.includes(this.remembered.get(scope)!)?this.remembered.get(scope)!:items[0]);return true;}
+  if(!current){this.focus(scope,this.remembered.get(scope)&&items.includes(this.remembered.get(scope)!)?this.remembered.get(scope)!:items[0]!/* items is non-empty */);return true;}
   const range=current.tagName==='INPUT'&&(current as HTMLInputElement).type==='range'?current as HTMLInputElement:null;
   if(!target&&range&&(direction==='left'||direction==='right')){if(direction==='right')range.stepUp();else range.stepDown();current.dispatchEvent(new Event('input',{bubbles:true}));current.dispatchEvent(new Event('change',{bubbles:true}));return true;}
-  const override=current.dataset[`nav${direction[0].toUpperCase()}${direction.slice(1)}`],forced=override?scope.querySelector<El>(override):null;
+  const override=current.dataset[`nav${direction.charAt(0).toUpperCase()}${direction.slice(1)}`],forced=override?scope.querySelector<El>(override):null;
   const others=items.filter(e=>e!==current),next=forced&&visible(forced)?forced:others[pickDirection(current.getBoundingClientRect(),others.map(e=>e.getBoundingClientRect()),direction)];
   if(next)this.focus(scope,next);
   return true;

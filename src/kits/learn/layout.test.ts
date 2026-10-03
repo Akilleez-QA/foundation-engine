@@ -6,6 +6,7 @@ import { installFakeDom } from '../../testing/fake-dom';
 import type { LessonInput } from './lesson';
 import { directorSystem, disposeLesson } from './runtime';
 import { CONTROLS_RESERVE, createControls } from './ui';
+import { must } from '../../testing/must';
 
 // Fake DOM geometry is set by hand: these tests pin the layout contract (what moves, by how much, and what stays),
 // not real browser layout. scripts/play/stock-touch-check.mjs measures the same separation in Chromium.
@@ -32,7 +33,7 @@ function setup() {
 function px(expr: string, overlay: El): number {
   const resolved = expr.replace(/var\((--[\w-]+),\s*([^)]+)\)/g, (_m, name: string, fallback: string) => overlay.style[name] || fallback);
   const m = resolved.match(/^max\((.*)\)$/);
-  return Math.max(...(m ? m[1].split(',') : [resolved]).map(v => parseFloat(v)));
+  return Math.max(...(m?.[1]?.split(',') ?? [resolved]).map(v => parseFloat(v)));
 }
 
 const lesson: LessonInput = {
@@ -61,7 +62,7 @@ test('compact portrait: a wrapped control bar never covers the board or its capt
   // 320×568 with the 47 px shell header: the bar wraps to three 48 px rows (160 px with gaps).
   const { fake, h, overlay, nav, board } = await boardLesson(320, 521, 160);
   try {
-    const boardBottomEdge = overlay.rect.height - px(board.style.bottom, overlay);
+    const boardBottomEdge = overlay.rect.height - px(must(board.style.bottom), overlay);
     assert.ok(boardBottomEdge <= nav.rect.top - 8, `board ends at ${boardBottomEdge}, bar starts at ${nav.rect.top}`);
     assert.equal(overlay.style[CONTROLS_RESERVE], '180px');
   } finally { h.dispose(); fake.restore(); }
@@ -70,7 +71,7 @@ test('compact portrait: a wrapped control bar never covers the board or its capt
 test('desktop: a single-row bar keeps the authored board inset and top line geometry', async () => {
   const { fake, h, overlay, board } = await boardLesson(1280, 753, 48);
   try {
-    assert.equal(px(board.style.bottom, overlay), 76);   // chalkboard's own inset, unchanged
+    assert.equal(px(must(board.style.bottom), overlay), 76);   // chalkboard's own inset, unchanged
     assert.equal(overlay.style['--learn-top-clear'], '0px');
     assert.equal(overlay.style['--learn-top-side'], '160px');
   } finally { h.dispose(); fake.restore(); }
@@ -81,7 +82,7 @@ test('a centred panel moves below the top line and scrolls above a wrapped bar o
   try {
     overlay.rect = { left: 0, top: 0, width: 320, height: 521 };
     const controls = createControls(overlay as never);
-    const nav = overlay.querySelector('nav')!, progress = overlay.children[0];
+    const nav = overlay.querySelector('nav')!, progress = must(overlay.children[0]);
     nav.rect = { left: 8, top: 349, width: 304, height: 160 };
     progress.rect = { left: 16, top: 56, width: 90, height: 30 };
     const doc = (overlay as unknown as { ownerDocument: { createElement(t: string): El } }).ownerDocument;

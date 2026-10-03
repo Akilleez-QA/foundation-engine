@@ -64,7 +64,7 @@ test('scene exit disposes shared and distinct primitive geometry exactly once', 
   const geometries = createPrimitiveGeometries(resources);
   const scene = new T.Scene();
   const leases = [geometries.acquire('plane', [2, 1, 3]),
-    geometries.acquire('plane', [2, 1, 3]), geometries.acquire('cone', [1, 2, 1])];
+    geometries.acquire('plane', [2, 1, 3]), geometries.acquire('cone', [1, 2, 1])] as const;
   const counts = [track(leases[0].geometry), track(leases[2].geometry)];
   const material = resources.own(new T.MeshLambertMaterial());
   const materialCount = track(material);

@@ -201,7 +201,7 @@ export function createSceneModels(o: { world: World; scene: T.Scene; library: Mo
             if (data.clip) {
               const matches = slot.lease!.value.animations.filter(c => c.name === data.clip);
               if (matches.length !== 1) { slot.animationKey = key; report(Error(`model: unknown or ambiguous clip ${data.clip}`)); continue; }
-              slot.action = slot.mixer!.clipAction(matches[0]); slot.action.setLoop(data.loop ? T.LoopRepeat : T.LoopOnce, data.loop ? Infinity : 1); slot.action.clampWhenFinished = true; slot.action.reset().play();
+              slot.action = slot.mixer!.clipAction(matches[0]!); /* matches.length === 1 */ slot.action.setLoop(data.loop ? T.LoopRepeat : T.LoopOnce, data.loop ? Infinity : 1); slot.action.clampWhenFinished = true; slot.action.reset().play();
             }
             slot.animationKey = key; slot.mixer!.update(0); changed = true;
           }

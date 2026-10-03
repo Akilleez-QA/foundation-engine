@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { classifyWindow, CLASSIFICATION_VERSION, type WindowFacts } from './window-class';
+import {must} from '../../testing/must';
 
 const steady: WindowFacts = { mode: 'idle', epochBreak: null, contextLost: false, frames: 60, renderedFrames: 60, complete: true, pendingAtStart: 0, requestsDuring: 0, uploads: [], programsCreated: 0 };
 const upload = (over: Partial<WindowFacts['uploads'][number]> = {}) => ({ resource: 7, bytes: 768 * 512 * 4, frame: 3, firstEver: false, count: 16, ...over });
@@ -15,7 +16,7 @@ test('a quiet window is steady play and comparable', () => {
 test('recurring uploads (a scoreboard redrawn every .25 s) are steady play, kept in the cost', () => {
   const { classification, uploads } = classifyWindow({ ...steady, uploads: [upload()] });
   assert.equal(classification.kind, 'steady');
-  assert.equal(uploads[0].purpose, 'recurring');
+  assert.equal(must(uploads[0]).purpose, 'recurring');
   assert.match(classification.reasons.join(), /recurring upload/);
 });
 
@@ -24,13 +25,13 @@ test('an unfinished initial load is entry, not steady', () => {
   assert.equal(pending.classification.kind, 'entry');
   const late = classifyWindow({ ...steady, requestsDuring: 1, uploads: [upload({ firstEver: true, count: 1 })] });
   assert.equal(late.classification.kind, 'entry');
-  assert.equal(late.uploads[0].purpose, 'initial');
+  assert.equal(must(late.uploads[0]).purpose, 'initial');
 });
 
 test('first use on the active route: new texture or program compiled is firstUse, never discarded', () => {
   const tex = classifyWindow({ ...steady, mode: 'active', uploads: [upload({ firstEver: true, count: 1 })] });
   assert.equal(tex.classification.kind, 'firstUse');
-  assert.equal(tex.uploads[0].purpose, 'firstUse');
+  assert.equal(must(tex.uploads[0]).purpose, 'firstUse');
   const prog = classifyWindow({ ...steady, mode: 'active', programsCreated: 3 });
   assert.equal(prog.classification.kind, 'firstUse');
   assert.equal(prog.classification.comparable, true);
@@ -38,7 +39,7 @@ test('first use on the active route: new texture or program compiled is firstUse
 
 test('an unknown upload (new texture in a still, loaded window) fails comparability', () => {
   const { classification, uploads } = classifyWindow({ ...steady, uploads: [upload({ firstEver: true, count: 1 })] });
-  assert.equal(uploads[0].purpose, 'unknown');
+  assert.equal(must(uploads[0]).purpose, 'unknown');
   assert.equal(classification.kind, 'unclassified');
   assert.equal(classification.comparable, false);
 });
@@ -47,7 +48,7 @@ test('a same-hash re-entry (new scene element, same hash) invalidates the window
   const { classification } = classifyWindow({ ...steady, epochBreak: 'scene element replaced (re-entry or exit)' });
   assert.equal(classification.kind, 'invalid');
   assert.equal(classification.comparable, false);
-  assert.match(classification.reasons[0], /re-entry/);
+  assert.match(must(classification.reasons[0]), /re-entry/);
 });
 
 test('an incomplete window or a lost context is invalid', () => {

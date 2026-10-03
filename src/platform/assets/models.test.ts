@@ -9,6 +9,7 @@ import * as T from 'three';
 import { createModelLibrary, modelBytes } from './models';
 import { isAbortError } from './lease-cache';
 import type { AssetDef } from './manifest';
+import {must} from '../../testing/must';
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 const defs: AssetDef[] = [
@@ -72,6 +73,7 @@ test('live requesters share one template; instances share geometry and materials
   const leases = owners.map(o => library.model(statue, { signal: o.signal }));
   await arrive();
   const [a, b] = await Promise.all(leases);
+  assert.ok(a); assert.ok(b);
   assert.equal(fetched.length, 1);
   assert.equal(a.value, b.value);
   const [x, y] = [a.value.instantiate(), b.value.instantiate()];
@@ -81,7 +83,7 @@ test('live requesters share one template; instances share geometry and materials
   a.release();
   a.release();
   assert.equal(disposed.length, 0);
-  owners[1].abort();
+  must(owners[1]).abort();
   assert.equal(disposed.length, 3);
 });
 
@@ -155,8 +157,8 @@ test('skeletal instances have independent bones, clips, and owned skeleton dispo
   const a = lease.value.instantiate(), b = lease.value.instantiate();
   const sa = (a.children[0] as T.SkinnedMesh).skeleton, sb = (b.children[0] as T.SkinnedMesh).skeleton;
   assert.notEqual(sa,sb);assert.notEqual(sa.bones[0],sb.bones[0]);assert.notEqual(sa.bones[0],bone);
-  sa.bones[0].rotation.z=.5;assert.equal(Math.abs(sb.bones[0].rotation.z),0);
-  animation.tracks[0].values[1]=7;assert.equal(lease.value.animations[0].tracks[0].values[1],1);
+  must(sa.bones[0]).rotation.z=.5;assert.equal(Math.abs(must(sb.bones[0]).rotation.z),0);
+  must(animation.tracks[0]).values[1]=7;assert.equal(must(must(lease.value.animations[0]).tracks[0]).values[1],1);
   assert.throws(()=>lease.value.instantiate(),/instance budget/);
   lease.value.releaseInstance(a);lease.value.releaseInstance(a);assert.equal(lib.stats().instances,1);
   life.abort();assert.equal(lib.stats().instances,0);assert.throws(()=>lease.value.instantiate(),/retired/);
@@ -176,10 +178,10 @@ test('original embedded GLB fixture retains real clip and independent skeletal n
   const data=readFileSync(join(import.meta.dirname,'../../../templates/mechanics/game/public/models/mechanics/beacon.glb'));
   const lib=createModelLibrary({def:()=>defs[0],fetchBytes:async()=>data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength)});
   const lease=await lib.model(statue,{signal:new AbortController().signal});
-  assert.equal(lease.value.animations[0].name,'pulse');
+  assert.equal(must(lease.value.animations[0]).name,'pulse');
   const a=lease.value.instantiate(),b=lease.value.instantiate();
   assert.notEqual(a.getObjectByName('hand'),b.getObjectByName('hand'));
-  const mixer=new T.AnimationMixer(a);mixer.clipAction(lease.value.animations[0]).play();mixer.update(.25);
+  const mixer=new T.AnimationMixer(a);mixer.clipAction(must(lease.value.animations[0])).play();mixer.update(.25);
   assert.ok(a.getObjectByName('shoulder')!.position.y>.1);assert.equal(b.getObjectByName('hand')!.position.y,.6);
   mixer.stopAllAction();mixer.uncacheRoot(a);lease.release();assert.equal(lib.stats().instances,0);lib.dispose();
 });
@@ -196,7 +198,7 @@ test('immediate reacquire never inherits a cancelled file request from an old ow
   const lib=createModelLibrary({def:()=>defs[0],fetchBytes:()=>{fetches++;return new Promise(resolve=>pending.push(resolve));},parse:async()=>new T.Group()});
   const old=new AbortController(),first=lib.model(statue,{signal:old.signal});await settle();old.abort();await assert.rejects(first,isAbortError);
   const replacement=lib.model(statue,{signal:new AbortController().signal});await settle();assert.equal(fetches,2);
-  pending[0](new ArrayBuffer(4));pending[1](new ArrayBuffer(4));const lease=await replacement;lease.release();lib.dispose();
+  must(pending[0])(new ArrayBuffer(4));must(pending[1])(new ArrayBuffer(4));const lease=await replacement;lease.release();lib.dispose();
 });
 
 test('cancelled decoders retain pending admission until actual settlement', async () => {
@@ -216,8 +218,8 @@ test('late replaced fetch cannot overwrite or double-charge retained bytes', asy
   const lib=createModelLibrary({def:()=>defs[0],fetchBytes:()=>new Promise(resolve=>pending.push(resolve)),parse:async bytes=>{parsed.push(bytes.byteLength);return new T.Group();}});
   const owner=new AbortController(),old=lib.model(statue,{signal:owner.signal});await settle();owner.abort();await assert.rejects(old,isAbortError);
   const next=lib.model(statue,{signal:new AbortController().signal});await settle();
-  pending[1](new ArrayBuffer(8));const lease=await next;lease.release();
-  pending[0](new ArrayBuffer(4));await settle();
+  must(pending[1])(new ArrayBuffer(8));const lease=await next;lease.release();
+  must(pending[0])(new ArrayBuffer(4));await settle();
   assert.equal(lib.stats().bytesKeptMiB,8/(1024*1024));
   const again=await lib.model(statue,{signal:new AbortController().signal});assert.deepEqual(parsed,[8,8]);again.release();lib.dispose();
 });
@@ -301,7 +303,7 @@ for (const cleanupThrows of [false, true]) {
     assert.equal(library.stats().residentMiB, 0);
     assert.deepEqual(disposals, ['geometry-1', 'material-1']);
     const lease = await library.model(statue, { signal: new AbortController().signal });
-    assert.equal(lease.value.animations[0].name, 'motion');
+    assert.equal(must(lease.value.animations[0]).name, 'motion');
     assert.ok(library.stats().residentMiB > 0);
     lease.release();
     library.dispose();
@@ -328,7 +330,7 @@ test('instance byte admission counts each cloned shared skeleton and restores re
   try {
     const a=lease.value.instantiate(),b=lease.value.instantiate();
     const meshes=a.children.filter(node=>(node as T.SkinnedMesh).isSkinnedMesh) as T.SkinnedMesh[];
-    assert.notStrictEqual(meshes[0].skeleton,meshes[1].skeleton);
+    assert.notStrictEqual(must(meshes[0]).skeleton,must(meshes[1]).skeleton);
     for(const mesh of meshes){assert.equal(mesh.skeleton.boneMatrices!.byteLength,64);mesh.skeleton.computeBoneTexture();assert.equal(mesh.skeleton.boneMatrices!.byteLength,256);}
     assert.throws(()=>lease.value.instantiate(),/instance budget/);assert.equal(lib.stats().instances,2);
     let disposed=0;for(const mesh of meshes)mesh.skeleton.boneTexture!.addEventListener('dispose',()=>disposed++);
@@ -339,7 +341,7 @@ test('instance byte admission counts each cloned shared skeleton and restores re
 });
 
 test('per-mesh skeleton and tiny texture charges refuse one byte below each exact admission estimate', async () => {
-  for (const [meshCount, budget] of [[1, 2111], [2, 3199]]) {
+  for (const [meshCount, budget] of [[1, 2111], [2, 3199]] as const) {
     const {scene}=sharedSkeletonScene(meshCount);let clones=0;const clone=scene.clone.bind(scene);scene.clone=(recursive?:boolean)=>{clones++;return clone(recursive);};
     // Single-mesh estimate is 2112; shared-source two-mesh estimate is 3200.
     // The second case would admit incorrectly if padded buffers were counted only once.

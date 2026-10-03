@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { lengthOf, pathOf, tickLabels, type BoardItem } from './board';
+import { must } from '../../testing/must';
 
 test('chalkboard: every item kind has a path and a length; text has neither', () => {
   const items: BoardItem[] = [
@@ -13,8 +14,8 @@ test('chalkboard: every item kind has a path and a length; text has neither', ()
     { id: 'p', kind: 'path', points: [[0, 0], [3, 4], [3, 0]], closed: true },
   ];
   for (const i of items) { assert.ok(pathOf(i).startsWith('M'), i.id); assert.ok(lengthOf(i) > 0, i.id); }
-  assert.equal(lengthOf(items[0]), 5);
-  assert.equal(lengthOf(items[6]), 5 + 4 + 3);
+  assert.equal(lengthOf(must(items[0])), 5);
+  assert.equal(lengthOf(must(items[6])), 5 + 4 + 3);
   assert.deepEqual(tickLabels(items[5] as Extract<BoardItem, { kind: 'number-line' }>).map(t => t.text), ['0', '5', '10']);
   assert.equal(pathOf({ id: 't', kind: 'text', at: [0, 0], text: 'k' }), '');
 });

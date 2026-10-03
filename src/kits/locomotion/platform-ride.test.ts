@@ -6,6 +6,7 @@ import { Solid, Walls } from '../character';
 import { jumpSystem, platformSystem, type PlatformLeave } from './jump-system';
 import { createPlatforms, type PlatformDef, type Platforms } from './platforms';
 import { deriveJump } from './jump';
+import { must } from '../../testing/must';
 
 /** The rates every regression runs at; 165 Hz is deliberately not a divisor of the aligned event times. */
 const RATES = [30, 60, 120, 165, 240];
@@ -85,7 +86,7 @@ test('MV-02: jumping off a moving platform inherits its velocity and the arc mat
     }
     const mid = at(s, 0.5 + 0.35);
     assert.ok(mid.y > 1.4 && Math.abs(mid.x - mid.px) < 1e-9, `${hz} Hz kept the platform velocity in the air (add-velocity)`);
-    const end = s[s.length - 1];
+    const end = must(s[s.length - 1]);
     assert.ok(Math.abs(end.y - end.py) < 1e-9 && Math.abs(end.x - end.px) < 1e-9, `${hz} Hz landed back on the platform`);
   }
   const still = await ride(60, 1, { path, press: pressAt(0.5), onLeave: 'none' });
@@ -99,7 +100,7 @@ test('MV-02 review 1: a jump from a vertically or diagonally moving lift rises e
     const ideal = (d.launchSpeed + vy) ** 2 / (2 * d.gravity);
     for (const hz of RATES) {
       const s = await ride(hz, 1.4, { path: t => ({ x: vx * t, y: 1 + vy * t, z: 0 }), halfX: 3, press: pressAt(0.5) });
-      const k = takeOff(s), top = s[k - 1].y;
+      const k = takeOff(s), top = must(s[k - 1]).y;
       const apex = Math.max(...s.slice(k).filter(p => p.y > p.py + 1e-9).map(p => p.y));
       // The sampled maximum may miss the true apex inside a tick by at most g·dt²/8.
       assert.ok(apex <= top + ideal + 1e-9 && apex >= top + ideal - d.gravity / (8 * hz * hz) - 1e-9, `${hz} Hz lift (${vx}, ${vy}): ${apex - top} vs ${ideal}`);
@@ -124,15 +125,15 @@ test('MV-02: a rising platform adds its upward velocity to the launch (add-veloc
 test('MV-02: one-way moving platforms: a rising one picks up a standing actor; one moving sideways is passed from below and landed on', async () => {
   for (const hz of RATES) {
     const s = await ride(hz, 1.5, { path: t => ({ x: 0, y: -0.5 + t, z: 0 }), start: { x: 0, y: 0, z: 0 }, ground: floor });
-    const end = s[s.length - 1];
+    const end = must(s[s.length - 1]);
     assert.equal(at(s, 0.25).y, 0, `${hz} Hz still on the floor while the platform is below`);
     assert.ok(Math.abs(end.y - end.py) < 1e-12 && end.y > 0.9, `${hz} Hz carried up: ${end.y}`);
   }
   for (const hz of RATES) {
     const s = await ride(hz, 2, { path: t => ({ x: 0.3 * Math.sin(t), y: 1, z: 0 }), halfX: 2, start: { x: 0, y: 0, z: 0 }, ground: floor, press: pressAt(0.1) });
     assert.ok(Math.max(...s.map(p => p.y)) > 1.4, 'rose through the platform');
-    assert.ok(Math.abs(s[s.length - 1].y - 1) < 1e-12, `${hz} Hz landed on it`);
-    const later = s.filter(p => p.t > 1.6), offset = later[0].x - later[0].px;
+    assert.ok(Math.abs(must(s[s.length - 1]).y - 1) < 1e-12, `${hz} Hz landed on it`);
+    const later = s.filter(p => p.t > 1.6), first = must(later[0]), offset = first.x - first.px;
     for (const p of later) assert.ok(Math.abs(p.x - p.px - offset) < 1e-9, `${hz} Hz rides with it`);
   }
 });
@@ -143,12 +144,12 @@ test('MV-02: leaving a footprint applies the leave policy; a removed platform dr
   for (const hz of RATES) {
     const kept = await ride(hz, 1, { path, each: shove() }), off = kept.filter(p => p.t > 0.55);
     assert.ok(off.every(p => p.y < 5), `${hz} Hz fell after leaving the footprint`);
-    assert.ok(Math.abs((off[off.length - 1].x - off[0].x) / (off[off.length - 1].t - off[0].t) - 2) < 1e-6, `${hz} Hz kept 2 m/s horizontally`);
+    assert.ok(Math.abs((must(off[off.length - 1]).x - must(off[0]).x) / (must(off[off.length - 1]).t - must(off[0]).t) - 2) < 1e-6, `${hz} Hz kept 2 m/s horizontally`);
     const d = (await ride(hz, 1, { path, each: shove(), onLeave: 'none' })).filter(p => p.t > 0.55);
-    assert.equal(d[d.length - 1].x, d[0].x, `${hz} Hz 'none' keeps nothing`);
+    assert.equal(must(d[d.length - 1]).x, must(d[0]).x, `${hz} Hz 'none' keeps nothing`);
     const r = (await ride(hz, 1, { path, each: once(0.5, (_tr, p) => { p.remove('deck'); }) })).filter(p => p.t > 0.55);
-    assert.equal(r[r.length - 1].x, r[0].x, `${hz} Hz a removed platform imparts no velocity`);
-    assert.ok(r[r.length - 1].y < 5);
+    assert.equal(must(r[r.length - 1]).x, must(r[0]).x, `${hz} Hz a removed platform imparts no velocity`);
+    assert.ok(must(r[r.length - 1]).y < 5);
   }
 });
 
@@ -178,13 +179,13 @@ test('MV-02 review 3: a cut, a restart or a removal and re-add detaches the ride
       }),
     });
     const after = s.filter(p => p.t > 0.55);
-    assert.ok(after.every(p => p.x < 1 && p.y < 1), `${hz} Hz ${kind}: rider stayed behind and fell (${after[after.length - 1].x}, ${after[after.length - 1].y})`);
+    assert.ok(after.every(p => p.x < 1 && p.y < 1), `${hz} Hz ${kind}: rider stayed behind and fell (${must(after[after.length - 1]).x}, ${must(after[after.length - 1]).y})`);
   }
   // Another owner lifting the rider detaches it: it is not pulled back down onto the platform.
   for (const hz of RATES) {
     const s = await ride(hz, 1, { path: t => ({ x: t, y: 1, z: 0 }), each: once(0.5, tr => { tr.y += 0.5; }) });
     const k = s.findIndex(p => p.y > 1.4);
-    assert.ok(k >= 0 && s[k + 1].y > 1.2, `${hz} Hz lifted rider kept its height on the next tick: ${s[k + 1]?.y}`);
+    assert.ok(k >= 0 && must(s[k + 1]).y > 1.2, `${hz} Hz lifted rider kept its height on the next tick: ${s[k + 1]?.y}`);
   }
 });
 
@@ -203,11 +204,11 @@ test('MV-02 review 5: while riding, static ground and other platforms are swept 
     // Carried into a step no higher than stepHeight: the rider steps up onto it and stays.
     const block = (x: number, _z: number, below: number) => (x > 1 && below >= 0.2 ? 0.2 : below >= 0 ? 0 : null);
     const step = await ride(hz, 2, { path: t => ({ x: t, y: 0, z: 0 }), halfX: 0.5, ground: block, stepHeight: 0.25 });
-    const end = step[step.length - 1];
+    const end = must(step[step.length - 1]);
     assert.ok(end.y === 0.2 && end.x > 1 && end.x < 1.1, `${hz} Hz stepped onto the block: (${end.x}, ${end.y})`);
     // A second platform rising past the rider picks it up.
     const pick = await ride(hz, 1.5, { setup: p => { p.add('deck', { halfX: 1, halfZ: 1, path: () => ({ x: 0, y: 1, z: 0 }) }); p.add('elevator', { halfX: 1, halfZ: 1, path: t => ({ x: 0, y: 0.5 + t, z: 0 }) }); }, start: { x: 0, y: 1, z: 0 } });
-    const last = pick[pick.length - 1];
+    const last = must(pick[pick.length - 1]);
     assert.ok(Math.abs(last.y - (0.5 + last.t)) < 1e-9 && last.y > 1.9, `${hz} Hz carried up by the overtaking platform: ${last.y}`);
   }
 });

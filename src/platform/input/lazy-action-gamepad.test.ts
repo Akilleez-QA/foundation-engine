@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { installLazyActionGamepad, type LazyActionGamepadOptions } from './lazy-action-gamepad';
 import type { PadLike } from './gamepad';
+import {must} from '../../testing/must';
 
 const standard: PadLike = { index: 0, id: 'pad', connected: true, mapping: 'standard', buttons: [], axes: [] };
 const flush = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -133,12 +134,12 @@ test('partial installation is aborted on failure and reentrant app abort reaches
   }), true);
   installLazyActionGamepad(r.o);
   await flush();
-  assert.equal(signals[0].aborted, true);
+  assert.equal(must(signals[0]).aborted, true);
   assert.equal(r.errors.length, 1);
   r.connect();
   await flush();
   assert.equal(installs, 2);
-  assert.equal(signals[1].aborted, true);
+  assert.equal(must(signals[1]).aborted, true);
   r.connect();
   await flush();
   assert.equal(installs, 2);

@@ -47,13 +47,13 @@ function queueFixture(){
 }
 test('shared queue bounds concurrent decodes and ready backlog, then uploads only the frame allowance',async()=>{
  const f=queueFixture();f.queue.setWanted([1,2,3,4,5]);await settle();assert.equal(f.requests.length,2);
- f.requests[0].resolve(1);f.requests[1].resolve(2);await settle();assert.equal(f.requests.length,3);
- f.requests[2].resolve(3);await settle();assert.equal(f.queue.ready,3);assert.equal(f.requests.length,3);
+ must(f.requests[0]).resolve(1);must(f.requests[1]).resolve(2);await settle();assert.equal(f.requests.length,3);
+ must(f.requests[2]).resolve(3);await settle();assert.equal(f.queue.ready,3);assert.equal(f.requests.length,3);
  f.queue.update();await settle();assert.deepEqual(f.uploaded,[1]);assert.equal(f.requests.length,4);
- f.queue.close();f.requests[3].resolve(4);await settle();assert.deepEqual(f.disposed.sort(),[2,3,4]);
+ f.queue.close();must(f.requests[3]).resolve(4);await settle();assert.deepEqual(f.disposed.sort(),[2,3,4]);
 });
 test('A to B to A cancellation discards stale decode even when it ignores AbortSignal, and restarts the wanted key',async()=>{
- const f=queueFixture();f.queue.setWanted([1]);await settle();const first=f.requests[0];
+ const f=queueFixture();f.queue.setWanted([1]);await settle();const first=must(f.requests[0]);
  f.queue.setWanted([2]);f.queue.setWanted([1]);assert.equal(first.signal.aborted,true);
  await settle();first.resolve(100);await settle();assert.deepEqual(f.disposed,[100]);
  const current=f.requests.at(-1)!;assert.equal(current.tile,1);assert.equal(current.signal.aborted,false);
@@ -70,8 +70,8 @@ test('hidden and covered work is cancelled, does not restart until visible, and 
 });
 test('closed queue disposes pending decode and supports selective retry without retrying permanent failures',async()=>{
  const f=queueFixture();f.queue.setWanted([1,2]);await settle();for(const r of f.requests)r.reject(Error('missing'));await settle();
- f.queue.retry(tile=>tile===2);await settle();assert.equal(f.requests.length,3);assert.equal(f.requests[2].tile,2);
- f.owner.abort();f.requests[2].resolve(2);await settle();assert.deepEqual(f.disposed,[2]);assert.equal(f.queue.ready,0);
+ f.queue.retry(tile=>tile===2);await settle();assert.equal(f.requests.length,3);assert.equal(must(f.requests[2]).tile,2);
+ f.owner.abort();must(f.requests[2]).resolve(2);await settle();assert.deepEqual(f.disposed,[2]);assert.equal(f.queue.ready,0);
 });
 test('released residency wakes a blocked decoded tile without fetching it again',async()=>{
  const scheduler=createTileScheduler(()=>({resident:1,concurrency:1,decodedBitmapCap:1,uploadsPerFrame:1}));
@@ -88,12 +88,13 @@ test('closing before the first queued microtask never calls the decoder',async()
 });
 
 import {tileReadiness} from './tile-readiness';
+import {must} from '../../testing/must';
 test('capture readiness follows finite wanted work through fetch, decode, upload, failure, coverage and close',async()=>{
  const before=tileReadiness(),f=queueFixture();
  const delta=()=>{const s=tileReadiness();return Object.fromEntries(Object.entries(s).map(([k,v])=>[k,v-before[k as keyof typeof before]]));};
  f.queue.setWanted([81]);await settle();
  assert.deepEqual(delta(),{wanted:1,pending:1,decoded:0,unresolved:1,failed:0});
- f.requests[0].resolve(81);await settle();
+ must(f.requests[0]).resolve(81);await settle();
  assert.deepEqual(delta(),{wanted:1,pending:0,decoded:1,unresolved:1,failed:0},'decoded is not yet presented');
  f.queue.update();assert.equal(delta().unresolved,0);
  f.queue.setWanted([82]);await settle();f.requests.at(-1)!.reject(Error('offline'));await settle();

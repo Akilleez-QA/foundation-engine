@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { benchResultOf, checkBudgets, deriveBudget, formatReport, readMetric, toCheckBudget, worstOf, type BenchResult, type CheckBudget, type SampleBinding } from './budget-check';
 import type { SceneBudget } from '../../core/budget';
 import type { PerfRun } from './perf-run';
+import {must} from '../../testing/must';
 
 const bindings: SampleBinding[] = [
   { sample: 'hall', scene: 'hall', metrics: ['draws', 'triangles', 'shadowCasters', 'shadowDrawsIdle', 'textureMiB', 'heapMiB', 'frameMs'] },
@@ -126,7 +127,7 @@ test('an inconclusive window (active, drew no frame) never passes: every row is 
   assert.ok(r.rows.length > 0);
   assert.ok(r.rows.every(x => x.verdict === 'inconclusive'), r.rows.map(x => `${x.metric}:${x.verdict}`).join());
   assert.ok(r.rows.every(x => !x.regression?.blocking));
-  assert.match(r.rows[0].reason!, /window inconclusive: active window rendered no frame/);
+  assert.match(must(r.rows[0]).reason!, /window inconclusive: active window rendered no frame/);
   assert.equal(r.failures, 0);
   assert.equal(r.inconclusive, r.rows.length);
   assert.equal(r.ok, false);

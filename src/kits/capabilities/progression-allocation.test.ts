@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createProgressionState, deriveProgressionGrants, parseProgressionRules, parseProgressionState, prepareProgressionChange,
   type ProgressionBounds, type ProgressionChange, type ProgressionRules, type ProgressionState } from './progression';
+import { must } from '../../testing/must';
 const bounds: ProgressionBounds = { xpTypes: 8, skills: 16, prerequisites: 32, grants: 32, learned: 8 };
 const rules: ProgressionRules = {
   id: 'training-v1', allocationLimit: 6,
@@ -41,7 +42,7 @@ describe('persistent skill allocation candidates', () => {
     assert.deepEqual(deriveProgressionGrants(s, rules, bounds), { certificates: ['machine', 'scanner'], schematics: ['beacon', 'fixture'] });
     const restored = parseProgressionState({ ...s, xp: [...s.xp].reverse(), learned: [...s.learned].reverse() }, rules, bounds);
     assert.deepEqual(restored, s);
-    restored.learned.length = 0; restored.xp[0].balance = 0;
+    restored.learned.length = 0; must(restored.xp[0]).balance = 0;
     assert.equal(s.learned.length, 2); assert.equal(balance(s, 'craft'), 350);
   });
   it('respec refuses dependent surrender, refunds points only, and charges XP again on relearning', () => {
@@ -92,8 +93,8 @@ describe('persistent skill allocation candidates', () => {
     assert.equal(balance(accept(s, { kind: 'earn', xpType: 'field', amount: 940 }), 'field'), 1000);
   });
   it('never rounds balances or allocations beyond safe integer capacity', () => {
-    const r = clone(rules); r.allocationLimit = Number.MAX_SAFE_INTEGER; r.xpTypes[0].maxBalance = Number.MAX_SAFE_INTEGER;
-    r.skills[0].pointCost = Number.MAX_SAFE_INTEGER; r.skills[1].pointCost = 1;
+    const r = clone(rules); r.allocationLimit = Number.MAX_SAFE_INTEGER; must(r.xpTypes[0]).maxBalance = Number.MAX_SAFE_INTEGER;
+    must(r.skills[0]).pointCost = Number.MAX_SAFE_INTEGER; must(r.skills[1]).pointCost = 1;
     let s = createProgressionState(r, bounds);
     s = accept(s, { kind: 'earn', xpType: 'field', amount: Number.MAX_SAFE_INTEGER }, r);
     reject(s, { kind: 'earn', xpType: 'field', amount: 1 }, 'xp-capacity', r);
@@ -118,27 +119,27 @@ describe('persistent skill allocation candidates', () => {
   });
   it('validates all authored types, missing prerequisites, duplicate IDs, cycles and bounds', () => {
     const variants: ProgressionRules[] = [];
-    let r = clone(rules); r.skills[0].requires = ['analysis']; variants.push(r);
-    r = clone(rules); r.skills[0].requires = ['survey']; variants.push(r);
-    r = clone(rules); r.skills[0].requires = ['missing']; variants.push(r);
-    r = clone(rules); r.skills[0].xpType = 'missing'; variants.push(r);
-    r = clone(rules); r.skills[0].pointCost = .5; variants.push(r);
-    r = clone(rules); r.skills[0].xpCost = -1; variants.push(r);
-    r = clone(rules); r.skills[0].certificates.push('scanner'); variants.push(r);
-    r = clone(rules); r.skills.push(r.skills[0]); variants.push(r);
-    r = clone(rules); r.xpTypes.push(r.xpTypes[0]); variants.push(r);
+    let r = clone(rules); must(r.skills[0]).requires = ['analysis']; variants.push(r);
+    r = clone(rules); must(r.skills[0]).requires = ['survey']; variants.push(r);
+    r = clone(rules); must(r.skills[0]).requires = ['missing']; variants.push(r);
+    r = clone(rules); must(r.skills[0]).xpType = 'missing'; variants.push(r);
+    r = clone(rules); must(r.skills[0]).pointCost = .5; variants.push(r);
+    r = clone(rules); must(r.skills[0]).xpCost = -1; variants.push(r);
+    r = clone(rules); must(r.skills[0]).certificates.push('scanner'); variants.push(r);
+    r = clone(rules); r.skills.push(must(r.skills[0])); variants.push(r);
+    r = clone(rules); r.xpTypes.push(must(r.xpTypes[0])); variants.push(r);
     for (const invalid of variants) assert.throws(() => parseProgressionRules(invalid, bounds));
     for (const b of [{ ...bounds, xpTypes: 1 }, { ...bounds, skills: 2 }, { ...bounds, prerequisites: 0 },
       { ...bounds, grants: 1 }, { ...bounds, learned: NaN }]) assert.throws(() => parseProgressionRules(rules, b));
-    const detached = parseProgressionRules(rules, bounds); detached.skills[0].requires.length = 0;
-    assert.deepEqual(rules.skills[1].requires, ['survey']);
+    const detached = parseProgressionRules(rules, bounds); must(detached.skills[0]).requires.length = 0;
+    assert.deepEqual(must(rules.skills[1]).requires, ['survey']);
   });
   it('rejects sparse arrays and ignores supplied array iteration methods during indexed capture', () => {
     const s = funded();
     for (const corrupt of [{ ...s, xp: new Array(2) }, { ...s, learned: new Array(1) }]) {
       assert.deepEqual(prepareProgressionChange(corrupt, { kind: 'learn', skill: 'survey' }, rules, bounds), { ok: false, reason: 'invalid' });
     }
-    const r = clone(rules); r.skills[0].certificates = new Array(1);
+    const r = clone(rules); must(r.skills[0]).certificates = new Array(1);
     assert.throws(() => parseProgressionRules(r, bounds));
     const guarded = clone(rules);
     guarded.skills.map = () => { throw Error('caller map'); };
@@ -148,14 +149,14 @@ describe('persistent skill allocation candidates', () => {
     assert.throws(() => parseProgressionRules(guarded, bounds));
   });
   it('supports zero-cost skills, empty rules, and special IDs as data', () => {
-    const r = clone(rules); r.skills[0].xpCost = 0; r.skills[0].pointCost = 0;
+    const r = clone(rules); must(r.skills[0]).xpCost = 0; must(r.skills[0]).pointCost = 0;
     let s = accept(createProgressionState(r, bounds), { kind: 'learn', skill: 'survey' }, r);
     assert.equal(s.spentAllocation, 0);
     s = accept(s, { kind: 'surrender', skill: 'survey' }, r); assert.equal(balance(s, 'field'), 0);
     const empty = { id: 'empty', allocationLimit: 0, xpTypes: [], skills: [] };
     const zero = { xpTypes: 0, skills: 0, prerequisites: 0, grants: 0, learned: 0 };
     assert.deepEqual(parseProgressionState(createProgressionState(empty, zero), empty, zero).learned, []);
-    r.xpTypes[0].id = '__proto__'; r.skills[0].xpType = '__proto__'; r.skills[1].xpType = '__proto__';
+    must(r.xpTypes[0]).id = '__proto__'; must(r.skills[0]).xpType = '__proto__'; must(r.skills[1]).xpType = '__proto__';
     s = accept(createProgressionState(r, bounds), { kind: 'earn', xpType: '__proto__', amount: 1 }, r);
     assert.equal(balance(s, '__proto__'), 1);
   });

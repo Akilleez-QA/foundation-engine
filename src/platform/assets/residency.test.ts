@@ -8,6 +8,7 @@ import { createModelLibrary, modelBytes } from './models';
 import { defineGame } from '../../author/defs';
 import type { AssetDef } from './manifest';
 import type { QualityPreset } from '../../core/tiers';
+import {must} from '../../testing/must';
 
 const MiB = 1024 * 1024;
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -60,14 +61,14 @@ test('RES-01: a binding applies the current preset now, on a preset change once,
     input: { textures: { residentBytes: 100, warmBytes: 10, ports: { low: { residentBytes: 50 } } }, pinned: ['hero'], onPressure() { throw Error('creator bug'); } },
   });
   assert.equal(applied.length, 1);
-  assert.equal(applied[0].residentBytes, 100);
-  assert.equal(applied[0].pinned?.('hero|a.png'), true);
-  assert.equal(applied[0].pinned?.('heroic|a.png'), false, 'a pin matches the whole asset id');
+  assert.equal(must(applied[0]).residentBytes, 100);
+  assert.equal(must(applied[0]).pinned?.('hero|a.png'), true);
+  assert.equal(must(applied[0]).pinned?.('heroic|a.png'), false, 'a pin matches the whole asset id');
   q.set('reference');
   assert.equal(applied.length, 1, 'an unchanged preset does not re-apply');
   q.set('low');
-  assert.deepEqual([applied.length, applied[1].residentBytes, applied[1].warmBytes], [2, 50, 10]);
-  applied[1].onPressure!({ residentBytes: 60, limitBytes: 50, liveBytes: 60, pinnedBytes: 0, warmBytes: 0 });
+  assert.deepEqual([applied.length, must(applied[1]).residentBytes, must(applied[1]).warmBytes], [2, 50, 10]);
+  must(applied[1]).onPressure!({ residentBytes: 60, limitBytes: 50, liveBytes: 60, pinnedBytes: 0, warmBytes: 0 });
   assert.deepEqual(logs, ['residency: textures over budget with every remaining asset in use or pinned', 'residency: onPressure failed'],
     'pressure is logged and a throwing creator hook is contained');
   life.abort();

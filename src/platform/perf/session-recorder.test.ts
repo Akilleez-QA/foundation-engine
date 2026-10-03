@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { FrameLoop } from '../../core/activity/loop';
 import type { FrameRecord } from '../../core/activity/ports';
 import { binWidthAt, createSessionRecorder, FixedHistogram, HISTOGRAM_BINS, recordSession, slope, type SessionRecorder } from './session-recorder';
+import {must} from '../../testing/must';
 
 /** Drives a recorder with synthetic frame records on one timeline. */
 function driver(rec: SessionRecorder, start = 1000) {
@@ -21,7 +22,7 @@ function driver(rec: SessionRecorder, start = 1000) {
 }
 
 /** Exact nearest-rank percentile. */
-const exact = (values: number[], p: number) => { const s = [...values].sort((a, b) => a - b); return s[Math.max(1, Math.ceil(p * s.length)) - 1]; };
+const exact = (values: number[], p: number) => { const s = [...values].sort((a, b) => a - b); return must(s[Math.max(1, Math.ceil(p * s.length)) - 1], 'a sample'); };
 
 test('PERF-01: percentiles on known distributions are within one bin above the exact nearest rank', () => {
   // A deterministic LCG: no Math.random in source (lint), and a replayable case.
@@ -61,6 +62,7 @@ test('PERF-01: rolling windows close on loop-active time and percentiles describ
   const e = rec.evidence();
   assert.equal(e.windows.length, 2);
   const [a, b] = e.windows;
+  assert.ok(a); assert.ok(b);
   assert.equal(a.complete, true); assert.equal(a.end, 'full');
   assert.equal(a.frames, 61); assert.equal(a.resumes, 1, 'the first frame after an idle loop has no interval');
   assert.equal(a.frameMs!.p50, 16.7); assert.equal(a.workMs!.p95, 2);
@@ -115,12 +117,12 @@ test('PERF-01: a hidden tab closes the open window as invalid and pauses account
   for (let i = 0; i < 70; i++) d.frame(16);
   const e = rec.evidence();
   assert.equal(e.session.hiddenTransitions, 1);
-  assert.equal(e.windows[0].end, 'hidden');
-  assert.equal(e.windows[0].complete, false);
-  assert.equal(e.windows[0].classification.kind, 'invalid');
-  assert.equal(e.windows[1].complete, true);
-  assert.equal(e.windows[1].frameMs!.max, 16, 'the hidden minute never appears as a frame interval');
-  assert.ok(e.windows[1].startMinute >= 1, 'drift x-axis keeps session wall time');
+  assert.equal(must(e.windows[0]).end, 'hidden');
+  assert.equal(must(e.windows[0]).complete, false);
+  assert.equal(must(e.windows[0]).classification.kind, 'invalid');
+  assert.equal(must(e.windows[1]).complete, true);
+  assert.equal(must(e.windows[1]).frameMs!.max, 16, 'the hidden minute never appears as a frame interval');
+  assert.ok(must(e.windows[1]).startMinute >= 1, 'drift x-axis keeps session wall time');
   // A hidden flip with fewer than two frames is discarded, not stored.
   d.hidden(); d.resume(); d.hidden();
   assert.equal(rec.evidence().session.discardedWindows, 1);
@@ -139,7 +141,7 @@ test('PERF-01: clock jumps: backwards timestamps are counted and kept monotonic;
   assert.equal(e.session.clockAnomalies, 2);
   assert.equal(e.session.gaps, 1);
   assert.equal(e.session.frameMs!.max, 16, 'the gap is excluded from percentiles');
-  const w = e.windows[0];
+  const w = must(e.windows[0]);
   assert.ok(w.endMs >= w.startMs);
   assert.equal(w.end, 'stopped');
 });
@@ -167,8 +169,8 @@ test('PERF-01: stop and dispose mid-window; both idempotent and evidence stays r
   const se = s.evidence();
   assert.equal(se.state, 'stopped');
   assert.equal(se.windows.length, 1, 'stop keeps the partial window, marked incomplete');
-  assert.equal(se.windows[0].end, 'stopped');
-  assert.equal(se.windows[0].classification.kind, 'invalid');
+  assert.equal(must(se.windows[0]).end, 'stopped');
+  assert.equal(must(se.windows[0]).classification.kind, 'invalid');
   s.dispose();
   assert.equal(s.evidence().windows.length, 1, 'retained summaries survive dispose');
 });
@@ -204,6 +206,7 @@ test('PERF-01: drift slope and early/late ratio surface a synthetic throttling r
   }
   const e = rec.evidence();
   const [g] = e.drift;
+  assert.ok(g);
   assert.equal(g.group, 'scene.soak|medium');
   assert.equal(g.windows, 20);
   assert.ok(Math.abs(g.workP95SlopeMsPerMin! - 0.25) < 0.02, `work slope ${g.workP95SlopeMsPerMin}`);
@@ -212,7 +215,7 @@ test('PERF-01: drift slope and early/late ratio surface a synthetic throttling r
   // A flat session has ~0 slope.
   const flat = createSessionRecorder({ windowMs: 1000 }), fd = driver(flat);
   for (let i = 0; i < 600; i++) fd.frame(16.7, 3);
-  assert.equal(flat.evidence().drift[0].workP95SlopeMsPerMin, 0);
+  assert.equal(must(flat.evidence().drift[0]).workP95SlopeMsPerMin, 0);
   assert.equal(slope([1], [2]), null);
   assert.equal(slope([1, 1], [2, 3]), null);
 });
@@ -223,14 +226,14 @@ test('PERF-01: optional cumulative counters are read only at window boundaries a
   const d = driver(rec);
   for (let i = 0; i < 10; i++) { draws += 7; tris += 300; d.frame(10); }
   assert.equal(reads, 2, 'one read when the window opens, one when it closes');
-  const w = rec.evidence().windows[0];
+  const w = must(rec.evidence().windows[0]);
   assert.equal(w.drawsPerRenderedFrame, 6.3, 'deltas after the opening read');
   assert.equal(w.trianglesPerRenderedFrame, 270);
   const broken = createSessionRecorder({ windowMs: 100, counters: () => { throw new Error('gone'); } });
   const b = driver(broken);
   for (let i = 0; i < 10; i++) b.frame(10);
   const be = broken.evidence();
-  assert.equal(be.windows[0].drawsPerRenderedFrame, null);
+  assert.equal(must(be.windows[0]).drawsPerRenderedFrame, null);
   assert.equal(be.session.counterFailures, 1);
 });
 
@@ -248,8 +251,8 @@ test('PERF-01: options are validated and labels are bounded; evidence is detache
   assert.equal(e.meta.evidence, 'emulated');
   assert.equal(e.recorder.histogram.bins, HISTOGRAM_BINS);
   assert.ok(e.limitations.some(l => /DV-01/.test(l)));
-  e.windows[0].frameMs!.p50 = -1;
-  assert.notEqual(rec.evidence().windows[0].frameMs!.p50, -1, 'a snapshot cannot mutate the recorder');
+  must(e.windows[0]).frameMs!.p50 = -1;
+  assert.notEqual(must(rec.evidence().windows[0]).frameMs!.p50, -1, 'a snapshot cannot mutate the recorder');
   assert.deepEqual(JSON.parse(JSON.stringify(e)), e, 'JSON-safe');
 });
 
@@ -307,6 +310,6 @@ test('PERF-01: frames stepped by a held test driver are counted, never timed', (
   assert.equal(e.session.frames, 10);
   assert.equal(e.session.frameMs!.max, 16, 'script-chosen intervals never enter percentiles');
   assert.equal(e.session.workMs!.max, 1);
-  assert.equal(e.windows[0].steppedFrames, 9);
-  assert.equal(e.windows[0].activeMs, 160);
+  assert.equal(must(e.windows[0]).steppedFrames, 9);
+  assert.equal(must(e.windows[0]).activeMs, 160);
 });

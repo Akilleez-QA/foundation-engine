@@ -71,7 +71,7 @@ export class GamepadInput{
   const reads=pads.map(p=>({pad:p,read:this.read(p)}));
   // Most recent meaningful input picks the active pad; a lying-around pad cannot steer by drift.
   for(const {pad,read} of reads){const s=this.state(pad);const edge=read.buttons.some((b,i)=>b&&!s.buttons[i]);if(s.armed&&(edge||Math.hypot(read.move.x,read.move.y)>MENU_ENGAGE)&&identity(pad)!==this.active){this.active=identity(pad);this.activeIndex=pad.index;this.zoomRepeat.reset();}}
-  const chosen=reads.find(r=>identity(r.pad)===this.active)??reads.find(r=>r.pad.mapping==='standard')??reads[0];
+  const chosen=reads.find(r=>identity(r.pad)===this.active)??reads.find(r=>r.pad.mapping==='standard')??reads[0]!; // pads (and so reads) is non-empty here
   if(!this.active){this.active=identity(chosen.pad);this.activeIndex=chosen.pad.index;}
   frame.connected=true;this.family=frame.family=padFamily(chosen.pad.id);
   for(const {pad,read} of reads){
@@ -110,7 +110,7 @@ export class GamepadInput{
  private read(p:PadLike):Read{
   const was=this.states.get(identity(p))?.buttons??[];
   const buttons=Array.from({length:Math.max(17,p.buttons.length)},(_,i)=>buttonDown(p.buttons[i],!!was[i]));
-  const ax=(i:number)=>{const v=p.axes[i];return Number.isFinite(v)?v:0;};
+  const ax=(i:number)=>{const v=p.axes[i];return v!==undefined&&Number.isFinite(v)?v:0;};
   const standard=p.mapping==='standard',move=scaledRadial(ax(0),ax(1),MOVE_DEAD);
   // Unknown layouts often put triggers resting at −1 on axes 2–5, so only the standard mapping looks.
   const look=standard?scaledRadial(ax(2),ax(3),LOOK_DEAD,OUTER_DEAD,LOOK_CURVE):{x:0,y:0};

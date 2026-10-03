@@ -212,7 +212,7 @@ export function createAudioTimeline<T = unknown>(o: AudioTimelineOptions<T>): Au
     const dead = queue.length - live; // resolved records before `head` plus cancelled ones after it
     if (dead > 64 && dead > live) { queue = queue.slice(head).filter(r => r.live); head = 0; }
   };
-  const clearAll = () => { for (let i = head; i < queue.length; i++) if (queue[i].live) removeAt(queue[i]); queue = []; head = 0; };
+  const clearAll = () => { for (const record of queue.slice(head)) if (record.live) removeAt(record); queue = []; head = 0; };
   const event = (record: Pending<T>, lateBy: number): TimelineEvent<T> =>
     Object.freeze({ id: record.id, at: record.at, when: source === 'audio' ? origin + record.at : null, lateBy, payload: record.payload });
 
@@ -248,7 +248,7 @@ export function createAudioTimeline<T = unknown>(o: AudioTimelineOptions<T>): Au
         const now = renderAt(ms);
         // A handler that stops or restarts the run ends this loop: `now` belonged to the old run.
         while (head < queue.length && resolved < maxDispatch && !closed && source && run === epoch) {
-          const record = queue[head];
+          const record = queue[head]!; // head < queue.length (loop condition)
           if (!record.live) { head++; continue; }
           if (record.at > now + lookahead) break;
           head++;
@@ -280,7 +280,7 @@ export function createAudioTimeline<T = unknown>(o: AudioTimelineOptions<T>): Au
       const record: Pending<T> = { id: ++sequence, at, payload, live: true };
       // Binary search among pending records: equal times keep admission order.
       let lo = head, hi = queue.length;
-      while (lo < hi) { const mid = (lo + hi) >>> 1; if (queue[mid].at <= at) lo = mid + 1; else hi = mid; }
+      while (lo < hi) { const mid = (lo + hi) >>> 1; if (queue[mid]!.at <= at) /* head <= lo <= mid < hi <= queue.length */ lo = mid + 1; else hi = mid; }
       queue.splice(lo, 0, record); byId.set(record.id, record); live++;
       if (signal) {
         const abort = () => { if (record.live) { removeAt(record); compact(); } };
@@ -312,7 +312,8 @@ export function estimateOffset(deltasMs: readonly number[], min = 8): OffsetEsti
   if (!Array.isArray(deltasMs) || deltasMs.length > 1024) throw Error('audio timeline: too many calibration samples');
   const usableDeltas = deltasMs.filter(d => finite(d) && Math.abs(d) <= 1000);
   if (usableDeltas.length < min) return null;
-  const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  // xs holds at least min >= 1 samples, so m and m - 1 are in range.
+  const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2; };
   const m0 = median(usableDeltas);
   const mad = median(usableDeltas.map(d => Math.abs(d - m0)));
   const kept = usableDeltas.filter(d => Math.abs(d - m0) <= Math.max(5, 3 * mad));

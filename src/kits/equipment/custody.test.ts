@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createEquipment, type ItemInstance} from './index';
 import {createInventoryLedger} from '../inventory';
+import { must } from '../../testing/must';
 const item = (id = 'tool'): ItemInstance => ({id, definition:'authored-tool', slots:['hand'], functional:true});
 const empty = (capacity = 2, revision = 0) => createEquipment(['hand'], capacity, {revision, items:[], equipped:[]});
 
@@ -54,8 +55,8 @@ test('custody captures bounded indexed facts and blocks reentrant getters', () =
   const source = {...item(), slots:arrangement};
   assert.equal(e.acquire(source, 0), 'applied');
   source.definition = 'changed'; arrangement[0] = 'changed';
-  assert.equal(e.snapshot().items[0].definition, 'authored-tool');
-  assert.deepEqual(e.snapshot().items[0].slots, ['hand']);
+  assert.equal(must(e.snapshot().items[0]).definition, 'authored-tool');
+  assert.deepEqual(must(e.snapshot().items[0]).slots, ['hand']);
   const before = e.snapshot();
   assert.equal(e.acquire({get id(): string { throw Error('stale payload read'); }, definition:'ignored', functional:true, slots:['hand']}, 0), 'stale');
   assert.throws(() => e.acquire({get id(){ e.release('tool', 1); return 'new'; }, definition:'x', functional:true, slots:['hand']}, 1), /reentrant/);
@@ -68,7 +69,7 @@ test('custody captures bounded indexed facts and blocks reentrant getters', () =
 test('equipped presentation includes cosmetics and returns detached facts', () => {
   const e = empty(); e.acquire({...item(), functional:false}, 0); e.commit('tool', 1);
   assert.equal(e.equipped().length, 1); assert.deepEqual(e.active(), []);
-  const view = e.equipped(); view[0].definition = 'mutated'; (view[0].slots as string[])[0] = 'other'; view.length = 0;
+  const view = e.equipped(); must(view[0]).definition = 'mutated'; (must(view[0]).slots as string[])[0] = 'other'; view.length = 0;
   assert.deepEqual(e.equipped(), [{...item(), functional:false}]);
 });
 
@@ -96,7 +97,7 @@ test('consumer stages inventory conversion, delivery receipt and equipment in on
   const gear = createEquipment(['hand'], 1, restored.equipment);
   assert.equal(createInventoryLedger(options, restored.inventory).quantity('bag', 'material'), 1);
   assert.equal(gear.commit('tool', gear.snapshot().revision), 'applied');
-  assert.equal(gear.active()[0].id, 'tool');
+  assert.equal(must(gear.active()[0]).id, 'tool');
   assert.equal(gear.commit('tool', gear.snapshot().revision, false), 'applied');
   assert.equal(gear.release('tool', gear.snapshot().revision), 'applied');
   assert.deepEqual(gear.snapshot().items, []);

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { must } from '../testing/must';
 import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 import {FrameReadinessError} from '../platform/render/frame-readiness';
@@ -38,7 +39,7 @@ test('initial first draw failures reject ready, and synchronous restore link fai
  const first=fixture();first.renderThrows(new ProgramLinkError('bad draw',[]));first.pending[0]!.resolve('ready');await assert.rejects(first.api.ready,ProgramLinkError);assert.equal(first.api.state(),false);
  const restored=fixture();restored.pending[0]!.resolve('ready');await restored.api.ready;
  restored.compileThrows(new ProgramLinkError('bad restore',[]));assert.doesNotThrow(()=>restored.api.contextRestored());await turn();
- assert.equal(restored.api.state(),false);assert.equal(restored.view.dataset.programReadiness,'failed');assert.equal(restored.cards.length,1);assert.equal(restored.layers[0].modal,'scope');
+ assert.equal(restored.api.state(),false);assert.equal(restored.view.dataset.programReadiness,'failed');assert.equal(restored.cards.length,1);assert.equal(must(restored.layers[0],'layer').modal,'scope');
  restored.api.contextRestored();await turn();assert.equal(restored.cards.length,1,'one owned recovery surface');
 });
 

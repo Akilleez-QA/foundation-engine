@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createActionRuns } from './action-runs';
 import { resolveAction } from '../combat';
 import { defineScene, defineSystem, testScene } from '../../author';
+import { must } from '../../testing/must';
 
 const input = (id = 'scene-1:scan') => ({ id, owner: 'actor', readyAt: 2, expiresAt: 5 });
 
@@ -15,7 +16,7 @@ test('action timing separates readiness, acknowledgement, expiry and stable term
   assert.equal(runs.get(source.id)?.readyAt, 2);
   assert.deepEqual(runs.acknowledge(source.id, 0), { kind: 'not-ready' });
   assert.deepEqual(runs.advance(1), []);
-  const [ready] = runs.advance(2);
+  const ready = must(runs.advance(2)[0], 'ready run');
   assert.equal(ready.state, 'ready');
   assert.equal(ready.revision, 1);
   assert.deepEqual(runs.acknowledge(ready.id, 0), { kind: 'stale' });
@@ -27,7 +28,7 @@ test('action timing separates readiness, acknowledgement, expiry and stable term
   assert.equal(runs.acknowledge(ready.id, 2).kind, 'terminal');
   assert.equal(runs.admit(input('second')).kind, 'admitted');
   assert.equal(runs.admit(input('third')).kind, 'capacity');
-  assert.equal(runs.advance(5)[0].state, 'expired');
+  assert.equal(must(runs.advance(5)[0]).state, 'expired');
   assert.equal(runs.admit(input('late')).kind, 'expired');
   assert.equal(runs.size, 2);
 });
@@ -68,7 +69,7 @@ test('action inputs, monotonic time and returned facts are validated and immutab
   assert.deepEqual(runs.advance(2), []);
   const jumped = createActionRuns({ now: 0 });
   jumped.admit(input());
-  assert.equal(jumped.advance(5)[0].state, 'expired', 'jump across both boundaries never exposes ready');
+  assert.equal(must(jumped.advance(5)[0]).state, 'expired', 'jump across both boundaries never exposes ready');
 });
 
 test('admission captures getters once and prevents reentrant mutation before publication', () => {

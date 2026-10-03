@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as T from 'three';
 import {onDemandFrames,scheduleShadows,shadowSchedulerOf,shadowTechniqueOf,throttleShadow} from './shadows';
 import {setShadowTechnique} from './shadow-technique';
+import {must} from '../../testing/must';
 
 type Knob='ultra'|'high'|'medium'|'low'|'off';
 /** A renderer as far as the scheduler sees one: its shadow map's `render`, called by three after updateMatrixWorld. */
@@ -40,7 +41,7 @@ test('a still scene draws its shadow map once, then only when a caster or the li
  caster.rotation.y=.5;assert.equal(frame(),true);
  caster.visible=false;assert.equal(frame(),true);caster.visible=true;assert.equal(frame(),true);
  (caster.material as T.Material).visible=false;assert.equal(frame(),true);(caster.material as T.Material).visible=true;frame();
- caster.geometry.attributes.position.needsUpdate=true;assert.equal(frame(),true,'deformed geometry');
+ caster.geometry.getAttribute('position').needsUpdate=true;assert.equal(frame(),true,'deformed geometry');
  crowd.setMatrixAt(1,new T.Matrix4().makeTranslation(2,0,0));crowd.instanceMatrix.needsUpdate=true;assert.equal(frame(),true);
  crowd.count=2;assert.equal(frame(),true);
  sun.position.set(4,9,1);assert.equal(frame(),true);sun.target.position.x=2;assert.equal(frame(),true);
@@ -53,10 +54,10 @@ test('a still scene draws its shadow map once, then only when a caster or the li
 
 test('no mesh type forces a redraw: a posed, still skinned caster draws its map once (ADR 0055, 0056)',()=>{
  const {scene,frame}=fixture();
- const bones=[new T.Bone(),new T.Bone()];bones[0].add(bones[1]);scene.add(bones[0]);
+ const bones=[new T.Bone(),new T.Bone()];must(bones[0]).add(must(bones[1]));scene.add(must(bones[0]));
  const rig=new T.SkinnedMesh(new T.BoxGeometry(),new T.MeshStandardMaterial());rig.castShadow=true;scene.add(rig);scene.updateMatrixWorld(true);rig.bind(new T.Skeleton(bones));
  assert.equal(frame(),true);assert.equal(frame(),false);assert.equal(frame(),false);
- bones[1].rotation.z=.4;assert.equal(frame(),true,'a new pose redraws');assert.equal(frame(),false);
+ must(bones[1]).rotation.z=.4;assert.equal(frame(),true,'a new pose redraws');assert.equal(frame(),false);
 });
 
 test('an input the tracker cannot observe redraws every frame (unknown means changed)',()=>{
