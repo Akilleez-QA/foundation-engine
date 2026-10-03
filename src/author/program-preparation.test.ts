@@ -8,12 +8,19 @@ import {ProgramLinkError} from '../platform/render/program-validation';
 // Execute the actual runtime preparation/restore blocks with a controllable pool,
 // without creating a GPU context or reimplementing their lifetime logic.
 const source=readFileSync(new URL('./runtime.ts',import.meta.url),'utf8');
-const prepare=source.slice(source.indexOf('      let programsPrepared=false,'),source.indexOf('      return {\n        ready,'));
-const restore=source.slice(source.indexOf('        contextRestored() {'),source.indexOf('\n      };\n    },',source.indexOf('        contextRestored() {')));
-const draw=source.slice(source.indexOf('        render() {'),source.indexOf('        activate() {'));
-const step=source.slice(source.indexOf('        update(f: FrameInfo) {'),source.indexOf('        render() {'));
-// The runtime's own arrival callback (it runs the scene's enter()), cut from the enterActivity call.
-const arriveAt=source.indexOf('    arrive: () =>'),arrival=source.slice(arriveAt,source.indexOf('\n',arriveAt)).replace(/,$/,'');
+// Markers tolerate the whitespace a formatter may add or remove; each must be found, or the fixture runs nothing.
+const find=(marker:string|RegExp,from=0)=>{
+ const i=typeof marker==='string'?source.indexOf(marker,from):from+source.slice(from).search(marker);
+ assert.ok(i>=from,`runtime.ts marker ${String(marker).trim()}`);
+ return i;
+};
+const prepare=source.slice(find(/ {6}let programsPrepared ?= ?false,/),find('      return {\n        ready,'));
+const restore=source.slice(find('        contextRestored() {'),find('\n      };\n    },',find('        contextRestored() {')));
+const draw=source.slice(find('        render() {'),find('        activate() {'));
+const step=source.slice(find('        update(f: FrameInfo) {'),find('        render() {'));
+// The runtime's own arrival callback (it runs the scene's enter()), cut from the enterActivity call: the last
+// property, on one line or several, up to the call's closing `});`.
+const arriveAt=find('    arrive: () =>'),arrival=source.slice(arriveAt,find('\n  });',arriveAt)).replace(/,\s*$/,'');
 function fixture(frameReady?:()=>Promise<string>,tap:{running():boolean}|null=null,arrive=true){
  const cards:unknown[]=[],layers:{modal?:string}[]=[];let compileError:Error|undefined,renderError:Error|undefined;
  const doc={createElement:()=>({children:[] as unknown[],setAttribute(){},addEventListener(){},append(...nodes:unknown[]){this.children.push(...nodes);},remove(){}})};

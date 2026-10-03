@@ -6,6 +6,7 @@
 //     Math.random() and no literal UI text (lint:game; tools/, public/ and tests are not game code)
 //   - an engine file in core/platform/author/app/dev: no genre vocabulary (lint:generic)
 //   - budgets.json or build.brief.ts: the brief lint for that game
+//   - any file Prettier formats (and .prettierignore does not exclude): whether it is formatted (`npm run format`)
 import {spawnSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import {dirname, join, relative, resolve} from 'node:path';
@@ -44,6 +45,14 @@ try {
     const c = toolCommand('tsx', ['scripts/lint/brief.ts', gameDirOf]);
     const r = spawnSync(c.command, c.args, {cwd: ROOT, encoding: 'utf8', shell: c.shell});
     if (r.status !== 0) notes.push((r.stderr || r.stdout).trim());
+  }
+  const abs = join(ROOT, rel);
+  const prettier = await import('prettier');
+  const info = await prettier.getFileInfo(abs, {ignorePath: join(ROOT, '.prettierignore')});
+  if (!info.ignored && info.inferredParser) {
+    let text = null; try { text = readFileSync(abs, 'utf8'); } catch { /* deleted */ }
+    const options = await prettier.resolveConfig(abs);
+    if (text !== null && !(await prettier.check(text, {...options, filepath: abs}))) notes.push(`${rel} is not formatted; run npm run format (CI runs format:check)`);
   }
 } catch (error) {
   notes.push(`after-edit: a check could not run (${String(error?.message ?? error).split('\n')[0]}); run npm run check`);

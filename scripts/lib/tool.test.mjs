@@ -19,7 +19,7 @@ test('tools run as this Node plus the package\'s JS bin entry: no npx, no shell,
 });
 
 test('the resolved tool entries actually start under this Node', () => {
-  for (const [name, args, out] of [['tsc', ['--version'], /Version \d/], ['tsx', ['--version'], /tsx v\d/], ['vite', ['--version'], /vite\/\d/]]) {
+  for (const [name, args, out] of [['tsc', ['--version'], /Version \d/], ['tsx', ['--version'], /tsx v\d/], ['vite', ['--version'], /vite\/\d/], ['prettier', ['--version'], /^\d+\.\d+\.\d+/]]) {
     const c = toolCommand(name, args);
     const r = spawnSync(c.command, c.args, {encoding: 'utf8', shell: c.shell});
     assert.equal(r.status, 0, `${name}: ${r.stderr}`);

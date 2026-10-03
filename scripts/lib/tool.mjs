@@ -1,4 +1,4 @@
-// scripts/lib/tool.mjs: start the repository's command-line tools (tsc, tsx, vite) and npm from a script the same way
+// scripts/lib/tool.mjs: start the repository's command-line tools (tsc, tsx, vite, prettier) and npm from a script the same way
 // on Linux, macOS and Windows. `spawnSync('npx', …)` without a shell fails with ENOENT on Windows, where npx and the
 // node_modules/.bin entries are `.cmd` files, and Node refuses to spawn a `.cmd` without a shell. So:
 //   - a package's tool runs as `node <its JS bin entry> …args` (process.execPath plus the `bin` file from the package's
@@ -15,7 +15,7 @@ import {fileURLToPath} from 'node:url';
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
 /** Which package provides each command (its package.json `bin` names the JS entry). */
-export const TOOL_PACKAGES = {tsc: 'typescript', tsx: 'tsx', vite: 'vite'};
+export const TOOL_PACKAGES = {tsc: 'typescript', tsx: 'tsx', vite: 'vite', prettier: 'prettier'};
 
 /** The absolute path of a package's JS bin entry for `bin` (default: the package's only or same-named bin). */
 export function binEntry(pkg, bin = pkg, {from = ROOT} = {}) {

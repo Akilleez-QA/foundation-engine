@@ -12,7 +12,8 @@ const source=readFileSync(new URL('./runtime.ts',import.meta.url),'utf8');
 const slice=(from:string,to:string)=>{const a=source.indexOf(from),b=source.indexOf(to,a);assert.ok(a>=0&&b>a,`runtime.ts slice ${from.trim()}`);return source.slice(a,b);};
 const wiring=slice('      const pressed = ','      input.onCancel(');
 const runnerLine=slice('      const fixedSystems = ','\n      const live = ');
-const liveInputLine=slice('      const liveInput = sceneInput(','\n');
+// The whole sceneInput(...) call, whether it sits on one line or Prettier wraps its arguments.
+const liveInputLine=slice('      const liveInput = sceneInput(',');\n')+');';
 const inputLine=slice('        input: tap ? tap.input : liveInput,','\n');
 const update=slice('        update(f: FrameInfo) {','        render() {');
 const STEP=1/60;
@@ -118,8 +119,10 @@ test('press timestamps follow the latch lanes: the earliest press per tick or fr
 test('ctx.input.pointer is read-only at compile time, matching the runtime getter view', () => {
  const view=latch.createPressLatch().pointer({x:0,y:0,down:false,pressed:false});
  const state=sceneInput(()=>true,()=>false,new Map<string,number>(),view);
- // @ts-expect-error A system cannot clear the pointer press; the runtime view has getters only.
- const write=()=>{state.pointer.pressed=false;};
+ const write=()=>{
+  // @ts-expect-error A system cannot clear the pointer press; the runtime view has getters only.
+  state.pointer.pressed=false;
+ };
  assert.throws(write,TypeError);
 });
 

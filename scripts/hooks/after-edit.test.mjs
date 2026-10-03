@@ -41,3 +41,30 @@ test('after-edit hook: a game file with Math.random() or literal HUD text gets l
     assert.equal(quiet.status, 0); assert.equal(quiet.stdout.trim(), '', 'tools/ is build-time Node code, not game code');
   } finally { rmSync(root, {recursive: true, force: true}); }
 });
+
+test('after-edit hook: an unformatted file gets a format note; a file .prettierignore excludes does not', async () => {
+  const {mkdtempSync, mkdirSync, writeFileSync, rmSync} = await import('node:fs');
+  const {tmpdir} = await import('node:os');
+  const {join} = await import('node:path');
+  const root = mkdtempSync(join(tmpdir(), 'after-edit-'));
+  try {
+    mkdirSync(join(root, 'game', 'tools'), {recursive: true});
+    writeFileSync(join(root, '.prettierrc.json'), '{"singleQuote": true}\n');
+    writeFileSync(join(root, '.prettierignore'), 'game/tools/kept.ts\n');
+    const messy = join(root, 'game', 'tools', 'messy.ts');
+    writeFileSync(messy, 'export const r={a:"b"}\n');
+    const kept = join(root, 'game', 'tools', 'kept.ts');
+    writeFileSync(kept, 'export const r={a:"b"}\n');
+    const tidy = join(root, 'game', 'tools', 'tidy.ts');
+    writeFileSync(tidy, "export const r = { a: 'b' };\n");
+    const env = {...process.env, AFTER_EDIT_ROOT: root};
+    const hook = file => spawnSync(process.execPath, [HOOK], {input: JSON.stringify({tool_input: {file_path: file}}), encoding: 'utf8', env});
+    const r = hook(messy);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(JSON.parse(r.stdout).hookSpecificOutput.additionalContext, /game\/tools\/messy\.ts is not formatted; run npm run format/);
+    for (const file of [kept, tidy]) {
+      const quiet = hook(file);
+      assert.equal(quiet.status, 0); assert.equal(quiet.stdout.trim(), '', file);
+    }
+  } finally { rmSync(root, {recursive: true, force: true}); }
+});
