@@ -21,6 +21,7 @@ import type {} from '../platform/ui/shell-module';
 import type {} from '../platform/input/module';
 import type {} from '../platform/audio/module';
 import type {BuildBrief} from './build';
+import {selectAppRenderBackend} from '../platform/render/app-renderer-pool';
 import {createPlayService} from './play';
 import {actionOf, sceneId} from './ids';
 import type {
@@ -119,6 +120,8 @@ export function compileGame(o: {
   defs: readonly (AuthorDef | undefined)[];
 }): CompiledGame {
   const {brief, game} = o;
+  // The creator's render backend (ADR 0078); refused here, at boot, when this build cannot provide it.
+  selectAppRenderBackend(brief.render.backend);
   const defs = allDefinitions(game, o.defs);
   const scenes = defs.filter((d): d is SceneDefinition => d.kind === 'scene');
   const sections = defs.filter((d): d is SaveSectionDef<unknown> => d.kind === 'save-section');

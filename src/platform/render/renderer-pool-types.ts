@@ -2,6 +2,7 @@
 import type * as T from 'three';
 import type {StageSurfaceRequest} from './pool-stage';
 import type {ShadowTechnique} from './shadow-technique';
+import type {RenderBackend} from './render-backend';
 
 declare module '../../core/probe' {
   interface EngineProbes {
@@ -114,6 +115,8 @@ export interface RendererPool {
  *  its own context there) and the world context, leased or parked (`renderer` is the lease's while `leased`). */
 export interface UtilityAccess {
   make(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext): PoolRenderer;
+  /** The pool's render backend: the utility role's own context, its loss and its retirement. */
+  backend: PoolBackend;
   stats: PoolStats;
   world(): {
     canvas: HTMLCanvasElement;
@@ -131,7 +134,11 @@ export type PoolRenderer = Pick<
   'domElement' | 'getContext' | 'dispose' | 'forceContextLoss' | 'resetState' | 'info'
 > &
   Partial<T.WebGLRenderer>;
+/** The render backend the pool creates renderers and contexts with (ADR 0078). */
+export type PoolBackend = RenderBackend<GL, PoolRenderer>;
 export interface RendererPoolOptions {
+  /** The render backend (default: the WebGL2 backend). `createRenderer` and `createStageContext` override its parts. */
+  backend?: PoolBackend;
   /** World renderers: test/dev defaults to full Three diagnostics; production validates links without success logs. */
   programDiagnostics?: 'full' | 'failure-only';
   /** Make a renderer: on a new canvas (`context` undefined) or on the pooled canvas and context. */
