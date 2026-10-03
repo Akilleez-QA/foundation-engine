@@ -38,6 +38,7 @@ Short, checked how-tos. Start with [getting started](../guides/getting-started.m
 |---|---|
 | share a genre pattern between games | [add a kit](add-a-kit.md) |
 | add a starting game | [add a template](add-a-template.md) |
+| upgrade a public API consumer | [compatibility and upgrades](../guides/public-compatibility.md) |
 | publish a separately compiled content bundle | [publish content](publish-content.md) |
 
 Something missing? The README's [Not here yet](../../README.md#not-here-yet-and-workarounds) lists features that do not exist today and the workaround for each.

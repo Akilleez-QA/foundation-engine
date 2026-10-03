@@ -1,7 +1,11 @@
 name: Engine proposal
 description: Propose a reusable contract or optional kit improvement.
 title: "[Proposal]: "
+labels: ["needs-triage", "proposal"]
 body:
+  - type: markdown
+    attributes:
+      value: "Describe systems and patterns instead of external game names or source-project references. Keep required attribution and exact reproduction identifiers. See CONTRIBUTING.md, Describe systems and patterns."
   - type: textarea
     id: problem
     attributes:

@@ -1,5 +1,9 @@
 # Foundation Engine
 
+[![CI](https://img.shields.io/github/actions/workflow/status/Akilleez-QA/foundation-engine/ci.yml?branch=main)](https://github.com/Akilleez-QA/foundation-engine/actions/workflows/ci.yml?query=branch%3Amain)
+[![GPL-3.0-only](https://img.shields.io/static/v1?label=license&message=GPL-3.0-only&color=blue)](LICENSE)
+[![Node.js >= 22.18](https://img.shields.io/static/v1?label=node&message=%3E%3D22.18&color=brightgreen)](package.json)
+
 A layered TypeScript and three.js engine for browser games of any genre, with explicit engineering contracts, automated checks and application-specific acceptance requirements.
 
 ## Choose your starting point

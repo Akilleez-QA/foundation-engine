@@ -1,5 +1,7 @@
 # Roadmap: bounded framework contracts
 
+The active [creator-readiness milestone](guides/creator-readiness-goal.md) defines the next finite outcome, evidence gates and parallel contribution lanes; track progress in [issue #66](https://github.com/Akilleez-QA/foundation-engine/issues/66).
+
 Foundation is a skeleton that creators extend within explicit quality, performance,
 ownership and maintenance contracts. It is not a checklist of game features to
 complete. The [creator contract](CREATOR-CONTRACT.md) defines the responsibilities
