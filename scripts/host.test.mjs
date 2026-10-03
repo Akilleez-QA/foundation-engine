@@ -1,6 +1,7 @@
 // `npm run host` reference host over real loopback WebSockets (MP-01). Node `ws` clients stand in for browsers here;
 // the browser workflow is scripts/play/session-check.mjs.
 import { test } from 'node:test';
+import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { WebSocket } from 'ws';
 import { checkJoinCode, loadSessionRules, startSessionServer } from './host.mjs';
@@ -113,3 +114,62 @@ test('MP01 host: close stops the driver and closes clients with host-closing', a
   assert.deepEqual(await a.closed, { code: 1001, reason: 'host-closing' });
   await server.close();
 });
+
+
+// Importing startSessionServer bypasses the CLI block. Exercise the executable and
+// use its printed link, then the existing IPC operator for portable graceful exit.
+async function deadline(promise, message, ms = 5000) {
+  let timer;
+  try { return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(Error(message)), ms); })]); }
+  finally { clearTimeout(timer); }
+}
+
+for (const supplied of [undefined, 'Zx8_k2Lp-q9Rv3Tn']) {
+  test(`MP01 host CLI: generated/supplied join code (${supplied ? 'supplied' : 'generated'}) reaches admission and graceful shutdown`, { timeout: 20000 }, async () => {
+    const child = spawn(process.execPath, ['--import', 'tsx', 'scripts/host.mjs', '--port', '0',
+      '--game', 'templates/shared-world/game', ...(supplied ? ['--join', supplied] : [])],
+    { cwd: ROOT, env: { ...process.env, PORT: '5173' }, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
+    let output = '', closed = false, peer;
+    const close = new Promise(resolve => child.once('close', (code, signal) => { closed = true; resolve({ code, signal }); }));
+    try {
+      const ready = await deadline(new Promise((resolve, reject) => {
+        const capture = chunk => { output += chunk.toString(); };
+        child.stdout.on('data', capture); child.stderr.on('data', capture);
+        child.once('error', reject);
+        child.once('exit', (code, signal) => reject(Error(`host CLI exited before readiness (${code}, ${signal}): ${output}`)));
+        child.once('message', resolve);
+      }), 'host CLI readiness timeout');
+      assert.equal(ready.type, 'ready');
+      // IPC readiness and stdout travel independently; require the user-facing URL too.
+      const printed = await deadline((async () => {
+        for (;;) {
+          const match = /http:\/\/127\.0\.0\.1:5173\/\?host=(\d+)&join=([A-Za-z0-9_-]+)#scene\/world/.exec(output);
+          if (match) return {port:Number(match[1]), joinCode:match[2]};
+          if (closed) throw Error(`host CLI stopped before printing link: ${output}`);
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      })(), 'host CLI printed-link timeout');
+      assert.ok(printed.port > 0 && printed.port <= 65535);
+      assert.equal(printed.port, ready.port);
+      assert.equal(printed.joinCode, ready.joinCode);
+      assert.equal(checkJoinCode(printed.joinCode), null);
+      if (supplied) assert.equal(printed.joinCode, supplied);
+      peer = client(`ws://127.0.0.1:${printed.port}/session`);
+      await deadline(peer.opened, 'socket open timeout');
+      join_(peer, printed.joinCode, 'cli-page-key-0123456789');
+      assert.equal((await peer.until(f => f.type === 'welcome')).player, 'p1');
+      const reply = new Promise(resolve => child.once('message', resolve));
+      child.send({ id:'close-test', method:'close' });
+      const [result, remote, processResult] = await deadline(Promise.all([reply, peer.closed, close]), 'host CLI shutdown timeout');
+      assert.deepEqual(result, {type:'reply', id:'close-test', value:{closed:true}});
+      assert.deepEqual(remote, {code:1001, reason:'host-closing'});
+      assert.deepEqual(processResult, {code:0, signal:null});
+    } finally {
+      peer?.socket.terminate();
+      if (!closed) child.kill('SIGTERM');
+      const force = setTimeout(() => { if (!closed) child.kill('SIGKILL'); }, 1500);
+      try { await deadline(close, 'child cleanup timeout', 5000); }
+      finally { clearTimeout(force); }
+    }
+  });
+}
