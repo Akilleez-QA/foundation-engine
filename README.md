@@ -2,6 +2,14 @@
 
 A layered TypeScript and three.js engine for browser games of any genre, with explicit engineering contracts, automated checks and application-specific acceptance requirements.
 
+## Choose your starting point
+
+- **[Make a game](docs/guides/getting-started.md)**: clone, run the arcade template, change its player colour, check it and build a static site. Git, Node.js 22.18+ and npm are required; an AI account is optional.
+- **[Contribute to the engine](CONTRIBUTING.md)**: reproduce a problem, find the relevant contract and submit a focused change. Keep your own game on its own branch.
+- **[Explore the templates](#templates)** or [browse task recipes](docs/recipes/README.md). Foundation is distributed as source and tooling, not an npm library or visual editor.
+
+Try the arcade example without creating a game: after cloning and running `npm ci`, run `npm run play -- --game templates/arcade/game`. Steer with the arrow keys and press Space after a collision to restart. This runs locally; no hosted demo is required.
+
 ## What's new in 0.2.0
 
 - **Your own textures, materials and sound files**: `defineMaterial` for textured, physically based shapes; `defineAsset({ type: 'audio' })` files through `ctx.play` with volume, pitch and position.
@@ -55,12 +63,15 @@ Each template's README lists what is in it, its controls and what to change firs
 
 Requires Git, Node.js 22.18 or newer (CI uses Node.js 22; `.nvmrc` and `.node-version` select Node 22 for nvm, fnm and similar tools) and npm. The scripts load TypeScript with Node's built-in type stripping, which Node 22 enables from 22.18; older versions stop with a one-line message. This repository is the engine source and tooling; it is not currently published as an npm library. [Getting started](docs/guides/getting-started.md) explains every step.
 
-```
+```sh
+git clone https://github.com/Akilleez-QA/foundation-engine.git
+cd foundation-engine
 npm ci
-npx --no-install playwright-core install chromium     # the muted test browser, once
+npx --no-install playwright-core install chromium     # needed for automated browser checks
 npm run new-game -- --template arcade --id my-game --title "My game"
 git switch -c my-game && git add game GAME.md && git commit -m "Start my game"
-npm run play          # http://127.0.0.1:5173/ with your game; edit game/ and it reloads
+npm run play          # open the printed URL; stop with Ctrl+C before the next command
+# Make the first edit described in Getting started, then:
 npm run check         # types, lints, the brief, the affected tests
 npm run play:snap     # screenshots and a probe in playtest/latest/
 npm run build         # dist/: a static site to share (`-- --base ./` to host it in any folder)
@@ -68,7 +79,7 @@ npm run build         # dist/: a static site to share (`-- --base ./` to host it
 
 Without a `game/` folder, every command builds `templates/blank/game`. `npm run dev` starts the same dev server as `npm run play`, which also prints your first scene's address (`PORT=5174 npm run play` if 5173 is taken). The [cookbook](docs/recipes/README.md) covers models, HUD and buttons, collision and picking, camera and lighting, and sharing a build. With a coding agent, see [working with your agent](docs/guides/working-with-your-agent.md).
 
-For engine work, `npm test` runs every test and `npm run gate` the full integration gate.
+A clean committed checkout can select zero tests with `npm run check`; read its test summary. The [first-game guide](docs/guides/getting-started.md#6-check-it) includes an explicit arcade test command. For engine contributions, follow [CONTRIBUTING.md](CONTRIBUTING.md) for scoped checks and integration evidence.
 
 On Linux, Playwright's Chromium may also need system libraries: `npx playwright-core install-deps chromium` (needs root).
 
