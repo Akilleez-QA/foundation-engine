@@ -111,8 +111,36 @@ test('lint:game: an escape comment with a reason allows one line; without a reas
   );
 });
 
+test('lint:game: three/webgpu and three/tsl imports fail in game code, with no escape (ADR 0078)', () => {
+  const v = checkSource(
+    [
+      "import { WebGPURenderer } from 'three/webgpu';",
+      "import * as TSL from 'three/tsl';",
+      "const lazy = () => import('three/webgpu');",
+      '// lint-game-allow three-webgpu: a reason does not help',
+      "import 'three/webgpu';",
+    ].join('\n'),
+  );
+  assert.deepEqual(
+    v.map(x => [x.line, x.rule]),
+    [
+      [1, 'three-webgpu'],
+      [2, 'three-webgpu'],
+      [3, 'three-webgpu'],
+      [5, 'three-webgpu'],
+    ],
+  );
+  assert.match(format({...v[0], file: 'game/x.ts'}), /defineBuild\(\{ render: \{ backend: 'webgpu' \} \}\)/);
+  assert.deepEqual(
+    checkSource("import { defineGame } from '@engine';\nimport * as THREE from 'three';\n").filter(
+      x => x.rule === 'three-webgpu',
+    ),
+    [],
+  );
+});
+
 test('lint:game: the command passes on every template game (they follow the rules)', () => {
   const r = spawnSync(process.execPath, [SCRIPT], {encoding: 'utf8'});
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /no Math\.random\(\) or literal UI text/);
+  assert.match(r.stdout, /no Math\.random\(\), literal UI text or three\/webgpu/);
 });
