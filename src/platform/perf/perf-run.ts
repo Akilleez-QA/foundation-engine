@@ -76,6 +76,12 @@ export interface PerfSample {
   submission?: SubmissionCounters;
   uploads?: UploadSummary;
   topTextures?: string[];
+  /** Active windows: the keys held, whether they drive the scene (null: unknown), how that was decided, and the game
+   *  actions they press. A window whose keys press nothing and that drew nothing is still, not dead (window-class). */
+  heldKeys?: string[];
+  heldKeysDrive?: boolean | null;
+  heldKeysSource?: 'activeKeys' | 'bindings' | 'unknown';
+  heldKeyActions?: string[];
 }
 
 export interface StartupSample {

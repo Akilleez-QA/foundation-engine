@@ -16,7 +16,7 @@ const intake=value=>createAppearanceDocument({id:'preview-model',json:JSON.strin
 const section=defineSaveSection({id:'model.profile',scope:'device',initial,parse(value){const d=intake(value);const out=d.read().value;d.dispose();return out;}});
 const brief=defineBuild({goal:'Preview asynchronous model candidates without losing the accepted selection.',genre:'diagnostic',pitch:'Owned model candidates.',coreLoop:['Preview','Accept','Save'],devices:{targets:['desktop'],minimum:'desktop',input:['keyboard','pointer']},success:[{id:'S1',check:'Failed and cancelled loads preserve accepted models and saved appearance.',how:'playtest',by:'scripts/play/model-preview-check.mjs'}]});
 const game=defineGame({id:'model-preview',version:'0.1.0',title:'Model preview',firstScene:'sample'});
-const assets=names.map(id=>defineAsset({id,type:'model',url:`/__model-preview/${id}.glb`,licence:'CC0-1.0',author:'Foundation Engine contributors',source:'templates/mechanics/assets/generate-fixture.mjs'}));
+const assets=names.map(id=>defineAsset({id,type:'model',url:`/__model-preview/${id}.glb`,licence:'CC0-1.0',author:'Foundation Engine contributors',source:'templates/mechanics/game/tools/generate-fixture.mjs'}));
 let ctx,accepted=null,candidate=null,documentOwner,session,save,life,retired=true,message='',lastStatus='';
 const el=id=>document.getElementById(id);
 const storageKey='model-preview|device|model.profile',local=browserPort('local');

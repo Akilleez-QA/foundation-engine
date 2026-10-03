@@ -173,7 +173,7 @@ test('oversized files never parse, oversized retention stays bounded, and live a
 });
 
 test('original embedded GLB fixture retains real clip and independent skeletal nodes through default parser', async () => {
-  const data=readFileSync(join(import.meta.dirname,'../../../public/models/mechanics/beacon.glb'));
+  const data=readFileSync(join(import.meta.dirname,'../../../templates/mechanics/game/public/models/mechanics/beacon.glb'));
   const lib=createModelLibrary({def:()=>defs[0],fetchBytes:async()=>data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength)});
   const lease=await lib.model(statue,{signal:new AbortController().signal});
   assert.equal(lease.value.animations[0].name,'pulse');

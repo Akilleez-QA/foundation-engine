@@ -57,7 +57,7 @@ if (process.argv[1] && process.argv[1].endsWith('check.mjs')) {
   run('lint:generic', 'node', ['scripts/lint/genericity.mjs']);
   run('lint:brief', toolCommand('tsx', ['scripts/lint/brief.ts', GAME]));
   run('lint:budgets', 'node', ['scripts/perf/budget-ratchet.mjs']);
-  const tests = all ? ['src/**/*.test.ts', 'templates/*/game/**/*.test.ts', 'scripts/**/*.test.mjs', 'scripts/**/*.test.ts'] : affectedTests(changedFiles());
+  const tests = all ? ['src/**/*.test.ts', 'templates/*/game/**/*.test.ts', 'templates/*/game/**/*.test.mjs', 'scripts/**/*.test.mjs', 'scripts/**/*.test.ts'] : affectedTests(changedFiles());
   if (tests.length) run(`tests (${all ? 'all' : tests.length + ' file(s)'})`, toolCommand('tsx', ['--test', ...tests]));
   else results.push({name: 'tests (nothing changed that has tests)', ok: true, s: 0, out: ''});
   for (const r of results) console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${r.name} (${r.s.toFixed(1)} s)${r.ok ? '' : '\n' + r.out.replace(/^/gm, '     ')}`);

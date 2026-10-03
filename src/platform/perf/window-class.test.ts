@@ -57,3 +57,33 @@ test('an incomplete window or a lost context is invalid', () => {
   assert.equal(still.classification.kind, 'steady', 'a render-on-demand scene that draws nothing is a valid still window');
   assert.match(still.classification.reasons.join(), /no rendered frame/);
 });
+
+test('an active window that drew no frame is inconclusive: the scene ended, it measured nothing', () => {
+  const { classification } = classifyWindow({ ...steady, mode: 'active', renderedFrames: 0 });
+  assert.equal(classification.kind, 'inconclusive');
+  assert.equal(classification.comparable, false);
+  assert.match(classification.reasons.join(), /active window rendered no frame/);
+});
+
+test('an incomplete active window with no frame stays invalid, not inconclusive', () => {
+  const { classification } = classifyWindow({ ...steady, mode: 'active', renderedFrames: 0, complete: false });
+  assert.equal(classification.kind, 'invalid');
+});
+
+test('an active window whose held keys drive the scene but drew no frame stays inconclusive (a dead window)', () => {
+  const { classification } = classifyWindow({ ...steady, mode: 'active', renderedFrames: 0, heldKeysDrive: true });
+  assert.equal(classification.kind, 'inconclusive');
+  assert.equal(classification.comparable, false);
+});
+
+test('an active window whose held keys press no game action and drew no frame is a still window, comparable', () => {
+  const { classification } = classifyWindow({ ...steady, mode: 'active', renderedFrames: 0, heldKeysDrive: false });
+  assert.equal(classification.kind, 'steady');
+  assert.equal(classification.comparable, true);
+  assert.match(classification.reasons.join(), /press no game action: a still window/);
+});
+
+test('undriven keys never excuse a broken window: the scene left (epoch break) or an incomplete window is still invalid', () => {
+  assert.equal(classifyWindow({ ...steady, mode: 'active', renderedFrames: 0, heldKeysDrive: false, epochBreak: 'scene element replaced (re-entry or exit)' }).classification.kind, 'invalid');
+  assert.equal(classifyWindow({ ...steady, mode: 'active', renderedFrames: 0, heldKeysDrive: false, complete: false }).classification.kind, 'invalid');
+});

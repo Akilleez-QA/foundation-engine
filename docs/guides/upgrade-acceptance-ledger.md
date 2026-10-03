@@ -724,3 +724,16 @@ Status: implemented, candidate (PR #61); not integrated. Guide:
   liveness detection by clients, physical-device input or performance, touch, more than
   four players, load or scalability, a joining-socket flood from many LAN addresses at
   once, and integrity enforcement quality (only observe mode is exercised in a browser).
+
+## Bench dead-window guard (W1-4) — checked on PR #59, not integrated
+
+- Implemented: per-scene `activeKeys` in `budgets.json`; the bench reads the game's input
+  rows in Node and records `heldKeys`, `heldKeysDrive` and `heldKeysSource` per active
+  sample; `classifyWindow` takes `heldKeysDrive` (classification version 3).
+- Checked: an active window with driving keys and no frame is inconclusive; with keys that
+  press nothing it is steady and comparable; an epoch break or incomplete window stays
+  invalid; unknown bindings never excuse a dead window; the expedition template's arrows
+  press nothing and the explorer template's press the character kit's move actions; a
+  malformed `activeKeys` is refused. Local `npm run gate -- --game templates/expedition/game`.
+- Not established: pointer-only scenes (no driving key, so a dead window there is not
+  detected), player rebinding, physical devices. GitHub CI on PR #59 decides integration.

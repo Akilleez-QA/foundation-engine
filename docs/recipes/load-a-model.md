@@ -2,9 +2,9 @@
 
 Show a `.glb` model in a scene and play one of its animation clips. The engine loads the file when a scene that uses it opens, shares it between entities, and frees it once no scene needs it (it may keep a recently used file warm within a memory budget).
 
-## 1. Put the file in `public/`
+## 1. Put the file in `game/public/`
 
-Files in the repository's `public/` folder are served from the site root, so `public/models/robot.glb` is fetched as `/models/robot.glb`. The repository already ships a tiny CC0 test model, `public/models/mechanics/beacon.glb` (one box with a one-second `pulse` clip), so you can try this recipe before you have a model of your own.
+Files in your game's own `public/` folder are served from the site root (or the build's base), so `game/public/models/robot.glb` is fetched as `/models/robot.glb`, and a build ships them with your game and no other game's files. The mechanics template ships a tiny CC0 test model, `templates/mechanics/game/public/models/mechanics/beacon.glb` (one box with a one-second `pulse` clip), so you can try this recipe before you have a model of your own: copy it to `game/public/models/mechanics/beacon.glb`.
 
 The loader accepts **binary glTF (`.glb`) with everything embedded**: a `.gltf` with a separate `.bin` or image files is rejected (`models: GLB dependencies must be embedded`). Export from Blender with *glTF Binary (.glb)*. Textures embedded in the GLB are drawn. To texture a primitive `Shape` instead, see [give a shape a material](give-a-shape-a-material.md).
 
@@ -14,16 +14,16 @@ Any `.ts` file in `game/` with a default export is a definition; the `.asset.ts`
 
 ```ts
 // game/beacon.asset.ts
-// A model the game ships. The file lives in the repository's public/ folder; the URL is its path from there.
+// A model the game ships. The file lives in game/public/; the URL is its path from there.
 import { defineAsset } from '@engine';
 
 export default defineAsset({
   id: 'beacon', type: 'model', url: '/models/mechanics/beacon.glb',
-  licence: 'CC0-1.0', author: 'Foundation Engine contributors', source: 'templates/mechanics/assets/generate-fixture.mjs',
+  licence: 'CC0-1.0', author: 'Foundation Engine contributors', source: 'templates/mechanics/game/tools/generate-fixture.mjs',
 });
 ```
 
-`id` is kebab-case and is what entities refer to. For your own model, change `id`, `url` (the path under `public/`, starting with `/`), `licence`, `author` and `source`.
+`id` is kebab-case and is what entities refer to. For your own model, change `id`, `url` (the path under `game/public/`, starting with `/`), `licence`, `author` and `source`.
 
 ## 3. Use it in a scene
 
@@ -102,7 +102,7 @@ npm run check
 npm run play:snap -- --scene showcase
 ```
 
-In the snap, the model should be visible and `probe.json` should have no page errors. A 404 for the model in the console means the `url` does not match a file under `public/`.
+In the snap, the model should be visible and `probe.json` should have no page errors. A 404 for the model in the console means the `url` does not match a file under `game/public/`.
 
 ## Limits
 

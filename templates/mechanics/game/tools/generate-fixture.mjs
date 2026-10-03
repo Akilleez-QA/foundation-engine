@@ -16,4 +16,4 @@ const gltf={asset:{version:'2.0',generator:'Foundation Engine original fixture g
 let json=Buffer.from(JSON.stringify(gltf));json=Buffer.concat([json,Buffer.alloc((4-json.length%4)%4,32)]);const bin=Buffer.concat(chunks);
 const header=Buffer.alloc(12);header.writeUInt32LE(0x46546c67,0);header.writeUInt32LE(2,4);header.writeUInt32LE(12+8+json.length+8+bin.length,8);
 const chunk=(data,type)=>{const h=Buffer.alloc(8);h.writeUInt32LE(data.length,0);h.writeUInt32LE(type,4);return Buffer.concat([h,data]);};
-const out=new URL('../../../public/models/mechanics/',import.meta.url);mkdirSync(out,{recursive:true});writeFileSync(new URL('beacon.glb',out),Buffer.concat([header,chunk(json,0x4e4f534a),chunk(bin,0x004e4942)]));
+const out=new URL('../public/models/mechanics/',import.meta.url);mkdirSync(out,{recursive:true});writeFileSync(new URL('beacon.glb',out),Buffer.concat([header,chunk(json,0x4e4f534a),chunk(bin,0x004e4942)]));

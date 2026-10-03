@@ -737,3 +737,13 @@ existing owner changed behaviour. Status: implemented, candidate (PR #61); not
 integrated. Evidence is unit, loopback socket and one desktop headless Chromium
 two-context check; see the [guide](multiplayer-session.md) and the
 [ledger](upgrade-acceptance-ledger.md#newcomer-shared-session-mp-01--implemented-candidate).
+
+## Bench dead-window guard (W1-4) — perf gate behaviour change, checked on PR #59, not integrated
+
+An active window that draws no frame fails the gate as "perf inconclusive" only when its
+held keys drive the scene (`activeKeys` in the scene's `budgets.json` row, or a game or kit
+input action bound to them). Keys that press nothing in the game make it a still window,
+comparable like an idle one; the expedition template's active windows are of this kind.
+A rejected window, an epoch break or an incomplete window stays invalid whatever the keys.
+Evidence: unit tests (`window-class`, `input-registry`, `bench-keys`) and a local expedition
+gate run; GitHub CI on PR #59 is the integration gate. Not integrated.

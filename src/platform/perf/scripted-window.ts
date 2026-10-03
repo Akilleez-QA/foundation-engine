@@ -10,7 +10,8 @@ export function scriptedWindowProblems(sample:{error?:unknown;classification?:un
  if(!w||w.policy!==WHOLE_ROUTE_POLICY)return ['missing whole-scripted-route evidence'];
  if(sample.error)problems.push('sample error');
  const kind=(sample.classification as {kind?:string}|undefined)?.kind;
- if(!kind||!['entry','steady','firstUse','unclassified'].includes(kind))problems.push('invalid or missing diagnostic classification');
+ if(kind==='inconclusive')problems.push('inconclusive window: the route drew no frame (the scene probably ended)');
+ else if(!kind||!['entry','steady','firstUse','unclassified'].includes(kind))problems.push('invalid or missing diagnostic classification');
  if(w.scriptComplete!==true||w.complete!==true||w.epochBreak!==null||w.contextLost!==false)problems.push('incomplete or broken epoch/context guard');
  if(!Number.isInteger(w.frames)||w.frames!<2)problems.push('insufficient frames');
  if(!Number.isFinite(w.durationMs)||w.durationMs!<4000||!Number.isFinite(w.elapsedMs)||w.elapsedMs!<w.durationMs!)problems.push('truncated fixed window');

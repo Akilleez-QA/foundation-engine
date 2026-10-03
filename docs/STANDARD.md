@@ -598,7 +598,7 @@ A game adds its own domain systems (for example an economy or a world model) wit
 - **STD-PRF-20.** Each advertised device profile MUST declare hardware/browser, viewport and pixel ratio, input, graphics preset, quality floor and performance acceptance thresholds. Minimum-device ceilings are scoped to the declared build, not all independent editions. They remain guardrails, not per-device certification. [ADR 0068]
 - **STD-PRF-21.** Device acceptance MUST include cold/first-use and sustained representative interaction with normal UI and effects enabled. Software rendering and viewport emulation MUST NOT be represented as physical-device timing, thermal or memory evidence.
 - **STD-PRF-22.** Automatic quality changes MUST preserve the declared quality floor, simulation and input semantics. UI target sizes, critical information and world visibility MUST NOT be sacrificed to meet rendering budgets.
-- **STD-PRF-19.** A timing window MUST belong to one run epoch and route, and MUST be classified before comparison as entry, steady, first use, unclassified or invalid. Recurring work MUST NOT be turned off to satisfy a window. [ADR 0053]
+- **STD-PRF-19.** A timing window MUST belong to one run epoch and route, and MUST be classified before comparison as entry, steady, first use, unclassified, inconclusive or invalid. Recurring work MUST NOT be turned off to satisfy a window. [ADR 0053]
 
 ---
 

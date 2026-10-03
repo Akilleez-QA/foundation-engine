@@ -19,6 +19,9 @@
 //   nobody imports app/ or dev/ (test support excepted)            (nobody-imports-app, nobody-imports-dev)
 //   game/ and templates/<name>/game/ (outside src/) import only `@engine`, `@kits/<name>`, their own files and JSON
 //                 (game-imports-engine-only); only app/ reads the game (the composition root, through `@game`).
+//                 Two folders of a game are not game code: <game>/public/ (static files served as they are) is not read,
+//                 and <game>/tools/ holds the game's build-time Node scripts (asset generators), which may import
+//                 anything; game code never imports a tool (game-imports-no-tools), so no tool reaches the browser.
 //                 app/game-files.ts alone (node-only) reads scripts/lib/game-dir.mjs, the one GAME_DIR rule.
 //   no import cycles, type-only edges included                     (no-circular)
 //
@@ -156,10 +159,15 @@ const KIT = /^@kits\/([a-z][a-z0-9-]*)$/;
 export function checkGame(dir, read = f => readFileSync(f, 'utf8')) {
   const out = [];
   if (!existsSync(dir)) return out;
-  const walk = d => { for (const e of readdirSync(d, {withFileTypes: true})) { const p = join(d, e.name); if (e.isDirectory()) walk(p); else if (/\.[cm]?[jt]s$/.test(e.name)) check1(p); } };
+  // <game>/public/ holds files the game serves as they are (a decoder's .js included), never game code.
+  const walk = d => { for (const e of readdirSync(d, {withFileTypes: true})) { const p = join(d, e.name); if (e.isDirectory()) { if (!(d === dir && e.name === 'public')) walk(p); } else if (/\.[cm]?[jt]s$/.test(e.name)) check1(p); } };
+  const tools = join(dir, 'tools');
+  const inTools = p => p === tools || p.startsWith(tools + sep);
   const check1 = file => {
     const rel = relative(ROOT, file).split(sep).join('/');
+    if (inTools(file)) return;
     for (const {spec} of importsOf(read(file))) {
+      if (spec.startsWith('.') && inTools(resolve(dirname(file), spec))) { out.push({rule: 'game-imports-no-tools', from: rel, to: spec}); continue; }
       if (spec === '@engine' || spec.endsWith('.json')) continue;
       const kit = KIT.exec(spec);
       if (kit) { if (!existsSync(join(SRC, 'kits', kit[1], 'index.ts'))) out.push({rule: 'game-imports-a-real-kit', from: rel, to: spec}); continue; }

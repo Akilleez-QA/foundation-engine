@@ -118,3 +118,17 @@ test('a non-comparable baseline window is never compared (the workshop 222 -> 24
   assert.equal(r.ok, true);
   assert.match(formatReport(r), /baseline window not comparable/);
 });
+
+test('an inconclusive window (active, drew no frame) never passes: every row is inconclusive and the check is not ok', () => {
+  const dead = { drawsPerRenderedFrame: 0, trisPerRenderedFrame: 0, shadowPassDrawsMax: 0, offscreenDrawsPerRenderedFrame: 0, textureMiB: 1, heapMB: 10, taskMsPerFrame: 1,
+    classification: { kind: 'inconclusive', comparable: false, reasons: ['active window rendered no frame while input was held'] } };
+  const r = checkBudgets({ hall: dead }, budgets, bindings.slice(0, 1), { tier: 'reference', baseline: { hall: { ...dead, drawsPerRenderedFrame: 0, classification: { kind: 'steady', comparable: true } } } });
+  assert.ok(r.rows.length > 0);
+  assert.ok(r.rows.every(x => x.verdict === 'inconclusive'), r.rows.map(x => `${x.metric}:${x.verdict}`).join());
+  assert.ok(r.rows.every(x => !x.regression?.blocking));
+  assert.match(r.rows[0].reason!, /window inconclusive: active window rendered no frame/);
+  assert.equal(r.failures, 0);
+  assert.equal(r.inconclusive, r.rows.length);
+  assert.equal(r.ok, false);
+  assert.match(formatReport(r), /INCONCLUSIVE/);
+});

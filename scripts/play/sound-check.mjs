@@ -16,7 +16,7 @@ import {diagnosticReport} from './diagnostic-report.mjs';
 const out = resolve(process.argv[2] ?? '/tmp/foundation-sound-browser');
 mkdirSync(out, {recursive: true});
 const html = '<!doctype html><html><head><meta charset="utf-8"><link rel="icon" href="data:,"><title>Sound diagnostic</title></head><body><header class="shell-header"><div class="header-left"></div><div class="header-right"></div></header><main id="app" class="app-root"></main><script type="module" src="/scripts/play/fixtures/sound-entry.mjs"></script></body></html>';
-const server = await createServer({root: ROOT, logLevel: 'error', plugins: [{name: 'sound-diagnostic', configureServer(s) {
+const server = await createServer({root: ROOT, logLevel: 'error', publicDir: resolve(ROOT, 'templates/mechanics/game/public'), plugins: [{name: 'sound-diagnostic', configureServer(s) {
   s.middlewares.use((req, res, next) => { if (req.url?.startsWith('/__sound.html')) { res.setHeader('Content-Type', 'text/html'); res.end(html); } else next(); });
 }}], server: {host: '127.0.0.1', port: 0}});
 const report = {revision: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).trim(), passed: false,
