@@ -14,9 +14,10 @@ authors to build and maintain different games without repeatedly implementing
 runtime infrastructure. Deliver a defined quality floor at measured performance,
 with explicit extension points, bounded resource use and dependable tooling.
 
-The current implementation platform is TypeScript, Three.js and WebGL2. Native
-runtimes, a general visual editor and distributed services are separate potential
-projects, not implied deliverables of this definition.
+The current implementation platform is TypeScript, Three.js and WebGL2 by default;
+WebGPU is an optional, creator-selected render backend (ADR 0078). Native runtimes,
+a general visual editor and distributed services are separate potential projects,
+not implied deliverables of this definition.
 
 ## Creator freedom
 
