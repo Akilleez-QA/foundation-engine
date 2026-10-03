@@ -144,8 +144,10 @@ if (process.argv[1] && process.argv[1].endsWith('check.mjs')) {
   run('generate', 'node', ['scripts/generate.mjs']);
   run('typecheck', toolCommand('tsc', ['--noEmit']));
   // Prettier skips files it does not format (--ignore-unknown) and those in .prettierignore; `npm run format` fixes them.
+  // Many changed files (a long-lived branch) check the whole tree instead: a command line has a length limit on Windows.
   const formattable = changed.filter(f => existsSync(join(ROOT, f)));
-  if (all) run('format:check', toolCommand('prettier', ['--check', '--log-level', 'warn', '.']));
+  if (all || formattable.length > 200)
+    run('format:check', toolCommand('prettier', ['--check', '--log-level', 'warn', '.']));
   else if (formattable.length)
     run(
       `format:check (${formattable.length} changed file(s))`,
