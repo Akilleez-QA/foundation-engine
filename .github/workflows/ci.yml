@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  browser:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -83,10 +83,56 @@ jobs:
         run: npm run test:sound-browser
       - name: Sub-path production build browser regressions
         run: npm run test:subpath-browser
-      - name: Full gates for every template
-        run: npm run gate:templates
-      - name: Phone smoke for every template
-        run: |
-          for t in templates/*/game; do
-            GAME_DIR="$t" npm run -s play:snap -- --mobile || exit 1
-          done
+
+  templates-1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # The budget ratchet compares against origin/main.
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install isolated test browser
+        run: npx --no-install playwright-core install --with-deps chromium
+      - name: Complete template shard 1 of 2, including phone smoke
+        run: npm run gate:templates -- --shard 1/2 --phone
+
+  templates-2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # The budget ratchet compares against origin/main.
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install isolated test browser
+        run: npx --no-install playwright-core install --with-deps chromium
+      - name: Complete template shard 2 of 2, including phone smoke
+        run: npm run gate:templates -- --shard 2/2 --phone
+
+  check:
+    needs: [browser, templates-1, templates-2]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Require every work job to succeed
+        env:
+          CI_JOB_RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/ci-results.mjs

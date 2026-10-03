@@ -4,10 +4,11 @@
 // order, with its `env` (workflow, job and step level, plus GitHub's `CI=true`) and GitHub's default shell
 // (`bash --noprofile --norc -eo pipefail`). `uses:` steps (checkout, setup-node) are the runner's own setup; the
 // `run:` steps listed in SETUP_ONLY are skipped and must be done once by hand (see their reasons). Anything in the
-// workflow this runner cannot mirror (a second job, `if:`, `shell:`, a matrix...) is an error, not a silent skip;
+// workflow this runner cannot mirror is an error. It accepts one ordinary job or the explicit browser/two-shard
+// graph with a terminal always-running check. Work jobs run serially locally; aggregate results come from those runs;
 // scripts/gate-ci.test.mjs fails when the workflow and this runner disagree.
 //
-//   npm run gate:ci                       every step, stops at the first failure
+//   npm run gate:ci                       every job serially; a failed step stops its job, not independent jobs
 //   npm run gate:ci -- --list             the plan (ids, names, env) without running it
 //   npm run gate:ci -- --from <step>      resume at a step (id, 1-based number, or name)
 //   npm run gate:ci -- --only <step>[,<step>...]   just these steps (the option may repeat)
@@ -19,6 +20,7 @@ import {spawn} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {WORK_JOBS, AGGREGATE_COMMAND, RESULTS_ENV, RESULTS_EXPRESSION} from './ci-results.mjs';
 
 export const ROOT = fileURLToPath(new URL('..', import.meta.url));
 export const WORKFLOW = '.github/workflows/ci.yml';
@@ -128,40 +130,76 @@ const envMap = (env, where) => {
  */
 export function planFromWorkflow(text) {
   const wf = parseYaml(text);
-  const jobs = Object.entries(wf.jobs ?? {});
-  if (jobs.length !== 1) throw Error(`${WORKFLOW}: gate:ci mirrors exactly one job, found ${jobs.length}; extend scripts/gate-ci.mjs`);
-  const [jobName, job] = jobs[0];
-  for (const k of Object.keys(job)) if (!JOB_KEYS.has(k)) throw Error(`${WORKFLOW}: job ${jobName} key "${k}" cannot be mirrored locally; extend scripts/gate-ci.mjs`);
-  const base = {...envMap(wf.env, 'workflow'), ...envMap(job.env, `job ${jobName}`)};
+  const workflowKeys = new Set(['name', 'on', 'permissions', 'concurrency', 'env', 'jobs']);
+  for (const key of Object.keys(wf)) if (!workflowKeys.has(key)) throw Error(`${WORKFLOW}: unsupported workflow key ${key}`);
+  const entries = Object.entries(wf.jobs ?? {});
+  const graph = entries.length !== 1;
+  if (graph) {
+    const names = entries.map(([id]) => id);
+    if (names.length !== 4 || ![...WORK_JOBS, 'check'].every(id => names.includes(id))) throw Error(`${WORKFLOW}: unsupported job graph; expected ${[...WORK_JOBS, 'check'].join(', ')}`);
+    const aggregate = wf.jobs.check;
+    if (aggregate.if !== 'always()' || !Array.isArray(aggregate.needs)
+      || aggregate.needs.length !== WORK_JOBS.length || new Set(aggregate.needs).size !== WORK_JOBS.length
+      || WORK_JOBS.some(id => !aggregate.needs.includes(id))) throw Error(`${WORKFLOW}: check needs every work job exactly once and if: always()`);
+    if (aggregate.env) throw Error(`${WORKFLOW}: aggregate job env is unsupported`);
+  }
+  const jobs = graph ? [...WORK_JOBS, 'check'].map(id => [id, wf.jobs[id]]) : entries;
+  if (!jobs.length) throw Error(`${WORKFLOW}: no jobs`);
   const steps = [], setup = [], actions = [];
   let node = null;
-  (job.steps ?? []).forEach((s, k) => {
-    const where = `${WORKFLOW}: step ${k + 1}${s?.name ? ` (${s.name})` : ''}`;
-    if (!s || typeof s !== 'object') throw Error(`${where}: not a mapping`);
-    for (const key of Object.keys(s)) if (!STEP_KEYS.has(key)) throw Error(`${where}: key "${key}" cannot be mirrored locally; extend scripts/gate-ci.mjs`);
-    if (s.uses && s.run) throw Error(`${where}: both uses and run`);
-    if (s.uses) {
-      actions.push(s.uses);
-      if (/^actions\/setup-node@/.test(s.uses)) node = String(s.with?.['node-version'] ?? '');
-      return;
+  for (const [jobName, job] of jobs) {
+    const aggregate = graph && jobName === 'check';
+    const allowed = new Set([...JOB_KEYS, ...(aggregate ? ['needs', 'if'] : [])]);
+    for (const k of Object.keys(job)) if (!allowed.has(k)) throw Error(`${WORKFLOW}: job ${jobName} key "${k}" cannot be mirrored locally; extend scripts/gate-ci.mjs`);
+    if (graph && job['runs-on'] !== 'ubuntu-latest') throw Error(`${WORKFLOW}: supported graph requires ubuntu-latest`);
+    for (const [key, value] of Object.entries(job)) if (key !== 'steps' && JSON.stringify(value).includes('${{')) throw Error(`${WORKFLOW}: job ${jobName} ${key} needs unsupported GitHub expressions`);
+    const base = {...envMap(wf.env, 'workflow'), ...envMap(job.env, `job ${jobName}`)};
+    if (!Array.isArray(job.steps) || !job.steps.length) throw Error(`${WORKFLOW}: job ${jobName} needs steps`);
+    let jobRuns = 0;
+    for (const [k, s] of job.steps.entries()) {
+      const where = `${WORKFLOW}: job ${jobName} step ${k + 1}${s?.name ? ` (${s.name})` : ''}`;
+      if (!s || typeof s !== 'object') throw Error(`${where}: not a mapping`);
+      for (const key of Object.keys(s)) if (!STEP_KEYS.has(key)) throw Error(`${where}: key "${key}" cannot be mirrored locally; extend scripts/gate-ci.mjs`);
+      if (s.uses && s.run) throw Error(`${where}: both uses and run`);
+      if (s.uses) {
+        if (!/^actions\/(checkout|setup-node)@[^\s]+$/.test(s.uses) || JSON.stringify(s).includes('${{')) throw Error(`${where}: unsupported action or GitHub expressions`);
+        actions.push(s.uses);
+        if (/^actions\/setup-node@/.test(s.uses)) {
+          const version = String(s.with?.['node-version'] ?? '');
+          if (!/^\d+(?:\.\d+){0,2}$/.test(version) || node && node !== version) throw Error(`${where}: inconsistent or unsupported Node version`);
+          node = version;
+        }
+        continue;
+      }
+      if (typeof s.run !== 'string' || !s.run.trim()) throw Error(`${where}: no run command`);
+      const run = s.run.trim();
+      if (run.includes('${{')) throw Error(`${where}: run needs GitHub expressions; extend scripts/gate-ci.mjs`);
+      if (aggregate) {
+        if (run !== AGGREGATE_COMMAND || JSON.stringify(s.env) !== JSON.stringify({[RESULTS_ENV]: RESULTS_EXPRESSION})) throw Error(`${where}: unsupported aggregate command or result binding`);
+      }
+      const stepEnv = aggregate ? {} : envMap(s.env, where);
+      if (run in SETUP_ONLY) { setup.push({job: jobName, name: s.name ?? run, run, reason: SETUP_ONLY[run]}); continue; }
+      jobRuns++;
+      const scripts = [...run.matchAll(/\bnpm run(?: -s| --silent)? ([\w:.-]+)/g)].map(m => m[1]);
+      const name = s.name ?? run.split('\n')[0];
+      const id = !run.includes('\n') && new Set(scripts).size === 1 ? scripts[0] : slug(name);
+      steps.push({n: steps.length + 1, id: graph ? `${jobName}/${id}` : id, job: jobName, aggregate, name, run,
+        env: {...base, ...stepEnv}});
     }
-    if (typeof s.run !== 'string' || !s.run.trim()) throw Error(`${where}: no run command`);
-    const run = s.run.trim();
-    if (run in SETUP_ONLY) { setup.push({name: s.name ?? run, run, reason: SETUP_ONLY[run]}); return; }
-    const scripts = [...run.matchAll(/\bnpm run(?: -s| --silent)? ([\w:.-]+)/g)].map(m => m[1]);
-    const name = s.name ?? run.split('\n')[0];
-    steps.push({n: steps.length + 1, id: !run.includes('\n') && new Set(scripts).size === 1 ? scripts[0] : slug(name), name, run, env: {...base, ...envMap(s.env, where)}});
-  });
+    if (!jobRuns || aggregate && jobRuns !== 1) throw Error(`${WORKFLOW}: job ${jobName} needs ${aggregate ? 'exactly one aggregate' : 'at least one checking'} run step`);
+  }
   const ids = steps.map(s => s.id);
-  for (const s of steps) if (ids.indexOf(s.id) !== ids.lastIndexOf(s.id)) s.id = slug(s.name);
+  for (const s of steps) if (ids.indexOf(s.id) !== ids.lastIndexOf(s.id)) s.id = (graph ? s.job + '/' : '') + slug(s.name);
   if (new Set(steps.map(s => s.id)).size !== steps.length) throw Error(`${WORKFLOW}: two steps share an id; give them distinct names`);
-  return {steps, setup, actions, node};
+  return {steps, setup, actions, node, graph};
 }
 
 /** The step a --from/--only argument names: its id, its 1-based number, its name, or its name's slug. */
 export function findStep(steps, ref) {
   const r = String(ref).trim().toLowerCase();
-  const hit = steps.find(s => s.id.toLowerCase() === r || String(s.n) === r || s.name.toLowerCase() === r || slug(s.name) === slug(r));
+  const matches = steps.filter(s => s.id.toLowerCase() === r || String(s.n) === r || s.name.toLowerCase() === r || slug(s.name) === slug(r));
+  if (matches.length > 1) throw Error(`gate:ci: ambiguous step "${ref}"; use a job-qualified id`);
+  const hit = matches[0];
   if (!hit) throw Error(`gate:ci: no step "${ref}"; steps: ${steps.map(s => s.id).join(', ')}`);
   return hit;
 }
@@ -222,7 +260,9 @@ function stopChild(state, signal) {
 export async function main(argv = process.argv.slice(2)) {
   const o = parseArgs(argv);
   const plan = planFromWorkflow(readFileSync(resolve(ROOT, o.workflow), 'utf8'));
-  const chosen = selectSteps(plan.steps, o);
+  const partial = Boolean(o.from || o.only.length);
+  const chosen = selectSteps(plan.steps, o).filter(s => !partial || !s.aggregate);
+  if (!chosen.length) throw Error('gate:ci: no executable steps; a partial selection cannot run the aggregate');
   if (o.list) {
     for (const s of plan.setup) console.log(`setup (not run): ${s.name}: ${s.reason}`);
     for (const s of plan.steps) console.log(`${pad(s.n, 3)} ${pad(s.id, 34)} ${s.name}${Object.keys(s.env).length ? '  env ' + JSON.stringify(s.env) : ''}`);
@@ -241,18 +281,31 @@ export async function main(argv = process.argv.slice(2)) {
   process.on('SIGINT', onSignal); process.on('SIGTERM', onSignal);
   const t0 = Date.now(), rows = plan.steps.map(s => ({n: s.n, id: s.id, result: chosen.includes(s) ? 'not run' : 'skipped'}));
   let failed = null;
+  const failedJobs = new Set();
   try {
     for (const step of chosen) {
       const row = rows[step.n - 1];
+      if (failedJobs.has(step.job)) continue;
+      if (step.aggregate) {
+        const results = Object.fromEntries(WORK_JOBS.map(job => {
+          const owned = plan.steps.filter(s => s.job === job).map(s => rows[s.n - 1]);
+          const result = owned.every(r => r.result === 'PASS') ? 'success' : owned.some(r => r.result === 'stopped') ? 'cancelled' : owned.some(r => r.result === 'FAIL') ? 'failure' : 'skipped';
+          return [job, {result}];
+        }));
+        step.env = {...step.env, [RESULTS_ENV]: JSON.stringify(results)};
+      }
       console.log(`\n=== gate:ci [${step.n}/${plan.steps.length}] ${step.id}: ${step.name} ===`);
       const t = Date.now(), r = await runStep(step, state);
       Object.assign(row, {code: r.code, s: (Date.now() - t) / 1000, result: state.stop ? 'stopped' : r.code === 0 ? 'PASS' : 'FAIL'});
-      if (r.code !== 0 || state.stop) { failed = {step, ...row}; break; }
+      if (r.code !== 0 || state.stop) {
+        failed ??= {step, ...row}; failedJobs.add(step.job);
+        if (state.stop || !plan.graph) break;
+      }
     }
   } finally { process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal); }
   table(rows);
   const total = fmt((Date.now() - t0) / 1000);
-  if (!failed) { console.log(`gate:ci: PASS (${chosen.length} step(s)) in ${total}`); return 0; }
+  if (!failed) { console.log(`gate:ci: ${partial ? 'PARTIAL PASS (not full CI acceptance)' : 'PASS'} (${chosen.length} step(s)) in ${total}`); return 0; }
   console.log(`gate:ci: ${failed.result === 'stopped' ? 'STOPPED' : 'FAIL'} at step ${failed.step.n} ${failed.step.id} ("${failed.step.name}"): exit ${failed.code} after ${fmt(failed.s)}; total ${total}`);
   console.log(`gate:ci: rerun from here: npm run gate:ci -- --from ${failed.step.id}`);
   return state.stop ? 130 : failed.code || 1;
