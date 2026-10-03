@@ -7,6 +7,14 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Explorer journey failure paths and dev/test `engine.dispose()`.** `npm run test:creator-journey-browser`
+  now also refuses localStorage writes through a labelled test switch (the discovery stays on the HUD, the
+  durable bytes stay byte-identical, the save store's own scheduled retry writes it once storage accepts
+  writes), supersedes a pending garden→shed change with a newer `goto`, blurs the window while a door change
+  is pending, and finally retires the app. The new dev/test-only `engine.dispose()` calls the existing kernel
+  `App.dispose()` and reports any remaining scene handle, probe getters and the renderer pool's release
+  audit; after it, `engine.clock.step()` refuses. Production builds have no test API, so they are unchanged.
+
 - **Reload tests and checked playtest scripts.** `createTestSaves()` from `@engine` gives game tests
   in-memory storage shared across `testScene` runs: `reload()` flushes the store as a page's
   `pagehide` does and re-opens it over the same storage (`{ flush: false }` loses pending writes, as a
