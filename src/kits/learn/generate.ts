@@ -4,22 +4,33 @@
  * lesson's words into the game's strings file. The author then grows the outline: one scene at a time, each
  * followed by `npm run play:snap` (the new-lesson skill).
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
-import type { BuildBrief } from '../../author/build';
+import {existsSync, readFileSync, writeFileSync} from 'node:fs';
+import {join, relative} from 'node:path';
+import type {BuildBrief} from '../../author/build';
 
-const pascal = (id: string) => id.split('-').map(w => {
-  const c = w[0]; if (c === undefined) throw Error(`lesson id '${id}' has an empty segment`);
-  return c.toUpperCase() + w.slice(1);
-}).join('');
+const pascal = (id: string) =>
+  id
+    .split('-')
+    .map(w => {
+      const c = w[0];
+      if (c === undefined) throw Error(`lesson id '${id}' has an empty segment`);
+      return c.toUpperCase() + w.slice(1);
+    })
+    .join('');
 
-export function generateLesson(dir: string, id: string, brief: BuildBrief, root: string): { files: string[]; text: Record<string, string>; next: string[]; strings: string[] } {
+export function generateLesson(
+  dir: string,
+  id: string,
+  brief: BuildBrief,
+  root: string,
+): {files: string[]; text: Record<string, string>; next: string[]; strings: string[]} {
   const rel = (f: string) => relative(root, join(dir, f)).split('\\').join('/');
   const c = id.replace(/-(\w)/g, (_, x: string) => x.toUpperCase());
   const k = (s: string) => `lesson.${id}.${s}`;
   const ages = brief.audience.ages ? `ages: [${brief.audience.ages[0]}, ${brief.audience.ages[1]}], ` : '';
   const text: Record<string, string> = {};
-  text[rel(`${id}-lesson.ts`)] = `// The ${id} lesson as data. Grow the outline one scene at a time; every objective needs a scene and a check.
+  text[rel(`${id}-lesson.ts`)] =
+    `// The ${id} lesson as data. Grow the outline one scene at a time; every objective needs a scene and a check.
 // Pacing (checked by npm run check): at most ${brief.pedagogy.maxPassiveActions} passive steps before the learner acts.
 import { defineLesson } from '@kits/learn';
 
@@ -59,7 +70,8 @@ export default defineLesson({
   },
 });
 `;
-  text[rel(`${id}.ts`)] = `// The ${id} lesson as a scene; its body (the learn runtime) loads only when the lesson opens.
+  text[rel(`${id}.ts`)] =
+    `// The ${id} lesson as a scene; its body (the learn runtime) loads only when the lesson opens.
 import { lessonScene } from '@kits/learn';
 import lesson from './${id}-lesson';
 
@@ -78,17 +90,39 @@ test('${id}: every objective is taught and checked, and the pacing rules hold', 
 });
 `;
   const words: Record<string, string> = {
-    [k('title')]: pascal(id).replace(/([a-z])([A-Z])/g, '$1 $2'), [k('o1')]: '<what the learner will be able to do>', [k('teacher')]: 'Teacher', [k('mate')]: 'Alex',
-    [k('intro.title')]: 'The idea', [k('idea')]: '<the one idea, in a few words>', [k('hello')]: '<a friendly opening line>',
-    [k('explain')]: '<one sentence that explains the idea>', [k('asks')]: '<the question a classmate would ask>', [k('answer')]: '<the teacher\'s answer to a question>',
-    [k('check.title')]: 'Check', [k('quiz-intro')]: 'One quick question.', [k('q1')]: '<a question about the idea>', [k('q1.a')]: '<the right answer>',
-    [k('q1.b')]: '<a tempting wrong answer>', [k('q1.hint')]: '<a hint that helps without giving it away>', [k('right')]: 'Yes, well done!', [k('retry')]: 'Nice try. Here is a hint.',
+    [k('title')]: pascal(id).replace(/([a-z])([A-Z])/g, '$1 $2'),
+    [k('o1')]: '<what the learner will be able to do>',
+    [k('teacher')]: 'Teacher',
+    [k('mate')]: 'Alex',
+    [k('intro.title')]: 'The idea',
+    [k('idea')]: '<the one idea, in a few words>',
+    [k('hello')]: '<a friendly opening line>',
+    [k('explain')]: '<one sentence that explains the idea>',
+    [k('asks')]: '<the question a classmate would ask>',
+    [k('answer')]: "<the teacher's answer to a question>",
+    [k('check.title')]: 'Check',
+    [k('quiz-intro')]: 'One quick question.',
+    [k('q1')]: '<a question about the idea>',
+    [k('q1.a')]: '<the right answer>',
+    [k('q1.b')]: '<a tempting wrong answer>',
+    [k('q1.hint')]: '<a hint that helps without giving it away>',
+    [k('right')]: 'Yes, well done!',
+    [k('retry')]: 'Nice try. Here is a hint.',
   };
   const stringsFile = join(dir, 'strings.en.json');
-  const existing = existsSync(stringsFile) ? JSON.parse(readFileSync(stringsFile, 'utf8')) as Record<string, string> : null;
-  const next = [`Write the words: ${rel('strings.en.json')} (every <…>)`, `Then grow the outline in ${rel(`${id}-lesson.ts`)}: outline -> scenes -> npm run play:snap -- --scene ${id} after each`, 'Needs the kits ui, camera, concept-explorer and learn in game.ts'];
-  if (existing) { writeFileSync(stringsFile, JSON.stringify({ ...existing, ...words }, null, 2) + '\n'); return { files: Object.keys(text), text, next, strings: [rel('strings.en.json') + ' (lesson words)'] }; }
+  const existing = existsSync(stringsFile)
+    ? (JSON.parse(readFileSync(stringsFile, 'utf8')) as Record<string, string>)
+    : null;
+  const next = [
+    `Write the words: ${rel('strings.en.json')} (every <…>)`,
+    `Then grow the outline in ${rel(`${id}-lesson.ts`)}: outline -> scenes -> npm run play:snap -- --scene ${id} after each`,
+    'Needs the kits ui, camera, concept-explorer and learn in game.ts',
+  ];
+  if (existing) {
+    writeFileSync(stringsFile, JSON.stringify({...existing, ...words}, null, 2) + '\n');
+    return {files: Object.keys(text), text, next, strings: [rel('strings.en.json') + ' (lesson words)']};
+  }
   text[rel('strings.en.json')] = JSON.stringify(words, null, 2) + '\n';
   next.unshift("In game.ts: import strings from './strings.en.json' and pass strings: { en: strings } to defineGame");
-  return { files: Object.keys(text), text, next, strings: [] };
+  return {files: Object.keys(text), text, next, strings: []};
 }

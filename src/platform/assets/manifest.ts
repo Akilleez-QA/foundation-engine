@@ -9,8 +9,8 @@
  * validation over every pack. Nothing in the running game reads this module yet. Pure: no DOM, no three.js, no I/O.
  */
 
-import { QUALITY_PRESETS, type QualityPreset } from '../../core/tiers.ts';
-import type { AssetDef } from '../../core/asset-def.ts';
+import {QUALITY_PRESETS, type QualityPreset} from '../../core/tiers.ts';
+import type {AssetDef} from '../../core/asset-def.ts';
 
 export type {
   AssetDef,
@@ -53,7 +53,7 @@ export function validateAssetDefs(defs: readonly AssetDef[]): AssetProblem[] {
   const ids = new Set<string>();
   const paths = new Map<string, string>();
   for (const def of defs) {
-    const report = (problem: string) => problems.push({ id: def.id, problem });
+    const report = (problem: string) => problems.push({id: def.id, problem});
     if (!ID_PATTERN.test(def.id)) report('id must be asset.<kind>.<name> in lower case');
     else if (def.id.split('.')[1] !== def.kind) report(`id segment does not match kind '${def.kind}'`);
     if (ids.has(def.id)) report('duplicate id');
@@ -65,7 +65,8 @@ export function validateAssetDefs(defs: readonly AssetDef[]): AssetProblem[] {
     if (def.variants.length === 0) report('no variants');
     const seen = new Set<string>();
     for (const v of def.variants) {
-      if (v.path.startsWith('/') || v.path.includes('..')) report(`variant path '${v.path}' must be relative to public/`);
+      if (v.path.startsWith('/') || v.path.includes('..'))
+        report(`variant path '${v.path}' must be relative to public/`);
       const owner = paths.get(v.path);
       if (owner !== undefined && owner !== def.id) report(`variant '${v.path}' is also claimed by ${owner}`);
       paths.set(v.path, def.id);

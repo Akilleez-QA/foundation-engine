@@ -1,6 +1,6 @@
-import { test } from 'node:test';
+import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import { createSurveyAdapter } from './survey.mjs';
+import {createSurveyAdapter} from './survey.mjs';
 const state = () => ({
   view: {
     clock: 0,
@@ -18,7 +18,7 @@ const state = () => ({
           batch: {
             id: 'input-a',
             material: 'input',
-            properties: { grade: 400 },
+            properties: {grade: 400},
           },
         },
       },
@@ -30,7 +30,7 @@ const state = () => ({
 test('survey samples bounded batches and completes exactly64 observations without harvest', () => {
   const runtime = state(),
     before = structuredClone(runtime),
-    owner = createSurveyAdapter({ readRuntime: () => runtime });
+    owner = createSurveyAdapter({readRuntime: () => runtime});
   assert.equal(owner.start('field').status, 'started');
   for (let i = 0; i < 8; i++) {
     const result = owner.step();
@@ -44,7 +44,7 @@ test('survey samples bounded batches and completes exactly64 observations withou
 test('replacement, expiry, cancellation and retirement revoke retained callbacks', () => {
   for (const mode of ['replacement', 'expiry', 'cancel', 'retire']) {
     const runtime = state(),
-      owner = createSurveyAdapter({ readRuntime: () => runtime });
+      owner = createSurveyAdapter({readRuntime: () => runtime});
     owner.start('field');
     const retained = owner.capture();
     if (mode === 'replacement') runtime.view.spawns[0].incarnation++;
@@ -57,7 +57,7 @@ test('replacement, expiry, cancellation and retirement revoke retained callbacks
 });
 test('same incarnation changed facts reject; late callback cannot progress replacement survey', () => {
   const runtime = state(),
-    owner = createSurveyAdapter({ readRuntime: () => runtime });
+    owner = createSurveyAdapter({readRuntime: () => runtime});
   owner.start('field');
   const old = owner.capture();
   runtime.view.spawns[0].deposit.seed++;

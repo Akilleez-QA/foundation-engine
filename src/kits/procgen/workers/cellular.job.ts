@@ -1,2 +1,2 @@
-import { cellularGridJob } from '../cellular';
+import {cellularGridJob} from '../cellular';
 export default cellularGridJob.module;

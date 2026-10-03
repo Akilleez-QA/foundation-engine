@@ -1,8 +1,8 @@
 import * as T from 'three';
-import type { Entity } from '../core/ecs/world';
-import { validateMesh, type MeshData } from './mesh';
-import type { createSceneResources } from './scene-resources';
-import { retireRepresentations } from './representation-cleanup';
+import type {Entity} from '../core/ecs/world';
+import {validateMesh, type MeshData} from './mesh';
+import type {createSceneResources} from './scene-resources';
+import {retireRepresentations} from './representation-cleanup';
 
 type Resources = ReturnType<typeof createSceneResources>;
 export interface IndexedSlot {
@@ -29,7 +29,13 @@ export function indexedGeometry(data: MeshData, resources: Resources): T.BufferG
 }
 
 /** Publish the whole replacement before disposal events can reenter or end the visit. */
-export function replaceIndexedGeometry(slot: IndexedSlot, data: MeshData, resources: Resources, current: () => boolean, changed: () => void): boolean {
+export function replaceIndexedGeometry(
+  slot: IndexedSlot,
+  data: MeshData,
+  resources: Resources,
+  current: () => boolean,
+  changed: () => void,
+): boolean {
   const replacement = indexedGeometry(data, resources);
   const previous = slot.mesh.geometry;
   slot.mesh.geometry = replacement;
@@ -53,6 +59,7 @@ export function releaseIndexed(e: Entity, slots: Map<Entity, IndexedSlot>, scene
   const slot = slots.get(e);
   if (!slot) return;
   slots.delete(e);
-  const geometry = slot.mesh.geometry, material = slot.mesh.material;
+  const geometry = slot.mesh.geometry,
+    material = slot.mesh.material;
   retireRepresentations(scene, [slot.mesh], [() => resources.release(geometry), () => resources.release(material)]);
 }

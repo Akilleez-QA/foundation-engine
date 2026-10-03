@@ -3,10 +3,10 @@
 // `*.test.mjs` file, so per-template `npm test` runs do not repeat it.
 // Evidence scope: loopback/process only; not WAN, not physical devices. Floors are loose so a loaded machine does
 // not flake, while a flooder or non-reader that harmed healthy peers, or a broken bound, still fails.
-import test, { before } from 'node:test';
+import test, {before} from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';
-import { runNetworkProbe } from './probe.mjs';
+import {runNetworkProbe} from './probe.mjs';
 
 try {
   os.setPriority(Math.max(os.getPriority(), 10));
@@ -20,53 +20,63 @@ before(async () => {
     seed: 11,
     // A 300 ms queue age is shorter than the worst queued wait at saturation; since PR #33 its sheds are free, so goodput
     // must still plateau (before that fix it collapsed).
-    overload: { queueAgeVariants: [null, 300], rampPerClient: [8, 24], stepMs: 1000, drainMs: 400 },
+    overload: {queueAgeVariants: [null, 300], rampPerClient: [8, 24], stepMs: 1000, drainMs: 400},
     // Operator changes every 5 ms keep the non-reader's view dirty, so it is driven until the buffered-send cap.
-    nonReader: { healthyClients: 2, settleMs: 300, changeEveryMs: 5, maxAttackMs: 30000 },
+    nonReader: {healthyClients: 2, settleMs: 300, changeEveryMs: 5, maxAttackMs: 30000},
     // Enough attempts (cumulative backoff up to 11.75 s) and observation that every client resolves even when a
     // loaded machine delays the restarted host.
     storm: {
-      variants: [{ policy: 'jitter', clients: 8 }],
+      variants: [{policy: 'jitter', clients: 8}],
       observeMs: 15000,
-      retry: { baseMs: 250, capMs: 2000, maxAttempts: 8, budget: { capacity: 10, refillEveryMs: 15000 } },
+      retry: {baseMs: 250, capMs: 2000, maxAttempts: 8, budget: {capacity: 10, refillEveryMs: 15000}},
     },
   });
 });
 
 for (const age of [null, 300])
-test(`NW07: healthy goodput stays above a floor past saturation while a flooder is rate-limited (queue age ${age ?? 'none'})`, () => {
-  assert.equal(report.aborted, null);
-  const o = report.scenarios.overload.variants.find((v) => v.host.maxQueuedAgeMs === age);
-  assert.equal(o.unexpectedHealthyCloses.length, 0, 'no healthy peer is closed');
-  assert.deepEqual(o.adversaries.filter((a) => a.kind === 'round-error'), []);
-  const floods = o.adversaries.filter((a) => a.kind === 'flooder');
-  assert.equal(floods.length, o.steps.length);
-  // Host-side retirement reason is authoritative; a loaded machine can lose the client-visible close frame.
-  assert.equal(o.highWater.hostCloseReasons['rate-capacity'], floods.length);
-  for (const f of floods) assert.ok(f.code === 1006 || (f.code === 1013 && f.reason === 'rate-capacity'), `${f.code} ${f.reason}`);
-  const wrong = o.adversaries.filter((a) => a.kind === 'wrong-credential');
-  assert.equal(o.highWater.hostCloseReasons['auth-rejected'], wrong.length);
-  for (const a of wrong)
-    assert.ok(a.code === 1006 || (a.code === 1008 && a.reason === 'auth-rejected' && a.class === 'terminal'), `${a.code} ${a.reason}`);
-  const saturated = o.steps.at(-1);
-  assert.ok(saturated.offeredPerSecond > saturated.goodputPerSecond, 'the last step is past saturation');
-  // Nominal capacity is 80 dispatches/s; a quarter of it is a floor that only a real regression breaks.
-  assert.ok(saturated.goodputPerSecond >= o.host.dispatchCapacityPerSecond / 4, `goodput ${saturated.goodputPerSecond}/s`);
-  assert.ok(o.highWater.queuedMessages <= 32 && o.highWater.queuedBytes <= 16384);
-  assert.ok(o.highWater.peerBufferedBytes <= 8192);
-  assert.ok(o.highWater.connections <= 8);
-  if (age !== null) {
-    // Aged commands were shed (with correlated stale refusals) and goodput did not collapse (PR #33).
-    assert.ok(o.steps.at(-1).hostStaleShed > 0, 'aged commands were shed at saturation');
-    const plateau = report.invariants.find((r) => r.id === `overload[age=${age}].goodput-plateaus`);
-    assert.ok(plateau.ok === true || plateau.inconclusive === true, plateau.detail);
-  }
-});
+  test(`NW07: healthy goodput stays above a floor past saturation while a flooder is rate-limited (queue age ${age ?? 'none'})`, () => {
+    assert.equal(report.aborted, null);
+    const o = report.scenarios.overload.variants.find(v => v.host.maxQueuedAgeMs === age);
+    assert.equal(o.unexpectedHealthyCloses.length, 0, 'no healthy peer is closed');
+    assert.deepEqual(
+      o.adversaries.filter(a => a.kind === 'round-error'),
+      [],
+    );
+    const floods = o.adversaries.filter(a => a.kind === 'flooder');
+    assert.equal(floods.length, o.steps.length);
+    // Host-side retirement reason is authoritative; a loaded machine can lose the client-visible close frame.
+    assert.equal(o.highWater.hostCloseReasons['rate-capacity'], floods.length);
+    for (const f of floods)
+      assert.ok(f.code === 1006 || (f.code === 1013 && f.reason === 'rate-capacity'), `${f.code} ${f.reason}`);
+    const wrong = o.adversaries.filter(a => a.kind === 'wrong-credential');
+    assert.equal(o.highWater.hostCloseReasons['auth-rejected'], wrong.length);
+    for (const a of wrong)
+      assert.ok(
+        a.code === 1006 || (a.code === 1008 && a.reason === 'auth-rejected' && a.class === 'terminal'),
+        `${a.code} ${a.reason}`,
+      );
+    const saturated = o.steps.at(-1);
+    assert.ok(saturated.offeredPerSecond > saturated.goodputPerSecond, 'the last step is past saturation');
+    // Nominal capacity is 80 dispatches/s; a quarter of it is a floor that only a real regression breaks.
+    assert.ok(
+      saturated.goodputPerSecond >= o.host.dispatchCapacityPerSecond / 4,
+      `goodput ${saturated.goodputPerSecond}/s`,
+    );
+    assert.ok(o.highWater.queuedMessages <= 32 && o.highWater.queuedBytes <= 16384);
+    assert.ok(o.highWater.peerBufferedBytes <= 8192);
+    assert.ok(o.highWater.connections <= 8);
+    if (age !== null) {
+      // Aged commands were shed (with correlated stale refusals) and goodput did not collapse (PR #33).
+      assert.ok(o.steps.at(-1).hostStaleShed > 0, 'aged commands were shed at saturation');
+      const plateau = report.invariants.find(r => r.id === `overload[age=${age}].goodput-plateaus`);
+      assert.ok(plateau.ok === true || plateau.inconclusive === true, plateau.detail);
+    }
+  });
 
 test('NW07: a physical non-reading peer is retired by the buffered-send cap; healthy peers keep current views', () => {
   const n = report.scenarios.nonReader;
   assert.equal(n.nonReader.retiredByHost, true, `not retired within the window: ${JSON.stringify(n.nonReader)}`);
-  assert.deepEqual(n.highWater.hostCloseReasons, { 'send-refused': 1 });
+  assert.deepEqual(n.highWater.hostCloseReasons, {'send-refused': 1});
   assert.ok(n.highWater.hostMaxBufferedBytesAtSend > 0, 'the host buffered views before refusing');
   assert.ok(n.highWater.hostMaxBufferedBytesAtSend <= 131072, `${n.highWater.hostMaxBufferedBytesAtSend}`);
   assert.equal(n.healthy.unexpectedCloses.length, 0);
@@ -100,6 +110,8 @@ test('NW07: reconnect storm after a host restart is paced and bounded; every own
   assert.equal(owned.children, 0);
   assert.equal(owned.socketsNotClosed, 0, `${owned.socketsNotClosed} of ${owned.socketsStarted} sockets still open`);
   assert.ok(owned.socketsStarted > 0);
-  for (const pid of owned.startedHostPids) assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `host ${pid} exited`);
-  for (const row of report.invariants) if (!row.finding && !row.inconclusive) assert.equal(row.ok, true, `${row.id}: ${row.detail}`);
+  for (const pid of owned.startedHostPids)
+    assert.throws(() => process.kill(pid, 0), {code: 'ESRCH'}, `host ${pid} exited`);
+  for (const row of report.invariants)
+    if (!row.finding && !row.inconclusive) assert.equal(row.ok, true, `${row.id}: ${row.detail}`);
 });

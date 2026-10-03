@@ -12,10 +12,12 @@
  * An element is found through `target()` each frame (cheap lookups by id), so a panel that rebuilds its markup gets
  * its text again without the HUD knowing about the panel.
  */
-import { formatReadout, type FormatLevel, type FormatText, type FormattableReadout } from './format';
+import {formatReadout, type FormatLevel, type FormatText, type FormattableReadout} from './format';
 
 /** A readout row as the HUD uses it. */
-export interface HudReadout<C> extends FormattableReadout { compute(ctx: C): unknown }
+export interface HudReadout<C> extends FormattableReadout {
+  compute(ctx: C): unknown;
+}
 
 export interface HudSlot<C> {
   /** The element this slot writes, or null when it is not on the page. */
@@ -49,11 +51,15 @@ const sameVersion = (a: readonly unknown[] | null, b: readonly unknown[]) =>
   !!a && a.length === b.length && a.every((x, i) => Object.is(x, b[i]));
 
 export function createReadoutHud<C>(slots: readonly HudSlot<C>[], opts: ReadoutHudOptions): ReadoutHud<C> {
-  let version: readonly unknown[] | null = null, level: FormatLevel | null = null, locale: string | undefined;
-  const texts: string[] = slots.map(() => ''), shown: (Element | null)[] = slots.map(() => null);
+  let version: readonly unknown[] | null = null,
+    level: FormatLevel | null = null,
+    locale: string | undefined;
+  const texts: string[] = slots.map(() => ''),
+    shown: (Element | null)[] = slots.map(() => null);
   return {
     update(nextVersion, context) {
-      const nextLevel = opts.level(), nextLocale = opts.locale?.();
+      const nextLevel = opts.level(),
+        nextLocale = opts.locale?.();
       const stale = !sameVersion(version, nextVersion) || nextLevel !== level || nextLocale !== locale;
       if (stale) {
         const ctx = context();
@@ -68,18 +74,30 @@ export function createReadoutHud<C>(slots: readonly HudSlot<C>[], opts: ReadoutH
           }
           texts[i] = text;
         }
-        version = nextVersion; level = nextLevel; locale = nextLocale;
+        version = nextVersion;
+        level = nextLevel;
+        locale = nextLocale;
       }
       let writes = 0;
       for (let i = 0; i < slots.length; i++) {
-        const el = slots[i]!.target(), text = texts[i]!;
+        const el = slots[i]!.target(),
+          text = texts[i]!;
         if (!stale && el === shown[i]) continue;
         shown[i] = el;
-        if (el && el.textContent !== text) { el.textContent = text; writes++; }
+        if (el && el.textContent !== text) {
+          el.textContent = text;
+          writes++;
+        }
       }
       return writes;
     },
     texts: () => texts,
-    reset() { version = null; level = null; locale = undefined; texts.fill(''); shown.fill(null); },
+    reset() {
+      version = null;
+      level = null;
+      locale = undefined;
+      texts.fill('');
+      shown.fill(null);
+    },
   };
 }

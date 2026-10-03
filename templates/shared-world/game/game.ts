@@ -1,8 +1,11 @@
-import { defineGame } from '@engine';
-import { ui } from '@kits/ui';
+import {defineGame} from '@engine';
+import {ui} from '@kits/ui';
 
 export default defineGame({
-  id: 'shared-world', title: 'Shared world', version: '0.1.0', firstScene: 'world',
+  id: 'shared-world',
+  title: 'Shared world',
+  version: '0.1.0',
+  firstScene: 'world',
   kits: [ui()],
   strings: {
     en: {

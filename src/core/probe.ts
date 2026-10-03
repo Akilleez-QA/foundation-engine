@@ -22,7 +22,13 @@ export function createProbes(enabled: boolean): Probes & ProbeReader {
     register(name, read, signal) {
       if (!enabled || signal.aborted) return;
       map.set(name, read);
-      signal.addEventListener('abort', () => { if (map.get(name) === read) map.delete(name); }, { once: true });
+      signal.addEventListener(
+        'abort',
+        () => {
+          if (map.get(name) === read) map.delete(name);
+        },
+        {once: true},
+      );
     },
     read: <K extends ProbeName>(name: K) => map.get(name)?.() as EngineProbes[K] | undefined,
     names: () => [...map.keys()] as ProbeName[],

@@ -1,6 +1,6 @@
-import { test } from 'node:test';
+import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import { publicBase, publicUrl } from './public-base';
+import {publicBase, publicUrl} from './public-base';
 
 test('a root-relative base is used as it is', () => {
   assert.equal(publicBase('/', 'https://host/sub/index.html'), '/');
@@ -11,7 +11,10 @@ test('a root-relative base is used as it is', () => {
 test('a relative base resolves against the page, so workers and media fetch the same file', () => {
   assert.equal(publicBase('./', 'https://host/sub/dir/index.html?x=1#scene/lab'), 'https://host/sub/dir/');
   assert.equal(publicUrl('models/a.glb', './', 'https://host/sub/dir/'), 'https://host/sub/dir/models/a.glb');
-  assert.equal(publicUrl('/models/a.glb', '', 'https://html.itch.zone/html/123/index.html'), 'https://html.itch.zone/html/123/models/a.glb');
+  assert.equal(
+    publicUrl('/models/a.glb', '', 'https://html.itch.zone/html/123/index.html'),
+    'https://html.itch.zone/html/123/models/a.glb',
+  );
 });
 
 test('without a document a relative base stays relative', () => {

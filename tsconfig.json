@@ -3,15 +3,8 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "types": [
-      "node",
-      "vite/client"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"],
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
@@ -21,24 +14,10 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
     "paths": {
-      "@engine": [
-        "./src/author/index.ts"
-      ],
-      "@kits/*": [
-        "./src/kits/*/index.ts"
-      ],
-      "@game/*": [
-        "./game/*",
-        "./templates/blank/game/*"
-      ]
+      "@engine": ["./src/author/index.ts"],
+      "@kits/*": ["./src/kits/*/index.ts"],
+      "@game/*": ["./game/*", "./templates/blank/game/*"]
     }
   },
-  "include": [
-    "src",
-    "game",
-    "templates",
-    "vite.config.ts",
-    "scripts/**/*.ts",
-    "perf/**/*.ts"
-  ]
+  "include": ["src", "game", "templates", "vite.config.ts", "scripts/**/*.ts", "perf/**/*.ts"]
 }
