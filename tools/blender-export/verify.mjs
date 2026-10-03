@@ -41,7 +41,7 @@ export async function verify(file) {
   }
   const asset = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
   asset.scene.updateMatrixWorld(true);
-  const bounds = new Box3().setFromObject(asset.scene), near = (a,b) => Math.abs(a-b) < 1e-6;
+  const bounds = new Box3().setFromObject(asset.scene, true), near = (a,b) => Math.abs(a-b) < 1e-6;
   assert.ok(bounds.min.toArray().every((v,i)=>near(v, [-.5,0,-.5][i])));
   assert.ok(bounds.max.toArray().every((v,i)=>near(v, [.5,1,.5][i])));
   const root = asset.scene.getObjectByName('metre-block'); assert.ok(root);

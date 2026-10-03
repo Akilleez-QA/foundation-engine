@@ -1,12 +1,14 @@
 // Actual stock-loader consumer; one isolated muted browser, no Blender process.
 import assert from 'node:assert/strict';
-import {mkdirSync, writeFileSync} from 'node:fs';
+import {mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {launch} from '../../scripts/perf/bench-browser.mjs';
+import {diagnosticReport} from '../../scripts/play/diagnostic-report.mjs';
 import {serve, open} from '../../scripts/play/lib.mjs';
 const out = resolve(process.argv[2] ?? 'playtest/blender-export');
 mkdirSync(out,{recursive:true});
 const report = {passed:false, errors:[], limitations:['Desktop software GL only; no physical-device, textured asset, animation, Blender GUI or MCP acceptance.']};
+const evidence = diagnosticReport(report, resolve(out,'report.json'));
 let server,browser;
 try {
  server=await serve(); browser=await launch({strictClose:true});
@@ -25,8 +27,11 @@ try {
  assert.equal(requests.length,1); assert.equal(requests[0].status,200);
  await browser.page.screenshot({path:resolve(out,'turned.png')});
  assert.deepEqual(report.errors,[]); report.passed=true;
+} catch (error) {
+ evidence.fail(error);
 } finally {
- await browser?.close(); await server?.close();
- writeFileSync(resolve(out,'report.json'),JSON.stringify(report,null,2)+'\n');
+ await evidence.close(browser,'browser cleanup');
+ await evidence.close(server,'server cleanup');
+ evidence.finish();
 }
 console.log(JSON.stringify(report,null,2));

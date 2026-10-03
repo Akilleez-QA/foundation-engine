@@ -38,3 +38,11 @@ The browser script emits `playtest/blender-export/report.json`, `loaded.png` and
 No full CI/template gate, physical device, production/subpath build of this specific consumer, artist-authored textured model, animation/rig, Blender interactive workflow, MCP tool or cross-version exporter compatibility was tested. A bounded static sample is the completed slice; these are distinct potential future acceptance cases. The verifier is sample-specific and not an arbitrary untrusted asset security checker.
 
 Reproduction, ownership and constraints: [Blender export example](../../tools/blender-export/README.md). The broader onboarding subpath receipt covers its separate arcade consumer; it does not silently extend this asset's evidence.
+
+## Independent review correction
+
+Review of `aa2fb2e` found that the original bounds check used Three's default cached geometry bounds, which GLTFLoader can derive from accessor metadata. It therefore did not independently establish the decoded-vertex bounds claimed above. The validator now requests precise world-space bounds from actual vertices. A regression mutates a binary vertex to x=9, retains the accessor min/max and updates the provenance hash; it reproduces the old false acceptance and is rejected after the fix. Original sample bounds and both export hashes remain unchanged.
+
+The browser diagnostic now uses the existing `diagnosticReport` owner: a browser-close exception cannot skip server cleanup or report writing, and any scenario/cleanup failure clears a previous pass. Test fixture URLs use `fileURLToPath` for paths containing escaped characters and Windows drive conventions.
+
+`node --test tools/blender-export/verify.test.mjs scripts/play/diagnostic-report.test.mjs` passes **9/9** (five asset tests and four existing cleanup-owner tests). The new decoded-position regression was separately run against the old non-precise expression and failed with the expected missing rejection, then passed with the corrected expression. This supersedes the original four-test-only count and the stronger original decoded-bound claim.
