@@ -4,16 +4,18 @@
 //   - every scene has a budget row, and no budget is above the brief's per-scene ceiling for its minimum device;
 //   - the first-load JS budget is within the brief's firstLoadKiB;
 //   - every success criterion has a checkable `by` file that exists, and GAME.md mirrors every criterion id;
+//   - every play:script file in the game's playtest/ folder is well formed and names scenes the game has;
 //   - quality views, modes and a template's genre agree with the game;
 //   - the input bindings pass the boot's inputActions validation (no overlap with the engine's or each other's rows);
 //   - learn mode: every lesson meets the pedagogy rules (lessonProblems) with the brief's maxPassiveActions and ages.
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { gameDirs, ROOT } from './layers.mjs';
 import { loadGame } from '../../src/app/game-files';
 import type { SceneDefinition } from '../../src/author/defs';
 import { lessonProblems, type LessonInput } from '../../src/kits/learn/lesson';
 import { gameInputProblems } from '../../src/author/input-registry';
+import { scriptProblems } from '../play/script-schema.mjs';
 
 export interface BriefProblem { game: string; problem: string }
 type Loaded = Awaited<ReturnType<typeof loadGame>>;
@@ -59,6 +61,17 @@ export async function checkGame(dir: string): Promise<string[]> {
     if (c.by && !existsSync(join(gameRoot, c.by))) out.push(`${c.id}: ${c.by} does not exist`);
     else if (c.how === 'test' && c.by && !new RegExp(`test\\(\\s*['"\`]${c.id}\\b`).test(readFileSync(join(gameRoot, c.by), 'utf8'))) out.push(`${c.id}: ${c.by} has no test named '${c.id}: …' (play:criteria runs tests by that name)`);
     if (md !== null && !md.includes(`| ${c.id} |`)) out.push(`${c.id}: GAME.md's brief does not mirror this success criterion`);
+  }
+  const playtests = join(dir, 'playtest');
+  for (const name of existsSync(playtests) ? readdirSync(playtests).filter(f => f.endsWith('.json')).sort() : []) {
+    const file = `game/playtest/${name}`;
+    let script: unknown;
+    try { script = JSON.parse(readFileSync(join(playtests, name), 'utf8')); } catch (error) { out.push(`${file}: not valid JSON: ${(error as Error).message}`); continue; }
+    const problems = scriptProblems(script);
+    for (const p of problems) out.push(`${file}: ${p} (docs/recipes/write-a-playtest-script.md)`);
+    if (problems.length || !record(script)) continue;
+    const named = [script.scene, ...(script.steps as Record<string, unknown>[]).map(s => s.goto)].filter((s): s is string => typeof s === 'string');
+    for (const id of named) if (!scenes.includes(id)) out.push(`${file}: scene '${id}' does not exist (scenes: ${scenes.join(', ')})`);
   }
   if (md !== null && !md.includes(brief.goal)) out.push('GAME.md does not mirror the brief\'s goal (update its Brief block)');
   for (const v of brief.quality.views) if (!scenes.includes(v.scene)) out.push(`quality view ${v.id} names unknown scene '${v.scene}'`);

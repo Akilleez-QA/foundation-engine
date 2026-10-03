@@ -401,6 +401,9 @@ streaming and looping are out of scope. Sound files share AUD-01's voice chain (
 distance models, cutoff, filter) through `ctx.playVoice`. Candidate in PR #57 (not integrated):
 `testScene` validates `playVoice` options as the output does and records them in `t.voices`,
 so game tests can assert spatial choices; this checks options only, never audible output.
+`testScene` also refuses a `ctx.play` / `ctx.playVoice` id that is neither a built-in cue
+(`BUILT_IN_CUES`) nor one of the scene's `sounds` (or its `sounds` option), where a browser
+only warns; candidate, not integrated. Unit-tested only; `ctx.playMusic` ids are not checked.
 
 ## Audio-clock timeline (AU-01) — integrated in v0.2.0
 
@@ -496,3 +499,17 @@ candidate; all 57 store tests pass under Node 22.23.3. This is MemoryBackend evi
 physical durability acceptance; hosted integration checks remain required. See
 [the import recipe](../recipes/add-a-save-section.md#6-report-orphan-import-outcomes)
 for the expanded result union and recovery boundaries.
+
+### Author scene DPR-only redraw — reviewed candidate, 2026-10-03
+
+The focused `fix/author-dpr-redraw` candidate connects the existing quality owner's
+resize notification to the visit-owned author resize callback. It guards retired
+visits and removes the listener on cleanup. Existing quality defaults, creator
+profiles and on-demand rendering semantics are preserved.
+
+Evidence: eight focused resize/cleanup tests and a clean-source browser run at
+`422975c43904037e7895a5ebe96a4a9913f45b4c` passed. A quality DPR change with unchanged
+CSS produced one redraw and then idle rendering; the unchanged public runtime
+reproduced the missing redraw. See the [contract](render-resize-lifecycle.md) and
+[source-scoped receipt](../verification/dpr-redraw-20261003.md). This is candidate
+evidence, not public integration, a full local gate or physical-device acceptance.

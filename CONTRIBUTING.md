@@ -6,22 +6,35 @@ Read [AGENTS.md](AGENTS.md), [the architecture standard](docs/STANDARD.md), and 
 
 ## Set up
 
-Use Node.js 22.18 or later (`.nvmrc` / `.node-version` pin the Node 22 line), npm, and Git. CI currently uses Node.js 22. In a checkout:
+Use Git, npm and Node.js 22.18 or later (`.nvmrc` / `.node-version` select Node 22; CI uses Node 22). No paid AI tool, coding agent, deployment credential or private repository is required.
+
+For a contribution without upstream write access, create your own GitHub fork, then clone the canonical repository and add your fork as the push destination. Replace `YOUR-NAME` and `my-change` below:
 
 ```sh
+git clone https://github.com/Akilleez-QA/foundation-engine.git
+cd foundation-engine
+git remote add fork https://github.com/YOUR-NAME/foundation-engine.git
+git fetch origin main
+git worktree add ../foundation-engine-my-change -b my-change origin/main
+cd ../foundation-engine-my-change
 npm ci
-npm run dev
 ```
 
-Without a `game/` folder, the blank template runs. Pass `--game templates/terrain/game` (for example `npm run play -- --game templates/terrain/game`; works on every shell) or set `GAME_DIR=templates/terrain/game` to select a diagnostic consumer. Shell examples use POSIX environment-variable syntax; in PowerShell use `$env:GAME_DIR="templates/terrain/game"; npm run …`, in cmd.exe `set GAME_DIR=templates/terrain/game&& npm run …`. The `test:*-browser` scripts assume bash (CI); on Windows run them from WSL or Git Bash.
+Here **`origin` is the canonical upstream; `fork` is your personal repository**. This is intentional: history and budget checks compare against `origin/main`. If you already cloned your fork as `origin`, rename that remote with `git remote rename origin fork`, add the canonical URL with `git remote add origin https://github.com/Akilleez-QA/foundation-engine.git`, and fetch it before creating the task worktree. Keep each worktree's own dependencies; do not reuse another contributor's `node_modules`.
+
+For a first contribution, a small reproduction, test, recipe correction or accessibility finding is useful. Choose the relevant existing contract and avoid unrelated cleanup. Making your own game instead? Follow [getting started](docs/guides/getting-started.md); game branches are not engine pull requests.
+
+Without a `game/` folder, the blank template is selected. To inspect another consumer, use `npm run play -- --game templates/terrain/game` (works on every shell). It prints the URL and keeps running; use a second terminal for checks or stop it with Ctrl+C. Browser inspection is needed for affected visible behavior, not to run a pure Node test.
+
+Shell examples with `GAME_DIR=...` use POSIX syntax; PowerShell uses `$env:GAME_DIR="templates/terrain/game"; npm run …`, and cmd.exe uses `set GAME_DIR=templates/terrain/game&& npm run …`. The `test:*-browser` scripts assume bash (CI); on Windows run those from WSL or Git Bash.
 
 Browser checks require Chromium. Install the matching browser with:
 
 ```sh
-npx playwright-core install chromium
+npx --no-install playwright-core install chromium
 ```
 
-Linux CI may also need browser system dependencies (`npx playwright-core install --with-deps chromium`). The harness accepts `ENGINE_CHROMIUM` as an executable path, then tries Playwright's installed browser, then an installed Chrome or Chromium in its usual folder for the OS (`ENGINE_CHROMIUM_SYSTEM=0` skips those); without one it stops with the install command. Test browsers are isolated and muted; do not change system audio or use a personal browser profile for automation.
+Linux CI may also need browser system dependencies (`npx --no-install playwright-core install --with-deps chromium`). The harness accepts `ENGINE_CHROMIUM` as an executable path, then tries Playwright's installed browser, then an installed Chrome or Chromium in its usual folder for the OS (`ENGINE_CHROMIUM_SYSTEM=0` skips those); without one it stops with the install command. Test browsers are isolated and muted; do not change system audio or use a personal browser profile for automation.
 
 For the current improvement milestone, see the [creator-readiness goal](docs/guides/creator-readiness-goal.md): acceptance criteria, task cards, parallel ownership and evidence requirements.
 
@@ -65,17 +78,30 @@ During development:
 npm run check
 ```
 
-`check` selects affected tests from working-tree changes against HEAD, including untracked files. A clean committed tree can select zero tests; the output reports that explicitly. Use `npm run check -- --base origin/main` (or your fork's upstream base) to include committed changes since the merge base, together with staged, unstaged and untracked changes. This selection is a local heuristic, not complete dependency coverage. Use `npm run check -- --all` to run the canonical `npm test` suite during the check. Invalid revisions and unknown selection options fail instead of silently selecting no tests. Before requesting review, run the complete source checks:
+`check` selects affected tests from working-tree changes against HEAD, including untracked files. A clean committed tree can select **zero tests**; the output reports that explicitly, and a pass then does not establish that a regression test ran. Use `npm run check -- --base origin/main` (or your fork's upstream base) to include committed changes since the merge base, together with staged, unstaged and untracked changes. This selection is a local heuristic, not complete dependency coverage. Use `npm run check -- --all` to run the canonical `npm test` suite during the check. Invalid revisions and unknown selection options fail instead of silently selecting no tests.
+
+Run relevant tests explicitly before requesting review, including after a commit. For example, a game-directory argument change uses:
+
+```sh
+node --import tsx --test scripts/lib/game-dir.test.mjs
+```
+
+Use the test files for your actual change, not this example by default. Record the test count and result. Before requesting review, also run the complete source checks:
 
 ```sh
 npm run typecheck
 npm run lint
-npm test
 ```
+
+`npm test` is the complete source suite; use it for broader changes when practical. If a required check cannot run locally, say so and obtain its result through CI before integration. A focused selection is not the full suite.
 
 For changed runtime behavior, add tests that demonstrate the failure and intended outcome, including cancellation, retry, or disposal when applicable. For visible changes, capture and inspect desktop and relevant mobile screenshots with `npm run play:snap` and `npm run play:snap -- --mobile`; report page errors and measured counts. Development heap readings do not substitute for production benchmark results.
 
-The integration contract remains `npm run gate` on the proposed head; run it with `GAME_DIR` for each affected template. Broad shared changes may need `npm run gate:templates`; before integration, `npm run gate:ci` runs everything CI runs, including its browser suites. Report commands, results, and any unavailable hardware/browser checks honestly. Never weaken a test, tolerance, or budget to obtain a pass. CI smoke checks do not replace the full integration gate.
+## Review and integration evidence
+
+The complete repository CI workflow on the reviewed candidate supplies the required integration evidence: browser suites, template gates and phone smoke. A green focused check or historical CI run cannot replace it. Contributors do not need to duplicate the full hosted workflow on a constrained local machine. `npm run gate:ci` remains the reproduction command for a suitable runner after dependency/browser installation; `npm run gate` for one template and `gate:templates` alone cover less than full CI. Record the checked head, base, CI run, local commands and unverified hardware claims.
+
+Keep the PR current with canonical upstream. If its base changes, the maintainer must review and validate the resulting combined candidate before merging. Local assembly is staging, not accepted integration. Never weaken a test, tolerance or budget to obtain a pass. CI does not establish physical-device acceptance. [Governance](GOVERNANCE.md#review-and-integration) describes the review requirement and the explicitly authorized sole-maintainer exception; ordinary contributors do not need administrative permissions.
 
 ## Maintain documentation with the implementation
 
@@ -95,6 +121,16 @@ checks and integration. This keeps the documentation useful to the next creator 
 agent without requiring this conversation.
 
 ## Submit a pull request
+
+Commit the focused change and push only your branch to your fork. Replace the example file path with the files you changed:
+
+```sh
+git add -- path/to/changed-file
+git commit -m "Describe the concrete change"
+git push -u fork my-change
+```
+
+On GitHub, open a pull request to `Akilleez-QA/foundation-engine`, base `main`, comparing your fork's `my-change` branch. No upstream write permission is needed. Include `git rev-parse HEAD`, relevant test commands/counts, and any missing checks in the PR template. Do not push to canonical `main`. A [recorded public-source rehearsal](docs/verification/contributor-rehearsal-20261003.md) shows this path with explicit post-commit tests and its remaining limits.
 
 Describe the concrete problem and resulting behavior, link the issue when one exists, and give reproduction/validation evidence. Explain public API or save-format compatibility changes and document new contracts. Include asset/source provenance and required notices for anything you add; do not copy proprietary implementation code or assets. Do not submit secrets, generated dependency directories, or unrelated local artifacts.
 

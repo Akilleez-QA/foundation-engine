@@ -26,13 +26,13 @@ export {
   type SaveSectionDef, type AssetDefinition, type PlayOptions, validatePlayOptions, PLAY_LATE_MS, type ModeDefinition, type KitDefinition, type SceneContext, type SaveHandle, type InputState, type InputSource, type ActionHint,
   type ViewState, type ReadingSheet, type ReadingSheetOptions, type ScenePreparationContext, type Vec3, type SceneBody, type SceneInput, type SceneReplayDigest, type ComponentType, type ComponentInit, type Entity, type World,
 } from './defs';
-export { testScene, createTestWorkerHost, type TestScene, type TestVoice } from './testing';
+export { testScene, createTestWorkerHost, createTestSaves, type TestScene, type TestVoice, type TestSaves, type TestSaveStore } from './testing';
 /** Seeded randomness whose state a simulation can save and restore (rollback, reload, replay). */
 export { createSaveableRng, type SaveableRng, type Rng } from '../core/rng';
 export { effectiveFov, viewRay, pointerOnGround, projectToView } from './view-math';
 export { Mesh, defineMesh, type MeshData, type MeshInput } from './mesh';
 export type { CueVoice, CueVoiceOptions, CueFilter, SpatialCue, PanningModel, DistanceModel, AudioVector } from '../platform/audio/audio-output';
-export { distanceGain, audibleGain } from '../platform/audio/audio-output';
+export { distanceGain, audibleGain, BUILT_IN_CUES } from '../platform/audio/audio-output';
 export type { SpatialAudioOptions } from '../platform/audio/module';
 export { Material, defineMaterial, validateMaterial, MATERIAL_DEFAULTS, MATERIAL_LIMITS, type MaterialData, type MaterialWrap } from './material';
 export { musicBudgets, MUSIC_START_MARGIN, type MusicOptions, type MusicVoice, type MusicState, type MusicStats } from '../platform/audio/music-clock';

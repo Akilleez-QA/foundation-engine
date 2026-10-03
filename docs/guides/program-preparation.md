@@ -42,8 +42,10 @@ retirement clear their shared validation epoch.
 The author runtime synchronizes initial entities/environment, compiles, awaits
 program readiness and submits a real initial draw before resolving `ready`.
 Initial errors therefore use router failure/retry. Scene systems do not step until initial
-preparation settles (ready or degraded), so the router's first-render frames still
-precede `enter()` as they did before preparation; restoration does not pause them. A later typed shader error
+preparation settles (ready or degraded) and the visit has arrived: the router's
+first-render frames draw the spawned entities but step no system, so `enter()` runs
+before a visit's first fixed or frame step, on a first entry and on every re-entry;
+restoration does not pause started systems. A later typed shader error
 suspends update/render and shows a visit-owned Retry surface. Synchronous restore
 errors enter the same owned boundary. Superseded owners cannot publish recovery.
 Other renderer exceptions retain their existing policy. A non-link preparation

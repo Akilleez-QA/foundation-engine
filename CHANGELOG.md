@@ -7,6 +7,15 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Reload tests and checked playtest scripts.** `createTestSaves()` from `@engine` gives game tests
+  in-memory storage shared across `testScene` runs: `reload()` flushes the store as a page's
+  `pagehide` does and re-opens it over the same storage (`{ flush: false }` loses pending writes, as a
+  crash would). `play:script` gains a `{"reload": true}` step that reloads the real page. Scripts
+  are now validated before any server or browser starts (unknown steps, fields and matchers, bad
+  arguments: exit 64, one line per problem), by `npm run check` (lint:brief, every
+  `game/playtest/*.json`, including scene names) and by `play:criteria`. The format is in the
+  [write a playtest script](docs/recipes/write-a-playtest-script.md) recipe. The arcade template
+  tests S4 across a reload, headless and in `playtest/best-reload.json`.
 - **Accurate orphan import receipts.** Unknown payloads report `orphan-kept` only
   after a successful write or exact stored-byte match. Different existing bytes
   remain untouched and report `orphan-conflict`; storage exceptions report
@@ -22,6 +31,12 @@ Every new framework below is optional: a game that does not use it is unchanged.
   slide-off, blur or the visit's end; presses keep the exactly-once fixed-tick delivery. Touch only,
   at least 48 CSS px. `bindPointerControl` gains `leave: 'release'` and `onContact`; `ctx.view.signal`
   aborts when the visit ends. Emulated browser evidence only.
+- **`testScene` refuses unknown cue and sound ids.** `ctx.play` / `ctx.playVoice` with an id that is
+  neither a built-in cue nor one of the scene's `sounds` now throws in `testScene`, naming the id and
+  the built-in cues (a browser only warns in the console). `testScene({ sounds })` adds ids a scene
+  plays without listing them. `BUILT_IN_CUES` lists the cue ids; the
+  [test a scene](docs/recipes/test-a-scene.md) recipe documents every option and result field, and
+  the built-in cue table in the sounds recipe is generated from the cue definitions and checked.
 - **`testScene` records `playVoice` options.** `t.voices` lists each voice with a copy of its options
   (gain, rate, variant, wait, at, spatial, filter), checked as the audio output checks them
   (`normalizeCueVoiceOptions`, shared with the real `playVoice`). `t.cues` is unchanged; invalid options now throw in tests, as they do

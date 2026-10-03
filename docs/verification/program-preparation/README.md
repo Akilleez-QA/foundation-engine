@@ -128,6 +128,14 @@ frames before the scene's `enter()` hook. Systems now start only after initial
 preparation settles (ready or degraded), restoring the previous order. The
 fixture was not changed; a unit regression fails without the fix.
 
+That "previous order" still stepped systems during the router's two first-render
+frames, before arrival ran `enter()` (one fixed and two frame steps per visit,
+measured by `scripts/play/scene-entry-order-check.mjs` before its fix). A game whose
+systems read state that `enter()` sets saw empty state on every entry, re-entry and
+restart, which unit tests (`testScene` runs `enter()` first) could not show. Systems
+now also wait for arrival; the unit regression in
+`src/author/program-preparation.test.ts` and that browser check fail without it.
+
 At `17391f3` on `main` `7d57880`, with Node 22: all 19 CI browser suites from
 `.github/workflows/ci.yml` PASS locally (with their `GAME_DIR` settings);
 `npm run check` PASS; `npm test` 2,048 tests, 0 failures; `npm run lint` PASS;
