@@ -14,7 +14,7 @@ Working-tree checks are development feedback. After committing, run relevant tes
 
 The complete hosted CI workflow on the reviewed candidate supplies the integration gate. Reproducing it locally with `gate:ci` is optional on a suitable runner; partial or historical passes do not substitute for missing full coverage. Recheck the combined candidate when the base changes. Integration remains serial through pull requests.
 
-The normal protected-review route remains preferred. For a sole active human maintainer, a repository-owner-authorized administrative exception may address the inability to approve one's own PR only after required checks pass and a separate source review is recorded. Record exact head/base, CI link, reviewer identity/type, resolved findings and the exception's reason. Do not describe self-review or an agent review as a GitHub human approval. Never bypass failed or missing checks.
+The normal protected-review route remains preferred. For a sole active human maintainer, a repository-owner-authorized administrative exception may address the inability to approve one's own PR only after required checks pass and a separate source review is recorded. Owner authorization may cover a specified merge or a bounded integration session; link the standing authorization in each merge record, honor its scope and do not request it again within that scope. Record exact head/base, CI link, reviewer identity/type, resolved findings and the exception's reason. Do not describe self-review or an agent review as a GitHub human approval. Never bypass failed or missing checks.
 
 ## Consequences
 
