@@ -14,7 +14,10 @@ Every new framework below is optional: a game that does not use it is unchanged.
   is pending, and finally retires the app. The new dev/test-only `engine.dispose()` calls the existing kernel
   `App.dispose()` and reports any remaining scene handle, probe getters and the renderer pool's release
   audit; after it, `engine.clock.step()` refuses. Production builds have no test API, so they are unchanged.
-
+- **Fixed (docs): world-edit saves acknowledge only the submitted revision.** The
+  [large world records](docs/recipes/store-large-world-records.md) recipe captures the revision
+  before awaiting `store.write` and passes it to `markSaved`, so edits made while a save is
+  pending stay dirty instead of being lost; a GEN-02 regression test covers it.
 - **Reload tests and checked playtest scripts.** `createTestSaves()` from `@engine` gives game tests
   in-memory storage shared across `testScene` runs: `reload()` flushes the store as a page's
   `pagehide` does and re-opens it over the same storage (`{ flush: false }` loses pending writes, as a
