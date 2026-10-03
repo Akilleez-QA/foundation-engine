@@ -784,3 +784,16 @@ Status: implemented, candidate on `feat/gen02-chunk-store` (PR); not integrated.
   - physical devices;
   - multi-tab totals (in-memory accounting refreshes on reopen);
   - compression, whole-world export and crash consistency beyond IndexedDB's transaction atomicity.
+
+### Orphan import receipt correction (focused candidate)
+
+The existing SaveStore now distinguishes exact retention, conflicting destination
+bytes and storage failure, with known writes completed before orphan receipts.
+No snapshot API or format migration is included. Six focused regressions cover
+both payload locations, duplicate/conflicting bytes, denied reads/writes and retry,
+known/alias overlap, pending writes and notification-time owner registration. Four
+of these fail against the unchanged public implementation; all 53 store tests pass
+with the fix under Node 22.23.3. This is MemoryBackend evidence, not browser or
+physical durability acceptance; hosted integration checks remain required. See
+[the import recipe](../recipes/add-a-save-section.md#6-report-orphan-import-outcomes)
+for the expanded result union and recovery boundaries.

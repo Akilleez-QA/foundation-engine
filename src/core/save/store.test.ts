@@ -221,6 +221,115 @@ test('legacy export files import through their adapter; unknown sections are kep
   assert.throws(() => store.importPlayer(JSON.stringify({ format: 'something-else' })), /not a save file/);
 });
 
+test('orphan import reports exact retention and preserves conflicting bytes', () => {
+  const { store, backend } = setup();
+  const id = 'demo.unknown', key = 'game|p:1|' + id;
+  const entry = { v: 1, data: { value: 7 } }, raw = JSON.stringify(entry);
+  const file = (orphans: boolean) => JSON.stringify({ format: 'engine-profile', version: 2, sections: orphans ? {} : { [id]: entry }, ...(orphans ? { orphans: { [id]: entry } } : {}) });
+  try {
+    for (const orphans of [false, true]) {
+      backend.data.delete(key);
+      assert.equal(store.importPlayer(file(orphans)).sections[id], 'orphan-kept');
+      assert.equal(backend.data.get(key), raw);
+      const writes = backend.writes;
+      assert.equal(store.importPlayer(file(orphans)).sections[id], 'orphan-kept');
+      assert.equal(backend.writes, writes, 'identical bytes require no write');
+      // Even equivalent JSON with different bytes requires explicit reconciliation.
+      for (const existing of [JSON.stringify(entry, null, 2), '{"v":2,"data":"other"}', 'corrupt']) {
+        backend.data.set(key, existing);
+        assert.equal(store.importPlayer(file(orphans)).sections[id], 'orphan-conflict');
+        assert.equal(backend.data.get(key), existing);
+        assert.equal(backend.writes, writes, 'conflicts must not overwrite');
+      }
+    }
+  } finally { store.dispose(); }
+});
+
+test('orphan import reports read/write failures and can retry the retained source file', () => {
+  const { store, backend } = setup();
+  const id = 'demo.unknown', key = 'game|p:1|' + id;
+  const entry = { v: 1, data: 7 };
+  const file = JSON.stringify({ format: 'engine-profile', version: 2, sections: {}, orphans: { [id]: entry } });
+  try {
+    backend.data.set(key, 'existing');
+    backend.failGet = k => k === key;
+    const writes = backend.writes;
+    assert.equal(store.importPlayer(file).sections[id], 'orphan-failed');
+    assert.equal(backend.data.get(key), 'existing');
+    assert.equal(backend.writes, writes, 'an unreadable destination must not be written');
+    backend.failGet = () => false;
+    backend.data.delete(key);
+    backend.failSet = k => k === key;
+    assert.equal(store.importPlayer(file).sections[id], 'orphan-failed');
+    assert.equal(backend.data.has(key), false);
+    backend.failSet = () => false;
+    assert.equal(store.importPlayer(file).sections[id], 'orphan-kept');
+    assert.equal(backend.data.get(key), JSON.stringify(entry));
+  } finally { store.dispose(); }
+});
+
+test('known section/orphan overlap rejects before mutation, including aliases and newer versions', () => {
+  const { store, backend } = setup();
+  const aliased: SaveSection<number> = { id: 'demo.aliased', aliases: ['demo.old'], scope: 'player', version: 1, initial: () => 0, parse: raw => Number(raw) };
+  const handle = store.section(aliased);
+  try {
+    for (const [incomingId, orphanId] of [['demo.aliased', 'demo.aliased'], ['demo.old', 'demo.aliased'], ['demo.aliased', 'demo.old']]) {
+      for (const v of [1, 2]) {
+        const before = [...backend.data], writes = backend.writes;
+        const file = JSON.stringify({ format: 'engine-profile', version: 2, sections: {
+          'demo.voice': { v: 1, data: 'brave' }, [incomingId!]: { v, data: 7 },
+        }, orphans: { [orphanId!]: { v: 3, data: 8 } } });
+        assert.throws(() => store.importPlayer(file), /also supplied as an orphan/);
+        assert.equal(store.section(S.voice).get(), 'calm', 'earlier valid section was not published');
+        assert.equal(handle.get(), 0);
+        assert.deepEqual([...backend.data], before);
+        assert.equal(backend.writes, writes);
+      }
+    }
+  } finally { store.dispose(); }
+});
+
+test('unknown section payload retains existing precedence over a duplicate orphan input', () => {
+  const { store, backend } = setup();
+  const entry = { v: 1, data: 'section' };
+  try {
+    const report = store.importPlayer(JSON.stringify({ format: 'engine-profile', version: 2,
+      sections: { 'demo.unknown': entry }, orphans: { 'demo.unknown': { v: 2, data: 'orphan' } } }));
+    assert.equal(report.sections['demo.unknown'], 'orphan-kept');
+    assert.equal(backend.data.get('game|p:1|demo.unknown'), JSON.stringify(entry));
+  } finally { store.dispose(); }
+});
+
+test('orphan outcomes follow pending and newly registered known-owner writes', () => {
+  for (const dynamic of [false, true]) for (const occupied of [false, true]) {
+    const { store, backend } = setup();
+    const def: SaveSection<number> = { id: 'demo.owned', scope: 'player', version: 1, initial: () => 0, parse: raw => Number(raw) };
+    const key = 'game|p:1|' + def.id;
+    if (occupied) backend.data.set(key, JSON.stringify({ v: 1, data: 3 }));
+    if (!dynamic) store.section(def).replace(2);
+    const off = store.section(S.voice).subscribe(value => { if (dynamic && value === 'brave') store.section(def).replace(2); });
+    try {
+      const result = store.importPlayer(JSON.stringify({ format: 'engine-profile', version: 2,
+        sections: { 'demo.voice': { v: 1, data: 'brave' } }, orphans: { 'demo.owned': { v: 1, data: 7 } } }));
+      assert.equal(result.sections['demo.voice'], 'saved');
+      assert.equal(result.sections['demo.owned'], 'orphan-conflict');
+      assert.equal(JSON.parse(backend.data.get(key)!).data, 2, 'known local publication precedes orphan comparison');
+      assert.equal(store.section(def).get(), 2);
+    } finally { off(); store.dispose(); }
+  }
+});
+
+test('registered newer orphan can still be retained by a clean owner', () => {
+  const { store, backend } = setup();
+  const entry = { v: 2, data: 'future-voice' };
+  store.section(S.voice).get();
+  try {
+    const result = store.importPlayer(JSON.stringify({ format: 'engine-profile', version: 2, sections: {}, orphans: { 'demo.voice': entry } }));
+    assert.equal(result.sections['demo.voice'], 'orphan-kept');
+    assert.equal(backend.data.get('game|p:1|demo.voice'), JSON.stringify(entry));
+  } finally { store.dispose(); }
+});
+
 test('N players: add one, switch, and sections stay per player', () => {
   const b = new MemoryBackend(); seedLegacy(b);
   const { store } = setup(b);

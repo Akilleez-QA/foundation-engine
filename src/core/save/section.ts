@@ -91,7 +91,9 @@ export interface QuarantineEntry { key: string; from: string; reason: string }
 export interface FlushReport { written: string[]; failed: string[]; skipped: string[] }
 export interface ImportReport {
   format: 'engine-profile@2' | 'legacy';
-  sections: Record<string, 'saved' | 'session' | 'skipped-newer' | 'orphan-kept'>;
+  /** Orphans are kept only after a successful write or exact stored-byte match.
+   * Conflict preserves different existing bytes; failed means storage access threw. */
+  sections: Record<string, 'saved' | 'session' | 'skipped-newer' | 'orphan-kept' | 'orphan-conflict' | 'orphan-failed'>;
 }
 export interface ProfileFileV2 {
   format: 'engine-profile';

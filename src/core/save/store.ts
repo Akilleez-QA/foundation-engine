@@ -620,13 +620,21 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
       }
       // Phase 1: validate everything; any readable-but-invalid known section rejects the whole file.
       const staged: [SaveSection<any>, any][] = [], report: ImportReport = { format, sections: {} };
+      const knownIncoming = new Set<string>();
       for (const [id, entry] of Object.entries(incoming)) {
         const def = defs.get(id) ?? defs.get(aliases.get(id) ?? '');
         if (!def || def.scope === 'profile') { orphans[id] = entry; continue; }
+        knownIncoming.add(def.id);
         if (!entry || !Number.isInteger(entry.v)) throw Error('Invalid section ' + id);
         if (entry.v > def.version) { report.sections[def.id] = 'skipped-newer'; continue; }
         try { staged.push([def, upgrade(def, entry.data, entry.v)]); }
         catch (e) { throw Error(`${def.id}: ${(e as Error).message}`); }
+      }
+      // One report slot cannot acknowledge both a known section and an opaque orphan.
+      // Resolve aliases too, and reject before publishing any staged values.
+      for (const id of Object.keys(orphans)) {
+        const canonical = defs.get(id)?.id ?? aliases.get(id) ?? id;
+        if (knownIncoming.has(canonical)) throw Error('Section also supplied as an orphan: ' + canonical);
       }
       // Phase 2: commit (merge progress, replace the rest), then write once.
       const touched: Cell[] = [];
@@ -640,13 +648,21 @@ export function createSaveStore(opts: SaveStoreOptions): SaveStore & { usage(): 
         c.value = next;
         c.imported = false; c.folded = false; markDirty(c); notify(c); requireOpen(); touched.push(c);
       }
+      // Complete known-owner callbacks/writes before issuing opaque retention receipts.
+      flush('import');
+      for (const c of touched) report.sections[c.def.id] = c.status === 'saved' ? 'saved' : 'session';
       for (const [id, entry] of Object.entries(orphans)) {
         requireOpen();
         const k = ENVELOPE_PREFIX + 'p:' + into + '|' + id;
-        try { if (opts.local.get(k) === null) opts.local.set(k, JSON.stringify(entry)); report.sections[id] = 'orphan-kept'; } catch { /* the file still has it */ }
+        try {
+          const raw = JSON.stringify(entry), existing = opts.local.get(k);
+          if (existing !== null && existing !== raw) report.sections[id] = 'orphan-conflict';
+          else {
+            if (existing === null) opts.local.set(k, raw);
+            report.sections[id] = 'orphan-kept';
+          }
+        } catch { report.sections[id] = 'orphan-failed'; } // Retain the source file for retry/reconciliation.
       }
-      flush('import');
-      for (const c of touched) report.sections[c.def.id] = c.status === 'saved' ? 'saved' : 'session';
       return report;
     },
     resetAll() {
