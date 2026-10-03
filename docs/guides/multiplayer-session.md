@@ -171,11 +171,14 @@ empty world.
   idle-socket flood (one address, then many) that neither blocks new players nor a
   returning player, `act` on every 60 Hz tick for ten seconds without a close, and a
   40-action burst stopping at the host queue size.
-- `scripts/host.test.mjs` (4 tests): real loopback WebSockets through `npm run host`'s
+- `scripts/host.test.mjs` (6 tests): real loopback WebSockets through `npm run host`'s
   server: two clients share one world, a wrong code closes 1008 `auth-rejected`,
   origins are limited by mode (loopback only by default; LAN with `--lan`; public
   sites never), `--join` reuses a code across a restart and refuses weak codes, and
-  close sends 1001 `host-closing`.
+  close sends 1001 `host-closing`. Two subprocess cases exercise the actual CLI with
+  generated and supplied join codes: each printed link admits a real socket, and the
+  existing IPC close command shuts down the host and connection. See the
+  [CLI startup regression receipt](../verification/session-host-cli-20261003.md).
 - `templates/shared-world/game/world.test.ts`: the scene in local play and the host core
   produce the same world from the same actions (criterion S1).
 - `npm run test:session-browser`: two isolated headless Chromium contexts against a
