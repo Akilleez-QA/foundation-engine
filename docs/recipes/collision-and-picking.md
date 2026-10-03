@@ -143,5 +143,6 @@ npm run play:snap -- --scene collect
 
 - Uneven ground: `characterSystem({ ground: (x, z) => ({ height }) })` keeps the character on a surface; the `terrain` template does this with exact ground queries and pointer picking against the terrain itself.
 - Many solids or many movers cost one check per pair each step. Keep counts small, or split the world into areas yourself.
-- Gravity, jumping and bouncing: keep a vertical speed in a component, and in a fixed-step system add it to `Transform.y`, subtract gravity from it, and stop at the ground. Fixed-step systems run at 60 Hz on every machine, so the motion is the same everywhere.
+- Jumping: use the locomotion kit's `jumpSystem` ([add and tune a jump](tune-a-jump.md)). It owns `Transform.y` and runs after `characterSystem()` without a `ground` option; set its `groundOffset` to the capsule's centre height (0.7 here). Never run two writers of `y`.
+- Other vertical motion (bouncing, a thrown object): keep a vertical speed in a component, and in a fixed-step system add it to `Transform.y`, subtract gravity from it, and stop at the ground. Fixed-step systems run at 60 Hz on every machine, so the motion is the same everywhere.
 - More: the [character kit README](../../src/kits/character/README.md), the `explorer` template (walls, solids and things to use) and the `arcade` template (box overlap).
