@@ -822,3 +822,31 @@ CSS produced one redraw and then idle rendering; the unchanged public runtime
 reproduced the missing redraw. See the [contract](render-resize-lifecycle.md) and
 [source-scoped receipt](../verification/dpr-redraw-20261003.md). This is candidate
 evidence, not public integration, a full local gate or physical-device acceptance.
+
+### Creator-selectable render backend (ADR 0078) — decision recorded, 2026-10-03
+
+[ADR 0078](../adr/0078-creator-selectable-render-backend.md) supersedes ADR 0034.
+WebGL2 stays the default backend; WebGPU becomes an opt-in, creator-selected and
+lazily loaded backend. The default changes only by a later author decision when the
+ADR's five measured criteria (C1–C5) hold. This entry records the decision and the
+narrowed `three-webgpu` lint (allowed only under `platform/render/backends/webgpu/`,
+banned in the rest of the engine, kits and game code).
+
+**Renderer seam (plan step 1), candidate.** The renderer pool, the stage role and the
+snapshot role now create renderers and contexts and handle object tracking, loss and
+readiness through a `RenderBackend` interface. The WebGL2 backend
+(`src/platform/render/backends/webgl/`) is the code the pool used to run inline,
+moved without change. `defineBuild({ render: { backend } })` selects the backend and
+defaults to `'webgl2'`. `'webgpu'` is refused as "not available yet" by the brief and
+at boot. See the [render backend guide](render-backend.md).
+
+Evidence:
+- The picture guard in `identical` mode gave the same sha256 for base and head on
+  blank (`main`) and explorer (`garden`, `shed`).
+- The software-GL bench gave the same mean and max draws on all eight templates.
+  Averaged triangle counts and idle windows varied within base's own run-to-run
+  spread.
+- The `runtime` chunk grew by at most 446 B raw.
+
+There is still no WebGPU backend, per-backend budget, WebGPU tooling or device
+evidence.
