@@ -583,7 +583,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
     playVoice,
     setListener(position,forward,up){vector(position);vector(forward);vector(up);
       const fn=Math.hypot(forward[0],forward[1],forward[2]),un=Math.hypot(up[0],up[1],up[2]);if(!Number.isFinite(fn)||!Number.isFinite(un)||fn===0||un===0)throw Error('invalid audio orientation');
-      const f=copy(forward).map(x=>x/fn) as unknown as AudioVector,u=copy(up).map(x=>x/un) as unknown as AudioVector;
+      const f:AudioVector=[forward[0]/fn,forward[1]/fn,forward[2]/fn],u:AudioVector=[up[0]/un,up[1]/un,up[2]/un];
       if(Math.abs(f.reduce((sum,x,i)=>sum+x*u[i],0))>0.999)throw Error('parallel audio orientation');
       listener={position:copy(position),forward:f,up:u};applyListener();
       for(const check of [...cutoffChecks])check();

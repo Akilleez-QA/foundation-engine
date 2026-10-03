@@ -664,6 +664,7 @@ A game adds its own domain systems (for example an economy or a world model) wit
   - it sits in the right layer and depends only downward;
   - it uses no owned capability outside its owner (STD-LAY-10);
   - it contains no literal UI text (STD-STR-1);
+  - it uses no explicit `any` and no double cast through `unknown` without a written reason;
   - it owns everything it creates (STD-MOD-5, STD-RUN-7).
 - **STD-CNF-2.** **A feature conforms** when, in addition, all of these hold:
   - it is one folder with an eager manifest and a lazy body;
@@ -689,6 +690,7 @@ A game adds its own domain systems (for example an economy or a world model) wit
 | Layers | Import direction, cycles, manifest closure; owned-capability ratchet with sharded baselines | `scripts/lint/layers.mjs`, `scripts/lint/architecture.mjs`, `scripts/lint/manifests.mjs` |
 | Module kernel and registries | Registries test from the frozen boot; discovery test; availability tests | `src/app/registries.test.ts`, `src/core/*.test.ts` |
 | Save store | Fixture chain, export round-trip, reset prefix, quarantine | `src/core/save/*.test.ts` |
+| Types | No explicit `any`; double casts through `unknown` only with a written reason, ratcheted in test files | `scripts/lint/types.mjs` |
 | Styles | Cascade layers, root scope, tokens, no `!important` | `scripts/lint/css.mjs` |
 | Strings | Literal-text ratchet; key generation | `scripts/lint/architecture.mjs`, `scripts/strings.mjs` |
 | Performance | Gate count budgets and regressions; bundle check; budget ratchet | `scripts/perf/gate.mjs`, `scripts/perf/budget-ratchet.mjs` |
@@ -703,7 +705,8 @@ A game adds its own domain systems (for example an economy or a world model) wit
   - falling ratchet baselines;
   - reviewed budget trailers;
   - signed-off `reviewed` guards;
-  - accessibility exceptions with a reason.
+  - accessibility exceptions with a reason;
+  - type escapes (`lint:allow-any`, `lint:allow-unknown-cast`) with a written reason.
 
   Any other exception requires an ADR.
 - **STD-CNF-11.** A conformance claim MUST name its evidence: the gate summary, the reference run and the quality-guard result. "It looks fine" is not evidence.

@@ -31,7 +31,7 @@ export function routerModule(o: RouterModuleOptions = {}): EngineModule {
     install(s) {
       const tables: RouteTables = { scenes: s.registries.scenes, redirects: s.registries.redirects };
       for (const problem of redirectProblems(routesOf(tables.scenes.all()), tables.redirects.all())) s.log.warn(problem);
-      const win = o.win?.() ?? (globalThis as unknown as { window?: RouterWindow }).window;
+      const win: RouterWindow | undefined = o.win?.() ?? (globalThis as { window?: Window }).window;
       if (!win) throw Error('core.router needs a window (pass `win` in tests)');
       const router = createRouterService(createHashRouter(tables, win, o.fallbackScene));
       s.provide('router', router);

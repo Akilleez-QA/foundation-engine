@@ -82,6 +82,9 @@ export function bakeStaticMeshes(scope:T.Object3D,moving:ReadonlySet<T.Object3D>
  return merged;
 }
 
+/** The texture slots a shareable material's key compares, by identity. */
+const MAP_KEYS=['map','alphaMap','aoMap','bumpMap','displacementMap','emissiveMap','envMap','lightMap','metalnessMap','normalMap','roughnessMap','specularMap'] as const;
+type MapSlots=Partial<Record<(typeof MAP_KEYS)[number],T.Texture|null>>;
 /**
  * One instance for identical plain materials under `root` (MeshStandardMaterial or MeshBasicMaterial, same colour,
  * finish, maps and render state), so `bakeStaticMeshes` can merge parts that builders gave a copy each. Materials
@@ -92,7 +95,7 @@ export function bakeStaticMeshes(scope:T.Object3D,moving:ReadonlySet<T.Object3D>
 export function shareEqualMaterials(root:T.Object3D,skip:ReadonlySet<T.Object3D>=new Set(),options:{consumePainted?:boolean}={}){
  const plain=(m:T.Material):m is T.MeshStandardMaterial|T.MeshBasicMaterial=>(m.type==='MeshStandardMaterial'||m.type==='MeshBasicMaterial')&&(options.consumePainted||!hasPaintingMaterialLease(m))&&!m.name&&!Object.keys(m.userData).length&&m.onBeforeCompile===T.Material.prototype.onBeforeCompile;
  const key=(m:T.MeshStandardMaterial|T.MeshBasicMaterial)=>{
-  const s=m as T.MeshStandardMaterial,maps=['map','alphaMap','aoMap','bumpMap','displacementMap','emissiveMap','envMap','lightMap','metalnessMap','normalMap','roughnessMap','specularMap'].map(k=>(m as unknown as Record<string,T.Texture|null|undefined>)[k]?.uuid??'');
+  const s=m as T.MeshStandardMaterial,slots:MapSlots=m,maps=MAP_KEYS.map(k=>slots[k]?.uuid??'');
   return [m.type,m.color.getHexString(),s.emissive?.getHexString(),s.emissiveIntensity,s.roughness,s.metalness,s.envMapIntensity,s.flatShading,s.bumpScale,m.vertexColors,m.side,m.transparent,m.opacity,m.alphaTest,m.depthTest,m.depthWrite,m.colorWrite,m.visible,m.toneMapped,m.fog,m.wireframe,m.blending,m.polygonOffset,m.polygonOffsetFactor,m.polygonOffsetUnits,m.dithering,m.premultipliedAlpha,JSON.stringify((m as T.Material&{defines?:object}).defines??{}),...maps].join('|');
  };
  const shared=new Map<string,T.Material>();let count=0;

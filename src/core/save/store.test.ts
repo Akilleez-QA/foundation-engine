@@ -57,7 +57,7 @@ test('legacy data loads through its bindings; legacy keys are never modified', (
   const { store } = setup(b);
   assert.equal(store.activePlayer(), '1');
   assert.deepEqual(store.players(), ['1']);
-  const h = (d: SaveSection<any>) => store.section(d).get();
+  const h = <T,>(d: SaveSection<T>) => store.section(d).get();
   assert.deepEqual(h(S.look), look);
   assert.equal(h(S.voice), 'brave');
   assert.equal(h(S.journal).entries.climb.assisted, true);

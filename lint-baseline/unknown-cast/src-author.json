@@ -1,0 +1,17 @@
+{
+  "rule": "unknown-cast",
+  "folder": "src/author",
+  "count": 17,
+  "files": {
+    "src/author/material.test.ts": 2,
+    "src/author/model-rig.test.ts": 1,
+    "src/author/model-skin-inspection.test.ts": 1,
+    "src/author/particle-view.test.ts": 1,
+    "src/author/play-options.test.ts": 2,
+    "src/author/reading-sheet.test.ts": 1,
+    "src/author/save-handle.test.ts": 2,
+    "src/author/scene-activity.test.ts": 1,
+    "src/author/scene-cubes.test.ts": 5,
+    "src/author/scene-pointer.test.ts": 1
+  }
+}

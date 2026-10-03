@@ -112,7 +112,7 @@ export function createInterestSets(grid: SpatialGrid, input: InterestLimits): In
   if (input === null || typeof input !== 'object') throw new TypeError('interest sets: limits must be an object');
   const extra = Object.keys(input).filter(k => !(KEYS as readonly string[]).includes(k));
   if (extra.length) throw new TypeError(`interest sets: unknown limit '${extra[0]}'`);
-  const limits: InterestLimits = Object.freeze(Object.fromEntries(KEYS.map(k => [k, input[k]])) as unknown as InterestLimits);
+  const limits: InterestLimits = Object.freeze({ enterRadius: input.enterRadius, exitRadius: input.exitRadius, holdUpdates: input.holdUpdates, maxObservers: input.maxObservers, maxRelevant: input.maxRelevant, maxCandidates: input.maxCandidates, maxPrioritized: input.maxPrioritized });
   const { enterRadius, exitRadius, holdUpdates, maxObservers, maxRelevant, maxCandidates, maxPrioritized } = limits;
   if (!finite(enterRadius) || enterRadius < 0) throw new RangeError('interest sets: enterRadius must be finite and >= 0');
   if (!finite(exitRadius) || exitRadius < enterRadius || !Number.isFinite(exitRadius * exitRadius)) throw new RangeError('interest sets: exitRadius must be finite, >= enterRadius, with a finite square');

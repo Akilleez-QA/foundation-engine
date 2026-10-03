@@ -179,5 +179,6 @@ export function createFakeIdb(): { factory: IDBFactory; controls: FakeIdbControl
     },
     async databases() { return [...databases.keys()].map(name => ({ name, version: 1 })); },
   };
+  // lint:allow-unknown-cast a test double implementing only the IDBFactory subset chunk-port uses; the DOM type is far wider.
   return { factory: factory as unknown as IDBFactory, controls };
 }

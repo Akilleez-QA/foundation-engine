@@ -6,7 +6,7 @@
  * a scene was left and re-entered. Drop the handlers when tearing a view down.
  */
 const handlerProps=['onpointerdown','onlostpointercapture','ongotpointercapture','onpointerup','onpointermove','onpointercancel','onpointerleave','onpointerenter','onpointerover','onpointerout','onclick','ondblclick','oncontextmenu','onwheel','onmousedown','onmouseup','onmousemove','ontouchstart','ontouchmove','ontouchend','onkeydown','onkeyup','onfocus','onblur'] as const;
-export function releaseCanvasHandlers(canvas:HTMLElement){for(const p of handlerProps)(canvas as unknown as Record<string,unknown>)[p]=null;}
+export function releaseCanvasHandlers(canvas:HTMLElement){for(const p of handlerProps)canvas[p]=null;}
 
 /**
  * Module-lifetime three.js resources (the DFG lookup texture every PBR material uses, the shared sprite

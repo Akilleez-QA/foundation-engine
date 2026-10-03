@@ -42,7 +42,7 @@ export function loadBaseline(run: PerfRun, dir = BASELINE_DIR): { baseline: Benc
 /** Samples of `scenes` that cannot be a baseline: rejected, or not comparable (ADR 0053 unclassified/invalid). */
 export function nonComparable(run: PerfRun, scenes?: readonly string[]): string[] {
   return run.samples.filter(s => !scenes || scenes.includes(s.scene))
-    .filter(s => s.error || !('scriptedWindow' in s ? isWholeScriptedWindow(s) : isComparable(s as unknown as BenchSample)) || ('scriptedWindow' in s && (run as PerfRun & {experiment?:{comparisonPolicy?:string}}).experiment?.comparisonPolicy!==WHOLE_ROUTE_POLICY))
+    .filter(s => s.error || !('scriptedWindow' in s ? isWholeScriptedWindow(s) : isComparable({ ...s })) || ('scriptedWindow' in s && (run as PerfRun & {experiment?:{comparisonPolicy?:string}}).experiment?.comparisonPolicy!==WHOLE_ROUTE_POLICY))
     .map(s => `${s.id} (${s.error ?? (s.classification?.kind??'missing classification') + ': ' + (s.classification?.reasons??[]).join('; ')})`);
 }
 export class NonComparableBaseline extends Error {
@@ -72,12 +72,12 @@ export function writeBaseline(run: PerfRun, dir = BASELINE_DIR, only?: readonly 
 }
 
 /** Per-metric maximum of several comparable windows of one sample id: the envelope a later run is compared with. */
-export function envelope<T extends Record<string, unknown>>(samples: readonly T[]): T {
-  const out: Record<string, unknown> = { ...samples[0] };
+export function envelope<T extends object>(samples: readonly T[]): T {
+  const out = { ...samples[0] } as Record<string, unknown>;
   for (const k of Object.keys(out)) {
     // Guard counters belong to the retained raw window; budget metrics still take their maximum.
     if(out.scriptedWindow && (k==='frames'||k==='windowMs'))continue;
-    const vals = samples.map(x => x[k]);
+    const vals = samples.map(x => (x as Record<string, unknown>)[k]);
     if (vals.every(v => typeof v === 'number' && Number.isFinite(v))) out[k] = Math.max(...(vals as number[]));
   }
   if (samples.length > 1) out.envelopeOf = samples.length;
@@ -119,10 +119,10 @@ export async function baselineFromBenches(bench: (attempt: number) => Promise<Pe
   const samples = scenes.flatMap(p => {
     const runs = good.get(p)!;
     const ids = [...new Set(runs[0].samples.filter(s => s.scene === p).map(s => s.id))];
-    return ids.map(id => envelope(runs.map(r => r.samples.find(s => s.id === id)!).filter(Boolean) as unknown as Record<string, unknown>[]) as unknown as PerfRun['samples'][number]);
+    return ids.map(id => envelope(runs.map(r => r.samples.find(s => s.id === id)!).filter(Boolean)));
   });
   const env: PerfRun = { ...latest, samples,
-    startup: apps.length ? envelope(apps.map(r => r.startup!) as unknown as Record<string, unknown>[]) as unknown as PerfRun['startup'] : latest.startup,
-    afterTour: apps.length ? envelope(apps.map(r => r.afterTour!) as unknown as Record<string, unknown>[]) as unknown as PerfRun['afterTour'] : latest.afterTour };
+    startup: apps.length ? envelope(apps.map(r => r.startup!)) : latest.startup,
+    afterTour: apps.length ? envelope(apps.map(r => r.afterTour!)) : latest.afterTour };
   return writeBaseline(env, dir, [...scenes, 'app'], sources);
 }

@@ -79,7 +79,7 @@ export interface WorkerHost {
 /** The designated only `new Worker` site (STD-RUN-35). */
 function defaultWorkerFactory(): WorkerFactory | null {
   if (typeof Worker === 'undefined') return null;
-  return () => new Worker(new URL('./worker-entry.ts', import.meta.url), { type: 'module' }) as unknown as WorkerLike;
+  return () => new Worker(new URL('./worker-entry.ts', import.meta.url), { type: 'module' }) as WorkerLike;
 }
 
 const defaultTimers: HostTimers = {
@@ -446,7 +446,7 @@ export function createWorkerHost(options: WorkerHostOptions = {}): WorkerHost {
   return {
     size,
     run<I, O>(request: JobRequest<I, O>, signal: AbortSignal): Promise<JobResult<O>> {
-      const req = request as unknown as JobRequest<unknown, unknown>;
+      const req = request as JobRequest<unknown, unknown>;
       registerKind(req.kind);
       const early = (status: 'cancelled' | 'superseded' | 'saturated' | 'oversized') =>
         Promise.resolve({ status } as JobResult<O>);

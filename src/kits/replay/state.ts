@@ -14,9 +14,9 @@ import { hashText } from './hash';
 /** Which world state a selection digest covers. Component and tag references may be types or their ids. */
 export interface WorldSelection {
   /** Components whose fields are digested, per entity (default: [Transform]). An entity with none is not listed. */
-  readonly components?: readonly (ComponentType<any> | string)[];
+  readonly components?: readonly (ComponentType<object> | string)[];
   /** Entities with any of these components are left out entirely (a cosmetic tag, particles, a camera rig). */
-  readonly exclude?: readonly (ComponentType<any> | string)[];
+  readonly exclude?: readonly (ComponentType<object> | string)[];
   /** World resources: all (true, the default), none (false) or only the listed keys. */
   readonly resources?: boolean | readonly string[];
   /** Also digest `world.count`, which counts every entity, excluded ones included (default false). */
@@ -27,7 +27,7 @@ export type ReplayDigestInput = SceneReplayDigest | (WorldSelection & { readonly
 /** Selection bounds: at most this many component, exclusion and resource names, each at most 128 characters. */
 export const SELECTION_LIMITS = Object.freeze({ components: 64, exclude: 64, resources: 256, name: 128 });
 
-interface Selection { components: readonly ComponentType<any>[]; exclude: readonly ComponentType<any>[]; resources: boolean | readonly string[]; count: boolean }
+interface Selection { components: readonly ComponentType<object>[]; exclude: readonly ComponentType<object>[]; resources: boolean | readonly string[]; count: boolean }
 
 function captureSelection(s: WorldSelection): Selection {
   if (!s || typeof s !== 'object') throw Error('replay digest: selection must be an object');
@@ -36,12 +36,12 @@ function captureSelection(s: WorldSelection): Selection {
     if (!Array.isArray(list) || list.length > max) throw Error(`replay digest: ${what} must be a list of at most ${max}`);
     const seen = new Set<string>();
     return Object.freeze((list as unknown[]).map(c => {
-      const id = typeof c === 'string' ? c : typeof c === 'function' && typeof (c as ComponentType<any>).id === 'string' ? (c as ComponentType<any>).id : null;
+      const id = typeof c === 'string' ? c : typeof c === 'function' && typeof (c as ComponentType<object>).id === 'string' ? (c as ComponentType<object>).id : null;
       if (id === null || id.length > SELECTION_LIMITS.name) throw Error(`replay digest: ${what} entries must be component types or ids`);
       if (seen.has(id)) throw Error(`replay digest: ${what} lists '${id}' twice`);
       seen.add(id);
       // A component type is only its id to the world's stores; an id names the same store.
-      return typeof c === 'string' ? component(c, {}) : c as ComponentType<any>;
+      return typeof c === 'string' ? component(c, {}) : c as ComponentType<object>;
     }));
   };
   const r = s.resources ?? true;
@@ -87,7 +87,7 @@ export function selectWorldState(world: World, selection: WorldSelection = {}): 
 }
 
 const idOf = (s: Selection) => {
-  const names = (l: readonly ComponentType<any>[]) => l.map(c => c.id).join(',');
+  const names = (l: readonly ComponentType<object>[]) => l.map(c => c.id).join(',');
   const text = `select:c=${names(s.components)};x=${names(s.exclude)};r=${s.resources === true ? 'all' : s.resources === false ? 'none' : s.resources.join(',')}${s.count ? ';n' : ''}`;
   return SCENE_REPLAY_DIGEST_ID.test(text) ? text : `select:${hashText(text)}`;
 };

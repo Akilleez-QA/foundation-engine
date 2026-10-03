@@ -50,6 +50,7 @@ import { livePixelRatio } from './quality-runtime';
 import { setShadowTechnique, type ShadowTechnique } from './shadow-technique';
 import { anonymousOwner, appLoop } from '../ui/runtime';
 import { createStagePool, type StageSurfaceRequest } from './pool-stage';
+import { glDelete } from './gl-interop';
 
 import type { SurfaceRole, RenderProfile, SurfaceRequest, RenderSurface, LeaseAudit, PoolStats, RecycleValve, HeldFrame, RendererPool, UtilityAccess, PoolRenderer, RendererPoolOptions } from './renderer-pool-types';
 export type { SurfaceRole, RenderProfile, SurfaceRequest, RenderSurface, LeaseAudit, PoolStats, RecycleValve, HeldFrame, RendererPool, UtilityAccess, PoolRenderer, RendererPoolOptions } from './renderer-pool-types';
@@ -70,11 +71,11 @@ const GL_KINDS = [
  */
 function trackGlObjects(gl: GL): { live: Map<object, string>; validation: ProgramValidation } {
   const live = new Map<object, string>();
-  const g = gl as unknown as Record<string, (...a: unknown[]) => unknown>;
+  const g: Record<(typeof GL_KINDS)[number][number], unknown> = gl;
   for (const [create, del] of GL_KINDS) {
     const c = g[create], d = g[del];
     if (typeof c !== 'function' || typeof d !== 'function') continue;
-    g[create] = function (this: unknown, ...a: unknown[]) { const o = c.apply(gl, a); if (o && typeof o === 'object') live.set(o, del); return o; };
+    g[create] = function (this: unknown, ...a: unknown[]) { const o: unknown = c.apply(gl, a); if (o && typeof o === 'object') live.set(o, del); return o; };
     g[del] = function (this: unknown, o: unknown) { if (o && typeof o === 'object') live.delete(o); return d.call(gl, o); };
   }
   return { live, validation: installProgramValidation(gl) };
@@ -122,8 +123,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
   const freshCanvas = (canvas: HTMLCanvasElement) => {
     for (const name of canvas.getAttributeNames?.() ?? []) canvas.removeAttribute(name);
     // Handler properties (`onpointermove = …`) would keep the last scene's closures alive and firing in the next.
-    const handlers = canvas as unknown as Record<string, unknown>;
-    for (const key in canvas) if (key.startsWith('on') && typeof handlers[key] === 'function') handlers[key] = null;
+    for (const key in canvas) if (key.startsWith('on') && typeof Reflect.get(canvas, key) === 'function') Reflect.set(canvas, key, null);
     if (canvas.style) canvas.style.display = 'block';
     canvas.width = 300; canvas.height = 150;
   };
@@ -178,8 +178,7 @@ export function createRendererPool(o: RendererPoolOptions = {}): RendererPool {
     const audit: LeaseAudit = { textures: m.textures, geometries: m.geometries, programs, glObjects: 0 };
     if (!slot.lost) { try { r.resetState(); } catch { /* a context lost mid-release */ } }
     r.dispose();
-    const g = slot.gl as unknown as Record<string, (x: object) => void>;
-    for (const [obj, del] of [...slot.tracker.live]) { audit.glObjects++; try { g[del]!(obj); } catch { /* lost */ } }
+    for (const [obj, del] of [...slot.tracker.live]) { audit.glObjects++; try { glDelete(slot.gl, del, obj); } catch { /* lost */ } }
     slot.tracker.live.clear(); slot.tracker.validation.clear();
     return audit;
   };
