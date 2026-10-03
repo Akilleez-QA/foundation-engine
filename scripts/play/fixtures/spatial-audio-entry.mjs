@@ -5,6 +5,7 @@
 // This proves configuration and signal behaviour (models, gains, cutoff, HRTF limit, ramps). It does not prove that
 // listeners localise sounds correctly: that needs human headphone trials.
 import {createAudioOutput, distanceGain} from '../../../src/platform/audio/audio-output.ts';
+import {createSpatialAudio} from '../../../src/kits/spatial-audio/sources.ts';
 
 const RATE = 48000, BLOCK = 128;
 const tone = (hz, duration = 1, gain = .5) => ({id: 'test.tone', duration, steps: [{tone: {at: 0, duration, hz, gain}}]});
@@ -102,9 +103,36 @@ async function smoothing() {
   return {instant: await run(0), smoothed: await run(.02)};
 }
 
+// The spatial-audio kit driving the real output: occlusion appearing mid-render ramps the filter (no step), and a
+// stolen voice fades instead of stopping abruptly. Measurement blocks are aligned to the 128-frame render quantum.
+const Q = BLOCK / RATE;
+const steps = (data, from, to) => { const levels = []; for (let t = from; t < to; t += Q) levels.push(rms(data, t, t + Q)); let worst = 0; for (let i = 1; i < levels.length; i++) worst = Math.max(worst, Math.abs(db(levels[i], levels[i - 1]))); return worst; };
+async function kitOcclusion() {
+  const CHANGE = 113 * Q;
+  const run = async appears => {
+    let wall = false, kit;
+    const r = await render({cue: tone(3000, 1), setup: out => {
+      kit = createSpatialAudio({output: out, classes: {shot: {refDistance: 2, cutoffDistance: 50}}, filterSmoothing: .08, occlusion: {query: () => wall ? 1 : null, blocked: {cutoffHz: 1000, gain: .5}}});
+      kit.emit({cue: 'test.tone', class: 'shot', position: [0, 0, -4]}, 0); kit.pump(0, [0, 0, 0]); return kit;
+    }, events: [[CHANGE, () => { wall = appears; kit.pump(CHANGE, [0, 0, 0]); }]]});
+    return {before: rms(r.L, .05, CHANGE), after: rms(r.L, .7, .95), worstBlockStepDb: steps(r.L, CHANGE - 4 * Q, CHANGE + 120 * Q), occluded: kit.occluded(1), rays: kit.stats.rays};
+  };
+  return {clear: await run(false), blocked: await run(true)};
+}
+async function kitSteal() {
+  const STEAL = 113 * Q;
+  let kit;
+  const r = await render({cue: tone(1000, 1), setup: out => {
+    kit = createSpatialAudio({output: out, classes: {near: {refDistance: 2, cutoffDistance: 50, importance: 10}, far: {refDistance: 2, cutoffDistance: 50}}, limits: {maxVoices: 1, maxLateness: .5}});
+    kit.emit({cue: 'test.tone', class: 'far', position: [0, 0, -10]}, 0); kit.pump(0, [0, 0, 0]); return kit;
+  }, events: [[STEAL, () => { kit.emit({cue: 'test.tone', class: 'near', position: [0, 0, -2]}, STEAL); kit.pump(STEAL, [0, 0, 0]); }],
+    [STEAL + 40 * Q, () => kit.pump(STEAL + 40 * Q, [0, 0, 0])]]});
+  return {stolen: kit.stats.stolen, before: rms(r.L, .05, STEAL), faded: rms(r.L, STEAL + 30 * Q, STEAL + 38 * Q), worstFadeStepDb: steps(r.L, STEAL - 4 * Q, STEAL + 36 * Q), voices: kit.stats.voices, after: rms(r.L, .6, .9)};
+}
+
 window.spatialAudio = {
   async run() {
-    return {userAgent: navigator.userAgent, sampleRate: RATE, panning: await panning(), selection: await selection(), distance: await distance(), cutoff: await cutoff(), filter: await filter(), smoothing: await smoothing()};
+    return {userAgent: navigator.userAgent, sampleRate: RATE, panning: await panning(), selection: await selection(), distance: await distance(), cutoff: await cutoff(), filter: await filter(), smoothing: await smoothing(), kitOcclusion: await kitOcclusion(), kitSteal: await kitSteal()};
   },
 };
 window.spatialAudioReady = true;
