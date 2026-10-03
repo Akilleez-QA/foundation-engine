@@ -96,7 +96,7 @@ Run the arcade tests explicitly, including after a commit:
 node --import tsx --test game/play.test.ts
 ```
 
-Expect four passing tests: steering, collision/restart, saved best score and deterministic replay. Other templates have different test files and counts; consult their README.
+Expect five passing tests: steering, collision/restart, saved best score, best score after a reload and deterministic replay. Other templates have different test files and counts; consult their README.
 
 ## 7. Look at it
 
@@ -105,7 +105,7 @@ npm run play:snap
 npm run play:snap -- --scene play --mobile
 ```
 
-Screenshots and `probe.json` land in `playtest/latest/`: open the pictures, and read the probe for page errors, frame rate, draws and triangles against your budget. `play:snap` fails on page errors or an over-budget scene. Some mistakes only show up here: for example, two actions bound to the same key stop the game at boot (`inputActions: … overlap`), while `npm run check` still passes.
+Screenshots and `probe.json` land in `playtest/latest/`: open the pictures, and read the probe for page errors, frame rate, draws and triangles against your budget. `play:snap` fails on page errors or an over-budget scene. Some mistakes only show up here, such as a scene that draws too much or a page error in a system the tests do not reach. Two actions bound to the same key are caught earlier: `npm run check` fails at `lint:brief` with the clash (`inputActions: key Space: game.restart (global) and game.steer.pos (global) overlap`) and a fix hint (give the game's `defineInput` another key or pad button); a dev or test boot stops with the same message.
 
 For arcade, also exercise the copied restart scenario:
 
@@ -152,7 +152,7 @@ Run Claude Code, Codex or another agent in the repository folder. It reads [AGEN
 |---|---|
 | odd errors from `npm ci`, `npm run check` or the tests | `node -v`: use Node.js 22.18 or newer |
 | `play:snap` cannot start a browser | step 2, or set `ENGINE_CHROMIUM` |
-| the page stays empty and the console shows `boot failed` | read the listed problems; overlapping key or pad bindings are the usual cause |
+| the page stays empty and the console shows `boot failed` | read the listed problems; overlapping key or pad bindings are the usual cause, and `npm run check` names them too |
 | commands show the blue cube, not your game | there is no `game/` folder in this checkout (see step 3) |
 | `play:snap` says OVER BUDGET | the scene draws more than `game/budgets.json` allows; see the fix-budget skill |
 | `npm run play: port 5173 is busy; try PORT=5174 npm run play` | another server (often an earlier `npm run play`) has 5173: stop it, or run the suggested command |
