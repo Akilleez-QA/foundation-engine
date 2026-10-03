@@ -18,6 +18,7 @@ See docs/policy/DEVICE-EXPERIENCE.md. Standards-only edits do not certify runtim
 ## Contribution checks
 
 - [ ] I followed CONTRIBUTING.md, AGENTS.md, and the relevant architecture recipe.
+- [ ] I described systems and patterns instead of external game names or source-project references, while preserving required attribution and reproducible identifiers.
 - [ ] Tests/docs cover the behavior changed, or I explained why they are not applicable.
 - [ ] I did not weaken budgets, tolerances, or tests to make checks pass.
 - [ ] New original contributions are submitted under GPL-3.0-only; third-party material is identified with its license and necessary notices.

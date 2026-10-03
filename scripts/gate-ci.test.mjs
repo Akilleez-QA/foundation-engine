@@ -16,12 +16,22 @@ test('gate:ci: every run step of ci.yml is executed locally, except the document
   for (const cmd of Object.keys(SETUP_ONLY)) assert.ok(plan.setup.some(s => s.run === cmd), `SETUP_ONLY entry "${cmd}" is no longer in ${WORKFLOW}; remove it`);
   const ids = plan.steps.map(s => s.id);
   assert.equal(new Set(ids).size, ids.length);
-  assert.ok(ids.includes('test:ui-browser') && ids.includes('gate:templates'));
+  assert.ok(ids.includes('browser/test:ui-browser') && ids.includes('templates-1/gate:templates') && ids.includes('templates-2/gate:templates'));
+  assert.equal(plan.steps.filter(s => s.aggregate).length, 1);
   assert.ok(plan.steps.some(s => /GAME_DIR=templates\/expedition\/game npm run test:framework-browser/.test(s.run)));
   assert.equal(plan.node, '22');
+  const parsed = parseYaml(ci);
+  assert.deepEqual(parsed.permissions, {contents: 'read'});
+  for (const id of ['browser','templates-1','templates-2']) {
+    assert.equal(parsed.jobs[id]['timeout-minutes'], '30');
+    assert.deepEqual(parsed.jobs[id].steps.slice(0,4), parsed.jobs.browser.steps.slice(0,4), 'each runner retains identical pinned setup');
+  }
+  assert.deepEqual(parsed.jobs.check.needs, ['browser','templates-1','templates-2']);
+  assert.equal(parsed.jobs.check.if, 'always()');
   // Same order as the workflow.
   const order = [...ci.matchAll(/run: (?:GAME_DIR=\S+ )?npm run (?:-s )?([\w:.-]+)/g)].map(m => m[1]);
-  assert.deepEqual(ids.filter(id => order.includes(id)), order.filter(id => ids.includes(id)));
+  assert.deepEqual(plan.steps.filter(s => s.job === 'browser').map(s => s.id.split('/')[1]), order.filter(id => id !== 'gate:templates'));
+  assert.deepEqual(plan.steps.filter(s => s.job.startsWith('templates-')).map(s => s.run), ['npm run gate:templates -- --shard 1/2 --phone', 'npm run gate:templates -- --shard 2/2 --phone']);
 });
 
 test('gate:ci: the YAML subset keeps block scalars and merges workflow, job and step env', () => {
@@ -59,15 +69,15 @@ test('gate:ci: workflow features it cannot mirror are errors, not silent skips',
   assert.throws(() => planFromWorkflow(wf('        if: always()\n')), /"if" cannot be mirrored/);
   assert.throws(() => planFromWorkflow(wf('        shell: sh\n')), /"shell" cannot be mirrored/);
   assert.throws(() => planFromWorkflow(wf('    strategy:\n      matrix:\n        os: [a, b]\n')), /strategy/);
-  assert.throws(() => planFromWorkflow(wf('  b:\n    runs-on: x\n')), /exactly one job/);
+  assert.throws(() => planFromWorkflow(wf('  b:\n    runs-on: x\n')), /unsupported job graph/);
   assert.throws(() => planFromWorkflow(wf('        env:\n          T: ${{ secrets.X }}\n')), /GitHub expressions/);
   assert.throws(() => parseYaml('a: >\n  folded\n'), /folded/);
 });
 
 test('gate:ci: --from and --only select steps by id, number or name', () => {
   const {steps} = planFromWorkflow(ci);
-  assert.equal(selectSteps(steps, {from: 'gate:templates'})[0].id, 'gate:templates');
-  assert.deepEqual(selectSteps(steps, {only: ['2', 'Full gates for every template']}).map(s => s.id), ['test:diagnostics-browser', 'gate:templates']);
+  assert.equal(selectSteps(steps, {from: 'templates-1/gate:templates'})[0].id, 'templates-1/gate:templates');
+  assert.deepEqual(selectSteps(steps, {only: ['2', 'Complete template shard 1 of 2, including phone smoke']}).map(s => s.id), ['browser/test:diagnostics-browser', 'templates-1/gate:templates']);
   assert.equal(selectSteps(steps, {}).length, steps.length);
   assert.throws(() => selectSteps(steps, {from: 'nope'}), /no step "nope"/);
   assert.throws(() => selectSteps(steps, {from: '1', only: ['2']}), /not both/);
@@ -115,4 +125,70 @@ test('gate:ci: an interrupt stops only the process group it spawned for the curr
     for (let k = 0; k < 40 && alive; k++) { try { process.kill(pid, 0); await new Promise(r => setTimeout(r, 50)); } catch { alive = false; } }
     assert.equal(alive, false, 'the step\'s background process was stopped');
   } finally { rmSync(dir, {recursive: true, force: true}); }
+});
+
+const graphWorkflow = (browser = 'echo browser', first = 'echo first', second = 'echo second') => `jobs:
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ${browser}
+  templates-1:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ${first}
+  templates-2:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ${second}
+  check:
+    needs: [browser, templates-1, templates-2]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate
+        env:
+          CI_JOB_RESULTS: \${{ toJSON(needs) }}
+        run: node scripts/ci-results.mjs
+`;
+
+test('bounded graph rejects missing dependencies, alternate conditions, aggregate changes and expressions', () => {
+  const good = graphWorkflow();
+  assert.equal(planFromWorkflow(good).steps.length, 4);
+  for (const [before, after] of [
+    ['needs: [browser, templates-1, templates-2]', 'needs: [browser, templates-1]'],
+    ['needs: [browser, templates-1, templates-2]', 'needs: [browser, templates-1, templates-1]'],
+    ['if: always()', 'if: success()'],
+    ['    if: always()\n', ''],
+    ['node scripts/ci-results.mjs', 'echo success'],
+    ['toJSON(needs)', 'toJSON(github)'],
+    ['      - run: echo first', '      - run: echo first\n        if: always()'],
+    ['      - run: echo second', '      - run: echo $' + '{{ secrets.X }}'],
+    ['  templates-2:', '  missing-shard:'],
+    ['  browser:\n', '  browser:\n    needs: [templates-1]\n'],
+    ['    runs-on: ubuntu-latest', '    runs-on: $' + '{{ matrix.os }}'],
+    ['jobs:', 'defaults:\n  run:\n    shell: sh\njobs:'],
+    ['      - run: echo first', '      - run: npm ci\n        env:\n          SECRET: $' + '{{ secrets.X }}'],
+  ]) assert.throws(() => planFromWorkflow(good.replace(before, after)), undefined, after);
+});
+
+test('local graph executes independent jobs after failure and derives a refusing aggregate; partial runs are explicit', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'gate-ci-graph-'));
+  try {
+    const file = join(dir, 'ci.yml'), skipped = join(dir, 'must-not-exist');
+    writeFileSync(file, graphWorkflow(`false\n      - run: touch ${skipped}`,  'echo FIRST_EXECUTED', 'echo SECOND_EXECUTED'));
+    const run = args => spawnSync(process.execPath, ['scripts/gate-ci.mjs', '--workflow', file, '--any-node', ...args], {cwd: ROOT, encoding:'utf8'});
+    const failed = run([]), output = failed.stdout + failed.stderr;
+    assert.equal(failed.status, 1, output);
+    assert.match(output, /FIRST_EXECUTED/); assert.match(output, /SECOND_EXECUTED/);
+    assert.throws(() => readFileSync(skipped), 'later steps of a failed job are not run');
+    assert.match(output, /unsuccessful jobs: browser=failure/);
+    assert.match(output, /check\/aggregate\s+FAIL/);
+    const partial = run(['--only','templates-1/echo-first-executed']);
+    assert.equal(partial.status, 0, partial.stderr); assert.match(partial.stdout, /PARTIAL PASS \(not full CI acceptance\)/);
+    assert.doesNotMatch(partial.stdout, /check: every work job succeeded/);
+    assert.match(partial.stdout, /check\/aggregate\s+skipped/);
+    const aggregateOnly = run(['--only','check/aggregate']); assert.equal(aggregateOnly.status, 2);
+    writeFileSync(file, graphWorkflow()); const passed = run([]);
+    assert.equal(passed.status, 0, passed.stdout + passed.stderr); assert.match(passed.stdout, /check: every work job succeeded/);
+  } finally { rmSync(dir, {recursive:true, force:true}); }
 });

@@ -791,6 +791,23 @@ not integrated. Evidence is focused tests over an in-repo IndexedDB fake and one
 Chromium real-IndexedDB check. See the [recipe](../recipes/store-large-world-records.md)
 and the [ledger](upgrade-acceptance-ledger.md).
 
+### Orphan import receipt correction (focused candidate)
+
+The existing SaveStore now distinguishes exact retention, conflicting destination
+bytes and storage failure, with known writes completed before orphan receipts.
+No snapshot API or format migration is included. Six focused regressions cover
+both payload locations, duplicate/conflicting bytes, denied reads/writes and retry,
+canonical-id known/orphan overlap, pending writes and notification-time owner
+registration. Four of these fail against the unchanged public implementation.
+A review follow-up keeps renamed sections round-tripping: export no longer writes a
+registered section's stale alias key as an orphan, and an alias orphan beside its
+section in one file reports `orphan-superseded` instead of rejecting the file. Four
+more regressions (rename/export/fresh import, newer alias-only payload, alias orphan
+beside the section, genuine conflict and retry beside a rename) fail on the first
+candidate; all 57 store tests pass under Node 22.23.3. This is MemoryBackend evidence, not browser or
+physical durability acceptance; hosted integration checks remain required. See
+[the import recipe](../recipes/add-a-save-section.md#6-report-orphan-import-outcomes)
+for the expanded result union and recovery boundaries.
 
 ### Author scene DPR-only redraw — reviewed candidate, 2026-10-03
 

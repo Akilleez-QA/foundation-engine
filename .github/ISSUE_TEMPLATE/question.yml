@@ -1,0 +1,22 @@
+name: Question
+description: Ask how to use the engine, a kit, or a template.
+title: "[Question]: "
+labels: ["needs-triage", "question"]
+body:
+  - type: markdown
+    attributes:
+      value: "For a defect, use the bug report. For a reusable contract, use the engine proposal. For a suspected vulnerability, read SECURITY.md first and do not post details here."
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What are you trying to do, and where did you get stuck?
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you already tried
+      description: Commands, docs, or templates you used. Remove secrets, private assets, and personal information.
+    validations:
+      required: true

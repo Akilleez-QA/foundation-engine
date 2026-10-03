@@ -4,23 +4,57 @@
 //   2. lint: layers, genericity, the brief (this game), the budget ratchet
 //   3. the tests that the change can affect: changed test files, the test next to each changed file, every test of
 //      the game folder when anything in it changed, and every test of a changed engine folder
-// "Changed" is the working tree against HEAD, plus untracked files. `--all` runs every test instead.
+// "Changed" is the working tree against HEAD, plus untracked files. `--base <ref>` includes committed branch
+// changes since the merge base with ref. `--all` delegates to npm test, keeping its complete suite selection.
 // It never builds, benches or opens a browser: that is `npm run play:snap` (see it) and `npm run gate` (integrate).
 import './lib/node-version.mjs';
 import {spawnSync} from 'node:child_process';
 import {existsSync, readdirSync} from 'node:fs';
 import {dirname, join, relative} from 'node:path';
 import {gameDir, ROOT} from './lib/game-dir.mjs';
-import {toolCommand} from './lib/tool.mjs';
+import {toolCommand, npmCommand} from './lib/tool.mjs';
 
 const t0 = Date.now();
-const all = process.argv.includes('--all');
 const rel = p => relative(ROOT, p).split('\\').join('/');
 const GAME = rel(gameDir());
-const git = args => spawnSync('git', args, {cwd: ROOT, encoding: 'utf8'}).stdout?.split('\n').map(s => s.trim()).filter(Boolean) ?? [];
+const git = (args, cwd) => {
+  const result = spawnSync('git', args, {cwd, encoding: 'utf8'});
+  if (result.error || result.status !== 0) throw Error(`Cannot select tests: git ${args[0]} failed: ${result.error?.message ?? result.stderr.trim()}`);
+  return result.stdout;
+};
 
-/** Files changed against HEAD, and untracked files. */
-export function changedFiles() { return [...new Set([...git(['diff', '--name-only', 'HEAD']), ...git(['ls-files', '--others', '--exclude-standard'])])].filter(f => existsSync(join(ROOT, f))); }
+/** Parse selection options without consuming the shared --game option. */
+export function selectionOptions(argv = process.argv.slice(2)) {
+  let base;
+  let all = false;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--all') { all = true; continue; }
+    if (arg === '--game') {
+      if (!argv[i + 1] || argv[i + 1].startsWith('-')) throw Error('--game needs a folder');
+      i++; continue;
+    }
+    if (arg.startsWith('--game=')) {
+      if (!arg.slice(7)) throw Error('--game needs a folder');
+      continue;
+    }
+    if (arg !== '--base' && !arg.startsWith('--base=')) throw Error(`Unknown check option: ${arg}`);
+    const value = arg === '--base' ? argv[++i] : arg.slice(7);
+    if (base !== undefined || !value || value.startsWith('-')) throw Error('--base needs one Git revision, e.g. --base origin/main');
+    base = value;
+  }
+  if (all && base !== undefined) throw Error('Choose --all or --base <ref>, not both');
+  return {all, base};
+}
+
+/** Include dirty/untracked paths and deletions; deleted source can still affect surviving tests. */
+export function changedFiles({base, cwd = ROOT} = {}) {
+  const revision = base === undefined ? 'HEAD' : git(['merge-base', 'HEAD', base], cwd).trim();
+  return [...new Set([
+    ...git(['diff', '--name-only', '--no-renames', '-z', revision, '--'], cwd).split('\0'),
+    ...git(['ls-files', '--others', '--exclude-standard', '-z'], cwd).split('\0'),
+  ].filter(Boolean))];
+}
 
 const testsIn = dir => existsSync(join(ROOT, dir)) ? readdirSync(join(ROOT, dir), {recursive: true}).map(f => `${dir}/${String(f).split('\\').join('/')}`).filter(f => /\.test\.(ts|mjs)$/.test(f)) : [];
 
@@ -41,26 +75,46 @@ export function affectedTests(changed, game = GAME) {
 }
 
 const results = [];
+/** Retain canonical Node test totals without flooding the quick-check report. */
+export function testSummary(output) {
+  return output.split('\n').filter(line => /^# (tests|pass|fail|cancelled|skipped|todo|duration_ms) /.test(line)).slice(-7).join('\n');
+}
 const run = (name, cmd, args = []) => {
   // A tool command from scripts/lib/tool.mjs (no npx, no shell: the same on Windows), or a plain `node` script.
   const c = typeof cmd === 'string' ? {command: cmd === 'node' ? process.execPath : cmd, args, shell: false} : cmd;
   const t = Date.now(), r = spawnSync(c.command, c.args, {cwd: ROOT, encoding: 'utf8', env: process.env, shell: c.shell});
   const ok = r.status === 0;
-  results.push({name, ok, s: (Date.now() - t) / 1000, out: ok ? '' : (r.stdout + r.stderr).trim().split('\n').filter(l => !/^\s*(#|ok |\.\.\.|---|duration_ms|type:)/.test(l)).slice(-40).join('\n')});
+  results.push({name, ok, s: (Date.now() - t) / 1000, out: ok ? (name.startsWith('tests (') ? testSummary(r.stdout) : '') : (r.stdout + r.stderr).trim().split('\n').filter(l => !/^\s*(#|ok |\.\.\.|---|duration_ms|type:)/.test(l)).slice(-40).join('\n')});
   return ok;
 };
 
 if (process.argv[1] && process.argv[1].endsWith('check.mjs')) {
+  let options, changed;
+  try {
+    options = selectionOptions();
+    changed = options.all ? [] : changedFiles(options);
+  } catch (error) {
+    console.error(error.message);
+    process.exit(2);
+  }
+  const {all, base} = options;
+  console.log(`test selection: ${all ? 'complete npm test suite' : base ? `branch changes since merge base with ${base}, plus working tree` : 'working tree against HEAD plus untracked files'}`);
   run('generate', 'node', ['scripts/generate.mjs']);
   run('typecheck', toolCommand('tsc', ['--noEmit']));
   run('lint:layers', 'node', ['scripts/lint/layers.mjs']);
   run('lint:generic', 'node', ['scripts/lint/genericity.mjs']);
   run('lint:brief', toolCommand('tsx', ['scripts/lint/brief.ts', GAME]));
   run('lint:budgets', 'node', ['scripts/perf/budget-ratchet.mjs']);
-  const tests = all ? ['src/**/*.test.ts', 'templates/*/game/**/*.test.ts', 'templates/*/game/**/*.test.mjs', 'scripts/**/*.test.mjs', 'scripts/**/*.test.ts'] : affectedTests(changedFiles());
-  if (tests.length) run(`tests (${all ? 'all' : tests.length + ' file(s)'})`, toolCommand('tsx', ['--test', ...tests]));
-  else results.push({name: 'tests (nothing changed that has tests)', ok: true, s: 0, out: ''});
-  for (const r of results) console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${r.name} (${r.s.toFixed(1)} s)${r.ok ? '' : '\n' + r.out.replace(/^/gm, '     ')}`);
+  const tests = all ? [] : affectedTests(changed);
+  if (all) run('tests (complete npm test suite)', npmCommand(['test']));
+  else if (tests.length) {
+    console.log(`selected test files (${tests.length}):\n${tests.map(t => `  ${t}`).join('\n')}`);
+    run(`tests (${tests.length} file(s))`, toolCommand('tsx', ['--test', ...tests]));
+  } else {
+    console.log('No tests selected (0 files). This is not test-suite acceptance; use --base <ref>, --all, or run explicit tests.');
+    results.push({name: 'tests (0 selected; not run)', ok: true, s: 0, out: ''});
+  }
+  for (const r of results) console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${r.name} (${r.s.toFixed(1)} s)${r.out ? '\n' + r.out.replace(/^/gm, '     ') : ''}`);
   const bad = results.filter(r => !r.ok);
   console.log(`check: ${bad.length ? 'FAIL (' + bad.map(r => r.name).join(', ') + ')' : 'PASS'} in ${((Date.now() - t0) / 1000).toFixed(0)} s · game ${GAME}${bad.length ? '' : ' · next: npm run play:snap to see it'}`);
   process.exitCode = bad.length ? 1 : 0;
