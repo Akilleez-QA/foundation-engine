@@ -67,6 +67,8 @@ jobs:
         run: GAME_DIR=templates/expedition/game npm run test:authority-workbench-browser
       - name: Spatial audio offline-render regressions
         run: npm run test:audio-browser
+      - name: Advisory first-use browser observations
+        run: npm run test:first-use-browser
       - name: Creator explorer journey browser regression
         run: npm run test:creator-journey-browser
       - name: Shared session two-browser workflow (MP-01)
