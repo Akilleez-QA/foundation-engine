@@ -13,7 +13,7 @@ Environment: Linux, Node 26.8.1, Chromium 152.0.7977.82, 1280×800 isolated head
 - Real keyboard movement changes player position.
 - Emulated window blur clears held input. The stock character retains its authored 0.1-second deceleration, then stays stationary when focus returns until a fresh press.
 - The real shell sound setting is activated using native Space; the menu closes and the actual settings owner records muted=true. Test sound remains silenced independently.
-- Bench, lamp and crate interactions run through real E input. Teleports position fixtures; this does not claim complete traversability by walking.
+- Bench, lamp and crate interactions run through real E input. Teleports position fixtures; this does not claim complete traversal using continuous movement.
 - Garden → shed → garden uses authored doors and checks arrival positions. All three discoveries are reflected in the HUD.
 - Three additional round trips retain one live pooled context and zero overflows. Lease count progresses 1 → 3 → 5 → 7 → 9; release audits are present. The last audit reports zero textures/geometries/programs and seven GL objects handled by the pool's release sweep. This is not a claim of zero sweep work or complete heap/listener leak freedom.
 - The test waits for actual localStorage envelopes containing all three discoveries and the setting, then reloads the same context and checks HUD plus sound setting.
