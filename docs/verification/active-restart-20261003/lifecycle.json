@@ -1,0 +1,249 @@
+{
+  "initial": {
+    "state": {
+      "scene": {
+        "scene": "scene.play",
+        "state": "active",
+        "epoch": 1,
+        "hash": "#scene/play"
+      },
+      "world": {
+        "scene": "play",
+        "entities": 2,
+        "state": {
+          "phase": "playing",
+          "score": 0,
+          "time": 0.4666666666666666,
+          "next": 0.5333333333333319,
+          "best": 0
+        },
+        "named": {
+          "lane": {
+            "x": 0,
+            "y": 0,
+            "z": -0.5
+          },
+          "player": {
+            "x": 0,
+            "y": 0.5,
+            "z": 5
+          }
+        },
+        "frame": 30
+      },
+      "game": {
+        "id": "arcade",
+        "genre": "arcade",
+        "policy": "default",
+        "modes": [
+          "play"
+        ],
+        "minimum": "phone"
+      }
+    },
+    "loop": {
+      "frames": 34,
+      "updates": 36,
+      "renders": 1,
+      "skipped": 33
+    }
+  },
+  "ended": {
+    "state": {
+      "scene": {
+        "scene": "scene.play",
+        "state": "active",
+        "epoch": 1,
+        "hash": "#scene/play"
+      },
+      "world": {
+        "scene": "play",
+        "entities": 7,
+        "state": {
+          "phase": "over",
+          "score": 1,
+          "time": 5.716666666666652,
+          "next": 0.32833333333333276,
+          "best": 1
+        },
+        "named": {
+          "lane": {
+            "x": 0,
+            "y": 0,
+            "z": -0.5
+          },
+          "player": {
+            "x": 0,
+            "y": 0.5,
+            "z": 5
+          }
+        },
+        "frame": 345
+      },
+      "game": {
+        "id": "arcade",
+        "genre": "arcade",
+        "policy": "default",
+        "modes": [
+          "play"
+        ],
+        "minimum": "phone"
+      }
+    },
+    "loop": {
+      "frames": 349,
+      "updates": 351,
+      "renders": 283,
+      "skipped": 66
+    }
+  },
+  "afterActiveOnEnded": {
+    "state": {
+      "scene": {
+        "scene": "scene.play",
+        "state": "active",
+        "epoch": 1,
+        "hash": "#scene/play"
+      },
+      "world": {
+        "scene": "play",
+        "entities": 7,
+        "state": {
+          "phase": "over",
+          "score": 1,
+          "time": 5.716666666666652,
+          "next": 0.32833333333333276,
+          "best": 1
+        },
+        "named": {
+          "lane": {
+            "x": 0,
+            "y": 0,
+            "z": -0.5
+          },
+          "player": {
+            "x": 0,
+            "y": 0.5,
+            "z": 5
+          }
+        },
+        "frame": 582
+      },
+      "game": {
+        "id": "arcade",
+        "genre": "arcade",
+        "policy": "default",
+        "modes": [
+          "play"
+        ],
+        "minimum": "phone"
+      }
+    },
+    "loop": {
+      "frames": 586,
+      "updates": 588,
+      "renders": 283,
+      "skipped": 303
+    }
+  },
+  "restarted": {
+    "state": {
+      "scene": {
+        "scene": "scene.play",
+        "state": "active",
+        "epoch": 2,
+        "hash": "#scene/play"
+      },
+      "world": {
+        "scene": "play",
+        "entities": 2,
+        "state": {
+          "phase": "playing",
+          "score": 0,
+          "time": 0,
+          "next": 1,
+          "best": 1
+        },
+        "named": {
+          "lane": {
+            "x": 0,
+            "y": 0,
+            "z": -0.5
+          },
+          "player": {
+            "x": 0,
+            "y": 0.5,
+            "z": 5
+          }
+        },
+        "frame": 2
+      },
+      "game": {
+        "id": "arcade",
+        "genre": "arcade",
+        "policy": "default",
+        "modes": [
+          "play"
+        ],
+        "minimum": "phone"
+      }
+    },
+    "loop": {
+      "frames": 592,
+      "updates": 596,
+      "renders": 284,
+      "skipped": 308
+    }
+  },
+  "afterFreshActive": {
+    "state": {
+      "scene": {
+        "scene": "scene.play",
+        "state": "active",
+        "epoch": 2,
+        "hash": "#scene/play"
+      },
+      "world": {
+        "scene": "play",
+        "entities": 6,
+        "state": {
+          "phase": "playing",
+          "score": 0,
+          "time": 3.949999999999991,
+          "next": 0.4779999999999992,
+          "best": 1
+        },
+        "named": {
+          "lane": {
+            "x": 0,
+            "y": 0,
+            "z": -0.5
+          },
+          "player": {
+            "x": 4.5,
+            "y": 0.5,
+            "z": 5
+          }
+        },
+        "frame": 239
+      },
+      "game": {
+        "id": "arcade",
+        "genre": "arcade",
+        "policy": "default",
+        "modes": [
+          "play"
+        ],
+        "minimum": "phone"
+      }
+    },
+    "loop": {
+      "frames": 829,
+      "updates": 833,
+      "renders": 490,
+      "skipped": 339
+    }
+  },
+  "errors": [],
+  "passed": true
+}
