@@ -46,3 +46,5 @@ Review of `aa2fb2e` found that the original bounds check used Three's default ca
 The browser diagnostic now uses the existing `diagnosticReport` owner: a browser-close exception cannot skip server cleanup or report writing, and any scenario/cleanup failure clears a previous pass. Test fixture URLs use `fileURLToPath` for paths containing escaped characters and Windows drive conventions.
 
 `node --test tools/blender-export/verify.test.mjs scripts/play/diagnostic-report.test.mjs` passes **9/9** (five asset tests and four existing cleanup-owner tests). The new decoded-position regression was separately run against the old non-precise expression and failed with the expected missing rejection, then passed with the corrected expression. This supersedes the original four-test-only count and the stronger original decoded-bound claim.
+
+The consumer browser command was rerun on corrected source `c3f2740`: PASS, no scenario or cleanup failures, model ready, exactly one HTTP-200 model response and rotation 0→π/2. Browser and server closed normally. This is the final source-level browser evidence; the subsequent receipt-only commit does not change the diagnostic.
