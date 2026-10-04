@@ -16,6 +16,7 @@ import type {SceneModelRequest, SceneModelResult} from '../author/model-inspecti
  *   engine.loop()               the loop's frame, update and render counters
  *   engine.redraw()             the running scene draws its unchanged picture once (measure a still scene); false
  *                               when no scene is running
+ *   engine.extensions()         the running scene's render extensions' counters by id (@kits/three), or {}
  *   engine.scatter()            the running scene's scatter counters (copies, refusals, draws, triangles per scatter),
  *                               or null when it has none
  *   engine.events(fn)           tap every bus event (returns an unsubscribe)
@@ -80,6 +81,8 @@ export interface EngineTestApi {
   loop(): {frames: number; updates: number; renders: number; skipped: number};
   /** The running scene draws its current picture once (render on demand stays on afterwards); false without one. */
   redraw(): boolean;
+  /** The running scene's render extensions' counters by id (a kit's `sceneThree()`), or {} without any. */
+  extensions(): Record<string, Record<string, unknown>>;
   /** The running scene's scatter counters, or null when it has no `sceneScatter()` (or the drawing has not loaded). */
   scatter(): ReturnType<NonNullable<SceneHandle['scatter']>>;
   events(fn: (name: string, payload: unknown) => void): () => void;
@@ -194,6 +197,10 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
     redraw() {
       const running = app.services.app.has('feature.game') ? app.services.play?.current() : null;
       return running?.redraw?.() ?? false;
+    },
+    extensions() {
+      const running = app.services.app.has('feature.game') ? app.services.play?.current() : null;
+      return running?.extensions?.() ?? {};
     },
     scatter() {
       const running = app.services.app.has('feature.game') ? app.services.play?.current() : null;

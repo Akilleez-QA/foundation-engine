@@ -98,7 +98,8 @@ export default defineConfig({
   // reaches the game being built as `@game` (scripts/lib/game-dir.mjs: GAME_DIR, else ./game, else templates/blank/game).
   resolve: {
     alias: [
-      // Keep one Three identity while allowing optional loaders/animation classes to remain in lazy chunks.
+      // Keep one Three identity while allowing optional loaders/animation classes to remain in lazy chunks. three's
+      // addons (`three/addons/*`, a game with @kits/three) import `three` too, so they get this same copy.
       {find: /^three$/, replacement: fileURLToPath(new URL('./node_modules/three/src/Three.js', import.meta.url))},
       {find: /^@engine$/, replacement: fileURLToPath(new URL('./src/author/index.ts', import.meta.url))},
       {find: /^@kits\/([a-z-]+)$/, replacement: fileURLToPath(new URL('./src/kits/', import.meta.url)) + '$1/index.ts'},

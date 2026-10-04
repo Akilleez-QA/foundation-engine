@@ -23,5 +23,13 @@
       "@game/*": ["./game/*", "./templates/blank/game/*"]
     }
   },
-  "include": ["src", "game", "templates", "vite.config.ts", "scripts/**/*.ts", "perf/**/*.ts"]
+  "include": [
+    "src",
+    "game",
+    "templates",
+    "tools/visual-courtyard/game",
+    "vite.config.ts",
+    "scripts/**/*.ts",
+    "perf/**/*.ts"
+  ]
 }

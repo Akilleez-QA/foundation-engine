@@ -23,6 +23,7 @@ import {Material, materialKey} from './material';
 import {createSceneSurfaces, type Surface, type SurfaceMaterial} from './scene-materials';
 import {createParticleView} from './particle-view';
 import {EMITTER_ID, type ParticleField} from './particle-contract';
+import {openSceneExtension, type SceneExtensionSession} from './scene-extension';
 import {SCATTER_ID, scatterRoot} from './scatter';
 import type {SceneScatterDrawing} from './scene-scatter';
 /**
@@ -39,6 +40,9 @@ import type {SceneScatterDrawing} from './scene-scatter';
  *  - particles: entities with `Transform` and `Emitter` are simulated by the engine's fixed system `engine.particles`
  *    (after the scene's own fixed systems) and drawn as one instanced draw per emitter, interpolated between steps
  *    (particle-sim.ts, scene-particles.ts). A scene without emitters creates nothing for them;
+ *  - render extensions: a kit's extensions listed in `defineScene({ extensions })` open once per visit before program
+ *    preparation, sync with the frame, may replace the scene's draw, and close before the scene's tree is released
+ *    (scene-extension.ts). A scene without extensions creates nothing for them;
  *  - `enter` runs once the visit is active (ADR 0045), before any of the visit's systems step; `exit` when it is left.
  *    Everything the visit creates is owned
  *    by the run and released in reverse order when it leaves.
@@ -646,12 +650,72 @@ export async function enterScene(o: {
           particleView.dispose();
         }
       });
+      // Render extensions (`defineScene({ extensions })`, made by a kit: scene-extension.ts). Each opens once, now, so
+      // its objects are part of program preparation; a session that throws is reported and closed for the visit.
+      // Closed first when the visit ends (registered after the scene tree's own release, so it runs before it).
+      type OpenExtension = {id: string; session: SceneExtensionSession | null};
+      const extensions: OpenExtension[] = [];
+      const closeExtension = (x: OpenExtension, error?: unknown) => {
+        const session = x.session;
+        x.session = null;
+        if (error !== undefined) s.log.error(`${scene.id}: extension ${x.id} failed; closed for this visit`, error);
+        try {
+          session?.dispose();
+        } catch (cleanup) {
+          s.log.error(`${scene.id}: extension ${x.id} cleanup failed`, cleanup);
+        }
+        dirty = true;
+      };
+      for (const extension of scene.extensions ?? []) {
+        const x: OpenExtension = {id: extension.id, session: null};
+        extensions.push(x);
+        try {
+          x.session = openSceneExtension(extension, {
+            scene: three,
+            camera,
+            renderer,
+            canvas: surface.canvas,
+            backend: brief.render.backend,
+            ctx,
+            world,
+            kits: (s.play.game.kits ?? []).map(k => k.id),
+            dev: TEST_API,
+            signal: actx.signal,
+            time: () => ({t, calm}),
+            mask: maskOf,
+            invalidate: () => {
+              dirty = true;
+              actx.invalidate();
+            },
+            report: error => s.log.error(`${scene.id}: extension ${extension.id}`, error),
+          });
+        } catch (error) {
+          s.log.error(`${scene.id}: extension ${extension.id} could not open`, error);
+        }
+      }
+      actx.own(() => {
+        for (const x of [...extensions].reverse()) closeExtension(x);
+      });
+      const extensionsBusy = () => extensions.some(x => !!x.session?.busy());
+      /** A session's own draw of the frame (a render override), else false: the scene draws. */
+      const drawOverride = () => {
+        for (const x of extensions)
+          if (x.session?.render)
+            try {
+              if (x.session.render()) return true;
+            } catch (error) {
+              if (error instanceof ProgramLinkError || error instanceof FrameReadinessError) throw error;
+              closeExtension(x, error);
+            }
+        return false;
+      };
       const sync = (dt = 0) => {
         if (actx.signal.aborted) return;
         actx.setFrameMode(
           body.systems.length ||
             [...world.query(Model)].some(([, m]) => m.playing && !!m.clip && m.speed > 0) ||
-            !!particles?.busy(world)
+            !!particles?.busy(world) ||
+            extensionsBusy()
             ? 'continuous'
             : 'on-demand',
         );
@@ -878,6 +942,13 @@ export async function enterScene(o: {
           )
         )
           dirty = true;
+        for (const x of extensions)
+          if (x.session)
+            try {
+              if (x.session.sync(dt)) dirty = true;
+            } catch (error) {
+              closeExtension(x, error);
+            }
         if (lightRig) {
           lightSlots.sync(world);
           if (lightRig.apply(world, lightSlots)) dirty = true;
@@ -907,6 +978,12 @@ export async function enterScene(o: {
         renderer.setSize(w, h, false);
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
+        for (const x of extensions)
+          try {
+            x.session?.resized?.(w, h, renderer.getPixelRatio());
+          } catch (error) {
+            closeExtension(x, error);
+          }
         dirty = true;
         actx.invalidate();
         sizes.refresh();
@@ -943,7 +1020,8 @@ export async function enterScene(o: {
         beforeStep: pressed.beginStep,
         beforeFrameLane: pressed.beginFrameLane,
       });
-      const live = body.systems.length > 0 || [...world.query(Model)].length > 0 || !!particles?.busy(world);
+      const live =
+        body.systems.length > 0 || [...world.query(Model)].length > 0 || !!particles?.busy(world) || extensionsBusy();
       const handle: SceneHandle = {
         state: () => {
           const named: Record<string, {x: number; y: number; z: number}> = {};
@@ -973,6 +1051,9 @@ export async function enterScene(o: {
         };
       if (TEST_API && models.inspect) handle.model = createSceneModelInspector(models.inspect, visit, actx.signal);
       if (TEST_API) handle.entities = createSceneEntityInspector(world, visit, actx.signal);
+      if (TEST_API && extensions.length)
+        handle.extensions = () =>
+          Object.fromEntries(extensions.map(x => [x.id, x.session ? (x.session.stats?.() ?? {}) : {closed: true}]));
       if (TEST_API) handle.lights = () => structuredClone(lightSlots.stats);
       if (TEST_API && particles)
         handle.particles = () => ({
@@ -1075,7 +1156,7 @@ export async function enterScene(o: {
           if (version !== preparationVersion || result === 'retired' || actx.leaving() || actx.signal.aborted)
             throw Error('Scene program preparation retired');
           // Include a real initial draw: generated passes can create programs absent from compile().
-          renderer.render(three, camera);
+          if (!drawOverride()) renderer.render(three, camera);
           const frame = await (surface.frameReady?.(actx.signal) ?? Promise.resolve('ready'));
           if (frame === 'retired') throw Error('Scene frame preparation retired');
           if (version !== preparationVersion || actx.leaving() || actx.signal.aborted)
@@ -1124,7 +1205,7 @@ export async function enterScene(o: {
           try {
             sync();
             if (actx.leaving() || actx.signal.aborted || !programsPrepared || !dirty) return false;
-            renderer.render(three, camera);
+            if (!drawOverride()) renderer.render(three, camera);
           } catch (error) {
             if (!(error instanceof ProgramLinkError || error instanceof FrameReadinessError)) throw error;
             failPrograms(error);
