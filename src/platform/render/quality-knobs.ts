@@ -56,6 +56,7 @@ export interface GraphicsKnobs {
   'post.mode': 'off' | 'basic' | 'full';
   'effects.particles': 0.25 | 0.5 | 0.75 | 1; // share of non-essential particles drawn (FX-01)
   'lights.local-max': 2 | 4 | 8 | 16; // local light slots of each kind a scene visit may create (VIS-02)
+  'lights.shadowed-max': 0 | 1 | 2 | 4; // local (point and spot) lights that may cast shadows in a visit (VIS-03)
   'frame-rate.cap': 0 | 30 | 60 | 120; // 0 = display rate
   'interface.backdrop-blur': boolean;
   'interface.live-contexts': 1 | 2 | 3 | 4; // renderer pool ceiling
