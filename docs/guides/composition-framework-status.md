@@ -409,7 +409,7 @@ and `Model` materials: see material options below).
 knob now wired: `off` (low) draws direct, `basic` (medium) adds one combined pass (tone map from `view.output`, grade
 and vignette in display values, sRGB), `full` (reference, high) adds a half-resolution 5-mip bloom chain (10 post
 draws). Owner `platform.render.post`: backend-neutral settings and plan (`src/platform/render/post/settings.ts`), GLSL
-implementation in the WebGL2 backend (`backends/webgl/post.ts`, a lazy chunk, 5.9 kB min / 2.5 kB gzip). Bounds: every
+implementation in the WebGL2 backend (`backends/webgl/post.ts`, a lazy chunk, 6.1 kB min / 2.6 kB gzip). Bounds: every
 field validated, naming it. Overload: none (no queue). Render on change: post runs only inside a drawn frame; a still
 scene draws nothing. Targets allocated on the first composed frame, reallocated only on size, sample or bloom change,
 disposed with the visit. Failure: an invalid runtime value keeps the last valid settings; a chunk, context or pipeline

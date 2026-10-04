@@ -60,7 +60,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
 - **Post-processing: `view.post` at the player's `post.mode` tier.** Bloom, vignette and grade as scene data
   (`ctx.view.post` is live, one redraw). `off` (low) draws as before, `basic` (medium) adds one combined pass (tone
   map, grade, vignette), `full` (reference, high) adds a half-resolution bloom chain. The knob is now wired. A scene
-  without `view.post` loads no post code; the GLSL chunk is 5.9 kB minified. **Budget contract change:** post passes
+  without `view.post` loads no post code; the GLSL chunk is 6.1 kB minified. **Budget contract change:** post passes
   are counted apart as `postDraws` (10, 1, 0 per tier; probe, bench, gate, `perf:derive`, `play:snap`), so `draws`
   keeps measuring scene draws. Guide: [post-processing](docs/guides/post-processing.md); browser evidence:
   `npm run test:post-browser`.

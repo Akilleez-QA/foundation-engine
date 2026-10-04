@@ -82,9 +82,9 @@ tier follows the preset (`?quality=` or the saved choice); a game that installs 
 - **Memory:** the scene target is half-float colour (8 B/px) and depth, with multisampled storage when MSAA is on. The
   bloom mips add about a third of a half-resolution target. `engine.post()` reports `targetBytes` in dev and test
   builds. The same textures also count in `textureMiB`.
-- **Bundle:** the chunk is 5.9 kB minified / 2.5 kB gzip (both tiers, hand-written, against an estimated 20 kB / 5 kB
+- **Bundle:** the chunk is 6.1 kB minified / 2.6 kB gzip (both tiers, hand-written, against an estimated 20 kB / 5 kB
   for three's EffectComposer and UnrealBloomPass). First-load JS grows by 2.5 KiB (settings validation in
-  `defineScene`, measured with `npm run perf:bundle`: 167.8 to 170.3 KiB).
+  `defineScene`, measured with `npm run perf:bundle`: 171.6 to 174.1 KiB on the blank template).
 - **GPU cost per preset:** not measured on the reference GPU yet (`bench:ref`), and phone fill-rate cost is
   unverified. Post is full-screen fill work: on a phone, prefer `basic` or `off`.
 
