@@ -26,6 +26,21 @@ This README stays with the template; your copy lives in `game/` and `GAME.md`. T
 - Next step: the button at the bottom, E, or gamepad A.
 - Move after stepping off the platform: arrows or WASD, or the left stick.
 
+## First steps
+
+Draws are per rendered frame from `npm run play:snap -- --scene <id>` (software rendering, 1280×800) at 986d06b. Each visible `Shape` is about one draw.
+
+| | |
+|---|---|
+| Scenes | `lab` (the only scene) |
+| Tests | `node --import tsx --test game/lab.test.ts`: 9 tests |
+| Playtest | none ([write one](../../docs/recipes/write-a-playtest-script.md)) |
+| Draws (budget 10) | `lab`: 7 in the opening view; the probe and the tag beam start hidden and draw only once shown |
+
+**First edit.** In `game/lab.ts`, in the `platform` entity, replace `color: 0x5bc8c0` with `color: 0xe0705b`. You should see a coral platform under the player, and the 9 tests still pass.
+
+**Budget.** The opening view leaves 3 of 10 draws, and the probe and tag beam use some of that later in the lab. `npm run play:snap` measures the opening view only, so after adding something, step through the lab in `npm run play` and run `npm run gate` before you rely on the budget.
+
 ## What to change first
 
 1. `game/lab.ts`: the beacon entity shows `Model({ asset, clip })`; swap in your own model with the [model recipe](../../docs/recipes/load-a-model.md).

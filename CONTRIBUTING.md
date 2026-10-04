@@ -27,7 +27,22 @@ cd ../foundation-engine-my-change
 npm ci
 ```
 
-Here **`origin` is the canonical upstream; `fork` is your personal repository**. This is intentional: history and budget checks compare against `origin/main`. If you already cloned your fork as `origin`, rename that remote with `git remote rename origin fork`, add the canonical URL with `git remote add origin https://github.com/Akilleez-QA/foundation-engine.git`, and fetch it before creating the task worktree. Keep each worktree's own dependencies; do not reuse another contributor's `node_modules`. A new dependency with an install script needs a reviewed `allowScripts` entry in `package.json` (`npm approve-scripts <pkg>` or `npm deny-scripts <pkg>` on npm 12 or newer); `scripts/install-scripts.test.mjs` fails until it has one.
+Here **`origin` is the canonical upstream; `fork` is your personal repository**. This is intentional: history and budget checks compare against `origin/main`. If you already cloned your fork as `origin`, rename that remote with `git remote rename origin fork`, add the canonical URL with `git remote add origin https://github.com/Akilleez-QA/foundation-engine.git`, and fetch it before creating the task worktree. Keep each worktree's own dependencies; do not reuse another contributor's `node_modules`. A new dependency with an install script needs a reviewed `allowScripts` entry in `package.json` (`npm approve-scripts <pkg>` or `npm deny-scripts <pkg>`; those commands need npm 12 or newer, while Node 22 ships npm 10, so run them with `npx npm@12 approve-scripts <pkg>` or edit the entry by hand); `scripts/install-scripts.test.mjs` fails until it has one.
+
+### Testing against a fixed candidate commit
+
+`git fetch origin main` always moves `origin/main` to the current upstream tip. To rehearse or review against a fixed commit (a release candidate, or the base a reviewer named), start the worktree from that commit and pass it as the base instead of `origin/main`:
+
+```sh
+git fetch origin
+git worktree add ../foundation-engine-candidate -b my-change 7c26db7   # the candidate's full or short SHA
+cd ../foundation-engine-candidate
+npm ci
+BUDGET_BASE=7c26db7 npm run check -- --base 7c26db7
+git diff --check 7c26db7...HEAD
+```
+
+`--base` sets the test selection; `BUDGET_BASE` sets the revision that `lint:budgets` (in `npm run check` and `npm run lint`) compares budgets with, which is otherwise `origin/main`. Both leave `origin/main` alone, so a later fetch changes nothing. Do not move `origin/main` with `git update-ref`: the next fetch resets it. Rebase onto the current `origin/main` before opening a pull request.
 
 For a first contribution, a small reproduction, test, recipe correction or accessibility finding is useful. Choose the relevant existing contract and avoid unrelated cleanup. Making your own game instead? Follow [getting started](docs/guides/getting-started.md); game branches are not engine pull requests.
 
@@ -87,7 +102,7 @@ npm run check
 
 Run `npm run format` (Prettier) before committing; CI checks it through `npm run format:check`, which `npm run lint` and `npm run check` include. Markdown is not formatted.
 
-`check` selects affected tests from working-tree changes against HEAD, including untracked files. A clean committed tree can select **zero tests**; the output reports that explicitly, and a pass then does not establish that a regression test ran. Use `npm run check -- --base origin/main` (or your fork's upstream base) to include committed changes since the merge base, together with staged, unstaged and untracked changes. This selection is a local heuristic, not complete dependency coverage. Use `npm run check -- --all` to run the canonical `npm test` suite during the check. Invalid revisions and unknown selection options fail instead of silently selecting no tests.
+`check` selects affected tests from working-tree changes against HEAD, including untracked files. A clean committed tree can select **zero tests**; the output reports that explicitly, and a pass then does not establish that a regression test ran. Use `npm run check -- --base origin/main` (or your fork's upstream base) to include committed changes since the merge base, together with staged, unstaged and untracked changes. This selection is a local heuristic, not complete dependency coverage. Use `npm run check -- --all` to run the canonical `npm test` suite during the check. Invalid revisions and unknown selection options fail instead of silently selecting no tests. With `--base`, a zero selection means that nothing changed since the merge base affects a test (a documentation-only branch, for example); the message then suggests `--all` or explicit tests, not `--base` again.
 
 Run relevant tests explicitly before requesting review, including after a commit. For example, a game-directory argument change uses:
 
@@ -102,7 +117,7 @@ npm run typecheck
 npm run lint
 ```
 
-`npm test` is the complete source suite; use it for broader changes when practical. If a required check cannot run locally, say so and obtain its result through CI before integration. A focused selection is not the full suite.
+`npm test` is the complete source suite; use it for broader changes when practical. A few tests assert wall-clock bounds (for example a bounded pump or admission cost). On a heavily loaded machine one of them can fail once and pass on a re-run. Re-run the failing file alone (`node --import tsx --test <file>`) and then the suite before investigating, and report both results; never widen the bound to get a pass. If a required check cannot run locally, say so and obtain its result through CI before integration. A focused selection is not the full suite.
 
 For changed runtime behavior, add tests that demonstrate the failure and intended outcome, including cancellation, retry, or disposal when applicable. For visible changes, capture and inspect desktop and relevant mobile screenshots with `npm run play:snap` and `npm run play:snap -- --mobile`; report page errors and measured counts. Development heap readings do not substitute for production benchmark results.
 
@@ -138,6 +153,8 @@ git add -- path/to/changed-file
 git commit -m "Describe the concrete change"
 git push -u fork my-change
 ```
+
+`push -u` makes `fork/my-change` the branch's upstream (the worktree command set it to `origin/main`), so a later plain `git pull` or `git status` compares with your fork, not canonical `main`. Compare with upstream explicitly: `git fetch origin && git log --oneline origin/main..HEAD`.
 
 On GitHub, open a pull request to `Akilleez-QA/foundation-engine`, base `main`, comparing your fork's `my-change` branch. No upstream write permission is needed. Include `git rev-parse HEAD`, relevant test commands/counts, and any missing checks in the PR template. Do not push to canonical `main`. A [recorded public-source rehearsal](docs/verification/contributor-rehearsal-20261003.md) shows this path with explicit post-commit tests and its remaining limits.
 
