@@ -93,7 +93,8 @@
     "test:blender-export-browser": "GAME_DIR=tools/blender-export/game node scripts/generate.mjs && tsc --noEmit -p tools/blender-export/tsconfig.json && tsx scripts/lint/brief.ts tools/blender-export/game && GAME_DIR=tools/blender-export/game node -r ./scripts/silent-browser.cjs tools/blender-export/browser.mjs",
     "test:first-use-browser": "GAME_DIR=templates/explorer/game node scripts/generate.mjs && GAME_DIR=templates/explorer/game node -r ./scripts/silent-browser.cjs scripts/play/first-use-check.mjs playtest/first-use",
     "test:first-use-browser:production": "GAME_DIR=templates/explorer/game node -r ./scripts/silent-browser.cjs scripts/play/first-use-check.mjs playtest/first-use-production --production",
-    "test:creator-journey-browser": "GAME_DIR=templates/explorer/game node scripts/generate.mjs && GAME_DIR=templates/explorer/game node -r ./scripts/silent-browser.cjs scripts/play/creator-journey-check.mjs playtest/creator-journey"
+    "test:creator-journey-browser": "GAME_DIR=templates/explorer/game node scripts/generate.mjs && GAME_DIR=templates/explorer/game node -r ./scripts/silent-browser.cjs scripts/play/creator-journey-check.mjs playtest/creator-journey",
+    "fx:pack": "node scripts/fx-pack.mjs"
   },
   "dependencies": {
     "three": "^0.186.1"

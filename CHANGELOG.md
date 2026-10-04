@@ -12,6 +12,11 @@ Every new framework below is optional: a game that does not use it is unchanged.
   texture limits, file and texture bytes, allowed material properties and the receipt fields licence, author,
   source, tool and generator. A GLB without a contract is unaffected. See
   [model contracts](docs/guides/model-contracts.md).
+- **fix-budget skill: draw calls first.** The skill now counts draws before triangles against the scene's
+  `budgets.json` row and the brief's per-scene ceiling (about 100 per scene on phones as guidance; the brief's
+  numbers win), and names the real APIs for instancing and scatter: one `defineMesh` entity for static repeats
+  placed with `@kits/terrain`'s `createSurfaceScatter`, and `Emitter` for many small moving things.
+  Documentation only.
 - **Agent skill: build an asset in Blender (`.claude/skills/blender-asset`).** Plan parts and contacts in
   metres, one rebuild-from-scratch script per asset, a screenshot after every change, measurements (bounds,
   ground contact, gaps, non-manifold edges) as the acceptance evidence, about two retries per defect, Blender
