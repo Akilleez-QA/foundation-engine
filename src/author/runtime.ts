@@ -627,6 +627,8 @@ export async function enterScene(o: {
       const particles: ParticleField | null = scene.particles
         ? scene.particles.createField({
             scale: s.quality.knob('effects.particles'),
+            // Calm from the frame (STD-RUN-8), read at each step: presentation only, never the particles' stream.
+            calm: () => calm,
             seed: particleSeed,
             report: error => s.log.error(`${scene.id}: particles`, error),
             renderer: particleView,

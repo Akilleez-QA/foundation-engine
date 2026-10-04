@@ -171,7 +171,7 @@ an author and a source, and the sidecar keeps the hashes of the frames it was pa
 | `texture` | `''` | A `defineAsset({ type: 'texture' })` id, tinted by `color`; `''` is a soft round dot. |
 | `frames` | `null` | The texture is a sprite sheet: `{ cols, rows, count?, fps?, mode }` (see above; needs a `texture`). |
 | `blending` | `'additive'` | `'additive'` glows and needs no sorting; `'normal'` covers what is behind (not sorted within the emitter). |
-| `essential` | `false` | `true`: never thinned by the particle-density quality setting (use it when particles carry meaning). |
+| `essential` | `false` | `true`: never thinned by the particle-density quality setting, and still shown (held still at the spawn point) under Calm; use it when particles carry meaning, such as a pickup's feedback. `false` emitters add no particle under Calm. |
 | `despawn` | `false` | `true`: remove the entity once it has emitted and finished. |
 
 `defineEmitter` checks the data and throws on a bad field; building the game fails when a scene's own entities, or a

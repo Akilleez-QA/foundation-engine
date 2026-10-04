@@ -244,12 +244,21 @@ export async function activity(b, ms = 1500) {
   const second = await b.page.screenshot({type: 'png'});
   const p0 = before.particles,
     p1 = after.particles;
+  // Particles actually added: spawn attempts less those thinned, withheld by Calm or dropped (attempts go on under
+  // Calm, so the particles' stream stays the same; only what is shown stops).
+  const shown = p => (p ? p.spawned - (p.thinned ?? 0) - (p.calmed ?? 0) - (p.dropped ?? 0) : 0);
   return {
     ms,
     renders: after.loop.renders - before.loop.renders,
     pictureChanged: !first.equals(second),
     particles: p1
-      ? {emitters: p1.emitters, live: p1.live, spawned: p1.spawned - (p0?.spawned ?? 0), draws: p1.draws}
+      ? {
+          emitters: p1.emitters,
+          live: p1.live,
+          spawned: shown(p1) - shown(p0),
+          calmed: (p1.calmed ?? 0) - (p0?.calmed ?? 0),
+          draws: p1.draws,
+        }
       : null,
   };
 }
@@ -260,7 +269,9 @@ export function activityLine(a, calm) {
   const parts = [
     `${a.renders} renders`,
     a.pictureChanged ? 'picture changed' : 'picture unchanged',
-    p ? `${p.emitters} emitter(s), ${p.live} live, ${p.spawned} spawned` : 'no particles',
+    p
+      ? `${p.emitters} emitter(s), ${p.live} live, ${p.spawned} spawned${p.calmed ? ` (${p.calmed} withheld by Calm)` : ''}`
+      : 'no particles',
   ];
   const head = `still ${(a.ms / 1000).toFixed(1)} s with no input: ${parts.join(', ')}`;
   if (calm === undefined) return head;

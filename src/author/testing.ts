@@ -345,6 +345,7 @@ export async function testScene(
   const particles =
     scene.particles?.createField({
       scale: o.particleScale ?? 1,
+      calm: () => o.calm ?? false,
       seed: () => particleRng!.next(),
       report: error => {
         particleReports.push(error.message);
