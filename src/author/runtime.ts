@@ -23,6 +23,8 @@ import {Material, materialKey} from './material';
 import {createSceneSurfaces, type Surface, type SurfaceMaterial} from './scene-materials';
 import {createParticleView} from './particle-view';
 import {EMITTER_ID, type ParticleField} from './particle-contract';
+import {SCATTER_ID, scatterRoot} from './scatter';
+import type {SceneScatterDrawing} from './scene-scatter';
 /**
  * author/runtime.ts: a scene's lazy body, loaded the first time a scene is entered (never in the first-load bundle).
  *
@@ -117,6 +119,14 @@ const json = (v: unknown): Record<string, unknown> => {
   }
 };
 
+/** The scatter drawing chunk, once a scene that opted in has prepared (so its first frame already draws scatters). */
+let scatterModule: typeof import('./scene-scatter') | null = null;
+const loadScatter = () =>
+  import('./scene-scatter').then(m => {
+    scatterModule = m;
+    return m;
+  });
+
 const preparations = new WeakMap<
   SceneVisit,
   {body: Awaited<ReturnType<typeof bodyOf>>; state: Record<string, unknown>}
@@ -126,8 +136,11 @@ export async function prepareScene(s: Services, scene: SceneDefinition, visit: S
   // Sound files start loading with the scene; a failure is reported by the output and never blocks the visit.
   if (scene.sounds?.length && s.app.has('platform.audio'))
     for (const id of scene.sounds) void s.audio.preload(id, visit.signal);
+  // Scatter drawing is a lazy chunk; a scene that opted in loads it while it prepares. A failure is reported at entry.
+  const scatterLoad = scene.scatter && !scatterModule ? loadScatter().catch(() => null) : null;
   const body = await bodyOf(scene),
     state: Record<string, unknown> = {};
+  await scatterLoad;
   if (visit.signal.aborted) return;
   await scene.prepare?.(
     {state, text: (key, vars) => (appI18n.t as (k: string, v?: unknown) => string)(key, vars), service: key => s[key]},
@@ -565,6 +578,41 @@ export async function enterScene(o: {
             renderer: particleView,
           })
         : null;
+      // Scatter: one instanced draw per admitted `Scatter`, in scenes that opted in (`sceneScatter()`); placement draws
+      // from a stream derived from the scene id and `?seed=`, never the gameplay one. The density knob is read once.
+      let scatter: SceneScatterDrawing | null = null;
+      const startScatter = (m: typeof import('./scene-scatter')) => {
+        if (actx.signal.aborted || scatter || !scene.scatter) return;
+        scatter = m.createSceneScatter({
+          world,
+          scene: three,
+          limits: scene.scatter.limits,
+          root: scatterRoot(scene.id, seed),
+          density: s.quality.knob('effects.scatter-density'),
+          surfaces,
+          geometries,
+          resources,
+          mask: maskOf,
+          report: error => s.log.error(`${scene.id}: scatter`, error),
+        });
+      };
+      if (scene.scatter) {
+        if (scatterModule) startScatter(scatterModule);
+        else
+          loadScatter().then(
+            m => {
+              startScatter(m);
+              dirty = true;
+              actx.invalidate();
+            },
+            error => {
+              if (!actx.signal.aborted) s.log.error(`${scene.id}: scatter drawing failed to load`, error);
+            },
+          );
+        actx.own(() => scatter?.dispose());
+      }
+      const scatterProbe = {id: SCATTER_ID} as ComponentType<object>;
+      let scatterReported = false;
       const emitterProbe = {id: EMITTER_ID} as ComponentType<object>;
       let emittersReported = false;
       // Local lights (VIS-02): a scene with `sceneLights()` gets a fixed rig of slots for this visit, capped by the
@@ -608,6 +656,8 @@ export async function enterScene(o: {
             : 'on-demand',
         );
         if (models.sync(dt)) dirty = true;
+        if (scatter?.sync()) dirty = true;
+        if (actx.signal.aborted) return;
         const seen = new Set<Entity>();
         for (const [e, tr, sh] of world.query(Transform, Shape)) {
           if (world.has(e, Mesh) || world.has(e, Model)) continue; // Deterministic precedence; never draw two representations.
@@ -836,6 +886,12 @@ export async function enterScene(o: {
         if (world.version !== lastVersion) {
           lastVersion = world.version;
           dirty = true;
+          if (!scene.scatter && !scatterReported && world.first(scatterProbe)) {
+            scatterReported = true;
+            s.log.error(
+              `${scene.id}: a Scatter is not drawn: the scene has no scatter (defineScene({ scatter: sceneScatter() }))`,
+            );
+          }
           if (!particles && !emittersReported && world.first(emitterProbe)) {
             emittersReported = true;
             s.log.error(
@@ -929,6 +985,11 @@ export async function enterScene(o: {
             failed: particleView.stats.failed,
           },
         });
+      if (TEST_API && scene.scatter)
+        handle.scatter = () => {
+          const st = scatter?.stats;
+          return st ? {...st, refused: {...st.refused}, list: st.list.map(entry => ({...entry}))} : null;
+        };
       s.play.attach(handle, actx.signal);
 
       // Prepare authored resident materials before router activation/first render.

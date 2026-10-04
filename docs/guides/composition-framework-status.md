@@ -436,6 +436,20 @@ batching eligibility and the ADR 0078 seam hold. See the [guide](material-option
 `npm run test:material-options-browser` (desktop headless Chromium, software GL); templates draw identically. No
 physical-device, GPU timing or visual-quality acceptance.
 
+## Instanced scatter (VIS-06) — implemented, checked in PR #144
+
+`Scatter` / `defineScatter` / `sceneScatter` (author API) draw many copies of a primitive `Shape` or a `Mesh` as one
+instanced draw per scatter, placed by exact points or a rect, ring or edge area, with scale, yaw, tilt and colour
+jitter, and shaded by the entity's `Material`. Owner: the scene visit (`author/scene-scatter.ts`, a lazy chunk;
+placement and admission in `author/scatter-field.ts`; instances from `platform/render/batching/instance.ts`).
+Placement uses a stream derived from the scene id, `seed` and `?seed=`, never `ctx.random()` (regression-tested).
+Bounded per scatter (65,536) and per scene (`max` 32, `instances` 65,536 by default) with counted, reported refusals;
+the `effects.scatter-density` knob thins non-essential scatters to a nested deterministic subset. One draw per scatter;
+triangles counted per copy. See the [guide](scatter.md) and [recipe](../recipes/scatter-grass-and-rocks.md). Evidence:
+unit tests, recipe test and `npm run test:scatter-browser` (desktop headless Chromium, software GL). No template uses
+it, so template budgets are unchanged. glTF `Model` scatter is a follow-up. No physical-device or GPU timing
+acceptance.
+
 ## Game sound files (DX P1-10) — integrated in v0.2.0
 
 `defineAsset({ type: 'audio' })` files play through `ctx.play(id, { volume, pitch,

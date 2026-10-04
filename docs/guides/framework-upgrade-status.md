@@ -723,6 +723,18 @@ upload are recreated after context loss. A class change builds one surface and r
 most one new program). Defaults reproduce the previous materials, so templates draw identically. Evidence: unit tests,
 recipe test, `npm run test:material-options-browser`. See the [guide](material-options.md).
 
+## Instanced scatter — VIS-06, implemented and checked in PR #144
+
+New author component `Scatter` with `defineScatter`, `validateScatter`, `SCATTER_DEFAULTS`/`SCATTER_LIMITS`, and the
+per-scene opt-in `sceneScatter({ max, instances })`; batching primitive `instanceStatic`; quality knob
+`effects.scatter-density` (1/1/0.6/0.35, `reenter-scene`, unwired); `testScene(...).scatter` and the dev
+`engine.scatter()` counters, also in `play:snap`'s probe. Owner: the scene visit; the drawing is a lazy chunk loaded
+while an opted-in scene prepares. Bounds: 65,536 copies per scatter; 32 scatters and 65,536 copies per scene by default
+(caps 256 and 262,144). Overload: refused, counted by cause, first refusal per cause reported; re-offered on a data
+change or freed capacity, never per frame. Cancellation: leaving disposes instance buffers and returns geometry and
+surfaces. Recovery: CPU-side buffers re-upload after context loss; a failed chunk load is reported and the visit draws
+without scatters. Determinism: a derived stream per scatter, never `ctx.random()`. See the [guide](scatter.md).
+
 ## Game sound files — DX P1-10, integrated in v0.2.0
 
 `ctx.play(id, options?)` accepts a game sound id as well as a cue id (`PlayOptions`:
