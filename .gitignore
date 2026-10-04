@@ -69,6 +69,7 @@ playtest/session/
 playtest/particles/
 playtest/creator-journey/
 playtest/blender-export/
+playtest/pose-to-pose/
 playtest/first-use/
 playtest/first-use-production/
 playtest/output/

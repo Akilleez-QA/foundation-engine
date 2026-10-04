@@ -194,3 +194,11 @@ test('impact exaggeration: the stinger is scaled 1.5 at the strike key and back 
   assert.ok(scales.at(-1).every(v => Math.abs(v - 1) < 1e-4));
   assert.ok(scales[0].every(v => Math.abs(v - 1) < 1e-4));
 });
+
+test('S1: every exported GLB has its declared clips, closed loops and planted feet within tolerance', async () => {
+  for (const [model, definition] of [
+    [MODEL, DEFINITION],
+    [BUG, BUG_DEFINITION],
+  ])
+    assert.deepEqual((await validate(model, definition, {allowUnreviewed: true})).failures, []);
+});
