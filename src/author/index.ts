@@ -17,6 +17,8 @@
  *                            shading (standard/matte/flat/toon), double side, alpha cut-out, vertex colours
  *   Emitter, defineEmitter, burst, sceneParticles   optional particles: one instanced draw per emitter, fixed-step, seeded
  *   view.output (validateSceneOutput)               opt-in tone mapping and exposure per scene
+ *   PointLight, SpotLight, sceneLights               optional local lights in fixed per-visit slots
+ *   Shadow, sceneShadows                             optional shadows: per scene, per light and per entity
  *
  * Budgets are data in game/budgets.json (the ratchet compares them across revisions without running code).
  */
@@ -143,6 +145,31 @@ export {
 export {dmath, platformMath, scalarMath, type ScalarMath, type ScalarMathMode} from '../core/dmath';
 
 export {defineEnvironment, type EnvironmentState} from './environment';
+export {
+  PointLight,
+  SpotLight,
+  sceneLights,
+  validatePointLight,
+  validateSpotLight,
+  LIGHT_LIMITS,
+  LOCAL_LIGHT_CAPS,
+  POINT_LIGHT_DEFAULTS,
+  SPOT_LIGHT_DEFAULTS,
+  SCENE_LIGHT_DEFAULTS,
+  type PointLightData,
+  type SpotLightData,
+  type SceneLights,
+  type SceneLightLimits,
+} from './lights';
+export type {LightStats, LightRefusal} from './light-slots';
+export {
+  Shadow,
+  sceneShadows,
+  SHADOWED_LIGHT_CAPS,
+  type ShadowData,
+  type SceneShadows,
+  type SceneShadowDefaults,
+} from './shadow-casting';
 export {
   validateSceneOutput,
   OUTPUT_DEFAULTS,

@@ -15,6 +15,9 @@ import {RenderMask, validateRenderMask} from './render-mask';
 import {bindEnvironment} from './scene-environment';
 import {validateSceneOutput} from './scene-output';
 import {createOutputSync} from './scene-output-sync';
+import {lightSlotsFor, PointLight, SpotLight} from './lights';
+import {createLightSlots, shadowedSlotsFor} from './light-slots';
+import {localShadowMapSize, Shadow, shadowFlags, SUN_SHADOW_MAP} from './shadow-casting';
 import {applyOutput, outputProfile} from '../platform/render/backends/webgl/output';
 import {Material, materialKey} from './material';
 import {createSceneSurfaces, type Surface, type SurfaceMaterial} from './scene-materials';
@@ -89,6 +92,7 @@ import {
 } from './defs';
 import type {CueVoiceOptions} from '../platform/audio/audio-output';
 
+const NO_SHADOW = Object.freeze({cast: false, receive: false});
 /** The fixed lane's step (core/ecs/systems.ts default), named so a replay header can record it. */
 const FIXED_STEP = 1 / 60;
 const seedFromAddress = (): number | null => {
@@ -142,6 +146,9 @@ export async function enterScene(o: {
   const {s, brief, scene, visit} = o;
   const prepared = preparations.get(visit);
   const body = prepared?.body ?? (await bodyOf(scene));
+  // Local lights (VIS-02) and shadows (VIS-03) are a lazy chunk: only a scene with `sceneLights()` or `sceneShadows()`
+  // loads the rig (and the shadow scheduler) before its first frame; every other scene carries none of it.
+  const lightModule = scene.lights || scene.shadows ? await import('./scene-light-rig') : null;
   preparations.delete(visit);
   let ctxRef: SceneContext | null = null;
   let activityStart: (() => void) | undefined;
@@ -182,6 +189,8 @@ export async function enterScene(o: {
           clearColor: scene.view?.background ?? 0x101820,
           outputColorSpace: T.SRGBColorSpace,
           ...outputProfile(initialOutput),
+          // Shadows (VIS-03) only for a scene that opted in; PCF filtering, with each light's radius for softness.
+          ...(scene.shadows ? {shadowMap: {enabled: true, type: T.PCFShadowMap}} : {}),
         },
       });
       if (!surface) throw Error(`${scene.id}: WebGL could not start`);
@@ -229,7 +238,12 @@ export async function enterScene(o: {
         next => applyOutput(renderer, next),
         error => s.log.error(`${scene.id}: view.output refused`, error),
       );
-      let environment = scene.view?.environment ? bindEnvironment(three) : null;
+      // The sun's shadow (VIS-03): a scene with `sceneShadows()` lets its environment's `directional.shadow` cast.
+      const sunShadow = scene.shadows && lightModule ? lightModule.createSunShadow(renderer, SUN_SHADOW_MAP) : null;
+      actx.own(() => sunShadow?.dispose());
+      const sunShadowApply = sunShadow ? sunShadow.apply : undefined;
+      let sunShadowReported = false;
+      let environment = scene.view?.environment ? bindEnvironment(three, sunShadowApply) : null;
       actx.own(() => environment?.dispose());
       const cubes = bindSceneCubes(
         three,
@@ -546,6 +560,28 @@ export async function enterScene(o: {
         : null;
       const emitterProbe = {id: EMITTER_ID} as ComponentType<object>;
       let emittersReported = false;
+      // Local lights (VIS-02): a scene with `sceneLights()` gets a fixed rig of slots for this visit, capped by the
+      // 'reenter-scene' knob `lights.local-max`; a scene without it creates no light and reports its lights once.
+      // Shadowed slots (VIS-03) are chosen once, from the scene's own lights, bounded by `lights.shadowed-max`.
+      const lightSlotCounts = lightSlotsFor(scene.lights, scene.lights ? s.quality.knob('lights.local-max') : 0);
+      const shadowCap = scene.shadows ? s.quality.knob('lights.shadowed-max') : 0;
+      const shadowedSlots = scene.shadows ? shadowedSlotsFor(world, lightSlotCounts, shadowCap) : {point: 0, spot: 0};
+      const lightSlots = createLightSlots({
+        slots: lightSlotCounts,
+        enabled: !!scene.lights,
+        shadowed: shadowedSlots,
+        shadows: !!scene.shadows,
+        report: message => s.log.error(`${scene.id}: ${message}`),
+      });
+      const lightRig =
+        lightModule && scene.lights
+          ? lightModule.createSceneLightRig(
+              three,
+              lightSlotCounts,
+              scene.shadows ? {shadowed: shadowedSlots, mapSize: localShadowMapSize(shadowCap), renderer} : undefined,
+            )
+          : null;
+      actx.own(() => lightRig?.dispose());
       // Preload whenever the scene opted in: a runtime-spawned first burst must not wait for (and miss) the chunk.
       if (particles) particleView.preload();
       actx.own(() => {
@@ -571,7 +607,8 @@ export async function enterScene(o: {
           seen.add(e);
           const look = world.get(e, Material),
             lookKey = look ? materialKey(look) : '';
-          const sig = `${tr.x},${tr.y},${tr.z},${tr.rx},${tr.ry},${tr.rz},${tr.scale},${sh.kind},${sh.size},${sh.color},${sh.visible},${maskOf(e)},${lookKey}`;
+          const shade = scene.shadows ? shadowFlags(scene.shadows, world.get(e, Shadow)) : NO_SHADOW;
+          const sig = `${tr.x},${tr.y},${tr.z},${tr.rx},${tr.ry},${tr.rz},${tr.scale},${sh.kind},${sh.size},${sh.color},${sh.visible},${maskOf(e)},${lookKey},${shade.cast},${shade.receive}`;
           let m = meshes.get(e);
           if (!m) {
             const geometry = geometries.acquire(sh.kind, sh.size);
@@ -630,6 +667,8 @@ export async function enterScene(o: {
           m.surface.material.color.setHex(sh.color);
           mesh.visible = sh.visible;
           mesh.layers.mask = maskOf(e);
+          mesh.castShadow = shade.cast;
+          mesh.receiveShadow = shade.receive;
           m.sig = sig;
           dirty = true;
         }
@@ -695,7 +734,8 @@ export async function enterScene(o: {
             if (!current || world.get(e, Mesh) !== data || world.get(e, Transform) !== tr || world.has(e, Model))
               continue;
           }
-          const sig = `${tr.x},${tr.y},${tr.z},${tr.rx},${tr.ry},${tr.rz},${tr.scale},${data.color},${data.visible},${maskOf(e)},${lookKey}`;
+          const shade = scene.shadows ? shadowFlags(scene.shadows, world.get(e, Shadow)) : NO_SHADOW;
+          const sig = `${tr.x},${tr.y},${tr.z},${tr.rx},${tr.ry},${tr.rz},${tr.scale},${data.color},${data.visible},${maskOf(e)},${lookKey},${shade.cast},${shade.receive}`;
           if (m.sig !== sig) {
             if (m.surface && m.surface.key !== lookKey && !m.surface.update(look)) {
               // A Material added, removed, made invalid or given another shading class: one new surface.
@@ -711,6 +751,8 @@ export async function enterScene(o: {
             m.mesh.material.color.setHex(data.color);
             m.mesh.visible = data.visible;
             m.mesh.layers.mask = maskOf(e);
+            m.mesh.castShadow = shade.cast;
+            m.mesh.receiveShadow = shade.receive;
             m.sig = sig;
             dirty = true;
           }
@@ -739,11 +781,17 @@ export async function enterScene(o: {
         }
         if (viewState.environment) {
           if (!environment) {
-            environment = bindEnvironment(three);
+            environment = bindEnvironment(three, sunShadowApply);
             for (const light of defaultLights) light.visible = false;
             dirty = true;
           }
           if (environment.sync(viewState.environment, camera)) dirty = true;
+          if (!scene.shadows && !sunShadowReported && viewState.environment.directional.shadow) {
+            sunShadowReported = true;
+            s.log.error(
+              `${scene.id}: the environment's sun casts no shadow: the scene has no shadows (defineScene({ shadows: sceneShadows() }))`,
+            );
+          }
         } else if (environment) {
           environment.dispose();
           environment = null;
@@ -760,6 +808,11 @@ export async function enterScene(o: {
           )
         )
           dirty = true;
+        if (lightRig) {
+          lightSlots.sync(world);
+          if (lightRig.apply(world, lightSlots)) dirty = true;
+        } else if (world.version !== lastVersion && (world.first(PointLight) || world.first(SpotLight)))
+          lightSlots.sync(world);
         if (world.version !== lastVersion) {
           lastVersion = world.version;
           dirty = true;
@@ -844,6 +897,7 @@ export async function enterScene(o: {
         };
       if (TEST_API && models.inspect) handle.model = createSceneModelInspector(models.inspect, visit, actx.signal);
       if (TEST_API) handle.entities = createSceneEntityInspector(world, visit, actx.signal);
+      if (TEST_API) handle.lights = () => structuredClone(lightSlots.stats);
       if (TEST_API && particles)
         handle.particles = () => ({
           ...particles.stats,
