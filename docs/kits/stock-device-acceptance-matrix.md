@@ -17,8 +17,8 @@ configure, replace or omit these templates and frameworks. Stock acceptance keep
 existing declared targets; it must not silently remove phone support or reduce
 desktop quality to make a check pass.
 
-For the current eight templates on release candidate `7c26db7`, see its
-[support matrix](../releases/candidate-7c26db7/support-matrix.md).
+For the current nine templates on release candidate `ffa8c6a`, see its
+[support matrix](../releases/candidate-ffa8c6a/support-matrix.md) (the earlier `7c26db7` matrix covered eight).
 
 ## Declarations versus evidence
 

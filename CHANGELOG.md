@@ -7,8 +7,103 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
-Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
-(#122 onward). None of it is in that candidate.
+Nothing yet after the release candidate `ffa8c6a`.
+
+## 0.3.0 — proposed; author decides
+
+**Proposed, not released.** The version number and date are a proposal; the author decides both, and
+creates any tag or GitHub release. Release candidate: `ffa8c6a` (the merge of #174), which replaces the earlier
+candidate `7c26db7`. Evidence, release notes, upgrade guide and support matrix:
+[candidate bundle](docs/releases/candidate-ffa8c6a/README.md). Covers every PR merged after v0.2.0 (`071e3c2`) up to
+the candidate; later PRs go under Unreleased. `package.json` still says 0.2.0 until the author bumps it with the tag.
+
+### Upgrading from 0.2.0
+
+Changes a v0.2.0 game or workflow can notice. Each says what changed, who is affected and what to do.
+
+- **No explicit `any`; double casts through `unknown` need a reason (#99).** `npm run lint:types`, run by
+  `npm run check` and `npm run lint`, rejects the `any` type everywhere in `src/`, `templates/`, `scripts/`,
+  `perf/` and the game folder, and `as unknown as` outside test files. *Affected:* game code with `any` or
+  double casts; save migrations whose old-value parameter was left unannotated (it is now `unknown`, not
+  `any`). *To do:* use a real type, `unknown` with narrowing, or annotate the migration's old shape
+  (`(old: { best: number }) => …`). An unavoidable cast goes in one typed helper with
+  `// lint:allow-unknown-cast <reason>`.
+- **Stricter TypeScript: `noUncheckedIndexedAccess`, `noImplicitOverride` and `noImplicitReturns`.** Indexing
+  an array or a record now yields `T | undefined`. *Affected:* game code that reads `list[i]`, `record[key]`
+  or tuple-less matrix elements without a check. *To do:* run `npm run typecheck`; destructure, iterate with
+  `for…of`, check for `undefined`, or type fixed-length data as tuples. Use `!` only for a local, obvious
+  invariant, with a comment.
+- **Stricter TypeScript: `exactOptionalPropertyTypes`.** An optional property (`x?: T`) no longer accepts an
+  explicit `undefined` unless it is typed `x?: T | undefined`. Engine and kit options that callers fill from
+  possibly-undefined values (`ages`, `provider`, `math`, `signal`, `residency`, audio cue fields and others)
+  are now typed `| undefined`, so passing them through still compiles and behaves as before. *Affected:* game
+  code that writes `{ x: maybe }` into its own optional properties, or assigns `obj.x = undefined` to one.
+  *To do:* run `npm run typecheck`; add `| undefined` to the property, or omit the key
+  (`...(maybe === undefined ? {} : { x: maybe })`) where its presence matters.
+- **Game code is linted for `Math.random()` and literal UI text (#90).** `npm run lint:game`, run by
+  `npm run check`, `npm run lint` and the gate, scans `game/` (or `GAME_DIR`) and every
+  `templates/*/game`. Previously only `src/` was checked, so a game that passed on 0.2.0 can now fail.
+  *Affected:* game code that calls `Math.random()`, or passes literal text to the UI kit's HUD
+  (`.line(id, '…')`, `.banner('…')`, `.prompt('…')`). *To do:* run `npm run lint:game`; each line names
+  the file, line, rule and fix. Use `ctx.random()` (seeded, replayable with `?seed=`), and move text to
+  `defineGame({ strings })` read with `ctx.text(...)`. Tests, `<game>/tools/` and `<game>/public/` are
+  exempt; a deliberate exception needs `// lint-game-allow <rule>: <reason>` on that line.
+- **A visit's `enter()` runs before any of its systems step (#92).** On 0.2.0 a browser visit (first
+  entry, `goto`, `restart`, retry) stepped one fixed and two frame ticks on an empty `ctx.state` before
+  `enter()`; `testScene` already ran `enter()` first. *Affected:* systems that guarded against
+  uninitialised state, or relied on running during the two first-render frames (camera or HUD systems
+  now take effect from the first step after `enter()`; those frames show the scene's authored `view`).
+  *To do:* nothing for most games. Initialise state in `enter()`; you may remove guards that only
+  existed for the early ticks.
+- **`npm run check` test selection (#67).** `check` selects tests from working-tree changes against
+  `HEAD`, so a clean committed branch selects zero tests (now reported explicitly). `--base <ref>`
+  adds committed changes since the merge base, and `--all` now runs the canonical `npm test` suite
+  (0.2.0's list omitted game and tools tests). Invalid refs and unknown options now fail instead of
+  selecting nothing. *Affected:* contributors and scripts that ran `check` on a committed branch or
+  passed unknown options. *To do:* use `npm run check -- --base origin/main` before a PR, and
+  `-- --all` for the full suite.
+- **`testScene` throws on unknown cue and sound ids (#91).** *Affected:* game tests whose scenes play an
+  id that is neither a built-in cue (`BUILT_IN_CUES`) nor in the scene's `sounds`; they passed on 0.2.0
+  and now fail, naming the id. The browser still only warns. *To do:* fix the id, add the sound to the
+  scene's `sounds`, or pass `testScene(scene, { sounds: [...] })` for ids a scene plays without listing.
+- **Playtest scripts are validated, and `reload` is a new step (#94).** `play:script`, `play:criteria`
+  and `npm run check` (`lint:brief`, every `game/playtest/*.json`) now refuse unknown steps, fields and
+  matchers, and unknown scene ids, before any browser starts (exit 64, one line per problem).
+  *Affected:* scripts that 0.2.0 accepted with a mistake, for example an unsupported matcher such as
+  `atMost`, or a step with two actions. *To do:* fix each reported line; the format is in
+  [write a playtest script](docs/recipes/write-a-playtest-script.md). `{"reload": true}` and
+  `createTestSaves()` are additive.
+- **Static scenes redraw after a resolution-only quality change (#83).** On 0.2.0, changing the live
+  graphics resolution with unchanged CSS size cleared the canvas and could leave an on-demand scene
+  undrawn until something moved. It now redraws once, then idles. *Affected:* none adversely; a
+  test or bench that counted renders across a DPR change sees one more. *To do:* nothing.
+- **Each game ships only its own static files (#59).** Root `public/` mechanics files moved; see the
+  migration in the entry below. *Affected:* games that load `models/mechanics/…`,
+  `textures/mechanics/…` or `sounds/mechanics/…`.
+- **Retained v0.2.0 baseline.** The tagged arcade template and save envelopes written by the v0.2.0 store
+  code (arcade best, device settings, explore progress, a profile v2 export) are retained with sha256
+  manifests and checked on every test run. See
+  [public compatibility](docs/guides/public-compatibility.md#retained-v020-baseline).
+- **Constrained mobile GPUs start on a lighter preset (ADR 0079).** When the brief does not declare
+  `quality.tier`, a first run on a mobile GPU family (Mali, Adreno, PowerVR, Xclipse, Immortalis, Maleoon) starts
+  on `low` for an entry-level GPU, 2 GB or less memory or a texture limit under 4096, and on `medium` for 4 GB or
+  less, 4 or fewer cores or data saver. Before, every template started every device on `reference`
+  (16 light slots per kind, 4 shadowed lights), and a direct `createQuality` caller started phones on `high`.
+  *Affected:* players on those phones and tablets see fewer local lights and shadows, a lower pixel ratio and a
+  frame cap on first run; desktops, software GL, iPhone-class devices, capable phones, gates and benches are
+  unchanged. The start is unsaved, and saved choices are never rewritten. `BuildBrief.quality` gains
+  `tierDeclared`. *To do:* nothing to keep the new default. To start every device on one tier, declare it:
+  `quality: { tier: 'reference' }`. Players can still choose any preset.
+- **Capable mobile GPUs start on `high` at most (ADR 0079 amendment).** A mobile GPU family with no other constraint
+  (for example an 8 GB Adreno 740 or Mali-G715) now starts on `high`, never `reference`, when the brief does not
+  declare `quality.tier`: phones throttle under sustained load, and `reference` brings 16 light slots, 4 shadowed
+  lights and full post-processing. Adreno X laptop GPUs are not a mobile family. The probe now also runs on an
+  Android or iOS browser that reports 8 GB and more than 4 cores; a desktop Chromium with those still skips it.
+  *Affected:* first runs on capable phones and Android tablets get 8 light slots, 2 shadowed lights and `high`
+  post-processing. Desktops, iPhone-class devices, gates and benches are unchanged. *To do:* nothing; declare
+  `quality: { tier: 'reference' }` to start every device on it. A declared tier, a saved choice and a pin still win.
+
+### Changes
 
 - **Small fixes from the acceptance runs.** `add-a-budget` no longer contradicts itself: a `Perf-Budget:` line counts
   anywhere in a commit message (the rule since #170); git's own trailer view shows only the last paragraph, so check a
@@ -219,105 +314,6 @@ Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c
   real renderer. **Unstable across three.js upgrades: the game owns that code.** Engine side: a genre-neutral render
   extension seam (`SceneExtension`, opaque in `@engine`). Guide: [use three.js directly](docs/recipes/use-three-directly.md);
   browser evidence: `npm run test:three-kit-browser` (the courtyard fixture, software GL only).
-
-### Upgrading
-
-- **Constrained mobile GPUs start on a lighter preset (ADR 0079).** When the brief does not declare
-  `quality.tier`, a first run on a mobile GPU family (Mali, Adreno, PowerVR, Xclipse, Immortalis, Maleoon) starts
-  on `low` for an entry-level GPU, 2 GB or less memory or a texture limit under 4096, and on `medium` for 4 GB or
-  less, 4 or fewer cores or data saver. Before, every template started every device on `reference`
-  (16 light slots per kind, 4 shadowed lights), and a direct `createQuality` caller started phones on `high`.
-  *Affected:* players on those phones and tablets see fewer local lights and shadows, a lower pixel ratio and a
-  frame cap on first run; desktops, software GL, iPhone-class devices, capable phones, gates and benches are
-  unchanged. The start is unsaved, and saved choices are never rewritten. `BuildBrief.quality` gains
-  `tierDeclared`. *To do:* nothing to keep the new default. To start every device on one tier, declare it:
-  `quality: { tier: 'reference' }`. Players can still choose any preset.
-- **Capable mobile GPUs start on `high` at most (ADR 0079 amendment).** A mobile GPU family with no other constraint
-  (for example an 8 GB Adreno 740 or Mali-G715) now starts on `high`, never `reference`, when the brief does not
-  declare `quality.tier`: phones throttle under sustained load, and `reference` brings 16 light slots, 4 shadowed
-  lights and full post-processing. Adreno X laptop GPUs are not a mobile family. The probe now also runs on an
-  Android or iOS browser that reports 8 GB and more than 4 cores; a desktop Chromium with those still skips it.
-  *Affected:* first runs on capable phones and Android tablets get 8 light slots, 2 shadowed lights and `high`
-  post-processing. Desktops, iPhone-class devices, gates and benches are unchanged. *To do:* nothing; declare
-  `quality: { tier: 'reference' }` to start every device on it. A declared tier, a saved choice and a pin still win.
-
-## 0.3.0 — proposed; author decides
-
-**Proposed, not released.** The version number and date are a proposal; the author decides both, and
-creates any tag or GitHub release. Release candidate: `7c26db7` (the merge of #121, after #108). Evidence, release notes,
-upgrade guide and support matrix: [candidate bundle](docs/releases/candidate-7c26db7/README.md). Covers every
-PR merged after v0.2.0 (`071e3c2`) up to the candidate; later PRs are under Unreleased. `package.json` still says 0.2.0 until the author bumps it with the tag.
-
-### Upgrading from 0.2.0
-
-Changes a v0.2.0 game or workflow can notice. Each says what changed, who is affected and what to do.
-
-- **No explicit `any`; double casts through `unknown` need a reason (#99).** `npm run lint:types`, run by
-  `npm run check` and `npm run lint`, rejects the `any` type everywhere in `src/`, `templates/`, `scripts/`,
-  `perf/` and the game folder, and `as unknown as` outside test files. *Affected:* game code with `any` or
-  double casts; save migrations whose old-value parameter was left unannotated (it is now `unknown`, not
-  `any`). *To do:* use a real type, `unknown` with narrowing, or annotate the migration's old shape
-  (`(old: { best: number }) => …`). An unavoidable cast goes in one typed helper with
-  `// lint:allow-unknown-cast <reason>`.
-- **Stricter TypeScript: `noUncheckedIndexedAccess`, `noImplicitOverride` and `noImplicitReturns`.** Indexing
-  an array or a record now yields `T | undefined`. *Affected:* game code that reads `list[i]`, `record[key]`
-  or tuple-less matrix elements without a check. *To do:* run `npm run typecheck`; destructure, iterate with
-  `for…of`, check for `undefined`, or type fixed-length data as tuples. Use `!` only for a local, obvious
-  invariant, with a comment.
-- **Stricter TypeScript: `exactOptionalPropertyTypes`.** An optional property (`x?: T`) no longer accepts an
-  explicit `undefined` unless it is typed `x?: T | undefined`. Engine and kit options that callers fill from
-  possibly-undefined values (`ages`, `provider`, `math`, `signal`, `residency`, audio cue fields and others)
-  are now typed `| undefined`, so passing them through still compiles and behaves as before. *Affected:* game
-  code that writes `{ x: maybe }` into its own optional properties, or assigns `obj.x = undefined` to one.
-  *To do:* run `npm run typecheck`; add `| undefined` to the property, or omit the key
-  (`...(maybe === undefined ? {} : { x: maybe })`) where its presence matters.
-- **Game code is linted for `Math.random()` and literal UI text (#90).** `npm run lint:game`, run by
-  `npm run check`, `npm run lint` and the gate, scans `game/` (or `GAME_DIR`) and every
-  `templates/*/game`. Previously only `src/` was checked, so a game that passed on 0.2.0 can now fail.
-  *Affected:* game code that calls `Math.random()`, or passes literal text to the UI kit's HUD
-  (`.line(id, '…')`, `.banner('…')`, `.prompt('…')`). *To do:* run `npm run lint:game`; each line names
-  the file, line, rule and fix. Use `ctx.random()` (seeded, replayable with `?seed=`), and move text to
-  `defineGame({ strings })` read with `ctx.text(...)`. Tests, `<game>/tools/` and `<game>/public/` are
-  exempt; a deliberate exception needs `// lint-game-allow <rule>: <reason>` on that line.
-- **A visit's `enter()` runs before any of its systems step (#92).** On 0.2.0 a browser visit (first
-  entry, `goto`, `restart`, retry) stepped one fixed and two frame ticks on an empty `ctx.state` before
-  `enter()`; `testScene` already ran `enter()` first. *Affected:* systems that guarded against
-  uninitialised state, or relied on running during the two first-render frames (camera or HUD systems
-  now take effect from the first step after `enter()`; those frames show the scene's authored `view`).
-  *To do:* nothing for most games. Initialise state in `enter()`; you may remove guards that only
-  existed for the early ticks.
-- **`npm run check` test selection (#67).** `check` selects tests from working-tree changes against
-  `HEAD`, so a clean committed branch selects zero tests (now reported explicitly). `--base <ref>`
-  adds committed changes since the merge base, and `--all` now runs the canonical `npm test` suite
-  (0.2.0's list omitted game and tools tests). Invalid refs and unknown options now fail instead of
-  selecting nothing. *Affected:* contributors and scripts that ran `check` on a committed branch or
-  passed unknown options. *To do:* use `npm run check -- --base origin/main` before a PR, and
-  `-- --all` for the full suite.
-- **`testScene` throws on unknown cue and sound ids (#91).** *Affected:* game tests whose scenes play an
-  id that is neither a built-in cue (`BUILT_IN_CUES`) nor in the scene's `sounds`; they passed on 0.2.0
-  and now fail, naming the id. The browser still only warns. *To do:* fix the id, add the sound to the
-  scene's `sounds`, or pass `testScene(scene, { sounds: [...] })` for ids a scene plays without listing.
-- **Playtest scripts are validated, and `reload` is a new step (#94).** `play:script`, `play:criteria`
-  and `npm run check` (`lint:brief`, every `game/playtest/*.json`) now refuse unknown steps, fields and
-  matchers, and unknown scene ids, before any browser starts (exit 64, one line per problem).
-  *Affected:* scripts that 0.2.0 accepted with a mistake, for example an unsupported matcher such as
-  `atMost`, or a step with two actions. *To do:* fix each reported line; the format is in
-  [write a playtest script](docs/recipes/write-a-playtest-script.md). `{"reload": true}` and
-  `createTestSaves()` are additive.
-- **Static scenes redraw after a resolution-only quality change (#83).** On 0.2.0, changing the live
-  graphics resolution with unchanged CSS size cleared the canvas and could leave an on-demand scene
-  undrawn until something moved. It now redraws once, then idles. *Affected:* none adversely; a
-  test or bench that counted renders across a DPR change sees one more. *To do:* nothing.
-- **Each game ships only its own static files (#59).** Root `public/` mechanics files moved; see the
-  migration in the entry below. *Affected:* games that load `models/mechanics/…`,
-  `textures/mechanics/…` or `sounds/mechanics/…`.
-- **Retained v0.2.0 baseline.** The tagged arcade template and save envelopes written by the v0.2.0 store
-  code (arcade best, device settings, explore progress, a profile v2 export) are retained with sha256
-  manifests and checked on every test run. See
-  [public compatibility](docs/guides/public-compatibility.md#retained-v020-baseline).
-
-### Changes
-
 - **The gate passes on Node 23 and newer.** Node 23 changed the test runner's default report for piped output
   from TAP (`# tests 4`) to spec (`ℹ tests 4`), so `scripts/compatibility.test.mjs` failed `npm test` and
   `npm run gate` for a fresh game on every Node newer than 22. Scripts that read test output now name the TAP
@@ -435,8 +431,8 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
 
 ### Pull requests in this version
 
-Every PR merged after v0.2.0, by area. Limits for each are in its entry above or in the
-[release notes](docs/releases/candidate-7c26db7/release-notes.md#known-limits).
+Every PR merged after v0.2.0 up to the candidate, by area. Limits for each are in its entry above or in the
+[release notes](docs/releases/candidate-ffa8c6a/release-notes.md#known-limits).
 
 - **Making and testing games:** [#67](https://github.com/Akilleez-QA/foundation-engine/pull/67), [#90](https://github.com/Akilleez-QA/foundation-engine/pull/90), [#91](https://github.com/Akilleez-QA/foundation-engine/pull/91), [#92](https://github.com/Akilleez-QA/foundation-engine/pull/92), [#94](https://github.com/Akilleez-QA/foundation-engine/pull/94), [#99](https://github.com/Akilleez-QA/foundation-engine/pull/99), [#101](https://github.com/Akilleez-QA/foundation-engine/pull/101), [#103](https://github.com/Akilleez-QA/foundation-engine/pull/103), [#105](https://github.com/Akilleez-QA/foundation-engine/pull/105), [#106](https://github.com/Akilleez-QA/foundation-engine/pull/106), [#107](https://github.com/Akilleez-QA/foundation-engine/pull/107), [#114](https://github.com/Akilleez-QA/foundation-engine/pull/114), [#120](https://github.com/Akilleez-QA/foundation-engine/pull/120), [#121](https://github.com/Akilleez-QA/foundation-engine/pull/121) (checks, linting, stricter
   types, formatting); [#68](https://github.com/Akilleez-QA/foundation-engine/pull/68), [#89](https://github.com/Akilleez-QA/foundation-engine/pull/89), [#109](https://github.com/Akilleez-QA/foundation-engine/pull/109), [#110](https://github.com/Akilleez-QA/foundation-engine/pull/110), [#111](https://github.com/Akilleez-QA/foundation-engine/pull/111), [#112](https://github.com/Akilleez-QA/foundation-engine/pull/112), [#108](https://github.com/Akilleez-QA/foundation-engine/pull/108) (onboarding and tooling, Node 23+ and Node 26 in CI).
@@ -447,6 +443,16 @@ Every PR merged after v0.2.0, by area. Limits for each are in its entry above or
 - **Evidence and compatibility:** [#72](https://github.com/Akilleez-QA/foundation-engine/pull/72), [#73](https://github.com/Akilleez-QA/foundation-engine/pull/73), [#75](https://github.com/Akilleez-QA/foundation-engine/pull/75), [#76](https://github.com/Akilleez-QA/foundation-engine/pull/76), [#78](https://github.com/Akilleez-QA/foundation-engine/pull/78), [#79](https://github.com/Akilleez-QA/foundation-engine/pull/79), [#81](https://github.com/Akilleez-QA/foundation-engine/pull/81), [#96](https://github.com/Akilleez-QA/foundation-engine/pull/96), [#97](https://github.com/Akilleez-QA/foundation-engine/pull/97), [#98](https://github.com/Akilleez-QA/foundation-engine/pull/98), [#104](https://github.com/Akilleez-QA/foundation-engine/pull/104), [#115](https://github.com/Akilleez-QA/foundation-engine/pull/115), [#116](https://github.com/Akilleez-QA/foundation-engine/pull/116), [#119](https://github.com/Akilleez-QA/foundation-engine/pull/119).
 - **Contributing, CI and project:** [#69](https://github.com/Akilleez-QA/foundation-engine/pull/69), [#71](https://github.com/Akilleez-QA/foundation-engine/pull/71), [#80](https://github.com/Akilleez-QA/foundation-engine/pull/80), [#82](https://github.com/Akilleez-QA/foundation-engine/pull/82), [#88](https://github.com/Akilleez-QA/foundation-engine/pull/88), [#93](https://github.com/Akilleez-QA/foundation-engine/pull/93), [#117](https://github.com/Akilleez-QA/foundation-engine/pull/117). Batch merges [#62](https://github.com/Akilleez-QA/foundation-engine/pull/62), [#64](https://github.com/Akilleez-QA/foundation-engine/pull/64), [#65](https://github.com/Akilleez-QA/foundation-engine/pull/65) integrate the PRs
   named in their titles.
+
+After the first candidate `7c26db7` (#122–#174):
+
+- **Look and art direction:** [#124](https://github.com/Akilleez-QA/foundation-engine/pull/124), [#127](https://github.com/Akilleez-QA/foundation-engine/pull/127), [#128](https://github.com/Akilleez-QA/foundation-engine/pull/128), [#136](https://github.com/Akilleez-QA/foundation-engine/pull/136), [#138](https://github.com/Akilleez-QA/foundation-engine/pull/138), [#139](https://github.com/Akilleez-QA/foundation-engine/pull/139), [#144](https://github.com/Akilleez-QA/foundation-engine/pull/144), [#146](https://github.com/Akilleez-QA/foundation-engine/pull/146), [#148](https://github.com/Akilleez-QA/foundation-engine/pull/148), [#150](https://github.com/Akilleez-QA/foundation-engine/pull/150), [#154](https://github.com/Akilleez-QA/foundation-engine/pull/154), [#159](https://github.com/Akilleez-QA/foundation-engine/pull/159), [#161](https://github.com/Akilleez-QA/foundation-engine/pull/161), [#166](https://github.com/Akilleez-QA/foundation-engine/pull/166).
+- **Assets and provenance:** [#126](https://github.com/Akilleez-QA/foundation-engine/pull/126), [#129](https://github.com/Akilleez-QA/foundation-engine/pull/129), [#131](https://github.com/Akilleez-QA/foundation-engine/pull/131), [#134](https://github.com/Akilleez-QA/foundation-engine/pull/134), [#135](https://github.com/Akilleez-QA/foundation-engine/pull/135), [#137](https://github.com/Akilleez-QA/foundation-engine/pull/137), [#145](https://github.com/Akilleez-QA/foundation-engine/pull/145), [#147](https://github.com/Akilleez-QA/foundation-engine/pull/147).
+- **Animation (pose to pose):** [#142](https://github.com/Akilleez-QA/foundation-engine/pull/142), [#149](https://github.com/Akilleez-QA/foundation-engine/pull/149), [#151](https://github.com/Akilleez-QA/foundation-engine/pull/151), [#152](https://github.com/Akilleez-QA/foundation-engine/pull/152), [#153](https://github.com/Akilleez-QA/foundation-engine/pull/153).
+- **Effects and Calm:** [#141](https://github.com/Akilleez-QA/foundation-engine/pull/141), [#143](https://github.com/Akilleez-QA/foundation-engine/pull/143), [#171](https://github.com/Akilleez-QA/foundation-engine/pull/171).
+- **Device-class tiers:** [#155](https://github.com/Akilleez-QA/foundation-engine/pull/155), [#164](https://github.com/Akilleez-QA/foundation-engine/pull/164), [#172](https://github.com/Akilleez-QA/foundation-engine/pull/172).
+- **Tooling, budgets and docs claims:** [#125](https://github.com/Akilleez-QA/foundation-engine/pull/125), [#130](https://github.com/Akilleez-QA/foundation-engine/pull/130), [#132](https://github.com/Akilleez-QA/foundation-engine/pull/132), [#156](https://github.com/Akilleez-QA/foundation-engine/pull/156), [#157](https://github.com/Akilleez-QA/foundation-engine/pull/157), [#158](https://github.com/Akilleez-QA/foundation-engine/pull/158), [#160](https://github.com/Akilleez-QA/foundation-engine/pull/160), [#162](https://github.com/Akilleez-QA/foundation-engine/pull/162), [#165](https://github.com/Akilleez-QA/foundation-engine/pull/165), [#167](https://github.com/Akilleez-QA/foundation-engine/pull/167), [#168](https://github.com/Akilleez-QA/foundation-engine/pull/168), [#169](https://github.com/Akilleez-QA/foundation-engine/pull/169), [#170](https://github.com/Akilleez-QA/foundation-engine/pull/170), [#173](https://github.com/Akilleez-QA/foundation-engine/pull/173), [#174](https://github.com/Akilleez-QA/foundation-engine/pull/174).
+- **Evidence, flakes and release:** [#122](https://github.com/Akilleez-QA/foundation-engine/pull/122), [#123](https://github.com/Akilleez-QA/foundation-engine/pull/123), [#133](https://github.com/Akilleez-QA/foundation-engine/pull/133), [#140](https://github.com/Akilleez-QA/foundation-engine/pull/140), [#163](https://github.com/Akilleez-QA/foundation-engine/pull/163).
 
 ## 0.2.0 — 2026-10-03
 

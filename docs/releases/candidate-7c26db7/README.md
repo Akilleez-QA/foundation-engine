@@ -1,5 +1,8 @@
 # Release candidate `7c26db7`
 
+> **Superseded** by candidate [`ffa8c6a`](../candidate-ffa8c6a/README.md) (2026-10-04). This bundle is kept as
+> the record of the first candidate; do not tag `7c26db7`.
+
 **Prepared, not released.** This bundle lets the author review and tag a release. Nobody has created a tag,
 a GitHub release, a package or a deployment for it. The version **0.3.0** and its date are proposed; the
 author decides both.
