@@ -3,7 +3,7 @@
 // the page opened with ?flags=dev.silent. The user's browser, profile and audio are never touched.
 import {createServer as netServer} from 'node:net';
 import {mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
-import {join} from 'node:path';
+import {join, relative, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {gameDir} from '../lib/game-dir.mjs';
 
@@ -218,6 +218,24 @@ export function budgetLine(status) {
     .join(', ');
   return `OVER BUDGET (${over} per rendered frame, budgets.json scenes.${status.scene}): recover with .claude/skills/fix-budget/SKILL.md (simplify, instance, bake, LOD); never raise a budget without the author`;
 }
+
+/**
+ * Frame rate of a measured window for a summary line. It is advisory: software GL in an emulated viewport on a shared
+ * machine says little about a device, so play:snap reports it and never judges a budget on it.
+ */
+export function frameRateLine(m) {
+  return m?.renders ? `${m.fps ?? '-'} fps (p95 ${m.frameMsP95 ?? '-'} ms), advisory` : 'fps not measured';
+}
+
+/** The summary line of a view other than desktop: draws, triangles and the verdict, then the advisory frame rate. */
+export function viewLine(name, v) {
+  const m = v.redrawn ?? v.moving;
+  const counts = m?.renders ? `${m.drawsPerFrame} draws, ${m.trisPerFrame} tris per rendered frame · ` : '';
+  return `  ${name} budget (${v.budget.window === 'redrawn' ? 'forced redraws' : 'moving window'}): ${counts}${budgetLine(v.budget)} · ${frameRateLine(v.moving)}`;
+}
+
+/** An evidence file's path as the CLI prints it: relative to the repository root, with forward slashes. */
+export const evidencePath = file => relative(ROOT, file).split(sep).join('/');
 
 export function freshOut(dir = OUT) {
   rmSync(dir, {recursive: true, force: true});

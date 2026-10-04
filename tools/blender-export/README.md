@@ -32,6 +32,19 @@ To compare two independent exports, choose a scratch directory and export again 
 
 The [Blender 5.2 glTF manual](https://docs.blender.org/manual/en/5.2/addons/scene_gltf2.html) explains the format and PBR export conventions. Exact operator options here were inspected and exercised in the installed 5.2.1 exporter; other versions need their own check.
 
+## Second example: a low-poly lantern
+
+`game/tools/lantern/export.py` builds a 148-triangle lantern from nothing (an iron base, roof and handle, and a warm glass chimney with an emissive factor) and exports `game/public/models/lantern.glb` with its receipt. It shows the general path for a new model: the creator's limits come first, in `game/public/models/lantern.contract.json` (about 35 cm tall and 20 cm across, base-centre pivot, at most 200 triangles, two untextured materials, 16 KiB), and the export is checked against them.
+
+```sh
+blender --background --factory-startup --python tools/blender-export/game/tools/lantern/export.py
+npm run asset:verify -- tools/blender-export/game/public/models/lantern.glb
+```
+
+`--output <scratch>.glb` after `--` writes a comparison copy elsewhere. Two Blender 5.2.1 exports were byte-identical. The lantern is original GPL-3.0-only work by the Foundation Engine contributors, written as agent-assisted Blender Python with no third-party models, textures or scans; its receipt records licence, author, source, tool, generator and origin.
+
+It is validated, not rendered: this sample's brief caps its scene at 3 draws and 14 triangles, and placing the lantern would need the creator to change that brief. In your own game, declare it with `defineAsset` and a `Model` as in [load a model](../../docs/recipes/load-a-model.md).
+
 ## Run the real consumer
 
 ```sh
