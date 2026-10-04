@@ -587,8 +587,8 @@ Opt-in visual data for a scene, owned by the scene visit (the [scene look guide]
 byte-identical (picture guard on blank and explorer). Status: integrated (PR #124, merge `522815f`). Evidence:
 unit tests and `npm run test:output-browser` (desktop headless Chromium, software GL). No physical-device acceptance.
 Local lights (VIS-02): `PointLight`/`SpotLight` components claim fixed per-visit slots from `sceneLights()`, capped by
-the `lights.local-max` knob; overflow is refused and reported once per cause. Status: implemented and checked as a
-candidate PR #138. Evidence: unit tests and `npm run test:lights-browser`. No physical-device fill-rate acceptance.
+the `lights.local-max` knob; overflow is refused and reported once per cause. Status: integrated (PR #138, merge
+`ef0d1bb`). Evidence: unit tests and `npm run test:lights-browser`. No physical-device fill-rate acceptance.
 Shadows (VIS-03): `sceneShadows()` per scene, `directional.shadow` for the sun, `shadow: true` on local lights and a
 per-entity `Shadow`; shadowed local slots fixed per visit and bounded by `lights.shadowed-max`; maps redraw only on
 change. Status: implemented and checked as a candidate PR. Evidence: unit tests and `npm run test:shadows-browser`.
