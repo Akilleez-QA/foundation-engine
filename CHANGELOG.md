@@ -16,6 +16,12 @@ Every new framework below is optional: a game that does not use it is unchanged.
   metres, one rebuild-from-scratch script per asset, a screenshot after every change, measurements (bounds,
   ground contact, gaps, non-manifold edges) as the acceptance evidence, about two retries per defect, Blender
   5.2 API lookups before writing code, and MCP safety defaults. Documentation only; no engine change.
+- **KTX2 model textures (#146).** A GLB whose textures use `KHR_texture_basisu` (Basis Universal ETC1S or UASTC) now
+  loads: the textures are transcoded to the GPU format the device supports (RGBA8 when it supports none) and stay
+  compressed on the GPU. The transcoder (0.6 MB) and its code load only when such a model does; a game without one
+  downloads none of it. `models` stats gain `compressedTextures`, `compressedTextureMiB` and `transcoderLoads`.
+  `npm run asset:verify` accepts `KHR_texture_basisu` when the contract lists it. See
+  [KTX2 model textures](docs/guides/compressed-textures.md).
 
 ## 0.3.0 — proposed; author decides
 

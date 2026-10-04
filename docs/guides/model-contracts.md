@@ -36,7 +36,7 @@ Every key is checked; an unknown key is an error, so a misspelt limit cannot sil
 | `pivot` | yes | `{at, node?, tolerance?}`. `at` is `"base-centre"` (lowest point at y = 0, footprint centred on x = z = 0), `"centre"` (bounds centred on the origin) or `"any"`. `node` names a node that must sit at the world origin. |
 | `limits` | yes | Whole numbers: `fileBytes`, `triangles`, `vertices`, `materials`, `textures`, `textureBytes` (required); `textureSize` (the largest width or height of any embedded image, in pixels; required when `textures` is above 0); `primitives`, `animations` (default 0), `cameras` (default 0). Vertices and triangles are counted from the re-imported geometry. |
 | `nodeTransforms` | no | `"forbidden"` rejects any node `translation`, `rotation`, `scale` or `matrix`, even an identity: transforms must be baked into the mesh. Default `"allowed"`. |
-| `extensions` | no | glTF extensions the GLB may use; default none. List `EXT_meshopt_compression` (and `KHR_mesh_quantization`, `EXT_texture_webp`) for an optimised model. Draco (`KHR_draco_mesh_compression`) can never be listed: the engine registers only the meshopt decoder. A *required* `KHR_texture_basisu` (KTX2) texture is refused even when listed: the stock model loader registers no KTX2 transcoder. |
+| `extensions` | no | glTF extensions the GLB may use; default none. List `EXT_meshopt_compression` (and `KHR_mesh_quantization`, `EXT_texture_webp`) for an optimised model. Draco (`KHR_draco_mesh_compression`) can never be listed: the engine registers only the meshopt decoder. List `KHR_texture_basisu` for KTX2 textures (the engine transcodes them since PR #146); each KTX2 image must be Basis Universal (ETC1S or UASTC) and one 2D image, as the engine requires. |
 | `materials` | yes | `properties`: the material keys allowed (must include `name`). `pbr`: the `pbrMetallicRoughness` keys allowed. Optional: `required`, `requiredPbr` (keys that must be present), `alphaModes` (default `["OPAQUE"]`), `expected` (the exact set of materials by name, each with optional `baseColorFactor`, `metallicFactor`, `roughnessFactor`, `emissiveFactor`, `doubleSided`). |
 | `lattice` | no | `{name, x, y, z}`: every vertex coordinate must be one of the listed values per axis (for block-built geometry). |
 | `faces` | no | `[{name, axis, at, material, triangles?}]`: exactly one primitive lies wholly on the plane `axis = at`, uses `material` and has `triangles` triangles. |
@@ -49,7 +49,17 @@ Rules that need no contract key: the GLB header and chunks must be well formed; 
 
 ## Re-import
 
-The geometry rules do not trust the exporter's report or the accessor metadata. They run on a re-import of the GLB: three.js's `GLTFLoader` with the meshopt decoder, the same parser the engine's model loader uses (`src/platform/assets/models.ts`). Triangles, vertices, bounds, size, pivot, named nodes and clips are read from what that re-import builds. Image dimensions come from each embedded image's header (PNG, JPEG, WebP or KTX2); the images are then removed, because Node has no image decoder.
+The geometry rules do not trust the exporter's report or the accessor metadata. They run on a re-import of the GLB: three.js's `GLTFLoader` with the meshopt decoder, the same parser the engine's model loader uses (`src/platform/assets/models.ts`). Triangles, vertices, bounds, size, pivot, named nodes and clips are read from what that re-import builds. Image dimensions come from each embedded image's header (PNG, JPEG, WebP or KTX2); the images are then removed, because Node has no image decoder (nor, for KTX2, a transcoder: the check reads the KTX2 header only).
+
+### Texture format for phone targets
+
+WebP (`EXT_texture_webp`) makes the download smaller; the GPU still holds RGBA8. KTX2 (`KHR_texture_basisu`) also keeps
+the texture compressed on the GPU, which is what limits art on phones. The engine loads KTX2 model textures lazily
+([guide](compressed-textures.md)), so an optimiser may write KTX2 instead of WebP when the brief targets phones: UASTC
+for normal, occlusion and metal-roughness maps, ETC1S for colour, sides a multiple of 4, and `KHR_texture_basisu` in the
+contract's `extensions`. `npm run asset:optimize` has its own owner; switching its texture step to KTX2 for phone
+targets is that tool's change, enabled by this capability rather than made by it. Keep WebP for desktop-only builds if
+the transcoder download (0.6 MB, fetched once) matters more than GPU memory.
 
 ## Provenance fields
 

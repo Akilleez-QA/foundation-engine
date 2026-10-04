@@ -41,6 +41,8 @@ jobs:
         run: npm run test:stage-journal-browser
       - name: Asynchronous model preview browser regressions
         run: npm run test:model-preview-browser
+      - name: KTX2 model texture browser regressions
+        run: npm run test:ktx2-browser
       - name: Optional framework browser regressions
         run: GAME_DIR=templates/expedition/game npm run test:framework-browser
       - name: Optional regional surface browser regressions

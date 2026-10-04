@@ -534,6 +534,22 @@ probe ([record](../verification/asset-residency-20261002/README.md)). No program
 budget, combined ceiling, prefetch, physical-device memory or performance claim.
 See the [guide](asset-residency.md).
 
+## KTX2 model textures — implemented and checked (PR #146)
+
+The model library loads GLBs whose textures use `KHR_texture_basisu`. Its KTX2 step
+(`src/platform/assets/model-ktx2.ts`) is a lazy chunk that imports three's `KTX2Loader`
+and fetches the Basis transcoder only for a model with a KTX2 image, once per library.
+The transcode targets the formats of the renderer the scene runtime binds (the pooled
+world renderer, `detectSupport`), with an RGBA8 fallback. Headers are refused and the
+worst case admitted against `maxResidentBytes` before any transcode; the transcoded
+level bytes count in residency and the `models` probe. Two workers per library by
+default, retired with it; late transcodes are dropped. Evidence: unit tests and
+`npm run test:ktx2-browser` (dev, fallback, sub-path builds, three cancel-after-transcode
+cycles) in SwiftShader Chromium ([record](../verification/ktx2-model-textures-20261003.md)).
+Checked, not yet integrated: the integration merge and its CI run are recorded in the
+ledger. No phone GPU, driver memory or transcode-time claim; the transcoder workers are
+an explicit STD-RUN-35 exception. See the [guide](compressed-textures.md).
+
 ## Zero-step press retention (STD-SIM-12) — fix integrated in v0.2.0
 
 The stock author runtime cleared pressed actions and `pointer.pressed` after every
