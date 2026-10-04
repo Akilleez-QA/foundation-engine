@@ -7,6 +7,16 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Model presentation is a lazy chunk (bundle headroom).** The scene model owner, rig capture, attachments, pose
+  links and model looks moved out of the `runtime` chunk into `scene-model-chunk`, loaded only by a scene with a
+  `Model` entity: while it prepares when the scene starts with one, else when a system first spawns one (until then
+  `ctx.modelState` reports `loading`). Production builds, `runtime` chunk before → after (gzip -9 in brackets):
+  blank 484,661 → 460,268 B (126,020 → 118,007), explorer 484,539 → 460,147 B (125,934 → 117,935), showcase
+  475,420 → 451,046 B (123,046 → 115,107). Headroom under the 500 kB rule grows from 15.3 kB to 39.7 kB (blank). The
+  model chunk is 26,019 B (8,988 gzip); a model scene loads about 1.6 kB more in all. First-load JS is unchanged.
+  The 500 kB limit is not raised. *Affected:* a scene whose first `Model` is spawned by a system sees its models one
+  chunk fetch later.
+
 - **Model contracts (`npm run asset:verify`).** A GLB under a game's `public/models/` with an adjacent
   `<name>.contract.json` is checked against it by `npm run check`: size and pivot, triangle, vertex, material and
   texture limits, file and texture bytes, allowed material properties and the receipt fields licence, author,

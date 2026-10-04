@@ -37,6 +37,21 @@ Graph work is O(N+E), with one parent per child and E≤N. Matrix work adds cons
 size affine composition per relation plus existing native node matrix updates;
 this work bound is not a physical CPU deadline.
 
+### Loading: the model chunk
+
+The scene model owner and everything it uses (instances, rig capture,
+attachments, pose links, material looks, playback) is a lazy chunk,
+`scene-model-chunk`, that only a scene with a `Model` entity loads. A scene whose
+own entities include a `Model` loads it while it prepares, before its first frame,
+so its models start as before. A scene that spawns its first `Model` from a system
+requests the chunk on that frame. Until it arrives, `ctx.modelState` reports
+`loading`, attachments and pose links `unresolved` and sockets `null`, the same
+answers as for a model the owner has not admitted yet (`model-pending.ts`); if the
+chunk fails to load, the visit reports it once and models report `failed`. After
+the first load every later visit starts its models synchronously. Blank template
+build: the `runtime` chunk fell from 484,661 to 460,268 bytes (126,020 to 118,007
+gzip); the model chunk is 26,019 bytes (8,988 gzip).
+
 ## Ordering and exact presentation
 
 The owner advances native animation and applies explicit node pose overrides
