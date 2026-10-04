@@ -1,7 +1,8 @@
 // scripts/lint/brief.ts (`npm run lint:brief`): the build brief is the contract (AGENTS.md). For every game in the
 // checkout (./game and each templates/<name>/game) it checks that:
 //   - the brief is valid (defineBuild already refuses a broken one; this reports it with the file);
-//   - every scene has a budget row, and no budget is above the brief's per-scene ceiling for its minimum device;
+//   - every scene has a budget row, and no budget is above the brief's per-scene ceiling for its minimum device
+//     (draws, triangles, textureMiB and heapMiB always; postDraws, shadowPasses and shadowCasters when the row has them);
 //   - the first-load JS budget is within the brief's firstLoadKiB;
 //   - every success criterion has a checkable `by` file that exists, and GAME.md mirrors every criterion id;
 //   - every play:script file in the game's playtest/ folder is well formed and names scenes the game has;
@@ -16,6 +17,7 @@ import type {SceneDefinition} from '../../src/author/defs';
 import {lessonProblems, type LessonInput} from '../../src/kits/learn/lesson';
 import {gameInputProblems} from '../../src/author/input-registry';
 import {scriptProblems} from '../play/script-schema.mjs';
+import {CEILING_METRICS} from '../../src/author/build';
 
 export interface BriefProblem {
   game: string;
@@ -29,7 +31,8 @@ export const addBriefCheck = (c: BriefCheck) => {
   extraChecks.push(c);
 };
 
-const CEILING_KEYS = {draws: 'draws', triangles: 'triangles', textureMiB: 'textureMiB', heapMiB: 'heapMiB'} as const;
+/** Rows every budget must state; the other ceilings (postDraws, shadow passes and casters) bound a row that has them. */
+const REQUIRED_CEILINGS = new Set<string>(['draws', 'triangles', 'textureMiB', 'heapMiB']);
 
 export async function checkGame(dir: string): Promise<string[]> {
   const out: string[] = [];
@@ -61,10 +64,11 @@ export async function checkGame(dir: string): Promise<string[]> {
   for (const [id, row] of Object.entries(sceneBudgets)) {
     if (!scenes.includes(id)) out.push(`budgets.json lists '${id}', which is not a scene`);
     const budget = record(row) && record(row.budget) ? row.budget : {};
-    for (const [metric, key] of Object.entries(CEILING_KEYS)) {
+    for (const metric of CEILING_METRICS) {
       const v = budget[metric],
-        ceiling = brief.performance.perScene[key];
-      const count = metric === 'draws' || metric === 'triangles';
+        ceiling = brief.performance.perScene[metric];
+      const count = metric !== 'textureMiB' && metric !== 'heapMiB';
+      if (v === undefined && !REQUIRED_CEILINGS.has(metric)) continue;
       if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || (count && !Number.isInteger(v))) {
         out.push(
           `${id}.${metric} must be an explicit finite nonnegative ${count ? 'integer' : 'number'} in budgets.json`,

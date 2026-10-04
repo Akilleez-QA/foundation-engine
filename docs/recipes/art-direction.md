@@ -435,12 +435,18 @@ textures to the courtyard. On phones prefer `basic` (vignette and grade) or none
 | Post (`view.post`) at `full` | +10 fullscreen passes (`postDraws`, counted apart from `draws`) | the scene target and bloom mips, about 10 MiB at 1280×800 |
 | Point or spot light without shadow | none | none (fragment cost on every lit pixel) |
 
-A trial scene with a shadowed sun and lamps measured 32.5 MiB of textures against an 8 MiB budget. On phones, use
+A trial scene with a shadowed sun and lamps measured 32.5 MiB of textures against its template's 8 MiB budget.
+Two numbers bind textures: the scene's measured budget in `budgets.json` (8 MiB in every template scene without a
+shadow map: the smallest `perf:derive` step, not a device limit) and the brief's per-scene ceiling for its minimum
+device, the most any budget may be (`brief.performance.perScene.textureMiB`: 64 MiB for a phone by default, a
+provisional engine default until minimum devices are chosen, DV-01). A shadow map fits a phone's ceiling, but adding
+one raises the scene's measured budget, which needs a `Perf-Budget:` trailer and the author's agreement
+([add a budget](add-a-budget.md)). On phones, use
 **one shadowed sun (or night key light)**, with baked or unshadowed fill lights; mark small or always-moving things
 `Shadow({cast: false})` (they would redraw the maps every frame), and floors too (they only receive). The showcase
 courtyard splits its stonework into a ground mesh that casts nothing and a standing mesh that casts.
 
-**Contact shadows without a shadow map.** Where a scene cannot afford a map (a phone budget of 8 MiB textures), darken
+**Contact shadows without a shadow map.** Where a scene cannot afford a map (it must stay within an 8 MiB texture budget), darken
 the ground right against everything that stands on it, per vertex, and put a see-through disc under moving things:
 
 ```ts
@@ -651,8 +657,8 @@ Measured on software GL at 1280×800 (`npm run bench`); triangles are per frame:
 | Courtyard | the trial courtyard: 98 draws, 10 488 triangles | showcase courtyard (8 point lights, a shadowed night light, sky, scatter, bloom): 41 draws + 10 post, 27 860 triangles, 42.5 MiB textures |
 
 Part of the courtyard's 41 draws is the shadow pass (one per casting entity), and of its 42.5 MiB of textures, 32
-are the shadow map (the single biggest cost in this recipe) and about 10 the post targets. The garden keeps the phone-sized budget (8 MiB) by
-using contact darkening instead of a shadow map.
+are the shadow map (the single biggest cost in this recipe) and about 10 the post targets. The garden keeps its 8 MiB texture budget (the template
+default, well under the phone ceiling of 64 MiB) by using contact darkening instead of a shadow map.
 
 Draws matter more than triangles on phones: baking a hundred rocks into one mesh is one draw. Frame time under
 software GL says nothing about a device; measure on the devices the brief targets.

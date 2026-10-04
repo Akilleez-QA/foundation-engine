@@ -29,7 +29,9 @@ npm run bench -- --only main,level --no-check      # the start scene must stay i
 npm run perf:derive -- perf/runs/<run>.json
 ```
 
-The bench is headless, muted and isolated. By default it uses software GL at 1280×800 with `?quality=reference`. `perf:derive` prints, per scene, the worst of its windows plus 10 % headroom, rounded up to a readable step. The brief's per-scene ceilings (`brief.performance.perScene`, derived from the minimum device) are the most a budget may ever be.
+The bench is headless, muted and isolated. By default it uses software GL at 1280×800 with `?quality=reference`. `perf:derive` prints, per scene, the worst of its windows plus 10 % headroom, rounded up to a readable step (8 MiB for `textureMiB`, 10 for `draws`). The fixed counts the gate checks with no noise allowance (`contexts`, `postDraws`, `shadowPasses`) are copied exactly as measured, with no headroom: a scene that measured 0 shadow passes derives 0, and the sun alone 1.
+
+The brief's per-scene ceilings (`brief.performance.perScene`, derived from the minimum device; `TIER` in `src/author/build.ts`) are the most a budget may ever be, and `npm run new -- scene` writes them as an unmeasured row: `draws`, `postDraws`, `triangles`, `shadowCasters`, `shadowPasses`, `textureMiB` and `heapMiB`. They are the engine's provisional defaults, not device evidence (minimum devices are pending creator selection, DV-01); a brief lowers them with `performance.perScene`. For a phone minimum the defaults are 100 draws, 150 000 triangles, 64 MiB of textures, 32 MiB of heap and 100 shadow casters. `postDraws` (10) and `shadowPasses` (25: the sun plus four shadowed point lights) are the reference preset's own maximum on every device class: budgets are measured at the reference preset, and a phone's lighter tier already draws fewer (record those with `ports`). `lint:brief` fails a row above a ceiling.
 
 `perf:derive` only derives from evidence. It prints no row for a scene with a rejected or non-comparable window, names the scene and the reason on stderr, and exits 1. The common case is a scene that has ended before its active window: an idle player is hit, the run freezes, and the active window renders no frame (`inconclusive: the active window drew no frame`). Make the bench meet the scene in play: declare an existing restart interaction with `activeRestart`, or start the app on a title/menu scene and verify that the later active window remains playable. Then bench again. The gate also reports such a window as INCONCLUSIVE, never as a pass. A still scene whose windows draw nothing keeps its other metrics, with `draws` and `triangles` left unmeasured.
 
@@ -48,8 +50,8 @@ Paste the derived numbers into the scene's `budget`, and add provenance:
   (reference, high), 1 at `basic` (medium), 0 at `off` (low). Write it with ports:
   `"postDraws": 10, "ports": {"medium": {"postDraws": 1}, "low": {"postDraws": 0}}`
   ([post-processing](../guides/post-processing.md)).
-- `shadowPasses` counts shadow-map renders in the busiest frame (the sun or a spot light 1, a point light 6) and has
-  no noise allowance; `shadowCasters` counts their draws. See
+- `shadowPasses` counts shadow-map renders in the busiest frame (the sun or a spot light 1, a point light 6). It has
+  no noise allowance, and `perf:derive` copies it exactly (no headroom); `shadowCasters` counts their draws. See
   [Cost per light and per shadow](../guides/scene-look.md#cost-per-light-and-per-shadow).
 - The start scene has no entry cost, so leave `loadMiB` and `loadMs` out of its row.
 
