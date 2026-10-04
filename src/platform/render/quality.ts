@@ -385,8 +385,9 @@ const LOW_GPU =
   /(Mali-(4|T[678]|G[57]\d)\b|Adreno \(TM\) [345]\d\d|PowerVR|Intel.*HD Graphics [2-6]\d{2,3}\b|GC\d{3,4}|VideoCore)/i;
 const SOFTWARE_GL = /(SwiftShader|llvmpipe|softpipe|Software Rasterizer|Microsoft Basic Render)/i;
 
-/** Mobile GPU families (renderer strings). "Apple GPU" is absent on purpose: Safari reports it on Macs too. */
-const MOBILE_GPU = /\b(Mali|Immortalis|Adreno|PowerVR|Xclipse|Maleoon)\b/i;
+/** Mobile GPU families (renderer strings). "Apple GPU" is absent on purpose: Safari reports it on Macs too. Adreno X
+ *  (Snapdragon X laptops, "Adreno(TM) X1-85") is a laptop GPU, so it is not a mobile family. */
+const MOBILE_GPU = /\b(Mali|Immortalis|Adreno(?!\s*\(TM\)\s*X\d)|PowerVR|Xclipse|Maleoon)\b/i;
 /** Entry-level or old mobile GPUs: Mali-4xx/T6xx-T8xx/G3x/G5x, Adreno 3xx-5xx and 60x-61x, PowerVR. */
 const MOBILE_ENTRY_GPU = /(Mali-(4\d\d|T[678]\d\d|G[35]\d)\b|Adreno \(TM\) ([345]\d\d|6[01]\d)\b|PowerVR)/i;
 const rank = (p: QualityPreset): number => PRESETS.indexOf(p);
@@ -403,7 +404,8 @@ export interface DeviceClassCap {
  *
  *  - Low: an entry-level mobile GPU, 2 GB or less memory, or a texture limit under 4096.
  *  - Medium: 4 GB or less memory, 4 or fewer cores, or data saver.
- *  - Otherwise no limit: a capable phone starts where it did before.
+ *  - High otherwise: a capable phone never starts on Reference (sustained thermal throttling; Reference's 16 light
+ *    slots, 4 shadowed lights and full post-processing).
  *
  * It only lowers a FIRST start. Pins, saved choices and a tier the creator declared in the brief are never limited.
  */
@@ -420,7 +422,7 @@ export function deviceClassCap(s: DeviceSignals | undefined): DeviceClassCap | u
   const head = `device class: mobile GPU ${s.gpu}`;
   if (low.length) return {preset: 'low', reasons: [head, ...low, ...medium]};
   if (medium.length) return {preset: 'medium', reasons: [head, ...medium]};
-  return undefined;
+  return {preset: 'high', reasons: [head]};
 }
 
 /**

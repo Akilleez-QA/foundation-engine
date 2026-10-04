@@ -180,6 +180,14 @@ Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c
   unchanged. The start is unsaved, and saved choices are never rewritten. `BuildBrief.quality` gains
   `tierDeclared`. *To do:* nothing to keep the new default. To start every device on one tier, declare it:
   `quality: { tier: 'reference' }`. Players can still choose any preset.
+- **Capable mobile GPUs start on `high` at most (ADR 0079 amendment).** A mobile GPU family with no other constraint
+  (for example an 8 GB Adreno 740 or Mali-G715) now starts on `high`, never `reference`, when the brief does not
+  declare `quality.tier`: phones throttle under sustained load, and `reference` brings 16 light slots, 4 shadowed
+  lights and full post-processing. Adreno X laptop GPUs are not a mobile family. The probe now also runs on an
+  Android or iOS browser that reports 8 GB and more than 4 cores; a desktop Chromium with those still skips it.
+  *Affected:* first runs on capable phones and Android tablets get 8 light slots, 2 shadowed lights and `high`
+  post-processing. Desktops, iPhone-class devices, gates and benches are unchanged. *To do:* nothing; declare
+  `quality: { tier: 'reference' }` to start every device on it. A declared tier, a saved choice and a pin still win.
 
 ## 0.3.0 — proposed; author decides
 

@@ -181,8 +181,14 @@ test('device class: a constrained mobile GPU starts lower; desktop and capable p
   });
   assert.equal(detectPreset({...ADRENO_740_8GB, cores: 4}).preset, 'medium', '4 cores');
   assert.equal(detectPreset({...ADRENO_740_8GB, saveData: true}).preset, 'medium', 'data saver');
-  // 8 GB Adreno 740, Mali-G710, Immortalis: no limit, today's High.
+  // 8 GB Adreno 740, Mali-G710/G715, Immortalis: High at most, never Reference.
+  assert.deepEqual(deviceClassCap(ADRENO_740_8GB), {
+    preset: 'high',
+    reasons: ['device class: mobile GPU ' + ADRENO_740_8GB.gpu],
+  });
+  assert.equal(deviceClassCap({...ADRENO_740_8GB, gpu: 'Mali-G715 MC7'})?.preset, 'high');
   assert.equal(detectPreset(ADRENO_740_8GB).preset, 'high');
+  assert.equal(detectPreset({...ADRENO_740_8GB, gpu: 'Mali-G715 MC7'}).preset, 'high');
   assert.equal(detectPreset({...ADRENO_740_8GB, gpu: 'Mali-G710 MC10'}).preset, 'high');
   assert.equal(detectPreset({...ADRENO_740_8GB, gpu: 'Immortalis-G715'}).preset, 'high');
   // iPhone-class: "Apple GPU" is ambiguous with Safari on a Mac, so no limit (a documented gap).
@@ -197,6 +203,14 @@ test('device class: a constrained mobile GPU starts lower; desktop and capable p
     {coarsePointer: false, gpu: 'VideoCore IV', maxTextureSize: 2048},
     {coarsePointer: false, maxTextureSize: 16384},
     {coarsePointer: false, deviceMemory: 8, cores: 10, gpu: 'Apple GPU', maxTextureSize: 16384},
+    {coarsePointer: false, deviceMemory: 8, cores: 12, gpu: 'Qualcomm(R) Adreno(TM) X1-85 GPU', maxTextureSize: 16384},
+    {
+      coarsePointer: false,
+      deviceMemory: 8,
+      cores: 12,
+      gpu: 'ANGLE (Qualcomm, Adreno (TM) X1-85)',
+      maxTextureSize: 16384,
+    },
   ] satisfies DeviceSignals[])
     assert.equal(deviceClassCap(s), undefined, s.gpu ?? 'unreported');
   // Pointer never decides: the same Mali without touch (an ARM Chromebook) starts the same.
@@ -259,8 +273,33 @@ test('device class under an authored default: only an undeclared tier is limited
     'medium',
   );
   assert.equal(createQuality({initialPreset: 'low', deviceClassSafety: true, signals: () => PHONE}).preset, 'low');
-  // Desktop and iPhone-class keep the authored start, as 'default'.
-  for (const signals of [RTX4080, SWIFTSHADER, IPHONE, ADRENO_740_8GB]) {
+  // A capable mobile GPU never starts on Reference: an 8 GB Adreno 740 and an 8 GB Mali-G715 start High.
+  for (const gpu of [ADRENO_740_8GB.gpu, 'ANGLE (ARM, Mali-G715 MC7, OpenGL ES 3.2)']) {
+    const phone = createQuality({
+      initialPreset: 'reference',
+      deviceClassSafety: true,
+      signals: () => ({...ADRENO_740_8GB, gpu}),
+    });
+    assert.equal(phone.preset, 'high', gpu);
+    assert.equal(phone.source, 'detected', gpu);
+    assert.deepEqual(phone.settings.detected?.reasons, ['device class: mobile GPU ' + gpu]);
+    assert.equal(phone.knob('lights.local-max'), 8);
+    assert.equal(phone.knob('lights.shadowed-max'), 2);
+  }
+  // An authored High or lower is kept.
+  assert.equal(
+    createQuality({initialPreset: 'high', deviceClassSafety: true, signals: () => ADRENO_740_8GB}).source,
+    'default',
+  );
+  // Desktop (including a Snapdragon X laptop's Adreno X1) and iPhone-class keep the authored start, as 'default'.
+  const adrenoX: DeviceSignals = {
+    coarsePointer: false,
+    deviceMemory: 8,
+    cores: 12,
+    gpu: 'ANGLE (Qualcomm, Qualcomm(R) Adreno(TM) X1-85 GPU Direct3D11 vs_5_0 ps_5_0, D3D11)',
+    maxTextureSize: 16384,
+  };
+  for (const signals of [RTX4080, SWIFTSHADER, IPHONE, adrenoX]) {
     const d = createQuality({initialPreset: 'reference', deviceClassSafety: true, signals: () => signals});
     assert.equal(d.preset, 'reference', signals.gpu);
     assert.equal(d.source, 'default', signals.gpu);
