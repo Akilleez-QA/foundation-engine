@@ -14,9 +14,9 @@ Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c
   links and model looks moved out of the `runtime` chunk into `scene-model-chunk`, loaded only by a scene with a
   `Model` entity: while it prepares when the scene starts with one, else when a system first spawns one (until then
   `ctx.modelState` reports `loading`). Production builds, `runtime` chunk before → after (gzip -9 in brackets):
-  blank 484,661 → 460,268 B (126,020 → 118,007), explorer 484,539 → 460,147 B (125,934 → 117,935), showcase
-  475,420 → 451,046 B (123,046 → 115,107). Headroom under the 500 kB rule grows from 15.3 kB to 39.7 kB (blank). The
-  model chunk is 26,019 B (8,988 gzip); a model scene loads about 1.6 kB more in all. First-load JS is unchanged.
+  blank 486,973 → 462,583 B (126,803 → 118,838), explorer 486,849 → 462,461 B (126,732 → 118,753), showcase
+  477,815 → 453,433 B (123,839 → 115,921). Headroom under the 500 kB rule grows from 13.0 kB to 37.4 kB (blank). The
+  model chunk is 26,020 B (9,001 gzip); a model scene loads about 1.6 kB more in all. First-load JS is unchanged.
   The 500 kB limit is not raised. *Affected:* a scene whose first `Model` is spawned by a system sees its models one
   chunk fetch later.
 

@@ -49,8 +49,7 @@ requests the chunk on that frame. Until it arrives, `ctx.modelState` reports
 answers as for a model the owner has not admitted yet (`model-pending.ts`); if the
 chunk fails to load, the visit reports it once and models report `failed`. After
 the first load every later visit starts its models synchronously. Blank template
-build: the `runtime` chunk fell from 484,661 to 460,268 bytes (126,020 to 118,007
-gzip); the model chunk is 26,019 bytes (8,988 gzip).
+build: the `runtime` chunk fell from 486,973 to 462,583 bytes (126,803 to 118,838 gzip); the model chunk is 26,020 bytes (9,001 gzip).
 
 ## Ordering and exact presentation
 
