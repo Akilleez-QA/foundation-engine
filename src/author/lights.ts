@@ -41,6 +41,9 @@ export interface PointLightData {
   essential: boolean;
   /** False keeps the slot but gives no light (intensity 0, no recompile). */
   visible: boolean;
+  /** Ask for a shadow (VIS-03): honoured in a scene with `sceneShadows()` while a shadowed slot is free (the
+   *  `lights.shadowed-max` knob bounds them). Read when the light is admitted to a slot. */
+  shadow: boolean;
 }
 export interface SpotLightData extends PointLightData {
   /** Half-angle of the cone in radians, (0, π/2]. */
@@ -58,6 +61,7 @@ export const POINT_LIGHT_DEFAULTS: Readonly<PointLightData> = Object.freeze({
   decay: 2,
   essential: false,
   visible: true,
+  shadow: false,
 });
 export const SPOT_LIGHT_DEFAULTS: Readonly<SpotLightData> = Object.freeze({
   ...POINT_LIGHT_DEFAULTS,
@@ -82,6 +86,7 @@ function checkPoint(kind: string, d: PointLightData): void {
   if (!within(d.decay, 0, LIGHT_LIMITS.decay)) fail(kind, `decay must be in [0, ${LIGHT_LIMITS.decay}]`);
   if (typeof d.essential !== 'boolean') fail(kind, 'essential must be a boolean');
   if (typeof d.visible !== 'boolean') fail(kind, 'visible must be a boolean');
+  if (typeof d.shadow !== 'boolean') fail(kind, 'shadow must be a boolean');
 }
 /** Throws, naming the field, on point-light data the renderer would not draw as written. */
 export function validatePointLight(d: PointLightData): void {

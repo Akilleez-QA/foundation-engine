@@ -101,6 +101,13 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
 
 ### Changes
 
+- **Optional shadows (VIS-03).** `defineScene({ shadows: sceneShadows({ cast, receive }) })` turns on shadow maps for a
+  scene; the environment's sun casts with `directional.shadow: { extent, softness }`, local lights with
+  `PointLight({ shadow: true })` / `SpotLight({ shadow: true })`, and `Shadow({ cast, receive })` overrides one entity.
+  Shadowed local lights are chosen once per visit and bounded by the new `lights.shadowed-max` knob (4/2/1/0,
+  unwired); maps redraw only when a caster or light changes. The bench's `shadowCasters` and `shadowDrawsIdle` rows now
+  measure real shadow passes for scenes that opt in. Scenes without `sceneShadows()` are unchanged. See the
+  [scene look guide](docs/guides/scene-look.md#shadows).
 - **Optional point and spot lights (VIS-02).** `PointLight` and `SpotLight` components on an entity with a
   `Transform`, in scenes that opt in with `defineScene({ lights: sceneLights({ point, spot }) })` (at most 16 and 4).
   Each visit creates its slots once, so spawning or despawning a light never recompiles shaders; overflow is refused
