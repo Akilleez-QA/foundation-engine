@@ -16,8 +16,15 @@
  *   time computed from the data alone (identical on every preset).
  */
 import {component, type ComponentInit, type Entity, type World} from '../core/ecs/world';
-import {EMITTER_ID, PARTICLE_LIMITS, type EmitterData} from './particle-contract';
-export {PARTICLE_LIMITS, type EmitterData, type EmitterMode, type EmitterBlending} from './particle-contract';
+import {EMITTER_ID, PARTICLE_LIMITS, type EmitterData, type EmitterFrames} from './particle-contract';
+export {
+  PARTICLE_LIMITS,
+  type EmitterData,
+  type EmitterMode,
+  type EmitterBlending,
+  type EmitterFrames,
+  type FlipbookMode,
+} from './particle-contract';
 
 export const EMITTER_DEFAULTS: Readonly<EmitterData> = Object.freeze({
   mode: 'burst',
@@ -36,6 +43,7 @@ export const EMITTER_DEFAULTS: Readonly<EmitterData> = Object.freeze({
   color: [0xffffff],
   opacity: [1, 0],
   texture: '',
+  frames: null,
   blending: 'additive',
   essential: false,
   despawn: false,
@@ -51,6 +59,9 @@ const copy = (d: Readonly<EmitterData>): EmitterData =>
     size: [...d.size],
     color: [...d.color],
     opacity: [...d.opacity],
+    // An omitted `frames` is none; an object is copied, so initialisers never share it; anything else is kept for
+    // validation to name.
+    frames: d.frames == null ? null : typeof d.frames === 'object' ? {...d.frames} : d.frames,
   }) as EmitterData;
 
 /** The emitter component. Use {@link defineEmitter} for a checked initialiser. */
@@ -110,10 +121,62 @@ export function emitterProblem(d: EmitterData): string | null {
     (d.texture !== '' && !KEBAB.test(d.texture))
   )
     return "emitter: texture must be '' or a kebab-case texture asset id";
+  const frames = framesProblem(d.frames, d.texture);
+  if (frames) return frames;
   if (d.blending !== 'additive' && d.blending !== 'normal') return 'emitter: blending must be additive or normal';
   if (typeof d.essential !== 'boolean') return 'emitter: essential must be boolean';
   if (typeof d.despawn !== 'boolean') return 'emitter: despawn must be boolean';
   return null;
+}
+
+const gridSide = (n: unknown) =>
+  Number.isInteger(n) && (n as number) >= 1 && (n as number) <= PARTICLE_LIMITS.frameGrid;
+function framesProblem(f: EmitterFrames | null | undefined, texture: string): string | null {
+  if (f == null) return null; // data built before `frames` existed (or without it) has no flipbook
+  if (!f || typeof f !== 'object') return 'emitter: frames must be null or { cols, rows, mode }';
+  if (!gridSide(f.cols) || !gridSide(f.rows))
+    return `emitter: frames.cols and frames.rows must be integers in [1, ${PARTICLE_LIMITS.frameGrid}]: a sprite sheet is at most ${PARTICLE_LIMITS.frameGrid}×${PARTICLE_LIMITS.frameGrid} frames; split a longer sequence or drop frames`;
+  if (f.count !== undefined && (!Number.isInteger(f.count) || f.count < 1 || f.count > f.cols * f.rows))
+    return 'emitter: frames.count must be an integer in [1, cols × rows]';
+  if (f.mode !== 'over-life' && f.mode !== 'loop' && f.mode !== 'random-start')
+    return 'emitter: frames.mode must be over-life, loop or random-start';
+  if (f.fps !== undefined && !(within(f.fps, 0, PARTICLE_LIMITS.frameFps) && f.fps > 0))
+    return `emitter: frames.fps must be in (0, ${PARTICLE_LIMITS.frameFps}] frames per second`;
+  if (f.mode !== 'over-life' && f.fps === undefined) return 'emitter: frames.fps is required for loop and random-start';
+  if (texture === '') return 'emitter: frames needs a texture: the sprite sheet';
+  return null;
+}
+
+/**
+ * The frame a flipbook particle shows (an integer in [0, count)), from its age and life in seconds and its start frame
+ * (0 unless 'random-start'). Pure and allocation-free: the simulation calls it per particle per drawn frame.
+ */
+export function flipbookFrame(
+  mode: EmitterFrames['mode'],
+  count: number,
+  fps: number,
+  age: number,
+  life: number,
+  start: number,
+): number {
+  if (count <= 1) return 0;
+  if (mode === 'over-life') {
+    const f = Math.floor((age <= 0 ? 0 : age >= life ? 1 : age / life) * count);
+    return f >= count ? count - 1 : f;
+  }
+  const f = (start + Math.floor((age > 0 ? age : 0) * fps)) % count;
+  return f < 0 ? 0 : f;
+}
+
+/**
+ * The texture coordinate a quad corner (u, v in [0, 1], v up) samples for `frame` of a `cols` × `rows` sheet: the
+ * vertex shader's formula (scene-particles.ts), for tests and tools. Frame 0 is the image's top-left cell, frames
+ * run left to right then down; textures are uploaded flipped (v up), so row r from the top starts at v = (rows-1-r)/rows.
+ */
+export function flipbookUv(frame: number, cols: number, rows: number, u: number, v: number): [u: number, v: number] {
+  const row = Math.floor((frame + 0.5) / cols),
+    col = frame - row * cols;
+  return [(col + u) / cols, (rows - 1 - row + v) / rows];
 }
 
 /** Throws on data the runtime would not simulate as written, naming the field. */
