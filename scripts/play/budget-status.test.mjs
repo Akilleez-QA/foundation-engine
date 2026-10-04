@@ -4,6 +4,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
 import {
+  activityLine,
   budgetAt,
   budgetLine,
   budgetStatus,
@@ -105,4 +106,20 @@ test('play:snap summary: a phone view prints its draws, verdict and measured fps
 test('play:snap and play:script evidence paths are relative to the repository, as the CLI prints them', () => {
   assert.equal(evidencePath(join(OUT, 'restart', '01-start.png')), 'playtest/latest/restart/01-start.png');
   assert.equal(evidencePath(join(ROOT, 'playtest', 'latest', 'probe.json')), 'playtest/latest/probe.json');
+});
+
+// C5 (2026-10-03 acceptance): Calm motion could not be checked in a browser. The snap's still window says what moved.
+test('play:snap activity line: renders, picture and particles; with Calm, whether motion and emitters stopped', () => {
+  const still = {ms: 1500, renders: 0, pictureChanged: false, particles: {emitters: 2, live: 0, spawned: 0, draws: 0}};
+  assert.equal(
+    activityLine(still),
+    'still 1.5 s with no input: 0 renders, picture unchanged, 2 emitter(s), 0 live, 0 spawned',
+  );
+  assert.match(activityLine(still, true), /motion stopped, emitters stopped/);
+  const busy = {ms: 1500, renders: 40, pictureChanged: true, particles: {emitters: 1, live: 9, spawned: 8, draws: 1}};
+  assert.match(activityLine(busy, true), /motion NOT stopped, emitters NOT stopped/);
+  // A DOM-only animation (no frame drawn) still counts as motion: the picture changed.
+  assert.match(activityLine({...still, pictureChanged: true}, true), /motion NOT stopped, emitters stopped/);
+  assert.match(activityLine({...still, particles: null}, true), /no particles · motion stopped, emitters stopped/);
+  assert.match(activityLine(still, false), /CALM NOT ON/);
 });

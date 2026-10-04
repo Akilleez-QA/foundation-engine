@@ -215,6 +215,61 @@ export function budgetAt(budget, preset = 'reference') {
 /** The counts play:snap judges, in budget-row order (the gate's count metrics it can measure on a dev server). */
 export const SNAP_METRICS = ['draws', 'postDraws', 'triangles', 'shadowCasters', 'shadowPasses', 'textureMiB'];
 
+/**
+ * The preset `play:snap --mobile` pins by default: what the device-class start rule (ADR 0079,
+ * src/platform/render/quality.ts deviceClassCap) gives a minimum-class phone (a mobile GPU with 4 GB of memory or 4
+ * cores): medium, so the phone picture shows medium's basic post (no bloom), fewer light slots and one shadowed local
+ * light. A capable phone starts on high and an entry-level one on low: pass `--quality high` or `--quality low`.
+ * An automated browser never runs detection (it would start on the brief's default, usually reference).
+ * scripts/play/phone-preset.test.ts keeps this equal to the rule.
+ */
+export const PHONE_PRESET = 'medium';
+export const PRESETS = ['reference', 'high', 'medium', 'low'];
+
+/** The preset a view runs at: `--quality` for every view, else the phone default for the mobile view, else no pin. */
+export function viewPreset(name, quality) {
+  if (quality !== undefined && !PRESETS.includes(quality))
+    throw Error(`--quality must be one of ${PRESETS.join(', ')} (got ${quality})`);
+  return quality ?? (name === 'mobile' ? PHONE_PRESET : null);
+}
+
+/** Copies, emitters and pictures over a still window with no input: what keeps moving on its own. */
+export async function activity(b, ms = 1500) {
+  const read = () =>
+    b.evaluate(`({loop: window.engine.loop(), particles: window.engine.particles ? window.engine.particles() : null})`);
+  const before = await read();
+  const first = await b.page.screenshot({type: 'png'});
+  await sleep(ms);
+  const after = await read();
+  const second = await b.page.screenshot({type: 'png'});
+  const p0 = before.particles,
+    p1 = after.particles;
+  return {
+    ms,
+    renders: after.loop.renders - before.loop.renders,
+    pictureChanged: !first.equals(second),
+    particles: p1
+      ? {emitters: p1.emitters, live: p1.live, spawned: p1.spawned - (p0?.spawned ?? 0), draws: p1.draws}
+      : null,
+  };
+}
+
+/** One line for a still window's activity; with Calm on, whether motion and emitters stopped. */
+export function activityLine(a, calm) {
+  const p = a.particles;
+  const parts = [
+    `${a.renders} renders`,
+    a.pictureChanged ? 'picture changed' : 'picture unchanged',
+    p ? `${p.emitters} emitter(s), ${p.live} live, ${p.spawned} spawned` : 'no particles',
+  ];
+  const head = `still ${(a.ms / 1000).toFixed(1)} s with no input: ${parts.join(', ')}`;
+  if (calm === undefined) return head;
+  if (!calm) return `${head} · CALM NOT ON (the page did not apply reduced motion)`;
+  const motion = a.renders === 0 && !a.pictureChanged;
+  const emitters = !p || p.spawned === 0;
+  return `${head} · motion ${motion ? 'stopped' : 'NOT stopped'}, emitters ${emitters ? 'stopped' : 'NOT stopped'} (a person judges whether what still moves is decorative)`;
+}
+
 export const NOT_MEASURED = 'not measured (no frames rendered)';
 /**
  * Budget status of a measured window against the game's budgets.json, at the preset the page ran (`preset`, default
