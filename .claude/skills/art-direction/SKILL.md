@@ -20,7 +20,15 @@ pictures yourself, and the checklist below.
    Haze `color: 'sky'`.
 4. **Haze**: `near` just past the play area seen from the camera, `far` before the ground ends.
 5. **Camera**: a lower pitch and a longer distance than top-down; the scene's `view.camera` set to the pose the camera
-   system settles on; fill a phone's extra height with something worth seeing.
+   system settles on.
+   **Phone framing** (recipe section 4, "Phone framing"): on 390×844 a `minWidthFov` of 55 widens the vertical view
+   to about 97°, so a 1.5 m player at distance 16 is only about 35 px tall. Aim for the player at least 48 px and each
+   pickup at least 24 px: on portrait, bring the camera closer and raise the pitch with the camera kit's per-frame
+   `options` (`options: ctx => (ctx.view.aspect < 1 ? {distance: 10, pitch: 0.9} : {})`), lower `minWidthFov` when
+   the whole play area need not show at once, or scale the subject up. Fill the top (a steeper pitch keeps the horizon
+   near the top edge; tall things behind the play area; a sky with discs or stars) and the bottom (a path, hedge or
+   rocks in front of the play area). Check the phone picture of `play:snap --mobile` for those sizes and for a top and
+   bottom quarter that are more than flat sky or bare ground.
 6. **Forms**: replace boxes with `rock`, `tree`, `prism`, `ring`, `box`, `roof` from `forms.ts`, all baked into one
    `Mesh` per scenery group. Keep `Solid`/`Walls` for collision.
 7. **Lights and shadows** (recipe section 6): the environment holds the darkness (dim ambient, palette colours left
@@ -30,6 +38,13 @@ pictures yourself, and the checklist below.
    and 18 draws, so on phones bake or leave fills unshadowed, or use contact darkening and a shadow disc instead. Tone
    mapping `'aces'` once there are point lights. Keep `emissiveIntensity` about 1: 2 to 6 washes out to white under
    tone mapping and clips without it; every glow needs something lit beside it.
+   **Craft** (recipe section 6, "Four common misses"): flat sides: key light 45 to 135 degrees round from the camera
+   seen from above, two-colour ambient, 6 or more sides on round forms, `k: 0.8` on faces away from the key. Faint
+   shadows: the key's share on the ground (`intensity × sun height`) at least the ambient intensity, a tight
+   `shadow.extent`, and a shadow disc under floating things. A glow that lights nothing: a `PointLight` on the glowing
+   entity, `essential: true` on the one or two that matter (`low` admits 2 per kind), and a `bakeLight` pool under each
+   for when its light is refused. `bakeLight` is per vertex and multiplies the vertex colour: a ground needs grid cells
+   no larger than about a third of the pool's `range`, and a near-black colour stays black.
 8. **Repeated things** (moss, grass, pickets, hedge blobs) are one `defineScatter` of a small mesh (`blobMesh`), with
    `essential: true` where gaps would show.
 9. **Textures** for doors, crates and floors on `Shape`s, painted by a `game/tools/` script (`png(name, size, paint)`).
@@ -52,8 +67,15 @@ pictures yourself, and the checklist below.
 
 Report: before and after pictures, what changed, the checklist result, draws, triangles and texture memory against the
 budget. The engine has tone mapping, point and spot lights, shadows, gradient skies, exp2 haze, post-processing (bloom,
-vignette, grade: `view.post`, docs/guides/post-processing.md), `Material` on a `Mesh` and instanced scatter. Not
-available yet (say so instead of promising it): textures on a `Mesh`, per-copy scatter motion, scattering a `Model`.
-The recipe's last table lists today's workaround. When the author agrees the look needs more (a custom shader, a
-loader), a game can opt into `@kits/three`; the game owns that code across three.js upgrades:
-docs/recipes/use-three-directly.md.
+vignette, grade: `view.post`, docs/guides/post-processing.md), `Material` on a `Mesh` and instanced scatter. Bloom is
+built in: use `view.post`, never `@kits/three`, for it. Not available yet (say so instead of promising it): textures on
+a `Mesh`, per-copy scatter motion, scattering a `Model`. The recipe's last table lists today's workaround. When the
+author agrees the look needs more (a post pass beyond the built-in tiers, a custom shader, a loader), a game can opt
+into `@kits/three`; the game owns that code across three.js upgrades: docs/recipes/use-three-directly.md.
+
+**Reusing the showcase for another game** (recipe, "Making a different game from the showcase"): renaming or removing a
+palette key breaks `forms.test.ts` and the other files that use it (change values freely; rename in every user; keep
+the `bakeLight` test's light warm); delete the courtyard, garden, embers and texture files together once your scene
+replaces them, and fix the brief's `by:` files and the budget rows; the copied budgets note's `showcase/` prefix is
+wrong for `game/` (keys have no prefix); the template's budgets are your starting budgets, so a redesigned kept scene
+that needs more is a raise with a `Perf-Budget:` trailer in the message's last paragraph, agreed with the author.

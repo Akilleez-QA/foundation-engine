@@ -21,6 +21,10 @@ game/playtest/jump.json: 1 problem(s):
 `scene` and every `goto` name a scene the game has. A criterion with `how: 'playtest'` and a malformed script fails in
 `npm run play:criteria` without starting a browser.
 
+`npm run play:playtests` runs every script in `game/playtest/` and every `how: 'playtest'` criterion's file, on one
+dev server, and writes `playtest/latest/playtests.json`. `npm run gate` runs it after the smoke snap, so a failing
+playtest fails the gate (and `npm run gate:templates` and CI, which run the gate per template).
+
 ## 1. The file
 
 The arcade template's `game/playtest/best-reload.json`:

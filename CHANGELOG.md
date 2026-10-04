@@ -10,6 +10,16 @@ Every new framework below is optional: a game that does not use it is unchanged.
 Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
 (#122 onward). None of it is in that candidate.
 
+- **Art-direction guidance after the acceptance trials.** The art-direction recipe and skill gain phone framing
+  (portrait field of view, camera distance, subject sizes at 390×844, filling the top and bottom, a `play:snap
+  --mobile` check, with a before/after picture), four craft fixes (flat sides, faint shadows, a glow that lights
+  nothing, `bakeLight` needing vertices and a non-black base) and notes on reusing the showcase template (palette keys
+  its tests use, files safe to delete, the copied budgets note, template budgets as the game's starting budgets). The
+  new-game skill and AGENTS.md route look work to the art-direction skill. Bloom is documented as built in
+  (`view.post`) everywhere; `@kits/three` is for passes beyond it. `lint:docs-claims` now also catches "bloom needs
+  three.js" phrasings. `add-a-budget` notes that `Perf-Budget:` lines must be in the message's last paragraph. Docs and
+  a lint only: no engine or template behaviour changed.
+
 - **Model presentation is a lazy chunk (bundle headroom).** The scene model owner, rig capture, attachments, pose
   links and model looks moved out of the `runtime` chunk into `scene-model-chunk`, loaded only by a scene with a
   `Model` entity: while it prepares when the scene starts with one, else when a system first spawns one (until then
