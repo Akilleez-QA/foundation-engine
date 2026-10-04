@@ -44,7 +44,7 @@ class Skeleton:
         self.head = {b.name: b.head_local.copy() for b in arm.data.bones}
         self.tail = {b.name: b.tail_local.copy() for b in arm.data.bones}
 
-    def local(self, world, hips=None):
+    def local(self, world, hips=None, locations=None):
         """world: bone -> armature-space delta rotation (applied to the rest orientation)."""
         out = {}
         for bone in self.rest:
@@ -58,9 +58,10 @@ class Skeleton:
             w = world.get(bone, wp)  # an unlisted bone follows its parent (identity local rotation)
             q = self.rest[bone].inverted() @ wp.inverted() @ w @ self.rest[bone]
             loc = Vector((0, 0, 0))
-            if bone == 'spine' and hips is not None:
-                # Bone-local translation of the hips bone, expressed from an armature-space offset.
-                loc = self.rest[bone].inverted() @ hips
+            offset = hips if bone == 'spine' and hips is not None else (locations or {}).get(bone)
+            if offset is not None:
+                # Bone-local translation from an armature-space offset (the parent is at rest orientation).
+                loc = self.rest[bone].inverted() @ offset
             out[bone] = (loc, q.normalized(), Vector((1, 1, 1)))
         return {b: transform_to_json(t) for b, t in out.items() if transform_to_json(t)}
 
@@ -170,4 +171,5 @@ def main():
     print(f'pose-to-pose: wrote {len(poses)} poses -> {args.out}, {len(tests)} test poses -> {args.test_out}')
 
 
-run(main)
+if __name__ == '__main__':
+    run(main)

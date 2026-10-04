@@ -139,3 +139,9 @@ test('weights decode as normalised four-influence rows', () => {
   const weights = readAccessor(gltf, gltf.json.meshes[0].primitives[0].attributes.WEIGHTS_0);
   assert.ok(weights.every(w => w.length === 4 && Math.abs(w.reduce((a, b) => a + b, 0) - 1) < 2e-3));
 });
+
+test('a bone that shares its name with another node is ambiguous for name lookups', async () => {
+  const file = variant('duplicate', ({json}) => (json.nodes.find(n => n.mesh !== undefined).name = 'hand.R'));
+  const failures = (await validate(file, DEFINITION, {provenance: false})).failures.join('\n');
+  assert.match(failures, /node name hand\.R is used by 2 nodes; bones need unique names/);
+});

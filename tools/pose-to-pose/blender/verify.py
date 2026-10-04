@@ -106,7 +106,7 @@ def main():
     if len(imported) != 1:
         raise PipelineError(f'expected one armature after re-import, found {len(imported)}')
     imp = imported[0]
-    imp_meshes = [o for o in bpy.context.scene.objects if o.type == 'MESH']
+    imp_meshes = [o for o in bpy.context.scene.objects if o.type == 'MESH' and o.visible_get()]
     actions = {a.name: a for a in bpy.data.actions}
     names = [c['name'] for c in manifest['clips']]
     found = {n: actions.get(n) or next((a for a in actions.values() if a.name.rsplit('_', 1)[0] == n), None)

@@ -41,12 +41,15 @@ def main():
     glb = Path(args.glb).resolve()
     manifest = read_json(glb.with_suffix('.clips.json'))
     clear_scene()
+    scene = bpy.context.scene
+    scene.render.fps, scene.render.fps_base = manifest['fps'], 1  # the importer maps seconds to frames at this rate
     bpy.ops.import_scene.gltf(filepath=str(glb))
     arms = [o for o in bpy.context.scene.objects if o.type == 'ARMATURE']
     if len(arms) != 1:
         raise PipelineError(f'expected one armature in {glb}, found {len(arms)}')
     arm = arms[0]
-    meshes = [o for o in bpy.context.scene.objects if o.type == 'MESH']
+    # The importer adds a hidden bone-shape mesh; only visible meshes are the model.
+    meshes = [o for o in bpy.context.scene.objects if o.type == 'MESH' and o.visible_get()]
     lo, hi = world_bounds(meshes)
     lo.z = min(lo.z, 0)
     setup_render(args.tile)

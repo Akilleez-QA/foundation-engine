@@ -258,6 +258,12 @@ export async function validate(file, definitionInput, options = {}) {
   const animated = new Set((json.animations ?? []).flatMap(a => a.channels.map(c => c.target.node)));
   const joints = new Set(skins.length ? skins.flatMap(s => s.joints) : animated);
   report.bones = joints.size;
+  // Engine lookups (sockets, pose overrides, inspection) go by node name: a joint must not share its name.
+  for (const j of joints) {
+    const same = nodes.filter(n => n.name === nodes[j].name).length;
+    if (same > 1) failures.push(`node name ${nodes[j].name} is used by ${same} nodes; bones need unique names`);
+  }
+  const jointNamed = name => [...joints].find(j => nodes[j].name === name) ?? nodes.findIndex(n => n.name === name);
   if (joints.size > def.skeleton.maxBones)
     failures.push(`${joints.size} bones exceed the declared limit of ${def.skeleton.maxBones}`);
   const rootName = def.skeleton.root;
@@ -338,7 +344,7 @@ export async function validate(file, definitionInput, options = {}) {
     }
     entry.measuredDuration = Number(duration.toFixed(6));
     for (const bone of clip.controls) {
-      const target = nodes.findIndex(n => n.name === bone);
+      const target = jointNamed(bone);
       let motion = 0;
       for (const channel of animation.channels.filter(c => c.target.node === target)) {
         const out = readAccessor(gltf, animation.samplers[channel.sampler].output);
