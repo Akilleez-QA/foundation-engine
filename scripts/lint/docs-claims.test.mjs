@@ -41,6 +41,27 @@ test('a correct "not yet" about a feature that has not shipped passes', () => {
   assert.deepEqual(check(claims, FEATURES).errors, []);
 });
 
+test('sending bloom to three.js claims the engine has no bloom', () => {
+  for (const text of [
+    'When they cannot (bloom or another EffectComposer pass, a custom shader), opt into `@kits/three`.',
+    'A game that opts into `@kits/three` gets an EffectComposer with bloom, custom shaders and loaders.',
+    'For a glow halo, bloom needs `@kits/three` and an EffectComposer.',
+    'Use this kit for everything the engine cannot say yet: bloom and other post-processing passes.',
+  ])
+    assert.deepEqual(
+      claimsIn(text).map(c => c.id),
+      ['POST-01'],
+      text,
+    );
+  const shipped = FEATURES.map(f => (f.id === 'POST-01' ? {...f, shipped: true} : f));
+  assert.equal(check(claimsIn('Bloom requires three.js and an EffectComposer.\n'), shipped).errors.length, 1);
+  for (const text of [
+    'Bloom is built in: ask for it with `view.post`; `@kits/three` is for passes beyond the built-in tiers.',
+    'The fixture runs UnrealBloom through an EffectComposer in software GL.',
+  ])
+    assert.deepEqual(claimsIn(text), [], text);
+});
+
 test('a list after a lead claims each item, across wrapped lines', () => {
   const text =
     'Report the result. Not available yet in the engine (say so): local lights,\ncast shadows, tone mapping and bloom.\n';

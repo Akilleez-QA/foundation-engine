@@ -2,16 +2,18 @@
 
 The engine draws with three.js. Most looks are plain data on `@engine` (environment, materials, particles, models):
 prefer those when they can say what you want, because then quality tiers, render backends and three.js upgrades stay
-the engine's problem. When they cannot (an EffectComposer pass, a custom shader, a loader or controls, lights or shadows beyond the
-engine's `PointLight`, `SpotLight` and `sceneShadows`), opt the
-game into **`@kits/three`** and use three.js itself.
+the engine's problem. Bloom, vignette and grade are built in: a scene asks for them with
+`view.post` ([post-processing](../guides/post-processing.md)), and the player's quality setting picks the tier (`off`,
+`basic`, `full`). When the engine cannot say it (a post pass beyond those tiers, such as depth of field or an outline,
+a custom shader, a loader or controls, lights or shadows beyond the engine's `PointLight`, `SpotLight` and
+`sceneShadows`), opt the game into **`@kits/three`** and use three.js itself.
 
 **Full power, you own compatibility across three upgrades.** Code written against three.js is `@unstable`: when the
 engine moves to a newer three.js, your code may need changes. The kit's contract is in its
 [README](../../src/kits/three/README.md).
 
 Every example below compiles in the courtyard fixture (`tools/visual-courtyard/game`: `look.ts`, `lantern.ts`,
-`recipes.ts`), and the lantern, shadow and bloom ones run in its browser check (`npm run test:three-kit-browser`).
+`recipes.ts`), and the lantern, shadow and composer ones run in its browser check (`npm run test:three-kit-browser`).
 
 ## 1. Opt in
 
@@ -44,7 +46,13 @@ export default defineScene({
 Elsewhere (`enter`, `exit`, a system), get the same handle with `useThree(ctx)`; `hasThree(ctx)` is false in headless
 `testScene`, which has no renderer.
 
-## 2. Bloom with an EffectComposer
+## 2. Your own EffectComposer chain
+
+For bloom alone, use `view.post`: it is tiered by the player's quality setting, counted in `postDraws`, and needs no
+three.js. Take over the frame with a composer only for a chain the built-in tiers do not have. The example builds an
+UnrealBloom chain because it is the shortest complete one; replace or extend its passes with your own (a
+`ShaderPass`, an `OutlinePass`, a `BokehPass`). A render override replaces the engine's
+draw, so a scene with one gets none of its `view.post`: put every pass you want in the composer.
 
 ```ts
 import {type ThreeHandle} from '@kits/three';
@@ -72,7 +80,8 @@ export function bloom(three: ThreeHandle) {
 ```
 
 The override runs only on frames the engine draws (render on change). It must leave the render target at `null`
-(an `OutputPass` or any `renderToScreen` pass does). Its passes count in the scene's `draws` budget.
+(an `OutputPass` or any `renderToScreen` pass does). Its passes count in the scene's `draws` budget, not in
+`postDraws`, and no quality preset turns them off: on phones, check the `low` picture and the budget yourself.
 
 ## 3. A lantern with a real light: `customObject`
 
