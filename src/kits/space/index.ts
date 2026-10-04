@@ -1,4 +1,4 @@
-import {defineKit, defineEnvironment, type EnvironmentState, type Vec3} from '../../author';
+import {defineKit, defineEnvironment, hazeColor, type EnvironmentState, type Vec3} from '../../author';
 export function space() {
   return defineKit({id: 'space'});
 }
@@ -37,7 +37,9 @@ export function environmentTransition(
     )
   )
     throw Error('space: transition populations must share directions');
-  if (Boolean(a.haze) !== Boolean(b.haze)) throw Error('space: haze transitions require matching endpoints');
+  if (Boolean(a.haze) !== Boolean(b.haze) || (a.haze?.kind ?? 'linear') !== (b.haze?.kind ?? 'linear'))
+    throw Error('space: haze transitions require matching endpoints');
+  if (a.sky || b.sky) throw Error('space: transitions between gradient skies are not supported');
   const mix = (x: number, y: number) => x * (1 - t) + y * t;
   // Decode sRGB before mixing and encode afterwards.
   const linear = (x: number) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4);
@@ -62,13 +64,15 @@ export function environmentTransition(
       position: a.directional.position.map((v, i) => mix(v, b.directional.position[i]! /* Vec3: i < 3 */)) as Vec3,
     },
     haze:
-      a.haze && b.haze
-        ? {
-            color: color(a.haze.color, b.haze.color),
-            near: mix(a.haze.near, b.haze.near),
-            far: mix(a.haze.far, b.haze.far),
-          }
-        : null,
+      a.haze?.kind === 'exp2' && b.haze?.kind === 'exp2'
+        ? {kind: 'exp2', color: color(hazeColor(a), hazeColor(b)), density: mix(a.haze.density, b.haze.density)}
+        : a.haze && b.haze && a.haze.kind !== 'exp2' && b.haze.kind !== 'exp2'
+          ? {
+              color: color(hazeColor(a), hazeColor(b)),
+              near: mix(a.haze.near, b.haze.near),
+              far: mix(a.haze.far, b.haze.far),
+            }
+          : null,
     points: a.points.map((p, i) => ({
       ...p,
       color: color(p.color, b.points[i]!.color),
