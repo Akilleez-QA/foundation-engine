@@ -30,6 +30,14 @@ test('creator contract versions resolved defaults without capping explicit creat
   assert.deepEqual(result.modes, ['play']);
 });
 
+test('quality.tierDeclared records whether the author chose the tier (device-class start, ADR 0079)', () => {
+  assert.equal(defineBuild(input()).quality.tierDeclared, false);
+  assert.equal(defineBuild(input()).quality.tier, 'reference');
+  const b = input();
+  b.quality = {tier: 'reference'};
+  assert.equal(defineBuild(b).quality.tierDeclared, true);
+});
+
 test('resolved contract is deeply frozen and detached without freezing creator-owned inputs', () => {
   const b = input();
   b.audience = {ages: [3, 90], kids: true, flags: ['readable'], notes: 'Mixed experience'};

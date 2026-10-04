@@ -52,7 +52,7 @@
     {
       "id": "VIS-09",
       "title": "Opt-in full three.js kit (@kits/three)",
-      "shipped": false,
+      "shipped": true,
       "pr": 136,
       "evidence": ["@kits/three exists"]
     },
@@ -342,6 +342,7 @@
       "SceneBody",
       "SceneContext",
       "SceneDefinition",
+      "SceneExtension",
       "SceneInput",
       "SceneLightLimits",
       "SceneLights",
@@ -743,6 +744,20 @@
         "terrainRegionSlices"
       ]
     },
+    {
+      "name": "three",
+      "exports": [
+        "CUSTOM_OBJECT_LIMITS",
+        "THREE",
+        "ThreeObject",
+        "customObject",
+        "hasThree",
+        "measureTree",
+        "sceneThree",
+        "three",
+        "useThree"
+      ]
+    },
     {"name": "turns", "exports": ["createTurnLog", "restoreTurnLog", "turnAuthorityPolicies", "turns"]},
     {"name": "ui", "exports": ["TOUCH_BUTTON_MAX", "TOUCH_BUTTON_MIN", "hud", "touchButton", "ui"]},
     {
@@ -870,6 +885,7 @@
     "test:sound-browser",
     "test:stage-journal-browser",
     "test:subpath-browser",
+    "test:three-kit-browser",
     "test:ui-browser",
     "test:weighted-appearance-browser",
     "typecheck"

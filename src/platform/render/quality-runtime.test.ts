@@ -15,6 +15,7 @@ import {
   createAppQuality,
   livePixelRatio,
   liveShadowMap,
+  mayBeLimited,
   pinnedPreset,
 } from './quality-runtime';
 
@@ -142,6 +143,42 @@ test("a weak device (software GL) starts on High, today's ratio, with Low only s
   assert.equal(createAppQuality({store: deviceStore(dev.b).store}).settings.detected?.suggested, 'low'); // kept across boots
 });
 
+test('an undeclared brief tier lets a constrained mobile GPU start lower; desktop Chromium skips the probe', () => {
+  const mali: DeviceSignals = {
+    coarsePointer: true,
+    deviceMemory: 2,
+    cores: 8,
+    gpu: 'Mali-G52 MC2',
+    maxTextureSize: 8192,
+  };
+  const dev = deviceStore();
+  const q = createAppQuality({
+    store: dev.store,
+    initialPreset: 'reference',
+    deviceClassSafety: true,
+    signals: () => mali,
+  });
+  assert.equal(q.preset, 'low');
+  assert.equal(q.source, 'detected');
+  assert.equal(dev.b.data.size, 0, 'the limited start is unsaved, like the authored default');
+  const declared = createAppQuality({store: deviceStore().store, initialPreset: 'reference', signals: () => mali});
+  assert.equal(declared.preset, 'reference', 'a declared tier wins');
+  const desktop = createAppQuality({
+    store: deviceStore().store,
+    initialPreset: 'reference',
+    deviceClassSafety: true,
+    signals: () => RTX,
+  });
+  assert.equal(desktop.preset, 'reference');
+  assert.equal(desktop.source, 'default');
+  // The probe gate: 8 GB and more than 4 cores never probes; anything else (or unreported memory) may.
+  assert.equal(mayBeLimited({deviceMemory: 8, hardwareConcurrency: 16}), false);
+  assert.equal(mayBeLimited({deviceMemory: 8, hardwareConcurrency: 4}), true);
+  assert.equal(mayBeLimited({deviceMemory: 4, hardwareConcurrency: 8}), true);
+  assert.equal(mayBeLimited({hardwareConcurrency: 8}), true, 'Safari and Firefox report no memory');
+  assert.equal(mayBeLimited(undefined), false);
+});
+
 test('the choice is one device section envelope, never exported', () => {
   const dev = deviceStore();
   const q = createAppQuality({store: dev.store, signals: () => PHONE});
@@ -149,10 +186,10 @@ test('the choice is one device section envelope, never exported', () => {
   const keys = [...dev.b.data.keys()];
   assert.deepEqual(keys, ['game|device|graphics.settings']);
   assert.deepEqual(JSON.parse(dev.b.data.get('game|device|graphics.settings')!).data, {
-    preset: 'high',
+    preset: 'medium',
     overrides: {'resolution.scale': 0.75},
     governor: false,
-    detected: {preset: 'high', reasons: ['GPU Adreno (TM) 740', '4 GB memory'], build: '', suggested: 'medium'},
+    detected: {preset: 'medium', reasons: ['device class: mobile GPU Adreno (TM) 740', '4 GB memory'], build: ''},
   });
   assert.equal(graphicsSettings.scope, 'device');
   assert.equal(graphicsSettings.export, false);

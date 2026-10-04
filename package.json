@@ -14,7 +14,7 @@
     "preview": "vite preview",
     "generate": "node scripts/generate.mjs",
     "typecheck": "node scripts/generate.mjs && tsc --noEmit",
-    "test": "node scripts/generate.mjs && tsx --test \"src/**/*.test.ts\" \"game/**/*.test.ts\" \"game/**/*.test.mjs\" \"templates/*/game/**/*.test.ts\" \"templates/*/game/**/*.test.mjs\" \"scripts/**/*.test.mjs\" \"scripts/**/*.test.ts\" \"tools/**/*.test.mjs\"",
+    "test": "node scripts/generate.mjs && tsx --test \"src/**/*.test.ts\" \"game/**/*.test.ts\" \"game/**/*.test.mjs\" \"templates/*/game/**/*.test.ts\" \"templates/*/game/**/*.test.mjs\" \"scripts/**/*.test.mjs\" \"scripts/**/*.test.ts\" \"tools/**/*.test.mjs\" \"tools/visual-courtyard/game/**/*.test.ts\"",
     "lint": "npm run --silent format:check && npm run --silent lint:layers && npm run --silent lint:game && npm run --silent lint:arch && npm run --silent lint:types && npm run --silent lint:css && npm run --silent lint:generic && npm run --silent lint:brief && npm run --silent lint:budgets && npm run --silent lint:provenance && npm run --silent lint:docs-claims",
     "format": "prettier --write .",
     "format:check": "prettier --check --log-level warn .",
@@ -100,6 +100,7 @@
     "test:blender-export-browser": "GAME_DIR=tools/blender-export/game node scripts/generate.mjs && tsc --noEmit -p tools/blender-export/tsconfig.json && tsx scripts/lint/brief.ts tools/blender-export/game && GAME_DIR=tools/blender-export/game node -r ./scripts/silent-browser.cjs tools/blender-export/browser.mjs",
     "test:first-use-browser": "GAME_DIR=templates/explorer/game node scripts/generate.mjs && GAME_DIR=templates/explorer/game node -r ./scripts/silent-browser.cjs scripts/play/first-use-check.mjs playtest/first-use",
     "test:first-use-browser:production": "GAME_DIR=templates/explorer/game node -r ./scripts/silent-browser.cjs scripts/play/first-use-check.mjs playtest/first-use-production --production",
+    "test:three-kit-browser": "GAME_DIR=tools/visual-courtyard/game node scripts/generate.mjs && node tools/visual-courtyard/game/tools/make-textures.mjs && tsx scripts/lint/brief.ts tools/visual-courtyard/game && GAME_DIR=tools/visual-courtyard/game node -r ./scripts/silent-browser.cjs tools/visual-courtyard/browser.mjs playtest/three-kit",
     "test:creator-journey-browser": "GAME_DIR=templates/explorer/game node scripts/generate.mjs && GAME_DIR=templates/explorer/game node -r ./scripts/silent-browser.cjs scripts/play/creator-journey-check.mjs playtest/creator-journey",
     "fx:pack": "node scripts/fx-pack.mjs"
   },

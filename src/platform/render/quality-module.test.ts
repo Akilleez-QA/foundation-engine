@@ -231,7 +231,9 @@ test('pinned module never reads the graphics section from storage', async () => 
 
 test('application composition forwards the authored quality tier into actual runtime service', async () => {
   const game = defineGame({id: 'quality-demo', version: '1.0.0', title: 'Quality demo', firstScene: 'sample'});
-  const quality = layerModules(game, {quality: {tier: 'medium', views: []}}).find(m => m.id === 'platform.quality')!;
+  const quality = layerModules(game, {quality: {tier: 'medium', tierDeclared: true, views: []}}).find(
+    m => m.id === 'platform.quality',
+  )!;
   const app = createApp(
     [
       quality,

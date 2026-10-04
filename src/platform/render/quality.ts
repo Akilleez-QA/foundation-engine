@@ -381,12 +381,51 @@ const LOW_GPU =
   /(Mali-(4|T[678]|G[57]\d)\b|Adreno \(TM\) [345]\d\d|PowerVR|Intel.*HD Graphics [2-6]\d{2,3}\b|GC\d{3,4}|VideoCore)/i;
 const SOFTWARE_GL = /(SwiftShader|llvmpipe|softpipe|Software Rasterizer|Microsoft Basic Render)/i;
 
+/** Mobile GPU families (renderer strings). "Apple GPU" is absent on purpose: Safari reports it on Macs too. */
+const MOBILE_GPU = /\b(Mali|Immortalis|Adreno|PowerVR|Xclipse|Maleoon)\b/i;
+/** Entry-level or old mobile GPUs: Mali-4xx/T6xx-T8xx/G3x/G5x, Adreno 3xx-5xx and 60x-61x, PowerVR. */
+const MOBILE_ENTRY_GPU = /(Mali-(4\d\d|T[678]\d\d|G[35]\d)\b|Adreno \(TM\) ([345]\d\d|6[01]\d)\b|PowerVR)/i;
+const rank = (p: QualityPreset): number => PRESETS.indexOf(p);
+
+/** A device-class start limit: the most expensive preset this device starts on, with why. */
+export interface DeviceClassCap {
+  preset: QualityPreset;
+  reasons: string[];
+}
+
+/**
+ * Device-class start limit (ADR 0079). Applies only to a renderer string
+ * from a mobile GPU family; every other device (desktop, software GL, unreported or ambiguous GPU) gets no limit.
+ *
+ *  - Low: an entry-level mobile GPU, 2 GB or less memory, or a texture limit under 4096.
+ *  - Medium: 4 GB or less memory, 4 or fewer cores, or data saver.
+ *  - Otherwise no limit: a capable phone starts where it did before.
+ *
+ * It only lowers a FIRST start. Pins, saved choices and a tier the creator declared in the brief are never limited.
+ */
+export function deviceClassCap(s: DeviceSignals | undefined): DeviceClassCap | undefined {
+  if (!s?.gpu || !MOBILE_GPU.test(s.gpu) || SOFTWARE_GL.test(s.gpu)) return undefined;
+  const low: string[] = [],
+    medium: string[] = [];
+  if (MOBILE_ENTRY_GPU.test(s.gpu)) low.push('entry-level mobile GPU');
+  if (s.deviceMemory !== undefined && s.deviceMemory <= 2) low.push(`${s.deviceMemory} GB memory`);
+  else if (s.deviceMemory !== undefined && s.deviceMemory <= 4) medium.push(`${s.deviceMemory} GB memory`);
+  if (s.maxTextureSize < 4096) low.push(`texture limit ${s.maxTextureSize}`);
+  if (s.cores !== undefined && s.cores <= 4) medium.push(`${s.cores} cores`);
+  if (s.saveData) medium.push('data saver');
+  const head = `device class: mobile GPU ${s.gpu}`;
+  if (low.length) return {preset: 'low', reasons: [head, ...low, ...medium]};
+  if (medium.length) return {preset: 'medium', reasons: [head, ...medium]};
+  return undefined;
+}
+
 /**
  * Picks the FIRST preset only. Callers never apply it over a saved choice.
  *
  * Input capability is not graphics capability (ADR 0070). A reference-class GPU with sufficient cores starts
- * at Reference; other hardware starts at High. Weak resource signals only suggest a lighter preset, never
- * silently cross a quality floor. Saved choices, including legacy detected Medium, remain unchanged.
+ * at Reference; other hardware starts at High. A constrained mobile GPU then starts no higher than its device-class
+ * limit (`deviceClassCap`). Other weak resource signals only suggest a lighter preset, never silently cross a quality
+ * floor. Saved choices, including legacy detected Medium, remain unchanged.
  */
 export function detectPreset(s: DeviceSignals): Detection {
   const softwareGl = !!s.gpu && SOFTWARE_GL.test(s.gpu);
@@ -399,10 +438,11 @@ export function detectPreset(s: DeviceSignals): Detection {
   else if (s.deviceMemory !== undefined && s.deviceMemory <= 4) lighter.push(`${s.deviceMemory} GB memory`);
   if (s.saveData) lighter.push('data saver');
   const suggestion = (preset: QualityPreset): Pick<Detection, 'suggested' | 'suggestedReasons'> => {
-    const rank = (p: QualityPreset) => PRESETS.indexOf(p);
     const want: QualityPreset | undefined = weak.length ? 'low' : lighter.length ? 'medium' : undefined;
     return want && rank(want) > rank(preset) ? {suggested: want, suggestedReasons: weak.length ? weak : lighter} : {};
   };
+  const cap = deviceClassCap(s);
+  if (cap) return {preset: cap.preset, reasons: cap.reasons, softwareGl, ...suggestion(cap.preset)}; // medium or low
   if (!weak.length && s.gpu && REFERENCE_GPU.test(s.gpu) && (s.cores ?? 0) >= 8) {
     return {
       preset: 'reference',
@@ -577,8 +617,12 @@ export interface QualityOptions {
   store?: GraphicsChoiceStore;
   /** Authored startup preset, used only without a pin or saved choice. Remains unsaved until the player acts. */
   initialPreset?: QualityPreset | undefined;
-  /** First-run probe; called at most once, only without a saved choice or authored startup preset. */
+  /** First-run probe; called at most once, only without a saved choice, and with an authored startup preset only
+   *  when `deviceClassSafety` is on. */
   signals?: () => DeviceSignals | undefined;
+  /** The authored startup preset was a default, not the creator's declared tier: a constrained mobile GPU starts no
+   *  higher than its device-class limit (`deviceClassCap`). Unsaved, like the authored default. */
+  deviceClassSafety?: boolean | undefined;
   devicePixelRatio?: () => number;
   /** A gate or bench `?quality=<preset>`: no read, no write, no detection, no governor. */
   pinned?: QualityPreset | undefined;
@@ -608,8 +652,16 @@ export function createQuality(options: QualityOptions = {}): Quality {
       const untouched = settings.detected?.preset === settings.preset && Object.keys(settings.overrides).length === 0;
       source = untouched ? 'detected' : 'player';
     } else if (options.initialPreset !== undefined) {
-      settings = {...defaultGraphicsSettings(), preset: options.initialPreset};
-      source = 'default';
+      const cap = options.deviceClassSafety ? deviceClassCap(options.signals?.()) : undefined;
+      if (cap && rank(cap.preset) > rank(options.initialPreset)) {
+        // Reported as a detection so the Graphics screen can say why; unsaved, so a later brief change still applies.
+        const detected: DetectedPreset = {preset: cap.preset, reasons: cap.reasons, build: options.build ?? ''};
+        settings = {...defaultGraphicsSettings(), preset: cap.preset, detected};
+        source = 'detected';
+      } else {
+        settings = {...defaultGraphicsSettings(), preset: options.initialPreset};
+        source = 'default';
+      }
     } else {
       const signals = options.signals?.();
       if (signals) {
