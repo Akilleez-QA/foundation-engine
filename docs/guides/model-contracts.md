@@ -61,7 +61,7 @@ The geometry rules do not trust the exporter's report or the accessor metadata. 
 | `tool` | What made it: `Blender 5.2.1 LTS`, or a named generator service and plan for AI-generated geometry. |
 | `generator` | The glTF writer recorded in the GLB's `asset.generator`, such as `Khronos glTF Blender I/O v5.2.40`. |
 
-The same licence, author and source go in the game's `defineAsset`; a third-party asset is also listed in [`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md) or the game's own notices. A receipt is an integrity record, not proof of rights.
+The same licence, author and source go in the game's `defineAsset`; a third-party asset is also listed in [`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md) or the game's own notices. [Make assets with Blender through MCP](../recipes/make-assets-with-blender-mcp.md#licence-and-provenance) covers each common source. A receipt is an integrity record, not proof of rights.
 
 ## Example
 
