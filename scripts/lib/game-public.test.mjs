@@ -103,6 +103,10 @@ test('no public folder at all is fine', () => {
 test("the engine keeps no file in the shared root public folder, so no template's files ship with another game", () => {
   assert.deepEqual(publicFiles(join(ROOT, 'public')), [], "a template's files belong in templates/<name>/game/public/");
   const owned = templateGameDirs().filter(d => publicFiles(join(ROOT, d, 'public')).length);
-  assert.deepEqual(owned, ['templates/mechanics/game'], 'only the mechanics template ships static files today');
+  assert.deepEqual(
+    owned,
+    ['templates/mechanics/game', 'templates/showcase/game'],
+    'only the mechanics and showcase templates ship static files today',
+  );
   for (const d of owned) assert.deepEqual(publicProblems(join(ROOT, d, 'public')), [], d);
 });
