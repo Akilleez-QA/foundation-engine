@@ -10,6 +10,16 @@ Every new framework below is optional: a game that does not use it is unchanged.
 Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
 (#122 onward). None of it is in that candidate.
 
+- **Capability manifest and `lint:docs-claims` (#156).** `npm run capabilities` writes `docs/capabilities.json` and
+  `docs/capabilities.md` from the code: the `@engine` value and type exports, each kit and its exports, the quality
+  knobs (and whether engine code reads each one), the templates, the npm scripts, and feature IDs (VIS-01 to VIS-06,
+  VIS-09, FX-01, GEN-02, MP-01, KTX2 and others) marked shipped only when their evidence is in the tree. The new
+  `npm run lint:docs-claims`, run by `npm run lint` and `npm run check`, fails when either file is out of date, and when
+  a page (AGENTS.md, README.md, docs/, skills, agents, template READMEs) says a shipped feature is missing ("no local
+  lights yet", "can't instance"), naming the feature and its PR. Claims are matched by an explicit phrase table, not
+  guessed; a correct "not yet" about an unshipped feature passes; dated records under `docs/verification/` and
+  `docs/releases/` are exempt. *Affected:* a change that adds an `@engine` export, a kit, a knob, a template or an npm
+  script runs `npm run capabilities` and commits the result.
 - **Optional gradient sky and exponential haze (VIS-05, #150).** `defineEnvironment({ sky: { kind: 'gradient', top, horizon,
   bottom, exponent, discs, stars } })` draws one CPU-generated texture on a sphere around the camera with a
   built-in unlit material (no custom shader), plus additive stars; `haze: { kind: 'exp2', color, density }` adds
