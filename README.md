@@ -22,7 +22,7 @@ Try the arcade example without creating a game: after cloning and running `npm c
 
 ## What's new in 0.2.0
 
-- **Your own textures, materials and sound files**: `defineMaterial` for textured, physically based shapes; `defineAsset({ type: 'audio' })` files through `ctx.play` with volume, pitch and position.
+- **Your own textures, materials and sound files**: `defineMaterial` for textured, physically based, flat, matte or toon shapes, meshes and models (double-sided, cut-out); `defineAsset({ type: 'audio' })` files through `ctx.play` with volume, pitch and position.
 - **3D audio**: HRTF panning, distance models with a hard cutoff, a muffle filter and smoothed movement.
 - **Genre kits**: rollback sessions, a deterministic turn log, a spatial grid, seeded procedural generation, tunable jump feel and an audio-clock timeline for rhythm games.
 - **Multiplayer hardening**: reconnect backoff, rate limiting, queue deadlines, planned drain, and optional host-side command integrity (anti-cheat, slice A).

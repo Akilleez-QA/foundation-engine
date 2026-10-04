@@ -142,7 +142,7 @@ test('Material maps to a standard material; surfaces with the same texture, wrap
   assert.equal(versionAtLease(), 0, 'making a view does not flag the image for another upload');
   assert.deepEqual([map.wrapS, map.repeat.x, map.repeat.y], [T.MirroredRepeatWrapping, 4, 2]);
   assert.deepEqual([shared().repeat.x], [1]);
-  assert.deepEqual(t.surfaces.stats, {leased: 2, applied: 2, failed: 0, views: 2});
+  assert.deepEqual(t.surfaces.stats, {leased: 2, applied: 2, failed: 0, views: 2, gradients: 0});
   let disposed = 0;
   map.addEventListener('dispose', () => {
     disposed++;
@@ -266,5 +266,133 @@ test('without a texture library a textured material draws its colour and loads n
   assert.ok(surface.material instanceof T.MeshStandardMaterial);
   assert.equal(t.surfaces.stats.leased, 0);
   surface.dispose();
+  t.resources.dispose();
+});
+
+test('shading picks one of three material classes; defaults keep the standard material exactly', () => {
+  const t = setup();
+  const standard = t.surfaces.create(data(), 0xffffff),
+    flat = t.surfaces.create(data({shading: 'flat'}), 0xffffff),
+    matte = t.surfaces.create(data({shading: 'matte', emissive: 0x330000}), 0xffffff),
+    toon = t.surfaces.create(data({shading: 'toon', toonSteps: 4}), 0xffffff);
+  assert.equal(standard.material.type, 'MeshStandardMaterial');
+  const plainStandard = new T.MeshStandardMaterial({color: 0xffffff});
+  for (const field of ['flatShading', 'side', 'alphaTest', 'vertexColors', 'transparent', 'opacity'] as const)
+    assert.equal(standard.material[field], plainStandard[field], `default ${field} unchanged`);
+  assert.equal(flat.material.type, 'MeshStandardMaterial');
+  assert.equal((flat.material as T.MeshStandardMaterial).flatShading, true);
+  assert.equal(matte.material.type, 'MeshLambertMaterial');
+  assert.equal(matte.material.emissive.getHex(), 0x330000);
+  assert.ok(matte.authored);
+  assert.equal(toon.material.type, 'MeshToonMaterial');
+  const ramp = (toon.material as T.MeshToonMaterial).gradientMap!;
+  assert.equal(ramp.magFilter, T.NearestFilter);
+  assert.deepEqual([...(ramp.image as {data: Uint8Array}).data], [0, 85, 170, 255]);
+  t.resources.dispose();
+});
+
+test('faceting, side, cutout and vertex colours change in place; another class needs a new surface', () => {
+  const t = setup();
+  const surface = t.surfaces.create(data(), 0xffffff, {colors: true});
+  const material = surface.material as T.MeshStandardMaterial;
+  assert.equal(material.vertexColors, true, 'a mesh with colours draws them by default');
+  const version = material.version;
+  assert.equal(surface.update(data({shading: 'flat', side: 'double', alphaCutoff: 0.5, vertexColors: false})), true);
+  assert.equal(surface.material, material, 'the same material');
+  assert.deepEqual(
+    [material.flatShading, material.side, material.alphaTest, material.vertexColors],
+    [true, T.DoubleSide, 0.5, false],
+  );
+  assert.ok(material.version > version, 'program-affecting changes ask three to recompile once');
+  const settled = material.version;
+  assert.equal(surface.update(data({shading: 'flat', side: 'double', alphaCutoff: 0.6, vertexColors: false})), true);
+  assert.equal(material.version, settled, 'a new cutoff value keeps the program');
+  surface.colors(false);
+  assert.equal(surface.update(data({shading: 'flat', vertexColors: true})), true);
+  assert.equal(material.vertexColors, false, 'no colours on the geometry: none drawn');
+  surface.colors(true);
+  assert.equal(material.vertexColors, true);
+  assert.equal(surface.update(data({shading: 'toon'})), false, 'standard to toon is a class change');
+  assert.equal(surface.update(data({shading: 'matte'})), false, 'standard to matte is a class change');
+  t.resources.dispose();
+});
+
+test('toon gradients are shared per step count and released with their last user', () => {
+  const t = setup();
+  const a = t.surfaces.create(data({shading: 'toon', toonSteps: 3}), 0xffffff),
+    b = t.surfaces.create(data({shading: 'toon', toonSteps: 3}), 0xff0000),
+    c = t.surfaces.create(data({shading: 'toon', toonSteps: 5}), 0xffffff);
+  const ramp = (s: typeof a) => (s.material as T.MeshToonMaterial).gradientMap!;
+  assert.equal(ramp(a), ramp(b), 'one gradient for every three-step surface');
+  assert.notEqual(ramp(a), ramp(c));
+  assert.equal(t.surfaces.stats.gradients, 2);
+  let disposed = 0;
+  ramp(a).addEventListener('dispose', () => disposed++);
+  const three = ramp(a);
+  assert.equal(c.update(data({shading: 'toon', toonSteps: 3})), true, 'steps change in place');
+  assert.equal(ramp(c), three);
+  assert.equal(t.surfaces.stats.gradients, 1, 'the five-step gradient went with its last user');
+  a.dispose();
+  b.dispose();
+  assert.equal(disposed, 0);
+  c.dispose();
+  assert.equal(disposed, 1);
+  assert.equal(t.surfaces.stats.gradients, 0);
+  t.resources.dispose();
+});
+
+test('a plain mesh surface keeps the original matte material with its vertex colours', () => {
+  const t = setup();
+  const surface = t.surfaces.create(undefined, 0x123456, {colors: true});
+  assert.equal(surface.material.type, 'MeshLambertMaterial');
+  assert.equal(surface.material.vertexColors, true);
+  surface.colors(false);
+  assert.equal(surface.material.vertexColors, false);
+  t.resources.dispose();
+});
+
+test('geometry without texture coordinates reports a texture once and loads nothing', () => {
+  const t = setup();
+  const surface = t.surfaces.create(data({texture: 'tiles', emissive: 0x112233}), 0xffffff, {uv: false});
+  assert.equal(t.lib.requests.length, 0);
+  assert.equal(t.errors.length, 1);
+  assert.match(String(t.errors[0]), /no texture coordinates/);
+  surface.update(data({texture: 'tiles', emissive: 0x332211}));
+  assert.equal(t.errors.length, 1, 'reported once');
+  assert.equal(surface.material.emissive.getHex(), 0x332211);
+  t.resources.dispose();
+});
+
+test('leaving the visit disposes every shared toon gradient', () => {
+  const life = new AbortController(),
+    t = setup({signal: life.signal});
+  const surface = t.surfaces.create(data({shading: 'toon'}), 0xffffff);
+  let disposed = 0;
+  (surface.material as T.MeshToonMaterial).gradientMap!.addEventListener('dispose', () => disposed++);
+  life.abort();
+  assert.equal(disposed, 1);
+  assert.equal(t.surfaces.stats.gradients, 0);
+  surface.dispose();
+  assert.equal(disposed, 1, 'a later release does not dispose it again');
+  t.resources.dispose();
+});
+
+test('every authored surface stays eligible for the static batching bake (no shader hooks)', async () => {
+  const {bakeStaticMeshes} = await import('../platform/render/batching');
+  const t = setup();
+  for (const shading of ['standard', 'flat', 'matte', 'toon'] as const) {
+    const surface = t.surfaces.create(data({shading, side: 'double', alphaCutoff: 0.3}), 0xffffff);
+    assert.equal(surface.material.onBeforeCompile, T.Material.prototype.onBeforeCompile, shading);
+    const scope = new T.Group(),
+      geometry = new T.BoxGeometry();
+    for (const x of [0, 2]) {
+      const mesh = new T.Mesh(geometry, surface.material);
+      mesh.position.x = x;
+      scope.add(mesh);
+    }
+    assert.equal(bakeStaticMeshes(scope), 2, `${shading} parts merge into one draw`);
+    assert.equal(scope.children.length, 1);
+    geometry.dispose();
+  }
   t.resources.dispose();
 });
