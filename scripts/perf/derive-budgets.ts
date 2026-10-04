@@ -14,6 +14,7 @@ import {NO_FRAME_HINT} from './budget-check';
 
 export const DERIVED: readonly BudgetMetric[] = [
   'draws',
+  'postDraws',
   'triangles',
   'shadowCasters',
   'shadowPasses',
@@ -34,7 +35,7 @@ export interface Derivation {
 }
 
 /** Means per rendered frame: unmeasured, not zero, when no window of the scene drew a frame. */
-const PER_RENDERED_FRAME: readonly BudgetMetric[] = ['draws', 'triangles'];
+const PER_RENDERED_FRAME: readonly BudgetMetric[] = ['draws', 'postDraws', 'triangles'];
 
 /** Why one scene's windows cannot be a budget source; [] when they can. */
 export function refusalReasons(samples: readonly PerfRun['samples'][number][]): string[] {

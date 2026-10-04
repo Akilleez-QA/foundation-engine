@@ -310,6 +310,7 @@ export async function runBench(o, {log = console.log} = {}) {
         drawsMaxFrame: w.drawsMax,
         trisPerRenderedFrame: Math.round(w.tris / drawn),
         offscreenDrawsPerRenderedFrame: Math.round(w.off / drawn),
+        postDrawsPerRenderedFrame: Math.round((w.post ?? 0) / drawn),
         shadowPassDrawsMax: g.shadowPassDrawsMax,
         shadowPassesMax: g.shadowPassesMax,
         taskMsPerFrame: per('TaskDuration'),

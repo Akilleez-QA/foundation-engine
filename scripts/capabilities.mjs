@@ -92,7 +92,9 @@ export const FEATURES = [
   },
   {
     id: 'POST-01',
-    title: 'Post-processing (bloom): a consumer of the post.mode quality knob',
+    title: 'Post-processing (bloom, vignette, grade): a consumer of the post.mode quality knob',
+    pr: 161,
+    docs: 'docs/guides/post-processing.md',
     evidence: [{knobRead: 'post.mode'}],
   },
   {

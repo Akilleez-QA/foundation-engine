@@ -53,6 +53,7 @@ Draws are per rendered frame from `npm run play:snap -- --scene <id>` (software 
 
 ## Limits
 
-The engine has no local lights, cast shadows, tone mapping or bloom yet. The courtyard fakes them: lantern light is baked
+The showcase was built before the engine had local lights, cast shadows, tone mapping and bloom, and does not use them.
+The courtyard fakes them: lantern light is baked
 into the stonework's vertex colours (it does not light the player or the embers), the player's shadow is a see-through
 disc, and glass glows with an emissive material. Baked light is fixed: moving a lantern means rebuilding the mesh.

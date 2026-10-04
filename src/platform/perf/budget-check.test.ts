@@ -240,6 +240,32 @@ test('an inconclusive window (active, drew no frame) never passes: every row is 
   assert.match(formatReport(r), /INCONCLUSIVE/);
 });
 
+test('postDraws is its own count budget, per tier, with no noise allowance; draws never include it', () => {
+  const post: Record<string, CheckBudget> = {
+    lit: {draws: 40, postDraws: {reference: 10, high: 10, medium: 1, low: 0}},
+  };
+  const bind: SampleBinding[] = [{sample: 'lit', scene: 'lit', metrics: ['draws', 'postDraws']}];
+  const sample = {drawsPerRenderedFrame: 38, postDrawsPerRenderedFrame: 10};
+  assert.equal(readMetric(sample, 'postDraws'), 10);
+  assert.equal(readMetric(sample, 'draws'), 38, 'scene draws only');
+  assert.equal(readMetric({drawsPerRenderedFrame: 38}, 'postDraws'), null, 'unmeasured, not zero');
+  const reference = checkBudgets({lit: sample}, post, bind, {tier: 'reference'});
+  assert.equal(reference.ok, true);
+  const low = checkBudgets({lit: sample}, post, bind, {tier: 'low'});
+  const row = must(low.rows.find(r => r.metric === 'postDraws'));
+  assert.equal(row.verdict, 'fail', 'the low preset draws no post: any post draw there fails at once');
+  const medium = checkBudgets({lit: {drawsPerRenderedFrame: 38, postDrawsPerRenderedFrame: 2}}, post, bind, {
+    tier: 'medium',
+  });
+  assert.equal(must(medium.rows.find(r => r.metric === 'postDraws')).verdict, 'fail', 'no tolerance: 2 > 1 fails');
+});
+
+test('a derived postDraws budget is the exact tier count, and worstOf keeps it', () => {
+  const worst = worstOf([{postDrawsPerRenderedFrame: 1}, {postDrawsPerRenderedFrame: 10}]);
+  assert.equal(worst.postDrawsPerRenderedFrame, 10);
+  assert.deepEqual(deriveBudget(worst, ['postDraws']), {postDraws: 10}, 'no headroom on a fixed pass count');
+});
+
 test('shadowPasses: one pass per shadow-map face, counted exactly (no tolerance), derived with a step of 1', () => {
   const b = {scene: {shadowPasses: 1}};
   const bind = [{sample: 'scene', scene: 'scene', metrics: ['shadowPasses' as const]}];

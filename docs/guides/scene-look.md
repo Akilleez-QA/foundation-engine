@@ -11,6 +11,7 @@ picture it drew before, with the same draws and budgets.
 | Point and spot lights | `defineScene({ lights: sceneLights() })`, `PointLight`, `SpotLight` | [Local lights](#local-lights-point-and-spot-lights) |
 | Shadows | `defineScene({ shadows: sceneShadows() })`, light `shadow`, `Shadow` | [Shadows](#shadows) |
 | Gradient sky, discs, stars, exp2 haze | `defineEnvironment({ sky, haze })` | [Sky and haze](#sky-and-haze) |
+| Bloom, vignette and grade, per the player's `post.mode` | `defineScene({ view: { post } })` | [Post-processing](post-processing.md) |
 
 ## Output: tone mapping and exposure
 

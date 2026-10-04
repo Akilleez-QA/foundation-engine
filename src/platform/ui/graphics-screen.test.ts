@@ -29,16 +29,17 @@ test('the screen is generated from the knob registry: a wired knob appears in it
   const before = graphicsModel(q);
   assert.deepEqual(
     before.map(g => g.group),
-    ['resolution', 'shadows'],
+    ['resolution', 'shadows', 'post'],
   );
   assert.deepEqual(
     before.flatMap(g => g.knobs).map(k => k.def.id),
-    ['resolution.scale', 'resolution.max-pixel-ratio', 'shadows.quality'],
+    ['resolution.scale', 'resolution.max-pixel-ratio', 'shadows.quality', 'post.mode'],
+    'post.mode is read by every scene with view.post (author/scene-post.ts)',
   );
   registry.add(sparkle);
   assert.deepEqual(
     graphicsModel(q).map(g => g.group),
-    ['resolution', 'shadows'],
+    ['resolution', 'shadows', 'post'],
     'registered but not read by the game: not shown',
   );
   assert.equal(q.knob('test.sparkle'), 'lots', 'still resolved for the profile');
@@ -48,7 +49,7 @@ test('the screen is generated from the knob registry: a wired knob appears in it
     effects = after.find(g => g.group === 'effects')!;
   assert.deepEqual(
     after.map(g => g.group),
-    ['resolution', 'shadows', 'effects'],
+    ['resolution', 'shadows', 'post', 'effects'],
   );
   assert.equal(must(effects.knobs[0]).label, 'Sparkle');
   assert.equal(must(effects.knobs[0]).value, 'lots');

@@ -16,9 +16,11 @@
 | Id | Check | How |
 | --- | --- | --- |
 | S1 | The kit draws custom-object lanterns with point lights, shadows and bloom, counts their draws and disposes everything on exit. | playtest: `browser.mjs` |
+| S2 | Post-processing draws exactly 10, 1 and 0 post passes at full, basic and off, keeps scene draws equal, blooms at full and draws nothing while still. | playtest: `post-browser.mjs` |
 
 ## Changelog
 
 | Date | Change | Evidence |
 | --- | --- | --- |
 | 2026-10-03 | Fixture ported from the visual-capability trial; the lit courtyard and the still lantern scene use @kits/three. | `npm run test:three-kit-browser` (browser.mjs). No template budget changed. |
+| 2026-10-04 | Post-processing scenes: `courtyard-post` (tone mapping, bloom, vignette, grade through `view.post`) and the still `glow-post`. | `npm run test:post-browser` (post-browser.mjs). No template budget changed. |
