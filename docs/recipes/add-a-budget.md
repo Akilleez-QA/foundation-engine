@@ -51,7 +51,10 @@ Paste the derived numbers into the scene's `budget`, and add provenance:
   `"postDraws": 10, "ports": {"medium": {"postDraws": 1}, "low": {"postDraws": 0}}`
   ([post-processing](../guides/post-processing.md)).
 - `shadowPasses` counts shadow-map renders in the busiest frame (the sun or a spot light 1, a point light 6). It has
-  no noise allowance, and `perf:derive` copies it exactly (no headroom); `shadowCasters` counts their draws. See
+  no noise allowance, and `perf:derive` copies it exactly (no headroom); `shadowCasters` counts their draws. Both are
+  the busiest frame since the scene's route was entered; the previous scene's last frame, drawn before the change and
+  read by the probe after it, is not counted (before PR #BENCHPR a scene benched after a shadowed one could show that
+  scene's casters and passes: the showcase garden read 7 and 1 after the courtyard, 0 and 0 on its own). See
   [Cost per light and per shadow](../guides/scene-look.md#cost-per-light-and-per-shadow).
 - The start scene has no entry cost, so leave `loadMiB` and `loadMs` out of its row.
 

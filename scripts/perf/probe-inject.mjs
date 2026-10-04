@@ -25,7 +25,7 @@ export const PROBE = `(()=>{
  const windowFinished=${windowFinished.toString()};
  const W=window;W.__draws=0;W.__tris=0;W.__off=0;W.__post=0;W.__passes=0;let passOpen=false;W.__texLive=new Map();W.__canv=[];W.__hashChanges=0;
  const C=W.__count={useProgram:0,programsCreated:0,uniformCalls:0,bindVertexArray:0,bufferSubData:0,textureUploads:0};
- addEventListener('hashchange',()=>{W.__hashChanges++;W.__offMax=0;W.__passMax=0;});
+ addEventListener('hashchange',()=>{W.__hashChanges++;});
  const fb=new WeakMap(),cur=new WeakMap(),main=new WeakMap(),inPost=new WeakMap(),unit=new WeakMap(),bound=new WeakMap(),bytesOf=new WeakMap(),texId=new WeakMap(),texUps=new WeakMap();
  let nextTex=1;const ctxs=W.__ctxs=[];
  const bppFmt={6408:4,6407:3,6403:1,33319:2,6409:1,6410:2,6406:1,6402:4,34041:4};
@@ -69,8 +69,12 @@ export const PROBE = `(()=>{
  const ce=Document.prototype.createElement;Document.prototype.createElement=function(n,...r){const e=ce.call(this,n,...r);if(String(n).toLowerCase()==='canvas')W.__canv.push(new WeakRef(e));return e;};
  if(W.OffscreenCanvas){const O=W.OffscreenCanvas;W.OffscreenCanvas=function(w,h){const c=new O(w,h);W.__canv.push(new WeakRef(c));return c;};W.OffscreenCanvas.prototype=O.prototype;}
  // Per-frame monitor. The largest off-screen burst since the last hash change is the shadow pass; the most off-screen
- // passes in one frame since then are the shadow-map renders.
+ // passes in one frame since then are the shadow-map renders. A hash change also moves the off-screen and pass
+ // baselines to now: the monitor reads a frame's draws at its next tick, so the previous scene's last frame (drawn
+ // before the change, read after it, often hundreds of ms later while the next scene loads) is never counted as the
+ // next scene's.
  W.__offMax=0;W.__passMax=0;let lastOff=0,lastDraws=0,lastTris=0,lastPost=0,lastT=0,lastPasses=0;
+ addEventListener('hashchange',()=>{W.__offMax=0;W.__passMax=0;lastOff=W.__off;lastPasses=W.__passes;});
  const mon=t=>{const dOff=W.__off-lastOff,dDraws=W.__draws-lastDraws,dTris=W.__tris-lastTris,dPost=W.__post-lastPost,dPasses=W.__passes-lastPasses;lastOff=W.__off;lastDraws=W.__draws;lastTris=W.__tris;lastPost=W.__post;lastPasses=W.__passes;
   if(dOff>W.__offMax)W.__offMax=dOff;if(dPasses>W.__passMax)W.__passMax=dPasses;const win=W.__win;
   if(win&&!win.done){win.frames++;if(lastT)win.intervals.push(t-lastT);
