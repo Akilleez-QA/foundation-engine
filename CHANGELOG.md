@@ -8,7 +8,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
 ## Unreleased
 
 Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
-(#122 to #153). None of it is in that candidate.
+(#122 onward). None of it is in that candidate.
 
 - **Optional gradient sky and exponential haze (VIS-05, #150).** `defineEnvironment({ sky: { kind: 'gradient', top, horizon,
   bottom, exponent, discs, stars } })` draws one CPU-generated texture on a sphere around the camera with a
@@ -101,13 +101,13 @@ Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c
   `npm run asset:verify` accepts `KHR_texture_basisu` when the contract lists it (`ENGINE_KTX2` is on), so
   `npm run asset:optimize -- --ktx2` now runs. See
   [KTX2 model textures](docs/guides/compressed-textures.md).
-- **`lint:game` rule `three-legacy`.** In a game file that imports three (through a `@kits/three` kit, or
+- **`lint:game` rule `three-legacy` (#132).** In a game file that imports three (through a `@kits/three` kit, or
   directly), it flags three.js APIs that are gone or deprecated in the pinned three r186, each with its
   replacement: `Geometry`/`Face3`, `*BufferGeometry` aliases, `outputEncoding`, `texture.encoding`,
   `sRGBEncoding`/`LinearEncoding`, `physicallyCorrectLights`, `useLegacyLights`, `gammaOutput`/`gammaFactor`,
   `JSONLoader`/`BasisTextureLoader`/`RGBELoader`, `mergeBufferGeometries`, `Clock`, `PCFSoftShadowMap` and
-  `three/examples/js/` imports. No `@kits/three` kit exists yet and `lint:layers` keeps three out of game code,
-  so the rule is dormant today and ready for that kit. A test checks each "removed" name against the installed
+  `three/examples/js/` imports. It applies to games that opt in to `@kits/three` (#136); `lint:layers` still keeps
+  three out of every other game. A test checks each "removed" name against the installed
   three. Escape with a reason: `// lint-game-allow three-legacy: <reason>`.
 - **Model optimisation (`npm run asset:optimize`).** glTF-Transform's `optimize` with meshopt geometry
   compression, WebP textures resized to the contract's `textureSize` (`--ktx2` writes KTX2 since the model
