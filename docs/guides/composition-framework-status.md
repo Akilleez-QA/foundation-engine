@@ -591,4 +591,4 @@ the `lights.local-max` knob; overflow is refused and reported once per cause. St
 `ef0d1bb`). Evidence: unit tests and `npm run test:lights-browser`. No physical-device fill-rate acceptance.
 Shadows (VIS-03): `sceneShadows()` per scene, `directional.shadow` for the sun, `shadow: true` on local lights and a
 per-entity `Shadow`; shadowed local slots fixed per visit and bounded by `lights.shadowed-max`; maps redraw only on
-change. Status: implemented and checked as a candidate PR. Evidence: unit tests and `npm run test:shadows-browser`.
+change. Status: implemented and checked as a candidate PR #148. Evidence: unit tests and `npm run test:shadows-browser`.
