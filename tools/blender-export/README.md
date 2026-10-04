@@ -41,6 +41,8 @@ blender --background --factory-startup --python tools/blender-export/game/tools/
 npm run asset:verify -- tools/blender-export/game/public/models/lantern.glb
 ```
 
+The contract also opts in to the [silhouette check](../../docs/guides/model-contracts.md#silhouette): the model's front outline must overlap the concept drawing `game/tools/lantern/lantern.front.png` by at least 0.90 at 128 px. `node tools/blender-export/game/tools/lantern/reference.mjs` draws that reference from the design outline in centimetres; it is not rendered from the model.
+
 `--output <scratch>.glb` after `--` writes a comparison copy elsewhere. Two Blender 5.2.1 exports were byte-identical. The lantern is original GPL-3.0-only work by the Foundation Engine contributors, written as agent-assisted Blender Python with no third-party models, textures or scans; its receipt records licence, author, source, tool, generator and origin.
 
 It is validated, not rendered: this sample's brief caps its scene at 3 draws and 14 triangles, and placing the lantern would need the creator to change that brief. In your own game, declare it with `defineAsset` and a `Model` as in [load a model](../../docs/recipes/load-a-model.md).

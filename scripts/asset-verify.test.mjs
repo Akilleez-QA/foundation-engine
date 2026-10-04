@@ -590,7 +590,14 @@ test('a model without a contract is refused, and discovery finds contracted, unc
   }
 });
 test('the command line takes model files or --all, and --contract with one model', () => {
-  assert.deepEqual(parseArgs(['a.glb']), {files: ['a.glb'], all: false, json: false, contract: undefined});
+  assert.deepEqual(parseArgs(['a.glb']), {
+    files: ['a.glb'],
+    all: false,
+    json: false,
+    contract: undefined,
+    masks: undefined,
+  });
+  assert.equal(parseArgs(['a.glb', '--masks', 'out']).masks, 'out');
   assert.equal(parseArgs(['--all', '--json']).all, true);
   assert.throws(() => parseArgs([]), /Usage/);
   assert.throws(() => parseArgs(['--all', 'a.glb']), /not both/);

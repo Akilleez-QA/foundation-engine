@@ -16,4 +16,5 @@ test('the lantern meets its contract: size, base pivot, budget, materials and pr
   assert.equal(report.source, 'tools/blender-export/game/tools/lantern/export.py');
   assert.match(report.tool, /^Blender 5\.2\./);
   assert.equal(report.bounds[0][1], 0, 'rests on its base');
+  assert.ok(report.silhouette.iou >= 0.9, `front silhouette overlap ${report.silhouette.iou}`);
 });
