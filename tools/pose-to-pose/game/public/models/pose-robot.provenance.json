@@ -1,0 +1,37 @@
+{
+  "agentAssisted": true,
+  "artifact": "pose-robot.glb",
+  "author": "Foundation Engine contributors",
+  "blender": "5.2.1 LTS",
+  "bones": 24,
+  "clips": [
+    "wave",
+    "walk",
+    "walk_turn_left",
+    "walk_turn_right"
+  ],
+  "clipsManifestSha256": "3a1dd8e9f3e11f022e91a7ea169fda02ee5fcebc31b925859558ee4211bfd2ba",
+  "generator": "Khronos glTF Blender I/O v5.2.40",
+  "inputs": {
+    "animations.json": "a41c878798de224f11fd0d0f553e74c9a7b0d0cdfc3596111f3b733efca58c4c",
+    "blender/animate.py": "c841e3f5396fd9f8efdc70bd53505b6bcd86670812728eb3259cfefc87ef7c5d",
+    "blender/capture_poses.py": "12517aa3f8f8fa06f15e596302512a866b369c411d37dce06302297a20b1d6e6",
+    "blender/common.py": "3d5250b1b0dd316e96c318d6f73ce952b2e36df7e337fb6ce3e004e97d4b3e20",
+    "blender/contact_sheet.py": "7c7c007b1b77c32b0982f961bc2a17536ce1c394c93ffea8b71bdbb9644975b5",
+    "blender/render.py": "8e15eb4720a9fb89f2574d6dfb76f7f28918a045327b2b03f903b8fccfef59b5",
+    "blender/rig.py": "f76e1535137ea445e92e1da6f6e18982ab3dc670a43db05cd314f8683c9257bb",
+    "blender/test_poses.py": "8e595a59df81a1de6664ea60db092f75cdb2f41630024c60cb1e3f268c426705",
+    "blender/verify.py": "0ddd9c29426d2c95b0724b9518e4c9cfdef0d1bd82eeec86dd190a8ea21bfa16",
+    "poses.json": "d4470c9597944d0610284bbe2948bf01a9493f4b0c947e6db7de5dfa1f7077b0"
+  },
+  "licence": "GPL-3.0-only",
+  "note": "Original procedural model. No user was present: the agent authored the key poses (author_poses.py) and the review gate was off; see the review field.",
+  "review": "off",
+  "rigSha256": "a742b067df60564f4614fca040a2cc11e9a06379b5b743a94f0a1ba8bbb411d3",
+  "schema": 1,
+  "sha256": "52d2658c328f2363a0b6cdb60f5bc9b363434a2feae48bdfc9a24e4ae8c3aa69",
+  "source": "tools/pose-to-pose/examples/robot",
+  "tool": "Blender 5.2.1 LTS",
+  "triangles": 376,
+  "unapprovedPoses": []
+}

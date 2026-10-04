@@ -1,4 +1,6 @@
 import {createSceneActivity} from './scene-activity';
+import {LOCAL_LIGHT_CAPS, lightSlotsFor} from './lights';
+import {createLightSlots, type LightStats} from './light-slots';
 import {validateSceneOutput} from './scene-output';
 import type {SceneActivityFacts} from './defs';
 import {ModelPoseLink} from './model-pose-link';
@@ -99,6 +101,9 @@ export interface TestScene {
     readonly reports: readonly string[];
     sample(entity: Entity): EmitterSample | null;
   };
+  /** The scene's local-light slots (VIS-02), admitted after each frame as in a visit: slots, admissions and refusals,
+   *  and every refusal reported (each cause once). Nothing is drawn. */
+  readonly lights: {readonly stats: LightStats; readonly reports: readonly string[]};
   /** Exit once and dispose the helper-owned save store. Injected services remain caller-owned. */
   dispose(): void;
 }
@@ -106,12 +111,14 @@ export interface TestScene {
 /** `inputs` enables local press-action hints. Defaults report inContext=true; inject services.input for remaps and modal context. */
 /** `input` replaces the scripted input with a caller-owned InputState (e.g. a replay log); press/hold/release then throw. */
 /** `particleScale` is the `effects.particles` quality knob (default 1, the reference preset). */
+/** `lightCap` is the `lights.local-max` quality knob (default 16, the reference preset). */
 /** `sounds` adds ids `ctx.play` / `ctx.playVoice` may use besides `BUILT_IN_CUES` and the scene's own `sounds`: an
  *  audio asset the scene plays without listing it, or a cue registered by a module the test composes. */
 export async function testScene(
   scene: SceneDefinition,
   o: {
     particleScale?: number;
+    lightCap?: number;
     sounds?: readonly string[];
     brief?: BuildBrief;
     game?: GameDefinition | undefined;
@@ -326,6 +333,14 @@ export async function testScene(
       },
     }) ?? null;
   const emitterProbe = {id: EMITTER_ID} as ComponentType<object>;
+  const lightReports: string[] = [];
+  const lightSlots = createLightSlots({
+    slots: lightSlotsFor(scene.lights, o.lightCap ?? LOCAL_LIGHT_CAPS.reference),
+    enabled: !!scene.lights,
+    report: message => {
+      lightReports.push(`${scene.id}: ${message}`);
+    },
+  });
   const stepParticles = particles
     ? [{id: 'engine.particles', run: (_: SceneContext, dt: number) => particles.step(world, dt)}]
     : [];
@@ -359,6 +374,12 @@ export async function testScene(
       reports: particleReports,
       sample: entity => particles?.sample(entity) ?? null,
     },
+    lights: {
+      get stats() {
+        return lightSlots.stats;
+      },
+      reports: lightReports,
+    },
     setActivity(facts) {
       alive();
       const coverage = facts.coverage,
@@ -376,6 +397,7 @@ export async function testScene(
         t += 1 / 60;
         runner.frame(ctx, 1 / 60);
         pressed.clear();
+        lightSlots.sync(world);
         if (!particles && !particleReports.length && world.first(emitterProbe))
           particleReports.push(
             `${scene.id}: an Emitter is not drawn: the scene has no particles (defineScene({ particles: sceneParticles() }))`,

@@ -162,6 +162,18 @@ export const coreKnobs: readonly AnyKnobDef[] = [
     applies: 'reenter-scene',
     owner: 'platform.render',
   },
+  // Local light slots (VIS-02): read once per visit by a scene with `sceneLights()`, capping its point and spot slots
+  // each (every slot is per-fragment work on every lit surface). Unwired like particles: a game without local lights
+  // would show a control that changes nothing.
+  {
+    id: 'lights.local-max',
+    group: 'effects',
+    label: 'graphics.lights.local-max',
+    control: {kind: 'choice', options: [2, 4, 8, 16]},
+    presets: {reference: 16, high: 8, medium: 4, low: 2},
+    applies: 'reenter-scene',
+    owner: 'platform.render',
+  },
   {
     id: 'frame-rate.cap',
     group: 'frame-rate',

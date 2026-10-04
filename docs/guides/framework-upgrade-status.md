@@ -928,9 +928,15 @@ evidence.
 
 Optional, per-scene visual capabilities on `@engine` data (the [scene look guide](scene-look.md)):
 
-- **Output (VIS-01), implemented and checked (PR #124).** `view.output` gives a scene tone mapping (`'none'`, `'aces'`,
+- **Output (VIS-01), integrated (PR #124, merge `522815f`).** `view.output` gives a scene tone mapping (`'none'`, `'aces'`,
   `'agx'`, `'neutral'`) and an exposure in (0, 16]. Owner: the scene visit, through the renderer lease profile.
   Defaults are a fresh renderer's own values, so the picture guard reports identical pictures for templates that do
   not opt in. A run-time change draws one frame; an invalid value is reported once and the last valid output stays.
   Evidence: unit tests and `npm run test:output-browser` (desktop headless Chromium, software GL). No physical-device
   or HDR acceptance.
+- **Local lights (VIS-02), implemented and checked (candidate PR #138).** `PointLight` and `SpotLight` components claim fixed per-visit
+  slots from `sceneLights({ point, spot })` (at most 16 and 4); the rig never changes size, so no program recompiles
+  on spawn or despawn. Overflow is refused essential-first then in spawn order and reported once per cause; the
+  `lights.local-max` knob (16/8/4/2, unwired) caps slots per kind. Evidence: unit tests and
+  `npm run test:lights-browser` (desktop headless Chromium, software GL). No budget row for slots and no physical-device
+  fill-rate evidence.

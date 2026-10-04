@@ -8,6 +8,7 @@ Short, checked how-tos. Start with [getting started](../guides/getting-started.m
 |---|---|
 | know where my models, textures, sounds and asset-making scripts go | [where your game's files go](your-game-files.md) |
 | show a `.glb` model and play its animation | [load a model](load-a-model.md) |
+| make a model with an agent in Blender (optional MCP), export it reproducibly and check it against its size, budget and licence contract | [make assets with Blender through MCP](make-assets-with-blender-mcp.md) |
 | show a score, messages, a tap action and a button | [HUD text and buttons](hud-and-buttons.md) |
 | collect things by touching them, block movement, click or tap the ground | [collision and picking](collision-and-picking.md) |
 | make the player jump, with a short hop on a quick tap | [add and tune a jump](tune-a-jump.md) |

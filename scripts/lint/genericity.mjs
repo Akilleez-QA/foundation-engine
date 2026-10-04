@@ -42,6 +42,10 @@ export const ALLOW = [
   [/`missions`/, "a candidate kit's name in docs/ROADMAP.md"],
   [/\bkid-safe\b/i, 'the opt-in kid-safe policy profile (docs/policy/KID-SAFE.md)'],
   [
+    /\bwalk[ -]cycles?\b|`walk(?:_turn_(?:left|right))?`|\bwalk (?:clip|clips|poses?|key poses?|loop)\b/i,
+    'the walk cycle: the standard example of a looping clip in pose-to-pose animation (a motion, not a genre)',
+  ],
+  [
     /\bkids\s*[?:]|audience\??\.kids|\bconst kids\b|\bkids \?|, kids,|kids: true|`kids`|\bkids\b.*\bopt/i,
     "the brief's opt-in audience flag",
   ],
