@@ -31,7 +31,9 @@ cache or registry:
 - **Output:** pixels only. Particles are presentation state owned by the visit and are not saved, inspected as
   entities or read back by systems. The one world change is `despawn: true`, which removes the entity in the fixed
   step at a time that depends only on the emitter's data and the step count.
-- **Diagnostics:** `testScene(...).particles.stats`; in dev/test builds the scene handle's `particles()` adds the
+- **Diagnostics:** `testScene(...).particles.stats`, and `particles.sample(entity)` (one admitted emitter's live
+  count, spawn attempts since admission and the bounds of its live particles at the latest step; null when the entity
+  has no admitted emitter; it allocates, so it is for tests, not the frame loop); in dev/test builds the scene handle's `particles()` adds the
   draws per frame and texture counts (`requested`, `leases` held now, `applied`, `failed`); refusals and invalid data are reported through the scene's error log.
 
 ## Owner and lifetime

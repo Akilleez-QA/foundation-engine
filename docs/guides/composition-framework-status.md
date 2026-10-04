@@ -419,7 +419,7 @@ integration: implemented, candidate. Evidence: unit tests and
 so template budgets are unchanged. No physical-device, GPU timing or visual-quality
 acceptance.
 
-Flipbooks (FX-01a, implemented and checked, not yet integrated): `frames` on an emitter plays a sprite sheet
+Flipbooks (FX-01a, integrated in PR #141, merge `4c4f156`): `frames` on an emitter plays a sprite sheet
 per particle (`over-life`, `loop`, `random-start`), still one draw per emitter, grid capped at 16 × 16; `npm run
 fx:pack` packs a PNG sequence into a sheet and JSON sidecar. See the [guide](particles.md#flipbooks-sprite-sheets).
 
@@ -591,4 +591,6 @@ the `lights.local-max` knob; overflow is refused and reported once per cause. St
 `ef0d1bb`). Evidence: unit tests and `npm run test:lights-browser`. No physical-device fill-rate acceptance.
 Shadows (VIS-03): `sceneShadows()` per scene, `directional.shadow` for the sun, `shadow: true` on local lights and a
 per-entity `Shadow`; shadowed local slots fixed per visit and bounded by `lights.shadowed-max`; maps redraw only on
-change. Status: implemented and checked as a candidate PR #148. Evidence: unit tests and `npm run test:shadows-browser`.
+change. Status: integrated (PR #148, merge `e84afcf`). Evidence: unit tests and `npm run test:shadows-browser`.
+Sky and haze (VIS-05): `defineEnvironment({ sky })` draws a gradient sky with optional discs and stars from
+one texture on an unlit sphere; `haze` gains `exp2` and `color: 'sky'`. Status: implemented and checked as a candidate PR #150. Evidence: unit tests and `npm run test:sky-browser`.

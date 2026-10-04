@@ -41,6 +41,7 @@ import {
   type SceneParticles,
 } from './particle-contract';
 export type {
+  EmitterSample,
   EmitterSlot,
   ParticleField,
   ParticleFieldOptions,
@@ -559,6 +560,21 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
         }
       }
       return changed;
+    },
+    sample(entity) {
+      const slot = slots.get(entity);
+      if (disposed || !slot) return null;
+      const p = slot.pool;
+      if (p.live === 0) return {live: 0, spawned: slot.spawnIndex, bounds: null};
+      const min: [number, number, number] = [Infinity, Infinity, Infinity],
+        max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+      for (let i = 0; i < p.live; i++)
+        for (let c = 0; c < 3; c++) {
+          const v = p.pos[i * 3 + c]!;
+          if (v < min[c]!) min[c] = v;
+          if (v > max[c]!) max[c] = v;
+        }
+      return {live: p.live, spawned: slot.spawnIndex, bounds: {min, max}};
     },
     bindFailed(slot, error) {
       const note = notes.get(slot.entity);
