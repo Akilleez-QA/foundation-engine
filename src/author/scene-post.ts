@@ -84,7 +84,7 @@ export interface ScenePostOptions {
   /** MSAA samples for the scene target (the `resolution.antialias` knob). */
   samples(): number;
   /** The chunk (default `loadPostModule`; tests pass their own). */
-  load?(): Promise<PostModule>;
+  load?(): Promise<Pick<PostModule, 'createWebGLPost' | 'postUnsupported'>>;
   /** The chunk arrived (or failed): draw again. */
   changed(): void;
   report(error: unknown): void;

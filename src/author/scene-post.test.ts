@@ -47,7 +47,7 @@ function harness(o: Partial<ScenePostOptions> & {unsupported?: string | null; fa
       return {
         createWebGLPost: () => pipeline,
         postUnsupported: () => o.unsupported ?? null,
-      } as unknown as typeof import('../platform/render/backends/webgl/post');
+      };
     },
     changed: () => changed++,
     report: error => reports.push(error),
@@ -156,7 +156,10 @@ test('a pipeline error falls back to direct for the visit; a shader link failure
 
 test('settled waits for the chunk, at most the bound; dispose releases the pipeline and ignores a late arrival', async () => {
   const h = harness();
-  assert.equal(await Promise.race([h.post.settled(10_000).then(() => 'settled'), turn().then(() => 'idle')]), 'settled');
+  assert.equal(
+    await Promise.race([h.post.settled(10_000).then(() => 'settled'), turn().then(() => 'idle')]),
+    'settled',
+  );
   h.post.sync({}, 'basic');
   const t0 = Date.now();
   await h.post.settled(30);

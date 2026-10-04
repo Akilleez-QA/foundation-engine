@@ -13,7 +13,8 @@ function fakeRenderer(o: {width?: number; height?: number; maxSamples?: number} 
   const nameOf = (t: T.WebGLRenderTarget | null) => (t ? `${t.width}x${t.height}` : 'canvas');
   const whatOf = (scene: T.Object3D) =>
     scene instanceof T.Mesh ? `pass:${(scene.material as T.ShaderMaterial).fragmentShader.length}` : 'scene';
-  const renderer = {
+  // A WebGLRenderer prototype with only what the pipeline reads and records.
+  const renderer: T.WebGLRenderer = Object.assign(Object.create(T.WebGLRenderer.prototype), {
     autoClear: true,
     capabilities: {maxSamples: o.maxSamples ?? 4},
     getContext: () => ({}),
@@ -28,8 +29,8 @@ function fakeRenderer(o: {width?: number; height?: number; maxSamples?: number} 
     compile(scene: T.Object3D) {
       compiled.push({into: nameOf(current), what: whatOf(scene)});
     },
-  };
-  return {renderer: renderer as unknown as T.WebGLRenderer, draws, compiled, size};
+  });
+  return {renderer, draws, compiled, size};
 }
 const plan = (mode: 'basic' | 'full', settings = {}) => postPlan(resolvePost(settings), mode) as PostPlan;
 const scene = new T.Scene(),
@@ -62,19 +63,7 @@ test('full adds a threshold pass, 4 downsamples and 4 additive upsamples at half
   post.render(scene, camera, plan('full', {bloom: {strength: 1, threshold: 0.8, radius: 0.5}}));
   assert.deepEqual(
     f.draws.map(d => d.into),
-    [
-      '1280x800',
-      '640x400',
-      '320x200',
-      '160x100',
-      '80x50',
-      '40x25',
-      '80x50',
-      '160x100',
-      '320x200',
-      '640x400',
-      'canvas',
-    ],
+    ['1280x800', '640x400', '320x200', '160x100', '80x50', '40x25', '80x50', '160x100', '320x200', '640x400', 'canvas'],
   );
   assert.equal(post.stats().draws, 10);
   post.dispose();
@@ -174,7 +163,8 @@ test('an error inside a pass restores the renderer state; the measurement hook b
 });
 
 test('a context without a float colour buffer is refused with a reason', () => {
-  const has = (names: string[]) => ({extensions: {has: (n: string) => names.includes(n)}}) as unknown as T.WebGLRenderer;
+  const has = (names: string[]) =>
+    ({extensions: {has: (n: string) => names.includes(n)}}) as Pick<T.WebGLRenderer, 'extensions'>;
   assert.equal(postUnsupported(has(['EXT_color_buffer_float'])), null);
   assert.equal(postUnsupported(has(['EXT_color_buffer_half_float'])), null);
   assert.match(postUnsupported(has([]))!, /half-float/);

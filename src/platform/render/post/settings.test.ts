@@ -62,7 +62,12 @@ test('the tier mapping is exact: off draws direct, basic has no glow, full adds 
   assert.deepEqual(full.bloom, POST_DEFAULTS.bloom);
   assert.equal(postPlan(resolvePost({bloom: false}), 'full')!.bloom, null);
   assert.deepEqual(
-    [postDrawsOf(null), postDrawsOf(basic), postDrawsOf(full), postDrawsOf(postPlan(resolvePost({bloom: false}), 'full'))],
+    [
+      postDrawsOf(null),
+      postDrawsOf(basic),
+      postDrawsOf(full),
+      postDrawsOf(postPlan(resolvePost({bloom: false}), 'full')),
+    ],
     [0, 1, 10, 1],
     'postDraws per rendered frame: 1 combined pass; bloom adds a threshold pass and 4 down and 4 up',
   );

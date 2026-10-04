@@ -8,6 +8,7 @@ picture it drew before, with the same draws and budgets.
 | Capability | Opt in with | Section |
 |---|---|---|
 | Tone mapping and exposure | `defineScene({ view: { output } })` | [Output](#output-tone-mapping-and-exposure) |
+| Bloom, vignette and grade, per the player's `post.mode` | `defineScene({ view: { post } })` | [Post-processing](post-processing.md) |
 
 ## Output: tone mapping and exposure
 

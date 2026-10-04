@@ -43,6 +43,11 @@ Paste the derived numbers into the scene's `budget`, and add provenance:
 ```
 
 - A missing metric is unmeasured, and the checker skips it.
+- `draws` counts the scene's own draws, shadow passes included. A scene with post-processing (`view.post`) also
+  gets `postDraws`, its fullscreen post passes per rendered frame, counted apart and exact per tier: 10 at `full`
+  (reference, high), 1 at `basic` (medium), 0 at `off` (low). Write it with ports:
+  `"postDraws": 10, "ports": {"medium": {"postDraws": 1}, "low": {"postDraws": 0}}`
+  ([post-processing](../guides/post-processing.md)).
 - The start scene has no entry cost, so leave `loadMiB` and `loadMs` out of its row.
 
 ## 4. Gate

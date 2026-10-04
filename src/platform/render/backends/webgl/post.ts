@@ -224,7 +224,7 @@ export function createWebGLPost(renderer: T.WebGLRenderer, options: {samples(): 
       scene?.dispose();
       scene = target(width, height, true, samples);
     }
-    if (bloom !== (mips.length > 0) || size.width !== width || size.height !== height) {
+    if (bloom !== mips.length > 0 || size.width !== width || size.height !== height) {
       for (const m of mips) m.dispose();
       mips = bloom ? bloomSizes(width, height).map(([w, h]) => target(w, h, false, 0)) : [];
     }
