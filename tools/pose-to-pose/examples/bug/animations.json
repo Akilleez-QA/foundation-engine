@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "fps": 30,
+  "skeleton": {"maxBones": 32, "maxInfluences": 4, "root": "root"},
+  "materials": {"team": "team"},
+  "mirror": {"pairs": [[".L", ".R"]]},
+  "clips": {
+    "scuttle": {
+      "playback": "loop",
+      "fps": 30,
+      "repeatMirrored": true,
+      "controls": ["leg1_upper.L", "leg2_upper.R", "leg3_upper.L", "leg1_lower.R", "tail.1"],
+      "keys": [
+        {"pose": "scuttle_contact"},
+        {"pose": "scuttle_down", "frames": 3},
+        {"pose": "scuttle_passing", "frames": 3},
+        {"pose": "scuttle_up", "frames": 3},
+        {"pose": "scuttle_contact", "mirror": true, "frames": 3}
+      ],
+      "events": [
+        {"name": "step_A", "at": 0, "floor": ["leg1_lower.L", "leg2_lower.R", "leg3_lower.L"]},
+        {"name": "step_B", "at": 0.4, "floor": ["leg1_lower.R", "leg2_lower.L", "leg3_lower.R"]}
+      ],
+      "rootMotion": {
+        "stride": 0.24,
+        "feet": [
+          {"bone": "leg1_tip.L"},
+          {"bone": "leg2_tip.L"},
+          {"bone": "leg3_tip.L"},
+          {"bone": "leg1_tip.R"},
+          {"bone": "leg2_tip.R"},
+          {"bone": "leg3_tip.R"}
+        ],
+        "footSlideTolerance": 0.02
+      }
+    },
+    "strike": {
+      "playback": "once",
+      "fps": 30,
+      "controls": ["tail.1", "tail.2", "tail.3", "stinger"],
+      "keys": [
+        {"pose": "idle"},
+        {"pose": "strike_ready", "frames": 9, "easing": "ease-out"},
+        {"pose": "strike_hit", "frames": 4, "easing": "ease-in", "scale": {"stinger": 1.5, "tail.3": 1.15}},
+        {"pose": "strike_ready", "frames": 8, "easing": "ease-out"},
+        {"pose": "idle", "frames": 9, "easing": "ease-in-out"}
+      ],
+      "events": [
+        {"name": "impact", "at": 0.4333},
+        {"name": "planted", "at": 0.4333, "floor": ["leg1_lower.L", "leg1_lower.R", "leg3_lower.L", "leg3_lower.R"]}
+      ]
+    }
+  }
+}
