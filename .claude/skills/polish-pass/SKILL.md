@@ -12,4 +12,5 @@ Work in small rounds; each ends with `npm run check`, `npm run play:snap -- --mo
 3. **Feedback**: every player action gets an immediate response (a cue `ctx.play('ui.click')`, a colour change, a small motion). Keep it inside the budget; prefer changing existing entities over adding new ones.
 4. **Calm**: motion that is decoration respects reduced motion; no flashing.
 5. **Words**: all text in string keys (`defineGame({ strings })`), short and friendly.
-6. Report what changed with before/after screenshots and confirm no budget moved up.
+6. **Look**: colour, light, haze, framing and forms follow the [art-direction skill](../art-direction/SKILL.md); run its look checklist on the screenshots.
+7. Report what changed with before/after screenshots and confirm no budget moved up.

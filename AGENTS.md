@@ -109,6 +109,7 @@ notes outside publishable documentation.
 - **Game code only in the game folder** (`game/`, or the folder `GAME_DIR` names; the engine's own templates live in `templates/<name>/game`). It imports only `@engine`, `@kits/<name>`, its own files and JSON (`npm run lint:layers`).
 - **A game's other files stay in its folder too** ([recipe](docs/recipes/your-game-files.md)): static files it serves in `game/public/` (built with that game only), build-time Node scripts such as asset generators in `game/tools/` (may import `node:`; game code never imports them). The root `public/` is used only by a game without its own `game/public/`; keep it empty.
 - **The engine (`src/`) is read-only** unless the author asks to extend it. An engine change follows the STANDARD and its recipe, and keeps genre words out of core, platform and author (`npm run lint:generic`).
+- **Looks**: for colour, light, haze, camera framing, forms and the look checklist, follow the [art-direction recipe](docs/recipes/art-direction.md) ([skill](.claude/skills/art-direction/SKILL.md)); the `showcase` template is its worked example. Visuals are `@engine` data (environment, materials, meshes, particles), never direct three.js.
 - A genre pattern more than one game would want is a kit (`src/kits/<name>`, [recipe](docs/recipes/add-a-kit.md)); a starting game is a template ([recipe](docs/recipes/add-a-template.md)).
 
 ## Short rules
@@ -139,7 +140,7 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 - **Reading `npm run check`**: one line per step (`ok  <step> (N s)` or `FAIL <step>` followed by the last 40 lines of its output), then `check: PASS` or `check: FAIL (<steps>)`. The tests line counts files, not tests (`tests (2 file(s))`), and it selects only tests affected by uncommitted changes, so after a commit it can say `tests (nothing changed that has tests)`. To see each test and the counts, run `npx tsx --test "game/**/*.test.ts"` (`# tests`, `# pass`, `# fail` at the end).
 - **`npm run check` fails**: fix the first error; re-run. A layer error in game code means an import from outside `@engine` / `@kits`: use the author API instead.
 - **play:snap shows page errors**: they are bugs; fix them before showing anything.
-- **Over budget** (play:snap or the gate): recover in order: simplify, instance, bake, LOD ([fix-budget skill](.claude/skills/fix-budget/SKILL.md)). Measure again. Only if that is not enough, explain the cost to the author and ask; never raise a number on your own.
+- **Over budget** (play:snap or the gate): recover in order: simplify, instance (not in the author API yet: bake copies into one mesh), bake, LOD ([fix-budget skill](.claude/skills/fix-budget/SKILL.md)). Measure again. Only if that is not enough, explain the cost to the author and ask; never raise a number on your own.
 - **The gate fails on perf and you believe it is noise**: the gate already re-runs and blocks only on two consecutive breaches. Treat a block as real.
 
 ## Commands
@@ -155,6 +156,7 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 | `npm run play:criteria [-- --gate]` | The brief's success criteria, checked and tabled |
 | `npm run asset:verify -- <model.glb>` | Check a model against its `<name>.contract.json`: size, pivot, triangle/vertex/material/texture limits, bytes, material properties, provenance ([model contracts](docs/guides/model-contracts.md)); `check` runs it for every contracted GLB |
 | `npm run disclosure [-- --strict]` | Steam and itch.io AI-disclosure draft from the asset provenance records ([guide](docs/guides/asset-provenance.md)) |
+| `npm run asset:optimize -- <in.glb> --out <out.glb>` | Meshopt-compress a model and re-encode its textures as WebP at the contract's texture size (`--ktx2` waits for engine KTX2 support), keeping named nodes; checks the contract before and after ([model contracts](docs/guides/model-contracts.md#optimise)) |
 | `npm test` / `npm run lint` | All tests / all lints (format, layers, game, arch, css, generic, brief, budgets, provenance) |
 | `npm run format` / `npm run format:check` | Format code with Prettier / check it (Markdown excluded) |
 | `npm run gate` / `npm run gate:templates` | The integration gate for this game / for every template |
@@ -195,4 +197,4 @@ performance. Standards-only edits do not certify existing template experiences.
 
 ## Test browsers
 
-Test browsers are isolated and muted. Never change the user's system or application audio. The bench, play scripts and quality guard always launch a fresh Chromium with `--mute-audio` and open the game with `?flags=dev.silent`. For other automation tools, preload `scripts/silent-browser.cjs`.
+Test browsers are isolated and muted. Never change the user's system or application audio. The bench, play scripts and quality guard always launch a fresh Chromium with `--mute-audio` and open the game with `?flags=dev.silent`. A driver of your own launches through `launch()` in `scripts/perf/bench-browser.mjs` (muted, throwaway profile, `ENGINE_CHROMIUM`) or passes `--mute-audio` itself ([getting started](docs/guides/getting-started.md#without-a-browser-window-coding-agents-ci)). Preloading `scripts/silent-browser.cjs` does not mute a browser your script launches: it only adds `--mute-audio` to `AGENT_BROWSER_ARGS`, for agent-browser tools that read it, and turns off the file watcher.
