@@ -59,7 +59,7 @@ git commit -m "Level: add the fountain" -m "Perf-Budget: level.draws 30 -> 36: t
 
 `npm run lint:budgets` compares every game's `budgets.json` (`game/` and each `templates/<name>/game/`) with `origin/main`. Template keys carry the template's name (`blank/main.draws`). It fails any raise that no `Perf-Budget: <key> <old> -> <new>: <reason>` trailer on the branch names exactly. A raise that is not yet committed always fails. Lowering a number needs nothing: that is the ratchet.
 
-Before raising, try in order: simplify, instance (one draw for many copies: a `Scatter` of a `Shape` or `Mesh`, see [scatter grass and rocks](scatter-grass-and-rocks.md); particles for short-lived sprites), bake (merge static meshes per material), LOD. Raise only with the author's agreement.
+Before raising, try in order: simplify, instance (one draw for many copies: a `Scatter` of a `Shape` or `Mesh`, see [scatter grass and rocks](scatter-grass-and-rocks.md); particles for small moving copies), bake (merge static meshes per material, or static copies into one `Mesh` with `defineMesh` and vertex colours: [art direction](art-direction.md), section 5), LOD. Raise only with the author's agreement.
 
 A scatter is counted honestly: one draw per scatter, and its triangles are the copies drawn times the triangles of one
 copy, so `draws` falls when copies are instanced while `triangles` does not. The quality knob `effects.scatter-density`

@@ -66,7 +66,7 @@ A game lives outside the engine, in `game/` (or any folder named by `GAME_DIR`).
 | [`terrain`](templates/terrain/README.md) | canonical surface, contact, finite detail levels and coherent revisions | terrain, character |
 | [`expedition`](templates/expedition/README.md) | guided routes, persistent completion and bounded production | navigation, objectives, inventory and supporting kits |
 | [`mechanics`](templates/mechanics/README.md) | ownership, attachments, local transactions and action results | frames, vehicles, control and supporting kits |
-| [`showcase`](templates/showcase/README.md) | a lantern-lit night courtyard and a daylight garden: how good the author API can look | ui, camera, character, explore |
+| [`showcase`](templates/showcase/README.md) | a lantern-lit night courtyard and a daylight garden: how good the author API can look ([art direction](docs/recipes/art-direction.md)) | ui, camera, character, explore |
 | [`shared-world`](templates/shared-world/README.md) | two or more players on one board through a local `npm run host` ([recipe](docs/recipes/two-players-one-world.md)) | ui (and `@kits/network`) |
 
 Each template's README lists what is in it, its controls and what to change first. Each template passes the gate on its own: `GAME_DIR=templates/<name>/game npm run gate`.

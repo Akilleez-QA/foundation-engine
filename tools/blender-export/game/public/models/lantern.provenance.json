@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "author": "Foundation Engine contributors",
+  "licence": "GPL-3.0-only",
+  "source": "tools/blender-export/game/tools/lantern/export.py",
+  "sourceSha256": "3830a2ae34ef5928f762b23f93370b48512a2746dd5fac5c9055e9e1b3257320",
+  "tool": "Blender 5.2.1 LTS",
+  "generator": "Khronos glTF Blender I/O v5.2.40",
+  "artifact": "lantern.glb",
+  "sha256": "b3a5ddcd1d26f22531bcd2d7241f85c5586f254c320488d62f3f563954c533fa",
+  "units": "metres",
+  "up": "+Y",
+  "pivot": "base centre",
+  "origin": "original: generated from scratch by this script; no third-party models, textures or scans",
+  "authoring": "agent-assisted Blender Python, reviewed and committed by the contributors"
+}

@@ -286,6 +286,8 @@ See the [CC0 dedication](https://creativecommons.org/publicdomain/zero/1.0/).
 
 `tools/blender-export/game/public/models/metre-block.glb` is original project content, generated solely from `tools/blender-export/export.py`, with no external art inputs. Both are GPL-3.0-only; this sample does not use the CC0 exception for the earlier mechanics fixtures. Its adjacent provenance JSON records the exporter version and hashes. The model contains 12 triangles, two materials and no textures; see `tools/blender-export/README.md`.
 
+`tools/blender-export/game/public/models/lantern.glb` is also original project content, GPL-3.0-only, generated solely from `tools/blender-export/game/tools/lantern/export.py` (agent-assisted Blender Python by the Foundation Engine contributors) with no external models, textures, scans or downloaded art. It has 148 triangles, two materials and no textures; its receipt records licence, author, source, tool, generator and origin, and `lantern.contract.json` holds its limits.
+
 ## Provenance boundaries and release review
 
 [PROVENANCE.md](docs/PROVENANCE.md) describes the initial engine extraction.

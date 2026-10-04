@@ -17,7 +17,9 @@ Budgets only fall. A raise needs the author's explicit approval and a `Perf-Budg
       lists them per scatter). A scatter has no collision: keep the `Solid` or `Walls` rows that block movement. Many
       short-lived sprites (sparks, dust) are particles (`defineEmitter`), also one draw each. glTF `Model` copies cannot
       be scattered yet (bake or simplify them).
-   3. **Bake**: merge static meshes that share a material.
+   3. **Bake**: merge static scenery into one `Mesh` (`defineMesh` with vertex colours; the builders in the
+      [art-direction recipe](../../../docs/recipes/art-direction.md) section 5). A `Material` on the `Mesh` shades it
+      (flat, toon, emissive), but a `Mesh` has no texture coordinates, so textured things stay `Shape`s.
    4. **LOD**: less detail far from the camera.
 3. Nothing redraws when nothing changed (render on change): a system that touches the world every frame without a visible change breaks the idle window. Only touch what moved.
 4. Measure: `npm run bench -- --only <first>,<id> --no-check`, then `npm run perf:derive -- perf/runs/<file>.json`; write the derived numbers and provenance into `budgets.json`. Lowering needs nothing.
