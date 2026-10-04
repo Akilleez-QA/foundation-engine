@@ -10,6 +10,8 @@ The loader accepts **binary glTF (`.glb`) with everything embedded**: a `.gltf` 
 
 For a reproducible Blender export with metre scale, a base-centre pivot, material bounds and an actual engine consumer, follow the [Blender export example](../../tools/blender-export/README.md). Its checked-in original asset runs without installing Blender.
 
+To rig a model and animate it from key poses you pose yourself (a start and an end, or a looping walk cycle broken into key poses), follow [animate a model pose to pose](animate-pose-to-pose.md).
+
 ## 2. Declare it as an asset
 
 Any `.ts` file in `game/` with a default export is a definition; the `.asset.ts` ending is only a naming habit. Every asset names its licence, author and source:
