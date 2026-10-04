@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "fps": 30,
+  "skeleton": {"maxBones": 64, "maxInfluences": 4, "root": "root"},
+  "materials": {"team": "team"},
+  "mirror": {"pairs": [[".L", ".R"]]},
+  "clips": {
+    "wave": {
+      "playback": "hold",
+      "fps": 30,
+      "controls": ["upper_arm.R", "forearm.R", "hand.R"],
+      "keys": [{"pose": "wave_start"}, {"pose": "wave_end", "seconds": 0.6, "easing": "ease-in-out"}],
+      "events": [{"name": "hand_up", "at": 0.5}]
+    },
+    "walk": {
+      "playback": "loop",
+      "fps": 30,
+      "repeatMirrored": true,
+      "controls": ["thigh.L", "shin.L", "foot.L", "thigh.R", "shin.R", "foot.R", "upper_arm.L", "upper_arm.R"],
+      "keys": [
+        {"pose": "walk_contact"},
+        {"pose": "walk_down", "frames": 3},
+        {"pose": "walk_passing", "frames": 5},
+        {"pose": "walk_up", "frames": 4},
+        {"pose": "walk_contact", "mirror": true, "frames": 4}
+      ],
+      "events": [
+        {"name": "step_L", "at": 0.1, "floor": ["foot.L", "toe.L"]},
+        {"name": "step_R", "at": 0.6333, "floor": ["foot.R", "toe.R"]}
+      ],
+      "rootMotion": {
+        "stride": 1.0,
+        "feet": [
+          {"bone": "foot.L", "toe": "toe.L"},
+          {"bone": "foot.R", "toe": "toe.R"}
+        ],
+        "footSlideTolerance": 0.04
+      }
+    },
+    "walk_turn_left": {
+      "derive": {"from": "walk", "turn": "left", "bone": "spine.001", "lean": 5, "twist": 6, "yawPerCycle": 20}
+    },
+    "walk_turn_right": {
+      "derive": {"from": "walk", "turn": "right", "bone": "spine.001", "lean": 5, "twist": 6, "yawPerCycle": 20}
+    }
+  }
+}

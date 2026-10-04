@@ -528,3 +528,69 @@ test('the command line takes model files or --all, and --contract with one model
   assert.throws(() => parseArgs(['--contract', 'c.json', 'a.glb', 'b.glb']), /exactly one model/);
   assert.throws(() => parseArgs(['--fast']), /Unknown option/);
 });
+
+// Skin limits, against mutated copies of the pose-to-pose robot (a skinned, animated original model).
+const ROBOT = join(ROOT, 'tools/pose-to-pose/game/public/models/pose-robot.glb');
+const robotContract = (change = () => {}) => {
+  const raw = JSON.parse(readFileSync(ROBOT.replace(/\.glb$/, '.contract.json'), 'utf8'));
+  change(raw);
+  return parseContract(raw);
+};
+async function robotRejects({json: jsonChange, bin: binChange} = {}, pattern, change) {
+  const {json, bin} = readGlb(readFileSync(ROBOT));
+  let b = Buffer.from(bin);
+  jsonChange?.(json);
+  b = binChange?.(json, b) ?? b;
+  const bytes = packGlb(json, b);
+  const receipt = JSON.parse(readFileSync(ROBOT.replace(/\.glb$/, '.provenance.json'), 'utf8'));
+  const dir = mkdtempSync(join(tmpdir(), 'foundation-asset-verify-skin-')),
+    file = join(dir, 'model.glb');
+  writeFileSync(file, bytes);
+  writeFileSync(join(dir, 'model.provenance.json'), JSON.stringify({...receipt, sha256: digest(bytes)}));
+  try {
+    await assert.rejects(verifyModel(file, robotContract(change)), pattern);
+  } finally {
+    rmSync(dir, {recursive: true, force: true});
+  }
+}
+test('a skinned model within its skin limits passes', async () => {
+  const report = await verifyFile(ROBOT);
+  assert.deepEqual(report.clips.toSorted(), ['walk', 'walk_turn_left', 'walk_turn_right', 'wave']);
+});
+test('a skin with more joints than the contract allows is rejected', () =>
+  robotRejects({}, /24 joints, over the contract's 20/, c => (c.skin.joints = 20)));
+test('a second influence set (more than four influences) is rejected', () =>
+  robotRejects(
+    {
+      json: j => {
+        const a = j.meshes[0].primitives[0].attributes;
+        a.JOINTS_1 = a.JOINTS_0;
+        a.WEIGHTS_1 = a.WEIGHTS_0;
+      },
+    },
+    /second influence set/,
+  ));
+test('more influences per vertex than the contract allows are rejected', () =>
+  robotRejects({}, /influences, over 1/, c => (c.skin.influences = 1)));
+test('weights that do not sum to one are rejected', () =>
+  robotRejects(
+    {
+      bin: (json, bin) => {
+        const a = json.accessors[json.meshes[0].primitives[0].attributes.WEIGHTS_0],
+          view = json.bufferViews[a.bufferView];
+        assert.equal(a.componentType, 5126, 'float weights');
+        bin.writeFloatLE(0.5, (view.byteOffset ?? 0) + (a.byteOffset ?? 0));
+        bin.writeFloatLE(0, (view.byteOffset ?? 0) + (a.byteOffset ?? 0) + 4);
+        bin.writeFloatLE(0, (view.byteOffset ?? 0) + (a.byteOffset ?? 0) + 8);
+        bin.writeFloatLE(0, (view.byteOffset ?? 0) + (a.byteOffset ?? 0) + 12);
+        return bin;
+      },
+    },
+    /weights sum to 0\.5, not 1/,
+  ));
+test('a skin root that is missing, or that does not hold every joint, is rejected', async () => {
+  await robotRejects({}, /skin root hips is missing/, c => (c.skin.root = 'hips'));
+  await robotRejects({}, /is not under the skin root spine/, c => (c.skin.root = 'spine'));
+});
+test('a skin contract allows one to four influences', () =>
+  assert.throws(() => robotContract(c => (c.skin.influences = 5)), /skin\.influences must be 1 to 4/));

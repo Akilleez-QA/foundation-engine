@@ -1,0 +1,541 @@
+{
+  "bones": 24,
+  "clips": [
+    {
+      "controls": [
+        "upper_arm.R",
+        "forearm.R",
+        "hand.R"
+      ],
+      "duration": 0.6,
+      "events": [
+        {
+          "at": 0.5,
+          "floor": [],
+          "frame": 15,
+          "name": "hand_up"
+        }
+      ],
+      "fps": 30,
+      "frames": 18,
+      "keys": [
+        {
+          "easing": "linear",
+          "frame": 0,
+          "mirror": false,
+          "pose": "wave_start"
+        },
+        {
+          "easing": "ease-in-out",
+          "frame": 18,
+          "mirror": false,
+          "pose": "wave_end"
+        }
+      ],
+      "loop": false,
+      "name": "wave",
+      "playback": "hold",
+      "poses": {
+        "wave_end": "f30d0eeec4874849",
+        "wave_start": "9dd76737d4584348"
+      },
+      "sampleSha256": "6ed2e7238ea3e54c89427ac1317b2e6e2f84cc074c189489c89d1d9e1881fd52"
+    },
+    {
+      "controls": [
+        "thigh.L",
+        "shin.L",
+        "foot.L",
+        "thigh.R",
+        "shin.R",
+        "foot.R",
+        "upper_arm.L",
+        "upper_arm.R"
+      ],
+      "duration": 1.0666666666666667,
+      "events": [
+        {
+          "at": 0.1,
+          "floor": [
+            "foot.L",
+            "toe.L"
+          ],
+          "frame": 3,
+          "name": "step_L"
+        },
+        {
+          "at": 0.6333,
+          "floor": [
+            "foot.R",
+            "toe.R"
+          ],
+          "frame": 19,
+          "name": "step_R"
+        }
+      ],
+      "fps": 30,
+      "frames": 32,
+      "keys": [
+        {
+          "easing": "linear",
+          "frame": 0,
+          "mirror": false,
+          "pose": "walk_contact"
+        },
+        {
+          "easing": "linear",
+          "frame": 3,
+          "mirror": false,
+          "pose": "walk_down"
+        },
+        {
+          "easing": "linear",
+          "frame": 8,
+          "mirror": false,
+          "pose": "walk_passing"
+        },
+        {
+          "easing": "linear",
+          "frame": 12,
+          "mirror": false,
+          "pose": "walk_up"
+        },
+        {
+          "easing": "linear",
+          "frame": 16,
+          "mirror": true,
+          "pose": "walk_contact"
+        },
+        {
+          "easing": "linear",
+          "frame": 19,
+          "mirror": true,
+          "pose": "walk_down"
+        },
+        {
+          "easing": "linear",
+          "frame": 24,
+          "mirror": true,
+          "pose": "walk_passing"
+        },
+        {
+          "easing": "linear",
+          "frame": 28,
+          "mirror": true,
+          "pose": "walk_up"
+        },
+        {
+          "easing": "linear",
+          "frame": 32,
+          "mirror": false,
+          "pose": "walk_contact"
+        }
+      ],
+      "loop": true,
+      "name": "walk",
+      "playback": "loop",
+      "poses": {
+        "walk_contact": "705745c9afbfad2c",
+        "walk_down": "d4ba896cb16b5ce2",
+        "walk_passing": "52ff3b7c6d70dc53",
+        "walk_up": "cc7746bcda208cdf"
+      },
+      "rootMotion": {
+        "clip": {
+          "duration": 1.0666666666666667,
+          "keys": [
+            {
+              "at": 0.0,
+              "x": 0.0,
+              "yaw": 0.0,
+              "z": 0.0
+            },
+            {
+              "at": 1.066666667,
+              "x": 0.0,
+              "yaw": 0.0,
+              "z": 1.0
+            }
+          ]
+        },
+        "contactHeight": 0.02,
+        "feet": [
+          {
+            "bone": "foot.L",
+            "toe": "toe.L"
+          },
+          {
+            "bone": "foot.R",
+            "toe": "toe.R"
+          }
+        ],
+        "flatFootTolerance": 8,
+        "footSlideTolerance": 0.04,
+        "stride": 1.0,
+        "yawPerCycle": 0
+      },
+      "sampleSha256": "bd80ab20aff9beb91fed4798a7a3483b4be0f47afa6141974f6318303e81bf60"
+    },
+    {
+      "controls": [
+        "thigh.L",
+        "shin.L",
+        "foot.L",
+        "thigh.R",
+        "shin.R",
+        "foot.R",
+        "upper_arm.L",
+        "upper_arm.R"
+      ],
+      "derivedFrom": "walk",
+      "duration": 1.0666666666666667,
+      "events": [
+        {
+          "at": 0.1,
+          "floor": [
+            "foot.L",
+            "toe.L"
+          ],
+          "frame": 3,
+          "name": "step_L"
+        },
+        {
+          "at": 0.6333,
+          "floor": [
+            "foot.R",
+            "toe.R"
+          ],
+          "frame": 19,
+          "name": "step_R"
+        }
+      ],
+      "fps": 30,
+      "frames": 32,
+      "keys": [
+        {
+          "easing": "linear",
+          "frame": 0,
+          "mirror": false,
+          "pose": "walk_contact"
+        },
+        {
+          "easing": "linear",
+          "frame": 3,
+          "mirror": false,
+          "pose": "walk_down"
+        },
+        {
+          "easing": "linear",
+          "frame": 8,
+          "mirror": false,
+          "pose": "walk_passing"
+        },
+        {
+          "easing": "linear",
+          "frame": 12,
+          "mirror": false,
+          "pose": "walk_up"
+        },
+        {
+          "easing": "linear",
+          "frame": 16,
+          "mirror": true,
+          "pose": "walk_contact"
+        },
+        {
+          "easing": "linear",
+          "frame": 19,
+          "mirror": true,
+          "pose": "walk_down"
+        },
+        {
+          "easing": "linear",
+          "frame": 24,
+          "mirror": true,
+          "pose": "walk_passing"
+        },
+        {
+          "easing": "linear",
+          "frame": 28,
+          "mirror": true,
+          "pose": "walk_up"
+        },
+        {
+          "easing": "linear",
+          "frame": 32,
+          "mirror": false,
+          "pose": "walk_contact"
+        }
+      ],
+      "loop": true,
+      "name": "walk_turn_left",
+      "playback": "loop",
+      "poses": {
+        "walk_contact": "705745c9afbfad2c",
+        "walk_down": "d4ba896cb16b5ce2",
+        "walk_passing": "52ff3b7c6d70dc53",
+        "walk_up": "cc7746bcda208cdf"
+      },
+      "rootMotion": {
+        "clip": {
+          "duration": 1.0666666666666667,
+          "keys": [
+            {
+              "at": 0.0,
+              "x": 0.0,
+              "yaw": 0.0,
+              "z": 0.0
+            },
+            {
+              "at": 0.133333333,
+              "x": 0.002726644,
+              "yaw": 0.043633231,
+              "z": 0.12496034
+            },
+            {
+              "at": 0.266666667,
+              "x": 0.010901387,
+              "yaw": 0.087266463,
+              "z": 0.249682811
+            },
+            {
+              "at": 0.4,
+              "x": 0.024508667,
+              "yaw": 0.130899694,
+              "z": 0.373929997
+            },
+            {
+              "at": 0.533333333,
+              "x": 0.043522582,
+              "yaw": 0.174532925,
+              "z": 0.497465385
+            },
+            {
+              "at": 0.666666667,
+              "x": 0.067906937,
+              "yaw": 0.218166156,
+              "z": 0.62005382
+            },
+            {
+              "at": 0.8,
+              "x": 0.097615317,
+              "yaw": 0.261799388,
+              "z": 0.741461947
+            },
+            {
+              "at": 0.933333333,
+              "x": 0.132591169,
+              "yaw": 0.305432619,
+              "z": 0.861458659
+            },
+            {
+              "at": 1.066666667,
+              "x": 0.172767915,
+              "yaw": 0.34906585,
+              "z": 0.979815536
+            }
+          ]
+        },
+        "contactHeight": 0.02,
+        "feet": [
+          {
+            "bone": "foot.L",
+            "toe": "toe.L"
+          },
+          {
+            "bone": "foot.R",
+            "toe": "toe.R"
+          }
+        ],
+        "flatFootTolerance": 8,
+        "footSlideTolerance": 0.04,
+        "stride": 1.0,
+        "yawPerCycle": 20
+      },
+      "sampleSha256": "48f7266bd9e869b5912ed39d1aabba0690ecd24800a2c50f6b230d7ee3f830f7"
+    },
+    {
+      "controls": [
+        "thigh.L",
+        "shin.L",
+        "foot.L",
+        "thigh.R",
+        "shin.R",
+        "foot.R",
+        "upper_arm.L",
+        "upper_arm.R"
+      ],
+      "derivedFrom": "walk",
+      "duration": 1.0666666666666667,
+      "events": [
+        {
+          "at": 0.1,
+          "floor": [
+            "foot.L",
+            "toe.L"
+          ],
+          "frame": 3,
+          "name": "step_L"
+        },
+        {
+          "at": 0.6333,
+          "floor": [
+            "foot.R",
+            "toe.R"
+          ],
+          "frame": 19,
+          "name": "step_R"
+        }
+      ],
+      "fps": 30,
+      "frames": 32,
+      "keys": [
+        {
+          "easing": "linear",
+          "frame": 0,
+          "mirror": false,
+          "pose": "walk_contact"
+        },
+        {
+          "easing": "linear",
+          "frame": 3,
+          "mirror": false,
+          "pose": "walk_down"
+        },
+        {
+          "easing": "linear",
+          "frame": 8,
+          "mirror": false,
+          "pose": "walk_passing"
+        },
+        {
+          "easing": "linear",
+          "frame": 12,
+          "mirror": false,
+          "pose": "walk_up"
+        },
+        {
+          "easing": "linear",
+          "frame": 16,
+          "mirror": true,
+          "pose": "walk_contact"
+        },
+        {
+          "easing": "linear",
+          "frame": 19,
+          "mirror": true,
+          "pose": "walk_down"
+        },
+        {
+          "easing": "linear",
+          "frame": 24,
+          "mirror": true,
+          "pose": "walk_passing"
+        },
+        {
+          "easing": "linear",
+          "frame": 28,
+          "mirror": true,
+          "pose": "walk_up"
+        },
+        {
+          "easing": "linear",
+          "frame": 32,
+          "mirror": false,
+          "pose": "walk_contact"
+        }
+      ],
+      "loop": true,
+      "name": "walk_turn_right",
+      "playback": "loop",
+      "poses": {
+        "walk_contact": "705745c9afbfad2c",
+        "walk_down": "d4ba896cb16b5ce2",
+        "walk_passing": "52ff3b7c6d70dc53",
+        "walk_up": "cc7746bcda208cdf"
+      },
+      "rootMotion": {
+        "clip": {
+          "duration": 1.0666666666666667,
+          "keys": [
+            {
+              "at": 0.0,
+              "x": -0.0,
+              "yaw": -0.0,
+              "z": 0.0
+            },
+            {
+              "at": 0.133333333,
+              "x": -0.002726644,
+              "yaw": -0.043633231,
+              "z": 0.12496034
+            },
+            {
+              "at": 0.266666667,
+              "x": -0.010901387,
+              "yaw": -0.087266463,
+              "z": 0.249682811
+            },
+            {
+              "at": 0.4,
+              "x": -0.024508667,
+              "yaw": -0.130899694,
+              "z": 0.373929997
+            },
+            {
+              "at": 0.533333333,
+              "x": -0.043522582,
+              "yaw": -0.174532925,
+              "z": 0.497465385
+            },
+            {
+              "at": 0.666666667,
+              "x": -0.067906937,
+              "yaw": -0.218166156,
+              "z": 0.62005382
+            },
+            {
+              "at": 0.8,
+              "x": -0.097615317,
+              "yaw": -0.261799388,
+              "z": 0.741461947
+            },
+            {
+              "at": 0.933333333,
+              "x": -0.132591169,
+              "yaw": -0.305432619,
+              "z": 0.861458659
+            },
+            {
+              "at": 1.066666667,
+              "x": -0.172767915,
+              "yaw": -0.34906585,
+              "z": 0.979815536
+            }
+          ]
+        },
+        "contactHeight": 0.02,
+        "feet": [
+          {
+            "bone": "foot.L",
+            "toe": "toe.L"
+          },
+          {
+            "bone": "foot.R",
+            "toe": "toe.R"
+          }
+        ],
+        "flatFootTolerance": 8,
+        "footSlideTolerance": 0.04,
+        "stride": 1.0,
+        "yawPerCycle": -20
+      },
+      "sampleSha256": "0b27f4eb1c90186313f6c176ac9aa344727149db21af696cf89537f9fba73289"
+    }
+  ],
+  "fps": 30,
+  "model": "pose-robot.glb",
+  "rigSha256": "a742b067df60564f4614fca040a2cc11e9a06379b5b743a94f0a1ba8bbb411d3",
+  "schema": 1,
+  "skeleton": "pose-robot"
+}
