@@ -81,6 +81,7 @@
     "test:subpath-browser": "node -r ./scripts/silent-browser.cjs scripts/play/subpath-check.mjs playtest/subpath",
     "test:material-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/material-check.mjs playtest/material",
     "test:output-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/output-check.mjs playtest/output",
+    "test:lights-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/lights-check.mjs playtest/lights",
     "test:material-options-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/material-options-check.mjs playtest/material-options",
     "test:dmath-browser": "node --import tsx -r ./scripts/silent-browser.cjs scripts/play/dmath-check.mjs playtest/dmath",
     "bench:dmath": "node --import tsx tools/dmath-bench/bench.mjs",

@@ -1,0 +1,7 @@
+{
+  "author": "Foundation Engine contributors",
+  "licence": "GPL-3.0-only",
+  "source": "tools/pose-to-pose/examples/robot",
+  "agentAssisted": true,
+  "note": "Original procedural model. No user was present: the agent authored the key poses (author_poses.py) and the review gate was off; see the review field."
+}

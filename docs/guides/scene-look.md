@@ -8,6 +8,7 @@ picture it drew before, with the same draws and budgets.
 | Capability | Opt in with | Section |
 |---|---|---|
 | Tone mapping and exposure | `defineScene({ view: { output } })` | [Output](#output-tone-mapping-and-exposure) |
+| Point and spot lights | `defineScene({ lights: sceneLights() })`, `PointLight`, `SpotLight` | [Local lights](#local-lights-point-and-spot-lights) |
 | Bloom, vignette and grade, per the player's `post.mode` | `defineScene({ view: { post } })` | [Post-processing](post-processing.md) |
 
 ## Output: tone mapping and exposure
@@ -111,3 +112,125 @@ type is `RenderOutput` in
   runtime +0.6 kB (explorer template build); no new chunk.
 - **Not verified:** physical devices, and colour on HDR or wide-gamut displays.
   The picture is judged by its pixels in software GL only.
+
+## Local lights: point and spot lights
+
+`PointLight` and `SpotLight` are components on an entity with a `Transform`. The
+light sits at the entity's position, and a spot light aims along the entity's
+forward axis (−z, turned by its rotation) or at an explicit `target`. A scene
+opts in with a fixed number of **light slots**:
+
+```ts
+import { defineScene, PointLight, SpotLight, sceneLights, Shape, Transform, defineMaterial } from '@engine';
+
+const lantern = (x: number, z: number) => [
+  Transform({ x, y: 2.45, z }),
+  Shape({ kind: 'box', size: [0.42, 0.5, 0.42], color: 0xffd28a }),
+  defineMaterial({ emissive: 0xffa040, emissiveIntensity: 4 }),
+  PointLight({ color: 0xffa850, intensity: 6, distance: 8, decay: 2 }),
+];
+
+export default defineScene({
+  id: 'courtyard',
+  title: 'Courtyard',
+  lights: sceneLights({ point: 8, spot: 2 }),   // fixed slots for each visit
+  view: { environment: night, output: { toneMapping: 'aces', exposure: 1 } },
+  entities: [
+    lantern(-9, -9), lantern(9, -9),
+    [Transform({ y: 6, rx: -Math.PI / 2 }), SpotLight({ color: 0xbfd4ff, intensity: 20, distance: 14, angle: 0.5, penumbra: 0.4 })],
+  ],
+});
+```
+
+Systems may change a light's fields at run time (flicker the `intensity`, switch
+`visible`, move the `Transform`); each change draws one frame.
+
+### Fields
+
+| Field | Default | Meaning |
+|---|---|---|
+| `color` | `0xffffff` | 24-bit sRGB |
+| `intensity` | `1` | Candela, 0…1000 |
+| `distance` | `0` | Where the light cuts off, 0…50 m; 0 never cuts off |
+| `decay` | `2` | Fall-off with distance, 0…4; 2 is physically correct |
+| `essential` | `false` | Admitted before other lights, so it keeps its slot on lighter presets |
+| `visible` | `true` | `false` keeps the slot but gives no light |
+| `angle` (spot) | `π/3` | Half-angle of the cone, (0, π/2] |
+| `penumbra` (spot) | `0` | Soft edge, 0…1 |
+| `target` (spot) | `null` | A world point to aim at; `null` aims along the entity's forward axis |
+
+`PointLight(...)` and `SpotLight(...)` validate when they are written and name the
+field (`PointLight: distance must be in [0, 50] metres`).
+
+### Why slots
+
+three.js compiles the number of lights into every lit material's shader. Adding
+or removing a light would recompile them all (STD-REN-11), which is a visible
+hitch. So the visit creates its slots once and never changes their number:
+
+- An entity's light claims the lowest free slot of its kind and keeps it until
+  the entity is despawned or loses its light or `Transform`. The slot then goes
+  dark (intensity 0); a dark slot is still a light, so nothing recompiles.
+- Lights waiting for a slot are admitted essential first, then in spawn order.
+  An admitted light is never moved or evicted, and nothing is re-chosen per
+  frame.
+- Every slot costs fragment work on every lit surface, even when it is dark. Ask
+  for the lights the scene shows at once, not for everything it might spawn.
+
+### Inputs and outputs, owner and bounds
+
+- **Input:** `defineScene({ lights: sceneLights({ point, spot }) })`, with
+  `point` in 0…16 (default 4) and `spot` in 0…4 (default 0); the components above.
+- **Output:** pixels only. The environment's directional and hemisphere lights,
+  and `view.lights: 'default' | 'none'`, are unchanged; the slots are additive.
+- **Owner:** the scene visit. `author/light-slots.ts` decides admission (it runs in
+  `testScene` too), and `author/scene-light-rig.ts` holds the three.js lights,
+  built with the platform's fixed light rig (`platform/render/light-rig.ts`).
+- **Quality:** the `lights.local-max` knob (reference 16, high 8, medium 4, low 2)
+  is read once per visit and caps the slots of **each** kind. The `low` preset
+  therefore draws at most 2 point and 2 spot lights. Lights beyond the cap are
+  refused like any other overflow: essential lights are kept first.
+- **Render on change:** the rig compares each slot's holder, `Transform` and
+  fields once per frame and marks the frame dirty only when one changed. A still
+  scene draws zero frames.
+
+### Overload, cancellation and recovery
+
+- **Overload:** a light with no free slot is refused (cause `full`) and admitted
+  later when a slot frees. Invalid data written by a system darkens the light
+  (cause `invalid`) until a valid value is written. A scene without `sceneLights()`
+  refuses every light (cause `no-slots`). Each cause is reported once per visit,
+  for example `courtyard: 1 PointLight(s) not drawn: the scene's 8 point slot(s)
+  are full (sceneLights({ point }) or the lights.local-max quality knob)`.
+- **Counters:** `testScene(...).lights.stats` and the dev scene handle's
+  `lights()` give `slots`, `admitted` and `refused` by cause.
+- **Cancellation:** leaving the scene disposes the rig with the visit.
+- **Recovery:** the rig is CPU-side state; after a context loss three recreates the
+  programs with the same light count.
+- **A refused light keeps its look:** its `Shape` and emissive `Material` still
+  draw; only its light is missing.
+
+### Evidence and limitations
+
+- **Unit:** `src/author/lights.test.ts` (validation, slot bounds, knob caps, claim
+  and release, deterministic refusal reported once, invalid data, `testScene`).
+- **Browser:** `npm run test:lights-browser` on the reference and low presets
+  (desktop headless Chromium, software GL). The floor under a lantern is brighter
+  than the floor 10 m away. The rig keeps its size, and spawning or despawning a
+  light links no program and draws one frame. An idle scene draws no frames. At
+  `low` the third lantern is refused, reported once, and admitted when a slot
+  frees. Leaving removes every light.
+- **Bundle:** the light rig is a lazy chunk (`scene-light-rig`, about 3 kB, plus
+  three's point and spot light classes, about 2 kB) that only a scene with
+  `sceneLights()` loads, before its first frame. First-load JS grows by about
+  0.8 kB (the components and their validation) and the scene runtime by about
+  4 kB (admission and refusal reports), explorer template build.
+- **Budgets:** lights add no draws. A per-scene `localLights` budget row is not
+  implemented: the bench does not measure slots yet, so slot cost is bounded only
+  by `sceneLights` and the knob.
+- **Not verified:** physical devices. Forward-rendered lights multiply fragment
+  cost, so fill rate on phones (DV-01) is unmeasured; that is why `low` caps the
+  slots at 2.
+- **Quality knob screen:** `lights.local-max` is registered but not wired to the
+  Graphics screen yet, like `effects.particles`: a game that has no lights would
+  show a control that changes nothing.
