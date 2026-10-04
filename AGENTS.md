@@ -194,4 +194,4 @@ performance. Standards-only edits do not certify existing template experiences.
 
 ## Test browsers
 
-Test browsers are isolated and muted. Never change the user's system or application audio. The bench, play scripts and quality guard always launch a fresh Chromium with `--mute-audio` and open the game with `?flags=dev.silent`. For other automation tools, preload `scripts/silent-browser.cjs`.
+Test browsers are isolated and muted. Never change the user's system or application audio. The bench, play scripts and quality guard always launch a fresh Chromium with `--mute-audio` and open the game with `?flags=dev.silent`. A driver of your own launches through `launch()` in `scripts/perf/bench-browser.mjs` (muted, throwaway profile, `ENGINE_CHROMIUM`) or passes `--mute-audio` itself ([getting started](docs/guides/getting-started.md#without-a-browser-window-coding-agents-ci)). Preloading `scripts/silent-browser.cjs` does not mute a browser your script launches: it only adds `--mute-audio` to `AGENT_BROWSER_ARGS`, for agent-browser tools that read it, and turns off the file watcher.
