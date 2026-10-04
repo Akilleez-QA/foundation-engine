@@ -15,6 +15,7 @@
  *   Transform, Shape, Name   the built-in components the renderer and tools read
  *   Material, defineMaterial a shape's texture, repeat/wrap, roughness, metalness, emission and transparency
  *   Emitter, defineEmitter, burst, sceneParticles   optional particles: one instanced draw per emitter, fixed-step, seeded
+ *   view.output (validateSceneOutput)               opt-in tone mapping and exposure per scene
  *
  * Budgets are data in game/budgets.json (the ratchet compares them across revisions without running code).
  */
@@ -138,6 +139,14 @@ export {
 export {dmath, platformMath, scalarMath, type ScalarMath, type ScalarMathMode} from '../core/dmath';
 
 export {defineEnvironment, type EnvironmentState} from './environment';
+export {
+  validateSceneOutput,
+  OUTPUT_DEFAULTS,
+  OUTPUT_LIMITS,
+  TONE_MAPPINGS,
+  type SceneOutput,
+  type ToneMappingName,
+} from './scene-output';
 
 export {Model, validateModel, type ModelData, type ModelSocketPose} from './model';
 export {RenderMask, validateRenderMask} from './render-mask';
