@@ -165,7 +165,8 @@ distance visible: layers of trees and roofs that grow paler with distance read a
   the first screenshot (and the first second of play) shows it swinging round to its pose. For `orbit`, the position is the
   target plus `distance × (0, sin(pitch), cos(pitch))`.
 - **Phones.** `minWidthFov` widens a portrait view so the play area still fits. Fill the extra height with something
-  worth seeing in front of the play area (a street, a meadow, a low hedge), not empty ground.
+  worth seeing in front of the play area (a street, a meadow, a low hedge), not empty ground. Portrait needs its own
+  numbers: see [phone framing](#phone-framing-portrait) below.
 - **Frame the edges.** Something dark or tall at the corners (a tree, a lamp post) frames the lit centre.
 
 ```ts
@@ -179,6 +180,68 @@ distance visible: layers of trees and roofs that grow paler with distance read a
 ```
 
 ![A top-down camera, then a framed one](art-direction/camera.jpg)
+
+### Phone framing (portrait)
+
+A camera framed on a 1280×800 desktop usually fails on a 390×844 phone in two ways: the player and pickups shrink to
+a few pixels, and the top or bottom third of the screen is plain sky or bare ground. Both come from the same
+arithmetic. `fov` is vertical; on a portrait screen `minWidthFov` widens it until the horizontal view is at least
+`minWidthFov` degrees:
+
+- vertical field of view on the phone = `2 × atan(tan(minWidthFov / 2) ÷ aspect)`, with aspect = 390 ÷ 844 ≈ 0.46;
+- what fits across the phone ≈ `2 × distance × tan(minWidthFov / 2)` metres;
+- a thing `h` metres tall at `distance` metres shows about `844 × h ÷ (2 × distance × tan(vertical fov / 2))` pixels
+  tall.
+
+| `minWidthFov` | Vertical fov on the phone | Distance | 1.5 m player | 0.5 m pickup | Width that fits |
+|---|---|---|---|---|---|
+| 55 (the showcase garden) | 97° | 16 | 35 px | 12 px | 16.7 m |
+| 55 | 97° | 10 | 56 px | 19 px | 10.4 m |
+| 45 | 84° | 10 | 71 px | 24 px | 8.3 m |
+| 40 | 76° | 8 | 100 px | 33 px | 5.8 m |
+
+For comparison, the same 1.5 m player at distance 16 and `fov: 50` is about 80 px tall on the desktop picture.
+
+**Sizes that read on a phone.** In the 390×844 snap, aim for the player at least **48 px** tall and each pickup or
+target at least **24 px** across, with a value or colour contrast against what is behind it (checklist item 1). When
+they are smaller, in this order:
+
+1. **Bring the camera closer on portrait only.** The camera kit takes per-frame `options`, so a scene can switch on
+   the view's shape without touching the desktop framing:
+   `cameraSystem('orbit', {distance: 16, pitch: 0.74, options: ctx => (ctx.view.aspect < 1 ? {distance: 10, pitch: 0.9} : {})})`.
+   Set the scene's `view.camera` to the desktop pose as before.
+2. **Lower `minWidthFov`** (45 or 40) when the whole play area need not be visible at once and the camera follows the
+   player. Keep it as wide as the game needs when it must (an arena where every threat has to be on screen).
+3. **Scale the subject, not the world.** A slightly larger player, pickup or a brighter accent (a rim of the palette's
+   accent, a small particle) reads better than a closer camera that hides the play area.
+
+**Fill the top and the bottom.** The extra height of a portrait view goes half above the subject and half below it.
+
+- The horizon sits `tan(pitch) ÷ tan(vertical fov / 2)` of the half-screen above the centre. With the showcase's
+  pitch of 0.74 rad (42°) and a 97° portrait view that is 0.8: only the top tenth is sky. A flatter pitch of 0.5
+  (29°) on the same phone puts the horizon halfway up the top half, so a quarter of the screen is sky. On portrait,
+  raise the pitch (the `options` above), or make that sky worth looking at: a gradient with `discs` or `stars`, and
+  tall things behind the play area (trees, roofs, a cliff, a lighthouse) that reach into it.
+- Below the subject, put something in front of the play area: a path leading in, a hedge, foreground rocks, the
+  near edge of a pier. Haze does not help here: it only fades distance, and the bottom of the view is the nearest
+  ground.
+- Move the camera's `target` a little ahead of or above the player, so the player sits in the lower-middle of a
+  portrait view rather than on a band of empty ground.
+
+![The courtyard on a 390×844 phone: the template's camera, then the portrait options above](art-direction/phone-framing.jpg)
+
+*Left: the showcase courtyard as shipped (`distance: 16`, `pitch: 0.74`, `minWidthFov: 50`): the player is about 45 px
+tall. Right: the same scene with `options: ctx => (ctx.view.aspect < 1 ? {distance: 10, pitch: 0.9} : {})`: about 60
+px, and the houses fill the top. The closer camera also shows bare paving at the bottom, where the template had its
+hedge: a scene framed this way needs something in its new foreground. Both from `play:snap --mobile` (software GL).
+The template itself is unchanged.*
+
+**Quick check.** `npm run play:snap -- --scene <id> --mobile`, then open the phone picture from `playtest/latest/` and
+look: is the player at least 48 px tall and each pickup at least 24 px? Is the top quarter more than one flat colour?
+Is the bottom quarter more than bare ground? Does the HUD cover anything that matters? The phone snap checks layout
+and framing at 390×844 in a desktop browser; it does not show which quality preset a real phone starts on. To see the
+lighter presets' picture, open `npm run play` with `?quality=medium` or `?quality=low` in a phone-sized window. Neither
+is device evidence ([device experience](../policy/DEVICE-EXPERIENCE.md)).
 
 ## 5. Forms: build from vertices, not boxes
 
@@ -402,6 +465,68 @@ the ground right against everything that stands on it, per vertex, and put a see
 
 ![The night environment only, then point lights, a baked glow, a shadowed night light and bloom](art-direction/baked-light.jpg)
 
+### Four common misses, and their fixes
+
+Trial games built with this recipe passed their checks and still missed these. Each has a cheap fix.
+
+**Sides that look flat** (logs, trunks, walls in one even tone). A face's shade comes from how squarely it faces the
+key light, so a form looks flat when the camera sees only faces that the key light hits equally, or only faces in
+shadow.
+
+- Put the key light **to one side**: seen from above, its direction about 45 to 135 degrees round from the camera's.
+  The orbit camera at `yaw: 0` stands on the +z side looking towards −z; golden hour's key at `position: [-7, 5, 5]`
+  (about 55 degrees round) and moonlight's at `[5, 8, -4]` (about 130 degrees) each light one side of every form and
+  leave the other in fill. A key light behind the camera lights every face the camera sees alike; a key light straight
+  overhead lights every side alike.
+- Give the fill two colours: `ambient: {sky, ground}` lights faces that point up with `sky` and faces that point down
+  with `ground`, so tops and undersides differ even in shade.
+- **Bake the difference in.** A round form needs enough sides to turn: a log or trunk from `prism` with `sides: 6` or
+  more shows three or four shades; with 4 sides the camera sees one or two. `prism` and `box` take a shade multiplier
+  `k`: build the side that faces away from the key light as its own piece with `k: 0.8`, or pass a lower `k` to `face`
+  for those faces.
+- At night, when the key light is dim, a point light beside the path or a rim of baked light on one side does the
+  same job.
+
+**Shadows too faint to read** (a drone or a player whose shadow is barely there). A shadow is the key light taken away,
+so it is only as dark as the key light is strong against the fill. On the ground, the key light gives
+`directional.intensity × sun height`. In golden hour that is 3.4 × 0.5 = 1.7 against a fill of 1.6, so shadowed ground
+keeps about half its light: a clear, soft shadow. With a fill twice the key's share it keeps two thirds and barely
+shows.
+
+- Keep the key's share on the ground at least equal to `ambient.intensity` where the action is, and more for crisp
+  shadows. A night scene keeps both dim and lets point lights make the contrast.
+- Keep the sun's `shadow.extent` just larger than the play area: the same map spread over more ground makes every
+  shadow softer and paler. `softness: 'hard'` sharpens small casters.
+- **Something floating** (a drone, a hovering pickup) casts its shadow off to one side and up to a metre away, so it
+  no longer reads as "under" it. Give it a see-through shadow disc under it as well (the `Follow` disc above), at
+  opacity 0.3 to 0.5, so its height reads on every preset, including `low`, where a scene may have no shadow map at
+  all.
+
+**A glow that lights nothing** (emissive orbs, neon strips, a campfire with a dark ring round it). Emission makes the
+surface bright and lights nothing else, so checklist item 6 fails until something next to the glow is lit:
+
+- Give the glowing thing a real light on the same entity, as the courtyard's `glass` does: a `PointLight` in its
+  colour with `distance` about the radius of the pool you want and `decay: 2`.
+- **Mark the lights that must stay `essential: true`.** On `low` only 2 point lights and 2 spot lights get a slot
+  ([scene look guide](../guides/scene-look.md)); essential ones are admitted first. Mark the one or two glows the
+  player must read (the campfire, the goal) essential, and leave decoration unmarked.
+- **Bake a pool under every glow as well**, with `bakeLight`, so a glow whose real light was refused on `low` still
+  lights the ground around it. The courtyard bakes a faint glow (`intensity: 0.5, range: 4`) round every lantern for
+  this reason.
+- For moving glows (a drone's light), a real light is the only option; keep them few, unshadowed and non-essential, and
+  check the `low` picture.
+
+**`bakeLight` that changes nothing.** `bakeLight` works per vertex and multiplies each vertex's own colour:
+
+- **It needs vertices where the pool should be.** A pool of `range` 4 m on a ground quad 20 m across gets light only
+  at the quad's four corners, so it does not show. Build the ground from a grid whose cells are at most about a third
+  of the smallest `range` (`ground(b, {size: 40, cells: 40, …})` gives 1 m cells for a 3 m pool), or split large
+  floor polygons before baking. A finer grid costs triangles, not draws: 40 × 40 cells is 3 200 triangles in the same
+  single draw.
+- **It cannot brighten black.** A vertex coloured near black stays near black under any light, real or baked. Keep the
+  ground's palette colour at its value and let the environment hold the darkness (rule 1 above), then bake.
+- Bake with a white ambient (`0xffffff`), so the bake only adds light.
+
 ## 7. Textures, generated in `game/tools`
 
 A texture breaks up a flat colour on a shape (doors, crates, floors). Paint it with a build-time script instead of
@@ -499,17 +624,19 @@ Run it on the desktop **and** phone screenshots of `npm run play:snap -- --scene
 Look at the pictures yourself; a passing snap is not a good-looking one.
 
 1. **The subject reads in under a second.** The player (and the next thing to do) stands out by value or colour from
-   what is around it.
+   what is around it. On the 390×844 phone picture the player is at least 48 px tall and each pickup at least 24 px
+   ([phone framing](#phone-framing-portrait)).
 2. **Value contrast.** Squint: foreground, middle and background are different brightnesses, not one even mid-tone.
 3. **No placeholder colours.** No default grey, no pure primaries; every colour is from the palette.
 4. **Every face shows its form.** Solid things show at least two shades (a lit side and a shaded side). If they look
    flat, move the key light lower and to the side.
 5. **Things sit on the ground.** Contact darkening or a shadow disc under everything that stands; nothing floats.
-6. **Every glowing thing lights something** (a point light or a baked glow). A glow with nothing lit around it reads
-   as paint; a glow washed to white means its `emissiveIntensity` is too high for the tone mapping.
+6. **Every glowing thing lights something** (a point light or a baked glow), on `low` too: the glows that matter
+   have an `essential` light or a baked pool. A glow with nothing lit around it reads as paint; a glow washed to white
+   means its `emissiveIntensity` is too high for the tone mapping.
 7. **The world has an edge you cannot see.** Haze or framing hides where the ground ends; no seam against the sky.
-8. **The phone view works.** The play area fits, the empty space is filled with something, the HUD covers nothing that
-   matters, and a dark setup is still readable.
+8. **The phone view works.** The play area fits, the top and bottom quarters show more than flat sky or bare ground,
+   the HUD covers nothing that matters, and a dark setup is still readable ([phone framing](#phone-framing-portrait)).
 9. **Within budget.** Draws, triangles and texture memory in the snap are inside `budgets.json` (a shadow map is
    texture memory). Static scenery is baked into one mesh per bake; repeated things are a scatter.
 10. **Motion is calm.** Nothing flickers or swims; decorative motion stops under Calm.
@@ -545,9 +672,66 @@ with today's workaround:
 
 When one of these lands in the engine, this recipe gains a section for it.
 
+## Making a different game from the showcase
+
+`npm run new-game -- --template showcase` copies the whole courtyard-and-garden game into `game/`. To build another
+game on its look, keep the look and replace the game, in this order.
+
+**Keep and edit:** `look.ts` (palette and presets), `forms.ts` and `forms.test.ts` (the builders and their tests),
+`world.ts` (the player, its shadow disc, the motes and the shared systems), `game.ts` (`firstScene` and the strings),
+`build.brief.ts`, `budgets.json` and `GAME.md`.
+
+**Safe to delete** once your own scene replaces them, together and in one commit:
+
+| Files | Also update |
+|---|---|
+| `courtyard.ts`, `courtyard-scenery.ts`, `courtyard.test.ts` | `garden.test.ts` imports `courtyard`: delete or rewrite it too |
+| `garden.ts`, `garden-scenery.ts`, `garden.test.ts` | `LOOKS` in `look.ts` is only used by the sundial; keep it or drop it |
+| `embers.ts` (a save section, `showcase.embers`) | the `game.hud.embers` strings; delete it before the game ships, never rename a shipped section |
+| `crate.asset.ts`, `planks.asset.ts`, `public/textures/showcase/`, `tools/generate-textures.mjs` | only when no scene uses the textures; otherwise move them to `public/textures/<your-game>/` and fix each asset's `url` and `source` |
+
+Then point the brief at what is left: each success criterion's `by:` names a test file, and `quality.views` names
+scenes. `npm run lint:brief` (part of `npm run check`) fails on a criterion whose test file is gone or has no test named
+after it; write the new game's criteria with the author (a GAME.md changelog row) and their tests (`test('S1: …')`); never
+delete a criterion only to make the check pass. It
+also fails when a scene has no `budgets.json` row or a row names no scene: remove the rows of deleted scenes and add a
+row for each new one ([add a budget](add-a-budget.md)). Keep your first scene as the first row; `play:snap` opens it.
+
+**Changing the palette breaks tests by name, not by colour.** `forms.test.ts` builds forms with `P.stone`, `P.wood`,
+`P.leaf`, `P.leafDark`, `P.woodDark`, `P.water` and `P.lantern`, and `world.ts` and both sceneries use more keys.
+Changing a key's **value** is safe. **Renaming or removing** a key fails `npm run check` (typecheck) in every file that
+still uses it: rename it there too, or point those tests at your own keys. The builders' tests check shapes and
+determinism, not colours, so any palette key keeps their meaning. One test does read a colour: the `bakeLight` test
+expects `P.lantern` to warm a white surface (a strong red channel). If your light is cold (a blue neon), give that test
+your warm accent or a literal warm colour and keep the assertion; never weaken it.
+
+**The copied budgets note.** `game/budgets.json` keeps the template's `note`, which tells you to write
+`Perf-Budget: showcase/<key> …`. That prefix is only for the template's own file in the engine repository. In your
+game the keys have no prefix: `Perf-Budget: courtyard.draws 46 -> 50: <reason>`. Edit the note in your copy; the
+ratchet ignores it.
+
+**The template's budgets are your starting budgets.** They are measurements of the template's scenes, not of yours,
+and the rule "budgets only fall" applies to them from the commit that started the game
+([add a budget](add-a-budget.md#raising-a-budget) says how `lint:budgets` compares them). Honestly:
+
+- **A new scene with a new id** gets a new row, measured: `npm run bench -- --only <id>`, then `npm run perf:derive`,
+  then the measured worst window plus 10 %, within the brief's per-scene ceilings. That is adding a scene, not a raise.
+  Do not keep a template scene's id for a different scene to inherit its looser numbers, and do not drop a row and
+  re-add it under another id to dodge a raise.
+- **Redesigning a kept scene** (same id, a different look or more content) may need more draws, triangles or texture
+  memory than the template measured. Recover first (simplify, instance, bake; the
+  [fix-budget skill](../../.claude/skills/fix-budget/SKILL.md)). If it still needs more, it is a raise: agree it with
+  the author, commit it with one `Perf-Budget: <scene>.<metric> <old> -> <new>: <reason>` trailer per number, the reason
+  naming the requirement and the measurement ("the creator asked for a shadowed sun; measured 42.3 MiB, the 2048 map
+  is 32"), in the message's last paragraph, and add a GAME.md changelog row. Raise to the measurement plus headroom,
+  not to the ceiling.
+- **Lowering** a number, or removing the row of a deleted scene, needs nothing.
+
 ## When the author API cannot express the look: three.js itself
 
 Prefer the techniques above while they can say what you want: they keep quality tiers, budgets and three.js upgrades
-the engine's problem. When they cannot (bloom or another EffectComposer pass, a custom shader, a loader or controls), a
-game can opt into `@kits/three` and use three.js directly: full power, and the game owns that code across three.js
-upgrades. See [use three.js directly](use-three-directly.md).
+the engine's problem. Bloom, vignette and grade are built in: ask for them with `view.post` (section 6,
+[post-processing](../guides/post-processing.md)), and the player's quality setting picks the tier. When the author API
+cannot say it (a custom post pass beyond the built-in `off`, `basic` and `full` tiers, such as depth of field or an
+outline, a custom shader, a loader or controls), a game can opt into `@kits/three` and use three.js directly: full
+power, and the game owns that code across three.js upgrades. See [use three.js directly](use-three-directly.md).

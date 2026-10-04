@@ -6,8 +6,9 @@ against it is `@unstable`: a three.js upgrade of the engine may break it, and fi
 outside the public compatibility promise ([public compatibility](../../../docs/guides/public-compatibility.md)).
 
 Prefer the engine's own data (`@engine`: environment, materials, particles, models) when it can say what you want: it
-keeps quality tiers, render backends and upgrades the engine's problem. Use this kit for everything it cannot say yet:
-bloom and other post-processing passes, custom shaders, loaders, controls, and lights or shadows beyond the engine's
+keeps quality tiers, render backends and upgrades the engine's problem. Bloom, vignette and grade are built in
+(`view.post`, [post-processing](../../../docs/guides/post-processing.md)). Use this kit for everything the engine cannot
+say yet: post passes beyond the built-in tiers, custom shaders, loaders, controls, and lights or shadows beyond the engine's
 own (`PointLight`, `SpotLight`, `sceneShadows`). Recipes with
 real examples: [use three.js directly](../../../docs/recipes/use-three-directly.md).
 

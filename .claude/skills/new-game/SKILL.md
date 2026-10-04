@@ -37,13 +37,27 @@ git commit -m "Start <Title> from the <genre> template"
 
 Commit again after each step that passes `npm run check`. The worktree, serial-integration and production rules in AGENTS.md are for engine contributions; see "Building your own game" there.
 
-## 3. Propose the milestone plan in GAME.md
+## 3. The look: use the art-direction skill
+
+Any work on how the game looks (palette, light, time of day, mood, sky, shadows, glow and bloom, camera framing, the
+phone view, "make it prettier") goes through the **art-direction skill** (`.claude/skills/art-direction/SKILL.md`)
+and its recipe (`docs/recipes/art-direction.md`). Read it before the first scene is dressed, not after. It covers real
+point and spot lights, shadows, gradient skies, scatter and built-in bloom (`view.post`; no three.js needed), phone
+framing, and the look checklist the vertical slice is judged against. Put "passes the look checklist on desktop and
+phone pictures" in the slice's success criteria when the author cares how it looks.
+
+Starting from `showcase` (or reusing its `look.ts` and `forms.ts`) for a different game: the recipe's section "Making a
+different game from the showcase" lists the files you may delete, the palette keys the template's tests use, and how
+the template's budgets become yours.
+
+## 4. Propose the milestone plan in GAME.md
 
 1. **Vertical slice**: one scene, the core loop playable end to end, with its success criteria checked. Smallest possible.
 2. Then one milestone per addition, each small enough to show in one playtest round.
 
-Show the plan and ask the author to confirm before building.
+Show the plan and ask the author to confirm before building. Each step that changes the look follows the
+art-direction skill (step 3).
 
-## 4. First round
+## 5. First round
 
 `npm run check`, then `npm run play:snap -- --mobile` (if phones are targets). Show the screenshots from `playtest/latest/` and the probe line, and ask what to change.
