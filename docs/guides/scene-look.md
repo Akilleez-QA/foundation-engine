@@ -229,11 +229,15 @@ hitch. So the visit creates its slots once and never changes their number:
   `sceneLights()` loads, before its first frame. First-load JS grows by about
   0.8 kB (the components and their validation) and the scene runtime by about
   4 kB (admission and refusal reports), explorer template build.
-- **Budgets:** an unshadowed light adds no draws; its cost is fragment work (see
-  [Cost per light and per shadow](#cost-per-light-and-per-shadow)). A shadowed
-  light adds draws and passes, which the `shadowCasters` and `shadowPasses` rows
-  count. A per-scene `localLights` budget row is not implemented: the bench does
-  not measure slots, so slot cost is bounded only by `sceneLights` and the knob.
+- **Budgets:** a light without a shadow adds no draws to the scene pass; its
+  cost is fragment work (see
+  [Cost per light and per shadow](#cost-per-light-and-per-shadow)). A light with
+  `shadow: true` (in a scene with `sceneShadows()`) adds scene passes: its shadow
+  map draws every caster in its reach again, once for a spot light and once per
+  face (six) for a point light, on each frame the map redraws. The bench's
+  `shadowPasses` and `shadowCasters` rows count those passes and draws. A
+  per-scene `localLights` budget row is not implemented: the bench does not
+  measure slots, so slot cost is bounded only by `sceneLights` and the knob.
 - **Not verified:** physical devices. Forward-rendered lights multiply fragment
   cost, so fill rate on phones (DV-01) is unmeasured; that is why `low` caps the
   slots at 2. A phone reaches `low` by the player's choice or, for a constrained

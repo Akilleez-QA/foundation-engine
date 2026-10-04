@@ -8,13 +8,14 @@ description: Bring a scene back under its performance budget, or measure a new s
 Budgets only fall. A raise needs the author's explicit approval and a `Perf-Budget: <key> <old> -> <new>: <reason>` commit trailer (docs/recipes/add-a-budget.md).
 
 1. Find the breach: `npm run play:snap -- --scene <id>` (draws, triangles per frame) or the gate's report (which metric, which window: idle or active).
-2. **Count draw calls before triangles.** Each draw has a fixed CPU and driver cost, so on phones the draw count usually runs out long before the triangles do. The numbers that bind are the scene's row in `budgets.json` and the brief's per-scene ceiling for its minimum device (`brief.performance.perScene.draws`; the phone tier's default is 100 per scene). As guidance, about 100 draws per scene is what phones carry well; the brief's and `budgets.json`'s numbers always win. Cut triangles only once the draws fit, or when triangles are the metric over.
+2. **Count draw calls before triangles.** Each draw has a fixed CPU and driver cost, so on phones the draw count usually runs out long before the triangles do. The numbers that bind are the scene's row in `budgets.json` and the brief's per-scene ceiling for its minimum device (`brief.performance.perScene.draws`; the phone tier's default is 100 per scene). As guidance, about 100 draws per scene is what phones carry well; the brief's and `budgets.json`'s numbers always win. Cut triangles only once the draws fit, or when triangles are the metric over. Shadows count too: in a scene with `sceneShadows()`, each shadow map that redraws draws its casters again (one pass for the sun or a spot light, six for a shadowed point light), and the bench's `shadowCasters` row measures the largest pass. Mark small or always-moving things `Shadow({ cast: false })` and keep shadowed lights few (docs/guides/scene-look.md, Shadows).
 3. Recover, in this order, and re-measure after each:
    1. **Simplify**: fewer entities, simpler shapes (a box instead of a capsule), fewer segments, hide what the camera cannot see.
    2. **Instance and scatter**: many copies of one thing should be one draw, not one entity each.
       - Static repeats of one primitive `Shape` or one `Mesh` (rocks, grass tufts, fence posts, crates in a row): one
-        `Scatter` (`defineScatter({ shape | mesh, points | area + count, seed, ... })`, optional `Material` on the same
-        entity) in a scene with `scatter: sceneScatter()`; see docs/recipes/scatter-grass-and-rocks.md. It draws one
+        `Scatter`, shipped in `@engine` (VIS-06, #144): `defineScatter({ shape | mesh, points | area + count, seed, ... })`,
+        an optional `Material` on the same entity, in a scene with `scatter: sceneScatter()`; see
+        docs/recipes/scatter-grass-and-rocks.md. It draws one
         `InstancedMesh` per scatter: draws fall to one, triangles stay `copies x triangles per copy` (play:snap's probe
         lists them per scatter). Placement is seeded and never uses `ctx.random()`. A scatter has no collision: keep
         the `Solid` or `Walls` rows that block movement.

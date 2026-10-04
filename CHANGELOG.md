@@ -7,6 +7,9 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
+(#122 onward). None of it is in that candidate.
+
 - **Shadow cost accounting.** The bench counts `shadowPasses`, the most shadow-map renders in one frame (one per map
   face: the sun or a spot light 1, a point light 6), and the gate checks it as a count with no noise allowance. Every
   template's scenes budget `shadowPasses: 1` (measured 0): one sun shadow fits, a shadowed point light needs a
@@ -16,7 +19,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
   table (software GL). *Affected:* a game that adds a shadowed point light to a template scene must measure and set
   its `shadowPasses` row; code that read `refused` as a report count now sees light counts.
 
-- **Capability manifest and `lint:docs-claims`.** `npm run capabilities` writes `docs/capabilities.json` and
+- **Capability manifest and `lint:docs-claims` (#156).** `npm run capabilities` writes `docs/capabilities.json` and
   `docs/capabilities.md` from the code: the `@engine` value and type exports, each kit and its exports, the quality
   knobs (and whether engine code reads each one), the templates, the npm scripts, and feature IDs (VIS-01 to VIS-06,
   VIS-09, FX-01, GEN-02, MP-01, KTX2 and others) marked shipped only when their evidence is in the tree. The new
@@ -26,6 +29,66 @@ Every new framework below is optional: a game that does not use it is unchanged.
   guessed; a correct "not yet" about an unshipped feature passes; dated records under `docs/verification/` and
   `docs/releases/` are exempt. *Affected:* a change that adds an `@engine` export, a kit, a knob, a template or an npm
   script runs `npm run capabilities` and commits the result.
+- **Optional gradient sky and exponential haze (VIS-05, #150).** `defineEnvironment({ sky: { kind: 'gradient', top, horizon,
+  bottom, exponent, discs, stars } })` draws one CPU-generated texture on a sphere around the camera with a
+  built-in unlit material (no custom shader), plus additive stars; `haze: { kind: 'exp2', color, density }` adds
+  exponential fog, and `color: 'sky'` takes the horizon colour for either haze. The texture regenerates only when the
+  sky changes. Environments without `sky` or `exp2` are unchanged. The space kit refuses transitions between skies and
+  between haze kinds. See the [scene look guide](docs/guides/scene-look.md#sky-and-haze).
+- **Optional shadows (VIS-03, #148).** `defineScene({ shadows: sceneShadows({ cast, receive }) })` turns on shadow maps for a
+  scene; the environment's sun casts with `directional.shadow: { extent, softness }`, local lights with
+  `PointLight({ shadow: true })` / `SpotLight({ shadow: true })`, and `Shadow({ cast, receive })` overrides one entity.
+  Shadowed local lights are chosen once per visit and bounded by the new `lights.shadowed-max` knob (4/2/1/0,
+  unwired); maps redraw only when a caster or light changes. The bench's `shadowCasters` and `shadowDrawsIdle` rows now
+  measure real shadow passes for scenes that opt in. Scenes without `sceneShadows()` are unchanged. See the
+  [scene look guide](docs/guides/scene-look.md#shadows).
+- **Optional point and spot lights (VIS-02, #138).** `PointLight` and `SpotLight` components on an entity with a
+  `Transform`, in scenes that opt in with `defineScene({ lights: sceneLights({ point, spot }) })` (at most 16 and 4).
+  Each visit creates its slots once, so spawning or despawning a light never recompiles shaders; overflow is refused
+  deterministically (essential first, then spawn order) and reported once per cause. New quality knob
+  `lights.local-max` (16/8/4/2, unwired) caps the slots per kind. Scenes without `sceneLights()` are unchanged. See the
+  [scene look guide](docs/guides/scene-look.md#local-lights-point-and-spot-lights).
+- **Opt-in tone mapping and exposure per scene (VIS-01, #124).** `defineScene({ view: { output: { toneMapping, exposure } } })`
+  with `'none'` (default), `'aces'`, `'agx'` or `'neutral'` and an exposure in (0, 16]; `ctx.view.output` changes at
+  run time with one redraw. A scene without `output` draws exactly as before (picture guard: identical). See the
+  [scene look guide](docs/guides/scene-look.md).
+- **Instanced scatter (VIS-06, #144).** `Scatter`/`defineScatter` in a scene with `defineScene({ scatter: sceneScatter({ max, instances }) })` draws
+  many copies of a primitive `Shape` or a `Mesh` as one `InstancedMesh` per scatter: placement from `points` or an
+  `area` (`rect`, `ring`, `edge`) with `count`, seeded (never `ctx.random()`), per-copy scale, rotation, tilt and colour
+  jitter, and an optional `Material` for every copy. Bounded per scene; a `Transform` move does not rebuild. New knob
+  `effects.scatter-density` thins non-essential copies (registered, unwired). glTF `Model` scatter is not included.
+  [Guide](docs/guides/scatter.md), [recipe](docs/recipes/scatter-grass-and-rocks.md), `npm run test:scatter-browser`.
+- **Material options; `Material` on `Mesh` and `Model` (VIS-04, #127).** `shading` (`'standard'`, `'matte'`, `'flat'`,
+  `'toon'` with `toonSteps`), `side: 'double'`, `alphaCutoff` and `vertexColors`. A `Mesh` with a `Material` is shaded
+  like a `Shape` (a texture is reported and not drawn: meshes have no UVs); a `Model` with a `Material` overrides that
+  entity's own materials, keeping each model value the material leaves at its default.
+  [Recipe](docs/recipes/give-a-shape-a-material.md), `npm run test:material-options-browser`.
+- **Flipbook particles and `npm run fx:pack` (FX-01a, #141).** `frames: { cols, rows, count?, fps?, mode }` on an
+  emitter's texture plays a sprite sheet (`'over-life'`, `'loop'`, `'random-start'`), still one draw per emitter;
+  emitters without `frames` are unchanged. `npm run fx:pack` packs a PNG sequence into an atlas with a JSON sidecar
+  (grid, sizes, input hashes, provenance). [Guide](docs/guides/particles.md).
+- **Effect lifecycle tests (#143).** [Recipe](docs/recipes/test-effect-lifecycles.md) with five named tests (a
+  cancelled windup produces nothing, an impact fires once, stacking refreshes, an owner despawn stops emission, pooled
+  trails do not bridge), effects spawned from animation markers, and `testScene` `particles.sample` to read one
+  emitter's particles. No runtime change.
+- **The showcase template (#128).** `npm run new-game -- --template showcase`: a night courtyard and a day garden built
+  from the author API alone, with a palette and four environment presets, low-poly forms baked into one `Mesh`, light
+  baked into vertex colours, emissive glass and particles. [README](templates/showcase/README.md).
+- **Art-direction recipe and skill (#139).** [Make it look good](docs/recipes/art-direction.md) and
+  `.claude/skills/art-direction`: palette, presets, lighting ratios, haze, framing, baked forms and light, textures,
+  particles and a look checklist, each code block an excerpt of the showcase template (tested).
+- **Pose-to-pose animation pipeline (#142, #149, #151, #152, #153).** `tools/pose-to-pose/`: headless Blender 5.2
+  rigging (humanoid metarig or rigid parts), rig test poses, key-pose capture, in-betweening, loops, export and
+  validation, with a robot and a six-legged creature as worked examples; the exports play in the stock model loader
+  with root motion and clip markers (`npm run test:pose-to-pose-browser`, in CI); key poses can come from a reference
+  clip through a take ledger with per-pose approval. [Recipe](docs/recipes/animate-pose-to-pose.md). The person poses
+  and approves; the agent rigs and interpolates.
+- **Blender examples and recipe (#134, #145).** An original low-poly lantern built by headless Blender with its model
+  contract and receipt, and [make assets with Blender through MCP](docs/recipes/make-assets-with-blender-mcp.md) with
+  an opt-in MCP config example (nothing is installed or registered).
+- **Onboarding fixes from the 7c26db7 trials (#140, #125).** Getting started gains a no-browser-window section and
+  template-aware steps; every template README gains a "First steps" table; `PORT=<n> npm run preview`; `play:snap`
+  prints the phone fps (advisory) and evidence paths are repository-relative.
 - **Model contracts (`npm run asset:verify`).** A GLB under a game's `public/models/` with an adjacent
   `<name>.contract.json` is checked against it by `npm run check`: size and pivot, triangle, vertex, material and
   texture limits, file and texture bytes, allowed material properties and the receipt fields licence, author,
@@ -41,11 +104,11 @@ Every new framework below is optional: a game that does not use it is unchanged.
   players see apart from development tooling; a missing record makes the draft INCOMPLETE. The ship skill runs it
   before a store page. [Guide](docs/guides/asset-provenance.md). *Affected:* games with files in `public/` see
   warnings in `npm run check` until they add records; nothing fails unless the brief opts in.
-- **fix-budget skill: draw calls first.** The skill now counts draws before triangles against the scene's
+- **fix-budget skill: draw calls first (#130).** The skill counts draws before triangles against the scene's
   `budgets.json` row and the brief's per-scene ceiling (about 100 per scene on phones as guidance; the brief's
-  numbers win), and names the real APIs for instancing and scatter: one `defineMesh` entity for static repeats
-  placed with `@kits/terrain`'s `createSurfaceScatter`, and `Emitter` for many small moving things.
-  Documentation only.
+  numbers win), and names the real APIs for instancing: `Scatter` for static repeats of a `Shape` or `Mesh` (since
+  #144), `@kits/terrain`'s `createSurfaceScatter` for uneven ground, and `Emitter` for many small moving things. It now
+  also counts shadow passes. Documentation only.
 - **Agent skill: build an asset in Blender (`.claude/skills/blender-asset`).** Plan parts and contacts in
   metres, one rebuild-from-scratch script per asset, a screenshot after every change, measurements (bounds,
   ground contact, gaps, non-manifold edges) as the acceptance evidence, about two retries per defect, Blender
@@ -57,13 +120,13 @@ Every new framework below is optional: a game that does not use it is unchanged.
   `npm run asset:verify` accepts `KHR_texture_basisu` when the contract lists it (`ENGINE_KTX2` is on), so
   `npm run asset:optimize -- --ktx2` now runs. See
   [KTX2 model textures](docs/guides/compressed-textures.md).
-- **`lint:game` rule `three-legacy`.** In a game file that imports three (through a `@kits/three` kit, or
+- **`lint:game` rule `three-legacy` (#132).** In a game file that imports three (through a `@kits/three` kit, or
   directly), it flags three.js APIs that are gone or deprecated in the pinned three r186, each with its
   replacement: `Geometry`/`Face3`, `*BufferGeometry` aliases, `outputEncoding`, `texture.encoding`,
   `sRGBEncoding`/`LinearEncoding`, `physicallyCorrectLights`, `useLegacyLights`, `gammaOutput`/`gammaFactor`,
   `JSONLoader`/`BasisTextureLoader`/`RGBELoader`, `mergeBufferGeometries`, `Clock`, `PCFSoftShadowMap` and
-  `three/examples/js/` imports. No `@kits/three` kit exists yet and `lint:layers` keeps three out of game code,
-  so the rule is dormant today and ready for that kit. A test checks each "removed" name against the installed
+  `three/examples/js/` imports. It applies to games that opt in to `@kits/three` (#136); `lint:layers` still keeps
+  three out of every other game. A test checks each "removed" name against the installed
   three. Escape with a reason: `// lint-game-allow three-legacy: <reason>`.
 - **Model optimisation (`npm run asset:optimize`).** glTF-Transform's `optimize` with meshopt geometry
   compression, WebP textures resized to the contract's `textureSize` (`--ktx2` writes KTX2 since the model
@@ -106,7 +169,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
 **Proposed, not released.** The version number and date are a proposal; the author decides both, and
 creates any tag or GitHub release. Release candidate: `7c26db7` (the merge of #121, after #108). Evidence, release notes,
 upgrade guide and support matrix: [candidate bundle](docs/releases/candidate-7c26db7/README.md). Covers every
-PR merged after v0.2.0 (`071e3c2`). `package.json` still says 0.2.0 until the author bumps it with the tag.
+PR merged after v0.2.0 (`071e3c2`) up to the candidate; later PRs are under Unreleased. `package.json` still says 0.2.0 until the author bumps it with the tag.
 
 ### Upgrading from 0.2.0
 
@@ -178,29 +241,6 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
 
 ### Changes
 
-- **Optional gradient sky and exponential haze (VIS-05).** `defineEnvironment({ sky: { kind: 'gradient', top, horizon,
-  bottom, exponent, discs, stars } })` draws one CPU-generated texture on a sphere around the camera with a
-  built-in unlit material (no custom shader), plus additive stars; `haze: { kind: 'exp2', color, density }` adds
-  exponential fog, and `color: 'sky'` takes the horizon colour for either haze. The texture regenerates only when the
-  sky changes. Environments without `sky` or `exp2` are unchanged. The space kit refuses transitions between skies and
-  between haze kinds. See the [scene look guide](docs/guides/scene-look.md#sky-and-haze).
-- **Optional shadows (VIS-03).** `defineScene({ shadows: sceneShadows({ cast, receive }) })` turns on shadow maps for a
-  scene; the environment's sun casts with `directional.shadow: { extent, softness }`, local lights with
-  `PointLight({ shadow: true })` / `SpotLight({ shadow: true })`, and `Shadow({ cast, receive })` overrides one entity.
-  Shadowed local lights are chosen once per visit and bounded by the new `lights.shadowed-max` knob (4/2/1/0,
-  unwired); maps redraw only when a caster or light changes. The bench's `shadowCasters` and `shadowDrawsIdle` rows now
-  measure real shadow passes for scenes that opt in. Scenes without `sceneShadows()` are unchanged. See the
-  [scene look guide](docs/guides/scene-look.md#shadows).
-- **Optional point and spot lights (VIS-02).** `PointLight` and `SpotLight` components on an entity with a
-  `Transform`, in scenes that opt in with `defineScene({ lights: sceneLights({ point, spot }) })` (at most 16 and 4).
-  Each visit creates its slots once, so spawning or despawning a light never recompiles shaders; overflow is refused
-  deterministically (essential first, then spawn order) and reported once per cause. New quality knob
-  `lights.local-max` (16/8/4/2, unwired) caps the slots per kind. Scenes without `sceneLights()` are unchanged. See the
-  [scene look guide](docs/guides/scene-look.md#local-lights-point-and-spot-lights).
-- **Opt-in tone mapping and exposure per scene (VIS-01).** `defineScene({ view: { output: { toneMapping, exposure } } })`
-  with `'none'` (default), `'aces'`, `'agx'` or `'neutral'` and an exposure in (0, 16]; `ctx.view.output` changes at
-  run time with one redraw. A scene without `output` draws exactly as before (picture guard: identical). See the
-  [scene look guide](docs/guides/scene-look.md).
 - **The gate passes on Node 23 and newer.** Node 23 changed the test runner's default report for piped output
   from TAP (`# tests 4`) to spec (`ℹ tests 4`), so `scripts/compatibility.test.mjs` failed `npm test` and
   `npm run gate` for a fresh game on every Node newer than 22. Scripts that read test output now name the TAP
