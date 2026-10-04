@@ -7,6 +7,8 @@ description: Start a new game with the author. Interview them, fill the build br
 
 The brief is the contract (AGENTS.md). Nothing is built before the author agrees to it.
 
+Before telling the author that something cannot be done, check docs/capabilities.md: it is generated from the code and lists every shipped feature, kit, knob and template. If another page says a feature is missing but this list shows it as shipped, the list is right.
+
 ## 1. Interview (short; one message, then follow-ups only where needed)
 
 Ask, in plain words:
