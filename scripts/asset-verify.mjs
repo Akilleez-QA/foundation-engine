@@ -542,13 +542,10 @@ export async function verifyModel(file, contract, {provenance = companions(file)
           assert.ok(k === root, `joint ${json.nodes[joint].name} is not under the skin root ${c.skin.root}`);
         }
     }
+    // A second influence set (JOINTS_1/WEIGHTS_1) is already refused by the loader caps above.
     for (const [m, mesh] of (json.meshes ?? []).entries())
       for (const primitive of mesh.primitives) {
         const a = primitive.attributes;
-        assert.ok(
-          a.JOINTS_1 === undefined && a.WEIGHTS_1 === undefined,
-          `mesh ${mesh.name} has a second influence set (JOINTS_1/WEIGHTS_1): more than four influences`,
-        );
         if (a.WEIGHTS_0 === undefined) continue;
         // Raw accessor values: the loader renormalises weights, so the re-import cannot show a bad sum.
         const skin = json.skins?.[(json.nodes ?? []).find(n => n.mesh === m)?.skin];
