@@ -9,7 +9,9 @@ the rest:** rigging, in-betweens, timing, loop closure, export and validation.
   the segments chain into a closed loop, for example contact → down → passing → up → contact (mirrored
   for the other side). The last pose of the chain is the first pose of the next cycle.
 
-This page is the tool reference: what each script does, its formats and its checks.
+The step-by-step guide for creators and agents is the recipe
+[animate a model pose to pose](../../docs/recipes/animate-pose-to-pose.md). This page is the tool
+reference: what each script does, its formats and its checks.
 
 Everything runs with Blender 5.2 in the background (`blender --background --factory-startup
 --python-exit-code 1 --python <script> -- <args>`). No add-on is installed, no MCP server is used and
