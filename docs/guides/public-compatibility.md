@@ -7,6 +7,15 @@ implementation files are internal dependencies; their presence is not a public
 compatibility promise. A creator can replace infrastructure deliberately, but owns
 the resulting integration and its verification.
 
+`@kits/three` is the documented exception: its entry point is supported, but what it
+exposes is three.js itself (the engine's copy, r186) and the engine's scene, camera
+and renderer objects. Code written against it is `@unstable` and outside this
+promise: a three.js upgrade of the engine may break it, and the game owns that code
+([use three.js directly](../recipes/use-three-directly.md)). A three.js upgrade
+re-runs `npm run typecheck` over the courtyard fixture (`tools/visual-courtyard/game`)
+and its browser check, which say what changed; record breaking changes in the
+changelog.
+
 The separately built `@foundation-engine/pure` artifact has a different boundary:
 only the subpaths in its generated package `exports` map are consumable contracts.
 It does not provide the scene runtime or all source-checkout aliases. Retain the

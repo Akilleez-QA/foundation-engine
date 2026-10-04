@@ -16,7 +16,7 @@ const slice = (from: string, to: string) => {
   return source.slice(a, b);
 };
 const wiring = slice('      const pressed = ', '      input.onCancel(');
-const runnerLine = slice('      const fixedSystems = ', '\n      const live = ');
+const runnerLine = slice('      const fixedSystems = ', '\n      const live =');
 // The whole sceneInput(...) call, whether it sits on one line or Prettier wraps its arguments.
 const liveInputLine = slice('      const liveInput = sceneInput(', ');\n') + ');';
 const inputLine = slice('        input: tap ? tap.input : liveInput,', '\n');

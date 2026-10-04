@@ -437,3 +437,10 @@ When one of these lands in the engine, this recipe gains a section for it. Alrea
 or `Mesh` in one draw ([scatter grass and rocks](scatter-grass-and-rocks.md)), and a `Material` on a `Mesh` or `Model`
 with flat, matte or toon shading, double sides and cut-outs ([give a shape a material](give-a-shape-a-material.md); a
 `Mesh` still takes no texture).
+
+## When the author API cannot express the look: three.js itself
+
+Prefer the techniques above while they can say what you want: they keep quality tiers, budgets and three.js upgrades
+the engine's problem. When they cannot (an EffectComposer pass, a custom shader, a loader or controls), a game can
+opt into `@kits/three` and use three.js directly: full power, and the game owns that code across three.js upgrades.
+See [use three.js directly](use-three-directly.md).

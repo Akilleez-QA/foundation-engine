@@ -19,6 +19,11 @@
 //   nobody imports app/ or dev/ (test support excepted)            (nobody-imports-app, nobody-imports-dev)
 //   game/ and templates/<name>/game/ (outside src/) import only `@engine`, `@kits/<name>`, their own files and JSON
 //                 (game-imports-engine-only); only app/ reads the game (the composition root, through `@game`).
+//                 The one exception is the three.js escape hatch (src/kits/three/README.md): a game that lists the kit
+//                 in `defineGame({ kits: [three()] })` may import `three`, `three/addons/*` and `three/examples/jsm/*`
+//                 in its own files; any other game may not (three-needs-kit), and `@kits/three` itself needs the
+//                 listing (kit-not-listed). `three/webgpu` and `three/tsl` stay banned for every game (lint:game,
+//                 ADR 0078). Engine code never gets this allowance.
 //                 Two folders of a game are not game code: <game>/public/ (static files served as they are) is not read,
 //                 and <game>/tools/ holds the game's build-time Node scripts (asset generators), which may import
 //                 anything; game code never imports a tool (game-imports-no-tools), so no tool reaches the browser.
@@ -250,6 +255,62 @@ export function gameDirs(root = ROOT) {
   ].filter(d => existsSync(d));
 }
 const KIT = /^@kits\/([a-z][a-z0-9-]*)$/;
+/** A three.js import the escape hatch allows: the core, its addons and examples (never three/webgpu or three/tsl). */
+export const THREE_IMPORT = /^three(\/(addons|examples\/jsm)\/.+)?$/;
+/** The bracketed text after `kits:` (balanced), or null. */
+function kitsArray(code) {
+  const m = /\bkits\s*:\s*\[/.exec(code);
+  if (!m) return null;
+  let depth = 1,
+    i = m.index + m[0].length;
+  const start = i;
+  for (; i < code.length && depth > 0; i++) {
+    if (code[i] === '[') depth++;
+    else if (code[i] === ']') depth--;
+  }
+  return code.slice(start, i - 1);
+}
+/** Game source files (absolute) of `dir`: not public/, tools/ or tests. */
+function gameSources(dir) {
+  const out = [];
+  const walk = d => {
+    for (const e of readdirSync(d, {withFileTypes: true})) {
+      const p = join(d, e.name);
+      if (e.isDirectory()) {
+        if (!(d === dir && (e.name === 'public' || e.name === 'tools')) && e.name !== 'node_modules') walk(p);
+      } else if (/\.[cm]?[jt]s$/.test(e.name) && !/\.test\.[cm]?[jt]s$/.test(e.name) && !e.name.endsWith('.d.ts'))
+        out.push(p);
+    }
+  };
+  if (existsSync(dir)) walk(dir);
+  return out.sort();
+}
+/**
+ * The kits a game folder lists in `defineGame({ kits: [...] })`: each `@kits/<name>` import whose binding is called
+ * inside the `kits` array of the file that calls `defineGame(`. Static, so the lints need no build.
+ */
+export function listedKits(dir, read = f => readFileSync(f, 'utf8')) {
+  const kits = new Set();
+  for (const file of gameSources(dir)) {
+    const code = stripComments(read(file));
+    if (!/\bdefineGame\s*\(/.test(code)) continue;
+    const list = kitsArray(code);
+    if (list === null) continue;
+    for (const m of code.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]@kits\/([a-z][a-z0-9-]*)['"]/g))
+      for (const part of m[1].split(',')) {
+        const [imported, local = imported] = part.trim().split(/\s+as\s+/);
+        if (local && /^[\w$]+$/.test(local) && new RegExp(`(^|[^\\w$.])${local.replace('$', '\\$')}\\s*\\(`).test(list))
+          kits.add(m[2]);
+      }
+  }
+  return kits;
+}
+/** Game files (repository-relative) that use the three.js escape hatch: they import `@kits/three` or `three`. */
+export function escapeHatchFiles(dir, read = f => readFileSync(f, 'utf8')) {
+  return gameSources(dir)
+    .filter(f => importsOf(read(f)).some(({spec}) => spec === '@kits/three' || THREE_IMPORT.test(spec)))
+    .map(f => relative(ROOT, f).split(sep).join('/'));
+}
 /** Game files (repository-relative), and their imports that are not the author API, a kit, their own files or JSON. */
 export function checkGame(dir, read = f => readFileSync(f, 'utf8')) {
   const out = [];
@@ -265,6 +326,7 @@ export function checkGame(dir, read = f => readFileSync(f, 'utf8')) {
   };
   const tools = join(dir, 'tools');
   const inTools = p => p === tools || p.startsWith(tools + sep);
+  const three = listedKits(dir, read).has('three');
   const check1 = file => {
     const rel = relative(ROOT, file).split(sep).join('/');
     if (inTools(file)) return;
@@ -278,6 +340,11 @@ export function checkGame(dir, read = f => readFileSync(f, 'utf8')) {
       if (kit) {
         if (!existsSync(join(SRC, 'kits', kit[1], 'index.ts')))
           out.push({rule: 'game-imports-a-real-kit', from: rel, to: spec});
+        else if (kit[1] === 'three' && !three) out.push({rule: 'kit-not-listed', from: rel, to: spec});
+        continue;
+      }
+      if (THREE_IMPORT.test(spec)) {
+        if (!three) out.push({rule: 'three-needs-kit', from: rel, to: spec});
         continue;
       }
       if (/\.test\.[cm]?[jt]s$/.test(rel) && spec.startsWith('node:')) continue;
@@ -296,7 +363,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (process.argv.includes('--json')) console.log(JSON.stringify(v, null, 1));
   else if (v.length) {
     console.error(
-      `lint:layers: ${v.length} violation(s)\n` + v.map(x => `  ${x.rule}: ${x.from} → ${x.to}`).join('\n'),
+      `lint:layers: ${v.length} violation(s)\n` +
+        v.map(x => `  ${x.rule}: ${x.from} → ${x.to}`).join('\n') +
+        (v.some(x => x.rule === 'three-needs-kit' || x.rule === 'kit-not-listed')
+          ? "\n  three.js in game code is the opt-in escape hatch: list three() from '@kits/three' in defineGame({ kits }) (src/kits/three/README.md), or use @engine"
+          : ''),
     );
   } else console.log(`lint:layers: ${files.length} engine files and ${games.length} game dir(s), no violations`);
   process.exitCode = v.length ? 1 : 0;

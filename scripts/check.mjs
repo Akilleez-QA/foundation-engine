@@ -4,7 +4,8 @@
 //   2. lint: formatting (Prettier, on the changed files; --all checks every file), layers, the game rules (Math.random,
 //      literal UI text), genericity, type escapes, the brief (this game), the budget ratchet, the model contracts
 //      (scripts/asset-verify.mjs --all: every GLB under a game's public/models with a <name>.contract.json), and
-//      asset provenance (this game; warnings by default, errors when the brief sets assets.provenance: 'required')
+//      asset provenance (this game; warnings by default, errors when the brief sets assets.provenance: 'required');
+//      and one line per game file that uses the three.js escape hatch (@kits/three or a `three` import)
 //   3. the tests that the change can affect: changed test files, the test next to each changed file, every test of
 //      the game folder when anything in it changed, and every test of a changed engine folder
 // "Changed" is the working tree against HEAD, plus untracked files. `--base <ref>` includes committed branch
@@ -171,6 +172,12 @@ if (process.argv[1] && process.argv[1].endsWith('check.mjs')) {
     );
   run('lint:layers', 'node', ['scripts/lint/layers.mjs']);
   run('lint:game', 'node', ['scripts/lint/game-rules.mjs']);
+  // The three.js escape hatch is allowed, never silent: name every game file that uses it (src/kits/three/README.md).
+  const {gameFolders} = await import('./lint/game-rules.mjs');
+  const {escapeHatchFiles} = await import('./lint/layers.mjs');
+  for (const dir of await gameFolders())
+    for (const file of escapeHatchFiles(dir))
+      console.log(`escape hatch in use (@kits/three: full three.js, unstable across three upgrades): ${file}`);
   run('lint:generic', 'node', ['scripts/lint/genericity.mjs']);
   run('lint:types', 'node', ['scripts/lint/types.mjs']);
   run('lint:brief', toolCommand('tsx', ['scripts/lint/brief.ts', GAME]));

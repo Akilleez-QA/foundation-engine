@@ -57,6 +57,17 @@ Every new framework below is optional: a game that does not use it is unchanged.
 - **`asset:verify` enforces the model loader's caps.** Every contracted model must fit the loader's admission
   limits (32 MiB, accessor, node, skin and animation counts, four bone influences), and Draco is refused (KTX2
   is accepted when the contract lists it, since #146).
+- **Full three.js for a game that opts in: `@kits/three`.** A game that lists `three()` in `defineGame({ kits })`
+  may import `three`, `three/addons/*` and `three/examples/jsm/*` (one shared copy); every other game still may not
+  (`npm run lint:layers`: `three-needs-kit`, `kit-not-listed`), and `npm run check` names each file that uses the kit.
+  A scene opts in with `defineScene({ extensions: [sceneThree()] })` and gets `useThree(ctx)`: the scene, a disposed
+  `root`, camera, renderer, canvas, `requestRender`, `onFrame`, `onBeforeRender`, `onResize`, `setRenderOverride`
+  (an EffectComposer, for example) and `own()`. `customObject({ create, update, dispose })` with `ThreeObject` is the
+  per-entity convenience path, capped per scene and bounded per object. The engine disposes everything on exit,
+  restores the render target, size and pixel ratio after game code, and keeps render on change; budgets measure the
+  real renderer. **Unstable across three.js upgrades: the game owns that code.** Engine side: a genre-neutral render
+  extension seam (`SceneExtension`, opaque in `@engine`). Guide: [use three.js directly](docs/recipes/use-three-directly.md);
+  browser evidence: `npm run test:three-kit-browser` (the courtyard fixture, software GL only).
 
 ## 0.3.0 — proposed; author decides
 
