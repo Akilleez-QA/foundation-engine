@@ -419,7 +419,7 @@ integration: implemented, candidate. Evidence: unit tests and
 so template budgets are unchanged. No physical-device, GPU timing or visual-quality
 acceptance.
 
-## Material options (VIS-04) — implemented, checked in PR #PR4
+## Material options (VIS-04) — implemented, checked in PR #127
 
 `Material` gains `shading` ('standard', 'matte', 'flat', 'toon' with `toonSteps`), `side`, `alphaCutoff` and
 `vertexColors`, and now applies to `Mesh` (`defineMesh`; no textures, which need texture coordinates) and to `Model`

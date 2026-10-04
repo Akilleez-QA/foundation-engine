@@ -689,7 +689,7 @@ Evidence: unit tests, the recipe's code as a test, and `npm run test:particle-br
 physical-device, GPU timing, fill-rate or visual-quality acceptance. See the
 [guide](particles.md).
 
-## Material options — VIS-04, implemented and checked in PR #PR4
+## Material options — VIS-04, implemented and checked in PR #127
 
 New `MaterialData` fields `shading` (`'standard' | 'matte' | 'flat' | 'toon'`), `toonSteps` (2…5), `side`
 (`'front' | 'double'`), `alphaCutoff` ([0, 1)) and `vertexColors` (default true), with `MATERIAL_SHADINGS`. A
