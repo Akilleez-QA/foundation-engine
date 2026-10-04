@@ -8,7 +8,7 @@ Following every "read first" link literally costs about 28k tokens. For work onl
 
 - **Read:** this file (17 KB, ~4.3k, already loaded), [getting started](docs/guides/getting-started.md) (9 KB, ~2.3k), your template's `templates/<name>/README.md` (1.5–2.3 KB, ~0.5k) and the [recipes index](docs/recipes/README.md) (3 KB, ~0.7k). Then only the skill (`.claude/skills/*/SKILL.md`, 1–3 KB) and the recipe for the task in hand.
 - **Skip unless you change `src/`:** [STANDARD.md](docs/STANDARD.md) (65 KB, ~16k), [CREATOR-CONTRACT.md](docs/CREATOR-CONTRACT.md) (11 KB, ~2.7k), the status ledgers in `docs/guides/` (`composition-framework-status`, `framework-upgrade-status`, `upgrade-acceptance-ledger`; 49–91 KB each), and the sections below on the engine contract, capability documentation and worktree integration.
-- **Read when it applies:** [DEVICE-EXPERIENCE.md](docs/policy/DEVICE-EXPERIENCE.md) (22 KB, ~5.4k) for UI, control, camera, framing or quality changes on the brief's devices; [KID-SAFE.md](docs/policy/KID-SAFE.md) when the brief sets `kids: true`.
+- **Read when it applies:** [DEVICE-EXPERIENCE.md](docs/policy/DEVICE-EXPERIENCE.md) (22 KB, ~5.4k) for UI, control, camera, framing or quality changes on the brief's devices; [KID-SAFE.md](docs/policy/KID-SAFE.md) when the brief sets `kids: true`; [make assets with Blender through MCP](docs/recipes/make-assets-with-blender-mcp.md) when you make a model. That recipe covers the contract first, a headless `export.py`, `npm run asset:verify`, and licence and provenance. Registering a Blender MCP server is the user's own opt-in; never add `.mcp.json` to the repository.
 - **First commands:**
 
   ```sh
