@@ -465,6 +465,11 @@ Flipbooks (FX-01a, integrated in PR #141, merge `4c4f156`): `frames` on an emitt
 per particle (`over-life`, `loop`, `random-start`), still one draw per emitter, grid capped at 16 × 16; `npm run
 fx:pack` packs a PNG sequence into a sheet and JSON sidecar. See the [guide](particles.md#flipbooks-sprite-sheets).
 
+Calm follow-up (FX-01b, PR #CALMPR): under Calm (reduced motion) non-essential emitters add no particle and live
+particles hold still and fade out; essential ones still show, held at the spawn point. Spawn attempts, the particles'
+stream and despawn ticks are unchanged (presentation only). Evidence: unit tests and `play:snap -- --calm` on the
+explorer and showcase templates (desktop headless Chromium); see the [guide](particles.md#calm-reduced-motion).
+
 ## Material options (VIS-04) — implemented, checked in PR #127
 
 `Material` gains `shading` ('standard', 'matte', 'flat', 'toon' with `toonSteps`), `side`, `alphaCutoff` and

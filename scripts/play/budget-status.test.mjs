@@ -122,4 +122,9 @@ test('play:snap activity line: renders, picture and particles; with Calm, whethe
   assert.match(activityLine({...still, pictureChanged: true}, true), /motion NOT stopped, emitters stopped/);
   assert.match(activityLine({...still, particles: null}, true), /no particles · motion stopped, emitters stopped/);
   assert.match(activityLine(still, false), /CALM NOT ON/);
+  // Under Calm, attempts go on (the stream is unchanged) but nothing is added: the line counts particles added.
+  assert.match(
+    activityLine({...still, particles: {...still.particles, calmed: 9}}, true),
+    /0 spawned \(9 withheld by Calm\) · motion stopped, emitters stopped/,
+  );
 });
