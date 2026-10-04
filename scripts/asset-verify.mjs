@@ -385,9 +385,13 @@ export async function verifyModel(file, contract, {provenance = companions(file)
     json.asset?.generator,
     'provenance generator must equal the GLB asset.generator that wrote it',
   );
-  assert.ok((json.buffers?.length ?? 0) <= 1, 'one embedded buffer at most');
+  // A meshopt fallback buffer holds no data (the decoder writes into it), so it is not a second real buffer.
+  const fallback = buffer =>
+    ['EXT_meshopt_compression', 'KHR_meshopt_compression'].some(e => buffer.extensions?.[e]?.fallback === true);
+  const real = (json.buffers ?? []).filter(b => !fallback(b));
+  assert.ok(real.length <= 1, 'one embedded buffer at most');
   for (const buffer of json.buffers ?? []) assert.ok(!buffer.uri, 'buffer must be embedded (no uri)');
-  assert.ok(!json.buffers?.length || bin, 'the declared buffer needs the GLB BIN chunk');
+  assert.ok(!real.length || bin, 'the declared buffer needs the GLB BIN chunk');
   for (const image of json.images ?? [])
     assert.ok(!image.uri && image.bufferView !== undefined, 'image must be embedded in the GLB (bufferView, no uri)');
   for (const name of [...(json.extensionsUsed ?? []), ...(json.extensionsRequired ?? [])]) {

@@ -51,6 +51,23 @@ Rules that need no contract key: the GLB header and chunks must be well formed; 
 
 The geometry rules do not trust the exporter's report or the accessor metadata. They run on a re-import of the GLB: three.js's `GLTFLoader` with the meshopt decoder, the same parser the engine's model loader uses (`src/platform/assets/models.ts`). Triangles, vertices, bounds, size, pivot, named nodes and clips are read from what that re-import builds. Image dimensions come from each embedded image's header (PNG, JPEG, WebP or KTX2); the images are then removed, because Node has no image decoder.
 
+## Optimise
+
+```sh
+npm run asset:optimize -- game/tools/lantern/out/lantern.glb --out game/public/models/lantern.glb
+```
+
+`asset:optimize` runs [glTF-Transform](https://gltf-transform.dev/) (`@gltf-transform/cli`, a development dependency) `optimize` on one model:
+
+1. **Before:** the input must pass its own contract (the `.contract.json` next to it), so the optimiser never hides a bad export.
+2. **Optimise:** meshopt geometry compression, the only mesh compression the engine decodes. `--join false --flatten false` keep named nodes; `--instance false --palette false` keep meshes and materials as authored; `--simplify false` never decimates, so make the model at its target polycount instead.
+3. **Textures:** WebP by default (`EXT_texture_webp`, which the stock loader decodes), resized to `--texture-size`, else the output contract's `limits.textureSize`, else the `--device` default (phone 1024; tablet, laptop and desktop 2048), else 2048. `--textures ktx2` uses UASTC for normal, occlusion and metal-roughness maps and ETC1S for colour. It needs the external `ktx` command from [KTX-Software](https://github.com/KhronosGroup/KTX-Software/releases) 4.4 or later; without it the pass says so and falls back to WebP. The stock model loader registers no KTX2 transcoder yet, so `asset:verify` refuses a required KTX2 texture until the engine does. `--textures keep` re-encodes in the original format.
+4. **After:** the output must pass the contract next to `--out` (else the input's; `--contract` sets one for both). Only then are the GLB and its receipt written. On any failure nothing at `--out` changes.
+
+The output receipt keeps the input's licence, author, source and tool. It records the new `sha256` and `generator` (`glTF-Transform v…`), plus `optimizedFrom` (the input's hash and generator) and `optimizer` (the exact arguments).
+
+Meshopt quantisation stores positions as integers with a node translation and scale to restore them, and it moves vertices by up to about a thousandth of the model's size. A contract for an optimised model therefore lists `EXT_meshopt_compression` and `KHR_mesh_quantization` (plus `EXT_texture_webp` when textured) in `extensions`. It sets `nodeTransforms` to `"allowed"`, has no `pivot.node` and no `semanticSha256`, and states `size` as a range or with a `tolerance` such as `0.001`. Keep the strict contract on the unoptimised export.
+
 ## Provenance fields
 
 | Field | Meaning |
