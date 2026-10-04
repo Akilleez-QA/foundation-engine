@@ -9,8 +9,7 @@ import {createViewSize} from './view-size';
 import {createReadingSheets} from './reading-sheet';
 import {bindSceneCubes} from './scene-cubes';
 import {Model} from './model';
-import {createSceneModels} from './scene-model';
-import {createModelLooks} from './model-looks';
+import {bodyHasModel, pendingAttachmentState, pendingModelState, pendingPoseLinkState} from './model-pending';
 import {RenderMask, validateRenderMask} from './render-mask';
 import {bindEnvironment} from './scene-environment';
 import {validateSceneOutput} from './scene-output';
@@ -136,6 +135,15 @@ const loadScatter = () =>
     return m;
   });
 
+/** Model presentation is a lazy chunk too: loaded while a scene that starts with a `Model` entity prepares, else when a
+ *  system first spawns one. Once loaded, every later visit starts its models synchronously. */
+let modelModule: typeof import('./scene-model-chunk') | null = null;
+const loadModels = () =>
+  import('./scene-model-chunk').then(m => {
+    modelModule = m;
+    return m;
+  });
+
 const preparations = new WeakMap<
   SceneVisit,
   {body: Awaited<ReturnType<typeof bodyOf>>; state: Record<string, unknown>}
@@ -151,6 +159,8 @@ export async function prepareScene(s: Services, scene: SceneDefinition, visit: S
   const scatterLoad = scene.scatter && !scatterModule ? loadScatter().catch(() => null) : null;
   const body = await bodyOf(scene),
     state: Record<string, unknown> = {};
+  // A failed model chunk is reported at entry, where the scene's models report `failed`.
+  if (!modelModule && bodyHasModel(body.entities)) await loadModels().catch(() => null);
   await scatterLoad;
   if (visit.signal.aborted) return;
   await scene.prepare?.(
@@ -170,6 +180,7 @@ export async function enterScene(o: {
   const {s, brief, scene, visit} = o;
   const prepared = preparations.get(visit);
   const body = prepared?.body ?? (await bodyOf(scene));
+  if (!modelModule && bodyHasModel(body.entities)) await loadModels().catch(() => null);
   // Local lights (VIS-02) and shadows (VIS-03) are a lazy chunk: only a scene with `sceneLights()` or `sceneShadows()`
   // loads the rig (and the shadow scheduler) before its first frame; every other scene carries none of it.
   const lightModule = scene.lights || scene.shadows ? await import('./scene-light-rig') : null;
@@ -434,10 +445,13 @@ export async function enterScene(o: {
           voices.play(cue, voiceOptions(options));
         },
         playVoice: (cue, options) => voices.play(cue, options),
-        modelState: entity => models.state(entity),
-        modelAttachmentState: entity => models.attachmentState(entity),
-        modelPoseLinkState: entity => models.poseLinkState(entity),
-        modelSocket: (entity, name) => models.socket(entity, name),
+        modelState: entity =>
+          models ? models.state(entity) : pendingModelState(world, entity, actx.signal.aborted, modelsFailed),
+        modelAttachmentState: entity =>
+          models ? models.attachmentState(entity) : pendingAttachmentState(world, entity, actx.signal.aborted),
+        modelPoseLinkState: entity =>
+          models ? models.poseLinkState(entity) : pendingPoseLinkState(world, entity, actx.signal.aborted),
+        modelSocket: (entity, name) => models?.socket(entity, name) ?? null,
         random,
         audioClock: () => (!s.app.has('platform.audio') || actx.signal.aborted ? null : s.audio.clock()),
         playMusic: (id, options) => songs.play(id, options),
@@ -536,28 +550,56 @@ export async function enterScene(o: {
         }),
       );
       const maskOf = (e: Entity) => validateRenderMask(world.get(e, RenderMask)?.mask ?? 1);
-      const looks = createModelLooks({
-        world,
-        surfaces,
-        resources,
-        report: error => s.log.error(`${scene.id}: model material failed`, error),
-      });
-      const models = createSceneModels({
-        looks,
-        poseLinks: scene.modelPoseLinks === undefined ? undefined : normalizeModelPoseLinkLimits(scene.modelPoseLinks),
-        inspection: TEST_API ? inspectModel : undefined,
-        world,
-        scene: three,
-        library: s.models,
-        signal: actx.signal,
-        mask: maskOf,
-        invalidate: () => {
-          dirty = true;
-          actx.invalidate();
-        },
-        report: error => s.log.error(`${scene.id}: model failed`, error),
-      });
-      actx.own(() => models.dispose());
+      // Models (the lazy `scene-model-chunk`): started now when the chunk is here (the scene started with a model, or an
+      // earlier visit loaded it), else on the first sync that sees a `Model` entity. Until then the context answers as
+      // for a model not admitted yet (model-pending.ts).
+      let models: ReturnType<typeof import('./scene-model-chunk').createSceneModels> | null = null,
+        modelsRequested = false,
+        modelsFailed = false;
+      const startModels = (m: typeof import('./scene-model-chunk')) => {
+        if (actx.signal.aborted || models) return;
+        const looks = m.createModelLooks({
+          world,
+          surfaces,
+          resources,
+          report: error => s.log.error(`${scene.id}: model material failed`, error),
+        });
+        const owner = m.createSceneModels({
+          looks,
+          poseLinks:
+            scene.modelPoseLinks === undefined ? undefined : normalizeModelPoseLinkLimits(scene.modelPoseLinks),
+          inspection: TEST_API ? inspectModel : undefined,
+          world,
+          scene: three,
+          library: s.models,
+          signal: actx.signal,
+          mask: maskOf,
+          invalidate: () => {
+            dirty = true;
+            actx.invalidate();
+          },
+          report: error => s.log.error(`${scene.id}: model failed`, error),
+        });
+        models = owner;
+        actx.own(() => owner.dispose());
+      };
+      const requestModels = () => {
+        if (models || modelsRequested) return;
+        modelsRequested = true;
+        (modelModule ? Promise.resolve(modelModule) : loadModels()).then(
+          m => {
+            startModels(m);
+            dirty = true;
+            actx.invalidate();
+          },
+          error => {
+            if (actx.signal.aborted) return;
+            modelsFailed = true;
+            s.log.error(`${scene.id}: model presentation failed to load`, error);
+          },
+        );
+      };
+      if (modelModule) startModels(modelModule);
       // Particles (FX-01): the field is pure and visit-owned and steps on the fixed lane; its renderer (one hidden mesh
       // per admitted emitter) is a lazy chunk, requested by the first admitted emitter, or now when the scene's own
       // entities have one. The density knob is 'reenter-scene': read once per visit.
@@ -745,7 +787,9 @@ export async function enterScene(o: {
             ? 'continuous'
             : 'on-demand',
         );
-        if (models.sync(dt)) dirty = true;
+        if (models) {
+          if (models.sync(dt)) dirty = true;
+        } else if (!modelsRequested && world.first(Model) !== undefined) requestModels();
         if (scatter?.sync()) dirty = true;
         if (actx.signal.aborted) return;
         const seen = new Set<Entity>();
@@ -1076,7 +1120,12 @@ export async function enterScene(o: {
           actx.invalidate();
           return true;
         };
-      if (TEST_API && models.inspect) handle.model = createSceneModelInspector(models.inspect, visit, actx.signal);
+      if (TEST_API)
+        handle.model = createSceneModelInspector(
+          request => models?.inspect?.(request) ?? inspectModel(request, () => null),
+          visit,
+          actx.signal,
+        );
       if (TEST_API) handle.entities = createSceneEntityInspector(world, visit, actx.signal);
       if (TEST_API) handle.post = () => post.stats();
       if (TEST_API && extensions.length)
