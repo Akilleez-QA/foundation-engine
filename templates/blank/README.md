@@ -18,10 +18,24 @@ This README stays with the template; your copy lives in `game/` and `GAME.md`.
 | `game/main.test.ts` | criterion S1 and a still-world check, with `testScene` |
 | `game/build.brief.ts` | the brief: goal, devices, success criteria |
 | `game/budgets.json` | the measured budget of `main` |
+| `game/playtest/turn.json` | a scripted browser playtest: press turn, check the count |
 
 ## Controls
 
 Space, gamepad A, or tap/click the view: turn the cube.
+
+## First steps
+
+Draws are per rendered frame from `npm run play:snap -- --scene <id>` (software rendering, 1280×800) at 986d06b. Each visible `Shape` is about one draw.
+
+| | |
+|---|---|
+| Scenes | `main` (the only scene) |
+| Tests | `node --import tsx --test game/main.test.ts`: 2 tests |
+| Playtest | `npm run play:script -- game/playtest/turn.json` |
+| Draws (budget 10) | `main`: 2 (floor and cube) |
+
+**First edit.** In `game/main.ts`, in the `cube` definition, replace `color: 0x4f8cff` with `color: 0xff7a45`. You should see an orange cube that still turns a quarter on Space or a tap, and the 2 tests still pass.
 
 ## What to change first
 

@@ -47,6 +47,7 @@
     "new": "tsx scripts/new.ts",
     "check": "node scripts/check.mjs",
     "asset:verify": "node scripts/asset-verify.mjs",
+    "asset:optimize": "node scripts/asset-optimize.mjs",
     "play:criteria": "node scripts/generate.mjs && tsx scripts/play/criteria.ts",
     "content:publish": "node scripts/publish-content.mjs",
     "test:diagnostics-browser": "node -r ./scripts/silent-browser.cjs scripts/play/event-trace-check.mjs playtest/diagnostics/event-trace && node -r ./scripts/silent-browser.cjs scripts/play/terrain-inspect-check.mjs playtest/diagnostics/terrain-inspect && node -r ./scripts/silent-browser.cjs scripts/play/entity-inspect-check.mjs playtest/diagnostics/entity-inspect && node -r ./scripts/silent-browser.cjs scripts/play/system-timing-check.mjs playtest/diagnostics/system-timing && node -r ./scripts/silent-browser.cjs scripts/play/scene-entry-order-check.mjs playtest/diagnostics/scene-entry-order && node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/session-recorder-check.mjs playtest/diagnostics/session-recorder --minutes 0.5",
@@ -95,6 +96,7 @@
     "three": "^0.186.1"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "4.5.1",
     "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^22.20.3",
     "@types/three": "^0.186.0",
