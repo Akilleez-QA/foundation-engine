@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "blender": {
+      "command": "uv",
+      "args": ["--directory", "${BLENDER_MCP_DIR}/mcp", "run", "blender-mcp"],
+      "env": {
+        "BLENDER_PATH": "${BLENDER_PATH:-blender}",
+        "BLENDER_MCP_HOST": "localhost",
+        "BLENDER_MCP_PORT": "9876"
+      }
+    }
+  }
+}

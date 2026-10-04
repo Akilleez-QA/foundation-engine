@@ -1,7 +1,13 @@
 import * as T from 'three';
 import {defineEnvironment, type EnvironmentState} from './environment';
+/** The sun's shadow, when the scene opted into shadows (scene-light-rig.ts `createSunShadow`, a lazy chunk). */
+export type SunShadowApply = (
+  light: T.DirectionalLight,
+  spec: {extent: number; softness: 'hard' | 'soft'} | null,
+  position: readonly [number, number, number],
+) => boolean;
 /** Per-view resources: no shared transforms, renderer state changes, or extra context. */
-export function bindEnvironment(scene: T.Scene) {
+export function bindEnvironment(scene: T.Scene, sunShadow?: SunShadowApply) {
   const ambient = new T.HemisphereLight(),
     directional = new T.DirectionalLight();
   let geometry = new T.BufferGeometry();
@@ -41,6 +47,14 @@ export function bindEnvironment(scene: T.Scene) {
       directional.color.setHex(e.directional.color);
       directional.intensity = e.directional.intensity;
       directional.position.set(...e.directional.position);
+      // Only a scene with shadows passes `sunShadow`; without one the sun is exactly as it always was.
+      sunShadow?.(
+        directional,
+        e.directional.shadow
+          ? {extent: e.directional.shadow.extent, softness: e.directional.shadow.softness ?? 'soft'}
+          : null,
+        e.directional.position,
+      );
       ownedFog = e.haze ? new T.Fog(e.haze.color, e.haze.near, e.haze.far) : null;
       scene.fog = ownedFog;
       const positions: number[] = [],

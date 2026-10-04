@@ -9,19 +9,42 @@
 //   - when particles die the picture is drawn once more without them, then the scene is still again;
 //   - the drawing code is a separate chunk, fetched once for a scene whose own entities have emitters;
 //   - leaving the scene disposes every emitter geometry and releases the texture (library resident bytes 0);
-//   - a scene with no systems (on-demand frames) plays its own one-shot burst, removes the entity, then draws nothing.
+//   - a scene with no systems (on-demand frames) plays its own one-shot burst, removes the entity, then draws nothing;
+//   - a flipbook emitter (a 2 × 2 sheet packed by fx:pack, 'over-life') is one draw, and its frame attribute and the
+//     pixels on screen advance through the cells in order: red, green, blue, yellow.
 // Limitations: desktop Chromium with software GL; no physical device, GPU timing or visual-quality judgement beyond
 // screenshots.
 import assert from 'node:assert/strict';
-import {mkdirSync} from 'node:fs';
+import {mkdirSync, writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createServer} from 'vite';
 import {ROOT, sleep} from './lib.mjs';
 import {launch} from '../perf/bench-browser.mjs';
 import {diagnosticReport} from './diagnostic-report.mjs';
+import {decodePng, encodePng} from '../perf/quality-png.mjs';
+import {packFrames} from '../fx-pack.mjs';
 const out = resolve(process.argv[2] ?? '/tmp/foundation-particle-browser');
 mkdirSync(out, {recursive: true});
+// The flipbook sheet: four 32 px solid cells (red, green, blue, yellow), packed as fx:pack packs a sequence.
+const COLOURS = {red: [255, 0, 0], green: [0, 255, 0], blue: [0, 0, 255], yellow: [255, 255, 0]};
+const cell = rgb => {
+  const data = Buffer.alloc(32 * 32 * 4);
+  for (let i = 0; i < 32 * 32; i++) data.set([...rgb, 255], i * 4);
+  return {width: 32, height: 32, data};
+};
+const sheetPng = encodePng(packFrames(Object.values(COLOURS).map(cell)).atlas);
+/** The dominant sheet colour in a screenshot (at least 500 pixels of it), or null. */
+const dominant = png => {
+  const {data} = decodePng(png),
+    counts = Object.fromEntries(Object.keys(COLOURS).map(k => [k, 0]));
+  for (let i = 0; i < data.length; i += 4)
+    for (const [name, [r, g, b]] of Object.entries(COLOURS))
+      if (Math.abs(data[i] - r) < 60 && Math.abs(data[i + 1] - g) < 60 && Math.abs(data[i + 2] - b) < 60)
+        counts[name]++;
+  const [name, n] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  return n >= 500 ? name : null;
+};
 const html =
   '<!doctype html><html><head><meta charset="utf-8"><link rel="icon" href="data:,"><title>Particle diagnostic</title></head><body><header class="shell-header"><div class="header-left"></div><div class="header-right"></div></header><main id="app" class="app-root"></main><script type="module" src="/scripts/play/fixtures/particle-entry.mjs"></script></body></html>';
 const server = await createServer({
@@ -33,7 +56,10 @@ const server = await createServer({
       name: 'particle-diagnostic',
       configureServer(s) {
         s.middlewares.use((req, res, next) => {
-          if (req.url?.startsWith('/__particles.html')) {
+          if (req.url?.startsWith('/__fx/sheet.png')) {
+            res.setHeader('Content-Type', 'image/png');
+            res.end(sheetPng);
+          } else if (req.url?.startsWith('/__particles.html')) {
             res.setHeader('Content-Type', 'text/html');
             res.end(html);
           } else next();
@@ -170,11 +196,47 @@ try {
     await sleep(800);
     assert.equal((await snap()).renders - still.renders, 0, 'on-demand scene still after its burst');
     run.still = {particles: still.particles, last: still.last};
+    // Flipbook: one draw; the frame attribute and the picture step through the sheet's cells in reading order.
+    await p.evaluate(() => window.particleCheck.goto('flipbook'));
+    await p.waitForFunction(() => window.particleCheck.snapshot().scene === 'flipbook');
+    await p.waitForFunction(() => window.particleCheck.snapshot().particles?.textures.applied === 1, null, {
+      timeout: 30000,
+    });
+    await settle();
+    const flipBase = await snap();
+    assert.equal(flipBase.particles.draws, 0);
+    await p.evaluate(() => window.particleCheck.fire('flip'));
+    await p.waitForFunction(() => window.particleCheck.snapshot().particles.live === 1);
+    const colours = [],
+      frames = [],
+      calls = new Set();
+    for (let tries = 0; tries < 80; tries++) {
+      const s = await snap();
+      if (s.particles.live === 0) break;
+      calls.add(s.last.calls - flipBase.last.calls);
+      assert.equal(s.particles.draws, 1, 'a flipbook emitter is one draw');
+      const f = s.flipFrames?.[0];
+      if (f !== undefined && frames.at(-1) !== f) frames.push(f);
+      const png = await p.screenshot(),
+        c = dominant(png);
+      if (c && colours.at(-1) !== c) {
+        colours.push(c);
+        writeFileSync(resolve(out, `flipbook-${quality}-${colours.length - 1}-${c}.png`), png);
+      }
+      await sleep(100);
+    }
+    assert.deepEqual(frames, [0, 1, 2, 3], 'the frame attribute advances over the life');
+    assert.deepEqual(colours, ['red', 'green', 'blue', 'yellow'], 'the picture shows the cells in reading order');
+    assert.ok(
+      [...calls].every(n => n === 0 || n === 1),
+      `at most one extra draw (${[...calls]})`,
+    );
+    run.flipbook = {frames, colours, extraDraws: [...calls]};
     assert.deepEqual(browser.errors, []);
     await browser.close();
     browser = null;
     console.log(
-      `particles (${quality}): idle 0 draws and 0 frames; burst +1 draw (${drawn.last.triangles - base.last.triangles} triangles, ${expectedFirst}/48 particles); three emitters ${three.last.calls - base.last.calls} draws; still after; 3 geometries disposed and texture released on exit; on-demand scene played its burst, despawned it and went still`,
+      `particles (${quality}): idle 0 draws and 0 frames; burst +1 draw (${drawn.last.triangles - base.last.triangles} triangles, ${expectedFirst}/48 particles); three emitters ${three.last.calls - base.last.calls} draws; still after; 3 geometries disposed and texture released on exit; on-demand scene played its burst, despawned it and went still; flipbook 1 draw, frames ${frames.join(',')} shown as ${colours.join(', ')}`,
     );
   }
   report.passed = true;

@@ -144,3 +144,78 @@ test('lint:game: the command passes on every template game (they follow the rule
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /no Math\.random\(\), literal UI text or three\/webgpu/);
 });
+
+test('lint:game three-legacy: common outdated three.js APIs in a file that imports @kits/three each name the fix', () => {
+  const src = [
+    "import * as THREE from '@kits/three';", // 1
+    "import { sRGBEncoding, Clock as Ticker, BoxBufferGeometry, BoxGeometry } from '@kits/three';", // 2
+    "import { RGBELoader } from '@kits/three/addons/loaders/RGBELoader.js';", // 3
+    "import { OrbitControls } from 'three/examples/js/controls/OrbitControls.js';", // 4
+    'export function setup(renderer, texture) {', // 5
+    '  renderer.outputEncoding = sRGBEncoding;', // 6
+    '  renderer.physicallyCorrectLights = true;', // 7
+    '  renderer.useLegacyLights = false;', // 8
+    '  texture.encoding = THREE.sRGBEncoding;', // 9
+    '  const g = new THREE.Geometry();', // 10
+    '  renderer.shadowMap.type = THREE.PCFSoftShadowMap;', // 11
+    '  return [g, mergeBufferGeometries([]), renderer.gammaOutput];', // 12
+    '}', // 13
+  ].join('\n');
+  const v = checkSource(src);
+  assert.deepEqual(
+    v.map(x => x.line),
+    [2, 2, 2, 3, 4, 6, 7, 8, 9, 9, 10, 11, 12, 12],
+  );
+  assert.ok(v.every(x => x.rule === 'three-legacy'));
+  const text = v.map(x => x.fix).join('\n');
+  for (const want of [
+    /sRGBEncoding removed in r162: use SRGBColorSpace/,
+    /Clock deprecated in r183: use Timer/,
+    /BoxBufferGeometry removed: use BoxGeometry/,
+    /RGBELoader deprecated in r180: use HDRLoader/,
+    /import the module from three\/addons/,
+    /renderer\.outputColorSpace = SRGBColorSpace/,
+    /texture\.colorSpace = SRGBColorSpace/,
+    /THREE\.Geometry removed in r125: use BufferGeometry/,
+    /THREE\.PCFSoftShadowMap deprecated in r186: use PCFShadowMap/,
+    /use mergeGeometries/,
+  ])
+    assert.match(text, want);
+});
+
+test('lint:game three-legacy: current APIs, files that do not use three, comments and escapes pass', () => {
+  assert.deepEqual(
+    checkSource(
+      [
+        "import { BoxGeometry, InstancedBufferGeometry, SRGBColorSpace, Timer } from '@kits/three';",
+        '// renderer.outputEncoding = sRGBEncoding was the old way',
+        'export const make = (r, t) => { r.outputColorSpace = SRGBColorSpace; t.colorSpace = SRGBColorSpace; return [new BoxGeometry(), new InstancedBufferGeometry(), new Timer()]; };',
+      ].join('\n'),
+    ),
+    [],
+  );
+  // Without a three import the names are the game's own (a Clock component, a text encoding).
+  assert.deepEqual(
+    checkSource(
+      "import { defineComponent } from '@engine';\nexport const Clock = defineComponent('clock', { t: 0 });\nconst d = { encoding: 'utf8' }; d.encoding = 'ascii';\n",
+    ),
+    [],
+  );
+  assert.deepEqual(
+    checkSource(
+      "import { Clock } from '@kits/three'; // lint-game-allow three-legacy: matches the kit's own pinned API in this test\n",
+    ),
+    [],
+  );
+});
+
+test('lint:game three-legacy: every name the rule calls removed is really absent from the pinned three', async () => {
+  const {THREE_LEGACY_NAMES} = await import('./game-rules.mjs');
+  const three = await import('three');
+  for (const [name, fix] of Object.entries(THREE_LEGACY_NAMES))
+    if (fix.startsWith('removed')) assert.equal(name in three, false, `${name} still exists in three`);
+    else assert.equal(name in three || name === 'RGBELoader', true, `${name} is not in three: call it removed`);
+  for (const alias of ['BoxBufferGeometry', 'PlaneBufferGeometry', 'SphereBufferGeometry'])
+    assert.equal(alias in three, false);
+  assert.equal('InstancedBufferGeometry' in three, true);
+});

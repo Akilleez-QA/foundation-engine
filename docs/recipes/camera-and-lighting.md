@@ -44,6 +44,45 @@ view: { environment: night, output: { toneMapping: 'aces', exposure: 1 } },
 redraws once. A scene without `output` looks exactly as before. Details: the
 [scene look guide](../guides/scene-look.md#output-tone-mapping-and-exposure).
 
+### Lamps, lanterns and torches: local lights
+
+The environment's sun and ambient light everything evenly. A light that belongs to a thing (a lantern, a torch, a
+street lamp) is a `PointLight` or `SpotLight` on that entity, in a scene that asks for light slots:
+
+```ts
+import { PointLight, sceneLights } from '@engine';
+
+// in defineScene({ ... }):
+lights: sceneLights({ point: 4 }),
+entities: [
+  [Transform({ x: 3, y: 2, z: 0 }), Shape({ kind: 'sphere', size: [0.3, 0.3, 0.3], color: 0xffd28a }),
+    defineMaterial({ emissive: 0xffa040, emissiveIntensity: 4 }),
+    PointLight({ color: 0xffa850, intensity: 8, distance: 8 })],
+],
+```
+
+The scene's slots are fixed for each visit, so spawning or despawning a light never recompiles shaders; a light that
+finds no free slot is refused and reported once. Ask only for the slots the scene shows at once: each one costs work on
+every lit pixel. Lighter quality presets cap the slots (2 of each kind on `low`), keeping `essential: true` lights first.
+Details: the [scene look guide](../guides/scene-look.md#local-lights-point-and-spot-lights).
+
+### Shadows
+
+Objects without shadows float. Opt the scene in, then give the sun (and, sparingly, a lamp) a shadow:
+
+```ts
+import { sceneShadows, Shadow } from '@engine';
+
+// defineEnvironment: directional: { color: 0xfff1d6, intensity: 2.2, position: [4, 10, 6], shadow: { extent: 16 } },
+// defineScene:       shadows: sceneShadows(),        // every Shape and Mesh casts and receives by default
+// one entity:        Shadow({ cast: false })          // glass around a light, grass, small things that always move
+```
+
+`extent` is the half-size of the square around the world origin that gets sun shadows: keep it just past the play
+area. `PointLight({ shadow: true })` costs six map faces; lighter presets allow fewer shadowed lamps (none on `low`).
+Maps redraw only when something that casts moves. Details: the
+[scene look guide](../guides/scene-look.md#shadows).
+
 ## 3. The scene
 
 An input to switch views (a key and a pad button; the right shoulder button, `rb`, is free in a new game):
