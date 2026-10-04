@@ -568,8 +568,8 @@ evidence; it is not a full local gate or physical-device acceptance.
 
 Opt-in visual data for a scene, owned by the scene visit (the [scene look guide](scene-look.md)). Output (VIS-01):
 `view.output` sets tone mapping and exposure through the renderer lease; the defaults keep every existing picture
-byte-identical (picture guard on blank and explorer). Status: implemented and checked as candidate PR #124. Evidence:
+byte-identical (picture guard on blank and explorer). Status: integrated (PR #124, merge `522815f`). Evidence:
 unit tests and `npm run test:output-browser` (desktop headless Chromium, software GL). No physical-device acceptance.
 Local lights (VIS-02): `PointLight`/`SpotLight` components claim fixed per-visit slots from `sceneLights()`, capped by
 the `lights.local-max` knob; overflow is refused and reported once per cause. Status: implemented and checked as a
-candidate PR. Evidence: unit tests and `npm run test:lights-browser`. No physical-device fill-rate acceptance.
+candidate PR #138. Evidence: unit tests and `npm run test:lights-browser`. No physical-device fill-rate acceptance.
