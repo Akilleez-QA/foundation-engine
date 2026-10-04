@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "note": "A browser-check fixture, not a template: declared desktop caps checked by tools/visual-courtyard/browser.mjs in software GL, not performance certification. No template budget changes.",
+  "app": {
+    "firstLoadJsKiB": 1024
+  },
+  "scenes": {
+    "courtyard-lit": {
+      "scene": "scene.courtyard-lit",
+      "route": "#scene/courtyard-lit",
+      "budget": {"draws": 400, "triangles": 400000, "textureMiB": 64, "heapMiB": 64, "contexts": 1}
+    },
+    "courtyard": {
+      "scene": "scene.courtyard",
+      "route": "#scene/courtyard",
+      "budget": {"draws": 120, "triangles": 150000, "textureMiB": 64, "heapMiB": 64, "contexts": 1}
+    },
+    "glow": {
+      "scene": "scene.glow",
+      "route": "#scene/glow",
+      "budget": {"draws": 40, "triangles": 5000, "textureMiB": 32, "heapMiB": 64, "contexts": 1}
+    }
+  }
+}

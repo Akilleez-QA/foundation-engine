@@ -92,8 +92,10 @@ export default defineConfig({
   // Game code imports the author API as `@engine` (src/author/index.ts) and optional kits as `@kits/<name>`; the app
   // reaches the game being built as `@game` (scripts/lib/game-dir.mjs: GAME_DIR, else ./game, else templates/blank/game).
   resolve: {
+    dedupe: ['three'],
     alias: [
-      // Keep one Three identity while allowing optional loaders/animation classes to remain in lazy chunks.
+      // Keep one Three identity while allowing optional loaders/animation classes to remain in lazy chunks. three's
+      // addons (`three/addons/*`, a game with @kits/three) import `three` too, so they get this same copy.
       {find: /^three$/, replacement: fileURLToPath(new URL('./node_modules/three/src/Three.js', import.meta.url))},
       {find: /^@engine$/, replacement: fileURLToPath(new URL('./src/author/index.ts', import.meta.url))},
       {find: /^@kits\/([a-z-]+)$/, replacement: fileURLToPath(new URL('./src/kits/', import.meta.url)) + '$1/index.ts'},
@@ -120,7 +122,9 @@ export default defineConfig({
   // sets it, because those servers never see an edit; `npm run dev` and `npm run play` keep watching.
   server: {host: devHost(process.env.ENGINE_HOST), ...(process.env.ENGINE_WATCH === '0' ? {watch: null} : {})},
   preview: {host: devHost(process.env.ENGINE_HOST)},
-  optimizeDeps: {entries: ['index.html']},
+  // three is never pre-bundled: a pre-bundled addon would carry its own copy of three, and `instanceof` across the
+  // engine and a game's addon objects (@kits/three) would break.
+  optimizeDeps: {entries: ['index.html'], exclude: ['three']},
   // src/author/index.ts is a pure re-export barrel (scripts/vite-config.test.mjs keeps it so). Declaring it free of
   // side effects lets Rolldown (Vite 8) drop the unused test helpers' static edge to the worker host, so the host
   // stays a lazy chunk as it was under Rollup instead of joining first-load JS.

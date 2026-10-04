@@ -24,6 +24,7 @@ import {validateSpatialAudioOptions, type SpatialAudioOptions} from '../platform
 import type {AudioClockReading} from '../platform/audio/audio-timeline';
 import type {MusicOptions, MusicVoice} from '../platform/audio/music-clock';
 import type {SceneParticles} from './particle-contract';
+import {validateExtensions, type SceneExtension} from './scene-extension';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const need = (ok: boolean, message: string) => {
@@ -280,6 +281,9 @@ export interface SceneInput extends SceneBody {
    *  emitters' `max` sum to at most `max` (default 4096); at most `emitters` (default 16, one draw each) are drawn.
    *  Without it the scene's emitters are not simulated or drawn (reported once). */
   particles?: SceneParticles | undefined;
+  /** Render extensions a kit provides (`sceneThree()` from `@kits/three`): opened once per visit, before the first
+   *  draw, and closed when it ends. A scene without them creates nothing for them. */
+  extensions?: readonly SceneExtension[] | undefined;
   id: string;
   title: string;
   /** Open, game-defined ('level', 'menu', 'world', 'cutscene', …). */
@@ -321,6 +325,7 @@ export function defineScene(s: SceneInput): SceneDefinition {
       `scene ${s.id}: replay.digest needs an id (1-128 of A-Za-z0-9._:,;=+-) and a state(world) function`,
     );
   const captured = {...s};
+  if (captured.extensions !== undefined) captured.extensions = validateExtensions(s.id, captured.extensions);
   if (captured.modelPoseLinks !== undefined)
     captured.modelPoseLinks = normalizeModelPoseLinkLimits(captured.modelPoseLinks);
   need(

@@ -27,6 +27,8 @@ export interface SceneHandle {
     draws: number;
     textures: {requested: number; leases: number; applied: number; failed: number};
   };
+  /** Dev/test only: each render extension's counters, by id (`{closed: true}` once it failed). */
+  extensions?(): Record<string, Record<string, unknown>>;
   /** Move the entity with this `Name` (default 'player'): false when there is none. */
   teleport(x: number, z: number, name?: string): boolean;
 }

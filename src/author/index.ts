@@ -176,3 +176,6 @@ export {
 } from './model-pose-link';
 
 export type {SceneActivityFacts} from './defs';
+
+/** A kit's render extension token for `defineScene({ extensions })`; opaque (no three.js type in the author API). */
+export type {SceneExtension} from './scene-extension';
