@@ -80,7 +80,7 @@ cd foundation-engine
 npm ci
 npx --no-install playwright-core install chromium     # needed for automated browser checks
 npm run new-game -- --template arcade --id my-game --title "My game"
-git switch -c my-game && git add game GAME.md && git commit -m "Start my game"
+git switch -c my-game && git add game GAME.md && git commit -m "Start my game from the arcade template"
 npm run play          # open the printed URL; stop with Ctrl+C before the next command
 # Make the first edit described in Getting started, then:
 npm run check         # types, lints, the brief, the affected tests

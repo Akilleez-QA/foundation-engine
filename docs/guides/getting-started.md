@@ -73,11 +73,38 @@ npm run play
 
 It prints an address such as `http://127.0.0.1:5173/#scene/play`; open it in your browser. You should see a yellow ball on a dark lane, score and best-score counters, and a steering hint. Use ← / → or A / D to dodge blocks; after a hit, press Space or Enter to restart. Press `M` to mute.
 
+Other templates open their own first scene (explorer: a garden; the address ends in `#scene/garden`); each template's README lists its scene IDs and controls. If 5173 is taken, run `PORT=5174 npm run play`.
+
 Leave this terminal running while editing: changes in `game/` reload the page. Use a second terminal in this same checkout for checks, or stop the server with Ctrl+C before running the next command. The server command does not return until stopped.
+
+### Without a browser window (coding agents, CI)
+
+You do not need to open a window to check that the game plays. Development and test builds expose a test API on `window.engine`: `state()` (the scene, world state and named entities' positions), `key(key, ms)`, `goto(scene)`, `teleport(x, z)` and more ([AGENTS.md](../../AGENTS.md#commands), source in `src/dev/test-api.ts`). Production builds do not contain it. The quickest headless check needs no code: a scripted playtest drives the same API in a muted, isolated browser and exits 1 when an expectation fails.
+
+```sh
+npm run play:script -- game/playtest/restart.json
+```
+
+The format (keys, presses, `waitUntil`, `expect`, snaps, reload) is in [write a playtest script](../recipes/write-a-playtest-script.md); add your own scripts to `game/playtest/`. For a driver of your own, launch the browser through `launch()` in `scripts/perf/bench-browser.mjs`. It always passes `--mute-audio`, uses a throwaway profile and honours `ENGINE_CHROMIUM`. Open the game with `?flags=dev.silent` (the Playwright `page` is `b.page`):
+
+```js
+// drive.mjs, run with `node drive.mjs` while `npm run play` is running
+import {launch} from './scripts/perf/bench-browser.mjs';
+const b = await launch();
+await b.page.goto('http://127.0.0.1:5173/?flags=dev.silent#scene/play');
+await b.wait(`window.engine?.state().scene?.state === 'active'`);
+await b.evaluate(`window.engine.key('ArrowLeft', 600)`);
+console.log(await b.evaluate('window.engine.state().world.named.player'), b.errors);
+await b.close();
+```
+
+`scripts/silent-browser.cjs` does not mute a browser that your own script launches: it only adds `--mute-audio` to `AGENT_BROWSER_ARGS` (read by agent-browser tools) and turns off the file watcher. Pass `--mute-audio` yourself, or use `launch()` as above.
 
 ## 5. Change something
 
-For the arcade template, open `game/components.ts`. In the `ball` definition, replace `color: 0xffcc33` with `color: 0x66ddff`. Save the file: the ball should turn cyan, while movement and scoring keep working. This edits your game; no engine change is needed. Each template's README lists other changes to try. The [cookbook](../recipes/README.md) has recipes for models, HUD and buttons, collision and picking, camera and lighting, and sharing your build.
+For the arcade template, open `game/components.ts`. In the `ball` definition, replace `color: 0xffcc33` with `color: 0x66ddff`. Save the file: the ball should turn cyan, while movement and scoring keep working. This edits your game; no engine change is needed.
+
+Every template's README has a **First steps** section with its own first edit and what you should see, for example recolouring the bench in the explorer garden. It also lists the template's scene IDs, its test command and test count, and any scene that is already at its draw budget, where one more visible thing goes over. The README also lists other changes to try. The [cookbook](../recipes/README.md) has recipes for models, HUD and buttons, collision and picking, camera and lighting, and sharing your build.
 
 The rules that keep a game healthy are short (all in [AGENTS.md](../../AGENTS.md)): game code imports only `@engine`, `@kits/<name>`, its own files and JSON; systems read actions, never keys; words go in string keys; randomness is `ctx.random()`.
 
@@ -97,7 +124,7 @@ Run the arcade tests explicitly, including after a commit:
 node --import tsx --test game/play.test.ts
 ```
 
-Expect five passing tests: steering, collision/restart, saved best score, best score after a reload and deterministic replay. Other templates have different test files and counts; consult their README.
+Expect five passing tests: steering, collision/restart, saved best score, best score after a reload and deterministic replay. Other templates have different test files and counts: the template README's **First steps** gives the exact command and count (explorer: `node --import tsx --test game/garden.test.ts`, three tests).
 
 ## 7. Look at it
 
@@ -106,7 +133,7 @@ npm run play:snap
 npm run play:snap -- --scene play --mobile
 ```
 
-Screenshots and `probe.json` land in `playtest/latest/`: open the pictures, and read the probe for page errors, frame rate, draws and triangles against your budget. `play:snap` fails on page errors or an over-budget scene. Some mistakes only show up here, such as a scene that draws too much or a page error in a system the tests do not reach. Two actions bound to the same key are caught earlier: `npm run check` fails at `lint:brief` with the clash (`inputActions: key Space: game.restart (global) and game.steer.pos (global) overlap`) and a fix hint (give the game's `defineInput` another key or pad button); a dev or test boot stops with the same message.
+`--scene` takes a scene ID: `play` is the arcade's only scene. Use your template's IDs from its README (explorer: `garden` or `shed`); without `--scene`, play:snap opens the first scene. Screenshots and `probe.json` land in `playtest/latest/`: open the pictures, and read the summary or the probe for page errors, draws and triangles against your budget. `play:snap` fails on page errors or an over-budget scene. The frame rate it prints is advisory: it comes from software rendering in an emulated viewport, varies with the machine's load and is never judged; it is not phone evidence. Some mistakes only show up here, such as a scene that draws too much or a page error in a system the tests do not reach. Two actions bound to the same key are caught earlier: `npm run check` fails at `lint:brief` with the clash (`inputActions: key Space: game.restart (global) and game.steer.pos (global) overlap`) and a fix hint (give the game's `defineInput` another key or pad button); a dev or test boot stops with the same message.
 
 For arcade, also exercise the copied restart scenario:
 
@@ -114,7 +141,15 @@ For arcade, also exercise the copied restart scenario:
 npm run play:script -- game/playtest/restart.json
 ```
 
-It steers, waits for a collision, restarts and checks score/best state. Evidence goes to `playtest/latest/restart/`. `game/playtest/best-reload.json` also reloads the page and checks that the best score is still there. The step format is in [write a playtest script](../recipes/write-a-playtest-script.md). The mobile command above emulates a phone viewport; it does not establish physical-phone acceptance. Other templates use their own scene IDs and scripts.
+It steers, waits for a collision, restarts and checks score/best state. Evidence goes to `playtest/latest/restart/`. `game/playtest/best-reload.json` also reloads the page and checks that the best score is still there. The step format is in [write a playtest script](../recipes/write-a-playtest-script.md). The mobile command above emulates a phone viewport; it does not establish physical-phone acceptance. Other templates have their own scripts in `game/playtest/` (explorer: `door.json`), listed in their README.
+
+To see every success criterion in your brief at once, run:
+
+```sh
+npm run play:criteria
+```
+
+It runs each criterion's test or playtest and prints a table. A criterion whose brief entry says `how: 'gate'` shows `NOT RUN` (arcade and explorer: `S5`, the scenes' budgets), because only the integration gate checks it: the gate builds the game and benchmarks every scene, which takes minutes. `npm run play:criteria -- --gate` runs `npm run gate` for those rows. `NOT RUN` is neither a failure nor a pass. A `manual` criterion is listed for you to judge.
 
 Commit when it looks right:
 
@@ -132,7 +167,7 @@ npm run build
 npm run preview
 ```
 
-Open the URL printed by preview and play again. Stop it with Ctrl+C. `dist/` is a static website; the default build expects the root of a domain or subdomain.
+Open the URL printed by preview and play again. Stop it with Ctrl+C. Preview listens on 4173; if that port is taken it moves to the next free one and prints it. To choose the port, run `PORT=4174 npm run preview`, which stops instead if that port is taken (or pass Vite's own `-- --port 4174`). `dist/` is a static website; the default build expects the root of a domain or subdomain.
 
 For a known folder, such as a GitHub Pages project site, rebuild and preview with the same base:
 
@@ -157,5 +192,8 @@ Run Claude Code, Codex or another agent in the repository folder. It reads [AGEN
 | commands show the blue cube, not your game | there is no `game/` folder in this checkout (see step 3) |
 | `play:snap` says OVER BUDGET | the scene draws more than `game/budgets.json` allows; see the fix-budget skill |
 | `npm run play: port 5173 is busy; try PORT=5174 npm run play` | another server (often an earlier `npm run play`) has 5173: stop it, or run the suggested command |
+| `Port 4174 is already in use` from `PORT=4174 npm run preview` | choose another port, or run `npm run preview` without `PORT` to take the next free one |
+| `play:script … FAIL` with `undefined` values just after a restart or scene change | the script read the new scene before its `enter()` ran: use `waitUntil` instead of a fixed `wait` ([timing](../recipes/write-a-playtest-script.md#4-timing)) |
+| `play:criteria` shows `NOT RUN` for one criterion | it is checked by the gate: `npm run play:criteria -- --gate` (see step 7) |
 | `./game already exists` | continue that game, or use a separate clone to try a template; do not overwrite existing work |
 | `git commit` asks who you are | configure your Git name/email following its message, then retry the commit |
