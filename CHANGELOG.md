@@ -10,6 +10,16 @@ Every new framework below is optional: a game that does not use it is unchanged.
 Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
 (#122 onward). None of it is in that candidate.
 
+- **Model presentation is a lazy chunk (bundle headroom).** The scene model owner, rig capture, attachments, pose
+  links and model looks moved out of the `runtime` chunk into `scene-model-chunk`, loaded only by a scene with a
+  `Model` entity: while it prepares when the scene starts with one, else when a system first spawns one (until then
+  `ctx.modelState` reports `loading`). Production builds, `runtime` chunk before → after (gzip -9 in brackets):
+  blank 486,973 → 462,583 B (126,803 → 118,838), explorer 486,849 → 462,461 B (126,732 → 118,753), showcase
+  477,815 → 453,433 B (123,839 → 115,921). Headroom under the 500 kB rule grows from 13.0 kB to 37.4 kB (blank). The
+  model chunk is 26,020 B (9,001 gzip); a model scene loads about 1.6 kB more in all. First-load JS is unchanged.
+  The 500 kB limit is not raised. *Affected:* a scene whose first `Model` is spawned by a system sees its models one
+  chunk fetch later.
+
 - **Shadow cost accounting.** The bench counts `shadowPasses`, the most shadow-map renders in one frame (one per map
   face: the sun or a spot light 1, a point light 6), and the gate checks it as a count with no noise allowance. Every
   template's scenes budget `shadowPasses: 1` (measured 0): one sun shadow fits, a shadowed point light needs a
