@@ -23,14 +23,28 @@ import type {EmitterSlot, ParticleRenderer} from './particle-contract';
 /** On-screen size a particle texture is chosen for: sprites are small. */
 const SPRITE_PX = 256;
 
+// FLIPBOOK (defined only for an emitter with `frames`): each instance's `frame` picks a cell of the `grid` (cols, rows)
+// sheet, frame 0 top-left, left to right then down (`flipbookUv` in particles.ts is the same formula). The quad's own
+// uv is kept in vQuad for the soft dot shown until the sheet arrives. Without it the program is the plain sprite.
 const VERTEX = /* glsl */ `
 attribute vec3 offset;
 attribute float size;
 attribute vec4 tint;
 varying vec2 vUv;
 varying vec4 vTint;
+#ifdef FLIPBOOK
+attribute float frame;
+uniform vec2 grid;
+varying vec2 vQuad;
+#endif
 void main() {
+#ifdef FLIPBOOK
+  float row = floor((frame + 0.5) / grid.x);
+  vUv = (vec2(frame - row * grid.x, grid.y - 1.0 - row) + uv) / grid;
+  vQuad = uv;
+#else
   vUv = uv;
+#endif
   vTint = tint;
   vec4 mv = modelViewMatrix * vec4(offset, 1.0);
   mv.xy += position.xy * size;
@@ -41,10 +55,15 @@ uniform sampler2D map;
 uniform float useMap;
 varying vec2 vUv;
 varying vec4 vTint;
+#ifdef FLIPBOOK
+varying vec2 vQuad;
+#else
+#define vQuad vUv
+#endif
 void main() {
   vec4 c = vTint;
   if (useMap > 0.5) c *= texture2D(map, vUv);
-  else { vec2 q = vUv * 2.0 - 1.0; float d = clamp(1.0 - dot(q, q), 0.0, 1.0); c.a *= d * d; }
+  else { vec2 q = vQuad * 2.0 - 1.0; float d = clamp(1.0 - dot(q, q), 0.0, 1.0); c.a *= d * d; }
   if (c.a < 0.004) discard;
   gl_FragColor = c;
   #include <colorspace_fragment>
@@ -76,7 +95,12 @@ export interface ParticleDrawing extends ParticleRenderer {
 }
 
 // A type alias (not an interface) so it fits ShaderMaterial's indexed `uniforms`.
-type ParticleUniforms = {map: T.IUniform<T.Texture | null>; useMap: T.IUniform<number>};
+type ParticleUniforms = {
+  map: T.IUniform<T.Texture | null>;
+  useMap: T.IUniform<number>;
+  /** Flipbook columns and rows (unused by the plain program). */
+  grid: T.IUniform<T.Vector2>;
+};
 interface View {
   mesh: T.Mesh<T.InstancedBufferGeometry, T.ShaderMaterial>;
   attrs: T.InstancedBufferAttribute[];
@@ -144,19 +168,27 @@ export function createSceneParticles(o: SceneParticleOptions): ParticleDrawing {
         new T.Float32BufferAttribute([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0], 3),
       );
       geometry.setAttribute('uv', new T.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
-      const named = [
+      const flipbook = slot.cols > 0;
+      const named: [string, T.InstancedBufferAttribute][] = [
         ['offset', new T.InstancedBufferAttribute(p.offset, 3)],
         ['size', new T.InstancedBufferAttribute(p.size, 1)],
         ['tint', new T.InstancedBufferAttribute(p.tint, 4)],
-      ] as const;
+      ];
+      // One float per particle, over the pool's frame array (allocated once at admission): still one draw.
+      if (flipbook) named.push(['frame', new T.InstancedBufferAttribute(p.frame, 1)]);
       const attrs = named.map(([, attr]) => attr);
       for (const [name, attr] of named) {
         attr.setUsage(T.DynamicDrawUsage);
         geometry.setAttribute(name, attr);
       }
       geometry.instanceCount = 0;
-      const uniforms: ParticleUniforms = {map: {value: null}, useMap: {value: 0}};
+      const uniforms: ParticleUniforms = {
+        map: {value: null},
+        useMap: {value: 0},
+        grid: {value: new T.Vector2(slot.cols || 1, slot.rows || 1)},
+      };
       const material = new T.ShaderMaterial({
+        ...(flipbook ? {defines: {FLIPBOOK: ''}} : {}),
         vertexShader: VERTEX,
         fragmentShader: FRAGMENT,
         transparent: true,

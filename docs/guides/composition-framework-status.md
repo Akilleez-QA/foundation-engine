@@ -440,6 +440,10 @@ integration: implemented, candidate. Evidence: unit tests and
 so template budgets are unchanged. No physical-device, GPU timing or visual-quality
 acceptance.
 
+Flipbooks (FX-01a, implemented and checked, not yet integrated): `frames` on an emitter plays a sprite sheet
+per particle (`over-life`, `loop`, `random-start`), still one draw per emitter, grid capped at 16 × 16; `npm run
+fx:pack` packs a PNG sequence into a sheet and JSON sidecar. See the [guide](particles.md#flipbooks-sprite-sheets).
+
 ## Material options (VIS-04) — implemented, checked in PR #127
 
 `Material` gains `shading` ('standard', 'matte', 'flat', 'toon' with `toonSteps`), `side`, `alphaCutoff` and
@@ -601,5 +605,8 @@ evidence; it is not a full local gate or physical-device acceptance.
 
 Opt-in visual data for a scene, owned by the scene visit (the [scene look guide](scene-look.md)). Output (VIS-01):
 `view.output` sets tone mapping and exposure through the renderer lease; the defaults keep every existing picture
-byte-identical (picture guard on blank and explorer). Status: implemented and checked as candidate PR #124. Evidence:
+byte-identical (picture guard on blank and explorer). Status: integrated (PR #124, merge `522815f`). Evidence:
 unit tests and `npm run test:output-browser` (desktop headless Chromium, software GL). No physical-device acceptance.
+Local lights (VIS-02): `PointLight`/`SpotLight` components claim fixed per-visit slots from `sceneLights()`, capped by
+the `lights.local-max` knob; overflow is refused and reported once per cause. Status: implemented and checked as a
+candidate PR #138. Evidence: unit tests and `npm run test:lights-browser`. No physical-device fill-rate acceptance.

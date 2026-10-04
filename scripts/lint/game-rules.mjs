@@ -10,6 +10,14 @@
 //   three-webgpu     an import of `three/webgpu` or `three/tsl` (ADR 0078). The render backend is a brief setting
 //                    (`defineBuild({ render: { backend } })`); only the engine's WebGPU backend imports these. This
 //                    rule has no escape.
+//   three-legacy     three.js APIs that are gone or deprecated in the pinned three (r186), in a file that imports
+//                    three directly or through `@kits/three`: `Geometry`/`Face3`, `*BufferGeometry` aliases,
+//                    `outputEncoding`/`.encoding`/`sRGBEncoding`/`LinearEncoding`, `physicallyCorrectLights`,
+//                    `useLegacyLights`, `gammaOutput`/`gammaFactor`, legacy loaders (`JSONLoader`,
+//                    `BasisTextureLoader`, `RGBELoader`), `mergeBufferGeometries`, `Clock`, `PCFSoftShadowMap` and
+//                    imports from `three/examples/js/`. Common in agent-written code trained on older three. Game code
+//                    reaches three only through a kit (lint:layers), so the rule is dormant until a `@kits/three`
+//                    kit exists; it is ready for it. Each finding names the replacement.
 //
 // Not scanned: <game>/tools/ (build-time Node scripts), <game>/public/ (static files), and test files (*.test.*).
 // An explicit escape, on the offending line or the line above, with a reason after the colon:
@@ -26,6 +34,76 @@ export const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
 /** HUD sinks of the UI kit (`hud(ctx)`): a literal straight into a line, the banner or the prompt. */
 const HUD_SINK = /\.(?:line\s*\(\s*[^,()]*,\s*|banner\s*\(\s*|prompt\s*\(\s*)(?=['"`])/g;
+
+/** A file that uses three: an import (static, dynamic or re-export) of `three`, `three/...` or `@kits/three[/...]`. */
+const THREE_IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"`](?:three|@kits\/three)(?:\/[^'"`]*)?['"`]/;
+/** Named imports from a three module: `import { A, B as C } from 'three'` (type-only imports included). */
+const THREE_NAMED =
+  /\b(?:import|export)\s+(?:type\s+)?\{([^}]*)\}\s*from\s*['"`](?:three|@kits\/three)(?:\/[^'"`]*)?['"`]/g;
+
+/**
+ * three.js names that are gone or deprecated in three r186 (checked against node_modules/three 0.186.1: absent
+ * from src/ and examples/jsm/, or marked @deprecated), with what to use instead. Matched as `THREE.<name>` or as a
+ * name imported from a three module.
+ */
+export const THREE_LEGACY_NAMES = {
+  Geometry: 'removed in r125: use BufferGeometry (or a built-in such as BoxGeometry)',
+  Face3: 'removed in r125: use BufferGeometry with an index',
+  sRGBEncoding: 'removed in r162: use SRGBColorSpace',
+  LinearEncoding: 'removed in r162: use LinearSRGBColorSpace (or NoColorSpace for data textures)',
+  JSONLoader: 'removed: export glTF (GLB) and load it with GLTFLoader, or use ObjectLoader for three JSON',
+  LegacyJSONLoader: 'removed: export glTF (GLB) and load it with GLTFLoader',
+  BasisTextureLoader: 'removed: use KTX2Loader with KTX2 (Basis Universal) textures',
+  RGBELoader: 'deprecated in r180: use HDRLoader',
+  Clock: 'deprecated in r183: use Timer',
+  PCFSoftShadowMap: 'deprecated in r186: use PCFShadowMap',
+};
+/** `BoxBufferGeometry` and friends: the aliases were removed; the plain names (`BoxGeometry`) are BufferGeometry. */
+const BUFFER_ALIAS = /^(?!Instanced)\w+BufferGeometry$/;
+const legacyNameFix = name =>
+  THREE_LEGACY_NAMES[name] ??
+  (BUFFER_ALIAS.test(name) ? `removed: use ${name.replace('BufferGeometry', 'Geometry')}` : null);
+
+/** Properties and paths that are gone in r186, matched anywhere in a file that uses three. */
+const THREE_LEGACY_PATTERNS = [
+  {re: /\.outputEncoding\b/g, fix: 'removed in r162: set renderer.outputColorSpace = SRGBColorSpace'},
+  {
+    re: /\.encoding\s*=(?!=)/g,
+    fix: 'texture.encoding was removed in r162: set texture.colorSpace = SRGBColorSpace for colour maps (leave data maps as they are)',
+  },
+  {re: /\.physicallyCorrectLights\b/g, fix: 'removed: physically based light units are the only mode; delete the line'},
+  {re: /\.useLegacyLights\b/g, fix: 'removed in r165: physically based light units are the only mode; delete the line'},
+  {re: /\.gamma(?:Output|Factor)\b/g, fix: 'removed: use renderer.outputColorSpace = SRGBColorSpace'},
+  {
+    re: /\bmergeBufferGeometries\b/g,
+    fix: 'renamed in r151: use mergeGeometries from three/addons/utils/BufferGeometryUtils.js',
+  },
+  {
+    re: /['"`]three\/examples\/js\/[^'"`]*['"`]/g,
+    fix: 'three/examples/js was removed in r148: import the module from three/addons/...',
+  },
+];
+
+/** Legacy three.js uses in comment-free source that imports three; [] for a file that does not. */
+export function threeLegacyMatches(code) {
+  if (!THREE_IMPORT.test(code)) return [];
+  const hits = [];
+  for (const {re, fix} of THREE_LEGACY_PATTERNS) for (const m of code.matchAll(re)) hits.push({index: m.index, fix});
+  for (const m of code.matchAll(/\bTHREE\.([A-Za-z_$][\w$]*)/g)) {
+    const fix = legacyNameFix(m[1]);
+    if (fix) hits.push({index: m.index, fix: `THREE.${m[1]} ${fix}`});
+  }
+  for (const m of code.matchAll(THREE_NAMED))
+    for (const part of m[1].split(',')) {
+      const name = part
+        .trim()
+        .replace(/^type\s+/, '')
+        .split(/\s+as\s+/)[0];
+      const fix = name && legacyNameFix(name);
+      if (fix) hits.push({index: m.index + m[0].indexOf(part.trim()), fix: `${name} ${fix}`});
+    }
+  return hits.sort((a, b) => a.index - b.index);
+}
 
 const MATH_RANDOM = ARCH_RULES.find(r => r.name === 'math-random');
 const THREE_WEBGPU = ARCH_RULES.find(r => r.name === 'three-webgpu');
@@ -52,6 +130,11 @@ export const GAME_RULES = [
     escapable: false,
     match: code => ruleMatches(THREE_WEBGPU, code),
     fix: "game code never imports three/webgpu or three/tsl (ADR 0078): choose the backend in the brief with defineBuild({ render: { backend: 'webgpu' } }) and keep game code on @engine",
+  },
+  {
+    name: 'three-legacy',
+    match: threeLegacyMatches,
+    fix: 'a three.js API that is gone or deprecated in the pinned three (r186): use the current API',
   },
 ];
 
@@ -90,7 +173,7 @@ export function checkSource(text) {
   for (const r of GAME_RULES) {
     for (const m of r.match(code)) {
       const line = code.slice(0, m.index).split('\n').length;
-      if (r.escapable === false || !escaped(lines, line, r.name)) out.push({rule: r.name, line, fix: r.fix});
+      if (r.escapable === false || !escaped(lines, line, r.name)) out.push({rule: r.name, line, fix: m.fix ?? r.fix});
     }
   }
   return out.sort((a, b) => a.line - b.line);
@@ -124,6 +207,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const v = dirs.flatMap(d => checkGameRules(d));
   if (process.argv.includes('--json')) console.log(JSON.stringify(v, null, 1));
   else if (v.length) console.error(`lint:game: ${v.length} violation(s)\n` + v.map(x => `  ${format(x)}`).join('\n'));
-  else console.log(`lint:game: ${dirs.length} game dir(s), no Math.random(), literal UI text or three/webgpu`);
+  else
+    console.log(
+      `lint:game: ${dirs.length} game dir(s), no Math.random(), literal UI text or three/webgpu, and no legacy three.js API`,
+    );
   process.exitCode = v.length ? 1 : 0;
 }

@@ -1,0 +1,216 @@
+{
+  "poses": {
+    "arms-up-twist": {
+      "bones": {
+        "spine.002": {
+          "rotation": [
+            0.953717,
+            0.0,
+            0.300706,
+            -0.0
+          ]
+        },
+        "spine.004": {
+          "rotation": [
+            0.991445,
+            0.0,
+            -0.0,
+            0.130526
+          ]
+        },
+        "upper_arm.L": {
+          "rotation": [
+            0.54703,
+            0.083611,
+            -0.206028,
+            0.807044
+          ]
+        },
+        "upper_arm.R": {
+          "rotation": [
+            0.54703,
+            -0.436733,
+            -0.079398,
+            -0.709732
+          ]
+        }
+      },
+      "source": {
+        "author": "agent",
+        "kind": "json",
+        "note": "No user was present: the agent authored this pose with author_poses.py."
+      }
+    },
+    "elbows-knees-120": {
+      "bones": {
+        "foot.L": {
+          "rotation": [
+            0.992437,
+            -0.122754,
+            0.0,
+            -0.0
+          ]
+        },
+        "foot.R": {
+          "rotation": [
+            0.992437,
+            -0.122754,
+            0.0,
+            -0.0
+          ]
+        },
+        "forearm.L": {
+          "rotation": [
+            0.5,
+            0.824085,
+            -0.16741,
+            0.207023
+          ]
+        },
+        "forearm.R": {
+          "rotation": [
+            0.5,
+            0.824085,
+            0.16741,
+            -0.207023
+          ]
+        },
+        "shin.L": {
+          "rotation": [
+            0.533896,
+            0.84555,
+            0.0,
+            0.0
+          ]
+        },
+        "shin.R": {
+          "rotation": [
+            0.533896,
+            0.84555,
+            0.0,
+            0.0
+          ]
+        },
+        "thigh.L": {
+          "rotation": [
+            0.633653,
+            -0.773617,
+            -0.0,
+            9.1e-05
+          ]
+        },
+        "thigh.R": {
+          "rotation": [
+            0.633653,
+            -0.773617,
+            -0.0,
+            9.1e-05
+          ]
+        },
+        "upper_arm.L": {
+          "rotation": [
+            0.906308,
+            0.095512,
+            0.034251,
+            -0.410257
+          ]
+        },
+        "upper_arm.R": {
+          "rotation": [
+            0.906308,
+            0.095512,
+            -0.034251,
+            0.410257
+          ]
+        }
+      },
+      "source": {
+        "author": "agent",
+        "kind": "json",
+        "note": "No user was present: the agent authored this pose with author_poses.py."
+      }
+    },
+    "split-reach": {
+      "bones": {
+        "forearm.L": {
+          "rotation": [
+            0.965926,
+            0.233176,
+            -0.093193,
+            0.0627
+          ]
+        },
+        "forearm.R": {
+          "rotation": [
+            0.965926,
+            0.233176,
+            0.093193,
+            -0.0627
+          ]
+        },
+        "shin.L": {
+          "rotation": [
+            0.737277,
+            0.67559,
+            0.0,
+            0.0
+          ]
+        },
+        "shin.R": {
+          "rotation": [
+            0.991445,
+            0.130526,
+            0.0,
+            0.0
+          ]
+        },
+        "spine.001": {
+          "rotation": [
+            0.976296,
+            0.21644,
+            0.0,
+            0.0
+          ]
+        },
+        "thigh.L": {
+          "rotation": [
+            0.793353,
+            -0.608761,
+            -0.0,
+            7.2e-05
+          ]
+        },
+        "thigh.R": {
+          "rotation": [
+            0.92388,
+            0.382684,
+            0.0,
+            -4.5e-05
+          ]
+        },
+        "upper_arm.L": {
+          "rotation": [
+            0.833518,
+            0.400965,
+            -0.291835,
+            -0.243532
+          ]
+        },
+        "upper_arm.R": {
+          "rotation": [
+            0.692814,
+            -0.429352,
+            -0.483397,
+            0.319362
+          ]
+        }
+      },
+      "source": {
+        "author": "agent",
+        "kind": "json",
+        "note": "No user was present: the agent authored this pose with author_poses.py."
+      }
+    }
+  },
+  "schema": 1
+}

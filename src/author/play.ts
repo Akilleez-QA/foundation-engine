@@ -4,6 +4,7 @@ import type {SceneModelRequest, SceneModelResult} from './model-inspection';
  * running scene for the test API, probes and play:snap. A scene attaches its handle when it enters and it detaches
  * when the visit ends.
  */
+import type {LightStats} from './light-slots';
 import type {SystemTimingOptions, SystemTimingCapture} from './system-timing';
 import type {EntityMetadataRequest, EntityMetadataPage} from '../core/ecs/world';
 import type {BuildBrief} from './build';
@@ -29,6 +30,8 @@ export interface SceneHandle {
   };
   /** Dev/test only: each render extension's counters, by id (`{closed: true}` once it failed). */
   extensions?(): Record<string, Record<string, unknown>>;
+  /** Dev/test only: the visit's local-light slots, admissions and refusals (VIS-02). */
+  lights?(): LightStats;
   /** Move the entity with this `Name` (default 'player'): false when there is none. */
   teleport(x: number, z: number, name?: string): boolean;
 }
