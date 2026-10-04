@@ -637,7 +637,7 @@ test('a second influence set (more than four influences) is rejected', () =>
         a.WEIGHTS_1 = a.WEIGHTS_0;
       },
     },
-    /second influence set/,
+    /has JOINTS_1: at most 4 bone influences/,
   ));
 test('more influences per vertex than the contract allows are rejected', () =>
   robotRejects({}, /influences, over 1/, c => (c.skin.influences = 1)));
