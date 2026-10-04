@@ -41,8 +41,11 @@ result = bpy.ops.export_scene.gltf(filepath=str(out), export_format='GLB', use_s
     export_cameras=False, export_lights=False)
 if result != {'FINISHED'}:
     raise RuntimeError(f'export did not finish: {result}')
+glb = out.read_bytes()
+generator = json.loads(glb[20:20 + int.from_bytes(glb[12:16], 'little')])['asset']['generator']
 manifest = dict(schema=1, author='Foundation Engine contributors', licence='GPL-3.0-only',
     source='tools/blender-export/export.py', sourceSha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    tool=f'Blender {bpy.app.version_string}', generator=generator,
     blender=bpy.app.version_string, artifact=out.name, sha256=hashlib.sha256(out.read_bytes()).hexdigest(),
     units='metres', up='+Y', pivot='base centre', bounds=[[-.5, 0, -.5], [.5, 1, .5]],
     materials=2, triangles=12, textures=0, animation='none')

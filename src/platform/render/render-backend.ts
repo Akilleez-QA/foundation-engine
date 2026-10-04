@@ -77,6 +77,14 @@ export interface RenderBackend<C, R> {
   frameReadiness(context: C, retired: () => boolean): FrameReadiness;
 }
 
+/** A scene's output transform, as backend-neutral data (author/scene-output.ts validates it; each backend maps it onto
+ *  its renderer: backends/webgl/output.ts). `'none'` with exposure 1 is the picture without tone mapping. */
+export type ToneMappingName = 'none' | 'aces' | 'agx' | 'neutral';
+export interface RenderOutput {
+  toneMapping: ToneMappingName;
+  exposure: number;
+}
+
 /** Why this build cannot provide `backend`, or null when it can. */
 export function renderBackendProblem(backend: unknown): string | null {
   if (backend === 'webgl2') return null;

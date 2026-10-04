@@ -177,6 +177,7 @@ the merge.
 | [first-use-20261003/](../verification/first-use-20261003/README.md) | #73 (`c915599`), then #104 (`8dd899a`), card B4 | Focused, advisory: development-server samples (#73); a production build served under `/first-use/` plus a warm second visit (#104), recorded at branch head `06fedec` on a heavily shared machine. No thresholds or budgets. | Fetch, decode, upload, compile and present stages are null; no CDN or real hosting; no physical device or thermal evidence. |
 | [active-restart-20261003/](../verification/active-restart-20261003/README.md) | #75 (`2ca1ea0`) | Focused: bench restarts an ended visit before active samples; reproduces hosted run 37141691681. | Pointer-only scenes. |
 | [blender-export-20261003.md](../verification/blender-export-20261003.md) | #74 (`40b9c70`) | Focused: two repeatable Blender 5.2.1 exports, validator tests, last local browser pass at source `4ff2058`. CI: main run 37149365823 passed on `40b9c70`, including `test:blender-export-browser`. | Other Blender versions, textured or animated art, physical devices. |
+| [asset-contracts-20261003.md](../verification/asset-contracts-20261003.md) | #126 | Focused: per-model contracts checked by `npm run asset:verify` and `npm run check`; 69 mutation tests, the sample's 15 unchanged tests, and a byte-identical Blender 5.2.1 re-export of the sample. | Texture dimensions and colour space, animation contents, licence truth, untrusted-file safety, other Blender versions. |
 | [save-recovery-20261003.md](../verification/save-recovery-20261003.md) | #76 (`1a32601`) | Focused: `test:weighted-appearance-browser` at clean `6a22639` (base `2fb6e69`): visible refusal, durable retry, reload. | Injected refusal, not real quota or power loss. |
 | [model-retirement-20261003.md](../verification/model-retirement-20261003.md) | #78 (`b5fbe8d`) | Focused: three transport cancellations and reentry cycles at clean `c750dd0` (base `5a68f06`), plus disposal with a pending request. | Heap and listener audit (counters only). |
 | [decode-cancellation-20261003.md](../verification/decode-cancellation-20261003.md) | #116 (`6dc111a`), card B5 | Focused: three browser cycles cancelling after a fully delivered response and a decoded image, with ownership back at baseline. Main CI run 37157174423 on `6dc111a` **failed** this check (request ended `failed`, not `finished`); PR #119 (`6da7951`) then asserted delivery from the fixture server and the page instead of the racing network event. | Counters only, no whole-heap or listener audit; no physical device. |
@@ -961,3 +962,13 @@ CSS produced one redraw and then idle rendering; the unchanged public runtime
 reproduced the missing redraw. See the [contract](render-resize-lifecycle.md) and
 [source-scoped receipt](../verification/dpr-redraw-20261003.md). The receipt is candidate-source
 evidence; it is not a full local gate or physical-device acceptance.
+
+## Scene look: output, local lights, shadows and sky (VIS) — in progress
+
+Creator requirement: a creator's agent can make a lit, atmospheric scene through `@engine` data without importing
+three.js. Each row is opt-in per scene, and a scene that does not opt in keeps its picture, draws and budgets. See the
+[scene look guide](scene-look.md).
+
+| ID | Contract | State |
+|---|---|---|
+| VIS-01 | Opt-in tone mapping and exposure per scene: `defineScene({ view: { output: { toneMapping, exposure } } })`, `'none'`/1 by default (a fresh renderer's own values). Owner: the scene visit through the renderer lease profile; `ctx.view.output` changes draw exactly one frame; an invalid run-time value is reported once and the last valid output stays. WebGL mapping in `platform/render/backends/webgl/output.ts`. | **Implemented and checked (candidate PR #124).** Evidence: unit tests (`scene-output.test.ts`, `backends/webgl/output.test.ts`), `npm run test:output-browser` (reference and low; desktop headless Chromium, software GL: an emissive-6 lantern clips under `'none'` and stays below clipping under `'aces'`; idle 0 frames; one frame per change), `quality:guard` *identical* on blank (`main`) and explorer (`garden`, `shed`). No physical-device or HDR-display acceptance. |

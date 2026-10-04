@@ -2,8 +2,9 @@
 // scripts/check.mjs (`npm run check`): the fast check to run after every small change (target: under 30 s).
 //   1. typecheck (tsc --noEmit)
 //   2. lint: formatting (Prettier, on the changed files; --all checks every file), layers, the game rules (Math.random,
-//      literal UI text), genericity, type escapes, the brief (this game), the budget ratchet; and one line per game
-//      file that uses the three.js escape hatch (@kits/three or a `three` import)
+//      literal UI text), genericity, type escapes, the brief (this game), the budget ratchet, and the model contracts
+//      (scripts/asset-verify.mjs --all: every GLB under a game's public/models with a <name>.contract.json); and one
+//      line per game file that uses the three.js escape hatch (@kits/three or a `three` import)
 //   3. the tests that the change can affect: changed test files, the test next to each changed file, every test of
 //      the game folder when anything in it changed, and every test of a changed engine folder
 // "Changed" is the working tree against HEAD, plus untracked files. `--base <ref>` includes committed branch
@@ -167,6 +168,8 @@ if (process.argv[1] && process.argv[1].endsWith('check.mjs')) {
   run('lint:types', 'node', ['scripts/lint/types.mjs']);
   run('lint:brief', toolCommand('tsx', ['scripts/lint/brief.ts', GAME]));
   run('lint:budgets', 'node', ['scripts/perf/budget-ratchet.mjs']);
+  // Every GLB under a game's public/models that has an adjacent <name>.contract.json must meet it.
+  run('asset:verify', 'node', ['scripts/asset-verify.mjs', '--all']);
   const tests = all ? [] : affectedTests(changed);
   if (all) run('tests (complete npm test suite)', npmCommand(['test']));
   else if (tests.length) {

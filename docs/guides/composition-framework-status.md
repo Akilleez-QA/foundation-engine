@@ -584,3 +584,10 @@ CSS produced one redraw and then idle rendering; the unchanged public runtime
 reproduced the missing redraw. See the [contract](render-resize-lifecycle.md) and
 [source-scoped receipt](../verification/dpr-redraw-20261003.md). The receipt is candidate-source
 evidence; it is not a full local gate or physical-device acceptance.
+
+## Scene look (VIS) — in progress
+
+Opt-in visual data for a scene, owned by the scene visit (the [scene look guide](scene-look.md)). Output (VIS-01):
+`view.output` sets tone mapping and exposure through the renderer lease; the defaults keep every existing picture
+byte-identical (picture guard on blank and explorer). Status: implemented and checked as candidate PR #124. Evidence:
+unit tests and `npm run test:output-browser` (desktop headless Chromium, software GL). No physical-device acceptance.

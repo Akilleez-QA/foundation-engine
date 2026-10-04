@@ -146,13 +146,14 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 
 | Command | What it does |
 |---|---|
-| `npm run new-game -- --template <name>` | Start a game from a template (blank, arcade, explorer, learn, terrain, expedition, mechanics); then commit `game/` on your own branch. `--force` removes the existing `game/` and `GAME.md` first |
+| `npm run new-game -- --template <name>` | Start a game from a template (blank, arcade, explorer, learn, terrain, expedition, mechanics, showcase); then commit `game/` on your own branch. `--force` removes the existing `game/` and `GAME.md` first |
 | `npm run new -- <kind> <id>` | Generators: scene, entity, component, system, input, save-section, kit; interactable, area (explore); lesson (learn) |
 | `npm run play [-- --host] [--game <dir>]` | Dev server with the test API; prints the URL (`--host`: also on the local network, for a phone) |
 | `npm run check` | Focused check: typecheck, lints, brief, affected tests; duration depends on the checkout and hardware |
 | `npm run play:snap [-- --scene <id>] [--mobile]` | Muted, isolated browser: screenshots and `playtest/latest/probe.json`; the budget verdict is judged on rendered frames (a still scene is redrawn on request) and says `not measured` when none rendered |
 | `npm run play:script -- <file.json>` | A scripted playtest (goto, key, press, teleport, wait, snap, expect, waitUntil, reload; [format](docs/recipes/write-a-playtest-script.md), checked before the browser starts); a game keeps its scripts in `game/playtest/`, evidence goes to `playtest/latest/` |
 | `npm run play:criteria [-- --gate]` | The brief's success criteria, checked and tabled |
+| `npm run asset:verify -- <model.glb>` | Check a model against its `<name>.contract.json`: size, pivot, triangle/vertex/material/texture limits, bytes, material properties, provenance ([model contracts](docs/guides/model-contracts.md)); `check` runs it for every contracted GLB |
 | `npm test` / `npm run lint` | All tests / all lints (format, layers, game, arch, css, generic, brief, budgets) |
 | `npm run format` / `npm run format:check` | Format code with Prettier / check it (Markdown excluded) |
 | `npm run gate` / `npm run gate:templates` | The integration gate for this game / for every template |

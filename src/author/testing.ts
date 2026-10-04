@@ -1,4 +1,5 @@
 import {createSceneActivity} from './scene-activity';
+import {validateSceneOutput} from './scene-output';
 import type {SceneActivityFacts} from './defs';
 import {ModelPoseLink} from './model-pose-link';
 import {ModelAttachment} from './model-attachment';
@@ -205,6 +206,7 @@ export async function testScene(
         fov: scene.view?.camera?.fov ?? 50,
       },
       background: scene.view?.background ?? 0x101820,
+      output: validateSceneOutput(scene.view?.output),
       aspect: 16 / 9,
       overlay: null,
       openReadingSheet: null,

@@ -7,6 +7,11 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Model contracts (`npm run asset:verify`).** A GLB under a game's `public/models/` with an adjacent
+  `<name>.contract.json` is checked against it by `npm run check`: size and pivot, triangle, vertex, material and
+  texture limits, file and texture bytes, allowed material properties and the receipt fields licence, author,
+  source, tool and generator. A GLB without a contract is unaffected. See
+  [model contracts](docs/guides/model-contracts.md).
 - **Full three.js for a game that opts in: `@kits/three`.** A game that lists `three()` in `defineGame({ kits })`
   may import `three`, `three/addons/*` and `three/examples/jsm/*` (one shared copy); every other game still may not
   (`npm run lint:layers`: `three-needs-kit`, `kit-not-listed`), and `npm run check` names each file that uses the kit.
@@ -96,6 +101,10 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
 
 ### Changes
 
+- **Opt-in tone mapping and exposure per scene (VIS-01).** `defineScene({ view: { output: { toneMapping, exposure } } })`
+  with `'none'` (default), `'aces'`, `'agx'` or `'neutral'` and an exposure in (0, 16]; `ctx.view.output` changes at
+  run time with one redraw. A scene without `output` draws exactly as before (picture guard: identical). See the
+  [scene look guide](docs/guides/scene-look.md).
 - **The gate passes on Node 23 and newer.** Node 23 changed the test runner's default report for piped output
   from TAP (`# tests 4`) to spec (`ℹ tests 4`), so `scripts/compatibility.test.mjs` failed `npm test` and
   `npm run gate` for a fresh game on every Node newer than 22. Scripts that read test output now name the TAP

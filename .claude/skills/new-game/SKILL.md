@@ -11,7 +11,7 @@ The brief is the contract (AGENTS.md). Nothing is built before the author agrees
 
 Ask, in plain words:
 1. **Pitch**: what is the game in one or two sentences? What does the player do again and again (the core loop)?
-2. **Genre**: which template is closest? `blank` (anything), `arcade` (score, fail, restart), `explorer` (move around, use things, doors), `learn` (a lesson: teacher, board, sim, quiz; kid-safe), `terrain` (a character on authored hills), `expedition` (routes, objectives, inventory: many kits), `mechanics` (riding, equipment, a loaded model: many kits), or another genre (start from `blank`). Each has a README in `templates/<name>/README.md`: what is in it, controls, what to change first.
+2. **Genre**: which template is closest? `blank` (anything), `arcade` (score, fail, restart), `explorer` (move around, use things, doors), `learn` (a lesson: teacher, board, sim, quiz; kid-safe), `terrain` (a character on authored hills), `expedition` (routes, objectives, inventory: many kits), `mechanics` (riding, equipment, a loaded model: many kits), `showcase` (a good-looking world: palette, light presets, baked light, low-poly forms), or another genre (start from `blank`). Each has a README in `templates/<name>/README.md`: what is in it, controls, what to change first.
 3. **Audience**: who plays? Ages? Is it for children (`kids: true` turns on the kid-safe profile, docs/policy/KID-SAFE.md)?
 4. **Devices**: which devices must it run on, and which is the weakest (the minimum sets every budget ceiling)? Keyboard, touch, gamepad?
 5. **Success**: how will we know the first version works? Turn each answer into a checkable criterion (what is observed, where, the pass condition, and how: test, playtest, gate or manual).
