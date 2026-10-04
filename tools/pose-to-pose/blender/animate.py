@@ -119,14 +119,15 @@ def root_motion(spec, duration, playback, where):
             t = k / count
             h = yaw_rad * t
             x, z = ((stride / yaw_rad) * (1 - math.cos(h)), (stride / yaw_rad) * math.sin(h)) if yaw else (0.0, stride * t)
-            keys.append({'at': round(duration * t, 9), 'x': round(x, 9), 'z': round(z, 9), 'yaw': round(h, 9)})
+            # `at` stays exact: createRootMotion needs the last key at exactly the clip duration.
+            keys.append({'at': duration * t, 'x': round(x, 9), 'z': round(z, 9), 'yaw': round(h, 9)})
         kind = {'stride': stride, 'yawPerCycle': yaw}
     elif 'delta' in spec:
         d = spec['delta']
         if not all(isinstance(d.get(k, 0), (int, float)) and math.isfinite(d.get(k, 0)) for k in ('x', 'z', 'yaw')):
             raise PipelineError(f'{where}: rootMotion.delta is {{"x": m, "z": m, "yaw": degrees}} over the clip')
         keys = [{'at': 0, 'x': 0, 'z': 0, 'yaw': 0},
-                {'at': round(duration, 9), 'x': d.get('x', 0), 'z': d.get('z', 0), 'yaw': math.radians(d.get('yaw', 0))}]
+                {'at': duration, 'x': d.get('x', 0), 'z': d.get('z', 0), 'yaw': math.radians(d.get('yaw', 0))}]
         kind = {'delta': d}
     else:
         raise PipelineError(f'{where}: rootMotion needs stride (loops) or delta (one-shot clips)')

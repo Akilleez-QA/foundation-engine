@@ -10,11 +10,11 @@
     "walk_turn_left",
     "walk_turn_right"
   ],
-  "clipsManifestSha256": "24ec1f0cffcd4e3826d2f30634044b00e4957e9d51c510cfdb165c61aed473ab",
+  "clipsManifestSha256": "3a1dd8e9f3e11f022e91a7ea169fda02ee5fcebc31b925859558ee4211bfd2ba",
   "generator": "Khronos glTF Blender I/O v5.2.40",
   "inputs": {
     "animations.json": "a41c878798de224f11fd0d0f553e74c9a7b0d0cdfc3596111f3b733efca58c4c",
-    "blender/animate.py": "c2381364c6cfbe7d604064fe6e619941ecebd0ad00a3337b8c0c208232b0862e",
+    "blender/animate.py": "c841e3f5396fd9f8efdc70bd53505b6bcd86670812728eb3259cfefc87ef7c5d",
     "blender/capture_poses.py": "12517aa3f8f8fa06f15e596302512a866b369c411d37dce06302297a20b1d6e6",
     "blender/common.py": "3d5250b1b0dd316e96c318d6f73ce952b2e36df7e337fb6ce3e004e97d4b3e20",
     "blender/contact_sheet.py": "7c7c007b1b77c32b0982f961bc2a17536ce1c394c93ffea8b71bdbb9644975b5",

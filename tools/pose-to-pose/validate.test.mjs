@@ -145,3 +145,17 @@ test('a bone that shares its name with another node is ambiguous for name lookup
   const failures = (await validate(file, DEFINITION, {provenance: false})).failures.join('\n');
   assert.match(failures, /node name hand\.R is used by 2 nodes; bones need unique names/);
 });
+
+test('the manifest root motion is a valid @kits/animation RootClip that travels one stride per cycle', async () => {
+  const {createRootMotion} = await import('../../src/kits/animation/root-motion.ts');
+  const manifest = JSON.parse(readFileSync(MODEL.replace(/\.glb$/, '.clips.json'), 'utf8'));
+  for (const clip of manifest.clips.filter(c => c.rootMotion)) {
+    const motion = createRootMotion(clip.rootMotion.clip, true);
+    let distance = 0;
+    for (let i = 1; i <= 64; i++) {
+      const d = motion.advance((i * clip.duration) / 32);
+      distance += Math.hypot(d.x, d.z);
+    }
+    assert.ok(Math.abs(distance - 2 * clip.rootMotion.stride) < 1e-3, `${clip.name} travels ${distance} in two cycles`);
+  }
+});
