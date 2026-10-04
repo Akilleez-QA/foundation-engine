@@ -940,8 +940,12 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   `lights.local-max` knob (16/8/4/2, unwired) caps slots per kind. Evidence: unit tests and
   `npm run test:lights-browser` (desktop headless Chromium, software GL). No budget row for slots and no physical-device
   fill-rate evidence.
-- **Shadows (VIS-03), implemented and checked (candidate PR #148).** `sceneShadows()` opts a scene in (shadow map through the lease
+- **Shadows (VIS-03), integrated (PR #148, merge `e84afcf`).** `sceneShadows()` opts a scene in (shadow map through the lease
   profile, PCF); the sun casts with `directional.shadow`, local lights with `shadow: true`, and `Shadow` overrides an
   entity. Shadowed local slots are fixed per visit and bounded by `lights.shadowed-max` (4/2/1/0, unwired); maps
   redraw only on change through the existing scheduler. Evidence: unit tests, `npm run test:shadows-browser` and a
   courtyard bench (`shadowCasters` measured for an opted-in scene). No physical-device evidence.
+- **Sky and haze (VIS-05), implemented and checked (candidate PR #150).** `defineEnvironment({ sky })` draws a gradient with an optional
+  sun-like discs and stars from one CPU-generated texture on an unlit sphere (no custom shader, backend-neutral);
+  `haze` gains `{ kind: 'exp2', density }` and `color: 'sky'`. Evidence: unit tests and `npm run test:sky-browser`
+  (desktop headless Chromium, software GL). No physical-device evidence.
