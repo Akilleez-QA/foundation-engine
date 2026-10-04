@@ -593,5 +593,4 @@ Shadows (VIS-03): `sceneShadows()` per scene, `directional.shadow` for the sun, 
 per-entity `Shadow`; shadowed local slots fixed per visit and bounded by `lights.shadowed-max`; maps redraw only on
 change. Status: integrated (PR #148, merge `e84afcf`). Evidence: unit tests and `npm run test:shadows-browser`.
 Sky and haze (VIS-05): `defineEnvironment({ sky })` draws a gradient sky with optional discs and stars from
-one texture on an unlit sphere; `haze` gains `exp2` and `color: 'sky'`. Status: implemented and checked as a candidate
-PR. Evidence: unit tests and `npm run test:sky-browser`.
+one texture on an unlit sphere; `haze` gains `exp2` and `color: 'sky'`. Status: implemented and checked as a candidate PR #150. Evidence: unit tests and `npm run test:sky-browser`.
