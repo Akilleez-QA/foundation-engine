@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { must } from '../testing/must';
 import { readFileSync } from 'node:fs';
-import { burst, defineEmitter, defineEntity, defineInput, defineScene, defineSystem, Emitter, Name, sceneParticles, Shape, testScene, Transform } from './index';
+import { burst, defineAsset, defineEmitter, defineEntity, defineInput, defineScene, defineSystem, Emitter, Name, sceneParticles, Shape, testScene, Transform } from './index';
 
 // recipe:begin
 const hitSparks = defineEntity({ id: 'hit-sparks', components: [
@@ -46,6 +46,20 @@ const trail = defineEmitter({ mode: 'continuous', rate: 80, max: 96, lifetime: [
 const smoke = defineEmitter({ mode: 'continuous', rate: 12, max: 48, lifetime: [2, 3], speed: [.4, .8], spread: .3, direction: [0, 1, 0],
   gravity: [.3, .2, 0], drag: .4, size: [.3, 1.2], color: [0x8a8a8a, 0x5a5a5a], opacity: [.5, .3, 0], blending: 'normal' });
 // recipe:end
+// The sidecar `npm run fx:pack` writes (the recipe imports it from game/public/textures/fx/smoke.json).
+const smokeSheet = {cols: 4, rows: 4, count: 16, fps: 24, atlas: {width: 256, height: 256}};
+// recipe:begin
+const smokeTexture = defineAsset({ id: 'smoke-sheet', type: 'texture', url: '/textures/fx/smoke.png',
+  width: smokeSheet.atlas.width, height: smokeSheet.atlas.height,
+  licence: 'CC0-1.0', author: 'Your name', source: 'smoke.blend, frames 1-16, packed with npm run fx:pack' });
+// recipe:end
+// recipe:begin
+const chimney = defineEntity({ id: 'chimney', components: [ Transform({ y: 3 }),
+  defineEmitter({ mode: 'continuous', rate: 6, max: 24, lifetime: [2, 3], speed: [.4, .8], spread: .3,
+    size: [.6, 1.6], opacity: [.8, 0], blending: 'normal', texture: 'smoke-sheet',
+    frames: { cols: smokeSheet.cols, rows: smokeSheet.rows, count: smokeSheet.count, mode: 'over-life' } }),
+] });
+// recipe:end
 const use = defineInput({ id: 'use', label: 'Use', keys: ['KeyE'], pad: ['a'] });
 
 test('recipe: hit sparks remove themselves; the pickup glitters, then bursts when collected; trail and smoke run', async () => {
@@ -70,6 +84,17 @@ test('recipe: hit sparks remove themselves; the pickup glitters, then bursts whe
   t.dispose();
 });
 
+test('recipe: the chimney plays its sprite sheet as one emitter', async () => {
+  assert.equal(smokeTexture.id, 'smoke-sheet');
+  const smokeScene = defineScene({ id: 'smoke', title: 'Smoke', particles: sceneParticles(), entities: [chimney] as never });
+  const t = await testScene(smokeScene, { seed: 1 });
+  t.run(2);
+  assert.equal(t.particles.stats!.emitters, 1);
+  assert.ok(t.particles.stats!.live > 0);
+  assert.deepEqual(t.particles.reports, []);
+  t.dispose();
+});
+
 test('recipe: the definitions above are the recipe\'s code', () => {
   // Compare without comments, whitespace, separators, `export` or the `const x =` binding (the recipe shows some
   // emitters inline in an entity list).
@@ -78,6 +103,6 @@ test('recipe: the definitions above are the recipe\'s code', () => {
   const code = norm([...recipe.matchAll(/```ts\n([\s\S]*?)```/g)].map(m => m[1]).join('\n'));
   const own = readFileSync(new URL(import.meta.url), 'utf8');
   const blocks = [...own.matchAll(/\/\/ recipe:begin\n([\s\S]*?)\/\/ recipe:end/g)].map(m => must(m[1], 'recipe block'));
-  assert.equal(blocks.length, 6);
+  assert.equal(blocks.length, 8);
   for (const block of blocks) assert.ok(code.includes(norm(block)), `not in the recipe:\n${block}`);
 });

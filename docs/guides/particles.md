@@ -58,13 +58,14 @@ scene.
 | Emitters per scene | default 16, cap 256 | Refused: not drawn, counted in `stats.refused` and by cause in `stats.refusals` (`emitters` or `particles`); the first refusal of each cause in a visit is reported. A refused burst is dropped and counted in `dropped` (never fired late), and a refused `despawn: true` one-shot is removed at once; a refused continuous emitter is admitted when capacity frees (same step) |
 | Reserved particles per scene (sum of admitted `max`) | default 4,096, cap 65,536 | As above |
 | Curve keys, lifetime, speed, gravity, drag, rate | 8 keys, 30 s, 1,000 m/s, ±1,000 m/s², 10/s, 10,000/s | `defineEmitter` throws; mutated data freezes the emitter with one report until fixed |
+| Flipbook grid, frame rate | `cols` and `rows` 1…16 each (256 frames), `fps` up to 120 | As above; the message names the 16×16 cap |
 
 Admission uses the unscaled `max`, so the same emitters are admitted on every preset. A work-count limit is not a
 CPU deadline: the per-step cost is proportional to live particles plus spawn attempts, bounded by the table.
 
 ## Rendering and cost
 
-- The drawing code is a separate lazy chunk (about 3 kB minified), requested when the first emitter is admitted, or
+- The drawing code is a separate lazy chunk (about 3.8 kB minified), requested when the first emitter is admitted, or
   while the scene opens (whenever it has `sceneParticles()`). Simulation never waits for it: until it arrives
   admitted emitters simulate and are not drawn, then they are bound and drawn from the next frame. A failed chunk load
   is reported once and particles stay undrawn for the rest of the visit.
@@ -86,12 +87,42 @@ CPU deadline: the per-step cost is proportional to live particles plus spawn att
 - The particle program is compiled at its first draw, not during the scene's program preparation, so the first burst
   of a visit may show a compile hitch on slow drivers.
 
+## Flipbooks (sprite sheets)
+
+`frames: { cols, rows, count?, fps?, mode }` on an emitter makes its `texture` a grid of frames (frame 0 top left,
+left to right, then down). Owner and cost are the emitter's: still one mesh and one draw. At admission a flipbook
+emitter's pool also allocates two `Float32Array`s of its capacity (the drawn frame and the start frame per particle);
+the renderer adds one instanced `frame` attribute (1 float per particle) over the first, uploaded with the live
+prefix like the others, and compiles the particle program with `FLIPBOOK` defined, where the vertex shader maps the
+quad's uv into the frame's cell (`grid` uniform; `flipbookUv` in `particles.ts` is the same formula, unit-tested).
+Emitters without `frames` keep the plain program and their three attributes, so their output is unchanged. The frame
+is computed in the same per-frame write as size and colour (`flipbookFrame`): `'over-life'` from age / life,
+`'loop'` from age × fps, `'random-start'` from age × fps plus a start frame drawn at spawn. Nothing is allocated per
+particle or per frame.
+
+Bounds: the grid is capped at 16 × 16 and `fps` at 120 (refused by `defineEmitter`, or frozen with one report when
+mutated). A flipbook needs a texture. Changing `cols` or `rows` restarts the emitter (new pool shape); `count`, `fps`
+and `mode` may change every step. Until the sheet arrives (or if it fails) the emitter draws its soft dot.
+
+Determinism: `'random-start'` takes a fifth draw from the emitter's own stream on every spawn attempt (before thinning,
+so the stream stays preset-independent); `'over-life'` and `'loop'` take none, so such an emitter moves exactly as it
+does without `frames`. No flipbook draws from `ctx.random()` or `Math.random` (regression tests in
+`particle-flipbook.test.ts`, with and without a seed).
+
+Limitations: frames are packed edge to edge with no padding or half-texel inset, so bilinear filtering and mipmaps blend
+neighbouring cells at the cell borders (visible as a one-pixel seam on a large opaque test sheet); author frames with
+transparent borders. No frame blending between cells, no per-emitter sheet atlas sharing beyond the texture library's
+own sharing, no compressed sheet formats beyond the texture library's. `npm run fx:pack` (`scripts/fx-pack.mjs`) packs
+8-bit RGB/RGBA PNG sequences only (palette, 16-bit and interlaced files are refused), offline and with no
+dependency; its sidecar records the grid, sizes, input hashes and stated provenance, which the creator copies into
+`defineAsset` (nothing checks the two agree).
+
 ## Quality
 
 Knob `effects.particles` (group Effects, applies on scene re-entry): 1 on reference and high, 0.75 medium, 0.5 low.
 For non-essential emitters the pool is `ceil(max × scale)` and spawn index k is drawn when
 `floor((k+1)·scale) > floor(k·scale)`, a deterministic subset of the reference particles. Every spawn attempt still
-takes its four random draws, so the stream, the despawn time and everything the game computes are identical on
+takes its four random draws (five for a `'random-start'` flipbook), so the stream, the despawn time and everything the game computes are identical on
 every preset (STD-SIM-10). `essential: true` emitters are never thinned: they are the content floor (STD-SET-10).
 The knob is registered and resolved but not yet `wired` (not shown on the Graphics screen), like texture anisotropy;
 a template that uses particles can wire it. Only the reference preset is gated (STD-SET-5).
@@ -137,8 +168,10 @@ an effect leaves the gameplay sequence and existing `?seed=` replays unchanged (
 | Level | Evidence | Scope |
 |---|---|---|
 | Unit | `src/author/particles.test.ts` (validation, burst/continuous, seeded determinism, gameplay stream unchanged by effects, bounded refusal under sustained hits with no late firing, no re-fire on rebuild, bind failure not retried, thinning subset, overload, admission and refusal, invalid-data freeze, rebuild, interpolation and curves, rotation, trail spacing, `testScene`, compile-time texture check); `src/author/scene-particles.test.ts` (one hidden instanced mesh per emitter, live-prefix upload ranges, blending, texture lease/apply/release/failure/late arrival, visit disposal); `src/author/particle-view.test.ts` (lazy renderer: loads once on first need, binds waiting emitters, ignores a late arrival after the visit, reports a failed load or a failed renderer creation once); `src/author/particles-recipe.test.ts` (the recipe's code, plus a check that its definitions still match the recipe's code blocks) | Node, no GPU |
-| Browser | `npm run test:particle-browser` (`scripts/play/particle-check.mjs`): reference and low presets; idle emitters 0 draws and 0 frames; one burst +1 draw with 2 triangles per particle (48 on reference, 24 on low); three live emitters 3 draws; back to the baseline draws and still once particles die; the drawing chunk fetched once; 3 emitter geometries disposed and the texture released on exit | Desktop headless Chromium, software GL |
+| Browser | `npm run test:particle-browser` (`scripts/play/particle-check.mjs`): reference and low presets; idle emitters 0 draws and 0 frames; one burst +1 draw with 2 triangles per particle (48 on reference, 24 on low); three live emitters 3 draws; back to the baseline draws and still once particles die; the drawing chunk fetched once; 3 emitter geometries disposed and the texture released on exit; a 2 × 2 flipbook packed by `fx:pack` (`'over-life'`) is one draw while live, its frame attribute steps 0, 1, 2, 3 and the screen shows the cells in reading order (red, green, blue, yellow) | Desktop headless Chromium, software GL |
 | Browser (on-demand) | Same check: a scene without systems plays its own one-shot burst, removes the entity and then renders no frames | As above |
+| Unit (flipbook) | `src/author/particle-flipbook.test.ts` (UV and frame maths, shader formula and attribute only on flipbook emitters, 16×16 cap refusal at definition and at run time, determinism with a seed and from the unseeded visit stream, no extra draw for over-life and loop, gameplay stream unchanged); `scripts/fx-pack.test.mjs` (grid choice and cap, layout, sidecar, natural order) | Node, no GPU |
+| Bundle (flipbook) | Blank template build: lazy `scene-particles` chunk 3,401 → 3,850 bytes minified (1,698 → 1,879 gzip); scene runtime chunk 462,401 → 462,427 bytes | Blank template only |
 | Gate | Template budgets unchanged: no template uses `Emitter`. Blank template build: scene runtime chunk +3.0 kB (489.6 → 492.6 kB, including the particle seed derivation), first-load JS +0.5 kB | Per-scene counts and bundle of the checked templates |
 
 Not established: physical-device or GPU timing, fill-rate cost of large or overlapping particles, visual quality

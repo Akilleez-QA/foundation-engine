@@ -97,6 +97,10 @@ To test the same thing without a browser, use `createTestSaves()` in a game test
 
 - A step after a `press` sees the state one frame late. Wait for something the press changes, such as a caption or a
   scene (`waitUntil`), before you `snap` or `expect`. A fixed `wait` works on your machine and fails on a slower one.
+- A restart, a `goto` or a scene change starts a new visit. Until that visit's `enter()` has run, `engine.state()`
+  reports the new scene with an empty `world.state`, so `world.state.score` reads `undefined`. On a loaded machine this
+  can last longer than a second. After the press, `waitUntil` a value that `enter()` sets (the arcade
+  `restart.json` waits for `world.state.phase` to be `"playing"`), then `expect` the rest.
 - `key` returns before the held key has moved anything. Follow it with a `waitUntil` on what it should change
   (`world.named.player.y`), not a `snap`.
 - Prefer `waitUntil`, `pressUntil` and `holdUntil` to fixed waits. Their `ms` is a timeout, not a delay.

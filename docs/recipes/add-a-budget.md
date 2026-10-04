@@ -65,3 +65,5 @@ git commit -m "Level: add the fountain" -m "Perf-Budget: level.draws 30 -> 36: t
 `npm run lint:budgets` compares every game's `budgets.json` (`game/` and each `templates/<name>/game/`) with `origin/main`. Template keys carry the template's name (`blank/main.draws`). It fails any raise that no `Perf-Budget: <key> <old> -> <new>: <reason>` trailer on the branch names exactly. A raise that is not yet committed always fails. Lowering a number needs nothing: that is the ratchet.
 
 Before raising, try in order: simplify, instance (one draw for many copies), bake (merge static meshes per material), LOD. Raise only with the author's agreement.
+
+The author API has no instancing yet (an instanced scatter API is planned, not landed). Until it lands, bake static copies into one `Mesh` with `defineMesh` and vertex colours ([art direction](art-direction.md), section 5: a hundred rocks are one draw), and draw small moving copies as particles (one draw per emitter).

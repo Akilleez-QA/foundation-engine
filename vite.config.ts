@@ -84,6 +84,11 @@ const lanWarning: Plugin = {
 const devHost = (value?: string): string | true =>
   !value || value === '0' || value === 'false' ? '127.0.0.1' : value === '1' || value === 'true' ? true : value;
 const slash = (path: string) => path.replace(/\\/g, '/');
+// PORT is read by every command that loads this config, so a value that is not a port number is left to Vite's default.
+const previewPort = (value?: string): {port?: number; strictPort?: boolean} => {
+  const port = Number(value);
+  return value && Number.isInteger(port) && port > 0 && port < 65536 ? {port, strictPort: true} : {};
+};
 const engineBarrel = slash(fileURLToPath(new URL('./src/author/index.ts', import.meta.url)));
 // Workers are module workers and the worker host loads job modules on demand: ES output with code splitting.
 // Production builds ship short string ids instead of readable keys (scripts/compact-keys.mjs).
@@ -119,7 +124,9 @@ export default defineConfig({
   // ENGINE_WATCH=0 starts no file watcher (`server.watch: null`): the browser-check preload (scripts/silent-browser.cjs)
   // sets it, because those servers never see an edit; `npm run dev` and `npm run play` keep watching.
   server: {host: devHost(process.env.ENGINE_HOST), ...(process.env.ENGINE_WATCH === '0' ? {watch: null} : {})},
-  preview: {host: devHost(process.env.ENGINE_HOST)},
+  // `PORT=4174 npm run preview` serves on that port and stops if it is taken (as `npm run play` does); without PORT,
+  // preview starts at 4173 and moves to the next free port, printing the address it chose.
+  preview: {host: devHost(process.env.ENGINE_HOST), ...previewPort(process.env.PORT)},
   optimizeDeps: {entries: ['index.html']},
   // src/author/index.ts is a pure re-export barrel (scripts/vite-config.test.mjs keeps it so). Declaring it free of
   // side effects lets Rolldown (Vite 8) drop the unused test helpers' static edge to the worker host, so the host

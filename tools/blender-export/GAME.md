@@ -22,3 +22,4 @@
 | Date | Change | Evidence |
 | --- | --- | --- |
 | 2026-10-03 | Original Blender static export consumer with explicit brief and budget declaration. | See `README.md` and the scoped verification receipt. No existing game budget was raised. |
+| 2026-10-03 | Low-poly lantern example asset (`game/tools/lantern/export.py`), checked by `lantern.contract.json`. Not placed in the scene: the brief's 14-triangle scene cap is unchanged. | `npm run asset:verify -- tools/blender-export/game/public/models/lantern.glb`; `lantern.test.mjs`. No budget was raised. |

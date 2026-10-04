@@ -689,6 +689,24 @@ Evidence: unit tests, the recipe's code as a test, and `npm run test:particle-br
 physical-device, GPU timing, fill-rate or visual-quality acceptance. See the
 [guide](particles.md).
 
+Flipbook follow-up (FX-01a): implemented and checked, not yet integrated. `frames` on an emitter's texture
+(one draw, one `frame` attribute, 16 × 16 cap, own random stream) and `npm run fx:pack`; evidence and limits in
+the [guide](particles.md#flipbooks-sprite-sheets).
+
+## Material options — VIS-04, implemented and checked in PR #127
+
+New `MaterialData` fields `shading` (`'standard' | 'matte' | 'flat' | 'toon'`), `toonSteps` (2…5), `side`
+(`'front' | 'double'`), `alphaCutoff` ([0, 1)) and `vertexColors` (default true), with `MATERIAL_SHADINGS`. A
+`Material` on a `Mesh` shades it through the same visit surfaces as a `Shape` (a texture is reported once and not
+drawn); on a `Model` it overrides the instance's materials, keeping the model's own value for every field left at its
+default. Owner: the scene visit (`author/scene-materials.ts`, `author/model-looks.ts`). Bounds: three material classes
+and two-valued options (a fixed program set); at most four shared toon gradients; model overrides at most materials ×
+looks in use. Overload: none beyond the texture library. Cancellation: visit exit disposes surface, override and
+gradient resources; overrides never dispose library textures. Recovery: CPU-side descriptions; programs and the gradient
+upload are recreated after context loss. A class change builds one surface and releases the old one (one redraw, at
+most one new program). Defaults reproduce the previous materials, so templates draw identically. Evidence: unit tests,
+recipe test, `npm run test:material-options-browser`. See the [guide](material-options.md).
+
 ## Game sound files — DX P1-10, integrated in v0.2.0
 
 `ctx.play(id, options?)` accepts a game sound id as well as a cue id (`PlayOptions`:
