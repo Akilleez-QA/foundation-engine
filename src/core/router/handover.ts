@@ -233,8 +233,12 @@ export function createHandover(deps: HandoverDeps): Handover {
     };
     const entered = (run: SceneRun): HandoverOutcome | Promise<HandoverOutcome> => {
       self.run = run;
-      // A late run for a superseded request is left at once, never activated.
-      if (!visit.current()) return stale();
+      // A late run for a superseded request is left at once, never activated. Its own preparation may still settle
+      // (a retired preparation rejects): that outcome is obsolete, so observe it instead of leaving it unhandled.
+      if (!visit.current()) {
+        run.ready?.catch(() => {});
+        return stale();
+      }
       return run.ready ? run.ready.then(rendered, fail) : rendered();
     };
     const enterPrepared = (module: unknown): HandoverOutcome | Promise<HandoverOutcome> => {
