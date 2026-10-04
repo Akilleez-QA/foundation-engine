@@ -9,7 +9,8 @@ under each light preset.
 npm run new-game -- --template showcase --id my-game --title "My game"
 ```
 
-This README stays with the template; your copy lives in `game/` and `GAME.md`.
+This README stays with the template; your copy lives in `game/` and `GAME.md`. The techniques, with before and after
+pictures, are in the [art-direction recipe](../../docs/recipes/art-direction.md).
 
 ## What is in it
 
