@@ -4,10 +4,10 @@
 //   1. generators, then tsc --noEmit           5. bundle check on that build (first-load JS, large chunks)
 //   2. lint: layers, architecture ratchet,      6. software-GL bench of every scene in perf/budgets.ts, with the
 //      CSS ratchet, budget ratchet                 ADR 0046 evidence cache
-//   3. npm test, then play:snap (smoke)         7. budgets and baselines; failing evidence (fresh or reused) is
-//   4. build this tree into a temp folder          confirmed by a fresh run: a count fails only if two consecutive
-//                                                  runs breach it. A non-comparable window (ADR 0053) never blocks;
-//                                                  if it stays so, the gate fails as INCONCLUSIVE
+//   3. npm test, play:snap (smoke), then the   7. budgets and baselines; failing evidence (fresh or reused) is
+//      game's browser playtests                    confirmed by a fresh run: a count fails only if two consecutive
+//      (play:playtests)                            runs breach it. A non-comparable window (ADR 0053) never blocks;
+//   4. build this tree into a temp folder          if it stays so, the gate fails as INCONCLUSIVE
 //
 // Only counts block in software GL (draws, triangles, casters, texture/canvas MiB, heap, contexts, load MiB); frame
 // and load times are advisory there. The bench is muted and isolated (bench-browser.mjs); it never touches audio.
@@ -94,6 +94,9 @@ if (!flag('--bench-only')) {
   step('npm test', npmCommand(['test', '--silent']));
   // Smoke: the first scene opens in a muted browser on the dev server with no page errors (scripts/play/snap.mjs).
   step('play:snap', 'node', ['scripts/play/snap.mjs']);
+  // Every scripted browser playtest of the game (<game>/playtest/*.json and each `how: 'playtest'` criterion): a
+  // failing playtest fails the gate (scripts/play/playtests.ts).
+  step('play:playtests', toolCommand('tsx', ['scripts/play/playtests.ts']));
 }
 const o = {...parseArgs([]), check: false};
 const experiment = {route: [...SCENE_IDS], active: [...ACTIVE_SCENES]};

@@ -156,9 +156,10 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 | `npm run new -- <kind> <id>` | Generators: scene, entity, component, system, input, save-section, kit; interactable, area (explore); lesson (learn) |
 | `npm run play [-- --host] [--game <dir>]` | Dev server with the test API; prints the URL (`--host`: also on the local network, for a phone) |
 | `npm run check` | Focused check: typecheck, lints, brief, affected tests; duration depends on the checkout and hardware |
-| `npm run play:snap [-- --scene <id>] [--mobile]` | Muted, isolated browser: screenshots and `playtest/latest/probe.json`; the budget verdict is judged on rendered frames (a still scene is redrawn on request) and says `not measured` when none rendered |
+| `npm run play:snap [-- --scene <id>] [--mobile] [--quality <preset>] [--calm]` | Muted, isolated browser: screenshots and `playtest/latest/probe.json`. `--mobile` snaps the phone view at the phone tier (medium, the device-class start rule) and `--quality` pins any preset; each view prints the tier it ran at. `--calm` turns Calm on (reduced motion) and reports whether motion and emitters stopped; every view records what moved with no input (renders, picture change, particles). A `counts:` line per view gives draws, postDraws, triangles, shadowCasters, shadowPasses and textureMiB against the scene's budget; the budget verdict is judged on rendered frames (a still scene is redrawn on request) and says `not measured` when none rendered |
 | `npm run play:script -- <file.json>` | A scripted playtest (goto, key, press, teleport, wait, snap, expect, waitUntil, reload; [format](docs/recipes/write-a-playtest-script.md), checked before the browser starts); a game keeps its scripts in `game/playtest/`, evidence goes to `playtest/latest/` |
 | `npm run play:criteria [-- --gate]` | The brief's success criteria, checked and tabled |
+| `npm run play:playtests` | Every playtest script of the game (`game/playtest/*.json` and each `how: 'playtest'` criterion) on one server; the gate runs it and fails on a failing playtest |
 | `npm run asset:verify -- <model.glb>` | Check a model against its `<name>.contract.json`: size, pivot, triangle/vertex/material/texture limits, bytes, material properties, provenance ([model contracts](docs/guides/model-contracts.md)); `check` runs it for every contracted GLB |
 | `npm run disclosure [-- --strict]` | Steam and itch.io AI-disclosure draft from the asset provenance records ([guide](docs/guides/asset-provenance.md)) |
 | `npm run asset:optimize -- <in.glb> --out <out.glb>` | Meshopt-compress a model and re-encode its textures as WebP at the contract's texture size (`--ktx2` writes KTX2 for phone targets), keeping named nodes; checks the contract before and after ([model contracts](docs/guides/model-contracts.md#optimise)) |
@@ -171,7 +172,7 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 | `npm run quality:guard` | Picture comparison of two builds |
 | `npm run deploy:production` | The only production release path for this repository's `main` (a game is shared with `npm run build` and static hosting) |
 
-The dev and test builds expose `window.engine` (src/dev/test-api.ts): `state()`, `goto(scene, params)`, `teleport(x, z, name)`, `key(key, ms)`, `clock.hold/step/resume`, `loop()`, `redraw()`, `probe(name)`, `events(fn)`. Production builds never contain it.
+The dev and test builds expose `window.engine` (src/dev/test-api.ts): `state()`, `goto(scene, params)`, `teleport(x, z, name)`, `key(key, ms)`, `clock.hold/step/resume`, `loop()`, `redraw()`, `particles()`, `probe(name)` (e.g. `probe('quality')`, `probe('settings').calm`), `events(fn)`. Production builds never contain it.
 
 ## Worktree per task, gate before integration, production only from a clean main
 

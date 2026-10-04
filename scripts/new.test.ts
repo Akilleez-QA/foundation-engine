@@ -71,6 +71,21 @@ test('new: every game generator writes files that load, compile and keep the bri
       brief.performance.perScene.draws,
       "an unmeasured scene starts at the brief's ceiling",
     );
+    // C3 (2026-10-03 acceptance): the row bounds every gated count the brief has a ceiling for, from the same source.
+    for (const m of [
+      'draws',
+      'postDraws',
+      'triangles',
+      'shadowCasters',
+      'shadowPasses',
+      'textureMiB',
+      'heapMiB',
+    ] as const)
+      assert.equal(
+        budgets.scenes.cellar.budget[m],
+        brief.performance.perScene[m],
+        `${m} starts at the brief's ceiling`,
+      );
     assert.equal(
       'loadMiB' in budgets.scenes.cellar.budget,
       false,

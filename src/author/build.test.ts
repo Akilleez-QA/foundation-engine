@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {must} from '../testing/must';
-import {briefProblems, defineBuild, TIER, type BuildInput} from './build';
+import {briefProblems, CEILING_METRICS, defineBuild, TIER, type BuildInput} from './build';
 const input = (): BuildInput => ({
   goal: 'Build a precise experience',
   pitch: 'A creator chooses the requirements',
@@ -23,7 +23,15 @@ test('creator contract versions resolved defaults without capping explicit creat
   assert.equal(result.contractVersion, 1);
   assert.equal(result.performance.fps, 120);
   assert.equal(result.performance.firstLoadKiB, 2048);
-  assert.deepEqual(result.performance.perScene, {draws: 900, triangles: 0, textureMiB: 0, heapMiB: 0});
+  assert.deepEqual(result.performance.perScene, {
+    draws: 900,
+    triangles: 0,
+    textureMiB: 0,
+    heapMiB: 0,
+    postDraws: TIER.desktop.perScene.postDraws,
+    shadowPasses: TIER.desktop.perScene.shadowPasses,
+    shadowCasters: TIER.desktop.perScene.shadowCasters,
+  });
   assert.equal(result.performance.loadMs, TIER.desktop.loadMs);
   assert.deepEqual(result.devices.targets, ['desktop']);
   assert.equal(result.policy, 'default');
@@ -91,10 +99,10 @@ test('invalid numeric creator declarations are diagnosed rather than silently cl
     b.performance = {[key]: 0};
     assert.ok(briefProblems(b).length);
   }
-  for (const key of ['draws', 'triangles'] as const) {
+  for (const key of ['draws', 'triangles', 'postDraws', 'shadowPasses', 'shadowCasters'] as const) {
     const b = input();
     b.performance = {perScene: {[key]: 1.5}};
-    assert.ok(briefProblems(b).length);
+    assert.ok(briefProblems(b).length, key);
   }
   const fractional = input();
   fractional.audience = {ages: [2.5, 5]};
@@ -209,4 +217,20 @@ test('assets.provenance defaults to warn, accepts required and refuses anything 
       briefProblems({...input(), assets}).some(p => /^assets/.test(p)),
       `refuses ${JSON.stringify(assets)}`,
     );
+});
+
+test('every device class has a ceiling for every gated per-scene count, and shadow casters never exceed draws', () => {
+  for (const [cls, t] of Object.entries(TIER)) {
+    for (const m of CEILING_METRICS) assert.ok(Number.isFinite(t.perScene[m]) && t.perScene[m] >= 0, `${cls}.${m}`);
+    assert.ok(t.perScene.shadowCasters <= t.perScene.draws, cls);
+    // Fixed by the reference preset's pipeline: 10 post passes, the sun plus four shadowed point lights (1 + 6 x 4).
+    assert.equal(t.perScene.postDraws, 10, cls);
+    assert.equal(t.perScene.shadowPasses, 25, cls);
+  }
+  const b = input();
+  b.performance = {perScene: {shadowPasses: 1, postDraws: 0}};
+  const r = defineBuild(b).performance.perScene;
+  assert.equal(r.shadowPasses, 1);
+  assert.equal(r.postDraws, 0);
+  assert.equal(r.shadowCasters, TIER.desktop.perScene.shadowCasters);
 });

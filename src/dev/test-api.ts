@@ -20,6 +20,7 @@ import type {SceneModelRequest, SceneModelResult} from '../author/model-inspecti
  *   engine.extensions()         the running scene's render extensions' counters by id (@kits/three), or {}
  *   engine.scatter()            the running scene's scatter counters (copies, refusals, draws, triangles per scatter),
  *                               or null when it has none
+ *   engine.particles()          the running scene's particle counters (emitters, live, spawned, draws), or null
  *   engine.events(fn)           tap every bus event (returns an unsubscribe)
  *   engine.sessionRecorder(o?)  start the local sustained-session recorder on the one loop (PERF-01); replaces the last
  *   engine.currentSession()     that recorder (or the `?session-record` auto-start), or null
@@ -89,6 +90,8 @@ export interface EngineTestApi {
   extensions(): Record<string, Record<string, unknown>>;
   /** The running scene's scatter counters, or null when it has no `sceneScatter()` (or the drawing has not loaded). */
   scatter(): ReturnType<NonNullable<SceneHandle['scatter']>>;
+  /** The running scene's particle counters (FX-01: emitters, live, spawned, draws), or null without a scene. */
+  particles(): ReturnType<NonNullable<SceneHandle['particles']>> | null;
   events(fn: (name: string, payload: unknown) => void): () => void;
   /** Start a bounded current-visit system capture; replaces that visit's capture and ends on visit abort. */
   systemTrace(options?: SystemTimingOptions): SystemTimingCapture | null;
@@ -213,6 +216,10 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
     scatter() {
       const running = app.services.app.has('feature.game') ? app.services.play?.current() : null;
       return running?.scatter?.() ?? null;
+    },
+    particles() {
+      const running = app.services.app.has('feature.game') ? app.services.play?.current() : null;
+      return running?.particles?.() ?? null;
     },
     events: fn => app.events.tap((k, p) => fn(k, p)),
     systemTrace(options) {

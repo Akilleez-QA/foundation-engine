@@ -400,8 +400,11 @@ Source: the 2026-10-03 POODO observation (fixture derived from
   redraw only then. `shadowDrawsIdle` is the off-screen draws per frame while
   still (0 = static maps). `npm run test:shadows-browser` checks the bench's
   probe: the sun alone is 1 pass and the sun plus one shadowed point light 7.
-  Every template budgets `shadowPasses: 1` (measured 0, rounded up to the step):
-  one sun shadow fits, a shadowed point light (6 passes) needs a measured row.
+  Every template budgets `shadowPasses: 1` (they measured 0): a declared allowance
+  for one sun shadow, set before `perf:derive` derived this row exactly. A newly
+  derived row is the measured count with no headroom (0 without shadows, 1 for the
+  sun, 7 for the sun and a shadowed point light), because the gate allows no noise
+  on it either; a shadowed point light (6 passes) needs a measured row.
   The courtyard trial (sun plus two shadowed lanterns, about 60 casters) measured
   `shadowCasters` 215, 0 off-screen draws per frame while idle (particles still
   animating), 168 while the character moves, and 56.9 MiB of textures, under
