@@ -58,6 +58,19 @@ Every new framework below is optional: a game that does not use it is unchanged.
   limits (32 MiB, accessor, node, skin and animation counts, four bone influences), and Draco is refused (KTX2
   is accepted when the contract lists it, since #146).
 
+### Upgrading
+
+- **Constrained mobile GPUs start on a lighter preset (ADR 0079).** When the brief does not declare
+  `quality.tier`, a first run on a mobile GPU family (Mali, Adreno, PowerVR, Xclipse, Immortalis, Maleoon) starts
+  on `low` for an entry-level GPU, 2 GB or less memory or a texture limit under 4096, and on `medium` for 4 GB or
+  less, 4 or fewer cores or data saver. Before, every template started every device on `reference`
+  (16 light slots per kind, 4 shadowed lights), and a direct `createQuality` caller started phones on `high`.
+  *Affected:* players on those phones and tablets see fewer local lights and shadows, a lower pixel ratio and a
+  frame cap on first run; desktops, software GL, iPhone-class devices, capable phones, gates and benches are
+  unchanged. The start is unsaved, and saved choices are never rewritten. `BuildBrief.quality` gains
+  `tierDeclared`. *To do:* nothing to keep the new default. To start every device on one tier, declare it:
+  `quality: { tier: 'reference' }`. Players can still choose any preset.
+
 ## 0.3.0 — proposed; author decides
 
 **Proposed, not released.** The version number and date are a proposal; the author decides both, and
