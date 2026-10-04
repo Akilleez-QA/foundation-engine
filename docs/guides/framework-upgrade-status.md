@@ -703,7 +703,7 @@ upload are recreated after context loss. A class change builds one surface and r
 most one new program). Defaults reproduce the previous materials, so templates draw identically. Evidence: unit tests,
 recipe test, `npm run test:material-options-browser`. See the [guide](material-options.md).
 
-## Instanced scatter — VIS-06, implemented and checked in PR #PR6
+## Instanced scatter — VIS-06, implemented and checked in PR #144
 
 New author component `Scatter` with `defineScatter`, `validateScatter`, `SCATTER_DEFAULTS`/`SCATTER_LIMITS`, and the
 per-scene opt-in `sceneScatter({ max, instances })`; batching primitive `instanceStatic`; quality knob

@@ -431,7 +431,7 @@ batching eligibility and the ADR 0078 seam hold. See the [guide](material-option
 `npm run test:material-options-browser` (desktop headless Chromium, software GL); templates draw identically. No
 physical-device, GPU timing or visual-quality acceptance.
 
-## Instanced scatter (VIS-06) — implemented, checked in PR #PR6
+## Instanced scatter (VIS-06) — implemented, checked in PR #144
 
 `Scatter` / `defineScatter` / `sceneScatter` (author API) draw many copies of a primitive `Shape` or a `Mesh` as one
 instanced draw per scatter, placed by exact points or a rect, ring or edge area, with scale, yaw, tilt and colour
