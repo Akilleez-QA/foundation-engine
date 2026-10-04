@@ -18,8 +18,9 @@ import {palette as P} from './look';
 /** A part drawn with the player: it keeps the player's x and z, `dy` metres above the player's centre. */
 export const Follow = defineComponent('follow', {dy: 0});
 
-/** The player at (x, z): a cloaked body, a head and a pointed hat, and a soft shadow (the engine casts none). */
-export const player = (x: number, z: number, shadow: number) => [
+/** The player at (x, z): a cloaked body, a head and a pointed hat, and a soft shadow disc of colour `shadow` for a
+ *  scene that casts no shadows (null in a scene with `sceneShadows()`). */
+export const player = (x: number, z: number, shadow: number | null) => [
   [
     Name({name: 'player'}),
     Transform({x, y: 0.7, z}),
@@ -28,12 +29,16 @@ export const player = (x: number, z: number, shadow: number) => [
   ],
   [Transform({x, y: 1.55, z}), Shape({kind: 'sphere', size: [0.42, 0.42, 0.42], color: 0xf1c7a0}), Follow({dy: 0.85})],
   [Transform({x, y: 1.9, z}), Shape({kind: 'cone', size: [0.6, 0.5, 0.6], color: P.roof}), Follow({dy: 1.2})],
-  [
-    Transform({x, y: 0.015, z}),
-    Shape({kind: 'cylinder', size: [0.85, 0.01, 0.85], color: shadow}),
-    defineMaterial({opacity: 0.4, transparent: true}),
-    Follow({dy: -0.685}),
-  ],
+  ...(shadow === null
+    ? []
+    : [
+        [
+          Transform({x, y: 0.015, z}),
+          Shape({kind: 'cylinder', size: [0.85, 0.01, 0.85], color: shadow}),
+          defineMaterial({opacity: 0.4, transparent: true}),
+          Follow({dy: -0.685}),
+        ],
+      ]),
 ];
 
 /** Keeps every Follow part with the player; touches the world only when the player has moved. */

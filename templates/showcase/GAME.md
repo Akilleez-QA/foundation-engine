@@ -30,9 +30,9 @@
 
 | File | What |
 |---|---|
-| `game/look.ts` | the palette and the environment presets (golden hour, overcast, moonlight, studio, and the baked night) |
+| `game/look.ts` | the palette and the environment presets (golden hour, overcast, moonlight, studio, and the lantern night) |
 | `game/forms.ts` | low-poly builders (rock, tree, crystal, prism, ring, box, roof, ground) that bake into one `Mesh`, and `bakeLight` |
-| `game/courtyard.ts`, `game/courtyard-scenery.ts` | the night courtyard: baked lantern light, glowing glass, the fountain, embers |
+| `game/courtyard.ts`, `game/courtyard-scenery.ts` | the night courtyard: point-lit lanterns, a shadowed night light, moss scatter, the fountain, embers |
 | `game/garden.ts`, `game/garden-scenery.ts` | the garden in daylight, and the sundial that cycles the presets |
 | `game/world.ts` | the player and its following parts, drifting motes, the shared systems |
 | `game/embers.ts` | the save section of taken embers |
@@ -48,3 +48,4 @@
 | Date | Change | Budgets |
 |---|---|---|
 | 2026-10-03 | Template created from the courtyard trial, built with the author API only (no engine change) | `courtyard` and `garden` measured on software GL |
+| 2026-10-04 | The courtyard uses the engine's own lights: eight lanterns are point lights (the stonework keeps only a faint baked glow, the water and the windows), the cold night key light casts shadows, a gradient sky with a moon disc and stars and exp2 haze, ACES tone mapping, bloom with a vignette and grade (`view.post`), moss as one scatter. The stonework is two meshes: a ground that casts no shadow and the standing walls that do. The garden's presets gain gradient skies. | **Raised** courtyard draws 40 → 46, triangles 20 000 → 31 000, textureMiB 8 → 47 (measured 41, 27 860, 42.5 MiB: the shadow pass, the 2048 shadow map and the post targets); new postDraws row 10 (1 medium, 0 low); garden unchanged (10 draws, 9 676 triangles) |

@@ -300,6 +300,17 @@ export function bakeLight(b: Bake, ambient: number, lights: readonly BakedLight[
   }
 }
 
+/** A blob for a scatter: an icosahedron (12 vertices, 20 faces), `size` across and squashed in height. Give its
+ *  entity `defineMaterial({shading: 'flat'})` to keep the facets. */
+export function blobMesh(size: number, squash = 1) {
+  const v = ICO_V.map(([x, y, z]): V3 => [x * size, y * size * squash, z * size]);
+  const indices = ICO_F.flatMap(([i, j, k]) => {
+    const n = cross(sub(v[j]!, v[i]!), sub(v[k]!, v[i]!));
+    return dot(n, v[i]!) > 0 ? [i, j, k] : [i, k, j];
+  });
+  return defineMesh({positions: v.flat(), indices}).value;
+}
+
 /** The finished Bake as one Mesh component: one draw. */
 export const toMesh = (b: Bake) => defineMesh({positions: b.positions, indices: b.indices, colors: b.colors});
 

@@ -18,18 +18,27 @@
       "route": "#scene/courtyard",
       "active": true,
       "budget": {
-        "draws": 40,
-        "triangles": 20000,
+        "draws": 46,
+        "triangles": 31000,
         "shadowCasters": 10,
         "shadowPasses": 1,
-        "textureMiB": 8,
+        "textureMiB": 47,
         "canvasMiB": 4,
         "heapMiB": 15,
-        "contexts": 1
+        "contexts": 1,
+        "postDraws": 10,
+        "ports": {
+          "medium": {
+            "postDraws": 1
+          },
+          "low": {
+            "postDraws": 0
+          }
+        }
       },
       "provenance": {
-        "measured": "7c26db7 + the showcase template, swiftshader@1280x800 (worst window +10 %, rounded up by npm run perf:derive)",
-        "run": "GAME_DIR=templates/showcase/game npm run bench -- --only courtyard,garden (courtyard 32 draws, 17 559 triangles; garden 9 draws, 8 661 triangles)"
+        "measured": "92d7b92 + real lanterns, a shadowed night light, gradient sky, moss scatter, bloom/vignette/grade; swiftshader@1280x800 worst window +10 %",
+        "run": "GAME_DIR=templates/showcase/game npm run bench -- --only courtyard,garden (courtyard 41 draws + 10 post, 27 860 triangles, 42.5 MiB textures: the 2048 shadow map and the post targets)"
       }
     },
     "garden": {

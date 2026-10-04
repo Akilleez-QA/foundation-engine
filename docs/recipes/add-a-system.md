@@ -18,6 +18,7 @@ export const move = defineSystem({
 });
 ```
 
+- **Step time** is the second argument, `run(ctx, dt)`, in seconds: the fixed step for `fixed` systems, the frame's time for `frame` systems. There is no `ctx.time.dt`; `ctx.time.t` is the seconds since the visit began.
 - **Read input as actions** (`pressed`, `held`, `axis`, `pointer`), never keys or devices ([add-an-input-action](add-an-input-action.md)).
 - **Talk through the world**: `ctx.world.emit('coin-taken', { id })` and `ctx.world.read('coin-taken')` in a later system of the same step; events clear after each step.
 - **World-wide state** (score, lives, phase) goes in `ctx.state`; play:snap and the test API report it.

@@ -1,6 +1,6 @@
-// The courtyard's stonework, built once from the forms and the palette (a helper file: no default export): flagstones,
-// block walls with an arched gate and lit windows, the fountain's basin, lantern posts, planters with trees, benches
-// and barrels, all in one mesh with the lanterns' light baked into its colours (one draw, no runtime lights).
+// The courtyard's stonework, built once from the forms and the palette (a helper file: no default export), in two
+// meshes: the ground (which casts no shadow) and everything standing (which does). The lanterns are point lights in
+// the scene; the meshes have only a faint glow, the water's light and the lit windows baked into their colours.
 // Collision is the scene's own Solid entities; the glass, water and gate door are the scene's own shapes.
 import {createSaveableRng} from '@engine';
 import {
@@ -59,11 +59,17 @@ export const BENCHES: {at: V3; ry: number}[] = [
 ];
 export const FOUNTAIN_R = 2.2;
 
-/** Every baked light: the lantern posts, the street lamps, the wall lamps, the water's glow and the windows. */
+/** The light baked into the stonework. The lanterns themselves are point lights in the scene; the bake adds only a
+ *  faint warm glow round each (so a light preset with fewer light slots never leaves a lantern lighting nothing), the
+ *  water's glow and the lit windows, which need no slot at all. */
 export const LIGHTS: BakedLight[] = [
-  ...POSTS.map(([x, z]): BakedLight => ({at: [x, LANTERN_Y, z], color: P.lantern, intensity: 3.2, range: 6})),
-  ...STREET_LAMPS.map(([x, z]): BakedLight => ({at: [x, LANTERN_Y, z], color: P.lantern, intensity: 3.2, range: 6})),
-  ...SCONCES.map((at): BakedLight => ({at, color: P.lantern, intensity: 2.2, range: 5.5})),
+  ...[...POSTS, ...STREET_LAMPS].map(([x, z]): BakedLight => ({
+    at: [x, LANTERN_Y, z],
+    color: P.lantern,
+    intensity: 0.5,
+    range: 4,
+  })),
+  ...SCONCES.map((at): BakedLight => ({at, color: P.lantern, intensity: 0.4, range: 3})),
   {at: [0, 0.7, 0], color: P.water, intensity: 1.4, range: 3.6},
   ...WINDOWS.map(({at, ry}): BakedLight => ({
     at: [at[0] + Math.sin(ry) * 0.6, at[1], at[2] + Math.cos(ry) * 0.6],
@@ -154,7 +160,9 @@ function bench(b: Bake, at: V3, ry: number) {
   for (const x of [-0.75, 0.75]) box(b, {at: p(x, 0, 0), size: [0.12, 0.42, 0.46], ry, color: P.stoneDark});
 }
 
-export function courtyardStone() {
+/** The ground and everything outside the walls: flagstones, the street, the hedge in front, the trees and roofs of
+ *  the town. Its entity casts no shadow (a floor needs none), so the shadow passes draw only `courtyardStone`. */
+export function courtyardGround() {
   const b = bake(0);
   // Flagstones on dark mortar, each its own shade and a hair proud of its neighbours; none under the fountain.
   const r = createSaveableRng('courtyard/flags');
@@ -234,7 +242,6 @@ export function courtyardStone() {
         k: o.range(0.8, 1.1),
       });
   b.occlusion = 0.8;
-  for (const [x, z] of STREET_LAMPS) lanternPost(b, x, z);
   for (let i = 0; i < 30; i++) {
     const x = -HALF - 2 + i * ((2 * HALF + 4) / 29) + o.range(-0.3, 0.3);
     rock(b, {
@@ -254,7 +261,15 @@ export function courtyardStone() {
     roof(b, {at: [x, h, z], size: [w + 0.5, 2, 4.6], color: P.roof});
     box(b, {at: [x - w * 0.22, h * 0.55, z + 2.01], size: [0.6, 0.7, 0.04], color: 0xffd9a0});
   }
-  b.occlusion = 0.8;
+  // A faint glow round every lamp, the water and the windows, on top of the stone's own colours (white: no darkening).
+  bakeLight(b, 0xffffff, LIGHTS);
+  return toMesh(b);
+}
+
+/** Everything standing in the courtyard: walls, gate, windows, fountain, lamp posts, planters, benches, barrels. */
+export function courtyardStone() {
+  const b = bake();
+  for (const [x, z] of STREET_LAMPS) lanternPost(b, x, z);
   // Walls: north with the arched gate, west and east with lit windows, and a low parapet across the front.
   const gate = (x: number, y: number) =>
     Math.abs(x - HALF) < 1.35 && y < 2.2 + Math.sqrt(Math.max(0, 1.35 ** 2 - (x - HALF) ** 2)) * 0.9;
@@ -379,7 +394,7 @@ export function courtyardStone() {
           color: P.leafDark,
         });
     }
-  // The night: a cool dim base everywhere, plus the warm light of every lantern, lamp and window.
-  bakeLight(b, 0x3c4a7c, LIGHTS);
+  // A faint glow round every lamp, the water and the windows, on top of the stone's own colours (white: no darkening).
+  bakeLight(b, 0xffffff, LIGHTS);
   return toMesh(b);
 }
