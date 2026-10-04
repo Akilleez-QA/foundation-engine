@@ -155,6 +155,7 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 | `npm run play:script -- <file.json>` | A scripted playtest (goto, key, press, teleport, wait, snap, expect, waitUntil, reload; [format](docs/recipes/write-a-playtest-script.md), checked before the browser starts); a game keeps its scripts in `game/playtest/`, evidence goes to `playtest/latest/` |
 | `npm run play:criteria [-- --gate]` | The brief's success criteria, checked and tabled |
 | `npm run asset:verify -- <model.glb>` | Check a model against its `<name>.contract.json`: size, pivot, triangle/vertex/material/texture limits, bytes, material properties, provenance ([model contracts](docs/guides/model-contracts.md)); `check` runs it for every contracted GLB |
+| `npm run asset:optimize -- <in.glb> --out <out.glb>` | Meshopt-compress a model and re-encode its textures as WebP at the contract's texture size (`--ktx2` waits for engine KTX2 support), keeping named nodes; checks the contract before and after ([model contracts](docs/guides/model-contracts.md#optimise)) |
 | `npm test` / `npm run lint` | All tests / all lints (format, layers, game, arch, css, generic, brief, budgets) |
 | `npm run format` / `npm run format:check` | Format code with Prettier / check it (Markdown excluded) |
 | `npm run gate` / `npm run gate:templates` | The integration gate for this game / for every template |
@@ -195,4 +196,4 @@ performance. Standards-only edits do not certify existing template experiences.
 
 ## Test browsers
 
-Test browsers are isolated and muted. Never change the user's system or application audio. The bench, play scripts and quality guard always launch a fresh Chromium with `--mute-audio` and open the game with `?flags=dev.silent`. For other automation tools, preload `scripts/silent-browser.cjs`.
+Test browsers are isolated and muted. Never change the user's system or application audio. The bench, play scripts and quality guard always launch a fresh Chromium with `--mute-audio` and open the game with `?flags=dev.silent`. A driver of your own launches through `launch()` in `scripts/perf/bench-browser.mjs` (muted, throwaway profile, `ENGINE_CHROMIUM`) or passes `--mute-audio` itself ([getting started](docs/guides/getting-started.md#without-a-browser-window-coding-agents-ci)). Preloading `scripts/silent-browser.cjs` does not mute a browser your script launches: it only adds `--mute-audio` to `AGENT_BROWSER_ARGS`, for agent-browser tools that read it, and turns off the file watcher.
