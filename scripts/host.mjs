@@ -17,6 +17,8 @@ import {gameDir, ROOT} from './lib/game-dir.mjs';
 /** Bytes a client may have waiting in the socket before the host stops admitting sends to it (that closes it). */
 const MAX_BUFFERED = 262144;
 export const DEFAULT_PORT = 8787;
+/** A closed socket that has not finished the close handshake is terminated this long after the host's close. */
+export const CLOSE_TERMINATE_MS = 1000;
 export const SECURITY_WARNING =
   'Development only: unencrypted ws://, one shared join code, in-memory state, no accounts. ' +
   'Do not expose this host to the Internet or run it on a network you do not trust.';
@@ -95,7 +97,7 @@ export async function startSessionServer({
       close(socket, code, reason) {
         if (socket.readyState === WebSocket.OPEN) socket.close(code, reason);
         // Do not keep a peer that never finishes the close handshake.
-        setTimeout(() => socket.terminate(), 1000).unref();
+        setTimeout(() => socket.terminate(), CLOSE_TERMINATE_MS).unref();
       },
     },
   });
