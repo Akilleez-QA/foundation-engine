@@ -15,7 +15,7 @@ import {createWorkerHost} from '../platform/workers/host';
 import type {AudioClockReading} from '../platform/audio/audio-timeline';
 import {BUILT_IN_CUES, normalizeCueVoiceOptions, type CueVoiceOptions} from '../platform/audio/audio-output';
 import type {MusicOptions} from '../platform/audio/music-clock';
-import {EMITTER_ID, type ParticleStats} from './particle-contract';
+import {EMITTER_ID, type EmitterSample, type ParticleStats} from './particle-contract';
 import {createRng, deriveSeed} from '../core/rng';
 /**
  * author/testing.ts: `testScene`, a scene without a browser, for a game's own unit tests. It spawns the scene's
@@ -95,8 +95,13 @@ export interface TestScene {
   readonly music: {id: string; options?: MusicOptions}[];
   /** The scene's particle field, stepped as in a visit (`engine.particles` after the scene's fixed systems), without
    *  drawing: its counters (null when the scene has no `sceneParticles()`), and every problem it reported (refusals,
-   *  invalid emitter data, emitters in a scene without particles). */
-  readonly particles: {readonly stats: ParticleStats | null; readonly reports: readonly string[]};
+   *  invalid emitter data, emitters in a scene without particles); `sample(entity)` is that entity's admitted emitter
+   *  now (live count, spawn attempts since admission, bounds of the live particles) or null. */
+  readonly particles: {
+    readonly stats: ParticleStats | null;
+    readonly reports: readonly string[];
+    sample(entity: Entity): EmitterSample | null;
+  };
   /** The scene's local-light slots (VIS-02), admitted after each frame as in a visit: slots, admissions and refusals,
    *  and every refusal reported (each cause once). Nothing is drawn. */
   readonly lights: {readonly stats: LightStats; readonly reports: readonly string[]};
@@ -375,6 +380,7 @@ export async function testScene(
         return particles?.stats ?? null;
       },
       reports: particleReports,
+      sample: entity => particles?.sample(entity) ?? null,
     },
     lights: {
       get stats() {

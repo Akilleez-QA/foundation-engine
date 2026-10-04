@@ -7,7 +7,7 @@ Short, checked how-tos. Start with [getting started](../guides/getting-started.m
 | I want to… | Recipe |
 |---|---|
 | know where my models, textures, sounds and asset-making scripts go | [where your game's files go](your-game-files.md) |
-| show a `.glb` model and play its animation | [load a model](load-a-model.md) |
+| show a `.glb` model and play its animation (KTX2 textures for phones included) | [load a model](load-a-model.md) |
 | make a model with an agent in Blender (optional MCP), export it reproducibly and check it against its size, budget and licence contract | [make assets with Blender through MCP](make-assets-with-blender-mcp.md) |
 | show a score, messages, a tap action and a button | [HUD text and buttons](hud-and-buttons.md) |
 | collect things by touching them, block movement, click or tap the ground | [collision and picking](collision-and-picking.md) |
@@ -17,6 +17,7 @@ Short, checked how-tos. Start with [getting started](../guides/getting-started.m
 | texture a shape, make it shiny, glowing or see-through | [give a shape a material](give-a-shape-a-material.md) |
 | make my game look good: palette, light presets, haze, framing, low-poly forms, baked light, the look checklist | [art direction](art-direction.md) |
 | show hit sparks, pickup glitter and bursts, trails or smoke | [hit sparks and pickups](hit-sparks-and-pickups.md) |
+| test that effects start on animation markers, fire once, stack, stop with their owner and reuse cleanly | [test your effects' lifecycles](test-effect-lifecycles.md) |
 | use three.js itself: point lights and shadows, bloom, a custom shader, loaders, controls (opt-in, full power; you own three upgrades) | [use three.js directly](use-three-directly.md) |
 | play my own sound effects, with volume, pitch and position | [play your own sound files](play-your-own-sounds.md) |
 | line up events, sounds or scoring with the music the player hears | [sync gameplay to music](sync-gameplay-to-music.md) |

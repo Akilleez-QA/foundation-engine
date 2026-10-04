@@ -24,7 +24,10 @@ Without `view.environment` a scene gets default lights and the plain `background
 - `background`: the sky colour;
 - `ambient`: a sky colour, a ground colour and an intensity (soft light from everywhere);
 - `directional`: a colour, an intensity and a `position` the sunlight comes from;
-- `haze`: a colour and `near` / `far` distances (fog), or `null`;
+- `haze`: a colour and `near` / `far` distances (fog), or `{ kind: 'exp2', color, density }`, or `null`; `color: 'sky'`
+  uses the sky's horizon colour;
+- `sky`: an optional gradient (`top`, `horizon`, `bottom`) with `discs` (a sun) and `stars`, instead of a flat
+  `background` ([sky and haze](../guides/scene-look.md#sky-and-haze));
 - `points` and `pointSize`: small decorative dots on the sky (directions), for example a few stars;
 - `cube`: an optional sky box from six texture assets (the `mechanics` template has one).
 
@@ -82,6 +85,19 @@ import { sceneShadows, Shadow } from '@engine';
 area. `PointLight({ shadow: true })` costs six map faces; lighter presets allow fewer shadowed lamps (none on `low`).
 Maps redraw only when something that casts moves. Details: the
 [scene look guide](../guides/scene-look.md#shadows).
+
+### A sky that meets the haze
+
+A flat background makes a hard line where the world stops. Give the environment a gradient sky and haze in its horizon
+colour:
+
+```ts
+sky: { kind: 'gradient', top: 0x2a5ea8, horizon: 0xbcd6ea, bottom: 0x6f8a6a, discs: [{ direction: [0.3, 0.6, -1] }] },
+haze: { kind: 'exp2', color: 'sky', density: 0.03 },
+```
+
+The sky is one texture on a sphere around the camera (one draw, plus one for `stars`). Details: the
+[scene look guide](../guides/scene-look.md#sky-and-haze).
 
 ## 3. The scene
 

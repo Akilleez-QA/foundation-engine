@@ -64,11 +64,30 @@ the wave raises the right arm from the side through horizontal to overhead; the 
 contact, the lowest hips at `down`, the swing foot passing under the body and the highest hips at
 `up`, mirrored in the second half and closing on the first pose.
 
+### Engine playback (browser, S2)
+
+`npm run test:pose-to-pose-browser`: one isolated, muted Chromium with software GL (the
+`chromium-automation` build, serialised on the shared browser lock), with the engine clock held and
+stepped at 60 Hz.
+
+| Check | Result |
+| --- | --- |
+| Clip names and durations (model inspection) | Robot: `walk`, `walk_turn_left`, `walk_turn_right` 1.0667 s and `wave` 0.6 s. Creature: `scuttle` 0.8 s and `strike` 1.0 s. All match the manifests |
+| Loop seams | `scuttle` seam step 5.2 mm against 7.8 mm beside it; `walk` seam step 14.0 mm against 14.0 mm (positions relative to the moving robot) |
+| Root motion | The robot's planted left foot drifted 21 mm in world space over 2 stances while `applyRootMotion` moved it |
+| Clip event | `impact` fired once, with marker time 0.4333 s, at strike clip time 0.4333 s; the creature returned to `scuttle` |
+| Wave | Right hand 0.90 m higher, holding at 0.60 s |
+| Counts | 23 draws and 728 triangles per frame, within the declared budget; no page or console errors |
+
+The screenshots `loops.png`, `strike-impact.png` and `wave.png` were inspected.
+`game/clip-events.test.mjs` covers the manifest-to-marker and root-motion adapter without a browser.
+
 ## Not verified
 
 - No person posed or approved anything: the example's key poses are agent-authored code and its review
   gate was off. Both are recorded in its provenance.
-- No browser or engine playback in this record. CI runs no Blender; it runs the validator tests on the
-  checked-in GLB.
+- Engine playback was checked in desktop Chromium with software GL only, with no physical device, GPU, phone or
+  sustained-performance acceptance. CI runs no Blender: it runs the validator tests on the checked-in GLBs and
+  the browser check.
 - Only Blender 5.2.1 LTS. Cross-version byte identity is not claimed.
 - Visual quality of the motion is a judgement for the person, not a check.

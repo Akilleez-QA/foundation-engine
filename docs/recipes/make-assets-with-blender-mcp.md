@@ -80,7 +80,7 @@ For a model with textures, or one large enough for compression to matter, export
 npm run asset:optimize -- game/tools/<name>/out/<name>.glb --out game/public/models/<name>.glb
 ```
 
-The pass checks the export against its own contract before it starts. It then applies meshopt compression and turns textures into WebP at the contract's texture size, keeping named nodes, meshes and materials. It never decimates. Before writing anything, it checks the result against the contract next to `--out`. KTX2 is not available yet: the engine's model loader cannot decode it, so `--ktx2` is refused. See [model contracts](../guides/model-contracts.md#optimise) for what an optimised model's contract allows. A small untextured prop such as the lantern does not need this step.
+The pass checks the export against its own contract before it starts. It then applies meshopt compression and turns textures into WebP at the contract's texture size, keeping named nodes, meshes and materials. It never decimates. Before writing anything, it checks the result against the contract next to `--out`. For a phone target, `--ktx2` writes KTX2 textures instead, which stay compressed on the GPU (the engine's model loader transcodes them; it needs KTX-Software's `ktx` 4.4 or later and `KHR_texture_basisu` in the contract). See [model contracts](../guides/model-contracts.md#optimise) for what an optimised model's contract allows. A small untextured prop such as the lantern does not need this step.
 
 ## 5. Put it in the game
 

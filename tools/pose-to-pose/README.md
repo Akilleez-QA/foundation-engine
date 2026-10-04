@@ -273,6 +273,36 @@ exaggeration), and the clip has an `impact` event at 0.4333 s. Both soles touche
 events, and two runs were byte-identical. As with the robot, the poses are agent-authored and the
 review gate was off.
 
+## Run it in the engine
+
+```sh
+npm run play -- --game tools/pose-to-pose/game     # E: wave or walk again; Space or a tap: strike
+npm run test:pose-to-pose-browser                 # the S2 browser check (CI runs it too)
+```
+
+The sample game loads both GLBs with the stock `defineAsset` and `Model`, and reads each model's
+clips manifest as JSON. The robot plays `walk` in place, and `createRootMotion` (from
+`@kits/animation`) samples the manifest's root clip on the same clock. `applyRootMotion` (from
+`@kits/locomotion`) moves the entity by that delta, so the feet stay planted. A press of E switches to
+`wave`, which holds its last pose. The creature loops `scuttle`. Space starts `strike` with a fresh
+`createMarkerTrack` built from the manifest's events, advanced by the strike clip's own time, so
+`impact` fires from the animation clock rather than a timer. When the clip ends, the creature goes back
+to `scuttle`. `game/clip-events.ts` is the small adapter from the manifest to markers and root motion.
+
+The browser check (`browser.mjs`, success criterion S2) holds the engine clock and steps it at 60 Hz:
+
+- every clip is listed by the model inspection under its exact name with the declared duration;
+- for `scuttle` and `walk`, the joint step across each loop wrap is no larger than the steps beside it;
+- the robot's planted foot drifts under 4 cm in world space while root motion carries it;
+- the `impact` marker fires once, within a frame of 0.4333 s of strike clip time;
+- the wave raises the right hand and holds;
+- draws and triangles are within the sample's declared budget.
+
+The model's own playback time is not readable from game systems (`ctx.modelState` reports status
+only), so the sample keeps a clip clock beside the `Model`, restarted with each `revision`. Recolouring
+only the `team` slot per instance is not supported yet: a `Material` on a `Model` overrides every one
+of its materials and has no colour field. That is noted as a follow-up, not built here.
+
 ## Limits
 
 - Blender runs locally. CI has no Blender: it validates the checked-in outputs with `validate.mjs` and its

@@ -85,10 +85,8 @@ test('arguments: one input, a distinct --out, and known texture modes and device
   assert.throws(() => parseArgs(['a.glb', '--out', 'b.glb', '--device', 'watch']), /--device must be one of/);
   assert.throws(() => parseArgs(['a.glb', '--out', 'b.glb', '--texture-size', '0']), /positive whole number/);
   assert.throws(() => parseArgs(['a.gltf', '--out', 'b.glb']), /must be \.glb/);
-  assert.throws(
-    () => parseArgs(['a.glb', '--out', 'b.glb', '--ktx2']),
-    /--ktx2: KTX2 textures are not loadable until the engine adds KTX2 support\. Use the default WebP\./,
-  );
+  // The model loader transcodes KTX2 since PR #146 (ENGINE_KTX2), so --ktx2 is accepted.
+  assert.equal(parseArgs(['a.glb', '--out', 'b.glb', '--ktx2']).textures, 'ktx2');
 });
 
 test('texture size: the flag, then the contract, then the device, then 2048', () => {

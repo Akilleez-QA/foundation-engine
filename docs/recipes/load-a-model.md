@@ -6,7 +6,7 @@ Show a `.glb` model in a scene and play one of its animation clips. The engine l
 
 Files in your game's own `public/` folder are served from the site root (or the build's base), so `game/public/models/robot.glb` is fetched as `/models/robot.glb`, and a build ships them with your game and no other game's files. The mechanics template ships a tiny CC0 test model, `templates/mechanics/game/public/models/mechanics/beacon.glb` (one box with a one-second `pulse` clip), so you can try this recipe before you have a model of your own: copy it to `game/public/models/mechanics/beacon.glb`.
 
-The loader accepts **binary glTF (`.glb`) with everything embedded**: a `.gltf` with a separate `.bin` or image files is rejected (`models: GLB dependencies must be embedded`). Export from Blender with *glTF Binary (.glb)*. Textures embedded in the GLB are drawn. To texture a primitive `Shape` instead, see [give a shape a material](give-a-shape-a-material.md).
+The loader accepts **binary glTF (`.glb`) with everything embedded**: a `.gltf` with a separate `.bin` or image files is rejected (`models: GLB dependencies must be embedded`). Export from Blender with *glTF Binary (.glb)*. Textures embedded in the GLB are drawn: PNG, JPEG, WebP, and KTX2 (see [KTX2 textures for phones](#ktx2-textures-for-phones)). To texture a primitive `Shape` instead, see [give a shape a material](give-a-shape-a-material.md).
 
 For a reproducible Blender export with metre scale, a base-centre pivot, material bounds and an actual engine consumer, follow the [Blender export example](../../tools/blender-export/README.md). Its checked-in original asset runs without installing Blender. To make a new model with an agent, set its size and budget first, export it headless and check it with `npm run asset:verify`: see [make assets with Blender through MCP](make-assets-with-blender-mcp.md) (the MCP part is optional).
 
@@ -106,9 +106,36 @@ npm run play:snap -- --scene showcase
 
 In the snap, the model should be visible and `probe.json` should have no page errors. A 404 for the model in the console means the `url` does not match a file under `game/public/`.
 
+## KTX2 textures for phones
+
+PNG, JPEG and WebP make the download smaller, but the GPU still holds every texel as 4 bytes (plus a third for mipmaps).
+KTX2 (Basis Universal) textures stay compressed on the GPU too: the engine transcodes them to the format the device
+supports (BC7 on desktops, ASTC or ETC2 on phones), typically 4 to 8 times smaller in GPU memory. Use them when a phone
+target runs short of memory for textures.
+
+1. With [KTX-Software](https://github.com/KhronosGroup/KTX-Software/releases) 4.4 or later (`ktx` on your `PATH`),
+   let the optimiser write KTX2 textures (its contract must list `KHR_texture_basisu`; see
+   [model contracts](../guides/model-contracts.md#optimise)):
+
+   ```
+   npm run asset:optimize -- game/tools/robot/out/robot.glb --out game/public/models/robot.glb --ktx2
+   ```
+
+   Without `ktx`, it says so and falls back to WebP. It uses UASTC for normal and other data maps, which keeps them
+   accurate, and ETC1S, which is smaller, for colour. Keep each texture side a
+   multiple of 4. The result declares `KHR_texture_basisu` with the textures embedded, as the loader requires.
+2. Declare and use it like any other model. Nothing else changes: the engine loads its KTX2 support (a code chunk and
+   the 0.6 MB transcoder) only when a model with KTX2 textures loads, so games without one pay nothing for it.
+3. If the model has a [contract](../guides/model-contracts.md), add `KHR_texture_basisu` to its `extensions`.
+
+`npm run play:snap` then shows it drawn. In the dev build, `engine.probe('models')` reports `compressedTextures` and
+`compressedTextureMiB` (the GPU bytes of the transcoded textures). A device with no compressed format still draws the
+model, with RGBA8 textures. Limits and failure behaviour are in the [KTX2 guide](../guides/compressed-textures.md).
+
 ## Limits
 
 - One GLB per asset; embedded buffers and images only. Large files cost load time and memory against the scene's budget (`npm run play:snap` reports draws and triangles).
+- Mesh compression is meshopt only (no Draco). KTX2 images must be Basis Universal (ETC1S or UASTC), one 2D image each, at most 16,384 texels a side.
 - Clips play one at a time per entity; there is no blending between clips in the `Model` component.
 - Asset URLs are resolved against the build base. For a sub-path, build with `npm run build -- --base ./` or a known prefix; see [host under a sub-path](host-under-a-sub-path.md). Arbitrary root-absolute URLs outside asset declarations still need your own base handling.
 - More: [model attachments](../guides/model-attachments.md), [model readiness](../guides/model-readiness.md), [model inspection](../guides/model-inspection.md), and the `mechanics` template, which uses this same fixture.
