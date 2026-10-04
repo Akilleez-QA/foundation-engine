@@ -28,8 +28,8 @@ export default defineScene({
 ```
 
 - **Imports.** A game that lists `three()` may import anything from `three`, `three/addons/*` and
-  `three/examples/jsm/*`, in its own files. Every import of `three` resolves to the engine's single copy (Vite alias and
-  `resolve.dedupe`; the fixture checks it), so `instanceof` works across engine, addons and game. A game that does not list
+  `three/examples/jsm/*`, in its own files. Every import of `three` resolves to the engine's single copy (the Vite `three` alias; the fixture
+  checks it), so `instanceof` works across engine, addons and game. A game that does not list
   the kit may not import either (`npm run lint:layers`: `three-needs-kit`, `kit-not-listed`). `three/webgpu` and
   `three/tsl` stay banned for every game (ADR 0078). Engine code never gets this allowance.
 - **Visibility.** `npm run check` prints one line per game file that uses the kit.

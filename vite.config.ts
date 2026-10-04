@@ -97,7 +97,6 @@ export default defineConfig({
   // Game code imports the author API as `@engine` (src/author/index.ts) and optional kits as `@kits/<name>`; the app
   // reaches the game being built as `@game` (scripts/lib/game-dir.mjs: GAME_DIR, else ./game, else templates/blank/game).
   resolve: {
-    dedupe: ['three'],
     alias: [
       // Keep one Three identity while allowing optional loaders/animation classes to remain in lazy chunks. three's
       // addons (`three/addons/*`, a game with @kits/three) import `three` too, so they get this same copy.
