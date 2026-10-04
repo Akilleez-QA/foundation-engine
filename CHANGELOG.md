@@ -7,7 +7,11 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
-Nothing yet.
+- **Model contracts (`npm run asset:verify`).** A GLB under a game's `public/models/` with an adjacent
+  `<name>.contract.json` is checked against it by `npm run check`: size and pivot, triangle, vertex, material and
+  texture limits, file and texture bytes, allowed material properties and the receipt fields licence, author,
+  source, tool and generator. A GLB without a contract is unaffected. See
+  [model contracts](docs/guides/model-contracts.md).
 
 ## 0.3.0 — proposed; author decides
 

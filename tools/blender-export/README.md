@@ -4,7 +4,7 @@ An original one-metre block proves a small authoring path: Blender Python → em
 
 The files live in `tools/blender-export/` rather than `game/tools/` because this is a standalone sample game with its own brief, budgets and `GAME.md`, selected explicitly with `GAME_DIR` or `--game`; `game/` is reserved for the author's own game.
 
-The block and generator are GPL-3.0-only project contributions. No downloaded model, image, font, texture, addon or generated external artwork is used. The adjacent provenance JSON records exporter version, source hash, artifact hash and the intended geometry contract. It is an integrity receipt, not a digital signature or proof of third-party rights.
+The block and generator are GPL-3.0-only project contributions. No downloaded model, image, font, texture, addon or generated external artwork is used. The adjacent provenance JSON records the licence, author, source, tool (`Blender 5.2.1 LTS`), glTF generator, source hash, artifact hash and the intended geometry contract. It is an integrity receipt, not a digital signature or proof of third-party rights.
 
 ## Regenerate and check
 
@@ -13,6 +13,7 @@ Install the repository's npm dependencies normally. The recorded export uses Ble
 ```sh
 blender --background --factory-startup --python tools/blender-export/export.py -- --output tools/blender-export/game/public/models/metre-block.glb
 node tools/blender-export/verify.mjs tools/blender-export/game/public/models/metre-block.glb
+npm run asset:verify -- tools/blender-export/game/public/models/metre-block.glb
 node --test tools/blender-export/verify.test.mjs
 ```
 
@@ -25,7 +26,8 @@ To compare two independent exports, choose a scratch directory and export again 
 - Coordinates are authored directly in metres. Object location/rotation are zero and scale is one; origin is at the base centre.
 - Blender Z-up is exported using `export_yup=True`: resulting glTF bounds are `[-0.5, 0, -0.5]` to `[0.5, 1, 0.5]` in Y-up coordinates.
 - The cube has 12 triangles, two opaque rough nonmetallic materials, no textures, no animation and no external dependencies. Blue sides and a gold top make the up axis visually inspectable.
-- The sample validator limits the file to 64 KiB, verifies provenance hashes, embedded data, declared geometry/material constraints and decoded bounds/pivot. It also rejects any node translation, rotation, scale or matrix (transforms are baked into the mesh); any material or PBR property beyond those the exporter writes; a top face that is not the `top-gold` primitive lying wholly at the box top; and any vertex that is not a box corner. The decoded geometry and materials must match the pinned `EXPECTED_SEMANTIC_SHA256`, so editing the GLB and rehashing its provenance together still fails. A deliberate model change regenerates the GLB and provenance and updates that pin in the same commit. It is an acceptance check for this original sample, not a general untrusted-GLB security boundary.
+- The sample's limits are a [model contract](../../docs/guides/model-contracts.md), `game/public/models/metre-block.contract.json`, checked by the general `npm run asset:verify` (and by `npm run check`, which checks every contracted GLB under a game's `public/models`). `verify.mjs` is that check with this contract, plus a requirement that the contract still pins `EXPECTED_SEMANTIC_SHA256` and the 64 KiB cap, so editing the contract alone cannot loosen the sample.
+- The sample contract limits the file to 64 KiB, verifies provenance hashes, embedded data, declared geometry/material constraints and decoded bounds/pivot. It also rejects any node translation, rotation, scale or matrix (transforms are baked into the mesh); any material or PBR property beyond those the exporter writes; a top face that is not the `top-gold` primitive lying wholly at the box top; and any vertex that is not a box corner. The decoded geometry and materials must match the pinned `EXPECTED_SEMANTIC_SHA256`, so editing the GLB and rehashing its provenance together still fails. A deliberate model change regenerates the GLB and provenance and updates that pin in the same commit. It is an acceptance check for this original sample, not a general untrusted-GLB security boundary.
 - The exporter deliberately omits compression, modifiers, lights and cameras. The runtime adds the scene camera and lighting. Material node graphs in arbitrary Blender projects are not automatically supported.
 
 The [Blender 5.2 glTF manual](https://docs.blender.org/manual/en/5.2/addons/scene_gltf2.html) explains the format and PBR export conventions. Exact operator options here were inspected and exercised in the installed 5.2.1 exporter; other versions need their own check.
