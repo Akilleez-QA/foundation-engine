@@ -15,4 +15,6 @@ test('genericity: genre words are caught; idioms and the opt-in audience flag ar
   assert.equal(hits('values are compared in place').length, 0);
   assert.equal(hits('gaps leave room for new rows').length, 0);
   assert.equal(hits('`kids: true` opts in to the kid-safe profile').length, 0);
+  assert.equal(hits('a walk cycle breaks into key poses; the `walk` clip loops').length, 0);
+  assert.equal(hits('the hero walks to the next room').length, 2);
 });
