@@ -6,7 +6,14 @@ export interface EnvironmentState {
   cube?: CubeSpec;
   reflection?: CubeSpec;
   ambient: {sky: number; ground: number; intensity: number};
-  directional: {color: number; intensity: number; position: Vec3};
+  /** The sun. `shadow` (VIS-03) makes it cast shadows in a scene with `sceneShadows()`: `extent` is the half-size in
+   *  metres (0…200] of the square around the world origin that receives them, `softness` their edge. */
+  directional: {
+    color: number;
+    intensity: number;
+    position: Vec3;
+    shadow?: {extent: number; softness?: 'hard' | 'soft' | undefined} | undefined;
+  };
   haze: {color: number; near: number; far: number} | null;
   /** Directional decorative points. Scientific catalogs belong to a kit. */
   points: readonly {direction: Vec3; color: number}[];
@@ -40,6 +47,19 @@ export function defineEnvironment(input: EnvironmentState): EnvironmentState {
     Math.hypot(...e.directional.position) === 0
   )
     throw Error('environment: invalid direction');
+  const shadow = e.directional.shadow;
+  if (shadow !== undefined) {
+    if (typeof shadow !== 'object' || shadow === null) throw Error('environment: directional.shadow must be an object');
+    if (!(
+      typeof shadow.extent === 'number' &&
+      Number.isFinite(shadow.extent) &&
+      shadow.extent > 0 &&
+      shadow.extent <= 200
+    ))
+      throw Error('environment: directional.shadow.extent must be in (0, 200] metres');
+    if (shadow.softness !== undefined && shadow.softness !== 'hard' && shadow.softness !== 'soft')
+      throw Error("environment: directional.shadow.softness must be 'hard' or 'soft'");
+  }
   if (
     e.points.length > 4096 ||
     e.points.some(
