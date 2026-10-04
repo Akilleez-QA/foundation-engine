@@ -7,6 +7,15 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Shadow cost accounting.** The bench counts `shadowPasses`, the most shadow-map renders in one frame (one per map
+  face: the sun or a spot light 1, a point light 6), and the gate checks it as a count with no noise allowance. Every
+  template's scenes budget `shadowPasses: 1` (measured 0): one sun shadow fits, a shadowed point light needs a
+  measured row. `shadowCasters` is documented as what it measures: the most off-screen draws in one frame, summed over
+  shadow lights and faces. Light `refused` counters now count refused lights (eight lights in two slots:
+  `refused.full` 6, was 1), still reported once per cause. The scene-look guide gains a per-light and per-shadow cost
+  table (software GL). *Affected:* a game that adds a shadowed point light to a template scene must measure and set
+  its `shadowPasses` row; code that read `refused` as a report count now sees light counts.
+
 - **Model contracts (`npm run asset:verify`).** A GLB under a game's `public/models/` with an adjacent
   `<name>.contract.json` is checked against it by `npm run check`: size and pivot, triangle, vertex, material and
   texture limits, file and texture bytes, allowed material properties and the receipt fields licence, author,

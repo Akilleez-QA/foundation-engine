@@ -57,6 +57,7 @@ export type PerfSample = {
   trisPerRenderedFrame?: number;
   offscreenDrawsPerRenderedFrame?: number;
   shadowPassDrawsMax?: number;
+  shadowPassesMax?: number;
   taskMsPerFrame?: number;
   frameMsP95?: number;
   frameMsMax?: number;

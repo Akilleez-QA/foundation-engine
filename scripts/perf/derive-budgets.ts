@@ -16,6 +16,7 @@ export const DERIVED: readonly BudgetMetric[] = [
   'draws',
   'triangles',
   'shadowCasters',
+  'shadowPasses',
   'textureMiB',
   'canvasMiB',
   'heapMiB',

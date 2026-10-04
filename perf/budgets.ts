@@ -60,6 +60,7 @@ const COUNTS: readonly BudgetMetric[] = [
   'draws',
   'triangles',
   'shadowCasters',
+  'shadowPasses',
   'textureMiB',
   'canvasMiB',
   'heapMiB',

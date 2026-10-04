@@ -9,8 +9,13 @@ export interface SceneBudgetValues {
   draws: number;
   /** Triangles submitted per rendered frame, shadow pass included. */
   triangles: number;
-  /** Draws in one full shadow pass (casters × shadow lights). */
+  /** Off-screen draws in the busiest frame (the bench's `shadowPassDrawsMax`): for each shadow light, the casters in
+   *  range of each map face, summed (a sun or spot light has 1 face, a point light 6). Any other render-target draw in
+   *  that frame counts too. Shadow maps redraw only when something moves, so active windows set it. */
   shadowCasters: number;
+  /** Off-screen passes in the busiest frame (the bench's `shadowPassesMax`): one per shadow-map face that drew
+   *  (sun or spot 1, point light 6), plus any other render-target pass. Optional: unset is unmeasured. */
+  shadowPasses?: number;
   /** Shadow-pass draws per rendered frame while still; 0 = static maps. */
   shadowDrawsIdle: number;
   /** Shadow-pass draws per rendered frame during the active script, rebuilds included (ADR 0037). */

@@ -102,6 +102,25 @@ test('overflow is refused deterministically (essential first, then spawn order) 
   assert.equal(slots.stats.refused.full, 0);
 });
 
+test('refusal counters count refused lights, not reports: 8 lights in 2 slots refuse 6, reported once', () => {
+  const world = new World(),
+    reports: string[] = [];
+  const slots = createLightSlots({slots: {point: 2, spot: 0}, enabled: true, report: m => reports.push(m)});
+  for (let i = 0; i < 8; i++) lamp(world, i);
+  slots.sync(world);
+  assert.equal(slots.stats.refused.full, 6);
+  assert.deepEqual(slots.stats.admitted, {point: 2, spot: 0});
+  for (let i = 0; i < 3; i++) slots.sync(world);
+  assert.equal(slots.stats.refused.full, 6, 'a count of lights now, not a running total');
+  assert.equal(reports.length, 1, 'still reported once per cause');
+  assert.match(reports[0]!, /^6 PointLight\(s\) not drawn/);
+  // Without sceneLights(): every light is refused and counted.
+  const none = createLightSlots({slots: {point: 0, spot: 0}, enabled: false, report: m => reports.push(m)});
+  none.sync(world);
+  assert.equal(none.stats.refused['no-slots'], 8);
+  assert.equal(reports.length, 2);
+});
+
 test('invalid run-time data darkens the slot and is reported once; fixing it lights it again', () => {
   const world = new World(),
     reports: string[] = [];
