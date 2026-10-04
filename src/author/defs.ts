@@ -25,6 +25,7 @@ import {validateSpatialAudioOptions, type SpatialAudioOptions} from '../platform
 import type {AudioClockReading} from '../platform/audio/audio-timeline';
 import type {MusicOptions, MusicVoice} from '../platform/audio/music-clock';
 import type {SceneParticles} from './particle-contract';
+import type {SceneScatter} from './scatter-contract';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const need = (ok: boolean, message: string) => {
@@ -285,6 +286,10 @@ export interface SceneInput extends SceneBody {
    *  emitters' `max` sum to at most `max` (default 4096); at most `emitters` (default 16, one draw each) are drawn.
    *  Without it the scene's emitters are not simulated or drawn (reported once). */
   particles?: SceneParticles | undefined;
+  /** Instanced scatter support and bounds (docs/guides/scatter.md): `sceneScatter({ max, instances })`. Each admitted
+   *  `Scatter` is one draw; at most `max` (default 32) scatters and `instances` (default 65,536) copies are drawn, excess
+   *  refused and reported. Without it the scene's scatters are not drawn (reported once). */
+  scatter?: SceneScatter | undefined;
   id: string;
   title: string;
   /** Open, game-defined ('level', 'menu', 'world', 'cutscene', …). */
@@ -336,6 +341,10 @@ export function defineScene(s: SceneInput): SceneDefinition {
   need(
     captured.particles === undefined || (captured.particles as {kind?: unknown})?.kind === 'scene-particles',
     `scene ${s.id}: particles must be sceneParticles(...)`,
+  );
+  need(
+    captured.scatter === undefined || (captured.scatter as {kind?: unknown})?.kind === 'scene-scatter',
+    `scene ${s.id}: scatter must be sceneScatter(...)`,
   );
   return {...captured, kind: 'scene', type: captured.type ?? 'scene'};
 }

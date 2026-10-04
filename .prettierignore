@@ -57,3 +57,4 @@ templates/*/verification/
 src/author/particles-recipe.test.ts
 src/author/test-a-scene-recipe.test.ts
 src/author/material-options-recipe.test.ts
+src/author/scatter-recipe.test.ts

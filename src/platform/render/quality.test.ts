@@ -89,7 +89,7 @@ const SWIFTSHADER: DeviceSignals = {
 test('presets resolve: every core knob is legal for all four presets and reference is the design bar', () => {
   assert.deepEqual(PRESETS, ['reference', 'high', 'medium', 'low']);
   assert.deepEqual(knobProblems(coreKnobs as never), []);
-  assert.equal(coreKnobs.length, 12);
+  assert.equal(coreKnobs.length, 13); // + effects.scatter-density
   for (const preset of PRESETS) {
     const r = resolveKnobs(coreKnobs as never, {preset, overrides: {}, governor: false});
     assert.equal(r.preset, preset);

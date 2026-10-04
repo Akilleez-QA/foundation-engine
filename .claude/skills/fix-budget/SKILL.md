@@ -10,7 +10,13 @@ Budgets only fall. A raise needs the author's explicit approval and a `Perf-Budg
 1. Find the breach: `npm run play:snap -- --scene <id>` (draws, triangles per frame) or the gate's report (which metric, which window: idle or active).
 2. Recover, in this order, and re-measure after each:
    1. **Simplify**: fewer entities, simpler shapes (a box instead of a capsule), fewer segments, hide what the camera cannot see.
-   2. **Instance**: many copies of one shape should be one draw.
+   2. **Instance**: many copies of one primitive `Shape` or one `Mesh` should be one draw. Replace the copies with a
+      `Scatter` (`defineScatter({ shape | mesh, points | area + count, seed, ... })`, optional `Material` on the same
+      entity) in a scene with `scatter: sceneScatter()`; see docs/recipes/scatter-grass-and-rocks.md. It draws one
+      `InstancedMesh` per scatter: draws fall to one, triangles stay `copies x triangles per copy` (play:snap's probe
+      lists them per scatter). A scatter has no collision: keep the `Solid` or `Walls` rows that block movement. Many
+      short-lived sprites (sparks, dust) are particles (`defineEmitter`), also one draw each. glTF `Model` copies cannot
+      be scattered yet (bake or simplify them).
    3. **Bake**: merge static meshes that share a material.
    4. **LOD**: less detail far from the camera.
 3. Nothing redraws when nothing changed (render on change): a system that touches the world every frame without a visible change breaks the idle window. Only touch what moved.

@@ -9,6 +9,8 @@ import type {EntityMetadataRequest, EntityMetadataPage} from '../core/ecs/world'
 import type {BuildBrief} from './build';
 import type {GameDefinition} from './defs';
 import type {ParticleStats} from './particle-contract';
+import type {ScatterStats} from './scatter-field';
+import type {ScatterEntry} from './scene-scatter';
 
 /** What a running scene reports and accepts from tools (the test API, probes, play scripts). */
 export interface SceneHandle {
@@ -27,6 +29,9 @@ export interface SceneHandle {
     draws: number;
     textures: {requested: number; leases: number; applied: number; failed: number};
   };
+  /** Dev/test only: the visit's scatter counters (admitted, copies, refusals, draws, triangles per scatter); null
+   *  until the scatter drawing has loaded. Installed only in scenes that opted in with `sceneScatter()`. */
+  scatter?(): (ScatterStats & {draws: number; triangles: number; list: ScatterEntry[]}) | null;
   /** Move the entity with this `Name` (default 'player'): false when there is none. */
   teleport(x: number, z: number, name?: string): boolean;
 }

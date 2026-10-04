@@ -17,6 +17,7 @@
  *                            shading (standard/matte/flat/toon), double side, alpha cut-out, vertex colours
  *   Emitter, defineEmitter, burst, sceneParticles   optional particles: one instanced draw per emitter, fixed-step, seeded
  *   view.output (validateSceneOutput)               opt-in tone mapping and exposure per scene
+ *   Scatter, defineScatter, sceneScatter            optional instanced scatter: many copies of a shape or mesh, one draw
  *
  * Budgets are data in game/budgets.json (the ratchet compares them across revisions without running code).
  */
@@ -123,6 +124,22 @@ export {
   type EmitterBlending,
 } from './particles';
 export {sceneParticles} from './particle-sim';
+export {
+  Scatter,
+  defineScatter,
+  validateScatter,
+  sceneScatter,
+  SCATTER_DEFAULTS,
+  SCATTER_LIMITS,
+  SCENE_SCATTER_LIMITS,
+  type ScatterData,
+  type ScatterInput,
+  type ScatterArea,
+  type ScatterShapeKind,
+  type SceneScatter,
+  type SceneScatterLimits,
+} from './scatter';
+export type {ScatterStats, ScatterPlacement} from './scatter-field';
 export type {ParticleStats, SceneParticles, SceneParticleLimits} from './particle-contract';
 export {
   createAudioTimeline,

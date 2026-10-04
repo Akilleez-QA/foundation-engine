@@ -85,6 +85,7 @@
     "bench:dmath": "node --import tsx tools/dmath-bench/bench.mjs",
     "dmath:golden": "node --import tsx scripts/dmath-golden.mjs",
     "test:particle-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/particle-check.mjs playtest/particles",
+    "test:scatter-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/scatter-check.mjs playtest/scatter",
     "test:sound-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/sound-check.mjs playtest/sound",
     "test:blender-export-browser": "GAME_DIR=tools/blender-export/game node scripts/generate.mjs && tsc --noEmit -p tools/blender-export/tsconfig.json && tsx scripts/lint/brief.ts tools/blender-export/game && GAME_DIR=tools/blender-export/game node -r ./scripts/silent-browser.cjs tools/blender-export/browser.mjs",
     "test:first-use-browser": "GAME_DIR=templates/explorer/game node scripts/generate.mjs && GAME_DIR=templates/explorer/game node -r ./scripts/silent-browser.cjs scripts/play/first-use-check.mjs playtest/first-use",

@@ -162,6 +162,18 @@ export const coreKnobs: readonly AnyKnobDef[] = [
     applies: 'reenter-scene',
     owner: 'platform.render',
   },
+  // Scatter density: a lighter preset draws a deterministic subset of each non-essential scatter's copies (the copies
+  // kept at a lower density are a subset of those kept at a higher one). Essential scatters are never thinned. Read by
+  // the scene runtime when a visit starts; unwired until a template reads it, like particles.
+  {
+    id: 'effects.scatter-density',
+    group: 'effects',
+    label: 'graphics.effects.scatter-density',
+    control: {kind: 'choice', options: [0.35, 0.6, 1]},
+    presets: {reference: 1, high: 1, medium: 0.6, low: 0.35},
+    applies: 'reenter-scene',
+    owner: 'platform.render',
+  },
   {
     id: 'frame-rate.cap',
     group: 'frame-rate',
