@@ -27,6 +27,21 @@ This README stays with the template; your copy lives in `game/` and `GAME.md`.
 - Stop moving: the Stop button, Escape, or gamepad B.
 - In the briefing, *Guided pace* chooses slower movement.
 
+## First steps
+
+Draws are per rendered frame from `npm run play:snap -- --scene <id>` (software rendering, 1280×800) at 986d06b. Each visible `Shape` is about one draw.
+
+| | |
+|---|---|
+| Scenes | `field` (first), `shelter` |
+| Tests | `node --import tsx --test game/*.test.ts`: 12 tests in four files |
+| Playtest | none ([write one](../../docs/recipes/write-a-playtest-script.md)) |
+| Draws (budget 10 each) | `field`: 8; `shelter`: 2 |
+
+**First edit.** In `game/field.ts`, in the `player` entity, replace `color: 0xffce62` with `color: 0xff7a45`. You should see an orange player among the three blue stations, and the 12 tests still pass.
+
+**Budget.** `field` uses 8 of its 10 draws, so about two more visible entities fit before `npm run play:snap` reports OVER BUDGET.
+
 ## What to change first
 
 1. `game/game.ts`: the words of the briefing and progress messages.

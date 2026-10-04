@@ -25,6 +25,19 @@ This README stays with the template; your copy lives in `game/` and `GAME.md`.
 | `game/world.test.ts` | S1 with `testScene` and the host core, no sockets |
 | `game/build.brief.ts`, `game/budgets.json` | the brief and the measured budget of `world` |
 
+## First steps
+
+Draws are per rendered frame from `npm run play:snap -- --scene <id>` (software rendering, 1280×800) at 986d06b. Each visible `Shape` is about one draw.
+
+| | |
+|---|---|
+| Scenes | `world` (the only scene) |
+| Tests | `node --import tsx --test game/world.test.ts`: 3 tests |
+| Playtest | `npm run play:script -- game/playtest/paint.json` |
+| Draws (budget 10) | `world`: 3 with one player (floor, board, one capsule); each extra player adds one |
+
+**First edit.** In `game/world.ts`, in the `floor` entity, replace `color: 0x2a3342` with `color: 0x4a2f5c`. You should see a plum floor around the board. Moving and painting still work, and the 3 tests still pass.
+
 ## What to change first
 
 1. `game/session.ts`: your world (entity id to JSON fields), your actions and `apply`. Bump `version` when the rules

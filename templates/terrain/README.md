@@ -26,6 +26,21 @@ This README stays with the template; your copy lives in `game/` and `GAME.md`.
 
 The camera is fixed so the whole landscape stays in view.
 
+## First steps
+
+Draws are per rendered frame from `npm run play:snap -- --scene <id>` (software rendering, 1280×800) at 986d06b. Each visible `Shape` is about one draw.
+
+| | |
+|---|---|
+| Scenes | `yard` (the only scene) |
+| Tests | `node --import tsx --test game/yard.test.ts`: 7 tests |
+| Playtest | none yet ([write one](../../docs/recipes/write-a-playtest-script.md)) |
+| Draws (budget 10) | `yard`: 7 (terrain tiles, scattered rocks, the player and the pad marker) |
+
+**First edit.** In `game/yard.ts`, in the `player` entity, replace `color: 0xf2c14e` with `color: 0xff7a45`. You should see an orange player standing on the pad. It still follows the ground when it moves, and the 7 tests still pass.
+
+**Budget.** `yard` uses 7 of its 10 draws. More terrain tiles or another kind of scattered object cost draws, so check `npm run play:snap` after each.
+
 ## What to change first
 
 1. `game/region.ts`: change the `layers` (a hill is `{ kind: 'radial', x, z, radius, height }`; a negative height is a hollow) and `pads` (flat areas).

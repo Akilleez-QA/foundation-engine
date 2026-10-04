@@ -6,7 +6,7 @@ does not replace those notices. The original generated diagnostic assets listed
 below are separately dedicated under **CC0-1.0**.
 
 This inventory was checked against `package-lock.json` and installed package
-license files on 2026-10-02, and again for the Prettier addition on 2026-10-03. It records pinned versions, not semver ranges.
+license files on 2026-10-02, and again for the Prettier addition and the model optimiser on 2026-10-03. It records pinned versions, not semver ranges.
 Update it when the dependency graph or shipped assets change.
 
 ## Optional network reference host dependency
@@ -38,6 +38,23 @@ not imported by the engine, templates or player builds and emits no code into th
 dependencies of its own in the lockfile; its bundled third-party code is credited in
 the installed `node_modules/prettier/LICENSE`, which begins "Copyright © James Long
 and contributors".
+
+## Model optimiser dependency
+
+Added and checked on 2026-10-03: **@gltf-transform/cli 4.5.1**, MIT, an exact-pinned
+development dependency used only by `npm run asset:optimize` (`scripts/asset-optimize.mjs`) to
+compress a game's own models with meshopt and re-encode their textures. It is not imported by the engine,
+templates or player builds. [Pinned source](https://github.com/donmccurdy/glTF-Transform/tree/v4.5.1).
+It brings 199 lockfile entries, listed in the inventory below, including **sharp 0.35** (Apache-2.0) and its
+prebuilt **libvips** binaries (`@img/sharp-libvips-*`, LGPL-3.0-or-later; `@img/sharp-win32-*` and
+`@img/sharp-wasm32` combine Apache-2.0, LGPL-3.0-or-later and MIT), **meshoptimizer** (MIT),
+**draco3dgltf** (Apache-2.0, installed but never selected: the pass refuses Draco), **gltf-validator** (Apache-2.0)
+and five BlueOak-1.0.0 utilities. LGPL-3.0-or-later is compatible with GPL-3.0-only use; these binaries are
+run on the developer's machine and are not distributed in player builds. KTX2 output additionally needs the
+external `ktx` command from KTX-Software 4.4 or later, which is not a package dependency and is not installed by
+`npm ci`. `npm audit` reports a high-severity advisory (GHSA-vfj7-8cjw-p6xm, stack exhaustion from deeply
+nested brace patterns) in `braces` through `micromatch`, with no patched version; the pass passes no
+user-controlled glob patterns to it, and the dependency is development-only.
 
 ## Code distributed in browser builds
 
@@ -118,17 +135,24 @@ SOFTWARE.
 
 ## Locked dependency inventory
 
-The lockfile contains 95 dependency entries. Its declared licenses are 64 MIT,
-25 MPL-2.0 (Lightning CSS, resvg-js and their platform binaries), four Apache-2.0, one
-BSD-3-Clause, and one ISC. These include transitive tools,
+The lockfile contains 294 dependency entries. Its declared licenses are 216 MIT,
+25 MPL-2.0 (Lightning CSS, resvg-js and their platform binaries), 19 Apache-2.0, 11 ISC,
+10 LGPL-3.0-or-later and four combined Apache-2.0/LGPL-3.0-or-later (sharp's prebuilt libvips binaries),
+five BlueOak-1.0.0, two BSD-3-Clause, one BSD-2-Clause and one 0BSD. These include transitive tools,
 types, and optional platform binaries; the table is not a statement that all
 packages ship in a browser build. The original 2026-09-30 audit installed 29 packages on its
-host; the separately documented network-host addition followed on 2026-10-01. Optional binaries for other operating systems were inspected through
+host; the separately documented network-host addition followed on 2026-10-01, and the model optimiser's 199 entries
+on 2026-10-03. Optional binaries for other operating systems were inspected through
 lockfile metadata only.
 
 | Package | Pinned version | Declared license | Installation condition |
 |---|---|---|---|
+| `@colors/colors` | 1.5.0 | MIT | Required by dependency graph |
+| `@colors/colors` | 1.6.0 | MIT | Required by dependency graph |
+| `@dabh/diagnostics` | 2.0.9 | MIT | Required by dependency graph |
 | `@dimforge/rapier3d-compat` | 0.12.0 | Apache-2.0 | Required by dependency graph |
+| `@donmccurdy/caporal` | 0.0.10 | MIT | Required by dependency graph |
+| `@emnapi/runtime` | 1.11.3 | MIT | Optional |
 | `@esbuild/aix-ppc64` | 0.28.2 | MIT | Optional |
 | `@esbuild/android-arm` | 0.28.2 | MIT | Optional |
 | `@esbuild/android-arm64` | 0.28.2 | MIT | Optional |
@@ -155,7 +179,40 @@ lockfile metadata only.
 | `@esbuild/win32-arm64` | 0.28.2 | MIT | Optional |
 | `@esbuild/win32-ia32` | 0.28.2 | MIT | Optional |
 | `@esbuild/win32-x64` | 0.28.2 | MIT | Optional |
+| `@gltf-transform/cli` | 4.5.1 | MIT | Development only: model optimiser |
+| `@gltf-transform/core` | 4.5.1 | MIT | Required by dependency graph |
+| `@gltf-transform/extensions` | 4.5.1 | MIT | Required by dependency graph |
+| `@gltf-transform/functions` | 4.5.1 | MIT | Required by dependency graph |
+| `@img/colour` | 1.1.0 | MIT | Required by dependency graph |
+| `@img/sharp-darwin-arm64` | 0.35.5 | Apache-2.0 | Optional |
+| `@img/sharp-darwin-x64` | 0.35.5 | Apache-2.0 | Optional |
+| `@img/sharp-freebsd-wasm32` | 0.35.5 | Apache-2.0 | Optional |
+| `@img/sharp-libvips-darwin-arm64` | 1.3.4 | LGPL-3.0-or-later | Optional |
+| `@img/sharp-libvips-darwin-x64` | 1.3.4 | LGPL-3.0-or-later | Optional |
+| `@img/sharp-libvips-linux-arm` | 1.3.4 | LGPL-3.0-or-later | Optional |
+| `@img/sharp-libvips-linux-arm64` | 1.3.4 | LGPL-3.0-or-later | Optional |
+| `@img/sharp-libvips-linux-ppc64` | 1.3.4 | LGPL-3.0-or-later | Optional |
+| `@img/sharp-libvips-linux-riscv64` | 1.3.4 | LGPL-3.0-or-later | Optional |
+| `@img/sharp-libvips-linux-s390x` | 1.3.4 | LGPL-3.0-or-later | Optional |
+| `@img/sharp-libvips-linux-x64` | 1.3.4 | LGPL-3.0-or-later | Optional |
+| `@img/sharp-libvips-linuxmusl-arm64` | 1.3.4 | LGPL-3.0-or-later | Optional |
+| `@img/sharp-libvips-linuxmusl-x64` | 1.3.4 | LGPL-3.0-or-later | Optional |
+| `@img/sharp-linux-arm` | 0.35.5 | Apache-2.0 | Optional |
+| `@img/sharp-linux-arm64` | 0.35.5 | Apache-2.0 | Optional |
+| `@img/sharp-linux-ppc64` | 0.35.5 | Apache-2.0 | Optional |
+| `@img/sharp-linux-riscv64` | 0.35.5 | Apache-2.0 | Optional |
+| `@img/sharp-linux-s390x` | 0.35.5 | Apache-2.0 | Optional |
+| `@img/sharp-linux-x64` | 0.35.5 | Apache-2.0 | Optional |
+| `@img/sharp-linuxmusl-arm64` | 0.35.5 | Apache-2.0 | Optional |
+| `@img/sharp-linuxmusl-x64` | 0.35.5 | Apache-2.0 | Optional |
+| `@img/sharp-wasm32` | 0.35.5 | Apache-2.0 AND LGPL-3.0-or-later AND MIT | Optional |
+| `@img/sharp-webcontainers-wasm32` | 0.35.5 | Apache-2.0 | Optional |
+| `@img/sharp-win32-arm64` | 0.35.5 | Apache-2.0 AND LGPL-3.0-or-later | Optional |
+| `@img/sharp-win32-ia32` | 0.35.5 | Apache-2.0 AND LGPL-3.0-or-later | Optional |
+| `@img/sharp-win32-x64` | 0.35.5 | Apache-2.0 AND LGPL-3.0-or-later | Optional |
+| `@isaacs/cliui` | 8.0.2 | ISC | Required by dependency graph |
 | `@oxc-project/types` | 0.152.0 | MIT | Required by dependency graph |
+| `@pkgjs/parseargs` | 0.11.0 | MIT | Optional |
 | `@rolldown/binding-android-arm-eabi` | 1.2.12 | MIT | Optional |
 | `@rolldown/binding-android-arm64` | 1.2.12 | MIT | Optional |
 | `@rolldown/binding-darwin-arm64` | 1.2.12 | MIT | Optional |
@@ -185,16 +242,104 @@ lockfile metadata only.
 | `@resvg/resvg-js-win32-arm64-msvc` | 2.6.2 | MPL-2.0 | Optional |
 | `@resvg/resvg-js-win32-ia32-msvc` | 2.6.2 | MPL-2.0 | Optional |
 | `@resvg/resvg-js-win32-x64-msvc` | 2.6.2 | MPL-2.0 | Optional |
+| `@so-ric/colorspace` | 1.1.6 | MIT | Required by dependency graph |
 | `@tweenjs/tween.js` | 23.1.3 | MIT | Required by dependency graph |
+| `@types/braces` | 3.0.5 | MIT | Required by dependency graph |
+| `@types/glob` | 8.1.0 | MIT | Required by dependency graph |
+| `@types/lodash` | 4.17.25 | MIT | Required by dependency graph |
+| `@types/micromatch` | 4.0.10 | MIT | Required by dependency graph |
+| `@types/minimatch` | 5.1.2 | MIT | Required by dependency graph |
+| `@types/ndarray` | 1.1.0 | MIT | Required by dependency graph |
 | `@types/node` | 22.20.4 | MIT | Required by dependency graph |
+| `@types/node` | 20.5.6 | MIT | Required by dependency graph |
+| `@types/prompts` | 2.4.9 | MIT | Required by dependency graph |
 | `@types/stats.js` | 0.17.4 | MIT | Required by dependency graph |
+| `@types/table` | 5.0.0 | MIT | Required by dependency graph |
 | `@types/three` | 0.186.0 | MIT | Required by dependency graph |
+| `@types/tmp` | 0.2.6 | MIT | Required by dependency graph |
+| `@types/triple-beam` | 1.3.5 | MIT | Required by dependency graph |
 | `@types/webxr` | 0.5.24 | MIT | Required by dependency graph |
+| `@types/wrap-ansi` | 8.0.2 | MIT | Required by dependency graph |
+| `ajv` | 6.15.0 | MIT | Required by dependency graph |
+| `ansi-escapes` | 7.3.0 | MIT | Required by dependency graph |
+| `ansi-regex` | 6.4.0 | MIT | Required by dependency graph |
+| `ansi-regex` | 5.0.1 | MIT | Required by dependency graph |
+| `ansi-regex` | 5.0.1 | MIT | Required by dependency graph |
+| `ansi-regex` | 5.0.1 | MIT | Required by dependency graph |
+| `ansi-regex` | 4.1.1 | MIT | Required by dependency graph |
+| `ansi-regex` | 5.0.1 | MIT | Required by dependency graph |
+| `ansi-styles` | 4.3.0 | MIT | Required by dependency graph |
+| `ansi-styles` | 6.2.3 | MIT | Required by dependency graph |
+| `ansi-styles` | 6.2.3 | MIT | Required by dependency graph |
+| `ansi-styles` | 6.2.3 | MIT | Required by dependency graph |
+| `ansi-styles` | 3.2.1 | MIT | Required by dependency graph |
+| `ansi-styles` | 6.2.3 | MIT | Required by dependency graph |
+| `astral-regex` | 1.0.0 | MIT | Required by dependency graph |
+| `async` | 3.2.6 | MIT | Required by dependency graph |
+| `balanced-match` | 1.0.2 | MIT | Required by dependency graph |
+| `brace-expansion` | 2.1.7 | MIT | Required by dependency graph |
+| `braces` | 3.0.3 | MIT | Required by dependency graph |
+| `chalk` | 3.0.0 | MIT | Required by dependency graph |
+| `cli-cursor` | 5.0.0 | MIT | Required by dependency graph |
+| `cli-table3` | 0.6.5 | MIT | Required by dependency graph |
+| `cli-truncate` | 4.0.0 | MIT | Required by dependency graph |
+| `color` | 5.0.3 | MIT | Required by dependency graph |
+| `color-convert` | 2.0.1 | MIT | Required by dependency graph |
+| `color-convert` | 3.1.3 | MIT | Required by dependency graph |
+| `color-convert` | 1.9.3 | MIT | Required by dependency graph |
+| `color-name` | 1.1.4 | MIT | Required by dependency graph |
+| `color-name` | 2.1.1 | MIT | Required by dependency graph |
+| `color-name` | 2.1.1 | MIT | Required by dependency graph |
+| `color-name` | 1.1.3 | MIT | Required by dependency graph |
+| `color-string` | 2.1.4 | MIT | Required by dependency graph |
+| `colorette` | 2.0.20 | MIT | Required by dependency graph |
+| `cross-spawn` | 7.0.6 | MIT | Required by dependency graph |
+| `csv-stringify` | 6.8.3 | MIT | Required by dependency graph |
+| `cwise-compiler` | 1.1.3 | MIT | Required by dependency graph |
 | `detect-libc` | 2.1.2 | Apache-2.0 | Required by dependency graph |
+| `draco3dgltf` | 1.5.7 | Apache-2.0 | Required by dependency graph |
+| `eastasianwidth` | 0.2.0 | MIT | Required by dependency graph |
+| `emoji-regex` | 9.2.2 | MIT | Required by dependency graph |
+| `emoji-regex` | 10.6.0 | MIT | Required by dependency graph |
+| `emoji-regex` | 8.0.0 | MIT | Required by dependency graph |
+| `emoji-regex` | 10.6.0 | MIT | Required by dependency graph |
+| `emoji-regex` | 10.6.0 | MIT | Required by dependency graph |
+| `emoji-regex` | 7.0.3 | MIT | Required by dependency graph |
+| `emoji-regex` | 9.2.2 | MIT | Required by dependency graph |
+| `enabled` | 2.0.0 | MIT | Required by dependency graph |
+| `environment` | 1.1.0 | MIT | Required by dependency graph |
 | `esbuild` | 0.28.2 | MIT | Required by dependency graph |
+| `eventemitter3` | 5.0.4 | MIT | Required by dependency graph |
+| `fast-deep-equal` | 3.1.3 | MIT | Required by dependency graph |
+| `fast-json-stable-stringify` | 2.1.0 | MIT | Required by dependency graph |
 | `fdir` | 6.5.0 | MIT | Required by dependency graph |
+| `fecha` | 4.2.3 | MIT | Required by dependency graph |
 | `fflate` | 0.8.3 | MIT | Required by dependency graph |
+| `fill-range` | 7.1.1 | MIT | Required by dependency graph |
+| `fn.name` | 1.1.0 | MIT | Required by dependency graph |
+| `foreground-child` | 3.3.1 | ISC | Required by dependency graph |
 | `fsevents` | 2.3.3 | MIT | Optional |
+| `get-east-asian-width` | 1.7.0 | MIT | Required by dependency graph |
+| `glob` | 10.5.0 | ISC | Required by dependency graph |
+| `gltf-validator` | 2.0.0-dev.3.10 | Apache-2.0 | Required by dependency graph |
+| `has-flag` | 4.0.0 | MIT | Required by dependency graph |
+| `inherits` | 2.0.4 | ISC | Required by dependency graph |
+| `iota-array` | 1.0.0 | MIT | Required by dependency graph |
+| `is-buffer` | 1.1.6 | MIT | Required by dependency graph |
+| `is-fullwidth-code-point` | 4.0.0 | MIT | Required by dependency graph |
+| `is-fullwidth-code-point` | 5.1.0 | MIT | Required by dependency graph |
+| `is-fullwidth-code-point` | 3.0.0 | MIT | Required by dependency graph |
+| `is-fullwidth-code-point` | 3.0.0 | MIT | Required by dependency graph |
+| `is-fullwidth-code-point` | 2.0.0 | MIT | Required by dependency graph |
+| `is-number` | 7.0.0 | MIT | Required by dependency graph |
+| `is-stream` | 2.0.1 | MIT | Required by dependency graph |
+| `isexe` | 2.0.0 | ISC | Required by dependency graph |
+| `jackspeak` | 3.4.3 | BlueOak-1.0.0 | Required by dependency graph |
+| `json-schema-traverse` | 0.4.1 | MIT | Required by dependency graph |
+| `keyframe-resample` | 0.1.0 | BlueOak-1.0.0 | Required by dependency graph |
+| `kleur` | 3.0.3 | MIT | Required by dependency graph |
+| `ktx-parse` | 1.1.0 | MIT | Required by dependency graph |
+| `kuler` | 2.0.0 | MIT | Required by dependency graph |
 | `lightningcss` | 1.33.0 | MPL-2.0 | Required by dependency graph |
 | `lightningcss-android-arm64` | 1.33.0 | MPL-2.0 | Optional |
 | `lightningcss-darwin-arm64` | 1.33.0 | MPL-2.0 | Optional |
@@ -207,21 +352,94 @@ lockfile metadata only.
 | `lightningcss-linux-x64-musl` | 1.33.0 | MPL-2.0 | Optional |
 | `lightningcss-win32-arm64-msvc` | 1.33.0 | MPL-2.0 | Optional |
 | `lightningcss-win32-x64-msvc` | 1.33.0 | MPL-2.0 | Optional |
+| `listr2` | 8.3.3 | MIT | Required by dependency graph |
+| `lodash` | 4.18.1 | MIT | Required by dependency graph |
+| `log-update` | 6.1.0 | MIT | Required by dependency graph |
+| `logform` | 2.7.0 | MIT | Required by dependency graph |
+| `lru-cache` | 10.4.3 | ISC | Required by dependency graph |
 | `meshoptimizer` | 1.1.1 | MIT | Required by dependency graph |
+| `meshoptimizer` | 1.2.0 | MIT | Required by dependency graph |
+| `micromatch` | 4.0.8 | MIT | Required by dependency graph |
+| `mikktspace` | 1.1.1 | MIT | Required by dependency graph |
+| `mimic-function` | 5.0.1 | MIT | Required by dependency graph |
+| `minimatch` | 9.0.9 | ISC | Required by dependency graph |
+| `minipass` | 7.1.3 | BlueOak-1.0.0 | Required by dependency graph |
+| `ms` | 2.1.3 | MIT | Required by dependency graph |
 | `nanoid` | 3.3.19 | MIT | Required by dependency graph |
+| `ndarray` | 1.1.1 | MIT | Required by dependency graph |
+| `ndarray-lanczos` | 0.3.0 | MIT | Required by dependency graph |
+| `ndarray-ops` | 1.2.2 | MIT | Required by dependency graph |
+| `ndarray-pixels` | 5.2.0 | MIT | Required by dependency graph |
+| `one-time` | 1.0.0 | MIT | Required by dependency graph |
+| `onetime` | 7.0.0 | MIT | Required by dependency graph |
+| `package-json-from-dist` | 1.0.1 | BlueOak-1.0.0 | Required by dependency graph |
+| `path-key` | 3.1.1 | MIT | Required by dependency graph |
+| `path-scurry` | 1.11.1 | BlueOak-1.0.0 | Required by dependency graph |
 | `picocolors` | 1.1.1 | ISC | Required by dependency graph |
 | `picomatch` | 4.0.7 | MIT | Required by dependency graph |
+| `picomatch` | 2.3.2 | MIT | Required by dependency graph |
 | `playwright-core` | 1.56.1 | Apache-2.0 | Required by dependency graph |
 | `postcss` | 8.5.28 | MIT | Required by dependency graph |
 | `prettier` | 3.9.9 | MIT | Development only: code formatter |
+| `prompts` | 2.4.2 | MIT | Required by dependency graph |
+| `property-graph` | 4.1.0 | MIT | Required by dependency graph |
+| `punycode` | 2.3.1 | MIT | Required by dependency graph |
+| `readable-stream` | 3.6.2 | MIT | Required by dependency graph |
+| `restore-cursor` | 5.1.0 | MIT | Required by dependency graph |
+| `rfdc` | 1.4.1 | MIT | Required by dependency graph |
 | `rolldown` | 1.2.12 | MIT | Required by dependency graph |
+| `safe-buffer` | 5.2.1 | MIT | Required by dependency graph |
+| `safe-stable-stringify` | 2.5.0 | MIT | Required by dependency graph |
+| `semver` | 7.8.5 | ISC | Required by dependency graph |
+| `sharp` | 0.35.5 | Apache-2.0 | Required by dependency graph |
+| `shebang-command` | 2.0.0 | MIT | Required by dependency graph |
+| `shebang-regex` | 3.0.0 | MIT | Required by dependency graph |
+| `signal-exit` | 4.1.0 | ISC | Required by dependency graph |
+| `sisteransi` | 1.0.5 | MIT | Required by dependency graph |
+| `slice-ansi` | 7.1.2 | MIT | Required by dependency graph |
+| `slice-ansi` | 5.0.0 | MIT | Required by dependency graph |
+| `slice-ansi` | 2.1.0 | MIT | Required by dependency graph |
 | `source-map-js` | 1.2.1 | BSD-3-Clause | Required by dependency graph |
+| `stack-trace` | 0.0.10 | MIT | Required by dependency graph |
+| `string-width` | 5.1.2 | MIT | Required by dependency graph |
+| `string-width` | 7.2.0 | MIT | Required by dependency graph |
+| `string-width` | 7.2.0 | MIT | Required by dependency graph |
+| `string-width` | 7.2.0 | MIT | Required by dependency graph |
+| `string-width` | 4.2.3 | MIT | Required by dependency graph |
+| `string-width` | 3.1.0 | MIT | Required by dependency graph |
+| `string-width` | 5.1.2 | MIT | Required by dependency graph |
+| `string-width-cjs` | 4.2.3 | MIT | Required by dependency graph |
+| `string_decoder` | 1.3.0 | MIT | Required by dependency graph |
+| `strip-ansi` | 6.0.1 | MIT | Required by dependency graph |
+| `strip-ansi` | 6.0.1 | MIT | Required by dependency graph |
+| `strip-ansi` | 7.2.0 | MIT | Required by dependency graph |
+| `strip-ansi` | 5.2.0 | MIT | Required by dependency graph |
+| `strip-ansi` | 6.0.1 | MIT | Required by dependency graph |
+| `strip-ansi-cjs` | 6.0.1 | MIT | Required by dependency graph |
+| `supports-color` | 7.2.0 | MIT | Required by dependency graph |
+| `table` | 5.4.6 | BSD-3-Clause | Required by dependency graph |
+| `text-hex` | 1.0.0 | MIT | Required by dependency graph |
 | `three` | 0.186.1 | MIT | Required by dependency graph |
 | `tinyglobby` | 0.2.17 | MIT | Required by dependency graph |
+| `tmp` | 0.2.7 | MIT | Required by dependency graph |
+| `to-regex-range` | 5.0.1 | MIT | Required by dependency graph |
+| `triple-beam` | 1.4.1 | MIT | Required by dependency graph |
+| `tslib` | 2.8.1 | 0BSD | Optional |
 | `tsx` | 4.23.15 | MIT | Required by dependency graph |
 | `typescript` | 6.0.3 | Apache-2.0 | Required by dependency graph |
 | `undici-types` | 6.21.0 | MIT | Required by dependency graph |
+| `uniq` | 1.0.1 | MIT | Required by dependency graph |
+| `uri-js` | 4.4.1 | BSD-2-Clause | Required by dependency graph |
+| `util-deprecate` | 1.0.2 | MIT | Required by dependency graph |
 | `vite` | 8.3.2 | MIT | Required by dependency graph |
+| `watlas` | 1.0.1 | MIT | Required by dependency graph |
+| `which` | 2.0.2 | ISC | Required by dependency graph |
+| `winston` | 3.10.0 | MIT | Required by dependency graph |
+| `winston-transport` | 4.9.0 | MIT | Required by dependency graph |
+| `wrap-ansi` | 9.0.2 | MIT | Required by dependency graph |
+| `wrap-ansi` | 9.0.2 | MIT | Required by dependency graph |
+| `wrap-ansi` | 8.1.0 | MIT | Required by dependency graph |
+| `wrap-ansi-cjs` | 7.0.0 | MIT | Required by dependency graph |
 | `ws` | 8.22.0 | MIT | Optional reference host; installed by the locked development graph |
 
 Retain each distributed package's license files and copyright notices. Relevant
@@ -258,6 +476,8 @@ to the [GNU compatibility guidance](https://www.gnu.org/licenses/license-compati
 and [Apache's GPL compatibility explanation](https://apache.org/licenses/GPL-compatibility.html).
 MPL-2.0 (Lightning CSS, a build tool that is not distributed in browser builds)
 is GPL-compatible through its secondary-license provision, as the GNU list notes;
+LGPL-3.0-or-later (sharp's libvips binaries, run only by the development-only model optimiser) is
+GPLv3-compatible, and BlueOak-1.0.0, 0BSD and BSD-2-Clause are permissive;
 the installed `lightningcss` license does not mark it Incompatible With Secondary
 Licenses.
 This does not relicense upstream packages, establish ownership, or certify every
