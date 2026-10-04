@@ -70,6 +70,7 @@ Most people clone this repository to make a game, not to change the engine. Then
 - **The loop, the brief, the short rules, the teaching rules and device acceptance all apply.** `npm run gate` is recommended before sharing a build; it is not a merge requirement for a game branch.
 - **Worktree per task, serial integration into `main` and `npm run deploy:production` are for contributions to this engine repository.** A game branch is not merged into this repository's `main`, and the production guard (which requires a clean `main` equal to `origin/main` and a provider hook) is not how a game is shared. Build with `npm run build` and upload `dist/` to any static host ([share your build](docs/recipes/share-your-build.md)).
 - **Never delete, move or `--force`-replace an existing `game/`** without the author's explicit request; it may hold uncommitted work.
+- **Try a system in a lab before it goes into your game** ([labs](docs/guides/labs.md)): `npm run new-lab -- <id>` starts an isolated game in `labs/<id>` on your branch, so a mechanic, kit or technique can be refined without your scenes, saves and content in the way. Move what works into `game/` (or propose it to the engine) once it answers its question.
 - Start with [getting started](docs/guides/getting-started.md), each template's README, and the [cookbook](docs/recipes/README.md).
 
 ## The loop
@@ -83,6 +84,8 @@ Every request from the author goes round this loop, in small steps:
 5. **`npm run play:snap`** (add `--mobile` when phones are targets): look at the screenshots yourself first.
 6. **Show**: the pictures, what changed, the criteria it moves (`npm run play:criteria`), fps / draws / triangles against the budget.
 7. **Continue or clarify**: continue work already authorized. Ask only when a material requirement or decision is missing; do not expand scope or require repeated approval of settled decisions.
+
+**A new system starts in a lab, not in the game.** When an idea needs a system the engine does not have (a mechanic worth refining, a kit to try, a rendering technique, an animation or asset pipeline step), prove it first in an isolated lab (`npm run new-lab -- <id> --question "<text>"`, [labs guide](docs/guides/labs.md)): one question, one system, refined quickly. When it works and another game would want it, graduate it into the engine, a kit or a tool with its contract, tests and guide; then the game uses the graduated API. A game never imports lab code.
 
 ## Keep capability documentation current
 
@@ -116,6 +119,7 @@ notes outside publishable documentation.
 - **The engine (`src/`) is read-only** unless the author asks to extend it. An engine change follows the STANDARD and its recipe, and keeps genre words out of core, platform and author (`npm run lint:generic`).
 - **Looks**: for colour, light, haze, camera framing, forms and the look checklist, follow the [art-direction recipe](docs/recipes/art-direction.md) ([skill](.claude/skills/art-direction/SKILL.md)); the `showcase` template is its worked example. Visuals are `@engine` data (environment, materials, meshes, particles), never direct three.js.
 - A genre pattern more than one game would want is a kit (`src/kits/<name>`, [recipe](docs/recipes/add-a-kit.md)); a starting game is a template ([recipe](docs/recipes/add-a-template.md)).
+- **Experiments live in labs** (`labs/<id>/game`, [guide](docs/guides/labs.md)): an isolated game that answers one question. Labs obey the game rules and are linted, typechecked and tested like templates; a lab may use `@kits/three` to try what the engine cannot say yet. What a lab proves graduates into `src/`, a kit or a tool before any game depends on it.
 
 ## Short rules
 
@@ -153,6 +157,8 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 | Command | What it does |
 |---|---|
 | `npm run new-game -- --template <name>` | Start a game from a template (blank, arcade, explorer, learn, terrain, expedition, mechanics, showcase); then commit `game/` on your own branch. `--force` removes the existing `game/` and `GAME.md` first |
+| `npm run new-lab -- <id> [--template <name>] [--kit <name>]… [--question "<text>"]` | Start a lab in `labs/<id>`: an isolated game for one question, with the kits (and the kits they require) registered; it reports key or button clashes between template and kits at once ([labs](docs/guides/labs.md)) |
+| `npm run lab [-- <id> [snap\|check\|criteria\|script\|bench\|gate]]` | List the labs with their status, or run a command for one lab (`GAME_DIR=labs/<id>/game`); with only an id, its dev server |
 | `npm run new -- <kind> <id>` | Generators: scene, entity, component, system, input, save-section, kit; interactable, area (explore); lesson (learn) |
 | `npm run play [-- --host] [--game <dir>]` | Dev server with the test API; prints the URL (`--host`: also on the local network, for a phone) |
 | `npm run check` | Focused check: typecheck, lints, brief, affected tests; duration depends on the checkout and hardware |

@@ -27,7 +27,8 @@
     "src",
     "game",
     "templates",
-    "tools/visual-courtyard/game",
+    "tools/*/game",
+    "labs/*/game",
     "vite.config.ts",
     "scripts/**/*.ts",
     "perf/**/*.ts"

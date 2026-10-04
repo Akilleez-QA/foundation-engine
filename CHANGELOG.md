@@ -10,6 +10,20 @@ Every new framework below is optional: a game that does not use it is unchanged.
 Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
 (#122 onward). None of it is in that candidate.
 
+- **Labs: prove one system before building a world.** `npm run new-lab -- <id> [--template <name>] [--kit <name>]…
+  [--question "<text>"]` starts an isolated game in `labs/<id>` to answer one question (a mechanic, a kit, a
+  rendering technique, a pipeline step). It registers each kit with the kits it requires, writes a lab card (question,
+  findings, graduation) and reports key or button clashes between template and kits before the first boot.
+  `npm run lab` lists labs with their status; `npm run lab -- <id> [snap|check|criteria|script|bench|gate]` runs a
+  command with `GAME_DIR=labs/<id>/game`. What a lab proves graduates into `src/`, a kit or a tool with its contract,
+  tests and guide before a game uses it ([labs guide](docs/guides/labs.md); AGENTS.md's loop and the add-a-kit
+  recipe point there). Labs are not ratcheted by `lint:budgets`.
+- **Every game folder is checked and tested.** `npm test` now selects TypeScript tests in every tool fixture game
+  (`tools/*/game`, previously only the courtyard) and in labs, and a new test fails when any `*.test.*` file in the
+  checkout is outside the test globs. `lint:layers`, `lint:game` and `lint:brief` now see `labs/*/game` and
+  `tools/*/game` as well as `./game` and the templates; the root typecheck includes them; `lint:types` scans labs;
+  `asset:verify` finds lab models. The existing fixture games (blender-export, pose-to-pose, visual-courtyard) pass.
+
 - **Small fixes from the acceptance runs.** `add-a-budget` no longer contradicts itself: a `Perf-Budget:` line counts
   anywhere in a commit message (the rule since #170); git's own trailer view shows only the last paragraph, so check a
   raise with `npm run lint:budgets`. The art-direction recipe and skill say the same. `npm run format:check` (and
