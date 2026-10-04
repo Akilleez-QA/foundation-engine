@@ -52,6 +52,17 @@ The geometry checks now decode with the meshopt decoder, the same `GLTFLoader` s
 
 `node --test scripts/asset-optimize.test.mjs`: **9/9** pass on Node 22. Two of the cases are **real meshopt round trips** on the metre block: the output's buffer views carry `EXT_meshopt_compression`, and the re-import through the engine's meshopt decoder still gives 12 triangles and the same vertex count. A textured copy (an 8×8 PNG) comes out as a 4×4 WebP under an output contract with `textureSize: 4`. The tests also cover argument rules; texture-size precedence; KTX2 selection with a mocked `ktx` 4.4.0 and 4.10.1, and the WebP fallback for 4.3.2 or a missing command; an output that fails its contract (nothing written); an input that fails its own contract; and a missing contract.
 
-No `ktx` binary is installed on the verification machine, so no KTX2 file was produced. The KTX2 path is tested only as far as choosing the format and falling back. The stock model loader registers no KTX2 transcoder, so a required KTX2 texture is refused by `asset:verify` in any case.
+No `ktx` binary is installed on the verification machine, so no KTX2 file was produced. The KTX2 path is tested only as far as choosing the format and falling back.
+
+The engine's model loader registers no KTX2 transcoder, so KTX2 is now gated behind `ENGINE_KTX2 = false` in `scripts/asset-verify.mjs`. While it is false, `asset:verify` refuses any KTX2 extension, texture source or `image/ktx2` image, contracts cannot list `KHR_texture_basisu`, and `asset:optimize --ktx2` stops with *KTX2 textures are not loadable until the engine adds KTX2 support*. A test fails if `ENGINE_KTX2` disagrees with whether `models.ts` calls `setKTX2Loader`.
+
+`asset:verify` also enforces the model loader's admission caps, whatever a contract says. The values are mirrored from `validateEmbeddedGlb` and the `maxFileBytes` default in `src/platform/assets/models.ts`, and a test checks that they match the source:
+
+- a file of at most 32 MiB;
+- at most 4,096 accessors, each with at most 1,048,576 elements, and at most 16,777,216 decoded values in all;
+- at most 4,096 nodes, 128 skins and 128 animations;
+- at most four bone influences per vertex, so `JOINTS_1`/`WEIGHTS_1` is refused.
+
+Each cap is tested with a mutated GLB. `node --test scripts/asset-verify.test.mjs scripts/asset-optimize.test.mjs tools/blender-export/verify.test.mjs`: **113/113** pass on Node 22.
 
 `npm audit` reports a high-severity advisory in `braces`, reached through `micromatch`, a dependency of the CLI (GHSA-vfj7-8cjw-p6xm). It has no patched release. It is recorded in the notices.

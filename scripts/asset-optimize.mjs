@@ -10,10 +10,10 @@
 //      compression the engine decodes) and the scene structure kept: --join false --flatten false keep named nodes,
 //      --instance false --palette false keep meshes and materials as authored, and --simplify false never decimates
 //      (make the model at its target polycount instead).
-//   3. Textures: WebP by default, resized to the largest size the contract allows. KTX2 (UASTC for normal, occlusion
-//      and metal-roughness maps, ETC1S for colour) only with --textures ktx2 and the external `ktx` command
-//      (KTX-Software 4.4 or later); without it the pass says so and falls back to WebP. The stock model loader registers
-//      no KTX2 transcoder, so asset:verify refuses a required KTX2 texture until the engine does.
+//   3. Textures: WebP (EXT_texture_webp, which the engine's GLTFLoader decodes) by default, resized to the largest size
+//      the contract allows. --ktx2 (UASTC for normal, occlusion and metal-roughness maps, ETC1S for colour, through the
+//      external `ktx` command from KTX-Software 4.4 or later, else a WebP fallback) is refused while ENGINE_KTX2 in
+//      asset-verify.mjs is false: KTX2 textures are not loadable until the engine adds KTX2 support.
 //   4. After: the output must pass the output's contract. Only then are the GLB and its receipt written to --out; on
 //      any failure nothing at --out changes.
 //
@@ -29,7 +29,7 @@ import {copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, 
 import {tmpdir} from 'node:os';
 import {basename, dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {ROOT, companions, readContract, readGlb, verifyModel} from './asset-verify.mjs';
+import {ENGINE_KTX2, KTX2_UNSUPPORTED, ROOT, companions, readContract, readGlb, verifyModel} from './asset-verify.mjs';
 
 const PACKAGE = join(ROOT, 'node_modules', '@gltf-transform', 'cli');
 export const CLI = join(PACKAGE, 'bin', 'cli.js');
@@ -53,6 +53,7 @@ export function parseArgs(argv) {
     if (arg === '--out') o.out = value();
     else if (arg === '--contract') o.contract = value();
     else if (arg === '--textures') o.textures = value();
+    else if (arg === '--ktx2') o.textures = 'ktx2';
     else if (arg === '--texture-size') o.textureSize = Number(value());
     else if (arg === '--device') o.device = value();
     else if (arg.startsWith('-')) throw Error(`Unknown option: ${arg}`);
@@ -61,9 +62,10 @@ export function parseArgs(argv) {
   }
   if (!o.input || !o.out)
     throw Error(
-      'Usage: npm run asset:optimize -- <in.glb> --out <out.glb> [--contract <c.json>] [--textures webp|ktx2|keep] [--texture-size N] [--device phone|tablet|laptop|desktop]',
+      'Usage: npm run asset:optimize -- <in.glb> --out <out.glb> [--contract <c.json>] [--textures webp|keep] [--ktx2] [--texture-size N] [--device phone|tablet|laptop|desktop]',
     );
   if (!TEXTURES.includes(o.textures)) throw Error(`--textures must be one of ${TEXTURES.join(', ')}`);
+  if (o.textures === 'ktx2' && !ENGINE_KTX2) throw Error(`--ktx2: ${KTX2_UNSUPPORTED}. Use the default WebP.`);
   if (o.textureSize !== undefined && !(Number.isInteger(o.textureSize) && o.textureSize > 0))
     throw Error('--texture-size must be a positive whole number of pixels');
   if (o.device !== undefined && !(o.device in DEVICE_TEXTURE_SIZE))
