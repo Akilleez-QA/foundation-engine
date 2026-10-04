@@ -7,6 +7,7 @@ For any coding agent working here, and for people. [docs/STANDARD.md](docs/STAND
 Following every "read first" link literally costs about 28k tokens. For work only in `game/`, about 8k is enough before the task's own skill and recipe (sizes at ~4 bytes per token):
 
 - **Read:** this file (17 KB, ~4.3k, already loaded), [getting started](docs/guides/getting-started.md) (9 KB, ~2.3k), your template's `templates/<name>/README.md` (1.5–2.3 KB, ~0.5k) and the [recipes index](docs/recipes/README.md) (3 KB, ~0.7k). Then only the skill (`.claude/skills/*/SKILL.md`, 1–3 KB) and the recipe for the task in hand.
+- **What exists:** [docs/capabilities.md](docs/capabilities.md) (and [capabilities.json](docs/capabilities.json)) is generated from the code by `npm run capabilities`: every `@engine` export, kit, quality knob, template, npm script and feature ID (VIS-01, FX-01, MP-01, KTX2 and the rest), marked shipped only when its code is in the tree. It is the source of truth for what exists. When a skill, recipe or README says a feature is missing but the manifest lists it as shipped, believe the manifest, use the feature, and fix the page; `npm run lint:docs-claims` (part of `npm run check`) catches the known phrasings.
 - **Skip unless you change `src/`:** [STANDARD.md](docs/STANDARD.md) (65 KB, ~16k), [CREATOR-CONTRACT.md](docs/CREATOR-CONTRACT.md) (11 KB, ~2.7k), the status ledgers in `docs/guides/` (`composition-framework-status`, `framework-upgrade-status`, `upgrade-acceptance-ledger`; 49–91 KB each), and the sections below on the engine contract, capability documentation and worktree integration.
 - **Read when it applies:** [DEVICE-EXPERIENCE.md](docs/policy/DEVICE-EXPERIENCE.md) (22 KB, ~5.4k) for UI, control, camera, framing or quality changes on the brief's devices; [KID-SAFE.md](docs/policy/KID-SAFE.md) when the brief sets `kids: true`; [make assets with Blender through MCP](docs/recipes/make-assets-with-blender-mcp.md) when you make a model. That recipe covers the contract first, a headless `export.py`, `npm run asset:verify`, and licence and provenance. Registering a Blender MCP server is the user's own opt-in; never add `.mcp.json` to the repository.
 - **First commands:**
@@ -90,6 +91,9 @@ overload, cancellation, recovery and actual limitations. Update examples when AP
 change. Before integration, reconcile `docs/guides/composition-framework-status.md`,
 `docs/guides/framework-upgrade-status.md` and
 `docs/guides/upgrade-acceptance-ledger.md` where the change affects their claims.
+Run `npm run capabilities` when the change adds an export, kit, knob, template, script
+or feature ID (add its row and evidence to `FEATURES` in `scripts/capabilities.mjs`),
+and fix any page that `npm run lint:docs-claims` reports as calling it missing.
 Distinguish implemented, checked and integrated work; cite the relevant revision or
 PR and verification scope. Preserve failed or missing acceptance honestly. A passing
 unit test or browser emulation never certifies physical devices or multiplayer.
@@ -157,7 +161,8 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 | `npm run asset:verify -- <model.glb>` | Check a model against its `<name>.contract.json`: size, pivot, triangle/vertex/material/texture limits, bytes, material properties, provenance ([model contracts](docs/guides/model-contracts.md)); `check` runs it for every contracted GLB |
 | `npm run disclosure [-- --strict]` | Steam and itch.io AI-disclosure draft from the asset provenance records ([guide](docs/guides/asset-provenance.md)) |
 | `npm run asset:optimize -- <in.glb> --out <out.glb>` | Meshopt-compress a model and re-encode its textures as WebP at the contract's texture size (`--ktx2` writes KTX2 for phone targets), keeping named nodes; checks the contract before and after ([model contracts](docs/guides/model-contracts.md#optimise)) |
-| `npm test` / `npm run lint` | All tests / all lints (format, layers, game, arch, css, generic, brief, budgets, provenance) |
+| `npm test` / `npm run lint` | All tests / all lints (format, layers, game, arch, css, generic, brief, budgets, provenance, docs claims) |
+| `npm run capabilities` | Regenerate `docs/capabilities.json` and `docs/capabilities.md` from the code (after adding an export, kit, knob, template or script) |
 | `npm run format` / `npm run format:check` | Format code with Prettier / check it (Markdown excluded) |
 | `npm run gate` / `npm run gate:templates` | The integration gate for this game / for every template |
 | `npm run gate:ci [-- --from <step> \| --only <step> \| --list]` | Every checking `run:` step of `.github/workflows/ci.yml`, with its env; reproduces all work jobs serially and derives the final aggregate. Partial selections are not full CI acceptance |
