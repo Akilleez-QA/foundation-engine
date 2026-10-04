@@ -5,15 +5,20 @@
 // API's engine.redraw() so the budget is judged on real frames), and writes what it saw to playtest/latest/ (gitignored):
 //   <scene>-desktop.png [<scene>-mobile.png]   the pictures to show the author
 //   probe.json                                   scene, world state (resources, named entities), scatters, fps, draws, tris,
-//                                                budget status, page errors and console lines
-// The summary prints every view's draws, triangles and verdict, then its measured fps labelled advisory: software GL in
-// an emulated viewport is not device evidence, so fps is never judged. Screenshot paths are relative to the repository.
+//                                                gpu (textureMiB, shadowPasses, shadowCasters), budget status (every
+//                                                count against the scene's row), page errors and console lines
+// The summary prints every view's draws, triangles and verdict, a counts line with draws, postDraws, triangles,
+// shadowCasters, shadowPasses and textureMiB each against the scene's budget (look checklist item 9), then its measured
+// fps labelled advisory: software GL in an emulated viewport is not device evidence, so fps is never judged.
+// Screenshot paths are relative to the repository.
 // Exit code 1 when the page had errors or the scene is over budget, so an agent notices. A window with no rendered frame
 // is reported as 'not measured (no frames rendered)', never as 'within budget'.
 import {PROBE} from '../perf/probe-inject.mjs';
 import {
   budgetLine,
   budgetStatus,
+  countsLine,
+  gpuCensus,
   evidencePath,
   frameRateLine,
   freshOut,
@@ -68,6 +73,8 @@ export async function snap({scene, mobile = false, url}) {
             600,
           );
       const judged = redrawn ?? moving;
+      // Texture memory now, and the busiest frame's shadow passes and draws since the scene opened (the bench probe).
+      const gpu = await gpuCensus(b);
       probe.views[name] = {
         screenshot: shot,
         viewport: view,
@@ -77,7 +84,8 @@ export async function snap({scene, mobile = false, url}) {
         state: await b.evaluate('window.engine.state()'),
         // Instanced scatters: copies, draws and triangles per scatter (null when the scene has none).
         scatter: await b.evaluate('window.engine.scatter?.() ?? null'),
-        budget: {...budgetStatus(scene, judged), window: redrawn ? 'redrawn' : 'moving'},
+        gpu,
+        budget: {...budgetStatus(scene, judged, {gpu}), window: redrawn ? 'redrawn' : 'moving'},
       };
       probe.errors.push(...b.errors.map(e => `${name}: ${e}`));
       probe.console.push(...lines.filter(l => !l.startsWith('debug')).map(l => `${name}: ${l}`));
@@ -107,7 +115,14 @@ function report(p) {
   console.log(
     `  budget (${d.budget.window === 'redrawn' ? 'forced redraws: the scene did not redraw on its own' : 'moving window'}): ${m.renders ? `${m.drawsPerFrame} draws, ${m.trisPerFrame} tris per rendered frame · ` : ''}${budgetLine(d.budget)}`,
   );
-  for (const [name, v] of Object.entries(p.views)) if (name !== 'desktop') console.log(viewLine(name, v));
+  const counts = countsLine(d.budget);
+  if (counts) console.log(`  counts: ${counts}`);
+  for (const [name, v] of Object.entries(p.views)) {
+    if (name === 'desktop') continue;
+    console.log(viewLine(name, v));
+    const c = countsLine(v.budget);
+    if (c) console.log(`    counts: ${c}`);
+  }
   if (p.errors.length) console.log(`  page errors:\n    ${p.errors.join('\n    ')}`);
   console.log('  details: playtest/latest/probe.json');
   return p.errors.length || Object.values(p.views).some(v => v.budget.status === 'OVER BUDGET') ? 1 : 0;

@@ -59,6 +59,8 @@ export type PerfSample = {
   /** Post-processing draws per rendered frame (fullscreen passes; never part of drawsPerRenderedFrame). */
   postDrawsPerRenderedFrame?: number;
   shadowPassDrawsMax?: number;
+  /** The `shadowCasters` budget metric under its own name: the busiest frame's off-screen draws (= shadowPassDrawsMax). */
+  shadowCasters?: number;
   shadowPassesMax?: number;
   taskMsPerFrame?: number;
   frameMsP95?: number;

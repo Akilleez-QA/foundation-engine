@@ -281,3 +281,9 @@ test('shadowPasses: one pass per shadow-map face, counted exactly (no tolerance)
   assert.deepEqual(deriveBudget({shadowPassesMax: 7}, ['shadowPasses']), {shadowPasses: 8});
   assert.equal(worstOf([{shadowPassesMax: 1}, {shadowPassesMax: 7}]).shadowPassesMax, 7);
 });
+
+test('shadowCasters reads the run sample field of its own name, else shadowPassDrawsMax (older runs)', () => {
+  assert.equal(readMetric({shadowCasters: 7, shadowPassDrawsMax: 7}, 'shadowCasters'), 7);
+  assert.equal(readMetric({shadowPassDrawsMax: 5}, 'shadowCasters'), 5);
+  assert.equal(worstOf([{shadowCasters: 3}, {shadowCasters: 9}]).shadowCasters, 9);
+});

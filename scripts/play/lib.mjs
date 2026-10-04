@@ -191,25 +191,75 @@ export async function measure(b, during, ms = 1200) {
   };
 }
 
+/** The page's GPU census from the bench probe (probe-inject.mjs): texture memory and the busiest frame's shadow work
+ *  since the page opened the scene. Null fields when the probe is not installed. */
+export async function gpuCensus(b) {
+  const g = await b.evaluate('window.__gpu ? window.__gpu() : null').catch(() => null);
+  return {
+    textureMiB: g?.textureMiB ?? null,
+    shadowPasses: g?.shadowPassesMax ?? null,
+    shadowCasters: g?.shadowPassDrawsMax ?? null,
+  };
+}
+
+/** Lighter presets fall back to their heavier ports, then the reference values (src/core/budget.ts budgetFor). */
+const PORT_CHAIN = {reference: [], high: ['high'], medium: ['high', 'medium'], low: ['high', 'medium', 'low']};
+/** A budget row's values at a quality preset: the flat reference values with that preset's ports applied. */
+export function budgetAt(budget, preset = 'reference') {
+  const {ports, ...flat} = budget ?? {};
+  const out = {...flat};
+  for (const p of PORT_CHAIN[preset] ?? []) Object.assign(out, ports?.[p] ?? {});
+  return out;
+}
+
+/** The counts play:snap judges, in budget-row order (the gate's count metrics it can measure on a dev server). */
+export const SNAP_METRICS = ['draws', 'postDraws', 'triangles', 'shadowCasters', 'shadowPasses', 'textureMiB'];
+
 export const NOT_MEASURED = 'not measured (no frames rendered)';
 /**
- * Budget status of a measured window against the game's budgets.json. A window with no rendered frame proves nothing
- * (render on demand draws nothing while a scene is still), so it is NOT_MEASURED, never 'within budget'.
+ * Budget status of a measured window against the game's budgets.json, at the preset the page ran (`preset`, default
+ * reference; a lighter preset reads the row's `ports`). Per rendered frame: draws, postDraws, triangles; busiest
+ * frame since the scene opened: shadowCasters, shadowPasses; live: textureMiB (`gpu`, from gpuCensus). A window with
+ * no rendered frame proves nothing (render on demand draws nothing while a scene is still), so it is NOT_MEASURED,
+ * never 'within budget'. `measured` keeps every value, budgeted or not, so the summary can print it.
  */
-export function budgetStatus(scene, m) {
-  const b = budgets().scenes?.[scene]?.budget;
-  if (!b) return {scene, status: 'no budget', rows: []};
-  if (!m?.renders) return {scene, status: NOT_MEASURED, rows: []};
+export function budgetStatus(scene, m, {gpu = null, preset = 'reference'} = {}) {
+  const row = budgets().scenes?.[scene]?.budget;
+  const measured = {
+    draws: m?.renders ? m.drawsPerFrame : null,
+    postDraws: m?.renders ? (m.postDrawsPerFrame ?? null) : null,
+    triangles: m?.renders ? m.trisPerFrame : null,
+    shadowCasters: gpu?.shadowCasters ?? null,
+    shadowPasses: gpu?.shadowPasses ?? null,
+    textureMiB: gpu?.textureMiB ?? null,
+  };
+  if (!row) return {scene, preset, status: 'no budget', rows: [], measured};
+  if (!m?.renders) return {scene, preset, status: NOT_MEASURED, rows: [], measured};
   // Heap here is the dev server's whole page (unbundled modules included), so it is reported, not judged: the bench
   // measures the budgeted heap on a production build.
-  const rows = [
-    ['draws', m.drawsPerFrame],
-    ['postDraws', m.postDrawsPerFrame ?? null],
-    ['triangles', m.trisPerFrame],
-  ]
-    .filter(([k, v]) => b[k] !== undefined && v !== null)
-    .map(([k, v]) => ({metric: k, measured: v, budget: b[k], ok: v <= b[k]}));
-  return {scene, status: rows.every(r => r.ok) ? 'within budget' : 'OVER BUDGET', rows};
+  const b = budgetAt(row, preset);
+  const rows = SNAP_METRICS.filter(k => b[k] !== undefined && measured[k] !== null).map(k => ({
+    metric: k,
+    measured: measured[k],
+    budget: b[k],
+    ok: measured[k] <= b[k],
+  }));
+  return {scene, preset, status: rows.every(r => r.ok) ? 'within budget' : 'OVER BUDGET', rows, measured};
+}
+
+/** Every count against its budget, e.g. `draws 29/40 · postDraws 10/10 · textureMiB 42.3/48`; a value the row does not
+ *  budget prints as `shadowPasses 0 (no budget)`. Look-checklist item 9 reads texture memory and shadow work here. */
+export function countsLine(status) {
+  const judged = new Map(status.rows.map(r => [r.metric, r]));
+  return SNAP_METRICS.filter(k => status.measured?.[k] !== null && status.measured?.[k] !== undefined)
+    .map(k => {
+      const r = judged.get(k);
+      const v = k === 'triangles' ? status.measured[k].toLocaleString('en-US') : status.measured[k];
+      return r
+        ? `${k} ${v}/${k === 'triangles' ? r.budget.toLocaleString('en-US') : r.budget}${r.ok ? '' : ' OVER'}`
+        : `${k} ${v} (no budget)`;
+    })
+    .join(' · ');
 }
 
 /** One line for a budget status: what was over and by how much, and where the recovery steps are. */
@@ -219,7 +269,8 @@ export function budgetLine(status) {
     .filter(r => !r.ok)
     .map(r => `${r.metric} ${r.measured} > ${r.budget}`)
     .join(', ');
-  return `OVER BUDGET (${over} per rendered frame, budgets.json scenes.${status.scene}): recover with .claude/skills/fix-budget/SKILL.md (simplify, instance, bake, LOD); never raise a budget without the author`;
+  const at = status.preset && status.preset !== 'reference' ? ` at ${status.preset}` : '';
+  return `OVER BUDGET (${over}${at}, budgets.json scenes.${status.scene}): recover with .claude/skills/fix-budget/SKILL.md (simplify, instance, bake, LOD); never raise a budget without the author`;
 }
 
 /**
