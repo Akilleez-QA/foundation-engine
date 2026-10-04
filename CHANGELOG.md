@@ -20,6 +20,10 @@ Every new framework below is optional: a game that does not use it is unchanged.
   compression, WebP textures resized to the contract's `textureSize` (`--ktx2` is refused until the engine
   adds KTX2 support), and named nodes, meshes and materials kept; the model contract is checked before and after. Adds the
   development-only `@gltf-transform/cli` 4.5.1 (MIT) and its graph; see the notices.
+- **Optional silhouette check.** A model contract may set `silhouette` with a reference PNG, a view (front, side, top), a
+  gameplay pixel size and a stage; `asset:verify` rasterises the re-imported model without a GPU and requires an
+  overlap of at least 0.85 at blockout or 0.90 when final (or the contract's own threshold). `--masks` writes both
+  masks for inspection. The lantern example uses it.
 - **`asset:verify` enforces the model loader's caps.** Every contracted model must fit the loader's admission
   limits (32 MiB, accessor, node, skin and animation counts, four bone influences), and KTX2 textures and Draco are
   refused until the engine supports them.
