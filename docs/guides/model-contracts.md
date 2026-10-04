@@ -42,6 +42,7 @@ Every key is checked; an unknown key is an error, so a misspelt limit cannot sil
 | `faces` | no | `[{name, axis, at, material, triangles?}]`: exactly one primitive lies wholly on the plane `axis = at`, uses `material` and has `triangles` triangles. |
 | `nodes` | no | Node names that must exist in the GLB and in the re-imported scene: attachment points, sockets, parts a system looks up by name. |
 | `clips` | no | Animation clip names that must exist and have a duration above zero. `limits.animations` must be at least their number. |
+| `silhouette` | no | Opt-in shape check against a reference image: `{reference, view, pixels?, stage?, threshold?}`. See [silhouette](#silhouette). |
 | `skin` | no | `{joints, influences, root?}` for skinned models: each skin has at most `joints` joints; every vertex has at most `influences` (1 to 4) non-zero weights, all finite and non-negative, summing to 1 within 0.002, each naming a joint of its skin; and, with `root`, every joint sits under that node. Weights are read from the GLB's own accessors, because the loader renormalises them on import. |
 | `semanticSha256` | no | Pins the decoded positions, normals, indices, world matrices and material factors. Any geometry change, however small, fails; a deliberate change re-exports and updates the pin in the same commit. |
 | `provenance` | yes | `required`: receipt fields that must be present and non-empty; it must include `licence`, `author`, `source`, `tool` and `generator`. Optional: `licences` (the accepted licence identifiers) and `equals` (receipt values that must match exactly). |
@@ -69,6 +70,26 @@ The output receipt keeps the input's licence, author, source and tool. It record
 
 Meshopt quantisation stores positions as integers with a node translation and scale to restore them, and it moves vertices by up to about a thousandth of the model's size. A contract for an optimised model therefore lists `EXT_meshopt_compression` and `KHR_mesh_quantization` (plus `EXT_texture_webp` when textured) in `extensions`. It sets `nodeTransforms` to `"allowed"`, has no `pivot.node` and no `semanticSha256`, and states `size` as a range or with a `tolerance` such as `0.001`. Keep the strict contract on the unoptimised export.
 
+## Silhouette
+
+Numbers alone do not say whether a model looks like what the creator asked for. The optional `silhouette` key compares the model's outline with a reference image, the measured check that the community recommends instead of "looks fine":
+
+```json
+"silhouette": {"reference": "../../tools/lantern/lantern.front.png", "view": "front", "pixels": 128, "stage": "final"}
+```
+
+| Key | Meaning |
+|---|---|
+| `reference` | A PNG, relative to the contract: a dark shape on a light background, or an opaque shape on transparency. 8-bit greyscale, RGB or with alpha; not indexed or interlaced; at most 4096 px a side. Keep it outside `public/` (for example in `game/tools/<name>/`), so it does not ship. |
+| `view` | `front` (looking along -Z: x right, y up), `side` (from +X: -z right, y up) or `top` (from above: x right, -z up). |
+| `pixels` | The comparison size, 16 to 1024; default 128. Use the size the model has on screen in play, so detail too small to see does not count. |
+| `stage` | `blockout` (default threshold 0.85) or `final` (0.90; the default). |
+| `threshold` | Overrides the stage's threshold: the minimum overlap, intersection over union, from 0 to 1. |
+
+The check renders the re-imported model's silhouette without a GPU, by rasterising its triangles orthographically from the view. It crops both masks to their shapes, scales each to fit `pixels` × `pixels` keeping its aspect ratio, centres it horizontally on the bottom edge, and measures the overlap. The reference's own scale and margins therefore do not matter, but its proportions do. `npm run asset:verify -- --masks <folder> <model.glb>` writes both masks as PNGs, so you can look at the difference.
+
+It needs a reference the creator agrees with: a concept drawing, an orthographic sketch or a photo traced to a silhouette. It measures the outline only, not colour, depth or detail inside the outline. A rotated or mirrored reference fails.
+
 ## Provenance fields
 
 | Field | Meaning |
@@ -79,7 +100,7 @@ Meshopt quantisation stores positions as integers with a node translation and sc
 | `tool` | What made it: `Blender 5.2.1 LTS`, or a named generator service and plan for AI-generated geometry. |
 | `generator` | The glTF writer recorded in the GLB's `asset.generator`, such as `Khronos glTF Blender I/O v5.2.40`. |
 
-The same licence, author and source go in the game's `defineAsset`; a third-party asset is also listed in [`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md) or the game's own notices. A receipt is an integrity record, not proof of rights.
+The same licence, author and source go in the game's `defineAsset`; a third-party asset is also listed in [`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md) or the game's own notices. [Make assets with Blender through MCP](../recipes/make-assets-with-blender-mcp.md#licence-and-provenance) covers each common source. A receipt is an integrity record, not proof of rights.
 
 ## Example
 
@@ -110,4 +131,5 @@ The strict sample contract is [`metre-block.contract.json`](../../tools/blender-
 - **Owner:** the creator owns each contract; `scripts/asset-verify.mjs` only reads. `npm run check` is its only automatic caller. It is not a runtime check: the engine's loader has its own admission rules ([model readiness](model-readiness.md)).
 - **Bounds:** one GLB, its contract and receipt in memory at a time. The file size is checked against `fileBytes` before the file is read. No network access; external URIs are refused, never fetched.
 - **Failure:** the first breach stops that model with one line naming the rule and the numbers; other models are still checked. Exit code 1 on any failure, 2 on a usage error.
+- **Silhouette bounds:** one canvas of at most 1024 × 1024 and one reference of at most 4096 × 4096 in memory per check.
 - **Not checked:** texture colour spaces and pixel contents; animation clip contents beyond names and duration (a pose-to-pose model's clips are checked against its animation definition by [`tools/pose-to-pose/validate.mjs`](../../tools/pose-to-pose/README.md)); skinning beyond the `skin` limits; visual quality; whether the receipt's licence claim is true. Images are counted, sized in bytes and measured from their headers, but not decoded. It is an acceptance check for the creator's own assets, not a security boundary for untrusted files.

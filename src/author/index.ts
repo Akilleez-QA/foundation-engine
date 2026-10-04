@@ -18,6 +18,7 @@
  *   Emitter, defineEmitter, burst, sceneParticles   optional particles: one instanced draw per emitter, fixed-step, seeded
  *   view.output (validateSceneOutput)               opt-in tone mapping and exposure per scene
  *   PointLight, SpotLight, sceneLights               optional local lights in fixed per-visit slots
+ *   Shadow, sceneShadows                             optional shadows: per scene, per light and per entity
  *
  * Budgets are data in game/budgets.json (the ratchet compares them across revisions without running code).
  */
@@ -161,6 +162,14 @@ export {
   type SceneLightLimits,
 } from './lights';
 export type {LightStats, LightRefusal} from './light-slots';
+export {
+  Shadow,
+  sceneShadows,
+  SHADOWED_LIGHT_CAPS,
+  type ShadowData,
+  type SceneShadows,
+  type SceneShadowDefaults,
+} from './shadow-casting';
 export {
   validateSceneOutput,
   OUTPUT_DEFAULTS,

@@ -66,6 +66,23 @@ finds no free slot is refused and reported once. Ask only for the slots the scen
 every lit pixel. Lighter quality presets cap the slots (2 of each kind on `low`), keeping `essential: true` lights first.
 Details: the [scene look guide](../guides/scene-look.md#local-lights-point-and-spot-lights).
 
+### Shadows
+
+Objects without shadows float. Opt the scene in, then give the sun (and, sparingly, a lamp) a shadow:
+
+```ts
+import { sceneShadows, Shadow } from '@engine';
+
+// defineEnvironment: directional: { color: 0xfff1d6, intensity: 2.2, position: [4, 10, 6], shadow: { extent: 16 } },
+// defineScene:       shadows: sceneShadows(),        // every Shape and Mesh casts and receives by default
+// one entity:        Shadow({ cast: false })          // glass around a light, grass, small things that always move
+```
+
+`extent` is the half-size of the square around the world origin that gets sun shadows: keep it just past the play
+area. `PointLight({ shadow: true })` costs six map faces; lighter presets allow fewer shadowed lamps (none on `low`).
+Maps redraw only when something that casts moves. Details: the
+[scene look guide](../guides/scene-look.md#shadows).
+
 ## 3. The scene
 
 An input to switch views (a key and a pad button; the right shoulder button, `rb`, is free in a new game):

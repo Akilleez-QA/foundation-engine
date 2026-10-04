@@ -83,6 +83,7 @@
     "test:output-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/output-check.mjs playtest/output",
     "test:lights-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/lights-check.mjs playtest/lights",
     "test:material-options-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/material-options-check.mjs playtest/material-options",
+    "test:shadows-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/shadows-check.mjs playtest/shadows",
     "test:dmath-browser": "node --import tsx -r ./scripts/silent-browser.cjs scripts/play/dmath-check.mjs playtest/dmath",
     "bench:dmath": "node --import tsx tools/dmath-bench/bench.mjs",
     "dmath:golden": "node --import tsx scripts/dmath-golden.mjs",

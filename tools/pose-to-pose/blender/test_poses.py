@@ -46,6 +46,8 @@ def weight_analysis(meshes, arm):
     for obj in meshes:
         if obj.parent_type == 'BONE':
             result['rigid'].append({'part': obj.name, 'bone': obj.parent_bone})
+            h = (bones.index(obj.parent_bone) * 0.61803) % 1
+            obj.color = (*colorsys.hsv_to_rgb(h, 0.65, 0.95), 1)  # shown with the object colour type
             continue
         names = {g.index: g.name for g in obj.vertex_groups}
         dominant = []
@@ -118,10 +120,12 @@ def main():
         for view in ('front', 'three-quarter'):
             cam = add_camera(lo, hi, view)
             tiles = []
-            bpy.context.scene.display.shading.color_type = 'VERTEX'
+            skinned = weights['vertices'] > 0
+            bpy.context.scene.display.shading.color_type = 'VERTEX' if skinned else 'OBJECT'
             for pb in arm.pose.bones:
                 pb.matrix_basis.identity()
-            text = add_label(cam, f'{view}\nweights (magenta: none)', True)
+            caption = 'weights (magenta: none)' if skinned else 'rigid parts by bone'
+            text = add_label(cam, f'{view}\n{caption}', True)
             tiles.append(render_tile(Path(tmp) / f'{view}-weights.png', text))
             bpy.data.objects.remove(text, do_unlink=True)
             bpy.context.scene.display.shading.color_type = 'MATERIAL'
