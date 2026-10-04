@@ -394,6 +394,7 @@ export async function testScene(
   const lightSlotCounts = lightSlotsFor(scene.lights, o.lightCap ?? LOCAL_LIGHT_CAPS.reference);
   const lightSlots = createLightSlots({
     slots: lightSlotCounts,
+    requested: scene.lights?.limits,
     enabled: !!scene.lights,
     shadowed: scene.shadows
       ? shadowedSlotsFor(world, lightSlotCounts, o.shadowCap ?? SHADOWED_LIGHT_CAPS.reference)

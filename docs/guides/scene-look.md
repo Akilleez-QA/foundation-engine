@@ -191,20 +191,30 @@ hitch. So the visit creates its slots once and never changes their number:
   built with the platform's fixed light rig (`platform/render/light-rig.ts`).
 - **Quality:** the `lights.local-max` knob (reference 16, high 8, medium 4, low 2)
   is read once per visit and caps the slots of **each** kind. The `low` preset
-  therefore draws at most 2 point and 2 spot lights. Lights beyond the cap are
-  refused like any other overflow: essential lights are kept first.
+  therefore draws at most 2 point and 2 spot lights. Essential lights are admitted
+  first. A non-essential light that the scene asked a slot for but the tier did not
+  create is refused **by design** (cause `tier`), reported once at **info** level:
+  it never fails `play:snap` or the gate. An essential light the tier cannot hold is
+  still an error (cause `full`), so keep a scene's essential lights within the
+  lightest preset it supports (low: 2 per kind).
 - **Render on change:** the rig compares each slot's holder, `Transform` and
   fields once per frame and marks the frame dirty only when one changed. A still
   scene draws zero frames.
 
 ### Overload, cancellation and recovery
 
-- **Overload:** a light with no free slot is refused (cause `full`) and admitted
-  later when a slot frees. Invalid data written by a system darkens the light
+- **Overload:** a light with no free slot is refused and admitted later when a slot
+  frees. Cause `tier` (info): a non-essential light beyond the slots the quality
+  tier created, within what the scene asked for, for example `courtyard: 4
+  non-essential PointLight(s) not drawn at this quality tier: the lights.local-max
+  quality knob creates 4 of the scene's 8 point slot(s)…`. Cause `full` (error): an
+  essential light, or more lights than the scene asked slots for. Invalid data written by a system darkens the light
   (cause `invalid`) until a valid value is written. A scene without `sceneLights()`
   refuses every light (cause `no-slots`). Each cause is reported once per visit,
   for example `courtyard: 1 PointLight(s) not drawn: the scene's 8 point slot(s)
-  are full (sceneLights({ point }) or the lights.local-max quality knob)`.
+  are full (sceneLights({ point }) or the lights.local-max quality knob)`. Errors
+  go to the error log; the `tier` report goes to the info log (`createLightSlots`'s
+  `report(message, level)`; `testScene(...).lights.reports` lists both).
 - **Counters:** `testScene(...).lights.stats` and the dev scene handle's
   `lights()` give `slots`, `admitted` and `refused` by cause. `refused` counts
   **lights**, not reports: eight point lights in two slots give `refused.full`
@@ -223,8 +233,11 @@ hitch. So the visit creates its slots once and never changes their number:
   (desktop headless Chromium, software GL). The floor under a lantern is brighter
   than the floor 10 m away. The rig keeps its size, and spawning or despawning a
   light links no program and draws one frame. An idle scene draws no frames. At
-  `low` the third lantern is refused, reported once, and admitted when a slot
-  frees. Leaving removes every light.
+  `low` the third (non-essential) lantern is refused by the tier, reported once at
+  info level and never as a page error, and admitted when a slot frees. The
+  showcase courtyard (`sceneLights({ point: 8 })`, two essential front posts) runs
+  `play:snap --mobile` (medium: 4 lit, 4 waiting) and `--quality low` (2 lit) with
+  no page error. Leaving removes every light.
 - **Bundle:** the light rig is a lazy chunk (`scene-light-rig`, about 3 kB, plus
   three's point and spot light classes, about 2 kB) that only a scene with
   `sceneLights()` loads, before its first frame. First-load JS grows by about

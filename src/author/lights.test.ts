@@ -168,3 +168,58 @@ test('testScene admits lights as a visit does, with the knob cap', async () => {
   assert.equal(low.lights.reports.length, 1);
   low.dispose();
 });
+
+test('a non-essential light refused only because the quality tier created fewer slots is info, once; essential is an error', () => {
+  const world = new World(),
+    reports: [string, string][] = [];
+  const report = (m: string, level: string) => reports.push([level, m]);
+  // The scene asked for 8; the tier (medium) creates 4: four non-essential lights wait, by design.
+  const tiered = createLightSlots({slots: {point: 4, spot: 0}, requested: {point: 8, spot: 0}, enabled: true, report});
+  const lamps = Array.from({length: 8}, (_, i) => lamp(world, i, {essential: i >= 6}));
+  for (let i = 0; i < 3; i++) tiered.sync(world);
+  assert.deepEqual(tiered.stats.refused.tier, 4);
+  assert.equal(tiered.stats.refused.full, 0);
+  assert.deepEqual(
+    reports.map(([level]) => level),
+    ['info'],
+    'reported once, at info level',
+  );
+  assert.match(
+    reports[0]![1],
+    /^4 non-essential PointLight\(s\) not drawn at this quality tier: .* creates 4 of the scene's 8/,
+  );
+  const held = [0, 1, 2, 3].map(i => tiered.point(world, i)?.entity);
+  assert.ok(held.includes(lamps[6]) && held.includes(lamps[7]), 'essential lights are admitted first');
+  // An essential light the tier cannot hold is still an error.
+  reports.length = 0;
+  const lowWorld = new World();
+  for (let i = 0; i < 8; i++) lamp(lowWorld, i, {essential: i < 4});
+  const low = createLightSlots({slots: {point: 2, spot: 0}, requested: {point: 8, spot: 0}, enabled: true, report});
+  low.sync(lowWorld);
+  assert.equal(low.stats.refused.full, 2, 'two of the four essential lights have no slot');
+  assert.equal(low.stats.refused.tier, 4);
+  assert.deepEqual(
+    reports.map(([level]) => level),
+    ['info', 'error'],
+  );
+  assert.match(reports[1]![1], /2 PointLight\(s\) not drawn, 2 of them essential/);
+});
+
+test('lights beyond what the scene asked for are an error even when the tier also capped the slots', () => {
+  const world = new World(),
+    reports: [string, string][] = [];
+  const slots = createLightSlots({
+    slots: {point: 2, spot: 0},
+    requested: {point: 4, spot: 0},
+    enabled: true,
+    report: (m, level) => reports.push([level, m]),
+  });
+  for (let i = 0; i < 6; i++) lamp(world, i);
+  slots.sync(world);
+  assert.equal(slots.stats.refused.tier, 2, 'the two the scene had room for');
+  assert.equal(slots.stats.refused.full, 2, 'the two the scene never asked a slot for');
+  assert.deepEqual(
+    reports.map(([level]) => level),
+    ['info', 'error'],
+  );
+});

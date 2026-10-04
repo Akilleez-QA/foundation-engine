@@ -180,7 +180,7 @@ export {
   type SceneLights,
   type SceneLightLimits,
 } from './lights';
-export type {LightStats, LightRefusal} from './light-slots';
+export type {LightStats, LightRefusal, LightReportLevel} from './light-slots';
 export {
   Shadow,
   sceneShadows,

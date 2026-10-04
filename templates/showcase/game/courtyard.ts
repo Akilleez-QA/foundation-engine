@@ -143,12 +143,14 @@ export const emberHud = defineSystem({
 });
 
 /** Lantern glass: it glows (emissive 1: stronger glows wash out to white under tone mapping), and a point light in it
- *  lights the courtyard. The glass casts no shadow, or it would shadow its own light. */
-const glass = (x: number, y: number, z: number, size: number, intensity: number) => [
+ *  lights the courtyard. The glass casts no shadow, or it would shadow its own light. An essential lantern keeps its
+ *  light on every preset that has the slots; the others may wait on a lighter preset and keep their glass and baked
+ *  glow (courtyard-scenery.ts). */
+const glass = (x: number, y: number, z: number, size: number, intensity: number, essential = false) => [
   Transform({x, y, z}),
   Shape({kind: 'box', size: [size, size * 1.2, size], color: 0xff9a40}),
   defineMaterial({emissive: 0xff8a30, emissiveIntensity: 1}),
-  PointLight({color: P.lantern, intensity, distance: 6.5, decay: 2}),
+  PointLight({color: P.lantern, intensity, distance: 6.5, decay: 2, essential}),
   Shadow({cast: false}),
 ];
 
@@ -224,7 +226,12 @@ export default defineScene({
         opacity: [0.8, 0],
       }),
     ],
-    ...[...POSTS, ...STREET_LAMPS].map(([x, z]) => glass(x, LANTERN_Y, z, 0.34, 30)),
+    // The two front posts frame the player's start and the walk into the courtyard: essential, so every preset keeps
+    // them (low creates 2 point slots; an essential light refused is an error). On medium (4 slots, the phone tier) the
+    // back posts by the gate take the other two slots in entity order, so all four posts are lit there. The street
+    // lamps outside the parapet and the gate sconces wait on lighter presets and keep their glass and baked glow.
+    ...POSTS.map(([x, z]) => glass(x, LANTERN_Y, z, 0.34, 30, z > 0)),
+    ...STREET_LAMPS.map(([x, z]) => glass(x, LANTERN_Y, z, 0.34, 30)),
     ...SCONCES.map(([x, y, z]) => glass(x, y, z, 0.26, 14)),
     // The gate: a plank door in the arch, a door to the garden.
     [
