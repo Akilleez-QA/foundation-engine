@@ -378,7 +378,7 @@ export function createSceneSurfaces(o: SceneSurfaceOptions): SceneSurfaces {
             material.needsUpdate = true;
           }
           if (material.alphaTest !== d.alphaCutoff) {
-            if ((material.alphaTest > 0) !== d.alphaCutoff > 0) material.needsUpdate = true;
+            if (material.alphaTest > 0 !== d.alphaCutoff > 0) material.needsUpdate = true;
             material.alphaTest = d.alphaCutoff;
           }
           wantColors = d.vertexColors;

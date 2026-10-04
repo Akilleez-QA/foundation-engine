@@ -8,6 +8,7 @@ import {
   materialKey,
   surfaceClassOf,
   validateMaterial,
+  type MaterialData,
 } from './material';
 
 test('defineMaterial fills defaults and copies the repeat it was given', () => {
@@ -58,7 +59,7 @@ test('invalid material data is refused with the field named', () => {
     [{side: 'back' as 'front'}, /side/],
     [{alphaCutoff: 1}, /alphaCutoff/],
     [{alphaCutoff: -0.1}, /alphaCutoff/],
-    [{vertexColors: 1 as unknown as boolean}, /vertexColors/],
+    [JSON.parse('{"vertexColors": 1}') as Partial<MaterialData>, /vertexColors/],
   ];
   for (const [input, message] of bad) assert.throws(() => defineMaterial(input), message, JSON.stringify(input));
 });

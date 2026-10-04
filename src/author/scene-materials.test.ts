@@ -278,7 +278,11 @@ test('shading picks one of three material classes; defaults keep the standard ma
   assert.equal(standard.material.type, 'MeshStandardMaterial');
   const plainStandard = new T.MeshStandardMaterial({color: 0xffffff});
   for (const field of ['flatShading', 'side', 'alphaTest', 'vertexColors', 'transparent', 'opacity'] as const)
-    assert.equal((standard.material as T.MeshStandardMaterial)[field], plainStandard[field], `default ${field} unchanged`);
+    assert.equal(
+      (standard.material as T.MeshStandardMaterial)[field],
+      plainStandard[field],
+      `default ${field} unchanged`,
+    );
   assert.equal(flat.material.type, 'MeshStandardMaterial');
   assert.equal((flat.material as T.MeshStandardMaterial).flatShading, true);
   assert.equal(matte.material.type, 'MeshLambertMaterial');

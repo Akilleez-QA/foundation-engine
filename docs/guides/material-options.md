@@ -61,7 +61,7 @@ eligible for static batching (`bakeStaticMeshes`; unit-tested).
 
 ## Evidence and limits
 
-- **Unit:** validation, keys, class mapping, in-place changes and class refusal, gradient sharing and disposal,
+- **Unit:** validation, keys, class mapping, changes on the same material and class refusal, gradient sharing and disposal,
   untextured meshes, model overrides (defaults keep model values, sharing, restore, toon/matte conversion, reports),
   batching eligibility, the recipe's code.
 - **Browser** (`npm run test:material-options-browser`, reference and low, desktop headless Chromium with software

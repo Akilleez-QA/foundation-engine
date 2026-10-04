@@ -65,7 +65,7 @@ test('fields left at their defaults keep the model value; the shared template is
   assert.equal(m.body.emissive.getHex(), 0, 'the template material is untouched');
   const parts = meshes(root)[1]!.material as T.MeshStandardMaterial[];
   assert.equal(parts[0], glow, 'one override per source material and look');
-  assert.equal(parts[1]!.opacity, 0.5, "the glass keeps its own opacity");
+  assert.equal(parts[1]!.opacity, 0.5, 'the glass keeps its own opacity');
   assert.equal(t.looks.sync(e, root), false, 'unchanged data: nothing rebuilt');
 });
 

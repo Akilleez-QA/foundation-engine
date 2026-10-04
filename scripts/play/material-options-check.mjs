@@ -29,7 +29,8 @@ function halves() {
   const size = 32,
     data = new Uint8Array(size * size * 4);
   for (let y = 0; y < size; y++)
-    for (let x = 0; x < size; x++) data.set(x < size / 2 ? [235, 235, 235, 255] : [235, 235, 235, 0], (y * size + x) * 4);
+    for (let x = 0; x < size; x++)
+      data.set(x < size / 2 ? [235, 235, 235, 255] : [235, 235, 235, 0], (y * size + x) * 4);
   return encodePng({width: size, height: size, data});
 }
 /** A 64x64 fern leaf: a pointed blade with a darker midrib and side veins, transparent around it. */
@@ -43,7 +44,7 @@ function leaf() {
         half = Math.sin(Math.PI * Math.min(1, v * 1.08)) * (0.75 - 0.35 * v),
         inside = Math.abs(u) < half && v > 0.02,
         rib = Math.abs(u) < 0.06,
-        vein = Math.abs(((Math.abs(u) * 0.6 + v) * 9) % 1 - 0.5) < 0.08;
+        vein = Math.abs((((Math.abs(u) * 0.6 + v) * 9) % 1) - 0.5) < 0.08;
       const g = rib ? 120 : vein ? 150 : 190 - Math.round(60 * Math.abs(u));
       data.set(inside ? [Math.round(g * 0.35), g, Math.round(g * 0.3), 255] : [0, 0, 0, 0], (y * size + x) * 4);
     }
@@ -94,7 +95,9 @@ try {
     const p = browser.page,
       run = {quality};
     report.runs.push(run);
-    await p.goto(`${server.resolvedUrls.local[0]}__material-options.html?flags=dev.silent&quality=${quality}#scene/options`);
+    await p.goto(
+      `${server.resolvedUrls.local[0]}__material-options.html?flags=dev.silent&quality=${quality}#scene/options`,
+    );
     const snap = () => p.evaluate(() => window.materialOptions.snapshot());
     const all = s => s.drawn.flatMap(m => m.materials.map(x => ({...x, name: m.name, model: m.model})));
     await p.waitForFunction(
@@ -128,15 +131,24 @@ try {
     assert.equal(by('toon').type, 'MeshToonMaterial');
     assert.equal(by('toon').gradient.steps, 3);
     assert.equal(by('gem-plain').type, 'MeshLambertMaterial', 'a mesh without Material keeps its matte material');
-    assert.deepEqual([by('gem').type, by('gem').flatShading, by('gem').emissive], ['MeshStandardMaterial', true, 0xff6a10]);
+    assert.deepEqual(
+      [by('gem').type, by('gem').flatShading, by('gem').emissive],
+      ['MeshStandardMaterial', true, 0xff6a10],
+    );
     assert.equal(by('back-single').side, 0);
     assert.equal(by('back-double').side, 2);
     assert.equal(by('cutout').alphaTest, 0.5);
     assert.equal(by('cutout').transparent, false, 'a cut-out is not sorted');
     assert.deepEqual([by('rock').vertexColors, by('rock').flatShading], [true, true]);
     const parts = all(loaded).filter(m => m.model);
-    assert.ok(parts.some(m => m.type === 'MeshToonMaterial' && m.emissive === 0x00ff66 && !m.shared), 'model override');
-    assert.ok(parts.some(m => m.shared), 'the model without Material keeps its shared materials');
+    assert.ok(
+      parts.some(m => m.type === 'MeshToonMaterial' && m.emissive === 0x00ff66 && !m.shared),
+      'model override',
+    );
+    assert.ok(
+      parts.some(m => m.shared),
+      'the model without Material keeps its shared materials',
+    );
     // Pixels.
     const img = await picture();
     writeFileSync(resolve(out, `options-${quality}.png`), encodePng(img));
@@ -163,7 +175,10 @@ try {
       toon = await bands('toon');
     run.bands = {smooth, toon};
     assert.ok(toon.top3 >= 0.9, `three flat bands cover the toon sphere (${toon.top3})`);
-    assert.ok(smooth.top3 < 0.8 && smooth.values > toon.values, `the smooth sphere shades continuously (${smooth.top3})`);
+    assert.ok(
+      smooth.top3 < 0.8 && smooth.values > toon.values,
+      `the smooth sphere shades continuously (${smooth.top3})`,
+    );
     const glow = pixelAt(img, await project('gem')),
       dull = pixelAt(img, await project('gem-plain'));
     run.gem = {glow, dull};
@@ -190,7 +205,9 @@ try {
     const settled = await snap();
     await p.evaluate(() => window.materialOptions.shade('matte'));
     await p.waitForFunction(
-      () => window.materialOptions.snapshot().drawn.find(m => m.name === 'toon')?.materials[0].type === 'MeshLambertMaterial',
+      () =>
+        window.materialOptions.snapshot().drawn.find(m => m.name === 'toon')?.materials[0].type ===
+        'MeshLambertMaterial',
     );
     await sleep(800);
     const swapped = await snap();
@@ -219,7 +236,8 @@ try {
     for (const id of ['before', 'after']) {
       await p.evaluate(s => window.materialOptions.goto(s), id);
       await p.waitForFunction(
-        s => window.materialOptions.snapshot().scene === s && window.materialOptions.snapshot().drawn.some(m => m.model),
+        s =>
+          window.materialOptions.snapshot().scene === s && window.materialOptions.snapshot().drawn.some(m => m.model),
         id,
         {timeout: 60000},
       );
