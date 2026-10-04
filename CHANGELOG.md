@@ -7,6 +7,19 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Model contracts (`npm run asset:verify`).** A GLB under a game's `public/models/` with an adjacent
+  `<name>.contract.json` is checked against it by `npm run check`: size and pivot, triangle, vertex, material and
+  texture limits, file and texture bytes, allowed material properties and the receipt fields licence, author,
+  source, tool and generator. A GLB without a contract is unaffected. See
+  [model contracts](docs/guides/model-contracts.md).
+
+## 0.3.0 — proposed; author decides
+
+**Proposed, not released.** The version number and date are a proposal; the author decides both, and
+creates any tag or GitHub release. Release candidate: `7c26db7` (the merge of #121, after #108). Evidence, release notes,
+upgrade guide and support matrix: [candidate bundle](docs/releases/candidate-7c26db7/README.md). Covers every
+PR merged after v0.2.0 (`071e3c2`). `package.json` still says 0.2.0 until the author bumps it with the tag.
+
 ### Upgrading from 0.2.0
 
 Changes a v0.2.0 game or workflow can notice. Each says what changed, who is affected and what to do.
@@ -77,6 +90,10 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
 
 ### Changes
 
+- **Opt-in tone mapping and exposure per scene (VIS-01).** `defineScene({ view: { output: { toneMapping, exposure } } })`
+  with `'none'` (default), `'aces'`, `'agx'` or `'neutral'` and an exposure in (0, 16]; `ctx.view.output` changes at
+  run time with one redraw. A scene without `output` draws exactly as before (picture guard: identical). See the
+  [scene look guide](docs/guides/scene-look.md).
 - **The gate passes on Node 23 and newer.** Node 23 changed the test runner's default report for piped output
   from TAP (`# tests 4`) to spec (`ℹ tests 4`), so `scripts/compatibility.test.mjs` failed `npm test` and
   `npm run gate` for a fresh game on every Node newer than 22. Scripts that read test output now name the TAP
@@ -191,6 +208,21 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
   shown on the Graphics screen). `testScene` steps emitters and exposes their counters.
   [Recipe](docs/recipes/hit-sparks-and-pickups.md), [guide](docs/guides/particles.md),
   `npm run test:particle-browser`. Desktop software-GL evidence only (#63).
+
+### Pull requests in this version
+
+Every PR merged after v0.2.0, by area. Limits for each are in its entry above or in the
+[release notes](docs/releases/candidate-7c26db7/release-notes.md#known-limits).
+
+- **Making and testing games:** [#67](https://github.com/Akilleez-QA/foundation-engine/pull/67), [#90](https://github.com/Akilleez-QA/foundation-engine/pull/90), [#91](https://github.com/Akilleez-QA/foundation-engine/pull/91), [#92](https://github.com/Akilleez-QA/foundation-engine/pull/92), [#94](https://github.com/Akilleez-QA/foundation-engine/pull/94), [#99](https://github.com/Akilleez-QA/foundation-engine/pull/99), [#101](https://github.com/Akilleez-QA/foundation-engine/pull/101), [#103](https://github.com/Akilleez-QA/foundation-engine/pull/103), [#105](https://github.com/Akilleez-QA/foundation-engine/pull/105), [#106](https://github.com/Akilleez-QA/foundation-engine/pull/106), [#107](https://github.com/Akilleez-QA/foundation-engine/pull/107), [#114](https://github.com/Akilleez-QA/foundation-engine/pull/114), [#120](https://github.com/Akilleez-QA/foundation-engine/pull/120), [#121](https://github.com/Akilleez-QA/foundation-engine/pull/121) (checks, linting, stricter
+  types, formatting); [#68](https://github.com/Akilleez-QA/foundation-engine/pull/68), [#89](https://github.com/Akilleez-QA/foundation-engine/pull/89), [#109](https://github.com/Akilleez-QA/foundation-engine/pull/109), [#110](https://github.com/Akilleez-QA/foundation-engine/pull/110), [#111](https://github.com/Akilleez-QA/foundation-engine/pull/111), [#112](https://github.com/Akilleez-QA/foundation-engine/pull/112), [#108](https://github.com/Akilleez-QA/foundation-engine/pull/108) (onboarding and tooling, Node 23+ and Node 26 in CI).
+- **Input and movement:** [#52](https://github.com/Akilleez-QA/foundation-engine/pull/52), [#53](https://github.com/Akilleez-QA/foundation-engine/pull/53), [#57](https://github.com/Akilleez-QA/foundation-engine/pull/57).
+- **Worlds, saves, strings and assets:** [#50](https://github.com/Akilleez-QA/foundation-engine/pull/50), [#56](https://github.com/Akilleez-QA/foundation-engine/pull/56), [#59](https://github.com/Akilleez-QA/foundation-engine/pull/59), [#74](https://github.com/Akilleez-QA/foundation-engine/pull/74), [#77](https://github.com/Akilleez-QA/foundation-engine/pull/77), [#95](https://github.com/Akilleez-QA/foundation-engine/pull/95).
+- **Rendering, effects and audio:** [#54](https://github.com/Akilleez-QA/foundation-engine/pull/54), [#55](https://github.com/Akilleez-QA/foundation-engine/pull/55), [#63](https://github.com/Akilleez-QA/foundation-engine/pull/63), [#83](https://github.com/Akilleez-QA/foundation-engine/pull/83), [#100](https://github.com/Akilleez-QA/foundation-engine/pull/100), [#102](https://github.com/Akilleez-QA/foundation-engine/pull/102), [#113](https://github.com/Akilleez-QA/foundation-engine/pull/113), [#118](https://github.com/Akilleez-QA/foundation-engine/pull/118).
+- **Multiplayer and replays:** [#51](https://github.com/Akilleez-QA/foundation-engine/pull/51), [#58](https://github.com/Akilleez-QA/foundation-engine/pull/58), [#60](https://github.com/Akilleez-QA/foundation-engine/pull/60), [#61](https://github.com/Akilleez-QA/foundation-engine/pull/61), [#70](https://github.com/Akilleez-QA/foundation-engine/pull/70).
+- **Evidence and compatibility:** [#72](https://github.com/Akilleez-QA/foundation-engine/pull/72), [#73](https://github.com/Akilleez-QA/foundation-engine/pull/73), [#75](https://github.com/Akilleez-QA/foundation-engine/pull/75), [#76](https://github.com/Akilleez-QA/foundation-engine/pull/76), [#78](https://github.com/Akilleez-QA/foundation-engine/pull/78), [#79](https://github.com/Akilleez-QA/foundation-engine/pull/79), [#81](https://github.com/Akilleez-QA/foundation-engine/pull/81), [#96](https://github.com/Akilleez-QA/foundation-engine/pull/96), [#97](https://github.com/Akilleez-QA/foundation-engine/pull/97), [#98](https://github.com/Akilleez-QA/foundation-engine/pull/98), [#104](https://github.com/Akilleez-QA/foundation-engine/pull/104), [#115](https://github.com/Akilleez-QA/foundation-engine/pull/115), [#116](https://github.com/Akilleez-QA/foundation-engine/pull/116), [#119](https://github.com/Akilleez-QA/foundation-engine/pull/119).
+- **Contributing, CI and project:** [#69](https://github.com/Akilleez-QA/foundation-engine/pull/69), [#71](https://github.com/Akilleez-QA/foundation-engine/pull/71), [#80](https://github.com/Akilleez-QA/foundation-engine/pull/80), [#82](https://github.com/Akilleez-QA/foundation-engine/pull/82), [#88](https://github.com/Akilleez-QA/foundation-engine/pull/88), [#93](https://github.com/Akilleez-QA/foundation-engine/pull/93), [#117](https://github.com/Akilleez-QA/foundation-engine/pull/117). Batch merges [#62](https://github.com/Akilleez-QA/foundation-engine/pull/62), [#64](https://github.com/Akilleez-QA/foundation-engine/pull/64), [#65](https://github.com/Akilleez-QA/foundation-engine/pull/65) integrate the PRs
+  named in their titles.
 
 ## 0.2.0 — 2026-10-03
 

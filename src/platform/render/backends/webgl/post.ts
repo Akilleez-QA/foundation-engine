@@ -1,5 +1,5 @@
 /**
- * platform/render/post/webgl.ts: the WebGL2 post pipeline (GLSL), a lazy chunk (owner `platform.render.post`; ADR 0078).
+ * platform/render/backends/webgl/post.ts: the WebGL2 post pipeline (GLSL), a lazy chunk (owner `platform.render.post`; ADR 0078).
  *
  * Draws a `PostPlan` (settings.ts) on one world renderer: the scene into a half-float target, an optional bloom chain
  * at half resolution, then one combined pass (bloom, tone map, grade, vignette, sRGB) into the canvas. Hand-written
@@ -20,7 +20,7 @@
  * property reads per composed frame and nothing else.
  */
 import * as T from 'three';
-import {bloomSizes, BLOOM_MIPS, postDrawsOf, postTargetBytes, type PostPlan} from './settings';
+import {bloomSizes, BLOOM_MIPS, postDrawsOf, postTargetBytes, type PostPlan} from '../../post/settings';
 
 /** What the scene runtime drives. A WebGPU implementation provides the same surface. */
 export interface PostPipeline {

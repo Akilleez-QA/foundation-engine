@@ -5,7 +5,7 @@
  * A scene asks for post-processing with plain data (`defineScene({ view: { post } })`, `ctx.view.post`); the player's
  * `post.mode` knob chooses how much of it runs. This module validates the data and resolves the plan a backend
  * implementation draws: it imports no renderer, so the author API and the shell may read it without loading GPU code.
- * The WebGL2 implementation is `webgl.ts` here (GLSL, a lazy chunk); a WebGPU backend adds its own implementation of
+ * The WebGL2 implementation is `backends/webgl/post.ts` (GLSL, a lazy chunk); a WebGPU backend adds its own implementation of
  * the same plan (TSL, under `backends/webgpu/`) one module at a time. Author data never names a pass.
  *
  * Tiers (`post.mode`, exact preset mapping in quality.ts: reference full, high full, medium basic, low off):

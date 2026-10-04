@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type * as T from 'three';
 import {createScenePost, type ScenePostOptions} from './scene-post';
 import type {PostPlan} from '../platform/render/post/settings';
-import type {PostPipeline} from '../platform/render/post/webgl';
+import type {PostPipeline} from '../platform/render/backends/webgl/post';
 import {ProgramLinkError} from '../platform/render/program-validation';
 import {defineScene} from './defs';
 import {testScene} from './testing';
@@ -47,7 +47,7 @@ function harness(o: Partial<ScenePostOptions> & {unsupported?: string | null; fa
       return {
         createWebGLPost: () => pipeline,
         postUnsupported: () => o.unsupported ?? null,
-      } as unknown as typeof import('../platform/render/post/webgl');
+      } as unknown as typeof import('../platform/render/backends/webgl/post');
     },
     changed: () => changed++,
     report: error => reports.push(error),

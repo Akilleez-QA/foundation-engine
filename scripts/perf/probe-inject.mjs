@@ -2,7 +2,7 @@
 // It wraps the WebGL prototypes only inside the muted, isolated bench browser (bench-browser.mjs); the game itself is never changed.
 //
 // - Draws, triangles and off-screen (framebuffer) draws; the largest off-screen burst in one frame is the shadow pass.
-// - Post draws apart (`postDraws`): the engine's post pipeline (src/platform/render/post/webgl.ts) brackets its work in
+// - Post draws apart (`postDraws`): the engine's post pipeline (src/platform/render/backends/webgl/post.ts) brackets its work in
 //   dev and test builds through `__engineRenderPhase(gl, phase)`, defined here. 'scene': the scene's own draws go into
 //   the framebuffer bound now, which counts as the main pass (not off-screen, so shadowCasters keeps its meaning);
 //   'post': the fullscreen passes are counted in __post only, never in __draws or __tris; 'end' closes the bracket.

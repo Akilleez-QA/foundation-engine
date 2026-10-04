@@ -48,6 +48,7 @@ The id becomes the save namespace, so choose it once. The title goes into `game/
 | `terrain` | a character on hills and hollows | [terrain](../../templates/terrain/README.md) |
 | `expedition` | routes, objectives, inventory: many kits together | [expedition](../../templates/expedition/README.md) |
 | `mechanics` | riding, equipment, a loaded model: many kits together | [mechanics](../../templates/mechanics/README.md) |
+| `showcase` | a good-looking start: palette, light presets, baked light, low-poly forms | [showcase](../../templates/showcase/README.md) |
 | `shared-world` | two or more players in one world over a local host (LAN or this machine) | [shared-world](../../templates/shared-world/README.md) |
 
 `--id` is your game's save namespace; choose it once. The command writes `game/` (with the template's scripted playtests in `game/playtest/`) and `GAME.md` into this checkout. Every command now builds your `game/` (without one, they build `templates/blank/game`).

@@ -30,6 +30,20 @@ Without `view.environment` a scene gets default lights and the plain `background
 
 To change it while playing, assign a new environment to `ctx.view.environment`; the renderer picks it up next frame.
 
+### Tone mapping and exposure
+
+Bright light clips without tone mapping: an emissive lantern at intensity 6 becomes a flat yellow patch. Opt a scene in
+with `view.output`, and keep emissive values between about 2 and 6:
+
+```ts
+view: { environment: night, output: { toneMapping: 'aces', exposure: 1 } },
+```
+
+`toneMapping` is `'none'` (the default), `'aces'`, `'agx'` or `'neutral'`; `exposure` is in (0, 16]. Replace
+`ctx.view.output` to change it while playing (`ctx.view.output = { ...ctx.view.output, exposure: 1.3 }`); the scene
+redraws once. A scene without `output` looks exactly as before. Details: the
+[scene look guide](../guides/scene-look.md#output-tone-mapping-and-exposure).
+
 ## 3. The scene
 
 An input to switch views (a key and a pad button; the right shoulder button, `rb`, is free in a new game):

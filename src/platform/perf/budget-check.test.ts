@@ -259,3 +259,9 @@ test('postDraws is its own count budget, per tier, with no noise allowance; draw
   });
   assert.equal(must(medium.rows.find(r => r.metric === 'postDraws')).verdict, 'fail', 'no tolerance: 2 > 1 fails');
 });
+
+test('a derived postDraws budget is the exact tier count, and worstOf keeps it', () => {
+  const worst = worstOf([{postDrawsPerRenderedFrame: 1}, {postDrawsPerRenderedFrame: 10}]);
+  assert.equal(worst.postDrawsPerRenderedFrame, 10);
+  assert.deepEqual(deriveBudget(worst, ['postDraws']), {postDraws: 10}, 'no headroom on a fixed pass count');
+});

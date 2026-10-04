@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from 'three';
-import {createWebGLPost, postUnsupported} from './webgl';
-import {postPlan, resolvePost, type PostPlan} from './settings';
+import {createWebGLPost, postUnsupported} from './post';
+import {postPlan, resolvePost, type PostPlan} from '../../post/settings';
 
 /** A renderer stand-in: records each draw's target and material; no GPU. */
 function fakeRenderer(o: {width?: number; height?: number; maxSamples?: number} = {}) {

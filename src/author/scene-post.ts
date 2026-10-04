@@ -3,7 +3,7 @@
  * platform/render/post/settings.ts).
  *
  * A scene asks for post with `view.post` (or later, `ctx.view.post`); the player's `post.mode` knob picks the tier.
- * The drawing code is a lazy chunk (`post/webgl.ts`), requested when the scene prepares (or when settings first
+ * The drawing code is a lazy chunk (`backends/webgl/post.ts`), requested when the scene prepares (or when settings first
  * appear): a scene without post never downloads it. Until it arrives, and whenever the plan is `off`, the scene draws
  * straight to the canvas as it does without post; when it arrives the picture is drawn once more.
  *
@@ -29,15 +29,15 @@ import {
   type PostResolved,
   type PostSettings,
 } from '../platform/render/post/settings';
-import type {PostPipeline} from '../platform/render/post/webgl';
+import type {PostPipeline} from '../platform/render/backends/webgl/post';
 
-type PostModule = typeof import('../platform/render/post/webgl');
+type PostModule = typeof import('../platform/render/backends/webgl/post');
 
 let module: Promise<PostModule> | null = null;
 /** The WebGL2 post chunk, requested once per page (a failed request is retried by the next visit). */
 export function loadPostModule(): Promise<PostModule> {
   if (!module)
-    module = import('../platform/render/post/webgl').catch((error: unknown) => {
+    module = import('../platform/render/backends/webgl/post').catch((error: unknown) => {
       module = null;
       throw error;
     });

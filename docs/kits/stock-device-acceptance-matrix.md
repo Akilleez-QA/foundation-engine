@@ -17,6 +17,9 @@ configure, replace or omit these templates and frameworks. Stock acceptance keep
 existing declared targets; it must not silently remove phone support or reduce
 desktop quality to make a check pass.
 
+For the current eight templates on release candidate `7c26db7`, see its
+[support matrix](../releases/candidate-7c26db7/support-matrix.md).
+
 ## Declarations versus evidence
 
 Every stock `build.brief.ts` declares **desktop, laptop, tablet and phone**, with

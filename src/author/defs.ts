@@ -2,6 +2,7 @@ import {normalizeModelPoseLinkLimits, type ModelPoseLinkLimits, type ModelPoseLi
 import type {ModelAttachmentState} from './model-attachment';
 import type {ModelState} from './model-state';
 import type {EnvironmentState} from './environment';
+import {validateSceneOutput, type SceneOutput} from './scene-output';
 /**
  * author/defs.ts: the author-facing definitions. Each `define*` checks its input and returns plain data tagged with a
  * `kind`; `compile.ts` turns the set into engine modules (registries, router, save, input). Nothing here runs a frame,
@@ -128,6 +129,10 @@ export interface ViewState {
   background: number;
   /** Replace this value to publish an environment change. */
   environment?: EnvironmentState | undefined;
+  /** Tone mapping and exposure (author/scene-output.ts). Replace the value to publish a change
+   *  (`ctx.view.output = { ...ctx.view.output, exposure: 1.2 }`): the next frame draws once with it. An invalid value
+   *  is reported once and the last valid output stays. */
+  output: SceneOutput;
   /** Post-processing (bloom, vignette, grade) at the player's `post.mode` tier. Replace this value to publish a change
    *  (one redraw); invalid settings are reported once and the last valid ones stay. docs/guides/post-processing.md. */
   post?: PostSettings | undefined;
@@ -294,6 +299,9 @@ export interface SceneInput extends SceneBody {
     background?: number;
     lights?: 'default' | 'none';
     environment?: EnvironmentState;
+    /** Opt-in tone mapping and exposure: `{ toneMapping: 'aces', exposure: 0.9 }`. Omitted: `'none'` and 1, the
+     *  picture every scene had before (docs/guides/scene-look.md). */
+    output?: Partial<SceneOutput>;
     /** Post-processing (docs/guides/post-processing.md): bloom at the `full` tier; grade and vignette at `basic` and
      *  `full`; nothing at `off`. Omit it and the scene loads no post code. */
     post?: PostSettings;
@@ -328,6 +336,8 @@ export function defineScene(s: SceneInput): SceneDefinition {
       `scene ${s.id}: replay.digest needs an id (1-128 of A-Za-z0-9._:,;=+-) and a state(world) function`,
     );
   const captured = {...s};
+  if (captured.view?.output !== undefined)
+    captured.view = {...captured.view, output: validateSceneOutput(captured.view.output, `scene ${s.id}: view.output`)};
   if (captured.view?.post !== undefined)
     captured.view = {...captured.view, post: validatePost(captured.view.post, `scene ${s.id}: view.post`)};
   if (captured.modelPoseLinks !== undefined)
