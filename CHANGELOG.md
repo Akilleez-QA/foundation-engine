@@ -90,6 +90,12 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
 
 ### Changes
 
+- **Optional point and spot lights (VIS-02).** `PointLight` and `SpotLight` components on an entity with a
+  `Transform`, in scenes that opt in with `defineScene({ lights: sceneLights({ point, spot }) })` (at most 16 and 4).
+  Each visit creates its slots once, so spawning or despawning a light never recompiles shaders; overflow is refused
+  deterministically (essential first, then spawn order) and reported once per cause. New quality knob
+  `lights.local-max` (16/8/4/2, unwired) caps the slots per kind. Scenes without `sceneLights()` are unchanged. See the
+  [scene look guide](docs/guides/scene-look.md#local-lights-point-and-spot-lights).
 - **Opt-in tone mapping and exposure per scene (VIS-01).** `defineScene({ view: { output: { toneMapping, exposure } } })`
   with `'none'` (default), `'aces'`, `'agx'` or `'neutral'` and an exposure in (0, 16]; `ctx.view.output` changes at
   run time with one redraw. A scene without `output` draws exactly as before (picture guard: identical). See the
