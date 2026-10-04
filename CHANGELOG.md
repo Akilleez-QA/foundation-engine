@@ -21,6 +21,14 @@ Every new framework below is optional: a game that does not use it is unchanged.
   metres, one rebuild-from-scratch script per asset, a screenshot after every change, measurements (bounds,
   ground contact, gaps, non-manifold edges) as the acceptance evidence, about two retries per defect, Blender
   5.2 API lookups before writing code, and MCP safety defaults. Documentation only; no engine change.
+- **`lint:game` rule `three-legacy`.** In a game file that imports three (through a `@kits/three` kit, or
+  directly), it flags three.js APIs that are gone or deprecated in the pinned three r186, each with its
+  replacement: `Geometry`/`Face3`, `*BufferGeometry` aliases, `outputEncoding`, `texture.encoding`,
+  `sRGBEncoding`/`LinearEncoding`, `physicallyCorrectLights`, `useLegacyLights`, `gammaOutput`/`gammaFactor`,
+  `JSONLoader`/`BasisTextureLoader`/`RGBELoader`, `mergeBufferGeometries`, `Clock`, `PCFSoftShadowMap` and
+  `three/examples/js/` imports. No `@kits/three` kit exists yet and `lint:layers` keeps three out of game code,
+  so the rule is dormant today and ready for that kit. A test checks each "removed" name against the installed
+  three. Escape with a reason: `// lint-game-allow three-legacy: <reason>`.
 - **Model optimisation (`npm run asset:optimize`).** glTF-Transform's `optimize` with meshopt geometry
   compression, WebP textures resized to the contract's `textureSize` (`--ktx2` is refused until the engine
   adds KTX2 support), and named nodes, meshes and materials kept; the model contract is checked before and after. Adds the
