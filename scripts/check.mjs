@@ -56,6 +56,13 @@ export function selectionOptions(argv = process.argv.slice(2)) {
   return {all, base};
 }
 
+/** The zero-selection line: never suggests `--base` when the selection already used one. */
+export function noTestsMessage(base) {
+  return base === undefined
+    ? 'No tests selected (0 files). This is not test-suite acceptance; use --base <ref>, --all, or run explicit tests.'
+    : `No tests selected (0 files): nothing changed since the merge base with ${base} affects a test. This is not test-suite acceptance; use --all or run explicit tests.`;
+}
+
 /** Include dirty/untracked paths and deletions; deleted source can still affect surviving tests. */
 export function changedFiles({base, cwd = ROOT} = {}) {
   const revision = base === undefined ? 'HEAD' : git(['merge-base', 'HEAD', base], cwd).trim();
@@ -169,9 +176,7 @@ if (process.argv[1] && process.argv[1].endsWith('check.mjs')) {
     console.log(`selected test files (${tests.length}):\n${tests.map(t => `  ${t}`).join('\n')}`);
     run(`tests (${tests.length} file(s))`, toolCommand('tsx', ['--test', TAP_REPORTER, ...tests]));
   } else {
-    console.log(
-      'No tests selected (0 files). This is not test-suite acceptance; use --base <ref>, --all, or run explicit tests.',
-    );
+    console.log(noTestsMessage(base));
     results.push({name: 'tests (0 selected; not run)', ok: true, s: 0, out: ''});
   }
   for (const r of results)
