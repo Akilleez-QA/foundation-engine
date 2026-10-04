@@ -78,4 +78,4 @@ palette key breaks `forms.test.ts` and the other files that use it (change value
 the `bakeLight` test's light warm); delete the courtyard, garden, embers and texture files together once your scene
 replaces them, and fix the brief's `by:` files and the budget rows; the copied budgets note's `showcase/` prefix is
 wrong for `game/` (keys have no prefix); the template's budgets are your starting budgets, so a redesigned kept scene
-that needs more is a raise with a `Perf-Budget:` trailer in the message's last paragraph, agreed with the author.
+that needs more is a raise with a `Perf-Budget:` line anywhere in the commit message, agreed with the author.

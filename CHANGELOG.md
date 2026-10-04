@@ -10,6 +10,48 @@ Every new framework below is optional: a game that does not use it is unchanged.
 Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
 (#122 onward). None of it is in that candidate.
 
+- **Small fixes from the acceptance runs.** `add-a-budget` no longer contradicts itself: a `Perf-Budget:` line counts
+  anywhere in a commit message (the rule since #170); git's own trailer view shows only the last paragraph, so check a
+  raise with `npm run lint:budgets`. The art-direction recipe and skill say the same. `npm run format:check` (and
+  `npm run lint`, `npm run check`) print the fix command, `npm run format`, when formatting fails. GOVERNANCE.md and
+  AGENTS.md state the merge rule: up to date with `main`, green CI on that exact head, and `main`'s latest CI completed
+  green. Budgets: the showcase garden's `shadowCasters` 10 → 0 and `shadowPasses` 1 → 0, re-measured after the bench
+  misattribution fix (#173); it has no shadows. Re-benching all nine templates at `a75504b` found no other row
+  inflated that way: the courtyard measures 7 and 1 (its own shadow), and every other scene 0 and 0 because none
+  has shadows. Those keep the template default `shadowCasters: 10`, `shadowPasses: 1` (one sun shadow fits, #158),
+  which no misattribution produced; lowering them is a separate choice.
+
+- **Bench attribution fix (#173).** After a scene change the bench probe no longer counts the previous scene's last
+  frame: the showcase garden read 7 shadow casters and 1 pass after the courtyard, 0 and 0 on its own. Budgets
+  measured that way could be inflated; see the first entry for the one row that was.
+
+- **Calm stops decorative particles (#171).** With Calm on, non-essential emitters add nothing (`stats.calmed`
+  counts the withheld spawns; the random stream and despawn ticks are unchanged), live particles hold still and fade,
+  and essential emitters still show, held at their spawn point. The showcase pickup burst is essential.
+  *Affected:* a game whose particles must show under Calm marks the emitter `essential: true`.
+
+- **Tier light refusals are info (#172).** A non-essential light that the scene requested but the device tier has
+  no slot for is reported once at info (`refused.tier`), not as an error. An essential light refused, or a light
+  beyond the scene's own request, stays an error (`refused.full`). The showcase's two front lanterns are essential
+  (they fit `low`'s two point slots). CI's phone smoke runs at the phone tier (`medium`).
+
+- **Tooling from the acceptance trials (#165, #167, #168, #169, #170).** `npm run gate` runs the game's browser
+  playtests (`npm run play:playtests`: every `playtest/*.json` and every `how: 'playtest'` criterion), so a failing
+  playtest fails the gate. `perf:derive` copies the zero-tolerance counts (`contexts`, `postDraws`, `shadowPasses`)
+  exactly; the scene generator writes every gated ceiling. `play:snap` prints a `counts:` line (draws, postDraws,
+  triangles, shadowCasters, shadowPasses, textureMiB against the budget); `--mobile` snaps at the phone tier
+  (`medium`), `--quality <preset>` pins another, `--calm` checks that motion and emitters stop. `lint:budgets`
+  compares a new `game/` with the template it started from (`game/.origin.json`) and reads `Perf-Budget:` lines in
+  any paragraph. *Affected:* a game whose playtests were failing now fails its gate.
+
+- **Explorer look pass (#154).** The explorer template uses the engine's own look features: baked low-poly forms,
+  scatter hedges, a lamp that is a real point light, a spot-lit shed, gradient sky and haze, ACES output. Mechanics,
+  tests and criteria are unchanged; `heapMiB` 5 → 8 for both scenes (measured, `Perf-Budget` trailers).
+
+- **MP-01 reconnect check deflaked (#163).** The two-tab session check waits for the host's idle timeout plus its
+  terminate delay instead of a generic 15 s, and asserts the drop was detected by exactly one `idle-timeout` close.
+  Harness only; the session kit and host are unchanged.
+
 - **Art-direction guidance after the acceptance trials.** The art-direction recipe and skill gain phone framing
   (portrait field of view, camera distance, subject sizes at 390×844, filling the top and bottom, a `play:snap
   --mobile` check, with a before/after picture), four craft fixes (flat sides, faint shadows, a glow that lights
@@ -17,7 +59,7 @@ Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c
   its tests use, files safe to delete, the copied budgets note, template budgets as the game's starting budgets). The
   new-game skill and AGENTS.md route look work to the art-direction skill. Bloom is documented as built in
   (`view.post`) everywhere; `@kits/three` is for passes beyond it. `lint:docs-claims` now also catches "bloom needs
-  three.js" phrasings. `add-a-budget` notes that `Perf-Budget:` lines must be in the message's last paragraph. Docs and
+  three.js" phrasings. `add-a-budget` notes where `Perf-Budget:` lines go (corrected below: anywhere in the message). Docs and
   a lint only: no engine or template behaviour changed.
 
 - **Model presentation is a lazy chunk (bundle headroom).** The scene model owner, rig capture, attachments, pose

@@ -19,6 +19,7 @@ import {dirname, join, relative} from 'node:path';
 import {gameDir, ROOT} from './lib/game-dir.mjs';
 import {toolCommand, npmCommand} from './lib/tool.mjs';
 import {TAP_REPORTER, childTestEnv, testTotals} from './lib/test-output.mjs';
+import {FIX_HINT, checkCommand} from './lint/format-check.mjs';
 
 const t0 = Date.now();
 const rel = p => relative(ROOT, p).split('\\').join('/');
@@ -164,13 +165,13 @@ if (process.argv[1] && process.argv[1].endsWith('check.mjs')) {
   // Prettier skips files it does not format (--ignore-unknown) and those in .prettierignore; `npm run format` fixes them.
   // Many changed files (a long-lived branch) check the whole tree instead: a command line has a length limit on Windows.
   const formattable = changed.filter(f => existsSync(join(ROOT, f)));
-  if (all || formattable.length > 200)
-    run('format:check', toolCommand('prettier', ['--check', '--log-level', 'warn', '.']));
-  else if (formattable.length)
-    run(
-      `format:check (${formattable.length} changed file(s))`,
-      toolCommand('prettier', ['--check', '--log-level', 'warn', '--ignore-unknown', ...formattable]),
-    );
+  const formatOk =
+    all || formattable.length > 200
+      ? run('format:check', checkCommand())
+      : formattable.length
+        ? run(`format:check (${formattable.length} changed file(s))`, checkCommand(formattable))
+        : true;
+  if (!formatOk) results.at(-1).out += `\n${FIX_HINT}`;
   run('lint:layers', 'node', ['scripts/lint/layers.mjs']);
   run('lint:game', 'node', ['scripts/lint/game-rules.mjs']);
   // The three.js escape hatch is allowed, never silent: name every game file that uses it (src/kits/three/README.md).
