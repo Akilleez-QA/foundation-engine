@@ -362,7 +362,12 @@ export function imageSize(b) {
     return {
       width: b.readUInt32LE(20),
       height: Math.max(1, b.readUInt32LE(24)),
-      ktx2: {vkFormat: b.readUInt32LE(12), depth: b.readUInt32LE(28), layers: b.readUInt32LE(32), faces: b.readUInt32LE(36)},
+      ktx2: {
+        vkFormat: b.readUInt32LE(12),
+        depth: b.readUInt32LE(28),
+        layers: b.readUInt32LE(32),
+        faces: b.readUInt32LE(36),
+      },
     };
   return null;
 }

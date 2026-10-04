@@ -67,17 +67,17 @@ The page reported no errors and no console errors in any phase. The check also r
 
 ## Bundle
 
-`npm run perf:bundle` and a reading of the Vite manifest, on `origin/main` (`8cfddac`) and on this branch:
+`npm run perf:bundle` and a reading of the Vite manifest, on `origin/main` (`f23ae6a`) and on this branch merged with it (`25be4bf`):
 
 | | `origin/main` | This branch |
 | --- | --- | --- |
-| `perf:bundle` | PASS · first-load JS 167.8 / 704 KiB · 0 chunks > 500 kB | PASS · first-load JS 168.1 / 704 KiB · 0 chunks > 500 kB |
-| First-load JS (`index-*.js`) | 171,794 B (59,993 gzip) | 172,113 B (60,131 gzip): +319 B, the renderer binding |
-| `models-*.js` (lazy) | 8,584 B (3,525 gzip) | 9,969 B (4,064 gzip) |
-| A model without KTX2 (models, GLTFLoader, meshopt and their chunks, beyond first load) | 277,607 B (80,253 gzip) | 279,582 B (81,762 gzip): +1,975 B, part of it from three's loader classes now shared in separate chunks |
-| Only for a KTX2 model: `model-ktx2-*.js` + `Data3DTexture-*.js` | — | 62,662 B (25,489 gzip) |
+| `perf:bundle` | PASS · first-load JS 168.5 / 704 KiB · 0 chunks > 500 kB | PASS · first-load JS 168.8 / 704 KiB · 0 chunks > 500 kB |
+| First-load JS (`index-*.js`) | 172,553 B (60,277 gzip) | 172,870 B (60,411 gzip): +317 B, the renderer binding |
+| `models-*.js` (lazy) | 8,590 B (3,509 gzip) | 9,975 B (4,047 gzip) |
+| A model without KTX2 (models, GLTFLoader, meshopt and their chunks, beyond first load) | 277,742 B (79,594 gzip) | 279,731 B (81,101 gzip): +1,989 B, part of it from three's loader classes now shared in separate chunks |
+| Only for a KTX2 model: `model-ktx2-*.js` + `Data3DTexture-*.js` | — | 62,662 B (25,488 gzip) |
 | Only for a KTX2 model: `basis_transcoder-*.js` / `.wasm` | — | 57,529 B (15,063 gzip) / 527,333 B (244,553 gzip) |
-| `dist/assets` total | 1,041,163 B, 33 files | 1,690,864 B, 41 files (the transcoder files are emitted in every build; fetched only when used) |
+| `dist/assets` total | 1,056,861 B, 34 files | 1,706,561 B, 42 files (the transcoder files are emitted in every build; fetched only when used) |
 
 gzip sizes are `gzip -9` of the built files, not a server's transfer.
 

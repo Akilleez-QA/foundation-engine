@@ -35,8 +35,8 @@ residency, late-drop and disposal paths as every other model.
   Apache-2.0, vendored in three) is fetched only by the first such model's set-up, once per library.
 - A model without a KTX2 image never imports the chunk or fetches the transcoder. The browser check asserts no request
   for `model-ktx2`, `KTX2Loader` or `basis_transcoder` and `transcoderLoads: 0`.
-- What a game without KTX2 still pays: 319 B of first-load JS (138 B gzip) for the renderer binding, and 1,385 B
-  (539 B gzip) in the lazy `models` chunk for detection and accounting. Measured with `npm run perf:bundle` and a
+- What a game without KTX2 still pays: 317 B of first-load JS (134 B gzip) for the renderer binding, and 1,385 B
+  (538 B gzip) in the lazy `models` chunk for detection and accounting. Measured with `npm run perf:bundle` and a
   reading of the Vite manifest; see the [evidence](../verification/ktx2-model-textures-20261003.md#bundle).
 
 ### Serving the transcoder
