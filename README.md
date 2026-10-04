@@ -81,7 +81,7 @@ cd foundation-engine
 npm ci
 npx --no-install playwright-core install chromium     # needed for automated browser checks
 npm run new-game -- --template arcade --id my-game --title "My game"
-git switch -c my-game && git add game GAME.md && git commit -m "Start my game"
+git switch -c my-game && git add game GAME.md && git commit -m "Start my game from the arcade template"
 npm run play          # open the printed URL; stop with Ctrl+C before the next command
 # Make the first edit described in Getting started, then:
 npm run check         # types, lints, the brief, the affected tests
@@ -107,7 +107,7 @@ Without a `game/` folder the blank template runs. `--game <dir>` selects another
 
 ## Not here yet (and workarounds)
 
-The current state as of 0.2.0 (October 2026). Textures and materials ([recipe](docs/recipes/give-a-shape-a-material.md)) and your own sound files ([recipe](docs/recipes/play-your-own-sounds.md)) are supported. After 0.2.0, optional particle emitters (hit sparks, pickups, trails, smoke: one draw per emitter; [recipe](docs/recipes/hit-sparks-and-pickups.md), [guide](docs/guides/particles.md)) are supported too, with desktop software-GL evidence only (FX-01 in the acceptance ledger), as is opt-in tone mapping and exposure per scene ([scene look](docs/guides/scene-look.md), VIS-01). These are still missing:
+The current state as of 0.2.0 (October 2026). Textures and materials ([recipe](docs/recipes/give-a-shape-a-material.md)) and your own sound files ([recipe](docs/recipes/play-your-own-sounds.md)) are supported. After 0.2.0, optional particle emitters (hit sparks, pickups, trails, smoke: one draw per emitter; [recipe](docs/recipes/hit-sparks-and-pickups.md), [guide](docs/guides/particles.md)) are supported too, with desktop software-GL evidence only (FX-01 in the acceptance ledger), as are opt-in tone mapping and exposure per scene and point and spot lights in fixed per-scene slots ([scene look](docs/guides/scene-look.md), VIS-01 and VIS-02). These are still missing:
 
 | Not here yet | What exists today | Workaround |
 |---|---|---|

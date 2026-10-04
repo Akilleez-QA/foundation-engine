@@ -47,6 +47,7 @@
     "new": "tsx scripts/new.ts",
     "check": "node scripts/check.mjs",
     "asset:verify": "node scripts/asset-verify.mjs",
+    "asset:optimize": "node scripts/asset-optimize.mjs",
     "play:criteria": "node scripts/generate.mjs && tsx scripts/play/criteria.ts",
     "content:publish": "node scripts/publish-content.mjs",
     "test:diagnostics-browser": "node -r ./scripts/silent-browser.cjs scripts/play/event-trace-check.mjs playtest/diagnostics/event-trace && node -r ./scripts/silent-browser.cjs scripts/play/terrain-inspect-check.mjs playtest/diagnostics/terrain-inspect && node -r ./scripts/silent-browser.cjs scripts/play/entity-inspect-check.mjs playtest/diagnostics/entity-inspect && node -r ./scripts/silent-browser.cjs scripts/play/system-timing-check.mjs playtest/diagnostics/system-timing && node -r ./scripts/silent-browser.cjs scripts/play/scene-entry-order-check.mjs playtest/diagnostics/scene-entry-order && node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/session-recorder-check.mjs playtest/diagnostics/session-recorder --minutes 0.5",
@@ -80,6 +81,7 @@
     "test:subpath-browser": "node -r ./scripts/silent-browser.cjs scripts/play/subpath-check.mjs playtest/subpath",
     "test:material-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/material-check.mjs playtest/material",
     "test:output-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/output-check.mjs playtest/output",
+    "test:lights-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/lights-check.mjs playtest/lights",
     "test:material-options-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/material-options-check.mjs playtest/material-options",
     "test:dmath-browser": "node --import tsx -r ./scripts/silent-browser.cjs scripts/play/dmath-check.mjs playtest/dmath",
     "bench:dmath": "node --import tsx tools/dmath-bench/bench.mjs",
@@ -90,12 +92,14 @@
     "test:blender-export-browser": "GAME_DIR=tools/blender-export/game node scripts/generate.mjs && tsc --noEmit -p tools/blender-export/tsconfig.json && tsx scripts/lint/brief.ts tools/blender-export/game && GAME_DIR=tools/blender-export/game node -r ./scripts/silent-browser.cjs tools/blender-export/browser.mjs",
     "test:first-use-browser": "GAME_DIR=templates/explorer/game node scripts/generate.mjs && GAME_DIR=templates/explorer/game node -r ./scripts/silent-browser.cjs scripts/play/first-use-check.mjs playtest/first-use",
     "test:first-use-browser:production": "GAME_DIR=templates/explorer/game node -r ./scripts/silent-browser.cjs scripts/play/first-use-check.mjs playtest/first-use-production --production",
-    "test:creator-journey-browser": "GAME_DIR=templates/explorer/game node scripts/generate.mjs && GAME_DIR=templates/explorer/game node -r ./scripts/silent-browser.cjs scripts/play/creator-journey-check.mjs playtest/creator-journey"
+    "test:creator-journey-browser": "GAME_DIR=templates/explorer/game node scripts/generate.mjs && GAME_DIR=templates/explorer/game node -r ./scripts/silent-browser.cjs scripts/play/creator-journey-check.mjs playtest/creator-journey",
+    "fx:pack": "node scripts/fx-pack.mjs"
   },
   "dependencies": {
     "three": "^0.186.1"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "4.5.1",
     "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^22.20.3",
     "@types/three": "^0.186.0",

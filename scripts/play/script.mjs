@@ -8,7 +8,7 @@
 // Output: playtest/latest/<name>/ (screenshots, report.json; gitignored). Exit code 1 when an expectation failed.
 import {join, resolve} from 'node:path';
 import {readFileSync} from 'node:fs';
-import {freshOut, homeScene, open, OUT, serve, sleep, write} from './lib.mjs';
+import {evidencePath, freshOut, homeScene, open, OUT, serve, sleep, write} from './lib.mjs';
 import {assertScript, MATCHERS, stepKind} from './script-schema.mjs';
 
 const at = (obj, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
@@ -68,10 +68,8 @@ export async function runScript(script, url) {
         );
       else if (kind === 'wait') await sleep(Number(step.wait));
       else if (kind === 'snap')
-        row.file = write(
-          dir,
-          `${String(++n).padStart(2, '0')}-${step.snap}.png`,
-          await b.page.screenshot({type: 'png'}),
+        row.file = evidencePath(
+          write(dir, `${String(++n).padStart(2, '0')}-${step.snap}.png`, await b.page.screenshot({type: 'png'})),
         );
       else if (kind === 'expect') {
         Object.assign(row, judge(await b.evaluate('window.engine.state()'), step.expect));
@@ -135,7 +133,7 @@ if (process.argv[1] && process.argv[1].endsWith('script.mjs')) {
       if (s.step.reload) console.log(`  ${s.ok ? 'PASS' : 'FAIL'} reload${s.ok ? ' -> ' + s.scene : ': ' + s.got}`);
       else if (e || s.file)
         console.log(
-          `  ${e ? (s.ok ? 'PASS' : 'FAIL') + ' ' + e.path + ' = ' + JSON.stringify(s.got) : 'snap ' + s.file.replace(/^.*playtest/, 'playtest')}`,
+          `  ${e ? (s.ok ? 'PASS' : 'FAIL') + ' ' + e.path + ' = ' + JSON.stringify(s.got) : 'snap ' + s.file}`,
         );
     }
     if (r.errors?.length) console.log('  page errors: ' + r.errors.join(' | '));

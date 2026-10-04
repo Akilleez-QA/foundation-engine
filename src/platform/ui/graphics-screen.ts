@@ -65,6 +65,7 @@ const KNOB_WORDS: Readonly<Record<string, string>> = {
   'graphics.post.mode': 'Post-processing',
   'graphics.effects.particles': 'Particle density',
   'graphics.effects.scatter-density': 'Scattered detail (grass, rocks)',
+  'graphics.lights.local-max': 'Local lights',
   'graphics.frame-rate.cap': 'Frame-rate cap',
   'graphics.frame-rate.display': 'Display rate',
   'graphics.interface.backdrop-blur': 'Blurred panel backgrounds',

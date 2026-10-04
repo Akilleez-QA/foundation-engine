@@ -26,6 +26,7 @@ import type {AudioClockReading} from '../platform/audio/audio-timeline';
 import type {MusicOptions, MusicVoice} from '../platform/audio/music-clock';
 import type {SceneParticles} from './particle-contract';
 import type {SceneScatter} from './scatter-contract';
+import type {SceneLights} from './lights';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const need = (ok: boolean, message: string) => {
@@ -290,6 +291,10 @@ export interface SceneInput extends SceneBody {
    *  `Scatter` is one draw; at most `max` (default 32) scatters and `instances` (default 65,536) copies are drawn, excess
    *  refused and reported. Without it the scene's scatters are not drawn (reported once). */
   scatter?: SceneScatter | undefined;
+  /** Local light slots (VIS-02, docs/guides/scene-look.md): `sceneLights({ point, spot })`. Each visit creates that many
+   *  point and spot lights once (capped by the `lights.local-max` quality knob); entities with `PointLight` or
+   *  `SpotLight` claim them. Without it the scene's light components are not drawn (reported once). */
+  lights?: SceneLights | undefined;
   id: string;
   title: string;
   /** Open, game-defined ('level', 'menu', 'world', 'cutscene', …). */
@@ -345,6 +350,10 @@ export function defineScene(s: SceneInput): SceneDefinition {
   need(
     captured.scatter === undefined || (captured.scatter as {kind?: unknown})?.kind === 'scene-scatter',
     `scene ${s.id}: scatter must be sceneScatter(...)`,
+  );
+  need(
+    captured.lights === undefined || (captured.lights as {kind?: unknown})?.kind === 'scene-lights',
+    `scene ${s.id}: lights must be sceneLights(...)`,
   );
   return {...captured, kind: 'scene', type: captured.type ?? 'scene'};
 }
