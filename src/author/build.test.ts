@@ -191,3 +191,14 @@ test('success criterion text still rejects empty, whitespace-only and nonstring 
     assert.throws(() => defineBuild(b as BuildInput), /nonempty success criterion text/);
   }
 });
+
+test('assets.provenance defaults to warn, accepts required and refuses anything else', () => {
+  assert.equal(defineBuild(input()).assets.provenance, 'warn');
+  assert.equal(defineBuild({...input(), assets: {provenance: 'required'}}).assets.provenance, 'required');
+  assert.equal(defineBuild({...input(), assets: {}}).assets.provenance, 'warn');
+  for (const assets of [{provenance: 'error'}, {provenance: true}, 'required'])
+    assert.ok(
+      briefProblems({...input(), assets}).some(p => /^assets/.test(p)),
+      `refuses ${JSON.stringify(assets)}`,
+    );
+});

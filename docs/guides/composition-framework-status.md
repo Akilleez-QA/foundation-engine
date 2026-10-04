@@ -570,3 +570,12 @@ Opt-in visual data for a scene, owned by the scene visit (the [scene look guide]
 `view.output` sets tone mapping and exposure through the renderer lease; the defaults keep every existing picture
 byte-identical (picture guard on blank and explorer). Status: implemented and checked as candidate PR #124. Evidence:
 unit tests and `npm run test:output-browser` (desktop headless Chromium, software GL). No physical-device acceptance.
+
+## Asset provenance and AI disclosure (DX-03) — implemented, candidate
+
+Tooling, not runtime: per-file provenance records, a `npm run check` step and a disclosure draft (the
+[asset provenance guide](asset-provenance.md)). Status: implemented and checked on its PR branch; not integrated until merged.
+
+| ID | Contract | State |
+|---|---|---|
+| DX-03 | Asset provenance and AI disclosure: one record per shipped model, texture and sound (beside the file as `<name>.provenance.json`, or in `<game>/assets.provenance.json`) with origin (`hand`, `agent-blender`, `ai-generator`, `library`), author, licence, source, SHA-256 and, for AI origins, tool, model, prompt or reference, human edits and (generators) weights and output licences; `tooling` and `liveGenerated` for what is not a file. `lint:provenance` in `npm run check` warns by default and fails when the brief sets `assets: { provenance: 'required' }`; `npm run disclosure` drafts Steam (pre-generated, live-generated, tooling apart) and itch.io (Graphics, Sound, Text & Dialog, Code) text. Owner: the creator writes records; `scripts/lib/provenance.ts` only reads. [Guide](asset-provenance.md) | **Implemented and checked (candidate PR, 2026-10-03).** Evidence: focused tests (`scripts/lib/provenance.test.ts`, `src/author/build.test.ts`) and `npm run check`. Tooling only: no runtime, browser or store-acceptance claim; licence claims are not verified; `defineAsset` fields are not cross-checked; no stock template has records yet (the mechanics template's nine files warn). |
