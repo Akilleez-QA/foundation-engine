@@ -1,6 +1,7 @@
 import {createSceneActivity} from './scene-activity';
 import {LOCAL_LIGHT_CAPS, lightSlotsFor} from './lights';
-import {createLightSlots, type LightStats} from './light-slots';
+import {createLightSlots, shadowedSlotsFor, type LightStats} from './light-slots';
+import {SHADOWED_LIGHT_CAPS} from './shadow-casting';
 import {validateSceneOutput} from './scene-output';
 import type {SceneActivityFacts} from './defs';
 import {ModelPoseLink} from './model-pose-link';
@@ -119,7 +120,8 @@ export interface TestScene {
 /** `particleScale` is the `effects.particles` quality knob (default 1, the reference preset). */
 /** `scatterDensity` is the `effects.scatter-density` knob (default 1); `seed` also seeds scatter placement as `?seed=`
  *  does in a visit (without it, placement uses the visit default). */
-/** `lightCap` is the `lights.local-max` quality knob (default 16, the reference preset). */
+/** `lightCap` is the `lights.local-max` quality knob (default 16, the reference preset); `shadowCap` is
+ *  `lights.shadowed-max` (default 4, the reference preset). */
 /** `sounds` adds ids `ctx.play` / `ctx.playVoice` may use besides `BUILT_IN_CUES` and the scene's own `sounds`: an
  *  audio asset the scene plays without listing it, or a cue registered by a module the test composes. */
 export async function testScene(
@@ -128,6 +130,7 @@ export async function testScene(
     particleScale?: number;
     scatterDensity?: number;
     lightCap?: number;
+    shadowCap?: number;
     sounds?: readonly string[];
     brief?: BuildBrief;
     game?: GameDefinition | undefined;
@@ -381,9 +384,14 @@ export async function testScene(
     }
   };
   const lightReports: string[] = [];
+  const lightSlotCounts = lightSlotsFor(scene.lights, o.lightCap ?? LOCAL_LIGHT_CAPS.reference);
   const lightSlots = createLightSlots({
-    slots: lightSlotsFor(scene.lights, o.lightCap ?? LOCAL_LIGHT_CAPS.reference),
+    slots: lightSlotCounts,
     enabled: !!scene.lights,
+    shadowed: scene.shadows
+      ? shadowedSlotsFor(world, lightSlotCounts, o.shadowCap ?? SHADOWED_LIGHT_CAPS.reference)
+      : {point: 0, spot: 0},
+    shadows: !!scene.shadows,
     report: message => {
       lightReports.push(`${scene.id}: ${message}`);
     },

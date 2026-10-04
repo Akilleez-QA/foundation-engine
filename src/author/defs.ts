@@ -27,6 +27,7 @@ import type {MusicOptions, MusicVoice} from '../platform/audio/music-clock';
 import type {SceneParticles} from './particle-contract';
 import type {SceneScatter} from './scatter-contract';
 import type {SceneLights} from './lights';
+import type {SceneShadows} from './shadow-casting';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const need = (ok: boolean, message: string) => {
@@ -295,6 +296,10 @@ export interface SceneInput extends SceneBody {
    *  point and spot lights once (capped by the `lights.local-max` quality knob); entities with `PointLight` or
    *  `SpotLight` claim them. Without it the scene's light components are not drawn (reported once). */
   lights?: SceneLights | undefined;
+  /** Shadows (VIS-03, docs/guides/scene-look.md): `sceneShadows({ cast, receive })` turns on shadow maps for this scene
+   *  and sets which shapes cast and receive by default (`Shadow` overrides one entity). Lights opt in one by one:
+   *  the environment's `directional.shadow`, `PointLight({ shadow: true })`, `SpotLight({ shadow: true })`. */
+  shadows?: SceneShadows | undefined;
   id: string;
   title: string;
   /** Open, game-defined ('level', 'menu', 'world', 'cutscene', …). */
@@ -354,6 +359,10 @@ export function defineScene(s: SceneInput): SceneDefinition {
   need(
     captured.lights === undefined || (captured.lights as {kind?: unknown})?.kind === 'scene-lights',
     `scene ${s.id}: lights must be sceneLights(...)`,
+  );
+  need(
+    captured.shadows === undefined || (captured.shadows as {kind?: unknown})?.kind === 'scene-shadows',
+    `scene ${s.id}: shadows must be sceneShadows(...)`,
   );
   return {...captured, kind: 'scene', type: captured.type ?? 'scene'};
 }

@@ -42,6 +42,11 @@ game/public/
 # - Blender export: metre-block.provenance.json records hashes of export.py and the asset.
 tools/blender-export/export.py
 tools/blender-export/game/public/
+# - Pose-to-pose: the exported example models, manifests and provenance, and the script-written pose files
+#   whose hashes the provenance records.
+tools/pose-to-pose/game/public/
+tools/pose-to-pose/examples/*/poses.json
+tools/pose-to-pose/examples/*/testposes.json
 # - Retained compatibility snapshot: manifest.json pins the sha256 of each copied source file.
 scripts/fixtures/compatibility/
 # - Save migration envelopes: old bytes are preserved deliberately.

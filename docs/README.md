@@ -13,7 +13,7 @@ Start with one route; the rest is reference.
 
 - [Getting started](guides/getting-started.md): from a clone to a static build you can share, by hand or with a coding agent.
 - [Cookbook and building blocks](recipes/README.md): one recipe per task (models, HUD and buttons, collision, camera, saves, budgets).
-- [Scene look](guides/scene-look.md): opt-in tone mapping, exposure and local point and spot lights for a scene, as plain data.
+- [Scene look](guides/scene-look.md): opt-in tone mapping, exposure, local point and spot lights and shadows for a scene, as plain data.
 - [Kit catalog](kits/README.md): optional patterns a game can choose, configure or leave out.
 - [Working with your agent](guides/working-with-your-agent.md): the author's side of the operating manual.
 

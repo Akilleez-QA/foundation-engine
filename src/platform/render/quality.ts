@@ -186,6 +186,17 @@ export const coreKnobs: readonly AnyKnobDef[] = [
     applies: 'reenter-scene',
     owner: 'platform.render',
   },
+  // Shadowed local lights (VIS-03): read once per visit by a scene with `sceneShadows()`. A point light's shadow is six
+  // map faces, a spot's one; the sun is not counted (its map follows `shadows.quality`). Unwired like local-max.
+  {
+    id: 'lights.shadowed-max',
+    group: 'shadows',
+    label: 'graphics.lights.shadowed-max',
+    control: {kind: 'choice', options: [0, 1, 2, 4]},
+    presets: {reference: 4, high: 2, medium: 1, low: 0},
+    applies: 'reenter-scene',
+    owner: 'platform.render',
+  },
   {
     id: 'frame-rate.cap',
     group: 'frame-rate',
