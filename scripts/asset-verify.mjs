@@ -15,24 +15,30 @@
 // `npm run check` runs `--all`: a GLB under a game's public/models with an adjacent contract must pass it; a GLB without
 // a contract is listed, not checked; a contract without its GLB fails.
 //
+// The geometry checks run on a re-import of the exported GLB, decoded the way the engine's model loader decodes it
+// (src/platform/assets/models.ts): three.js's GLTFLoader with the meshopt decoder. Draco is refused, because the engine
+// registers only the meshopt decoder; so is a required KHR_texture_basisu (KTX2) texture, because the stock model loader
+// registers no KTX2 transcoder.
+//
 // Owner: the creator's contract; this script only reads. Bounds: one GLB, its contract and its receipt in memory at a
 // time; file size is checked before the file is read. It is an acceptance check for the creator's own assets, not a
-// security boundary for untrusted files: decoding uses three.js's GLTFLoader with images and textures removed, and
-// compressed geometry (Draco, meshopt) is refused rather than decoded.
+// security boundary for untrusted files: images are measured from their headers and removed before decoding.
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {existsSync, readFileSync, readdirSync, statSync} from 'node:fs';
 import {basename, isAbsolute, join, relative, resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {Box3, Vector3} from 'three';
+import {Box3, PropertyBinding, Vector3} from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
 
 export const ROOT = fileURLToPath(new URL('..', import.meta.url));
 /** Every contract must require at least these provenance fields. */
 export const PROVENANCE_FIELDS = ['licence', 'author', 'source', 'tool', 'generator'];
 const AXES = ['x', 'y', 'z'];
 const NODE_TRANSFORMS = ['translation', 'rotation', 'scale', 'matrix'];
-const COMPRESSION = ['KHR_draco_mesh_compression', 'EXT_meshopt_compression', 'KHR_meshopt_compression'];
+const DRACO = 'KHR_draco_mesh_compression';
+const KTX2 = 'KHR_texture_basisu';
 const PIVOTS = ['base-centre', 'centre', 'any'];
 const ALPHA_MODES = ['OPAQUE', 'MASK', 'BLEND'];
 const MATERIAL_TEXTURE_KEYS = ['normalTexture', 'occlusionTexture', 'emissiveTexture'];
@@ -75,6 +81,8 @@ export function parseContract(raw) {
     'lattice',
     'faces',
     'semanticSha256',
+    'nodes',
+    'clips',
     'provenance',
   ]);
   need(raw.schema === 1, 'schema must be 1');
@@ -103,18 +111,31 @@ export function parseContract(raw) {
   const pivotTolerance = raw.pivot.tolerance ?? tolerance;
   need(Number.isFinite(pivotTolerance) && pivotTolerance >= 0, 'pivot.tolerance must be a non-negative number');
   const required = ['fileBytes', 'triangles', 'vertices', 'materials', 'textures', 'textureBytes'];
-  closed(raw.limits, 'limits', [...required, 'primitives', 'animations', 'cameras']);
+  closed(raw.limits, 'limits', [...required, 'primitives', 'animations', 'cameras', 'textureSize']);
   for (const key of required) need(isCount(raw.limits[key]), `limits.${key} must be a whole number`);
-  for (const key of ['primitives', 'animations', 'cameras'])
+  for (const key of ['primitives', 'animations', 'cameras', 'textureSize'])
     need(raw.limits[key] === undefined || isCount(raw.limits[key]), `limits.${key} must be a whole number`);
   need(raw.limits.fileBytes > 0, 'limits.fileBytes must be positive');
+  need(
+    raw.limits.textures === 0 || raw.limits.textureSize > 0,
+    'limits.textureSize (the largest width or height in pixels) is required when textures are allowed',
+  );
+  for (const key of ['nodes', 'clips'])
+    need(
+      raw[key] === undefined || (isStrings(raw[key]) && new Set(raw[key]).size === raw[key].length),
+      `${key} must be a list of distinct names`,
+    );
+  need(
+    (raw.clips?.length ?? 0) <= (raw.limits.animations ?? 0),
+    'limits.animations must be at least the number of required clips',
+  );
   need(
     raw.nodeTransforms === undefined || ['allowed', 'forbidden'].includes(raw.nodeTransforms),
     'nodeTransforms must be "allowed" or "forbidden"',
   );
   need(raw.extensions === undefined || isStrings(raw.extensions), 'extensions must be a list of extension names');
   for (const name of raw.extensions ?? [])
-    need(!COMPRESSION.includes(name), `extensions cannot allow ${name}: compressed geometry is not decoded here`);
+    need(name !== DRACO, `extensions cannot allow ${DRACO}: the engine registers only the meshopt decoder`);
   const m = raw.materials;
   closed(m, 'materials', ['properties', 'pbr', 'required', 'requiredPbr', 'alphaModes', 'expected']);
   need(isStrings(m.properties) && m.properties.includes('name'), 'materials.properties must list "name" and others');
@@ -191,6 +212,8 @@ export function parseContract(raw) {
     extensions: raw.extensions ?? [],
     materials: {required: [], requiredPbr: [], alphaModes: ['OPAQUE'], ...m},
     faces: raw.faces ?? [],
+    nodes: raw.nodes ?? [],
+    clips: raw.clips ?? [],
   };
 }
 
@@ -276,6 +299,37 @@ const withoutTextures = json => {
   return copy;
 };
 
+/** Width and height from a PNG, JPEG, WebP or KTX2 header, or null for anything else. */
+export function imageSize(b) {
+  if (b.length >= 24 && b.readUInt32BE(0) === 0x89504e47 && b.toString('latin1', 12, 16) === 'IHDR')
+    return {width: b.readUInt32BE(16), height: b.readUInt32BE(20)};
+  if (b.length >= 4 && b[0] === 0xff && b[1] === 0xd8) {
+    // JPEG: walk the markers to the first start-of-frame (SOF0..SOF15 except DHT, JPG and DAC).
+    for (let i = 2; i + 9 < b.length;) {
+      if (b[i] !== 0xff) return null;
+      const marker = b[i + 1];
+      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker))
+        return {width: b.readUInt16BE(i + 7), height: b.readUInt16BE(i + 5)};
+      i += 2 + b.readUInt16BE(i + 2);
+    }
+    return null;
+  }
+  if (b.length >= 30 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') {
+    const kind = b.toString('latin1', 12, 16);
+    if (kind === 'VP8 ') return {width: b.readUInt16LE(26) & 0x3fff, height: b.readUInt16LE(28) & 0x3fff};
+    if (kind === 'VP8L') {
+      const bits = b.readUInt32LE(21);
+      return {width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1};
+    }
+    if (kind === 'VP8X') return {width: b.readUIntLE(24, 3) + 1, height: b.readUIntLE(27, 3) + 1};
+    return null;
+  }
+  const KTX2_MAGIC = '«KTX 20»\r\n\x1a\n';
+  if (b.length >= 28 && b.toString('latin1', 0, 12) === KTX2_MAGIC)
+    return {width: b.readUInt32LE(20), height: Math.max(1, b.readUInt32LE(24))};
+  return null;
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // The check.
 
@@ -337,12 +391,19 @@ export async function verifyModel(file, contract, {provenance = companions(file)
   for (const image of json.images ?? [])
     assert.ok(!image.uri && image.bufferView !== undefined, 'image must be embedded in the GLB (bufferView, no uri)');
   for (const name of [...(json.extensionsUsed ?? []), ...(json.extensionsRequired ?? [])]) {
-    assert.ok(!COMPRESSION.includes(name), `${name}: compressed geometry is not accepted; export uncompressed`);
+    assert.ok(
+      name !== DRACO,
+      `${DRACO}: Draco is not accepted, the engine registers only the meshopt decoder; export uncompressed or with meshopt`,
+    );
     assert.ok(
       c.extensions.includes(name),
       `extension ${name} is not one the contract allows (${c.extensions.join(', ') || 'none'})`,
     );
   }
+  assert.ok(
+    !(json.extensionsRequired ?? []).includes(KTX2),
+    `${KTX2} is required, but the engine's model loader registers no KTX2 transcoder: use PNG, JPEG or WebP textures`,
+  );
   const textures = json.textures?.length ?? 0;
   assert.ok(textures <= c.limits.textures, `${textures} textures, over the contract's ${c.limits.textures}`);
   const textureBytes = (json.images ?? []).reduce(
@@ -353,6 +414,16 @@ export async function verifyModel(file, contract, {provenance = companions(file)
     textureBytes <= c.limits.textureBytes,
     `${textureBytes} bytes of embedded images, over the contract's ${c.limits.textureBytes}`,
   );
+  const largest = c.limits.textureSize ?? 0;
+  for (const [i, image] of (json.images ?? []).entries()) {
+    const view = json.bufferViews[image.bufferView];
+    const size = imageSize(bin.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength));
+    assert.ok(size, `image ${i} (${image.mimeType ?? 'no mimeType'}) is not a PNG, JPEG, WebP or KTX2 image`);
+    assert.ok(
+      size.width <= largest && size.height <= largest,
+      `image ${i} is ${size.width}×${size.height}, over the contract's textureSize ${largest}`,
+    );
+  }
   const animations = json.animations?.length ?? 0;
   assert.ok(animations <= c.limits.animations, `${animations} animations, over the contract's ${c.limits.animations}`);
   const cameras = json.cameras?.length ?? 0;
@@ -438,10 +509,10 @@ export async function verifyModel(file, contract, {provenance = companions(file)
   // Decoded geometry: what the engine's loader will actually build.
   const stripped = withoutTextures(json),
     decode = stripped ? packGlb(stripped, bin) : bytes;
-  const asset = await new GLTFLoader().parseAsync(
-    decode.buffer.slice(decode.byteOffset, decode.byteOffset + decode.byteLength),
-    '',
-  );
+  await MeshoptDecoder.ready;
+  const asset = await new GLTFLoader()
+    .setMeshoptDecoder(MeshoptDecoder)
+    .parseAsync(decode.buffer.slice(decode.byteOffset, decode.byteOffset + decode.byteLength), '');
   try {
     asset.scene.updateMatrixWorld(true);
     let lights = 0;
@@ -494,6 +565,19 @@ export async function verifyModel(file, contract, {provenance = companions(file)
           .every(v => near(v, 0, pt)),
         `base pivot: node ${c.pivot.node} is not at the origin`,
       );
+    }
+
+    for (const name of c.nodes)
+      assert.ok(
+        (json.nodes ?? []).some(n => n.name === name) &&
+          asset.scene.getObjectByName(PropertyBinding.sanitizeNodeName(name)),
+        `the required node ${name} is missing`,
+      );
+    const clipNames = asset.animations.map(a => a.name);
+    for (const name of c.clips) {
+      const clip = asset.animations.find(a => a.name === name);
+      assert.ok(clip, `the required clip ${name} is missing (clips: ${clipNames.join(', ') || 'none'})`);
+      assert.ok(clip.duration > 0, `the required clip ${name} has no duration`);
     }
 
     const geometry = [];
@@ -563,6 +647,7 @@ export async function verifyModel(file, contract, {provenance = companions(file)
       textures,
       textureBytes,
       animations,
+      clips: clipNames,
       bounds: [min, max],
       size: extent.map(round),
       sha256: digest(bytes),
