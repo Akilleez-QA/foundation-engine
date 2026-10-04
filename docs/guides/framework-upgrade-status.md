@@ -941,3 +941,7 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   entity. Shadowed local slots are fixed per visit and bounded by `lights.shadowed-max` (4/2/1/0, unwired); maps
   redraw only on change through the existing scheduler. Evidence: unit tests, `npm run test:shadows-browser` and a
   courtyard bench (`shadowCasters` measured for an opted-in scene). No physical-device evidence.
+- **Sky and haze (VIS-05), implemented and checked.** `defineEnvironment({ sky })` draws a gradient with an optional
+  sun-like discs and stars from one CPU-generated texture on an unlit sphere (no custom shader, backend-neutral);
+  `haze` gains `{ kind: 'exp2', density }` and `color: 'sky'`. Evidence: unit tests and `npm run test:sky-browser`
+  (desktop headless Chromium, software GL). No physical-device evidence.
