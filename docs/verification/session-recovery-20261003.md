@@ -57,3 +57,40 @@ reverted.
 - Playwright reports only the WebSockets the page creates. Attempts made while the context is offline may not appear
   in the socket count, so the 1-7 bound is an upper bound on observed sockets, not a full retry trace.
 - The host restart reuses the same process, port and join code.
+
+## Follow-up: the client-drop deadline raced the host idle timeout (D3, 2026-10-04)
+
+After #97, `test:session-browser` failed three times in CI (runs 37152853649, 37169650361, 37171149554), each at
+`timed out: b reconnecting after its own drop` with page B still `joined`.
+
+**Cause: a race in the check, not a reconnect defect.** Playwright's offline emulation stops frames in both
+directions but does not close B's open WebSocket (a standalone probe: no `close` event within 12 s, whether the page
+was idle, sending, or receiving). B's pings no longer reach the host, so the host retires B's connection after its
+documented idle timeout (15 s without a frame, close `idle-timeout`; the host terminates a socket that does not
+finish the close handshake 1 s later). Only then does B see a close and enter `reconnecting`. An instrumented run
+recorded the host still showing B connected at 14 s and B `reconnecting` at 15.0 s after `setOffline`, with
+`closeReasons {"idle-timeout": 1}`. The check polled for B with the default 15 s window, which equals the idle
+timeout, so a pass depended on the last poll landing a few tens of milliseconds after the deadline. Under CPU load
+the close delivery and the page's update loop are later, and the poll timed out. After detection, B's reconnect,
+resume and convergence behaved as documented in every run.
+
+**Fix.** B's deadline is now derived from the bounds that decide it: the host's `idleTimeoutMs`
+(`DEFAULT_SESSION_HOST_LIMITS`) plus the host's close-terminate delay (`CLOSE_TERMINATE_MS`, exported from
+`scripts/host.mjs`) plus the same 15 s allowance the other polls use. A new assertion pins the mechanism: the host's
+`idle-timeout` close count rises by exactly one during the drop. The step records `dropDetectedMs`. Every assertion
+#97 added is unchanged, and the bounds that matter after detection still apply: B must resume within the host's
+`leaveAfterMs` (10 s) and its paced retry episode, or the same-slot assertions fail.
+
+**Runs.** CI before the fix: the MP-01 step failed 3 of the 142 CI runs that executed it after #97 (about 2%).
+Locally, on Linux x86-64 with Node 22.23.3 and headless Chromium at nice 15 under
+`flock ~/.cache/foundation-browser.lock`, the unchanged check passed 30 of 30 runs: 10 with 24 busy loops at nice 15,
+10 pinned to 4 CPUs with 8 busy loops, and 10 pinned to 2 CPUs with 6 busy loops. The failure did not reproduce
+locally, but the detection time shows why it can happen. With the fix, the check passed 15 of 15 runs pinned to 2 CPUs
+with 6 busy loops. The time from `setOffline` to B's `reconnecting` was 14,849-15,063 ms. Six of the 15 runs were at or
+above 15,000 ms, so they were inside or past the old window's last poll.
+
+**Limitation recorded, not fixed.** The session client has no receive-side liveness check: it pings, but nothing
+answers a ping, so a page notices a lost connection only when a close or socket error reaches it. Under offline
+emulation that is the host's idle close. Under a real network loss, where no close may reach the page, detection is
+left to the browser's own socket and has not been measured. Adding client liveness would be a protocol change to the
+session kit and needs the creator's direction.
