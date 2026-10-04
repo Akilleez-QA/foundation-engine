@@ -4,7 +4,7 @@
 // an active frame (and, when nothing redrew because the scene is still, asks the loop for redraws through the test
 // API's engine.redraw() so the budget is judged on real frames), and writes what it saw to playtest/latest/ (gitignored):
 //   <scene>-desktop.png [<scene>-mobile.png]   the pictures to show the author
-//   probe.json                                   scene, world state (resources, named entities), fps, draws, tris,
+//   probe.json                                   scene, world state (resources, named entities), scatters, fps, draws, tris,
 //                                                budget status, page errors and console lines
 // The summary prints every view's draws, triangles and verdict, then its measured fps labelled advisory: software GL in
 // an emulated viewport is not device evidence, so fps is never judged. Screenshot paths are relative to the repository.
@@ -75,6 +75,8 @@ export async function snap({scene, mobile = false, url}) {
         moving,
         ...(redrawn ? {redrawn} : {}),
         state: await b.evaluate('window.engine.state()'),
+        // Instanced scatters: copies, draws and triangles per scatter (null when the scene has none).
+        scatter: await b.evaluate('window.engine.scatter?.() ?? null'),
         budget: {...budgetStatus(scene, judged), window: redrawn ? 'redrawn' : 'moving'},
       };
       probe.errors.push(...b.errors.map(e => `${name}: ${e}`));

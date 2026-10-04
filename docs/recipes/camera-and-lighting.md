@@ -206,7 +206,6 @@ More: the [camera kit README](../../src/kits/camera/README.md) (camera clearance
 
 ## When the author API is not enough
 
-`defineEnvironment` has one directional light and one ambient, no local lights, shadows or bloom yet. Reach for
-three.js only when the author API cannot express the look: a game that opts into `@kits/three` gets point and spot
-lights, shadows, an EffectComposer with bloom and custom shaders, and owns that code across three.js upgrades. See
-[use three.js directly](use-three-directly.md).
+Prefer the engine's own lights, shadows and materials. Reach for three.js only when the author API cannot express
+the look: a game that opts into `@kits/three` gets an EffectComposer with bloom, custom shaders, loaders and controls,
+and owns that code across three.js upgrades. See [use three.js directly](use-three-directly.md).

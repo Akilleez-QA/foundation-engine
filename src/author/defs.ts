@@ -26,6 +26,7 @@ import type {AudioClockReading} from '../platform/audio/audio-timeline';
 import type {MusicOptions, MusicVoice} from '../platform/audio/music-clock';
 import type {SceneParticles} from './particle-contract';
 import {validateExtensions, type SceneExtension} from './scene-extension';
+import type {SceneScatter} from './scatter-contract';
 import type {SceneLights} from './lights';
 import type {SceneShadows} from './shadow-casting';
 
@@ -291,6 +292,10 @@ export interface SceneInput extends SceneBody {
   /** Render extensions a kit provides (`sceneThree()` from `@kits/three`): opened once per visit, before the first
    *  draw, and closed when it ends. A scene without them creates nothing for them. */
   extensions?: readonly SceneExtension[] | undefined;
+  /** Instanced scatter support and bounds (docs/guides/scatter.md): `sceneScatter({ max, instances })`. Each admitted
+   *  `Scatter` is one draw; at most `max` (default 32) scatters and `instances` (default 65,536) copies are drawn, excess
+   *  refused and reported. Without it the scene's scatters are not drawn (reported once). */
+  scatter?: SceneScatter | undefined;
   /** Local light slots (VIS-02, docs/guides/scene-look.md): `sceneLights({ point, spot })`. Each visit creates that many
    *  point and spot lights once (capped by the `lights.local-max` quality knob); entities with `PointLight` or
    *  `SpotLight` claim them. Without it the scene's light components are not drawn (reported once). */
@@ -351,6 +356,10 @@ export function defineScene(s: SceneInput): SceneDefinition {
   need(
     captured.particles === undefined || (captured.particles as {kind?: unknown})?.kind === 'scene-particles',
     `scene ${s.id}: particles must be sceneParticles(...)`,
+  );
+  need(
+    captured.scatter === undefined || (captured.scatter as {kind?: unknown})?.kind === 'scene-scatter',
+    `scene ${s.id}: scatter must be sceneScatter(...)`,
   );
   need(
     captured.lights === undefined || (captured.lights as {kind?: unknown})?.kind === 'scene-lights',

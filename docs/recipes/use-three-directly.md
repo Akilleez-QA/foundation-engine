@@ -2,7 +2,8 @@
 
 The engine draws with three.js. Most looks are plain data on `@engine` (environment, materials, particles, models):
 prefer those when they can say what you want, because then quality tiers, render backends and three.js upgrades stay
-the engine's problem. When they cannot (point lights, shadows, bloom, a custom shader, a loader or controls), opt the
+the engine's problem. When they cannot (an EffectComposer pass, a custom shader, a loader or controls, lights or shadows beyond the
+engine's `PointLight`, `SpotLight` and `sceneShadows`), opt the
 game into **`@kits/three`** and use three.js itself.
 
 **Full power, you own compatibility across three upgrades.** Code written against three.js is `@unstable`: when the
