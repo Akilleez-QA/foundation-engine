@@ -21,14 +21,14 @@
  *
  * Determinism: an emitter's stream is seeded with one `seed()` draw when admitted. `seed` is the particles' own stream
  * (runtime.ts, testing.ts), never the gameplay `ctx.random`, so effects cannot shift a game's random sequence; every
- * spawn attempt takes exactly four draws, before thinning and before the pool check, so the stream (and the
+ * spawn attempt takes exactly four draws (five for a 'random-start' flipbook), before thinning and before the pool check, so the stream (and the
  * `despawn` time) does not depend on the quality preset. Thinning keeps spawn index k when
  * floor((k+1)·scale) > floor(k·scale): a lighter preset draws a deterministic subset of the reference particles.
  */
 import {mulberry32} from '../core/rng';
 import type {Entity, World} from '../core/ecs/world';
 import {Transform} from './defs';
-import {Emitter, emitterProblem} from './particles';
+import {Emitter, emitterProblem, flipbookFrame} from './particles';
 import {
   PARTICLE_LIMITS,
   normalizeSceneParticles,
@@ -79,7 +79,7 @@ interface Note {
   failed: boolean;
 }
 
-function allocatePool(capacity: number): ParticlePool {
+function allocatePool(capacity: number, flipbook: boolean): ParticlePool {
   return {
     capacity,
     live: 0,
@@ -92,6 +92,8 @@ function allocatePool(capacity: number): ParticlePool {
     offset: new Float32Array(capacity * 3),
     size: new Float32Array(capacity),
     tint: new Float32Array(capacity * 4),
+    frame: new Float32Array(flipbook ? capacity : 0),
+    start: new Float32Array(flipbook ? capacity : 0),
   };
 }
 
@@ -179,7 +181,9 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
       return undefined;
     }
     note.refused = false;
-    const s = d.essential ? 1 : scale;
+    const s = d.essential ? 1 : scale,
+      cols = d.frames?.cols ?? 0,
+      rows = d.frames?.rows ?? 0;
     const slot: Slot = {
       entity: e,
       data: d,
@@ -187,8 +191,10 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
       scale: s,
       texture: d.texture,
       blending: d.blending,
+      cols,
+      rows,
       view: undefined,
-      pool: allocatePool(Math.max(1, Math.ceil(d.max * s))),
+      pool: allocatePool(Math.max(1, Math.ceil(d.max * s)), cols > 0),
       rng: mulberry32(Math.floor(Math.min(0.999999999, Math.max(0, o.seed())) * 4294967296) >>> 0),
       spawnIndex: 0,
       seenBursts: note.bursts ?? 0,
@@ -274,7 +280,11 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
       u0 = r(),
       u1 = r(),
       u2 = r(),
-      u3 = r();
+      u3 = r(),
+      // 'random-start' takes a fifth draw per attempt (before thinning, so the stream stays preset-independent); every
+      // other emitter keeps exactly four, so its particles are unchanged by the flipbook feature.
+      frames = slot.cols ? d.frames : null,
+      u4 = frames?.mode === 'random-start' ? r() : 0;
     const k = slot.spawnIndex++;
     counts.spawned++;
     if (!keeps(k, slot.scale)) {
@@ -316,6 +326,7 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
     p.prevAge[i] = 0;
     p.age[i] = age;
     p.life[i] = life;
+    if (frames) p.start[i] = Math.floor(u4 * (frames.count ?? frames.cols * frames.rows));
   };
 
   const simulate = (
@@ -364,6 +375,7 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
           p.age[i] = p.age[last]!;
           p.prevAge[i] = p.prevAge[last]!;
           p.life[i] = p.life[last]!;
+          if (slot.cols) p.start[i] = p.start[last]!;
         }
         continue; // index i now holds the last particle, not yet advanced this step: process it next.
       }
@@ -438,7 +450,12 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
         let slot = slots.get(e);
         if (
           slot &&
-          (slot.data !== d || slot.reserved !== d.max || slot.texture !== d.texture || slot.blending !== d.blending)
+          (slot.data !== d ||
+            slot.reserved !== d.max ||
+            slot.texture !== d.texture ||
+            slot.blending !== d.blending ||
+            slot.cols !== (d.frames?.cols ?? 0) ||
+            slot.rows !== (d.frames?.rows ?? 0))
         ) {
           release(slot);
           slot = undefined;
@@ -511,7 +528,10 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
           sn = sizes.length,
           ops = d.opacity,
           on = ops.length,
-          cn = d.color.length;
+          cn = d.color.length,
+          frames = slot.cols ? d.frames : null,
+          frameCount = frames ? (frames.count ?? frames.cols * frames.rows) : 0,
+          fps = frames?.fps ?? 0;
         // Hot path: i < n = p.live ≤ capacity, so every pool index is in range.
         for (let i = 0; i < n; i++) {
           const j = i * 3,
@@ -531,6 +551,7 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
           p.tint[q + 1] = curve(slot.linear, cn, t, 3, 1);
           p.tint[q + 2] = curve(slot.linear, cn, t, 3, 2);
           p.tint[q + 3] = curve(ops, on, t);
+          if (frames) p.frame[i] = flipbookFrame(frames.mode, frameCount, fps, age, life, p.start[i]!);
         }
         try {
           o.renderer?.draw(slot, n);

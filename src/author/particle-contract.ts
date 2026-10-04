@@ -33,6 +33,10 @@ export const PARTICLE_LIMITS = Object.freeze({
   emittersCap: 256,
   /** Bursts handled per emitter per fixed step; requests beyond it are dropped and counted. */
   burstsPerStep: 4,
+  /** Flipbook grid cap: at most this many columns and rows (16 × 16 = 256 frames). */
+  frameGrid: 16,
+  /** Flipbook playback rate cap, frames per second. */
+  frameFps: 120,
 });
 
 /** Scene-level particle bounds: `defineScene({ particles: { max, emitters } })`. */
@@ -53,6 +57,23 @@ export function normalizeSceneParticles(input: Partial<SceneParticleLimits> | un
 }
 
 export type EmitterMode = 'burst' | 'continuous';
+/**
+ * How a particle picks its sprite-sheet frame: 'over-life' plays the sheet once across each particle's life (`fps` is
+ * ignored); 'loop' plays it at `fps` from frame 0 from the particle's birth; 'random-start' loops at `fps` from a
+ * random frame chosen at spawn from the particles' own stream.
+ */
+export type FlipbookMode = 'over-life' | 'loop' | 'random-start';
+/** A sprite sheet: the emitter's texture is a grid of `cols` × `rows` frames, read left to right, top to bottom. */
+export interface EmitterFrames {
+  /** Columns and rows of the grid, each 1…{@link PARTICLE_LIMITS.frameGrid}. */
+  cols: number;
+  rows: number;
+  /** Frames in use (1…cols × rows), when the last row is not full; default cols × rows. */
+  count?: number;
+  /** Frames per second for 'loop' and 'random-start' (0 < fps ≤ {@link PARTICLE_LIMITS.frameFps}). */
+  fps?: number;
+  mode: FlipbookMode;
+}
 export type EmitterBlending = 'additive' | 'normal';
 
 export interface EmitterData {
@@ -88,6 +109,8 @@ export interface EmitterData {
   opacity: number[];
   /** A `defineAsset({ type: 'texture' })` id; '' draws a soft round dot. Tinted by `color`. */
   texture: string;
+  /** null: the texture is one image. Otherwise the texture is a sprite sheet animated per particle (needs a texture). */
+  frames: EmitterFrames | null;
   /** 'additive' glows and needs no sorting; 'normal' blends over (unsorted within the emitter). */
   blending: EmitterBlending;
   /** True: never thinned by the `effects.particles` quality knob (for particles that carry meaning). */
@@ -112,6 +135,9 @@ export interface ParticlePool {
   readonly offset: Float32Array;
   readonly size: Float32Array;
   readonly tint: Float32Array;
+  /** Flipbook emitters only (empty otherwise): the drawn frame index and the spawn's start frame, per particle. */
+  readonly frame: Float32Array;
+  readonly start: Float32Array;
 }
 
 export interface EmitterSlot {
@@ -125,6 +151,9 @@ export interface EmitterSlot {
   readonly scale: number;
   readonly texture: string;
   readonly blending: EmitterBlending;
+  /** The flipbook grid the slot was admitted with; 0 × 0 when the emitter has no frames. */
+  readonly cols: number;
+  readonly rows: number;
   /** The renderer's own handle (scene-particles.ts); undefined headless. */
   view: unknown;
 }

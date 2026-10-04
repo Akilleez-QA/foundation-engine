@@ -92,6 +92,70 @@ defineEmitter({ mode: 'continuous', rate: 12, max: 48, lifetime: [2, 3], speed: 
 Stop and start a continuous emitter with `ctx.world.get(e, Emitter)!.playing = false`. Particles already out finish
 their lives.
 
+## Animated effects with sprite sheets
+
+A sprite sheet (flipbook) is one texture holding a grid of frames: a puff of smoke, a flame, an explosion, a magic
+swirl. Give the emitter its `texture` and `frames`, and every particle plays the frames: still **one draw** per
+emitter.
+
+**1. Pack the frames.** Render or export the sequence as same-size PNG files (8-bit RGBA, transparent borders), then
+pack them into one sheet with a JSON sidecar beside it:
+
+```sh
+npm run fx:pack -- --out game/public/textures/fx/smoke.png --fps 24 \
+  --licence CC0-1.0 --author "Your name" --source "smoke.blend, frames 1-16" --tool blender --generator none \
+  renders/smoke/
+```
+
+A directory is read in natural name order (`smoke_2` before `smoke_10`). The sheet is laid out left to right, then
+down, frame 0 at the top left, at most 16 × 16 frames and 4096 × 4096 pixels. `smoke.json` records `cols`, `rows`,
+`count`, `fps`, the frame and sheet sizes (including `gpuBytes`, what the sheet costs on the GPU before mipmaps), a
+hash of every input frame and the provenance you passed. It runs offline with no extra dependency. Frames sit edge to
+edge with no padding, so keep a few transparent pixels round each frame: filtering and mipmaps blend neighbouring
+cells at their borders.
+
+**2. Use the sheet.**
+
+```ts
+// game/fx.ts
+import { defineAsset, defineEmitter, defineEntity, Transform } from '@engine';
+import smokeSheet from './public/textures/fx/smoke.json';
+
+export const smokeTexture = defineAsset({ id: 'smoke-sheet', type: 'texture', url: '/textures/fx/smoke.png',
+  width: smokeSheet.atlas.width, height: smokeSheet.atlas.height,
+  licence: 'CC0-1.0', author: 'Your name', source: 'smoke.blend, frames 1-16, packed with npm run fx:pack' });
+
+/** A chimney: every puff plays the sheet once over its life. */
+export const chimney = defineEntity({ id: 'chimney', components: [ Transform({ y: 3 }),
+  defineEmitter({ mode: 'continuous', rate: 6, max: 24, lifetime: [2, 3], speed: [.4, .8], spread: .3,
+    size: [.6, 1.6], opacity: [.8, 0], blending: 'normal', texture: 'smoke-sheet',
+    frames: { cols: smokeSheet.cols, rows: smokeSheet.rows, count: smokeSheet.count, mode: 'over-life' } }),
+] });
+```
+
+| `frames` field | Meaning |
+|---|---|
+| `cols`, `rows` | The grid, each 1…16. A bigger grid is refused with a message: split the sequence or drop frames. |
+| `count` | Frames in use when the last row is not full (1…cols × rows); default cols × rows. |
+| `mode` | `'over-life'`: each particle plays the sheet once across its life (`fps` ignored). `'loop'`: plays at `fps` from frame 0, wrapping. `'random-start'`: loops at `fps` from a random frame, so a cloud of flames does not flicker in step. |
+| `fps` | Frames per second for `'loop'` and `'random-start'` (required there), up to 120. |
+
+The start frame of `'random-start'` comes from the particles' own random stream, never `ctx.random()`, so a sheet
+never changes your game's random numbers and `?seed=` replays it exactly. `'over-life'` and `'loop'` take no extra
+random number: the same emitter moves exactly as it did without `frames`. Changing `cols` or `rows` at run time
+restarts the emitter like a `texture` change; `count`, `fps` and `mode` may change every step.
+
+**Where the frames come from, and the licence.** A sheet is an asset like any other: `defineAsset` needs a licence,
+an author and a source, and the sidecar keeps the hashes of the frames it was packed from. Record the truth:
+
+- Your own renders (a Blender simulation, a hand-drawn sequence): your licence; name the source file.
+- Downloaded packs: keep the pack's licence text with your project and check it allows use in a published game and
+  redistribution inside a web build (a texture shipped in a web game can be downloaded by anyone). CC0 needs no
+  credit; CC BY needs the credit shown in the game.
+- Generated with an AI tool or from an AI video clip: name the tool and model in `--tool` and `--generator`, and
+  check the plan you generated it on grants you commercial rights and lets you keep the output private; free tiers of
+  some services publish your outputs or keep their rights. Do not pack frames whose terms you cannot state.
+
 ## Fields
 
 | Field | Default | Meaning |
@@ -105,13 +169,14 @@ their lives.
 | `gravity`, `drag` | `[0, 0, 0]`, `0` | World acceleration (m/s²) and linear drag per second. |
 | `size`, `color`, `opacity` | `[.2]`, `[0xffffff]`, `[1, 0]` | Curves over each particle's life: 1 to 8 keys, evenly spaced, blended linearly. Size in metres. |
 | `texture` | `''` | A `defineAsset({ type: 'texture' })` id, tinted by `color`; `''` is a soft round dot. |
+| `frames` | `null` | The texture is a sprite sheet: `{ cols, rows, count?, fps?, mode }` (see above; needs a `texture`). |
 | `blending` | `'additive'` | `'additive'` glows and needs no sorting; `'normal'` covers what is behind (not sorted within the emitter). |
 | `essential` | `false` | `true`: never thinned by the particle-density quality setting (use it when particles carry meaning). |
 | `despawn` | `false` | `true`: remove the entity once it has emitted and finished. |
 
 `defineEmitter` checks the data and throws on a bad field; building the game fails when a scene's own entities, or a
-prefab listed with the game's definitions, name a texture that is not a texture asset. Changing `max`, `texture` or
-`blending` at run time restarts that emitter (its live particles are cleared; bursts already fired do not fire again);
+prefab listed with the game's definitions, name a texture that is not a texture asset. Changing `max`, `texture`,
+`blending` or the `frames` grid at run time restarts that emitter (its live particles are cleared; bursts already fired do not fire again);
 every other field may change every step.
 
 ## Cost and limits
