@@ -41,6 +41,8 @@ jobs:
         run: npm run test:stage-journal-browser
       - name: Asynchronous model preview browser regressions
         run: npm run test:model-preview-browser
+      - name: KTX2 model texture browser regressions
+        run: npm run test:ktx2-browser
       - name: Optional framework browser regressions
         run: GAME_DIR=templates/expedition/game npm run test:framework-browser
       - name: Optional regional surface browser regressions
@@ -67,6 +69,8 @@ jobs:
         run: GAME_DIR=templates/expedition/game npm run test:authority-workbench-browser
       - name: Blender export consumer and brief
         run: npm run test:blender-export-browser
+      - name: Pose-to-pose clips in the stock loader
+        run: npm run test:pose-to-pose-browser
       - name: Spatial audio offline-render regressions
         run: npm run test:audio-browser
       - name: Advisory first-use browser observations

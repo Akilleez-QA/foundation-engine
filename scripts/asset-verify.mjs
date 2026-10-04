@@ -10,15 +10,17 @@
 //   npm run asset:verify -- game/public/models/lantern.glb      one or more models, each with its adjacent contract
 //   npm run asset:verify -- --contract other.json model.glb     one model, an explicit contract
 //   npm run asset:verify -- --all                               every contracted GLB under each game's public/models
-//   add --json for a machine-readable report
+//   add --json for a machine-readable report, and --masks <folder> to write each silhouette check's model and reference
+//   masks as PNGs for inspection
 //
 // `npm run check` runs `--all`: a GLB under a game's public/models with an adjacent contract must pass it; a GLB without
 // a contract is listed, not checked; a contract without its GLB fails.
 //
 // The geometry checks run on a re-import of the exported GLB, decoded the way the engine's model loader decodes it
 // (src/platform/assets/models.ts): three.js's GLTFLoader with the meshopt decoder. Draco is refused, because the engine
-// registers only the meshopt decoder; so is any KTX2 texture (KHR_texture_basisu) while ENGINE_KTX2 is false, because the
-// stock model loader registers no KTX2 transcoder yet. The loader's own admission caps (LOADER below, mirrored from
+// registers only the meshopt decoder. KTX2 textures (KHR_texture_basisu) are accepted when the contract lists the
+// extension (ENGINE_KTX2: the model loader transcodes them since PR #146), and each KTX2 image must be what the engine's
+// KTX2 step accepts (src/platform/assets/model-ktx2.ts): Basis Universal (ETC1S or UASTC), one 2D image. The loader's own admission caps (LOADER below, mirrored from
 // validateEmbeddedGlb in models.ts and checked against it by the tests) apply to every model whatever its contract says.
 //
 // Owner: the creator's contract; this script only reads. Bounds: one GLB, its contract and its receipt in memory at a
@@ -26,12 +28,13 @@
 // security boundary for untrusted files: images are measured from their headers and removed before decoding.
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {existsSync, readFileSync, readdirSync, statSync} from 'node:fs';
-import {basename, isAbsolute, join, relative, resolve, sep} from 'node:path';
+import {existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync} from 'node:fs';
+import {basename, dirname, isAbsolute, join, relative, resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {Box3, PropertyBinding, Vector3} from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
+import {MAX_PIXELS, STAGE_THRESHOLD, VIEWS, compareSilhouette, encodeMaskPng} from './asset-silhouette.mjs';
 
 export const ROOT = fileURLToPath(new URL('..', import.meta.url));
 /** Every contract must require at least these provenance fields. */
@@ -41,10 +44,10 @@ const NODE_TRANSFORMS = ['translation', 'rotation', 'scale', 'matrix'];
 const DRACO = 'KHR_draco_mesh_compression';
 const KTX2 = 'KHR_texture_basisu';
 /**
- * Whether the engine's model loader can decode KTX2 textures. False until src/platform/assets/models.ts registers a
- * KTX2 transcoder; the change that adds it flips this, and asset:optimize --ktx2 follows.
+ * Whether the engine's model loader can decode KTX2 textures. True since src/platform/assets/models.ts registers a KTX2
+ * transcoder (PR #146, model-ktx2.ts); asset:optimize --ktx2 follows it. A test keeps it in step with the loader.
  */
-export const ENGINE_KTX2 = false;
+export const ENGINE_KTX2 = true;
 export const KTX2_UNSUPPORTED = 'KTX2 textures are not loadable until the engine adds KTX2 support';
 const MIB = 1024 * 1024;
 /** The model loader's admission caps (src/platform/assets/models.ts: maxFileBytes default and validateEmbeddedGlb). */
@@ -83,8 +86,11 @@ const need = (ok, message) => {
   if (!ok) throw Error(`contract ${message}`);
 };
 
-/** Validate a parsed contract and fill its defaults. Throws a one-line Error naming the first problem. */
-export function parseContract(raw) {
+/**
+ * Validate a parsed contract and fill its defaults. Throws a one-line Error naming the first problem. `dir` is the
+ * contract's folder, which a silhouette reference path is relative to.
+ */
+export function parseContract(raw, {dir = process.cwd()} = {}) {
   closed(raw, 'root', [
     '$comment',
     'schema',
@@ -103,6 +109,7 @@ export function parseContract(raw) {
     'semanticSha256',
     'nodes',
     'clips',
+    'silhouette',
     'skin',
     'provenance',
   ]);
@@ -226,6 +233,32 @@ export function parseContract(raw) {
     raw.semanticSha256 === undefined || /^[0-9a-f]{64}$/.test(raw.semanticSha256),
     'semanticSha256 must be a lowercase SHA-256 hex digest',
   );
+  let silhouette;
+  if (raw.silhouette !== undefined) {
+    const sil = raw.silhouette;
+    closed(sil, 'silhouette', ['reference', 'view', 'pixels', 'stage', 'threshold']);
+    need(typeof sil.reference === 'string' && /\.png$/i.test(sil.reference), 'silhouette.reference must name a .png');
+    need(VIEWS.includes(sil.view), `silhouette.view must be one of ${VIEWS.join(', ')}`);
+    const pixels = sil.pixels ?? 128,
+      stage = sil.stage ?? 'final';
+    need(
+      Number.isInteger(pixels) && pixels >= 16 && pixels <= MAX_PIXELS,
+      `silhouette.pixels must be a whole number from 16 to ${MAX_PIXELS}`,
+    );
+    need(stage in STAGE_THRESHOLD, `silhouette.stage must be one of ${Object.keys(STAGE_THRESHOLD).join(', ')}`);
+    need(
+      sil.threshold === undefined || (Number.isFinite(sil.threshold) && sil.threshold > 0 && sil.threshold <= 1),
+      'silhouette.threshold must be a number above 0 and at most 1',
+    );
+    silhouette = {
+      reference: resolve(dir, sil.reference),
+      name: sil.reference,
+      view: sil.view,
+      pixels,
+      stage,
+      threshold: sil.threshold ?? STAGE_THRESHOLD[stage],
+    };
+  }
   closed(raw.provenance, 'provenance', ['required', 'licences', 'equals']);
   need(isStrings(raw.provenance.required), 'provenance.required must list field names');
   for (const field of PROVENANCE_FIELDS)
@@ -246,6 +279,7 @@ export function parseContract(raw) {
     faces: raw.faces ?? [],
     nodes: raw.nodes ?? [],
     clips: raw.clips ?? [],
+    silhouette,
   };
 }
 
@@ -264,7 +298,7 @@ export const readContract = path => {
     throw Error(`${show(path)}: cannot read the contract: ${error.message}`);
   }
   try {
-    return parseContract(raw);
+    return parseContract(raw, {dir: dirname(resolve(path))});
   } catch (error) {
     throw Error(`${show(path)}: ${error.message}`);
   }
@@ -357,8 +391,17 @@ export function imageSize(b) {
     return null;
   }
   const KTX2_MAGIC = '«KTX 20»\r\n\x1a\n';
-  if (b.length >= 28 && b.toString('latin1', 0, 12) === KTX2_MAGIC)
-    return {width: b.readUInt32LE(20), height: Math.max(1, b.readUInt32LE(24))};
+  if (b.length >= 40 && b.toString('latin1', 0, 12) === KTX2_MAGIC)
+    return {
+      width: b.readUInt32LE(20),
+      height: Math.max(1, b.readUInt32LE(24)),
+      ktx2: {
+        vkFormat: b.readUInt32LE(12),
+        depth: b.readUInt32LE(28),
+        layers: b.readUInt32LE(32),
+        faces: b.readUInt32LE(36),
+      },
+    };
   return null;
 }
 
@@ -393,7 +436,7 @@ function vec4s(json, bin, index) {
   );
 }
 
-export async function verifyModel(file, contract, {provenance = companions(file).provenance, root = ROOT} = {}) {
+export async function verifyModel(file, contract, {provenance = companions(file).provenance, root = ROOT, masks} = {}) {
   const c = contract;
   const size = statSync(file).size;
   assert.ok(size <= LOADER.fileBytes, `file is ${size} bytes, over the model loader's ${LOADER.fileBytes}`);
@@ -508,6 +551,17 @@ export async function verifyModel(file, contract, {provenance = companions(file)
     const view = json.bufferViews[image.bufferView];
     const size = imageSize(bin.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength));
     assert.ok(size, `image ${i} (${image.mimeType ?? 'no mimeType'}) is not a PNG, JPEG, WebP or KTX2 image`);
+    if (size.ktx2) {
+      assert.ok(
+        (json.extensionsUsed ?? []).includes(KTX2),
+        `image ${i} is KTX2, so the GLB must declare ${KTX2} (the engine transcodes only images a texture names through it)`,
+      );
+      assert.equal(size.ktx2.vkFormat, 0, `image ${i}: a KTX2 image must be Basis Universal (ETC1S or UASTC)`);
+      assert.ok(
+        size.ktx2.depth === 0 && size.ktx2.layers === 0 && size.ktx2.faces === 1,
+        `image ${i}: a KTX2 image must be one 2D texture (no depth, layers or cube faces)`,
+      );
+    }
     assert.ok(
       size.width <= largest && size.height <= largest,
       `image ${i} is ${size.width}×${size.height}, over the contract's textureSize ${largest}`,
@@ -765,6 +819,28 @@ export async function verifyModel(file, contract, {provenance = companions(file)
           `${face.name} is ${face.triangles} triangles`,
         );
     }
+    let silhouette;
+    if (c.silhouette) {
+      const sil = c.silhouette;
+      assert.ok(existsSync(sil.reference), `the silhouette reference ${sil.name} does not exist`);
+      const result = compareSilhouette(asset.scene, sil);
+      silhouette = {
+        view: sil.view,
+        pixels: sil.pixels,
+        stage: sil.stage,
+        threshold: sil.threshold,
+        iou: round(result.iou),
+      };
+      if (masks) {
+        const stem = join(masks, `${basename(file, '.glb')}.${sil.view}`);
+        writeFileSync(`${stem}.model.png`, encodeMaskPng(result.model));
+        writeFileSync(`${stem}.reference.png`, encodeMaskPng(result.reference));
+      }
+      assert.ok(
+        result.iou >= sil.threshold,
+        `silhouette overlap ${result.iou.toFixed(3)} with ${sil.name} (${sil.view}, ${sil.pixels} px) is below the ${sil.stage} threshold ${sil.threshold}`,
+      );
+    }
     const semanticSha256 = digest(JSON.stringify(geometry));
     if (c.semanticSha256)
       assert.equal(
@@ -783,6 +859,7 @@ export async function verifyModel(file, contract, {provenance = companions(file)
       textureBytes,
       animations,
       clips: clipNames,
+      silhouette,
       bounds: [min, max],
       size: extent.map(round),
       sha256: digest(bytes),
@@ -806,10 +883,10 @@ const round = v => Math.round(v * 1e6) / 1e6;
 const fmt = v => `[${v.map(round).join(', ')}]`;
 
 /** Check one GLB against its adjacent contract (or an explicit one). */
-export async function verifyFile(file, {contract} = {}) {
+export async function verifyFile(file, {contract, masks} = {}) {
   const path = contract ?? companions(file).contract;
   assert.ok(existsSync(path), `${show(file)} has no contract: write ${show(path)} (docs/guides/model-contracts.md)`);
-  return verifyModel(file, readContract(path));
+  return verifyModel(file, readContract(path), {masks});
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -857,7 +934,8 @@ export function parseArgs(argv) {
   const files = [];
   let all = false,
     json = false,
-    contract;
+    contract,
+    masks;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--all') all = true;
@@ -865,13 +943,17 @@ export function parseArgs(argv) {
     else if (arg === '--contract') {
       contract = argv[++i];
       if (!contract || contract.startsWith('-')) throw Error('--contract needs a file');
+    } else if (arg === '--masks') {
+      masks = argv[++i];
+      if (!masks || masks.startsWith('-')) throw Error('--masks needs a folder');
     } else if (arg.startsWith('-')) throw Error(`Unknown option: ${arg}`);
     else files.push(arg);
   }
-  if (!all && !files.length) throw Error('Usage: npm run asset:verify -- <model.glb> [...] | --all [--json]');
+  if (!all && !files.length)
+    throw Error('Usage: npm run asset:verify -- <model.glb> [...] | --all [--json] [--masks <folder>]');
   if (all && files.length) throw Error('Choose --all or model files, not both');
   if (contract && files.length !== 1) throw Error('--contract applies to exactly one model file');
-  return {files, all, json, contract};
+  return {files, all, json, contract, masks};
 }
 
 async function main() {
@@ -882,12 +964,13 @@ async function main() {
     console.error(error.message);
     return 2;
   }
-  const {all, json, contract} = options;
+  const {all, json, contract, masks} = options;
+  if (masks) mkdirSync(masks, {recursive: true});
   const found = all ? discover() : {contracted: options.files.map(f => resolve(f)), uncontracted: [], orphans: []};
   const results = [];
   for (const file of found.contracted) {
     try {
-      results.push({file: show(file), ok: true, report: await verifyFile(file, {contract})});
+      results.push({file: show(file), ok: true, report: await verifyFile(file, {contract, masks})});
     } catch (error) {
       results.push({file: show(file), ok: false, error: error.message.split('\n')[0]});
     }

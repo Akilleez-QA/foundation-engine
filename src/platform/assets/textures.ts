@@ -31,6 +31,7 @@ import * as T from 'three';
 import {AbortError, LeaseCache, TEXELS_PER_PIXEL, chooseVariant, isAbortError, type AssetLease} from './lease-cache';
 import type {AssetDef, AssetVariant, QualityTier} from './manifest';
 import type {AssetResidencyPolicy} from './residency';
+import {textureBytes} from './texture-bytes';
 
 export interface TextureOptions {
   /** On-screen size in CSS pixels at the reference resolution (the widest the map is drawn). */
@@ -127,11 +128,8 @@ const isImageBitmap = (image: unknown): image is ImageBitmap =>
 
 const defaultLoadImage = (url: string): Promise<TextureImage> => new T.ImageLoader().loadAsync(url);
 
-/** Mipmapped RGBA8: the four bytes per texel plus a third for the mip chain. */
-export function textureBytes(texture: T.Texture): number {
-  const image = texture.image as {width?: number; height?: number} | undefined;
-  return Math.round((image?.width ?? 0) * (image?.height ?? 0) * 4 * (4 / 3));
-}
+/** Mipmapped RGBA8 for an image; the exact level bytes for a compressed (KTX2) texture (texture-bytes.ts). */
+export {textureBytes};
 
 /** The cache key: asset id and variant, plus the sampler and colour space when they are not the defaults. */
 export function textureKey(

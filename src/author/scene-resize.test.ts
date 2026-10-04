@@ -12,7 +12,7 @@ const start = source.indexOf('      const resize = () => {'),
   end = source.indexOf('      sync();', start);
 assert.ok(start > 0 && end > start);
 const body = ts.transpile(
-  `let dirty=false; ${source.slice(start, end)} return {dirty:()=>dirty,clean:()=>{dirty=false;}};`,
+  `let dirty=false; const extensions=[]; ${source.slice(start, end)} return {dirty:()=>dirty,clean:()=>{dirty=false;}};`,
   {target: ts.ScriptTarget.ES2022},
 );
 function fixture(win = new EventTarget()) {

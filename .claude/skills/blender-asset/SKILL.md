@@ -59,4 +59,8 @@ Use the images only for silhouette, proportion and style. Print the measurements
 3. Write the asset's `<name>.contract.json` from the plan (size, pivot, triangle and material limits) **before** exporting, and check the GLB with `npm run asset:verify -- game/public/models/<name>.glb` ([model contracts](../../../docs/guides/model-contracts.md)); `npm run check` runs it too. Then `npm run play:snap`. If the scene is over budget, use the fix-budget skill; never relax a contract or budget to pass.
 4. Show the author: the screenshots beside the reference, the measurement table, triangles and draws against the budget, and what is still unverified.
 
+The whole path, including opting in to the MCP server, `asset:optimize`, and licence and provenance for downloaded or generated models, is in [make assets with Blender through MCP](../../../docs/recipes/make-assets-with-blender-mcp.md).
+
+To rig the asset and animate it from key poses the author poses, hand over to [animate a model pose to pose](../../../docs/recipes/animate-pose-to-pose.md): keep parts separate until after rigging.
+
 Credits: the measure-don't-eyeball and gated-phase ideas are informed by MIT-licensed [blender-game-skills](https://github.com/majidmanzarpour/blender-game-skills), the Apache-2.0 [blender-ai-mcp](https://github.com/PatrykIti/blender-ai-mcp) (vision as advisory, measurements as proof) and the MIT [blender-claude-plugin](https://github.com/ra100/blender-claude-plugin) (Blender 5.x API notes). This text is our own.

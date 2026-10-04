@@ -36,12 +36,13 @@ Every key is checked; an unknown key is an error, so a misspelt limit cannot sil
 | `pivot` | yes | `{at, node?, tolerance?}`. `at` is `"base-centre"` (lowest point at y = 0, footprint centred on x = z = 0), `"centre"` (bounds centred on the origin) or `"any"`. `node` names a node that must sit at the world origin. |
 | `limits` | yes | Whole numbers: `fileBytes`, `triangles`, `vertices`, `materials`, `textures`, `textureBytes` (required); `textureSize` (the largest width or height of any embedded image, in pixels; required when `textures` is above 0); `primitives`, `animations` (default 0), `cameras` (default 0). Vertices and triangles are counted from the re-imported geometry. |
 | `nodeTransforms` | no | `"forbidden"` rejects any node `translation`, `rotation`, `scale` or `matrix`, even an identity: transforms must be baked into the mesh. Default `"allowed"`. |
-| `extensions` | no | glTF extensions the GLB may use; default none. List `EXT_meshopt_compression` (and `KHR_mesh_quantization`, `EXT_texture_webp`) for an optimised model. Draco (`KHR_draco_mesh_compression`) can never be listed: the engine registers only the meshopt decoder. KTX2 (`KHR_texture_basisu`) can never be listed either, and a KTX2 extension, texture source or `image/ktx2` image anywhere in the model is refused: KTX2 textures are not loadable until the engine adds KTX2 support (the switch is `ENGINE_KTX2` in `scripts/asset-verify.mjs`). |
+| `extensions` | no | glTF extensions the GLB may use; default none. List `EXT_meshopt_compression` (and `KHR_mesh_quantization`, `EXT_texture_webp`) for an optimised model. Draco (`KHR_draco_mesh_compression`) can never be listed: the engine registers only the meshopt decoder. List `KHR_texture_basisu` for KTX2 textures (the engine transcodes them since PR #146); each KTX2 image must be Basis Universal (ETC1S or UASTC) and one 2D image, as the engine requires (`ENGINE_KTX2` in `scripts/asset-verify.mjs` is true). |
 | `materials` | yes | `properties`: the material keys allowed (must include `name`). `pbr`: the `pbrMetallicRoughness` keys allowed. Optional: `required`, `requiredPbr` (keys that must be present), `alphaModes` (default `["OPAQUE"]`), `expected` (the exact set of materials by name, each with optional `baseColorFactor`, `metallicFactor`, `roughnessFactor`, `emissiveFactor`, `doubleSided`). |
 | `lattice` | no | `{name, x, y, z}`: every vertex coordinate must be one of the listed values per axis (for block-built geometry). |
 | `faces` | no | `[{name, axis, at, material, triangles?}]`: exactly one primitive lies wholly on the plane `axis = at`, uses `material` and has `triangles` triangles. |
 | `nodes` | no | Node names that must exist in the GLB and in the re-imported scene: attachment points, sockets, parts a system looks up by name. |
 | `clips` | no | Animation clip names that must exist and have a duration above zero. `limits.animations` must be at least their number. |
+| `silhouette` | no | Opt-in shape check against a reference image: `{reference, view, pixels?, stage?, threshold?}`. See [silhouette](#silhouette). |
 | `skin` | no | `{joints, influences, root?}` for skinned models: each skin has at most `joints` joints; every vertex has at most `influences` (1 to 4) non-zero weights, all finite and non-negative, summing to 1 within 0.002, each naming a joint of its skin; and, with `root`, every joint sits under that node. Weights are read from the GLB's own accessors, because the loader renormalises them on import. |
 | `semanticSha256` | no | Pins the decoded positions, normals, indices, world matrices and material factors. Any geometry change, however small, fails; a deliberate change re-exports and updates the pin in the same commit. |
 | `provenance` | yes | `required`: receipt fields that must be present and non-empty; it must include `licence`, `author`, `source`, `tool` and `generator`. Optional: `licences` (the accepted licence identifiers) and `equals` (receipt values that must match exactly). |
@@ -50,7 +51,17 @@ Rules that need no contract key: the model loader's own admission caps from `src
 
 ## Re-import
 
-The geometry rules do not trust the exporter's report or the accessor metadata. They run on a re-import of the GLB: three.js's `GLTFLoader` with the meshopt decoder, the same parser the engine's model loader uses (`src/platform/assets/models.ts`). Triangles, vertices, bounds, size, pivot, named nodes and clips are read from what that re-import builds. Image dimensions come from each embedded image's header (PNG, JPEG, WebP or KTX2); the images are then removed, because Node has no image decoder.
+The geometry rules do not trust the exporter's report or the accessor metadata. They run on a re-import of the GLB: three.js's `GLTFLoader` with the meshopt decoder, the same parser the engine's model loader uses (`src/platform/assets/models.ts`). Triangles, vertices, bounds, size, pivot, named nodes and clips are read from what that re-import builds. Image dimensions come from each embedded image's header (PNG, JPEG, WebP or KTX2); the images are then removed, because Node has no image decoder (nor, for KTX2, a transcoder: the check reads the KTX2 header only).
+
+### Texture format for phone targets
+
+WebP (`EXT_texture_webp`) makes the download smaller; the GPU still holds RGBA8. KTX2 (`KHR_texture_basisu`) also keeps
+the texture compressed on the GPU, which is what limits art on phones. The engine loads KTX2 model textures lazily
+([guide](compressed-textures.md)), so an optimiser may write KTX2 instead of WebP when the brief targets phones: UASTC
+for normal, occlusion and metal-roughness maps, ETC1S for colour, sides a multiple of 4, and `KHR_texture_basisu` in the
+contract's `extensions`. `npm run asset:optimize -- --ktx2` does exactly that (see [Optimise](#optimise)); use it for
+phone targets. Keep WebP for desktop-only builds if the transcoder download (0.6 MB, fetched once) matters more than
+GPU memory.
 
 ## Optimise
 
@@ -62,12 +73,32 @@ npm run asset:optimize -- game/tools/lantern/out/lantern.glb --out game/public/m
 
 1. **Before:** the input must pass its own contract (the `.contract.json` next to it), so the optimiser never hides a bad export.
 2. **Optimise:** meshopt geometry compression, the only mesh compression the engine decodes. `--join false --flatten false` keep named nodes; `--instance false --palette false` keep meshes and materials as authored; `--simplify false` never decimates, so make the model at its target polycount instead.
-3. **Textures:** WebP by default (`EXT_texture_webp`, which the engine's `GLTFLoader` decodes), resized to `--texture-size`, else the output contract's `limits.textureSize`, else the `--device` default (phone 1024; tablet, laptop and desktop 2048), else 2048. `--textures keep` re-encodes in the original format. `--ktx2` is refused for now with the message *KTX2 textures are not loadable until the engine adds KTX2 support*. Once the engine registers a KTX2 transcoder and `ENGINE_KTX2` is switched on, it will use UASTC for normal, occlusion and metal-roughness maps and ETC1S for colour. That needs the external `ktx` command from [KTX-Software](https://github.com/KhronosGroup/KTX-Software/releases) 4.4 or later; without it, the pass says so and falls back to WebP.
+3. **Textures:** WebP by default (`EXT_texture_webp`, which the engine's `GLTFLoader` decodes), resized to `--texture-size`, else the output contract's `limits.textureSize`, else the `--device` default (phone 1024; tablet, laptop and desktop 2048), else 2048. `--textures keep` re-encodes in the original format. `--ktx2` writes KTX2 (`KHR_texture_basisu`) instead, which the engine's model loader transcodes since PR #146 ([KTX2 model textures](compressed-textures.md); `ENGINE_KTX2` in `scripts/asset-verify.mjs` is on): UASTC for normal, occlusion and metal-roughness maps and ETC1S for colour. Prefer it for phone targets, where GPU memory is the limit; the output contract must list `KHR_texture_basisu`. That needs the external `ktx` command from [KTX-Software](https://github.com/KhronosGroup/KTX-Software/releases) 4.4 or later; without it, the pass says so and falls back to WebP.
 4. **After:** the output must pass the contract next to `--out` (else the input's; `--contract` sets one for both). Only then are the GLB and its receipt written. On any failure nothing at `--out` changes.
 
 The output receipt keeps the input's licence, author, source and tool. It records the new `sha256` and `generator` (`glTF-Transform v…`), plus `optimizedFrom` (the input's hash and generator) and `optimizer` (the exact arguments).
 
-Meshopt quantisation stores positions as integers with a node translation and scale to restore them, and it moves vertices by up to about a thousandth of the model's size. A contract for an optimised model therefore lists `EXT_meshopt_compression` and `KHR_mesh_quantization` (plus `EXT_texture_webp` when textured) in `extensions`. It sets `nodeTransforms` to `"allowed"`, has no `pivot.node` and no `semanticSha256`, and states `size` as a range or with a `tolerance` such as `0.001`. Keep the strict contract on the unoptimised export.
+Meshopt quantisation stores positions as integers with a node translation and scale to restore them, and it moves vertices by up to about a thousandth of the model's size. A contract for an optimised model therefore lists `EXT_meshopt_compression` and `KHR_mesh_quantization` (plus `EXT_texture_webp` when textured with WebP, or `KHR_texture_basisu` with `--ktx2`) in `extensions`. It sets `nodeTransforms` to `"allowed"`, has no `pivot.node` and no `semanticSha256`, and states `size` as a range or with a `tolerance` such as `0.001`. Keep the strict contract on the unoptimised export.
+
+## Silhouette
+
+Numbers alone do not say whether a model looks like what the creator asked for. The optional `silhouette` key compares the model's outline with a reference image, the measured check that the community recommends instead of "looks fine":
+
+```json
+"silhouette": {"reference": "../../tools/lantern/lantern.front.png", "view": "front", "pixels": 128, "stage": "final"}
+```
+
+| Key | Meaning |
+|---|---|
+| `reference` | A PNG, relative to the contract: a dark shape on a light background, or an opaque shape on transparency. 8-bit greyscale, RGB or with alpha; not indexed or interlaced; at most 4096 px a side. Keep it outside `public/` (for example in `game/tools/<name>/`), so it does not ship. |
+| `view` | `front` (looking along -Z: x right, y up), `side` (from +X: -z right, y up) or `top` (from above: x right, -z up). |
+| `pixels` | The comparison size, 16 to 1024; default 128. Use the size the model has on screen in play, so detail too small to see does not count. |
+| `stage` | `blockout` (default threshold 0.85) or `final` (0.90; the default). |
+| `threshold` | Overrides the stage's threshold: the minimum overlap, intersection over union, from 0 to 1. |
+
+The check renders the re-imported model's silhouette without a GPU, by rasterising its triangles orthographically from the view. It crops both masks to their shapes, scales each to fit `pixels` × `pixels` keeping its aspect ratio, centres it horizontally on the bottom edge, and measures the overlap. The reference's own scale and margins therefore do not matter, but its proportions do. `npm run asset:verify -- --masks <folder> <model.glb>` writes both masks as PNGs, so you can look at the difference.
+
+It needs a reference the creator agrees with: a concept drawing, an orthographic sketch or a photo traced to a silhouette. It measures the outline only, not colour, depth or detail inside the outline. A rotated or mirrored reference fails.
 
 ## Provenance fields
 
@@ -79,7 +110,7 @@ Meshopt quantisation stores positions as integers with a node translation and sc
 | `tool` | What made it: `Blender 5.2.1 LTS`, or a named generator service and plan for AI-generated geometry. |
 | `generator` | The glTF writer recorded in the GLB's `asset.generator`, such as `Khronos glTF Blender I/O v5.2.40`. |
 
-The same licence, author and source go in the game's `defineAsset`; a third-party asset is also listed in [`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md) or the game's own notices. A receipt is an integrity record, not proof of rights.
+The same licence, author and source go in the game's `defineAsset`; a third-party asset is also listed in [`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md) or the game's own notices. [Make assets with Blender through MCP](../recipes/make-assets-with-blender-mcp.md#licence-and-provenance) covers each common source. A receipt is an integrity record, not proof of rights.
 
 ## Example
 
@@ -110,4 +141,5 @@ The strict sample contract is [`metre-block.contract.json`](../../tools/blender-
 - **Owner:** the creator owns each contract; `scripts/asset-verify.mjs` only reads. `npm run check` is its only automatic caller. It is not a runtime check: the engine's loader has its own admission rules ([model readiness](model-readiness.md)).
 - **Bounds:** one GLB, its contract and receipt in memory at a time. The file size is checked against `fileBytes` before the file is read. No network access; external URIs are refused, never fetched.
 - **Failure:** the first breach stops that model with one line naming the rule and the numbers; other models are still checked. Exit code 1 on any failure, 2 on a usage error.
+- **Silhouette bounds:** one canvas of at most 1024 × 1024 and one reference of at most 4096 × 4096 in memory per check.
 - **Not checked:** texture colour spaces and pixel contents; animation clip contents beyond names and duration (a pose-to-pose model's clips are checked against its animation definition by [`tools/pose-to-pose/validate.mjs`](../../tools/pose-to-pose/README.md)); skinning beyond the `skin` limits; visual quality; whether the receipt's licence claim is true. Images are counted, sized in bytes and measured from their headers, but not decoded. It is an acceptance check for the creator's own assets, not a security boundary for untrusted files.

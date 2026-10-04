@@ -159,3 +159,46 @@ test('the manifest root motion is a valid @kits/animation RootClip that travels 
     assert.ok(Math.abs(distance - 2 * clip.rootMotion.stride) < 1e-3, `${clip.name} travels ${distance} in two cycles`);
   }
 });
+
+const BUG = at('./game/public/models/pose-bug.glb');
+const BUG_DEFINITION = at('./examples/bug/animations.json');
+
+test('the rigid six-legged creature passes: a tripod scuttle with planted feet and a one-shot strike', async () => {
+  const report = await validate(BUG, BUG_DEFINITION, {allowUnreviewed: true});
+  assert.deepEqual(report.failures, []);
+  assert.equal(report.skinnedVertices, 0, 'rigid parts follow bones without skin weights');
+  assert.equal(report.clips.scuttle.playback, 'loop');
+  assert.equal(report.clips.strike.playback, 'once');
+  assert.equal(report.clips.scuttle.feet.length, 6);
+  for (const foot of report.clips.scuttle.feet) assert.ok(foot.maxSlide <= 0.02 && foot.plantedFrames >= 6);
+  assert.deepEqual(
+    report.clips.strike.events.map(e => [e.name, e.frame]),
+    [
+      ['impact', 13],
+      ['planted', 13],
+    ],
+  );
+});
+
+test('impact exaggeration: the stinger is scaled 1.5 at the strike key and back to 1 at the end', () => {
+  const gltf = parseGlb(readFileSync(BUG));
+  const {json} = gltf;
+  const strike = json.animations.find(a => a.name === 'strike');
+  const stinger = json.nodes.findIndex(n => n.name === 'stinger' && n.mesh === undefined);
+  const channel = strike.channels.find(c => c.target.node === stinger && c.target.path === 'scale');
+  const sampler = strike.samplers[channel.sampler];
+  const times = readAccessor(gltf, sampler.input).map(r => r[0]);
+  const scales = readAccessor(gltf, sampler.output);
+  const at13 = times.findIndex(t => Math.abs(t - 13 / 30) < 1e-4);
+  assert.ok(scales[at13].every(v => Math.abs(v - 1.5) < 1e-4));
+  assert.ok(scales.at(-1).every(v => Math.abs(v - 1) < 1e-4));
+  assert.ok(scales[0].every(v => Math.abs(v - 1) < 1e-4));
+});
+
+test('S1: every exported GLB has its declared clips, closed loops and planted feet within tolerance', async () => {
+  for (const [model, definition] of [
+    [MODEL, DEFINITION],
+    [BUG, BUG_DEFINITION],
+  ])
+    assert.deepEqual((await validate(model, definition, {allowUnreviewed: true})).failures, []);
+});

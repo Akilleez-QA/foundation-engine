@@ -17,7 +17,10 @@
  *                            shading (standard/matte/flat/toon), double side, alpha cut-out, vertex colours
  *   Emitter, defineEmitter, burst, sceneParticles   optional particles: one instanced draw per emitter, fixed-step, seeded
  *   view.output (validateSceneOutput)               opt-in tone mapping and exposure per scene
+ *   Scatter, defineScatter, sceneScatter            optional instanced scatter: many copies of a shape or mesh, one draw
  *   PointLight, SpotLight, sceneLights               optional local lights in fixed per-visit slots
+ *   Shadow, sceneShadows                             optional shadows: per scene, per light and per entity
+ *   defineEnvironment({ sky, haze })                 optional gradient sky, discs, stars, exp2 haze
  *
  * Budgets are data in game/budgets.json (the ratchet compares them across revisions without running code).
  */
@@ -124,6 +127,22 @@ export {
   type EmitterBlending,
 } from './particles';
 export {sceneParticles} from './particle-sim';
+export {
+  Scatter,
+  defineScatter,
+  validateScatter,
+  sceneScatter,
+  SCATTER_DEFAULTS,
+  SCATTER_LIMITS,
+  SCENE_SCATTER_LIMITS,
+  type ScatterData,
+  type ScatterInput,
+  type ScatterArea,
+  type ScatterShapeKind,
+  type SceneScatter,
+  type SceneScatterLimits,
+} from './scatter';
+export type {ScatterStats, ScatterPlacement} from './scatter-field';
 export type {ParticleStats, SceneParticles, SceneParticleLimits} from './particle-contract';
 export {
   createAudioTimeline,
@@ -143,7 +162,8 @@ export {
 
 export {dmath, platformMath, scalarMath, type ScalarMath, type ScalarMathMode} from '../core/dmath';
 
-export {defineEnvironment, type EnvironmentState} from './environment';
+export {defineEnvironment, hazeColor, type EnvironmentState, type LinearHaze, type ExpHaze} from './environment';
+export {validateSky, skyGradientAt, SKY_LIMITS, type Sky, type GradientSky, type SkyDisc, type SkyStars} from './sky';
 export {
   PointLight,
   SpotLight,
@@ -161,6 +181,14 @@ export {
   type SceneLightLimits,
 } from './lights';
 export type {LightStats, LightRefusal} from './light-slots';
+export {
+  Shadow,
+  sceneShadows,
+  SHADOWED_LIGHT_CAPS,
+  type ShadowData,
+  type SceneShadows,
+  type SceneShadowDefaults,
+} from './shadow-casting';
 export {
   validateSceneOutput,
   OUTPUT_DEFAULTS,
@@ -217,3 +245,6 @@ export {
 } from './model-pose-link';
 
 export type {SceneActivityFacts} from './defs';
+
+/** A kit's render extension token for `defineScene({ extensions })`; opaque (no three.js type in the author API). */
+export type {SceneExtension} from './scene-extension';

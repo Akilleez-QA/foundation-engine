@@ -454,7 +454,7 @@ A game adds its own domain systems (for example an economy or a world model) wit
 - **STD-SET-6.** Every device-dependent cost MUST be a registered **knob**. A knob has a value for every preset (reference authored first), a measured cost, an apply mode, a group and an owner. [ADR 0029]
 - **STD-SET-8.** The graphics screen MUST be generated from the knobs. [ADR 0029]
 - **STD-SET-10.** Knobs MUST declare content floors, and no preset default crosses them. Removing content is a player choice only. [ADR 0029]
-- **STD-SET-11.** Detection picks a preset only on a first run, and records and shows its reasons. Nothing changes the player's choice afterwards. [ADR 0029]
+- **STD-SET-11.** Detection picks a preset only on a first run, and records and shows its reasons. Nothing changes the player's choice afterwards. A constrained mobile GPU starts no higher than its device-class limit unless the brief declares a tier. [ADR 0029; ADR 0079]
 - **STD-SET-12.** Any frame-time governor MUST be off by default. It moves only the resolution scale, and never runs in a gate or a bench. [ADR 0029]
 - **STD-SET-13.** Graphics settings MUST live in a device section and MUST NOT be exported.
 - **STD-SET-14.** The graphics screen is a preview layer: the covered scene keeps running, so changes are seen live.

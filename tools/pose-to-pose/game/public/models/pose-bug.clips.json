@@ -1,0 +1,225 @@
+{
+  "bones": 25,
+  "clips": [
+    {
+      "controls": [
+        "leg1_upper.L",
+        "leg2_upper.R",
+        "leg3_upper.L",
+        "leg1_lower.R",
+        "tail.1"
+      ],
+      "duration": 0.8,
+      "events": [
+        {
+          "at": 0,
+          "floor": [
+            "leg1_lower.L",
+            "leg2_lower.R",
+            "leg3_lower.L"
+          ],
+          "frame": 0,
+          "name": "step_A"
+        },
+        {
+          "at": 0.4,
+          "floor": [
+            "leg1_lower.R",
+            "leg2_lower.L",
+            "leg3_lower.R"
+          ],
+          "frame": 12,
+          "name": "step_B"
+        }
+      ],
+      "fps": 30,
+      "frames": 24,
+      "keys": [
+        {
+          "easing": "linear",
+          "frame": 0,
+          "mirror": false,
+          "pose": "scuttle_contact"
+        },
+        {
+          "easing": "linear",
+          "frame": 3,
+          "mirror": false,
+          "pose": "scuttle_down"
+        },
+        {
+          "easing": "linear",
+          "frame": 6,
+          "mirror": false,
+          "pose": "scuttle_passing"
+        },
+        {
+          "easing": "linear",
+          "frame": 9,
+          "mirror": false,
+          "pose": "scuttle_up"
+        },
+        {
+          "easing": "linear",
+          "frame": 12,
+          "mirror": true,
+          "pose": "scuttle_contact"
+        },
+        {
+          "easing": "linear",
+          "frame": 15,
+          "mirror": true,
+          "pose": "scuttle_down"
+        },
+        {
+          "easing": "linear",
+          "frame": 18,
+          "mirror": true,
+          "pose": "scuttle_passing"
+        },
+        {
+          "easing": "linear",
+          "frame": 21,
+          "mirror": true,
+          "pose": "scuttle_up"
+        },
+        {
+          "easing": "linear",
+          "frame": 24,
+          "mirror": false,
+          "pose": "scuttle_contact"
+        }
+      ],
+      "loop": true,
+      "name": "scuttle",
+      "playback": "loop",
+      "poses": {
+        "scuttle_contact": "f2e861f8e2b83d23",
+        "scuttle_down": "1d666fe49b06c718",
+        "scuttle_passing": "308059e6b7b71229",
+        "scuttle_up": "d17be610d8d71c49"
+      },
+      "rootMotion": {
+        "clip": {
+          "duration": 0.8,
+          "keys": [
+            {
+              "at": 0.0,
+              "x": 0.0,
+              "yaw": 0.0,
+              "z": 0.0
+            },
+            {
+              "at": 0.8,
+              "x": 0.0,
+              "yaw": 0.0,
+              "z": 0.24
+            }
+          ]
+        },
+        "contactHeight": 0.02,
+        "feet": [
+          {
+            "bone": "leg1_tip.L"
+          },
+          {
+            "bone": "leg2_tip.L"
+          },
+          {
+            "bone": "leg3_tip.L"
+          },
+          {
+            "bone": "leg1_tip.R"
+          },
+          {
+            "bone": "leg2_tip.R"
+          },
+          {
+            "bone": "leg3_tip.R"
+          }
+        ],
+        "flatFootTolerance": 8,
+        "footSlideTolerance": 0.02,
+        "stride": 0.24,
+        "yawPerCycle": 0
+      },
+      "sampleSha256": "b82b0a4566772ea7c76837dd9041a0e51d89cdf3764da89e5348e12761ccdd1a"
+    },
+    {
+      "controls": [
+        "tail.1",
+        "tail.2",
+        "tail.3",
+        "stinger"
+      ],
+      "duration": 1.0,
+      "events": [
+        {
+          "at": 0.4333,
+          "floor": [],
+          "frame": 13,
+          "name": "impact"
+        },
+        {
+          "at": 0.4333,
+          "floor": [
+            "leg1_lower.L",
+            "leg1_lower.R",
+            "leg3_lower.L",
+            "leg3_lower.R"
+          ],
+          "frame": 13,
+          "name": "planted"
+        }
+      ],
+      "fps": 30,
+      "frames": 30,
+      "keys": [
+        {
+          "easing": "linear",
+          "frame": 0,
+          "mirror": false,
+          "pose": "idle"
+        },
+        {
+          "easing": "ease-out",
+          "frame": 9,
+          "mirror": false,
+          "pose": "strike_ready"
+        },
+        {
+          "easing": "ease-in",
+          "frame": 13,
+          "mirror": false,
+          "pose": "strike_hit"
+        },
+        {
+          "easing": "ease-out",
+          "frame": 21,
+          "mirror": false,
+          "pose": "strike_ready"
+        },
+        {
+          "easing": "ease-in-out",
+          "frame": 30,
+          "mirror": false,
+          "pose": "idle"
+        }
+      ],
+      "loop": false,
+      "name": "strike",
+      "playback": "once",
+      "poses": {
+        "idle": "44136fa355b3678a",
+        "strike_hit": "a179702b5f8031ba",
+        "strike_ready": "0416776c3c275499"
+      },
+      "sampleSha256": "c9ad334e97b114021eb06fb902f1da6a50f17d902f4025805692226ca668921c"
+    }
+  ],
+  "fps": 30,
+  "model": "pose-bug.glb",
+  "rigSha256": "2a2f2037a1a204582e667dd4c1a575a00ed99ee8ce8497ed47f8139b6e3cc21c",
+  "schema": 1,
+  "skeleton": "pose-bug"
+}

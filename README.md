@@ -22,6 +22,7 @@ Try the arcade example without creating a game: after cloning and running `npm c
 
 ## What's new in 0.2.0
 
+- **Instanced scatter**: grass, rocks or a row of identical props as one draw each (`defineScatter`, [recipe](docs/recipes/scatter-grass-and-rocks.md)).
 - **Your own textures, materials and sound files**: `defineMaterial` for textured, physically based, flat, matte or toon shapes, meshes and models (double-sided, cut-out); `defineAsset({ type: 'audio' })` files through `ctx.play` with volume, pitch and position.
 - **3D audio**: HRTF panning, distance models with a hard cutoff, a muffle filter and smoothed movement.
 - **Genre kits**: rollback sessions, a deterministic turn log, a spatial grid, seeded procedural generation, tunable jump feel and an audio-clock timeline for rhythm games.
@@ -106,7 +107,7 @@ Without a `game/` folder the blank template runs. `--game <dir>` selects another
 
 ## Not here yet (and workarounds)
 
-The current state as of 0.2.0 (October 2026). Textures and materials ([recipe](docs/recipes/give-a-shape-a-material.md)) and your own sound files ([recipe](docs/recipes/play-your-own-sounds.md)) are supported. After 0.2.0, optional particle emitters (hit sparks, pickups, trails, smoke: one draw per emitter; [recipe](docs/recipes/hit-sparks-and-pickups.md), [guide](docs/guides/particles.md)) are supported too, with desktop software-GL evidence only (FX-01 in the acceptance ledger), as are opt-in tone mapping and exposure per scene and point and spot lights in fixed per-scene slots ([scene look](docs/guides/scene-look.md), VIS-01 and VIS-02). These are still missing:
+The current state as of 0.2.0 (October 2026). Textures and materials ([recipe](docs/recipes/give-a-shape-a-material.md)) and your own sound files ([recipe](docs/recipes/play-your-own-sounds.md)) are supported. After 0.2.0, optional particle emitters (hit sparks, pickups, trails, smoke: one draw per emitter; [recipe](docs/recipes/hit-sparks-and-pickups.md), [guide](docs/guides/particles.md)) are supported too, with desktop software-GL evidence only (FX-01 in the acceptance ledger), as are opt-in tone mapping and exposure per scene, point and spot lights in fixed per-scene slots, and shadows from the sun and lamps, and a gradient sky with exponential haze ([scene look](docs/guides/scene-look.md), VIS-01 to VIS-03 and VIS-05). These are still missing:
 
 | Not here yet | What exists today | Workaround |
 |---|---|---|

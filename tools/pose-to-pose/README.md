@@ -9,7 +9,9 @@ the rest:** rigging, in-betweens, timing, loop closure, export and validation.
   the segments chain into a closed loop, for example contact → down → passing → up → contact (mirrored
   for the other side). The last pose of the chain is the first pose of the next cycle.
 
-This page is the tool reference: what each script does, its formats and its checks.
+The step-by-step guide for creators and agents is the recipe
+[animate a model pose to pose](../../docs/recipes/animate-pose-to-pose.md). This page is the tool
+reference: what each script does, its formats and its checks.
 
 Everything runs with Blender 5.2 in the background (`blender --background --factory-startup
 --python-exit-code 1 --python <script> -- <args>`). No add-on is installed, no MCP server is used and
@@ -31,8 +33,10 @@ comes from the built-in deform-only flatten (see [rig](#1-rig)).
 | `definition.mjs` | The `animations.json` contract in JavaScript (the validator's twin of `common.py`) |
 | `validate.mjs` | Offline GLB validator against the definition |
 | `review.mjs` | The review ledger: approve the rig, approve or unfreeze clips |
+| `reference.mjs`, `blender/pose_compare.py` | Reference-clip intake: take ledger, timestamped sheets, frames, side-by-side, pose approval |
 | `pipeline.mjs` | Runs a worked example end to end |
 | `examples/robot/` | Worked example: an original low-poly humanoid with a wave and a mirrored walk |
+| `examples/bug/` | Worked example: an original six-legged creature of rigid parts with a tripod scuttle and a tail strike |
 | `game/public/models/` | The example's exported GLB, clips manifest, provenance and model contract |
 
 ## The steps
@@ -121,6 +125,35 @@ with an optional `order`), and optional `location` (metres, bone-local) and `sca
 same values as Blender's pose-mode transform fields. Bones not listed are at rest. Unknown bones are
 errors.
 
+### 3b. Key poses from a reference clip
+
+A generated video or filmed footage can supply the key poses instead. The clip is an input only and
+stays out of the repository. `reference.mjs` keeps a take ledger (file hash, source, prompt, provider,
+plan or licence, and status: new, reviewed, selected, approved or rejected). It refuses to add a
+reference file that git would commit unless its terms are recorded with `--licence`.
+
+```sh
+node tools/pose-to-pose/reference.mjs add --ledger refs/ledger.json --take walk-01 --file ~/refs/walk.mp4 \
+  --provider "<service and model, or 'filmed'>" --plan "<plan and its output terms>" --prompt "<prompt>"
+node tools/pose-to-pose/reference.mjs sheet --ledger refs/ledger.json --take walk-01 --out refs/walk-01 --fps 8
+node tools/pose-to-pose/reference.mjs status --ledger refs/ledger.json --take walk-01 --set selected --by "<name>"
+node tools/pose-to-pose/reference.mjs frame --ledger refs/ledger.json --take walk-01 --seconds 1.25 --out refs/contact.png
+node tools/pose-to-pose/reference.mjs mark-pose --ledger refs/ledger.json --poses poses.json --pose contact --take walk-01 --seconds 1.25
+blender ... --python tools/pose-to-pose/blender/pose_compare.py -- --rigged work/rigged.blend --poses poses.json \
+  --pose contact --image refs/contact.png --view side --out refs/contact-compare.png
+node tools/pose-to-pose/reference.mjs approve-pose --poses poses.json --pose contact --by "<name>"
+```
+
+`sheet` writes ffmpeg frames stamped with their source time and frame number, a tiled `sheet.png` and
+`frames.json`. The person (or the agent, with the person's sign-off) picks the key frames and records
+which pose each one is. The agent then poses the rig to match (as JSON, or in Blender), and
+`pose_compare.py` renders the reference frame beside the posed rig from the same view (`--view`, or
+`--azimuth` and `--elevation`). **The person approves each match.** Agents judge 3D poses from
+pictures poorly, so the generator refuses a reference-matched pose whose approval is not `approved`
+(`--allow-unapproved` makes a draft, recorded in the provenance and failed by the validator). A
+reference filmed or generated at half speed is retimed with the clip's `speed` (2), and `trim` cuts a
+one-shot clip to game length.
+
 ### 4. Animation definition (`animations.json`)
 
 ```json
@@ -168,6 +201,7 @@ errors.
 | `controls` | Bones that must visibly move in this clip (more than 1° or 1 mm); the validator checks them. |
 | `rootMotion` | In-place clips with declared travel. Loops: `stride` (metres per cycle) and optional `yawPerCycle`; one-shot clips: `delta` (`{"x", "z", "yaw"}`). `feet` enables the foot checks; `footSlideTolerance` (0.04 m), `contactHeight` (0.02 m) and `flatFootTolerance` (8°) may be set per clip. |
 | `derive` | A turn variant of a walk: same keys, the named bone banked by `lean` and turned by `twist` degrees toward the turn, and `yawPerCycle` degrees of root yaw. Its root motion is an arc. |
+| `reference` | Free-form record of the take a clip was matched from (for example `{"take": "walk-01", "from": 0.4, "to": 1.5}`). |
 | `skeleton`, `materials` | Limits (bones, influences per vertex), the required root bone, and required material slots (for example a `team` slot the game can recolour). |
 
 Author walks **in place**: the character's hips stay over the origin and the planted foot moves back at
@@ -246,6 +280,7 @@ every 10 cm, so sliding shows. Look at it yourself, then show it to the person.
 
 ```sh
 node tools/pose-to-pose/pipeline.mjs robot --sheets /tmp/robot-sheets
+node tools/pose-to-pose/pipeline.mjs bug --sheets /tmp/bug-sheets
 ```
 
 An original low-poly robot (190 vertices, three material slots including `team`) is built from
@@ -258,12 +293,58 @@ bone without vertices, so the rig step used the voxel proxy; the re-import match
 0.003 mm; both soles touched the floor at their step events; the walk's largest foot slide was 17 mm
 and the turns' 31 mm. Re-running the pipeline produced byte-identical files.
 
+The second example is a non-humanoid built the way rigging works best: 19 separate low-poly parts
+(body, back plate, head, three tail segments, a stinger, and two segments for each of six legs), each
+with box-projected UVs, sharing three materials (`shell`, `team`, `stinger`). It is rigged with
+`--kind rigid` (25 bones, including a contact bone at each foot tip), so every part follows one bone
+with no weights. `scuttle` is a 4-key-pose tripod gait (front and rear legs of one side with the middle
+leg of the other), mirrored into a closed 24-frame loop with a stride of 0.24 m. The swing feet lift
+straight off and settle back at ground speed, so the six planted feet slide at most 5 mm. `strike` is a
+one-shot: idle, a cocked tail, a tail whip over the head with the body lunging over planted feet, back
+to idle. The stinger is scaled to 1.5 and the last tail segment to 1.15 on the hit key (impact
+exaggeration), and the clip has an `impact` event at 0.4333 s. Both soles touched the floor at their
+events, and two runs were byte-identical. As with the robot, the poses are agent-authored and the
+review gate was off.
+
+## Run it in the engine
+
+```sh
+npm run play -- --game tools/pose-to-pose/game     # E: wave or walk again; Space or a tap: strike
+npm run test:pose-to-pose-browser                 # the S2 browser check (CI runs it too)
+```
+
+The sample game loads both GLBs with the stock `defineAsset` and `Model`, and reads each model's
+clips manifest as JSON. The robot plays `walk` in place, and `createRootMotion` (from
+`@kits/animation`) samples the manifest's root clip on the same clock. `applyRootMotion` (from
+`@kits/locomotion`) moves the entity by that delta, so the feet stay planted. A press of E switches to
+`wave`, which holds its last pose. The creature loops `scuttle`. Space starts `strike` with a fresh
+`createMarkerTrack` built from the manifest's events, advanced by the strike clip's own time, so
+`impact` fires from the animation clock rather than a timer. When the clip ends, the creature goes back
+to `scuttle`. `game/clip-events.ts` is the small adapter from the manifest to markers and root motion.
+
+The browser check (`browser.mjs`, success criterion S2) holds the engine clock and steps it at 60 Hz:
+
+- every clip is listed by the model inspection under its exact name with the declared duration;
+- for `scuttle` and `walk`, the joint step across each loop wrap is no larger than the steps beside it;
+- the robot's planted foot drifts under 4 cm in world space while root motion carries it;
+- the `impact` marker fires once, within a frame of 0.4333 s of strike clip time;
+- the wave raises the right hand and holds;
+- draws and triangles are within the sample's declared budget.
+
+The model's own playback time is not readable from game systems (`ctx.modelState` reports status
+only), so the sample keeps a clip clock beside the `Model`, restarted with each `revision`. Recolouring
+only the `team` slot per instance is not supported yet: a `Material` on a `Model` overrides every one
+of its materials and has no colour field. That is noted as a follow-up, not built here.
+
 ## Limits
 
 - Blender runs locally. CI has no Blender: it validates the checked-in outputs with `validate.mjs` and its
   tests. The Python scripts were exercised with Blender 5.2.1 LTS only.
 - In-betweens are forward-kinematic interpolation of local rotations. There is no IK or foot locking
   between keys; add a key pose where a contact must hold exactly.
+- Rebuild scripts must be deterministic to re-export byte for byte. Two Blender operations were not, on
+  this machine: Smart UV Project and bmesh's UV-sphere primitive (whose pole merge orders faces
+  differently between runs). The creature builds its UVs and ellipsoids explicitly instead.
 - The humanoid fit expects a symmetric, upright model facing −Y in an A- or T-pose. Fingers, face and
   twist bones are not generated.
 - Turn variants are an approximation: a lean and twist on one bone plus root yaw. The validator measures

@@ -432,7 +432,15 @@ The engine does not yet have these, and this recipe fakes them as described:
 | Cast shadows | contact darkening in the ground colours, and a see-through disc under moving things |
 | Tone mapping and bloom | emissive near 1, and a baked light around every glow |
 | A gradient or procedural sky | `background` plus haze of the same colour; `points` for stars; `cube` from six images |
-| Instancing many copies of one shape | bake static copies into one `Mesh`; particles for small moving things |
-| A material on a `Mesh` | a `Mesh` is matte with vertex colours; put a texture or a glow on a `Shape` |
 
-When one of these lands in the engine, this recipe gains a section for it.
+When one of these lands in the engine, this recipe gains a section for it. Already landed: many copies of one shape
+or `Mesh` in one draw ([scatter grass and rocks](scatter-grass-and-rocks.md)), and a `Material` on a `Mesh` or `Model`
+with flat, matte or toon shading, double sides and cut-outs ([give a shape a material](give-a-shape-a-material.md); a
+`Mesh` still takes no texture).
+
+## When the author API cannot express the look: three.js itself
+
+Prefer the techniques above while they can say what you want: they keep quality tiers, budgets and three.js upgrades
+the engine's problem. When they cannot (an EffectComposer pass, a custom shader, a loader or controls), a game can
+opt into `@kits/three` and use three.js directly: full power, and the game owns that code across three.js upgrades.
+See [use three.js directly](use-three-directly.md).

@@ -121,6 +121,7 @@ are contextual evidence, not verification of Foundation.
 | Crafting and resources | Survey fields, reserves, exact slot selection, weighted facts, authored experiment steps, locked manifests, production and materialization | PR #118 integrates selection/reservation/experimentation, historical recipe/batch facts, explicit spawn changes and native recipe/effect inspection. Final desktop browser, independent recovery probes and all seven gates passed at `790aaea`; combined main tests/build passed. No automatic spawn rotation or minigame prescribed. |
 | Multiplayer | NW-01 integrated in PR #120. NW-02 complete scoped views, application credit and optional scene lifecycle hooks are integrated on main at `ea48539` (PR #122 in the private development history). | Rebased clean browser passed at `508edd9`; final `47a7e6d` passed all seven gates (1,965 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive, four heap advisories). Combined main tests/build passed; measured load and earlier failure remain documented below. Git ancestry establishes integration, not the PR API state. NW-03 is integrated as recorded below; DV-01 remains unresolved. No multiplayer-completion claim. |
 | Multiplayer: queue age and deadlines (NW-06) | Optional intake `maxQueuedAgeMs` with `stale` notice; optional authority `clock` and `submit(command, {deadlineMs})` returning `expired` before storage invocation only | Integrated in v0.2.0 (PR #12, merged to main at `53d549d`). Focused unit tests only; defaults unchanged; no load, browser-composition or device claim. Follow-up (integrated in v0.2.0 (PR #33; batch PR #42)): age shedding is no longer charged to the pump budget (optional `maxStaleDropsPerPump` cap), fixing the NW-07 goodput collapse; 300 ms final/peak 0.23-0.25 before, 0.92-0.96 after with PR #27's probe (loopback). |
+| KTX2 model textures | `KHR_texture_basisu` in the model library: lazy `KTX2Loader` and Basis transcoder, formats from the pooled renderer, RGBA8 fallback, transcoded bytes in residency and the `models` probe | Implemented and checked in PR #146 (unit tests, `test:ktx2-browser` in SwiftShader Chromium). No phone GPU, driver memory or transcode-time evidence; the transcoder's own worker pool is an explicit STD-RUN-35 exception. See [KTX2 model textures](compressed-textures.md). |
 | Asset residency (RES-01) | Optional per-preset texture/model byte budgets, pinned asset ids and a pressure hook over the existing lease caches | Integrated in v0.2.0 (PR #22, merged to main at `9913019`). Unit tests and a native software-renderer fixture only; defaults unchanged; no template configures it. See [asset residency](asset-residency.md). |
 | Multiplayer: peer rollback (RB-01) | Optional `@kits/rollback` session (prediction window, input delay, rollback/resimulation, confirmed-state checksums) and local sync test, driven from the fixed lane | Integrated in v0.2.0 (PR #25; batch PR #42). Focused headless tests and a `testScene` consumer only; requires a reliable, ordered link; no WAN, time-sync, spectator or device claim. See the [kit README](../../src/kits/rollback/README.md). |
 | Determinism: saveable random state (RNG-01) | `createSaveableRng` in `@engine`: `createRng` draws plus `state()`/`restore(word)` | **Integrated 2026-10-02** (PR #52 merge `2d5f50e`, batch PR #62, `main` `6485572`). Before integration: implemented, candidate (PR #52). Focused tests and a rollback sync-test consumer. `ctx.random()` is unchanged. |
@@ -401,6 +402,27 @@ mechanics template demonstrates it with draws and triangles unchanged. No physic
 or visual-quality acceptance; texture maps beyond the colour map are out of scope (`Mesh`
 and `Model` materials: see material options below).
 
+## Three.js escape hatch (VIS-09) — implemented, candidate
+
+**Current status (2026-10-03): implemented, candidate (PR `feat/kit-three`); not integrated.** Optional kit
+`@kits/three` for a game that lists `three()` in `defineGame({ kits })`: `three`, `three/addons/*` and
+`three/examples/jsm/*` imports in that game's files only (`lint:layers`), and per scene, with
+`defineScene({ extensions: [sceneThree()] })`, the handle `useThree(ctx)` (scene, kit-owned `root`, camera, renderer,
+canvas, `requestRender`, `onFrame`, `onBeforeRender`, `onResize`, `setRenderOverride`, `own`) plus
+`customObject({ create, update, dispose })` with `ThreeObject`. Engine seam: the genre-neutral render extension
+(`author/scene-extension.ts`, opaque `SceneExtension` in `@engine`). Owner: the scene visit; the kit owns its `root`,
+owned resources and custom objects and disposes them before the scene's tree. Bounds: `sceneThree({ max })` custom
+objects per scene (default 16, cap 256) and per-object triangle and texture `limits`; refusals reported once. Overload:
+refusal, never a late draw. Cancellation and recovery: visit exit disposes everything; a throwing session, hook or
+override is reported and closed or dropped for the visit, and the engine-owned render target, size and pixel ratio are
+restored after game code. Evidence: unit tests (handle lifecycle, disposal registry, custom objects, lint allowance)
+and `npm run test:three-kit-browser` on the courtyard fixture (desktop and phone-sized headless Chromium, software
+GL): point-lit lanterns, shadows and UnrealBloom through an EffectComposer, counted draws within the fixture's rows, a
+still scene drawing no frame, and nothing left in the renderer pool's release audit. **Unstable across three.js
+upgrades by contract.** Not yet: WebGPU refusal of WebGL-only materials, a dev warning for unreported changes, an
+upgrade-time changelog of breaking three.js changes beyond the fixture compile. No template uses it; no
+physical-device, GPU timing or visual-quality acceptance. See the [recipe](../recipes/use-three-directly.md).
+
 ## Particle emitters (FX-01) — integrated
 
 **Current status (2026-10-03): integrated.** PR #63 (PR merge `b7b5550`) reached `main` through merge-train batch PR #65, merged to `main` at `1f9d10d` on 2026-10-03. Main CI run 37086722080 on `1f9d10d` failed: the arcade template's active bench window drew no frame (perf inconclusive), the ended-visit defect later fixed by PR #75. The next main CI, run 37088378582 on `2fb6e69` (which contains batch 7), passed. Not in any release: v0.2.0 (`071e3c2`) predates it. "Integrated" is source delivery; the evidence scope below is unchanged and the candidate-era status is kept as history.
@@ -419,7 +441,7 @@ integration: implemented, candidate. Evidence: unit tests and
 so template budgets are unchanged. No physical-device, GPU timing or visual-quality
 acceptance.
 
-Flipbooks (FX-01a, implemented and checked, not yet integrated): `frames` on an emitter plays a sprite sheet
+Flipbooks (FX-01a, integrated in PR #141, merge `4c4f156`): `frames` on an emitter plays a sprite sheet
 per particle (`over-life`, `loop`, `random-start`), still one draw per emitter, grid capped at 16 × 16; `npm run
 fx:pack` packs a PNG sequence into a sheet and JSON sidecar. See the [guide](particles.md#flipbooks-sprite-sheets).
 
@@ -434,6 +456,20 @@ batching eligibility and the ADR 0078 seam hold. See the [guide](material-option
 [recipe](../recipes/give-a-shape-a-material.md). Evidence: unit tests, the recipe's code as a test and
 `npm run test:material-options-browser` (desktop headless Chromium, software GL); templates draw identically. No
 physical-device, GPU timing or visual-quality acceptance.
+
+## Instanced scatter (VIS-06) — implemented, checked in PR #144
+
+`Scatter` / `defineScatter` / `sceneScatter` (author API) draw many copies of a primitive `Shape` or a `Mesh` as one
+instanced draw per scatter, placed by exact points or a rect, ring or edge area, with scale, yaw, tilt and colour
+jitter, and shaded by the entity's `Material`. Owner: the scene visit (`author/scene-scatter.ts`, a lazy chunk;
+placement and admission in `author/scatter-field.ts`; instances from `platform/render/batching/instance.ts`).
+Placement uses a stream derived from the scene id, `seed` and `?seed=`, never `ctx.random()` (regression-tested).
+Bounded per scatter (65,536) and per scene (`max` 32, `instances` 65,536 by default) with counted, reported refusals;
+the `effects.scatter-density` knob thins non-essential scatters to a nested deterministic subset. One draw per scatter;
+triangles counted per copy. See the [guide](scatter.md) and [recipe](../recipes/scatter-grass-and-rocks.md). Evidence:
+unit tests, recipe test and `npm run test:scatter-browser` (desktop headless Chromium, software GL). No template uses
+it, so template budgets are unchanged. glTF `Model` scatter is a follow-up. No physical-device or GPU timing
+acceptance.
 
 ## Game sound files (DX P1-10) — integrated in v0.2.0
 
@@ -587,5 +623,19 @@ Opt-in visual data for a scene, owned by the scene visit (the [scene look guide]
 byte-identical (picture guard on blank and explorer). Status: integrated (PR #124, merge `522815f`). Evidence:
 unit tests and `npm run test:output-browser` (desktop headless Chromium, software GL). No physical-device acceptance.
 Local lights (VIS-02): `PointLight`/`SpotLight` components claim fixed per-visit slots from `sceneLights()`, capped by
-the `lights.local-max` knob; overflow is refused and reported once per cause. Status: implemented and checked as a
-candidate PR #138. Evidence: unit tests and `npm run test:lights-browser`. No physical-device fill-rate acceptance.
+the `lights.local-max` knob; overflow is refused and reported once per cause. Status: integrated (PR #138, merge
+`ef0d1bb`). Evidence: unit tests and `npm run test:lights-browser`. No physical-device fill-rate acceptance.
+Shadows (VIS-03): `sceneShadows()` per scene, `directional.shadow` for the sun, `shadow: true` on local lights and a
+per-entity `Shadow`; shadowed local slots fixed per visit and bounded by `lights.shadowed-max`; maps redraw only on
+change. Status: integrated (PR #148, merge `e84afcf`). Evidence: unit tests and `npm run test:shadows-browser`.
+Sky and haze (VIS-05): `defineEnvironment({ sky })` draws a gradient sky with optional discs and stars from
+one texture on an unlit sphere; `haze` gains `exp2` and `color: 'sky'`. Status: implemented and checked as a candidate PR #150. Evidence: unit tests and `npm run test:sky-browser`.
+
+## Asset provenance and AI disclosure (DX-03) — implemented, candidate
+
+Tooling, not runtime: per-file provenance records, a `npm run check` step and a disclosure draft (the
+[asset provenance guide](asset-provenance.md)). Status: implemented and checked on its PR branch; not integrated until merged.
+
+| ID | Contract | State |
+|---|---|---|
+| DX-03 | Asset provenance and AI disclosure: one record per shipped model, texture and sound (beside the file as `<name>.provenance.json`, or in `<game>/assets.provenance.json`) with origin (`hand`, `agent-blender`, `ai-generator`, `library`), author, licence, source, SHA-256 and, for AI origins, tool, model, prompt or reference, human edits and (generators) weights and output licences; `tooling` and `liveGenerated` for what is not a file. `lint:provenance` in `npm run check` warns by default and fails when the brief sets `assets: { provenance: 'required' }`; `npm run disclosure` drafts Steam (pre-generated, live-generated, tooling apart) and itch.io (Graphics, Sound, Text & Dialog, Code) text. Owner: the creator writes records; `scripts/lib/provenance.ts` only reads. [Guide](asset-provenance.md) | **Implemented and checked (candidate PR, 2026-10-03).** Evidence: focused tests (`scripts/lib/provenance.test.ts`, `src/author/build.test.ts`) and `npm run check`. Tooling only: no runtime, browser or store-acceptance claim; licence claims are not verified; `defineAsset` fields are not cross-checked; no stock template has records yet (the mechanics template's nine files and the showcase template's two textures warn). |

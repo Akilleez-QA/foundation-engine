@@ -31,7 +31,12 @@ export function layerModules(
   return [
     saveModule({namespace: game.id, build: `${game.id}@${game.version}`}),
     settingsModule({game: spatialAudioSettings(game.audio)}),
-    qualityModule({initialPreset: brief?.quality.tier ?? 'reference', build: `${game.id}@${game.version}`}),
+    // A declared brief tier is the start on every device; an undeclared one lets a constrained mobile GPU start lower.
+    qualityModule({
+      initialPreset: brief?.quality.tier ?? 'reference',
+      deviceClassSafety: brief?.quality.tierDeclared !== true,
+      build: `${game.id}@${game.version}`,
+    }),
     features,
     routerModule({fallbackScene: sceneId(game.firstScene)}),
     inputModule(),

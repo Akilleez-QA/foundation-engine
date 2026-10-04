@@ -21,15 +21,27 @@
  * Deliberate limits in this step (verbatim looks, STD-REN-27):
  * - Parsing uses three.js's `GLTFLoader` as the sites did, with the meshopt decoder (the only mesh compression, D11).
  *   Draco is not registered: no non-staged model needs it.
+ * - KTX2 (Basis Universal, `KHR_texture_basisu`) textures are opt-in and lazy: three's `KTX2Loader` and the Basis
+ *   transcoder (`basis_transcoder.js` / `.wasm`) load only when a GLB actually has a KTX2 image, once per library.
+ *   The transcoder targets the GPU formats of the renderer the scene runtime binds (`bindRenderer`, the pooled world
+ *   renderer; `KTX2Loader.detectSupport`) and falls back to uncompressed RGBA8 where the device has none. Its worker
+ *   pool is bounded (`compressedTextures.workers`, default 2) and disposed with the library. A KTX2 image must be one
+ *   2D Basis image (ETC1S or UASTC), as `KHR_texture_basisu` requires; its worst-case transcoded bytes are admitted
+ *   against `maxResidentBytes` before any transcode starts, and the transcoded bytes (the GPU size) are what the
+ *   residency budgets and the `models` probe count. See docs/guides/compressed-textures.md.
  * - The warm template budget defaults to 0 (a released model is disposed as today); the GPU warm LRU arrives with the
  *   quality port, like the texture library's.
  * - The three.js loader modules are imported on the first model request, so this module costs nothing at boot.
  */
 import type * as T from 'three';
+import type {KTX2Loader} from 'three/addons/loaders/KTX2Loader.js';
 import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
 import {AbortError, LeaseCache, chooseVariant, type AssetLease} from './lease-cache';
 import type {AssetDef, AssetVariant, QualityTier} from './manifest';
 import type {AssetResidencyPolicy} from './residency';
+import {isCompressedTexture, textureBytes} from './texture-bytes';
+import type {CompressedTextureOptions, EmbeddedGlb, TextureFormatRenderer} from './model-ktx2';
+export type {CompressedTextureOptions, EmbeddedGlb, GlbJson, TextureFormatRenderer} from './model-ktx2';
 
 /** A parsed model shared by its leases. Treat `scene` as read-only; draw `instantiate()` copies. */
 export interface ModelTemplate {
@@ -61,6 +73,11 @@ export interface ModelLibraryStats {
   readonly reloads?: number;
   readonly pressure?: number;
   readonly cleanupFailures?: number;
+  /** Compressed (KTX2-transcoded) textures in resident templates, and their transcoded (GPU) bytes. */
+  readonly compressedTextures?: number;
+  readonly compressedTextureMiB?: number;
+  /** Times the KTX2 transcoder was set up (0 while no model has a KTX2 image: nothing was fetched for it). */
+  readonly transcoderLoads?: number;
 }
 
 export interface ModelLibrary {
@@ -72,6 +89,11 @@ export interface ModelLibrary {
   dispose(): void;
   /** Applies a residency policy (RES-01). Live leases are never evicted; `maxResidentBytes` admission is unchanged. */
   setResidency?(policy: AssetResidencyPolicy): void;
+  /**
+   * Offers the renderer KTX2 textures are transcoded for (the scene's pooled world renderer) until `signal` aborts.
+   * The most recent live binding is used; nothing is loaded until a model has a KTX2 image.
+   */
+  bindRenderer?(renderer: TextureFormatRenderer, signal: AbortSignal): void;
 }
 
 export interface ModelLibraryOptions {
@@ -79,8 +101,11 @@ export interface ModelLibraryOptions {
   def(id: string): AssetDef | undefined | Promise<AssetDef | undefined>;
   /** Fetches one file. Default: `fetch` (what three.js's FileLoader used). */
   fetchBytes?(url: string, signal: AbortSignal): Promise<ArrayBuffer>;
-  /** Parses GLB bytes into a scene. Default: three.js's GLTFLoader with the meshopt decoder, loaded on first use. */
-  parse?(bytes: ArrayBuffer, url: string): Promise<T.Object3D | ParsedModel>;
+  /**
+   * Parses GLB bytes into a scene. Default: three.js's GLTFLoader with the meshopt decoder, loaded on first use, and
+   * the KTX2 transcoder when the GLB has a KTX2 image. `signal` is the load's: a parse may stop early once it aborts.
+   */
+  parse?(bytes: ArrayBuffer, url: string, signal: AbortSignal): Promise<T.Object3D | ParsedModel>;
   /** Prefix for variant paths (relative to `public/`). Default `/`. */
   base?: string;
   /** CPU bytes of fetched files kept for the session. Default 64 MiB. */
@@ -98,6 +123,8 @@ export interface ModelLibraryOptions {
   maxPending?: number;
   /** Optional residency policy (RES-01). Its `warmBytes` replaces `warmBytes`. */
   residency?: AssetResidencyPolicy | undefined;
+  /** KTX2 texture support. Without it, a GLB with a KTX2 image is refused. */
+  compressedTextures?: CompressedTextureOptions | undefined;
 }
 
 export interface ParsedModel {
@@ -125,7 +152,10 @@ export function modelResources(root: T.Object3D): Set<Disposable> {
   return found;
 }
 
-/** Resident bytes: vertex and index buffers, plus mipmapped RGBA8 for each texture. */
+/**
+ * Resident bytes: vertex and index buffers, plus each texture's estimate (texture-bytes.ts): mipmapped RGBA8 for an
+ * image, the transcoded level bytes for a compressed (KTX2) texture.
+ */
 export function modelBytes(root: T.Object3D): number {
   let n = 0;
   for (const r of modelResources(root)) {
@@ -136,10 +166,7 @@ export function modelBytes(root: T.Object3D): number {
       for (const attrs of Object.values(geometry.morphAttributes ?? {}))
         for (const a of attrs ?? []) n += a.array.byteLength;
     }
-    const image = (r as Partial<T.Texture>).isTexture
-      ? ((r as T.Texture).image as {width?: number; height?: number} | null)
-      : null;
-    if (image) n += Math.round((image.width ?? 0) * (image.height ?? 0) * 4 * (4 / 3));
+    if ((r as Partial<T.Texture>).isTexture) n += textureBytes(r as T.Texture);
   }
   return n;
 }
@@ -181,8 +208,9 @@ const defaultFetch = async (url: string, signal: AbortSignal, limit: number): Pr
   }
   return data.buffer;
 };
+
 /** Reject side-loaded dependencies before GLTFLoader can initiate requests outside this lease. */
-export function validateEmbeddedGlb(bytes: ArrayBuffer): void {
+export function validateEmbeddedGlb(bytes: ArrayBuffer): EmbeddedGlb {
   if (bytes.byteLength < 20) throw Error('models: invalid GLB');
   const view = new DataView(bytes),
     length = view.getUint32(12, true);
@@ -213,30 +241,71 @@ export function validateEmbeddedGlb(bytes: ArrayBuffer): void {
   }
   if ((json.nodes?.length ?? 0) > 4096 || (json.skins?.length ?? 0) > 128 || (json.animations?.length ?? 0) > 128)
     throw Error('models: graph budget exceeded');
+  const ktx2 = new Set<number>(),
+    images: unknown[] = json.images ?? [];
+  for (const texture of json.textures ?? []) {
+    const source: unknown = texture?.extensions?.KHR_texture_basisu?.source;
+    if (source === undefined) continue;
+    if (!Number.isSafeInteger(source) || !images[source as number]) throw Error('models: invalid KTX2 image');
+    ktx2.add(source as number);
+  }
+  images.forEach((image, i) => {
+    if ((image as {mimeType?: unknown})?.mimeType === 'image/ktx2') ktx2.add(i);
+  });
+  return {json, binAt: 20 + length, ktx2: [...ktx2]};
 }
 
-let gltfParser: Promise<(bytes: ArrayBuffer, url: string) => Promise<ParsedModel>> | undefined;
-function defaultParse(bytes: ArrayBuffer, url: string): Promise<ParsedModel> {
-  validateEmbeddedGlb(bytes);
-  gltfParser ??= Promise.all([
+type GltfModules = [
+  typeof import('three/addons/loaders/GLTFLoader.js'),
+  typeof import('three/addons/libs/meshopt_decoder.module.js'),
+];
+let gltfModules: Promise<GltfModules> | undefined;
+/** GLTFLoader with the meshopt decoder; `ktx2` supplies the KTX2 loader, asked for only when the GLB has a KTX2 image. */
+async function defaultParse(
+  bytes: ArrayBuffer,
+  url: string,
+  signal: AbortSignal,
+  ktx2: (bytes: ArrayBuffer, glb: EmbeddedGlb) => Promise<KTX2Loader>,
+): Promise<ParsedModel> {
+  const glb = validateEmbeddedGlb(bytes);
+  const modules = (gltfModules ??= Promise.all([
     import('three/addons/loaders/GLTFLoader.js'),
     import('three/addons/libs/meshopt_decoder.module.js'),
-  ]).then(([{GLTFLoader}, {MeshoptDecoder}]) => {
-    const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-    return async (data: ArrayBuffer, from: string) => {
-      const result = await loader.parseAsync(data, from.slice(0, from.lastIndexOf('/') + 1));
-      return {scene: result.scene, animations: result.animations};
-    };
+  ]));
+  modules.catch(() => {
+    if (gltfModules === modules) gltfModules = undefined;
   });
-  gltfParser.catch(() => (gltfParser = undefined));
-  return gltfParser.then(parse => parse(bytes, url));
+  const [{GLTFLoader}, {MeshoptDecoder}] = await modules;
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  if (glb.ktx2.length) {
+    loader.setKTX2Loader(await ktx2(bytes, glb));
+    // The transcoder may have taken a while to arrive: an owner that left meanwhile costs no transcode.
+    if (signal.aborted) throw new AbortError();
+  }
+  const result = await loader.parseAsync(bytes, url.slice(0, url.lastIndexOf('/') + 1));
+  return {scene: result.scene, animations: result.animations};
 }
+
+// The KTX2 step (header checks, three's KTX2Loader, the transcoder files) is its own chunk, loaded by the first KTX2 model.
+type Ktx2Host = ReturnType<(typeof import('./model-ktx2'))['createKtx2Host']>;
+let ktx2Module: Promise<typeof import('./model-ktx2')> | undefined;
+const loadKtx2Module = () => {
+  const loading = (ktx2Module ??= import('./model-ktx2'));
+  loading.catch(() => {
+    if (ktx2Module === loading) ktx2Module = undefined;
+  });
+  return loading;
+};
 
 export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
   const base = options.base ?? '/';
   const tier = options.tier ?? 'reference';
   const fetchBytes = options.fetchBytes ?? ((url: string, signal: AbortSignal) => defaultFetch(url, signal, maxFile));
-  const parse = options.parse ?? defaultParse;
+  const compressed = options.compressedTextures,
+    workers = compressed?.workers ?? 2;
+  if (!Number.isSafeInteger(workers) || workers < 1 || workers > 8) throw Error('models: invalid transcoder workers');
+  const parse =
+    options.parse ?? ((bytes: ArrayBuffer, url: string, signal: AbortSignal) => defaultParse(bytes, url, signal, ktx2));
   const keepLimit = options.keepBytes ?? 64 * MIB;
   const maxFile = options.maxFileBytes ?? 32 * MIB,
     maxResident = options.maxResidentBytes ?? 128 * MIB;
@@ -266,7 +335,22 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
   const slots = new Map<string, AssetVariant>();
   const inside = new WeakSet<object>();
   const fetches: Record<string, number> = {};
-  let parses = 0;
+  let parses = 0,
+    compressedCount = 0,
+    compressedBytes = 0;
+
+  // ── KTX2: one transcoder host per library (model-ktx2.ts), created by the first model with a KTX2 image.
+  let ktx2Host: Promise<Ktx2Host> | undefined, ktx2Ready: Ktx2Host | undefined;
+  async function ktx2(bytes: ArrayBuffer, glb: EmbeddedGlb): Promise<KTX2Loader> {
+    if (!compressed) throw Error('models: KTX2 textures are not enabled for this library');
+    const host = (ktx2Host ??= loadKtx2Module().then(
+      k => (ktx2Ready = k.createKtx2Host({...compressed, workers, maxBytes: maxResident, closed: () => closed})),
+    ));
+    host.catch(() => {
+      if (ktx2Host === host) ktx2Host = undefined;
+    });
+    return (await host).loader(bytes, glb);
+  }
 
   // ── File bytes: shared in flight, then kept (LRU by bytes) for the session.
   const kept = new Map<string, ArrayBuffer>();
@@ -359,7 +443,7 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
           const bytes = await bytesOf(url, signal);
           if (signal.aborted) throw new AbortError();
           parses++;
-          const parsed = await parse(bytes, url);
+          const parsed = await parse(bytes, url, signal);
           return 'scene' in parsed ? (parsed as ParsedModel) : {scene: parsed, animations: []};
         } finally {
           activeLoads--;
@@ -374,6 +458,13 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
           for (const clip of parsed.animations)
             for (const track of clip.tracks) bytes += track.times.byteLength + track.values.byteLength;
           if (!Number.isSafeInteger(bytes)) throw Error('models: resident budget exceeded');
+          let compressedHere = 0,
+            compressedHereBytes = 0;
+          for (const r of modelResources(scene))
+            if ((r as Partial<T.Texture>).isTexture && isCompressedTexture(r as T.Texture)) {
+              compressedHere++;
+              compressedHereBytes += textureBytes(r as T.Texture);
+            }
           // Retained (released, unpinned) templates yield to a new live one before the hard admission (RES-01).
           if (bytes + resident > maxResident) cache.makeSpace(() => bytes + resident > maxResident);
           if (bytes + resident > maxResident) throw Error('models: resident budget exceeded');
@@ -444,9 +535,13 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
             releaseInstance,
           };
           templateBytes.set(template, bytes);
+          compressedCount += compressedHere;
+          compressedBytes += compressedHereBytes;
           cleanups.set(template, () => {
             if (retired) return;
             retired = true;
+            compressedCount -= compressedHere;
+            compressedBytes -= compressedHereBytes;
             const errors: unknown[] = [];
             for (const root of instances)
               try {
@@ -551,6 +646,8 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
         kept.clear();
         keptBytes = 0;
         slots.clear();
+        // A set-up still in flight sees `closed` and retires its own loader.
+        ktx2Ready?.dispose();
       }
     },
     owns: resource =>
@@ -569,6 +666,9 @@ export function createModelLibrary(options: ModelLibraryOptions): ModelLibrary {
       reloads: cache.stats.reloads,
       pressure: cache.stats.pressure,
       cleanupFailures: cache.stats.cleanupFailures,
+      compressedTextures: compressedCount,
+      compressedTextureMiB: compressedBytes / MIB,
+      transcoderLoads: ktx2Ready?.loads() ?? 0,
     }),
     setResidency: ({warmBytes, ...residency}) => {
       if (!Number.isSafeInteger(warmBytes) || warmBytes < 0) throw Error('models: invalid budget');

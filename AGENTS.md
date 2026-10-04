@@ -8,7 +8,7 @@ Following every "read first" link literally costs about 28k tokens. For work onl
 
 - **Read:** this file (17 KB, ~4.3k, already loaded), [getting started](docs/guides/getting-started.md) (9 KB, ~2.3k), your template's `templates/<name>/README.md` (1.5–2.3 KB, ~0.5k) and the [recipes index](docs/recipes/README.md) (3 KB, ~0.7k). Then only the skill (`.claude/skills/*/SKILL.md`, 1–3 KB) and the recipe for the task in hand.
 - **Skip unless you change `src/`:** [STANDARD.md](docs/STANDARD.md) (65 KB, ~16k), [CREATOR-CONTRACT.md](docs/CREATOR-CONTRACT.md) (11 KB, ~2.7k), the status ledgers in `docs/guides/` (`composition-framework-status`, `framework-upgrade-status`, `upgrade-acceptance-ledger`; 49–91 KB each), and the sections below on the engine contract, capability documentation and worktree integration.
-- **Read when it applies:** [DEVICE-EXPERIENCE.md](docs/policy/DEVICE-EXPERIENCE.md) (22 KB, ~5.4k) for UI, control, camera, framing or quality changes on the brief's devices; [KID-SAFE.md](docs/policy/KID-SAFE.md) when the brief sets `kids: true`.
+- **Read when it applies:** [DEVICE-EXPERIENCE.md](docs/policy/DEVICE-EXPERIENCE.md) (22 KB, ~5.4k) for UI, control, camera, framing or quality changes on the brief's devices; [KID-SAFE.md](docs/policy/KID-SAFE.md) when the brief sets `kids: true`; [make assets with Blender through MCP](docs/recipes/make-assets-with-blender-mcp.md) when you make a model. That recipe covers the contract first, a headless `export.py`, `npm run asset:verify`, and licence and provenance. Registering a Blender MCP server is the user's own opt-in; never add `.mcp.json` to the repository.
 - **First commands:**
 
   ```sh
@@ -106,7 +106,7 @@ notes outside publishable documentation.
 
 ## Where code goes
 
-- **Game code only in the game folder** (`game/`, or the folder `GAME_DIR` names; the engine's own templates live in `templates/<name>/game`). It imports only `@engine`, `@kits/<name>`, its own files and JSON (`npm run lint:layers`).
+- **Game code only in the game folder** (`game/`, or the folder `GAME_DIR` names; the engine's own templates live in `templates/<name>/game`). It imports only `@engine`, `@kits/<name>`, its own files and JSON (`npm run lint:layers`). The one exception is opt-in: a game that lists `three()` from `@kits/three` in `defineGame({ kits })` may import `three` and its addons, with full power and its own responsibility across three.js upgrades ([use three.js directly](docs/recipes/use-three-directly.md)); prefer `@engine` data when it can express the look, and `npm run check` lists every file that uses the kit.
 - **A game's other files stay in its folder too** ([recipe](docs/recipes/your-game-files.md)): static files it serves in `game/public/` (built with that game only), build-time Node scripts such as asset generators in `game/tools/` (may import `node:`; game code never imports them). The root `public/` is used only by a game without its own `game/public/`; keep it empty.
 - **The engine (`src/`) is read-only** unless the author asks to extend it. An engine change follows the STANDARD and its recipe, and keeps genre words out of core, platform and author (`npm run lint:generic`).
 - **Looks**: for colour, light, haze, camera framing, forms and the look checklist, follow the [art-direction recipe](docs/recipes/art-direction.md) ([skill](.claude/skills/art-direction/SKILL.md)); the `showcase` template is its worked example. Visuals are `@engine` data (environment, materials, meshes, particles), never direct three.js.
@@ -155,8 +155,9 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 | `npm run play:script -- <file.json>` | A scripted playtest (goto, key, press, teleport, wait, snap, expect, waitUntil, reload; [format](docs/recipes/write-a-playtest-script.md), checked before the browser starts); a game keeps its scripts in `game/playtest/`, evidence goes to `playtest/latest/` |
 | `npm run play:criteria [-- --gate]` | The brief's success criteria, checked and tabled |
 | `npm run asset:verify -- <model.glb>` | Check a model against its `<name>.contract.json`: size, pivot, triangle/vertex/material/texture limits, bytes, material properties, provenance ([model contracts](docs/guides/model-contracts.md)); `check` runs it for every contracted GLB |
-| `npm run asset:optimize -- <in.glb> --out <out.glb>` | Meshopt-compress a model and re-encode its textures as WebP at the contract's texture size (`--ktx2` waits for engine KTX2 support), keeping named nodes; checks the contract before and after ([model contracts](docs/guides/model-contracts.md#optimise)) |
-| `npm test` / `npm run lint` | All tests / all lints (format, layers, game, arch, css, generic, brief, budgets) |
+| `npm run disclosure [-- --strict]` | Steam and itch.io AI-disclosure draft from the asset provenance records ([guide](docs/guides/asset-provenance.md)) |
+| `npm run asset:optimize -- <in.glb> --out <out.glb>` | Meshopt-compress a model and re-encode its textures as WebP at the contract's texture size (`--ktx2` writes KTX2 for phone targets), keeping named nodes; checks the contract before and after ([model contracts](docs/guides/model-contracts.md#optimise)) |
+| `npm test` / `npm run lint` | All tests / all lints (format, layers, game, arch, css, generic, brief, budgets, provenance) |
 | `npm run format` / `npm run format:check` | Format code with Prettier / check it (Markdown excluded) |
 | `npm run gate` / `npm run gate:templates` | The integration gate for this game / for every template |
 | `npm run gate:ci [-- --from <step> \| --only <step> \| --list]` | Every checking `run:` step of `.github/workflows/ci.yml`, with its env; reproduces all work jobs serially and derives the final aggregate. Partial selections are not full CI acceptance |

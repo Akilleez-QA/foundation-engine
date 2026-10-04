@@ -17,6 +17,9 @@ import type {SceneModelRequest, SceneModelResult} from '../author/model-inspecti
  *   engine.redraw()             the running scene draws its unchanged picture once (measure a still scene); false
  *                               when no scene is running
  *   engine.post()               the running scene's post-processing tier, targets and post draws, or null
+ *   engine.extensions()         the running scene's render extensions' counters by id (@kits/three), or {}
+ *   engine.scatter()            the running scene's scatter counters (copies, refusals, draws, triangles per scatter),
+ *                               or null when it has none
  *   engine.events(fn)           tap every bus event (returns an unsubscribe)
  *   engine.sessionRecorder(o?)  start the local sustained-session recorder on the one loop (PERF-01); replaces the last
  *   engine.currentSession()     that recorder (or the `?session-record` auto-start), or null
@@ -35,7 +38,7 @@ import type {ProbeName} from '../core/probe';
 import {appLoop} from '../platform/ui/runtime';
 import {rendererPoolStats} from '../platform/render/app-renderer-pool';
 import type {PoolStats} from '../platform/render/renderer-pool-types';
-import type {SceneEntitiesRequest, SceneEntitiesResult} from '../author/play';
+import type {SceneEntitiesRequest, SceneEntitiesResult, SceneHandle} from '../author/play';
 import type {ScenePostStats} from '../author/scene-post';
 import {createEventTrace, type EventTrace, type EventTraceOptions} from './event-trace';
 import type {ReplayDev, ReplayDevRequest, ReplayDevState, ReplayStart} from './replay';
@@ -82,6 +85,10 @@ export interface EngineTestApi {
   redraw(): boolean;
   /** The running scene's post-processing (tier, readiness, target bytes, post draws), or null without a scene. */
   post(): ScenePostStats | null;
+  /** The running scene's render extensions' counters by id (a kit's `sceneThree()`), or {} without any. */
+  extensions(): Record<string, Record<string, unknown>>;
+  /** The running scene's scatter counters, or null when it has no `sceneScatter()` (or the drawing has not loaded). */
+  scatter(): ReturnType<NonNullable<SceneHandle['scatter']>>;
   events(fn: (name: string, payload: unknown) => void): () => void;
   /** Start a bounded current-visit system capture; replaces that visit's capture and ends on visit abort. */
   systemTrace(options?: SystemTimingOptions): SystemTimingCapture | null;
@@ -198,6 +205,14 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
     post() {
       const running = app.services.app.has('feature.game') ? app.services.play?.current() : null;
       return running?.post?.() ?? null;
+    },
+    extensions() {
+      const running = app.services.app.has('feature.game') ? app.services.play?.current() : null;
+      return running?.extensions?.() ?? {};
+    },
+    scatter() {
+      const running = app.services.app.has('feature.game') ? app.services.play?.current() : null;
+      return running?.scatter?.() ?? null;
     },
     events: fn => app.events.tap((k, p) => fn(k, p)),
     systemTrace(options) {

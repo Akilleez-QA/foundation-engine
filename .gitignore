@@ -16,6 +16,10 @@ playtest/action-hints/
 .npmrc
 .netrc
 .vercel/
+
+# A project MCP config is a per-user opt-in: it starts third-party code, without a prompt in non-interactive sessions.
+# Copy .mcp.json.example to .mcp.json for your own checkout; never commit it (docs/recipes/make-assets-with-blender-mcp.md).
+.mcp.json
 *.pem
 *.p12
 *.key
@@ -31,6 +35,7 @@ playtest/framework/
 playtest/appearance/
 playtest/stage-journal/
 playtest/model-preview*/
+playtest/ktx2-model/
 
 playtest/model-admission/
 playtest/model-admission-reentry/
@@ -65,7 +70,12 @@ playtest/session/
 playtest/particles/
 playtest/creator-journey/
 playtest/blender-export/
+playtest/pose-to-pose/
 playtest/first-use/
 playtest/first-use-production/
 playtest/output/
 playtest/lights/
+playtest/shadows/
+playtest/sky/
+tools/visual-courtyard/game/public/
+playtest/three-kit/

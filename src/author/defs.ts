@@ -26,7 +26,10 @@ import type {AudioClockReading} from '../platform/audio/audio-timeline';
 import type {MusicOptions, MusicVoice} from '../platform/audio/music-clock';
 import type {SceneParticles} from './particle-contract';
 import {validatePost, type PostSettings} from '../platform/render/post/settings';
+import {validateExtensions, type SceneExtension} from './scene-extension';
+import type {SceneScatter} from './scatter-contract';
 import type {SceneLights} from './lights';
+import type {SceneShadows} from './shadow-casting';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const need = (ok: boolean, message: string) => {
@@ -290,10 +293,21 @@ export interface SceneInput extends SceneBody {
    *  emitters' `max` sum to at most `max` (default 4096); at most `emitters` (default 16, one draw each) are drawn.
    *  Without it the scene's emitters are not simulated or drawn (reported once). */
   particles?: SceneParticles | undefined;
+  /** Render extensions a kit provides (`sceneThree()` from `@kits/three`): opened once per visit, before the first
+   *  draw, and closed when it ends. A scene without them creates nothing for them. */
+  extensions?: readonly SceneExtension[] | undefined;
+  /** Instanced scatter support and bounds (docs/guides/scatter.md): `sceneScatter({ max, instances })`. Each admitted
+   *  `Scatter` is one draw; at most `max` (default 32) scatters and `instances` (default 65,536) copies are drawn, excess
+   *  refused and reported. Without it the scene's scatters are not drawn (reported once). */
+  scatter?: SceneScatter | undefined;
   /** Local light slots (VIS-02, docs/guides/scene-look.md): `sceneLights({ point, spot })`. Each visit creates that many
    *  point and spot lights once (capped by the `lights.local-max` quality knob); entities with `PointLight` or
    *  `SpotLight` claim them. Without it the scene's light components are not drawn (reported once). */
   lights?: SceneLights | undefined;
+  /** Shadows (VIS-03, docs/guides/scene-look.md): `sceneShadows({ cast, receive })` turns on shadow maps for this scene
+   *  and sets which shapes cast and receive by default (`Shadow` overrides one entity). Lights opt in one by one:
+   *  the environment's `directional.shadow`, `PointLight({ shadow: true })`, `SpotLight({ shadow: true })`. */
+  shadows?: SceneShadows | undefined;
   id: string;
   title: string;
   /** Open, game-defined ('level', 'menu', 'world', 'cutscene', …). */
@@ -341,6 +355,7 @@ export function defineScene(s: SceneInput): SceneDefinition {
       `scene ${s.id}: replay.digest needs an id (1-128 of A-Za-z0-9._:,;=+-) and a state(world) function`,
     );
   const captured = {...s};
+  if (captured.extensions !== undefined) captured.extensions = validateExtensions(s.id, captured.extensions);
   if (captured.view?.output !== undefined)
     captured.view = {...captured.view, output: validateSceneOutput(captured.view.output, `scene ${s.id}: view.output`)};
   if (captured.view?.post !== undefined)
@@ -352,8 +367,16 @@ export function defineScene(s: SceneInput): SceneDefinition {
     `scene ${s.id}: particles must be sceneParticles(...)`,
   );
   need(
+    captured.scatter === undefined || (captured.scatter as {kind?: unknown})?.kind === 'scene-scatter',
+    `scene ${s.id}: scatter must be sceneScatter(...)`,
+  );
+  need(
     captured.lights === undefined || (captured.lights as {kind?: unknown})?.kind === 'scene-lights',
     `scene ${s.id}: lights must be sceneLights(...)`,
+  );
+  need(
+    captured.shadows === undefined || (captured.shadows as {kind?: unknown})?.kind === 'scene-shadows',
+    `scene ${s.id}: shadows must be sceneShadows(...)`,
   );
   return {...captured, kind: 'scene', type: captured.type ?? 'scene'};
 }

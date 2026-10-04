@@ -113,7 +113,14 @@ export interface BuildInput {
   /** The render backend (ADR 0078): 'webgl2' (the default) or 'webgpu'. 'webgpu' is refused as not available yet
    *  until the WebGPU backend lands; a build never falls back from it silently. */
   render?: {backend?: RenderBackendId};
+  /** Shipped files: `provenance: 'required'` makes a missing or broken provenance record for a model, texture or
+   *  sound under the game's public/ folder an error in `npm run check`; 'warn' (the default) reports it only.
+   *  docs/guides/asset-provenance.md */
+  assets?: {provenance?: ProvenancePolicy};
 }
+
+/** How `npm run check` treats shipped files without a valid provenance record. */
+export type ProvenancePolicy = 'warn' | 'required';
 
 export type BuildBrief = Immutable<{
   /** Resolved data schema version; application acceptance evidence is recorded separately. */
@@ -127,6 +134,9 @@ export type BuildBrief = Immutable<{
   readonly devices: BuildInput['devices'];
   readonly quality: {
     tier: 'reference' | 'high' | 'medium' | 'low';
+    /** True when the author declared `tier`. An undeclared tier lets a constrained mobile GPU start lower
+     *  (device-class start limit, ADR 0079). */
+    tierDeclared: boolean;
     views: readonly {id: string; scene: string; mode: 'identical' | 'near' | 'reviewed'}[];
   };
   readonly performance: PerformanceTargets;
@@ -137,6 +147,7 @@ export type BuildBrief = Immutable<{
   readonly pedagogy: {maxPassiveActions: number};
   readonly kidSafe: {maxRepeat: number};
   readonly render: {backend: RenderBackendId};
+  readonly assets: {provenance: ProvenancePolicy};
 }>;
 
 /** Problems in a brief; [] when it is a usable contract. */
@@ -180,7 +191,7 @@ export function briefProblems(value: unknown): string[] {
     if (!targets.includes(b.devices.minimum as string)) out.push('devices.minimum must be one of the declared targets');
     list(b.devices.input, 'devices.input', true, ['keyboard', 'pointer', 'touch', 'gamepad']);
   }
-  for (const key of ['audience', 'quality', 'performance', 'constraints', 'pedagogy', 'kidSafe', 'render'])
+  for (const key of ['audience', 'quality', 'performance', 'constraints', 'pedagogy', 'kidSafe', 'render', 'assets'])
     if (b[key] !== undefined && !record(b[key])) out.push(`${key}: expected an object`);
   if (record(b.audience)) {
     const audience = b.audience;
@@ -246,6 +257,12 @@ export function briefProblems(value: unknown): string[] {
     const problem = renderBackendProblem(b.render.backend);
     if (problem) out.push(problem);
   }
+  if (
+    record(b.assets) &&
+    b.assets.provenance !== undefined &&
+    !['warn', 'required'].includes(b.assets.provenance as string)
+  )
+    out.push("assets.provenance: expected 'warn' or 'required'");
   const ids = new Set<string>();
   if (!Array.isArray(b.success) || !b.success.length) out.push('state at least one success criterion');
   else
@@ -299,6 +316,7 @@ export function defineBuild(b: BuildInput): BuildBrief {
     },
     quality: {
       tier: b.quality?.tier ?? 'reference',
+      tierDeclared: b.quality?.tier !== undefined,
       views: (b.quality?.views ?? []).map(v => ({id: v.id, scene: v.scene, mode: v.mode})),
     },
     performance: {
@@ -322,5 +340,6 @@ export function defineBuild(b: BuildInput): BuildBrief {
     pedagogy: {maxPassiveActions: b.pedagogy?.maxPassiveActions ?? 3},
     kidSafe: {maxRepeat: b.kidSafe?.maxRepeat ?? 5},
     render: {backend: b.render?.backend ?? DEFAULT_RENDER_BACKEND},
+    assets: {provenance: b.assets?.provenance ?? 'warn'},
   });
 }

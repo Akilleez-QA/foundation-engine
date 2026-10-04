@@ -1,0 +1,14 @@
+{
+  "name": "pose-bug",
+  "kind": "rigid",
+  "skeleton": true,
+  "build": "build_bug.py",
+  "author": "author_poses.py",
+  "poses": "poses.json",
+  "testPoses": "testposes.json",
+  "definition": "animations.json",
+  "sheets": [
+    {"clip": "scuttle", "view": "side", "every": 2},
+    {"clip": "strike", "view": "side", "every": 2}
+  ]
+}

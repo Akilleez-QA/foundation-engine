@@ -12,6 +12,16 @@ Every new framework below is optional: a game that does not use it is unchanged.
   texture limits, file and texture bytes, allowed material properties and the receipt fields licence, author,
   source, tool and generator. A GLB without a contract is unaffected. See
   [model contracts](docs/guides/model-contracts.md).
+- **Asset provenance and AI disclosure (DX-03).** Each model, texture and sound under a game's `public/` gets a
+  provenance record, beside the file (`<name>.provenance.json`, the receipt the Blender export already writes) or in
+  `<game>/assets.provenance.json`: origin (`hand`, `agent-blender`, `ai-generator`, `library`), author, licence,
+  source, SHA-256 and, for AI origins, tool, model, prompt or reference, human edits and the generator's weights and
+  output licences. `npm run check` runs the new `lint:provenance`: missing or broken records are **warnings**, and
+  errors only when the brief sets `assets: { provenance: 'required' }` (a new optional brief field; default
+  `'warn'`). `npm run disclosure` drafts Steam and itch.io AI-disclosure text from the records, keeping content
+  players see apart from development tooling; a missing record makes the draft INCOMPLETE. The ship skill runs it
+  before a store page. [Guide](docs/guides/asset-provenance.md). *Affected:* games with files in `public/` see
+  warnings in `npm run check` until they add records; nothing fails unless the brief opts in.
 - **fix-budget skill: draw calls first.** The skill now counts draws before triangles against the scene's
   `budgets.json` row and the brief's per-scene ceiling (about 100 per scene on phones as guidance; the brief's
   numbers win), and names the real APIs for instancing and scatter: one `defineMesh` entity for static repeats
@@ -21,6 +31,13 @@ Every new framework below is optional: a game that does not use it is unchanged.
   metres, one rebuild-from-scratch script per asset, a screenshot after every change, measurements (bounds,
   ground contact, gaps, non-manifold edges) as the acceptance evidence, about two retries per defect, Blender
   5.2 API lookups before writing code, and MCP safety defaults. Documentation only; no engine change.
+- **KTX2 model textures (#146).** A GLB whose textures use `KHR_texture_basisu` (Basis Universal ETC1S or UASTC) now
+  loads: the textures are transcoded to the GPU format the device supports (RGBA8 when it supports none) and stay
+  compressed on the GPU. The transcoder (0.6 MB) and its code load only when such a model does; a game without one
+  downloads none of it. `models` stats gain `compressedTextures`, `compressedTextureMiB` and `transcoderLoads`.
+  `npm run asset:verify` accepts `KHR_texture_basisu` when the contract lists it (`ENGINE_KTX2` is on), so
+  `npm run asset:optimize -- --ktx2` now runs. See
+  [KTX2 model textures](docs/guides/compressed-textures.md).
 - **`lint:game` rule `three-legacy`.** In a game file that imports three (through a `@kits/three` kit, or
   directly), it flags three.js APIs that are gone or deprecated in the pinned three r186, each with its
   replacement: `Geometry`/`Face3`, `*BufferGeometry` aliases, `outputEncoding`, `texture.encoding`,
@@ -30,12 +47,40 @@ Every new framework below is optional: a game that does not use it is unchanged.
   so the rule is dormant today and ready for that kit. A test checks each "removed" name against the installed
   three. Escape with a reason: `// lint-game-allow three-legacy: <reason>`.
 - **Model optimisation (`npm run asset:optimize`).** glTF-Transform's `optimize` with meshopt geometry
-  compression, WebP textures resized to the contract's `textureSize` (`--ktx2` is refused until the engine
-  adds KTX2 support), and named nodes, meshes and materials kept; the model contract is checked before and after. Adds the
+  compression, WebP textures resized to the contract's `textureSize` (`--ktx2` writes KTX2 since the model
+  loader transcodes it, #146), and named nodes, meshes and materials kept; the model contract is checked before and after. Adds the
   development-only `@gltf-transform/cli` 4.5.1 (MIT) and its graph; see the notices.
+- **Optional silhouette check.** A model contract may set `silhouette` with a reference PNG, a view (front, side, top), a
+  gameplay pixel size and a stage; `asset:verify` rasterises the re-imported model without a GPU and requires an
+  overlap of at least 0.85 at blockout or 0.90 when final (or the contract's own threshold). `--masks` writes both
+  masks for inspection. The lantern example uses it.
 - **`asset:verify` enforces the model loader's caps.** Every contracted model must fit the loader's admission
-  limits (32 MiB, accessor, node, skin and animation counts, four bone influences), and KTX2 textures and Draco are
-  refused until the engine supports them.
+  limits (32 MiB, accessor, node, skin and animation counts, four bone influences), and Draco is refused (KTX2
+  is accepted when the contract lists it, since #146).
+- **Full three.js for a game that opts in: `@kits/three`.** A game that lists `three()` in `defineGame({ kits })`
+  may import `three`, `three/addons/*` and `three/examples/jsm/*` (one shared copy); every other game still may not
+  (`npm run lint:layers`: `three-needs-kit`, `kit-not-listed`), and `npm run check` names each file that uses the kit.
+  A scene opts in with `defineScene({ extensions: [sceneThree()] })` and gets `useThree(ctx)`: the scene, a disposed
+  `root`, camera, renderer, canvas, `requestRender`, `onFrame`, `onBeforeRender`, `onResize`, `setRenderOverride`
+  (an EffectComposer, for example) and `own()`. `customObject({ create, update, dispose })` with `ThreeObject` is the
+  per-entity convenience path, capped per scene and bounded per object. The engine disposes everything on exit,
+  restores the render target, size and pixel ratio after game code, and keeps render on change; budgets measure the
+  real renderer. **Unstable across three.js upgrades: the game owns that code.** Engine side: a genre-neutral render
+  extension seam (`SceneExtension`, opaque in `@engine`). Guide: [use three.js directly](docs/recipes/use-three-directly.md);
+  browser evidence: `npm run test:three-kit-browser` (the courtyard fixture, software GL only).
+
+### Upgrading
+
+- **Constrained mobile GPUs start on a lighter preset (ADR 0079).** When the brief does not declare
+  `quality.tier`, a first run on a mobile GPU family (Mali, Adreno, PowerVR, Xclipse, Immortalis, Maleoon) starts
+  on `low` for an entry-level GPU, 2 GB or less memory or a texture limit under 4096, and on `medium` for 4 GB or
+  less, 4 or fewer cores or data saver. Before, every template started every device on `reference`
+  (16 light slots per kind, 4 shadowed lights), and a direct `createQuality` caller started phones on `high`.
+  *Affected:* players on those phones and tablets see fewer local lights and shadows, a lower pixel ratio and a
+  frame cap on first run; desktops, software GL, iPhone-class devices, capable phones, gates and benches are
+  unchanged. The start is unsaved, and saved choices are never rewritten. `BuildBrief.quality` gains
+  `tierDeclared`. *To do:* nothing to keep the new default. To start every device on one tier, declare it:
+  `quality: { tier: 'reference' }`. Players can still choose any preset.
 
 ## 0.3.0 — proposed; author decides
 
@@ -114,6 +159,19 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
 
 ### Changes
 
+- **Optional gradient sky and exponential haze (VIS-05).** `defineEnvironment({ sky: { kind: 'gradient', top, horizon,
+  bottom, exponent, discs, stars } })` draws one CPU-generated texture on a sphere around the camera with a
+  built-in unlit material (no custom shader), plus additive stars; `haze: { kind: 'exp2', color, density }` adds
+  exponential fog, and `color: 'sky'` takes the horizon colour for either haze. The texture regenerates only when the
+  sky changes. Environments without `sky` or `exp2` are unchanged. The space kit refuses transitions between skies and
+  between haze kinds. See the [scene look guide](docs/guides/scene-look.md#sky-and-haze).
+- **Optional shadows (VIS-03).** `defineScene({ shadows: sceneShadows({ cast, receive }) })` turns on shadow maps for a
+  scene; the environment's sun casts with `directional.shadow: { extent, softness }`, local lights with
+  `PointLight({ shadow: true })` / `SpotLight({ shadow: true })`, and `Shadow({ cast, receive })` overrides one entity.
+  Shadowed local lights are chosen once per visit and bounded by the new `lights.shadowed-max` knob (4/2/1/0,
+  unwired); maps redraw only when a caster or light changes. The bench's `shadowCasters` and `shadowDrawsIdle` rows now
+  measure real shadow passes for scenes that opt in. Scenes without `sceneShadows()` are unchanged. See the
+  [scene look guide](docs/guides/scene-look.md#shadows).
 - **Optional point and spot lights (VIS-02).** `PointLight` and `SpotLight` components on an entity with a
   `Transform`, in scenes that opt in with `defineScene({ lights: sceneLights({ point, spot }) })` (at most 16 and 4).
   Each visit creates its slots once, so spawning or despawning a light never recompiles shaders; overflow is refused

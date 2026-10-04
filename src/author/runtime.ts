@@ -16,13 +16,17 @@ import {bindEnvironment} from './scene-environment';
 import {validateSceneOutput} from './scene-output';
 import {createOutputSync} from './scene-output-sync';
 import {lightSlotsFor, PointLight, SpotLight} from './lights';
-import {createLightSlots} from './light-slots';
+import {createLightSlots, shadowedSlotsFor} from './light-slots';
+import {localShadowMapSize, Shadow, shadowFlags, SUN_SHADOW_MAP} from './shadow-casting';
 import {applyOutput, outputProfile} from '../platform/render/backends/webgl/output';
 import {Material, materialKey} from './material';
 import {createSceneSurfaces, type Surface, type SurfaceMaterial} from './scene-materials';
 import {createParticleView} from './particle-view';
 import {EMITTER_ID, type ParticleField} from './particle-contract';
 import {createScenePost, loadPostModule} from './scene-post';
+import {openSceneExtension, type SceneExtensionSession} from './scene-extension';
+import {SCATTER_ID, scatterRoot} from './scatter';
+import type {SceneScatterDrawing} from './scene-scatter';
 /**
  * author/runtime.ts: a scene's lazy body, loaded the first time a scene is entered (never in the first-load bundle).
  *
@@ -39,6 +43,9 @@ import {createScenePost, loadPostModule} from './scene-post';
  *    (particle-sim.ts, scene-particles.ts). A scene without emitters creates nothing for them;
  *  - post-processing: `view.post` (and `ctx.view.post`) at the player's `post.mode` tier, drawn by a lazy chunk inside
  *    the same render-on-change frame (scene-post.ts). A scene without post creates nothing for it;
+ *  - render extensions: a kit's extensions listed in `defineScene({ extensions })` open once per visit before program
+ *    preparation, sync with the frame, may replace the scene's draw, and close before the scene's tree is released
+ *    (scene-extension.ts). A scene without extensions creates nothing for them;
  *  - `enter` runs once the visit is active (ADR 0045), before any of the visit's systems step; `exit` when it is left.
  *    Everything the visit creates is owned
  *    by the run and released in reverse order when it leaves.
@@ -94,6 +101,7 @@ import {
 } from './defs';
 import type {CueVoiceOptions} from '../platform/audio/audio-output';
 
+const NO_SHADOW = Object.freeze({cast: false, receive: false});
 /** The fixed lane's step (core/ecs/systems.ts default), named so a replay header can record it. */
 const FIXED_STEP = 1 / 60;
 /** How long a scene with post waits for its chunk before its first picture; later, it arrives with one redraw. */
@@ -120,6 +128,14 @@ const json = (v: unknown): Record<string, unknown> => {
   }
 };
 
+/** The scatter drawing chunk, once a scene that opted in has prepared (so its first frame already draws scatters). */
+let scatterModule: typeof import('./scene-scatter') | null = null;
+const loadScatter = () =>
+  import('./scene-scatter').then(m => {
+    scatterModule = m;
+    return m;
+  });
+
 const preparations = new WeakMap<
   SceneVisit,
   {body: Awaited<ReturnType<typeof bodyOf>>; state: Record<string, unknown>}
@@ -131,8 +147,11 @@ export async function prepareScene(s: Services, scene: SceneDefinition, visit: S
     for (const id of scene.sounds) void s.audio.preload(id, visit.signal);
   // The post chunk starts loading with the scene; the visit reports a failure (scene-post.ts).
   if (scene.view?.post) loadPostModule().catch(() => {});
+  // Scatter drawing is a lazy chunk; a scene that opted in loads it while it prepares. A failure is reported at entry.
+  const scatterLoad = scene.scatter && !scatterModule ? loadScatter().catch(() => null) : null;
   const body = await bodyOf(scene),
     state: Record<string, unknown> = {};
+  await scatterLoad;
   if (visit.signal.aborted) return;
   await scene.prepare?.(
     {state, text: (key, vars) => (appI18n.t as (k: string, v?: unknown) => string)(key, vars), service: key => s[key]},
@@ -151,9 +170,12 @@ export async function enterScene(o: {
   const {s, brief, scene, visit} = o;
   const prepared = preparations.get(visit);
   const body = prepared?.body ?? (await bodyOf(scene));
-  // Local lights (VIS-02) are a lazy chunk: only a scene with `sceneLights()` loads the rig (and the light rig's
-  // shadow scheduler) before its first frame; every other scene carries none of it.
-  const lightModule = scene.lights ? await import('./scene-light-rig') : null;
+  // Local lights (VIS-02) and shadows (VIS-03) are a lazy chunk: only a scene with `sceneLights()` or `sceneShadows()`
+  // loads the rig (and the shadow scheduler) before its first frame; every other scene carries none of it.
+  const lightModule = scene.lights || scene.shadows ? await import('./scene-light-rig') : null;
+  // The gradient sky (VIS-05) is a lazy chunk too: loaded now when the scene starts with one, or later when an
+  // environment first asks for one (that sky then appears one frame after its chunk arrives).
+  let skyModule = scene.view?.environment?.sky ? await import('./scene-sky') : null;
   preparations.delete(visit);
   let ctxRef: SceneContext | null = null;
   let activityStart: (() => void) | undefined;
@@ -194,10 +216,14 @@ export async function enterScene(o: {
           clearColor: scene.view?.background ?? 0x101820,
           outputColorSpace: T.SRGBColorSpace,
           ...outputProfile(initialOutput),
+          // Shadows (VIS-03) only for a scene that opted in; PCF filtering, with each light's radius for softness.
+          ...(scene.shadows ? {shadowMap: {enabled: true, type: T.PCFShadowMap}} : {}),
         },
       });
       if (!surface) throw Error(`${scene.id}: WebGL could not start`);
       const renderer = surface.renderer;
+      // KTX2 model textures are transcoded for this visit's renderer formats; nothing loads until a model needs it.
+      s.models.bindRenderer?.(renderer, actx.signal);
 
       const three = new T.Scene();
       actx.own(() => disposeOwnedTree(three));
@@ -242,7 +268,14 @@ export async function enterScene(o: {
         next => applyOutput(renderer, next),
         error => s.log.error(`${scene.id}: view.output refused`, error),
       );
-      let environment = scene.view?.environment ? bindEnvironment(three) : null;
+      // The sun's shadow (VIS-03): a scene with `sceneShadows()` lets its environment's `directional.shadow` cast.
+      const sunShadow = scene.shadows && lightModule ? lightModule.createSunShadow(renderer, SUN_SHADOW_MAP) : null;
+      actx.own(() => sunShadow?.dispose());
+      const sunShadowApply = sunShadow ? sunShadow.apply : undefined;
+      let sunShadowReported = false;
+      const skyLayer = () => skyModule?.createSkyLayer(three) ?? null;
+      let skyLoading = false;
+      let environment = scene.view?.environment ? bindEnvironment(three, sunShadowApply, skyLayer) : null;
       actx.own(() => environment?.dispose());
       const cubes = bindSceneCubes(
         three,
@@ -557,17 +590,64 @@ export async function enterScene(o: {
             renderer: particleView,
           })
         : null;
+      // Scatter: one instanced draw per admitted `Scatter`, in scenes that opted in (`sceneScatter()`); placement draws
+      // from a stream derived from the scene id and `?seed=`, never the gameplay one. The density knob is read once.
+      let scatter: SceneScatterDrawing | null = null;
+      const startScatter = (m: typeof import('./scene-scatter')) => {
+        if (actx.signal.aborted || scatter || !scene.scatter) return;
+        scatter = m.createSceneScatter({
+          world,
+          scene: three,
+          limits: scene.scatter.limits,
+          root: scatterRoot(scene.id, seed),
+          density: s.quality.knob('effects.scatter-density'),
+          surfaces,
+          geometries,
+          resources,
+          mask: maskOf,
+          report: error => s.log.error(`${scene.id}: scatter`, error),
+        });
+      };
+      if (scene.scatter) {
+        if (scatterModule) startScatter(scatterModule);
+        else
+          loadScatter().then(
+            m => {
+              startScatter(m);
+              dirty = true;
+              actx.invalidate();
+            },
+            error => {
+              if (!actx.signal.aborted) s.log.error(`${scene.id}: scatter drawing failed to load`, error);
+            },
+          );
+        actx.own(() => scatter?.dispose());
+      }
+      const scatterProbe = {id: SCATTER_ID} as ComponentType<object>;
+      let scatterReported = false;
       const emitterProbe = {id: EMITTER_ID} as ComponentType<object>;
       let emittersReported = false;
       // Local lights (VIS-02): a scene with `sceneLights()` gets a fixed rig of slots for this visit, capped by the
       // 'reenter-scene' knob `lights.local-max`; a scene without it creates no light and reports its lights once.
+      // Shadowed slots (VIS-03) are chosen once, from the scene's own lights, bounded by `lights.shadowed-max`.
       const lightSlotCounts = lightSlotsFor(scene.lights, scene.lights ? s.quality.knob('lights.local-max') : 0);
+      const shadowCap = scene.shadows ? s.quality.knob('lights.shadowed-max') : 0;
+      const shadowedSlots = scene.shadows ? shadowedSlotsFor(world, lightSlotCounts, shadowCap) : {point: 0, spot: 0};
       const lightSlots = createLightSlots({
         slots: lightSlotCounts,
         enabled: !!scene.lights,
+        shadowed: shadowedSlots,
+        shadows: !!scene.shadows,
         report: message => s.log.error(`${scene.id}: ${message}`),
       });
-      const lightRig = lightModule ? lightModule.createSceneLightRig(three, lightSlotCounts) : null;
+      const lightRig =
+        lightModule && scene.lights
+          ? lightModule.createSceneLightRig(
+              three,
+              lightSlotCounts,
+              scene.shadows ? {shadowed: shadowedSlots, mapSize: localShadowMapSize(shadowCap), renderer} : undefined,
+            )
+          : null;
       actx.own(() => lightRig?.dispose());
       // Preload whenever the scene opted in: a runtime-spawned first burst must not wait for (and miss) the chunk.
       if (particles) particleView.preload();
@@ -596,23 +676,86 @@ export async function enterScene(o: {
       s.quality.subscribe(() => {
         if (viewState.post) actx.invalidate();
       }, actx.signal);
+      // Render extensions (`defineScene({ extensions })`, made by a kit: scene-extension.ts). Each opens once, now, so
+      // its objects are part of program preparation; a session that throws is reported and closed for the visit.
+      // Closed first when the visit ends (registered after the scene tree's own release, so it runs before it).
+      type OpenExtension = {id: string; session: SceneExtensionSession | null};
+      const extensions: OpenExtension[] = [];
+      const closeExtension = (x: OpenExtension, error?: unknown) => {
+        const session = x.session;
+        x.session = null;
+        if (error !== undefined) s.log.error(`${scene.id}: extension ${x.id} failed; closed for this visit`, error);
+        try {
+          session?.dispose();
+        } catch (cleanup) {
+          s.log.error(`${scene.id}: extension ${x.id} cleanup failed`, cleanup);
+        }
+        dirty = true;
+      };
+      for (const extension of scene.extensions ?? []) {
+        const x: OpenExtension = {id: extension.id, session: null};
+        extensions.push(x);
+        try {
+          x.session = openSceneExtension(extension, {
+            scene: three,
+            camera,
+            renderer,
+            canvas: surface.canvas,
+            backend: brief.render.backend,
+            ctx,
+            world,
+            kits: (s.play.game.kits ?? []).map(k => k.id),
+            dev: TEST_API,
+            signal: actx.signal,
+            time: () => ({t, calm}),
+            mask: maskOf,
+            invalidate: () => {
+              dirty = true;
+              actx.invalidate();
+            },
+            report: error => s.log.error(`${scene.id}: extension ${extension.id}`, error),
+          });
+        } catch (error) {
+          s.log.error(`${scene.id}: extension ${extension.id} could not open`, error);
+        }
+      }
+      actx.own(() => {
+        for (const x of [...extensions].reverse()) closeExtension(x);
+      });
+      const extensionsBusy = () => extensions.some(x => !!x.session?.busy());
+      /** A session's own draw of the frame (a render override), else false: the scene draws. */
+      const drawOverride = () => {
+        for (const x of extensions)
+          if (x.session?.render)
+            try {
+              if (x.session.render()) return true;
+            } catch (error) {
+              if (error instanceof ProgramLinkError || error instanceof FrameReadinessError) throw error;
+              closeExtension(x, error);
+            }
+        return false;
+      };
       const sync = (dt = 0) => {
         if (actx.signal.aborted) return;
         actx.setFrameMode(
           body.systems.length ||
             [...world.query(Model)].some(([, m]) => m.playing && !!m.clip && m.speed > 0) ||
-            !!particles?.busy(world)
+            !!particles?.busy(world) ||
+            extensionsBusy()
             ? 'continuous'
             : 'on-demand',
         );
         if (models.sync(dt)) dirty = true;
+        if (scatter?.sync()) dirty = true;
+        if (actx.signal.aborted) return;
         const seen = new Set<Entity>();
         for (const [e, tr, sh] of world.query(Transform, Shape)) {
           if (world.has(e, Mesh) || world.has(e, Model)) continue; // Deterministic precedence; never draw two representations.
           seen.add(e);
           const look = world.get(e, Material),
             lookKey = look ? materialKey(look) : '';
-          const sig = `${tr.x},${tr.y},${tr.z},${tr.rx},${tr.ry},${tr.rz},${tr.scale},${sh.kind},${sh.size},${sh.color},${sh.visible},${maskOf(e)},${lookKey}`;
+          const shade = scene.shadows ? shadowFlags(scene.shadows, world.get(e, Shadow)) : NO_SHADOW;
+          const sig = `${tr.x},${tr.y},${tr.z},${tr.rx},${tr.ry},${tr.rz},${tr.scale},${sh.kind},${sh.size},${sh.color},${sh.visible},${maskOf(e)},${lookKey},${shade.cast},${shade.receive}`;
           let m = meshes.get(e);
           if (!m) {
             const geometry = geometries.acquire(sh.kind, sh.size);
@@ -671,6 +814,8 @@ export async function enterScene(o: {
           m.surface.material.color.setHex(sh.color);
           mesh.visible = sh.visible;
           mesh.layers.mask = maskOf(e);
+          mesh.castShadow = shade.cast;
+          mesh.receiveShadow = shade.receive;
           m.sig = sig;
           dirty = true;
         }
@@ -736,7 +881,8 @@ export async function enterScene(o: {
             if (!current || world.get(e, Mesh) !== data || world.get(e, Transform) !== tr || world.has(e, Model))
               continue;
           }
-          const sig = `${tr.x},${tr.y},${tr.z},${tr.rx},${tr.ry},${tr.rz},${tr.scale},${data.color},${data.visible},${maskOf(e)},${lookKey}`;
+          const shade = scene.shadows ? shadowFlags(scene.shadows, world.get(e, Shadow)) : NO_SHADOW;
+          const sig = `${tr.x},${tr.y},${tr.z},${tr.rx},${tr.ry},${tr.rz},${tr.scale},${data.color},${data.visible},${maskOf(e)},${lookKey},${shade.cast},${shade.receive}`;
           if (m.sig !== sig) {
             if (m.surface && m.surface.key !== lookKey && !m.surface.update(look)) {
               // A Material added, removed, made invalid or given another shading class: one new surface.
@@ -752,6 +898,8 @@ export async function enterScene(o: {
             m.mesh.material.color.setHex(data.color);
             m.mesh.visible = data.visible;
             m.mesh.layers.mask = maskOf(e);
+            m.mesh.castShadow = shade.cast;
+            m.mesh.receiveShadow = shade.receive;
             m.sig = sig;
             dirty = true;
           }
@@ -780,11 +928,30 @@ export async function enterScene(o: {
         }
         if (viewState.environment) {
           if (!environment) {
-            environment = bindEnvironment(three);
+            environment = bindEnvironment(three, sunShadowApply, skyLayer);
             for (const light of defaultLights) light.visible = false;
             dirty = true;
           }
           if (environment.sync(viewState.environment, camera)) dirty = true;
+          if (!skyLoading && environment.wantsSky()) {
+            skyLoading = true;
+            void import('./scene-sky').then(
+              m => {
+                if (actx.signal.aborted) return;
+                skyModule = m;
+                environment?.refresh();
+                dirty = true;
+                actx.invalidate();
+              },
+              error => s.log.error(`${scene.id}: the sky could not load`, error),
+            );
+          }
+          if (!scene.shadows && !sunShadowReported && viewState.environment.directional.shadow) {
+            sunShadowReported = true;
+            s.log.error(
+              `${scene.id}: the environment's sun casts no shadow: the scene has no shadows (defineScene({ shadows: sceneShadows() }))`,
+            );
+          }
         } else if (environment) {
           environment.dispose();
           environment = null;
@@ -802,6 +969,13 @@ export async function enterScene(o: {
         )
           dirty = true;
         if (post.sync(viewState.post, s.quality.knob('post.mode'))) dirty = true;
+        for (const x of extensions)
+          if (x.session)
+            try {
+              if (x.session.sync(dt)) dirty = true;
+            } catch (error) {
+              closeExtension(x, error);
+            }
         if (lightRig) {
           lightSlots.sync(world);
           if (lightRig.apply(world, lightSlots)) dirty = true;
@@ -810,6 +984,12 @@ export async function enterScene(o: {
         if (world.version !== lastVersion) {
           lastVersion = world.version;
           dirty = true;
+          if (!scene.scatter && !scatterReported && world.first(scatterProbe)) {
+            scatterReported = true;
+            s.log.error(
+              `${scene.id}: a Scatter is not drawn: the scene has no scatter (defineScene({ scatter: sceneScatter() }))`,
+            );
+          }
           if (!particles && !emittersReported && world.first(emitterProbe)) {
             emittersReported = true;
             s.log.error(
@@ -825,6 +1005,12 @@ export async function enterScene(o: {
         renderer.setSize(w, h, false);
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
+        for (const x of extensions)
+          try {
+            x.session?.resized?.(w, h, renderer.getPixelRatio());
+          } catch (error) {
+            closeExtension(x, error);
+          }
         dirty = true;
         actx.invalidate();
         sizes.refresh();
@@ -861,7 +1047,8 @@ export async function enterScene(o: {
         beforeStep: pressed.beginStep,
         beforeFrameLane: pressed.beginFrameLane,
       });
-      const live = body.systems.length > 0 || [...world.query(Model)].length > 0 || !!particles?.busy(world);
+      const live =
+        body.systems.length > 0 || [...world.query(Model)].length > 0 || !!particles?.busy(world) || extensionsBusy();
       const handle: SceneHandle = {
         state: () => {
           const named: Record<string, {x: number; y: number; z: number}> = {};
@@ -892,6 +1079,9 @@ export async function enterScene(o: {
       if (TEST_API && models.inspect) handle.model = createSceneModelInspector(models.inspect, visit, actx.signal);
       if (TEST_API) handle.entities = createSceneEntityInspector(world, visit, actx.signal);
       if (TEST_API) handle.post = () => post.stats();
+      if (TEST_API && extensions.length)
+        handle.extensions = () =>
+          Object.fromEntries(extensions.map(x => [x.id, x.session ? (x.session.stats?.() ?? {}) : {closed: true}]));
       if (TEST_API) handle.lights = () => structuredClone(lightSlots.stats);
       if (TEST_API && particles)
         handle.particles = () => ({
@@ -904,6 +1094,11 @@ export async function enterScene(o: {
             failed: particleView.stats.failed,
           },
         });
+      if (TEST_API && scene.scatter)
+        handle.scatter = () => {
+          const st = scatter?.stats;
+          return st ? {...st, refused: {...st.refused}, list: st.list.map(entry => ({...entry}))} : null;
+        };
       s.play.attach(handle, actx.signal);
 
       // Prepare authored resident materials before router activation/first render.
@@ -996,7 +1191,7 @@ export async function enterScene(o: {
           sync();
           post.compile(three, camera);
           // Include a real initial draw: generated passes can create programs absent from compile().
-          if (!post.render(three, camera)) renderer.render(three, camera);
+          if (!drawOverride() && !post.render(three, camera)) renderer.render(three, camera);
           const frame = await (surface.frameReady?.(actx.signal) ?? Promise.resolve('ready'));
           if (frame === 'retired') throw Error('Scene frame preparation retired');
           if (version !== preparationVersion || actx.leaving() || actx.signal.aborted)
@@ -1045,7 +1240,7 @@ export async function enterScene(o: {
           try {
             sync();
             if (actx.leaving() || actx.signal.aborted || !programsPrepared || !dirty) return false;
-            if (!post.render(three, camera)) renderer.render(three, camera);
+            if (!drawOverride() && !post.render(three, camera)) renderer.render(three, camera);
           } catch (error) {
             if (!(error instanceof ProgramLinkError || error instanceof FrameReadinessError)) throw error;
             failPrograms(error);
