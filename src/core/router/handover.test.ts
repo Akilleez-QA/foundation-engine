@@ -112,6 +112,32 @@ test('a stale enter: the late run is left at once, never activated, no reward', 
   assert.deepEqual(w.saves, ['reward b for player 1']);
 });
 
+test('a stale enter whose late run then fails to prepare: the rejection is observed, not unhandled', async () => {
+  const w = world(),
+    h = createHandover(w.deps);
+  const slow = gate(),
+    ready = gate();
+  const unhandled: unknown[] = [];
+  const watch = (reason: unknown) => unhandled.push(reason);
+  process.on('unhandledRejection', watch);
+  try {
+    const A = w.scene('a', {enter: () => slow.p, ready: () => ready.p}),
+      B = w.scene('b');
+    const ra = h.go(A);
+    await tick();
+    assert.equal(await h.go(B), 'activated');
+    slow.open();
+    assert.equal(await ra, 'superseded');
+    ready.fail(Error('Scene program preparation retired'));
+    await tick();
+    await tick();
+    assert.deepEqual(unhandled, []);
+    assert.deepEqual(w.failures, [], 'an obsolete preparation failure is never reported');
+  } finally {
+    process.off('unhandledRejection', watch);
+  }
+});
+
 test('a stale ready: the prepared run is left when superseded, and its late ready changes nothing', async () => {
   const w = world(),
     h = createHandover(w.deps);

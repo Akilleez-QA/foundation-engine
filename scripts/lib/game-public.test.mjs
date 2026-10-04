@@ -105,8 +105,8 @@ test("the engine keeps no file in the shared root public folder, so no template'
   const owned = templateGameDirs().filter(d => publicFiles(join(ROOT, d, 'public')).length);
   assert.deepEqual(
     owned,
-    ['templates/mechanics/game', 'templates/showcase/game'],
-    'only the mechanics and showcase templates ship static files today',
+    ['templates/explorer/game', 'templates/mechanics/game', 'templates/showcase/game'],
+    'only the explorer, mechanics and showcase templates ship static files today',
   );
   for (const d of owned) assert.deepEqual(publicProblems(join(ROOT, d, 'public')), [], d);
 });
