@@ -43,3 +43,4 @@ useful patterns. Native threading, device APIs and licensing metadata do not tra
 automatically to a browser engine. New dependencies need a separate adoption decision.
 
 - [Callback ownership and bounded diagnostics](CALLBACK-OWNERSHIP.md)
+- [Runtime pose chains: interpolating key poses at runtime (recommendation: not now)](runtime-pose-chains.md)

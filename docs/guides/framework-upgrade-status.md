@@ -977,3 +977,12 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   sun-like discs and stars from one CPU-generated texture on an unlit sphere (no custom shader, backend-neutral);
   `haze` gains `{ kind: 'exp2', density }` and `color: 'sky'`. Evidence: unit tests and `npm run test:sky-browser`
   (desktop headless Chromium, software GL). No physical-device evidence.
+
+## Asset provenance and AI disclosure — DX-03, implemented
+
+- **Records and check.** Every model, texture and sound under a game's `public/` needs a provenance record (origin,
+  author, licence, source, SHA-256; tool, model, prompt or reference and human edits for AI origins).
+  `lint:provenance` in `npm run check` warns by default; `defineBuild({ assets: { provenance: 'required' } })` makes it
+  an error. **Disclosure.** `npm run disclosure` drafts Steam and itch.io AI-disclosure text from the records, with
+  development tooling kept apart from content players see. Evidence: focused tests and `npm run check`. Tooling only;
+  no store-acceptance or licence-truth claim. [Guide](asset-provenance.md).

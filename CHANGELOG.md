@@ -12,6 +12,16 @@ Every new framework below is optional: a game that does not use it is unchanged.
   texture limits, file and texture bytes, allowed material properties and the receipt fields licence, author,
   source, tool and generator. A GLB without a contract is unaffected. See
   [model contracts](docs/guides/model-contracts.md).
+- **Asset provenance and AI disclosure (DX-03).** Each model, texture and sound under a game's `public/` gets a
+  provenance record, beside the file (`<name>.provenance.json`, the receipt the Blender export already writes) or in
+  `<game>/assets.provenance.json`: origin (`hand`, `agent-blender`, `ai-generator`, `library`), author, licence,
+  source, SHA-256 and, for AI origins, tool, model, prompt or reference, human edits and the generator's weights and
+  output licences. `npm run check` runs the new `lint:provenance`: missing or broken records are **warnings**, and
+  errors only when the brief sets `assets: { provenance: 'required' }` (a new optional brief field; default
+  `'warn'`). `npm run disclosure` drafts Steam and itch.io AI-disclosure text from the records, keeping content
+  players see apart from development tooling; a missing record makes the draft INCOMPLETE. The ship skill runs it
+  before a store page. [Guide](docs/guides/asset-provenance.md). *Affected:* games with files in `public/` see
+  warnings in `npm run check` until they add records; nothing fails unless the brief opts in.
 - **fix-budget skill: draw calls first.** The skill now counts draws before triangles against the scene's
   `budgets.json` row and the brief's per-scene ceiling (about 100 per scene on phones as guidance; the brief's
   numbers win), and names the real APIs for instancing and scatter: one `defineMesh` entity for static repeats
