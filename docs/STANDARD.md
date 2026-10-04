@@ -585,6 +585,8 @@ A game adds its own domain systems (for example an economy or a world model) wit
   - typecheck;
   - the lint ratchets (layers, owned capabilities, CSS, budgets);
   - the tests;
+  - the smoke snap and every scripted browser playtest of the game (`npm run play:playtests`: `game/playtest/*.json`
+    and each `how: 'playtest'` success criterion); a failing playtest fails the gate;
   - the bundle check;
   - a software-rendered bench at the reference preset.
 
