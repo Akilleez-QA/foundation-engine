@@ -60,6 +60,7 @@ export interface BenchSample {
   readonly offscreenDrawsPerRenderedFrame?: number;
   readonly postDrawsPerRenderedFrame?: number;
   readonly shadowPassDrawsMax?: number;
+  readonly shadowCasters?: number;
   readonly shadowPassesMax?: number;
   readonly chunkKiB?: number;
   readonly textureMiB?: number;
@@ -190,7 +191,7 @@ export function readMetric(s: BenchSample, metric: BudgetMetric): number | null 
     case 'triangles':
       return n(s.trisPerRenderedFrame);
     case 'shadowCasters':
-      return n(s.shadowPassDrawsMax);
+      return n(s.shadowCasters) ?? n(s.shadowPassDrawsMax);
     case 'shadowPasses':
       return n(s.shadowPassesMax);
     case 'shadowDrawsIdle':
@@ -404,6 +405,7 @@ export function worstOf(samples: readonly BenchSample[]): BenchSample {
     'offscreenDrawsPerRenderedFrame',
     'postDrawsPerRenderedFrame',
     'shadowPassDrawsMax',
+    'shadowCasters',
     'shadowPassesMax',
     'textureMiB',
     'canvasMiB',

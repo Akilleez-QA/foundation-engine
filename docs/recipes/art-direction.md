@@ -644,7 +644,8 @@ Look at the pictures yourself; a passing snap is not a good-looking one.
 8. **The phone view works.** The play area fits, the top and bottom quarters show more than flat sky or bare ground,
    the HUD covers nothing that matters, and a dark setup is still readable ([phone framing](#phone-framing-portrait)).
 9. **Within budget.** Draws, triangles and texture memory in the snap are inside `budgets.json` (a shadow map is
-   texture memory). Static scenery is baked into one mesh per bake; repeated things are a scatter.
+   texture memory). `npm run play:snap` prints them on its `counts:` line with post draws, shadow passes and shadow
+   casters, each against the scene's row (`views.<view>.budget` in `playtest/latest/probe.json`). Static scenery is baked into one mesh per bake; repeated things are a scatter.
 10. **Motion is calm.** Nothing flickers or swims; decorative motion stops under Calm.
 
 ## What it costs

@@ -4,9 +4,11 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
 import {
+  budgetAt,
   budgetLine,
   budgetStatus,
   budgets,
+  countsLine,
   evidencePath,
   frameRateLine,
   NOT_MEASURED,
@@ -44,6 +46,52 @@ test('play:snap budget: postDraws is judged only where a scene budgets it, apart
     s.rows.map(r => r.metric),
     ['draws', ...(limit.postDraws === undefined ? [] : ['postDraws']), 'triangles'],
   );
+});
+
+// C1 (2026-10-03 acceptance): look-checklist item 9 needs texture memory and shadow work from the snap itself.
+test('play:snap budget: textureMiB, shadowPasses and shadowCasters are judged against the row next to draws', () => {
+  const m = {renders: 3, drawsPerFrame: 1, trisPerFrame: 2};
+  const gpu = {textureMiB: 0.5, shadowPasses: 0, shadowCasters: 0};
+  const s = budgetStatus(scene, m, {gpu});
+  for (const k of ['shadowCasters', 'shadowPasses', 'textureMiB'])
+    if (limit[k] !== undefined)
+      assert.ok(
+        s.rows.some(r => r.metric === k && r.ok),
+        k,
+      );
+  assert.equal(s.status, 'within budget');
+  assert.deepEqual(s.measured, {draws: 1, postDraws: null, triangles: 2, ...gpu});
+  const over = budgetStatus(scene, m, {gpu: {textureMiB: limit.textureMiB + 0.1, shadowPasses: 7, shadowCasters: 1}});
+  assert.equal(over.status, 'OVER BUDGET');
+  const line = budgetLine(over);
+  assert.match(line, new RegExp(`textureMiB ${limit.textureMiB + 0.1} > ${limit.textureMiB}`));
+  assert.match(line, new RegExp(`shadowPasses 7 > ${limit.shadowPasses}`));
+  assert.doesNotMatch(line, /shadowCasters/);
+  // Shadow and texture counts never make an unrendered window 'within budget'.
+  assert.equal(budgetStatus(scene, {renders: 0}, {gpu}).status, NOT_MEASURED);
+});
+
+test('play:snap counts line: every count against its budget, unbudgeted ones labelled', () => {
+  const status = {
+    rows: [
+      {metric: 'draws', measured: 29, budget: 40, ok: true},
+      {metric: 'triangles', measured: 19765, budget: 30000, ok: true},
+      {metric: 'textureMiB', measured: 49, budget: 48, ok: false},
+    ],
+    measured: {draws: 29, postDraws: null, triangles: 19765, shadowCasters: 4, shadowPasses: 1, textureMiB: 49},
+  };
+  assert.equal(
+    countsLine(status),
+    'draws 29/40 · triangles 19,765/30,000 · shadowCasters 4 (no budget) · shadowPasses 1 (no budget) · textureMiB 49/48 OVER',
+  );
+});
+
+test('play:snap budget at a lighter preset reads the row ports (as src/core/budget.ts budgetFor)', () => {
+  const row = {draws: 46, postDraws: 10, ports: {high: {draws: 40}, medium: {postDraws: 1}, low: {postDraws: 0}}};
+  assert.deepEqual(budgetAt(row), {draws: 46, postDraws: 10});
+  assert.deepEqual(budgetAt(row, 'high'), {draws: 40, postDraws: 10});
+  assert.deepEqual(budgetAt(row, 'medium'), {draws: 40, postDraws: 1});
+  assert.deepEqual(budgetAt(row, 'low'), {draws: 40, postDraws: 0});
 });
 
 test('play:snap summary: a phone view prints its draws, verdict and measured fps, labelled advisory', () => {

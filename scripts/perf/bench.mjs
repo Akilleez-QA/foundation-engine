@@ -312,6 +312,8 @@ export async function runBench(o, {log = console.log} = {}) {
         offscreenDrawsPerRenderedFrame: Math.round(w.off / drawn),
         postDrawsPerRenderedFrame: Math.round((w.post ?? 0) / drawn),
         shadowPassDrawsMax: g.shadowPassDrawsMax,
+        // The budget metric's own name, so a run file reads like the budgets.json row (the same number).
+        shadowCasters: g.shadowPassDrawsMax,
         shadowPassesMax: g.shadowPassesMax,
         taskMsPerFrame: per('TaskDuration'),
         frameMsP95: w.frameMsP95 === null ? undefined : +w.frameMsP95.toFixed(2),
@@ -345,7 +347,7 @@ export async function runBench(o, {log = console.log} = {}) {
       if (!o.quiet && classification.reasons.length) log(' '.repeat(20), classification.reasons.join('; '));
       log(
         id.padEnd(20),
-        `${classification.kind.padEnd(12)} draws ${s.drawsPerRenderedFrame} (max ${s.drawsMaxFrame}) tris ${s.trisPerRenderedFrame} frames ${s.renderedFrames}/${s.frames} tex ${s.textureMiB} canvas ${s.canvasMiB} heap ${s.heapMB} ctx ${s.liveContexts}` +
+        `${classification.kind.padEnd(12)} draws ${s.drawsPerRenderedFrame} (max ${s.drawsMaxFrame}) post ${s.postDrawsPerRenderedFrame} tris ${s.trisPerRenderedFrame} casters ${s.shadowCasters} passes ${s.shadowPassesMax} frames ${s.renderedFrames}/${s.frames} tex ${s.textureMiB} canvas ${s.canvasMiB} heap ${s.heapMB} ctx ${s.liveContexts}` +
           (extra.enterMs ? ` enter ${extra.enterMs}ms ${extra.enterMB}MB` : ''),
       );
       return s;
