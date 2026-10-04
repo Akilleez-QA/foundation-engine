@@ -33,6 +33,7 @@ comes from the built-in deform-only flatten (see [rig](#1-rig)).
 | `review.mjs` | The review ledger: approve the rig, approve or unfreeze clips |
 | `pipeline.mjs` | Runs a worked example end to end |
 | `examples/robot/` | Worked example: an original low-poly humanoid with a wave and a mirrored walk |
+| `examples/bug/` | Worked example: an original six-legged creature of rigid parts with a tripod scuttle and a tail strike |
 | `game/public/models/` | The example's exported GLB, clips manifest, provenance and model contract |
 
 ## The steps
@@ -246,6 +247,7 @@ every 10 cm, so sliding shows. Look at it yourself, then show it to the person.
 
 ```sh
 node tools/pose-to-pose/pipeline.mjs robot --sheets /tmp/robot-sheets
+node tools/pose-to-pose/pipeline.mjs bug --sheets /tmp/bug-sheets
 ```
 
 An original low-poly robot (190 vertices, three material slots including `team`) is built from
@@ -258,12 +260,28 @@ bone without vertices, so the rig step used the voxel proxy; the re-import match
 0.003 mm; both soles touched the floor at their step events; the walk's largest foot slide was 17 mm
 and the turns' 31 mm. Re-running the pipeline produced byte-identical files.
 
+The second example is a non-humanoid built the way rigging works best: 19 separate low-poly parts
+(body, back plate, head, three tail segments, a stinger, and two segments for each of six legs), each
+with box-projected UVs, sharing three materials (`shell`, `team`, `stinger`). It is rigged with
+`--kind rigid` (25 bones, including a contact bone at each foot tip), so every part follows one bone
+with no weights. `scuttle` is a 4-key-pose tripod gait (front and rear legs of one side with the middle
+leg of the other), mirrored into a closed 24-frame loop with a stride of 0.24 m. The swing feet lift
+straight off and settle back at ground speed, so the six planted feet slide at most 5 mm. `strike` is a
+one-shot: idle, a cocked tail, a tail whip over the head with the body lunging over planted feet, back
+to idle. The stinger is scaled to 1.5 and the last tail segment to 1.15 on the hit key (impact
+exaggeration), and the clip has an `impact` event at 0.4333 s. Both soles touched the floor at their
+events, and two runs were byte-identical. As with the robot, the poses are agent-authored and the
+review gate was off.
+
 ## Limits
 
 - Blender runs locally. CI has no Blender: it validates the checked-in outputs with `validate.mjs` and its
   tests. The Python scripts were exercised with Blender 5.2.1 LTS only.
 - In-betweens are forward-kinematic interpolation of local rotations. There is no IK or foot locking
   between keys; add a key pose where a contact must hold exactly.
+- Rebuild scripts must be deterministic to re-export byte for byte. Two Blender operations were not, on
+  this machine: Smart UV Project and bmesh's UV-sphere primitive (whose pole merge orders faces
+  differently between runs). The creature builds its UVs and ellipsoids explicitly instead.
 - The humanoid fit expects a symmetric, upright model facing −Y in an A- or T-pose. Fingers, face and
   twist bones are not generated.
 - Turn variants are an approximation: a lean and twist on one bone plus root yaw. The validator measures

@@ -1,19 +1,17 @@
 {
   "agentAssisted": true,
-  "artifact": "pose-robot.glb",
+  "artifact": "pose-bug.glb",
   "author": "Foundation Engine contributors",
   "blender": "5.2.1 LTS",
-  "bones": 24,
+  "bones": 25,
   "clips": [
-    "wave",
-    "walk",
-    "walk_turn_left",
-    "walk_turn_right"
+    "scuttle",
+    "strike"
   ],
-  "clipsManifestSha256": "3a1dd8e9f3e11f022e91a7ea169fda02ee5fcebc31b925859558ee4211bfd2ba",
+  "clipsManifestSha256": "edf80b8d5145e2eab6c0f2d7ea9d4659440c24c264e2e27b4721c1abbcb10ecb",
   "generator": "Khronos glTF Blender I/O v5.2.40",
   "inputs": {
-    "animations.json": "a41c878798de224f11fd0d0f553e74c9a7b0d0cdfc3596111f3b733efca58c4c",
+    "animations.json": "b58bd0ce402693618ca4735cdac49d18f673a8cfc4d7404ce9c74ea48d2e8eac",
     "blender/animate.py": "c841e3f5396fd9f8efdc70bd53505b6bcd86670812728eb3259cfefc87ef7c5d",
     "blender/capture_poses.py": "12517aa3f8f8fa06f15e596302512a866b369c411d37dce06302297a20b1d6e6",
     "blender/common.py": "3d5250b1b0dd316e96c318d6f73ce952b2e36df7e337fb6ce3e004e97d4b3e20",
@@ -22,16 +20,16 @@
     "blender/rig.py": "f76e1535137ea445e92e1da6f6e18982ab3dc670a43db05cd314f8683c9257bb",
     "blender/test_poses.py": "c71029841e88166355cd3eaede4ee9ce96eec8eb675e7f065ae99f3685266b7b",
     "blender/verify.py": "0ddd9c29426d2c95b0724b9518e4c9cfdef0d1bd82eeec86dd190a8ea21bfa16",
-    "poses.json": "d4470c9597944d0610284bbe2948bf01a9493f4b0c947e6db7de5dfa1f7077b0"
+    "poses.json": "af2dad78c475e1381b0b6466f198f35dbb01a44096a06069862956e89fb500a7"
   },
   "licence": "GPL-3.0-only",
-  "note": "Original procedural model. No user was present: the agent authored the key poses (author_poses.py) and the review gate was off; see the review field.",
+  "note": "Original procedural model built from separate rigid parts. No user was present: the agent authored the key poses (author_poses.py) and the review gate was off; see the review field.",
   "review": "off",
-  "rigSha256": "a742b067df60564f4614fca040a2cc11e9a06379b5b743a94f0a1ba8bbb411d3",
+  "rigSha256": "2a2f2037a1a204582e667dd4c1a575a00ed99ee8ce8497ed47f8139b6e3cc21c",
   "schema": 1,
-  "sha256": "52d2658c328f2363a0b6cdb60f5bc9b363434a2feae48bdfc9a24e4ae8c3aa69",
-  "source": "tools/pose-to-pose/examples/robot",
+  "sha256": "f9720d52f8b11d7e408f7bf82ef3d4e906e7c300b6e746f53d7baf981d70e32c",
+  "source": "tools/pose-to-pose/examples/bug",
   "tool": "Blender 5.2.1 LTS",
-  "triangles": 376,
+  "triangles": 350,
   "unapprovedPoses": []
 }
