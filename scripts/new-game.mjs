@@ -7,6 +7,8 @@
 // --force replaces an existing game: it prints what will be replaced, then removes ./game and ./GAME.md before copying,
 // so no file of the old game (a scene, a test, an input) is left mixed into the new one. The engine's root playtest/
 // folder (evidence in playtest/latest/, engine scripts) is never written or removed.
+// It also writes game/.origin.json ({template, commit}), which lint:budgets reads to ratchet against the template.
+import {execFileSync} from 'node:child_process';
 import {cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {ROOT} from './lib/game-dir.mjs';
@@ -29,6 +31,24 @@ export function replaced(root) {
 export function withHeading(md, title) {
   const heading = `# ${title.replace(/\s+/g, ' ').trim()}`;
   return /^# .*$/m.test(md) ? md.replace(/^# .*$/m, () => heading) : `${heading}\n\n${md}`;
+}
+
+/** The file in ./game that records the template and engine commit the game started from (budget-ratchet.mjs). */
+export const ORIGIN_FILE = '.origin.json';
+/** `{template, commit}`: commit is the checkout's HEAD when `root` is a git work tree with a commit, else null. */
+export function gameOrigin(root, template) {
+  let commit = null;
+  try {
+    commit =
+      execFileSync('git', ['rev-parse', '--verify', 'HEAD^{commit}'], {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim() || null;
+  } catch {
+    commit = null;
+  }
+  return {template, commit};
 }
 
 /** Starts a game in `root` from template `name`. Throws with a message for the author on a bad request. */
@@ -60,6 +80,9 @@ export function startGame({root = ROOT, name, id = 'my-game', title, force = fal
   }
   cpSync(join(root, 'templates', name, 'game'), join(root, 'game'), {recursive: true});
   cpSync(join(root, 'templates', name, 'GAME.md'), join(root, 'GAME.md'));
+  // Where the game came from: lint:budgets compares a new ./game with this template's budgets at this commit, so a
+  // raise above the template's numbers needs a Perf-Budget line even where origin/main has no ./game.
+  writeFileSync(join(root, 'game', ORIGIN_FILE), JSON.stringify(gameOrigin(root, name), null, 2) + '\n');
   if (named) {
     const md = join(root, 'GAME.md');
     writeFileSync(md, withHeading(readFileSync(md, 'utf8'), title));
