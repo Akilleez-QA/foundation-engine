@@ -150,5 +150,9 @@ t.run(1);
 assert.equal(t.world.count, before, 'the sparks removed themselves');
 ```
 
+`t.particles.sample(entity)` describes one emitter: its live particles, spawn attempts and their bounds. For the
+named tests every ability or status effect should pass (cancelled windups, single impacts, stacking, owner despawn,
+pooled trails), see [test your effects' lifecycles](test-effect-lifecycles.md).
+
 Look at it: `npm run play:snap` and check the draw count against the scene budget. More detail, including what is
 not covered, is in the [particles guide](../guides/particles.md).

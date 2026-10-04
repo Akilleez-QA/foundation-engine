@@ -151,6 +151,16 @@ export interface ParticleStats {
   readonly refusals: {readonly emitters: number; readonly particles: number};
 }
 
+/** One admitted emitter's particles, for tests and diagnostics (allocates; not for the frame loop). */
+export interface EmitterSample {
+  /** Particles alive now. */
+  readonly live: number;
+  /** Spawn attempts since this emitter was admitted (a rebuild or re-admission starts again at 0). */
+  readonly spawned: number;
+  /** The axis-aligned bounds of the live particles' centres at the latest step; null when none is alive. */
+  readonly bounds: {readonly min: Vec3; readonly max: Vec3} | null;
+}
+
 export interface ParticleField {
   /** One fixed step: admit, simulate, spawn, retire and despawn finished emitters. */
   step(world: World, dt: number): void;
@@ -163,6 +173,8 @@ export interface ParticleField {
    *  admit that entity's emitter again this visit. */
   bindFailed(slot: EmitterSlot, error: unknown): void;
   readonly stats: ParticleStats;
+  /** `entity`'s admitted emitter now, or null when it has none admitted (none, refused, invalid or removed). */
+  sample(entity: Entity): EmitterSample | null;
   dispose(): void;
 }
 

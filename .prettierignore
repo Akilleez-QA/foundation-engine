@@ -56,3 +56,4 @@ templates/*/verification/
 # Recipe tests: their `recipe:begin`...`recipe:end` blocks must appear verbatim in the (unformatted) Markdown recipe.
 src/author/particles-recipe.test.ts
 src/author/test-a-scene-recipe.test.ts
+src/kits/animation/effect-lifecycle-recipe.test.ts
