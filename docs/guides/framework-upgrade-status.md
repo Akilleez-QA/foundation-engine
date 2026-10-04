@@ -750,7 +750,7 @@ Flipbook follow-up (FX-01a): integrated in PR #141 (merge `4c4f156`). `frames` o
 (one draw, one `frame` attribute, 16 × 16 cap, own random stream) and `npm run fx:pack`; evidence and limits in
 the [guide](particles.md#flipbooks-sprite-sheets).
 
-Calm follow-up (FX-01b, PR #CALMPR): under Calm (reduced motion) non-essential emitters add no particle and live
+Calm follow-up (FX-01b, PR #171): under Calm (reduced motion) non-essential emitters add no particle and live
 particles hold still and fade out; essential ones still show, held at the spawn point. Spawn attempts, the particles'
 stream and despawn ticks are unchanged (presentation only). Evidence: unit tests and `play:snap -- --calm` on the
 explorer and showcase templates (desktop headless Chromium); see the [guide](particles.md#calm-reduced-motion).
