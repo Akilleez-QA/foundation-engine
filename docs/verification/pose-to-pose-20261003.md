@@ -82,6 +82,22 @@ stepped at 60 Hz.
 The screenshots `loops.png`, `strike-impact.png` and `wave.png` were inspected.
 `game/clip-events.test.mjs` covers the manifest-to-marker and root-motion adapter without a browser.
 
+### Reference intake (rehearsal)
+
+A scratch stand-in for a reference clip was used: a 64-frame side-view render of the robot's own
+`walk` clip, encoded with ffmpeg and kept outside the repository. On it:
+
+- `reference.mjs add` recorded the take.
+- `sheet` wrote 17 frames at 15 fps, each stamped with its source time and frame number, plus a tiled sheet.
+- Marking a pose against the take failed while the take was still `new`; it worked once the take was `selected`.
+- `frame` extracted the 0 s frame.
+- `pose_compare.py` rendered it beside the posed rig from the side view, labelled `approval: pending`.
+- The generator refused the pending pose.
+
+The sheet and side-by-side were inspected. No real generated or filmed footage was used, and no person
+approved a match. `reference.test.mjs` covers the ledger rules and, when ffmpeg is installed, the frame
+timestamps.
+
 ## Not verified
 
 - No person posed or approved anything: the example's key poses are agent-authored code and its review
