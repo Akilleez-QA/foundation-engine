@@ -107,7 +107,7 @@ Without a `game/` folder the blank template runs. `--game <dir>` selects another
 
 ## Not here yet (and workarounds)
 
-The current state as of 0.2.0 (October 2026). Textures and materials ([recipe](docs/recipes/give-a-shape-a-material.md)) and your own sound files ([recipe](docs/recipes/play-your-own-sounds.md)) are supported. After 0.2.0, optional particle emitters (hit sparks, pickups, trails, smoke: one draw per emitter; [recipe](docs/recipes/hit-sparks-and-pickups.md), [guide](docs/guides/particles.md)) are supported too, with desktop software-GL evidence only (FX-01 in the acceptance ledger), as are opt-in tone mapping and exposure per scene, point and spot lights in fixed per-scene slots, and shadows from the sun and lamps ([scene look](docs/guides/scene-look.md), VIS-01 to VIS-03). These are still missing:
+The current state as of 0.2.0 (October 2026). Textures and materials ([recipe](docs/recipes/give-a-shape-a-material.md)) and your own sound files ([recipe](docs/recipes/play-your-own-sounds.md)) are supported. After 0.2.0, optional particle emitters (hit sparks, pickups, trails, smoke: one draw per emitter; [recipe](docs/recipes/hit-sparks-and-pickups.md), [guide](docs/guides/particles.md)) are supported too, with desktop software-GL evidence only (FX-01 in the acceptance ledger), as are opt-in tone mapping and exposure per scene, point and spot lights in fixed per-scene slots, and shadows from the sun and lamps, and a gradient sky with exponential haze ([scene look](docs/guides/scene-look.md), VIS-01 to VIS-03 and VIS-05). These are still missing:
 
 | Not here yet | What exists today | Workaround |
 |---|---|---|

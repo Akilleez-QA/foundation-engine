@@ -41,6 +41,24 @@ npm run check   # typecheck, lints, asset:verify --all, and the affected tests
 | Review gate (scratch copy, not a user approval) | No ledger: export refused. Rig approved, two clips: refused (one representative clip first). One clip: exported as a draft; validator fails it without `--allow-draft`. Clip approved, second clip drafted: exported. A pose edit reaching the approved clip: refused as frozen |
 | Pose capture (scratch) | A pose asset made on the Rigify `head` control and a marker pose captured as `spine.006` rotations in deform space |
 
+### Creature example (rigid parts)
+
+| Check | Result |
+| --- | --- |
+| Pre-rig check | 19 objects, 350 triangles, no warnings |
+| Rig | `--kind rigid`: 25 bones (6 foot-tip contact bones without parts); every part parented to one bone |
+| Rig test poses | Parts coloured by bone, plus legs raised, a tail curl and a body twist; no problems |
+| Clips | `scuttle` (loop, 24 frames, tripod gait mirrored, stride 0.24 m) and `strike` (once, 30 frames, stinger scaled 1.5 at the hit, `impact` at 0.4333 s); GLB 137,032 bytes |
+| Verify (copied folder) | Joint error 0.0 m; deformed parts at the floor events at 8.9 mm (`step_A`, `step_B`) and 7.1 mm (`planted`), tolerance 15 mm |
+| Foot slide | 4.3 to 4.6 mm for each of the six feet, tolerance 20 mm |
+| Static contract | `pose-bug.contract.json` passes `asset:verify`: 350 triangles, 732 vertices, 19 primitives, 3 materials, size 0.63 × 0.58 × 0.67 m |
+| Determinism | Byte-identical after replacing Smart UV Project and bmesh's UV sphere, both of which varied between runs |
+
+The checks caught two of the agent's own mistakes on the way. The validator refused part objects that
+shared their bones' names, which would make engine name lookups ambiguous. The contract's size bound,
+the floor check and the test-pose sheet all caught legs flattened by a floor clamp that read stale
+world matrices.
+
 Contact sheets of the key poses and in-betweens were rendered with `contact_sheet.py` and inspected:
 the wave raises the right arm from the side through horizontal to overhead; the `walk` clip shows heel
 contact, the lowest hips at `down`, the swing foot passing under the body and the highest hips at

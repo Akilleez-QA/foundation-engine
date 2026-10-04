@@ -58,6 +58,7 @@ def add_floor(lo, hi, stripe=0.1):
         plane.scale = (span, stripe, 1)
         plane.location = (0, -span / 2 + stripe / 2 + i * stripe, -0.001)
         plane.data.materials.append(mats[i % 2])
+        plane.color = mats[i % 2].diffuse_color  # the same look under the object colour type
 
 
 def add_camera(lo, hi, view, margin=1.35):

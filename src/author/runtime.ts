@@ -162,6 +162,9 @@ export async function enterScene(o: {
   // Local lights (VIS-02) and shadows (VIS-03) are a lazy chunk: only a scene with `sceneLights()` or `sceneShadows()`
   // loads the rig (and the shadow scheduler) before its first frame; every other scene carries none of it.
   const lightModule = scene.lights || scene.shadows ? await import('./scene-light-rig') : null;
+  // The gradient sky (VIS-05) is a lazy chunk too: loaded now when the scene starts with one, or later when an
+  // environment first asks for one (that sky then appears one frame after its chunk arrives).
+  let skyModule = scene.view?.environment?.sky ? await import('./scene-sky') : null;
   preparations.delete(visit);
   let ctxRef: SceneContext | null = null;
   let activityStart: (() => void) | undefined;
@@ -256,7 +259,9 @@ export async function enterScene(o: {
       actx.own(() => sunShadow?.dispose());
       const sunShadowApply = sunShadow ? sunShadow.apply : undefined;
       let sunShadowReported = false;
-      let environment = scene.view?.environment ? bindEnvironment(three, sunShadowApply) : null;
+      const skyLayer = () => skyModule?.createSkyLayer(three) ?? null;
+      let skyLoading = false;
+      let environment = scene.view?.environment ? bindEnvironment(three, sunShadowApply, skyLayer) : null;
       actx.own(() => environment?.dispose());
       const cubes = bindSceneCubes(
         three,
@@ -831,11 +836,24 @@ export async function enterScene(o: {
         }
         if (viewState.environment) {
           if (!environment) {
-            environment = bindEnvironment(three, sunShadowApply);
+            environment = bindEnvironment(three, sunShadowApply, skyLayer);
             for (const light of defaultLights) light.visible = false;
             dirty = true;
           }
           if (environment.sync(viewState.environment, camera)) dirty = true;
+          if (!skyLoading && environment.wantsSky()) {
+            skyLoading = true;
+            void import('./scene-sky').then(
+              m => {
+                if (actx.signal.aborted) return;
+                skyModule = m;
+                environment?.refresh();
+                dirty = true;
+                actx.invalidate();
+              },
+              error => s.log.error(`${scene.id}: the sky could not load`, error),
+            );
+          }
           if (!scene.shadows && !sunShadowReported && viewState.environment.directional.shadow) {
             sunShadowReported = true;
             s.log.error(

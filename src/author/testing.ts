@@ -15,7 +15,7 @@ import {createWorkerHost} from '../platform/workers/host';
 import type {AudioClockReading} from '../platform/audio/audio-timeline';
 import {BUILT_IN_CUES, normalizeCueVoiceOptions, type CueVoiceOptions} from '../platform/audio/audio-output';
 import type {MusicOptions} from '../platform/audio/music-clock';
-import {EMITTER_ID, type ParticleStats} from './particle-contract';
+import {EMITTER_ID, type EmitterSample, type ParticleStats} from './particle-contract';
 import {Scatter, SCATTER_ID, scatterRoot, validateScatter, type ScatterData} from './scatter';
 import {createScatterAdmission, placeScatter, type ScatterPlacement, type ScatterStats} from './scatter-field';
 import {createRng, deriveSeed} from '../core/rng';
@@ -97,8 +97,13 @@ export interface TestScene {
   readonly music: {id: string; options?: MusicOptions}[];
   /** The scene's particle field, stepped as in a visit (`engine.particles` after the scene's fixed systems), without
    *  drawing: its counters (null when the scene has no `sceneParticles()`), and every problem it reported (refusals,
-   *  invalid emitter data, emitters in a scene without particles). */
-  readonly particles: {readonly stats: ParticleStats | null; readonly reports: readonly string[]};
+   *  invalid emitter data, emitters in a scene without particles); `sample(entity)` is that entity's admitted emitter
+   *  now (live count, spawn attempts since admission, bounds of the live particles) or null. */
+  readonly particles: {
+    readonly stats: ParticleStats | null;
+    readonly reports: readonly string[];
+    sample(entity: Entity): EmitterSample | null;
+  };
   /** The scene's scatters, admitted and placed as in a visit (same stream, density and bounds), without drawing: the
    *  counters (null when the scene has no `sceneScatter()`), every problem reported (refusals, invalid data, scatters
    *  in a scene without scatter), and the kept copies of one entity (null when not admitted). Updated after each
@@ -428,6 +433,7 @@ export async function testScene(
         return particles?.stats ?? null;
       },
       reports: particleReports,
+      sample: entity => particles?.sample(entity) ?? null,
     },
     scatter: {
       get stats() {

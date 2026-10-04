@@ -18,6 +18,7 @@ Short, checked how-tos. Start with [getting started](../guides/getting-started.m
 | make my game look good: palette, light presets, haze, framing, low-poly forms, baked light, the look checklist | [art direction](art-direction.md) |
 | show hit sparks, pickup glitter and bursts, trails or smoke | [hit sparks and pickups](hit-sparks-and-pickups.md) |
 | cover the ground with grass or rocks, repeat a prop many times in one draw | [scatter grass and rocks](scatter-grass-and-rocks.md) |
+| test that effects start on animation markers, fire once, stack, stop with their owner and reuse cleanly | [test your effects' lifecycles](test-effect-lifecycles.md) |
 | play my own sound effects, with volume, pitch and position | [play your own sound files](play-your-own-sounds.md) |
 | line up events, sounds or scoring with the music the player hears | [sync gameplay to music](sync-gameplay-to-music.md) |
 | let players locate unseen opponents by sound: direction and distance | [3D sound for shooters](3d-sound-for-shooters.md) |

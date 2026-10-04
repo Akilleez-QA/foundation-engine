@@ -10,6 +10,7 @@ picture it drew before, with the same draws and budgets.
 | Tone mapping and exposure | `defineScene({ view: { output } })` | [Output](#output-tone-mapping-and-exposure) |
 | Point and spot lights | `defineScene({ lights: sceneLights() })`, `PointLight`, `SpotLight` | [Local lights](#local-lights-point-and-spot-lights) |
 | Shadows | `defineScene({ shadows: sceneShadows() })`, light `shadow`, `Shadow` | [Shadows](#shadows) |
+| Gradient sky, discs, stars, exp2 haze | `defineEnvironment({ sky, haze })` | [Sky and haze](#sky-and-haze) |
 
 ## Output: tone mapping and exposure
 
@@ -353,3 +354,100 @@ export default defineScene({
 - **Templates:** a scene without `sceneShadows()` is unchanged; `quality:guard`
   reports identical pictures for blank and explorer.
 - **Not verified:** physical devices, GPU time per shadow pass and phone memory.
+
+## Sky and haze
+
+A flat background colour makes a hard seam where the world ends. A gradient sky,
+with haze in the same horizon colour, hides it:
+
+```ts
+import { defineEnvironment } from '@engine';
+
+export const night = defineEnvironment({
+  background: 0x070b1a,
+  sky: {
+    kind: 'gradient',
+    top: 0x02040f, horizon: 0x1d1838, bottom: 0x070b1a, exponent: 0.6,
+    discs: [{ direction: [-0.4, 0.5, -0.7], size: 3, color: 0xdfe6ff, glow: 0.4 }],
+    stars: { count: 300, seed: 7 },
+  },
+  haze: { kind: 'exp2', color: 'sky', density: 0.035 },   // fog that meets the sky
+  ambient: { sky: 0x2b3a6b, ground: 0x1a1008, intensity: 0.55 },
+  directional: { color: 0x8ea8ff, intensity: 0.45, position: [-6, 12, -4] },
+  points: [], pointSize: 2,
+});
+```
+
+### Inputs and outputs
+
+- **`sky`** (optional): `{ kind: 'gradient', top, horizon, bottom, exponent?, discs?, stars? }`.
+  - `top`, `horizon` and `bottom` are packed sRGB colours, straight up, at the
+    horizon and straight down. The gradient blends them in sRGB, so the authored
+    colours come out exactly.
+  - `exponent` (0…8, default 1) shapes the curve: below 1 the colour leaves the
+    horizon sooner, above 1 the horizon band is wider.
+  - `discs` (at most 4: a sun, or any body seen from the ground), each with
+    `direction` (towards the disc), `size` (angular diameter, 0…20°, default 3),
+    `color` (default white) and `glow` (halo, 0…1, default 0.3).
+  - `stars: { count, seed, brightness }` adds up to 4,096 deterministic stars on
+    the upper hemisphere, dimmer towards the horizon. The same seed gives the
+    same sky.
+- **`haze`** (existing field, new options):
+  - the linear form `{ color, near, far }` is unchanged and still the default;
+  - `{ kind: 'exp2', color, density }` thickens with distance (density 0…1; about
+    2 / density metres is where things vanish);
+  - either form takes `color: 'sky'`, which uses the sky's horizon colour.
+- `sky` and `cube` are both backgrounds: an environment with both is refused.
+- **Output:** pixels only. Without `sky` the background is the `background`
+  colour (or the `cube`), exactly as before.
+
+### Owner, bounds and cost
+
+- **Owner:** the environment binding of the scene visit
+  (`author/scene-environment.ts`). `author/sky.ts` holds the data and validation,
+  `author/sky-pixels.ts` the pixel maths, and `author/scene-sky.ts` the three.js
+  layer, a lazy chunk (about 3 kB) that a scene loads before its first frame when
+  it starts with a sky, or when a later environment first has one (that sky then
+  appears one frame after the chunk arrives; a failed load is reported).
+- **One texture, no custom shader.** The sky is a CPU-generated `DataTexture` on
+  an inverted sphere drawn with three's built-in unlit material (`fog: false`,
+  `toneMapped: false`, centred on the camera like the star points). Nothing here
+  is WebGL-specific, so the WebGPU backend draws the same data (ADR 0078).
+- **Cost:** one draw for the sky and one for the stars. The texture is 1 KiB for a
+  plain gradient and 512 KiB with discs (512 × 256 RGBA).
+- **Render on change:** the environment is applied only when the value changes. The
+  sky texture is regenerated only when the sky's own fields change (a key
+  compare), and the stars only when `stars` changes. An idle scene draws nothing.
+- **Tone mapping:** the sky and the haze colour are not tone-mapped (three applies
+  fog after tone mapping), so a sky and a haze in its horizon colour meet without
+  a seam under any `view.output`.
+
+### Overload, cancellation and recovery
+
+- **Overload:** none. Bounds are validated by `defineEnvironment` (and again when a
+  new environment is published), naming the field
+  (`environment: sky.discs[0].size must be in (0, 20] degrees`).
+- **Cancellation:** leaving the scene disposes the sky mesh, its texture and the
+  stars with the environment. A replaced sky texture is disposed at once.
+- **Recovery:** the texture is CPU data; three re-uploads it after a context loss.
+
+### Evidence and limitations
+
+- **Unit:** `src/author/sky.test.ts` (gradient values, deterministic pixels, disc
+  placement, deterministic stars, validation, one mesh and one additive star
+  draw, regeneration only on a sky change, unchanged output without a sky).
+- **Browser:** `npm run test:sky-browser` on the reference and low presets
+  (desktop headless Chromium, software GL). The horizon and the top of the view
+  match the authored gradient within 10/255 per channel. A far crate in exp2
+  haze with `color: 'sky'` takes the horizon colour, and a near crate keeps its
+  own. The sky and its stars cost two draws. An idle scene draws no frames, a
+  sky change replaces and disposes the texture once, and leaving disposes it.
+- **Templates:** no template uses `sky`, so `quality:guard` reports identical
+  pictures for blank and explorer.
+- **Bundle:** the scene runtime grows by about 3 kB (validation and exp2 haze);
+  the sky layer is its own lazy chunk.
+- **Not verified:** physical devices, and banding on 8-bit displays for very dark
+  gradients.
+- The disc is texture-based: at 512 × 256 a 3° disc is about 4 texels across, so
+  it is soft-edged, not a crisp disc. A sharp disc needs a later sprite or shader
+  module.
