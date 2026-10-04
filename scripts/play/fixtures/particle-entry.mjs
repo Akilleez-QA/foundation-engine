@@ -24,12 +24,14 @@ import {
 } from '../../../src/author/index.ts';
 
 let renders = 0,
+  lastScene = null,
   last = {calls: 0, triangles: 0},
   disposedGeometries = 0;
 // three.js calls Scene.onAfterRender(renderer, ...) at the end of each scene draw, after its draw calls are counted.
 const originalAfterRender = T.Scene.prototype.onAfterRender;
 T.Scene.prototype.onAfterRender = function (renderer, ...rest) {
   renders++;
+  lastScene = this;
   last = {calls: renderer.info.render.calls, triangles: renderer.info.render.triangles};
   return originalAfterRender.call(this, renderer, ...rest);
 };
@@ -64,6 +66,18 @@ const panel = defineAsset({
   licence: 'CC0-1.0',
   author: 'Foundation Engine contributors',
   source: 'templates/mechanics/game/tools/generate-panel.mjs',
+});
+// A 2 × 2 sprite sheet of solid red, green, blue and yellow cells, packed by scripts/fx-pack.mjs at check start and
+// served by particle-check.mjs: the flipbook emitter shows each cell in turn over its life.
+const sheet = defineAsset({
+  id: 'sheet',
+  type: 'texture',
+  url: '/__fx/sheet.png',
+  width: 64,
+  height: 64,
+  licence: 'CC0-1.0',
+  author: 'Foundation Engine contributors',
+  source: 'scripts/play/particle-check.mjs (generated solid colours)',
 });
 let context;
 // A frame system keeps the loop ticking so outside edits are seen; frames still draw only when something changed.
@@ -181,7 +195,38 @@ const still = defineScene({
     context = ctx;
   },
 });
-const compiled = compileGame({brief, game, defs: [sample, other, still, panel]});
+// One large, still particle that lives 4 s and plays the 4-frame sheet once over its life ('over-life'): one draw.
+const flipbook = defineScene({
+  id: 'flipbook',
+  title: 'Flipbook',
+  particles: sceneParticles({emitters: 2, max: 8}),
+  view: {camera: {position: [0, 3, 7], target: [0, 0.8, 0]}, background: 0x10141c},
+  entities: [
+    [
+      Name({name: 'flip'}),
+      Transform({y: 0.8}),
+      defineEmitter({
+        mode: 'burst',
+        count: 1,
+        max: 1,
+        lifetime: [4, 4],
+        speed: [0, 0],
+        size: [2.5],
+        color: [0xffffff],
+        opacity: [1],
+        texture: 'sheet',
+        frames: {cols: 2, rows: 2, mode: 'over-life'},
+        blending: 'normal',
+        essential: true,
+      }),
+    ],
+  ],
+  systems: [idle],
+  enter(ctx) {
+    context = ctx;
+  },
+});
+const compiled = compileGame({brief, game, defs: [sample, other, still, flipbook, panel, sheet]});
 const app = createApp([...layerModules(game, brief), ...compiled.modules], {
   mode: 'test',
   events: appBus,
@@ -199,6 +244,11 @@ window.particleCheck = {
     chunk: performance.getEntriesByType('resource').filter(r => /scene-particles/.test(r.name)).length,
     scene: app.probes.read('world')?.scene ?? null,
     particles: app.services.play.current()?.particles?.() ?? null,
+    // The flipbook emitter's per-particle frame attribute as last uploaded (one float per live particle).
+    flipFrames: (() => {
+      const mesh = lastScene?.children.find(c => c.visible && c.material?.defines?.FLIPBOOK !== undefined);
+      return mesh ? Array.from(mesh.geometry.getAttribute('frame').array.slice(0, mesh.geometry.instanceCount)) : null;
+    })(),
     assets: app.services.assets.stats(),
   }),
   fire: name => burst(context.world, context.named(name)),

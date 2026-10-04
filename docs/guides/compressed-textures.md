@@ -132,5 +132,5 @@ backend exists it will need to:
 
 See [load a model](../recipes/load-a-model.md#ktx2-textures-for-phones). In short: with KTX-Software 4.4 or later on
 `PATH`, `gltf-transform uastc` (normal maps, ORM) and `gltf-transform etc1s` (colour) write `KHR_texture_basisu`
-textures; keep each side a multiple of 4. When this capability is available, `npm run asset:optimize` can switch its
-texture step from WebP to KTX2 for phone targets; the optimiser has its own owner and is not changed here.
+textures; keep each side a multiple of 4. For phone targets, `npm run asset:optimize -- --ktx2` does this in the
+optimisation pass (enabled by `ENGINE_KTX2` in `scripts/asset-verify.mjs`, on since this change).

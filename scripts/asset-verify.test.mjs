@@ -7,6 +7,8 @@ import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {
+  ENGINE_KTX2,
+  LOADER,
   PROVENANCE_FIELDS,
   ROOT,
   discover,
@@ -333,6 +335,7 @@ const allowKtx2 = c => {
   c.extensions = ['KHR_texture_basisu'];
 };
 test('a required KTX2 texture passes when the contract lists KHR_texture_basisu: the engine transcodes it', async () => {
+  assert.equal(ENGINE_KTX2, true);
   const f = fixture({bin: ktx2Textured()});
   try {
     const report = await verifyModel(f.file, contract(allowKtx2));
@@ -351,6 +354,70 @@ test('a KTX2 image the engine cannot transcode is rejected', async () => {
   await rejects({bin: ktx2Textured(Buffer.from(editKtx2(image, {12: 37})))}, /must be Basis Universal/, allowKtx2);
   await rejects({bin: ktx2Textured(Buffer.from(editKtx2(image, {36: 6})))}, /must be one 2D texture/, allowKtx2);
 });
+
+// The model loader's admission caps (src/platform/assets/models.ts), whatever the contract allows.
+test('the loader caps mirror src/platform/assets/models.ts', () => {
+  const source = readFileSync(join(ROOT, 'src/platform/assets/models.ts'), 'utf8');
+  assert.match(source, /maxFileBytes \?\? 32 \* MIB/);
+  assert.equal(LOADER.fileBytes, 32 * 1024 * 1024);
+  assert.match(source, new RegExp(`accessors\\?\\.length \\?\\? 0\\) > ${LOADER.accessors}\\)`));
+  assert.match(source, new RegExp(`accessor\\.count > ${LOADER.accessorCount}`));
+  assert.match(source, new RegExp(`\\(scalars \\+= accessor\\.count \\* width\\) > ${LOADER.scalars}`));
+  assert.match(source, new RegExp(`nodes\\?\\.length \\?\\? 0\\) > ${LOADER.nodes}`));
+  assert.match(source, new RegExp(`skins\\?\\.length \\?\\? 0\\) > ${LOADER.skins}`));
+  assert.match(source, new RegExp(`animations\\?\\.length \\?\\? 0\\) > ${LOADER.animations}`));
+  assert.equal(ENGINE_KTX2, /setKTX2Loader/.test(source), 'ENGINE_KTX2 follows the model loader');
+});
+test('a file over the model loader cap is rejected even when the contract allows it', async () => {
+  const f = fixture();
+  try {
+    writeFileSync(f.file, Buffer.alloc(LOADER.fileBytes + 4));
+    await assert.rejects(
+      verifyModel(
+        f.file,
+        contract(c => (c.limits.fileBytes = 2 * LOADER.fileBytes)),
+      ),
+      /over the model loader's 33554432/,
+    );
+  } finally {
+    f.close();
+  }
+});
+const unused = (count, type = 'SCALAR') => ({componentType: 5126, count, type});
+test('more accessors than the model loader allows are rejected', () =>
+  rejects(
+    {json: j => j.accessors.push(...Array.from({length: LOADER.accessors}, () => unused(0)))},
+    /4102 accessors, over the model loader's 4096/,
+    c => (c.limits.fileBytes = 1e6),
+  ));
+test('an accessor with more elements than the model loader allows is rejected', () =>
+  rejects(
+    {json: j => j.accessors.push(unused(LOADER.accessorCount + 1))},
+    /elements, over the model loader's 1048576/,
+  ));
+test('more decoded accessor values than the model loader allows are rejected', () =>
+  rejects(
+    {json: j => j.accessors.push(...Array.from({length: 5}, () => unused(LOADER.accessorCount, 'VEC4')))},
+    /decoded accessor values, over the model loader's 16777216/,
+  ));
+test('an accessor with an unknown type is rejected', () =>
+  rejects({json: j => j.accessors.push(unused(1, 'VEC5'))}, /unknown type VEC5/));
+for (const [key, cap, row] of [
+  ['nodes', LOADER.nodes, () => ({name: 'spare'})],
+  ['skins', LOADER.skins, () => ({joints: [0]})],
+  ['animations', LOADER.animations, () => ({channels: [], samplers: []})],
+])
+  test(`more ${key} than the model loader allows are rejected`, () =>
+    rejects(
+      {json: j => (j[key] = [...(j[key] ?? []), ...Array.from({length: cap + 1}, row)])},
+      new RegExp(`${key}, over the model loader's ${cap}`),
+      c => (c.limits.fileBytes = 1e6),
+    ));
+test('more than four bone influences per vertex are rejected', () =>
+  rejects(
+    {json: j => (j.meshes[0].primitives[0].attributes.JOINTS_1 = 0)},
+    /has JOINTS_1: at most 4 bone influences per vertex/,
+  ));
 test('a meshopt extension the contract allows is decoded with the engine decoder', async () => {
   const f = fixture({json: j => (j.extensionsUsed = ['EXT_meshopt_compression'])});
   try {
@@ -522,10 +589,11 @@ test('a decoded change that keeps every structural rule fails the pinned semanti
   ));
 
 // The contract itself and the command line.
-test('a contract with an unknown key, a missing provenance field or a compression extension is refused', () => {
+test('a contract with an unknown key, a missing provenance field or Draco is refused; KTX2 may be listed', () => {
   assert.throws(() => contract(c => (c.limit = {})), /unknown key "limit"/);
   assert.throws(() => contract(c => (c.provenance.required = ['licence'])), /must include "author"/);
   assert.throws(() => contract(c => (c.extensions = ['KHR_draco_mesh_compression'])), /only the meshopt decoder/);
+  assert.equal(contract(c => (c.extensions = ['KHR_texture_basisu'])).extensions[0], 'KHR_texture_basisu');
   assert.equal(contract(c => (c.extensions = ['EXT_meshopt_compression'])).extensions[0], 'EXT_meshopt_compression');
   assert.throws(() => contract(c => (c.limits.textures = 1)), /textureSize .* is required when textures are allowed/);
   assert.throws(() => contract(c => (c.clips = ['idle'])), /limits.animations must be at least/);
@@ -561,3 +629,69 @@ test('the command line takes model files or --all, and --contract with one model
   assert.throws(() => parseArgs(['--contract', 'c.json', 'a.glb', 'b.glb']), /exactly one model/);
   assert.throws(() => parseArgs(['--fast']), /Unknown option/);
 });
+
+// Skin limits, against mutated copies of the pose-to-pose robot (a skinned, animated original model).
+const ROBOT = join(ROOT, 'tools/pose-to-pose/game/public/models/pose-robot.glb');
+const robotContract = (change = () => {}) => {
+  const raw = JSON.parse(readFileSync(ROBOT.replace(/\.glb$/, '.contract.json'), 'utf8'));
+  change(raw);
+  return parseContract(raw);
+};
+async function robotRejects({json: jsonChange, bin: binChange} = {}, pattern, change) {
+  const {json, bin} = readGlb(readFileSync(ROBOT));
+  let b = Buffer.from(bin);
+  jsonChange?.(json);
+  b = binChange?.(json, b) ?? b;
+  const bytes = packGlb(json, b);
+  const receipt = JSON.parse(readFileSync(ROBOT.replace(/\.glb$/, '.provenance.json'), 'utf8'));
+  const dir = mkdtempSync(join(tmpdir(), 'foundation-asset-verify-skin-')),
+    file = join(dir, 'model.glb');
+  writeFileSync(file, bytes);
+  writeFileSync(join(dir, 'model.provenance.json'), JSON.stringify({...receipt, sha256: digest(bytes)}));
+  try {
+    await assert.rejects(verifyModel(file, robotContract(change)), pattern);
+  } finally {
+    rmSync(dir, {recursive: true, force: true});
+  }
+}
+test('a skinned model within its skin limits passes', async () => {
+  const report = await verifyFile(ROBOT);
+  assert.deepEqual(report.clips.toSorted(), ['walk', 'walk_turn_left', 'walk_turn_right', 'wave']);
+});
+test('a skin with more joints than the contract allows is rejected', () =>
+  robotRejects({}, /24 joints, over the contract's 20/, c => (c.skin.joints = 20)));
+test('a second influence set (more than four influences) is rejected', () =>
+  robotRejects(
+    {
+      json: j => {
+        const a = j.meshes[0].primitives[0].attributes;
+        a.JOINTS_1 = a.JOINTS_0;
+        a.WEIGHTS_1 = a.WEIGHTS_0;
+      },
+    },
+    /has JOINTS_1: at most 4 bone influences/,
+  ));
+test('more influences per vertex than the contract allows are rejected', () =>
+  robotRejects({}, /influences, over 1/, c => (c.skin.influences = 1)));
+test('weights that do not sum to one are rejected', () =>
+  robotRejects(
+    {
+      bin: (json, bin) => {
+        const a = json.accessors[json.meshes[0].primitives[0].attributes.WEIGHTS_0],
+          view = json.bufferViews[a.bufferView];
+        assert.equal(a.componentType, 5126, 'float weights');
+        bin.writeFloatLE(0.5, (view.byteOffset ?? 0) + (a.byteOffset ?? 0));
+        bin.writeFloatLE(0, (view.byteOffset ?? 0) + (a.byteOffset ?? 0) + 4);
+        bin.writeFloatLE(0, (view.byteOffset ?? 0) + (a.byteOffset ?? 0) + 8);
+        bin.writeFloatLE(0, (view.byteOffset ?? 0) + (a.byteOffset ?? 0) + 12);
+        return bin;
+      },
+    },
+    /weights sum to 0\.5, not 1/,
+  ));
+test('a skin root that is missing, or that does not hold every joint, is rejected', async () => {
+  await robotRejects({}, /skin root hips is missing/, c => (c.skin.root = 'hips'));
+  await robotRejects({}, /is not under the skin root spine/, c => (c.skin.root = 'spine'));
+});
+test('a skin contract allows one to four influences', () =>
+  assert.throws(() => robotContract(c => (c.skin.influences = 5)), /skin\.influences must be 1 to 4/));

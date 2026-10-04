@@ -44,6 +44,28 @@ view: { environment: night, output: { toneMapping: 'aces', exposure: 1 } },
 redraws once. A scene without `output` looks exactly as before. Details: the
 [scene look guide](../guides/scene-look.md#output-tone-mapping-and-exposure).
 
+### Lamps, lanterns and torches: local lights
+
+The environment's sun and ambient light everything evenly. A light that belongs to a thing (a lantern, a torch, a
+street lamp) is a `PointLight` or `SpotLight` on that entity, in a scene that asks for light slots:
+
+```ts
+import { PointLight, sceneLights } from '@engine';
+
+// in defineScene({ ... }):
+lights: sceneLights({ point: 4 }),
+entities: [
+  [Transform({ x: 3, y: 2, z: 0 }), Shape({ kind: 'sphere', size: [0.3, 0.3, 0.3], color: 0xffd28a }),
+    defineMaterial({ emissive: 0xffa040, emissiveIntensity: 4 }),
+    PointLight({ color: 0xffa850, intensity: 8, distance: 8 })],
+],
+```
+
+The scene's slots are fixed for each visit, so spawning or despawning a light never recompiles shaders; a light that
+finds no free slot is refused and reported once. Ask only for the slots the scene shows at once: each one costs work on
+every lit pixel. Lighter quality presets cap the slots (2 of each kind on `low`), keeping `essential: true` lights first.
+Details: the [scene look guide](../guides/scene-look.md#local-lights-point-and-spot-lights).
+
 ## 3. The scene
 
 An input to switch views (a key and a pad button; the right shoulder button, `rb`, is free in a new game):
@@ -144,5 +166,7 @@ npm run play:snap -- --scene look --mobile
 ```
 
 Light changes are easy to overdo; compare the desktop and phone screenshots, and check that what matters is still readable in the darker setup.
+
+For a whole look (palette, four light presets, haze distances, framing, low-poly forms and baked light), see [art direction](art-direction.md).
 
 More: the [camera kit README](../../src/kits/camera/README.md) (camera clearance around obstacles), the `explorer` template (orbit) and the `expedition` template (environment with decorative stars).

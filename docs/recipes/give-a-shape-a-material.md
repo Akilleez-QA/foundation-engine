@@ -49,7 +49,7 @@ const looks = [
 | `repeat` | `[1, 1]` | Repeats across each face, `[u, v]`, each in (0, 1024]. |
 | `wrap` | `'repeat'` | `'repeat'`, `'clamp'` (stretch the edge) or `'mirror'`. |
 | `roughness` / `metalness` | `1` / `0` | 0…1, physically based. |
-| `emissive` / `emissiveIntensity` | `0` / `1` | Light the surface gives off; intensity 0…16. It does not light other things. Above about 1 it clips to a flat colour unless the scene opts into tone mapping (`view.output`, [scene look](../guides/scene-look.md#output-tone-mapping-and-exposure)). |
+| `emissive` / `emissiveIntensity` | `0` / `1` | Light the surface gives off; intensity 0…16. It does not light other things: add a `PointLight` to the entity for that ([local lights](../guides/scene-look.md#local-lights-point-and-spot-lights)). Above about 1 it clips to a flat colour unless the scene opts into tone mapping (`view.output`, [scene look](../guides/scene-look.md#output-tone-mapping-and-exposure)). |
 | `opacity` / `transparent` | `1` / `false` | Opacity below 1, or a texture's alpha, shows only with `transparent: true`. |
 | `shading` | `'standard'` | `'standard'` physically based; `'matte'` Lambert (cheaper, ignores roughness and metalness); `'flat'` physically based with faceted faces; `'toon'` banded light. |
 | `toonSteps` | `3` | Light bands for `'toon'`, 2…5. |

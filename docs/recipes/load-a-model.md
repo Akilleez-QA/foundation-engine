@@ -8,7 +8,7 @@ Files in your game's own `public/` folder are served from the site root (or the 
 
 The loader accepts **binary glTF (`.glb`) with everything embedded**: a `.gltf` with a separate `.bin` or image files is rejected (`models: GLB dependencies must be embedded`). Export from Blender with *glTF Binary (.glb)*. Textures embedded in the GLB are drawn: PNG, JPEG, WebP, and KTX2 (see [KTX2 textures for phones](#ktx2-textures-for-phones)). To texture a primitive `Shape` instead, see [give a shape a material](give-a-shape-a-material.md).
 
-For a reproducible Blender export with metre scale, a base-centre pivot, material bounds and an actual engine consumer, follow the [Blender export example](../../tools/blender-export/README.md). Its checked-in original asset runs without installing Blender.
+For a reproducible Blender export with metre scale, a base-centre pivot, material bounds and an actual engine consumer, follow the [Blender export example](../../tools/blender-export/README.md). Its checked-in original asset runs without installing Blender. To make a new model with an agent, set its size and budget first, export it headless and check it with `npm run asset:verify`: see [make assets with Blender through MCP](make-assets-with-blender-mcp.md) (the MCP part is optional).
 
 ## 2. Declare it as an asset
 
@@ -113,15 +113,16 @@ KTX2 (Basis Universal) textures stay compressed on the GPU too: the engine trans
 supports (BC7 on desktops, ASTC or ETC2 on phones), typically 4 to 8 times smaller in GPU memory. Use them when a phone
 target runs short of memory for textures.
 
-1. Convert the textures of your optimised GLB with [glTF-Transform](https://gltf-transform.dev/) and
-   [KTX-Software](https://github.com/KhronosGroup/KTX-Software/releases) 4.4 or later (`ktx` on your `PATH`):
+1. With [KTX-Software](https://github.com/KhronosGroup/KTX-Software/releases) 4.4 or later (`ktx` on your `PATH`),
+   let the optimiser write KTX2 textures (its contract must list `KHR_texture_basisu`; see
+   [model contracts](../guides/model-contracts.md#optimise)):
 
    ```
-   npx gltf-transform uastc robot.glb robot.glb --slots "{normalTexture,occlusionTexture,metallicRoughnessTexture}"
-   npx gltf-transform etc1s robot.glb robot.glb --slots "{baseColorTexture,emissiveTexture}"
+   npm run asset:optimize -- game/tools/robot/out/robot.glb --out game/public/models/robot.glb --ktx2
    ```
 
-   UASTC keeps normal maps and other data maps accurate; ETC1S is smaller and suits colour. Keep each texture side a
+   Without `ktx`, it says so and falls back to WebP. It uses UASTC for normal and other data maps, which keeps them
+   accurate, and ETC1S, which is smaller, for colour. Keep each texture side a
    multiple of 4. The result declares `KHR_texture_basisu` with the textures embedded, as the loader requires.
 2. Declare and use it like any other model. Nothing else changes: the engine loads its KTX2 support (a code chunk and
    the 0.6 MB transcoder) only when a model with KTX2 textures loads, so games without one pay nothing for it.

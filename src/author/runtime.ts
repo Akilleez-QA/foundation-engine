@@ -15,6 +15,8 @@ import {RenderMask, validateRenderMask} from './render-mask';
 import {bindEnvironment} from './scene-environment';
 import {validateSceneOutput} from './scene-output';
 import {createOutputSync} from './scene-output-sync';
+import {lightSlotsFor, PointLight, SpotLight} from './lights';
+import {createLightSlots} from './light-slots';
 import {applyOutput, outputProfile} from '../platform/render/backends/webgl/output';
 import {Material, materialKey} from './material';
 import {createSceneSurfaces, type Surface, type SurfaceMaterial} from './scene-materials';
@@ -142,6 +144,9 @@ export async function enterScene(o: {
   const {s, brief, scene, visit} = o;
   const prepared = preparations.get(visit);
   const body = prepared?.body ?? (await bodyOf(scene));
+  // Local lights (VIS-02) are a lazy chunk: only a scene with `sceneLights()` loads the rig (and the light rig's
+  // shadow scheduler) before its first frame; every other scene carries none of it.
+  const lightModule = scene.lights ? await import('./scene-light-rig') : null;
   preparations.delete(visit);
   let ctxRef: SceneContext | null = null;
   let activityStart: (() => void) | undefined;
@@ -548,6 +553,16 @@ export async function enterScene(o: {
         : null;
       const emitterProbe = {id: EMITTER_ID} as ComponentType<object>;
       let emittersReported = false;
+      // Local lights (VIS-02): a scene with `sceneLights()` gets a fixed rig of slots for this visit, capped by the
+      // 'reenter-scene' knob `lights.local-max`; a scene without it creates no light and reports its lights once.
+      const lightSlotCounts = lightSlotsFor(scene.lights, scene.lights ? s.quality.knob('lights.local-max') : 0);
+      const lightSlots = createLightSlots({
+        slots: lightSlotCounts,
+        enabled: !!scene.lights,
+        report: message => s.log.error(`${scene.id}: ${message}`),
+      });
+      const lightRig = lightModule ? lightModule.createSceneLightRig(three, lightSlotCounts) : null;
+      actx.own(() => lightRig?.dispose());
       // Preload whenever the scene opted in: a runtime-spawned first burst must not wait for (and miss) the chunk.
       if (particles) particleView.preload();
       actx.own(() => {
@@ -762,6 +777,11 @@ export async function enterScene(o: {
           )
         )
           dirty = true;
+        if (lightRig) {
+          lightSlots.sync(world);
+          if (lightRig.apply(world, lightSlots)) dirty = true;
+        } else if (world.version !== lastVersion && (world.first(PointLight) || world.first(SpotLight)))
+          lightSlots.sync(world);
         if (world.version !== lastVersion) {
           lastVersion = world.version;
           dirty = true;
@@ -846,6 +866,7 @@ export async function enterScene(o: {
         };
       if (TEST_API && models.inspect) handle.model = createSceneModelInspector(models.inspect, visit, actx.signal);
       if (TEST_API) handle.entities = createSceneEntityInspector(world, visit, actx.signal);
+      if (TEST_API) handle.lights = () => structuredClone(lightSlots.stats);
       if (TEST_API && particles)
         handle.particles = () => ({
           ...particles.stats,

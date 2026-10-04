@@ -17,9 +17,10 @@
 //
 // The geometry checks run on a re-import of the exported GLB, decoded the way the engine's model loader decodes it
 // (src/platform/assets/models.ts): three.js's GLTFLoader with the meshopt decoder. Draco is refused, because the engine
-// registers only the meshopt decoder. KHR_texture_basisu (KTX2) textures are accepted when the contract lists the
-// extension, and each KTX2 image must be what the engine's KTX2 step accepts (src/platform/assets/model-ktx2.ts): Basis
-// Universal (ETC1S or UASTC), one 2D image.
+// registers only the meshopt decoder. KTX2 textures (KHR_texture_basisu) are accepted when the contract lists the
+// extension (ENGINE_KTX2: the model loader transcodes them since PR #146), and each KTX2 image must be what the engine's
+// KTX2 step accepts (src/platform/assets/model-ktx2.ts): Basis Universal (ETC1S or UASTC), one 2D image. The loader's own admission caps (LOADER below, mirrored from
+// validateEmbeddedGlb in models.ts and checked against it by the tests) apply to every model whatever its contract says.
 //
 // Owner: the creator's contract; this script only reads. Bounds: one GLB, its contract and its receipt in memory at a
 // time; file size is checked before the file is read. It is an acceptance check for the creator's own assets, not a
@@ -40,6 +41,25 @@ const AXES = ['x', 'y', 'z'];
 const NODE_TRANSFORMS = ['translation', 'rotation', 'scale', 'matrix'];
 const DRACO = 'KHR_draco_mesh_compression';
 const KTX2 = 'KHR_texture_basisu';
+/**
+ * Whether the engine's model loader can decode KTX2 textures. True since src/platform/assets/models.ts registers a KTX2
+ * transcoder (PR #146, model-ktx2.ts); asset:optimize --ktx2 follows it. A test keeps it in step with the loader.
+ */
+export const ENGINE_KTX2 = true;
+export const KTX2_UNSUPPORTED = 'KTX2 textures are not loadable until the engine adds KTX2 support';
+const MIB = 1024 * 1024;
+/** The model loader's admission caps (src/platform/assets/models.ts: maxFileBytes default and validateEmbeddedGlb). */
+export const LOADER = {
+  fileBytes: 32 * MIB,
+  accessors: 4096,
+  accessorCount: 1048576,
+  scalars: 16777216,
+  nodes: 4096,
+  skins: 128,
+  animations: 128,
+  influences: 4,
+};
+const COMPONENTS = {SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16};
 const PIVOTS = ['base-centre', 'centre', 'any'];
 const ALPHA_MODES = ['OPAQUE', 'MASK', 'BLEND'];
 const MATERIAL_TEXTURE_KEYS = ['normalTexture', 'occlusionTexture', 'emissiveTexture'];
@@ -84,6 +104,7 @@ export function parseContract(raw) {
     'semanticSha256',
     'nodes',
     'clips',
+    'skin',
     'provenance',
   ]);
   need(raw.schema === 1, 'schema must be 1');
@@ -130,6 +151,15 @@ export function parseContract(raw) {
     (raw.clips?.length ?? 0) <= (raw.limits.animations ?? 0),
     'limits.animations must be at least the number of required clips',
   );
+  if (raw.skin !== undefined) {
+    closed(raw.skin, 'skin', ['joints', 'influences', 'root']);
+    need(isCount(raw.skin.joints) && raw.skin.joints > 0, 'skin.joints must be a positive whole number');
+    need(
+      Number.isInteger(raw.skin.influences) && raw.skin.influences >= 1 && raw.skin.influences <= 4,
+      'skin.influences must be 1 to 4 (one JOINTS_0/WEIGHTS_0 set)',
+    );
+    need(raw.skin.root === undefined || typeof raw.skin.root === 'string', 'skin.root must be a node name');
+  }
   need(
     raw.nodeTransforms === undefined || ['allowed', 'forbidden'].includes(raw.nodeTransforms),
     'nodeTransforms must be "allowed" or "forbidden"',
@@ -137,6 +167,8 @@ export function parseContract(raw) {
   need(raw.extensions === undefined || isStrings(raw.extensions), 'extensions must be a list of extension names');
   for (const name of raw.extensions ?? [])
     need(name !== DRACO, `extensions cannot allow ${DRACO}: the engine registers only the meshopt decoder`);
+  for (const name of raw.extensions ?? [])
+    need(ENGINE_KTX2 || name !== KTX2, `extensions cannot allow ${KTX2}: ${KTX2_UNSUPPORTED}`);
   const m = raw.materials;
   closed(m, 'materials', ['properties', 'pbr', 'required', 'requiredPbr', 'alphaModes', 'expected']);
   need(isStrings(m.properties) && m.properties.includes('name'), 'materials.properties must list "name" and others');
@@ -330,12 +362,7 @@ export function imageSize(b) {
     return {
       width: b.readUInt32LE(20),
       height: Math.max(1, b.readUInt32LE(24)),
-      ktx2: {
-        vkFormat: b.readUInt32LE(12),
-        depth: b.readUInt32LE(28),
-        layers: b.readUInt32LE(32),
-        faces: b.readUInt32LE(36),
-      },
+      ktx2: {vkFormat: b.readUInt32LE(12), depth: b.readUInt32LE(28), layers: b.readUInt32LE(32), faces: b.readUInt32LE(36)},
     };
   return null;
 }
@@ -352,9 +379,29 @@ const sameNumbers = (actual, expected, tolerance) =>
  * Check one GLB against a contract. Throws an AssertionError naming the first breach; returns a report on success.
  * `provenance` defaults to the adjacent receipt; `root` resolves the receipt's `source` path for its sourceSha256.
  */
+/** A VEC4 accessor as rows of numbers; normalised unsigned integers become 0..1. */
+function vec4s(json, bin, index) {
+  const a = json.accessors[index],
+    view = json.bufferViews[a.bufferView];
+  const reader = {5126: [4, 'readFloatLE', 1], 5121: [1, 'readUInt8', 255], 5123: [2, 'readUInt16LE', 65535]}[
+    a.componentType
+  ];
+  assert.ok(reader && a.type === 'VEC4' && !a.sparse, `accessor ${index} is not a supported VEC4 layout`);
+  const [size, read, max] = reader,
+    stride = view.byteStride ?? size * 4,
+    base = (view.byteOffset ?? 0) + (a.byteOffset ?? 0);
+  return Array.from({length: a.count}, (_, i) =>
+    [0, 1, 2, 3].map(k => {
+      const value = bin[read](base + i * stride + k * size);
+      return a.normalized ? value / max : value;
+    }),
+  );
+}
+
 export async function verifyModel(file, contract, {provenance = companions(file).provenance, root = ROOT} = {}) {
   const c = contract;
   const size = statSync(file).size;
+  assert.ok(size <= LOADER.fileBytes, `file is ${size} bytes, over the model loader's ${LOADER.fileBytes}`);
   assert.ok(size <= c.limits.fileBytes, `file is ${size} bytes, over the contract's ${c.limits.fileBytes}`);
   const bytes = readFileSync(file);
 
@@ -395,11 +442,52 @@ export async function verifyModel(file, contract, {provenance = companions(file)
     json.asset?.generator,
     'provenance generator must equal the GLB asset.generator that wrote it',
   );
-  assert.ok((json.buffers?.length ?? 0) <= 1, 'one embedded buffer at most');
+  // A meshopt fallback buffer holds no data (the decoder writes into it), so it is not a second real buffer.
+  const fallback = buffer =>
+    ['EXT_meshopt_compression', 'KHR_meshopt_compression'].some(e => buffer.extensions?.[e]?.fallback === true);
+  const real = (json.buffers ?? []).filter(b => !fallback(b));
+  assert.ok(real.length <= 1, 'one embedded buffer at most');
   for (const buffer of json.buffers ?? []) assert.ok(!buffer.uri, 'buffer must be embedded (no uri)');
-  assert.ok(!json.buffers?.length || bin, 'the declared buffer needs the GLB BIN chunk');
+  assert.ok(!real.length || bin, 'the declared buffer needs the GLB BIN chunk');
   for (const image of json.images ?? [])
     assert.ok(!image.uri && image.bufferView !== undefined, 'image must be embedded in the GLB (bufferView, no uri)');
+  // The model loader's admission caps, whatever the contract allows.
+  const accessors = json.accessors ?? [];
+  assert.ok(
+    accessors.length <= LOADER.accessors,
+    `${accessors.length} accessors, over the model loader's ${LOADER.accessors}`,
+  );
+  let scalars = 0;
+  for (const [i, accessor] of accessors.entries()) {
+    const width = COMPONENTS[accessor.type];
+    assert.ok(width, `accessor ${i} has an unknown type ${accessor.type}`);
+    assert.ok(
+      Number.isSafeInteger(accessor.count) && accessor.count >= 0 && accessor.count <= LOADER.accessorCount,
+      `accessor ${i} has ${accessor.count} elements, over the model loader's ${LOADER.accessorCount}`,
+    );
+    scalars += accessor.count * width;
+  }
+  assert.ok(scalars <= LOADER.scalars, `${scalars} decoded accessor values, over the model loader's ${LOADER.scalars}`);
+  for (const [key, cap] of [
+    ['nodes', LOADER.nodes],
+    ['skins', LOADER.skins],
+    ['animations', LOADER.animations],
+  ])
+    assert.ok((json[key]?.length ?? 0) <= cap, `${json[key]?.length} ${key}, over the model loader's ${cap}`);
+  for (const mesh of json.meshes ?? [])
+    for (const primitive of mesh.primitives)
+      for (const name of Object.keys(primitive.attributes ?? {}))
+        assert.ok(
+          !/^(JOINTS|WEIGHTS)_[1-9]\d*$/.test(name),
+          `mesh ${mesh.name} has ${name}: at most ${LOADER.influences} bone influences per vertex (JOINTS_0 and WEIGHTS_0)`,
+        );
+  if (!ENGINE_KTX2)
+    assert.ok(
+      ![...(json.extensionsUsed ?? []), ...(json.extensionsRequired ?? [])].includes(KTX2) &&
+        !(json.textures ?? []).some(t => t.extensions?.[KTX2]) &&
+        !(json.images ?? []).some(image => image.mimeType === 'image/ktx2'),
+      `${KTX2_UNSUPPORTED}: use PNG, JPEG or WebP textures`,
+    );
   for (const name of [...(json.extensionsUsed ?? []), ...(json.extensionsRequired ?? [])]) {
     assert.ok(
       name !== DRACO,
@@ -423,8 +511,7 @@ export async function verifyModel(file, contract, {provenance = companions(file)
   const largest = c.limits.textureSize ?? 0;
   for (const [i, image] of (json.images ?? []).entries()) {
     const view = json.bufferViews[image.bufferView];
-    const data = bin.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength);
-    const size = imageSize(data);
+    const size = imageSize(bin.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength));
     assert.ok(size, `image ${i} (${image.mimeType ?? 'no mimeType'}) is not a PNG, JPEG, WebP or KTX2 image`);
     if (size.ktx2) {
       assert.ok(
@@ -453,6 +540,52 @@ export async function verifyModel(file, contract, {provenance = companions(file)
   );
   for (const mesh of json.meshes ?? [])
     for (const primitive of mesh.primitives) assert.equal(primitive.mode ?? 4, 4, 'triangle primitives only');
+  if (c.skin) {
+    // Skins: joint count, a single influence set, and every joint under the named root.
+    const parent = new Map();
+    (json.nodes ?? []).forEach((n, i) => (n.children ?? []).forEach(child => parent.set(child, i)));
+    const root = c.skin.root === undefined ? -1 : (json.nodes ?? []).findIndex(n => n.name === c.skin.root);
+    assert.ok(c.skin.root === undefined || root >= 0, `the skin root ${c.skin.root} is missing`);
+    for (const skin of json.skins ?? []) {
+      assert.ok(
+        skin.joints.length <= c.skin.joints,
+        `a skin has ${skin.joints.length} joints, over the contract's ${c.skin.joints}`,
+      );
+      if (root >= 0)
+        for (const joint of skin.joints) {
+          let k = joint;
+          while (k !== undefined && k !== root) k = parent.get(k);
+          assert.ok(k === root, `joint ${json.nodes[joint].name} is not under the skin root ${c.skin.root}`);
+        }
+    }
+    // A second influence set (JOINTS_1/WEIGHTS_1) is already refused by the loader caps above.
+    for (const [m, mesh] of (json.meshes ?? []).entries())
+      for (const primitive of mesh.primitives) {
+        const a = primitive.attributes;
+        if (a.WEIGHTS_0 === undefined) continue;
+        // Raw accessor values: the loader renormalises weights, so the re-import cannot show a bad sum.
+        const skin = json.skins?.[(json.nodes ?? []).find(n => n.mesh === m)?.skin];
+        const weights = vec4s(json, bin, a.WEIGHTS_0),
+          joints = vec4s(json, bin, a.JOINTS_0);
+        weights.forEach((w, v) => {
+          assert.ok(
+            w.every(x => Number.isFinite(x) && x >= 0),
+            `mesh ${mesh.name} vertex ${v}: weights must be finite and not negative`,
+          );
+          const used = w.filter(x => x > 1e-6).length,
+            sum = w.reduce((n, x) => n + x, 0);
+          assert.ok(
+            used <= c.skin.influences,
+            `mesh ${mesh.name} vertex ${v}: ${used} influences, over ${c.skin.influences}`,
+          );
+          assert.ok(Math.abs(sum - 1) <= 2e-3, `mesh ${mesh.name} vertex ${v}: weights sum to ${round(sum)}, not 1`);
+          assert.ok(
+            w.every((x, k) => x <= 1e-6 || joints[v][k] < (skin?.joints.length ?? 0)),
+            `mesh ${mesh.name} vertex ${v}: a joint index outside its skin`,
+          );
+        });
+      }
+  }
   if (c.nodeTransforms === 'forbidden')
     for (const node of json.nodes ?? [])
       for (const key of NODE_TRANSFORMS)
