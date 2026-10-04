@@ -82,6 +82,8 @@ npm run asset:optimize -- game/tools/<name>/out/<name>.glb --out game/public/mod
 
 The pass checks the export against its own contract before it starts. It then applies meshopt compression and turns textures into WebP at the contract's texture size, keeping named nodes, meshes and materials. It never decimates. Before writing anything, it checks the result against the contract next to `--out`. For a phone target, `--ktx2` writes KTX2 textures instead, which stay compressed on the GPU (the engine's model loader transcodes them; it needs KTX-Software's `ktx` 4.4 or later and `KHR_texture_basisu` in the contract). See [model contracts](../guides/model-contracts.md#optimise) for what an optimised model's contract allows. A small untextured prop such as the lantern does not need this step.
 
+To rig the model and animate it from key poses you pose (a start and an end, or a looping walk cycle broken into key poses), go on to [animate a model pose to pose](animate-pose-to-pose.md) before this step. Keep the parts separate until after rigging.
+
 ## 5. Put it in the game
 
 The GLB is already in `game/public/models/`, so it is served as `/models/<name>.glb`. Declare it with the receipt's licence, author and source, and show it with a `Model`, as in [load a model](load-a-model.md):
@@ -135,6 +137,6 @@ Revisit this only if a creator requirement needs Unreal-specific authoring and t
 ## Limits
 
 - MCP sessions are not reproducible. Only the committed script and its receipt are evidence.
-- `asset:verify` checks the numbers in the contract and the model loader's own caps. It does not check visual quality, colour space, animation contents beyond clip names and durations, or whether a licence claim is true ([model contracts](../guides/model-contracts.md#owner-bounds-and-limits)).
+- `asset:verify` checks the numbers in the contract and the model loader's own caps. It does not check visual quality, colour space, animation contents beyond clip names and durations (pose-to-pose clips are checked by [`tools/pose-to-pose/validate.mjs`](../../tools/pose-to-pose/README.md)), or whether a licence claim is true ([model contracts](../guides/model-contracts.md#owner-bounds-and-limits)).
 - The official server was not installed or run for this recipe, and no server is part of the gate or CI. The headless export and validation steps were run with Blender 5.2.1 LTS. Other Blender versions need their own check.
 - Steps 5 and 6 were run in a scratch game made from the blank template. The lantern was declared with the snippet above and placed beside the cube. `npm run play:snap` showed it standing on the floor with its glowing chimney, with no page errors, 4 draws and 162 triangles. That is browser emulation with software GL, not a physical device.
