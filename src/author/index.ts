@@ -13,7 +13,8 @@
  *   defineMode         a way to play (play, practice, learn) and where it starts
  *   defineKit          (for kits) a kit's modules and definitions
  *   Transform, Shape, Name   the built-in components the renderer and tools read
- *   Material, defineMaterial a shape's texture, repeat/wrap, roughness, metalness, emission and transparency
+ *   Material, defineMaterial how a shape, mesh or model looks: texture, roughness, metalness, emission, transparency,
+ *                            shading (standard/matte/flat/toon), double side, alpha cut-out, vertex colours
  *   Emitter, defineEmitter, burst, sceneParticles   optional particles: one instanced draw per emitter, fixed-step, seeded
  *   view.output (validateSceneOutput)               opt-in tone mapping and exposure per scene
  *   PointLight, SpotLight, sceneLights               optional local lights in fixed per-visit slots
@@ -97,8 +98,11 @@ export {
   validateMaterial,
   MATERIAL_DEFAULTS,
   MATERIAL_LIMITS,
+  MATERIAL_SHADINGS,
   type MaterialData,
   type MaterialWrap,
+  type MaterialShading,
+  type MaterialSide,
 } from './material';
 export {
   musicBudgets,

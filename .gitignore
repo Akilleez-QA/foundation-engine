@@ -57,6 +57,8 @@ playtest/replication-workbench*/
 playtest/replay/
 playtest/subpath/
 playtest/material/
+playtest/material-options/
+playtest/scatter/
 playtest/sound/
 playtest/dmath/
 playtest/session/

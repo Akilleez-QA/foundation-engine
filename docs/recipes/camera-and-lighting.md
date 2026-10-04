@@ -167,4 +167,6 @@ npm run play:snap -- --scene look --mobile
 
 Light changes are easy to overdo; compare the desktop and phone screenshots, and check that what matters is still readable in the darker setup.
 
+For a whole look (palette, four light presets, haze distances, framing, low-poly forms and baked light), see [art direction](art-direction.md).
+
 More: the [camera kit README](../../src/kits/camera/README.md) (camera clearance around obstacles), the `explorer` template (orbit) and the `expedition` template (environment with decorative stars).

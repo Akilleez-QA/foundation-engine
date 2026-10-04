@@ -1,6 +1,15 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {defineMaterial, Material, MATERIAL_DEFAULTS, materialKey, validateMaterial} from './material';
+import {
+  defineMaterial,
+  Material,
+  MATERIAL_DEFAULTS,
+  MATERIAL_SHADINGS,
+  materialKey,
+  surfaceClassOf,
+  validateMaterial,
+  type MaterialData,
+} from './material';
 
 test('defineMaterial fills defaults and copies the repeat it was given', () => {
   const repeat: [number, number] = [2, 3];
@@ -9,6 +18,24 @@ test('defineMaterial fills defaults and copies the repeat it was given', () => {
   assert.deepEqual(init.value, {...MATERIAL_DEFAULTS, texture: 'floor-tiles', repeat: [2, 3], roughness: 0.5});
   repeat[0] = 9;
   assert.deepEqual(init.value.repeat, [2, 3]);
+});
+
+test('the new options default to the look a Material drew before them', () => {
+  assert.deepEqual(
+    [
+      MATERIAL_DEFAULTS.shading,
+      MATERIAL_DEFAULTS.side,
+      MATERIAL_DEFAULTS.alphaCutoff,
+      MATERIAL_DEFAULTS.vertexColors,
+      MATERIAL_DEFAULTS.toonSteps,
+    ],
+    ['standard', 'front', 0, true, 3],
+  );
+  assert.deepEqual(
+    MATERIAL_SHADINGS.map(s => surfaceClassOf(s)),
+    ['standard', 'lambert', 'standard', 'toon'],
+    'four shadings, three material classes: the program count stays bounded',
+  );
 });
 
 test('invalid material data is refused with the field named', () => {
@@ -25,6 +52,14 @@ test('invalid material data is refused with the field named', () => {
     [{emissiveIntensity: 17}, /emissiveIntensity/],
     [{opacity: NaN}, /opacity/],
     [{transparent: 'yes' as unknown as boolean}, /transparent/],
+    [{shading: 'cel' as 'toon'}, /shading/],
+    [{toonSteps: 1}, /toonSteps/],
+    [{toonSteps: 6}, /toonSteps/],
+    [{toonSteps: 2.5}, /toonSteps/],
+    [{side: 'back' as 'front'}, /side/],
+    [{alphaCutoff: 1}, /alphaCutoff/],
+    [{alphaCutoff: -0.1}, /alphaCutoff/],
+    [JSON.parse('{"vertexColors": 1}') as Partial<MaterialData>, /vertexColors/],
   ];
   for (const [input, message] of bad) assert.throws(() => defineMaterial(input), message, JSON.stringify(input));
 });
@@ -45,10 +80,15 @@ test('the material key changes with every drawn field', () => {
         {emissiveIntensity: 2},
         {opacity: 0.5},
         {transparent: true},
+        {shading: 'toon'},
+        {toonSteps: 4},
+        {side: 'double'},
+        {alphaCutoff: 0.5},
+        {vertexColors: false},
       ] as const
     ).map(change => materialKey({...base, ...change} as typeof base)),
   ]);
-  assert.equal(keys.size, 10);
+  assert.equal(keys.size, 15);
 });
 
 test("a scene's material textures must name texture assets of the game", async () => {

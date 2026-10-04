@@ -36,7 +36,8 @@ Useful things to say:
 | "/playtest" | runs a playtest round and reports every criterion |
 | "/budget" | shows each scene against its performance budget |
 | "make it feel better" | runs a polish pass (feedback, readability, phone layout) |
-| "it's slow on my phone" | measures, then simplifies, instances, bakes or adds detail levels |
+| "make it look better" | runs the art-direction skill: palette, light preset, haze, framing, low-poly forms, baked light, then the look checklist on the screenshots |
+| "it's slow on my phone" | measures, then simplifies, bakes (merges static scenery into one mesh) or adds detail levels |
 | "ship it" | for your game: checks the criteria, commits, and builds `dist/` to share; for engine changes: gates, integrates and, only if you ask, deploys |
 
 ## The brief is the contract

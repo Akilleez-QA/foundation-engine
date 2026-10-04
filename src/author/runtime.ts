@@ -10,6 +10,7 @@ import {createReadingSheets} from './reading-sheet';
 import {bindSceneCubes} from './scene-cubes';
 import {Model} from './model';
 import {createSceneModels} from './scene-model';
+import {createModelLooks} from './model-looks';
 import {RenderMask, validateRenderMask} from './render-mask';
 import {bindEnvironment} from './scene-environment';
 import {validateSceneOutput} from './scene-output';
@@ -18,7 +19,7 @@ import {lightSlotsFor, PointLight, SpotLight} from './lights';
 import {createLightSlots} from './light-slots';
 import {applyOutput, outputProfile} from '../platform/render/backends/webgl/output';
 import {Material, materialKey} from './material';
-import {createSceneSurfaces, type Surface} from './scene-materials';
+import {createSceneSurfaces, type Surface, type SurfaceMaterial} from './scene-materials';
 import {createParticleView} from './particle-view';
 import {EMITTER_ID, type ParticleField} from './particle-contract';
 /**
@@ -463,10 +464,10 @@ export async function enterScene(o: {
           three,
           [...indexedMeshes, ...primitiveMeshes].map(({mesh}) => mesh),
           [
-            ...primitiveMeshes.map(
+            ...[...primitiveMeshes, ...indexedMeshes].map(
               ({surface}) =>
                 () =>
-                  surface.dispose(),
+                  surface?.dispose(),
             ),
             () => geometries.dispose(),
             () => resources.dispose(),
@@ -494,7 +495,14 @@ export async function enterScene(o: {
         }),
       );
       const maskOf = (e: Entity) => validateRenderMask(world.get(e, RenderMask)?.mask ?? 1);
+      const looks = createModelLooks({
+        world,
+        surfaces,
+        resources,
+        report: error => s.log.error(`${scene.id}: model material failed`, error),
+      });
       const models = createSceneModels({
+        looks,
         poseLinks: scene.modelPoseLinks === undefined ? undefined : normalizeModelPoseLinkLimits(scene.modelPoseLinks),
         inspection: TEST_API ? inspectModel : undefined,
         world,
@@ -653,18 +661,26 @@ export async function enterScene(o: {
         for (const [e, tr, data] of world.query(Transform, Mesh)) {
           if (world.has(e, Model)) continue;
           indexedSeen.add(e);
+          const look = world.get(e, Material),
+            lookKey = look ? materialKey(look) : '';
           let m = indexed.get(e);
           if (!m) {
-            const mesh = new T.Mesh(
-              indexedGeometry(data, resources),
-              resources.own(new T.MeshLambertMaterial({color: data.color, vertexColors: data.colors.length > 0})),
-            );
+            // A Mesh has no texture coordinates: its Material shades it, but a texture is reported and not drawn.
+            const surface = surfaces.create(look, data.color, {colors: data.colors.length > 0, uv: false});
+            let mesh: T.Mesh<T.BufferGeometry, SurfaceMaterial>;
+            try {
+              mesh = new T.Mesh(indexedGeometry(data, resources), surface.material);
+            } catch (error) {
+              surface.dispose();
+              throw error;
+            }
             mesh.name = world.get(e, Name)?.name ?? `e${e}`;
             three.add(mesh);
             indexed.set(
               e,
               (m = {
                 mesh,
+                surface,
                 positions: data.positions,
                 indices: data.indices,
                 colors: data.colors,
@@ -694,8 +710,16 @@ export async function enterScene(o: {
             if (!current || world.get(e, Mesh) !== data || world.get(e, Transform) !== tr || world.has(e, Model))
               continue;
           }
-          const sig = `${tr.x},${tr.y},${tr.z},${tr.rx},${tr.ry},${tr.rz},${tr.scale},${data.color},${data.visible},${maskOf(e)}`;
+          const sig = `${tr.x},${tr.y},${tr.z},${tr.rx},${tr.ry},${tr.rz},${tr.scale},${data.color},${data.visible},${maskOf(e)},${lookKey}`;
           if (m.sig !== sig) {
+            if (m.surface && m.surface.key !== lookKey && !m.surface.update(look)) {
+              // A Material added, removed, made invalid or given another shading class: one new surface.
+              const previous = m.surface;
+              m.surface = surfaces.create(look, data.color, {colors: data.colors.length > 0, uv: false});
+              m.mesh.material = m.surface.material;
+              previous.dispose();
+              if (actx.signal.aborted) return;
+            }
             m.mesh.position.set(tr.x, tr.y, tr.z);
             m.mesh.rotation.set(tr.rx, tr.ry, tr.rz);
             m.mesh.scale.setScalar(tr.scale);
