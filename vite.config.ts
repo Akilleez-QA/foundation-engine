@@ -122,9 +122,7 @@ export default defineConfig({
   // sets it, because those servers never see an edit; `npm run dev` and `npm run play` keep watching.
   server: {host: devHost(process.env.ENGINE_HOST), ...(process.env.ENGINE_WATCH === '0' ? {watch: null} : {})},
   preview: {host: devHost(process.env.ENGINE_HOST)},
-  // three is never pre-bundled: a pre-bundled addon would carry its own copy of three, and `instanceof` across the
-  // engine and a game's addon objects (@kits/three) would break.
-  optimizeDeps: {entries: ['index.html'], exclude: ['three']},
+  optimizeDeps: {entries: ['index.html']},
   // src/author/index.ts is a pure re-export barrel (scripts/vite-config.test.mjs keeps it so). Declaring it free of
   // side effects lets Rolldown (Vite 8) drop the unused test helpers' static edge to the worker host, so the host
   // stays a lazy chunk as it was under Rollup instead of joining first-load JS.
