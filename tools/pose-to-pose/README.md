@@ -31,6 +31,7 @@ comes from the built-in deform-only flatten (see [rig](#1-rig)).
 | `definition.mjs` | The `animations.json` contract in JavaScript (the validator's twin of `common.py`) |
 | `validate.mjs` | Offline GLB validator against the definition |
 | `review.mjs` | The review ledger: approve the rig, approve or unfreeze clips |
+| `reference.mjs`, `blender/pose_compare.py` | Reference-clip intake: take ledger, timestamped sheets, frames, side-by-side, pose approval |
 | `pipeline.mjs` | Runs a worked example end to end |
 | `examples/robot/` | Worked example: an original low-poly humanoid with a wave and a mirrored walk |
 | `examples/bug/` | Worked example: an original six-legged creature of rigid parts with a tripod scuttle and a tail strike |
@@ -122,6 +123,35 @@ with an optional `order`), and optional `location` (metres, bone-local) and `sca
 same values as Blender's pose-mode transform fields. Bones not listed are at rest. Unknown bones are
 errors.
 
+### 3b. Key poses from a reference clip
+
+A generated video or filmed footage can supply the key poses instead. The clip is an input only and
+stays out of the repository. `reference.mjs` keeps a take ledger (file hash, source, prompt, provider,
+plan or licence, and status: new, reviewed, selected, approved or rejected). It refuses to add a
+reference file that git would commit unless its terms are recorded with `--licence`.
+
+```sh
+node tools/pose-to-pose/reference.mjs add --ledger refs/ledger.json --take walk-01 --file ~/refs/walk.mp4 \
+  --provider "<service and model, or 'filmed'>" --plan "<plan and its output terms>" --prompt "<prompt>"
+node tools/pose-to-pose/reference.mjs sheet --ledger refs/ledger.json --take walk-01 --out refs/walk-01 --fps 8
+node tools/pose-to-pose/reference.mjs status --ledger refs/ledger.json --take walk-01 --set selected --by "<name>"
+node tools/pose-to-pose/reference.mjs frame --ledger refs/ledger.json --take walk-01 --seconds 1.25 --out refs/contact.png
+node tools/pose-to-pose/reference.mjs mark-pose --ledger refs/ledger.json --poses poses.json --pose contact --take walk-01 --seconds 1.25
+blender ... --python tools/pose-to-pose/blender/pose_compare.py -- --rigged work/rigged.blend --poses poses.json \
+  --pose contact --image refs/contact.png --view side --out refs/contact-compare.png
+node tools/pose-to-pose/reference.mjs approve-pose --poses poses.json --pose contact --by "<name>"
+```
+
+`sheet` writes ffmpeg frames stamped with their source time and frame number, a tiled `sheet.png` and
+`frames.json`. The person (or the agent, with the person's sign-off) picks the key frames and records
+which pose each one is. The agent then poses the rig to match (as JSON, or in Blender), and
+`pose_compare.py` renders the reference frame beside the posed rig from the same view (`--view`, or
+`--azimuth` and `--elevation`). **The person approves each match.** Agents judge 3D poses from
+pictures poorly, so the generator refuses a reference-matched pose whose approval is not `approved`
+(`--allow-unapproved` makes a draft, recorded in the provenance and failed by the validator). A
+reference filmed or generated at half speed is retimed with the clip's `speed` (2), and `trim` cuts a
+one-shot clip to game length.
+
 ### 4. Animation definition (`animations.json`)
 
 ```json
@@ -169,6 +199,7 @@ errors.
 | `controls` | Bones that must visibly move in this clip (more than 1° or 1 mm); the validator checks them. |
 | `rootMotion` | In-place clips with declared travel. Loops: `stride` (metres per cycle) and optional `yawPerCycle`; one-shot clips: `delta` (`{"x", "z", "yaw"}`). `feet` enables the foot checks; `footSlideTolerance` (0.04 m), `contactHeight` (0.02 m) and `flatFootTolerance` (8°) may be set per clip. |
 | `derive` | A turn variant of a walk: same keys, the named bone banked by `lean` and turned by `twist` degrees toward the turn, and `yawPerCycle` degrees of root yaw. Its root motion is an arc. |
+| `reference` | Free-form record of the take a clip was matched from (for example `{"take": "walk-01", "from": 0.4, "to": 1.5}`). |
 | `skeleton`, `materials` | Limits (bones, influences per vertex), the required root bone, and required material slots (for example a `team` slot the game can recolour). |
 
 Author walks **in place**: the character's hips stay over the origin and the planted foot moves back at
