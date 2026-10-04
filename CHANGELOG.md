@@ -17,6 +17,10 @@ Every new framework below is optional: a game that does not use it is unchanged.
   numbers win), and names the real APIs for instancing and scatter: one `defineMesh` entity for static repeats
   placed with `@kits/terrain`'s `createSurfaceScatter`, and `Emitter` for many small moving things.
   Documentation only.
+- **Agent skill: build an asset in Blender (`.claude/skills/blender-asset`).** Plan parts and contacts in
+  metres, one rebuild-from-scratch script per asset, a screenshot after every change, measurements (bounds,
+  ground contact, gaps, non-manifold edges) as the acceptance evidence, about two retries per defect, Blender
+  5.2 API lookups before writing code, and MCP safety defaults. Documentation only; no engine change.
 
 ## 0.3.0 — proposed; author decides
 

@@ -13,6 +13,7 @@ import type {AssetLease} from '../platform/assets/lease-cache';
 import {isAbortError} from '../platform/assets/lease-cache';
 import {Model, validateModel, type ModelData, type ModelSocketPose} from './model';
 import {Transform} from './defs';
+import type {ModelLooks} from './model-looks';
 interface Slot {
   rig?: ModelRigCapture;
   poseLink?: PoseLinkPresentation;
@@ -46,6 +47,8 @@ export function createSceneModels(o: {
     typeof inspectModel | undefined;
   poseLinks?: ModelPoseLinkLimits | undefined;
   mask?(entity: Entity): number;
+  /** Draws an entity's `Material` over its instance's own materials (model-looks.ts); absent, models keep theirs. */
+  looks?: Pick<ModelLooks, 'sync' | 'release'> | undefined;
 }) {
   const slots = new Map<Entity, Slot>();
   let closed = false,
@@ -82,6 +85,7 @@ export function createSceneModels(o: {
       attempt(() => {
         slot.mixer?.uncacheRoot(slot.instance!);
       });
+    attempt(() => o.looks?.release(e));
     if (slot.root)
       attempt(() => {
         slot.root!.removeFromParent();
@@ -161,6 +165,8 @@ export function createSceneModels(o: {
         slot.root.matrixAutoUpdate = false;
       }
       applyMask(slot, e);
+      if (!live(e, slot)) return;
+      o.looks?.sync(e, instance);
       if (!live(e, slot)) return;
       slot.ready = true;
       o.scene.add(slot.root);
@@ -351,6 +357,8 @@ export function createSceneModels(o: {
           if (!slot?.ready) continue;
           changed = pose(e, slot, data, tr) || changed;
           changed = applyMask(slot, e) || changed;
+          if (!live(e, slot)) continue;
+          if (o.looks?.sync(e, slot.instance!)) changed = true;
           if (!live(e, slot)) continue;
           const hadOverrides = slot.overrides!.size > 0;
           for (const node of slot.overrides!) {
