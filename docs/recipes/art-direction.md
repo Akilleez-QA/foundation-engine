@@ -374,11 +374,11 @@ export const lanternNight = defineEnvironment({
 
 ```ts
 // game/courtyard.ts (excerpt)
-const glass = (x: number, y: number, z: number, size: number, intensity: number) => [
+const glass = (x: number, y: number, z: number, size: number, intensity: number, essential = false) => [
   Transform({x, y, z}),
   Shape({kind: 'box', size: [size, size * 1.2, size], color: 0xff9a40}),
   defineMaterial({emissive: 0xff8a30, emissiveIntensity: 1}),
-  PointLight({color: P.lantern, intensity, distance: 6.5, decay: 2}),
+  PointLight({color: P.lantern, intensity, distance: 6.5, decay: 2, essential}),
   Shadow({cast: false}),
 ];
 // …
@@ -386,6 +386,9 @@ const glass = (x: number, y: number, z: number, size: number, intensity: number)
 // …
   lights: sceneLights({point: 8}),
   shadows: sceneShadows(),
+// …
+    ...POSTS.map(([x, z]) => glass(x, LANTERN_Y, z, 0.34, 30, z > 0)),
+    ...STREET_LAMPS.map(([x, z]) => glass(x, LANTERN_Y, z, 0.34, 30)),
 ```
 
 ```ts
@@ -515,7 +518,10 @@ surface bright and lights nothing else, so checklist item 6 fails until somethin
   colour with `distance` about the radius of the pool you want and `decay: 2`.
 - **Mark the lights that must stay `essential: true`.** On `low` only 2 point lights and 2 spot lights get a slot
   ([scene look guide](../guides/scene-look.md)); essential ones are admitted first. Mark the one or two glows the
-  player must read (the campfire, the goal) essential, and leave decoration unmarked.
+  player must read (the campfire, the goal) essential, and leave decoration unmarked. Keep them within the lightest
+  preset you support: a non-essential light that waits for a slot on a lighter preset is designed behaviour (reported
+  once at info level), but an essential light without a slot is an error that fails `play:snap`. The courtyard marks
+  its two front posts essential; on medium the back posts take the other two slots.
 - **Bake a pool under every glow as well**, with `bakeLight`, so a glow whose real light was refused on `low` still
   lights the ground around it. The courtyard bakes a faint glow (`intensity: 0.5, range: 4`) round every lantern for
   this reason.

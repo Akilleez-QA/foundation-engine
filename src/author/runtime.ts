@@ -627,6 +627,8 @@ export async function enterScene(o: {
       const particles: ParticleField | null = scene.particles
         ? scene.particles.createField({
             scale: s.quality.knob('effects.particles'),
+            // Calm from the frame (STD-RUN-8), read at each step: presentation only, never the particles' stream.
+            calm: () => calm,
             seed: particleSeed,
             report: error => s.log.error(`${scene.id}: particles`, error),
             renderer: particleView,
@@ -677,10 +679,13 @@ export async function enterScene(o: {
       const shadowedSlots = scene.shadows ? shadowedSlotsFor(world, lightSlotCounts, shadowCap) : {point: 0, spot: 0};
       const lightSlots = createLightSlots({
         slots: lightSlotCounts,
+        requested: scene.lights?.limits,
         enabled: !!scene.lights,
         shadowed: shadowedSlots,
         shadows: !!scene.shadows,
-        report: message => s.log.error(`${scene.id}: ${message}`),
+        // A tier refusal (a non-essential light beyond a lighter preset's slots) is designed behaviour: info, once.
+        report: (message, level) =>
+          level === 'info' ? s.log.info(`${scene.id}: ${message}`) : s.log.error(`${scene.id}: ${message}`),
       });
       const lightRig =
         lightModule && scene.lights

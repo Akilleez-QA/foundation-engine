@@ -45,12 +45,9 @@ export function selectTemplates(names, argv) {
 export function runTemplates({names, phone}, {spawn = spawnSync, log = console.log, root = ROOT} = {}) {
   for (const name of names) {
     const t0 = Date.now();
-    // The phone smoke keeps the reference preset it always ran at (layout and boot at phone size). play:snap --mobile
-    // now defaults to the phone tier (medium); that picture is an agent's look check, not part of this gate yet.
-    const commands = [
-      ['run', '-s', 'gate'],
-      ...(phone ? [['run', '-s', 'play:snap', '--', '--mobile', '--quality', 'reference']] : []),
-    ];
+    // The phone smoke runs what phones get: play:snap --mobile at its default phone tier (medium), so a page error or an
+    // over-budget count at that tier fails the gate (a tier light refusal is info, not an error).
+    const commands = [['run', '-s', 'gate'], ...(phone ? [['run', '-s', 'play:snap', '--', '--mobile']] : [])];
     for (const args of commands) {
       log(`\n=== ${args[2]}: template ${name} ===`);
       const npm = npmCommand(args);

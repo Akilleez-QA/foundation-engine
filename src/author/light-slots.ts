@@ -8,7 +8,10 @@
  *    then drops to intensity 0 and is free;
  *  - lights waiting for a slot are admitted essential first, then in entity order (spawn order), into the lowest free
  *    slot; an admitted light is never moved to another slot or evicted;
- *  - a light with no free slot is refused (cause `full`) and admitted later if a slot frees; invalid data (a system
+ *  - a light with no free slot is refused and admitted later if a slot frees. A non-essential light that would have had
+ *    one of the slots the scene asked for, but the quality tier (`lights.local-max`) created fewer, is refused by design
+ *    (cause `tier`, reported at info level); any other refusal for want of a slot (an essential light, or more lights
+ *    than the scene asked slots for) is cause `full`, reported as an error. Invalid data (a system
  *    wrote a value out of range) is refused (cause `invalid`) and its slot, if it had one, goes dark until fixed;
  *  - a scene without `sceneLights()` refuses every light (cause `no-slots`);
  *  - shadows: the first `shadowed[kind]` slots of each kind cast shadows for the whole visit (so the shadow count
@@ -31,7 +34,10 @@ import {
 } from './lights';
 
 export type LightKind = 'point' | 'spot';
-export type LightRefusal = 'full' | 'invalid' | 'no-slots' | 'shadow' | 'no-shadows';
+export type LightRefusal = 'full' | 'tier' | 'invalid' | 'no-slots' | 'shadow' | 'no-shadows';
+/** How a refusal is reported: `error` for a light the scene needs or a scene that asked too little; `info` for the
+ *  designed tier refusal (a non-essential light beyond the slots a lighter quality tier creates). */
+export type LightReportLevel = 'error' | 'info';
 
 export interface LightStats {
   /** Slots created for this visit (fixed). */
@@ -91,14 +97,17 @@ export function shadowedSlotsFor(world: World, slots: SceneLightLimits, cap: num
 
 export function createLightSlots(o: {
   slots: SceneLightLimits;
+  /** The slots the scene asked for (`sceneLights()`), before the quality tier's cap; default `slots` (no cap). */
+  requested?: Readonly<SceneLightLimits> | undefined;
   /** The scene asked for slots (`sceneLights()`); false refuses every light with `no-slots`. */
   enabled: boolean;
   /** Shadowed slots of each kind (`shadowedSlotsFor`); default none. */
   shadowed?: SceneLightLimits;
   /** The scene opted into shadows (`sceneShadows()`); false reports shadow requests with `no-shadows`. */
   shadows?: boolean;
-  report: (message: string) => void;
+  report: (message: string, level: LightReportLevel) => void;
 }) {
+  const requested = o.requested ?? o.slots;
   const shadowed = o.shadowed ?? NO_SLOTS;
   const point: Kind<PointLightData> = {
       type: PointLight,
@@ -115,7 +124,14 @@ export function createLightSlots(o: {
       shadowed: Math.min(shadowed.spot, o.slots.spot),
     };
   const kinds = {point, spot};
-  const empty = (): Record<LightRefusal, number> => ({full: 0, invalid: 0, 'no-slots': 0, shadow: 0, 'no-shadows': 0});
+  const empty = (): Record<LightRefusal, number> => ({
+    full: 0,
+    tier: 0,
+    invalid: 0,
+    'no-slots': 0,
+    shadow: 0,
+    'no-shadows': 0,
+  });
   const stats: LightStats = {
     slots: Object.freeze({...o.slots}),
     shadowed: Object.freeze({point: point.shadowed, spot: spot.shadowed}),
@@ -127,7 +143,7 @@ export function createLightSlots(o: {
     stats.refused[cause] += lights;
     if (stats.reported.includes(cause)) return;
     stats.reported.push(cause);
-    o.report(detail);
+    o.report(detail, cause === 'tier' ? 'info' : 'error');
   };
   // Validation is cached per data object and its key: an unchanged light is not revalidated every frame.
   const checked = new WeakMap<object, string>();
@@ -184,13 +200,15 @@ export function createLightSlots(o: {
       return;
     }
     waiting.sort(byPriority);
-    let full = 0;
+    let essential = 0,
+      plain = 0;
     for (const w of waiting) {
       const shadow = wantsShadow(w.data);
       let slot = shadow ? free(holders, 0, kind.shadowed) : -1;
       if (slot < 0) slot = free(holders, kind.shadowed, holders.length);
       if (slot < 0) {
-        full++;
+        if (w.data.essential === true) essential++;
+        else plain++;
         continue;
       }
       holders[slot] = w.entity;
@@ -207,10 +225,23 @@ export function createLightSlots(o: {
           );
       }
     }
+    // Non-essential lights that the scene's own request had room for are refused by the tier, by design; the rest of
+    // the refusals (essential lights, and lights beyond what the scene asked for) are errors.
+    const asked = requested[name],
+      tier = Math.min(plain, Math.max(0, asked - holders.length)),
+      full = essential + plain - tier;
+    if (tier)
+      refusal(
+        'tier',
+        `${tier} non-essential ${LABEL[name]}(s) not drawn at this quality tier: the lights.local-max quality knob creates ${holders.length} of the scene's ${asked} ${name} slot(s). Designed behaviour: essential lights are admitted first; mark a light essential: true to keep it`,
+        tier,
+      );
     if (full)
       refusal(
         'full',
-        `${full} ${LABEL[name]}(s) not drawn: the scene's ${holders.length} ${name} slot(s) are full (sceneLights({ ${name} }) or the lights.local-max quality knob)`,
+        essential
+          ? `${full} ${LABEL[name]}(s) not drawn, ${essential} of them essential: the scene's ${holders.length} ${name} slot(s) are full (sceneLights({ ${name} }) asked ${asked}; the lights.local-max quality knob caps them)`
+          : `${full} ${LABEL[name]}(s) not drawn: the scene's ${holders.length} ${name} slot(s) are full (sceneLights({ ${name} }) or the lights.local-max quality knob)`,
         full,
       );
   };

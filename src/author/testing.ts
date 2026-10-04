@@ -345,6 +345,7 @@ export async function testScene(
   const particles =
     scene.particles?.createField({
       scale: o.particleScale ?? 1,
+      calm: () => o.calm ?? false,
       seed: () => particleRng!.next(),
       report: error => {
         particleReports.push(error.message);
@@ -393,6 +394,7 @@ export async function testScene(
   const lightSlotCounts = lightSlotsFor(scene.lights, o.lightCap ?? LOCAL_LIGHT_CAPS.reference);
   const lightSlots = createLightSlots({
     slots: lightSlotCounts,
+    requested: scene.lights?.limits,
     enabled: !!scene.lights,
     shadowed: scene.shadows
       ? shadowedSlotsFor(world, lightSlotCounts, o.shadowCap ?? SHADOWED_LIGHT_CAPS.reference)

@@ -5,8 +5,8 @@
 //   - the visit's rig is fixed: as many three.js point and spot lights as slots, whatever is spawned or despawned;
 //   - spawning and despawning a light links no program (no recompile, STD-REN-11), and each draws once;
 //   - an idle scene draws no frames; a light's intensity change draws once;
-//   - low (`lights.local-max` 2): the essential lantern keeps its slot, the third lantern is refused and reported
-//     exactly once, and it is admitted when a slot frees;
+//   - low (`lights.local-max` 2): the essential lantern keeps its slot, the third (non-essential) lantern is refused by
+//     the tier and reported exactly once at info level (never as a page error), and it is admitted when a slot frees;
 //   - leaving the scene removes every light.
 // Limitations: desktop Chromium with software GL; no physical device, GPU timing, fill-rate or visual-quality judgement.
 import assert from 'node:assert/strict';
@@ -63,7 +63,11 @@ try {
   for (const quality of ['reference', 'low']) {
     browser = await launch({width: 960, height: 640, strictClose: true});
     const p = browser.page,
-      run = {quality};
+      run = {quality},
+      infos = [];
+    p.on('console', m => {
+      if (m.type() === 'info') infos.push(m.text());
+    });
     report.runs.push(run);
     const snap = () => p.evaluate(() => window.lightsCheck.snapshot());
     const settle = async () => {
@@ -106,21 +110,23 @@ try {
     run.dimRenders = (await settle()) - dimFrom;
     assert.equal(run.dimRenders, 1, 'one redraw per light change');
     if (quality === 'low') {
-      // Two point slots: the essential lantern and the first other one; the third is refused, reported once.
+      // Two point slots: the essential lantern and the first other one; the third waits on the tier (designed
+      // behaviour): reported once at info level, never as a page error.
       assert.deepEqual(start.lights.admitted, {point: 2, spot: 1});
-      const refusals = browser.errors.filter(e => /PointLight\(s\) not drawn/.test(e));
-      assert.equal(refusals.length, 1, `refusal reported once: ${browser.errors.join(' | ')}`);
-      assert.equal(start.lights.refused.full, 1);
+      const refusals = infos.filter(e => /PointLight\(s\) not drawn at this quality tier/.test(e));
+      assert.equal(refusals.length, 1, `tier refusal reported once at info: ${infos.join(' | ')}`);
+      assert.deepEqual(
+        browser.errors.filter(e => /not drawn/.test(e)),
+        [],
+        'a tier refusal is not an error',
+      );
+      assert.equal(start.lights.refused.tier, 1);
+      assert.equal(start.lights.refused.full, 0);
       await p.evaluate(() => window.lightsCheck.despawn('lantern-b'));
       await settle();
       const after = await snap();
       assert.deepEqual(after.lights.admitted, {point: 2, spot: 1}, 'the refused lantern takes the freed slot');
-      assert.equal(after.lights.refused.full, 0);
-      browser.errors.splice(
-        0,
-        browser.errors.length,
-        ...browser.errors.filter(e => !/PointLight\(s\) not drawn/.test(e)),
-      );
+      assert.equal(after.lights.refused.tier, 0);
     } else {
       assert.deepEqual(start.lights.admitted, {point: 3, spot: 1});
       // Free a slot, then spawn and despawn a lantern: no program links, one redraw each, the rig unchanged.

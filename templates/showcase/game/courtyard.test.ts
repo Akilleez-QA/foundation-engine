@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createTestSaves, Mesh, testScene, Transform} from '@engine';
+import {createTestSaves, Mesh, PointLight, testScene, Transform} from '@engine';
 import {hud} from '@kits/ui';
 import game from './game';
 import courtyard, {Ember, EMBERS} from './courtyard';
@@ -58,4 +58,26 @@ test('the stonework is one mesh within its triangle share, and its baked colours
   assert.ok(stone.indices.length / 3 < 20_000, `${stone.indices.length / 3} triangles`);
   assert.ok(stone.colors.every(c => c >= 0 && c <= 1));
   t.dispose();
+});
+
+test('lanterns: essential posts fit every preset; tier refusals are info, never an error', async () => {
+  const scene = await testScene(courtyard, {game});
+  const lanterns = [...scene.world.query(PointLight)].map(([, l]) => l);
+  scene.dispose();
+  assert.equal(lanterns.length, 8);
+  assert.equal(lanterns.filter(l => l.essential).length, 2, "within the low preset's 2 point slots");
+  for (const [cap, lit] of [
+    [16, 8],
+    [8, 8],
+    [4, 4],
+    [2, 2],
+  ] as const) {
+    const t = await testScene(courtyard, {game, lightCap: cap});
+    t.run(1 / 60);
+    const {admitted, refused} = t.lights.stats;
+    assert.equal(admitted.point, lit, `${cap} slots light ${lit} lanterns`);
+    assert.equal(refused.full, 0, `no essential lantern is refused with ${cap} slots`);
+    assert.equal(refused.tier, 8 - lit, 'the rest wait by design (info)');
+    t.dispose();
+  }
 });
