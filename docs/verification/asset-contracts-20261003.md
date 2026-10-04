@@ -66,3 +66,19 @@ The engine's model loader registers no KTX2 transcoder, so KTX2 is now gated beh
 Each cap is tested with a mutated GLB. `node --test scripts/asset-verify.test.mjs scripts/asset-optimize.test.mjs tools/blender-export/verify.test.mjs`: **113/113** pass on Node 22.
 
 `npm audit` reports a high-severity advisory in `braces`, reached through `micromatch`, a dependency of the CLI (GHSA-vfj7-8cjw-p6xm). It has no patched release. It is recorded in the notices.
+
+## Silhouette check (follow-up)
+
+`scripts/asset-silhouette.mjs` adds an opt-in `silhouette` contract key. The check rasterises the re-imported model's triangles orthographically (front, side or top) into a `pixels` × `pixels` mask, without a GPU. It normalises both the model mask and the reference PNG mask the same way: cropped, aspect kept, centred, set on the bottom edge. It then requires their intersection over union to reach the stage threshold (0.85 at blockout, 0.90 when final) or the contract's own `threshold`.
+
+- `node --test scripts/asset-silhouette.test.mjs`: **7/7** pass on Node 22. The tests cover:
+  - a PNG round trip, and the same shape decoded from sharp-written, adaptively filtered greyscale, RGB and RGBA PNGs;
+  - normalisation ignoring scale and margins but not proportions;
+  - all three view axes on a 2 × 1 × 0.5 box;
+  - the metre block passing a square reference, and `--masks` writing both masks;
+  - a 1:2 reference rejected with an overlap of about 0.5;
+  - a reference 15% taller than wide (overlap about 0.87) passing at blockout, failing when final, and failing a stricter explicit threshold;
+  - a missing reference, and every contract-key refusal.
+- The lantern contract now opts in. It uses a front-view concept drawing at 128 px, drawn from the design outline by `tools/blender-export/game/tools/lantern/reference.mjs`. Its measured overlap is **0.960**, against a final threshold of 0.90. The two masks written by `--masks` were inspected and line up: base, chimney, roof and ring.
+- The reference is drawn from the same design numbers that `export.py` builds from. It therefore shows how the check works, not an independent art review.
+

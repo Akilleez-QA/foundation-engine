@@ -8,7 +8,7 @@ Files in your game's own `public/` folder are served from the site root (or the 
 
 The loader accepts **binary glTF (`.glb`) with everything embedded**: a `.gltf` with a separate `.bin` or image files is rejected (`models: GLB dependencies must be embedded`). Export from Blender with *glTF Binary (.glb)*. Textures embedded in the GLB are drawn. To texture a primitive `Shape` instead, see [give a shape a material](give-a-shape-a-material.md).
 
-For a reproducible Blender export with metre scale, a base-centre pivot, material bounds and an actual engine consumer, follow the [Blender export example](../../tools/blender-export/README.md). Its checked-in original asset runs without installing Blender.
+For a reproducible Blender export with metre scale, a base-centre pivot, material bounds and an actual engine consumer, follow the [Blender export example](../../tools/blender-export/README.md). Its checked-in original asset runs without installing Blender. To make a new model with an agent, set its size and budget first, export it headless and check it with `npm run asset:verify`: see [make assets with Blender through MCP](make-assets-with-blender-mcp.md) (the MCP part is optional).
 
 ## 2. Declare it as an asset
 

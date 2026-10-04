@@ -1,5 +1,5 @@
 {
-  "$comment": "Low-poly lantern example. Requirement: a hand-held prop about 35 cm tall and 20 cm across, resting on its base, within 200 triangles, two untextured materials and 16 KiB. Made by tools/blender-export/game/tools/lantern/export.py.",
+  "$comment": "Low-poly lantern example. Requirement: a hand-held prop about 35 cm tall and 20 cm across, resting on its base, within 200 triangles, two untextured materials and 16 KiB. Made by tools/blender-export/game/tools/lantern/export.py; its front silhouette must overlap the concept drawing (game/tools/lantern/reference.mjs) by at least 0.90.",
   "schema": 1,
   "units": "metres",
   "up": "+Y",
@@ -29,6 +29,7 @@
     ]
   },
   "nodes": ["lantern"],
+  "silhouette": {"reference": "../../tools/lantern/lantern.front.png", "view": "front", "pixels": 128, "stage": "final"},
   "semanticSha256": "ab6bd03f915940cd5e57b252805f6c2d41f8e20216740e8e6130fc82d861da02",
   "provenance": {
     "required": ["licence", "author", "source", "tool", "generator", "sourceSha256", "sha256", "origin"],
