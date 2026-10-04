@@ -6,6 +6,7 @@ import {
   createKnobRegistry,
   createQuality,
   detectPreset,
+  deviceClassCap,
   knobProblems,
   pixelRatio,
   readDeviceSignals,
@@ -120,13 +121,26 @@ test('reference pixelRatio equals today’s desktop renderPixelRatio(max) at eve
   assert.equal(pixelRatio(NaN, {maxPixelRatio: 2, scale: 1}), 1);
 });
 
-test('detection picks the first preset from hardware, with reasons; weakness is only a suggestion', () => {
+// Representative signals for the device-class rule (D4). Renderer strings as Chromium reports them.
+const MALI_G52_2GB: DeviceSignals = {
+  coarsePointer: true,
+  deviceMemory: 2,
+  cores: 8,
+  gpu: 'ANGLE (ARM, Mali-G52 MC2, OpenGL ES 3.2)',
+  maxTextureSize: 8192,
+};
+const ADRENO_740_8GB: DeviceSignals = {
+  ...PHONE,
+  deviceMemory: 8,
+  gpu: 'ANGLE (Qualcomm, Adreno (TM) 740, OpenGL ES 3.2)',
+};
+// iOS Safari: no deviceMemory, a generic renderer string that Safari on a Mac reports too.
+const IPHONE: DeviceSignals = {coarsePointer: true, cores: 4, gpu: 'Apple GPU', maxTextureSize: 16384};
+
+test('detection picks the first preset from hardware, with reasons; desktop weakness is only a suggestion', () => {
   assert.equal(detectPreset(RTX4080).preset, 'reference');
   assert.match(detectPreset(RTX4080).reasons.join(' '), /RTX 4080/);
   assert.equal(detectPreset({...RTX4080, cores: 4}).preset, 'high');
-  assert.equal(detectPreset(PHONE).preset, 'high');
-  assert.deepEqual(detectPreset(PHONE).reasons, ['GPU Adreno (TM) 740', '4 GB memory']);
-  assert.equal(detectPreset(PHONE).suggested, 'medium');
   assert.deepEqual(detectPreset(SWIFTSHADER), {
     preset: 'high',
     reasons: ['GPU ' + SWIFTSHADER.gpu, `software GL (${SWIFTSHADER.gpu})`],
@@ -142,18 +156,57 @@ test('detection picks the first preset from hardware, with reasons; weakness is 
     suggestedReasons: ['2 GB memory'],
   });
   assert.equal(detectPreset({coarsePointer: false, maxTextureSize: 16384}).preset, 'high');
-  const mali = detectPreset({...PHONE, gpu: 'Mali-G57 MC2'});
-  assert.equal(mali.preset, 'high');
-  assert.equal(mali.suggested, 'low');
   assert.equal(
     detectPreset({coarsePointer: false, cores: 8, deviceMemory: 4, maxTextureSize: 16384}).suggested,
     'medium',
   );
 });
 
-// ADR 0070 replaces the historical touch cap; requested and preset ceilings still apply.
+test('device class: a constrained mobile GPU starts lower; desktop and capable phones do not', () => {
+  // 2 GB Mali-G52 (entry-level phone): Low.
+  assert.deepEqual(detectPreset(MALI_G52_2GB), {
+    preset: 'low',
+    reasons: ['device class: mobile GPU ' + MALI_G52_2GB.gpu, 'entry-level mobile GPU', '2 GB memory'],
+    softwareGl: false,
+  });
+  assert.equal(detectPreset({...MALI_G52_2GB, deviceMemory: 4}).preset, 'low', 'an entry GPU alone is Low');
+  assert.equal(detectPreset({...PHONE, gpu: 'Mali-G57 MC2'}).preset, 'low');
+  assert.equal(detectPreset({...PHONE, gpu: 'PowerVR Rogue GE8320'}).preset, 'low');
+  assert.equal(detectPreset({...PHONE, gpu: 'Adreno (TM) 610'}).preset, 'low');
+  // 4 GB Adreno 740 (flagship GPU, constrained memory): Medium.
+  assert.deepEqual(detectPreset(PHONE), {
+    preset: 'medium',
+    reasons: ['device class: mobile GPU Adreno (TM) 740', '4 GB memory'],
+    softwareGl: false,
+  });
+  assert.equal(detectPreset({...ADRENO_740_8GB, cores: 4}).preset, 'medium', '4 cores');
+  assert.equal(detectPreset({...ADRENO_740_8GB, saveData: true}).preset, 'medium', 'data saver');
+  // 8 GB Adreno 740, Mali-G710, Immortalis: no limit, today's High.
+  assert.equal(detectPreset(ADRENO_740_8GB).preset, 'high');
+  assert.equal(detectPreset({...ADRENO_740_8GB, gpu: 'Mali-G710 MC10'}).preset, 'high');
+  assert.equal(detectPreset({...ADRENO_740_8GB, gpu: 'Immortalis-G715'}).preset, 'high');
+  // iPhone-class: "Apple GPU" is ambiguous with Safari on a Mac, so no limit (a documented gap).
+  assert.equal(deviceClassCap(IPHONE), undefined);
+  assert.equal(detectPreset(IPHONE).preset, 'high');
+  // Desktop: never limited, whatever its memory, cores or GPU age.
+  for (const s of [
+    RTX4080,
+    {...RTX4080, deviceMemory: 2, cores: 2},
+    SWIFTSHADER,
+    {coarsePointer: false, cores: 4, gpu: 'Intel(R) HD Graphics 4000', maxTextureSize: 8192},
+    {coarsePointer: false, gpu: 'VideoCore IV', maxTextureSize: 2048},
+    {coarsePointer: false, maxTextureSize: 16384},
+    {coarsePointer: false, deviceMemory: 8, cores: 10, gpu: 'Apple GPU', maxTextureSize: 16384},
+  ] satisfies DeviceSignals[])
+    assert.equal(deviceClassCap(s), undefined, s.gpu ?? 'unreported');
+  // Pointer never decides: the same Mali without touch (an ARM Chromebook) starts the same.
+  assert.equal(detectPreset({...MALI_G52_2GB, coarsePointer: false}).preset, 'low');
+});
 
-test('detection preserves requested ceilings regardless of pointer; Low remains a player choice', () => {
+// ADR 0070 replaces the historical touch cap; requested and preset ceilings still apply. ADR 0079 limits only the
+// first start of a constrained mobile GPU.
+
+test('detection preserves requested ceilings regardless of pointer; desktop never starts Low', () => {
   const table: [string, DeviceSignals, QualityPreset][] = [
     ['reference desktop (RTX 4080, 32 cores)', RTX4080, 'reference'],
     ['desktop, 4 cores', {...RTX4080, cores: 4}, 'high'],
@@ -169,25 +222,83 @@ test('detection preserves requested ceilings regardless of pointer; Low remains 
     ['desktop, texture limit 2048', {coarsePointer: false, gpu: 'VideoCore IV', maxTextureSize: 2048}, 'high'],
     ['desktop, 2 GB memory', {...RTX4080, deviceMemory: 2}, 'high'],
     ['touch reference-class tablet', {...RTX4080, coarsePointer: true}, 'reference'],
-    ['phone, 4 GB', PHONE, 'high'],
-    [
-      'phone, entry-level GPU, 2 GB',
-      {coarsePointer: true, deviceMemory: 2, cores: 4, gpu: 'Mali-G52', maxTextureSize: 4096},
-      'high',
-    ],
     ['touch, software GL', {...SWIFTSHADER, coarsePointer: true}, 'high'],
+    ['phone, 4 GB Adreno 740', PHONE, 'medium'],
+    ['phone, 8 GB Adreno 740', ADRENO_740_8GB, 'high'],
+    ['phone, entry-level GPU, 2 GB', MALI_G52_2GB, 'low'],
+    ['iPhone-class', IPHONE, 'high'],
   ];
   for (const [name, signals, expected] of table) {
     const d = detectPreset(signals);
     assert.equal(d.preset, expected, name);
-    assert.notEqual(d.preset, 'low', name);
+    if (!deviceClassCap(signals)) assert.notEqual(d.preset, 'low', name);
     for (const dpr of [1, 1.25, 1.5, 2, 3])
       for (const max of [1.25, 1.5, 1.6, 1.7, 1.75, 2]) {
         const q = createQuality({signals: () => signals, devicePixelRatio: () => dpr});
         assert.equal(q.preset, expected, name);
-        assert.equal(q.pixelRatio(max), Math.min(dpr, max), `${name}: dpr ${dpr} max ${max}`);
+        const knob = expected === 'medium' ? 1.5 : expected === 'low' ? 1 : 2;
+        const scale = expected === 'low' ? 0.85 : 1;
+        assert.equal(q.pixelRatio(max), Math.min(dpr, max, knob) * scale, `${name}: dpr ${dpr} max ${max}`);
       }
   }
+});
+
+test('device class under an authored default: only an undeclared tier is limited, unsaved; pins and saves win', () => {
+  // The brief left the tier at its default (Reference): a 2 GB Mali starts Low, reported as a detection, not saved.
+  const store = memoryStore();
+  const q = createQuality({store, initialPreset: 'reference', deviceClassSafety: true, signals: () => MALI_G52_2GB});
+  assert.equal(q.preset, 'low');
+  assert.equal(q.source, 'detected');
+  assert.equal(q.settings.detected?.reasons[0], 'device class: mobile GPU ' + MALI_G52_2GB.gpu);
+  assert.equal(store.writes, 0, 'unsaved: a later brief change still applies');
+  assert.equal(q.knob('lights.local-max'), 2);
+  assert.equal(q.knob('lights.shadowed-max'), 0);
+  // A 4 GB Adreno 740 starts Medium; an authored Low is never raised.
+  assert.equal(
+    createQuality({initialPreset: 'reference', deviceClassSafety: true, signals: () => PHONE}).preset,
+    'medium',
+  );
+  assert.equal(createQuality({initialPreset: 'low', deviceClassSafety: true, signals: () => PHONE}).preset, 'low');
+  // Desktop and iPhone-class keep the authored start, as 'default'.
+  for (const signals of [RTX4080, SWIFTSHADER, IPHONE, ADRENO_740_8GB]) {
+    const d = createQuality({initialPreset: 'reference', deviceClassSafety: true, signals: () => signals});
+    assert.equal(d.preset, 'reference', signals.gpu);
+    assert.equal(d.source, 'default', signals.gpu);
+  }
+  // The creator declared the tier: no limit, and no probe.
+  let probed = 0;
+  const declared = createQuality({
+    initialPreset: 'reference',
+    signals: () => {
+      probed++;
+      return MALI_G52_2GB;
+    },
+  });
+  assert.equal(declared.preset, 'reference');
+  assert.equal(probed, 0);
+  // The player's saved choice and a gate pin both win over the device class.
+  const saved = memoryStore({preset: 'high', overrides: {}, governor: false});
+  assert.equal(
+    createQuality({store: saved, initialPreset: 'reference', deviceClassSafety: true, signals: () => MALI_G52_2GB})
+      .preset,
+    'high',
+  );
+  assert.equal(
+    createQuality({
+      pinned: 'reference',
+      initialPreset: 'reference',
+      deviceClassSafety: true,
+      signals: () => MALI_G52_2GB,
+    }).preset,
+    'reference',
+  );
+  // A player change from the limited start is saved as the player's choice.
+  q.setPreset('high');
+  assert.equal(store.value?.preset, 'high');
+  assert.equal(
+    createQuality({store, initialPreset: 'reference', deviceClassSafety: true, signals: () => MALI_G52_2GB}).source,
+    'player',
+  );
 });
 
 test('the probe reads an injected environment only', () => {
@@ -230,14 +341,14 @@ test('first run: detection picks the preset once, records reasons, and saves it'
     },
     build: 'b1',
   });
-  assert.equal(q.preset, 'high');
+  assert.equal(q.preset, 'medium'); // a 4 GB mobile GPU: the device-class start
   assert.equal(q.source, 'detected');
   assert.equal(probes, 1);
   assert.deepEqual(store.value, {
-    preset: 'high',
+    preset: 'medium',
     overrides: {},
     governor: false,
-    detected: {preset: 'high', reasons: ['GPU Adreno (TM) 740', '4 GB memory'], build: 'b1', suggested: 'medium'},
+    detected: {preset: 'medium', reasons: ['device class: mobile GPU Adreno (TM) 740', '4 GB memory'], build: 'b1'},
   });
   // A later run with the same saved section never probes again.
   const again = createQuality({
@@ -247,7 +358,7 @@ test('first run: detection picks the preset once, records reasons, and saves it'
       return RTX4080;
     },
   });
-  assert.equal(again.preset, 'high');
+  assert.equal(again.preset, 'medium');
   assert.equal(probes, 1);
   // No probe and nothing saved: reference, and nothing written.
   const empty = memoryStore();
@@ -260,12 +371,12 @@ test('first run: detection picks the preset once, records reasons, and saves it'
 test('the player’s choice beats detection, on every later run and after a device change', () => {
   const store = memoryStore();
   const first = createQuality({store, signals: () => PHONE});
-  assert.equal(first.preset, 'high');
+  assert.equal(first.preset, 'medium');
   first.setPreset('reference');
   first.setKnob('shadows.quality', 'high');
   assert.equal(first.source, 'player');
   assert.equal(store.value!.preset, 'reference');
-  assert.equal(store.value!.detected!.preset, 'high', 'detection reasons are kept for the screen');
+  assert.equal(store.value!.detected!.preset, 'medium', 'detection reasons are kept for the screen');
 
   let probed = false;
   for (const signals of [PHONE, SWIFTSHADER, RTX4080]) {
