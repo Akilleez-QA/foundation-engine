@@ -23,12 +23,13 @@
         "shadowCasters": 10,
         "textureMiB": 8,
         "canvasMiB": 4,
-        "heapMiB": 5,
+        "heapMiB": 8,
         "contexts": 1
       },
       "provenance": {
         "measured": "775e411 + the explorer template, swiftshader@1280x800 (worst window +10 %, rounded up by npm run perf:derive)",
-        "run": "GAME_DIR=templates/explorer/game npm run gate (first-load JS 634.8 KiB; startup heap 3.5 MiB)"
+        "run": "GAME_DIR=templates/explorer/game npm run gate (first-load JS 634.8 KiB; startup heap 3.5 MiB)",
+        "heapMiB": "look pass: the baked scenery meshes and the scatter, light, sky and particle chunks; npm run bench d918d39 + look pass, swiftshader 1280x800: garden 7.2 MiB, shed 6.7 MiB, +10 % rounded up (Perf-Budget trailer)"
       }
     },
     "shed": {
@@ -41,13 +42,14 @@
         "shadowCasters": 10,
         "textureMiB": 8,
         "canvasMiB": 4,
-        "heapMiB": 5,
+        "heapMiB": 8,
         "contexts": 1,
         "loadMiB": 1
       },
       "provenance": {
         "measured": "775e411 + the explorer template, swiftshader@1280x800 (worst window +10 %, rounded up by npm run perf:derive)",
-        "run": "GAME_DIR=templates/explorer/game npm run gate (first-load JS 634.8 KiB; startup heap 3.5 MiB)"
+        "run": "GAME_DIR=templates/explorer/game npm run gate (first-load JS 634.8 KiB; startup heap 3.5 MiB)",
+        "heapMiB": "look pass: the baked scenery meshes and the scatter, light, sky and particle chunks; npm run bench d918d39 + look pass, swiftshader 1280x800: garden 7.2 MiB, shed 6.7 MiB, +10 % rounded up (Perf-Budget trailer)"
       }
     }
   }
