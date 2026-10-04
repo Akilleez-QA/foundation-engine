@@ -17,7 +17,7 @@
     "test": "node scripts/generate.mjs && tsx --test \"src/**/*.test.ts\" \"game/**/*.test.ts\" \"game/**/*.test.mjs\" \"templates/*/game/**/*.test.ts\" \"templates/*/game/**/*.test.mjs\" \"scripts/**/*.test.mjs\" \"scripts/**/*.test.ts\" \"tools/**/*.test.mjs\" \"tools/visual-courtyard/game/**/*.test.ts\"",
     "lint": "npm run --silent format:check && npm run --silent lint:layers && npm run --silent lint:game && npm run --silent lint:arch && npm run --silent lint:types && npm run --silent lint:css && npm run --silent lint:generic && npm run --silent lint:brief && npm run --silent lint:budgets && npm run --silent lint:provenance && npm run --silent lint:docs-claims",
     "format": "prettier --write .",
-    "format:check": "prettier --check --log-level warn .",
+    "format:check": "node scripts/lint/format-check.mjs",
     "lint:layers": "node scripts/lint/layers.mjs",
     "lint:arch": "node scripts/lint/architecture.mjs",
     "lint:types": "node scripts/lint/types.mjs",

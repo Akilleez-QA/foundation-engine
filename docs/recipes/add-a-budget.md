@@ -74,17 +74,9 @@ git commit -m "Level: add the fountain" -m "Perf-Budget: level.draws 30 -> 36: t
 
 A new `game/` in an engine checkout has no `game/` on `origin/main` to compare with, so the ratchet compares it with the template it started from: `npm run new-game` writes `game/.origin.json` (`{"template", "commit"}`), and the template's `budgets.json` at that commit is the starting point. Without that file, the template is the brief's `genre` when a template has that name, else the template whose scene ids the game keeps. A raise above the template's numbers needs its `Perf-Budget:` line like any other.
 
-Git reads trailers only from the **last paragraph** of the message. Put every `Perf-Budget:` line in the same final
-paragraph as any other trailer (`Co-Authored-By:`, `Signed-off-by:`), with no blank line between them; a `Perf-Budget:`
-paragraph followed by a separate `Co-Authored-By:` paragraph is not read, and the raise fails as if it had no trailer.
-Check with `git log -1 --format='%(trailers:key=Perf-Budget)'`.
+Because `lint:budgets` reads whole messages, git's own trailer view can miss a line the lint accepts: `git log -1 --format='%(trailers:key=Perf-Budget)'` shows only last-paragraph trailers. Check a raise with `npm run lint:budgets`, or read the full message with `git log -1 --format=%B`. Keeping the line in the final trailer block with `Co-Authored-By:` is tidy, not required.
 
-In a game started from a template, `lint:budgets` compares `game/budgets.json` with the same file on `origin/main`. In
-an engine checkout, `origin/main` has no `game/`, so every number of a new game counts as new and nothing is compared
-until the game's own `main` holds the file. The template's numbers are still the game's starting budgets: compare
-against the commit that started the game with `npm run lint:budgets -- --base <start-commit>` (the art-direction
-recipe's [template notes](art-direction.md#making-a-different-game-from-the-showcase) say when a redesign needs a
-trailer).
+The template's numbers are a new game's starting budgets. To compare against a particular commit (say, the one that started the game) instead of `origin/main`, pass it: `npm run lint:budgets -- --base <start-commit>`. The art-direction recipe's [template notes](art-direction.md#making-a-different-game-from-the-showcase) say when a redesign needs a trailer.
 
 Before raising, try in order: simplify, instance (one draw for many copies: a `Scatter` of a `Shape` or `Mesh`, see [scatter grass and rocks](scatter-grass-and-rocks.md); particles for small moving copies), bake (merge static meshes per material, or static copies into one `Mesh` with `defineMesh` and vertex colours: [art direction](art-direction.md), section 5), LOD. Raise only with the author's agreement.
 

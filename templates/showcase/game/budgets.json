@@ -48,8 +48,8 @@
       "budget": {
         "draws": 10,
         "triangles": 10000,
-        "shadowCasters": 10,
-        "shadowPasses": 1,
+        "shadowCasters": 0,
+        "shadowPasses": 0,
         "textureMiB": 8,
         "canvasMiB": 4,
         "heapMiB": 10,
@@ -57,7 +57,7 @@
         "loadMiB": 1
       },
       "provenance": {
-        "measured": "7c26db7 + the showcase template, swiftshader@1280x800 (worst window +10 %, rounded up by npm run perf:derive)",
+        "measured": "7c26db7 + the showcase template, swiftshader@1280x800 (worst window +10 %, rounded up by npm run perf:derive); shadowCasters and shadowPasses re-measured at a75504b after the #173 probe fix: 0 and 0 (they read 7 and 1 after the courtyard before it)",
         "run": "GAME_DIR=templates/showcase/game npm run bench -- --only courtyard,garden (courtyard 32 draws, 17 559 triangles; garden 9 draws, 8 661 triangles)"
       }
     }

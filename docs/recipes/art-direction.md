@@ -739,7 +739,7 @@ and the rule "budgets only fall" applies to them from the commit that started th
   [fix-budget skill](../../.claude/skills/fix-budget/SKILL.md)). If it still needs more, it is a raise: agree it with
   the author, commit it with one `Perf-Budget: <scene>.<metric> <old> -> <new>: <reason>` trailer per number, the reason
   naming the requirement and the measurement ("the creator asked for a shadowed sun; measured 42.3 MiB, the 2048 map
-  is 32"), in the message's last paragraph, and add a GAME.md changelog row. Raise to the measurement plus headroom,
+  is 32"), anywhere in the commit message, and add a GAME.md changelog row. Raise to the measurement plus headroom,
   not to the ceiling.
 - **Lowering** a number, or removing the row of a deleted scene, needs nothing.
 
