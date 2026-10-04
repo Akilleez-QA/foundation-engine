@@ -59,6 +59,7 @@ export type PerfSample = {
   /** Post-processing draws per rendered frame (fullscreen passes; never part of drawsPerRenderedFrame). */
   postDrawsPerRenderedFrame?: number;
   shadowPassDrawsMax?: number;
+  shadowPassesMax?: number;
   taskMsPerFrame?: number;
   frameMsP95?: number;
   frameMsMax?: number;

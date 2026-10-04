@@ -1013,7 +1013,9 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   profile, PCF); the sun casts with `directional.shadow`, local lights with `shadow: true`, and `Shadow` overrides an
   entity. Shadowed local slots are fixed per visit and bounded by `lights.shadowed-max` (4/2/1/0, unwired); maps
   redraw only on change through the existing scheduler. Evidence: unit tests, `npm run test:shadows-browser` and a
-  courtyard bench (`shadowCasters` measured for an opted-in scene). No physical-device evidence.
+  courtyard bench (`shadowCasters` measured for an opted-in scene). The bench also counts `shadowPasses` (one per
+  map face; sun 1, point light 6) and every template budgets it; light refusal counters count lights, not reports
+  (D4 shadow cost accounting). No physical-device evidence.
 - **Sky and haze (VIS-05), implemented and checked (candidate PR #150).** `defineEnvironment({ sky })` draws a gradient with an optional
   sun-like discs and stars from one CPU-generated texture on an unlit sphere (no custom shader, backend-neutral);
   `haze` gains `{ kind: 'exp2', density }` and `color: 'sky'`. Evidence: unit tests and `npm run test:sky-browser`

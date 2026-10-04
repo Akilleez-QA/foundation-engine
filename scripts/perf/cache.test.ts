@@ -30,6 +30,7 @@ const sample = (id: string, scene: string, draws: number): PerfSample => ({
   trisPerRenderedFrame: draws * 100,
   offscreenDrawsPerRenderedFrame: 0,
   shadowPassDrawsMax: 0,
+  shadowPassesMax: 0,
   textureMiB: 4,
   canvasMiB: 2,
   heapMB: 10,

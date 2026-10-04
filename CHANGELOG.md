@@ -10,6 +10,15 @@ Every new framework below is optional: a game that does not use it is unchanged.
 Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
 (#122 onward). None of it is in that candidate.
 
+- **Shadow cost accounting.** The bench counts `shadowPasses`, the most shadow-map renders in one frame (one per map
+  face: the sun or a spot light 1, a point light 6), and the gate checks it as a count with no noise allowance. Every
+  template's scenes budget `shadowPasses: 1` (measured 0): one sun shadow fits, a shadowed point light needs a
+  measured row. `shadowCasters` is documented as what it measures: the most off-screen draws in one frame, summed over
+  shadow lights and faces. Light `refused` counters now count refused lights (eight lights in two slots:
+  `refused.full` 6, was 1), still reported once per cause. The scene-look guide gains a per-light and per-shadow cost
+  table (software GL). *Affected:* a game that adds a shadowed point light to a template scene must measure and set
+  its `shadowPasses` row; code that read `refused` as a report count now sees light counts.
+
 - **Capability manifest and `lint:docs-claims` (#156).** `npm run capabilities` writes `docs/capabilities.json` and
   `docs/capabilities.md` from the code: the `@engine` value and type exports, each kit and its exports, the quality
   knobs (and whether engine code reads each one), the templates, the npm scripts, and feature IDs (VIS-01 to VIS-06,
