@@ -54,9 +54,9 @@ Use the images only for silhouette, proportion and style. Print the measurements
 
 ## 4. Hand off
 
-1. Export headless from the script, as in [tools/blender-export](../../../tools/blender-export/README.md): background Blender with `--factory-startup`, GLB with embedded data, `export_yup=True`, no lights or cameras, and the adjacent `.provenance.json` receipt (tool and version, source script and its hash, the GLB hash, and that an agent built it through Blender MCP).
+1. Export headless from the script, as in [tools/blender-export](../../../tools/blender-export/README.md): background Blender with `--factory-startup`, GLB with embedded data, `export_yup=True`, no lights or cameras, and the adjacent `.provenance.json` receipt (`tool`, `generator`, source script and its hash, the GLB hash, and that an agent built it through Blender MCP).
 2. Put it in `game/public/models/`, declare it with `defineAsset` (true licence, author, source) and place it as in [load a model](../../../docs/recipes/load-a-model.md).
-3. Run the asset checks the repository has (a model contract and `npm run asset:verify` when present), then `npm run check` and `npm run play:snap`. If the scene is over budget, use the fix-budget skill; never relax a contract or budget to pass.
+3. Write the asset's `<name>.contract.json` from the plan (size, pivot, triangle and material limits) **before** exporting, and check the GLB with `npm run asset:verify -- game/public/models/<name>.glb` ([model contracts](../../../docs/guides/model-contracts.md)); `npm run check` runs it too. Then `npm run play:snap`. If the scene is over budget, use the fix-budget skill; never relax a contract or budget to pass.
 4. Show the author: the screenshots beside the reference, the measurement table, triangles and draws against the budget, and what is still unverified.
 
 Credits: the measure-don't-eyeball and gated-phase ideas are informed by MIT-licensed [blender-game-skills](https://github.com/majidmanzarpour/blender-game-skills), the Apache-2.0 [blender-ai-mcp](https://github.com/PatrykIti/blender-ai-mcp) (vision as advisory, measurements as proof) and the MIT [blender-claude-plugin](https://github.com/ra100/blender-claude-plugin) (Blender 5.x API notes). This text is our own.
