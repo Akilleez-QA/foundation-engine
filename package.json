@@ -86,6 +86,7 @@
     "dmath:golden": "node --import tsx scripts/dmath-golden.mjs",
     "test:particle-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/particle-check.mjs playtest/particles",
     "test:sound-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/sound-check.mjs playtest/sound",
+    "test:pose-to-pose-browser": "GAME_DIR=tools/pose-to-pose/game node scripts/generate.mjs && tsc --noEmit -p tools/pose-to-pose/tsconfig.json && tsx scripts/lint/brief.ts tools/pose-to-pose/game && GAME_DIR=tools/pose-to-pose/game node -r ./scripts/silent-browser.cjs tools/pose-to-pose/browser.mjs",
     "test:blender-export-browser": "GAME_DIR=tools/blender-export/game node scripts/generate.mjs && tsc --noEmit -p tools/blender-export/tsconfig.json && tsx scripts/lint/brief.ts tools/blender-export/game && GAME_DIR=tools/blender-export/game node -r ./scripts/silent-browser.cjs tools/blender-export/browser.mjs",
     "test:first-use-browser": "GAME_DIR=templates/explorer/game node scripts/generate.mjs && GAME_DIR=templates/explorer/game node -r ./scripts/silent-browser.cjs scripts/play/first-use-check.mjs playtest/first-use",
     "test:first-use-browser:production": "GAME_DIR=templates/explorer/game node -r ./scripts/silent-browser.cjs scripts/play/first-use-check.mjs playtest/first-use-production --production",
