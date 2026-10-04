@@ -18,6 +18,9 @@
 // - Root: Chromium's sandbox cannot start as root (containers, CI), so `--no-sandbox` is added only when the bench runs
 //   as uid 0. It is recorded in the launch arguments like every other flag.
 // - Software GL by default (`--use-angle=swiftshader`), so runs are comparable on any machine; ENGINE_GPU=1 drops it.
+//   With the GPU on Linux, headless Chromium still falls back to SwiftShader unless ANGLE is pointed at a hardware
+//   backend, so `gpu` adds `--use-gl=angle --use-angle=gl-egl` there (ENGINE_GPU_ANGLE picks another backend, e.g.
+//   `vulkan`, or `default` to add nothing). `isSoftwareRenderer` tells a caller when it fell back anyway.
 import {existsSync} from 'node:fs';
 import {createRequire} from 'node:module';
 
@@ -101,8 +104,27 @@ function defaultBundled() {
   }
 }
 
+/** ANGLE backend flags for the GPU harness: on Linux a hardware backend (gl-egl unless ENGINE_GPU_ANGLE names one). */
+export function gpuAngleArgs(platform = process.platform, env = process.env) {
+  if (platform !== 'linux') return [];
+  const backend = (env.ENGINE_GPU_ANGLE ?? 'gl-egl').trim();
+  if (backend === '' || backend === 'default') return [];
+  if (!/^[a-z0-9-]+$/.test(backend)) throw Error(`ENGINE_GPU_ANGLE must be an ANGLE backend name, got "${backend}"`);
+  return ['--use-gl=angle', `--use-angle=${backend}`, ...(backend === 'vulkan' ? ['--enable-features=Vulkan'] : [])];
+}
+
+/** True when a WebGL renderer string (UNMASKED_RENDERER_WEBGL) names a software rasteriser. */
+export const isSoftwareRenderer = renderer => /swiftshader|llvmpipe|softpipe|software/i.test(String(renderer ?? ''));
+
 /** The command-line flags: muted and isolated always; software GL unless `gpu`; no sandbox only as root. */
-export function chromiumArgs({width = 1280, height = 800, gpu = false, root = process.getuid?.() === 0} = {}) {
+export function chromiumArgs({
+  width = 1280,
+  height = 800,
+  gpu = false,
+  root = process.getuid?.() === 0,
+  platform = process.platform,
+  env = process.env,
+} = {}) {
   return [
     '--mute-audio',
     '--no-first-run',
@@ -112,7 +134,7 @@ export function chromiumArgs({width = 1280, height = 800, gpu = false, root = pr
     '--enable-automation',
     '--ignore-gpu-blocklist',
     `--window-size=${width},${height}`,
-    ...(gpu ? [] : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']),
+    ...(gpu ? gpuAngleArgs(platform, env) : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']),
     ...(root ? ['--no-sandbox'] : []),
   ];
 }

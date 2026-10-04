@@ -15,7 +15,8 @@
 // Usage: tsx scripts/perf/bench.mjs [baseUrl] [--json out.json] [--only a,b] [--active a,b] [--gpu]
 //                                   [--viewport desktop|4k|WxH] [--frames N] [--network live] [--no-check]
 //   baseUrl  an already served build. Without it the bench builds this tree into a temp folder and serves it.
-//   --gpu    drop software GL (set ENGINE_CHROMIUM to a GPU-enabled wrapper for the reference machine).
+//   --gpu    drop software GL (Linux: ANGLE gl-egl, or ENGINE_GPU_ANGLE; else ENGINE_CHROMIUM to a GPU-enabled
+//            wrapper). A run that still renders in software fails instead of being recorded as gpu.
 import {writeFileSync, mkdirSync, readFileSync, renameSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
@@ -181,7 +182,7 @@ export async function runBench(o, {log = console.log} = {}) {
   const restartPlans = new Map(BENCH_SCENES.map(row => [row.id, activeRestartPlan(row)]));
   if (!BENCH_SCENES.length)
     throw Error("game/budgets.json lists no scenes: add the game's scenes (docs/recipes/add-a-budget.md)");
-  const {launch, sleep} = await import('./bench-browser.mjs');
+  const {launch, sleep, isSoftwareRenderer} = await import('./bench-browser.mjs');
   const {classifyWindow} = await import('../../src/platform/perf/window-class.ts');
   const served = o.base ? null : await buildAndServe();
   const base = o.base ?? served.url;
@@ -190,6 +191,11 @@ export async function runBench(o, {log = console.log} = {}) {
   try {
     await b.page.goto('about:blank');
     const gpuString = await b.evaluate(GPU_STRING);
+    // A GPU run that fell back to a software rasteriser would be recorded as `gpu` with software numbers.
+    if (o.gpu && isSoftwareRenderer(gpuString))
+      throw Error(
+        `bench --gpu: the browser rendered with ${gpuString}. Set ENGINE_GPU_ANGLE (Linux: gl-egl, vulkan) or ENGINE_CHROMIUM to a GPU-enabled browser.`,
+      );
     const browser = 'Chromium ' + b.version;
     const descriptor = experimentDescriptor(o, {browser, gpuString, launchArguments: b.launchArguments});
     const run = {
