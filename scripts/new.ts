@@ -20,6 +20,7 @@ import {dirname, join, relative} from 'node:path';
 import {gameDir, ROOT} from './lib/game-dir.mjs';
 import {loadGame} from '../src/app/game-files';
 import {freeAxisBinding, freeButtonBinding} from '../src/author/input-registry';
+import {CEILING_METRICS} from '../src/author/build';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 export const pascal = (id: string) =>
@@ -82,7 +83,9 @@ function addBudgetRow(dir: string, id: string, brief: Brief, made: string[]) {
     // No loadMiB: a missing metric is unmeasured and the gate skips it (docs/recipes/add-a-budget.md). The bench never
     // measures the start scene's entry cost, so a guessed number would fail the gate, and removing it would count as a
     // raise. perf:derive supplies a measured loadMiB later; adding a metric is not a raise.
-    budget: {draws: c.draws, triangles: c.triangles, textureMiB: c.textureMiB, heapMiB: c.heapMiB, contexts: 1},
+    // Every ceiling the brief declares (CEILING_METRICS: draws, post draws, triangles, shadow casters and passes,
+    // textures, heap), so each row the gate can check is bounded from the start; perf:derive replaces them.
+    budget: {...Object.fromEntries(CEILING_METRICS.map(m => [m, c[m]])), contexts: 1},
     provenance: {
       measured: `unmeasured: the brief's ceiling for a ${brief.devices.minimum}`,
       run:

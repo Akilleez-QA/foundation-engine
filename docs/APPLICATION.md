@@ -104,7 +104,7 @@ Kernel modules the composition root installs:
 | Clause | Application |
 |---|---|
 | STD-PRF-1 | Budgets live in the game's `budgets.json` (`templates/blank/game/budgets.json` here), read by `perf/budgets.ts` |
-| STD-PRF-3 | Measured with `npm run bench` in software GL at 1280×800 and derived by `npm run perf:derive` (worst window + 10 %, rounded up) |
+| STD-PRF-3 | Measured with `npm run bench` in software GL at 1280×800 and derived by `npm run perf:derive` (worst window + 10 %, rounded up; exact for contexts, postDraws and shadowPasses) |
 | STD-PRF-5 | `scripts/perf/budget-ratchet.mjs` (in `npm run lint`) fails a raise without a matching `Perf-Budget:` trailer |
 | STD-PRF-11 | `npm run gate` *(engine)* |
 | STD-PRF-14 | Reference run: `npm run bench:ref` with `ENGINE_CHROMIUM` pointing at a GPU-enabled Chromium wrapper |

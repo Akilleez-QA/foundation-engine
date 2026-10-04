@@ -367,7 +367,7 @@ export function deriveBudget(sample: BenchSample, metrics: readonly BudgetMetric
     postDraws: 1,
     triangles: 10000,
     shadowCasters: 10,
-    shadowPasses: 1,
+    shadowPasses: 1, // unused: derived exactly
     shadowDrawsIdle: 1,
     chunkKiB: 16,
     textureMiB: 8,
@@ -386,8 +386,9 @@ export function deriveBudget(sample: BenchSample, metrics: readonly BudgetMetric
     if (v === null) continue;
     const s = step[m];
     out[m] =
-      // Exact counts: a context count, a still scene's zero shadow draws, and a tier's fixed post passes.
-      m === 'contexts' || m === 'postDraws' || (m === 'shadowDrawsIdle' && v === 0)
+      // Exact counts, the metrics the check gives no noise allowance (DEFAULT_TOLERANCE 0): a context count, a tier's
+      // fixed post passes, the shadow-map passes (sun or spot 1, point light 6), and a still scene's zero shadow draws.
+      m === 'contexts' || m === 'postDraws' || m === 'shadowPasses' || (m === 'shadowDrawsIdle' && v === 0)
         ? v
         : m === 'idleRenderRatio'
           ? Math.min(1, Math.max(s, Math.round(Math.ceil((v * (1 + headroom)) / s) * s * 100) / 100))

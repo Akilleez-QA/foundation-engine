@@ -27,13 +27,32 @@ function snapshot<T>(value: T): Immutable<T> {
 export type DeviceClass = 'desktop' | 'laptop' | 'tablet' | 'phone';
 export type InputKind = 'keyboard' | 'pointer' | 'touch' | 'gamepad';
 
-/** Per-scene ceilings a scene's measured budget must stay under (the software-GL gate counts). */
+/**
+ * Per-scene ceilings a scene's measured budget must stay under (the software-GL gate counts). Like every budget row
+ * they bound the reference-preset measurement (perf/budgets.ts); a lighter tier's own cost goes in the row's `ports`.
+ */
 export interface SceneCeiling {
   draws: number;
   triangles: number;
   textureMiB: number;
   heapMiB: number;
+  /** Post-processing fullscreen draws per rendered frame: the full pipeline is 10 at reference (exact per tier). */
+  postDraws: number;
+  /** Shadow-map passes in the busiest frame: the sun 1 plus 6 per shadowed point light; reference allows 4 (25). */
+  shadowPasses: number;
+  /** Shadow-pass draws in the busiest frame; they are draws too, so never above the draws ceiling. */
+  shadowCasters: number;
 }
+/** Every per-scene ceiling, in budget-row order: the generator writes them and lint:brief checks them. */
+export const CEILING_METRICS = [
+  'draws',
+  'postDraws',
+  'triangles',
+  'shadowCasters',
+  'shadowPasses',
+  'textureMiB',
+  'heapMiB',
+] as const satisfies readonly (keyof SceneCeiling)[];
 export interface PerformanceTargets {
   fps: number;
   /** Cold start to the first scene, reference machine. */
@@ -45,35 +64,75 @@ export interface PerformanceTargets {
   perScene: SceneCeiling;
 }
 
-/** Tier defaults: what a scene may cost on the weakest device the game promises to run on. */
+/**
+ * Tier defaults: what a scene may cost on the weakest device the game promises to run on. These are the engine's
+ * provisional defaults, not device evidence: minimum phone, tablet and laptop/desktop profiles are pending creator
+ * selection (DV-01), so a brief may lower any of them with `performance.perScene`. A ceiling is the most a budget may
+ * ever be, not a target: a measured budget (`npm run perf:derive`) is usually far lower, e.g. 8 MiB of textures, the
+ * derive step, for a template scene without a shadow map. `postDraws` and `shadowPasses` are fixed by the reference
+ * preset's pipeline (10 post passes; 1 + 6 x 4 shadow passes) on every class: on a phone the quality knobs already
+ * draw fewer (`post.mode`, `lights.shadowed-max`), and the budget row's `ports` record that.
+ */
 export const TIER: Immutable<Record<DeviceClass, PerformanceTargets>> = snapshot({
   desktop: {
     fps: 60,
     loadMs: 3000,
     firstLoadKiB: 1024,
     heapMiB: 96,
-    perScene: {draws: 400, triangles: 1_000_000, textureMiB: 256, heapMiB: 64},
+    perScene: {
+      draws: 400,
+      triangles: 1_000_000,
+      textureMiB: 256,
+      heapMiB: 64,
+      postDraws: 10,
+      shadowPasses: 25,
+      shadowCasters: 400,
+    },
   },
   laptop: {
     fps: 60,
     loadMs: 3000,
     firstLoadKiB: 900,
     heapMiB: 80,
-    perScene: {draws: 250, triangles: 500_000, textureMiB: 128, heapMiB: 48},
+    perScene: {
+      draws: 250,
+      triangles: 500_000,
+      textureMiB: 128,
+      heapMiB: 48,
+      postDraws: 10,
+      shadowPasses: 25,
+      shadowCasters: 250,
+    },
   },
   tablet: {
     fps: 60,
     loadMs: 4000,
     firstLoadKiB: 800,
     heapMiB: 64,
-    perScene: {draws: 150, triangles: 300_000, textureMiB: 96, heapMiB: 40},
+    perScene: {
+      draws: 150,
+      triangles: 300_000,
+      textureMiB: 96,
+      heapMiB: 40,
+      postDraws: 10,
+      shadowPasses: 25,
+      shadowCasters: 150,
+    },
   },
   phone: {
     fps: 60,
     loadMs: 5000,
     firstLoadKiB: 704,
     heapMiB: 48,
-    perScene: {draws: 100, triangles: 150_000, textureMiB: 64, heapMiB: 32},
+    perScene: {
+      draws: 100,
+      triangles: 150_000,
+      textureMiB: 64,
+      heapMiB: 32,
+      postDraws: 10,
+      shadowPasses: 25,
+      shadowCasters: 100,
+    },
   },
 });
 
@@ -236,13 +295,13 @@ export function briefProblems(value: unknown): string[] {
     if (b.performance.perScene !== undefined && !record(b.performance.perScene))
       out.push('performance.perScene: expected an object');
     if (record(b.performance.perScene))
-      for (const key of ['draws', 'triangles', 'textureMiB', 'heapMiB'])
+      for (const key of CEILING_METRICS)
         if (b.performance.perScene[key] !== undefined)
           number(
             b.performance.perScene[key],
             `performance.perScene.${key}`,
             false,
-            key === 'draws' || key === 'triangles',
+            key !== 'textureMiB' && key !== 'heapMiB',
           );
   }
   if (b.modes !== undefined) list(b.modes, 'modes');
@@ -329,6 +388,9 @@ export function defineBuild(b: BuildInput): BuildBrief {
         triangles: b.performance?.perScene?.triangles ?? tier.perScene.triangles,
         textureMiB: b.performance?.perScene?.textureMiB ?? tier.perScene.textureMiB,
         heapMiB: b.performance?.perScene?.heapMiB ?? tier.perScene.heapMiB,
+        postDraws: b.performance?.perScene?.postDraws ?? tier.perScene.postDraws,
+        shadowPasses: b.performance?.perScene?.shadowPasses ?? tier.perScene.shadowPasses,
+        shadowCasters: b.performance?.perScene?.shadowCasters ?? tier.perScene.shadowCasters,
       },
     },
     modes: b.modes ?? ['play'],

@@ -166,3 +166,43 @@ test('brief: zero resource caps and custom authored ceilings remain valid contra
     rmSync(tmp, {recursive: true, force: true});
   }
 });
+
+test('brief: post draws, shadow passes and shadow casters are bounded by the ceiling when a row has them', async () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'engine-brief-shadow-'));
+  try {
+    cpSync(join(ROOT, 'templates', 'blank'), tmp, {recursive: true});
+    const brief = join(tmp, 'game', 'build.brief.ts');
+    writeFileSync(
+      brief,
+      readFileSync(brief, 'utf8').replace(
+        '  success:',
+        '  performance: { perScene: { postDraws: 1, shadowPasses: 7, shadowCasters: 20 } },\n  success:',
+      ),
+    );
+    const file = join(tmp, 'game', 'budgets.json'),
+      data = JSON.parse(readFileSync(file, 'utf8'));
+    const write = (budget: Record<string, unknown>) => {
+      data.scenes.main.budget = budget;
+      writeFileSync(file, JSON.stringify(data));
+    };
+    const base = {...data.scenes.main.budget};
+    delete base.postDraws;
+    delete base.shadowPasses;
+    delete base.shadowCasters;
+    write(base);
+    assert.deepEqual(await checkGame(join(tmp, 'game')), [], 'absent rows are unmeasured, not errors');
+    write({...base, postDraws: 1, shadowPasses: 7, shadowCasters: 20});
+    assert.deepEqual(await checkGame(join(tmp, 'game')), []);
+    write({...base, postDraws: 10, shadowPasses: 8, shadowCasters: 21});
+    const problems = await checkGame(join(tmp, 'game'));
+    for (const m of ['postDraws 10', 'shadowPasses 8', 'shadowCasters 21'])
+      assert.ok(
+        problems.some(p => p.includes(`main.${m} is above the brief's ceiling`)),
+        m,
+      );
+    write({...base, shadowPasses: 1.5});
+    assert.ok((await checkGame(join(tmp, 'game'))).some(p => /main.shadowPasses must be an explicit finite/.test(p)));
+  } finally {
+    rmSync(tmp, {recursive: true, force: true});
+  }
+});
