@@ -20,6 +20,15 @@ Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c
   The 500 kB limit is not raised. *Affected:* a scene whose first `Model` is spawned by a system sees its models one
   chunk fetch later.
 
+- **Shadow cost accounting.** The bench counts `shadowPasses`, the most shadow-map renders in one frame (one per map
+  face: the sun or a spot light 1, a point light 6), and the gate checks it as a count with no noise allowance. Every
+  template's scenes budget `shadowPasses: 1` (measured 0): one sun shadow fits, a shadowed point light needs a
+  measured row. `shadowCasters` is documented as what it measures: the most off-screen draws in one frame, summed over
+  shadow lights and faces. Light `refused` counters now count refused lights (eight lights in two slots:
+  `refused.full` 6, was 1), still reported once per cause. The scene-look guide gains a per-light and per-shadow cost
+  table (software GL). *Affected:* a game that adds a shadowed point light to a template scene must measure and set
+  its `shadowPasses` row; code that read `refused` as a report count now sees light counts.
+
 - **Capability manifest and `lint:docs-claims` (#156).** `npm run capabilities` writes `docs/capabilities.json` and
   `docs/capabilities.md` from the code: the `@engine` value and type exports, each kit and its exports, the quality
   knobs (and whether engine code reads each one), the templates, the npm scripts, and feature IDs (VIS-01 to VIS-06,
@@ -140,6 +149,13 @@ Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c
 - **`asset:verify` enforces the model loader's caps.** Every contracted model must fit the loader's admission
   limits (32 MiB, accessor, node, skin and animation counts, four bone influences), and Draco is refused (KTX2
   is accepted when the contract lists it, since #146).
+- **Post-processing: `view.post` at the player's `post.mode` tier.** Bloom, vignette and grade as scene data
+  (`ctx.view.post` is live, one redraw). `off` (low) draws as before, `basic` (medium) adds one combined pass (tone
+  map, grade, vignette), `full` (reference, high) adds a half-resolution bloom chain. The knob is now wired. A scene
+  without `view.post` loads no post code; the GLSL chunk is 6.1 kB minified. **Budget contract change:** post passes
+  are counted apart as `postDraws` (10, 1, 0 per tier; probe, bench, gate, `perf:derive`, `play:snap`), so `draws`
+  keeps measuring scene draws. Guide: [post-processing](docs/guides/post-processing.md); browser evidence:
+  `npm run test:post-browser`.
 - **Full three.js for a game that opts in: `@kits/three`.** A game that lists `three()` in `defineGame({ kits })`
   may import `three`, `three/addons/*` and `three/examples/jsm/*` (one shared copy); every other game still may not
   (`npm run lint:layers`: `three-needs-kit`, `kit-not-listed`), and `npm run check` names each file that uses the kit.

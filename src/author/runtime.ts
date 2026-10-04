@@ -22,6 +22,7 @@ import {Material, materialKey} from './material';
 import {createSceneSurfaces, type Surface, type SurfaceMaterial} from './scene-materials';
 import {createParticleView} from './particle-view';
 import {EMITTER_ID, type ParticleField} from './particle-contract';
+import {createScenePost, loadPostModule} from './scene-post';
 import {openSceneExtension, type SceneExtensionSession} from './scene-extension';
 import {SCATTER_ID, scatterRoot} from './scatter';
 import type {SceneScatterDrawing} from './scene-scatter';
@@ -39,6 +40,8 @@ import type {SceneScatterDrawing} from './scene-scatter';
  *  - particles: entities with `Transform` and `Emitter` are simulated by the engine's fixed system `engine.particles`
  *    (after the scene's own fixed systems) and drawn as one instanced draw per emitter, interpolated between steps
  *    (particle-sim.ts, scene-particles.ts). A scene without emitters creates nothing for them;
+ *  - post-processing: `view.post` (and `ctx.view.post`) at the player's `post.mode` tier, drawn by a lazy chunk inside
+ *    the same render-on-change frame (scene-post.ts). A scene without post creates nothing for it;
  *  - render extensions: a kit's extensions listed in `defineScene({ extensions })` open once per visit before program
  *    preparation, sync with the frame, may replace the scene's draw, and close before the scene's tree is released
  *    (scene-extension.ts). A scene without extensions creates nothing for them;
@@ -100,6 +103,8 @@ import type {CueVoiceOptions} from '../platform/audio/audio-output';
 const NO_SHADOW = Object.freeze({cast: false, receive: false});
 /** The fixed lane's step (core/ecs/systems.ts default), named so a replay header can record it. */
 const FIXED_STEP = 1 / 60;
+/** How long a scene with post waits for its chunk before its first picture; later, it arrives with one redraw. */
+const POST_WAIT_MS = 4000;
 const seedFromAddress = (): number | null => {
   if (typeof location === 'undefined') return null;
   const s = new URLSearchParams(location.search).get('seed');
@@ -148,6 +153,8 @@ export async function prepareScene(s: Services, scene: SceneDefinition, visit: S
   // Sound files start loading with the scene; a failure is reported by the output and never blocks the visit.
   if (scene.sounds?.length && s.app.has('platform.audio'))
     for (const id of scene.sounds) void s.audio.preload(id, visit.signal);
+  // The post chunk starts loading with the scene; the visit reports a failure (scene-post.ts).
+  if (scene.view?.post) loadPostModule().catch(() => {});
   // Scatter drawing is a lazy chunk; a scene that opted in loads it while it prepares. A failure is reported at entry.
   const scatterLoad = scene.scatter && !scatterModule ? loadScatter().catch(() => null) : null;
   const body = await bodyOf(scene),
@@ -258,6 +265,7 @@ export async function enterScene(o: {
         background: scene.view?.background ?? 0x101820,
         environment: scene.view?.environment,
         output: {...initialOutput},
+        post: scene.view?.post,
         overlay,
         signal: actx.signal,
         openReadingSheet: options => readingSheets.open(options),
@@ -692,6 +700,24 @@ export async function enterScene(o: {
           particleView.dispose();
         }
       });
+      // Post-processing (`view.post`): the chunk loads when the scene has settings; `off` and a still-loading or
+      // failed chunk draw direct. The `post.mode` knob is live: a change asks for a frame, and sync() decides whether
+      // the picture changed. MSAA on the scene target follows `resolution.antialias`.
+      const post = createScenePost({
+        renderer,
+        backend: brief.render.backend,
+        signal: actx.signal,
+        samples: () => (s.quality.knob('resolution.antialias') ? 4 : 0),
+        changed: () => {
+          dirty = true;
+          actx.invalidate();
+        },
+        report: error => s.log.error(`${scene.id}: post-processing`, error),
+      });
+      actx.own(() => post.dispose());
+      s.quality.subscribe(() => {
+        if (viewState.post) actx.invalidate();
+      }, actx.signal);
       // Render extensions (`defineScene({ extensions })`, made by a kit: scene-extension.ts). Each opens once, now, so
       // its objects are part of program preparation; a session that throws is reported and closed for the visit.
       // Closed first when the visit ends (registered after the scene tree's own release, so it runs before it).
@@ -986,6 +1012,7 @@ export async function enterScene(o: {
           )
         )
           dirty = true;
+        if (post.sync(viewState.post, s.quality.knob('post.mode'))) dirty = true;
         for (const x of extensions)
           if (x.session)
             try {
@@ -1100,6 +1127,7 @@ export async function enterScene(o: {
           actx.signal,
         );
       if (TEST_API) handle.entities = createSceneEntityInspector(world, visit, actx.signal);
+      if (TEST_API) handle.post = () => post.stats();
       if (TEST_API && extensions.length)
         handle.extensions = () =>
           Object.fromEntries(extensions.map(x => [x.id, x.session ? (x.session.stats?.() ?? {}) : {closed: true}]));
@@ -1183,6 +1211,7 @@ export async function enterScene(o: {
         if (actx.leaving() || actx.signal.aborted) throw Error('Scene program preparation retired');
         sync();
         renderer.compile(three, camera);
+        post.compile(three, camera);
         const programs = (surface.programsReady?.(actx.signal) ?? Promise.resolve('unsupported')).catch(error => {
           if (
             error instanceof ProgramLinkError ||
@@ -1204,8 +1233,14 @@ export async function enterScene(o: {
         return programs.then(async result => {
           if (version !== preparationVersion || result === 'retired' || actx.leaving() || actx.signal.aborted)
             throw Error('Scene program preparation retired');
+          // A scene with post waits (bounded) for its chunk, so its first picture is already the composed one.
+          await post.settled(POST_WAIT_MS);
+          if (version !== preparationVersion || actx.leaving() || actx.signal.aborted)
+            throw Error('Scene program preparation retired');
+          sync();
+          post.compile(three, camera);
           // Include a real initial draw: generated passes can create programs absent from compile().
-          if (!drawOverride()) renderer.render(three, camera);
+          if (!drawOverride() && !post.render(three, camera)) renderer.render(three, camera);
           const frame = await (surface.frameReady?.(actx.signal) ?? Promise.resolve('ready'));
           if (frame === 'retired') throw Error('Scene frame preparation retired');
           if (version !== preparationVersion || actx.leaving() || actx.signal.aborted)
@@ -1254,7 +1289,7 @@ export async function enterScene(o: {
           try {
             sync();
             if (actx.leaving() || actx.signal.aborted || !programsPrepared || !dirty) return false;
-            if (!drawOverride()) renderer.render(three, camera);
+            if (!drawOverride() && !post.render(three, camera)) renderer.render(three, camera);
           } catch (error) {
             if (!(error instanceof ProgramLinkError || error instanceof FrameReadinessError)) throw error;
             failPrograms(error);

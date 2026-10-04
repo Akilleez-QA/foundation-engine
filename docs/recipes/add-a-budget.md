@@ -38,11 +38,19 @@ The bench is headless, muted and isolated. By default it uses software GL at 128
 Paste the derived numbers into the scene's `budget`, and add provenance:
 
 ```json
-"budget": { "draws": 30, "triangles": 10000, "shadowCasters": 10, "textureMiB": 8, "canvasMiB": 4, "heapMiB": 10, "contexts": 1, "loadMiB": 1 },
+"budget": { "draws": 30, "triangles": 10000, "shadowCasters": 10, "shadowPasses": 1, "textureMiB": 8, "canvasMiB": 4, "heapMiB": 10, "contexts": 1, "loadMiB": 1 },
 "provenance": { "measured": "<commit> swiftshader@1280x800", "run": "perf/runs/<file>.json" }
 ```
 
 - A missing metric is unmeasured, and the checker skips it.
+- `draws` counts the scene's own draws, shadow passes included. A scene with post-processing (`view.post`) also
+  gets `postDraws`, its fullscreen post passes per rendered frame, counted apart and exact per tier: 10 at `full`
+  (reference, high), 1 at `basic` (medium), 0 at `off` (low). Write it with ports:
+  `"postDraws": 10, "ports": {"medium": {"postDraws": 1}, "low": {"postDraws": 0}}`
+  ([post-processing](../guides/post-processing.md)).
+- `shadowPasses` counts shadow-map renders in the busiest frame (the sun or a spot light 1, a point light 6) and has
+  no noise allowance; `shadowCasters` counts their draws. See
+  [Cost per light and per shadow](../guides/scene-look.md#cost-per-light-and-per-shadow).
 - The start scene has no entry cost, so leave `loadMiB` and `loadMs` out of its row.
 
 ## 4. Gate

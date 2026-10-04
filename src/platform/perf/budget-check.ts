@@ -15,9 +15,11 @@ export type Limit = number | PerTier<number>;
 
 /** Every metric a budget may declare (ADR 0025). All are "lower is better". */
 export type BudgetMetric =
-  | 'draws' // GL draw calls per rendered frame, shadow passes included
+  | 'draws' // GL draw calls per rendered frame, shadow passes included, post-processing passes excluded
+  | 'postDraws' // post-processing fullscreen draws per rendered frame (view.post at the run's post.mode tier)
   | 'triangles' // triangles submitted per rendered frame, shadow passes included
-  | 'shadowCasters' // draws in the largest shadow pass seen (casters x shadow lights)
+  | 'shadowCasters' // off-screen draws in the busiest frame: casters in range x map faces, summed over shadow lights
+  | 'shadowPasses' // off-screen passes in the busiest frame: one per shadow-map face (sun/spot 1, point light 6)
   | 'shadowDrawsIdle' // off-screen (shadow/RT) draws per rendered frame while still: 0 = static shadow maps
   | 'textureMiB' // live GPU texture bytes in connected, non-lost contexts
   | 'canvasMiB' // live 2D canvas backing store (DOM + offscreen), after GC
@@ -33,8 +35,10 @@ export type BudgetMetric =
 /** Metrics that come from the structure of a frame: the ones the software-GL gate blocks on. */
 export const COUNT_METRICS: ReadonlySet<BudgetMetric> = new Set<BudgetMetric>([
   'draws',
+  'postDraws',
   'triangles',
   'shadowCasters',
+  'shadowPasses',
   'textureMiB',
   'canvasMiB',
   'heapMiB',
@@ -54,7 +58,9 @@ export interface BenchSample {
   readonly drawsPerRenderedFrame?: number;
   readonly trisPerRenderedFrame?: number;
   readonly offscreenDrawsPerRenderedFrame?: number;
+  readonly postDrawsPerRenderedFrame?: number;
   readonly shadowPassDrawsMax?: number;
+  readonly shadowPassesMax?: number;
   readonly chunkKiB?: number;
   readonly textureMiB?: number;
   readonly canvasMiB?: number;
@@ -92,8 +98,11 @@ export interface Tolerance {
 /** Noise allowance per metric. Counts are near-deterministic; timings are not. */
 export const DEFAULT_TOLERANCE: Readonly<Record<BudgetMetric, Tolerance>> = {
   draws: {relative: 0.03, absolute: 2},
+  // A tier's post draws are a fixed number (1 basic, 10 full): no noise allowance.
+  postDraws: {relative: 0, absolute: 0},
   triangles: {relative: 0.03, absolute: 500},
   shadowCasters: {relative: 0.03, absolute: 2},
+  shadowPasses: {relative: 0, absolute: 0},
   shadowDrawsIdle: {relative: 0, absolute: 0},
   textureMiB: {relative: 0.02, absolute: 1},
   canvasMiB: {relative: 0.02, absolute: 1},
@@ -110,8 +119,10 @@ export const DEFAULT_TOLERANCE: Readonly<Record<BudgetMetric, Tolerance>> = {
 /** Growth against the baseline run that blocks a merge even while under budget (the ratchet). */
 export const DEFAULT_REGRESSION: Readonly<Record<BudgetMetric, Tolerance>> = {
   draws: {relative: 0.1, absolute: 10},
+  postDraws: {relative: 0, absolute: 0},
   triangles: {relative: 0.1, absolute: 5000},
   shadowCasters: {relative: 0.1, absolute: 10},
+  shadowPasses: {relative: 0, absolute: 0},
   shadowDrawsIdle: {relative: 0, absolute: 0},
   textureMiB: {relative: 0.1, absolute: 4},
   canvasMiB: {relative: 0.1, absolute: 4},
@@ -174,10 +185,14 @@ export function readMetric(s: BenchSample, metric: BudgetMetric): number | null 
   switch (metric) {
     case 'draws':
       return n(s.drawsPerRenderedFrame) ?? n(s.drawsPerFrame);
+    case 'postDraws':
+      return n(s.postDrawsPerRenderedFrame);
     case 'triangles':
       return n(s.trisPerRenderedFrame);
     case 'shadowCasters':
       return n(s.shadowPassDrawsMax);
+    case 'shadowPasses':
+      return n(s.shadowPassesMax);
     case 'shadowDrawsIdle':
       return n(s.offscreenDrawsPerRenderedFrame);
     case 'chunkKiB':
@@ -348,8 +363,10 @@ export function formatReport(r: CheckReport): string {
 export function deriveBudget(sample: BenchSample, metrics: readonly BudgetMetric[], headroom = 0.1): CheckBudget {
   const step: Record<BudgetMetric, number> = {
     draws: 10,
+    postDraws: 1,
     triangles: 10000,
     shadowCasters: 10,
+    shadowPasses: 1,
     shadowDrawsIdle: 1,
     chunkKiB: 16,
     textureMiB: 8,
@@ -368,7 +385,8 @@ export function deriveBudget(sample: BenchSample, metrics: readonly BudgetMetric
     if (v === null) continue;
     const s = step[m];
     out[m] =
-      m === 'contexts' || (m === 'shadowDrawsIdle' && v === 0)
+      // Exact counts: a context count, a still scene's zero shadow draws, and a tier's fixed post passes.
+      m === 'contexts' || m === 'postDraws' || (m === 'shadowDrawsIdle' && v === 0)
         ? v
         : m === 'idleRenderRatio'
           ? Math.min(1, Math.max(s, Math.round(Math.ceil((v * (1 + headroom)) / s) * s * 100) / 100))
@@ -383,7 +401,9 @@ export function worstOf(samples: readonly BenchSample[]): BenchSample {
     'drawsPerRenderedFrame',
     'trisPerRenderedFrame',
     'offscreenDrawsPerRenderedFrame',
+    'postDrawsPerRenderedFrame',
     'shadowPassDrawsMax',
+    'shadowPassesMax',
     'textureMiB',
     'canvasMiB',
     'heapMB',
@@ -411,6 +431,7 @@ export function toCheckBudget(b: Ported<Partial<SceneBudgetValues>>): CheckBudge
     'draws',
     'triangles',
     'shadowCasters',
+    'shadowPasses',
     'shadowDrawsIdle',
     'idleRenderRatio',
     'textureMiB',

@@ -14,7 +14,8 @@ import {serve, ROOT} from './lib.mjs';
 import {gameDirLabel} from '../lib/game-dir.mjs';
 import {launch} from '../perf/bench-browser.mjs';
 import {diagnosticReport} from './diagnostic-report.mjs';
-import {loadSessionRules, startSessionServer} from '../host.mjs';
+import {CLOSE_TERMINATE_MS, loadSessionRules, startSessionServer} from '../host.mjs';
+import {DEFAULT_SESSION_HOST_LIMITS} from '../../src/kits/network/index.ts';
 
 const out = resolve(process.argv[2] ?? 'playtest/session');
 mkdirSync(out, {recursive: true});
@@ -34,6 +35,7 @@ const report = {
     'Two isolated desktop Chromium contexts (headless, software GL) on one machine against a loopback host; no LAN, WAN, TLS, physical-device or scalability evidence.',
     'The host restart is the same process closing and re-listening on the same port with the same join code; its world is new (in-memory state).',
     'The client-only drop is Playwright offline emulation of one browser context (Chromium network emulation), not a physical network loss.',
+    'Offline emulation stops frames but does not close the open socket: page B learns of its drop only when the host retires the silent connection (idle timeout, 15 s by default) and that close reaches the page. The client has no receive-side liveness check of its own, so this does not show how fast a page notices a real network loss.',
     'Keyboard input through Playwright; no gamepad, touch or simultaneous-input evidence.',
     'Integrity runs in observe mode; this check does not attempt cheating.',
   ],
@@ -207,8 +209,26 @@ try {
   await until(pages.a, s => s.painted === 2, "a sees b's paint before the drop");
   const beforeDrop = host.read(),
     socketsBeforeDrop = {...sockets};
+  // Offline emulation stops frames both ways but leaves the open socket open, so page B notices its drop only when the
+  // host retires the silent connection (`idleTimeoutMs`, counted from B's last frame) and the close reaches the page
+  // (scripts/host.mjs terminates a socket that does not finish the close handshake after CLOSE_TERMINATE_MS). The
+  // earliest detection is therefore the idle timeout itself, so B's deadline is that bound plus the usual 15 s poll
+  // allowance; the plain 15 s poll window equalled the idle timeout and raced it under load.
+  const idleClosesBeforeDrop = beforeDrop.closeReasons['idle-timeout'] ?? 0,
+    dropAt = Date.now();
   await otherContext.setOffline(true);
-  await until(pages.b, s => s.session === 'reconnecting', 'b reconnecting after its own drop');
+  await until(
+    pages.b,
+    s => s.session === 'reconnecting',
+    'b reconnecting after its own drop',
+    DEFAULT_SESSION_HOST_LIMITS.idleTimeoutMs + CLOSE_TERMINATE_MS + 15000,
+  );
+  const dropDetectedMs = Date.now() - dropAt;
+  assert.equal(
+    host.read().closeReasons['idle-timeout'] ?? 0,
+    idleClosesBeforeDrop + 1,
+    "the host retired b's silent connection as idle",
+  );
   await until(
     () => host.read(),
     h => h.players.find(p => p.player === idB)?.connected === false,
@@ -255,6 +275,7 @@ try {
     b: resumedB,
     a: finalA,
     reconnectSockets: {a: 0, b: dropAttempts},
+    dropDetectedMs,
     resumed: afterDrop.metrics.resumed,
     applied: afterDrop.metrics.applied - beforeDrop.metrics.applied,
   });

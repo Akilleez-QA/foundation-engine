@@ -25,6 +25,7 @@ import {validateSpatialAudioOptions, type SpatialAudioOptions} from '../platform
 import type {AudioClockReading} from '../platform/audio/audio-timeline';
 import type {MusicOptions, MusicVoice} from '../platform/audio/music-clock';
 import type {SceneParticles} from './particle-contract';
+import {validatePost, type PostSettings} from '../platform/render/post/settings';
 import {validateExtensions, type SceneExtension} from './scene-extension';
 import type {SceneScatter} from './scatter-contract';
 import type {SceneLights} from './lights';
@@ -136,6 +137,9 @@ export interface ViewState {
    *  (`ctx.view.output = { ...ctx.view.output, exposure: 1.2 }`): the next frame draws once with it. An invalid value
    *  is reported once and the last valid output stays. */
   output: SceneOutput;
+  /** Post-processing (bloom, vignette, grade) at the player's `post.mode` tier. Replace this value to publish a change
+   *  (one redraw); invalid settings are reported once and the last valid ones stay. docs/guides/post-processing.md. */
+  post?: PostSettings | undefined;
   /** Width / height of the view (16/9 in node tests). */
   readonly aspect: number;
   /** An element over the view for HUD text and prompts (the UI kit uses it); null in node tests. */
@@ -317,6 +321,9 @@ export interface SceneInput extends SceneBody {
     /** Opt-in tone mapping and exposure: `{ toneMapping: 'aces', exposure: 0.9 }`. Omitted: `'none'` and 1, the
      *  picture every scene had before (docs/guides/scene-look.md). */
     output?: Partial<SceneOutput>;
+    /** Post-processing (docs/guides/post-processing.md): bloom at the `full` tier; grade and vignette at `basic` and
+     *  `full`; nothing at `off`. Omit it and the scene loads no post code. */
+    post?: PostSettings;
   };
   /** Sound files (audio asset ids) this scene plays: fetched while it loads, so their first play is on time. */
   sounds?: readonly string[];
@@ -351,6 +358,8 @@ export function defineScene(s: SceneInput): SceneDefinition {
   if (captured.extensions !== undefined) captured.extensions = validateExtensions(s.id, captured.extensions);
   if (captured.view?.output !== undefined)
     captured.view = {...captured.view, output: validateSceneOutput(captured.view.output, `scene ${s.id}: view.output`)};
+  if (captured.view?.post !== undefined)
+    captured.view = {...captured.view, post: validatePost(captured.view.post, `scene ${s.id}: view.post`)};
   if (captured.modelPoseLinks !== undefined)
     captured.modelPoseLinks = normalizeModelPoseLinkLimits(captured.modelPoseLinks);
   need(

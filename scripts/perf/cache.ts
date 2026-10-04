@@ -52,6 +52,7 @@ const REQUIRED: readonly (keyof PerfSample)[] = [
   'trisPerRenderedFrame',
   'offscreenDrawsPerRenderedFrame',
   'shadowPassDrawsMax',
+  'shadowPassesMax',
   'textureMiB',
   'canvasMiB',
   'heapMB',

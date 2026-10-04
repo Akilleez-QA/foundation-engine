@@ -115,6 +115,13 @@ work, not kernel or browser buffers, and they are not a CPU deadline: `apply`,
   `leaveAfterMs` the player resumes the same slot. Pending actions are dropped on loss
   and never resent: one that reached the host before the loss stays applied once.
   Exhausted retries end in `closed` with `retry-exhausted`.
+- **Noticing a silent loss.** The client pings every 5 s but nothing answers a ping, so
+  a page has no receive-side liveness check: it notices a lost connection only when a
+  close or socket error reaches it. The host retires a connection that sends nothing
+  for the idle timeout (15 s), so when the host's close can reach the page (as under
+  Playwright offline emulation) the page enters `reconnecting` about 15 s after its
+  last frame. When no close reaches the page, detection is left to the browser's socket
+  and is unmeasured.
 - **Resynchronisation.** A malformed frame, a prediction failure, a send refusal or a
   `view-unavailable` frame tears down the connection and reconnects through the same
   schedule; a fresh connection brings a fresh baseline and prediction owner.
@@ -190,7 +197,11 @@ empty world.
   painted count is 0 (it was 2), the host board is empty, the host world revision has
   started again (2, two joins) and the host has applied no action; then one paint
   reaches both pages. A drop of page B alone (Playwright offline emulation of B's
-  context, the host and page A stay up): A stays joined and keeps moving and painting,
+  context, the host and page A stay up): B notices only when the host retires its
+  silent connection as `idle-timeout` (asserted; B's deadline is the idle timeout plus
+  the host's close-terminate delay plus the usual 15 s poll allowance, see
+  [the D3 follow-up](../verification/session-recovery-20261003.md#follow-up-the-client-drop-deadline-raced-the-host-idle-timeout-d3-2026-10-04)),
+  A stays joined and keeps moving and painting,
   B reconnects within the same bound, resumes the same player slot (host `resumed` +1,
   no new join or leave), converges on the host's world and its earlier paint is applied
   once. A wrong join code is terminal with exactly one attempt, integrity stayed in

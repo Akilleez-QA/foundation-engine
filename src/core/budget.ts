@@ -5,12 +5,20 @@
 import type {Ported, PortPreset, QualityPreset} from './tiers';
 
 export interface SceneBudgetValues {
-  /** GL draws per rendered frame, shadow pass included (worst window of the scene). */
+  /** GL draws per rendered frame, shadow pass included, post-processing excluded (worst window of the scene). */
   draws: number;
+  /** Post-processing fullscreen draws per rendered frame (`view.post` at the preset's `post.mode`: 0 off, 1 basic,
+   *  10 full). Counted apart so `draws` keeps measuring the scene's own complexity. */
+  postDraws?: number;
   /** Triangles submitted per rendered frame, shadow pass included. */
   triangles: number;
-  /** Draws in one full shadow pass (casters × shadow lights). */
+  /** Off-screen draws in the busiest frame (the bench's `shadowPassDrawsMax`): for each shadow light, the casters in
+   *  range of each map face, summed (a sun or spot light has 1 face, a point light 6). Any other render-target draw in
+   *  that frame counts too. Shadow maps redraw only when something moves, so active windows set it. */
   shadowCasters: number;
+  /** Off-screen passes in the busiest frame (the bench's `shadowPassesMax`): one per shadow-map face that drew
+   *  (sun or spot 1, point light 6), plus any other render-target pass. Optional: unset is unmeasured. */
+  shadowPasses?: number;
   /** Shadow-pass draws per rendered frame while still; 0 = static maps. */
   shadowDrawsIdle: number;
   /** Shadow-pass draws per rendered frame during the active script, rebuilds included (ADR 0037). */

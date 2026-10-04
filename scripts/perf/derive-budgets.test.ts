@@ -28,6 +28,7 @@ const sample = (id: string, scene: string, mode: 'idle' | 'active', renderedFram
   trisPerRenderedFrame: draws * 100,
   offscreenDrawsPerRenderedFrame: 0,
   shadowPassDrawsMax: 0,
+  shadowPassesMax: 0,
   textureMiB: 2,
   canvasMiB: 4,
   heapMB: 20,

@@ -58,8 +58,10 @@ export const LARGE_CHUNK_ALLOW: readonly string[] = BUDGET_DATA.largeChunkAllow;
 
 const COUNTS: readonly BudgetMetric[] = [
   'draws',
+  'postDraws',
   'triangles',
   'shadowCasters',
+  'shadowPasses',
   'textureMiB',
   'canvasMiB',
   'heapMiB',

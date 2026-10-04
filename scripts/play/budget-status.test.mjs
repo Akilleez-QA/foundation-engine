@@ -38,6 +38,14 @@ test('play:snap budget: OVER BUDGET names each metric over its limit and points 
   assert.match(line, /\.claude\/skills\/fix-budget\/SKILL\.md/);
 });
 
+test('play:snap budget: postDraws is judged only where a scene budgets it, apart from draws', () => {
+  const s = budgetStatus(scene, {renders: 3, drawsPerFrame: 1, postDrawsPerFrame: 10, trisPerFrame: 2});
+  assert.deepEqual(
+    s.rows.map(r => r.metric),
+    ['draws', ...(limit.postDraws === undefined ? [] : ['postDraws']), 'triangles'],
+  );
+});
+
 test('play:snap summary: a phone view prints its draws, verdict and measured fps, labelled advisory', () => {
   const moving = {renders: 17, drawsPerFrame: 3, trisPerFrame: 735, fps: 5, frameMsP95: 183.3};
   const line = viewLine('mobile', {moving, budget: {...budgetStatus(scene, moving), window: 'moving'}});
