@@ -1009,6 +1009,8 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   `lights.local-max` knob (16/8/4/2, unwired) caps slots per kind. Evidence: unit tests and
   `npm run test:lights-browser` (desktop headless Chromium, software GL). No budget row for slots and no physical-device
   fill-rate evidence.
+  Follow-up (PR #LIGHTPR): a non-essential light refused only by the quality tier is cause `tier`, reported once at
+  info level (designed behaviour, never a page error); an essential light refused stays `full`, an error.
 - **Shadows (VIS-03), integrated (PR #148, merge `e84afcf`).** `sceneShadows()` opts a scene in (shadow map through the lease
   profile, PCF); the sun casts with `directional.shadow`, local lights with `shadow: true`, and `Shadow` overrides an
   entity. Shadowed local slots are fixed per visit and bounded by `lights.shadowed-max` (4/2/1/0, unwired); maps

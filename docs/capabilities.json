@@ -301,6 +301,7 @@
       "InputState",
       "KitDefinition",
       "LightRefusal",
+      "LightReportLevel",
       "LightStats",
       "LinearHaze",
       "MaterialData",

@@ -77,9 +77,9 @@ test('every selected template gets the complete gate and phone smoke; failures p
     calls.map(c => c.args.slice(-3)),
     [
       ['run', '-s', 'gate'],
-      ['--mobile', '--quality', 'reference'],
+      ['play:snap', '--', '--mobile'],
       ['run', '-s', 'gate'],
-      ['--mobile', '--quality', 'reference'],
+      ['play:snap', '--', '--mobile'],
     ],
   );
   calls.length = 0;
