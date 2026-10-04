@@ -15,7 +15,7 @@ export const palette = {
   stoneDark: 0x6f6a66,
   path: 0xe0c08e,
   iron: 0x3a3f4a,
-  ink: 0x2f4670,
+  ink: 0x3f5f96,
   water: 0x3f8fb0,
   cream: 0xf5ecd9,
   bloom: 0xf07a6a,
@@ -23,12 +23,14 @@ export const palette = {
   lantern: 0xffb45a,
 } as const;
 
-/** Late-afternoon sun: low, warm key light against a cool sky fill; warm haze swallows the distance. */
+/** Late-afternoon sun: low, warm key light against a cool sky fill; a gradient sky, and haze in its horizon colour
+ *  swallows the distance. */
 export const goldenHour = defineEnvironment({
   background: 0xf4cfa0,
+  sky: {kind: 'gradient', top: 0x7fa6d6, horizon: 0xf4cfa0, bottom: 0xb9a27a, exponent: 0.7},
   ambient: {sky: 0xa8c0e8, ground: 0x6b5638, intensity: 1.6},
   directional: {color: 0xffc47e, intensity: 3.4, position: [-7, 5, 5]},
-  haze: {color: 0xf4cfa0, near: 20, far: 48},
+  haze: {color: 'sky', near: 20, far: 48},
   points: [],
   pointSize: 1,
 });
@@ -36,27 +38,31 @@ export const goldenHour = defineEnvironment({
 /** Flat, soft, even light: a cloudy day. Little sun, a strong sky fill, grey-blue haze close in. */
 export const overcast = defineEnvironment({
   background: 0xc5ced4,
+  sky: {kind: 'gradient', top: 0x9aa8b4, horizon: 0xc5ced4, bottom: 0x8a8f86},
   ambient: {sky: 0xe8eef2, ground: 0x8a8f86, intensity: 2.6},
   directional: {color: 0xf2f4f7, intensity: 0.9, position: [2, 10, 3]},
-  haze: {color: 0xc5ced4, near: 14, far: 40},
+  haze: {color: 'sky', near: 14, far: 40},
   points: [],
   pointSize: 1,
 });
 
-/** Night: a cold, dim key light, deep blue fill, dark haze and a few stars. Keep what matters bright. */
+/** Night: a cold, dim key light, deep blue fill, a starry gradient sky and haze in its horizon colour. Keep what matters
+ *  bright. */
 export const moonlight = defineEnvironment({
   background: 0x0f1834,
+  sky: {
+    kind: 'gradient',
+    top: 0x050a1f,
+    horizon: 0x1b2550,
+    bottom: 0x0f1834,
+    exponent: 0.6,
+    stars: {count: 300, seed: 3},
+  },
   ambient: {sky: 0x5a6fae, ground: 0x1a1d2a, intensity: 1.5},
   directional: {color: 0xaec4ff, intensity: 1.6, position: [5, 8, -4]},
-  haze: {color: 0x0f1834, near: 14, far: 36},
-  points: [
-    {direction: [0.2, 1, -0.4], color: 0xffffff},
-    {direction: [-0.5, 0.8, -0.3], color: 0xdde6ff},
-    {direction: [0.6, 0.7, -0.6], color: 0xffeecc},
-    {direction: [-0.2, 0.6, -0.8], color: 0xffffff},
-    {direction: [0.8, 0.9, -0.2], color: 0xdde6ff},
-  ],
-  pointSize: 2,
+  haze: {color: 'sky', near: 14, far: 36},
+  points: [],
+  pointSize: 1,
 });
 
 /** A neutral studio: white key light from the front left, even fill, no haze. For checking forms and colours. */
@@ -69,23 +75,24 @@ export const studio = defineEnvironment({
   pointSize: 1,
 });
 
-/** Night for a scene whose lanterns are baked into its vertex colours (forms.ts bakeLight): an even, nearly white fill
- *  so the baked colours show as painted, a faint cold moon for the facets, and deep blue haze at the edges. */
-export const bakedNight = defineEnvironment({
-  background: 0x0c1430,
-  ambient: {sky: 0xe4e9ff, ground: 0xb8ab9c, intensity: 2.5},
-  directional: {color: 0x9fb4ff, intensity: 0.8, position: [-4, 8, -6]},
-  haze: {color: 0x0c1430, near: 20, far: 44},
-  // Stars low over the far wall, where a looking-down camera can still see sky. Placed by a fixed rule, not at random.
-  points: Array.from({length: 70}, (_, i) => ({
-    direction: [Math.cos(3.3 + i * 0.045) * 2, 0.12 + ((i * 0.618) % 1) * 0.5, Math.sin(3.3 + i * 0.045) * 2 - 1.6] as [
-      number,
-      number,
-      number,
-    ],
-    color: i % 5 ? 0xd8e0ff : 0xffe9c0,
-  })),
-  pointSize: 2,
+/** The courtyard's night: a deep gradient sky with a moon and stars, haze in the sky's horizon colour, a dim blue
+ *  fill, and a cold moon that casts shadows. The lanterns are point lights in the scene. */
+export const lanternNight = defineEnvironment({
+  background: 0x0a1028,
+  sky: {
+    kind: 'gradient',
+    top: 0x03061a,
+    horizon: 0x1f2a5a,
+    bottom: 0x0a1028,
+    exponent: 0.6,
+    discs: [{direction: [-0.45, 0.5, -0.75], size: 4, color: 0xe6ecff, glow: 0.5}],
+    stars: {count: 400, seed: 7},
+  },
+  ambient: {sky: 0x5a6fae, ground: 0x2a2433, intensity: 0.5},
+  directional: {color: 0xa8bcff, intensity: 0.7, position: [-4, 8, -6], shadow: {extent: 13}},
+  haze: {kind: 'exp2', color: 'sky', density: 0.028},
+  points: [],
+  pointSize: 1,
 });
 
 /** The presets in the order the sundial cycles them. */

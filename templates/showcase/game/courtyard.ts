@@ -5,10 +5,16 @@ import {
   defineEmitter,
   defineEntity,
   defineMaterial,
+  defineScatter,
   defineScene,
   defineSystem,
   Name,
+  PointLight,
+  sceneLights,
   sceneParticles,
+  sceneScatter,
+  sceneShadows,
+  Shadow,
   Shape,
   Transform,
 } from '@engine';
@@ -17,6 +23,7 @@ import {Interactable} from '@kits/explore';
 import {hud} from '@kits/ui';
 import {
   BENCHES,
+  courtyardGround,
   courtyardStone,
   FOUNTAIN_R,
   HALF,
@@ -27,7 +34,8 @@ import {
   STREET_LAMPS,
 } from './courtyard-scenery';
 import embers from './embers';
-import {bakedNight, palette as P} from './look';
+import {blobMesh} from './forms';
+import {lanternNight, palette as P} from './look';
 import {motes, player, systems, wanderMotes} from './world';
 
 /** Something to find: its id (remembered once taken) and how close the player must come, in metres. */
@@ -44,8 +52,9 @@ export const EMBERS: [number, number][] = [
 
 const ember = ([x, z]: [number, number], i: number) => [
   Transform({x, y: 0.9, z}),
-  Shape({kind: 'sphere', size: [0.36, 0.36, 0.36], color: 0xff9a40}),
-  defineMaterial({emissive: 0xff5a10, emissiveIntensity: 1.2}),
+  Shape({kind: 'sphere', size: [0.36, 0.36, 0.36], color: 0xff8a30}),
+  defineMaterial({emissive: 0xff5a10, emissiveIntensity: 1.6}),
+  Shadow({cast: false}),
   Ember({id: `ember-${i + 1}`, phase: i * 1.1}),
   defineEmitter({
     mode: 'continuous',
@@ -131,11 +140,14 @@ export const emberHud = defineSystem({
   },
 });
 
-/** Lantern glass: it glows, and the light it gives is baked into the stonework around it. */
-const glass = (x: number, y: number, z: number, size: number) => [
+/** Lantern glass: it glows (emissive 1: stronger glows wash out to white under tone mapping), and a point light in it
+ *  lights the courtyard. The glass casts no shadow, or it would shadow its own light. */
+const glass = (x: number, y: number, z: number, size: number, intensity: number) => [
   Transform({x, y, z}),
-  Shape({kind: 'box', size: [size, size * 1.2, size], color: 0xffd08a}),
-  defineMaterial({emissive: P.lantern, emissiveIntensity: 1.2}),
+  Shape({kind: 'box', size: [size, size * 1.2, size], color: 0xff9a40}),
+  defineMaterial({emissive: 0xff8a30, emissiveIntensity: 1}),
+  PointLight({color: P.lantern, intensity, distance: 6.5, decay: 2}),
+  Shadow({cast: false}),
 ];
 
 export default defineScene({
@@ -144,16 +156,46 @@ export default defineScene({
   type: 'area',
   view: {
     camera: {position: [0, 11.5, 18.3], target: [0, 0.7, 6.5], fov: 50, minWidthFov: 50},
-    background: bakedNight.background,
-    environment: bakedNight,
+    background: lanternNight.background,
+    environment: lanternNight,
+    output: {toneMapping: 'aces', exposure: 1.1},
+    // Bloom spreads the lantern glass into a halo; a vignette and a cool lift hold the eye in the lit centre.
+    post: {
+      bloom: {strength: 0.8, threshold: 0.85, radius: 0.55},
+      vignette: {amount: 0.35},
+      grade: {lift: [0, 0.004, 0.02], gain: [1.04, 1, 0.96], saturation: 1.05},
+    },
   },
+  lights: sceneLights({point: 8}),
+  shadows: sceneShadows(),
+  scatter: sceneScatter(),
   particles: sceneParticles({emitters: 12, max: 512}),
   entities: [
+    [Name({name: 'ground'}), Transform(), courtyardGround(), Shadow({cast: false})],
     [Name({name: 'stonework'}), Transform(), courtyardStone()],
+    // Moss in a band along the foot of the walls: one blob copied 160 times, one draw. It casts no shadow (copies never
+    // do) and a lighter quality preset draws fewer of them.
+    [
+      Name({name: 'moss'}),
+      Transform(),
+      defineScatter({
+        mesh: blobMesh(0.32, 0.5),
+        area: {kind: 'edge', rect: [-HALF + 0.1, -HALF + 0.1, HALF - 0.1, HALF - 0.1], width: 0.7},
+        count: 160,
+        seed: 5,
+        y: 0.04,
+        scale: [0.5, 1.4],
+        ry: 'random',
+        color: P.leafDark,
+        colorJitter: [0.02, 0.06, 0.08],
+      }),
+      defineMaterial({shading: 'flat'}),
+    ],
     // The water: see-through, slightly glowing, so it reads as water at night.
     [
       Transform({y: 0.46}),
       Shape({kind: 'cylinder', size: [2 * FOUNTAIN_R - 0.3, 0.04, 2 * FOUNTAIN_R - 0.3], color: P.water}),
+      Shadow({cast: false, receive: false}),
       defineMaterial({
         emissive: 0x1d6f8f,
         emissiveIntensity: 1.2,
@@ -180,8 +222,8 @@ export default defineScene({
         opacity: [0.8, 0],
       }),
     ],
-    ...[...POSTS, ...STREET_LAMPS].map(([x, z]) => glass(x, LANTERN_Y, z, 0.34)),
-    ...SCONCES.map(([x, y, z]) => glass(x, y, z, 0.26)),
+    ...[...POSTS, ...STREET_LAMPS].map(([x, z]) => glass(x, LANTERN_Y, z, 0.34, 30)),
+    ...SCONCES.map(([x, y, z]) => glass(x, y, z, 0.26, 14)),
     // The gate: a plank door in the arch, a door to the garden.
     [
       Transform({y: 1.1, z: -HALF + 0.08}),
@@ -210,7 +252,7 @@ export default defineScene({
     ]),
     ...EMBERS.map(ember),
     [...motes(0xd9ff8a)],
-    ...player(0, 6.5, 0x05070f),
+    ...player(0, 6.5, null),
   ],
   systems: [...systems, takeEmbers, bobEmbers, emberHud, wanderMotes(0, 0, 7, 6)],
 });

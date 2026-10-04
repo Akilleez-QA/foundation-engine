@@ -1,9 +1,10 @@
 # Recipe: make it look good (art direction)
 
 A scene made of default-coloured boxes under default light looks like programmer art, however good the game is. This
-recipe gets a good-looking picture out of what the author API already has: a limited palette, environment presets,
-haze, a framed camera, low-poly forms built from vertices, light baked into vertex colours, generated textures and
-particles. Then it checks the picture against a short look checklist.
+recipe gets a good-looking picture out of the author API: a limited palette, environment presets with gradient skies,
+haze, a framed camera, low-poly forms built from vertices, tone mapping, point and spot lights, shadows, light baked
+into vertex colours, scatter for repeated things, generated textures and particles. Then it checks the picture against
+a short look checklist. All of it is `@engine` data; game code never imports three.js.
 
 Every snippet here is an excerpt of the [`showcase` template](../../templates/showcase/README.md), which is compiled,
 tested and gated like every template (`scripts/docs/art-direction-recipe.test.ts` checks that the excerpts still match).
@@ -13,7 +14,8 @@ To start from it: `npm run new-game -- --template showcase`. To use the techniqu
 ![Before and after: the courtyard](art-direction/hero-courtyard.jpg)
 
 *Left: a night courtyard built from primitives, an environment and emissive materials, 98 draws. Right: the showcase
-courtyard, with the same API and no engine change, 32 draws.*
+courtyard built with this recipe: baked low-poly stonework, point-lit lanterns, one shadowed night light, a gradient sky
+a moss scatter and bloom, 41 draws.*
 
 ## 0. The loop
 
@@ -44,7 +46,7 @@ export const palette = {
   stoneDark: 0x6f6a66,
   path: 0xe0c08e,
   iron: 0x3a3f4a,
-  ink: 0x2f4670,
+  ink: 0x3f5f96,
   water: 0x3f8fb0,
   cream: 0xf5ecd9,
   bloom: 0xf07a6a,
@@ -60,18 +62,22 @@ whole game's key is one edit.
 
 ## 2. Light: four presets to copy
 
-`defineEnvironment` sets the sky colour, a hemisphere fill (`ambient`: sky colour above, ground colour below), one
-directional key light (`directional`, coming *from* `position`), and haze. These four cover most moods; copy them into
+`defineEnvironment` sets the background, an optional gradient `sky` (top, horizon and bottom colours, with optional
+`discs` for a sun and `stars`), a hemisphere fill (`ambient`: sky colour above, ground colour below), one
+directional key light (`directional`, coming *from* `position`), and haze (`color: 'sky'` takes the sky's horizon
+colour, so the world's edge melts into it). These four cover most moods; copy them into
 `game/look.ts` and adjust.
 
 ```ts
 // game/look.ts (excerpt)
-/** Late-afternoon sun: low, warm key light against a cool sky fill; warm haze swallows the distance. */
+/** Late-afternoon sun: low, warm key light against a cool sky fill; a gradient sky, and haze in its horizon colour
+ *  swallows the distance. */
 export const goldenHour = defineEnvironment({
   background: 0xf4cfa0,
+  sky: {kind: 'gradient', top: 0x7fa6d6, horizon: 0xf4cfa0, bottom: 0xb9a27a, exponent: 0.7},
   ambient: {sky: 0xa8c0e8, ground: 0x6b5638, intensity: 1.6},
   directional: {color: 0xffc47e, intensity: 3.4, position: [-7, 5, 5]},
-  haze: {color: 0xf4cfa0, near: 20, far: 48},
+  haze: {color: 'sky', near: 20, far: 48},
   points: [],
   pointSize: 1,
 });
@@ -79,27 +85,31 @@ export const goldenHour = defineEnvironment({
 /** Flat, soft, even light: a cloudy day. Little sun, a strong sky fill, grey-blue haze close in. */
 export const overcast = defineEnvironment({
   background: 0xc5ced4,
+  sky: {kind: 'gradient', top: 0x9aa8b4, horizon: 0xc5ced4, bottom: 0x8a8f86},
   ambient: {sky: 0xe8eef2, ground: 0x8a8f86, intensity: 2.6},
   directional: {color: 0xf2f4f7, intensity: 0.9, position: [2, 10, 3]},
-  haze: {color: 0xc5ced4, near: 14, far: 40},
+  haze: {color: 'sky', near: 14, far: 40},
   points: [],
   pointSize: 1,
 });
 
-/** Night: a cold, dim key light, deep blue fill, dark haze and a few stars. Keep what matters bright. */
+/** Night: a cold, dim key light, deep blue fill, a starry gradient sky and haze in its horizon colour. Keep what matters
+ *  bright. */
 export const moonlight = defineEnvironment({
   background: 0x0f1834,
+  sky: {
+    kind: 'gradient',
+    top: 0x050a1f,
+    horizon: 0x1b2550,
+    bottom: 0x0f1834,
+    exponent: 0.6,
+    stars: {count: 300, seed: 3},
+  },
   ambient: {sky: 0x5a6fae, ground: 0x1a1d2a, intensity: 1.5},
   directional: {color: 0xaec4ff, intensity: 1.6, position: [5, 8, -4]},
-  haze: {color: 0x0f1834, near: 14, far: 36},
-  points: [
-    {direction: [0.2, 1, -0.4], color: 0xffffff},
-    {direction: [-0.5, 0.8, -0.3], color: 0xdde6ff},
-    {direction: [0.6, 0.7, -0.6], color: 0xffeecc},
-    {direction: [-0.2, 0.6, -0.8], color: 0xffffff},
-    {direction: [0.8, 0.9, -0.2], color: 0xdde6ff},
-  ],
-  pointSize: 2,
+  haze: {color: 'sky', near: 14, far: 36},
+  points: [],
+  pointSize: 1,
 });
 
 /** A neutral studio: white key light from the front left, even fill, no haze. For checking forms and colours. */
@@ -118,7 +128,7 @@ assigning `ctx.view.environment = overcast` (the garden's sundial does this in t
 
 ![Default lights, then golden hour, overcast, moonlight and studio](art-direction/presets.jpg)
 
-**Lighting ratios.** The renderer has no tone mapping yet, so the numbers are close to literal:
+**Lighting ratios.** Without tone mapping (the default, `view.output` unset) the numbers are close to literal:
 
 - A surface's drawn colour is roughly its colour × (fill + key × how squarely it faces the key) ÷ π. For daylight,
   keep `ambient.intensity + directional.intensity × (height of the sun)` near **3** (π): a surface facing the sun then
@@ -129,7 +139,11 @@ assigning `ctx.view.environment = overcast` (the garden's sundial does this in t
 - **Warm key, cool fill** (or the reverse at night). The contrast between them is what makes faces read.
 - **A low sun from the side** (`position` with y about half the horizontal distance, x not zero) gives every form a lit
   side and a shaded side. A sun straight overhead or straight behind the camera flattens everything.
-- Keep the background and the haze colour the same, so the world's edge melts into the sky.
+- Keep the haze in the sky's colour (`color: 'sky'`), so the world's edge melts into the sky.
+- **Tone mapping** (`view: {output: {toneMapping: 'aces', exposure: 1.1}}`) rolls bright light off instead of clipping
+  it, which a scene with point lights needs. It also desaturates: mid-tones get a little darker and strong glows turn
+  towards white. A daylight scene without bright lights can leave it off and keep its palette exact; a night scene
+  with lamps should turn it on and compare the pictures.
 
 ## 3. Haze for depth
 
@@ -224,17 +238,147 @@ Collision is separate: keep `Solid` and `Walls` entities where the player must s
 
 - **Detail where the eye goes.** Clumps of grass read as texture; single scattered blades read as noise.
 - **Vary scale and shade** a little per piece (`r.range(0.9, 1.08)`), never per frame.
-- **Limits:** a `Mesh` is matte (no `Material`: no texture, emission or transparency) and static once built. Rebuild
-  it, or bump its `revision`, only when the scenery changes.
+- **Materials:** a `Mesh` takes a `Material` (shading `'flat'`, `'matte'` or `'toon'`, emission, transparency) but
+  no texture (it has no texture coordinates); put textures on `Shape`s. A bake is static once built: rebuild it, or
+  bump its `revision`, only when the scenery changes.
+- **Many copies of one thing** (moss, grass, pickets, hedge blobs) are a `Scatter`: one small mesh, copied with
+  seeded positions, scale, turn and colour jitter, in one draw ([scatter grass and rocks](scatter-grass-and-rocks.md)).
+  The courtyard's moss:
+
+```ts
+// game/courtyard.ts (excerpt)
+      defineScatter({
+        mesh: blobMesh(0.32, 0.5),
+        area: {kind: 'edge', rect: [-HALF + 0.1, -HALF + 0.1, HALF - 0.1, HALF - 0.1], width: 0.7},
+        count: 160,
+        seed: 5,
+        y: 0.04,
+        scale: [0.5, 1.4],
+        ry: 'random',
+        color: P.leafDark,
+        colorJitter: [0.02, 0.06, 0.08],
+      }),
+      defineMaterial({shading: 'flat'}),
+```
+
+  A scatter's triangles are its copies times one copy's: keep the copied mesh small (`blobMesh` is 20 triangles).
+  Copies cast no shadows, and lighter quality presets draw fewer of them unless `essential: true` (use that for things
+  whose gaps would show, like a hedge).
 
 ![Primitives, then low-poly forms (the explorer garden, then the showcase garden)](art-direction/forms.jpg)
 
-## 6. Shadows and light, baked into colours
+## 6. Light and shadow: real where it matters, baked for the rest
 
-The engine has no cast shadows and no local lights yet. Bake both into vertex colours:
+The engine has point and spot lights, shadows and tone mapping, all opt-in per scene
+([scene look guide](../guides/scene-look.md)). They cost per pixel, per slot and per shadow map, so a good-looking
+scene that still runs on a phone mixes them with light baked into vertex colours.
 
-- **Contact shadows.** Darken the ground right against everything that stands on it. The garden's ground colour
-  function does it per vertex:
+**The rule:**
+
+1. **The environment holds the darkness.** Night is a dim, cool `ambient` and a weak key, with the scene's colours
+   left at their palette values. (If darkness is baked into the colours instead, a real light can only light a dark
+   surface, and the picture comes out near black.)
+2. **Real lights for what the player sees light up.** A `PointLight` or `SpotLight` on each lamp near the action, in a
+   scene with `lights: sceneLights({point: n})`. Slots are fixed per visit; the `low` preset admits 2 of each kind
+   (`essential: true` ones first).
+3. **Bake the rest.** `bakeLight` adds static light to a bake's vertex colours for free: a faint glow round every lamp
+   (so a lamp whose real light was refused on a light preset still lights its surroundings a little), lit windows,
+   glowing water. Bake with a white ambient (`0xffffff`), so it only adds light.
+4. **One shadowed light.** Give the sun (by night, the cold key light) the shadow (`directional: {…, shadow: {extent}}` and
+   `shadows: sceneShadows()`), and leave lamps unshadowed or baked.
+5. **Tone mapping on** (`'aces'`, exposure about 1.1) once there are point lights, and keep glass emissive near 1.
+
+```ts
+// game/look.ts (excerpt)
+export const lanternNight = defineEnvironment({
+  background: 0x0a1028,
+  sky: {
+    kind: 'gradient',
+    top: 0x03061a,
+    horizon: 0x1f2a5a,
+    bottom: 0x0a1028,
+    exponent: 0.6,
+    discs: [{direction: [-0.45, 0.5, -0.75], size: 4, color: 0xe6ecff, glow: 0.5}],
+    stars: {count: 400, seed: 7},
+  },
+  ambient: {sky: 0x5a6fae, ground: 0x2a2433, intensity: 0.5},
+  directional: {color: 0xa8bcff, intensity: 0.7, position: [-4, 8, -6], shadow: {extent: 13}},
+  haze: {kind: 'exp2', color: 'sky', density: 0.028},
+  points: [],
+  pointSize: 1,
+});
+```
+
+```ts
+// game/courtyard.ts (excerpt)
+const glass = (x: number, y: number, z: number, size: number, intensity: number) => [
+  Transform({x, y, z}),
+  Shape({kind: 'box', size: [size, size * 1.2, size], color: 0xff9a40}),
+  defineMaterial({emissive: 0xff8a30, emissiveIntensity: 1}),
+  PointLight({color: P.lantern, intensity, distance: 6.5, decay: 2}),
+  Shadow({cast: false}),
+];
+// …
+    output: {toneMapping: 'aces', exposure: 1.1},
+// …
+  lights: sceneLights({point: 8}),
+  shadows: sceneShadows(),
+```
+
+```ts
+// game/courtyard-scenery.ts (excerpt)
+export const LIGHTS: BakedLight[] = [
+  ...[...POSTS, ...STREET_LAMPS].map(([x, z]): BakedLight => ({
+    at: [x, LANTERN_Y, z],
+    color: P.lantern,
+    intensity: 0.5,
+    range: 4,
+  })),
+// …
+  // A faint glow round every lamp, the water and the windows, on top of the stone's own colours (white: no darkening).
+  bakeLight(b, 0xffffff, LIGHTS);
+```
+
+**Emissive.** An emissive material lights nothing; it only makes the surface bright. Keep `emissiveIntensity` about 1
+for coloured glass and embers. With tone mapping, 2 to 6 washes the colour out towards white (tone mapping
+desaturates strong glows); without it, anything above about 1 clips to a flat patch. A glow reads as light only when
+something next to it is lit: put a light (real or baked) at every glowing thing.
+
+**Bloom** spreads the brightest pixels into a halo, so glass reads as a light source. Ask for it with `view.post`
+([post-processing](../guides/post-processing.md)); the player's quality setting decides how much runs (`full`: bloom,
+vignette and grade, 10 fullscreen passes counted as `postDraws`; `basic`: vignette and grade, 1 pass; `off` on `low`).
+With bloom, keep the emissive near 1 and lower the bloom `threshold` below 1 instead of pushing the glow:
+
+```ts
+// game/courtyard.ts (excerpt)
+    post: {
+      bloom: {strength: 0.8, threshold: 0.85, radius: 0.55},
+      vignette: {amount: 0.35},
+      grade: {lift: [0, 0.004, 0.02], gain: [1.04, 1, 0.96], saturation: 1.05},
+    },
+```
+
+Post renders the scene into a half-float target first: at 1280×800 that and the bloom mips added about 10 MiB of
+textures to the courtyard. On phones prefer `basic` (vignette and grade) or none.
+
+**What shadows and sky cost** (measured on software GL at the reference preset):
+
+| Feature | Draws | Texture memory |
+|---|---|---|
+| Sun shadow (`directional.shadow`) | one extra pass: +1 draw per shadow-casting entity | the 2048 map, about **32 MiB** (1024 on `low`, about 8 MiB) |
+| A shadowed point light | about **6 extra scene passes** (one per cube face), about 18 extra draws in a small scene | 512 per face |
+| A shadowed spot light | one extra pass | 1024 at reference |
+| Gradient sky | +1 draw (+1 more with `stars`) | 1 KiB, or 512 KiB with `discs` |
+| Post (`view.post`) at `full` | +10 fullscreen passes (`postDraws`, counted apart from `draws`) | the scene target and bloom mips, about 10 MiB at 1280×800 |
+| Point or spot light without shadow | none | none (fragment cost on every lit pixel) |
+
+A trial scene with a shadowed sun and lamps measured 32.5 MiB of textures against an 8 MiB budget. On phones, use
+**one shadowed sun (or night key light)**, with baked or unshadowed fill lights; mark small or always-moving things
+`Shadow({cast: false})` (they would redraw the maps every frame), and floors too (they only receive). The showcase
+courtyard splits its stonework into a ground mesh that casts nothing and a standing mesh that casts.
+
+**Contact shadows without a shadow map.** Where a scene cannot afford a map (a phone budget of 8 MiB textures), darken
+the ground right against everything that stands on it, per vertex, and put a see-through disc under moving things:
 
 ```ts
 // game/garden-scenery.ts (excerpt)
@@ -246,61 +390,17 @@ The engine has no cast shadows and no local lights yet. Bake both into vertex co
 
 ![No contact shadows, then contact shadows](art-direction/contact.jpg)
 
-- **Things that move** get a soft disc under them that follows them: a see-through cylinder with `defineMaterial({
-  opacity, transparent: true })`. The template's player has one, kept in place by the `followPlayer` frame system.
-
 ```ts
 // game/world.ts (excerpt)
-  [
-    Transform({x, y: 0.015, z}),
-    Shape({kind: 'cylinder', size: [0.85, 0.01, 0.85], color: shadow}),
-    defineMaterial({opacity: 0.4, transparent: true}),
-    Follow({dy: -0.685}),
-  ],
+        [
+          Transform({x, y: 0.015, z}),
+          Shape({kind: 'cylinder', size: [0.85, 0.01, 0.85], color: shadow}),
+          defineMaterial({opacity: 0.4, transparent: true}),
+          Follow({dy: -0.685}),
+        ],
 ```
 
-- **Lanterns, windows, glowing water.** `bakeLight` multiplies every vertex colour of a bake by an ambient colour plus
-  each light that reaches it, fading with distance and with how far the face turns away. The courtyard's lanterns
-  light the stones, walls and benches around them, and cost nothing when drawn:
-
-```ts
-// game/forms.ts (excerpt)
-/** A light baked into vertex colours: it costs nothing when drawn, and lights only what was baked with it. */
-export interface BakedLight {
-  at: V3;
-  color: number;
-  /** Brightness at the light; 1 doubles a surface's colour right next to it (colours stop at full). */
-  intensity: number;
-  /** Metres to where its light has faded out. */
-  range: number;
-}
-```
-
-```ts
-// game/courtyard-scenery.ts (excerpt)
-  // The night: a cool dim base everywhere, plus the warm light of every lantern, lamp and window.
-  bakeLight(b, 0x3c4a7c, LIGHTS);
-  return toMesh(b);
-```
-
-Bake the darkness too: the courtyard's environment (`bakedNight`) is an even, nearly white fill, and the night lives
-in the colours (the `0x3c4a7c` base). With a dark environment instead, the baked lantern light would be dimmed as much
-as the shadows. What is not in the bake (the player, the embers) is lit by the environment only.
-
-![Moonlight preset only, then baked lantern light](art-direction/baked-light.jpg)
-
-- **Glow.** Lantern glass is a shape with an emissive material. With no tone mapping or bloom, keep
-  `emissiveIntensity` near 1: above that the colour clips to a flat patch. A glow only reads as light when something
-  next to it is lit, so bake a light at every glowing thing.
-
-```ts
-// game/courtyard.ts (excerpt)
-const glass = (x: number, y: number, z: number, size: number) => [
-  Transform({x, y, z}),
-  Shape({kind: 'box', size: [size, size * 1.2, size], color: 0xffd08a}),
-  defineMaterial({emissive: P.lantern, emissiveIntensity: 1.2}),
-];
-```
+![The night environment only, then point lights, a baked glow, a shadowed night light and bloom](art-direction/baked-light.jpg)
 
 ## 7. Textures, generated in `game/tools`
 
@@ -385,6 +485,9 @@ export const wanderMotes = (x: number, z: number, rx: number, rz: number) =>
   });
 ```
 
+**Time in a system.** A system's `run(ctx, dt)` receives the step time `dt` in seconds (fixed systems get the fixed
+step, frame systems the frame's time); `ctx.time.t` is the seconds since the visit began. There is no `ctx.time.dt`.
+
 Continuous emitters keep the scene redrawing, so keep them few and small. The particle API is in
 [hit sparks and pickups](hit-sparks-and-pickups.md).
 
@@ -402,12 +505,13 @@ Look at the pictures yourself; a passing snap is not a good-looking one.
 4. **Every face shows its form.** Solid things show at least two shades (a lit side and a shaded side). If they look
    flat, move the key light lower and to the side.
 5. **Things sit on the ground.** Contact darkening or a shadow disc under everything that stands; nothing floats.
-6. **Every glowing thing lights something.** A glow with nothing lit around it reads as paint.
+6. **Every glowing thing lights something** (a point light or a baked glow). A glow with nothing lit around it reads
+   as paint; a glow washed to white means its `emissiveIntensity` is too high for the tone mapping.
 7. **The world has an edge you cannot see.** Haze or framing hides where the ground ends; no seam against the sky.
 8. **The phone view works.** The play area fits, the empty space is filled with something, the HUD covers nothing that
    matters, and a dark setup is still readable.
-9. **Within budget.** Draws and triangles in the snap are inside `budgets.json`. Static scenery is baked into one mesh
-   per bake.
+9. **Within budget.** Draws, triangles and texture memory in the snap are inside `budgets.json` (a shadow map is
+   texture memory). Static scenery is baked into one mesh per bake; repeated things are a scatter.
 10. **Motion is calm.** Nothing flickers or swims; decorative motion stops under Calm.
 
 ## What it costs
@@ -416,31 +520,34 @@ Measured on software GL at 1280×800 (`npm run bench`); triangles are per frame:
 
 | Scene | Before | After |
 |---|---|---|
-| Garden | explorer garden: 10 draws, 1 306 triangles | showcase garden: 9 draws, 8 661 triangles |
-| Courtyard | the trial courtyard: 98 draws, 10 488 triangles | showcase courtyard: 32 draws, 17 559 triangles |
+| Garden | explorer garden: 10 draws, 1 306 triangles | showcase garden (gradient sky, no shadows): 10 draws, 9 676 triangles, 0.1 MiB textures |
+| Courtyard | the trial courtyard: 98 draws, 10 488 triangles | showcase courtyard (8 point lights, a shadowed night light, sky, scatter, bloom): 41 draws + 10 post, 27 860 triangles, 42.5 MiB textures |
+
+Part of the courtyard's 41 draws is the shadow pass (one per casting entity), and of its 42.5 MiB of textures, 32
+are the shadow map (the single biggest cost in this recipe) and about 10 the post targets. The garden keeps the phone-sized budget (8 MiB) by
+using contact darkening instead of a shadow map.
 
 Draws matter more than triangles on phones: baking a hundred rocks into one mesh is one draw. Frame time under
 software GL says nothing about a device; measure on the devices the brief targets.
 
 ## What is not here yet
 
-The engine does not yet have these, and this recipe fakes them as described:
+Tone mapping, point and spot lights, shadows, gradient skies with discs and stars, exp2 haze, `Material` on a `Mesh`
+(flat, matte and toon shading) and instanced scatter are all in the engine now (sections 2, 5 and 6). Still missing,
+with today's workaround:
 
 | Missing | Today |
 |---|---|
-| Local (point and spot) lights | `bakeLight` into the scenery's vertex colours; it does not light moving things |
-| Cast shadows | contact darkening in the ground colours, and a see-through disc under moving things |
-| A gradient or procedural sky | `background` plus haze of the same colour; `points` for stars; `cube` from six images |
+| A texture on a `Mesh` | vertex colours on the mesh; textures on `Shape`s |
+| Per-copy motion in a scatter (grass sway) | static copies; particles for small moving things |
+| Scattering a glTF `Model` | bake it into a `Mesh`, or scatter a `Mesh` |
+| Scatter copies as shadow casters (scenes with `sceneShadows()` still shadow other things) | contact darkening baked into the ground under them |
 
-When one of these lands in the engine, this recipe gains a section for it. Already landed: many copies of one shape
-or `Mesh` in one draw ([scatter grass and rocks](scatter-grass-and-rocks.md)), and a `Material` on a `Mesh` or `Model`
-with flat, matte or toon shading, double sides and cut-outs ([give a shape a material](give-a-shape-a-material.md); a
-`Mesh` still takes no texture), and tone mapping with bloom, vignette and grade (`view.output` and `view.post`,
-[post-processing](../guides/post-processing.md)).
+When one of these lands in the engine, this recipe gains a section for it.
 
 ## When the author API cannot express the look: three.js itself
 
 Prefer the techniques above while they can say what you want: they keep quality tiers, budgets and three.js upgrades
-the engine's problem. When they cannot (an EffectComposer pass, a custom shader, a loader or controls), a game can
-opt into `@kits/three` and use three.js directly: full power, and the game owns that code across three.js upgrades.
-See [use three.js directly](use-three-directly.md).
+the engine's problem. When they cannot (bloom or another EffectComposer pass, a custom shader, a loader or controls), a
+game can opt into `@kits/three` and use three.js directly: full power, and the game owns that code across three.js
+upgrades. See [use three.js directly](use-three-directly.md).
