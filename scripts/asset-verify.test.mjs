@@ -19,6 +19,7 @@ import {
   verifyFile,
   verifyModel,
 } from './asset-verify.mjs';
+import {editKtx2, quadrantKtx2} from '../src/testing/ktx2-fixture.ts';
 
 const SAMPLE = join(ROOT, 'tools/blender-export/game/public/models/metre-block.glb');
 const RECEIPT = JSON.parse(readFileSync(SAMPLE.replace(/\.glb$/, '.provenance.json'), 'utf8'));
@@ -312,17 +313,44 @@ test('an image that is not PNG, JPEG, WebP or KTX2 is rejected', () =>
     /image 0 \(image\/png\) is not a PNG, JPEG, WebP or KTX2 image/,
     withTextures,
   ));
-test('a required KTX2 texture is rejected: the stock model loader has no KTX2 transcoder', () =>
-  rejects(
-    {
-      json: j => {
-        j.extensionsUsed = ['KHR_texture_basisu'];
-        j.extensionsRequired = ['KHR_texture_basisu'];
-      },
-    },
-    /registers no KTX2 transcoder/,
-    c => (c.extensions = ['KHR_texture_basisu']),
-  ));
+/** Embed a KTX2 image as a base-colour texture through KHR_texture_basisu (required, no fallback source). */
+const ktx2Textured =
+  (image = Buffer.from(quadrantKtx2(8))) =>
+  (json, bin) => {
+    const offset = bin.length;
+    json.bufferViews.push({buffer: 0, byteOffset: offset, byteLength: image.length});
+    json.buffers[0].byteLength = offset + image.length;
+    json.images = [{bufferView: json.bufferViews.length - 1, mimeType: 'image/ktx2'}];
+    json.textures = [{extensions: {KHR_texture_basisu: {source: 0}}}];
+    json.materials[0].pbrMetallicRoughness.baseColorTexture = {index: 0};
+    json.extensionsUsed = ['KHR_texture_basisu'];
+    json.extensionsRequired = ['KHR_texture_basisu'];
+    return Buffer.concat([bin, image]);
+  };
+const allowKtx2 = c => {
+  withTextures(c);
+  c.limits.textureSize = 8;
+  c.extensions = ['KHR_texture_basisu'];
+};
+test('a required KTX2 texture passes when the contract lists KHR_texture_basisu: the engine transcodes it', async () => {
+  const f = fixture({bin: ktx2Textured()});
+  try {
+    const report = await verifyModel(f.file, contract(allowKtx2));
+    assert.equal(report.triangles, 12);
+  } finally {
+    f.close();
+  }
+});
+test('a KTX2 texture the contract does not list is rejected', () =>
+  rejects({bin: ktx2Textured()}, /extension KHR_texture_basisu is not one the contract allows/, c => {
+    allowKtx2(c);
+    c.extensions = [];
+  }));
+test('a KTX2 image the engine cannot transcode is rejected', async () => {
+  const image = Buffer.from(quadrantKtx2(8));
+  await rejects({bin: ktx2Textured(Buffer.from(editKtx2(image, {12: 37})))}, /must be Basis Universal/, allowKtx2);
+  await rejects({bin: ktx2Textured(Buffer.from(editKtx2(image, {36: 6})))}, /must be one 2D texture/, allowKtx2);
+});
 test('a meshopt extension the contract allows is decoded with the engine decoder', async () => {
   const f = fixture({json: j => (j.extensionsUsed = ['EXT_meshopt_compression'])});
   try {
@@ -394,11 +422,16 @@ test('image headers give width and height for PNG, JPEG, WebP and KTX2', () => {
   vp8l.write('WEBPVP8L', 8, 'latin1');
   vp8l.writeUInt32LE((128 - 1) | ((256 - 1) << 14), 21);
   assert.deepEqual(imageSize(vp8l), {width: 128, height: 256});
-  const ktx2 = Buffer.alloc(32);
+  const ktx2 = Buffer.alloc(40);
   ktx2.write('\u00abKTX 20\u00bb\r\n\x1a\n', 0, 'latin1');
   ktx2.writeUInt32LE(512, 20);
   ktx2.writeUInt32LE(256, 24);
-  assert.deepEqual(imageSize(ktx2), {width: 512, height: 256});
+  ktx2.writeUInt32LE(1, 36);
+  assert.deepEqual(imageSize(ktx2), {
+    width: 512,
+    height: 256,
+    ktx2: {vkFormat: 0, depth: 0, layers: 0, faces: 1},
+  });
   assert.equal(imageSize(Buffer.from('GIF89a')), null);
 });
 

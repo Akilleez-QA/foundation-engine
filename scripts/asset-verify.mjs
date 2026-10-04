@@ -17,8 +17,9 @@
 //
 // The geometry checks run on a re-import of the exported GLB, decoded the way the engine's model loader decodes it
 // (src/platform/assets/models.ts): three.js's GLTFLoader with the meshopt decoder. Draco is refused, because the engine
-// registers only the meshopt decoder; so is a required KHR_texture_basisu (KTX2) texture, because the stock model loader
-// registers no KTX2 transcoder.
+// registers only the meshopt decoder. KHR_texture_basisu (KTX2) textures are accepted when the contract lists the
+// extension, and each KTX2 image must be what the engine's KTX2 step accepts (src/platform/assets/model-ktx2.ts): Basis
+// Universal (ETC1S or UASTC), one 2D image.
 //
 // Owner: the creator's contract; this script only reads. Bounds: one GLB, its contract and its receipt in memory at a
 // time; file size is checked before the file is read. It is an acceptance check for the creator's own assets, not a
@@ -325,8 +326,17 @@ export function imageSize(b) {
     return null;
   }
   const KTX2_MAGIC = '«KTX 20»\r\n\x1a\n';
-  if (b.length >= 28 && b.toString('latin1', 0, 12) === KTX2_MAGIC)
-    return {width: b.readUInt32LE(20), height: Math.max(1, b.readUInt32LE(24))};
+  if (b.length >= 40 && b.toString('latin1', 0, 12) === KTX2_MAGIC)
+    return {
+      width: b.readUInt32LE(20),
+      height: Math.max(1, b.readUInt32LE(24)),
+      ktx2: {
+        vkFormat: b.readUInt32LE(12),
+        depth: b.readUInt32LE(28),
+        layers: b.readUInt32LE(32),
+        faces: b.readUInt32LE(36),
+      },
+    };
   return null;
 }
 
@@ -400,10 +410,6 @@ export async function verifyModel(file, contract, {provenance = companions(file)
       `extension ${name} is not one the contract allows (${c.extensions.join(', ') || 'none'})`,
     );
   }
-  assert.ok(
-    !(json.extensionsRequired ?? []).includes(KTX2),
-    `${KTX2} is required, but the engine's model loader registers no KTX2 transcoder: use PNG, JPEG or WebP textures`,
-  );
   const textures = json.textures?.length ?? 0;
   assert.ok(textures <= c.limits.textures, `${textures} textures, over the contract's ${c.limits.textures}`);
   const textureBytes = (json.images ?? []).reduce(
@@ -417,8 +423,20 @@ export async function verifyModel(file, contract, {provenance = companions(file)
   const largest = c.limits.textureSize ?? 0;
   for (const [i, image] of (json.images ?? []).entries()) {
     const view = json.bufferViews[image.bufferView];
-    const size = imageSize(bin.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength));
+    const data = bin.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength);
+    const size = imageSize(data);
     assert.ok(size, `image ${i} (${image.mimeType ?? 'no mimeType'}) is not a PNG, JPEG, WebP or KTX2 image`);
+    if (size.ktx2) {
+      assert.ok(
+        (json.extensionsUsed ?? []).includes(KTX2),
+        `image ${i} is KTX2, so the GLB must declare ${KTX2} (the engine transcodes only images a texture names through it)`,
+      );
+      assert.equal(size.ktx2.vkFormat, 0, `image ${i}: a KTX2 image must be Basis Universal (ETC1S or UASTC)`);
+      assert.ok(
+        size.ktx2.depth === 0 && size.ktx2.layers === 0 && size.ktx2.faces === 1,
+        `image ${i}: a KTX2 image must be one 2D texture (no depth, layers or cube faces)`,
+      );
+    }
     assert.ok(
       size.width <= largest && size.height <= largest,
       `image ${i} is ${size.width}×${size.height}, over the contract's textureSize ${largest}`,

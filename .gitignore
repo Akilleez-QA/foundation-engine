@@ -31,6 +31,7 @@ playtest/framework/
 playtest/appearance/
 playtest/stage-journal/
 playtest/model-preview*/
+playtest/ktx2-model/
 
 playtest/model-admission/
 playtest/model-admission-reentry/

@@ -57,6 +57,7 @@
     "package:pure": "node scripts/package-pure.mjs",
     "test:stage-journal-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/stage-journal-check.mjs playtest/stage-journal",
     "test:model-preview-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/model-preview-check.mjs playtest/model-preview",
+    "test:ktx2-browser": "node scripts/generate.mjs && node --import tsx -r ./scripts/silent-browser.cjs scripts/play/ktx2-model-check.mjs playtest/ktx2-model",
     "test:regional-surface-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/regional-surface-check.mjs playtest/regional-surface",
     "test:model-attachment-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/model-attachment-check.mjs playtest/model-attachment",
     "test:progression-workbench-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/progression-workbench-check.mjs playtest/progression-workbench",
