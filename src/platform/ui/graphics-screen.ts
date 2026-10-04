@@ -64,6 +64,7 @@ const KNOB_WORDS: Readonly<Record<string, string>> = {
   'graphics.textures.canvas-budget': 'Painted-surface memory',
   'graphics.post.mode': 'Post-processing',
   'graphics.effects.particles': 'Particle density',
+  'graphics.effects.scatter-density': 'Scattered detail (grass, rocks)',
   'graphics.lights.local-max': 'Local lights',
   'graphics.lights.shadowed-max': 'Lamp shadows',
   'graphics.frame-rate.cap': 'Frame-rate cap',

@@ -15,7 +15,9 @@ import {createWorkerHost} from '../platform/workers/host';
 import type {AudioClockReading} from '../platform/audio/audio-timeline';
 import {BUILT_IN_CUES, normalizeCueVoiceOptions, type CueVoiceOptions} from '../platform/audio/audio-output';
 import type {MusicOptions} from '../platform/audio/music-clock';
-import {EMITTER_ID, type ParticleStats} from './particle-contract';
+import {EMITTER_ID, type EmitterSample, type ParticleStats} from './particle-contract';
+import {Scatter, SCATTER_ID, scatterRoot, validateScatter, type ScatterData} from './scatter';
+import {createScatterAdmission, placeScatter, type ScatterPlacement, type ScatterStats} from './scatter-field';
 import {createRng, deriveSeed} from '../core/rng';
 /**
  * author/testing.ts: `testScene`, a scene without a browser, for a game's own unit tests. It spawns the scene's
@@ -95,8 +97,22 @@ export interface TestScene {
   readonly music: {id: string; options?: MusicOptions}[];
   /** The scene's particle field, stepped as in a visit (`engine.particles` after the scene's fixed systems), without
    *  drawing: its counters (null when the scene has no `sceneParticles()`), and every problem it reported (refusals,
-   *  invalid emitter data, emitters in a scene without particles). */
-  readonly particles: {readonly stats: ParticleStats | null; readonly reports: readonly string[]};
+   *  invalid emitter data, emitters in a scene without particles); `sample(entity)` is that entity's admitted emitter
+   *  now (live count, spawn attempts since admission, bounds of the live particles) or null. */
+  readonly particles: {
+    readonly stats: ParticleStats | null;
+    readonly reports: readonly string[];
+    sample(entity: Entity): EmitterSample | null;
+  };
+  /** The scene's scatters, admitted and placed as in a visit (same stream, density and bounds), without drawing: the
+   *  counters (null when the scene has no `sceneScatter()`), every problem reported (refusals, invalid data, scatters
+   *  in a scene without scatter), and the kept copies of one entity (null when not admitted). Updated after each
+   *  `run` frame and at the start. */
+  readonly scatter: {
+    readonly stats: ScatterStats | null;
+    readonly reports: readonly string[];
+    placement(entity: Entity): ScatterPlacement | null;
+  };
   /** The scene's local-light slots (VIS-02), admitted after each frame as in a visit: slots, admissions and refusals,
    *  and every refusal reported (each cause once). Nothing is drawn. */
   readonly lights: {readonly stats: LightStats; readonly reports: readonly string[]};
@@ -107,6 +123,8 @@ export interface TestScene {
 /** `inputs` enables local press-action hints. Defaults report inContext=true; inject services.input for remaps and modal context. */
 /** `input` replaces the scripted input with a caller-owned InputState (e.g. a replay log); press/hold/release then throw. */
 /** `particleScale` is the `effects.particles` quality knob (default 1, the reference preset). */
+/** `scatterDensity` is the `effects.scatter-density` knob (default 1); `seed` also seeds scatter placement as `?seed=`
+ *  does in a visit (without it, placement uses the visit default). */
 /** `lightCap` is the `lights.local-max` quality knob (default 16, the reference preset); `shadowCap` is
  *  `lights.shadowed-max` (default 4, the reference preset). */
 /** `sounds` adds ids `ctx.play` / `ctx.playVoice` may use besides `BUILT_IN_CUES` and the scene's own `sounds`: an
@@ -115,6 +133,7 @@ export async function testScene(
   scene: SceneDefinition,
   o: {
     particleScale?: number;
+    scatterDensity?: number;
     lightCap?: number;
     shadowCap?: number;
     sounds?: readonly string[];
@@ -331,6 +350,44 @@ export async function testScene(
       },
     }) ?? null;
   const emitterProbe = {id: EMITTER_ID} as ComponentType<object>;
+  // Scatter placement and admission, headless: its own derived stream, never `ctx.random()`.
+  const scatterReports: string[] = [];
+  const scatterAdmission = scene.scatter
+    ? createScatterAdmission<Entity>(scene.scatter.limits, error => scatterReports.push(error.message))
+    : null;
+  const scatterRootSeed = scatterRoot(scene.id, o.seed ?? null),
+    scatterDensity = o.scatterDensity ?? 1;
+  const placed = new Map<Entity, {data: ScatterData; placement: ScatterPlacement | null}>();
+  const scatterProbe = {id: SCATTER_ID} as ComponentType<object>;
+  const syncScatter = () => {
+    if (!scatterAdmission) {
+      if (!scatterReports.length && world.first(scatterProbe))
+        scatterReports.push(
+          `${scene.id}: a Scatter is not drawn: the scene has no scatter (defineScene({ scatter: sceneScatter() }))`,
+        );
+      return;
+    }
+    const offered = [...world.query(Scatter)].filter(([e]) => world.has(e, Transform));
+    offered.sort(([a, x], [b, y]) => Number(y.essential) - Number(x.essential) || a - b);
+    for (const e of [...placed.keys()])
+      if (!offered.some(([x]) => x === e)) {
+        placed.delete(e);
+        scatterAdmission.release(e);
+      }
+    for (const [e, data] of offered) {
+      if (placed.get(e)?.data === data) continue;
+      let placement: ScatterPlacement | null = null;
+      try {
+        validateScatter(data);
+        const p = placeScatter(data, scatterRootSeed, scatterDensity);
+        if (scatterAdmission.admit(e, p.count, p.requested)) placement = p;
+      } catch (error) {
+        scatterAdmission.release(e);
+        scatterAdmission.invalid(error);
+      }
+      placed.set(e, {data, placement});
+    }
+  };
   const lightReports: string[] = [];
   const lightSlotCounts = lightSlotsFor(scene.lights, o.lightCap ?? LOCAL_LIGHT_CAPS.reference);
   const lightSlots = createLightSlots({
@@ -357,6 +414,7 @@ export async function testScene(
     await scene.prepare?.(ctx, new AbortController().signal);
     scene.enter?.(ctx);
     activityEvents?.start();
+    syncScatter();
   } catch (error) {
     if (ownsSave) save.dispose();
     throw error;
@@ -375,6 +433,14 @@ export async function testScene(
         return particles?.stats ?? null;
       },
       reports: particleReports,
+      sample: entity => particles?.sample(entity) ?? null,
+    },
+    scatter: {
+      get stats() {
+        return scatterAdmission ? {...scatterAdmission.stats, refused: {...scatterAdmission.stats.refused}} : null;
+      },
+      reports: scatterReports,
+      placement: entity => placed.get(entity)?.placement ?? null,
     },
     lights: {
       get stats() {
@@ -399,6 +465,7 @@ export async function testScene(
         t += 1 / 60;
         runner.frame(ctx, 1 / 60);
         pressed.clear();
+        syncScatter();
         lightSlots.sync(world);
         if (!particles && !particleReports.length && world.first(emitterProbe))
           particleReports.push(

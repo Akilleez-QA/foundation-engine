@@ -23,6 +23,8 @@ import {Material, materialKey} from './material';
 import {createSceneSurfaces, type Surface, type SurfaceMaterial} from './scene-materials';
 import {createParticleView} from './particle-view';
 import {EMITTER_ID, type ParticleField} from './particle-contract';
+import {SCATTER_ID, scatterRoot} from './scatter';
+import type {SceneScatterDrawing} from './scene-scatter';
 /**
  * author/runtime.ts: a scene's lazy body, loaded the first time a scene is entered (never in the first-load bundle).
  *
@@ -117,6 +119,14 @@ const json = (v: unknown): Record<string, unknown> => {
   }
 };
 
+/** The scatter drawing chunk, once a scene that opted in has prepared (so its first frame already draws scatters). */
+let scatterModule: typeof import('./scene-scatter') | null = null;
+const loadScatter = () =>
+  import('./scene-scatter').then(m => {
+    scatterModule = m;
+    return m;
+  });
+
 const preparations = new WeakMap<
   SceneVisit,
   {body: Awaited<ReturnType<typeof bodyOf>>; state: Record<string, unknown>}
@@ -126,8 +136,11 @@ export async function prepareScene(s: Services, scene: SceneDefinition, visit: S
   // Sound files start loading with the scene; a failure is reported by the output and never blocks the visit.
   if (scene.sounds?.length && s.app.has('platform.audio'))
     for (const id of scene.sounds) void s.audio.preload(id, visit.signal);
+  // Scatter drawing is a lazy chunk; a scene that opted in loads it while it prepares. A failure is reported at entry.
+  const scatterLoad = scene.scatter && !scatterModule ? loadScatter().catch(() => null) : null;
   const body = await bodyOf(scene),
     state: Record<string, unknown> = {};
+  await scatterLoad;
   if (visit.signal.aborted) return;
   await scene.prepare?.(
     {state, text: (key, vars) => (appI18n.t as (k: string, v?: unknown) => string)(key, vars), service: key => s[key]},
@@ -149,6 +162,9 @@ export async function enterScene(o: {
   // Local lights (VIS-02) and shadows (VIS-03) are a lazy chunk: only a scene with `sceneLights()` or `sceneShadows()`
   // loads the rig (and the shadow scheduler) before its first frame; every other scene carries none of it.
   const lightModule = scene.lights || scene.shadows ? await import('./scene-light-rig') : null;
+  // The gradient sky (VIS-05) is a lazy chunk too: loaded now when the scene starts with one, or later when an
+  // environment first asks for one (that sky then appears one frame after its chunk arrives).
+  let skyModule = scene.view?.environment?.sky ? await import('./scene-sky') : null;
   preparations.delete(visit);
   let ctxRef: SceneContext | null = null;
   let activityStart: (() => void) | undefined;
@@ -195,6 +211,8 @@ export async function enterScene(o: {
       });
       if (!surface) throw Error(`${scene.id}: WebGL could not start`);
       const renderer = surface.renderer;
+      // KTX2 model textures are transcoded for this visit's renderer formats; nothing loads until a model needs it.
+      s.models.bindRenderer?.(renderer, actx.signal);
 
       const three = new T.Scene();
       actx.own(() => disposeOwnedTree(three));
@@ -243,7 +261,9 @@ export async function enterScene(o: {
       actx.own(() => sunShadow?.dispose());
       const sunShadowApply = sunShadow ? sunShadow.apply : undefined;
       let sunShadowReported = false;
-      let environment = scene.view?.environment ? bindEnvironment(three, sunShadowApply) : null;
+      const skyLayer = () => skyModule?.createSkyLayer(three) ?? null;
+      let skyLoading = false;
+      let environment = scene.view?.environment ? bindEnvironment(three, sunShadowApply, skyLayer) : null;
       actx.own(() => environment?.dispose());
       const cubes = bindSceneCubes(
         three,
@@ -558,6 +578,41 @@ export async function enterScene(o: {
             renderer: particleView,
           })
         : null;
+      // Scatter: one instanced draw per admitted `Scatter`, in scenes that opted in (`sceneScatter()`); placement draws
+      // from a stream derived from the scene id and `?seed=`, never the gameplay one. The density knob is read once.
+      let scatter: SceneScatterDrawing | null = null;
+      const startScatter = (m: typeof import('./scene-scatter')) => {
+        if (actx.signal.aborted || scatter || !scene.scatter) return;
+        scatter = m.createSceneScatter({
+          world,
+          scene: three,
+          limits: scene.scatter.limits,
+          root: scatterRoot(scene.id, seed),
+          density: s.quality.knob('effects.scatter-density'),
+          surfaces,
+          geometries,
+          resources,
+          mask: maskOf,
+          report: error => s.log.error(`${scene.id}: scatter`, error),
+        });
+      };
+      if (scene.scatter) {
+        if (scatterModule) startScatter(scatterModule);
+        else
+          loadScatter().then(
+            m => {
+              startScatter(m);
+              dirty = true;
+              actx.invalidate();
+            },
+            error => {
+              if (!actx.signal.aborted) s.log.error(`${scene.id}: scatter drawing failed to load`, error);
+            },
+          );
+        actx.own(() => scatter?.dispose());
+      }
+      const scatterProbe = {id: SCATTER_ID} as ComponentType<object>;
+      let scatterReported = false;
       const emitterProbe = {id: EMITTER_ID} as ComponentType<object>;
       let emittersReported = false;
       // Local lights (VIS-02): a scene with `sceneLights()` gets a fixed rig of slots for this visit, capped by the
@@ -601,6 +656,8 @@ export async function enterScene(o: {
             : 'on-demand',
         );
         if (models.sync(dt)) dirty = true;
+        if (scatter?.sync()) dirty = true;
+        if (actx.signal.aborted) return;
         const seen = new Set<Entity>();
         for (const [e, tr, sh] of world.query(Transform, Shape)) {
           if (world.has(e, Mesh) || world.has(e, Model)) continue; // Deterministic precedence; never draw two representations.
@@ -781,11 +838,24 @@ export async function enterScene(o: {
         }
         if (viewState.environment) {
           if (!environment) {
-            environment = bindEnvironment(three, sunShadowApply);
+            environment = bindEnvironment(three, sunShadowApply, skyLayer);
             for (const light of defaultLights) light.visible = false;
             dirty = true;
           }
           if (environment.sync(viewState.environment, camera)) dirty = true;
+          if (!skyLoading && environment.wantsSky()) {
+            skyLoading = true;
+            void import('./scene-sky').then(
+              m => {
+                if (actx.signal.aborted) return;
+                skyModule = m;
+                environment?.refresh();
+                dirty = true;
+                actx.invalidate();
+              },
+              error => s.log.error(`${scene.id}: the sky could not load`, error),
+            );
+          }
           if (!scene.shadows && !sunShadowReported && viewState.environment.directional.shadow) {
             sunShadowReported = true;
             s.log.error(
@@ -816,6 +886,12 @@ export async function enterScene(o: {
         if (world.version !== lastVersion) {
           lastVersion = world.version;
           dirty = true;
+          if (!scene.scatter && !scatterReported && world.first(scatterProbe)) {
+            scatterReported = true;
+            s.log.error(
+              `${scene.id}: a Scatter is not drawn: the scene has no scatter (defineScene({ scatter: sceneScatter() }))`,
+            );
+          }
           if (!particles && !emittersReported && world.first(emitterProbe)) {
             emittersReported = true;
             s.log.error(
@@ -909,6 +985,11 @@ export async function enterScene(o: {
             failed: particleView.stats.failed,
           },
         });
+      if (TEST_API && scene.scatter)
+        handle.scatter = () => {
+          const st = scatter?.stats;
+          return st ? {...st, refused: {...st.refused}, list: st.list.map(entry => ({...entry}))} : null;
+        };
       s.play.attach(handle, actx.signal);
 
       // Prepare authored resident materials before router activation/first render.

@@ -18,8 +18,9 @@
 //
 // The geometry checks run on a re-import of the exported GLB, decoded the way the engine's model loader decodes it
 // (src/platform/assets/models.ts): three.js's GLTFLoader with the meshopt decoder. Draco is refused, because the engine
-// registers only the meshopt decoder; so is any KTX2 texture (KHR_texture_basisu) while ENGINE_KTX2 is false, because the
-// stock model loader registers no KTX2 transcoder yet. The loader's own admission caps (LOADER below, mirrored from
+// registers only the meshopt decoder. KTX2 textures (KHR_texture_basisu) are accepted when the contract lists the
+// extension (ENGINE_KTX2: the model loader transcodes them since PR #146), and each KTX2 image must be what the engine's
+// KTX2 step accepts (src/platform/assets/model-ktx2.ts): Basis Universal (ETC1S or UASTC), one 2D image. The loader's own admission caps (LOADER below, mirrored from
 // validateEmbeddedGlb in models.ts and checked against it by the tests) apply to every model whatever its contract says.
 //
 // Owner: the creator's contract; this script only reads. Bounds: one GLB, its contract and its receipt in memory at a
@@ -43,10 +44,10 @@ const NODE_TRANSFORMS = ['translation', 'rotation', 'scale', 'matrix'];
 const DRACO = 'KHR_draco_mesh_compression';
 const KTX2 = 'KHR_texture_basisu';
 /**
- * Whether the engine's model loader can decode KTX2 textures. False until src/platform/assets/models.ts registers a
- * KTX2 transcoder; the change that adds it flips this, and asset:optimize --ktx2 follows.
+ * Whether the engine's model loader can decode KTX2 textures. True since src/platform/assets/models.ts registers a KTX2
+ * transcoder (PR #146, model-ktx2.ts); asset:optimize --ktx2 follows it. A test keeps it in step with the loader.
  */
-export const ENGINE_KTX2 = false;
+export const ENGINE_KTX2 = true;
 export const KTX2_UNSUPPORTED = 'KTX2 textures are not loadable until the engine adds KTX2 support';
 const MIB = 1024 * 1024;
 /** The model loader's admission caps (src/platform/assets/models.ts: maxFileBytes default and validateEmbeddedGlb). */
@@ -390,8 +391,17 @@ export function imageSize(b) {
     return null;
   }
   const KTX2_MAGIC = '«KTX 20»\r\n\x1a\n';
-  if (b.length >= 28 && b.toString('latin1', 0, 12) === KTX2_MAGIC)
-    return {width: b.readUInt32LE(20), height: Math.max(1, b.readUInt32LE(24))};
+  if (b.length >= 40 && b.toString('latin1', 0, 12) === KTX2_MAGIC)
+    return {
+      width: b.readUInt32LE(20),
+      height: Math.max(1, b.readUInt32LE(24)),
+      ktx2: {
+        vkFormat: b.readUInt32LE(12),
+        depth: b.readUInt32LE(28),
+        layers: b.readUInt32LE(32),
+        faces: b.readUInt32LE(36),
+      },
+    };
   return null;
 }
 
@@ -541,6 +551,17 @@ export async function verifyModel(file, contract, {provenance = companions(file)
     const view = json.bufferViews[image.bufferView];
     const size = imageSize(bin.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength));
     assert.ok(size, `image ${i} (${image.mimeType ?? 'no mimeType'}) is not a PNG, JPEG, WebP or KTX2 image`);
+    if (size.ktx2) {
+      assert.ok(
+        (json.extensionsUsed ?? []).includes(KTX2),
+        `image ${i} is KTX2, so the GLB must declare ${KTX2} (the engine transcodes only images a texture names through it)`,
+      );
+      assert.equal(size.ktx2.vkFormat, 0, `image ${i}: a KTX2 image must be Basis Universal (ETC1S or UASTC)`);
+      assert.ok(
+        size.ktx2.depth === 0 && size.ktx2.layers === 0 && size.ktx2.faces === 1,
+        `image ${i}: a KTX2 image must be one 2D texture (no depth, layers or cube faces)`,
+      );
+    }
     assert.ok(
       size.width <= largest && size.height <= largest,
       `image ${i} is ${size.width}×${size.height}, over the contract's textureSize ${largest}`,

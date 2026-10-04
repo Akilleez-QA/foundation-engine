@@ -121,6 +121,7 @@ are contextual evidence, not verification of Foundation.
 | Crafting and resources | Survey fields, reserves, exact slot selection, weighted facts, authored experiment steps, locked manifests, production and materialization | PR #118 integrates selection/reservation/experimentation, historical recipe/batch facts, explicit spawn changes and native recipe/effect inspection. Final desktop browser, independent recovery probes and all seven gates passed at `790aaea`; combined main tests/build passed. No automatic spawn rotation or minigame prescribed. |
 | Multiplayer | NW-01 integrated in PR #120. NW-02 complete scoped views, application credit and optional scene lifecycle hooks are integrated on main at `ea48539` (PR #122 in the private development history). | Rebased clean browser passed at `508edd9`; final `47a7e6d` passed all seven gates (1,965 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive, four heap advisories). Combined main tests/build passed; measured load and earlier failure remain documented below. Git ancestry establishes integration, not the PR API state. NW-03 is integrated as recorded below; DV-01 remains unresolved. No multiplayer-completion claim. |
 | Multiplayer: queue age and deadlines (NW-06) | Optional intake `maxQueuedAgeMs` with `stale` notice; optional authority `clock` and `submit(command, {deadlineMs})` returning `expired` before storage invocation only | Integrated in v0.2.0 (PR #12, merged to main at `53d549d`). Focused unit tests only; defaults unchanged; no load, browser-composition or device claim. Follow-up (integrated in v0.2.0 (PR #33; batch PR #42)): age shedding is no longer charged to the pump budget (optional `maxStaleDropsPerPump` cap), fixing the NW-07 goodput collapse; 300 ms final/peak 0.23-0.25 before, 0.92-0.96 after with PR #27's probe (loopback). |
+| KTX2 model textures | `KHR_texture_basisu` in the model library: lazy `KTX2Loader` and Basis transcoder, formats from the pooled renderer, RGBA8 fallback, transcoded bytes in residency and the `models` probe | Implemented and checked in PR #146 (unit tests, `test:ktx2-browser` in SwiftShader Chromium). No phone GPU, driver memory or transcode-time evidence; the transcoder's own worker pool is an explicit STD-RUN-35 exception. See [KTX2 model textures](compressed-textures.md). |
 | Asset residency (RES-01) | Optional per-preset texture/model byte budgets, pinned asset ids and a pressure hook over the existing lease caches | Integrated in v0.2.0 (PR #22, merged to main at `9913019`). Unit tests and a native software-renderer fixture only; defaults unchanged; no template configures it. See [asset residency](asset-residency.md). |
 | Multiplayer: peer rollback (RB-01) | Optional `@kits/rollback` session (prediction window, input delay, rollback/resimulation, confirmed-state checksums) and local sync test, driven from the fixed lane | Integrated in v0.2.0 (PR #25; batch PR #42). Focused headless tests and a `testScene` consumer only; requires a reliable, ordered link; no WAN, time-sync, spectator or device claim. See the [kit README](../../src/kits/rollback/README.md). |
 | Determinism: saveable random state (RNG-01) | `createSaveableRng` in `@engine`: `createRng` draws plus `state()`/`restore(word)` | **Integrated 2026-10-02** (PR #52 merge `2d5f50e`, batch PR #62, `main` `6485572`). Before integration: implemented, candidate (PR #52). Focused tests and a rollback sync-test consumer. `ctx.random()` is unchanged. |
@@ -419,7 +420,7 @@ integration: implemented, candidate. Evidence: unit tests and
 so template budgets are unchanged. No physical-device, GPU timing or visual-quality
 acceptance.
 
-Flipbooks (FX-01a, implemented and checked, not yet integrated): `frames` on an emitter plays a sprite sheet
+Flipbooks (FX-01a, integrated in PR #141, merge `4c4f156`): `frames` on an emitter plays a sprite sheet
 per particle (`over-life`, `loop`, `random-start`), still one draw per emitter, grid capped at 16 × 16; `npm run
 fx:pack` packs a PNG sequence into a sheet and JSON sidecar. See the [guide](particles.md#flipbooks-sprite-sheets).
 
@@ -434,6 +435,20 @@ batching eligibility and the ADR 0078 seam hold. See the [guide](material-option
 [recipe](../recipes/give-a-shape-a-material.md). Evidence: unit tests, the recipe's code as a test and
 `npm run test:material-options-browser` (desktop headless Chromium, software GL); templates draw identically. No
 physical-device, GPU timing or visual-quality acceptance.
+
+## Instanced scatter (VIS-06) — implemented, checked in PR #144
+
+`Scatter` / `defineScatter` / `sceneScatter` (author API) draw many copies of a primitive `Shape` or a `Mesh` as one
+instanced draw per scatter, placed by exact points or a rect, ring or edge area, with scale, yaw, tilt and colour
+jitter, and shaded by the entity's `Material`. Owner: the scene visit (`author/scene-scatter.ts`, a lazy chunk;
+placement and admission in `author/scatter-field.ts`; instances from `platform/render/batching/instance.ts`).
+Placement uses a stream derived from the scene id, `seed` and `?seed=`, never `ctx.random()` (regression-tested).
+Bounded per scatter (65,536) and per scene (`max` 32, `instances` 65,536 by default) with counted, reported refusals;
+the `effects.scatter-density` knob thins non-essential scatters to a nested deterministic subset. One draw per scatter;
+triangles counted per copy. See the [guide](scatter.md) and [recipe](../recipes/scatter-grass-and-rocks.md). Evidence:
+unit tests, recipe test and `npm run test:scatter-browser` (desktop headless Chromium, software GL). No template uses
+it, so template budgets are unchanged. glTF `Model` scatter is a follow-up. No physical-device or GPU timing
+acceptance.
 
 ## Game sound files (DX P1-10) — integrated in v0.2.0
 
@@ -591,4 +606,6 @@ the `lights.local-max` knob; overflow is refused and reported once per cause. St
 `ef0d1bb`). Evidence: unit tests and `npm run test:lights-browser`. No physical-device fill-rate acceptance.
 Shadows (VIS-03): `sceneShadows()` per scene, `directional.shadow` for the sun, `shadow: true` on local lights and a
 per-entity `Shadow`; shadowed local slots fixed per visit and bounded by `lights.shadowed-max`; maps redraw only on
-change. Status: implemented and checked as a candidate PR #148. Evidence: unit tests and `npm run test:shadows-browser`.
+change. Status: integrated (PR #148, merge `e84afcf`). Evidence: unit tests and `npm run test:shadows-browser`.
+Sky and haze (VIS-05): `defineEnvironment({ sky })` draws a gradient sky with optional discs and stars from
+one texture on an unlit sphere; `haze` gains `exp2` and `color: 'sky'`. Status: implemented and checked as a candidate PR #150. Evidence: unit tests and `npm run test:sky-browser`.
