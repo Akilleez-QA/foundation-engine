@@ -43,6 +43,7 @@
     "host": "node --import tsx scripts/host.mjs",
     "play:snap": "node scripts/generate.mjs && node scripts/play/snap.mjs",
     "play:script": "node scripts/generate.mjs && node scripts/play/script.mjs",
+    "play:playtests": "node scripts/generate.mjs && tsx scripts/play/playtests.ts",
     "lint:generic": "node scripts/lint/genericity.mjs",
     "new-game": "node scripts/new-game.mjs",
     "gate:templates": "node scripts/gate-templates.mjs",
