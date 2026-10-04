@@ -198,6 +198,8 @@ export async function enterScene(o: {
       });
       if (!surface) throw Error(`${scene.id}: WebGL could not start`);
       const renderer = surface.renderer;
+      // KTX2 model textures are transcoded for this visit's renderer formats; nothing loads until a model needs it.
+      s.models.bindRenderer?.(renderer, actx.signal);
 
       const three = new T.Scene();
       actx.own(() => disposeOwnedTree(three));

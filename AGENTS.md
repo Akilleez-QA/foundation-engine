@@ -156,7 +156,7 @@ When the game teaches ([learn mode](docs/guides/learn-mode.md)), these rules hol
 | `npm run play:criteria [-- --gate]` | The brief's success criteria, checked and tabled |
 | `npm run asset:verify -- <model.glb>` | Check a model against its `<name>.contract.json`: size, pivot, triangle/vertex/material/texture limits, bytes, material properties, provenance ([model contracts](docs/guides/model-contracts.md)); `check` runs it for every contracted GLB |
 | `npm run disclosure [-- --strict]` | Steam and itch.io AI-disclosure draft from the asset provenance records ([guide](docs/guides/asset-provenance.md)) |
-| `npm run asset:optimize -- <in.glb> --out <out.glb>` | Meshopt-compress a model and re-encode its textures as WebP at the contract's texture size (`--ktx2` waits for engine KTX2 support), keeping named nodes; checks the contract before and after ([model contracts](docs/guides/model-contracts.md#optimise)) |
+| `npm run asset:optimize -- <in.glb> --out <out.glb>` | Meshopt-compress a model and re-encode its textures as WebP at the contract's texture size (`--ktx2` writes KTX2 for phone targets), keeping named nodes; checks the contract before and after ([model contracts](docs/guides/model-contracts.md#optimise)) |
 | `npm test` / `npm run lint` | All tests / all lints (format, layers, game, arch, css, generic, brief, budgets, provenance) |
 | `npm run format` / `npm run format:check` | Format code with Prettier / check it (Markdown excluded) |
 | `npm run gate` / `npm run gate:templates` | The integration gate for this game / for every template |

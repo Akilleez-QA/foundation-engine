@@ -31,6 +31,13 @@ Every new framework below is optional: a game that does not use it is unchanged.
   metres, one rebuild-from-scratch script per asset, a screenshot after every change, measurements (bounds,
   ground contact, gaps, non-manifold edges) as the acceptance evidence, about two retries per defect, Blender
   5.2 API lookups before writing code, and MCP safety defaults. Documentation only; no engine change.
+- **KTX2 model textures (#146).** A GLB whose textures use `KHR_texture_basisu` (Basis Universal ETC1S or UASTC) now
+  loads: the textures are transcoded to the GPU format the device supports (RGBA8 when it supports none) and stay
+  compressed on the GPU. The transcoder (0.6 MB) and its code load only when such a model does; a game without one
+  downloads none of it. `models` stats gain `compressedTextures`, `compressedTextureMiB` and `transcoderLoads`.
+  `npm run asset:verify` accepts `KHR_texture_basisu` when the contract lists it (`ENGINE_KTX2` is on), so
+  `npm run asset:optimize -- --ktx2` now runs. See
+  [KTX2 model textures](docs/guides/compressed-textures.md).
 - **`lint:game` rule `three-legacy`.** In a game file that imports three (through a `@kits/three` kit, or
   directly), it flags three.js APIs that are gone or deprecated in the pinned three r186, each with its
   replacement: `Geometry`/`Face3`, `*BufferGeometry` aliases, `outputEncoding`, `texture.encoding`,
@@ -40,16 +47,16 @@ Every new framework below is optional: a game that does not use it is unchanged.
   so the rule is dormant today and ready for that kit. A test checks each "removed" name against the installed
   three. Escape with a reason: `// lint-game-allow three-legacy: <reason>`.
 - **Model optimisation (`npm run asset:optimize`).** glTF-Transform's `optimize` with meshopt geometry
-  compression, WebP textures resized to the contract's `textureSize` (`--ktx2` is refused until the engine
-  adds KTX2 support), and named nodes, meshes and materials kept; the model contract is checked before and after. Adds the
+  compression, WebP textures resized to the contract's `textureSize` (`--ktx2` writes KTX2 since the model
+  loader transcodes it, #146), and named nodes, meshes and materials kept; the model contract is checked before and after. Adds the
   development-only `@gltf-transform/cli` 4.5.1 (MIT) and its graph; see the notices.
 - **Optional silhouette check.** A model contract may set `silhouette` with a reference PNG, a view (front, side, top), a
   gameplay pixel size and a stage; `asset:verify` rasterises the re-imported model without a GPU and requires an
   overlap of at least 0.85 at blockout or 0.90 when final (or the contract's own threshold). `--masks` writes both
   masks for inspection. The lantern example uses it.
 - **`asset:verify` enforces the model loader's caps.** Every contracted model must fit the loader's admission
-  limits (32 MiB, accessor, node, skin and animation counts, four bone influences), and KTX2 textures and Draco are
-  refused until the engine supports them.
+  limits (32 MiB, accessor, node, skin and animation counts, four bone influences), and Draco is refused (KTX2
+  is accepted when the contract lists it, since #146).
 
 ## 0.3.0 — proposed; author decides
 

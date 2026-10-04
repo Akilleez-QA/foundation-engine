@@ -12,8 +12,8 @@
 //      (make the model at its target polycount instead).
 //   3. Textures: WebP (EXT_texture_webp, which the engine's GLTFLoader decodes) by default, resized to the largest size
 //      the contract allows. --ktx2 (UASTC for normal, occlusion and metal-roughness maps, ETC1S for colour, through the
-//      external `ktx` command from KTX-Software 4.4 or later, else a WebP fallback) is refused while ENGINE_KTX2 in
-//      asset-verify.mjs is false: KTX2 textures are not loadable until the engine adds KTX2 support.
+//      external `ktx` command from KTX-Software 4.4 or later, else a WebP fallback) follows ENGINE_KTX2 in asset-verify.mjs,
+//      true since the model loader transcodes KTX2 (PR #146); the output's contract must list KHR_texture_basisu.
 //   4. After: the output must pass the output's contract. Only then are the GLB and its receipt written to --out; on
 //      any failure nothing at --out changes.
 //

@@ -21,6 +21,7 @@ import {
   verifyFile,
   verifyModel,
 } from './asset-verify.mjs';
+import {editKtx2, quadrantKtx2} from '../src/testing/ktx2-fixture.ts';
 
 const SAMPLE = join(ROOT, 'tools/blender-export/game/public/models/metre-block.glb');
 const RECEIPT = JSON.parse(readFileSync(SAMPLE.replace(/\.glb$/, '.provenance.json'), 'utf8'));
@@ -314,19 +315,45 @@ test('an image that is not PNG, JPEG, WebP or KTX2 is rejected', () =>
     /image 0 \(image\/png\) is not a PNG, JPEG, WebP or KTX2 image/,
     withTextures,
   ));
-for (const [name, change] of [
-  [
-    'a KTX2 extension',
-    j => {
-      j.extensionsUsed = ['KHR_texture_basisu'];
-      j.extensionsRequired = ['KHR_texture_basisu'];
-    },
-  ],
-  ['a KTX2 texture source', j => (j.textures = [{extensions: {KHR_texture_basisu: {source: 0}}}])],
-  ['a KTX2 image', j => (j.images = [{bufferView: 0, mimeType: 'image/ktx2'}])],
-])
-  test(`${name} is rejected: KTX2 is not loadable until the engine adds KTX2 support`, () =>
-    rejects({json: change}, /KTX2 textures are not loadable until the engine adds KTX2 support/));
+/** Embed a KTX2 image as a base-colour texture through KHR_texture_basisu (required, no fallback source). */
+const ktx2Textured =
+  (image = Buffer.from(quadrantKtx2(8))) =>
+  (json, bin) => {
+    const offset = bin.length;
+    json.bufferViews.push({buffer: 0, byteOffset: offset, byteLength: image.length});
+    json.buffers[0].byteLength = offset + image.length;
+    json.images = [{bufferView: json.bufferViews.length - 1, mimeType: 'image/ktx2'}];
+    json.textures = [{extensions: {KHR_texture_basisu: {source: 0}}}];
+    json.materials[0].pbrMetallicRoughness.baseColorTexture = {index: 0};
+    json.extensionsUsed = ['KHR_texture_basisu'];
+    json.extensionsRequired = ['KHR_texture_basisu'];
+    return Buffer.concat([bin, image]);
+  };
+const allowKtx2 = c => {
+  withTextures(c);
+  c.limits.textureSize = 8;
+  c.extensions = ['KHR_texture_basisu'];
+};
+test('a required KTX2 texture passes when the contract lists KHR_texture_basisu: the engine transcodes it', async () => {
+  assert.equal(ENGINE_KTX2, true);
+  const f = fixture({bin: ktx2Textured()});
+  try {
+    const report = await verifyModel(f.file, contract(allowKtx2));
+    assert.equal(report.triangles, 12);
+  } finally {
+    f.close();
+  }
+});
+test('a KTX2 texture the contract does not list is rejected', () =>
+  rejects({bin: ktx2Textured()}, /extension KHR_texture_basisu is not one the contract allows/, c => {
+    allowKtx2(c);
+    c.extensions = [];
+  }));
+test('a KTX2 image the engine cannot transcode is rejected', async () => {
+  const image = Buffer.from(quadrantKtx2(8));
+  await rejects({bin: ktx2Textured(Buffer.from(editKtx2(image, {12: 37})))}, /must be Basis Universal/, allowKtx2);
+  await rejects({bin: ktx2Textured(Buffer.from(editKtx2(image, {36: 6})))}, /must be one 2D texture/, allowKtx2);
+});
 
 // The model loader's admission caps (src/platform/assets/models.ts), whatever the contract allows.
 test('the loader caps mirror src/platform/assets/models.ts', () => {
@@ -462,11 +489,16 @@ test('image headers give width and height for PNG, JPEG, WebP and KTX2', () => {
   vp8l.write('WEBPVP8L', 8, 'latin1');
   vp8l.writeUInt32LE((128 - 1) | ((256 - 1) << 14), 21);
   assert.deepEqual(imageSize(vp8l), {width: 128, height: 256});
-  const ktx2 = Buffer.alloc(32);
+  const ktx2 = Buffer.alloc(40);
   ktx2.write('\u00abKTX 20\u00bb\r\n\x1a\n', 0, 'latin1');
   ktx2.writeUInt32LE(512, 20);
   ktx2.writeUInt32LE(256, 24);
-  assert.deepEqual(imageSize(ktx2), {width: 512, height: 256});
+  ktx2.writeUInt32LE(1, 36);
+  assert.deepEqual(imageSize(ktx2), {
+    width: 512,
+    height: 256,
+    ktx2: {vkFormat: 0, depth: 0, layers: 0, faces: 1},
+  });
   assert.equal(imageSize(Buffer.from('GIF89a')), null);
 });
 
@@ -557,11 +589,11 @@ test('a decoded change that keeps every structural rule fails the pinned semanti
   ));
 
 // The contract itself and the command line.
-test('a contract with an unknown key, a missing provenance field or a compression extension is refused', () => {
+test('a contract with an unknown key, a missing provenance field or Draco is refused; KTX2 may be listed', () => {
   assert.throws(() => contract(c => (c.limit = {})), /unknown key "limit"/);
   assert.throws(() => contract(c => (c.provenance.required = ['licence'])), /must include "author"/);
   assert.throws(() => contract(c => (c.extensions = ['KHR_draco_mesh_compression'])), /only the meshopt decoder/);
-  assert.throws(() => contract(c => (c.extensions = ['KHR_texture_basisu'])), /not loadable until the engine/);
+  assert.equal(contract(c => (c.extensions = ['KHR_texture_basisu'])).extensions[0], 'KHR_texture_basisu');
   assert.equal(contract(c => (c.extensions = ['EXT_meshopt_compression'])).extensions[0], 'EXT_meshopt_compression');
   assert.throws(() => contract(c => (c.limits.textures = 1)), /textureSize .* is required when textures are allowed/);
   assert.throws(() => contract(c => (c.clips = ['idle'])), /limits.animations must be at least/);

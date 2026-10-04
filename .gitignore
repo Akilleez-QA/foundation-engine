@@ -35,6 +35,7 @@ playtest/framework/
 playtest/appearance/
 playtest/stage-journal/
 playtest/model-preview*/
+playtest/ktx2-model/
 
 playtest/model-admission/
 playtest/model-admission-reentry/
@@ -69,6 +70,7 @@ playtest/session/
 playtest/particles/
 playtest/creator-journey/
 playtest/blender-export/
+playtest/pose-to-pose/
 playtest/first-use/
 playtest/first-use-production/
 playtest/output/

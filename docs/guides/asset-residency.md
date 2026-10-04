@@ -78,8 +78,9 @@ every retained entry, pinned or not, through the library `dispose` path.
   bytes and are never evicted; their publication re-checks the ceiling.
 - Recent eviction memory for the `reloads` counter is bounded to 1024 keys.
 - Bytes are the libraries' existing descriptor estimates (texels × 4 × 4/3 for
-  a mipmapped RGBA8 texture; vertex, index and morph buffers plus textures and
-  animation tracks for a model). They are not measured driver or browser memory.
+  a mipmapped RGBA8 texture; the transcoded level bytes for a compressed KTX2
+  model texture, see [KTX2 model textures](compressed-textures.md); vertex, index
+  and morph buffers plus textures and animation tracks for a model). They are not measured driver or browser memory.
   The existing model estimate counts each attribute's array, so attributes that
   share one interleaved buffer are over-counted (conservative).
 
