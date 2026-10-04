@@ -34,16 +34,22 @@ Every key is checked; an unknown key is an error, so a misspelt limit cannot sil
 | `bounds` | one of `bounds` / `size` | `{min: [x, y, z], max: [x, y, z]}`: the exact decoded world bounds. |
 | `size` | one of `bounds` / `size` | `{min: [x, y, z], max: [x, y, z]}`: the allowed range of the decoded extents (width, height, depth). |
 | `pivot` | yes | `{at, node?, tolerance?}`. `at` is `"base-centre"` (lowest point at y = 0, footprint centred on x = z = 0), `"centre"` (bounds centred on the origin) or `"any"`. `node` names a node that must sit at the world origin. |
-| `limits` | yes | Whole numbers: `fileBytes`, `triangles`, `vertices`, `materials`, `textures`, `textureBytes` (required); `primitives`, `animations` (default 0), `cameras` (default 0). Vertices and triangles are counted from the decoded geometry the loader builds. |
+| `limits` | yes | Whole numbers: `fileBytes`, `triangles`, `vertices`, `materials`, `textures`, `textureBytes` (required); `textureSize` (the largest width or height of any embedded image, in pixels; required when `textures` is above 0); `primitives`, `animations` (default 0), `cameras` (default 0). Vertices and triangles are counted from the re-imported geometry. |
 | `nodeTransforms` | no | `"forbidden"` rejects any node `translation`, `rotation`, `scale` or `matrix`, even an identity: transforms must be baked into the mesh. Default `"allowed"`. |
-| `extensions` | no | glTF extensions the GLB may use; default none. Draco and meshopt compression are always refused (not decoded here). |
+| `extensions` | no | glTF extensions the GLB may use; default none. List `EXT_meshopt_compression` (and `KHR_mesh_quantization`, `EXT_texture_webp`) for an optimised model. Draco (`KHR_draco_mesh_compression`) can never be listed: the engine registers only the meshopt decoder. A *required* `KHR_texture_basisu` (KTX2) texture is refused even when listed: the stock model loader registers no KTX2 transcoder. |
 | `materials` | yes | `properties`: the material keys allowed (must include `name`). `pbr`: the `pbrMetallicRoughness` keys allowed. Optional: `required`, `requiredPbr` (keys that must be present), `alphaModes` (default `["OPAQUE"]`), `expected` (the exact set of materials by name, each with optional `baseColorFactor`, `metallicFactor`, `roughnessFactor`, `emissiveFactor`, `doubleSided`). |
 | `lattice` | no | `{name, x, y, z}`: every vertex coordinate must be one of the listed values per axis (for block-built geometry). |
 | `faces` | no | `[{name, axis, at, material, triangles?}]`: exactly one primitive lies wholly on the plane `axis = at`, uses `material` and has `triangles` triangles. |
+| `nodes` | no | Node names that must exist in the GLB and in the re-imported scene: attachment points, sockets, parts a system looks up by name. |
+| `clips` | no | Animation clip names that must exist and have a duration above zero. `limits.animations` must be at least their number. |
 | `semanticSha256` | no | Pins the decoded positions, normals, indices, world matrices and material factors. Any geometry change, however small, fails; a deliberate change re-exports and updates the pin in the same commit. |
 | `provenance` | yes | `required`: receipt fields that must be present and non-empty; it must include `licence`, `author`, `source`, `tool` and `generator`. Optional: `licences` (the accepted licence identifiers) and `equals` (receipt values that must match exactly). |
 
 Rules that need no contract key: the GLB header and chunks must be well formed; there is at most one buffer and it is the GLB's own BIN chunk (no `uri`); images are embedded (`bufferView`, no `uri`); primitives are triangles; the model carries no light; the receipt's `sha256` matches the file; the receipt's `generator` equals the GLB's `asset.generator`; when the receipt has `sourceSha256`, its `source` file exists in the repository and matches it.
+
+## Re-import
+
+The geometry rules do not trust the exporter's report or the accessor metadata. They run on a re-import of the GLB: three.js's `GLTFLoader` with the meshopt decoder, the same parser the engine's model loader uses (`src/platform/assets/models.ts`). Triangles, vertices, bounds, size, pivot, named nodes and clips are read from what that re-import builds. Image dimensions come from each embedded image's header (PNG, JPEG, WebP or KTX2); the images are then removed, because Node has no image decoder.
 
 ## Provenance fields
 
@@ -86,4 +92,4 @@ The strict sample contract is [`metre-block.contract.json`](../../tools/blender-
 - **Owner:** the creator owns each contract; `scripts/asset-verify.mjs` only reads. `npm run check` is its only automatic caller. It is not a runtime check: the engine's loader has its own admission rules ([model readiness](model-readiness.md)).
 - **Bounds:** one GLB, its contract and receipt in memory at a time. The file size is checked against `fileBytes` before the file is read. No network access; external URIs are refused, never fetched.
 - **Failure:** the first breach stops that model with one line naming the rule and the numbers; other models are still checked. Exit code 1 on any failure, 2 on a usage error.
-- **Not checked:** texture dimensions, colour spaces and compression; animation clip contents (only their count); skinning; visual quality; whether the receipt's licence claim is true. Decoding uses three.js's `GLTFLoader` in Node with images removed, so texture data is counted and sized but not decoded. It is an acceptance check for the creator's own assets, not a security boundary for untrusted files.
+- **Not checked:** texture colour spaces and pixel contents; animation clip contents beyond names and duration; skinning; visual quality; whether the receipt's licence claim is true. Images are counted, sized in bytes and measured from their headers, but not decoded. It is an acceptance check for the creator's own assets, not a security boundary for untrusted files.

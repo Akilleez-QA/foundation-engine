@@ -25,3 +25,14 @@ No browser was run for this change: the scene, the GLB and the browser diagnosti
 - Whether a receipt's licence claim is true: the check confirms the field is present and accepted by the contract, not the rights.
 - Untrusted-file safety: decoding uses three.js's `GLTFLoader` in Node with images removed; compressed geometry is refused, not decoded.
 - Other Blender versions.
+
+## Re-import checks (follow-up)
+
+The geometry checks now decode with the meshopt decoder, the same `GLTFLoader` setup as `src/platform/assets/models.ts`. New rules:
+
+- `limits.textureSize`: each embedded image's width and height, read from its PNG, JPEG, WebP or KTX2 header. It is required when `limits.textures` is above 0. An image in any other format is refused.
+- `nodes` and `clips`: required node names, present both in the GLB and in the re-imported scene, and required animation clips with a duration above zero.
+- Draco is refused with the reason (the engine registers only the meshopt decoder). A contract may now allow `EXT_meshopt_compression`. A required `KHR_texture_basisu` is refused, because the stock model loader registers no KTX2 transcoder.
+
+`node --test scripts/asset-verify.test.mjs tools/blender-export/verify.test.mjs`: **92/92** pass on Node 22. The new tests are a texture wider than `textureSize` (a PNG header edited to 4096); a GIF image; a required KTX2 texture; a missing required node; a missing clip; a clip present (passes) and one with a single key (no duration); header parsing for all four formats; and contract refusals. The meshopt test checks that an allowed `EXT_meshopt_compression` declaration decodes through the engine decoder. That model has no compressed buffer views, so a real meshopt round trip still needs an optimised fixture.
+

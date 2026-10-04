@@ -11,6 +11,7 @@ import {
   ROOT,
   discover,
   gameFolders,
+  imageSize,
   packGlb,
   parseArgs,
   parseContract,
@@ -120,6 +121,7 @@ test('the unchanged sample passes a general contract, and a textured copy passes
       contract(c => {
         c.limits.textures = 1;
         c.limits.textureBytes = PNG.length;
+        c.limits.textureSize = 1;
       }),
     );
     assert.equal(texturedReport.textures, 1);
@@ -211,10 +213,10 @@ test('an external buffer is rejected', () =>
   rejects({json: j => (j.buffers[0].uri = 'https://invalid.example/model.bin')}, /buffer must be embedded/));
 test('an external image is rejected', () =>
   rejects({json: j => (j.images = [{uri: 'colour.png'}])}, /image must be embedded/));
-test('compressed geometry is rejected', () =>
+test('Draco geometry is rejected: the engine registers only the meshopt decoder', () =>
   rejects(
     {json: j => (j.extensionsUsed = ['KHR_draco_mesh_compression'])},
-    /compressed geometry is not accepted/,
+    /Draco is not accepted, the engine registers only the meshopt decoder/,
     c => (c.extensions = []),
   ));
 test('an extension the contract does not allow is rejected', () =>
@@ -225,6 +227,7 @@ test('more texture bytes than the contract allows are rejected', () =>
   rejects({bin: textured}, /bytes of embedded images, over the contract's 10/, c => {
     c.limits.textures = 1;
     c.limits.textureBytes = 10;
+    c.limits.textureSize = 1;
   }));
 test('an animation the contract does not allow is rejected', () =>
   rejects({json: j => (j.animations = [{channels: [], samplers: []}])}, /1 animations, over the contract's 0/));
@@ -278,6 +281,126 @@ test('a changed roughness factor is rejected', () =>
   rejects({json: j => (j.materials[0].pbrMetallicRoughness.roughnessFactor = 0.5)}, /roughnessFactor differs/));
 test('a changed emissive factor is rejected', () =>
   rejects({json: j => (j.materials[1].emissiveFactor = [1, 0, 0])}, /emissiveFactor differs/));
+
+// Re-import: texture dimensions, compression the engine cannot decode, named nodes and clips.
+const withTextures = c => {
+  c.limits.textures = 1;
+  c.limits.textureBytes = 1e6;
+  c.limits.textureSize = 1;
+};
+test('a texture wider than the contract textureSize is rejected', () =>
+  rejects(
+    {
+      bin: (j, b) => {
+        const out = textured(j, b);
+        out.writeUInt32BE(4096, out.length - PNG.length + 16);
+        return out;
+      },
+    },
+    /image 0 is 4096×1, over the contract's textureSize 1/,
+    withTextures,
+  ));
+test('an image that is not PNG, JPEG, WebP or KTX2 is rejected', () =>
+  rejects(
+    {
+      bin: (j, b) => {
+        const out = textured(j, b);
+        out.write('GIF89a', out.length - PNG.length, 'latin1');
+        return out;
+      },
+    },
+    /image 0 \(image\/png\) is not a PNG, JPEG, WebP or KTX2 image/,
+    withTextures,
+  ));
+test('a required KTX2 texture is rejected: the stock model loader has no KTX2 transcoder', () =>
+  rejects(
+    {
+      json: j => {
+        j.extensionsUsed = ['KHR_texture_basisu'];
+        j.extensionsRequired = ['KHR_texture_basisu'];
+      },
+    },
+    /registers no KTX2 transcoder/,
+    c => (c.extensions = ['KHR_texture_basisu']),
+  ));
+test('a meshopt extension the contract allows is decoded with the engine decoder', async () => {
+  const f = fixture({json: j => (j.extensionsUsed = ['EXT_meshopt_compression'])});
+  try {
+    const report = await verifyModel(
+      f.file,
+      contract(c => (c.extensions = ['EXT_meshopt_compression'])),
+    );
+    assert.equal(report.triangles, 12);
+  } finally {
+    f.close();
+  }
+});
+test('a missing required node is rejected', () =>
+  rejects({}, /the required node handle is missing/, c => (c.nodes = ['metre-block', 'handle'])));
+test('a missing required animation clip is rejected', () =>
+  rejects({}, /the required clip idle is missing \(clips: none\)/, c => {
+    c.limits.animations = 1;
+    c.clips = ['idle'];
+  }));
+test('a required clip present in the model passes, and one without duration is rejected', async () => {
+  const clip = (j, b, times) => {
+    // A one-key or two-key translation track on the model node; the node transform rule is relaxed for it.
+    const offset = b.length,
+      data = Buffer.alloc(times.length * 4 + times.length * 12);
+    times.forEach((t, i) => data.writeFloatLE(t, i * 4));
+    j.bufferViews.push(
+      {buffer: 0, byteOffset: offset, byteLength: times.length * 4},
+      {buffer: 0, byteOffset: offset + times.length * 4, byteLength: times.length * 12},
+    );
+    j.accessors.push(
+      {
+        bufferView: j.bufferViews.length - 2,
+        componentType: 5126,
+        count: times.length,
+        type: 'SCALAR',
+        min: [Math.min(...times)],
+        max: [Math.max(...times)],
+      },
+      {bufferView: j.bufferViews.length - 1, componentType: 5126, count: times.length, type: 'VEC3'},
+    );
+    j.animations = [
+      {
+        name: 'idle',
+        samplers: [{input: j.accessors.length - 2, output: j.accessors.length - 1}],
+        channels: [{sampler: 0, target: {node: 0, path: 'translation'}}],
+      },
+    ];
+    j.buffers[0].byteLength = offset + data.length;
+    return Buffer.concat([b, data]);
+  };
+  const withClip = c => {
+    c.limits.animations = 1;
+    c.clips = ['idle'];
+  };
+  const good = fixture({bin: (j, b) => clip(j, b, [0, 1])});
+  try {
+    assert.deepEqual((await verifyModel(good.file, contract(withClip))).clips, ['idle']);
+  } finally {
+    good.close();
+  }
+  await rejects({bin: (j, b) => clip(j, b, [0])}, /the required clip idle has no duration/, withClip);
+});
+test('image headers give width and height for PNG, JPEG, WebP and KTX2', () => {
+  assert.deepEqual(imageSize(PNG), {width: 1, height: 1});
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 4, 0, 0, 0xff, 0xc0, 0, 11, 8, 0, 32, 0, 64, 3, 0, 0, 0]);
+  assert.deepEqual(imageSize(jpeg), {width: 64, height: 32});
+  const vp8l = Buffer.alloc(30);
+  vp8l.write('RIFF', 0, 'latin1');
+  vp8l.write('WEBPVP8L', 8, 'latin1');
+  vp8l.writeUInt32LE((128 - 1) | ((256 - 1) << 14), 21);
+  assert.deepEqual(imageSize(vp8l), {width: 128, height: 256});
+  const ktx2 = Buffer.alloc(32);
+  ktx2.write('\u00abKTX 20\u00bb\r\n\x1a\n', 0, 'latin1');
+  ktx2.writeUInt32LE(512, 20);
+  ktx2.writeUInt32LE(256, 24);
+  assert.deepEqual(imageSize(ktx2), {width: 512, height: 256});
+  assert.equal(imageSize(Buffer.from('GIF89a')), null);
+});
 
 // Decoded geometry.
 test('a light in the model is rejected even when its extension is allowed', () =>
@@ -369,7 +492,11 @@ test('a decoded change that keeps every structural rule fails the pinned semanti
 test('a contract with an unknown key, a missing provenance field or a compression extension is refused', () => {
   assert.throws(() => contract(c => (c.limit = {})), /unknown key "limit"/);
   assert.throws(() => contract(c => (c.provenance.required = ['licence'])), /must include "author"/);
-  assert.throws(() => contract(c => (c.extensions = ['EXT_meshopt_compression'])), /compressed geometry/);
+  assert.throws(() => contract(c => (c.extensions = ['KHR_draco_mesh_compression'])), /only the meshopt decoder/);
+  assert.equal(contract(c => (c.extensions = ['EXT_meshopt_compression'])).extensions[0], 'EXT_meshopt_compression');
+  assert.throws(() => contract(c => (c.limits.textures = 1)), /textureSize .* is required when textures are allowed/);
+  assert.throws(() => contract(c => (c.clips = ['idle'])), /limits.animations must be at least/);
+  assert.throws(() => contract(c => (c.nodes = ['a', 'a'])), /nodes must be a list of distinct names/);
   assert.throws(() => contract(c => (c.up = '+Z')), /up must be "\+Y"/);
   assert.throws(() => contract(c => delete c.bounds && delete c.size), /needs bounds, size or both/);
   assert.throws(() => contract(c => (c.limits.triangles = -1)), /limits.triangles/);
