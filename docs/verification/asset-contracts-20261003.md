@@ -36,3 +36,12 @@ The geometry checks now decode with the meshopt decoder, the same `GLTFLoader` s
 
 `node --test scripts/asset-verify.test.mjs tools/blender-export/verify.test.mjs`: **92/92** pass on Node 22. The new tests are a texture wider than `textureSize` (a PNG header edited to 4096); a GIF image; a required KTX2 texture; a missing required node; a missing clip; a clip present (passes) and one with a single key (no duration); header parsing for all four formats; and contract refusals. The meshopt test checks that an allowed `EXT_meshopt_compression` declaration decodes through the engine decoder. That model has no compressed buffer views, so a real meshopt round trip still needs an optimised fixture.
 
+## Lantern example (follow-up)
+
+`tools/blender-export/game/tools/lantern/export.py` is an original GPL-3.0-only low-poly lantern, built from nothing with `bmesh` and exported headless by Blender 5.2.1 LTS with `--factory-startup --background`. No MCP was used.
+
+- Two exports, one to the checked-in path and one to a scratch path, were byte-identical: SHA-256 `b3a5ddcd1d26f22531bcd2d7241f85c5586f254c320488d62f3f563954c533fa`, 9,344 bytes.
+- `npm run asset:verify -- tools/blender-export/game/public/models/lantern.glb` passes against `lantern.contract.json`. The model has 148 triangles (limit 200), 272 vertices (limit 400), 2 primitives, 2 materials and 0 textures. Its size is 0.19 × 0.348 × 0.19 m, inside the 0.17–0.21 × 0.32–0.38 m range. The base-centre pivot, the named node `lantern`, the exact material factors (including the glow's emissive factor) and the pinned semantic hash `ab6bd03f…61da02` all pass. `tools/blender-export/lantern.test.mjs` passes.
+- A Blender workbench render of the re-imported GLB was inspected. It shows an iron base, an amber chimney, a pointed roof and an upright handle. The render was a scratch file and is not committed.
+- The lantern is not placed in the sample scene. The sample brief caps that scene at 3 draws and 14 triangles; placing the lantern would need the creator to change the brief. `npm run test:blender-export-browser` still passes: 3 draws and 14 triangles, one model response, no errors.
+

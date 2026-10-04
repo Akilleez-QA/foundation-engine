@@ -14,6 +14,7 @@ Short, checked how-tos. Start with [getting started](../guides/getting-started.m
 | add lifts and moving platforms the player can ride | [add moving platforms](add-moving-platforms.md) |
 | follow the player with the camera, change light, sky colour and haze | [camera and lighting](camera-and-lighting.md) |
 | texture a shape, make it shiny, glowing or see-through | [give a shape a material](give-a-shape-a-material.md) |
+| make my game look good: palette, light presets, haze, framing, low-poly forms, baked light, the look checklist | [art direction](art-direction.md) |
 | show hit sparks, pickup glitter and bursts, trails or smoke | [hit sparks and pickups](hit-sparks-and-pickups.md) |
 | use three.js itself: point lights and shadows, bloom, a custom shader, loaders, controls (opt-in, full power; you own three upgrades) | [use three.js directly](use-three-directly.md) |
 | play my own sound effects, with volume, pitch and position | [play your own sound files](play-your-own-sounds.md) |

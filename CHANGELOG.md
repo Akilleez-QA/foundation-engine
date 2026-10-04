@@ -12,6 +12,10 @@ Every new framework below is optional: a game that does not use it is unchanged.
   texture limits, file and texture bytes, allowed material properties and the receipt fields licence, author,
   source, tool and generator. A GLB without a contract is unaffected. See
   [model contracts](docs/guides/model-contracts.md).
+- **Agent skill: build an asset in Blender (`.claude/skills/blender-asset`).** Plan parts and contacts in
+  metres, one rebuild-from-scratch script per asset, a screenshot after every change, measurements (bounds,
+  ground contact, gaps, non-manifold edges) as the acceptance evidence, about two retries per defect, Blender
+  5.2 API lookups before writing code, and MCP safety defaults. Documentation only; no engine change.
 - **Full three.js for a game that opts in: `@kits/three`.** A game that lists `three()` in `defineGame({ kits })`
   may import `three`, `three/addons/*` and `three/examples/jsm/*` (one shared copy); every other game still may not
   (`npm run lint:layers`: `three-needs-kit`, `kit-not-listed`), and `npm run check` names each file that uses the kit.

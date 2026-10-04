@@ -3,10 +3,13 @@ import type {Entity} from '../core/ecs/world';
 import {validateMesh, type MeshData} from './mesh';
 import type {createSceneResources} from './scene-resources';
 import {retireRepresentations} from './representation-cleanup';
+import type {Surface, SurfaceMaterial} from './scene-materials';
 
 type Resources = ReturnType<typeof createSceneResources>;
 export interface IndexedSlot {
-  mesh: T.Mesh<T.BufferGeometry, T.MeshLambertMaterial>;
+  mesh: T.Mesh<T.BufferGeometry, SurfaceMaterial>;
+  /** The visit surface drawing this mesh (plain matte, or its `Material`); absent, the slot owns `mesh.material`. */
+  surface?: Surface;
   positions: number[];
   indices: number[];
   colors: number[];
@@ -40,7 +43,8 @@ export function replaceIndexedGeometry(
   const previous = slot.mesh.geometry;
   slot.mesh.geometry = replacement;
   const vertexColors = data.colors.length > 0;
-  if (slot.mesh.material.vertexColors !== vertexColors) {
+  if (slot.surface) slot.surface.colors(vertexColors);
+  else if (slot.mesh.material.vertexColors !== vertexColors) {
     slot.mesh.material.vertexColors = vertexColors;
     slot.mesh.material.needsUpdate = true;
   }
@@ -60,6 +64,11 @@ export function releaseIndexed(e: Entity, slots: Map<Entity, IndexedSlot>, scene
   if (!slot) return;
   slots.delete(e);
   const geometry = slot.mesh.geometry,
-    material = slot.mesh.material;
-  retireRepresentations(scene, [slot.mesh], [() => resources.release(geometry), () => resources.release(material)]);
+    material = slot.mesh.material,
+    surface = slot.surface;
+  retireRepresentations(
+    scene,
+    [slot.mesh],
+    [() => resources.release(geometry), () => (surface ? surface.dispose() : resources.release(material))],
+  );
 }

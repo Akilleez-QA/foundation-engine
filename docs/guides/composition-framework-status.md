@@ -398,8 +398,8 @@ fields change in place. See the
 [recipe](../recipes/give-a-shape-a-material.md). Status: integrated in v0.2.0 (PR #36; batch PR #46). Evidence: unit
 tests and `npm run test:material-browser` (desktop headless Chromium, software GL); the
 mechanics template demonstrates it with draws and triangles unchanged. No physical-device
-or visual-quality acceptance; `Mesh`/`Model` and texture maps beyond the colour map are out
-of scope.
+or visual-quality acceptance; texture maps beyond the colour map are out of scope (`Mesh`
+and `Model` materials: see material options below).
 
 ## Three.js escape hatch (VIS-09) — implemented, candidate
 
@@ -439,6 +439,18 @@ integration: implemented, candidate. Evidence: unit tests and
 `npm run test:particle-browser` (desktop headless Chromium, software GL). No template uses it,
 so template budgets are unchanged. No physical-device, GPU timing or visual-quality
 acceptance.
+
+## Material options (VIS-04) — implemented, checked in PR #127
+
+`Material` gains `shading` ('standard', 'matte', 'flat', 'toon' with `toonSteps`), `side`, `alphaCutoff` and
+`vertexColors`, and now applies to `Mesh` (`defineMesh`; no textures, which need texture coordinates) and to `Model`
+(per-entity overrides of the model's own materials; fields at their defaults keep the model's values). Owner: the
+scene visit (`author/scene-materials.ts`, `author/model-looks.ts`). Bounded program set (three material classes,
+two-valued options), shared toon gradients and model overrides released with their last user; no shader hooks, so
+batching eligibility and the ADR 0078 seam hold. See the [guide](material-options.md) and
+[recipe](../recipes/give-a-shape-a-material.md). Evidence: unit tests, the recipe's code as a test and
+`npm run test:material-options-browser` (desktop headless Chromium, software GL); templates draw identically. No
+physical-device, GPU timing or visual-quality acceptance.
 
 ## Game sound files (DX P1-10) — integrated in v0.2.0
 
