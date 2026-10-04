@@ -197,6 +197,16 @@ export {
   type SceneOutput,
   type ToneMappingName,
 } from './scene-output';
+export {
+  validatePost,
+  POST_DEFAULTS,
+  POST_LIMITS,
+  type PostSettings,
+  type PostBloom,
+  type PostVignette,
+  type PostGrade,
+  type PostMode,
+} from '../platform/render/post/settings';
 
 export {Model, validateModel, type ModelData, type ModelSocketPose} from './model';
 export {RenderMask, validateRenderMask} from './render-mask';

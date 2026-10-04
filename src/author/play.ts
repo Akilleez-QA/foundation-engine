@@ -10,6 +10,7 @@ import type {EntityMetadataRequest, EntityMetadataPage} from '../core/ecs/world'
 import type {BuildBrief} from './build';
 import type {GameDefinition} from './defs';
 import type {ParticleStats} from './particle-contract';
+import type {ScenePostStats} from './scene-post';
 import type {ScatterStats} from './scatter-field';
 import type {ScatterEntry} from './scene-scatter';
 
@@ -30,6 +31,8 @@ export interface SceneHandle {
     draws: number;
     textures: {requested: number; leases: number; applied: number; failed: number};
   };
+  /** Dev/test only: the visit's post-processing tier, readiness, targets and post draws (docs/guides/post-processing.md). */
+  post?(): ScenePostStats;
   /** Dev/test only: each render extension's counters, by id (`{closed: true}` once it failed). */
   extensions?(): Record<string, Record<string, unknown>>;
   /** Dev/test only: the visit's scatter counters (admitted, copies, refusals, draws, triangles per scatter); null

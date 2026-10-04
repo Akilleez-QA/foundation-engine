@@ -402,6 +402,26 @@ mechanics template demonstrates it with draws and triangles unchanged. No physic
 or visual-quality acceptance; texture maps beyond the colour map are out of scope (`Mesh`
 and `Model` materials: see material options below).
 
+## Post-processing (VIS-07) — implemented, candidate
+
+**Current status (2026-10-04): implemented, candidate (PR `feat/post-processing`); not integrated.** `view.post` on
+`defineScene` (bloom, vignette, grade; `ctx.view.post` live) drawn at the player's `post.mode` tier, the registered
+knob now wired: `off` (low) draws direct, `basic` (medium) adds one combined pass (tone map from `view.output`, grade
+and vignette in display values, sRGB), `full` (reference, high) adds a half-resolution 5-mip bloom chain (10 post
+draws). Owner `platform.render.post`: backend-neutral settings and plan (`src/platform/render/post/settings.ts`), GLSL
+implementation in the WebGL2 backend (`backends/webgl/post.ts`, a lazy chunk, 6.1 kB min / 2.6 kB gzip). Bounds: every
+field validated, naming it. Overload: none (no queue). Render on change: post runs only inside a drawn frame; a still
+scene draws nothing. Targets allocated on the first composed frame, reallocated only on size, sample or bloom change,
+disposed with the visit. Failure: an invalid runtime value keeps the last valid settings; a chunk, context or pipeline
+failure is reported once and the visit draws direct; a WebGPU visit reports no implementation. A kit render override
+(`@kits/three`) takes precedence. **Budget contract change, stated:** post passes are counted apart as `postDraws`
+(probe bracket, bench, gate, derive, play:snap); `draws` keeps measuring scene draws. Evidence: unit tests and
+`npm run test:post-browser` (courtyard fixture, reference, medium and low; exact 10/1/0 post draws, equal scene draws,
+bloom beside an emissive box at full only, a still scene draws no frame, release audit at the author-API baseline);
+`quality:guard` identical for the blank and explorer templates. No reference-GPU cost, physical-device or
+visual-quality acceptance; the stock shell does not install the Graphics screen, so the live knob is unit-tested only.
+See the [guide](post-processing.md).
+
 ## Three.js escape hatch (VIS-09) — implemented, candidate
 
 **Current status (2026-10-03): implemented, candidate (PR `feat/kit-three`); not integrated.** Optional kit

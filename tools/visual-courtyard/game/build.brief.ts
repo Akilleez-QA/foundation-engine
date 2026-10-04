@@ -13,5 +13,12 @@ export default defineBuild({
       how: 'playtest',
       by: 'browser.mjs',
     },
+    {
+      id: 'S2',
+      check:
+        'Post-processing draws exactly 10, 1 and 0 post passes at full, basic and off, keeps scene draws equal, blooms at full and draws nothing while still.',
+      how: 'playtest',
+      by: 'post-browser.mjs',
+    },
   ],
 });

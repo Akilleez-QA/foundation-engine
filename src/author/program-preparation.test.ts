@@ -25,7 +25,19 @@ const step = source.slice(find('        update(f: FrameInfo) {'), find('        
 // property, on one line or several, up to the call's closing `});`.
 const arriveAt = find('    arrive: () =>'),
   arrival = source.slice(arriveAt, find('\n  });', arriveAt)).replace(/,\s*$/, '');
-function fixture(frameReady?: () => Promise<string>, tap: {running(): boolean} | null = null, arrive = true) {
+/** The visit's post-processing seam (scene-post.ts): `render` returns true when it drew the frame itself. */
+interface PostStub {
+  compile(): void;
+  settled(ms: number): Promise<void>;
+  render(): boolean;
+}
+const noPost = (): PostStub => ({compile() {}, settled: () => Promise.resolve(), render: () => false});
+function fixture(
+  frameReady?: () => Promise<string>,
+  tap: {running(): boolean} | null = null,
+  arrive = true,
+  post: PostStub = noPost(),
+) {
   const cards: unknown[] = [],
     layers: {modal?: string}[] = [];
   let compileError: Error | undefined, renderError: Error | undefined;
@@ -46,9 +58,10 @@ function fixture(frameReady?: () => Promise<string>, tap: {running(): boolean} |
     log: unknown[] = [];
   let compiled = 0,
     invalidated = 0,
+    directRenders = 0,
     lost = false;
   const run = ts.transpile(
-    `const drawOverride=()=>false;let dirty=true,frame=0,t=0,calm=false,frameMs=0,steps=0;const pressed={clear(){},endFrame(){}},gestures={sync(){},pointer:{pressed:false}},runner={frame(){steps++;},alpha:0},ctx={},particles={interpolate:()=>false};const three={},camera={},visit={current:()=>true};let arrived=false,activityStart,tapArrive,ctxRef=ctx,enteredAt=-1;scene.enter=()=>{enteredAt=steps;};${prepare}\nreturn {ready,state:()=>programsPrepared,steps:()=>steps,enteredAt:()=>enteredAt,${arrival},${step}${draw}${restore}};`,
+    `const POST_WAIT_MS=4000;const drawOverride=()=>false;let dirty=true,frame=0,t=0,calm=false,frameMs=0,steps=0;const pressed={clear(){},endFrame(){}},gestures={sync(){},pointer:{pressed:false}},runner={frame(){steps++;},alpha:0},ctx={},particles={interpolate:()=>false};const three={},camera={},visit={current:()=>true};let arrived=false,activityStart,tapArrive,ctxRef=ctx,enteredAt=-1;scene.enter=()=>{enteredAt=steps;};${prepare}\nreturn {ready,state:()=>programsPrepared,steps:()=>steps,redraw:()=>{dirty=true;},enteredAt:()=>enteredAt,${arrival},${step}${draw}${restore}};`,
     {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None},
   );
   const api = new Function(
@@ -64,6 +77,7 @@ function fixture(frameReady?: () => Promise<string>, tap: {running(): boolean} |
     'failureText',
     'FrameReadinessError',
     'tap',
+    'post',
     run,
   )(
     {
@@ -82,6 +96,7 @@ function fixture(frameReady?: () => Promise<string>, tap: {running(): boolean} |
       },
       render: () => {
         if (renderError) throw renderError;
+        directRenders++;
       },
       getContext: () => ({isContextLost: () => lost}),
     },
@@ -94,6 +109,7 @@ function fixture(frameReady?: () => Promise<string>, tap: {running(): boolean} |
     (key: string) => key,
     FrameReadinessError,
     tap,
+    post,
   );
   if (arrive) api.arrive();
   return {
@@ -115,6 +131,9 @@ function fixture(frameReady?: () => Promise<string>, tap: {running(): boolean} |
     },
     get compiled() {
       return compiled;
+    },
+    get directRenders() {
+      return directRenders;
     },
     get invalidated() {
       return invalidated;
@@ -291,4 +310,39 @@ test('no system steps before arrival runs enter(), on a first entry or a re-entr
   assert.equal(f.api.enteredAt(), 0, 'enter() ran before any step');
   f.api.update({dt: 0.016, calm: false});
   assert.equal(f.api.steps(), 1, 'systems step once arrived');
+});
+
+test('a scene with post waits (bounded) for its chunk, compiles its passes and draws its frames through it', async () => {
+  let settle!: () => void;
+  const calls: string[] = [];
+  let drawsThrough = true;
+  const f = fixture(undefined, null, true, {
+    compile: () => calls.push('compile'),
+    settled: ms => {
+      calls.push(`settled ${ms}`);
+      return new Promise<void>(resolve => {
+        settle = resolve;
+      });
+    },
+    render: () => {
+      calls.push('render');
+      return drawsThrough;
+    },
+  });
+  assert.deepEqual(calls, ['compile'], 'post compiles with the scene (a no-op until its chunk is ready)');
+  f.pending[0]!.resolve('ready');
+  await turn();
+  assert.deepEqual(calls, ['compile', 'settled 4000'], 'the first picture waits for the chunk, at most 4 s');
+  assert.equal(f.api.state(), false);
+  settle();
+  await f.api.ready;
+  assert.deepEqual(calls, ['compile', 'settled 4000', 'compile', 'render']);
+  assert.equal(f.directRenders, 0, 'post drew the initial frame');
+  assert.equal(f.api.render(), true);
+  assert.equal(f.directRenders, 0);
+  assert.equal(f.api.render(), false, 'nothing changed: nothing is drawn (render on change)');
+  drawsThrough = false;
+  f.api.redraw();
+  assert.equal(f.api.render(), true);
+  assert.equal(f.directRenders, 1, 'post off (or failed): the scene draws direct');
 });
