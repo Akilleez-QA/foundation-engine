@@ -110,9 +110,10 @@ export function customObject<O extends THREE.Object3D>(input: CustomObjectInput<
 export function disposeLightShadows(root: THREE.Object3D) {
   const errors: unknown[] = [];
   root.traverse(o => {
-    if (o instanceof THREE.Light && o.shadow?.map)
+    const shadow = o instanceof THREE.Light ? (o as THREE.Light & {shadow?: THREE.LightShadow}).shadow : undefined;
+    if (shadow?.map)
       try {
-        o.shadow.dispose();
+        shadow.dispose();
       } catch (error) {
         errors.push(error);
       }
