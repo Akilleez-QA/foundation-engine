@@ -1,0 +1,535 @@
+{
+  "poses": {
+    "walk_contact": {
+      "bones": {
+        "foot.L": {
+          "rotation": [
+            0.998747,
+            0.050054,
+            -0.0,
+            0.0
+          ]
+        },
+        "foot.R": {
+          "rotation": [
+            0.998697,
+            -0.051029,
+            0.0,
+            -0.0
+          ]
+        },
+        "forearm.L": {
+          "rotation": [
+            0.994522,
+            0.100986,
+            -0.011226,
+            0.024534
+          ]
+        },
+        "forearm.R": {
+          "rotation": [
+            0.994522,
+            0.100986,
+            0.011226,
+            -0.024534
+          ]
+        },
+        "shin.L": {
+          "rotation": [
+            0.991387,
+            0.130964,
+            0.0,
+            0.0
+          ]
+        },
+        "shin.R": {
+          "rotation": [
+            0.94233,
+            0.334684,
+            0.0,
+            0.0
+          ]
+        },
+        "spine": {
+          "location": [
+            0.0,
+            -0.052,
+            0.0
+          ]
+        },
+        "thigh.L": {
+          "rotation": [
+            0.972799,
+            -0.231652,
+            -0.0,
+            2.7e-05
+          ]
+        },
+        "thigh.R": {
+          "rotation": [
+            0.998948,
+            -0.045857,
+            -0.0,
+            5e-06
+          ]
+        },
+        "toe.L": {
+          "rotation": [
+            0.99863,
+            -0.052336,
+            -0.0,
+            0.0
+          ]
+        },
+        "toe.R": {
+          "rotation": [
+            0.970296,
+            0.241922,
+            0.0,
+            -0.0
+          ]
+        },
+        "upper_arm.L": {
+          "rotation": [
+            0.87609,
+            -0.02198,
+            0.128465,
+            -0.464198
+          ]
+        },
+        "upper_arm.R": {
+          "rotation": [
+            0.87609,
+            0.228121,
+            0.054543,
+            0.42125
+          ]
+        }
+      },
+      "source": {
+        "author": "agent",
+        "kind": "json",
+        "note": "No user was present: the agent authored this pose with author_poses.py."
+      }
+    },
+    "walk_down": {
+      "bones": {
+        "foot.L": {
+          "rotation": [
+            0.999799,
+            -0.020043,
+            0.0,
+            -0.0
+          ]
+        },
+        "foot.R": {
+          "rotation": [
+            0.997255,
+            0.074042,
+            -0.0,
+            0.0
+          ]
+        },
+        "forearm.L": {
+          "rotation": [
+            0.994522,
+            0.100986,
+            -0.011226,
+            0.024534
+          ]
+        },
+        "forearm.R": {
+          "rotation": [
+            0.994522,
+            0.100986,
+            0.011226,
+            -0.024534
+          ]
+        },
+        "shin.L": {
+          "rotation": [
+            0.962089,
+            0.272734,
+            0.0,
+            0.0
+          ]
+        },
+        "shin.R": {
+          "rotation": [
+            0.882306,
+            0.470676,
+            0.0,
+            0.0
+          ]
+        },
+        "spine": {
+          "location": [
+            0.0,
+            -0.068,
+            0.0
+          ]
+        },
+        "thigh.L": {
+          "rotation": [
+            0.967363,
+            -0.253397,
+            -0.0,
+            3e-05
+          ]
+        },
+        "thigh.R": {
+          "rotation": [
+            0.996457,
+            -0.084102,
+            -0.0,
+            1e-05
+          ]
+        },
+        "toe.R": {
+          "rotation": [
+            0.887011,
+            0.461749,
+            0.0,
+            -0.0
+          ]
+        },
+        "upper_arm.L": {
+          "rotation": [
+            0.880399,
+            0.006158,
+            0.108429,
+            -0.46163
+          ]
+        },
+        "upper_arm.R": {
+          "rotation": [
+            0.880399,
+            0.200997,
+            0.034143,
+            0.428172
+          ]
+        }
+      },
+      "source": {
+        "author": "agent",
+        "kind": "json",
+        "note": "No user was present: the agent authored this pose with author_poses.py."
+      }
+    },
+    "walk_passing": {
+      "bones": {
+        "foot.L": {
+          "rotation": [
+            0.996555,
+            -0.082934,
+            0.0,
+            -0.0
+          ]
+        },
+        "foot.R": {
+          "rotation": [
+            0.9938,
+            -0.111185,
+            0.0,
+            -0.0
+          ]
+        },
+        "forearm.L": {
+          "rotation": [
+            0.994522,
+            0.100987,
+            -0.011226,
+            0.024534
+          ]
+        },
+        "forearm.R": {
+          "rotation": [
+            0.994522,
+            0.100986,
+            0.011226,
+            -0.024534
+          ]
+        },
+        "shin.L": {
+          "rotation": [
+            0.981677,
+            0.190555,
+            0.0,
+            0.0
+          ]
+        },
+        "shin.R": {
+          "rotation": [
+            0.892296,
+            0.451452,
+            0.0,
+            0.0
+          ]
+        },
+        "spine": {
+          "location": [
+            0.0,
+            -0.028,
+            0.0
+          ]
+        },
+        "thigh.L": {
+          "rotation": [
+            0.994098,
+            -0.108484,
+            -0.0,
+            1.3e-05
+          ]
+        },
+        "thigh.R": {
+          "rotation": [
+            0.974553,
+            -0.224155,
+            -0.0,
+            2.6e-05
+          ]
+        },
+        "toe.R": {
+          "rotation": [
+            0.991445,
+            0.130526,
+            0.0,
+            -0.0
+          ]
+        },
+        "upper_arm.L": {
+          "rotation": [
+            0.887011,
+            0.104355,
+            0.037422,
+            -0.448243
+          ]
+        },
+        "upper_arm.R": {
+          "rotation": [
+            0.887011,
+            0.104355,
+            -0.037422,
+            0.448243
+          ]
+        }
+      },
+      "source": {
+        "author": "agent",
+        "kind": "json",
+        "note": "No user was present: the agent authored this pose with author_poses.py."
+      }
+    },
+    "walk_up": {
+      "bones": {
+        "foot.L": {
+          "rotation": [
+            0.994522,
+            -0.104527,
+            0.0,
+            -0.0
+          ]
+        },
+        "foot.R": {
+          "rotation": [
+            0.998755,
+            -0.049878,
+            0.0,
+            -0.0
+          ]
+        },
+        "forearm.L": {
+          "rotation": [
+            0.994522,
+            0.100986,
+            -0.011226,
+            0.024534
+          ]
+        },
+        "forearm.R": {
+          "rotation": [
+            0.994522,
+            0.100987,
+            0.011226,
+            -0.024534
+          ]
+        },
+        "shin.L": {
+          "rotation": [
+            0.997085,
+            0.076302,
+            0.0,
+            0.0
+          ]
+        },
+        "shin.R": {
+          "rotation": [
+            0.971584,
+            0.236697,
+            0.0,
+            0.0
+          ]
+        },
+        "spine": {
+          "location": [
+            0.0,
+            -0.016,
+            0.0
+          ]
+        },
+        "thigh.L": {
+          "rotation": [
+            0.999598,
+            0.028339,
+            0.0,
+            -3e-06
+          ]
+        },
+        "thigh.R": {
+          "rotation": [
+            0.966678,
+            -0.255997,
+            -0.0,
+            3e-05
+          ]
+        },
+        "toe.R": {
+          "rotation": [
+            0.997564,
+            -0.069756,
+            -0.0,
+            0.0
+          ]
+        },
+        "upper_arm.L": {
+          "rotation": [
+            0.882152,
+            0.187342,
+            -0.023925,
+            -0.431438
+          ]
+        },
+        "upper_arm.R": {
+          "rotation": [
+            0.882152,
+            0.020226,
+            -0.098359,
+            0.460136
+          ]
+        }
+      },
+      "source": {
+        "author": "agent",
+        "kind": "json",
+        "note": "No user was present: the agent authored this pose with author_poses.py."
+      }
+    },
+    "wave_end": {
+      "bones": {
+        "forearm.L": {
+          "rotation": [
+            0.99863,
+            0.050939,
+            -0.001082,
+            0.011963
+          ]
+        },
+        "forearm.R": {
+          "rotation": [
+            0.92388,
+            -0.086486,
+            -0.033403,
+            -0.371283
+          ]
+        },
+        "hand.R": {
+          "rotation": [
+            0.984808,
+            0.093202,
+            -0.144912,
+            -0.021627
+          ]
+        },
+        "spine.002": {
+          "rotation": [
+            0.999391,
+            0.0,
+            0.0,
+            -0.0349
+          ]
+        },
+        "spine.004": {
+          "rotation": [
+            0.994522,
+            0.0,
+            0.0,
+            0.104528
+          ]
+        },
+        "upper_arm.L": {
+          "rotation": [
+            0.848048,
+            0.119762,
+            0.042947,
+            -0.514419
+          ]
+        },
+        "upper_arm.R": {
+          "rotation": [
+            0.580703,
+            -0.183991,
+            0.065979,
+            -0.790303
+          ]
+        }
+      },
+      "source": {
+        "author": "agent",
+        "kind": "json",
+        "note": "No user was present: the agent authored this pose with author_poses.py."
+      }
+    },
+    "wave_start": {
+      "bones": {
+        "forearm.L": {
+          "rotation": [
+            0.99863,
+            0.050939,
+            -0.001082,
+            0.011963
+          ]
+        },
+        "forearm.R": {
+          "rotation": [
+            0.99863,
+            0.050939,
+            0.001082,
+            -0.011963
+          ]
+        },
+        "upper_arm.L": {
+          "rotation": [
+            0.866025,
+            0.113,
+            0.040522,
+            -0.485375
+          ]
+        },
+        "upper_arm.R": {
+          "rotation": [
+            0.866025,
+            0.113,
+            -0.040522,
+            0.485375
+          ]
+        }
+      },
+      "source": {
+        "author": "agent",
+        "kind": "json",
+        "note": "No user was present: the agent authored this pose with author_poses.py."
+      }
+    }
+  },
+  "schema": 1
+}

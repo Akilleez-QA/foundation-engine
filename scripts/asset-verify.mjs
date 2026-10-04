@@ -109,6 +109,7 @@ export function parseContract(raw, {dir = process.cwd()} = {}) {
     'nodes',
     'clips',
     'silhouette',
+    'skin',
     'provenance',
   ]);
   need(raw.schema === 1, 'schema must be 1');
@@ -155,6 +156,15 @@ export function parseContract(raw, {dir = process.cwd()} = {}) {
     (raw.clips?.length ?? 0) <= (raw.limits.animations ?? 0),
     'limits.animations must be at least the number of required clips',
   );
+  if (raw.skin !== undefined) {
+    closed(raw.skin, 'skin', ['joints', 'influences', 'root']);
+    need(isCount(raw.skin.joints) && raw.skin.joints > 0, 'skin.joints must be a positive whole number');
+    need(
+      Number.isInteger(raw.skin.influences) && raw.skin.influences >= 1 && raw.skin.influences <= 4,
+      'skin.influences must be 1 to 4 (one JOINTS_0/WEIGHTS_0 set)',
+    );
+    need(raw.skin.root === undefined || typeof raw.skin.root === 'string', 'skin.root must be a node name');
+  }
   need(
     raw.nodeTransforms === undefined || ['allowed', 'forbidden'].includes(raw.nodeTransforms),
     'nodeTransforms must be "allowed" or "forbidden"',
@@ -397,6 +407,25 @@ const sameNumbers = (actual, expected, tolerance) =>
  * Check one GLB against a contract. Throws an AssertionError naming the first breach; returns a report on success.
  * `provenance` defaults to the adjacent receipt; `root` resolves the receipt's `source` path for its sourceSha256.
  */
+/** A VEC4 accessor as rows of numbers; normalised unsigned integers become 0..1. */
+function vec4s(json, bin, index) {
+  const a = json.accessors[index],
+    view = json.bufferViews[a.bufferView];
+  const reader = {5126: [4, 'readFloatLE', 1], 5121: [1, 'readUInt8', 255], 5123: [2, 'readUInt16LE', 65535]}[
+    a.componentType
+  ];
+  assert.ok(reader && a.type === 'VEC4' && !a.sparse, `accessor ${index} is not a supported VEC4 layout`);
+  const [size, read, max] = reader,
+    stride = view.byteStride ?? size * 4,
+    base = (view.byteOffset ?? 0) + (a.byteOffset ?? 0);
+  return Array.from({length: a.count}, (_, i) =>
+    [0, 1, 2, 3].map(k => {
+      const value = bin[read](base + i * stride + k * size);
+      return a.normalized ? value / max : value;
+    }),
+  );
+}
+
 export async function verifyModel(file, contract, {provenance = companions(file).provenance, root = ROOT, masks} = {}) {
   const c = contract;
   const size = statSync(file).size;
@@ -528,6 +557,52 @@ export async function verifyModel(file, contract, {provenance = companions(file)
   );
   for (const mesh of json.meshes ?? [])
     for (const primitive of mesh.primitives) assert.equal(primitive.mode ?? 4, 4, 'triangle primitives only');
+  if (c.skin) {
+    // Skins: joint count, a single influence set, and every joint under the named root.
+    const parent = new Map();
+    (json.nodes ?? []).forEach((n, i) => (n.children ?? []).forEach(child => parent.set(child, i)));
+    const root = c.skin.root === undefined ? -1 : (json.nodes ?? []).findIndex(n => n.name === c.skin.root);
+    assert.ok(c.skin.root === undefined || root >= 0, `the skin root ${c.skin.root} is missing`);
+    for (const skin of json.skins ?? []) {
+      assert.ok(
+        skin.joints.length <= c.skin.joints,
+        `a skin has ${skin.joints.length} joints, over the contract's ${c.skin.joints}`,
+      );
+      if (root >= 0)
+        for (const joint of skin.joints) {
+          let k = joint;
+          while (k !== undefined && k !== root) k = parent.get(k);
+          assert.ok(k === root, `joint ${json.nodes[joint].name} is not under the skin root ${c.skin.root}`);
+        }
+    }
+    // A second influence set (JOINTS_1/WEIGHTS_1) is already refused by the loader caps above.
+    for (const [m, mesh] of (json.meshes ?? []).entries())
+      for (const primitive of mesh.primitives) {
+        const a = primitive.attributes;
+        if (a.WEIGHTS_0 === undefined) continue;
+        // Raw accessor values: the loader renormalises weights, so the re-import cannot show a bad sum.
+        const skin = json.skins?.[(json.nodes ?? []).find(n => n.mesh === m)?.skin];
+        const weights = vec4s(json, bin, a.WEIGHTS_0),
+          joints = vec4s(json, bin, a.JOINTS_0);
+        weights.forEach((w, v) => {
+          assert.ok(
+            w.every(x => Number.isFinite(x) && x >= 0),
+            `mesh ${mesh.name} vertex ${v}: weights must be finite and not negative`,
+          );
+          const used = w.filter(x => x > 1e-6).length,
+            sum = w.reduce((n, x) => n + x, 0);
+          assert.ok(
+            used <= c.skin.influences,
+            `mesh ${mesh.name} vertex ${v}: ${used} influences, over ${c.skin.influences}`,
+          );
+          assert.ok(Math.abs(sum - 1) <= 2e-3, `mesh ${mesh.name} vertex ${v}: weights sum to ${round(sum)}, not 1`);
+          assert.ok(
+            w.every((x, k) => x <= 1e-6 || joints[v][k] < (skin?.joints.length ?? 0)),
+            `mesh ${mesh.name} vertex ${v}: a joint index outside its skin`,
+          );
+        });
+      }
+  }
   if (c.nodeTransforms === 'forbidden')
     for (const node of json.nodes ?? [])
       for (const key of NODE_TRANSFORMS)
