@@ -143,7 +143,7 @@ test("a weak device (software GL) starts on High, today's ratio, with Low only s
   assert.equal(createAppQuality({store: deviceStore(dev.b).store}).settings.detected?.suggested, 'low'); // kept across boots
 });
 
-test('an undeclared brief tier lets a constrained mobile GPU start lower; desktop Chromium skips the probe', () => {
+test('an undeclared brief tier lets a mobile GPU start lower; desktop Chromium skips the probe', () => {
   const mali: DeviceSignals = {
     coarsePointer: true,
     deviceMemory: 2,
@@ -172,9 +172,21 @@ test('an undeclared brief tier lets a constrained mobile GPU start lower; deskto
   assert.equal(desktop.preset, 'reference');
   assert.equal(desktop.source, 'default');
   // The probe gate: 8 GB and more than 4 cores never probes; anything else (or unreported memory) may.
-  assert.equal(mayBeLimited({deviceMemory: 8, hardwareConcurrency: 16}), false);
-  assert.equal(mayBeLimited({deviceMemory: 8, hardwareConcurrency: 4}), true);
-  assert.equal(mayBeLimited({deviceMemory: 4, hardwareConcurrency: 8}), true);
+  const win = {platform: 'Windows'},
+    android = {platform: 'Android'};
+  assert.equal(mayBeLimited({deviceMemory: 8, hardwareConcurrency: 16, userAgentData: win}), false);
+  assert.equal(mayBeLimited({deviceMemory: 8, hardwareConcurrency: 8, userAgentData: android}), true, 'a phone probes');
+  assert.equal(
+    mayBeLimited({deviceMemory: 8, hardwareConcurrency: 8, userAgent: 'Mozilla/5.0 (Linux; Android 14)'}),
+    true,
+  );
+  assert.equal(
+    mayBeLimited({deviceMemory: 8, hardwareConcurrency: 8, userAgent: 'Mozilla/5.0 (X11; Linux x86_64)'}),
+    false,
+  );
+  assert.equal(mayBeLimited({deviceMemory: 8, hardwareConcurrency: 16}), true, 'unknown platform probes');
+  assert.equal(mayBeLimited({deviceMemory: 8, hardwareConcurrency: 4, userAgentData: win}), true);
+  assert.equal(mayBeLimited({deviceMemory: 4, hardwareConcurrency: 8, userAgentData: win}), true);
   assert.equal(mayBeLimited({hardwareConcurrency: 8}), true, 'Safari and Firefox report no memory');
   assert.equal(mayBeLimited(undefined), false);
 });

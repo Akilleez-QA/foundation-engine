@@ -24,14 +24,14 @@ Before this ADR no device started on `low`:
 
 ## Decision
 
-`deviceClassCap(signals)` in `src/platform/render/quality.ts` returns a start limit for a constrained mobile GPU:
+`deviceClassCap(signals)` in `src/platform/render/quality.ts` returns a start limit for a mobile GPU:
 
 | Signals | Start limit |
 |---|---|
-| Renderer string from a mobile GPU family (`Mali`, `Immortalis`, `Adreno`, `PowerVR`, `Xclipse`, `Maleoon`) and any of: an entry-level mobile GPU (Mali-4xx, T6xx-T8xx, G3x, G5x; Adreno 3xx-5xx, 60x-61x; PowerVR), `deviceMemory` of 2 GB or less, a texture limit under 4096 | `low` |
+| Renderer string from a mobile GPU family (`Mali`, `Immortalis`, `Adreno` except the Adreno X laptop GPUs, `PowerVR`, `Xclipse`, `Maleoon`) and any of: an entry-level mobile GPU (Mali-4xx, T6xx-T8xx, G3x, G5x; Adreno 3xx-5xx, 60x-61x; PowerVR), `deviceMemory` of 2 GB or less, a texture limit under 4096 | `low` |
 | Mobile GPU family and any of: `deviceMemory` of 4 GB or less, 4 or fewer cores, data saver | `medium` |
-| Mobile GPU family otherwise (for example an 8 GB Adreno 740 or a Mali-G710) | no limit |
-| Any other renderer string, software GL, an unreported GPU, or `Apple GPU` | no limit |
+| Mobile GPU family otherwise (for example an 8 GB Adreno 740 or an 8 GB Mali-G715) | `high` (amendment below) |
+| Any other renderer string (including Adreno X1 on Snapdragon X laptops), software GL, an unreported GPU, or `Apple GPU` | no limit |
 
 The limit only lowers a start; it never raises one. It applies to two start paths:
 
@@ -40,8 +40,9 @@ The limit only lowers a start; it never raises one. It applies to two start path
 2. An application whose brief does **not** declare `quality.tier` (`BuildBrief.quality.tierDeclared === false`) starts
    at the limit when it is below the authored default. That start is reported with source `detected` and the reasons
    (so the Graphics screen can say why), and stays **unsaved** like the authored default, so a later brief change
-   still applies. To spare desktops a throwaway WebGL context, the probe is skipped when the browser reports 8 GB
-   and more than 4 cores (`mayBeLimited`).
+   still applies. To spare desktops a throwaway WebGL context, the probe is skipped when the browser reports a
+   desktop platform (`navigator.userAgentData.platform`, else the user agent), 8 GB and more than 4 cores
+   (`mayBeLimited`). Android, iOS, an unknown platform and unreported memory always probe.
 
 Precedence is unchanged at the top: a verification pin, then the player's saved choice, then a tier the creator
 declared in the brief. None of them is ever limited.
@@ -49,7 +50,9 @@ declared in the brief. None of them is ever limited.
 Signals not used:
 
 - **Pointer and touch.** ADR 0070 stands: input capability selects nothing. A Mali Chromebook without touch starts
-  the same as a Mali phone.
+  the same as one with touch. The probe gate reads the operating-system platform, not input: a mobile GPU in a
+  desktop-platform browser (an ARM Chromebook) that reports 8 GB and more than 4 cores is not probed and keeps its
+  authored start, a documented gap.
 - **Screen size.** STD-RUN-42: a small viewport does not imply a weak GPU, and a desktop window can be small.
 - **`Apple GPU`.** Safari reports that string on iPhones and on Macs alike, and reports no `deviceMemory`, so an
   iPhone-class device cannot be told apart from a Mac. It keeps its authored start (a documented gap).
@@ -61,7 +64,8 @@ Signals not used:
   `medium` (4 slots, 1 shadowed light, pixel ratio 1.5, 60 fps cap). This is an intentional tradeoff recorded in
   [DEVICE-EXPERIENCE.md](../policy/DEVICE-EXPERIENCE.md): first-run cost falls on those devices at the price of
   first-run image quality. Content floors are untouched; `low` is a preset, not a content change (STD-SET-10).
-- Desktops, software GL, unreported GPUs, iPhone-class devices and capable phones start exactly as before.
+- Desktops, software GL, unreported GPUs and iPhone-class devices start exactly as before. Capable phones start on
+  `high` instead of the authored default `reference` (amendment below).
 - Gates, benches and automated browsers never probe (`navigator.webdriver`, pinned `?quality=`), so no gate number
   moves.
 - A creator who wants every device to start on a tier declares it (`quality: {tier: 'reference'}`); the player can
@@ -70,8 +74,20 @@ Signals not used:
 
 ## Acceptance
 
-- Unit tests over representative signals: 2 GB Mali-G52 → `low`; 4 GB Adreno 740 → `medium`; 8 GB Adreno 740 →
-  unchanged; iPhone-class (`Apple GPU`, no memory) → unchanged; desktop RTX, Intel HD, VideoCore, SwiftShader and an
+- Unit tests over representative signals: 2 GB Mali-G52 → `low`; 4 GB Adreno 740 → `medium`; 8 GB Adreno 740 and
+  8 GB Mali-G715 → `high`; Adreno X1 laptop → unchanged; iPhone-class (`Apple GPU`, no memory) → unchanged; desktop RTX, Intel HD, VideoCore, SwiftShader and an
   unreported GPU → unchanged; a declared tier, a saved choice and a pin each win over the limit.
 - **Not verified:** physical phones. The renderer strings come from vendor naming; the cost the limit avoids was
   measured only on software GL. A device that reports a mobile GPU string under another vendor name is not limited.
+
+## Amendment (2026-10-04): capable mobile GPUs start on `high` at most
+
+Decided by the author after the first version shipped. Any mobile GPU family with no other constraint now starts on
+`high` at most, never `reference`: phones throttle under sustained load, and `reference` brings 16 light slots per
+kind, 4 shadowed local lights and full post-processing. An 8 GB Adreno 740 or Mali-G715 under an undeclared brief
+tier now starts on `high` (8 slots, 2 shadowed lights) instead of `reference`; under `detectPreset` it already started
+on `high`, now with the device-class reason. A declared brief tier, the player's saved choice and a gate pin still
+win. Desktops are unchanged: Snapdragon X laptops' Adreno X GPUs are excluded from the mobile family, and a desktop
+Chromium with 8 GB and more than 4 cores still skips the probe. Because every mobile GPU is now limited, the probe gate
+also checks the platform, so an 8 GB Android phone is probed. Same intentional tradeoff as above: first-run image
+quality on phones for sustained cost. Not verified on physical phones.

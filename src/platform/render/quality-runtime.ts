@@ -81,14 +81,31 @@ export function probeDevice(doc: Document = document): DeviceSignals | undefined
 }
 
 /**
- * Is the GPU probe worth running for the device-class rule under an authored default? A browser that reports 8 GB and
- * more than 4 cores skips it (most desktop Chromium), so a desktop start costs no throwaway WebGL context. The cost of
- * the gate: an entry-level mobile GPU that reports 8 GB and more than 4 cores keeps its authored start. Unreported
- * memory (Safari, Firefox) still probes.
+ * Is the GPU probe worth running for the device-class rule under an authored default? Every mobile GPU is limited
+ * (at most High), so only a desktop browser may skip it: a Chromium that reports a desktop platform, 8 GB and more than
+ * 4 cores costs no throwaway WebGL context. Android, iOS, an unknown platform and unreported memory (Safari, Firefox)
+ * probe. The platform is an operating-system signal, not an input capability (ADR 0070). The cost of the gate: a
+ * mobile GPU in a desktop-platform browser (an ARM Chromebook) reporting 8 GB and more than 4 cores keeps its start.
  */
-export function mayBeLimited(nav: {deviceMemory?: number; hardwareConcurrency?: number} | undefined): boolean {
+export function mayBeLimited(
+  nav:
+    | {deviceMemory?: number; hardwareConcurrency?: number; userAgentData?: {platform?: string}; userAgent?: string}
+    | undefined,
+): boolean {
   if (!nav) return false;
-  return !(typeof nav.deviceMemory === 'number' && nav.deviceMemory >= 8 && (nav.hardwareConcurrency ?? 0) > 4);
+  const platform = nav.userAgentData?.platform;
+  const desktop =
+    typeof platform === 'string' && platform !== ''
+      ? !/^(Android|iOS)$/i.test(platform)
+      : typeof nav.userAgent === 'string' &&
+        nav.userAgent !== '' &&
+        !/Android|iPhone|iPad|iPod|Mobile/i.test(nav.userAgent);
+  return !(
+    desktop &&
+    typeof nav.deviceMemory === 'number' &&
+    nav.deviceMemory >= 8 &&
+    (nav.hardwareConcurrency ?? 0) > 4
+  );
 }
 
 export interface AppQualityOptions {
