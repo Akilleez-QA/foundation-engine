@@ -436,3 +436,10 @@ The engine does not yet have these, and this recipe fakes them as described:
 | A material on a `Mesh` | a `Mesh` is matte with vertex colours; put a texture or a glow on a `Shape` |
 
 When one of these lands in the engine, this recipe gains a section for it.
+
+## When the author API cannot express the look: three.js itself
+
+Prefer the techniques above while they can say what you want: they keep quality tiers, budgets and three.js upgrades
+the engine's problem. When they cannot (real point and spot lights, cast shadows, bloom, a custom shader), a game can
+opt into `@kits/three` and use three.js directly: full power, and the game owns that code across three.js upgrades.
+See [use three.js directly](use-three-directly.md).

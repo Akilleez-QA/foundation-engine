@@ -42,4 +42,6 @@ pictures yourself, and the checklist below.
 
 Report: before and after pictures, what changed, the checklist result, draws and triangles against the budget. Not
 available yet in the engine (say so instead of promising them): local lights, cast shadows, tone mapping and bloom,
-a gradient sky, instancing, a material on a `Mesh`. The recipe's last table lists today's workaround for each.
+a gradient sky, instancing, a material on a `Mesh`. The recipe's last table lists today's workaround for each. When
+the author agrees the look needs them now, a game can opt into `@kits/three` (real lights, shadows, bloom, shaders;
+the game owns that code across three.js upgrades): docs/recipes/use-three-directly.md.
