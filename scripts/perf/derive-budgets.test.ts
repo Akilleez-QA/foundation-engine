@@ -80,3 +80,15 @@ test('a still idle-only scene that drew no frame leaves its per-frame counts unm
   assert.equal(must(rows.menu, 'the menu row').textureMiB, 8);
   assert.match(must(notes.menu, 'the menu note'), /no window drew a frame/);
 });
+
+test('shadowPasses derives the exact measured count, as the docs say (no noise allowance, no headroom)', () => {
+  // The forest and island acceptance trials (2026-10-03) saw perf:derive propose 2 for a measured 1 and 1 for 0.
+  const lit = (id: string, mode: 'idle' | 'active', passes: number) => ({
+    ...sample(id, 'lit', mode, 60, 30),
+    shadowPassesMax: passes,
+  });
+  const rows = deriveFromRun(run([lit('lit', 'idle', 0), lit('lit:active', 'active', 1)]));
+  assert.equal(must(rows.lit).shadowPasses, 1);
+  const none = deriveFromRun(run([lit('lit', 'idle', 0), lit('lit:active', 'active', 0)]));
+  assert.equal(must(none.lit).shadowPasses, 0);
+});

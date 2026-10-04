@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {
   benchResultOf,
   checkBudgets,
+  DEFAULT_TOLERANCE,
   deriveBudget,
   formatReport,
   readMetric,
@@ -266,7 +267,7 @@ test('a derived postDraws budget is the exact tier count, and worstOf keeps it',
   assert.deepEqual(deriveBudget(worst, ['postDraws']), {postDraws: 10}, 'no headroom on a fixed pass count');
 });
 
-test('shadowPasses: one pass per shadow-map face, counted exactly (no tolerance), derived with a step of 1', () => {
+test('shadowPasses: one pass per shadow-map face, counted exactly (no tolerance) and derived exactly', () => {
   const b = {scene: {shadowPasses: 1}};
   const bind = [{sample: 'scene', scene: 'scene', metrics: ['shadowPasses' as const]}];
   // A sun shadow (1 pass) fits; adding one shadowed point light (6 more faces) fails, with no noise allowance.
@@ -277,7 +278,15 @@ test('shadowPasses: one pass per shadow-map face, counted exactly (no tolerance)
   assert.equal(checkBudgets({scene: {shadowPassesMax: 2}}, b, bind, {tier: 'reference'}).rows[0]!.verdict, 'fail');
   // Not measured by an older run: missing, not a pass.
   assert.equal(checkBudgets({scene: {}}, b, bind, {tier: 'reference'}).rows[0]!.verdict, 'missing');
-  assert.deepEqual(deriveBudget({shadowPassesMax: 0}, ['shadowPasses']), {shadowPasses: 1});
-  assert.deepEqual(deriveBudget({shadowPassesMax: 7}, ['shadowPasses']), {shadowPasses: 8});
+  // C2 (2026-10-03 acceptance): a fixed pass count gets no noise allowance in the check, so derive adds no headroom
+  // either (as for postDraws): a measured 0 is budget 0, a measured 1 is 1, and the sun plus a point light is 7.
+  assert.deepEqual(deriveBudget({shadowPassesMax: 0}, ['shadowPasses']), {shadowPasses: 0});
+  assert.deepEqual(deriveBudget({shadowPassesMax: 1}, ['shadowPasses']), {shadowPasses: 1});
+  assert.deepEqual(deriveBudget({shadowPassesMax: 7}, ['shadowPasses']), {shadowPasses: 7});
+  assert.deepEqual(deriveBudget({shadowPassesMax: 7}, ['shadowPasses'], 0.5), {shadowPasses: 7}, 'headroom ignored');
+  // Every exact-tolerance count derives exactly: what the gate allows no noise for, derive allows no headroom for.
+  for (const m of ['postDraws', 'shadowPasses', 'contexts'] as const) {
+    assert.deepEqual(DEFAULT_TOLERANCE[m], {relative: 0, absolute: 0}, m);
+  }
   assert.equal(worstOf([{shadowPassesMax: 1}, {shadowPassesMax: 7}]).shadowPassesMax, 7);
 });
