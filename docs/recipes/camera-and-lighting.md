@@ -203,3 +203,9 @@ Light changes are easy to overdo; compare the desktop and phone screenshots, and
 For a whole look (palette, four light presets, haze distances, framing, low-poly forms and baked light), see [art direction](art-direction.md).
 
 More: the [camera kit README](../../src/kits/camera/README.md) (camera clearance around obstacles), the `explorer` template (orbit) and the `expedition` template (environment with decorative stars).
+
+## When the author API is not enough
+
+Prefer the engine's own lights, shadows and materials. Reach for three.js only when the author API cannot express
+the look: a game that opts into `@kits/three` gets an EffectComposer with bloom, custom shaders, loaders and controls,
+and owns that code across three.js upgrades. See [use three.js directly](use-three-directly.md).

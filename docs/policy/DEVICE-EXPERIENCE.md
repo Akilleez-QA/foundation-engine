@@ -209,6 +209,19 @@ reachability and quality requirements.
   independently of the pinned-profile gate, including effects on text, targeting
   and input. Battery-saving configurations require the same interaction evidence.
 
+**Engine default tradeoff: device-class start (ADR 0079).** When the brief does not
+declare `quality.tier`, a constrained mobile GPU starts on a lighter preset than the
+authored default: an entry-level mobile GPU, 2 GB or less memory or a texture limit
+under 4096 starts on `low`; 4 GB or less, 4 or fewer cores or data saver starts on
+`medium`. This intentionally trades first-run image quality on those phones and
+tablets for lower fill, shadow and memory cost (local lights and shadows are the
+cost cliff). It is a start only: a declared brief tier, a gate pin and the player's
+saved choice always win, content floors are unchanged, and desktops, software GL,
+unreported GPUs, capable phones and iPhone-class devices (`Apple GPU`, which Safari
+also reports on Macs) start as before. It is not acceptance: a phone that starts on
+`low` still needs the physical evidence below, and the rule's thresholds come from
+vendor naming and software-GL cost shape, not device measurement.
+
 ## Acceptance matrix and evidence
 
 **DX-19.** Before claiming a profile is supported, record the following for every

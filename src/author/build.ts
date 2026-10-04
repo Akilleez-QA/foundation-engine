@@ -134,6 +134,9 @@ export type BuildBrief = Immutable<{
   readonly devices: BuildInput['devices'];
   readonly quality: {
     tier: 'reference' | 'high' | 'medium' | 'low';
+    /** True when the author declared `tier`. An undeclared tier lets a constrained mobile GPU start lower
+     *  (device-class start limit, ADR 0079). */
+    tierDeclared: boolean;
     views: readonly {id: string; scene: string; mode: 'identical' | 'near' | 'reviewed'}[];
   };
   readonly performance: PerformanceTargets;
@@ -313,6 +316,7 @@ export function defineBuild(b: BuildInput): BuildBrief {
     },
     quality: {
       tier: b.quality?.tier ?? 'reference',
+      tierDeclared: b.quality?.tier !== undefined,
       views: (b.quality?.views ?? []).map(v => ({id: v.id, scene: v.scene, mode: v.mode})),
     },
     performance: {

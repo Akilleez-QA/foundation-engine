@@ -4,7 +4,8 @@
  *
  * - `createAppQuality` builds the one service from the device-scope section `graphics.settings` (owned by core/save,
  *   passed in as a `GraphicsChoiceStore`), the page's `?quality=<preset>` pin and, on a first run only, the device
- *   probe when no authored startup preset was supplied. A pinned run (a gate, a bench, a verifier) reads nothing, writes nothing and never detects or governs.
+ *   probe when no authored startup preset was supplied (or, with `deviceClassSafety`, to limit a constrained mobile GPU's
+ *   start below an undeclared authored default). A pinned run (a gate, a bench, a verifier) reads nothing, writes nothing and never detects or governs.
  * - `appQuality()` is that service. Before `installAppQuality` it is a default, unsaved `reference` service, which
  *   is what tests and tools without a page see.
  * - `livePixelRatio(renderer, max)` replaces `renderer.setPixelRatio(renderPixelRatio(max))`: it sets
@@ -79,9 +80,23 @@ export function probeDevice(doc: Document = document): DeviceSignals | undefined
   }
 }
 
+/**
+ * Is the GPU probe worth running for the device-class rule under an authored default? A browser that reports 8 GB and
+ * more than 4 cores skips it (most desktop Chromium), so a desktop start costs no throwaway WebGL context. The cost of
+ * the gate: an entry-level mobile GPU that reports 8 GB and more than 4 cores keeps its authored start. Unreported
+ * memory (Safari, Firefox) still probes.
+ */
+export function mayBeLimited(nav: {deviceMemory?: number; hardwareConcurrency?: number} | undefined): boolean {
+  if (!nav) return false;
+  return !(typeof nav.deviceMemory === 'number' && nav.deviceMemory >= 8 && (nav.hardwareConcurrency ?? 0) > 4);
+}
+
 export interface AppQualityOptions {
   /** Author-selected startup quality; pins and saved choices take precedence. */
   initialPreset?: QualityPreset;
+  /** `initialPreset` is a default the creator did not declare: a constrained mobile GPU starts lower (quality.ts,
+   *  `deviceClassCap`). Off when the brief declares `quality.tier`. */
+  deviceClassSafety?: boolean;
   /** The saved choice for this device (section `graphics.settings`). */
   store: GraphicsChoiceStore;
   /** `location.search`: `?quality=<preset>` pins. */
@@ -100,7 +115,13 @@ export function createAppQuality(o: AppQualityOptions): Quality {
     store: o.store,
     pinned: pinnedPreset(o.search ?? ''),
     build: o.build,
-    signals: o.signals ?? (() => probeDevice()),
+    deviceClassSafety: o.deviceClassSafety,
+    signals:
+      o.signals ??
+      (() =>
+        o.initialPreset !== undefined && !mayBeLimited(typeof navigator === 'object' ? (navigator as never) : undefined)
+          ? undefined
+          : probeDevice()),
     devicePixelRatio: browserDpr,
   });
 }

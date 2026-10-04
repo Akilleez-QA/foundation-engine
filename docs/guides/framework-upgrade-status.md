@@ -683,6 +683,27 @@ texture change keeps the old view until the new one arrives. Overload: none beyo
 physics, a game-facing multiplayer session, normal/roughness maps and `Mesh` texture
 coordinates.
 
+## Three.js escape hatch (VIS-09) — implemented, candidate
+
+**Current status (2026-10-03): implemented, candidate (PR `feat/kit-three`); not integrated.** Optional kit
+`@kits/three` for a game that lists `three()` in `defineGame({ kits })`: `three`, `three/addons/*` and
+`three/examples/jsm/*` imports in that game's files only (`lint:layers`), and per scene, with
+`defineScene({ extensions: [sceneThree()] })`, the handle `useThree(ctx)` (scene, kit-owned `root`, camera, renderer,
+canvas, `requestRender`, `onFrame`, `onBeforeRender`, `onResize`, `setRenderOverride`, `own`) plus
+`customObject({ create, update, dispose })` with `ThreeObject`. Engine seam: the genre-neutral render extension
+(`author/scene-extension.ts`, opaque `SceneExtension` in `@engine`). Owner: the scene visit; the kit owns its `root`,
+owned resources and custom objects and disposes them before the scene's tree. Bounds: `sceneThree({ max })` custom
+objects per scene (default 16, cap 256) and per-object triangle and texture `limits`; refusals reported once. Overload:
+refusal, never a late draw. Cancellation and recovery: visit exit disposes everything; a throwing session, hook or
+override is reported and closed or dropped for the visit, and the engine-owned render target, size and pixel ratio are
+restored after game code. Evidence: unit tests (handle lifecycle, disposal registry, custom objects, lint allowance)
+and `npm run test:three-kit-browser` on the courtyard fixture (desktop and phone-sized headless Chromium, software
+GL): point-lit lanterns, shadows and UnrealBloom through an EffectComposer, counted draws within the fixture's rows, a
+still scene drawing no frame, and nothing left in the renderer pool's release audit. **Unstable across three.js
+upgrades by contract.** Not yet: WebGPU refusal of WebGL-only materials, a dev warning for unreported changes, an
+upgrade-time changelog of breaking three.js changes beyond the fixture compile. No template uses it; no
+physical-device, GPU timing or visual-quality acceptance. See the [recipe](../recipes/use-three-directly.md).
+
 ## Particle emitters — FX-01, integrated
 
 **Current status (2026-10-03): integrated.** PR #63 (PR merge `b7b5550`) reached `main` through merge-train batch PR #65, merged to `main` at `1f9d10d` on 2026-10-03. Main CI run 37086722080 on `1f9d10d` failed: the arcade template's active bench window drew no frame (perf inconclusive), the ended-visit defect later fixed by PR #75. The next main CI, run 37088378582 on `2fb6e69` (which contains batch 7), passed. Not in any release: v0.2.0 (`071e3c2`) predates it. "Integrated" is source delivery; the evidence scope below is unchanged and the candidate-era status is kept as history.
