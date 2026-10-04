@@ -61,7 +61,7 @@ function fixture(
     directRenders = 0,
     lost = false;
   const run = ts.transpile(
-    `const POST_WAIT_MS=4000;const drawOverride=()=>false;let dirty=true,frame=0,t=0,calm=false,frameMs=0,steps=0;const pressed={clear(){},endFrame(){}},gestures={sync(){},pointer:{pressed:false}},runner={frame(){steps++;},alpha:0},ctx={},particles={interpolate:()=>false};const three={},camera={},visit={current:()=>true};let arrived=false,activityStart,tapArrive,ctxRef=ctx,enteredAt=-1;scene.enter=()=>{enteredAt=steps;};${prepare}\nreturn {ready,state:()=>programsPrepared,steps:()=>steps,enteredAt:()=>enteredAt,${arrival},${step}${draw}${restore}};`,
+    `const POST_WAIT_MS=4000;const drawOverride=()=>false;let dirty=true,frame=0,t=0,calm=false,frameMs=0,steps=0;const pressed={clear(){},endFrame(){}},gestures={sync(){},pointer:{pressed:false}},runner={frame(){steps++;},alpha:0},ctx={},particles={interpolate:()=>false};const three={},camera={},visit={current:()=>true};let arrived=false,activityStart,tapArrive,ctxRef=ctx,enteredAt=-1;scene.enter=()=>{enteredAt=steps;};${prepare}\nreturn {ready,state:()=>programsPrepared,steps:()=>steps,redraw:()=>{dirty=true;},enteredAt:()=>enteredAt,${arrival},${step}${draw}${restore}};`,
     {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None},
   );
   const api = new Function(

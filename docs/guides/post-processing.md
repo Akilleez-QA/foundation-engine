@@ -34,7 +34,9 @@ ctx.view.post = {...ctx.view.post, vignette: {amount: 0.2}};
 | `full` | high, reference | `basic` plus bloom: a threshold pass, 4 downsamples and 4 upsamples at half resolution and below (5 mips). | 10 |
 
 The mapping is exact and is part of the knob (`src/platform/render/quality.ts`). Post is cosmetic, so it has no floor:
-the player may choose `off` on any preset. The knob is live: a change draws one frame.
+the player may choose `off` on any preset. The knob is live: a change draws one frame (unit-tested in
+`author/scene-post.test.ts`). The stock app shell does not install the Graphics screen yet, so in a stock game the
+tier follows the preset (`?quality=` or the saved choice); a game that installs the Graphics screen shows the control.
 
 ## Inputs, outputs and bounds
 
@@ -46,7 +48,7 @@ the player may choose `off` on any preset. The knob is live: a change draws one 
 - **Output:** pixels only.
 - **Order** in the combined pass: scene plus bloom (linear light), tone mapping (the scene's `view.output`, the same
   mapping and exposure as `off`), then grade (`c * gain + lift * (1 - c)`, then saturation) and vignette on the
-  tone-mapped picture, then sRGB.
+  tone-mapped picture in display (sRGB) values, as an image editor grades, then the output colour space.
 
 ## Owner, lifetime and render on change
 
@@ -103,5 +105,6 @@ Unit tests:
 - preparation and drawing through post: `author/program-preparation.test.ts`;
 - the budget metric: `platform/perf/budget-check.test.ts`.
 
-Browser: `npm run test:post-browser`, on the courtyard fixture, in software GL. No physical-device, GPU timing or
+Browser: `npm run test:post-browser` (`tools/visual-courtyard/post-browser.mjs`), on the courtyard fixture, in software
+GL, at the reference, medium and low presets. No physical-device, GPU timing or
 visual-quality acceptance.

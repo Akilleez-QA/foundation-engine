@@ -128,11 +128,12 @@ void main() {
 #ifdef TONE_MAPPING
   c = toneMapping(c);
 #endif
-  c = clamp(c, 0.0, 1.0);
-  c = c * gain + lift * (1.0 - c);
-  c = mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, saturation);
-  c *= 1.0 - vignette * smoothstep(0.35, 1.0, length(vUv - 0.5) * 1.41421356);
-  gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+  // Grade and vignette on the display-referred (sRGB) picture, where lift and gain read as they do in an editor.
+  vec3 g = sRGBTransferOETF(vec4(clamp(c, 0.0, 1.0), 1.0)).rgb;
+  g = g * gain + lift * (1.0 - g);
+  g = mix(vec3(dot(g, vec3(0.2126, 0.7152, 0.0722))), g, saturation);
+  g *= 1.0 - vignette * smoothstep(0.35, 1.0, length(vUv - 0.5) * 1.41421356);
+  gl_FragColor = vec4(sRGBTransferEOTF(vec4(clamp(g, 0.0, 1.0), 1.0)).rgb, 1.0);
   #include <colorspace_fragment>
 }`;
 
