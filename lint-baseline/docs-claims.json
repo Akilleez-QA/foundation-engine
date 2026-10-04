@@ -1,0 +1,71 @@
+{
+  "comment": "Known stale 'not here yet' claims in pages another change is rewriting (scripts/lint/docs-claims.mjs). Counts only fall: node scripts/lint/docs-claims.mjs --lower drops entries that no longer match.",
+  "entries": [
+    {
+      "file": ".claude/skills/art-direction/SKILL.md",
+      "id": "VIS-01",
+      "count": 1,
+      "reason": "the art-direction skill rewrite (separate change) owns this page"
+    },
+    {
+      "file": ".claude/skills/art-direction/SKILL.md",
+      "id": "VIS-02",
+      "count": 1,
+      "reason": "the art-direction skill rewrite (separate change) owns this page"
+    },
+    {
+      "file": ".claude/skills/art-direction/SKILL.md",
+      "id": "VIS-03",
+      "count": 1,
+      "reason": "the art-direction skill rewrite (separate change) owns this page"
+    },
+    {
+      "file": ".claude/skills/art-direction/SKILL.md",
+      "id": "VIS-05",
+      "count": 1,
+      "reason": "the art-direction skill rewrite (separate change) owns this page"
+    },
+    {
+      "file": "docs/recipes/art-direction.md",
+      "id": "VIS-01",
+      "count": 3,
+      "reason": "the art-direction recipe rewrite (separate change) owns this page"
+    },
+    {
+      "file": "docs/recipes/art-direction.md",
+      "id": "VIS-02",
+      "count": 2,
+      "reason": "the art-direction recipe rewrite (separate change) owns this page"
+    },
+    {
+      "file": "docs/recipes/art-direction.md",
+      "id": "VIS-03",
+      "count": 2,
+      "reason": "the art-direction recipe rewrite (separate change) owns this page"
+    },
+    {
+      "file": "docs/recipes/art-direction.md",
+      "id": "VIS-05",
+      "count": 1,
+      "reason": "the art-direction recipe rewrite (separate change) owns this page"
+    },
+    {
+      "file": "templates/showcase/README.md",
+      "id": "VIS-01",
+      "count": 1,
+      "reason": "the showcase README rewrite (separate change) owns this page"
+    },
+    {
+      "file": "templates/showcase/README.md",
+      "id": "VIS-02",
+      "count": 1,
+      "reason": "the showcase README rewrite (separate change) owns this page"
+    },
+    {
+      "file": "templates/showcase/README.md",
+      "id": "VIS-03",
+      "count": 1,
+      "reason": "the showcase README rewrite (separate change) owns this page"
+    }
+  ]
+}

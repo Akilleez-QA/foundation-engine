@@ -7,6 +7,16 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Capability manifest and `lint:docs-claims`.** `npm run capabilities` writes `docs/capabilities.json` and
+  `docs/capabilities.md` from the code: the `@engine` value and type exports, each kit and its exports, the quality
+  knobs (and whether engine code reads each one), the templates, the npm scripts, and feature IDs (VIS-01 to VIS-06,
+  VIS-09, FX-01, GEN-02, MP-01, KTX2 and others) marked shipped only when their evidence is in the tree. The new
+  `npm run lint:docs-claims`, run by `npm run lint` and `npm run check`, fails when either file is out of date, and when
+  a page (AGENTS.md, README.md, docs/, skills, agents, template READMEs) says a shipped feature is missing ("no local
+  lights yet", "can't instance"), naming the feature and its PR. Claims are matched by an explicit phrase table, not
+  guessed; a correct "not yet" about an unshipped feature passes; dated records under `docs/verification/` and
+  `docs/releases/` are exempt. *Affected:* a change that adds an `@engine` export, a kit, a knob, a template or an npm
+  script runs `npm run capabilities` and commits the result.
 - **Model contracts (`npm run asset:verify`).** A GLB under a game's `public/models/` with an adjacent
   `<name>.contract.json` is checked against it by `npm run check`: size and pivot, triangle, vertex, material and
   texture limits, file and texture bytes, allowed material properties and the receipt fields licence, author,
@@ -57,6 +67,30 @@ Every new framework below is optional: a game that does not use it is unchanged.
 - **`asset:verify` enforces the model loader's caps.** Every contracted model must fit the loader's admission
   limits (32 MiB, accessor, node, skin and animation counts, four bone influences), and Draco is refused (KTX2
   is accepted when the contract lists it, since #146).
+- **Full three.js for a game that opts in: `@kits/three`.** A game that lists `three()` in `defineGame({ kits })`
+  may import `three`, `three/addons/*` and `three/examples/jsm/*` (one shared copy); every other game still may not
+  (`npm run lint:layers`: `three-needs-kit`, `kit-not-listed`), and `npm run check` names each file that uses the kit.
+  A scene opts in with `defineScene({ extensions: [sceneThree()] })` and gets `useThree(ctx)`: the scene, a disposed
+  `root`, camera, renderer, canvas, `requestRender`, `onFrame`, `onBeforeRender`, `onResize`, `setRenderOverride`
+  (an EffectComposer, for example) and `own()`. `customObject({ create, update, dispose })` with `ThreeObject` is the
+  per-entity convenience path, capped per scene and bounded per object. The engine disposes everything on exit,
+  restores the render target, size and pixel ratio after game code, and keeps render on change; budgets measure the
+  real renderer. **Unstable across three.js upgrades: the game owns that code.** Engine side: a genre-neutral render
+  extension seam (`SceneExtension`, opaque in `@engine`). Guide: [use three.js directly](docs/recipes/use-three-directly.md);
+  browser evidence: `npm run test:three-kit-browser` (the courtyard fixture, software GL only).
+
+### Upgrading
+
+- **Constrained mobile GPUs start on a lighter preset (ADR 0079).** When the brief does not declare
+  `quality.tier`, a first run on a mobile GPU family (Mali, Adreno, PowerVR, Xclipse, Immortalis, Maleoon) starts
+  on `low` for an entry-level GPU, 2 GB or less memory or a texture limit under 4096, and on `medium` for 4 GB or
+  less, 4 or fewer cores or data saver. Before, every template started every device on `reference`
+  (16 light slots per kind, 4 shadowed lights), and a direct `createQuality` caller started phones on `high`.
+  *Affected:* players on those phones and tablets see fewer local lights and shadows, a lower pixel ratio and a
+  frame cap on first run; desktops, software GL, iPhone-class devices, capable phones, gates and benches are
+  unchanged. The start is unsaved, and saved choices are never rewritten. `BuildBrief.quality` gains
+  `tierDeclared`. *To do:* nothing to keep the new default. To start every device on one tier, declare it:
+  `quality: { tier: 'reference' }`. Players can still choose any preset.
 
 ## 0.3.0 — proposed; author decides
 

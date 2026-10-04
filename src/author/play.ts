@@ -30,6 +30,8 @@ export interface SceneHandle {
     draws: number;
     textures: {requested: number; leases: number; applied: number; failed: number};
   };
+  /** Dev/test only: each render extension's counters, by id (`{closed: true}` once it failed). */
+  extensions?(): Record<string, Record<string, unknown>>;
   /** Dev/test only: the visit's scatter counters (admitted, copies, refusals, draws, triangles per scatter); null
    *  until the scatter drawing has loaded. Installed only in scenes that opted in with `sceneScatter()`. */
   scatter?(): (ScatterStats & {draws: number; triangles: number; list: ScatterEntry[]}) | null;

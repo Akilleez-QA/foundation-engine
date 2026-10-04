@@ -43,4 +43,6 @@ pictures yourself, and the checklist below.
 Report: before and after pictures, what changed, the checklist result, draws and triangles against the budget. Not
 available yet in the engine (say so instead of promising them): local lights, cast shadows, tone mapping and bloom,
 a gradient sky. The recipe's last table lists today's workaround for each. Instanced scatter (`defineScatter`) and
-`Material` on a `Mesh` or `Model` (flat, matte, toon, double side, cut-out) do exist: use them.
+`Material` on a `Mesh` or `Model` (flat, matte, toon, double side, cut-out) do exist: use them. When
+the author agrees the look needs more (a composer pass, a custom shader, a loader), a game can opt into `@kits/three`;
+the game owns that code across three.js upgrades: docs/recipes/use-three-directly.md.
