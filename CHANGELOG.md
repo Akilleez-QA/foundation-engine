@@ -16,6 +16,13 @@ Every new framework below is optional: a game that does not use it is unchanged.
   metres, one rebuild-from-scratch script per asset, a screenshot after every change, measurements (bounds,
   ground contact, gaps, non-manifold edges) as the acceptance evidence, about two retries per defect, Blender
   5.2 API lookups before writing code, and MCP safety defaults. Documentation only; no engine change.
+- **Model optimisation (`npm run asset:optimize`).** glTF-Transform's `optimize` with meshopt geometry
+  compression, WebP textures resized to the contract's `textureSize` (`--ktx2` is refused until the engine
+  adds KTX2 support), and named nodes, meshes and materials kept; the model contract is checked before and after. Adds the
+  development-only `@gltf-transform/cli` 4.5.1 (MIT) and its graph; see the notices.
+- **`asset:verify` enforces the model loader's caps.** Every contracted model must fit the loader's admission
+  limits (32 MiB, accessor, node, skin and animation counts, four bone influences), and KTX2 textures and Draco are
+  refused until the engine supports them.
 
 ## 0.3.0 — proposed; author decides
 
