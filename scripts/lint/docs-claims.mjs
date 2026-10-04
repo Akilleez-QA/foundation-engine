@@ -103,6 +103,13 @@ export const CLAIMS = [
       re('\\bno bloom\\b'),
       re(`\\bbloom\\b[^.]{0,30}${NOT_YET}`),
       re('post\\.mode`?[^.]{0,60}\\b(?:unimplemented|not implemented|has no consumer|does nothing|changes nothing)'),
+      // "Bloom needs three.js": sending a game to @kits/three or an EffectComposer for bloom says the engine has none.
+      re(
+        '\\bbloom\\b[^.]{0,40}\\b(?:needs|requires|means|takes|through|via)\\b[^.]{0,20}(?:@kits/three|three\\.js|an? EffectComposer)',
+      ),
+      re('\\bbloom or (?:another|other) EffectComposer pass'),
+      re('\\bEffectComposer (?:and|with) bloom\\b'),
+      re("\\b(?:cannot|can't) (?:say|express|do)\\b[^.]{0,40}\\bbloom\\b"),
     ],
     item: re('\\bbloom\\b|\\bpost-processing\\b'),
   },
