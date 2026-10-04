@@ -5,7 +5,7 @@ import {Solid} from '@kits/character';
 import {courtyardRows, courtyardSystems, courtyardView, LANTERNS, WARM, type Row} from './parts';
 
 /** A lantern on a post: iron post, glowing glass, a cap, a fake light pool on the ground and a halo of soft light. */
-const lantern = (x: number, z: number): Row[] => [
+export const lanternRows = (x: number, z: number): Row[] => [
   [
     Transform({x, y: 1.1, z}),
     Shape({kind: 'cylinder', size: [0.14, 2.2, 0.14], color: 0x1c1f26}),
@@ -49,7 +49,7 @@ export default defineScene({
   title: 'Courtyard (author API)',
   particles: sceneParticles({emitters: 32, max: 4096}),
   view: courtyardView,
-  entities: [...courtyardRows(), ...LANTERNS.flatMap(([x, z]) => lantern(x, z))],
+  entities: [...courtyardRows(), ...LANTERNS.flatMap(([x, z]) => lanternRows(x, z))],
   systems: courtyardSystems,
   enter(ctx) {
     ctx.state.collected = 0;

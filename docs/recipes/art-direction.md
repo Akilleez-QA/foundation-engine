@@ -430,13 +430,13 @@ The engine does not yet have these, and this recipe fakes them as described:
 |---|---|
 | Local (point and spot) lights | `bakeLight` into the scenery's vertex colours; it does not light moving things |
 | Cast shadows | contact darkening in the ground colours, and a see-through disc under moving things |
-| Tone mapping and bloom | emissive near 1, and a baked light around every glow |
 | A gradient or procedural sky | `background` plus haze of the same colour; `points` for stars; `cube` from six images |
 
 When one of these lands in the engine, this recipe gains a section for it. Already landed: many copies of one shape
 or `Mesh` in one draw ([scatter grass and rocks](scatter-grass-and-rocks.md)), and a `Material` on a `Mesh` or `Model`
 with flat, matte or toon shading, double sides and cut-outs ([give a shape a material](give-a-shape-a-material.md); a
-`Mesh` still takes no texture).
+`Mesh` still takes no texture), and tone mapping with bloom, vignette and grade (`view.output` and `view.post`,
+[post-processing](../guides/post-processing.md)).
 
 ## When the author API cannot express the look: three.js itself
 

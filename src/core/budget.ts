@@ -5,8 +5,11 @@
 import type {Ported, PortPreset, QualityPreset} from './tiers';
 
 export interface SceneBudgetValues {
-  /** GL draws per rendered frame, shadow pass included (worst window of the scene). */
+  /** GL draws per rendered frame, shadow pass included, post-processing excluded (worst window of the scene). */
   draws: number;
+  /** Post-processing fullscreen draws per rendered frame (`view.post` at the preset's `post.mode`: 0 off, 1 basic,
+   *  10 full). Counted apart so `draws` keeps measuring the scene's own complexity. */
+  postDraws?: number;
   /** Triangles submitted per rendered frame, shadow pass included. */
   triangles: number;
   /** Draws in one full shadow pass (casters × shadow lights). */

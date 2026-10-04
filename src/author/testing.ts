@@ -236,6 +236,7 @@ export async function testScene(
       },
       background: scene.view?.background ?? 0x101820,
       output: validateSceneOutput(scene.view?.output),
+      post: scene.view?.post,
       aspect: 16 / 9,
       overlay: null,
       openReadingSheet: null,
