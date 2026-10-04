@@ -22,7 +22,7 @@ const looks = [
 // recipe:end
 
 test('the recipe rows spawn with valid materials on a shape, a mesh and a model', async () => {
-  const t = await testScene(defineScene({ id: 'looks', entities: looks }));
+  const t = await testScene(defineScene({ id: 'looks', title: 'Looks', entities: looks }));
   const shaded = [...t.world.query(Material)].map(([e, m]) => ({ shading: m.shading, mesh: t.world.has(e, Mesh), model: t.world.has(e, Model) }));
   assert.deepEqual(shaded, [
     { shading: 'toon', mesh: false, model: false },
