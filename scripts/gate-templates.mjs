@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Full unchanged gates per template. Optional shards select disjoint sorted names; --phone adds mobile smoke.
+// Full unchanged gates per template. Optional shards select disjoint sorted names; --phone adds mobile smoke (phone
+// viewport at the reference preset).
 import {spawnSync} from 'node:child_process';
 import {existsSync, readdirSync} from 'node:fs';
 import {join, resolve} from 'node:path';
@@ -44,7 +45,12 @@ export function selectTemplates(names, argv) {
 export function runTemplates({names, phone}, {spawn = spawnSync, log = console.log, root = ROOT} = {}) {
   for (const name of names) {
     const t0 = Date.now();
-    const commands = [['run', '-s', 'gate'], ...(phone ? [['run', '-s', 'play:snap', '--', '--mobile']] : [])];
+    // The phone smoke keeps the reference preset it always ran at (layout and boot at phone size). play:snap --mobile
+    // now defaults to the phone tier (medium); that picture is an agent's look check, not part of this gate yet.
+    const commands = [
+      ['run', '-s', 'gate'],
+      ...(phone ? [['run', '-s', 'play:snap', '--', '--mobile', '--quality', 'reference']] : []),
+    ];
     for (const args of commands) {
       log(`\n=== ${args[2]}: template ${name} ===`);
       const npm = npmCommand(args);

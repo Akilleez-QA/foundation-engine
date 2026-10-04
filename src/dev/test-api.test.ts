@@ -46,12 +46,15 @@ test('entity metadata API remains optional before boot, without a game, and afte
   const api = createTestApi(app, booted);
   assert.deepEqual(api.entities({expectedEpoch: 0}), {status: 'unavailable'});
   assert.equal(api.systemTrace(), null);
+  assert.equal(api.particles(), null, 'no game: no particle counters');
   await booted;
   assert.deepEqual(api.entities({expectedEpoch: 0}), {status: 'unavailable'});
   assert.equal(api.systemTrace(), null);
+  assert.equal(api.particles(), null);
   app.dispose();
   assert.deepEqual(api.entities({expectedEpoch: 0}), {status: 'unavailable'});
   assert.equal(api.systemTrace(), null);
+  assert.equal(api.particles(), null);
 });
 
 test('SIM-01: engine.replay.start disarms when navigation fails or the scene never arrives', async () => {
