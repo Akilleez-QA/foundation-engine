@@ -24,6 +24,7 @@ import {validateSpatialAudioOptions, type SpatialAudioOptions} from '../platform
 import type {AudioClockReading} from '../platform/audio/audio-timeline';
 import type {MusicOptions, MusicVoice} from '../platform/audio/music-clock';
 import type {SceneParticles} from './particle-contract';
+import {validatePost, type PostSettings} from '../platform/render/post/settings';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const need = (ok: boolean, message: string) => {
@@ -127,6 +128,9 @@ export interface ViewState {
   background: number;
   /** Replace this value to publish an environment change. */
   environment?: EnvironmentState | undefined;
+  /** Post-processing (bloom, vignette, grade) at the player's `post.mode` tier. Replace this value to publish a change
+   *  (one redraw); invalid settings are reported once and the last valid ones stay. docs/guides/post-processing.md. */
+  post?: PostSettings | undefined;
   /** Width / height of the view (16/9 in node tests). */
   readonly aspect: number;
   /** An element over the view for HUD text and prompts (the UI kit uses it); null in node tests. */
@@ -290,6 +294,9 @@ export interface SceneInput extends SceneBody {
     background?: number;
     lights?: 'default' | 'none';
     environment?: EnvironmentState;
+    /** Post-processing (docs/guides/post-processing.md): bloom at the `full` tier; grade and vignette at `basic` and
+     *  `full`; nothing at `off`. Omit it and the scene loads no post code. */
+    post?: PostSettings;
   };
   /** Sound files (audio asset ids) this scene plays: fetched while it loads, so their first play is on time. */
   sounds?: readonly string[];
@@ -321,6 +328,8 @@ export function defineScene(s: SceneInput): SceneDefinition {
       `scene ${s.id}: replay.digest needs an id (1-128 of A-Za-z0-9._:,;=+-) and a state(world) function`,
     );
   const captured = {...s};
+  if (captured.view?.post !== undefined)
+    captured.view = {...captured.view, post: validatePost(captured.view.post, `scene ${s.id}: view.post`)};
   if (captured.modelPoseLinks !== undefined)
     captured.modelPoseLinks = normalizeModelPoseLinkLimits(captured.modelPoseLinks);
   need(

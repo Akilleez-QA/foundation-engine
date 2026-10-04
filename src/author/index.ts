@@ -138,6 +138,16 @@ export {
 export {dmath, platformMath, scalarMath, type ScalarMath, type ScalarMathMode} from '../core/dmath';
 
 export {defineEnvironment, type EnvironmentState} from './environment';
+export {
+  validatePost,
+  POST_DEFAULTS,
+  POST_LIMITS,
+  type PostSettings,
+  type PostBloom,
+  type PostVignette,
+  type PostGrade,
+  type PostMode,
+} from '../platform/render/post/settings';
 
 export {Model, validateModel, type ModelData, type ModelSocketPose} from './model';
 export {RenderMask, validateRenderMask} from './render-mask';

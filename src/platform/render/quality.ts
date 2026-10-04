@@ -141,8 +141,12 @@ export const coreKnobs: readonly AnyKnobDef[] = [
     applies: 'live',
     owner: 'platform.render',
   },
+  // Post-processing tiers (docs/guides/post-processing.md): read live by every scene with `view.post`
+  // (author/scene-post.ts). Cosmetic, so no floor. Off draws direct; basic adds grade, vignette and tone mapping in one
+  // pass; full adds a half-resolution bloom chain.
   {
     id: 'post.mode',
+    wired: {by: 'scenePost'},
     group: 'post',
     label: 'graphics.post.mode',
     control: {kind: 'choice', options: ['off', 'basic', 'full']},

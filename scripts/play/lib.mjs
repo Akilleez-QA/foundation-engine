@@ -162,10 +162,11 @@ export async function open(b, url, scene, {seed = 1, query = {}} = {}) {
   return pageErrors;
 }
 
-/** A short measured window: frames, draws and triangles per rendered frame, frame-interval p95 (the bench's probe). */
+/** A short measured window: frames, draws, post draws and triangles per rendered frame, frame-interval p95 (the bench's
+ *  probe). Post-processing passes are counted apart from the scene's draws (postDraws). */
 export async function measure(b, during, ms = 1200) {
   const before = await b.evaluate(
-    `({draws: window.__draws ?? 0, tris: window.__tris ?? 0, loop: window.engine.loop()})`,
+    `({draws: window.__draws ?? 0, post: window.__post ?? 0, tris: window.__tris ?? 0, loop: window.engine.loop()})`,
   );
   const t0 = Date.now();
   const intervals = b.evaluate(
@@ -174,7 +175,7 @@ export async function measure(b, during, ms = 1200) {
   if (during) await during();
   const iv = (await intervals).sort((a, c) => a - c);
   const after = await b.evaluate(
-    `({draws: window.__draws ?? 0, tris: window.__tris ?? 0, loop: window.engine.loop(), heap: performance.memory ? performance.memory.usedJSHeapSize / 1048576 : null})`,
+    `({draws: window.__draws ?? 0, post: window.__post ?? 0, tris: window.__tris ?? 0, loop: window.engine.loop(), heap: performance.memory ? performance.memory.usedJSHeapSize / 1048576 : null})`,
   );
   const renders = after.loop.renders - before.loop.renders;
   const p95 = iv.length ? iv[Math.min(iv.length - 1, Math.floor(iv.length * 0.95))] : null;
@@ -182,6 +183,7 @@ export async function measure(b, during, ms = 1200) {
     ms: Date.now() - t0,
     renders,
     drawsPerFrame: renders ? Math.round((after.draws - before.draws) / renders) : 0,
+    postDrawsPerFrame: renders ? Math.round((after.post - before.post) / renders) : 0,
     trisPerFrame: renders ? Math.round((after.tris - before.tris) / renders) : 0,
     frameMsP95: p95 === null ? null : +p95.toFixed(1),
     fps: p95 ? Math.min(60, Math.round(1000 / p95)) : null,
@@ -202,6 +204,7 @@ export function budgetStatus(scene, m) {
   // measures the budgeted heap on a production build.
   const rows = [
     ['draws', m.drawsPerFrame],
+    ['postDraws', m.postDrawsPerFrame ?? null],
     ['triangles', m.trisPerFrame],
   ]
     .filter(([k, v]) => b[k] !== undefined && v !== null)

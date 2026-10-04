@@ -2,6 +2,10 @@
 // It wraps the WebGL prototypes only inside the muted, isolated bench browser (bench-browser.mjs); the game itself is never changed.
 //
 // - Draws, triangles and off-screen (framebuffer) draws; the largest off-screen burst in one frame is the shadow pass.
+// - Post draws apart (`postDraws`): the engine's post pipeline (src/platform/render/post/webgl.ts) brackets its work in
+//   dev and test builds through `__engineRenderPhase(gl, phase)`, defined here. 'scene': the scene's own draws go into
+//   the framebuffer bound now, which counts as the main pass (not off-screen, so shadowCasters keeps its meaning);
+//   'post': the fullscreen passes are counted in __post only, never in __draws or __tris; 'end' closes the bracket.
 // - The GL upload ledger: live texture bytes per texture object (unknown formats count 4 bytes per texel, mips +1/3).
 // - The canvas census: every live canvas and OffscreenCanvas, page-wide.
 // - ADR 0051 submission counters: useProgram, programs linked, uniform* calls, bindVertexArray, bufferSubData,
@@ -16,10 +20,10 @@ export const windowFinished = (win, elapsed) =>
   ((win.target > 0 && win.rendered >= win.target && elapsed >= win.minMs) || elapsed >= win.maxMs);
 export const PROBE = `(()=>{
  const windowFinished=${windowFinished.toString()};
- const W=window;W.__draws=0;W.__tris=0;W.__off=0;W.__texLive=new Map();W.__canv=[];W.__hashChanges=0;
+ const W=window;W.__draws=0;W.__tris=0;W.__off=0;W.__post=0;W.__texLive=new Map();W.__canv=[];W.__hashChanges=0;
  const C=W.__count={useProgram:0,programsCreated:0,uniformCalls:0,bindVertexArray:0,bufferSubData:0,textureUploads:0};
  addEventListener('hashchange',()=>{W.__hashChanges++;W.__offMax=0;});
- const fb=new WeakMap(),unit=new WeakMap(),bound=new WeakMap(),bytesOf=new WeakMap(),texId=new WeakMap(),texUps=new WeakMap();
+ const fb=new WeakMap(),cur=new WeakMap(),main=new WeakMap(),inPost=new WeakMap(),unit=new WeakMap(),bound=new WeakMap(),bytesOf=new WeakMap(),texId=new WeakMap(),texUps=new WeakMap();
  let nextTex=1;const ctxs=W.__ctxs=[];
  const bppFmt={6408:4,6407:3,6403:1,33319:2,6409:1,6410:2,6406:1,6402:4,34041:4};
  const bppType={5121:1,5126:4,36193:2,5131:2,5123:2,5125:4,34042:4};
@@ -36,8 +40,8 @@ export const PROBE = `(()=>{
   r.count++;r.bytes+=bytes;};
  for(const P of [WebGLRenderingContext.prototype,WebGL2RenderingContext.prototype]){
   for(const f of ['drawElements','drawArrays','drawElementsInstanced','drawArraysInstanced']){const o=P[f];if(!o)continue;
-   P[f]=function(...a){W.__draws++;if(fb.get(this))W.__off++;const n=f.startsWith('drawElements')?a[1]:a[2];const inst=f.endsWith('Instanced')?a[f.startsWith('drawElements')?4:3]:1;W.__tris+=n/3*inst;return o.apply(this,a);};}
-  const bf=P.bindFramebuffer;P.bindFramebuffer=function(t,f){fb.set(this,!!f);return bf.call(this,t,f);};
+   P[f]=function(...a){if(inPost.get(this)){W.__post++;return o.apply(this,a);}W.__draws++;if(fb.get(this))W.__off++;const n=f.startsWith('drawElements')?a[1]:a[2];const inst=f.endsWith('Instanced')?a[f.startsWith('drawElements')?4:3]:1;W.__tris+=n/3*inst;return o.apply(this,a);};}
+  const bf=P.bindFramebuffer;P.bindFramebuffer=function(t,f){if(t!==36008){cur.set(this,f);fb.set(this,!!f&&f!==main.get(this));}return bf.call(this,t,f);};
   const at=P.activeTexture;P.activeTexture=function(u){unit.set(this,u);return at.call(this,u);};
   const bt=P.bindTexture;P.bindTexture=function(t,tex){let m=bound.get(this);if(!m){m=new Map();bound.set(this,m);ctxs.push(new WeakRef(this));}m.set((unit.get(this)??0)+':'+t,tex);return bt.call(this,t,tex);};
   const ti=P.texImage2D;P.texImage2D=function(...a){try{const lvl=a[1];let w,h,bpp;
@@ -57,14 +61,15 @@ export const PROBE = `(()=>{
   if(P.bindVertexArray){const bv=P.bindVertexArray;P.bindVertexArray=function(v){C.bindVertexArray++;return bv.call(this,v);};}
   for(const f of Object.getOwnPropertyNames(P)){if(!/^uniform(Matrix)?[1-4]/.test(f))continue;const o=P[f];if(typeof o!=='function')continue;P[f]=function(...a){C.uniformCalls++;return o.apply(this,a);};}
  }
+ W.__engineRenderPhase=(gl,p)=>{if(p==='scene'){main.set(gl,cur.get(gl)??null);fb.set(gl,false);}else if(p==='post')inPost.set(gl,true);else{inPost.delete(gl);main.delete(gl);fb.set(gl,!!cur.get(gl));}};
  const ce=Document.prototype.createElement;Document.prototype.createElement=function(n,...r){const e=ce.call(this,n,...r);if(String(n).toLowerCase()==='canvas')W.__canv.push(new WeakRef(e));return e;};
  if(W.OffscreenCanvas){const O=W.OffscreenCanvas;W.OffscreenCanvas=function(w,h){const c=new O(w,h);W.__canv.push(new WeakRef(c));return c;};W.OffscreenCanvas.prototype=O.prototype;}
  // Per-frame monitor. The largest off-screen burst since the last hash change is the shadow pass.
- W.__offMax=0;let lastOff=0,lastDraws=0,lastTris=0,lastT=0;
- const mon=t=>{const dOff=W.__off-lastOff,dDraws=W.__draws-lastDraws,dTris=W.__tris-lastTris;lastOff=W.__off;lastDraws=W.__draws;lastTris=W.__tris;
+ W.__offMax=0;let lastOff=0,lastDraws=0,lastTris=0,lastPost=0,lastT=0;
+ const mon=t=>{const dOff=W.__off-lastOff,dDraws=W.__draws-lastDraws,dTris=W.__tris-lastTris,dPost=W.__post-lastPost;lastOff=W.__off;lastDraws=W.__draws;lastTris=W.__tris;lastPost=W.__post;
   if(dOff>W.__offMax)W.__offMax=dOff;const win=W.__win;
   if(win&&!win.done){win.frames++;if(lastT)win.intervals.push(t-lastT);
-   if(dDraws>0){win.rendered++;win.draws.push(dDraws);win.tris+=dTris;win.off+=dOff;if(dOff>0)win.offFrames++;}
+   if(dDraws>0||dPost>0){win.rendered++;win.draws.push(dDraws);win.tris+=dTris;win.off+=dOff;win.post+=dPost;if(dOff>0)win.offFrames++;}
    const el=t-win.t0;if(windowFinished(win,el)){win.done=true;win.complete=win.rendered>=win.target||win.frames>=2;win.resolve();}}
   lastT=t;requestAnimationFrame(mon);};requestAnimationFrame(mon);
  W.__topTex=(n=12)=>{const g=new Map();for(const [t,r] of W.__texLive){if(r.gl.isContextLost()||r.gl.canvas.isConnected===false)continue;const d=r.dim+(r.mips>5?' mip-regen x'+r.mips:'')+(r.ups>5?' re-uploads x'+r.ups:'');const e=g.get(d)??[0,0];e[0]++;e[1]+=r.b/1048576;g.set(d,e);}return [...g].sort((x,y)=>y[1][1]-x[1][1]).slice(0,n).map(([d,[c,m]])=>d+' x'+c+' = '+m.toFixed(1)+' MiB');};
@@ -77,7 +82,7 @@ export const PROBE = `(()=>{
   *  minMs) or at maxMs; target 0 ends at maxMs (active windows, timed by their script). */
  W.__winOpen=(sel,target,minMs,maxMs,scriptPending=false)=>{const e=document.querySelector(sel);const token=Symbol('bench-epoch');if(e)e.__benchEpoch=token;
   let resolve;const done=new Promise(r=>{resolve=r;});
-  W.__win={sel,token,el:e?new WeakRef(e):null,hash:location.hash,changes:W.__hashChanges,t0:performance.now(),target,minMs,maxMs,scriptPending,frames:0,rendered:0,draws:[],tris:0,off:0,offFrames:0,
+  W.__win={sel,token,el:e?new WeakRef(e):null,hash:location.hash,changes:W.__hashChanges,t0:performance.now(),target,minMs,maxMs,scriptPending,frames:0,rendered:0,draws:[],tris:0,off:0,post:0,offFrames:0,
    intervals:[],uploads:new Map(),newTex:new Set(),counts:{...C},lost:W.__gpu().lostContexts,done:false,complete:false,resolve,finished:done};
   return !!e;};
  W.__winClose=()=>{const w=W.__win;if(!w)return null;w.done=true;w.resolve();W.__win=null;
@@ -88,6 +93,6 @@ export const PROBE = `(()=>{
   const counts={};for(const k in C)counts[k]=C[k]-w.counts[k];
   const iv=[...w.intervals].sort((a,b)=>a-b);const q=p=>iv.length?iv[Math.min(iv.length-1,Math.floor(p*iv.length))]:null;
   return {hash:location.hash,epochBreak,scriptComplete:!w.scriptPending,lostContexts:W.__gpu().lostContexts-w.lost,ms:performance.now()-w.t0,frames:w.frames,rendered:w.rendered,complete:w.complete||(w.target===0&&w.frames>=2),
-   draws:w.draws.reduce((a,b)=>a+b,0),drawsMax:w.draws.length?Math.max(...w.draws):0,tris:w.tris,off:w.off,offFrames:w.offFrames,
+   draws:w.draws.reduce((a,b)=>a+b,0),drawsMax:w.draws.length?Math.max(...w.draws):0,tris:w.tris,off:w.off,post:w.post,offFrames:w.offFrames,
    frameMsP95:q(.95),frameMsMax:iv.length?iv[iv.length-1]:null,counts,uploads:[...w.uploads.values()]};};
 })()`;

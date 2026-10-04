@@ -205,6 +205,7 @@ export async function testScene(
         fov: scene.view?.camera?.fov ?? 50,
       },
       background: scene.view?.background ?? 0x101820,
+      post: scene.view?.post,
       aspect: 16 / 9,
       overlay: null,
       openReadingSheet: null,

@@ -15,7 +15,8 @@ export type Limit = number | PerTier<number>;
 
 /** Every metric a budget may declare (ADR 0025). All are "lower is better". */
 export type BudgetMetric =
-  | 'draws' // GL draw calls per rendered frame, shadow passes included
+  | 'draws' // GL draw calls per rendered frame, shadow passes included, post-processing passes excluded
+  | 'postDraws' // post-processing fullscreen draws per rendered frame (view.post at the run's post.mode tier)
   | 'triangles' // triangles submitted per rendered frame, shadow passes included
   | 'shadowCasters' // draws in the largest shadow pass seen (casters x shadow lights)
   | 'shadowDrawsIdle' // off-screen (shadow/RT) draws per rendered frame while still: 0 = static shadow maps
@@ -33,6 +34,7 @@ export type BudgetMetric =
 /** Metrics that come from the structure of a frame: the ones the software-GL gate blocks on. */
 export const COUNT_METRICS: ReadonlySet<BudgetMetric> = new Set<BudgetMetric>([
   'draws',
+  'postDraws',
   'triangles',
   'shadowCasters',
   'textureMiB',
@@ -54,6 +56,7 @@ export interface BenchSample {
   readonly drawsPerRenderedFrame?: number;
   readonly trisPerRenderedFrame?: number;
   readonly offscreenDrawsPerRenderedFrame?: number;
+  readonly postDrawsPerRenderedFrame?: number;
   readonly shadowPassDrawsMax?: number;
   readonly chunkKiB?: number;
   readonly textureMiB?: number;
@@ -92,6 +95,8 @@ export interface Tolerance {
 /** Noise allowance per metric. Counts are near-deterministic; timings are not. */
 export const DEFAULT_TOLERANCE: Readonly<Record<BudgetMetric, Tolerance>> = {
   draws: {relative: 0.03, absolute: 2},
+  // A tier's post draws are a fixed number (1 basic, 10 full): no noise allowance.
+  postDraws: {relative: 0, absolute: 0},
   triangles: {relative: 0.03, absolute: 500},
   shadowCasters: {relative: 0.03, absolute: 2},
   shadowDrawsIdle: {relative: 0, absolute: 0},
@@ -110,6 +115,7 @@ export const DEFAULT_TOLERANCE: Readonly<Record<BudgetMetric, Tolerance>> = {
 /** Growth against the baseline run that blocks a merge even while under budget (the ratchet). */
 export const DEFAULT_REGRESSION: Readonly<Record<BudgetMetric, Tolerance>> = {
   draws: {relative: 0.1, absolute: 10},
+  postDraws: {relative: 0, absolute: 0},
   triangles: {relative: 0.1, absolute: 5000},
   shadowCasters: {relative: 0.1, absolute: 10},
   shadowDrawsIdle: {relative: 0, absolute: 0},
@@ -174,6 +180,8 @@ export function readMetric(s: BenchSample, metric: BudgetMetric): number | null 
   switch (metric) {
     case 'draws':
       return n(s.drawsPerRenderedFrame) ?? n(s.drawsPerFrame);
+    case 'postDraws':
+      return n(s.postDrawsPerRenderedFrame);
     case 'triangles':
       return n(s.trisPerRenderedFrame);
     case 'shadowCasters':

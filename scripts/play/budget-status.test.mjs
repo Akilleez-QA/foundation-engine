@@ -26,3 +26,11 @@ test('play:snap budget: OVER BUDGET names each metric over its limit and points 
   assert.doesNotMatch(line, /triangles/, 'a metric within its limit is not named');
   assert.match(line, /\.claude\/skills\/fix-budget\/SKILL\.md/);
 });
+
+test('play:snap budget: postDraws is judged only where a scene budgets it, apart from draws', () => {
+  const s = budgetStatus(scene, {renders: 3, drawsPerFrame: 1, postDrawsPerFrame: 10, trisPerFrame: 2});
+  assert.deepEqual(
+    s.rows.map(r => r.metric),
+    ['draws', ...(limit.postDraws === undefined ? [] : ['postDraws']), 'triangles'],
+  );
+});
