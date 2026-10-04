@@ -67,7 +67,9 @@ A raise is an exception, and a reviewed one:
 git commit -m "Level: add the fountain" -m "Perf-Budget: level.draws 30 -> 36: the fountain adds 6 draws; batched already"
 ```
 
-`npm run lint:budgets` compares every game's `budgets.json` (`game/` and each `templates/<name>/game/`) with `origin/main`. Template keys carry the template's name (`blank/main.draws`). It fails any raise that no `Perf-Budget: <key> <old> -> <new>: <reason>` trailer on the branch names exactly. A raise that is not yet committed always fails. Lowering a number needs nothing: that is the ratchet.
+`npm run lint:budgets` compares every game's `budgets.json` (`game/` and each `templates/<name>/game/`) with `origin/main`. Template keys carry the template's name (`blank/main.draws`). It fails any raise that no `Perf-Budget: <key> <old> -> <new>: <reason>` line on the branch names exactly. The line may stand anywhere in a commit message, on a line of its own: in the trailer block with `Co-Authored-By:` or in a paragraph of its own (unlike git's own trailer parser, which reads only the last paragraph). A raise that is not yet committed always fails. Lowering a number needs nothing: that is the ratchet.
+
+A new `game/` in an engine checkout has no `game/` on `origin/main` to compare with, so the ratchet compares it with the template it started from: `npm run new-game` writes `game/.origin.json` (`{"template", "commit"}`), and the template's `budgets.json` at that commit is the starting point. Without that file, the template is the brief's `genre` when a template has that name, else the template whose scene ids the game keeps. A raise above the template's numbers needs its `Perf-Budget:` line like any other.
 
 Git reads trailers only from the **last paragraph** of the message. Put every `Perf-Budget:` line in the same final
 paragraph as any other trailer (`Co-Authored-By:`, `Signed-off-by:`), with no blank line between them; a `Perf-Budget:`

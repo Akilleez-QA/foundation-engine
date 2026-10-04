@@ -21,6 +21,11 @@ test("new-game: the template's playtests go into game/playtest, never the engine
     assert.ok(existsSync(join(root, 'game', 'playtest', 'door.json')));
     assert.equal(existsSync(join(root, 'playtest')), false);
     assert.match(readFileSync(join(root, 'game', 'game.ts'), 'utf8'), /id: 'garden-walk'/);
+    // C10: lint:budgets ratchets the new game against the template it started from (no git here: commit null).
+    assert.deepEqual(JSON.parse(readFileSync(join(root, 'game', '.origin.json'), 'utf8')), {
+      template: 'explorer',
+      commit: null,
+    });
   } finally {
     rmSync(root, {recursive: true, force: true});
   }

@@ -13,6 +13,16 @@
 // A raise that is not committed yet cannot carry a trailer, so it fails until it is committed with one. Lowering a
 // number, adding a scene or adding a metric needs nothing: that is the ratchet turning.
 //
+// The trailer is a line of its own anywhere in a commit message on the branch: in the trailer block with
+// Co-Authored-By, or in a paragraph of its own (git's own trailer parser reads only the last paragraph; this does not).
+//
+// A new ./game in an engine checkout: when the base has no game/budgets.json, ./game is compared with the template it
+// started from, so a raise above the template's numbers still needs a trailer. game/.origin.json (written by
+// `npm run new-game`: {template, commit}) names it; the template's budgets are read at that commit, else at the base,
+// else from the working tree. Without the file, the template is the brief's genre when a template has that name,
+// else the template whose scene ids the game keeps the most of. A game not committed yet starts from that point too,
+// so a raise above the template is reported as not committed.
+//
 //   node scripts/perf/budget-ratchet.mjs [--base <ref>] [--json]
 import {execFileSync} from 'node:child_process';
 import {existsSync, readFileSync} from 'node:fs';
@@ -77,6 +87,16 @@ export function findRaises(before, after) {
   return raises;
 }
 
+/** Every `Perf-Budget:` value in commit messages (full bodies, any paragraph), one per line. */
+export function perfBudgetLines(messages) {
+  const out = [];
+  for (const line of String(messages ?? '').split('\n')) {
+    const m = /^\s*Perf-Budget:\s*(.*)$/i.exec(line);
+    if (m) out.push(m[1]);
+  }
+  return out;
+}
+
 const TRAILER = /^(\S+)\s+(-?[\d.]+|none)\s*->\s*(-?[\d.]+|none)\s*:\s*(\S.*)$/;
 /** `<key> <old> -> <new>: <reason>` rows; malformed rows are returned as problems. */
 export function parseTrailers(lines) {
@@ -110,7 +130,7 @@ export function checkRatchet({before, committed, working, trailerLines}) {
     const t = trailers.find(x => x.key === r.key && x.now === r.now);
     if (!t)
       failures.push(
-        `${r.key} rose ${r.old} -> ${r.now ?? 'none'} without a matching "Perf-Budget: ${r.key} ${r.old} -> ${r.now ?? 'none'}: <reason>" trailer`,
+        `${r.key} rose ${r.old} -> ${r.now ?? 'none'} without a matching "Perf-Budget: ${r.key} ${r.old} -> ${r.now ?? 'none'}: <reason>" line in a commit message on this branch (a line of its own, anywhere in the message)`,
       );
   }
   return {ok: failures.length === 0, raises, trailers, failures};
@@ -150,6 +170,35 @@ export function prefixed(data, prefix) {
   for (const [id, row] of Object.entries(data?.scenes ?? {})) out.scenes[prefix + id] = row;
   return out;
 }
+/** The template a game started from: game/.origin.json, else the brief's genre, else the best scene-id match. */
+export function gameTemplate(root = ROOT, gameDir = 'game') {
+  const dir = join(root, gameDir);
+  const templates = existsSync(join(root, 'templates'))
+    ? readdirSync(join(root, 'templates')).filter(t => existsSync(join(root, 'templates', t, 'game', 'budgets.json')))
+    : [];
+  const originFile = join(dir, '.origin.json');
+  if (existsSync(originFile)) {
+    const o = JSON.parse(readFileSync(originFile, 'utf8'));
+    if (typeof o?.template === 'string' && templates.includes(o.template))
+      return {template: o.template, commit: typeof o.commit === 'string' ? o.commit : null, from: '.origin.json'};
+  }
+  const brief = existsSync(join(dir, 'build.brief.ts')) ? readFileSync(join(dir, 'build.brief.ts'), 'utf8') : '';
+  const genre = /genre:\s*['"]([^'"]+)['"]/.exec(brief)?.[1];
+  if (genre && templates.includes(genre)) return {template: genre, commit: null, from: 'genre'};
+  const scenes = existsSync(join(dir, 'budgets.json'))
+    ? Object.keys(JSON.parse(readFileSync(join(dir, 'budgets.json'), 'utf8')).scenes ?? {})
+    : [];
+  let best = null;
+  for (const t of templates) {
+    const ids = Object.keys(
+      JSON.parse(readFileSync(join(root, 'templates', t, 'game', 'budgets.json'), 'utf8')).scenes ?? {},
+    );
+    const kept = ids.filter(id => scenes.includes(id)).length;
+    if (kept && (!best || kept > best.kept)) best = {template: t, kept};
+  }
+  return best ? {template: best.template, commit: null, from: 'scene ids'} : null;
+}
+
 const merge = parts => ({
   app: Object.assign({}, ...parts.map(p => p.app ?? {})),
   scenes: Object.assign({}, ...parts.map(p => p.scenes ?? {})),
@@ -161,20 +210,45 @@ export function main(argv = process.argv.slice(2)) {
   const hasHead = !!git('rev-parse', '--verify', 'HEAD^{commit}');
   const files = budgetFiles();
   const working = merge(files.map(f => prefixed(JSON.parse(readFileSync(join(ROOT, f), 'utf8')), prefixOf(f))));
-  const committed = merge(files.map(f => prefixed(hasHead ? readAt('HEAD', f) : {}, prefixOf(f))));
-  const before = merge(files.map(f => prefixed(base ? readAt(base, f) : {}, prefixOf(f))));
+  let origin = null;
+  const beforeOf = f => {
+    const at = base ? readAt(base, f) : {};
+    if (f !== DATA_FILE || Object.keys(at).length) return at;
+    // A new ./game: the base never had one. Compare it with the template it started from.
+    origin = gameTemplate();
+    if (!origin) return {};
+    const tf = `templates/${origin.template}/game/budgets.json`;
+    for (const rev of [origin.commit, base]) {
+      if (!rev || !git('rev-parse', '--verify', rev + '^{commit}')) continue;
+      const s = git('show', `${rev}:${tf}`);
+      if (s) return ((origin.at = rev.slice(0, 12)), JSON.parse(s));
+    }
+    origin.at = 'working tree';
+    return JSON.parse(readFileSync(join(ROOT, tf), 'utf8'));
+  };
+  const before = merge(files.map(f => prefixed(beforeOf(f), prefixOf(f))));
+  // A game not committed yet (only in the working tree) starts from its comparison point, so a raise above the
+  // template is reported as not committed rather than every number as missing.
+  const inHead = f => hasHead && git('cat-file', '-e', `HEAD:${f}`) !== null;
+  const committed = merge(
+    files.map(f => prefixed(inHead(f) ? readAt('HEAD', f) : f === DATA_FILE ? beforeOf(f) : {}, prefixOf(f))),
+  );
   const range = base && hasHead ? `${base}..HEAD` : null;
-  const trailerLines = range
-    ? (git('log', '--format=%(trailers:key=Perf-Budget,valueonly)', range) ?? '').split('\n')
-    : [];
+  // Full messages, not git's trailer block: a Perf-Budget line counts in any paragraph.
+  const trailerLines = range ? perfBudgetLines(git('log', '--format=%B', range) ?? '') : [];
   const result = checkRatchet({before, committed, working, trailerLines});
-  if (argv.includes('--json')) console.log(JSON.stringify({base, ...result}, null, 1));
+  const from = origin
+    ? `; ./game compared with templates/${origin.template} (${origin.from}, at ${origin.at ?? 'nothing'})`
+    : '';
+  if (argv.includes('--json')) console.log(JSON.stringify({base, origin, ...result}, null, 1));
   else if (result.ok)
     console.log(
-      `lint:budgets: ${flattenBudgets(working).size} budget numbers in ${files.length} game(s); ${result.raises.length} raise(s) since ${base ? base.slice(0, 12) : 'the start'}, each with its Perf-Budget trailer`,
+      `lint:budgets: ${flattenBudgets(working).size} budget numbers in ${files.length} game(s); ${result.raises.length} raise(s) since ${base ? base.slice(0, 12) : 'the start'}, each with its Perf-Budget trailer${from}`,
     );
   else
-    console.error(`lint:budgets: FAILED (budgets only fall; STANDARD chapter 12)\n  ${result.failures.join('\n  ')}`);
+    console.error(
+      `lint:budgets: FAILED (budgets only fall; STANDARD chapter 12)${from}\n  ${result.failures.join('\n  ')}`,
+    );
   return result.ok ? 0 : 1;
 }
 
