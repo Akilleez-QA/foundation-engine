@@ -265,3 +265,19 @@ test('a derived postDraws budget is the exact tier count, and worstOf keeps it',
   assert.equal(worst.postDrawsPerRenderedFrame, 10);
   assert.deepEqual(deriveBudget(worst, ['postDraws']), {postDraws: 10}, 'no headroom on a fixed pass count');
 });
+
+test('shadowPasses: one pass per shadow-map face, counted exactly (no tolerance), derived with a step of 1', () => {
+  const b = {scene: {shadowPasses: 1}};
+  const bind = [{sample: 'scene', scene: 'scene', metrics: ['shadowPasses' as const]}];
+  // A sun shadow (1 pass) fits; adding one shadowed point light (6 more faces) fails, with no noise allowance.
+  assert.equal(checkBudgets({scene: {shadowPassesMax: 1}}, b, bind, {tier: 'reference'}).ok, true);
+  const over = checkBudgets({scene: {shadowPassesMax: 7}}, b, bind, {tier: 'reference'});
+  assert.equal(over.rows[0]!.verdict, 'fail');
+  assert.equal(over.rows[0]!.measured, 7);
+  assert.equal(checkBudgets({scene: {shadowPassesMax: 2}}, b, bind, {tier: 'reference'}).rows[0]!.verdict, 'fail');
+  // Not measured by an older run: missing, not a pass.
+  assert.equal(checkBudgets({scene: {}}, b, bind, {tier: 'reference'}).rows[0]!.verdict, 'missing');
+  assert.deepEqual(deriveBudget({shadowPassesMax: 0}, ['shadowPasses']), {shadowPasses: 1});
+  assert.deepEqual(deriveBudget({shadowPassesMax: 7}, ['shadowPasses']), {shadowPasses: 8});
+  assert.equal(worstOf([{shadowPassesMax: 1}, {shadowPassesMax: 7}]).shadowPassesMax, 7);
+});

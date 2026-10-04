@@ -312,6 +312,7 @@ export async function runBench(o, {log = console.log} = {}) {
         offscreenDrawsPerRenderedFrame: Math.round(w.off / drawn),
         postDrawsPerRenderedFrame: Math.round((w.post ?? 0) / drawn),
         shadowPassDrawsMax: g.shadowPassDrawsMax,
+        shadowPassesMax: g.shadowPassesMax,
         taskMsPerFrame: per('TaskDuration'),
         frameMsP95: w.frameMsP95 === null ? undefined : +w.frameMsP95.toFixed(2),
         frameMsMax: w.frameMsMax === null ? undefined : +w.frameMsMax.toFixed(2),

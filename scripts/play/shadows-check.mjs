@@ -7,7 +7,8 @@
 //     request in a scene without sceneShadows() is drawn without a shadow and reported once;
 //   - a forced redraw of a still scene draws no shadow-map (off-screen) draws: maps redraw only on change
 //     (shadowDrawsIdle 0); moving a caster redraws them once; an idle scene draws no frames;
-//   - a scene without sceneShadows() draws no off-screen pass at all.
+//   - a scene without sceneShadows() draws no off-screen pass at all;
+//   - the bench's own probe (the gate's counters) counts one shadow pass per map face: sun 1, point light 6.
 // Limitations: desktop Chromium with software GL; no physical device, GPU timing or visual-quality judgement.
 import assert from 'node:assert/strict';
 import {mkdirSync} from 'node:fs';
@@ -16,6 +17,7 @@ import {execFileSync} from 'node:child_process';
 import {createServer} from 'vite';
 import {ROOT, sleep} from './lib.mjs';
 import {launch} from '../perf/bench-browser.mjs';
+import {PROBE} from '../perf/probe-inject.mjs';
 import {decodePng} from '../perf/quality-png.mjs';
 import {diagnosticReport} from './diagnostic-report.mjs';
 const out = resolve(process.argv[2] ?? '/tmp/foundation-shadows-browser');
@@ -68,6 +70,8 @@ try {
     const p = browser.page,
       run = {quality};
     report.runs.push(run);
+    // The bench's own page probe, so the gate's shadowPasses / shadowCasters counters are checked against known lights.
+    await p.addInitScript(PROBE);
     const snap = () => p.evaluate(() => window.shadowsCheck.snapshot());
     const settle = async () => {
       let last = -1;
@@ -116,6 +120,11 @@ try {
     const moved = await snap();
     run.shadowDrawsMoved = moved.offscreen - redrawn.offscreen;
     assert.ok(run.shadowDrawsMoved > 0, 'a moved caster redraws the shadow maps');
+    const bench = await p.evaluate(() => window.__gpu());
+    run.bench = {shadowPassesMax: bench.shadowPassesMax, shadowPassDrawsMax: bench.shadowPassDrawsMax};
+    // One pass per shadow-map face: the sun 1, the lantern's point light 6 (its packed map's six faces).
+    assert.equal(bench.shadowPassesMax, quality === 'low' ? 1 : 7, 'bench shadowPasses: sun 1 + point light 6');
+    assert.ok(bench.shadowPassDrawsMax >= run.shadowDrawsMoved, 'bench shadowCasters covers a moved frame');
     await p.evaluate(() => window.shadowsCheck.move('crate', 0));
     await settle();
 

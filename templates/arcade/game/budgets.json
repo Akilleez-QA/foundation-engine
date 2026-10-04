@@ -23,6 +23,7 @@
         "draws": 10,
         "triangles": 10000,
         "shadowCasters": 10,
+        "shadowPasses": 1,
         "textureMiB": 8,
         "canvasMiB": 4,
         "heapMiB": 5,

@@ -206,7 +206,9 @@ hitch. So the visit creates its slots once and never changes their number:
   for example `courtyard: 1 PointLight(s) not drawn: the scene's 8 point slot(s)
   are full (sceneLights({ point }) or the lights.local-max quality knob)`.
 - **Counters:** `testScene(...).lights.stats` and the dev scene handle's
-  `lights()` give `slots`, `admitted` and `refused` by cause.
+  `lights()` give `slots`, `admitted` and `refused` by cause. `refused` counts
+  **lights**, not reports: eight point lights in two slots give `refused.full`
+  6 on every frame they stay refused, while the report still appears once.
 - **Cancellation:** leaving the scene disposes the rig with the visit.
 - **Recovery:** the rig is CPU-side state; after a context loss three recreates the
   programs with the same light count.
@@ -228,16 +230,19 @@ hitch. So the visit creates its slots once and never changes their number:
   `sceneLights()` loads, before its first frame. First-load JS grows by about
   0.8 kB (the components and their validation) and the scene runtime by about
   4 kB (admission and refusal reports), explorer template build.
-- **Budgets:** a light without a shadow adds no draws to the scene pass. A light
-  with `shadow: true` (in a scene with `sceneShadows()`) adds scene passes: its
-  shadow map draws every caster in its reach again, once for a spot light and once
-  per cube face (six) for a point light, on each frame the map redraws (see
-  [Shadows](#shadows); the bench's `shadowCasters` row measures the largest shadow
-  pass). A per-scene `localLights` budget row is not implemented: the bench does
-  not measure slots yet, so slot cost is bounded only by `sceneLights` and the knob.
+- **Budgets:** a light without a shadow adds no draws to the scene pass; its
+  cost is fragment work (see
+  [Cost per light and per shadow](#cost-per-light-and-per-shadow)). A light with
+  `shadow: true` (in a scene with `sceneShadows()`) adds scene passes: its shadow
+  map draws every caster in its reach again, once for a spot light and once per
+  face (six) for a point light, on each frame the map redraws. The bench's
+  `shadowPasses` and `shadowCasters` rows count those passes and draws. A
+  per-scene `localLights` budget row is not implemented: the bench does not
+  measure slots, so slot cost is bounded only by `sceneLights` and the knob.
 - **Not verified:** physical devices. Forward-rendered lights multiply fragment
   cost, so fill rate on phones (DV-01) is unmeasured; that is why `low` caps the
-  slots at 2.
+  slots at 2. A phone reaches `low` by the player's choice or, for a constrained
+  mobile GPU, by the device-class start (ADR 0079).
 - **Quality knob screen:** `lights.local-max` is registered but not wired to the
   Graphics screen yet, like `effects.particles`: a game that has no lights would
   show a control that changes nothing.
@@ -321,13 +326,49 @@ export default defineScene({
 - **Cascades** stay a reference-only, sun-only platform option behind
   `shadows.quality === 'ultra'`; creator scenes do not get them.
 
+### Cost per light and per shadow
+
+Measured on a 10-object fixture (a floor, nine crates, point lights on a ring),
+one crate moving every frame, in headless Chromium with **software GL**. Software
+GL rasterises on the CPU, so the milliseconds show the shape of the cost, not
+phone or desktop times. Draws and passes are counts and transfer.
+
+| Added | Passes per moved frame | Off-screen draws per moved frame | Frame time, software GL |
+|---|---|---|---|
+| An unshadowed point or spot light | 0 | 0 | about +1.5 ms per megapixel (+2.1 ms at 1.24 MP, +8.6 ms at 6.1 MP) |
+| The sun's shadow | 1 | casters inside its box | +10 ms at 1.24 MP, +33 ms at 6.1 MP |
+| A shadowed spot light | 1 | casters in its cone | not measured; one map like the sun's, at 512 or 1024 |
+| A shadowed point light | 6 (one per face) | casters in range of each face, summed (about 18 here) | about +10 ms at 1.24 MP, +27 ms at 6.1 MP |
+
+- **Unshadowed lights cost per lit pixel.** Every slot is evaluated in every lit
+  fragment, dark or not, so cost grows with slots × pixels. They add no draws.
+- **Shadows are the cliff.** Each shadow map re-renders its casters. In the
+  fixture, four shadowed point lights raised the frame from 10 to 92 draws, close
+  to the guidance of about 100 draws per scene on phones. A denser scene grows
+  faster: off-screen draws scale with the casters in each light's range.
+- **Worst case per preset** (all shadowed slots used, something moving): passes
+  are 1 for the sun plus 6 per shadowed point light, so reference 25, high 13,
+  medium 7 and low 1 (spot lights use 1 each instead of 6).
+- **Idle frames are free.** A still scene draws no frames, and a redraw of a
+  still scene draws no shadow pass; the cost applies only while a caster or a
+  shadow light moves.
+- **Cheaper first:** one shadowed sun and unshadowed local lights; `Shadow({ cast:
+  false })` on small moving things; a shadowed spot light (1 pass) before a
+  shadowed point light (6); bake static light into the art. Budget the scene's
+  `shadowPasses` and `shadowCasters` from a bench run.
+
+Source: the 2026-10-03 POODO observation (fixture derived from
+`scripts/play/fixtures/shadows-entry.mjs`; 390 × 844 at DPR 3 = 1.24 MP and
+1600 × 1000 at DPR 2 = 6.1 MP). Not verified on physical devices.
+
 ### Overload, cancellation and recovery
 
 - **Overload:** a light that asks for a shadow when no shadowed slot is free still
   shines, without a shadow (cause `shadow`). In a scene without `sceneShadows()`
   the request is reported the same way (cause `no-shadows`), and an environment's
   sun `shadow` is reported once as well. Each cause is reported once per visit;
-  `testScene(...).lights.stats` counts them, and `stats.shadowed` gives the
+  `testScene(...).lights.stats.refused` counts the lights drawn without their
+  shadow now (one per light, not per report), and `stats.shadowed` gives the
   shadowed slots.
 - **Changing it while playing:** a light's `shadow` is read when it is admitted to
   a slot. Adding or removing the sun's `shadow` in a new environment recompiles
@@ -349,8 +390,18 @@ export default defineScene({
   redraw of the still scene draws **0** shadow-map draws; moving the crate redraws
   them. A scene without `sceneShadows()` draws no off-screen pass. Each report
   appears exactly once.
-- **Budgets:** the bench's `shadowCasters` metric (the largest shadow pass in one
-  frame) and `shadowDrawsIdle` measure real shadow passes for scenes that opt in.
+- **Budgets:** three bench rows count shadow work for scenes that opt in.
+  `shadowPasses` is the most off-screen passes in one frame: one per shadow-map
+  face that drew, so the sun or a spot light is 1 and a point light 6.
+  `shadowCasters` is the most off-screen draws in one frame: for each shadow
+  light, the casters in range of each face, summed (a caster near a point light
+  counts up to six times). Both also count any other render-target pass or draw
+  in that frame, and both are set by frames where something moves, because maps
+  redraw only then. `shadowDrawsIdle` is the off-screen draws per frame while
+  still (0 = static maps). `npm run test:shadows-browser` checks the bench's
+  probe: the sun alone is 1 pass and the sun plus one shadowed point light 7.
+  Every template budgets `shadowPasses: 1` (measured 0, rounded up to the step):
+  one sun shadow fits, a shadowed point light (6 passes) needs a measured row.
   The courtyard trial (sun plus two shadowed lanterns, about 60 casters) measured
   `shadowCasters` 215, 0 off-screen draws per frame while idle (particles still
   animating), 168 while the character moves, and 56.9 MiB of textures, under

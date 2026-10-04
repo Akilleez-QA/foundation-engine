@@ -15,7 +15,7 @@
  *    compiled into programs never changes). A light with `shadow: true` takes a free shadowed slot; when none is free
  *    it takes a plain slot and casts no shadow (cause `shadow`). A light without `shadow` never takes a shadowed slot.
  *    In a scene without `sceneShadows()` a shadow request draws the light without a shadow (cause `no-shadows`);
- *  - each cause is reported once per visit.
+ *  - each cause is reported once per visit; the counters count lights (every light refused now), not reports.
  */
 import type {ComponentType, Entity, World} from '../core/ecs/world';
 import {
@@ -40,7 +40,8 @@ export interface LightStats {
   readonly shadowed: Readonly<SceneLightLimits>;
   /** Lights holding a slot now. */
   admitted: {point: number; spot: number};
-  /** Lights refused (or, for `shadow` and `no-shadows`, drawn without the shadow they asked for) now, by cause. */
+  /** How many lights are refused now (or, for `shadow` and `no-shadows`, drawn without the shadow they asked for), by
+   *  cause. One per light, every frame it stays refused; the report is separate and once per cause per visit. */
   refused: Record<LightRefusal, number>;
   /** Causes reported so far (each once per visit). */
   reported: LightRefusal[];
@@ -122,8 +123,8 @@ export function createLightSlots(o: {
     refused: empty(),
     reported: [],
   };
-  const refusal = (cause: LightRefusal, detail: string) => {
-    stats.refused[cause]++;
+  const refusal = (cause: LightRefusal, detail: string, lights = 1) => {
+    stats.refused[cause] += lights;
     if (stats.reported.includes(cause)) return;
     stats.reported.push(cause);
     o.report(detail);
@@ -178,6 +179,7 @@ export function createLightSlots(o: {
         refusal(
           'no-slots',
           `a ${LABEL[name]} is not drawn: the scene has no light slots (defineScene({ lights: sceneLights() }))`,
+          waiting.length,
         );
       return;
     }
@@ -209,6 +211,7 @@ export function createLightSlots(o: {
       refusal(
         'full',
         `${full} ${LABEL[name]}(s) not drawn: the scene's ${holders.length} ${name} slot(s) are full (sceneLights({ ${name} }) or the lights.local-max quality knob)`,
+        full,
       );
   };
   return {
