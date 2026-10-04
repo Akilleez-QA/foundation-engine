@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {affectedTests, changedFiles, selectionOptions, testSummary} from './check.mjs';
+import {affectedTests, changedFiles, noTestsMessage, selectionOptions, testSummary} from './check.mjs';
 import {mkdtempSync, writeFileSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -116,4 +116,13 @@ test('check: selection options reject missing or conflicting revisions', () => {
   ]) {
     assert.throws(() => selectionOptions(argv));
   }
+});
+
+test('check: the zero-tests line suggests --base only when the selection did not already use it', () => {
+  assert.match(noTestsMessage(undefined), /use --base <ref>, --all, or run explicit tests/);
+  const based = noTestsMessage('origin/main');
+  assert.match(based, /^No tests selected \(0 files\)/);
+  assert.match(based, /since the merge base with origin\/main/);
+  assert.match(based, /not test-suite acceptance/);
+  assert.doesNotMatch(based, /--base/);
 });

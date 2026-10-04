@@ -43,7 +43,7 @@ export const overcast = defineEnvironment({
   pointSize: 1,
 });
 
-/** Night: a cold, dim moon, deep blue fill, dark haze and a few stars. Keep what matters bright. */
+/** Night: a cold, dim key light, deep blue fill, dark haze and a few stars. Keep what matters bright. */
 export const moonlight = defineEnvironment({
   background: 0x0f1834,
   ambient: {sky: 0x5a6fae, ground: 0x1a1d2a, intensity: 1.5},

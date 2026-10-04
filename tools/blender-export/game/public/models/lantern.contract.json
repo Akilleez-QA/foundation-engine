@@ -1,0 +1,38 @@
+{
+  "$comment": "Low-poly lantern example. Requirement: a hand-held prop about 35 cm tall and 20 cm across, resting on its base, within 200 triangles, two untextured materials and 16 KiB. Made by tools/blender-export/game/tools/lantern/export.py.",
+  "schema": 1,
+  "units": "metres",
+  "up": "+Y",
+  "tolerance": 1e-6,
+  "size": {"min": [0.17, 0.32, 0.17], "max": [0.21, 0.38, 0.21]},
+  "pivot": {"at": "base-centre", "node": "lantern"},
+  "limits": {
+    "fileBytes": 16384,
+    "triangles": 200,
+    "vertices": 400,
+    "primitives": 2,
+    "materials": 2,
+    "textures": 0,
+    "textureBytes": 0,
+    "animations": 0,
+    "cameras": 0
+  },
+  "nodeTransforms": "forbidden",
+  "extensions": [],
+  "materials": {
+    "properties": ["name", "doubleSided", "pbrMetallicRoughness", "emissiveFactor"],
+    "pbr": ["baseColorFactor", "metallicFactor", "roughnessFactor"],
+    "alphaModes": ["OPAQUE"],
+    "expected": [
+      {"name": "lantern-iron", "baseColorFactor": [0.08, 0.07, 0.06, 1], "metallicFactor": 0.6, "roughnessFactor": 0.55, "emissiveFactor": [0, 0, 0]},
+      {"name": "lantern-glow", "baseColorFactor": [1, 0.62, 0.2, 1], "metallicFactor": 0, "roughnessFactor": 0.3, "emissiveFactor": [1, 0.55, 0.15]}
+    ]
+  },
+  "nodes": ["lantern"],
+  "semanticSha256": "ab6bd03f915940cd5e57b252805f6c2d41f8e20216740e8e6130fc82d861da02",
+  "provenance": {
+    "required": ["licence", "author", "source", "tool", "generator", "sourceSha256", "sha256", "origin"],
+    "licences": ["GPL-3.0-only"],
+    "equals": {"units": "metres", "up": "+Y", "pivot": "base centre", "source": "tools/blender-export/game/tools/lantern/export.py"}
+  }
+}
