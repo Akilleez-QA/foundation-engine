@@ -113,7 +113,8 @@ export interface EmitterData {
   frames: EmitterFrames | null;
   /** 'additive' glows and needs no sorting; 'normal' blends over (unsorted within the emitter). */
   blending: EmitterBlending;
-  /** True: never thinned by the `effects.particles` quality knob (for particles that carry meaning). */
+  /** True: never thinned by the `effects.particles` quality knob, and still shown (held still) under Calm, for particles
+   *  that carry meaning (a pickup's feedback). False: decoration, withheld under Calm. */
   essential: boolean;
   /** True: the entity is removed once the emitter has emitted and is finished (burst fired, or stopped, and the
    *  longest lifetime has passed). */
@@ -172,6 +173,8 @@ export interface ParticleStats {
   /** Spawn attempts, those thinned by the quality scale, those dropped (full pool or per-step cap). */
   readonly spawned: number;
   readonly thinned: number;
+  /** Spawn attempts of non-essential emitters that Calm (reduced motion) withheld; their draws were still taken. */
+  readonly calmed: number;
   readonly dropped: number;
   /** Admission refusals and invalid-data reports so far. */
   readonly refused: number;
@@ -211,6 +214,8 @@ export interface ParticleFieldOptions {
   limits: SceneParticleLimits;
   /** Quality scale (0, 1] for non-essential emitters: the `effects.particles` knob, read once per visit. */
   scale: number;
+  /** Calm (reduced motion), read at every step: non-essential emitters add no particle and nothing moves. Default off. */
+  calm?(): boolean;
   /** One uniform draw in [0, 1) per admitted emitter, from the particles' own stream (never the gameplay `ctx.random`). */
   seed(): number;
   report(error: Error): void;

@@ -129,6 +129,28 @@ every preset (STD-SIM-10). `essential: true` emitters are never thinned: they ar
 The knob is registered and resolved but not yet `wired` (not shown on the Graphics screen), like texture anisotropy;
 a template that uses particles can wire it. Only the reference preset is gated (STD-SET-5).
 
+## Calm (reduced motion)
+
+Calm (`comfort.calm`, the reduced-motion setting, STD-SET-2) is read from the frame (STD-RUN-8, STD-RUN-32) at every
+fixed step by the visit's field (`ParticleFieldOptions.calm`; `testScene({ calm })` passes the same value). With Calm on:
+
+- **Non-essential emitters add no particle.** Each spawn attempt still takes its random draws and advances its spawn
+  index, then is withheld and counted in `stats.calmed`, so the particles' stream, `spawned` and the `despawn: true`
+  removal tick are the same with Calm on or off (Calm is presentation, not simulation).
+- **Nothing drifts.** Live particles hold their position (no velocity, gravity or drag is applied) and keep ageing, so
+  they fade out by their size and opacity curves where they are and the scene then stops redrawing.
+- **Essential emitters still show** (`essential: true`, for feedback the player needs, such as a pickup burst): their
+  particles appear at the spawn point and stay still, with their usual count, size, colour and opacity curves. A
+  flipbook still steps its frames (frame changes are not translated; an author who considers them motion can drop
+  `frames` under Calm).
+- **Turning Calm off** resumes motion: held particles move on with the velocity they had, and new particles are the
+  same ones a run that never had Calm draws at that step.
+
+Whether something is decoration is the author's call; the field only distinguishes `essential`. A system that moves
+an emitter's `Transform` is the game's own motion and reads `ctx.time.calm` itself (the explorer and showcase motes
+hold their source still). `npm run play:snap -- --calm` reports particles added in its still window and those
+withheld by Calm.
+
 ## Determinism
 
 **Step rate.** Particles step on the fixed 60 Hz lane, like every fixed system. On a 120 or 144 Hz display they move
@@ -172,6 +194,8 @@ an effect leaves the gameplay sequence and existing `?seed=` replays unchanged (
 | Unit | `src/author/particles.test.ts` (validation, burst/continuous, seeded determinism, gameplay stream unchanged by effects, bounded refusal under sustained hits with no late firing, no re-fire on rebuild, bind failure not retried, thinning subset, overload, admission and refusal, invalid-data freeze, rebuild, interpolation and curves, rotation, trail spacing, `testScene`, compile-time texture check); `src/author/scene-particles.test.ts` (one hidden instanced mesh per emitter, live-prefix upload ranges, blending, texture lease/apply/release/failure/late arrival, visit disposal); `src/author/particle-view.test.ts` (lazy renderer: loads once on first need, binds waiting emitters, ignores a late arrival after the visit, reports a failed load or a failed renderer creation once); `src/author/particles-recipe.test.ts` (the recipe's code, plus a check that its definitions still match the recipe's code blocks) | Node, no GPU |
 | Browser | `npm run test:particle-browser` (`scripts/play/particle-check.mjs`): reference and low presets; idle emitters 0 draws and 0 frames; one burst +1 draw with 2 triangles per particle (48 on reference, 24 on low); three live emitters 3 draws; back to the baseline draws and still once particles die; the drawing chunk fetched once; 3 emitter geometries disposed and the texture released on exit; a 2 × 2 flipbook packed by `fx:pack` (`'over-life'`) is one draw while live, its frame attribute steps 0, 1, 2, 3 and the screen shows the cells in reading order (red, green, blue, yellow) | Desktop headless Chromium, software GL |
 | Browser (on-demand) | Same check: a scene without systems plays its own one-shot burst, removes the entity and then renders no frames | As above |
+| Unit (Calm) | `src/author/particles.test.ts` (`Calm: …`): non-essential emitters add nothing, attempts and despawn tick unchanged, live particles held still and aged out, new particles after Calm is off are the reference run's; an essential burst shows, held at its spawn point; `testScene({ calm })` leaves world state, `ctx.random()` and the particle stream unchanged | Node, no GPU |
+| Browser (Calm) | `npm run play:snap -- --calm` on the explorer (garden: 1 emitter) and showcase (courtyard: 8 emitters) templates: 0 renders, picture unchanged, 0 particles added (7 and 199 withheld by Calm) in the 1.5 s still window | Desktop headless Chromium, software GL; no physical device |
 | Unit (flipbook) | `src/author/particle-flipbook.test.ts` (UV and frame maths, shader formula and attribute only on flipbook emitters, 16×16 cap refusal at definition and at run time, determinism with a seed and from the unseeded visit stream, no extra draw for over-life and loop, gameplay stream unchanged); `scripts/fx-pack.test.mjs` (grid choice and cap, layout, sidecar, natural order) | Node, no GPU |
 | Bundle (flipbook) | Blank template build: lazy `scene-particles` chunk 3,401 → 3,850 bytes minified (1,698 → 1,879 gzip); scene runtime chunk 462,401 → 462,427 bytes | Blank template only |
 | Gate | Template budgets unchanged: no template uses `Emitter`. Blank template build: scene runtime chunk +3.0 kB (489.6 → 492.6 kB, including the particle seed derivation), first-load JS +0.5 kB | Per-scene counts and bundle of the checked templates |

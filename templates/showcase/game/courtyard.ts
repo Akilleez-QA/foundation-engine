@@ -88,6 +88,8 @@ export const emberBurst = defineEntity({
       color: [0xffffff, 0xffb04a, 0xff5a00],
       opacity: [1, 0],
       despawn: true,
+      // Feedback the player needs (an ember was taken): never thinned, and still shown (held still) under Calm.
+      essential: true,
     }),
   ],
 });

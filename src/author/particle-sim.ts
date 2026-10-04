@@ -24,6 +24,11 @@
  * spawn attempt takes exactly four draws (five for a 'random-start' flipbook), before thinning and before the pool check, so the stream (and the
  * `despawn` time) does not depend on the quality preset. Thinning keeps spawn index k when
  * floor((k+1)·scale) > floor(k·scale): a lighter preset draws a deterministic subset of the reference particles.
+ *
+ * Calm (reduced motion, `calm()` read every step): a presentation setting, so it changes no stream, spawn index, count
+ * other than its own or despawn time. Non-essential emitters keep taking their draws but add no particle (counted in
+ * `calmed`); nothing moves (live particles hold where they are and fade out by their curves); an essential emitter still
+ * shows its particles, at its spawn point and still. When Calm is turned off, held particles move on.
  */
 import {mulberry32} from '../core/rng';
 import type {Entity, World} from '../core/ecs/world';
@@ -120,8 +125,10 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
   // Emitters waiting for admission this step (reused arrays): admitted after retired slots free their capacity.
   const waiting: Entity[] = [],
     waitingData: EmitterData[] = [];
-  const counts = {spawned: 0, thinned: 0, dropped: 0, refused: 0, invalid: 0};
+  const counts = {spawned: 0, thinned: 0, calmed: 0, dropped: 0, refused: 0, invalid: 0};
+  const readCalm = o.calm ?? (() => false);
   let tick = 0,
+    calm = false,
     reserved = 0,
     disposed = false;
   // Refusals by cause; each cause is reported once per visit (a later refusal for the other cause is still reported).
@@ -291,6 +298,11 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
       counts.thinned++;
       return;
     }
+    // Calm: the draws above are taken either way, so the stream is the same with Calm on or off.
+    if (calm && !d.essential) {
+      counts.calmed++;
+      return;
+    }
     const p = slot.pool;
     if (p.live >= p.capacity) {
       counts.dropped++;
@@ -313,13 +325,14 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
       sy = slot.ey + (y - slot.ey) * f,
       sz = slot.ez + (z - slot.ez) * f;
     const i = p.live++,
-      j = i * 3;
+      j = i * 3,
+      moved = calm ? 0 : age;
     p.prev[j] = sx;
     p.prev[j + 1] = sy;
     p.prev[j + 2] = sz;
-    p.pos[j] = sx + vx * age;
-    p.pos[j + 1] = sy + vy * age;
-    p.pos[j + 2] = sz + vz * age;
+    p.pos[j] = sx + vx * moved;
+    p.pos[j + 1] = sy + vy * moved;
+    p.pos[j + 2] = sz + vz * moved;
     p.vel[j] = vx;
     p.vel[j + 1] = vy;
     p.vel[j + 2] = vz;
@@ -381,6 +394,14 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
       }
       p.prevAge[i] = age - dt;
       const j = i * 3;
+      if (calm) {
+        // Held: no drift, gravity or drag while Calm is on; the particle ages and fades out where it is.
+        p.prev[j] = p.pos[j]!;
+        p.prev[j + 1] = p.pos[j + 1]!;
+        p.prev[j + 2] = p.pos[j + 2]!;
+        i++;
+        continue;
+      }
       const px = (p.prev[j] = p.pos[j]!),
         py = (p.prev[j + 1] = p.pos[j + 1]!),
         pz = (p.prev[j + 2] = p.pos[j + 2]!);
@@ -440,6 +461,11 @@ export function createParticleField(o: ParticleFieldOptions): ParticleField {
     step(world, dt) {
       if (disposed || !(dt > 0)) return;
       tick++;
+      try {
+        calm = readCalm() === true;
+      } catch {
+        calm = false; // A failing setting read cannot stop the step.
+      }
       finished.length = 0;
       waiting.length = 0;
       waitingData.length = 0;

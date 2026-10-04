@@ -710,3 +710,137 @@ test('bindFailed from a lazy renderer releases the slot and the emitter is not r
   assert.equal(r.released.length, 1);
   assert.deepEqual(reports, ['late bind']);
 });
+
+test('Calm: non-essential emitters add no particle and live ones hold still, with the same stream and despawn time', () => {
+  let calmOn = false;
+  const make = (calm: () => boolean) => {
+    const world = new World(),
+      r = recorder();
+    const f = createParticleField({
+      limits: normalizeSceneParticles(undefined),
+      scale: 1,
+      calm,
+      seed: mulberry32(11),
+      report: () => {},
+      renderer: r.renderer,
+    });
+    const e = world.spawn(
+      Transform({x: 1}),
+      defineEmitter({
+        mode: 'continuous',
+        rate: 60,
+        max: 128,
+        lifetime: [0.5, 1],
+        speed: [1, 2],
+        spread: Math.PI,
+        gravity: [0, -2, 0],
+        despawn: true,
+      }),
+    );
+    return {world, f, r, e};
+  };
+  // Reference: Calm never on.
+  const ref = make(() => false);
+  // Calm from the start: nothing is added, every attempt still takes its draws.
+  const calm = make(() => true);
+  run(ref.f, ref.world, 30);
+  run(calm.f, calm.world, 30);
+  assert.ok(ref.f.stats.live > 0);
+  assert.equal(calm.f.stats.live, 0, 'Calm: a non-essential emitter adds no particle');
+  assert.equal(calm.f.stats.spawned, ref.f.stats.spawned, 'the same spawn attempts');
+  assert.equal(calm.f.stats.calmed, ref.f.stats.spawned);
+  // Turned on mid-run: live particles hold where they are and fade out; turned off: the stream is where the reference is.
+  const mid = make(() => calmOn);
+  run(mid.f, mid.world, 30);
+  calmOn = true;
+  const slot = must(mid.r.bound[0], 'bound slot 0');
+  const held = positions(slot).slice(0, 3);
+  mid.f.step(mid.world, STEP);
+  assert.deepEqual(positions(slot).slice(0, 3), held, 'no drift, gravity or drag under Calm');
+  mid.f.interpolate(0.5);
+  assert.deepEqual(Array.from(slot.pool.offset.subarray(0, 3)), held.map(Math.fround), 'drawn still between steps');
+  run(mid.f, mid.world, 70);
+  assert.equal(mid.f.stats.live, 0, 'held particles age out');
+  calmOn = false;
+  run(ref.f, ref.world, 71);
+  run(mid.f, mid.world, 30);
+  run(ref.f, ref.world, 30);
+  assert.equal(mid.f.stats.spawned, ref.f.stats.spawned);
+  // Particles spawned after Calm is off are the reference's own (same stream position): each is one of its particles.
+  const triples = (xs: number[]) => xs.flatMap((_, i) => (i % 3 ? [] : [xs.slice(i, i + 3).join(',')]));
+  const after = triples(positions(slot)),
+    reference = new Set(triples(positions(must(ref.r.bound[0], 'reference slot'))));
+  assert.ok(after.length > 0);
+  for (const p of after) assert.ok(reference.has(p), `particle ${p} is the reference's`);
+  // The one-shot's removal is a function of the data and the step count, not of Calm.
+  for (const x of [ref, calm]) x.world.get(x.e, Emitter)!.playing = false;
+  let a = 0,
+    b = 0;
+  while (ref.world.exists(ref.e) && a < 1000) (ref.f.step(ref.world, STEP), a++);
+  while (calm.world.exists(calm.e) && b < 1000) (calm.f.step(calm.world, STEP), b++);
+  assert.equal(b, a);
+});
+
+test('Calm: an essential burst still shows, held still at its spawn point', () => {
+  const world = new World(),
+    {f} = field({calm: () => true});
+  const e = world.spawn(
+    Transform({x: 2, y: 1, z: -1}),
+    defineEmitter({
+      mode: 'burst',
+      count: 12,
+      bursts: 1,
+      lifetime: [0.5, 0.5],
+      speed: [2, 3],
+      spread: Math.PI,
+      gravity: [0, -9, 0],
+      essential: true,
+    }),
+  );
+  f.step(world, STEP);
+  run(f, world, 10);
+  const s = must(f.sample(e), 'essential sample');
+  assert.equal(s.live, 12, 'essential particles carry meaning: still shown under Calm');
+  assert.deepEqual(s.bounds, {min: [2, 1, -1], max: [2, 1, -1]}, 'and held at the spawn point');
+  assert.equal(f.stats.calmed, 0);
+});
+
+test('Calm: testScene with calm changes no world state, gameplay stream or particle stream', async () => {
+  const sparks = defineEntity({
+    id: 'sparks',
+    components: [defineEmitter({mode: 'burst', count: 6, max: 6, bursts: 1, despawn: true, speed: [1, 2]})],
+  });
+  const play = async (calm: boolean) => {
+    const out: number[] = [];
+    let n = 0;
+    const roll = defineSystem({
+      id: 'roll',
+      run(ctx) {
+        n++;
+        if (n % 5 === 0) ctx.spawn(sparks, Transform({x: n}));
+        out.push(ctx.random());
+      },
+    });
+    const t = await testScene(
+      defineScene({
+        id: 's',
+        title: 'S',
+        particles: sceneParticles(),
+        entities: [[Transform(), defineEmitter({mode: 'continuous', rate: 30})]],
+        systems: [roll],
+      }),
+      {seed: 9, calm},
+    );
+    t.run(1);
+    const result = {out, count: t.world.count, stats: t.particles.stats!};
+    t.dispose();
+    return result;
+  };
+  const moving = await play(false),
+    calm = await play(true);
+  assert.deepEqual(calm.out, moving.out);
+  assert.equal(calm.count, moving.count, 'one-shots despawn at the same ticks');
+  assert.equal(calm.stats.spawned, moving.stats.spawned);
+  assert.equal(calm.stats.live, 0);
+  assert.equal(calm.stats.calmed, moving.stats.spawned);
+});
