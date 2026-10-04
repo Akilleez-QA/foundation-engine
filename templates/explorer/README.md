@@ -15,6 +15,7 @@ This README stays with the template; your copy lives in `game/` and `GAME.md`.
 | `game/game.ts` | the game, the `ui`, `camera`, `character` and `explore` kits, and the words |
 | `game/garden.ts`, `game/shed.ts` | the two scenes: ground, `Walls`, `Solid` obstacles, `Interactable` things and doors |
 | `game/world.ts` | shared parts: the player, the list of things to find, the HUD, and every scene's systems |
+| `game/look.ts`, `game/forms.ts`, `game/*-scenery.ts` | the palette and light, low-poly builders, and each scene's scenery baked into one mesh ([art direction](../../docs/recipes/art-direction.md)) |
 | `game/garden.test.ts` | the criteria's tests |
 | `game/playtest/door.json` | a scripted browser playtest through the door |
 
