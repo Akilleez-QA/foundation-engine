@@ -40,9 +40,10 @@ pictures yourself, and the checklist below.
 9. Within budget: draws and triangles from the snap against `budgets.json`; static scenery baked.
 10. Calm motion: no flicker; decoration stops under Calm.
 
-Report: before and after pictures, what changed, the checklist result, draws and triangles against the budget. Not
-available yet in the engine (say so instead of promising them): local lights, cast shadows, tone mapping and bloom,
-a gradient sky. The recipe's last table lists today's workaround for each. Instanced scatter (`defineScatter`) and
+Report: before and after pictures, what changed, the checklist result, draws and triangles against the budget. The
+recipe's last table lists workarounds from before the engine had local lights, cast shadows, tone mapping, a gradient
+sky and post-processing (bloom, vignette, grade: `view.post`, docs/guides/post-processing.md); prefer the engine's
+own where it has them. Instanced scatter (`defineScatter`) and
 `Material` on a `Mesh` or `Model` (flat, matte, toon, double side, cut-out) do exist: use them. When
 the author agrees the look needs more (a composer pass, a custom shader, a loader), a game can opt into `@kits/three`;
 the game owns that code across three.js upgrades: docs/recipes/use-three-directly.md.

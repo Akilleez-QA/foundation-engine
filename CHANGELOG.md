@@ -130,6 +130,13 @@ Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c
 - **`asset:verify` enforces the model loader's caps.** Every contracted model must fit the loader's admission
   limits (32 MiB, accessor, node, skin and animation counts, four bone influences), and Draco is refused (KTX2
   is accepted when the contract lists it, since #146).
+- **Post-processing: `view.post` at the player's `post.mode` tier.** Bloom, vignette and grade as scene data
+  (`ctx.view.post` is live, one redraw). `off` (low) draws as before, `basic` (medium) adds one combined pass (tone
+  map, grade, vignette), `full` (reference, high) adds a half-resolution bloom chain. The knob is now wired. A scene
+  without `view.post` loads no post code; the GLSL chunk is 6.1 kB minified. **Budget contract change:** post passes
+  are counted apart as `postDraws` (10, 1, 0 per tier; probe, bench, gate, `perf:derive`, `play:snap`), so `draws`
+  keeps measuring scene draws. Guide: [post-processing](docs/guides/post-processing.md); browser evidence:
+  `npm run test:post-browser`.
 - **Full three.js for a game that opts in: `@kits/three`.** A game that lists `three()` in `defineGame({ kits })`
   may import `three`, `three/addons/*` and `three/examples/jsm/*` (one shared copy); every other game still may not
   (`npm run lint:layers`: `three-needs-kit`, `kit-not-listed`), and `npm run check` names each file that uses the kit.
