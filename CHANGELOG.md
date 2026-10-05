@@ -10,7 +10,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
 Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
 (#122 onward). None of it is in that candidate.
 
-- **play:snap judges the settled scene and reports the warm-up.** Each view now measures from the moment the scene
+- **play:snap judges the settled scene and reports the warm-up (#180).** Each view now measures from the moment the scene
   opens until its per-frame draws, post draws and triangles agree within 5 % across three consecutive 600 ms windows
   (at most 8 s), then takes its pictures and the windows the budget is judged on. A scene that draws more on its first
   frames (programs compiling, passes started a few frames in, geometry settling) used to be judged partly on those
