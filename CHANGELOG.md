@@ -10,6 +10,14 @@ Every new framework below is optional: a game that does not use it is unchanged.
 Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
 (#122 onward). None of it is in that candidate.
 
+- **Docs: lessons from a character-crowd lab.** Two new guides record practices learned building skinned, mocap-driven
+  characters and a crowd in a lab, written generically and marked as practices rather than engine features:
+  [character pipeline lessons](docs/guides/character-pipeline-lessons.md) (rest-pose alignment on limb chains only,
+  heel-flat-ball foot planting and gait-symmetry gates, re-cleaning skin weights on every LOD, resampling and loop
+  seams, clip QA) and [crowd and night rendering lessons](docs/guides/crowd-and-night-rendering-lessons.md) (per-pass
+  character cost, animation cadence by on-screen rank, inertialized transitions, specular and HDR caps under bloom,
+  mirror reflection cost, fitted grading tables, GPU and warm-up honesty in measurement). Each says where the engine
+  has no such step. Linked from the docs index, the labs guide and the load-a-model recipe.
 - **The GPU bench reaches the GPU on Linux.** `npm run bench -- --gpu` (and `bench:ref`) dropped only the software-GL
   flags, and headless Chromium on Linux then fell back to SwiftShader anyway, so "gpu" runs measured a software
   rasteriser (about 1 fps for a crowded three.js scene instead of 60). The harness now adds `--use-gl=angle

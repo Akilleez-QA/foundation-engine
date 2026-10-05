@@ -17,6 +17,7 @@ Start with one route; the rest is reference.
 - [Scene look](guides/scene-look.md): opt-in tone mapping, exposure, local point and spot lights, shadows, and a gradient sky with haze for a scene, as plain data.
 - [Kit catalog](kits/README.md): optional patterns a game can choose, configure or leave out.
 - [Labs](guides/labs.md): prove one system (a mechanic, a kit, a technique) in a small isolated game before building a world on it, then graduate it into the engine.
+- [Character pipeline lessons](guides/character-pipeline-lessons.md) and [crowd and night rendering lessons](guides/crowd-and-night-rendering-lessons.md): practices learned in a character-crowd lab (retargeting, weights, LOD, clip QA, crowd cost, transitions, wet looks, measuring), with what the engine does and does not provide.
 - [Working with your agent](guides/working-with-your-agent.md): the author's side of the operating manual.
 
 ## Contribute to the engine
