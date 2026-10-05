@@ -12,6 +12,12 @@
 // shadowCasters, shadowPasses and textureMiB each against the scene's budget (look checklist item 9), then its measured
 // fps labelled advisory: software GL in an emulated viewport is not device evidence, so fps is never judged.
 // Screenshot paths are relative to the repository.
+// Warm-up: a scene may draw more on its first frames than once it settles (programs compiling, shadow or reflection
+// passes started a few frames in, culling or streaming not yet settled). Every view first measures from the moment the
+// scene opens until its per-frame draws, post draws and triangles agree across consecutive windows (lib.mjs SETTLE,
+// bounded), and only then takes its pictures and the windows the budget is judged on. Both are reported: the first
+// window as `warmUp` (not judged) and the settle result. Shadow passes, shadow casters and texture memory stay the
+// busiest frame and the total since the scene opened, warm-up included, as the gate measures them.
 // Exit code 1 when the page had errors or the scene is over budget, so an agent notices. A window with no rendered frame
 // is reported as 'not measured (no frames rendered)', never as 'within budget'.
 //
@@ -39,10 +45,12 @@ import {
   measure,
   open,
   serve,
+  settle,
   sleep,
   VIEWS,
   viewLine,
   viewPreset,
+  warmUpLine,
   write,
 } from './lib.mjs';
 
@@ -75,6 +83,8 @@ export async function snap({scene, mobile = false, url, quality, calm = false}) 
       const lines = await open(b, url, scene, pin ? {query: {quality: pin}} : {});
       const preset = await b.evaluate(`window.engine.probe('quality') ?? null`);
       const calmOn = calm ? !!(await b.evaluate(`window.engine.probe('settings')?.calm`)) : undefined;
+      // From the open until the per-frame counts settle; the warm-up window is reported, the settled frames judged.
+      const settled = await settle(b);
       const shot = evidencePath(
         write(dir, `${scene}-${name}${calm ? '-calm' : ''}.png`, await b.page.screenshot({type: 'png'})),
       );
@@ -112,6 +122,8 @@ export async function snap({scene, mobile = false, url, quality, calm = false}) 
         quality: {preset: preset?.preset ?? null, source: preset?.source ?? null, requested: pin},
         ...(calm ? {calm: calmOn} : {}),
         activity: idle,
+        warmUp: settled.warmUp,
+        settle: {settled: settled.settled, windows: settled.windows, ms: settled.ms, steady: settled.steady},
         still,
         moving,
         ...(redrawn ? {redrawn} : {}),
@@ -165,6 +177,7 @@ function report(p) {
   );
   const counts = countsLine(d.budget);
   if (counts) console.log(`  counts: ${counts}`);
+  console.log(`  ${warmUpLine({...d.settle, warmUp: d.warmUp})}`);
   console.log(`  ${qualityLine('desktop', d)}`);
   console.log(`  ${p.calm ? 'calm' : 'activity'}: ${activityLine(d.activity, d.calm)}`);
   for (const [name, v] of Object.entries(p.views)) {
@@ -172,6 +185,7 @@ function report(p) {
     console.log(viewLine(name, v));
     const c = countsLine(v.budget);
     if (c) console.log(`    counts: ${c}`);
+    console.log(`    ${warmUpLine({...v.settle, warmUp: v.warmUp})}`);
     console.log(`    ${qualityLine(name, v)}`);
     console.log(`    ${p.calm ? 'calm' : 'activity'}: ${activityLine(v.activity, v.calm)}`);
   }

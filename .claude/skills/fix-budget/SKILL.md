@@ -7,7 +7,7 @@ description: Bring a scene back under its performance budget, or measure a new s
 
 Budgets only fall. A raise needs the author's explicit approval and a `Perf-Budget: <key> <old> -> <new>: <reason>` commit trailer (docs/recipes/add-a-budget.md).
 
-1. Find the breach: `npm run play:snap -- --scene <id>` (draws, triangles per frame) or the gate's report (which metric, which window: idle or active).
+1. Find the breach: `npm run play:snap -- --scene <id>` (draws, triangles per frame after the scene settles; its `warm-up` line shows the first frames after open, which are reported but not judged) or the gate's report (which metric, which window: idle or active).
 2. **Count draw calls before triangles.** Each draw has a fixed CPU and driver cost, so on phones the draw count usually runs out long before the triangles do. The numbers that bind are the scene's row in `budgets.json` and the brief's per-scene ceiling for its minimum device (`brief.performance.perScene.draws`; the phone tier's default is 100 per scene). As guidance, about 100 draws per scene is what phones carry well; the brief's and `budgets.json`'s numbers always win. Cut triangles only once the draws fit, or when triangles are the metric over. Shadows count too: in a scene with `sceneShadows()`, each shadow map that redraws draws its casters again (one pass for the sun or a spot light, six for a shadowed point light), and the bench's `shadowCasters` row measures the largest pass. Mark small or always-moving things `Shadow({ cast: false })` and keep shadowed lights few (docs/guides/scene-look.md, Shadows).
 3. Recover, in this order, and re-measure after each:
    1. **Simplify**: fewer entities, simpler shapes (a box instead of a capsule), fewer segments, hide what the camera cannot see.

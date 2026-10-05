@@ -191,6 +191,69 @@ export async function measure(b, during, ms = 1200) {
   };
 }
 
+/**
+ * Settle bounds for play:snap: windows of `windowMs`; the scene has settled when `stableWindows` consecutive windows
+ * each drew frames and match the window before within `tolerance` (relative) on draws, post draws and triangles per
+ * frame; `maxMs` ends the wait either way (the last window is then judged and the result says it did not settle).
+ */
+export const SETTLE = Object.freeze({windowMs: 600, stableWindows: 2, tolerance: 0.05, maxMs: 8000});
+
+/** Two windows agree: both drew frames and every per-frame count is within `tolerance` of the other (relative). */
+export function windowsAgree(a, b, tolerance = SETTLE.tolerance) {
+  if (!a?.renders || !b?.renders) return false;
+  const near = (x, y) => Math.abs(x - y) <= tolerance * Math.max(Math.abs(x), Math.abs(y), 1);
+  return (
+    near(a.drawsPerFrame, b.drawsPerFrame) &&
+    near(a.postDrawsPerFrame ?? 0, b.postDrawsPerFrame ?? 0) &&
+    near(a.trisPerFrame, b.trisPerFrame)
+  );
+}
+
+/** Whether the last `stableWindows` windows each agree with the one before (so stableWindows + 1 windows at least). */
+export function hasSettled(windows, {stableWindows = SETTLE.stableWindows, tolerance = SETTLE.tolerance} = {}) {
+  if (windows.length < stableWindows + 1) return false;
+  for (let i = windows.length - stableWindows; i < windows.length; i++)
+    if (!windowsAgree(windows[i - 1], windows[i], tolerance)) return false;
+  return true;
+}
+
+/**
+ * Measure from the moment a scene opens until its per-frame counts settle. A scene may warm up: compile programs,
+ * stream or build geometry, render shadow maps or other passes only on its first frames, or cull nothing until its
+ * bounds are known. Each window asks the loop for a few redraws through the test API, so a still scene draws too.
+ * Returns the first window (`warmUp`), the last (`steady`), whether it settled, the windows taken and the time.
+ */
+export async function settle(b, o = {}) {
+  const {windowMs, stableWindows, tolerance, maxMs} = {...SETTLE, ...o};
+  const t0 = Date.now(),
+    windows = [];
+  const redraws = async () => {
+    for (let i = 0; i < 4; i++) {
+      await b.evaluate('window.engine.redraw()');
+      await sleep(windowMs / 5);
+    }
+  };
+  do windows.push(await measure(b, redraws, windowMs));
+  while (!hasSettled(windows, {stableWindows, tolerance}) && Date.now() - t0 < maxMs);
+  return {
+    warmUp: windows[0],
+    steady: windows.at(-1),
+    settled: hasSettled(windows, {stableWindows, tolerance}),
+    windows: windows.length,
+    ms: Date.now() - t0,
+  };
+}
+
+/** One line comparing the warm-up window with the steady one, e.g. `warm-up 41 draws, 1,636,000 tris → steady …`. */
+export function warmUpLine(s) {
+  const f = m =>
+    m?.renders ? `${m.drawsPerFrame} draws, ${m.trisPerFrame.toLocaleString('en-US')} tris` : 'no frames';
+  const how = s.settled
+    ? `settled after ${(s.ms / 1000).toFixed(1)} s (${s.windows} windows)`
+    : `did not settle within ${(s.ms / 1000).toFixed(1)} s; the budget is judged on the last frames`;
+  return `warm-up (first ${s.windowMs ?? SETTLE.windowMs} ms after open, not judged): ${f(s.warmUp)} → steady: ${f(s.steady)} · ${how}`;
+}
+
 /** The page's GPU census from the bench probe (probe-inject.mjs): texture memory and the busiest frame's shadow work
  *  since the page opened the scene. Null fields when the probe is not installed. */
 export async function gpuCensus(b) {

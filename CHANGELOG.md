@@ -10,6 +10,14 @@ Every new framework below is optional: a game that does not use it is unchanged.
 Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
 (#122 onward). None of it is in that candidate.
 
+- **play:snap judges the settled scene and reports the warm-up.** Each view now measures from the moment the scene
+  opens until its per-frame draws, post draws and triangles agree within 5 % across three consecutive 600 ms windows
+  (at most 8 s), then takes its pictures and the windows the budget is judged on. A scene that draws more on its first
+  frames (programs compiling, passes started a few frames in, geometry settling) used to be judged partly on those
+  frames. A `warm-up` line prints the first window after open beside the settled one; `probe.json` records `warmUp`
+  and `settle` per view. Shadow passes, shadow casters and texture memory are unchanged: still the busiest frame and
+  the total since the scene opened, as the gate measures them. A snap takes about 2 s longer per view (more while a
+  scene settles).
 - **The GPU bench reaches the GPU on Linux.** `npm run bench -- --gpu` (and `bench:ref`) dropped only the software-GL
   flags, and headless Chromium on Linux then fell back to SwiftShader anyway, so "gpu" runs measured a software
   rasteriser (about 1 fps for a crowded three.js scene instead of 60). The harness now adds `--use-gl=angle

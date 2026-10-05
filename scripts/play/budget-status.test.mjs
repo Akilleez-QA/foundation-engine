@@ -12,10 +12,15 @@ import {
   countsLine,
   evidencePath,
   frameRateLine,
+  hasSettled,
   NOT_MEASURED,
   OUT,
   ROOT,
+  SETTLE,
+  settle,
   viewLine,
+  warmUpLine,
+  windowsAgree,
 } from './lib.mjs';
 
 const scene = Object.keys(budgets().scenes)[0];
@@ -127,4 +132,70 @@ test('play:snap activity line: renders, picture and particles; with Calm, whethe
     activityLine({...still, particles: {...still.particles, calmed: 9}}, true),
     /0 spawned \(9 withheld by Calm\) · motion stopped, emitters stopped/,
   );
+});
+
+const win = (drawsPerFrame, trisPerFrame, postDrawsPerFrame = 0, renders = 5) => ({
+  renders,
+  drawsPerFrame,
+  trisPerFrame,
+  postDrawsPerFrame,
+});
+
+test('play:snap settle: windows agree within the tolerance on draws, post draws and triangles, and only with frames', () => {
+  assert.equal(windowsAgree(win(40, 100_000), win(41, 102_000)), true, 'within 5 %');
+  assert.equal(windowsAgree(win(40, 1_636_000), win(40, 420_000)), false, 'a warm-up triangle peak');
+  assert.equal(windowsAgree(win(60, 1000), win(40, 1000)), false, 'draws differ');
+  assert.equal(windowsAgree(win(40, 1000, 10), win(40, 1000, 0)), false, 'post draws differ');
+  assert.equal(windowsAgree(win(0, 0, 0, 0), win(0, 0, 0, 0)), false, 'no frames is never settled');
+});
+
+test('play:snap settle: settled after stableWindows consecutive agreeing windows, so a warm-up window never counts', () => {
+  const warm = win(52, 1_636_000);
+  const steady = win(40, 420_000);
+  assert.equal(SETTLE.stableWindows, 2);
+  assert.equal(hasSettled([warm, steady]), false);
+  assert.equal(hasSettled([warm, steady, steady]), false, 'one agreeing pair is not enough');
+  assert.equal(hasSettled([warm, steady, steady, steady]), true);
+  assert.equal(hasSettled([steady, steady, warm]), false, 'a late spike resets it');
+  assert.equal(hasSettled([warm, steady, steady], {stableWindows: 1}), true);
+});
+
+test('play:snap settle: the warm-up line names both windows and whether it settled', () => {
+  const line = warmUpLine({warmUp: win(52, 1_636_000), steady: win(40, 420_000), settled: true, windows: 4, ms: 2600});
+  assert.match(
+    line,
+    /warm-up \(first 600 ms after open, not judged\): 52 draws, 1,636,000 tris → steady: 40 draws, 420,000 tris/,
+  );
+  assert.match(line, /settled after 2\.6 s \(4 windows\)/);
+  const not = warmUpLine({warmUp: win(1, 1), steady: win(0, 0, 0, 0), settled: false, windows: 13, ms: 8100});
+  assert.match(not, /steady: no frames · did not settle within 8\.1 s; the budget is judged on the last frames/);
+});
+
+/** A page stand-in for settle(): every engine.redraw() draws one frame; the first `heavy` frames are a warm-up. */
+function warmingPage({heavy = 6, warm = [52, 1_636_000], steady = [40, 420_000]} = {}) {
+  const c = {draws: 0, tris: 0, renders: 0};
+  return {
+    async evaluate(js) {
+      if (js.includes('engine.redraw()')) {
+        const [d, t] = c.renders < heavy ? warm : steady;
+        c.draws += d;
+        c.tris += t;
+        c.renders++;
+        return undefined;
+      }
+      if (js.includes('requestAnimationFrame')) return [16, 16, 17];
+      return {draws: c.draws, post: 0, tris: c.tris, loop: {renders: c.renders}, heap: null};
+    },
+  };
+}
+
+test('play:snap settle: a scene that warms up is judged on its settled frames and reports the warm-up apart', async () => {
+  const s = await settle(warmingPage(), {windowMs: 5});
+  assert.equal(s.settled, true);
+  assert.deepEqual([s.warmUp.drawsPerFrame, s.warmUp.trisPerFrame], [52, 1_636_000], 'the first window is the warm-up');
+  assert.deepEqual([s.steady.drawsPerFrame, s.steady.trisPerFrame], [40, 420_000]);
+  assert.equal(s.windows, 5, 'warm-up, the mixed window, then three alike (two agreeing pairs)');
+  const never = await settle(warmingPage({heavy: Infinity, warm: [1, 1]}), {windowMs: 5, maxMs: 0});
+  assert.equal(never.windows, 1, 'maxMs bounds the wait');
+  assert.equal(never.settled, false);
 });
