@@ -3,3 +3,5 @@
   of Unreleased. `npm run changelog` previews the section, `npm run lint:changelog` (in `lint` and `check`) validates
   the fragments, and `npm run changelog -- --fold` moves them into CHANGELOG.md at release time
   ([changes/unreleased](changes/unreleased/README.md)).
+  `docs/capabilities.md` now lists kits, templates, `@engine` exports and npm scripts one per line for the same
+  reason: two changes that each add an item no longer edit the same line.
