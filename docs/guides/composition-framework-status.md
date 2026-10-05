@@ -504,8 +504,7 @@ real sun shadow (beyond the sun's shadow box with a crossfade, in a scene withou
 visit (`author/scene-blob-shadows.ts`, a lazy chunk; policy in `author/blob-shadow.ts`; GPU layer in
 `platform/render/blob-shadows.ts`). Bounded by `max` (64 by default, cap 1024), allocated once; over it the nearest to
 the camera are kept, the rest counted and reported once. Buffers upload only on change; leaving disposes them. See the
-[guide](blob-shadows.md). Evidence: unit tests and `npm run check`; the browser acceptance
-`npm run test:blob-shadows-browser` is written but **not yet run**. No template uses it, so template budgets are
+[guide](blob-shadows.md). Evidence: unit tests and `npm run check`; the browser acceptance `npm run test:blob-shadows-browser` passed 2026-10-05 in local software GL on the reference and low presets (7 candidates, 4 drawn in 1 draw, +8 triangles, 1 dropped; shadows off 4 drawn, 3 dropped; idle 0 frames; a move uploads once; disposed on exit). No template uses it, so template budgets are
 unchanged. No physical-device, GPU timing or visual-quality acceptance.
 
 ## Game sound files (DX P1-10) — integrated in v0.2.0

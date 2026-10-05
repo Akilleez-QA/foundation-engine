@@ -131,7 +131,7 @@ A blob stands in for a real shadow where there is none:
   headless Chromium, software GL) checks one draw call and 2 × drawn triangles
   against a blob-less twin, the same shadow casters, the in-box/beyond-box policy,
   the cap, shadows off, idle 0 frames and 0 uploads, a move uploading once and
-  disposal on exit. **Not yet run** for this change: see the acceptance ledger.
+  disposal on exit. Result: passed 2026-10-05 in local software GL on the reference and low presets (7 candidates, 4 drawn in 1 draw, +8 triangles, 1 dropped; shadows off 4 drawn, 3 dropped; idle 0 frames; a move uploads once; disposed on exit).
 - **Not covered:** no physical-device, GPU timing, fill-rate or visual-quality
   acceptance. Blobs lie on a flat height (no terrain or slope following), are not
   occluded by walls they pass under, do not shrink with the entity's height, and

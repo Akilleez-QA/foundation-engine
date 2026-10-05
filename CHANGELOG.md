@@ -17,7 +17,7 @@ Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c
   without `sceneShadows()`, with the player's `shadows.quality: off`, or for a `Model` or non-caster. Bounded by `max`
   (default 64, cap 1024); over it the nearest to the camera are kept and the overload is reported once. Buffers are
   allocated once and upload only on change; leaving disposes them; the drawing is a lazy chunk. Unit tests; browser
-  acceptance `npm run test:blob-shadows-browser` added but not yet run. No template uses it, so no budget changed
+  acceptance `npm run test:blob-shadows-browser` passed 2026-10-05 in local software GL on the reference and low presets (7 candidates, 4 drawn in 1 draw, +8 triangles, 1 dropped; shadows off 4 drawn, 3 dropped; idle 0 frames; a move uploads once; disposed on exit). No template uses it, so no budget changed
   ([guide](docs/guides/blob-shadows.md)).
 - **The GPU bench reaches the GPU on Linux.** `npm run bench -- --gpu` (and `bench:ref`) dropped only the software-GL
   flags, and headless Chromium on Linux then fell back to SwiftShader anyway, so "gpu" runs measured a software

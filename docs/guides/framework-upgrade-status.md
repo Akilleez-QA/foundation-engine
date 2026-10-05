@@ -792,7 +792,7 @@ x, z, `ry` and scale, the scene's `sceneShadows` flags, the environment sun's `s
 are drawn, the rest counted in `dropped` and reported once per visit at info level. Cancellation: leaving disposes the
 mesh, material and instance buffers. Recovery: CPU-side buffers re-upload after context loss; a failed chunk load is
 reported and the visit draws without blobs. Cost: +1 draw and +2 triangles per blob on every preset, no shadow pass, no
-texture. Browser acceptance (`npm run test:blob-shadows-browser`) is written but not yet run. See the
+texture. Browser acceptance (`npm run test:blob-shadows-browser`) passed 2026-10-05 in local software GL on the reference and low presets (7 candidates, 4 drawn in 1 draw, +8 triangles, 1 dropped; shadows off 4 drawn, 3 dropped; idle 0 frames; a move uploads once; disposed on exit). See the
 [guide](blob-shadows.md).
 
 ## Game sound files — DX P1-10, integrated in v0.2.0
