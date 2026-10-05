@@ -242,16 +242,25 @@ export function check(files = sourceFiles(), read = f => readFileSync(join(SRC, 
   return violations;
 }
 
-/** Every game directory in the checkout: ./game and each template's game. */
+/** The folders under `root/<parent>` that hold a game (`<parent>/<name>/game/game.ts`), sorted. */
+function gamesUnder(root, parent) {
+  const dir = join(root, parent);
+  return existsSync(dir)
+    ? readdirSync(dir)
+        .filter(n => !n.startsWith('.') && existsSync(join(dir, n, 'game', 'game.ts')))
+        .sort()
+        .map(n => join(dir, n, 'game'))
+    : [];
+}
+
+/** Every game directory in the checkout: ./game, each template's game, each lab's game (labs/<name>/game) and each
+ *  tool fixture game (tools/<name>/game). Labs and fixtures obey the same game rules as a template. */
 export function gameDirs(root = ROOT) {
-  const templates = join(root, 'templates');
   return [
     join(root, 'game'),
-    ...(existsSync(templates)
-      ? readdirSync(templates)
-          .filter(t => !t.startsWith('.'))
-          .map(t => join(templates, t, 'game'))
-      : []),
+    ...gamesUnder(root, 'templates'),
+    ...gamesUnder(root, 'labs'),
+    ...gamesUnder(root, 'tools'),
   ].filter(d => existsSync(d));
 }
 const KIT = /^@kits\/([a-z][a-z0-9-]*)$/;

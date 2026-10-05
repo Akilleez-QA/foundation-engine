@@ -33,7 +33,7 @@ const toPosix = p => p.split(sep).join('/');
 
 /** Every TypeScript source under the scanned roots, as root-relative POSIX paths (generated files skipped). */
 export function typeSourceFiles(root = ROOT) {
-  const roots = ['src', 'templates', 'scripts', 'perf'];
+  const roots = ['src', 'templates', 'labs', 'scripts', 'perf'];
   const game = toPosix(relative(root, gameDir()));
   if (game && !game.startsWith('..') && !game.startsWith('templates/')) roots.push(game);
   const out = new Set();

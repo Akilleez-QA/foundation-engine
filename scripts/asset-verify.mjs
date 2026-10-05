@@ -892,14 +892,14 @@ export async function verifyFile(file, {contract, masks} = {}) {
 // ---------------------------------------------------------------------------------------------------------------------
 // Discovery: every game folder's public/models.
 
-/** Game folders in a repository: root game/, templates/<name>/game and tools/<name>/game (and an extra one). */
+/** Game folders in a repository: root game/, templates/<name>/game, labs/<name>/game and tools/<name>/game (and an extra one). */
 export function gameFolders(root = ROOT, extra = process.env.GAME_DIR) {
   const out = new Set();
   const add = dir => {
     if (existsSync(join(dir, 'game.ts'))) out.add(resolve(dir));
   };
   add(join(root, 'game'));
-  for (const parent of ['templates', 'tools']) {
+  for (const parent of ['templates', 'labs', 'tools']) {
     const dir = join(root, parent);
     if (existsSync(dir)) for (const name of readdirSync(dir).sort()) add(join(dir, name, 'game'));
   }

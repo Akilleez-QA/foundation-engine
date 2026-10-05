@@ -107,7 +107,8 @@ test('three/webgpu and three/tsl stay refused even in a game that opts in (ADR 0
 });
 
 test('every template and the default game stay without the escape hatch', () => {
-  for (const dir of gameDirs()) {
+  // Labs and tool fixture games may opt in (labs try what the engine cannot say yet); templates and ./game may not.
+  for (const dir of gameDirs().filter(d => !/[\\/](labs|tools)[\\/][^\\/]+[\\/]game$/.test(d))) {
     assert.equal(listedKits(dir).has('three'), false, dir);
     assert.deepEqual(escapeHatchFiles(dir), [], dir);
   }

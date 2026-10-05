@@ -2,6 +2,8 @@
 
 A kit is an optional genre pattern (a camera rig, a character controller, exploration with interactable things, a HUD, lessons) built on the same author API a game uses. The engine runs with no kit at all; a game chooses its kits in `defineGame({ kits })`. Growth is meant to be cheap: a new kit is one folder, and nothing in core, platform or the author layer changes. Candidates are listed in [ROADMAP.md](../ROADMAP.md).
 
+Prove the pattern first in a [lab](../guides/labs.md) (`npm run new-lab -- <id>`): a small isolated game that answers one question. A kit is what a lab graduates into once the answer is in and another game would want it; the lab's tests and measurements become the kit's tests and acceptance evidence, and the lab is rebuilt on the kit as its reference scene.
+
 ## The contract
 
 Use the [engine/creator/agent contract](../CREATOR-CONTRACT.md). Before adding code,
