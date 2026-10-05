@@ -18,7 +18,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | VIS-05 | Gradient sky, discs, stars and exponential haze | [#150](https://github.com/Akilleez-QA/foundation-engine/pull/150) | [scene-look.md](guides/scene-look.md) |
 | VIS-06 | Instanced scatter of a Shape or Mesh (one draw per scatter) | [#144](https://github.com/Akilleez-QA/foundation-engine/pull/144) | [scatter.md](guides/scatter.md) |
 | VIS-09 | Opt-in full three.js kit (@kits/three) | [#136](https://github.com/Akilleez-QA/foundation-engine/pull/136) |  |
-| VIS-10 | Procedural interior reflection environment (reflection kind interior) |  | [scene-look.md](guides/scene-look.md) |
+| VIS-10 | Procedural interior reflection environment (reflection kind interior) | [#183](https://github.com/Akilleez-QA/foundation-engine/pull/183) | [scene-look.md](guides/scene-look.md) |
 | POST-01 | Post-processing (bloom, vignette, grade): a consumer of the post.mode quality knob | [#161](https://github.com/Akilleez-QA/foundation-engine/pull/161) | [post-processing.md](guides/post-processing.md) |
 | FX-01 | Particle emitters | [#63](https://github.com/Akilleez-QA/foundation-engine/pull/63) | [particles.md](guides/particles.md) |
 | FX-01a | Flipbook (sprite-sheet) particles and npm run fx:pack | [#141](https://github.com/Akilleez-QA/foundation-engine/pull/141) | [particles.md](guides/particles.md) |

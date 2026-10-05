@@ -93,6 +93,7 @@ export const FEATURES = [
   {
     id: 'VIS-10',
     title: 'Procedural interior reflection environment (reflection kind interior)',
+    pr: 183,
     docs: 'docs/guides/scene-look.md',
     evidence: [{engine: 'validateInteriorReflection'}, {engine: 'INTERIOR_REFLECTION_LIMITS'}],
   },

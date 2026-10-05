@@ -1027,7 +1027,7 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   sun-like discs and stars from one CPU-generated texture on an unlit sphere (no custom shader, backend-neutral);
   `haze` gains `{ kind: 'exp2', density }` and `color: 'sky'`. Evidence: unit tests and `npm run test:sky-browser`
   (desktop headless Chromium, software GL). No physical-device evidence.
-- **Interior reflection (VIS-10), implemented, candidate (PR `feat/interior-reflection`).** `defineEnvironment({ reflection:
+- **Interior reflection (VIS-10), implemented, candidate (PR #183).** `defineEnvironment({ reflection:
   { kind: 'interior', size, eyeHeight, wall, floor, ceiling, lights } })`: a procedural box interior with at most 8 glowing
   spheres, validated at definition, built once per distinct interior (keyed by its data) as one 512 x 256 half-float
   equirectangular texture in a lazy chunk, prefiltered once by the renderer, disposed on change, clear or exit. Owner:

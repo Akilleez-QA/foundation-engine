@@ -658,7 +658,7 @@ Sky and haze (VIS-05): `defineEnvironment({ sky })` draws a gradient sky with op
 one texture on an unlit sphere; `haze` gains `exp2` and `color: 'sky'`. Status: implemented and checked as a candidate PR #150. Evidence: unit tests and `npm run test:sky-browser`.
 Interior reflection (VIS-10): `defineEnvironment({ reflection: { kind: 'interior' } })` builds a procedural interior (walls,
 floor, ceiling, at most 8 lights) once per distinct interior into the scene's reflection environment; no per-frame cost.
-Status: implemented, candidate (PR `feat/interior-reflection`); not integrated. Evidence: unit tests;
+Status: implemented, candidate (PR #183); not integrated. Evidence: unit tests;
 `npm run test:interior-reflection-browser` added, not yet run. No physical-device or visual-quality acceptance.
 
 ## Asset provenance and AI disclosure (DX-03) — implemented, candidate
