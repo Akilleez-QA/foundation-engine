@@ -10,13 +10,6 @@ Every new framework below is optional: a game that does not use it is unchanged.
 Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
 (#122 onward). None of it is in that candidate.
 
-- **Inertialized pose transitions in the animation kit.** `createInertializer(joints)` switches pose sources at once
-  and hides the switch by decaying the outgoing-minus-incoming offset (position, shortest-hemisphere rotation and
-  their velocity difference) to zero with a quintic over `blendTime`: position and velocity are continuous at the
-  switch, and the offset ends with zero velocity. A new `switchTo` replaces a blend in progress; `sample` reuses one
-  preallocated buffer. Bounded to 128 joints in a fixed order, finite inputs, `blendTime` 0-2 s and `dt` 1e-4-1 s;
-  invalid input throws before any state changes. Pose-level only: not wired to the `Model` component, no browser or
-  device evidence ([animation kit README](src/kits/animation/README.md)).
 - **The GPU bench reaches the GPU on Linux.** `npm run bench -- --gpu` (and `bench:ref`) dropped only the software-GL
   flags, and headless Chromium on Linux then fell back to SwiftShader anyway, so "gpu" runs measured a software
   rasteriser (about 1 fps for a crowded three.js scene instead of 60). The harness now adds `--use-gl=angle
