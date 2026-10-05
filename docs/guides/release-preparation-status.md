@@ -81,3 +81,13 @@ A release-candidate bundle for `7c26db7` (proposed 0.3.0) is prepared in
 [docs/releases/candidate-7c26db7](../releases/candidate-7c26db7/README.md): release notes, upgrade guide,
 support matrix, reproducible build rehearsal, notices check and CI evidence. No tag, release or deployment
 was made; the bundle lists the steps only the author can take.
+
+## Release candidate re-cut (2026-10-04)
+
+The `7c26db7` candidate is stale: 53 PRs (#122–#174) merged after it, including the visual features,
+asset pipeline, pose-to-pose animation and device-class tiers. A new bundle for `ffa8c6a` (the merge of
+#174, proposed 0.3.0) is in [docs/releases/candidate-ffa8c6a](../releases/candidate-ffa8c6a/README.md), cut
+on a certified `main` (CI completed green on the exact SHA). It adds a nine-template support matrix, a
+clean-checkout verification that includes `npm run gate` for blank, and two simulated trials (newcomer
+onboarding and contributor rehearsal). The CHANGELOG's proposed 0.3.0 section now covers everything up to
+`ffa8c6a`. No tag, release or deployment was made.
