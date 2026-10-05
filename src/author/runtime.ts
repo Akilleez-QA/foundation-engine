@@ -26,6 +26,8 @@ import {createScenePost, loadPostModule} from './scene-post';
 import {openSceneExtension, type SceneExtensionSession} from './scene-extension';
 import {SCATTER_ID, scatterRoot} from './scatter';
 import type {SceneScatterDrawing} from './scene-scatter';
+import {BLOB_SHADOW_ID, sunCoverage} from './blob-shadow';
+import type {SceneBlobShadowDrawing} from './scene-blob-shadows';
 /**
  * author/runtime.ts: a scene's lazy body, loaded the first time a scene is entered (never in the first-load bundle).
  *
@@ -135,6 +137,14 @@ const loadScatter = () =>
     return m;
   });
 
+/** The blob shadow chunk (VIS-10), once a scene that opted in has prepared (so its first frame already draws blobs). */
+let blobModule: typeof import('./scene-blob-shadows') | null = null;
+const loadBlobs = () =>
+  import('./scene-blob-shadows').then(m => {
+    blobModule = m;
+    return m;
+  });
+
 /** Model presentation is a lazy chunk too: loaded while a scene that starts with a `Model` entity prepares, else when a
  *  system first spawns one. Once loaded, every later visit starts its models synchronously. */
 let modelModule: typeof import('./scene-model-chunk') | null = null;
@@ -157,11 +167,14 @@ export async function prepareScene(s: Services, scene: SceneDefinition, visit: S
   if (scene.view?.post) loadPostModule().catch(() => {});
   // Scatter drawing is a lazy chunk; a scene that opted in loads it while it prepares. A failure is reported at entry.
   const scatterLoad = scene.scatter && !scatterModule ? loadScatter().catch(() => null) : null;
+  // Blob shadows are a lazy chunk too; a failure is reported at entry and the visit draws without them.
+  const blobLoad = scene.blobShadows && !blobModule ? loadBlobs().catch(() => null) : null;
   const body = await bodyOf(scene),
     state: Record<string, unknown> = {};
   // A failed model chunk is reported at entry, where the scene's models report `failed`.
   if (!modelModule && bodyHasModel(body.entities)) await loadModels().catch(() => null);
   await scatterLoad;
+  await blobLoad;
   if (visit.signal.aborted) return;
   await scene.prepare?.(
     {state, text: (key, vars) => (appI18n.t as (k: string, v?: unknown) => string)(key, vars), service: key => s[key]},
@@ -669,6 +682,36 @@ export async function enterScene(o: {
       }
       const scatterProbe = {id: SCATTER_ID} as ComponentType<object>;
       let scatterReported = false;
+      // Blob shadows (VIS-10): one instanced draw of every `BlobShadow` in a scene with `sceneBlobShadows()`. Synced
+      // after the camera and environment each frame, since the sun's live shadow decides which blobs stand in for it.
+      let blobs: SceneBlobShadowDrawing | null = null;
+      const startBlobs = (m: typeof import('./scene-blob-shadows')) => {
+        if (actx.signal.aborted || blobs || !scene.blobShadows) return;
+        blobs = m.createSceneBlobShadows({
+          world,
+          scene: three,
+          limits: scene.blobShadows.limits,
+          shadows: scene.shadows,
+          report: message => s.log.info(`${scene.id}: ${message}`),
+        });
+      };
+      if (scene.blobShadows) {
+        if (blobModule) startBlobs(blobModule);
+        else
+          loadBlobs().then(
+            m => {
+              startBlobs(m);
+              dirty = true;
+              actx.invalidate();
+            },
+            error => {
+              if (!actx.signal.aborted) s.log.error(`${scene.id}: blob shadows failed to load`, error);
+            },
+          );
+        actx.own(() => blobs?.dispose());
+      }
+      const blobProbe = {id: BLOB_SHADOW_ID} as ComponentType<object>;
+      let blobsReported = false;
       const emitterProbe = {id: EMITTER_ID} as ComponentType<object>;
       let emittersReported = false;
       // Local lights (VIS-02): a scene with `sceneLights()` gets a fixed rig of slots for this visit, capped by the
@@ -1008,6 +1051,16 @@ export async function enterScene(o: {
           three.background = new T.Color(viewState.background);
           dirty = true;
         }
+        if (blobs) {
+          // The sun's real shadow is live only in a scene with shadows, with a sun `shadow`, while the player's
+          // `shadows.quality` is not `off` (no preset turns it off: its floor is `low`).
+          const sun = sunCoverage({
+            sceneShadows: !!sunShadow,
+            extent: viewState.environment?.directional.shadow?.extent,
+            quality: s.quality.knob('shadows.quality'),
+          });
+          if (blobs.sync({camera: viewState.camera.position, sun})) dirty = true;
+        }
         if (output.sync(viewState.output)) dirty = true;
         if (
           cubes.sync(
@@ -1037,6 +1090,12 @@ export async function enterScene(o: {
             scatterReported = true;
             s.log.error(
               `${scene.id}: a Scatter is not drawn: the scene has no scatter (defineScene({ scatter: sceneScatter() }))`,
+            );
+          }
+          if (!scene.blobShadows && !blobsReported && world.first(blobProbe)) {
+            blobsReported = true;
+            s.log.error(
+              `${scene.id}: a BlobShadow is not drawn: the scene has no blob shadows (defineScene({ blobShadows: sceneBlobShadows() }))`,
             );
           }
           if (!particles && !emittersReported && world.first(emitterProbe)) {
@@ -1148,6 +1207,7 @@ export async function enterScene(o: {
             failed: particleView.stats.failed,
           },
         });
+      if (TEST_API && scene.blobShadows) handle.blobShadows = () => (blobs ? {...blobs.stats} : null);
       if (TEST_API && scene.scatter)
         handle.scatter = () => {
           const st = scatter?.stats;

@@ -97,6 +97,7 @@
     "bench:dmath": "node --import tsx tools/dmath-bench/bench.mjs",
     "dmath:golden": "node --import tsx scripts/dmath-golden.mjs",
     "test:particle-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/particle-check.mjs playtest/particles",
+    "test:blob-shadows-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/blob-shadows-check.mjs playtest/blob-shadows",
     "test:scatter-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/scatter-check.mjs playtest/scatter",
     "test:sound-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/sound-check.mjs playtest/sound",
     "test:pose-to-pose-browser": "GAME_DIR=tools/pose-to-pose/game node scripts/generate.mjs && tsc --noEmit -p tools/pose-to-pose/tsconfig.json && tsx scripts/lint/brief.ts tools/pose-to-pose/game && GAME_DIR=tools/pose-to-pose/game node -r ./scripts/silent-browser.cjs tools/pose-to-pose/browser.mjs",

@@ -496,6 +496,18 @@ unit tests, recipe test and `npm run test:scatter-browser` (desktop headless Chr
 it, so template budgets are unchanged. glTF `Model` scatter is a follow-up. No physical-device or GPU timing
 acceptance.
 
+## Blob shadows (VIS-10) — implemented, candidate
+
+`BlobShadow` / `sceneBlobShadows` (author API) draw a soft ground ellipse under each opted-in entity where it has no
+real sun shadow (beyond the sun's shadow box with a crossfade, in a scene without `sceneShadows()`, with the player's
+`shadows.quality: off`, or for a `Model` or non-caster), every blob of a scene in one instanced draw. Owner: the scene
+visit (`author/scene-blob-shadows.ts`, a lazy chunk; policy in `author/blob-shadow.ts`; GPU layer in
+`platform/render/blob-shadows.ts`). Bounded by `max` (64 by default, cap 1024), allocated once; over it the nearest to
+the camera are kept, the rest counted and reported once. Buffers upload only on change; leaving disposes them. See the
+[guide](blob-shadows.md). Evidence: unit tests and `npm run check`; the browser acceptance
+`npm run test:blob-shadows-browser` is written but **not yet run**. No template uses it, so template budgets are
+unchanged. No physical-device, GPU timing or visual-quality acceptance.
+
 ## Game sound files (DX P1-10) — integrated in v0.2.0
 
 `defineAsset({ type: 'audio' })` files play through `ctx.play(id, { volume, pitch,

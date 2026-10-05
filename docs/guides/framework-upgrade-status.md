@@ -781,6 +781,20 @@ change or freed capacity, never per frame. Cancellation: leaving disposes instan
 surfaces. Recovery: CPU-side buffers re-upload after context loss; a failed chunk load is reported and the visit draws
 without scatters. Determinism: a derived stream per scatter, never `ctx.random()`. See the [guide](scatter.md).
 
+## Blob shadows — VIS-10, implemented, candidate
+
+New author component `BlobShadow` with `validateBlobShadow`, `BLOB_SHADOW_DEFAULTS`/`BLOB_SHADOW_LIMITS`, and the
+per-scene opt-in `sceneBlobShadows({ max, ground, crossfade, distance })` (`SCENE_BLOB_SHADOW_LIMITS`); platform layer
+`createBlobShadowLayer`; dev `engine.blobShadows()` counters (capacity, candidates, drawn, dropped, draws, uploads).
+Owner: the scene visit; the drawing is a lazy chunk loaded while an opted-in scene prepares. Inputs: entity `Transform`
+x, z, `ry` and scale, the scene's `sceneShadows` flags, the environment sun's `shadow.extent` and the live
+`shadows.quality` knob. Bounds: `max` 64 by default (1…1024), allocated once. Overload: the nearest `max` to the camera
+are drawn, the rest counted in `dropped` and reported once per visit at info level. Cancellation: leaving disposes the
+mesh, material and instance buffers. Recovery: CPU-side buffers re-upload after context loss; a failed chunk load is
+reported and the visit draws without blobs. Cost: +1 draw and +2 triangles per blob on every preset, no shadow pass, no
+texture. Browser acceptance (`npm run test:blob-shadows-browser`) is written but not yet run. See the
+[guide](blob-shadows.md).
+
 ## Game sound files — DX P1-10, integrated in v0.2.0
 
 `ctx.play(id, options?)` accepts a game sound id as well as a cue id (`PlayOptions`:

@@ -10,6 +10,7 @@ picture it drew before, with the same draws and budgets.
 | Tone mapping and exposure | `defineScene({ view: { output } })` | [Output](#output-tone-mapping-and-exposure) |
 | Point and spot lights | `defineScene({ lights: sceneLights() })`, `PointLight`, `SpotLight` | [Local lights](#local-lights-point-and-spot-lights) |
 | Shadows | `defineScene({ shadows: sceneShadows() })`, light `shadow`, `Shadow` | [Shadows](#shadows) |
+| Blob (contact) shadows where no shadow map reaches | `defineScene({ blobShadows: sceneBlobShadows() })`, `BlobShadow` | [Blob shadows](blob-shadows.md) |
 | Gradient sky, discs, stars, exp2 haze | `defineEnvironment({ sky, haze })` | [Sky and haze](#sky-and-haze) |
 | Bloom, vignette and grade, per the player's `post.mode` | `defineScene({ view: { post } })` | [Post-processing](post-processing.md) |
 
@@ -336,6 +337,8 @@ export default defineScene({
   redraw of a still scene draws no shadow pass. A moving caster redraws the maps
   of the lights it can affect on each frame it moves. Mark small, always-moving
   decorations `Shadow({ cast: false })`.
+- **Beyond the sun's box,** or with shadows off, a [blob shadow](blob-shadows.md)
+  (`BlobShadow`, one instanced draw per scene) keeps things on the ground.
 - **Cascades** stay a reference-only, sun-only platform option behind
   `shadows.quality === 'ultra'`; creator scenes do not get them.
 

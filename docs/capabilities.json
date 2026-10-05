@@ -50,6 +50,17 @@
       "evidence": ["@engine exports Scatter", "@engine exports defineScatter", "@engine exports sceneScatter"]
     },
     {
+      "id": "VIS-10",
+      "title": "Blob (contact) shadows: one instanced draw of soft ground ellipses where no real shadow reaches",
+      "shipped": true,
+      "docs": "docs/guides/blob-shadows.md",
+      "evidence": [
+        "@engine exports BlobShadow",
+        "@engine exports sceneBlobShadows",
+        "npm run test:blob-shadows-browser"
+      ]
+    },
+    {
       "id": "VIS-09",
       "title": "Opt-in full three.js kit (@kits/three)",
       "shipped": true,
@@ -162,7 +173,10 @@
   "engine": {
     "module": "@engine",
     "values": [
+      "BLOB_SHADOW_DEFAULTS",
+      "BLOB_SHADOW_LIMITS",
       "BUILT_IN_CUES",
+      "BlobShadow",
       "EMITTER_DEFAULTS",
       "Emitter",
       "LIGHT_LIMITS",
@@ -190,6 +204,7 @@
       "RenderMask",
       "SCATTER_DEFAULTS",
       "SCATTER_LIMITS",
+      "SCENE_BLOB_SHADOW_LIMITS",
       "SCENE_LIGHT_DEFAULTS",
       "SCENE_SCATTER_LIMITS",
       "SHADOWED_LIGHT_CAPS",
@@ -239,6 +254,7 @@
       "pointerOnGround",
       "projectToView",
       "scalarMath",
+      "sceneBlobShadows",
       "sceneLights",
       "sceneParticles",
       "sceneScatter",
@@ -246,6 +262,7 @@
       "shapeParser",
       "skyGradientAt",
       "testScene",
+      "validateBlobShadow",
       "validateCalibration",
       "validateEmitter",
       "validateMaterial",
@@ -273,6 +290,7 @@
       "AudioTimelineStats",
       "AudioVector",
       "AuthorDef",
+      "BlobShadowData",
       "BuildBrief",
       "BuildInput",
       "ComponentInit",
@@ -350,6 +368,8 @@
       "ScatterShapeKind",
       "ScatterStats",
       "SceneActivityFacts",
+      "SceneBlobShadowLimits",
+      "SceneBlobShadows",
       "SceneBody",
       "SceneContext",
       "SceneDefinition",
@@ -781,7 +801,10 @@
     {"id": "resolution.scale", "readBy": []},
     {"id": "resolution.max-pixel-ratio", "readBy": []},
     {"id": "resolution.antialias", "readBy": ["src/author/runtime.ts"]},
-    {"id": "shadows.quality", "readBy": ["src/platform/render/shadow-cascades.ts", "src/platform/render/shadows.ts"]},
+    {
+      "id": "shadows.quality",
+      "readBy": ["src/author/runtime.ts", "src/platform/render/shadow-cascades.ts", "src/platform/render/shadows.ts"]
+    },
     {"id": "textures.max-size", "readBy": []},
     {"id": "textures.anisotropy", "readBy": ["src/author/runtime.ts"]},
     {"id": "textures.canvas-budget-mib", "readBy": ["src/platform/assets/painted-surfaces.ts"]},
@@ -866,6 +889,7 @@
     "test:authoring-browser",
     "test:authority-workbench-browser",
     "test:blender-export-browser",
+    "test:blob-shadows-browser",
     "test:capture-browser",
     "test:crafting-workbench-browser",
     "test:creator-journey-browser",

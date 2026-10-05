@@ -13,6 +13,7 @@ import type {ParticleStats} from './particle-contract';
 import type {ScenePostStats} from './scene-post';
 import type {ScatterStats} from './scatter-field';
 import type {ScatterEntry} from './scene-scatter';
+import type {BlobShadowStats} from './scene-blob-shadows';
 
 /** What a running scene reports and accepts from tools (the test API, probes, play scripts). */
 export interface SceneHandle {
@@ -38,6 +39,9 @@ export interface SceneHandle {
   /** Dev/test only: the visit's scatter counters (admitted, copies, refusals, draws, triangles per scatter); null
    *  until the scatter drawing has loaded. Installed only in scenes that opted in with `sceneScatter()`. */
   scatter?(): (ScatterStats & {draws: number; triangles: number; list: ScatterEntry[]}) | null;
+  /** Dev/test only: the visit's blob shadow counters (capacity, candidates, drawn, dropped, draws, uploads); null until
+   *  the chunk has loaded. Installed only in scenes that opted in with `sceneBlobShadows()` (VIS-10). */
+  blobShadows?(): BlobShadowStats | null;
   /** Dev/test only: the visit's local-light slots, admissions and refusals (VIS-02). */
   lights?(): LightStats;
   /** Move the entity with this `Name` (default 'player'): false when there is none. */
