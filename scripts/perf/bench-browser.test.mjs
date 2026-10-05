@@ -239,3 +239,24 @@ test('a browser that exists but fails to start shows the cause lines and start a
     false,
   );
 });
+
+test('the GPU harness points ANGLE at a hardware backend on Linux and detects a software fallback', async () => {
+  const {chromiumArgs, gpuAngleArgs, isSoftwareRenderer} = await import('./bench-browser.mjs');
+  const linux = chromiumArgs({gpu: true, platform: 'linux', env: {}, root: false});
+  assert.ok(linux.includes('--use-gl=angle') && linux.includes('--use-angle=gl-egl'));
+  assert.ok(!linux.some(a => a.includes('swiftshader')), 'no software flags in the GPU harness');
+  const soft = chromiumArgs({gpu: false, platform: 'linux', env: {}, root: false});
+  assert.ok(soft.includes('--use-angle=swiftshader') && !soft.includes('--use-gl=angle'), 'software default unchanged');
+  assert.deepEqual(gpuAngleArgs('darwin', {}), []);
+  assert.deepEqual(gpuAngleArgs('win32', {}), []);
+  assert.deepEqual(gpuAngleArgs('linux', {ENGINE_GPU_ANGLE: 'default'}), []);
+  assert.deepEqual(gpuAngleArgs('linux', {ENGINE_GPU_ANGLE: 'vulkan'}), [
+    '--use-gl=angle',
+    '--use-angle=vulkan',
+    '--enable-features=Vulkan',
+  ]);
+  assert.throws(() => gpuAngleArgs('linux', {ENGINE_GPU_ANGLE: 'gl --no-sandbox'}), /ANGLE backend name/);
+  assert.ok(isSoftwareRenderer('ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)'));
+  assert.ok(isSoftwareRenderer('llvmpipe (LLVM 17.0.6, 256 bits)'));
+  assert.ok(!isSoftwareRenderer('ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4080/PCIe/SSE2, OpenGL ES 3.2)'));
+});

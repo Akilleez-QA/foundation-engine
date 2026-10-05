@@ -107,7 +107,7 @@ Kernel modules the composition root installs:
 | STD-PRF-3 | Measured with `npm run bench` in software GL at 1280×800 and derived by `npm run perf:derive` (worst window + 10 %, rounded up; exact for contexts, postDraws and shadowPasses) |
 | STD-PRF-5 | `scripts/perf/budget-ratchet.mjs` (in `npm run lint`) fails a raise without a matching `Perf-Budget:` trailer |
 | STD-PRF-11 | `npm run gate` *(engine)* |
-| STD-PRF-14 | Reference run: `npm run bench:ref` with `ENGINE_CHROMIUM` pointing at a GPU-enabled Chromium wrapper |
+| STD-PRF-14 | Reference run: `npm run bench:ref` on a GPU machine (on Linux the harness points ANGLE at a hardware backend, `ENGINE_GPU_ANGLE`; elsewhere, or for another browser, `ENGINE_CHROMIUM` at a GPU-enabled Chromium); a run that renders in software fails |
 
 Measured starting budgets: see the game's `budgets.json`. Each row's `provenance` names the commit and harness.
 
