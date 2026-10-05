@@ -57,7 +57,7 @@
       "evidence": ["@kits/three exists"]
     },
     {
-      "id": "VIS-10",
+      "id": "VIS-11",
       "title": "Procedural interior reflection environment (reflection kind interior)",
       "shipped": true,
       "pr": 183,

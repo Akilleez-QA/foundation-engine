@@ -1027,13 +1027,12 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   sun-like discs and stars from one CPU-generated texture on an unlit sphere (no custom shader, backend-neutral);
   `haze` gains `{ kind: 'exp2', density }` and `color: 'sky'`. Evidence: unit tests and `npm run test:sky-browser`
   (desktop headless Chromium, software GL). No physical-device evidence.
-- **Interior reflection (VIS-10), implemented, candidate (PR #183).** `defineEnvironment({ reflection:
+- **Interior reflection (VIS-11), implemented, candidate (PR #183).** `defineEnvironment({ reflection:
   { kind: 'interior', size, eyeHeight, wall, floor, ceiling, lights } })`: a procedural box interior with at most 8 glowing
   spheres, validated at definition, built once per distinct interior (keyed by its data) as one 512 x 256 half-float
   equirectangular texture in a lazy chunk, prefiltered once by the renderer, disposed on change, clear or exit. Owner:
   the visit's reflection binding (`author/scene-cubes.ts`). No per-frame cost and not tiered, like cube reflections.
-  Evidence: unit tests (`interior-reflection.test.ts`). `npm run test:interior-reflection-browser` is added and **not yet
-  run**. No physical-device, GPU prefilter time or visual-quality evidence.
+  Evidence: unit tests (`interior-reflection.test.ts`). `npm run test:interior-reflection-browser` passed 2026-10-05 in local software GL on the reference and low presets (mirror sphere centre 255,255,255, rim 8,8,8; relit after one change; draws 1/1; idle 0). No physical-device, GPU prefilter time or visual-quality evidence.
 
 ## Asset provenance and AI disclosure — DX-03, implemented
 

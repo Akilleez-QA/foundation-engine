@@ -25,7 +25,7 @@ Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c
   at most 8 glowing lights) instead of nothing or a bright studio. Validated at definition, built once per distinct
   interior as one 1 MiB half-float equirectangular texture in a lazy chunk, prefiltered once by the renderer, disposed on
   change or exit; no per-frame cost on any preset. Cube reflections are unchanged. Unit tests; the browser check
-  `npm run test:interior-reflection-browser` is added but not yet run
+  `npm run test:interior-reflection-browser` passed 2026-10-05 in local software GL on the reference and low presets (mirror sphere centre 255,255,255, rim 8,8,8; relit after one change; draws 1/1; idle 0)
   ([scene look guide](docs/guides/scene-look.md#interior-reflection)).
 - **Labs: prove one system before building a world.** `npm run new-lab -- <id> [--template <name>] [--kit <name>]…
   [--question "<text>"]` starts an isolated game in `labs/<id>` to answer one question (a mechanic, a kit, a

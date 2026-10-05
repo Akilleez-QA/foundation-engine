@@ -91,7 +91,7 @@ export const FEATURES = [
     evidence: [{kit: 'three'}],
   },
   {
-    id: 'VIS-10',
+    id: 'VIS-11',
     title: 'Procedural interior reflection environment (reflection kind interior)',
     pr: 183,
     docs: 'docs/guides/scene-look.md',

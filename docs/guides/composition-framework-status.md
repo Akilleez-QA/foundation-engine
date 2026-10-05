@@ -656,10 +656,10 @@ per-entity `Shadow`; shadowed local slots fixed per visit and bounded by `lights
 change. Status: integrated (PR #148, merge `e84afcf`). Evidence: unit tests and `npm run test:shadows-browser`.
 Sky and haze (VIS-05): `defineEnvironment({ sky })` draws a gradient sky with optional discs and stars from
 one texture on an unlit sphere; `haze` gains `exp2` and `color: 'sky'`. Status: implemented and checked as a candidate PR #150. Evidence: unit tests and `npm run test:sky-browser`.
-Interior reflection (VIS-10): `defineEnvironment({ reflection: { kind: 'interior' } })` builds a procedural interior (walls,
+Interior reflection (VIS-11): `defineEnvironment({ reflection: { kind: 'interior' } })` builds a procedural interior (walls,
 floor, ceiling, at most 8 lights) once per distinct interior into the scene's reflection environment; no per-frame cost.
 Status: implemented, candidate (PR #183); not integrated. Evidence: unit tests;
-`npm run test:interior-reflection-browser` added, not yet run. No physical-device or visual-quality acceptance.
+`npm run test:interior-reflection-browser` passed 2026-10-05 in local software GL on the reference and low presets (mirror sphere centre 255,255,255, rim 8,8,8; relit after one change; draws 1/1; idle 0). No physical-device or visual-quality acceptance.
 
 ## Asset provenance and AI disclosure (DX-03) — implemented, candidate
 
