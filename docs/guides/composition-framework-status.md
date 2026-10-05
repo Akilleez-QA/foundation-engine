@@ -420,7 +420,7 @@ failure is reported once and the visit draws direct; a WebGPU visit reports no i
 bloom beside an emissive box at full only, a still scene draws no frame, release audit at the author-API baseline);
 `quality:guard` identical for the blank and explorer templates. No reference-GPU cost, physical-device or
 visual-quality acceptance; the stock shell does not install the Graphics screen, so the live knob is unit-tested only.
-**Grade tools (POST-02, 2026-10-04): implemented, candidate (PR `feat/post-grade`); not integrated.** `grade.lut`
+**Grade tools (POST-02, 2026-10-04): implemented, candidate (PR #179, `feat/post-grade`); not integrated.** `grade.lut`
 (a `.cube` 3D lookup table under `public/`, strength 0 to 1) and `ceiling` (an opt-in HDR clamp, 1 to 65504) in the same
 combined pass, no extra post draw. Owner: the visit's post seam (fetch with the visit signal after the chunk, 4 parsed
 tables per page, one half-float 3D texture per visit). Overload: a file over 8 MiB or a side over 65 is refused.

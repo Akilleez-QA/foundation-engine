@@ -10,7 +10,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
 Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
 (#122 onward). None of it is in that candidate.
 
-- **Post grade: lookup tables and an HDR ceiling (POST-02).** `view.post.grade.lut: {file, strength}` applies a 3D
+- **Post grade: lookup tables and an HDR ceiling (POST-02, #179).** `view.post.grade.lut: {file, strength}` applies a 3D
   `.cube` lookup table (side 2 to 65, under the game's `public/`) after lift, gain and saturation, inside the existing
   combined pass at `basic` and `full`: no extra post draw. The file is fetched with the visit's signal once the post
   chunk is ready (its reader ships in the chunk), up to 4 parsed tables are kept per page, and a failure is reported

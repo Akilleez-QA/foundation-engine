@@ -68,6 +68,7 @@
       "id": "POST-02",
       "title": "Post grade lookup tables (.cube, view.post.grade.lut) and an HDR ceiling before bloom (view.post.ceiling)",
       "shipped": true,
+      "pr": 179,
       "docs": "docs/guides/post-processing.md",
       "evidence": [
         "@engine exports cubeLutText",

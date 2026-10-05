@@ -100,6 +100,7 @@ export const FEATURES = [
   {
     id: 'POST-02',
     title: 'Post grade lookup tables (.cube, view.post.grade.lut) and an HDR ceiling before bloom (view.post.ceiling)',
+    pr: 179,
     docs: 'docs/guides/post-processing.md',
     evidence: [{engine: 'cubeLutText'}, {engine: 'parseCubeLut'}, {path: 'src/platform/render/post/lut.ts'}],
   },

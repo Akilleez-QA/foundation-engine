@@ -19,7 +19,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | VIS-06 | Instanced scatter of a Shape or Mesh (one draw per scatter) | [#144](https://github.com/Akilleez-QA/foundation-engine/pull/144) | [scatter.md](guides/scatter.md) |
 | VIS-09 | Opt-in full three.js kit (@kits/three) | [#136](https://github.com/Akilleez-QA/foundation-engine/pull/136) |  |
 | POST-01 | Post-processing (bloom, vignette, grade): a consumer of the post.mode quality knob | [#161](https://github.com/Akilleez-QA/foundation-engine/pull/161) | [post-processing.md](guides/post-processing.md) |
-| POST-02 | Post grade lookup tables (.cube, view.post.grade.lut) and an HDR ceiling before bloom (view.post.ceiling) |  | [post-processing.md](guides/post-processing.md) |
+| POST-02 | Post grade lookup tables (.cube, view.post.grade.lut) and an HDR ceiling before bloom (view.post.ceiling) | [#179](https://github.com/Akilleez-QA/foundation-engine/pull/179) | [post-processing.md](guides/post-processing.md) |
 | FX-01 | Particle emitters | [#63](https://github.com/Akilleez-QA/foundation-engine/pull/63) | [particles.md](guides/particles.md) |
 | FX-01a | Flipbook (sprite-sheet) particles and npm run fx:pack | [#141](https://github.com/Akilleez-QA/foundation-engine/pull/141) | [particles.md](guides/particles.md) |
 | GEN-01 | Seeded hierarchical generation (deriveSeed) |  | [README.md](kits/README.md) |
