@@ -91,6 +91,12 @@ export const FEATURES = [
     evidence: [{kit: 'three'}],
   },
   {
+    id: 'VIS-10',
+    title: 'Procedural interior reflection environment (reflection kind interior)',
+    docs: 'docs/guides/scene-look.md',
+    evidence: [{engine: 'validateInteriorReflection'}, {engine: 'INTERIOR_REFLECTION_LIMITS'}],
+  },
+  {
     id: 'POST-01',
     title: 'Post-processing (bloom, vignette, grade): a consumer of the post.mode quality knob',
     pr: 161,
