@@ -65,6 +65,17 @@
       "evidence": ["engine code reads the post.mode knob"]
     },
     {
+      "id": "POST-02",
+      "title": "Post grade lookup tables (.cube, view.post.grade.lut) and an HDR ceiling before bloom (view.post.ceiling)",
+      "shipped": true,
+      "docs": "docs/guides/post-processing.md",
+      "evidence": [
+        "@engine exports cubeLutText",
+        "@engine exports parseCubeLut",
+        "src/platform/render/post/lut.ts exists"
+      ]
+    },
+    {
       "id": "FX-01",
       "title": "Particle emitters",
       "shipped": true,
@@ -167,6 +178,7 @@
       "Emitter",
       "LIGHT_LIMITS",
       "LOCAL_LIGHT_CAPS",
+      "LUT_SIZE_LIMITS",
       "MATERIAL_DEFAULTS",
       "MATERIAL_LIMITS",
       "MATERIAL_SHADINGS",
@@ -212,6 +224,7 @@
       "createSaveableRng",
       "createTestSaves",
       "createTestWorkerHost",
+      "cubeLutText",
       "defineAsset",
       "defineBuild",
       "defineComponent",
@@ -235,6 +248,7 @@
       "hazeColor",
       "measureUiOcclusion",
       "musicBudgets",
+      "parseCubeLut",
       "platformMath",
       "pointerOnGround",
       "projectToView",
@@ -277,6 +291,7 @@
       "BuildInput",
       "ComponentInit",
       "ComponentType",
+      "CubeLut",
       "CueFilter",
       "CueVoice",
       "CueVoiceOptions",
@@ -332,6 +347,7 @@
       "PointLightData",
       "PostBloom",
       "PostGrade",
+      "PostLut",
       "PostMode",
       "PostSettings",
       "PostVignette",

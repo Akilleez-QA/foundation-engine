@@ -18,7 +18,8 @@ test('post settings fill defaults and validate every field, naming it', () => {
   const r = resolvePost({});
   assert.deepEqual(r.bloom, POST_DEFAULTS.bloom);
   assert.equal(r.vignette.amount, 0);
-  assert.deepEqual(r.grade, {lift: [0, 0, 0], gain: [1, 1, 1], saturation: 1});
+  assert.deepEqual(r.grade, {lift: [0, 0, 0], gain: [1, 1, 1], saturation: 1, lut: null});
+  assert.equal(r.ceiling, null, 'no HDR ceiling unless asked for');
   assert.equal(resolvePost({bloom: false}).bloom, null, 'bloom: false turns the glow off');
   const full = resolvePost({
     bloom: {strength: 1.2, threshold: 0.9, radius: 0.3},
@@ -91,4 +92,28 @@ test('bloom mips start at half resolution and target bytes are what the pipeline
   assert.equal(postTargetBytes(false, 1280, 800, 4), px * 8 + px * 4 * 12, 'multisampled colour and depth');
   const mips = bloomSizes(1280, 800).reduce((sum, [w, h]) => sum + w * h * 8, 0);
   assert.equal(postTargetBytes(true, 1280, 800, 0), px * 12 + mips);
+});
+
+test('a lookup table and an HDR ceiling validate, naming the field; strength 0 asks for no table', () => {
+  const r = resolvePost({grade: {lut: {file: 'luts/night.cube'}}, ceiling: 32});
+  assert.deepEqual(r.grade.lut, {file: 'luts/night.cube', strength: 1});
+  assert.equal(r.ceiling, 32);
+  assert.equal(resolvePost({grade: {lut: {file: 'a.cube', strength: 0}}}).grade.lut, null);
+  const plan = postPlan(r, 'basic')!;
+  assert.equal(plan.grade.lut!.file, 'luts/night.cube', 'the table is drawn at basic');
+  assert.equal(plan.ceiling, 32);
+  assert.notEqual(postKey(plan), postKey(postPlan(resolvePost({ceiling: 64}), 'basic')));
+  const bad: [unknown, RegExp][] = [
+    [{ceiling: 0.5}, /view\.post\.ceiling must be a number from 1 to 65504/],
+    [{ceiling: Infinity}, /view\.post\.ceiling/],
+    [{grade: {lut: {file: 'luts/night.cube', strength: 2}}}, /grade\.lut\.strength must be a number from 0 to 1/],
+    [{grade: {lut: {strength: 1}}}, /grade\.lut\.file must be a path under public\//],
+    [{grade: {lut: {file: '../secret.cube'}}}, /grade\.lut\.file/],
+    [{grade: {lut: {file: 'https://x.test/a.cube'}}}, /grade\.lut\.file/],
+    [{grade: {lut: {file: '/luts/a.cube'}}}, /grade\.lut\.file/],
+    [{grade: {lut: {file: 'luts//a.cube'}}}, /grade\.lut\.file/],
+    [{grade: {lut: {file: 'luts/a.png'}}}, /grade\.lut\.file/],
+    [{grade: {lut: {file: 'a.cube', size: 33}}}, /grade\.lut\.size is unknown/],
+  ];
+  for (const [settings, re] of bad) assert.throws(() => resolvePost(settings as PostSettings), re);
 });

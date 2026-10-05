@@ -67,7 +67,8 @@ pictures yourself, and the checklist below.
 
 Report: before and after pictures, what changed, the checklist result, draws, triangles and texture memory against the
 budget. The engine has tone mapping, point and spot lights, shadows, gradient skies, exp2 haze, post-processing (bloom,
-vignette, grade: `view.post`, docs/guides/post-processing.md), `Material` on a `Mesh` and instanced scatter. Bloom is
+vignette, grade with an optional `.cube` lookup table, an HDR `ceiling` against bloom fireflies: `view.post`,
+docs/guides/post-processing.md), AgX tone mapping (`view.output: {toneMapping: 'agx'}`, kinder to saturated night lamps), `Material` on a `Mesh` and instanced scatter. Bloom is
 built in: use `view.post`, never `@kits/three`, for it. Not available yet (say so instead of promising it): textures on
 a `Mesh`, per-copy scatter motion, scattering a `Model`. The recipe's last table lists today's workaround. When the
 author agrees the look needs more (a post pass beyond the built-in tiers, a custom shader, a loader), a game can opt
