@@ -44,6 +44,8 @@ export {
 } from './seed-section';
 export {
   createCellEdits,
+  CELL_BATCH_CEILING,
+  type CellEdit,
   decodeCellEdits,
   baselineChecksum,
   CELL_EDIT_DEFAULT_LIMITS,

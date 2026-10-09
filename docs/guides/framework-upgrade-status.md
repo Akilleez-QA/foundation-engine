@@ -1183,3 +1183,13 @@ evidence; report-write failures retain prior causes and the in-memory report.
 This receipt does not certify every diagnostic caller, physical-device behavior,
 or completion of the wider engine work. The fixed-step numeric candidate above
 still requires CI on its combined head after integration with this base.
+
+
+## Atomic cell batches and occupancy candidate (2026-10-09)
+
+Optional procgen batch edits and immutable spatial point/rectangle/segment queries
+reuse existing storage and lifetime owners. See [contract and evidence](cell-occupancy.md)
+and ADR0085. Configured limits and exact contact ordering are runtime contracts;
+focused geometric, persistence and consumer tests are candidate evidence. Hosted
+full CI, browser/GPU and physical-device acceptance are not established here.
+No new scheduler, material policy or whole-engine completion claim.
