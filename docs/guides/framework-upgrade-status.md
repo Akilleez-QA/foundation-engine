@@ -1036,3 +1036,9 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   an error. **Disclosure.** `npm run disclosure` drafts Steam and itch.io AI-disclosure text from the records, with
   development tooling kept apart from content players see. Evidence: focused tests and `npm run check`. Tooling only;
   no store-acceptance or licence-truth claim. [Guide](asset-provenance.md).
+
+## Weighted choice/history — candidate, 2026-10-09
+
+Existing procgen helper extension; ADR0082 proposed. Ten focused tests pass, including
+endpoint/no-draw/refusal/eviction and saved RNG/history continuation via real SaveStore.
+Two headless consumers; no browser/full-gate/device claim. See [contract](weighted-choice.md).

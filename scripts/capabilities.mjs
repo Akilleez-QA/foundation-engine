@@ -43,6 +43,15 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'GEN-WEIGHTED',
+    title: 'Bounded eligible weighted choice with separately committed recent history',
+    docs: 'docs/guides/weighted-choice.md',
+    evidence: [
+      {kit: 'procgen', export: 'chooseWeighted'},
+      {kit: 'procgen', export: 'createChoiceHistory'},
+    ],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,
