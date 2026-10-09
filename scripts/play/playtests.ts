@@ -127,9 +127,10 @@ if (process.argv[1]?.endsWith('playtests.ts')) {
       });
       for (const r of results)
         console.log(
-          `  ${r.pass ? 'PASS' : 'FAIL'} ${r.file}${r.criteria.length ? ` (${r.criteria.join(', ')})` : ''}: ${r.detail}`,
+          `  ${r.status === 'not-run' ? 'NOT RUN' : r.pass ? 'PASS' : 'FAIL'} ${r.file}${r.criteria.length ? ` (${r.criteria.join(', ')})` : ''}: ${r.detail}`,
         );
-      const failed = results.filter(r => !r.pass);
+      const failed = results.filter(r => r.status === 'failed'),
+        notRun = results.filter(r => r.status === 'not-run');
       const out = join(ROOT, 'playtest', 'latest');
       mkdirSync(out, {recursive: true});
       writeFileSync(
@@ -137,9 +138,9 @@ if (process.argv[1]?.endsWith('playtests.ts')) {
         JSON.stringify({when: new Date().toISOString(), game: rel(dir), results}, null, 2) + '\n',
       );
       console.log(
-        `play:playtests: ${results.length - failed.length} pass, ${failed.length} fail in ${((Date.now() - t0) / 1000).toFixed(0)} s · playtest/latest/playtests.json`,
+        `play:playtests: ${results.length - failed.length - notRun.length} pass, ${failed.length} fail, ${notRun.length} not run in ${((Date.now() - t0) / 1000).toFixed(0)} s · playtest/latest/playtests.json`,
       );
-      process.exitCode = failed.length ? 1 : 0;
+      process.exitCode = failed.length || notRun.length ? 1 : 0;
     } catch (error) {
       // A missing test browser is one actionable line (scripts/perf/bench-browser.mjs), not a stack.
       if ((error as {code?: string})?.code !== 'ENGINE_NO_BROWSER') throw error;
