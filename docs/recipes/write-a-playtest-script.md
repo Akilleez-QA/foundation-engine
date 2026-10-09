@@ -136,4 +136,3 @@ If the final evidence file cannot be written, the runner throws an aggregate err
 whose message includes earlier observation and cleanup failures plus the write
 failure. Its `report` property retains the collected evidence for programmatic
 callers; batch failure details keep the combined message.
-
