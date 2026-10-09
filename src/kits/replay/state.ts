@@ -9,7 +9,7 @@ import {component, type ComponentType, type World} from '../../core/ecs/world';
 import {SCENE_REPLAY_DIGEST_ID, Transform, type SceneReplayDigest} from '../../author/defs';
 import {captureJson, type JsonLimits} from '../network/captured-json';
 import type {DigestTrace, ObserveResult} from './digest';
-import {hashText} from './hash';
+import {hashText, replayJson} from './hash';
 
 /** Which world state a selection digest covers. Component and tag references may be types or their ids. */
 export interface WorldSelection {
@@ -215,8 +215,7 @@ const DEFAULT_DETAIL = captureSelection({components: [Transform], resources: tru
 /** Canonical JSON text of a digest's state (or of the default digest's coverage). Throws over `limits`. */
 export function replayStateText(world: World, digest: SceneReplayDigest | null, limits: JsonLimits): string {
   const value = digest ? digest.state(world) : selectionState(world, DEFAULT_DETAIL);
-  const json = JSON.stringify(value);
-  if (typeof json !== 'string') throw Error('replay digest: state is not JSON');
+  const json = replayJson(value);
   return captureJson(json, limits).json;
 }
 

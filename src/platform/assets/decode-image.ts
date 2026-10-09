@@ -36,8 +36,9 @@ export interface DecodeImageInput {
 export const DECODE_IMAGE_JOB_ID = 'job.assets.decode-image';
 
 /**
- * The job row. Sliced: the module checks for cancellation after the fetch and after the decode, and closes a bitmap
- * it will not deliver. The deadline is Provisional (ADR 0062 decision 5), as the host's other limits are.
+ * The job row declares sliced cancellation. Its module checks cancellation after fetch + decode completes and
+ * closes a bitmap it will not deliver; it does not pass cancellation into those browser operations. The host owns
+ * deadline enforcement and physical cancellation accounting. The deadline is Provisional (ADR 0062).
  */
 export const decodeImageJob: JobKind<DecodeImageInput, ImageBitmap> = {
   id: DECODE_IMAGE_JOB_ID,
@@ -46,7 +47,7 @@ export const decodeImageJob: JobKind<DecodeImageInput, ImageBitmap> = {
   release: bitmap => bitmap.close(),
 };
 
-/** Size of the decoded file, for the host's admission before anything is allocated. */
+/** Authored dimensions used to reserve declared output bytes before starting a decode. */
 export interface DecodeHint {
   readonly width?: number;
   readonly height?: number;
@@ -106,7 +107,7 @@ const pageUrl = (url: string): string => {
   return base ? new URL(url, base).href : url;
 };
 
-/** Complete dimensions bound decoded output; incomplete dimensions use the conservative allowance. */
+/** Complete dimensions set the accepted output allowance; incomplete dimensions use the conservative allowance. */
 const reservedBytes = (hint: DecodeHint | undefined, unknownBytes: number) => {
   for (const dimension of [hint?.width, hint?.height])
     if (dimension !== undefined && (!Number.isSafeInteger(dimension) || dimension < 1))
@@ -121,6 +122,8 @@ const reservedBytes = (hint: DecodeHint | undefined, unknownBytes: number) => {
 /**
  * The texture cache's `loadImage`: decode in a worker of the host, or on the fallback when the host cannot take the
  * job due to unavailable capabilities. Transient capacity refusals wait within explicit queue/retry bounds. Rejects with `AbortError` when `signal` aborts, and with the job's error when the file cannot be loaded.
+ * Reservations and post-decode size checks bound accepted output, not fetched blob bytes or browser decoder peak
+ * allocations (ADR 0067). The signal-aware local helper checks after fetch and decode; the worker checks after both.
  */
 export function createImageDecoder(options: ImageDecoderOptions): ImageDecoder {
   const maxBytes = options.maxPendingBytes ?? 64 * 1024 * 1024;

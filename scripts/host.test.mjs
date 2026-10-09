@@ -4,6 +4,7 @@ import {test} from 'node:test';
 import {spawn} from 'node:child_process';
 import assert from 'node:assert/strict';
 import {WebSocket} from 'ws';
+import {createSession} from '../src/kits/network/session-client.ts';
 import {checkJoinCode, loadSessionRules, startSessionServer} from './host.mjs';
 import {ROOT} from './lib/game-dir.mjs';
 import {join} from 'node:path';
@@ -260,3 +261,140 @@ for (const supplied of [undefined, 'Zx8_k2Lp-q9Rv3Tn']) {
     },
   );
 }
+
+// Top-level tests in this file are serial (Node's default); do not make this test
+// concurrent: it briefly intercepts the adapter's interval construction, not I/O.
+test(
+  'MP01 liveness: real loopback sockets detect a stalled pump and resume without uncertain resend',
+  {concurrency: false, timeout: 15000},
+  async t => {
+    let pumping = true,
+      skipped = 0,
+      driverCalls = 0;
+    const interval = globalThis.setInterval;
+    const interception = t.mock.method(globalThis, 'setInterval', (callback, ms, ...args) => {
+      driverCalls++;
+      return interval(() => {
+        if (pumping) callback(...args);
+        else skipped++;
+      }, ms);
+    });
+    let server, session;
+    const sockets = [],
+      sent = [],
+      views = [];
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const until = async (predicate, label, drive = true) => {
+      const end = performance.now() + 5000;
+      for (;;) {
+        if (drive) session.update(performance.now());
+        if (predicate()) return;
+        assert.ok(performance.now() < end, `timed out: ${label}; ${JSON.stringify(session.read())}`);
+        await sleep(5);
+      }
+    };
+    try {
+      try {
+        server = await startSessionServer({rules, port: 0, driverMs: 5, refreshOnPing: true});
+      } finally {
+        interception.mock.restore();
+      }
+      assert.equal(globalThis.setInterval, interval, 'global timer restored before driving the session');
+      assert.equal(driverCalls, 1, 'only the existing host driver is intercepted');
+      session = createSession({
+        rules,
+        endpoint: {url: server.url, joinCode: server.joinCode},
+        random: () => 0.5,
+        pingMs: 100,
+        liveness: {connectTimeoutMs: 3000, hostTimeoutMs: 600},
+        socketFactory(url) {
+          const socket = new WebSocket(url);
+          sockets.push(socket);
+          const send = socket.send.bind(socket);
+          socket.send = text => {
+            sent.push(JSON.parse(text));
+            return send(text);
+          };
+          socket.on('message', data => {
+            const frame = JSON.parse(data.toString());
+            if (frame.type === 'view') views.push(frame);
+          });
+          return socket;
+        },
+      });
+      await until(() => session.read().status === 'joined' && session.read().confirmed !== null, 'initial baseline');
+      const player = session.read().player,
+        baseline = session.read().confirmed;
+      const revision = session.read().revision,
+        worldRevision = server.read().worldRevision,
+        firstViews = views.length;
+      const healthyUntil = performance.now() + 1300; // More than two host timeout windows.
+      await until(() => performance.now() >= healthyUntil, 'healthy idle windows');
+      assert.equal(session.read().status, 'joined');
+      assert.equal(sockets.length, 1);
+      assert.ok(views.length > firstViews + 2, 'real socket delivered advancing idle views');
+      assert.equal(session.read().revision, revision, 'idle liveness does not redraw');
+      assert.equal(server.read().worldRevision, worldRevision);
+      assert.deepEqual(server.read().world, baseline);
+
+      pumping = false;
+      const before = server.read(),
+        stoppedViews = views.length,
+        pingCount = sent.filter(f => f.type === 'ping').length;
+      const oldSocket = sockets[0];
+      assert.equal(oldSocket.readyState, WebSocket.OPEN, 'transport is open when the pump stops');
+      assert.equal(session.act({type: 'step', dx: 1, dz: 0}).status, 'predicted');
+      assert.equal(session.read().world[player].x, baseline[player].x + 1);
+      assert.equal(session.read().pending, 1);
+      const stalledAt = performance.now();
+      let sawOpenDuringStall = false;
+      await until(() => {
+        if (session.read().status === 'joined' && performance.now() - stalledAt > 300) {
+          assert.equal(oldSocket.readyState, WebSocket.OPEN);
+          sawOpenDuringStall = true;
+        }
+        return session.read().lastClose?.reason === 'host-timeout';
+      }, 'host timeout with socket still open');
+      assert.ok(sawOpenDuringStall, 'observed open socket well into the pump stall');
+      assert.ok(skipped > 0, 'the injected fault skipped actual driver callbacks');
+      assert.ok(sent.filter(f => f.type === 'ping').length > pingCount, 'client kept probing during the stall');
+      assert.ok(views.length <= stoppedViews + 1, 'no new pumped views (at most one already in flight)');
+      assert.equal(session.read().status, 'reconnecting');
+      assert.equal(session.read().stale, true);
+      assert.equal(session.read().pending, 0);
+      assert.deepEqual(session.read().world, baseline, 'unconfirmed prediction is rolled back');
+      // Deliver the real close handshake and host retirement before pumping again;
+      // otherwise an uncertain queued action could legitimately be applied first.
+      await until(() => oldSocket.readyState === WebSocket.CLOSED, 'old socket closed', false);
+      await until(() => server.read().connections === 0, 'host retired old socket', false);
+      const viewsBeforeReconnect = views.length;
+      pumping = true;
+      await until(
+        () =>
+          session.read().status === 'joined' &&
+          !session.read().stale &&
+          session.read().confirmed !== null &&
+          views.length > viewsBeforeReconnect,
+        'fresh baseline after reconnect',
+      );
+      assert.equal(session.read().player, player);
+      assert.equal(session.read().reconnects, 1);
+      assert.equal(session.read().pending, 0, 'fresh baseline has no uncertain pending action');
+      assert.equal(sockets.length, 2);
+      assert.equal(server.read().metrics.resumed, 1);
+      assert.equal(server.read().metrics.applied, before.metrics.applied);
+      assert.deepEqual(server.read().world, baseline, 'uncertain move was not applied after retirement');
+      assert.deepEqual(session.read().world, baseline);
+      assert.equal(sent.filter(f => f.type === 'action').length, 1, 'uncertain action was never resent');
+    } finally {
+      interception.mock.restore();
+      session?.dispose();
+      session?.dispose();
+      if (server) {
+        await server.close();
+        await server.close();
+      }
+      for (const socket of sockets) socket.terminate();
+    }
+  },
+);

@@ -29,7 +29,7 @@ import {
   type DigestSnapshot,
   type DigestTraceOptions,
 } from './digest';
-import {digestJson, hashText} from './hash';
+import {digestJson, hashText, replayJson} from './hash';
 import {explainDivergence, type DivergenceExplanation} from './explain';
 import {
   createDigestCoverage,
@@ -235,7 +235,7 @@ export const WORLD_DIGEST_LIMITS: JsonLimits = Object.freeze({maxBytes: 1 << 20,
 export function worldDigestText(world: World): string {
   const transforms: number[][] = [];
   for (const [e, t] of world.query(Transform)) transforms.push([e, t.x, t.y, t.z, t.rx, t.ry, t.rz, t.scale]);
-  return JSON.stringify({count: world.count, resources: world.resources, transforms});
+  return replayJson({count: world.count, resources: world.resources, transforms});
 }
 /** The default world digest. Creators with other state supply their own digest function. */
 export function worldDigest(world: World, limits: JsonLimits = WORLD_DIGEST_LIMITS): string {

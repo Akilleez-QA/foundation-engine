@@ -112,10 +112,6 @@ export function cameraSystem(
       if (revision !== undefined && !Number.isSafeInteger(revision))
         throw Error('camera: reset revision must be an integer');
       const revisionChanged = revision !== undefined && revisions.get(ctx.world) !== revision;
-      if (revisionChanged) {
-        previous.delete(ctx.world);
-        revisions.set(ctx.world, revision!);
-      }
       const e = ctx.named(o.target ?? 'player'),
         tr = e === undefined ? undefined : ctx.world.get(e, Transform);
       if (!tr && mode !== 'fixed') {
@@ -126,12 +122,11 @@ export function cameraSystem(
         ...o,
         ...o.options?.(ctx),
       });
-      const old = previous.get(ctx.world);
+      const old = revisionChanged ? undefined : previous.get(ctx.world);
       const discontinuity =
         old &&
         o.teleportDistance !== undefined &&
         Math.hypot(...pose.target.map((v, i) => v - old[i]!)) > o.teleportDistance;
-      previous.set(ctx.world, [...pose.target]);
       const k =
         revisionChanged || discontinuity ? 1 : (o.smooth ?? 0.12) <= 0 ? 1 : 1 - Math.exp(-dt / (o.smooth ?? 0.12));
       const cam = ctx.view.camera;
@@ -148,6 +143,9 @@ export function cameraSystem(
         cam.position = position;
         cam.target = target;
       }
+      // A missing target or failed clearance must not consume a reset request.
+      previous.set(ctx.world, [...pose.target]);
+      if (revision !== undefined) revisions.set(ctx.world, revision);
     },
   });
 }

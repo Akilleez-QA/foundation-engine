@@ -16,6 +16,7 @@ import type {ScatterEntry} from './scene-scatter';
 
 /** What a running scene reports and accepts from tools (the test API, probes, play scripts). */
 export interface SceneHandle {
+  /** Throws RESOURCE_CAPTURE_FAILED when resource JSON observation fails; later reads may recover. */
   state(): SceneState;
   /** Optional synchronous system capture, owned by this scene visit. */
   systemTrace?(options?: SystemTimingOptions): SystemTimingCapture | null;
