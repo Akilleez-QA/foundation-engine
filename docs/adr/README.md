@@ -65,3 +65,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0077](0077-candidate-verification-evidence.md) | Public contributor setup, candidate gate evidence and recorded sole-maintainer review exceptions | Process / Governance | Proposed |
 | [0078](0078-creator-selectable-render-backend.md) | Creator-selectable render backend: WebGL2 by default, WebGPU opt-in and lazily loaded | Render | Accepted |
 | [0079](0079-device-class-start-limit.md) | A constrained mobile GPU starts on a lighter preset unless the brief declares a tier | Quality | Accepted |
+
+| [0083](0083-portable-timed-contribution-checkpoints.md) | Portable timed contribution checkpoints through the existing owner | Capabilities / Persistence | Proposed |

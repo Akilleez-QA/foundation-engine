@@ -1036,3 +1036,15 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   an error. **Disclosure.** `npm run disclosure` drafts Steam and itch.io AI-disclosure text from the records, with
   development tooling kept apart from content players see. Evidence: focused tests and `npm run check`. Tooling only;
   no store-acceptance or licence-truth claim. [Guide](asset-provenance.md).
+
+
+## Timed contribution checkpoint candidate (2026-10-09)
+
+The existing capabilities owner now exposes separate portable checkpoint/restore.
+Configured base and bounds, saved time and ordered contributions validate before a
+single modifier transaction; successful load retires old runtime handles. Seven
+focused new tests exercise continuation, malformed/overflow atomicity, safe batch
+aggregation and real SaveStore failed-write recovery. See
+[timed contribution continuation](timed-effects.md#portable-continuation).
+This is a local candidate pending independent review and complete integration CI;
+no whole action-session persistence or device-performance acceptance is implied.
