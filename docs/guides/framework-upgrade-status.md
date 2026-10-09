@@ -1159,6 +1159,32 @@ reporting is a subsequent candidate; further source coverage, application wiring
 device experience and physical reclamation evidence remain separate obligations.
 
 
+## Fixed-step numeric admission candidate (2026-10-09)
+
+The existing core runner now rejects nonfinite configuration/frame inputs and unsafe
+step-count or frame/step/drop-counter arithmetic before frame work. Zero step budgets
+remain valid; finite negative deltas retain their fixed-lane clamp and presentation
+value. Step-relative tolerance replaces the absolute seconds tolerance, preventing
+phantom ticks for tiny steps. See [the system recipe](../recipes/add-a-system.md#core-runner-numeric-boundary).
+Targeted tests cover ordinary30/60/144Hz, tiny/subnormal steps, zero budgets, retained
+phase after refusal and overflow. This is a numeric-boundary candidate, not full
+engine, browser or physical-device acceptance; hosted integration remains required.
+
+### Resource-observation failure reporting integrated — 2026-10-09
+
+[PR #219](https://github.com/Akilleez-QA/foundation-engine/pull/219) integrated
+resource capture rejection and script, snapshot, and batch failure evidence at main
+`6dfbcf944098afe96daf79e468decda1516102eb`.
+[Candidate CI](https://github.com/Akilleez-QA/foundation-engine/actions/runs/37893991051)
+completed successfully on `82bb981bf927dc038025cb916da516ba3005415f`.
+This closes the earlier resource-observation integration-pending statement.
+Failed capture stops the affected script; incomplete snapshots retain partial
+evidence; report-write failures retain prior causes and the in-memory report.
+This receipt does not certify every diagnostic caller, physical-device behavior,
+or completion of the wider engine work. The fixed-step numeric candidate above
+still requires CI on its combined head after integration with this base.
+
+
 ## Editable-focus keyboard retirement candidate (2026-10-09)
 
 The existing document input bridge selectively retires prior non-inText keyboard
