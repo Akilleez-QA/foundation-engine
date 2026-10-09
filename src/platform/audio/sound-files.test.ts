@@ -309,20 +309,32 @@ test('budgets follow the minimum device', () => {
 });
 
 for (const outcome of ['resolve', 'reject'] as const) {
-  test(`timed-out decode retains admission until underlying ${outcome}`, async () => {
+  test(`timed-out decode retains admission until underlying ${outcome}`, async t => {
+    const deadlines: AbortController[] = [];
+    t.mock.method(AbortSignal, 'timeout', () => {
+      const deadline = new AbortController();
+      deadlines.push(deadline);
+      return deadline.signal;
+    });
     const pending: {resolve: (value: AudioBuffer) => void; reject: (error: Error) => void}[] = [];
     const context = {
       sampleRate: 48000,
       decodeAudioData: () => new Promise<AudioBuffer>((resolve, reject) => pending.push({resolve, reject})),
     } as unknown as BaseAudioContext;
     const files = createSoundFiles({
-      report() {}, maxDecodes: 1, timeoutMs: 15, compressedRatio: 4,
+      report() {},
+      maxDecodes: 1,
+      timeoutMs: 15,
+      compressedRatio: 4,
       fetchBytes: async () => new ArrayBuffer(10),
     });
     const first = files.decode('first', 'first', context).catch(() => null);
-    await new Promise(resolve => setTimeout(resolve, 35));
+    await flush();
+    deadlines.at(-1)!.abort(Error('decode timeout'));
     assert.equal(await first, null);
-    const second = files.decode('second', 'second', context).catch(() => null);
+    const nextId = outcome === 'resolve' ? 'first' : 'second';
+    files.retry(nextId);
+    const second = files.decode(nextId, nextId, context).catch(() => null);
     try {
       await flush();
       assert.equal(pending.length, 1, 'native decode slot remains occupied after caller timeout');
@@ -348,10 +360,15 @@ test('disposal retains unsettled reservations and retires them once without nega
   let finish!: (value: AudioBuffer) => void;
   const context = {
     sampleRate: 48000,
-    decodeAudioData: () => new Promise<AudioBuffer>(resolve => { finish = resolve; }),
+    decodeAudioData: () =>
+      new Promise<AudioBuffer>(resolve => {
+        finish = resolve;
+      }),
   } as unknown as BaseAudioContext;
   const files = createSoundFiles({
-    report() {}, compressedRatio: 4, fetchBytes: async () => new ArrayBuffer(10),
+    report() {},
+    compressedRatio: 4,
+    fetchBytes: async () => new ArrayBuffer(10),
   });
   const result = files.decode('sound', 'sound', context).catch(() => null);
   await flush();
@@ -366,4 +383,88 @@ test('disposal retains unsettled reservations and retires them once without nega
   assert.equal(files.buffer('sound'), undefined);
   files.dispose();
   assert.equal(files.stats.reservedBytes, 0);
+});
+
+test('synchronous decoder failure releases admission for retry', async () => {
+  let calls = 0;
+  const buffer = {length: 10, numberOfChannels: 1} as AudioBuffer;
+  const context = {
+    sampleRate: 48000,
+    decodeAudioData: () => {
+      if (++calls === 1) throw Error('synchronous decode failure');
+      return Promise.resolve(buffer);
+    },
+  } as unknown as BaseAudioContext;
+  const files = createSoundFiles({
+    report() {},
+    maxDecodes: 1,
+    compressedRatio: 4,
+    fetchBytes: async () => new ArrayBuffer(10),
+  });
+  await assert.rejects(files.decode('sound', 'sound', context), /synchronous/);
+  assert.equal(files.stats.reservedBytes, 0);
+  files.retry('sound');
+  assert.equal(await files.decode('sound', 'sound', context), buffer);
+  files.dispose();
+});
+
+test('disposal rejects queued decodes without starting them while native work retires later', async () => {
+  let rejectNative!: (error: Error) => void,
+    calls = 0;
+  const context = {
+    sampleRate: 48000,
+    decodeAudioData: () => {
+      calls++;
+      return new Promise<AudioBuffer>((_, reject) => {
+        rejectNative = reject;
+      });
+    },
+  } as unknown as BaseAudioContext;
+  const files = createSoundFiles({
+    report() {},
+    maxDecodes: 1,
+    compressedRatio: 4,
+    fetchBytes: async () => new ArrayBuffer(10),
+  });
+  const active = files.decode('active', 'active', context).catch(() => null);
+  const queued = files.decode('queued', 'queued', context).catch(() => null);
+  await flush();
+  assert.equal(calls, 1);
+  files.dispose();
+  assert.deepEqual(await Promise.all([active, queued]), [null, null]);
+  assert.equal(calls, 1);
+  assert.equal(files.stats.reservedBytes, 40);
+  rejectNative(Error('late native rejection'));
+  await flush();
+  assert.equal(files.stats.reservedBytes, 0);
+  assert.equal(files.stats.decodedBytes, 0);
+});
+
+test('successful decode transfers its reservation before admitting the next decoder', async () => {
+  const pending: ((buffer: AudioBuffer) => void)[] = [];
+  const context = {
+    sampleRate: 48000,
+    decodeAudioData: () => new Promise<AudioBuffer>(resolve => pending.push(resolve)),
+  } as unknown as BaseAudioContext;
+  const files = createSoundFiles({
+    report() {},
+    maxDecodes: 1,
+    maxDecodedBytes: 40,
+    compressedRatio: 4,
+    fetchBytes: async () => new ArrayBuffer(10),
+  });
+  const first = files.decode('a', 'a', context);
+  const second = files.decode('b', 'b', context);
+  await flush();
+  const buffer = {length: 10, numberOfChannels: 1} as AudioBuffer;
+  pending[0]!(buffer);
+  assert.equal(await first, buffer);
+  await flush();
+  assert.equal(pending.length, 2);
+  assert.ok(files.stats.decodedBytes + files.stats.reservedBytes <= 40);
+  pending[1]!(buffer);
+  await second;
+  assert.equal(files.stats.decodedBytes, 40);
+  assert.equal(files.stats.reservedBytes, 0);
+  files.dispose();
 });

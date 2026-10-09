@@ -15,11 +15,13 @@
  * for the brief's minimum device.
  *
  * Bounds: file size (checked while streaming, with a running cap), retained bytes and decode reservations, logical
- * concurrent fetches and decodes (more wait in order), tracked files (an idle entry, then the least recently used held file, is dropped; a
+ * concurrent fetches and underlying decodes (more wait in order), tracked files (an idle entry, then the least recently used held file, is dropped; a
  * refusal is reported), and a per-load timeout. Cancellation: `dispose()` aborts every fetch and rejects every waiter;
  * a caller's signal only stops its own wait. Recovery: a failed fetch or decode is reported once and remembered, so
  * repeated plays of a broken file do not hit the network again; `retry(id)` (a scene's preload) forgets the failure.
- * Timeout or disposal ends the wait, but an opaque decodeAudioData operation may continue after its slot is released.
+ * Timeout or disposal ends the wait, but an opaque decodeAudioData operation keeps its slot and estimate reserved
+ * until settlement. A decoder that never settles prevents queued decodes from starting; disposal rejects that queue.
+ * Reservations remain visible after disposal until the underlying work settles; they do not measure native heap use.
  * Pure apart from `fetch`; no AudioContext is created here.
  */
 
@@ -417,13 +419,17 @@ export function createSoundFiles(o: SoundFileOptions): SoundFiles {
         try {
           const bytes = await encoded(id, e);
           await decodes.enter();
-          let reserved = 0, started = false;
+          let reserved = 0,
+            started = false,
+            settled = false,
+            waiting = true;
           const retire = () => {
             stats.reservedBytes -= reserved;
             reserved = 0;
             decodes.leave();
           };
           try {
+            if (life.signal.aborted) throw Error('sounds: disposed');
             const estimate = estimateDecodedBytes(bytes, context.sampleRate, ratio);
             evict(id, estimate);
             if (stats.decodedBytes + stats.reservedBytes + estimate > maxDecoded)
@@ -432,14 +438,18 @@ export function createSoundFiles(o: SoundFileOptions): SoundFiles {
             stats.reservedBytes += reserved;
             stats.decodes++;
             // decodeAudioData detaches its argument: decode a copy so the kept bytes survive.
-            const work = Promise.resolve(context.decodeAudioData(bytes.slice(0))).finally(retire);
+            const work = Promise.resolve(context.decodeAudioData(bytes.slice(0)));
+            const completed = () => {
+              settled = true;
+              if (!waiting) retire();
+            };
+            work.then(completed, completed);
             started = true;
-            const buffer = await bounded(
-              work,
-              AbortSignal.any([life.signal, AbortSignal.timeout(timeoutMs)]),
-            );
+            const buffer = await bounded(work, AbortSignal.any([life.signal, AbortSignal.timeout(timeoutMs)]));
             if (life.signal.aborted) throw Error('sounds: disposed');
             const size = buffer.length * buffer.numberOfChannels * 4;
+            stats.reservedBytes -= reserved;
+            reserved = 0;
             if (!Number.isSafeInteger(size) || size > maxDecoded)
               throw Error('decoded sound exceeds the decoded budget');
             if (entries.get(id) === e) {
@@ -451,8 +461,10 @@ export function createSoundFiles(o: SoundFileOptions): SoundFiles {
             }
             return buffer;
           } finally {
-            // Once started, only settlement of the opaque decoder retires its admission.
-            if (!started) retire();
+            // Successful publication transfers accounting before waking the next decoder.
+            // An abandoned wait keeps admission until the opaque operation settles.
+            waiting = false;
+            if (!started || settled) retire();
           }
         } catch (error) {
           e.decoding = undefined;

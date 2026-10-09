@@ -66,7 +66,7 @@ either path, or both.
 | Encoded bytes kept | Twice the file budget: phone 4 MiB, tablet 6, laptop/desktop 8 | Least recently used first out |
 | Retained PCM bytes and decode reservations | Phone 48 MiB, tablet 72, laptop/desktop 96 | Estimate checked before decoding; actual output checked before retention |
 | Fetch or decode wait | `musicTimeoutMs(maxFileBytes)`: 10 s, or 1 s per 128 KiB if longer (phone 16 s, tablet 24, laptop/desktop 32) | The load fails and is reported once; opaque decoding may continue |
-| Logical decodes at once | 1 | Further decodes wait in order; timed-out native work may outlive its slot |
+| Underlying decodes at once | 1 | Further decodes wait in order until the previous decoder settles, even after caller timeout |
 | Files tracked | 16 | An idle entry, then the least recently used held file, is dropped |
 
 The app passes `musicBudgets(brief.devices.minimum)`. A creator may pass their own
@@ -86,8 +86,9 @@ The decoded size is estimated before decoding:
 
 These are admission and retained-buffer limits, not a cap on browser decoder peak
 memory. A ratio is an estimate, and neither timeout nor disposal forcibly cancels
-an opaque `decodeAudioData` operation. Its logical slot and reservation can be
-released while browser work continues. Measure native allocation and reclamation
+an opaque `decodeAudioData` operation. Its slot and estimate remain reserved until the decoder promise settles, including
+after disposal. A decoder that never settles blocks queued decodes; disposal rejects
+those queued callers. Measure native allocation and reclamation
 separately on the intended devices.
 
 Because the file budget is the decoded budget ÷ 24, a 128 kbps song that

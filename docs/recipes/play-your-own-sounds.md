@@ -73,8 +73,8 @@ nothing in a browser (a console warning) and fails a [`testScene`](test-a-scene.
   formats as 48 × their file size (a 64 kbps stereo file). So a 100 KiB mp3 reserves about 4.7 MiB, and a compressed
   file larger than the decoded budget ÷ 48 is refused before decoding (reported): keep effects short, and use the
   music channel for long tracks. Actual decoded size is checked before retention; estimates do not cap browser
-  decoder peak allocations. There are 4 logical fetches and 2 logical decodes at once (the rest queue); opaque
-  decoding may continue after a timeout releases its slot. A file is read with a running size
+  decoder peak allocations. There are 4 logical fetches and 2 underlying decodes at once (the rest queue); opaque
+  decoding retains its slot and estimate until settlement, even after timeout or disposal. A file is read with a running size
   cap; 256 files tracked (an idle or least recently used file is dropped to admit a new one); 10 s per fetch or decode; 64 voices at once,
   including plays waiting for their file. Past a bound a play is skipped and counted, never queued without limit.
 - **Unlock:** files fetched before the player's first gesture are decoded when the gesture creates the audio context,
