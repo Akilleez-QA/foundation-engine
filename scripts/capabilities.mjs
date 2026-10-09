@@ -43,6 +43,12 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'ALN-01',
+    title: 'Planar interaction preparation with bounded proposals and exact-ticket acknowledgment',
+    docs: 'src/kits/alignment/README.md',
+    evidence: [{kit: 'alignment', export: 'createAlignment'}, {path: 'src/kits/alignment/alignment.test.ts'}],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,
