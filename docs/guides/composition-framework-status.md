@@ -787,3 +787,12 @@ do not establish a browser native-heap ceiling.
 These receipts cover those merged batches only. Resource-observation failure
 reporting is a subsequent candidate; further source coverage, application wiring,
 device experience and physical reclamation evidence remain separate obligations.
+
+
+## Optional shared-session liveness — candidate (2026-10-09)
+
+The existing session client accepts paired connection/host deadlines and the host
+can refresh its existing one-credit view on ping. Defaults remain unchanged; no
+new timer or protocol owner. See [the contract](multiplayer-session.md#optional-host-liveness).
+Focused unit and real loopback acceptance is recorded in the upgrade ledger;
+independent review and full hosted integration CI remain required.
