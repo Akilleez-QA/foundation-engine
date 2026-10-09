@@ -140,11 +140,11 @@ export function createAlignment(initial: Target, local: Pose, input: Limits) {
       if (terminal) return {kind: 'refused', reason: terminal === 'accepted' ? 'stale-ticket' : terminal};
       const invalid = inspect(sample);
       if (invalid) return refuse(invalid);
+      if (ticket && !aligned(sample.actor)) return refuse('drift');
       if (paused || seconds === 0) return {kind: 'paused'};
       elapsed += seconds;
       if (elapsed >= limits.timeoutSeconds) return refuse('timeout');
       if (++steps > limits.maxSteps) return refuse('step-budget');
-      if (ticket && !aligned(sample.actor)) return refuse('drift');
       if (aligned(sample.actor)) {
         ticket ??= Object.freeze({target: bound.identity, revision: bound.revision, pose: goal});
         return {kind: 'prepared', ticket};
@@ -169,8 +169,8 @@ export function createAlignment(initial: Target, local: Pose, input: Limits) {
       if (!ticket) return {kind: 'refused', reason: 'not-prepared'};
       const invalid = inspect(sample);
       if (invalid) return refuse(invalid);
-      if (paused) return {kind: 'paused'};
       if (!aligned(sample.actor)) return refuse('drift');
+      if (paused) return {kind: 'paused'};
       const accepted = ticket;
       ticket = null;
       terminal = 'accepted';

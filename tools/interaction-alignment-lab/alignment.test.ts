@@ -93,6 +93,23 @@ test('pause and zero time consume no budget or acceptance; pending ticket can re
   assert.equal(attempt.acknowledge(ticket, observed).kind, 'accepted');
 });
 
+test('prepared drift retires tickets during paused steps, zero-time steps and paused acknowledgment', () => {
+  for (const mode of ['paused-step', 'zero-step', 'paused-ack'] as const) {
+    for (const change of [{x: 11.1}, {yaw: Math.PI / 2 + 0.1}]) {
+      const {attempt, observed, ticket} = prepared(),
+        before = attempt.state;
+      const drifted = {...observed, actor: {...observed.actor, ...change}};
+      const result =
+        mode === 'paused-ack'
+          ? attempt.acknowledge(ticket, drifted, true)
+          : attempt.step(drifted, mode === 'zero-step' ? 0 : 0.1, mode === 'paused-step');
+      assert.deepEqual(result, {kind: 'refused', reason: 'drift'}, mode);
+      assert.deepEqual(attempt.state, {...before, pendingTickets: 0, terminal: 'drift'});
+      assert.deepEqual(attempt.acknowledge(ticket, observed), {kind: 'refused', reason: 'stale-ticket'});
+    }
+  }
+});
+
 test('changed target identity, generation, revision or unversioned pose invalidate acknowledgment', () => {
   for (const changed of [
     {...base, identity: {...base.identity, id: 'other'}},
