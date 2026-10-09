@@ -84,13 +84,34 @@ test('cube accounting requires six equal square faces and uses the parent descri
   cube.type = T.FloatType;
   assert.equal(textureBytes(cube), 32736);
   cube.images[5] = {width: 8, height: 8};
-  assert.equal(textureBytes(cube), 0, 'heterogeneous cube retains unsupported legacy fallback');
+  assert.ok(Number.isNaN(textureBytes(cube)), 'heterogeneous supported cube refuses');
   cube.images = Array.from({length: 5}, () => ({width: 16, height: 16}));
-  assert.equal(textureBytes(cube), 0);
+  assert.ok(Number.isNaN(textureBytes(cube)));
   cube.images = Array.from({length: 6}, () => ({width: 16, height: 8}));
-  assert.equal(textureBytes(cube), 0);
+  assert.ok(Number.isNaN(textureBytes(cube)));
   cube.images = Array.from({length: 6}, () => ({width: NaN, height: 16}));
   assert.ok(Number.isNaN(textureBytes(cube)));
+  cube.images = [];
+  assert.equal(textureBytes(cube), 0, 'empty cube retains its unpopulated estimate');
+});
+
+test('cube inspection reads six indexed faces without invoking a supplied iterator', () => {
+  let reads = 0;
+  const faces = Array.from({length: 6}, () => ({width: 2, height: 2}));
+  Object.defineProperty(faces, Symbol.iterator, {
+    get() {
+      throw Error('iterator must not run');
+    },
+  });
+  for (let i = 0; i < 6; i++)
+    Object.defineProperty(faces, i, {
+      get() {
+        reads++;
+        return {width: 2, height: 2};
+      },
+    });
+  assert.equal(textureBytes(new T.CubeTexture(faces)), 120);
+  assert.equal(reads, 6);
 });
 
 test('unsupported descriptors retain compatibility fallback; invalid supported depth refuses', () => {

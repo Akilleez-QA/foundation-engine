@@ -100,10 +100,12 @@ policy can charge more levels than a backend creates. Data textures retain the
 full-chain charge even when their default settings disable generated mipmaps.
 Cube textures require six equal nonempty square faces; the parent texture's
 format and type determine bytes, including when faces are DataTextures.
+An empty cube keeps its zero unpopulated estimate. Nonempty malformed cube faces
+within this format domain produce an invalid estimate and model admission refuses them.
 
 General texture descriptors remain an accounting limitation. Explicit internal
 formats, authored mip layouts, packed/integer/depth formats outside the table,
-render-target textures and malformed cube layouts retain the ordinary 2D RGBA8
+render-target textures retain the ordinary 2D RGBA8
 fallback for compatibility. That fallback can undercount, including zero for an
 unsupported cube. A custom model parser can supply these descriptors, so its
 `maxResidentBytes` check must not be treated as a universal bound. Unsupported

@@ -79,15 +79,17 @@ export function textureBytes(texture: T.Texture): number {
   };
   if (flags.isCubeTexture) {
     const faces: unknown = texture.image;
-    if (!Array.isArray(faces) || faces.length !== 6) return fallback();
+    if (faces == null || (Array.isArray(faces) && faces.length === 0)) return 0;
+    if (!Array.isArray(faces) || faces.length !== 6) return NaN;
     let size = 0;
-    for (const face of faces) {
+    for (let i = 0; i < 6; i++) {
+      const face = faces[i];
       const dimensions = (face?.isDataTexture ? face.image : face) as Dimensions | null | undefined,
         width = dimensions?.width ?? 0,
         height = dimensions?.height ?? 0;
       if (!validDimension(width) || !validDimension(height)) return NaN;
       // Valid cube allocations use six equal square faces; the parent descriptor supplies the format and type.
-      if (!width || width !== height || (size && width !== size)) return fallback();
+      if (!width || width !== height || (size && width !== size)) return NaN;
       size = width;
     }
     return fullChain(size, size, 6, components * scalar);

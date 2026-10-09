@@ -205,6 +205,25 @@ test('custom model descriptors enforce corrected estimates and recover after ref
     ['float', (size: number) => new T.DataTexture(null, size, size, T.RGBAFormat, T.FloatType), 2000, 16],
     ['array', (size: number) => new T.DataArrayTexture(null, size, size, 3), 2000, 12],
     ['volume', (size: number) => new T.Data3DTexture(null, size, size, 3), 2000, 16],
+    [
+      'cube face count',
+      (size: number) => new T.CubeTexture(Array.from({length: size === 16 ? 5 : 6}, () => ({width: 1, height: 1}))),
+      1000,
+      24,
+    ],
+    [
+      'cube rectangle',
+      (size: number) => new T.CubeTexture(Array.from({length: 6}, () => ({width: size, height: 1}))),
+      1000,
+      24,
+    ],
+    [
+      'cube mismatch',
+      (size: number) =>
+        new T.CubeTexture(Array.from({length: 6}, (_, i) => ({width: i === 5 ? size : 1, height: i === 5 ? size : 1}))),
+      1000,
+      24,
+    ],
   ] as const) {
     let attempt = 0;
     const disposed: string[] = [];
