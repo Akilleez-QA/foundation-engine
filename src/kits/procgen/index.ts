@@ -4,6 +4,16 @@ export function procgen(): KitDefinition {
   return defineKit({id: 'procgen', requires: [], defs: [], modules: []});
 }
 export {deriveSeed, createRng, SEED_PATH_LIMITS, type SeedPart, type Rng} from '../../core/rng';
+export {chooseWeighted, createChoiceHistory} from './weighted';
+export type {
+  WeightedCandidate,
+  WeightedLimits,
+  ChoiceHistoryOptions,
+  ChoiceHistory,
+  ChoiceTicket,
+  ChoiceHistorySnapshot,
+  ChoicePreparation,
+} from './weighted';
 export {
   createGridGenerationJob,
   parseGridParameters,

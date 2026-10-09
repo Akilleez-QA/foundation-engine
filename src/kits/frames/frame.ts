@@ -8,8 +8,10 @@ export interface FrameNode extends FrameRef {
   readonly matrix: readonly number[];
 }
 export function frameRef(ref: FrameRef): FrameRef {
-  if (!ref.id || !Number.isSafeInteger(ref.generation) || ref.generation < 0) throw Error('invalid frame identity');
-  return Object.freeze({id: ref.id, generation: ref.generation});
+  const {id, generation} = ref;
+  if (typeof id !== 'string' || !id.length || !Number.isSafeInteger(generation) || generation < 0)
+    throw Error('invalid frame identity');
+  return Object.freeze({id, generation});
 }
 /** Immutable affine pose; finite and invertible so attachment can preserve world pose. */
 export function poseMatrix(input: readonly number[]): readonly number[] {
@@ -60,14 +62,14 @@ export function createFrames(maxFrames = 128, maxDepth = 16) {
       return true;
     },
     remove(ref: FrameRef): boolean {
-      const node = nodes.get(ref.id);
-      return node?.generation === ref.generation ? nodes.delete(ref.id) : false;
+      const captured = frameRef(ref),
+        node = nodes.get(captured.id);
+      return node?.generation === captured.generation ? nodes.delete(captured.id) : false;
     },
     resolve(ref: FrameRef): readonly number[] | null {
-      frameRef(ref);
       const chain: FrameNode[] = [],
         seen = new Set<string>();
-      let current: FrameRef | undefined = ref;
+      let current: FrameRef | undefined = frameRef(ref);
       while (current) {
         if (seen.has(current.id) || chain.length >= maxDepth) return null;
         seen.add(current.id);

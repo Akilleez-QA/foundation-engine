@@ -74,6 +74,8 @@ export interface SessionHostOptions<A extends DocumentValue, C> {
   /** Integrity enforcement for `rules.integrity`: `observe` (default) audits only, `enforce` acts, `off` skips. */
   readonly integrity?: SessionHostIntegrity;
   readonly limits?: Partial<SessionHostLimits>;
+  /** Optional paired client liveness: pings dirty the existing one-credit view; only pump publishes it. */
+  readonly refreshOnPing?: boolean;
   readonly ports: SessionHostPorts<C>;
   /** Optional local log line for the operator console. Never sent to clients. */
   readonly log?: (event: Readonly<{event: string; player?: string; reason?: string}>) => void;
@@ -151,6 +153,10 @@ export function createSessionHost<A extends DocumentValue, C>(options: SessionHo
     throw Error('session host: join code must be 16-128 URL-safe characters');
   if (!ports || typeof ports.send !== 'function' || typeof ports.close !== 'function')
     throw Error('session host: missing port');
+  const configuredRefresh = options.refreshOnPing;
+  if (configuredRefresh !== undefined && typeof configuredRefresh !== 'boolean')
+    throw Error('session host: invalid refreshOnPing');
+  const refreshOnPing = configuredRefresh === true;
   const mode: SessionHostIntegrity = options.integrity ?? 'observe';
   if (!['observe', 'enforce', 'off'].includes(mode)) throw Error('session host: invalid integrity mode');
   const supplied = options.limits ?? {};
@@ -585,7 +591,10 @@ export function createSessionHost<A extends DocumentValue, C>(options: SessionHo
         c.publisher?.ack(f.session, f.sequence);
         return;
       }
-      if (f.type === 'ping' && exactKeys(f, ['v', 'type'])) return;
+      if (f.type === 'ping' && exactKeys(f, ['v', 'type'])) {
+        if (refreshOnPing) c.publisher?.markDirty();
+        return;
+      }
       retire(peer, 'protocol');
     },
     disconnected(conn: C, now: number) {

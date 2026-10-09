@@ -36,7 +36,7 @@ serialized handles, handles from another owner, and retired handles return false
 Replacing a key makes all its previous handles stale. The owner retains no terminal
 history. Handles have increasing safe-integer serials; exhaustion throws without
 changing state. `snapshot()` exposes frozen live facts and handles for inspection;
-it is not a durable checkpoint format or a restore contract.
+use the separate portable checkpoint contract below for persistence.
 
 `advance(time)` accepts finite monotonic caller time. Expiry is inclusive at the
 exact deadline. A new effect with deadline at or before the current time reports
@@ -81,4 +81,49 @@ foreign sessions, deadlines, bounds, caller mutation, reentry and arithmetic fai
 Its headless scene consumes temporary speed through the existing frame system,
 observes exact-deadline expiry and retires state on exit. This establishes local
 composition behavior; it does not certify rendered feedback, device performance,
-network authority, saved effect restoration or arbitrary creator formulas.
+network authority or arbitrary creator formulas.
+
+## Portable continuation
+
+`checkpoint(): TimedEffectsCheckpoint` returns detached, deeply frozen version-1
+data: captured base, configured limits, accepted simulation time and ordered live
+effect rows. Runtime handles and serials are deliberately absent. Source keys can
+repeat under stacking; array order preserves each same-key admission order.
+No global effect identifier or cross-save cancellation token is introduced.
+
+`restore(data: unknown)` validates plain records and dense own-index arrays,
+exact version/base/limits, finite time, identifiers, known statistics, contributions
+and total bounds. Accessors, extra fields, sparse arrays and custom iterators reject.
+Live rows must expire strictly after saved time. It then evaluates the complete
+candidate through the existing modifier owner **once**, publishes records and time
+together, and returns frozen live rows with fresh handles. Restoring one row at a
+time can overflow on an intermediate prefix even when the full aggregate is safe.
+
+Invalid shape, capacity, handle exhaustion or final arithmetic throws without
+changing existing records, handles, values or time. Successful restoration replaces
+all records, retires old handles and may rewind local time. Call it at an explicit
+load boundary before exposing the owner; normal `advance` remains monotonic.
+The creator must restore the enclosing simulation clock consistently. It does not
+advance offline time, apply an outcome, schedule work or execute an expiry callback.
+Arbitrary proxy traps are not sandboxed; reentrant owner mutations remain refused.
+
+Persist this data with any coupled creator state in **one existing SaveStore
+section**. A changed base or bound requires an explicit creator migration before
+restoration. There is no automatic expiry filtering, unknown-stat migration or
+queue for pending applications. Save failures do not rewind this in-memory owner;
+the creator handles durability results and recovery. Retire external callbacks at
+load/exit and use `cancelAll()` for local cleanup.
+
+The checkpoint test uses the finite amount-projection configuration (base 1,
+four effects, eight contributions), saves it through the real SaveStore, and
+compares future values before, at and after expiry. It also keeps a receipt and
+resource in that same creator envelope: replaying the acknowledged fixture
+operation is refused, and a failed newer write reloads the last durable envelope.
+That receipt check belongs to the fixture; this API does not make arbitrary external
+effects idempotent. The existing session action controller has no portable restore
+contract and is not claimed to be saved by this change.
+
+Seven focused checkpoint tests cover stacked ordering, old/foreign/copied handles,
+immutable data, empty replacement, malformed/oversized input, reentry, atomic
+overflow recovery and one-batch restoration of a safe aggregate with an unsafe
+prefix. Full integration and physical-device acceptance remain separate.
