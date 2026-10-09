@@ -1075,3 +1075,7 @@ Unexported planar alignment candidate: [contract and limits](interaction-alignme
 ## Planar alignment public kit candidate — 2026-10-09
 
 The earlier unexported experiment is graduated in this candidate to optional `@kits/alignment` (ALN-01), reusing frames identity validation without installing a system or requiring kit registration. It provides bounded target-relative proposals and exact-ticket acknowledgment; creators retain movement, clearance, eligibility, clock and effect ownership. Lab consumers now use the kit; no duplicate tool implementation or new installed system remains. Public yaw matches author Y rotation, with focused frame-composition coverage. Evidence: 15 focused headless tests, isolated typecheck and formatting. Full CI, browser/runtime playability, physics, save composition and devices remain unverified; this does not establish integration. [Contract](../../src/kits/alignment/README.md) and [consumer guide](interaction-alignment-lab.md).
+
+### Acceptance evidence prototype — 2026-10-09
+
+Local unexported development candidate: [contract and limits](../../tools/acceptance-evidence/README.md). Required-case/minimum-sample admission with explicit failure statuses and bounded JSON CLI; real replay and historical-save consumer tests. Seven focused tests passed locally, including CLI negative cases. Existing test glob includes the regressions; complete hosted CI is pending. No engine runtime API, new scheduler, performance claim or physical-device acceptance.
