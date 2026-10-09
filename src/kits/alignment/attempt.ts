@@ -65,6 +65,7 @@ function angle(value: number): number {
   return Math.atan2(Math.sin(value), Math.cos(value));
 }
 function target(value: AlignmentTarget): AlignmentTarget {
+  if (typeof value.identity.id !== 'string' || !value.identity.id) throw Error('invalid target identity');
   if (!Number.isSafeInteger(value.revision) || value.revision < 0) throw Error('invalid target revision');
   return Object.freeze({identity: frameRef(value.identity), revision: value.revision, frame: pose(value.frame)});
 }
@@ -128,8 +129,8 @@ export function createAlignment(initial: AlignmentTarget, local: AlignmentPose, 
     return {kind: 'refused', reason};
   };
   const inspect = (sample: AlignmentSample): AlignmentReason | null => {
-    if (sample.target.identity.id.length > limits.maxIdentityLength) throw Error('target identity exceeds limit');
     const current = target(sample.target);
+    if (current.identity.id.length > limits.maxIdentityLength) throw Error('target identity exceeds limit');
     const actor = pose(sample.actor);
     if (typeof sample.eligible !== 'boolean' || typeof sample.clear !== 'boolean')
       throw Error('invalid creator checks');

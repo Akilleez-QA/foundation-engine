@@ -7,7 +7,7 @@ This headless experiment now consumes the optional public `@kits/alignment` help
 Run from the repository root:
 
 ```sh
-node --import tsx --test tools/interaction-alignment-lab/alignment.test.ts
+node --import tsx --test src/kits/alignment/*.test.ts tools/interaction-alignment-lab/alignment.test.ts
 node_modules/.bin/tsc --noEmit -p tools/interaction-alignment-lab/tsconfig.json
 ```
 

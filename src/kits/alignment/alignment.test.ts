@@ -69,6 +69,27 @@ test('retained identity size and numeric limits are enforced at both admission b
   assert.deepEqual(attempt.state, before);
 });
 
+test('runtime identity admission rejects nonstrings without retaining caller objects or consuming progress', () => {
+  const attempt = createAlignment(target, {x: 0, z: 0, yaw: 0}, limits);
+  const observed = {target, actor: target.frame, eligible: true, clear: true};
+  const prepared = attempt.step(observed, 0.1);
+  assert.equal(prepared.kind, 'prepared');
+  if (prepared.kind !== 'prepared') throw Error('expected preparation');
+  const before = attempt.state;
+  for (const id of [123, {payload: 'x'.repeat(10000)}, ['anchor'], null, '']) {
+    const malformed = {...target, identity: {...target.identity, id}};
+    // Reflect supplies malformed runtime input without pretending it satisfies the public static type.
+    assert.throws(() => Reflect.apply(createAlignment, undefined, [malformed, {x: 0, z: 0, yaw: 0}, limits]));
+    assert.throws(() => Reflect.apply(attempt.step, undefined, [{...observed, target: malformed}, 0.1]));
+    assert.throws(() =>
+      Reflect.apply(attempt.acknowledge, undefined, [prepared.ticket, {...observed, target: malformed}]),
+    );
+    assert.deepEqual(attempt.state, before);
+  }
+  assert.equal(prepared.ticket.target.id, 'anchor');
+  assert.equal(attempt.acknowledge(prepared.ticket, observed).kind, 'accepted');
+});
+
 test('numeric extremes reject unsafe positions before progress and avoid zero-distance underflow', () => {
   const attempt = createAlignment(target, {x: 0, z: 0, yaw: 0}, limits),
     before = attempt.state;
