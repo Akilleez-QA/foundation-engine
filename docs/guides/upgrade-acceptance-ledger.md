@@ -1071,3 +1071,21 @@ mid-period reload, large jumps, stale callbacks, reentry and failed durability.
 It is a composition experiment, not a public scheduler or whole-game persistence
 claim. Callbacks stage state without storage writes; explicit host save boundaries flush.
 Production integration still needs coordinated clock/consumer restore, full CI and creator acceptance.
+
+### Integrated ownership helpers and continuation candidates — 2026-10-09
+
+[PR #197](https://github.com/Akilleez-QA/foundation-engine/pull/197) integrated
+assignments, itineraries, planar alignment and development acceptance reporting
+at main commit `5b26285da7ba1f75fef5bf3c47df115331da8b69`.
+[Full candidate CI](https://github.com/Akilleez-QA/foundation-engine/actions/runs/37886326403)
+passed on reviewed head `e10f0ef54535a737455757c9366a78f76b4bf2db`.
+This supersedes earlier entries' “not integrated” status for that batch only;
+it does not add concrete-game or physical-device acceptance.
+
+The follow-up condition and recurring-phase experiments remain unexported.
+They compose existing equipment/modifier/save and clock/save owners respectively.
+Separate agent reviews and thirteen focused tests per experiment passed.
+The combined follow-up candidate also retains real-owner regressions for failed
+scene preflight and queued action delivery. These exercise headless ownership
+boundaries; production scene wiring and physical resource reclamation are not
+certified. Full CI on the combined candidate remains required before integration.
