@@ -99,11 +99,11 @@ supported. No arbitrary epsilon expands a cell. Defensive arithmetic refusal is
 `numeric-refusal`, distinct from clear.
 
 These are logical work/storage bounds, not native heap measurements or CPU
-deadlines. In one local Node diagnostic run, 100 empty 1024×1024 diagonals visited
-3070 cells each in about 54 ms total; subnormal-origin diagonals took about 375 ms.
-100 distant horizontal queries took about 46 ms, and 10,000 short queries about
-59 ms. These single-run observations are not device benchmarks or guaranteed
-throughput; subnormal BigInt costs are materially higher.
+deadlines. A 1024-cell empty diagonal checks 3070 distinct cells in the regression
+rather than scanning its full bounding-box area. BigInt arithmetic with subnormal
+coordinates uses larger operands and may cost materially more than ordinary
+coordinates. Profile representative query volume on the creator-selected devices;
+no throughput guarantee follows from a visited-cell count.
 
 ## Composition and evidence
 
