@@ -4,6 +4,7 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 
 | Kit | What | Used by |
 |---|---|---|
+| [rewind](../../src/kits/rewind/README.md) | Bounded per-subject sample history and capped time choice for judging remote commands against past state; pure helper | Headless tests and a combat-sweep composition; no integrated game |
 | [visibility](../../src/kits/visibility/README.md) | Bounded source contributions, current visibility and explored history; pure helper | Two headless sensor/facility fixtures; no integrated game |
 | [ui](../../src/kits/ui/README.md) | HUD lines, a banner and a prompt over a scene | arcade, explorer |
 | [camera](../../src/kits/camera/README.md) | Camera poses: follow, orbit, first-person, top-down, side-scroll, fixed | explorer |

@@ -61,6 +61,12 @@ export const FEATURES = [
     evidence: [{kit: 'alignment', export: 'createAlignment'}, {path: 'src/kits/alignment/alignment.test.ts'}],
   },
   {
+    id: 'REWIND-01',
+    title: 'Bounded rewind history for judging remote commands against past state',
+    docs: 'src/kits/rewind/README.md',
+    evidence: [{kit: 'rewind', export: 'createRewindHistory'}, {path: 'src/kits/rewind/history.test.ts'}],
+  },
+  {
     id: 'VISIBILITY-01',
     title: 'Bounded source-owned visibility and explored history',
     docs: 'src/kits/visibility/README.md',

@@ -9,6 +9,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
+- Optional `@kits/rewind` keeps bounded per-subject sample history so an authoritative host can test a remote command against the state its sender saw, with a creator cap on look-back, no extrapolation and explicit discontinuities. Latency estimation and protocol remain creator-owned; evidence is headless tests. See [ADR 0087](docs/adr/0087-rewind-history.md).
+
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.
 
 Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
