@@ -43,6 +43,12 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'WORK-01',
+    title: 'Optional bounded fair work roster',
+    docs: 'src/kits/work-roster/README.md',
+    evidence: [{kit: 'work-roster', export: 'createWorkRoster'}, {path: 'src/kits/work-roster/consumers.test.ts'}],
+  },
+  {
     id: 'ASG-01',
     title: 'Optional bounded service and worksite assignment ownership',
     docs: 'docs/guides/assignments.md',

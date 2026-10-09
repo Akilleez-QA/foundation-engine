@@ -1158,3 +1158,14 @@ confirmed-state rollback, then reconnects after old-peer retirement without
 resending its uncertain action. Independent review and full hosted integration CI
 are pending. No new browser,
 WAN, physical-device, scalability or full-CI acceptance is claimed.
+
+
+## Optional bounded work roster candidate
+
+The [work roster](../../src/kits/work-roster/README.md) supplies finite admission, fair
+visit batches and exact registration membership, with no scheduler or payload owner.
+Two headless consumers use the existing fixed runner for World observations and
+revision-checked inspections. An independent array model covers 10,000 churn operations.
+These are candidate headless contracts; hosted combined CI and physical-device
+timing/native-memory acceptance are not implied. Creator result revisions and
+consumer cleanup remain explicit; runtime tickets are not saved. See ADR 0086.

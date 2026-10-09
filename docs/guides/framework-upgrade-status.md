@@ -1192,3 +1192,14 @@ can refresh its existing one-credit view on ping. Defaults remain unchanged; no
 new timer or protocol owner. See [the contract](multiplayer-session.md#optional-host-liveness).
 Focused unit and real loopback acceptance is recorded in the upgrade ledger;
 independent review and full hosted integration CI remain required.
+
+
+## Optional bounded work roster candidate
+
+The [work roster](../../src/kits/work-roster/README.md) supplies finite admission, fair
+visit batches and exact registration membership, with no scheduler or payload owner.
+Two headless consumers use the existing fixed runner for World observations and
+revision-checked inspections. An independent array model covers 10,000 churn operations.
+These are candidate headless contracts; hosted combined CI and physical-device
+timing/native-memory acceptance are not implied. Creator result revisions and
+consumer cleanup remain explicit; runtime tickets are not saved. See ADR 0086.
