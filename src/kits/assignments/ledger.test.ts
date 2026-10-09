@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {assignments, createAssignments, type Assignments, type AssignmentToken} from './index';
+import {createAssignments, type Assignments, type AssignmentToken} from './index';
 
 function actor(l: Assignments, id: string) {
   const value = l.addActor(id);
@@ -17,10 +17,6 @@ function claim(l: Assignments, a: unknown, t: unknown, units = 1): AssignmentTok
   assert.equal(value.status, 'claimed');
   return value.token;
 }
-
-test('optional kit has no installed scheduler or dependencies', () => {
-  assert.equal(assignments().id, 'assignments');
-});
 
 test('claim authority is replaced only after successful weighted transfer', () => {
   const l = createAssignments({maxClaims: 2});

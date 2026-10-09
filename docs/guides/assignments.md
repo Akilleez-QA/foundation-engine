@@ -1,6 +1,6 @@
 # Service and worksite assignments
 
-Choose `@kits/assignments` when a creator needs one live task or worksite claim per actor, with exclusive or weighted target capacity. The [kit contract](../../src/kits/assignments/README.md) describes its public inputs, outputs, lifecycle, refusal statuses and bounds. The helper is optional and installs no system; add `assignments()` to the game's kit list when using it.
+Choose `@kits/assignments` when a creator needs one live task or worksite claim per actor, with exclusive or weighted target capacity. The [kit contract](../../src/kits/assignments/README.md) describes its public inputs, outputs, lifecycle, refusal statuses and bounds. Import the helper directly; it installs no runtime system and needs no kit-list registration.
 
 ## Choose the existing owner
 

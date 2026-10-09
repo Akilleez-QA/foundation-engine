@@ -1,6 +1,6 @@
 # Assignments
 
-Optional, headless ownership for exclusive service requests and weighted worksite capacity. `assignments()` records the creator's kit choice and installs nothing. `createAssignments(options)` creates a synchronous visit-owned ledger. The creator chooses eligibility, priority, target selection, retry timing, arrival rules and effects.
+Optional, headless ownership for exclusive service requests and weighted worksite capacity. Import the pure helper directly; no kit-list registration is needed. `createAssignments(options)` creates a synchronous visit-owned ledger. The creator chooses eligibility, priority, target selection, retry timing, arrival rules and effects.
 
 ```ts
 import {createAssignments} from '@kits/assignments';
