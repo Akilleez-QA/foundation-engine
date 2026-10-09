@@ -133,6 +133,13 @@
       "evidence": ["@kits/procgen exports deriveSeed"]
     },
     {
+      "id": "GRID-01",
+      "title": "Atomic sparse cell batches and bounded immutable occupancy queries",
+      "shipped": true,
+      "docs": "docs/guides/cell-occupancy.md",
+      "evidence": ["@kits/spatial exports createOccupancy", "@kits/procgen exports CELL_BATCH_CEILING"]
+    },
+    {
       "id": "GEN-02",
       "title": "Bounded binary record store for large edited worlds",
       "shipped": true,
@@ -651,6 +658,7 @@
       "name": "procgen",
       "exports": [
         "CELLULAR_CELLS_PER_SLICE",
+        "CELL_BATCH_CEILING",
         "CELL_EDIT_DEFAULT_LIMITS",
         "CHUNK_STORE_DEFAULT_LIMITS",
         "ChunkStoreError",
@@ -755,8 +763,10 @@
       "exports": [
         "GRID_CEILING",
         "INTEREST_CEILING",
+        "OCCUPANCY_MAX_CELLS",
         "createInterestResult",
         "createInterestSets",
+        "createOccupancy",
         "createQueryResult",
         "createSpatialGrid",
         "spatial"

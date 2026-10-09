@@ -1169,3 +1169,13 @@ no new owner or global cancellation is introduced. See the input README for
 recovery and focus-event limitations. Dispatcher and bridge regressions cover
 selectivity, stale repeats, fresh presses and listener retirement. This is a
 candidate; full hosted integration and physical-device acceptance remain separate.
+
+
+## Atomic cell batches and occupancy candidate (2026-10-09)
+
+Optional procgen batch edits and immutable spatial point/rectangle/segment queries
+reuse existing storage and lifetime owners. See [contract and evidence](cell-occupancy.md)
+and ADR0085. Configured limits and exact contact ordering are runtime contracts;
+focused geometric, persistence and consumer tests are candidate evidence. Hosted
+full CI, browser/GPU and physical-device acceptance are not established here.
+No new scheduler, material policy or whole-engine completion claim.

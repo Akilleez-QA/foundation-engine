@@ -33,3 +33,12 @@ export {
 export function spatial(): KitDefinition {
   return defineKit({id: 'spatial', requires: [], defs: [], modules: []});
 }
+
+export {
+  createOccupancy,
+  OCCUPANCY_MAX_CELLS,
+  type Occupancy,
+  type OccupancyOptions,
+  type OccupancyResult,
+  type OccupancyOutside,
+} from './occupancy';

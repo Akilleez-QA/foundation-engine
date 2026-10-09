@@ -160,6 +160,15 @@ export const FEATURES = [
     evidence: [{kit: 'procgen', export: 'deriveSeed'}],
   },
   {
+    id: 'GRID-01',
+    title: 'Atomic sparse cell batches and bounded immutable occupancy queries',
+    docs: 'docs/guides/cell-occupancy.md',
+    evidence: [
+      {kit: 'spatial', export: 'createOccupancy'},
+      {kit: 'procgen', export: 'CELL_BATCH_CEILING'},
+    ],
+  },
+  {
     id: 'GEN-02',
     title: 'Bounded binary record store for large edited worlds',
     pr: 56,

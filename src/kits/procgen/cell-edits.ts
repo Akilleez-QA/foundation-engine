@@ -36,6 +36,13 @@ export interface CellEditBaseline {
   readonly cellsZ: number;
   readonly values: Uint16Array;
 }
+export interface CellEdit {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly value: number;
+}
+export const CELL_BATCH_CEILING = 1 << 20;
 export interface CellEdits {
   /** `baselineChecksum` of the baseline these edits apply to. */
   readonly baseline: number;
@@ -43,6 +50,8 @@ export interface CellEdits {
   get(x: number, y: number, z: number): number;
   /** `changed`, `unchanged` (same as the current value), or `full` (would exceed maxEdits; nothing changes). */
   set(x: number, y: number, z: number, value: number): 'changed' | 'unchanged' | 'full';
+  /** Atomic, revision-checked batch. Own dense data only; duplicate cells are invalid. */
+  batch(expectedRevision: number, edits: readonly CellEdit[]): 'changed' | 'unchanged' | 'full' | 'stale';
   /** Edited cells (differing from the baseline). */
   readonly size: number;
   /** Increments on every `changed`; use it as the chunk store record revision. Starts at the loaded revision. */
@@ -128,7 +137,7 @@ export function decodeCellEdits(
  */
 export function createCellEdits(
   baseline: CellEditBaseline,
-  options: {saved?: Uint8Array; revision?: number; limits?: Partial<CellEditLimits>} = {},
+  options: {saved?: Uint8Array; revision?: number; limits?: Partial<CellEditLimits>; maxBatch?: number} = {},
 ): CellEdits {
   const {cellsX, cellsY, cellsZ, values} = baseline;
   if (
@@ -143,7 +152,16 @@ export function createCellEdits(
     saved = revision;
   if (!int(revision, 0, Number.MAX_SAFE_INTEGER)) throw Error('cell edits: invalid revision');
   const checksum = baselineChecksum(values);
-  const edits = options.saved
+  const maxBatch = options.maxBatch ?? 4096;
+  if (!int(maxBatch, 1, CELL_BATCH_CEILING)) throw Error('cell edits: invalid batch limit');
+  let admitting = false;
+  const mutable = () => {
+    if (admitting) throw Error('cell edits: mutation during batch admission');
+  };
+  const advanceable = () => {
+    if (revision === Number.MAX_SAFE_INTEGER) throw Error('cell edits: revision exhausted');
+  };
+  let edits = options.saved
     ? decodeCellEdits(options.saved, {cellsX, cellsY, cellsZ}, l, checksum)
     : new Map<number, number>();
   for (const [i, v] of edits) if (values[i] === v) edits.delete(i);
@@ -159,9 +177,12 @@ export function createCellEdits(
       return edits.get(i) ?? values[i]!;
     },
     set(x, y, z, value) {
+      mutable();
       const i = index(x, y, z);
       if (!int(value, 0, l.maxValue)) throw Error('cell edits: value out of range');
       if ((edits.get(i) ?? values[i]) === value) return 'unchanged';
+      if (values[i] !== value && !edits.has(i) && edits.size >= l.maxEdits) return 'full';
+      advanceable();
       if (values[i] === value) edits.delete(i);
       else {
         if (!edits.has(i) && edits.size >= l.maxEdits) return 'full';
@@ -169,6 +190,59 @@ export function createCellEdits(
       }
       revision++;
       return 'changed';
+    },
+    batch(expectedRevision, input) {
+      mutable();
+      admitting = true;
+      try {
+        if (!int(expectedRevision, 0, Number.MAX_SAFE_INTEGER)) throw Error('cell edits: invalid expected revision');
+        if (expectedRevision !== revision) return 'stale';
+        if (!Array.isArray(input) || Object.getPrototypeOf(input) !== Array.prototype)
+          throw Error('cell edits: expected array');
+        const length: unknown = Object.getOwnPropertyDescriptor(input, 'length')?.value;
+        if (!int(length, 0, maxBatch)) throw Error('cell edits: batch bound');
+        if (Reflect.ownKeys(input).length !== length + 1) throw Error('cell edits: expected dense batch');
+        const captured = new Map<number, number>();
+        let size = edits.size,
+          changed = false;
+        for (let n = 0; n < length; n++) {
+          const slot = Object.getOwnPropertyDescriptor(input, String(n));
+          if (!slot || !('value' in slot)) throw Error('cell edits: expected data slot');
+          const row: unknown = slot.value;
+          if (
+            !row ||
+            typeof row !== 'object' ||
+            Object.getPrototypeOf(row) !== Object.prototype ||
+            Reflect.ownKeys(row).length !== 4
+          )
+            throw Error('cell edits: expected data record');
+          const fields: number[] = [];
+          for (const key of ['x', 'y', 'z', 'value']) {
+            const d = Object.getOwnPropertyDescriptor(row, key);
+            if (!d || !('value' in d) || typeof d.value !== 'number') throw Error('cell edits: expected numeric data');
+            fields.push(d.value);
+          }
+          const i = index(fields[0]!, fields[1]!, fields[2]!),
+            value = fields[3]!;
+          if (!int(value, 0, l.maxValue) || captured.has(i)) throw Error('cell edits: invalid or duplicate batch cell');
+          captured.set(i, value);
+          if ((edits.get(i) ?? values[i]) !== value) changed = true;
+          size += Number(value !== values[i]) - Number(edits.has(i));
+        }
+        if (size > l.maxEdits) return 'full';
+        if (!changed) return 'unchanged';
+        advanceable();
+        const next = new Map(edits);
+        for (const [i, value] of captured) {
+          if (value === values[i]) next.delete(i);
+          else next.set(i, value);
+        }
+        edits = next;
+        revision++;
+        return 'changed';
+      } finally {
+        admitting = false;
+      }
     },
     get size() {
       return edits.size;
@@ -180,6 +254,7 @@ export function createCellEdits(
       return revision !== saved;
     },
     markSaved(r) {
+      mutable();
       if (!int(r, 0, revision)) throw Error('cell edits: invalid saved revision');
       saved = Math.max(saved, r);
     },
