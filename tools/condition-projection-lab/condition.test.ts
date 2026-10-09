@@ -19,6 +19,30 @@ function open(definition: ConditionDefinition, disk = new MemoryBackend()) {
   return {fixture, abort, store, disk, owner: fixture.owner(store, abort.signal)};
 }
 type Lab = ReturnType<typeof open>;
+test('synchronous subscriber replacement during publication retires the owner', () => {
+  for (const sameValue of [false, true]) {
+    const lab = open(chargeDefinition);
+    const handle = lab.store.section(lab.fixture.section);
+    let once = true;
+    const stop = handle.subscribe(value => {
+      if (once && value.revision === 1) {
+        once = false;
+        handle.replace(sameValue ? structuredClone(value) : lab.fixture.section.initial());
+      }
+    });
+    try {
+      const ticket = lab.owner.prepare('lamp')!;
+      assert.equal(lab.owner.update(ticket, 0), 'stale');
+      assert.equal(lab.owner.prepare('lamp'), null);
+      assert.equal(lab.owner.checkpoint(), 'stale');
+      assert.equal(lab.owner.update(ticket, 1), 'stale');
+      assert.equal(lab.owner.snapshot().revision, sameValue ? 1 : 0);
+    } finally {
+      stop();
+      close(lab);
+    }
+  }
+});
 function close(lab: Lab) {
   lab.owner.dispose();
   lab.store.dispose();

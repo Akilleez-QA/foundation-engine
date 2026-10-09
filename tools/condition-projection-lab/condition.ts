@@ -193,12 +193,29 @@ export function conditionFixture(input: ConditionDefinition) {
         if (!live()) return 'stale';
         if (['quarantined', 'newer', 'unavailable'].includes(handle.status())) return 'blocked';
         store.flush();
+        if (!live()) return 'stale';
         return handle.status() === 'saved' ? 'saved' : 'save-failed';
       };
       const commit = (candidate: ConditionSnapshot) => {
         const accepted = parse(candidate); // projection arithmetic must pass before publication
-        handle.replace(accepted);
-        observed = handle.get();
+        let publications = 0;
+        let published: Readonly<ConditionSnapshot> | undefined;
+        const stop = handle.subscribe(value => {
+          publications++;
+          published = value;
+        });
+        try {
+          handle.replace(accepted);
+        } finally {
+          stop();
+        }
+        // A subscriber may synchronously publish again, including a byte-identical
+        // reset. Only the single immutable value from our publication is owned.
+        if (retired || publications !== 1 || handle.get() !== published) {
+          dispose();
+          return 'stale';
+        }
+        observed = published;
         pending = null;
         return checkpoint();
       };
