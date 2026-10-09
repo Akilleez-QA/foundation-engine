@@ -2,11 +2,11 @@
 
 Question: can one small ownership ledger support both one-shot service requests and persistent weighted worksite occupancy without selecting gameplay policy?
 
-This is an unexported, Node-runnable prototype. It is not an installed kit, game scene, scheduler or production API. Product code must not import this folder. The two fixtures exercise different lifecycles; they are not two integrated game consumers.
+This Node-runnable lab now consumes the optional `@kits/assignments` helper. `assignments.mjs` is a compatibility re-export; there is one implementation in the kit. Product code must not import this folder. The two fixtures exercise different lifecycles; they are not two integrated game consumers. See the [public kit contract](../../src/kits/assignments/README.md).
 
 ```sh
-node tools/service-assignment-lab/demo.mjs
-node --test tools/service-assignment-lab/assignments.test.mjs
+node --import tsx tools/service-assignment-lab/demo.mjs
+node --import tsx --test tools/service-assignment-lab/assignments.test.mjs
 ```
 
 ## Owner and contract
@@ -43,4 +43,4 @@ Normal claim/transfer/release operations use map lookups and constant ledger wor
 
 `assignments.test.mjs` has 15 tests: both consumer fixtures, independent claim lifetimes, failed transfer preservation, weighted same-target resize, claim saturation, foreign/copied handles, stale actor/target generations, retry limits, input validation, detached snapshots, disposal, 1000 admission/removal cycles, and 600 mixed commands compared after every step with an independent allocation model. These establish selected state transitions, not fairness, multiplayer determinism, worker safety, browser timing, persistence or physical-device performance.
 
-The guide [Service assignment prototype](../../docs/guides/service-assignment-lab.md) describes the existing engine seams and graduation criteria. No new exports, package scripts, capability rows or global owners are introduced.
+The guide [Service assignment prototype](../../docs/guides/service-assignment-lab.md) describes the existing engine seams and graduation criteria. The optional kit supplies public exports and a capability row; this lab adds no package script or global owner.

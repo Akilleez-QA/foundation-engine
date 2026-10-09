@@ -1043,3 +1043,10 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
 `tools/service-assignment-lab/` contains an unexported bounded ownership prototype with service-request and weighted-worksite fixtures. It demonstrates exclusive actor claims, generation-scoped token refusal, capacity admission, atomic failed-transfer preservation, bounded explicit retry withdrawals and disposal. It adds no installed kit, scheduler, thread, persistence adapter or product API. [Contract and limitations](service-assignment-lab.md).
 
 Evidence: 15 focused Node tests passed, including a 600-command independent allocation model and 1000 admission/removal cycles; both Node fixtures ran, and `npm run check` passed with the one prototype test file selected (15/15). Integration gates, browser behavior and physical-device performance are not accepted by this evidence. This entry records a branch candidate, not integration or production readiness.
+
+
+## Optional assignment kit candidate — ASG-01, 2026-10-09
+
+The independently implemented `@kits/assignments` helper graduates the service/worksite ownership mechanism into a typed optional public surface. It retains bounded actors, targets, weighted claims and retry counts, preserves existing claims on failed transfer, rejects retired tokens, and supports explicit disposal. Existing navigation/command/save/inventory owners keep their responsibilities; no matching policy, global scheduler or persistence format is added. The original lab now imports the kit through two consumer modules. [Contract](assignments.md).
+
+Evidence: 24 focused tests passed (9 typed kit/consumer tests plus 15 retained lab regressions), including real route-owner cancellation, stale result rejection, an independent allocation model and bounded churn. `npm run check` passed with 28/28 tests across four selected files, and the migrated demo ran successfully. This is a local candidate; hosted/full integration gates, playable consumers and browser/physical-device acceptance remain pending.

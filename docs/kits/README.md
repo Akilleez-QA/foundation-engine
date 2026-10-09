@@ -35,6 +35,8 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [spatial](../../src/kits/spatial/README.md) | Bounded uniform-grid index for neighbour, range and interest queries; per-observer interest sets | No template yet. Grid integrated in v0.2.0 (SC-01, PR #23, [guide](../guides/spatial-index.md)); interest sets implemented, candidate (SC-02, PR #51, [guide](../guides/interest-sets.md)) |
 | [spatial-audio](../../src/kits/spatial-audio/README.md) | Logical sound sources: virtual tracking, importance ranking with HRTF for the sounds that matter, class distance curves with a hard cutoff, budgeted occlusion driving the smoothed filter | None yet; implemented, candidate (AUD-02, PR #55, [recipe](../recipes/3d-sound-for-shooters.md)) |
 
+The optional [assignments](../../src/kits/assignments/README.md) candidate supplies exclusive actor claims, weighted target capacity and atomic transfer refusal. Two headless service/worksite fixtures and route-owner composition tests exercise it; no playable template consumer or browser/device acceptance is claimed. [Guide](../guides/assignments.md).
+
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.
 
 

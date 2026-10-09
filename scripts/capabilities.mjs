@@ -43,6 +43,15 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'ASG-01',
+    title: 'Optional bounded service and worksite assignment ownership',
+    docs: 'docs/guides/assignments.md',
+    evidence: [
+      {kit: 'assignments', export: 'createAssignments'},
+      {kit: 'assignments', export: 'assignments'},
+    ],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,
