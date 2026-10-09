@@ -68,13 +68,15 @@ export async function snap({scene, mobile = false, url, quality, calm = false}, 
   };
   for (const [name, view] of Object.entries(VIEWS).filter(([n]) => n === 'desktop' || mobile)) {
     const pin = viewPreset(name, quality);
-    const b = await launch(view);
-    let shot;
+    let b,
+      shot,
+      lines = [];
     try {
+      b = await launch(view);
       await b.page.addInitScript(PROBE);
       // Calm: the OS reduced-motion preference, the default of the comfort.calm setting (STD-SET-2).
       if (calm) await b.page.emulateMedia({reducedMotion: 'reduce'});
-      const lines = await (runtime.open ?? open)(b, url, scene, pin ? {query: {quality: pin}} : {});
+      lines = await (runtime.open ?? open)(b, url, scene, pin ? {query: {quality: pin}} : {});
       const preset = await b.evaluate(`window.engine.probe('quality') ?? null`);
       const calmOn = calm ? !!(await b.evaluate(`window.engine.probe('settings')?.calm`)) : undefined;
       shot = evidencePath(
@@ -127,8 +129,6 @@ export async function snap({scene, mobile = false, url, quality, calm = false}, 
           window: redrawn ? 'redrawn' : 'moving',
         },
       };
-      probe.errors.push(...b.errors.map(e => `${name}: ${e}`));
-      probe.console.push(...lines.filter(l => !l.startsWith('debug')).map(l => `${name}: ${l}`));
     } catch (error) {
       probe.views[name] = {
         status: 'incomplete',
@@ -139,11 +139,13 @@ export async function snap({scene, mobile = false, url, quality, calm = false}, 
       probe.errors.push(name + ': ' + describeDiagnostic(error));
     } finally {
       try {
-        await b.close();
+        await b?.close();
       } catch (error) {
         probe.errors.push(name + ': browser close: ' + describeDiagnostic(error));
         probe.views[name] = {...probe.views[name], status: 'incomplete', cleanupError: describeDiagnostic(error)};
       }
+      probe.errors.push(...(b?.errors ?? []).map(e => `${name}: ${e}`));
+      probe.console.push(...lines.filter(l => !l.startsWith('debug')).map(l => `${name}: ${l}`));
     }
   }
   write(dir, 'probe.json', probe);

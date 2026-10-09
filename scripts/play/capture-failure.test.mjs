@@ -62,7 +62,7 @@ test('snap saves incomplete observation and screenshot without inventing state',
   const directory = mkdtempSync(join(tmpdir(), 'capture-snap-'));
   let closed = 0;
   const browser = {
-    errors: [],
+    errors: ['concurrent page failure'],
     page: {addInitScript: async () => {}, screenshot: async () => Buffer.from('image')},
     evaluate: async code => {
       if (code === 'window.engine.state()') throw Error('RESOURCE_CAPTURE_FAILED');
@@ -78,7 +78,7 @@ test('snap saves incomplete observation and screenshot without inventing state',
       {
         directory,
         launch: async () => browser,
-        open: async () => [],
+        open: async () => ['warning: observation pending'],
         measure: async () => ({renders: 1}),
         activity: async () => ({}),
         gpuCensus: async () => null,
@@ -89,12 +89,73 @@ test('snap saves incomplete observation and screenshot without inventing state',
     assert.ok(result.views.desktop.screenshot);
     assert.equal('state' in result.views.desktop, false);
     assert.match(result.errors.join(' '), /RESOURCE_CAPTURE_FAILED/);
+    assert.match(result.errors.join(' '), /concurrent page failure/);
+    assert.deepEqual(result.console, ['desktop: warning: observation pending']);
     assert.deepEqual(JSON.parse(readFileSync(join(directory, 'probe.json'), 'utf8')), result);
     const lines = [];
     t.mock.method(console, 'log', line => lines.push(line));
     assert.equal(report(result), 1);
     assert.match(lines.join(' '), /incomplete observation/);
     assert.doesNotMatch(lines.join(' '), /0 entities|state \{\}/);
+  } finally {
+    rmSync(directory, {recursive: true, force: true});
+  }
+});
+
+test('script launch failure still writes terminal evidence', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'launch-script-'));
+  try {
+    const result = await runScript({name: 'launch', steps: [{expect: {path: 'world', exists: true}}]}, '', {
+      directory,
+      launch: async () => {
+        throw Error('launch refused');
+      },
+    });
+    assert.equal(result.pass, false);
+    assert.equal(result.terminal, true);
+    assert.deepEqual(result.steps, []);
+    assert.match(result.errors.join(' '), /launch refused/);
+    assert.deepEqual(JSON.parse(readFileSync(join(directory, 'report.json'), 'utf8')), result);
+  } finally {
+    rmSync(directory, {recursive: true, force: true});
+  }
+});
+
+test('later view launch failure preserves completed snapshot evidence', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'launch-snap-'));
+  let launches = 0,
+    closes = 0;
+  const browser = {
+    errors: [],
+    page: {addInitScript: async () => {}, screenshot: async () => Buffer.from('image')},
+    evaluate: async code => (code === 'window.engine.state()' ? {world: {entities: 2, state: {ok: true}}} : null),
+    close: async () => {
+      closes++;
+    },
+  };
+  try {
+    const result = await snap(
+      {scene: 'test', url: '', mobile: true},
+      {
+        directory,
+        launch: async () => {
+          if (++launches === 2) throw Error('mobile launch refused');
+          return browser;
+        },
+        open: async () => [],
+        measure: async () => ({renders: 1, drawsPerFrame: 1, trisPerFrame: 1}),
+        activity: async () => ({}),
+        gpuCensus: async () => null,
+      },
+    );
+    assert.equal(launches, 2);
+    assert.equal(closes, 1);
+    assert.equal(result.views.desktop.status, 'complete');
+    assert.equal(result.views.desktop.state.world.entities, 2);
+    assert.equal(result.views.mobile.status, 'incomplete');
+    assert.equal('state' in result.views.mobile, false);
+    assert.match(result.errors.join(' '), /mobile launch refused/);
+    assert.deepEqual(JSON.parse(readFileSync(join(directory, 'probe.json'), 'utf8')), result);
   } finally {
     rmSync(directory, {recursive: true, force: true});
   }

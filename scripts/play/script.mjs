@@ -31,9 +31,9 @@ export async function runScript(script, url, runtime = {}) {
   const launch = runtime.launch ?? (await import('../perf/bench-browser.mjs')).launch;
   const dir = runtime.directory ?? freshOut(join(OUT, script.name));
   const report = {name: script.name, steps: [], pass: true, errors: []};
-  let current;
-  const b = await launch({width: 1280, height: 800});
+  let current, b;
   try {
+    b = await launch({width: 1280, height: 800});
     await (runtime.open ?? open)(b, url, script.scene ?? homeScene(), {seed: script.seed ?? 1});
     let n = 0;
     for (const step of script.steps) {
@@ -117,14 +117,14 @@ export async function runScript(script, url, runtime = {}) {
     }
   } finally {
     try {
-      await b.close();
+      await b?.close();
     } catch (error) {
       report.pass = false;
       report.terminal = true;
       report.errors.push('browser close: ' + describeDiagnostic(error));
     }
   }
-  report.errors.push(...b.errors);
+  report.errors.push(...(b?.errors ?? []));
   if (report.errors.length) report.pass = false;
   write(dir, 'report.json', report);
   return report;
