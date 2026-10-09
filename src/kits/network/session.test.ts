@@ -88,7 +88,7 @@ class Link implements BrowserSocket {
     for (const fn of [...(this.listeners.get(type) ?? [])]) fn(event);
   }
 }
-function network(rules = makeRules(), integrity: SessionHostIntegrity = 'observe', limits = {}) {
+function network(rules = makeRules(), integrity: SessionHostIntegrity = 'observe', limits = {}, refreshOnPing = false) {
   let now = 1000;
   const links: Link[] = [],
     refuse = new Set<Link>();
@@ -97,6 +97,7 @@ function network(rules = makeRules(), integrity: SessionHostIntegrity = 'observe
     joinCode: JOIN,
     integrity,
     limits,
+    refreshOnPing,
     ports: {
       send: (link, text) => {
         if (link.readyState !== 1) return false;
@@ -139,6 +140,7 @@ function network(rules = makeRules(), integrity: SessionHostIntegrity = 'observe
     host,
     links,
     refuse,
+    pump: true,
     get now() {
       return now;
     },
@@ -157,7 +159,7 @@ function network(rules = makeRules(), integrity: SessionHostIntegrity = 'observe
         now += ms;
         for (const c of clients) c.update(now);
         deliver();
-        host.pump(now);
+        if (net.pump) host.pump(now);
         deliver();
         for (const c of clients) c.update(now);
       }
@@ -559,4 +561,289 @@ test('MP01: unconfirmed actions stop at the host queue size, so a burst cannot t
   assert.equal(a.read().status, 'joined');
   assert.equal(net.host.read().closeReasons['queue-limit'], undefined);
   assert.throws(() => createSession({rules: makeRules(), actionsPerSecond: 0}));
+});
+
+const LIVE = {pingMs: 100, liveness: {connectTimeoutMs: 300, hostTimeoutMs: 350}};
+
+test('MP01 liveness: deadlines are captured once before validation', () => {
+  let reads = 0;
+  const config = {
+    get connectTimeoutMs() {
+      return ++reads === 1 ? 300 : Infinity;
+    },
+    hostTimeoutMs: 400,
+  };
+  const silent = silentClient('connecting', {liveness: config});
+  assert.equal(reads, 1);
+  silent.step(0);
+  silent.step(300);
+  assert.equal(silent.client.read().lastClose?.reason, 'connect-timeout');
+  silent.client.dispose();
+});
+
+test('MP01 liveness: paired idle views advance without changing the world or redrawing; defaults stay silent', () => {
+  for (const enabled of [false, true]) {
+    const net = network(makeRules(), 'observe', {}, enabled),
+      a = net.client(undefined, undefined, undefined, enabled ? LIVE : {});
+    net.step(20, 4);
+    const revision = a.read().revision,
+      worldRevision = net.host.read().worldRevision,
+      views = must(net.host.read().metrics.views);
+    net.step(20, 100);
+    assert.equal(a.read().status, 'joined');
+    assert.equal(a.read().reconnects, 0);
+    assert.equal(a.read().revision, revision);
+    assert.equal(net.host.read().worldRevision, worldRevision);
+    assert.equal(must(net.host.read().metrics.views) > views, enabled);
+  }
+});
+
+test('MP01 liveness: stopped pump expires despite messages, drops prediction and resumes without resend', () => {
+  const net = network(makeRules(), 'observe', {}, true),
+    a = net.client(undefined, undefined, undefined, LIVE);
+  net.step(20, 4);
+  const player = a.read().player!;
+  net.pump = false;
+  assert.equal(a.act({dx: 1}).status, 'predicted');
+  net.step(20, 18);
+  assert.equal(a.read().status, 'reconnecting');
+  assert.equal(a.read().lastClose?.reason, 'host-timeout');
+  assert.equal(a.read().stale, true);
+  assert.equal(a.read().pending, 0);
+  assert.equal(xOf(a.read().world, player), 0, 'unconfirmed display restored immediately');
+  net.pump = true;
+  net.step(20, 30);
+  assert.equal(a.read().status, 'joined');
+  assert.equal(a.read().player, player);
+  assert.equal(xOf(net.host.read().world, player), 0, 'uncertain action was not resent');
+});
+
+test('MP01 liveness: continuous actions do not suppress probes; ping cannot publish without pump', () => {
+  const net = network(makeRules(), 'observe', {}, true),
+    a = net.client(undefined, undefined, undefined, LIVE);
+  net.step(20, 4);
+  const link = net.links[0]!,
+    sent: string[] = [],
+    original = link.send.bind(link);
+  link.send = text => {
+    sent.push(text);
+    original(text);
+  };
+  for (let i = 0; i < 40; i++) {
+    a.act({dx: 0});
+    net.step(20);
+  }
+  assert.ok(sent.filter(text => JSON.parse(text).type === 'ping').length >= 7);
+  net.step(1); // Deliver the last action view's credit-releasing ack.
+  const views = must(net.host.read().metrics.views);
+  net.host.message(link, '{"v":1,"type":"ping"}', net.now);
+  assert.equal(must(net.host.read().metrics.views), views);
+  net.host.pump(net.now);
+  assert.equal(must(net.host.read().metrics.views), views + 1);
+});
+
+function silentClient(
+  mode: 'connecting' | 'open' | 'welcome',
+  extra: Partial<SessionClientOptions<Step>> = {},
+  enabled = true,
+) {
+  const links: Link[] = [];
+  const client = createSession({
+    rules: makeRules(),
+    endpoint: {url: 'ws://localhost/session', joinCode: JOIN},
+    ...(enabled ? LIVE : {pingMs: 100}),
+    random: () => 0.5,
+    ...extra,
+    socketFactory: () => {
+      const link = new Link();
+      links.push(link);
+      return link;
+    },
+  });
+  function step(now: number) {
+    client.update(now);
+    const link = links.at(-1)!;
+    if (link.readyState === 0 && mode !== 'connecting') {
+      link.readyState = 1;
+      link.emit('open');
+      if (mode === 'welcome') link.emit('message', {data: '{"v":1,"type":"welcome","player":"p1","session":"silent"}'});
+    }
+    client.update(now);
+  }
+  return {client, links, step};
+}
+
+test('MP01 liveness: connecting, no welcome, and welcome-only attempts all exhaust without external close events', () => {
+  for (const mode of ['connecting', 'open', 'welcome'] as const) {
+    const {client, links, step} = silentClient(mode);
+    for (let now = 0; now < 30000 && client.read().status !== 'closed'; now += 50) step(now);
+    assert.equal(client.read().reason, 'retry-exhausted', mode);
+    assert.equal(links.length, 7, mode);
+    assert.ok(
+      links.every(link => link.readyState === 3 && [...link.listeners.values()].every(rows => rows.size === 0)),
+    );
+  }
+});
+
+test('MP01 liveness: opt-in against a nonparticipating idle host expires; disabled connecting stays unchanged', () => {
+  const net = network(),
+    a = net.client(undefined, undefined, undefined, LIVE);
+  net.step(20, 4);
+  net.step(20, 18);
+  assert.equal(a.read().lastClose?.reason, 'host-timeout');
+  const silent = silentClient('connecting', {}, false);
+  silent.step(0);
+  silent.step(100000);
+  assert.equal(silent.client.read().status, 'connecting');
+  assert.equal(silent.links.length, 1);
+});
+
+test('MP01 liveness: exact deadline, regression, large jumps and disposal remain bounded', () => {
+  const {client, links, step} = silentClient('connecting');
+  step(100);
+  step(99);
+  step(399);
+  assert.equal(client.read().lastClose, null);
+  step(400);
+  assert.equal(client.read().lastClose?.reason, 'connect-timeout');
+  client.dispose();
+  step(1000000);
+  assert.equal(links.length, 1);
+  assert.equal(client.read().reason, 'disposed');
+  links[0]!.emit('message', {data: '{"v":1,"type":"welcome","player":"p1","session":"late"}'});
+  assert.equal(client.read().status, 'closed');
+});
+
+test('MP01 liveness: malformed and incompatible durations are refused, captured options are immutable', () => {
+  for (const liveness of [
+    null,
+    {},
+    {connectTimeoutMs: 0, hostTimeoutMs: 400},
+    {connectTimeoutMs: Infinity, hostTimeoutMs: 400},
+    {connectTimeoutMs: 300, hostTimeoutMs: 100},
+    {connectTimeoutMs: 0.1, hostTimeoutMs: 400},
+    {connectTimeoutMs: 300, hostTimeoutMs: Number.MAX_SAFE_INTEGER + 1},
+  ])
+    assert.throws(() => Reflect.apply(createSession, null, [{rules: makeRules(), pingMs: 100, liveness}]));
+  const config = {connectTimeoutMs: 300, hostTimeoutMs: 400};
+  const silent = silentClient('connecting', {liveness: config});
+  silent.step(0);
+  config.connectTimeoutMs = 99999;
+  silent.step(300);
+  assert.equal(silent.client.read().lastClose?.reason, 'connect-timeout');
+  assert.throws(() =>
+    Reflect.apply(createSessionHost, null, [
+      {
+        rules: makeRules(),
+        joinCode: JOIN,
+        refreshOnPing: 1,
+        ports: {send: () => true, close: () => {}},
+      },
+    ]),
+  );
+});
+
+test('MP01 liveness: duplicates, obsolete and foreign views do not renew the lease; queued fresh view wins at deadline', () => {
+  for (const kind of ['duplicate', 'obsolete', 'foreign', 'fresh'] as const) {
+    const net = network(makeRules(), 'observe', {}, true),
+      a = net.client(undefined, undefined, undefined, LIVE);
+    net.step(20, 4);
+    const link = net.links[0]!;
+    let captured = '';
+    link.addEventListener('message', ((event: Event & {data: string}) => {
+      if (JSON.parse(event.data).type === 'view') captured = event.data;
+    }) as EventListener);
+    net.step(20, 6);
+    assert.ok(captured);
+    const frame = JSON.parse(captured);
+    // Adopt another genuine view first, leaving an older frame to replay.
+    net.step(20, 5);
+    const current = JSON.parse(captured),
+      start = net.now;
+    net.pump = false;
+    const injected =
+      kind === 'duplicate'
+        ? captured
+        : JSON.stringify(
+            kind === 'obsolete'
+              ? frame
+              : kind === 'foreign'
+                ? {...current, session: 'another-session', sequence: current.sequence + 1}
+                : {...current, sequence: current.sequence + 1},
+          );
+    link.emit('message', {data: injected});
+    a.update(start + 350);
+    if (kind === 'fresh') {
+      assert.equal(a.read().status, 'joined');
+      const sent = link.toHost.length;
+      a.update(start + 350);
+      a.update(start + 300);
+      assert.equal(link.toHost.length, sent, 'no catch-up burst or regressing-clock probe');
+      a.update(start + 1000000);
+      assert.equal(a.read().lastClose?.reason, 'host-timeout');
+    } else assert.equal(a.read().lastClose?.reason, 'host-timeout', kind);
+  }
+});
+
+test('MP01 liveness: unacknowledged view coalesces probes and send refusal still retires the peer', () => {
+  const net = network(makeRules(), 'observe', {}, true),
+    a = net.client(undefined, undefined, undefined, LIVE);
+  net.step(20, 4);
+  net.step(1);
+  const link = net.links[0]!;
+  net.host.message(link, '{"v":1,"type":"ping"}', net.now);
+  net.host.pump(net.now);
+  const views = must(net.host.read().metrics.views);
+  for (let i = 0; i < 10; i++) {
+    net.host.message(link, '{"v":1,"type":"ping"}', net.now);
+    net.host.pump(net.now);
+  }
+  assert.equal(must(net.host.read().metrics.views), views, 'one outstanding credit, no snapshot outbox');
+  a.update(net.now + 400); // No host frames delivered: downstream silent loss.
+  assert.equal(a.read().lastClose?.reason, 'host-timeout');
+  assert.equal(a.read().stale, true);
+  const failure = network(makeRules(), 'observe', {}, true),
+    b = failure.client(undefined, undefined, undefined, LIVE);
+  failure.step(20, 4);
+  failure.step(1);
+  const blocked = failure.links[0]!;
+  blocked.readyState = 3;
+  failure.host.message(blocked, '{"v":1,"type":"ping"}', failure.now);
+  failure.host.pump(failure.now);
+  assert.equal(failure.host.read().closeReasons['view-send-refused'], 1);
+  void b;
+});
+
+test('MP01 liveness: malformed input retains protocol refusal and late old frames cannot renew a replacement', () => {
+  const net = network(makeRules(), 'observe', {}, true),
+    a = net.client(undefined, undefined, undefined, LIVE);
+  net.step(20, 4);
+  const old = net.links[0]!;
+  old.emit('message', {data: '{"v":1,"type":"pong"}'});
+  a.update(net.now);
+  assert.equal(a.read().lastClose?.reason, 'protocol');
+  net.step(20, 30);
+  assert.equal(a.read().status, 'joined');
+  net.pump = false;
+  for (let i = 0; i < 18; i++) {
+    old.emit('message', {data: '{"v":1,"type":"welcome","player":"p1","session":"late"}'});
+    net.step(20);
+  }
+  assert.equal(a.read().lastClose?.reason, 'host-timeout');
+});
+
+test('MP01 liveness: old clients accept refreshed views and ping floods still hit the existing rate bound', () => {
+  const net = network(makeRules(), 'observe', {}, true),
+    a = net.client();
+  net.step(20, 4);
+  const views = must(net.host.read().metrics.views);
+  net.step(100, 60);
+  assert.equal(a.read().status, 'joined');
+  assert.equal(a.read().reconnects, 0);
+  assert.ok(must(net.host.read().metrics.views) > views);
+  const link = net.links[0]!;
+  for (let i = 0; i < 100; i++) net.host.message(link, '{"v":1,"type":"ping"}', net.now);
+  assert.equal(link.closing?.reason, 'rate-limit');
+  net.host.pump(net.now);
+  assert.equal(net.host.read().connections, 0);
 });

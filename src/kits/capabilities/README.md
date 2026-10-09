@@ -27,3 +27,7 @@ receipts, persistence and coupled equipment/job acceptance. It does not change t
 existing capability owner. See [persistent skill allocation](../../../docs/guides/skill-allocation.md)
 for the intended contract, strict restore rules and integration limits. The same helpers are
 exported through the game barrel and `@foundation-engine/pure/capabilities`.
+
+Timed contributions also expose portable `checkpoint()` and transactional `restore()`
+through the existing owner, with fresh cancellation handles and exact base/bound
+validation. See [portable continuation](../../../docs/guides/timed-effects.md#portable-continuation).

@@ -12,6 +12,8 @@ Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c
 [changes/unreleased/](changes/unreleased/README.md), one per change, folded in here at release time;
 `npm run changelog` shows the whole section.
 
+- **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
+- Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.
 - **The GPU bench reaches the GPU on Linux.** `npm run bench -- --gpu` (and `bench:ref`) dropped only the software-GL
   flags, and headless Chromium on Linux then fell back to SwiftShader anyway, so "gpu" runs measured a software
   rasteriser (about 1 fps for a crowded three.js scene instead of 60). The harness now adds `--use-gl=angle

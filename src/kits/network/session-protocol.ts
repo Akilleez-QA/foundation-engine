@@ -2,6 +2,8 @@
  * The MP-01 shared-session wire contract (text JSON, `v: 1`). Shared by `createSessionHost` and `createSession`.
  *
  * Client to host: `join {rules, version, token, player}`, `action {seq, action}`, `ack {session, sequence}`, `ping`.
+ * Optional host `refreshOnPing` dirties the existing view on ping; only host pump publishes it.
+ * No extra frame or negotiated capability is added; client deadlines require paired setup.
  * Host to client: `welcome {player, session}`, then complete scoped views (`view` / `view-unavailable`, NW-02) whose
  * reserved entity `@you` carries `{player, processed}`: the last action sequence of this connection the host applied
  * (or consumed as a rejection) in that same projection, the coherent prediction baseline.

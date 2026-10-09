@@ -7,7 +7,14 @@ import {compareDigests, createDigestTrace} from './digest';
 import {explainDivergence} from './explain';
 import {hashText} from './hash';
 import type {OpenLimits} from './log';
-import {recordSceneRun, replaySceneLog, sceneReplayDigest, worldDigest, WORLD_DIGEST_LIMITS} from './scene';
+import {
+  recordSceneRun,
+  replaySceneLog,
+  sceneReplayDigest,
+  worldDigest,
+  worldDigestText,
+  WORLD_DIGEST_LIMITS,
+} from './scene';
 import {observeWorld, replayDigest, replayStateText, selectWorldState, toReplayDigest} from './state';
 import {must} from '../../testing/must';
 
@@ -516,5 +523,72 @@ test('SIM-02 replay digest: coverage flags a selected component no entity has (a
   assert.equal(
     (await recordSceneRun(orbScene(), {inputs: [steer], seed: 3, ticks: 5, limits, script, trace})).coverage,
     null,
+  );
+});
+
+test('nonfinite world numbers cannot become equal null digests', () => {
+  const {w, a} = world();
+  const tr = w.get(a, Transform)!;
+  assert.equal(
+    worldDigestText(w),
+    JSON.stringify({
+      count: w.count,
+      resources: w.resources,
+      transforms: [...w.query(Transform)].map(([id, t]) => [id, t.x, t.y, t.z, t.rx, t.ry, t.rz, t.scale]),
+    }),
+  );
+  for (const invalid of [NaN, Infinity, -Infinity]) {
+    tr.x = invalid;
+    assert.throws(() => worldDigest(w), /nonfinite/);
+    assert.throws(() => replayStateText(w, null, WORLD_DIGEST_LIMITS), /nonfinite/);
+  }
+  tr.x = 1;
+  w.resources.invalid = {nested: [Infinity]};
+  assert.throws(() => worldDigest(w), /nonfinite/);
+  delete w.resources.invalid;
+  assert.equal(typeof worldDigest(w), 'string');
+});
+
+test('selected state rejects only included nonfinite numbers and preserves canonical finite JSON', () => {
+  const {w, a, orb} = world();
+  w.get(orb, Transform)!.x = Infinity;
+  w.resources.secret = NaN;
+  const selected = replayDigest({components: [Score], resources: ['round']});
+  const before = replayStateText(w, selected, WORLD_DIGEST_LIMITS);
+  assert.equal(typeof before, 'string');
+  w.get(a, Score)!.value = NaN;
+  assert.throws(() => replayStateText(w, selected, WORLD_DIGEST_LIMITS), /nonfinite/);
+  w.get(a, Score)!.value = 3;
+  assert.equal(replayStateText(w, selected, WORLD_DIGEST_LIMITS), before);
+  const custom = {id: 'custom', state: () => ({nested: [Infinity]})};
+  assert.throws(() => replayStateText(w, custom, WORLD_DIGEST_LIMITS), /nonfinite/);
+  assert.equal(
+    replayStateText(w, {id: 'finite', state: () => ({z: -0, a: [null, 1]})}, WORLD_DIGEST_LIMITS),
+    '{"a":[null,1],"z":0}',
+  );
+});
+
+test('nonfinite default and selected samples fail traces without appending a false digest', () => {
+  for (const selected of [false, true]) {
+    const {w, a} = world();
+    const trace = createDigestTrace({identity: 'finite', every: 1, maxEntries: 8, maxDigestLength: 16});
+    const digest = selected ? replayDigest() : null;
+    assert.equal(observeWorld(trace, 0, w, digest, WORLD_DIGEST_LIMITS, worldDigest), 'sampled');
+    const before = trace.read().entries;
+    w.get(a, Transform)!.x = NaN;
+    assert.equal(observeWorld(trace, 1, w, digest, WORLD_DIGEST_LIMITS, worldDigest), 'failed');
+    assert.equal(trace.read().status, 'failed');
+    assert.deepEqual(trace.read().entries, before);
+    assert.equal(compareDigests(trace.read(), trace.read()).status, 'incomparable');
+  }
+});
+
+test('creator JSON projection remains explicit and its numeric output is validated', () => {
+  const {w} = world();
+  const value = {hidden: Infinity, toJSON: () => ({selected: 2})};
+  assert.equal(replayStateText(w, {id: 'projection', state: () => value}, WORLD_DIGEST_LIMITS), '{\"selected\":2}');
+  assert.throws(
+    () => replayStateText(w, {id: 'bad-projection', state: () => ({toJSON: () => Infinity})}, WORLD_DIGEST_LIMITS),
+    /nonfinite/,
   );
 });

@@ -27,3 +27,13 @@ export function hashText(text: string): string {
 export function digestJson(json: string, limits: JsonLimits): string {
   return hashText(captureJson(json, limits).json);
 }
+
+/** Internal state serialization: retain JSON projection semantics but never coerce a nonfinite number to null. */
+export function replayJson(value: unknown): string {
+  const json = JSON.stringify(value, (_key, entry: unknown) => {
+    if (typeof entry === 'number' && !Number.isFinite(entry)) throw Error('replay digest: nonfinite state number');
+    return entry;
+  });
+  if (typeof json !== 'string') throw Error('replay digest: state is not JSON');
+  return json;
+}
