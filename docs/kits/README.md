@@ -13,6 +13,7 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [concept-explorer](../../src/kits/concept-explorer/README.md) | Orbit a model, tap parts, toggle layers, a parameter slider, a mini quiz | learn |
 | [terrain](../../src/kits/terrain/README.md) | Canonical surface, exact contact queries, bounded chunks and coherent revisions | terrain, expedition |
 | [procgen](../../src/kits/procgen/README.md) | Hierarchical seed derivation, bounded seeded grid generation on the worker host, a strict root-seed save section; sparse cell edits and a bounded IndexedDB chunk store (GEN-02) | None yet. GEN-01 integrated in v0.2.0 (PR #38); GEN-02 implemented, candidate (PR #56), not integrated |
+| [itinerary](../../src/kits/itinerary/README.md) | Editable destination orders, preserved active cursor and owned completion attempts | Patrol and delivery/service headless lab consumers; public candidate, no device evidence |
 | [navigation](../../src/kits/navigation/README.md) | Incremental bounded route search with cancellation | expedition |
 | [dialogue](../../src/kits/dialogue/README.md) | Stable choices, revision guards and validated graph exits; optional declared variables, visit counts and bounded conditions (TB-02 candidate, PR #50) | expedition |
 | [objectives](../../src/kits/objectives/README.md) | Counted event runs, explicit stage composition and retry-safe completion claims | expedition |
@@ -21,6 +22,7 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [capabilities](../../src/kits/capabilities/README.md) | Evidence, prerequisite graphs, source-owned modifiers and optional action lifetimes | expedition, mechanics |
 | [equipment](../../src/kits/equipment/README.md) | Unique-instance acquisition/release, arrangements and atomic multi-slot changes | expedition, mechanics |
 | [frames](../../src/kits/frames/README.md) | Versioned coordinate frames and bounded delayed updates | mechanics |
+| [alignment](../../src/kits/alignment/README.md) | Target-relative planar approach proposals and exact-ticket acknowledgment; creator-owned movement, clearance and effects | Two headless lab fixtures; no runtime template consumer |
 | [vehicles](../../src/kits/vehicles/README.md) | Local seat ownership and validated exits | mechanics |
 | [locomotion](../../src/kits/locomotion/README.md) | Authored root motion through character collision; tunable jump feel (coyote, buffer, variable height, apex gravity) with a fixed-step adapter; moving platforms (ride, leave policy, one-way catch) | mechanics (root motion); jump feel and moving platforms have no template consumer |
 | [control](../../src/kits/control/README.md) | Explicit actor ownership and discontinuity resets | mechanics |
@@ -34,6 +36,8 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [turns](../../src/kits/turns/README.md) | Deterministic command logs: seeded per-position random, undo/redo, exact previews, replay, save snapshots with drift detection, durable-authority policies | None yet. Integrated in v0.2.0 (PR #24); headless unit tests only. [Recipe](../recipes/add-a-turn-log.md) |
 | [spatial](../../src/kits/spatial/README.md) | Bounded uniform-grid index for neighbour, range and interest queries; per-observer interest sets | No template yet. Grid integrated in v0.2.0 (SC-01, PR #23, [guide](../guides/spatial-index.md)); interest sets implemented, candidate (SC-02, PR #51, [guide](../guides/interest-sets.md)) |
 | [spatial-audio](../../src/kits/spatial-audio/README.md) | Logical sound sources: virtual tracking, importance ranking with HRTF for the sounds that matter, class distance curves with a hard cutoff, budgeted occlusion driving the smoothed filter | None yet; implemented, candidate (AUD-02, PR #55, [recipe](../recipes/3d-sound-for-shooters.md)) |
+
+The optional [assignments](../../src/kits/assignments/README.md) candidate supplies exclusive actor claims, weighted target capacity and atomic transfer refusal. Two headless service/worksite fixtures and route-owner composition tests exercise it; no playable template consumer or browser/device acceptance is claimed. [Guide](../guides/assignments.md).
 
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.
 

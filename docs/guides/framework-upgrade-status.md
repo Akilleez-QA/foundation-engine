@@ -1036,3 +1036,50 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   an error. **Disclosure.** `npm run disclosure` drafts Steam and itch.io AI-disclosure text from the records, with
   development tooling kept apart from content players see. Evidence: focused tests and `npm run check`. Tooling only;
   no store-acceptance or licence-truth claim. [Guide](asset-provenance.md).
+
+
+## Service assignment experiment — isolated candidate, 2026-10-09
+
+`tools/service-assignment-lab/` contains an unexported bounded ownership prototype with service-request and weighted-worksite fixtures. It demonstrates exclusive actor claims, generation-scoped token refusal, capacity admission, atomic failed-transfer preservation, bounded explicit retry withdrawals and disposal. It adds no installed kit, scheduler, thread, persistence adapter or product API. [Contract and limitations](service-assignment-lab.md).
+
+Evidence: 15 focused Node tests passed, including a 600-command independent allocation model and 1000 admission/removal cycles; both Node fixtures ran, and `npm run check` passed with the one prototype test file selected (15/15). Integration gates, browser behavior and physical-device performance are not accepted by this evidence. This entry records a branch candidate, not integration or production readiness.
+
+
+## Optional assignment kit candidate — ASG-01, 2026-10-09
+
+The independently implemented `@kits/assignments` helper graduates the service/worksite ownership mechanism into a typed optional public surface. It retains bounded actors, targets, weighted claims and retry counts, preserves existing claims on failed transfer, rejects retired tokens, and supports explicit disposal. Existing navigation/command/save/inventory owners keep their responsibilities; no matching policy, global scheduler or persistence format is added. The original lab now imports the kit through two consumer modules. [Contract](assignments.md).
+
+Evidence: 23 focused tests passed (8 typed kit/consumer tests plus 15 retained lab regressions), including real route-owner cancellation, stale result rejection, an independent allocation model and bounded churn. `npm run check` passed with 27/27 tests across four selected files, and the migrated demo ran successfully. This is a local candidate; hosted/full integration gates, playable consumers and browser/physical-device acceptance remain pending.
+
+## Editable itinerary experiment — candidate, 2026-10-09
+
+[Lab contract](itinerary-lab.md): bounded order edits preserve the active cursor;
+opaque attempts reject late/replayed completion. Nineteen headless tests and scoped
+controller typechecking passed. Unexported prototype; no navigation/scheduler owner
+added, no production persistence or browser/device acceptance. Not integrated.
+
+## Public itinerary helper — graduation candidate, 2026-10-09
+
+ITINERARY-01 exposes createItinerary from @kits/itinerary with caller-owned lifetime
+and no registration or execution owner. The lab now consumes this implementation.
+Base: reviewed prototype e7aa2e55; branch feat/itinerary-kit. Twenty-four focused
+tests and scoped strict typechecking passed, including a real SaveStore/fresh-store
+round trip. This supersedes the prototype's unexported status, not its evidence
+limits. No full gate, browser, durable custody transaction or physical-device claim;
+not integrated. See the [contract](../../src/kits/itinerary/README.md).
+
+### Interaction alignment prototype — 2026-10-09
+
+Unexported planar alignment candidate: [contract and limits](interaction-alignment-lab.md). Creator-owned poses, clock and clearance assertions; bounded approach proposals and identity-checked prepare/acknowledge tickets. Observed drift revokes prepared tickets even during paused or zero-duration calls. Ten focused tests pass; independent review completed. Hosted integration CI is pending. No collision oracle, movement owner, public kit export, performance claim or physical-device acceptance.
+
+## Planar alignment public kit candidate — 2026-10-09
+
+The earlier unexported experiment is graduated in this candidate to optional `@kits/alignment` (ALN-01), reusing frames identity validation without installing a system or requiring kit registration. It provides bounded target-relative proposals and exact-ticket acknowledgment; creators retain movement, clearance, eligibility, clock and effect ownership. Lab consumers now use the kit; no duplicate tool implementation or new installed system remains. Public yaw matches author Y rotation, with focused frame-composition coverage. Evidence: 15 focused headless tests, isolated typecheck and formatting. Full CI, browser/runtime playability, physics, save composition and devices remain unverified; this does not establish integration. [Contract](../../src/kits/alignment/README.md) and [consumer guide](interaction-alignment-lab.md).
+
+### Acceptance evidence prototype — 2026-10-09
+
+Local unexported development candidate: [contract and limits](../../tools/acceptance-evidence/README.md). Required-case/minimum-sample admission with explicit failure statuses and bounded JSON CLI; real replay and historical-save consumer tests. Seven focused tests passed locally, including CLI negative cases. Existing test glob includes the regressions; complete hosted CI is pending. No engine runtime API, new scheduler, performance claim or physical-device acceptance.
+
+### Combined optional-helper implementation — 2026-10-09
+
+This combined implementation supersedes the earlier lab-only export status: assignments, itinerary and alignment are public optional pure helpers; the lab fixtures consume those helpers. Acceptance reporting remains a development-only tool. Historical candidate evidence above is retained as history, not a claim of current integration. [ADR 0080](../adr/0080-optional-interaction-ownership.md) records ownership and limitations. Full hosted CI on the combined candidate is the integration prerequisite; physical-device and concrete-game acceptance remain unverified.
