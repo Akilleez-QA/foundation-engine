@@ -317,10 +317,10 @@ for (const outcome of ['resolve', 'reject'] as const) {
       return deadline.signal;
     });
     const pending: {resolve: (value: AudioBuffer) => void; reject: (error: Error) => void}[] = [];
-    const context = {
+    const context = Object.assign(decoder().ctx, {
       sampleRate: 48000,
       decodeAudioData: () => new Promise<AudioBuffer>((resolve, reject) => pending.push({resolve, reject})),
-    } as unknown as BaseAudioContext;
+    });
     const files = createSoundFiles({
       report() {},
       maxDecodes: 1,
@@ -358,13 +358,13 @@ for (const outcome of ['resolve', 'reject'] as const) {
 
 test('disposal retains unsettled reservations and retires them once without negative accounting', async () => {
   let finish!: (value: AudioBuffer) => void;
-  const context = {
+  const context = Object.assign(decoder().ctx, {
     sampleRate: 48000,
     decodeAudioData: () =>
       new Promise<AudioBuffer>(resolve => {
         finish = resolve;
       }),
-  } as unknown as BaseAudioContext;
+  });
   const files = createSoundFiles({
     report() {},
     compressedRatio: 4,
@@ -388,13 +388,13 @@ test('disposal retains unsettled reservations and retires them once without nega
 test('synchronous decoder failure releases admission for retry', async () => {
   let calls = 0;
   const buffer = {length: 10, numberOfChannels: 1} as AudioBuffer;
-  const context = {
+  const context = Object.assign(decoder().ctx, {
     sampleRate: 48000,
     decodeAudioData: () => {
       if (++calls === 1) throw Error('synchronous decode failure');
       return Promise.resolve(buffer);
     },
-  } as unknown as BaseAudioContext;
+  });
   const files = createSoundFiles({
     report() {},
     maxDecodes: 1,
@@ -411,7 +411,7 @@ test('synchronous decoder failure releases admission for retry', async () => {
 test('disposal rejects queued decodes without starting them while native work retires later', async () => {
   let rejectNative!: (error: Error) => void,
     calls = 0;
-  const context = {
+  const context = Object.assign(decoder().ctx, {
     sampleRate: 48000,
     decodeAudioData: () => {
       calls++;
@@ -419,7 +419,7 @@ test('disposal rejects queued decodes without starting them while native work re
         rejectNative = reject;
       });
     },
-  } as unknown as BaseAudioContext;
+  });
   const files = createSoundFiles({
     report() {},
     maxDecodes: 1,
@@ -442,10 +442,10 @@ test('disposal rejects queued decodes without starting them while native work re
 
 test('successful decode transfers its reservation before admitting the next decoder', async () => {
   const pending: ((buffer: AudioBuffer) => void)[] = [];
-  const context = {
+  const context = Object.assign(decoder().ctx, {
     sampleRate: 48000,
     decodeAudioData: () => new Promise<AudioBuffer>(resolve => pending.push(resolve)),
-  } as unknown as BaseAudioContext;
+  });
   const files = createSoundFiles({
     report() {},
     maxDecodes: 1,
@@ -471,10 +471,10 @@ test('successful decode transfers its reservation before admitting the next deco
 
 test('actual decoded output must fit beside other unsettled reservations', async () => {
   const pending: ((buffer: AudioBuffer) => void)[] = [];
-  const context = {
+  const context = Object.assign(decoder().ctx, {
     sampleRate: 48000,
     decodeAudioData: () => new Promise<AudioBuffer>(resolve => pending.push(resolve)),
-  } as unknown as BaseAudioContext;
+  });
   const files = createSoundFiles({
     report() {},
     maxDecodes: 2,
