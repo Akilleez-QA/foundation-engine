@@ -208,7 +208,7 @@ test('RES-01: a retained texture drops every renderer copy and listener, keeps i
 
 test('RES-01: a texture ceiling evicts released unpinned textures LRU and reports when pins alone exceed it', async () => {
   const bytes = textureBytes({image: {width: 256, height: 256}} as T.Texture);
-  assert.equal(bytes, Math.round((256 * 256 * 4 * 4) / 3), 'mipmapped RGBA8 descriptor estimate');
+  assert.equal(bytes, 349524, 'complete integer RGBA8 mip chain');
   const pressure: number[] = [];
   const {library} = textures({
     warmBytes: 4 * bytes,

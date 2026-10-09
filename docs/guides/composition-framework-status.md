@@ -855,3 +855,16 @@ policy. Independent integer-graph oracles and two activity-lifetime compositions
 exercise cancellation and stale publication; floating accumulation order is
 documented separately from forward route parity. See the navigation README.
 Full hosted integration and physical-performance acceptance remain separate.
+
+
+## Ordinary image mip accounting correction — candidate (2026-10-09)
+
+Ordinary 2D image estimates now sum the full RGBA8 mip chain using integer
+dimensions with independent axis clamping. Thin images no longer use the
+undercharging four-thirds approximation. The existing model owner refuses an
+over-budget thin image, retires its resources, and permits a valid retry.
+Compressed accounting is unchanged; no-mip images retain conservative full-chain
+charging. Cube, array, volume, authored mip and non-RGBA8 descriptor support remain
+explicit accounting limitations. See [asset residency](asset-residency.md).
+Focused and affected checks plus independent review are required before hosted
+integration; no physical memory or device evidence is implied.

@@ -153,8 +153,9 @@ export function modelResources(root: T.Object3D): Set<Disposable> {
 }
 
 /**
- * Resident bytes: vertex and index buffers, plus each texture's estimate (texture-bytes.ts): mipmapped RGBA8 for an
- * image, the transcoded level bytes for a compressed (KTX2) texture.
+ * Resident bytes: vertex and index buffers, plus each texture's estimate (texture-bytes.ts): a full RGBA8 mip chain
+ * for an ordinary 2D image, the transcoded level bytes for a compressed (KTX2) texture. Other descriptors need
+ * separate accounting support; this is not a general texture-format or physical allocation measurement.
  */
 export function modelBytes(root: T.Object3D): number {
   let n = 0;
