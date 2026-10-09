@@ -296,3 +296,10 @@ cover:
   It shows that the discovered row loads, that worker, fallback and direct output are
   bit-identical, and that cancellation and stale outcomes are named. Physical-device
   timing and generation quality are not established.
+
+## Optional eligible weighted choice
+
+chooseWeighted and createChoiceHistory reuse the existing seeded RNG for bounded
+eligible selection and separately committed per-label recency. See the
+[contract, bounds and continuation evidence](../../../docs/guides/weighted-choice.md).
+No director, scheduler or new persistence owner is installed.

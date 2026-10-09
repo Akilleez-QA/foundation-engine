@@ -1042,3 +1042,159 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   an error. **Disclosure.** `npm run disclosure` drafts Steam and itch.io AI-disclosure text from the records, with
   development tooling kept apart from content players see. Evidence: focused tests and `npm run check`. Tooling only;
   no store-acceptance or licence-truth claim. [Guide](asset-provenance.md).
+
+
+## Service assignment experiment — isolated candidate, 2026-10-09
+
+`tools/service-assignment-lab/` contains an unexported bounded ownership prototype with service-request and weighted-worksite fixtures. It demonstrates exclusive actor claims, generation-scoped token refusal, capacity admission, atomic failed-transfer preservation, bounded explicit retry withdrawals and disposal. It adds no installed kit, scheduler, thread, persistence adapter or product API. [Contract and limitations](service-assignment-lab.md).
+
+Evidence: 15 focused Node tests passed, including a 600-command independent allocation model and 1000 admission/removal cycles; both Node fixtures ran, and `npm run check` passed with the one prototype test file selected (15/15). Integration gates, browser behavior and physical-device performance are not accepted by this evidence. This entry records a branch candidate, not integration or production readiness.
+
+
+## Optional assignment kit candidate — ASG-01, 2026-10-09
+
+The independently implemented `@kits/assignments` helper graduates the service/worksite ownership mechanism into a typed optional public surface. It retains bounded actors, targets, weighted claims and retry counts, preserves existing claims on failed transfer, rejects retired tokens, and supports explicit disposal. Existing navigation/command/save/inventory owners keep their responsibilities; no matching policy, global scheduler or persistence format is added. The original lab now imports the kit through two consumer modules. [Contract](assignments.md).
+
+Evidence: 23 focused tests passed (8 typed kit/consumer tests plus 15 retained lab regressions), including real route-owner cancellation, stale result rejection, an independent allocation model and bounded churn. `npm run check` passed with 27/27 tests across four selected files, and the migrated demo ran successfully. This is a local candidate; hosted/full integration gates, playable consumers and browser/physical-device acceptance remain pending.
+
+## Editable itinerary experiment — candidate, 2026-10-09
+
+[Lab contract](itinerary-lab.md): bounded order edits preserve the active cursor;
+opaque attempts reject late/replayed completion. Nineteen headless tests and scoped
+controller typechecking passed. Unexported prototype; no navigation/scheduler owner
+added, no production persistence or browser/device acceptance. Not integrated.
+
+## Public itinerary helper — graduation candidate, 2026-10-09
+
+ITINERARY-01 exposes createItinerary from @kits/itinerary with caller-owned lifetime
+and no registration or execution owner. The lab now consumes this implementation.
+Base: reviewed prototype e7aa2e55; branch feat/itinerary-kit. Twenty-four focused
+tests and scoped strict typechecking passed, including a real SaveStore/fresh-store
+round trip. This supersedes the prototype's unexported status, not its evidence
+limits. No full gate, browser, durable custody transaction or physical-device claim;
+not integrated. See the [contract](../../src/kits/itinerary/README.md).
+
+### Interaction alignment prototype — 2026-10-09
+
+Unexported planar alignment candidate: [contract and limits](interaction-alignment-lab.md). Creator-owned poses, clock and clearance assertions; bounded approach proposals and identity-checked prepare/acknowledge tickets. Observed drift revokes prepared tickets even during paused or zero-duration calls. Ten focused tests pass; independent review completed. Hosted integration CI is pending. No collision oracle, movement owner, public kit export, performance claim or physical-device acceptance.
+
+## Planar alignment public kit candidate — 2026-10-09
+
+The earlier unexported experiment is graduated in this candidate to optional `@kits/alignment` (ALN-01), reusing frames identity validation without installing a system or requiring kit registration. It provides bounded target-relative proposals and exact-ticket acknowledgment; creators retain movement, clearance, eligibility, clock and effect ownership. Lab consumers now use the kit; no duplicate tool implementation or new installed system remains. Public yaw matches author Y rotation, with focused frame-composition coverage. Evidence: 15 focused headless tests, isolated typecheck and formatting. Full CI, browser/runtime playability, physics, save composition and devices remain unverified; this does not establish integration. [Contract](../../src/kits/alignment/README.md) and [consumer guide](interaction-alignment-lab.md).
+
+### Acceptance evidence prototype — 2026-10-09
+
+Local unexported development candidate: [contract and limits](../../tools/acceptance-evidence/README.md). Required-case/minimum-sample admission with explicit failure statuses and bounded JSON CLI; real replay and historical-save consumer tests. Seven focused tests passed locally, including CLI negative cases. Existing test glob includes the regressions; complete hosted CI is pending. No engine runtime API, new scheduler, performance claim or physical-device acceptance.
+
+### Combined optional-helper implementation — 2026-10-09
+
+This combined implementation supersedes the earlier lab-only export status: assignments, itinerary and alignment are public optional pure helpers; the lab fixtures consume those helpers. Acceptance reporting remains a development-only tool. Historical candidate evidence above is retained as history, not a claim of current integration. [ADR 0080](../adr/0080-optional-interaction-ownership.md) records ownership and limitations. Full hosted CI on the combined candidate is the integration prerequisite; physical-device and concrete-game acceptance remain unverified.
+
+## Visibility contributions — VISIBILITY-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/visibility/README.md), [decision](../adr/0081-visibility-contributions.md), [discussion #198](https://github.com/Akilleez-QA/foundation-engine/issues/198). Pure optional per-observer cell contributions with atomic replacement, stale calculation refusal, explored history and bounded coalesced draining. Creator geometry, relationships and disclosure remain external. Evidence: focused lifetime/refusal/drain tests, two distinct headless sensor/facility consumers and a 600-command set-union/history model. Validation: eight focused tests and scoped strict typechecking pass; `npm run check` passes all steps and 12 selected tests across three files. Candidate only; no integrated game, full CI, browser, save or physical-device acceptance claimed here.
+
+## Weighted choice/history — candidate, 2026-10-09
+
+Existing procgen helper extension; ADR0082 proposed. Ten focused tests pass, including
+endpoint/no-draw/refusal/eviction and saved RNG/history continuation via real SaveStore.
+Two headless consumers; no browser/full-gate/device claim. See [contract](weighted-choice.md).
+
+## Timed contribution checkpoint candidate (2026-10-09)
+
+The existing capabilities owner now exposes separate portable checkpoint/restore.
+Configured base and bounds, saved time and ordered contributions validate before a
+single modifier transaction; successful load retires old runtime handles. Seven
+focused new tests exercise continuation, malformed/overflow atomicity, safe batch
+aggregation and real SaveStore failed-write recovery. See
+[timed contribution continuation](timed-effects.md#portable-continuation).
+This is a local candidate pending independent review and complete integration CI;
+no whole action-session persistence or device-performance acceptance is implied.
+
+## Recurring phase lab candidate (2026-10-09)
+
+The [unexported recurring phase lab](../../tools/recurring-lab/README.md) tests
+explicit skip/coalesce/bounded-replay policies while reusing the existing clock
+and SaveStore. Thirteen headless tests cover two consumer projections, pause,
+mid-period reload, large jumps, stale callbacks, reentry and failed durability.
+It is a composition experiment, not a public scheduler or whole-game persistence
+claim. Callbacks stage state without storage writes; explicit host save boundaries flush.
+Production integration still needs coordinated clock/consumer restore, full CI and creator acceptance.
+
+### Integrated ownership helpers and continuation candidates — 2026-10-09
+
+[PR #197](https://github.com/Akilleez-QA/foundation-engine/pull/197) integrated
+assignments, itineraries, planar alignment and development acceptance reporting
+at main commit `5b26285da7ba1f75fef5bf3c47df115331da8b69`.
+[Full candidate CI](https://github.com/Akilleez-QA/foundation-engine/actions/runs/37886326403)
+passed on reviewed head `e10f0ef54535a737455757c9366a78f76b4bf2db`.
+This supersedes earlier entries' “not integrated” status for that batch only;
+it does not add concrete-game or physical-device acceptance.
+
+The follow-up condition and recurring-phase experiments remain unexported.
+They compose existing equipment/modifier/save and clock/save owners respectively.
+Separate agent reviews and thirteen focused tests per experiment passed.
+The combined follow-up candidate also retains real-owner regressions for failed
+scene preflight and queued action delivery. These exercise headless ownership
+boundaries; production scene wiring and physical resource reclamation are not
+certified. Full CI on the combined candidate remains required before integration.
+
+### Integrated continuation and diagnostic boundary fixes — 2026-10-09
+
+[PR #213](https://github.com/Akilleez-QA/foundation-engine/pull/213) integrated
+the unexported condition and recurring-phase compositions, shared dependency
+preflight ownership regression, and queued action-delivery regression at main
+`0a873d2070fecf605c25e0f9b98dee0f4a5f26d7`.
+[Candidate CI](https://github.com/Akilleez-QA/foundation-engine/actions/runs/37889789566)
+completed successfully on `1961cc0638cf76385aa17f50b61700ff64c78517`.
+This closes the earlier integration-pending status for that batch, not its
+concrete-game or physical-device acceptance questions.
+
+[PR #218](https://github.com/Akilleez-QA/foundation-engine/pull/218) integrated
+frame identity and adapter caching, camera reset admission, decoder retirement
+accounting, replay numeric validation and script observation matching at main
+`0214411f89badbefabc16712039967b7799fc37a`.
+[Candidate CI](https://github.com/Akilleez-QA/foundation-engine/actions/runs/37891867717)
+completed successfully on `1cfece534241c563be5ebc6f2ffffcfc8dc16db8`.
+The combined candidate preserved the independently reviewed component files and
+passed 331 affected tests locally. Decoder admission and retained-byte accounting
+do not establish a browser native-heap ceiling.
+
+These receipts cover those merged batches only. Resource-observation failure
+reporting is a subsequent candidate; further source coverage, application wiring,
+device experience and physical reclamation evidence remain separate obligations.
+
+
+## Fixed-step numeric admission candidate (2026-10-09)
+
+The existing core runner now rejects nonfinite configuration/frame inputs and unsafe
+step-count or frame/step/drop-counter arithmetic before frame work. Zero step budgets
+remain valid; finite negative deltas retain their fixed-lane clamp and presentation
+value. Step-relative tolerance replaces the absolute seconds tolerance, preventing
+phantom ticks for tiny steps. See [the system recipe](../recipes/add-a-system.md#core-runner-numeric-boundary).
+Targeted tests cover ordinary30/60/144Hz, tiny/subnormal steps, zero budgets, retained
+phase after refusal and overflow. This is a numeric-boundary candidate, not full
+engine, browser or physical-device acceptance; hosted integration remains required.
+
+### Resource-observation failure reporting integrated — 2026-10-09
+
+[PR #219](https://github.com/Akilleez-QA/foundation-engine/pull/219) integrated
+resource capture rejection and script, snapshot, and batch failure evidence at main
+`6dfbcf944098afe96daf79e468decda1516102eb`.
+[Candidate CI](https://github.com/Akilleez-QA/foundation-engine/actions/runs/37893991051)
+completed successfully on `82bb981bf927dc038025cb916da516ba3005415f`.
+This closes the earlier resource-observation integration-pending statement.
+Failed capture stops the affected script; incomplete snapshots retain partial
+evidence; report-write failures retain prior causes and the in-memory report.
+This receipt does not certify every diagnostic caller, physical-device behavior,
+or completion of the wider engine work. The fixed-step numeric candidate above
+still requires CI on its combined head after integration with this base.
+
+
+## Optional shared-session liveness — candidate (2026-10-09)
+
+The existing session client accepts paired connection/host deadlines and the host
+can refresh its existing one-credit view on ping. Defaults remain unchanged; no
+new timer or protocol owner. See [the contract](multiplayer-session.md#optional-host-liveness).
+Focused unit and real loopback acceptance is recorded in the upgrade ledger;
+independent review and full hosted integration CI remain required.

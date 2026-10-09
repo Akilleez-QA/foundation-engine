@@ -7,6 +7,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {ROOT} from '../lib/game-dir.mjs';
 import {scriptProblems} from './script-schema.mjs';
+import {runScript} from './script.mjs';
 import {playtestFiles, runPlaytests} from './playtests';
 
 const ok = {name: 'ok', steps: [{expect: {path: 'scene', equals: 'scene.main'}}]};
@@ -101,5 +102,81 @@ test('every template playtest script is found for the template gates', () => {
   ] as const) {
     const files = playtestFiles(join(ROOT, 'templates', t, 'game'), []).map(f => f.file.split('/').pop());
     assert.deepEqual(files, want, t);
+  }
+});
+
+for (const terminal of ['throw', 'report'] as const) {
+  test(`batch preserves completed, failed and not-run rows after terminal ${terminal}`, async () => {
+    const {root, dir} = game();
+    try {
+      writeFileSync(join(dir, 'playtest', 'c.json'), JSON.stringify({...ok, name: 'c'}));
+      const files = playtestFiles(dir, []);
+      let calls = 0;
+      const results = await runPlaytests(files, {
+        url: async () => '',
+        problems: scriptProblems,
+        run: async script => {
+          calls++;
+          if (calls === 2) {
+            if (terminal === 'throw') throw Error('RESOURCE_CAPTURE_FAILED');
+            return {
+              name: script.name,
+              pass: false,
+              terminal: true,
+              steps: [{step: {}, ok: false}],
+              errors: ['RESOURCE_CAPTURE_FAILED'],
+            };
+          }
+          return {name: script.name, pass: true, steps: [{step: {}, ok: true}]};
+        },
+      });
+      assert.equal(calls, 2);
+      assert.deepEqual(
+        results.map(row => row.status),
+        ['completed', 'failed', 'not-run'],
+      );
+      assert.deepEqual(
+        results.map(row => row.pass),
+        [true, false, false],
+      );
+      assert.match(results[1]!.detail, /RESOURCE_CAPTURE_FAILED/);
+    } finally {
+      rmSync(root, {recursive: true, force: true});
+    }
+  });
+}
+
+test('batch formatting retains actual runner causes when report writing fails', async () => {
+  const {root, dir} = game();
+  const directory = join(root, 'failed-output');
+  mkdirSync(join(directory, 'report.json'), {recursive: true});
+  const browser = {
+    errors: [],
+    page: {},
+    evaluate: async () => {
+      throw Error('RESOURCE_CAPTURE_FAILED');
+    },
+    close: async () => {
+      throw Error('browser close failed');
+    },
+  };
+  try {
+    const results = await runPlaytests(playtestFiles(dir, []), {
+      url: async () => '',
+      problems: scriptProblems,
+      run: (script, url) =>
+        runScript(script, url, {
+          directory,
+          launch: async () => browser,
+          open: async () => {},
+        }),
+    });
+    assert.equal(results[0]!.status, 'failed');
+    assert.equal(results[1]!.status, 'not-run');
+    assert.match(results[0]!.detail, /RESOURCE_CAPTURE_FAILED/);
+    assert.match(results[0]!.detail, /browser close failed/);
+    assert.match(results[0]!.detail, /report write:.*EISDIR/);
+  } finally {
+    rmSync(root, {recursive: true, force: true});
   }
 });
