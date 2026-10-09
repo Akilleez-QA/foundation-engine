@@ -61,6 +61,30 @@ export const FEATURES = [
     evidence: [{kit: 'alignment', export: 'createAlignment'}, {path: 'src/kits/alignment/alignment.test.ts'}],
   },
   {
+    id: 'VISIBILITY-01',
+    title: 'Bounded source-owned visibility and explored history',
+    docs: 'src/kits/visibility/README.md',
+    evidence: [{kit: 'visibility', export: 'createVisibility'}],
+  },
+  {
+    id: 'GEN-WEIGHTED',
+    title: 'Bounded eligible weighted choice with separately committed recent history',
+    docs: 'docs/guides/weighted-choice.md',
+    evidence: [
+      {kit: 'procgen', export: 'chooseWeighted'},
+      {kit: 'procgen', export: 'createChoiceHistory'},
+    ],
+  },
+  {
+    id: 'CAP-EFFECT-CHECKPOINT',
+    title: 'Portable timed contribution checkpoints',
+    docs: 'docs/guides/timed-effects.md',
+    evidence: [
+      {kit: 'capabilities', export: 'createTimedEffects'},
+      {path: 'src/kits/capabilities/timed-effects-checkpoint.test.ts'},
+    ],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,
