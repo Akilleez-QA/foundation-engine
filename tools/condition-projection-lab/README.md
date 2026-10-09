@@ -96,18 +96,16 @@ node --import tsx --test tools/condition-projection-lab/condition.test.ts
 npx tsc --noEmit -p tools/condition-projection-lab/tsconfig.json
 ```
 
-Twelve focused tests cover both consumers, real fresh-store reload continuation,
+Thirteen focused tests cover both consumers, real fresh-store reload continuation,
 write failures, derived overflow, capacity/domain refusal, cosmetic separation,
 stale/copied/foreign tickets, arrangement invalidation, external rewind, player
-replacement, abort, immutable definitions, counter exhaustion and actual SaveStore
+replacement, synchronous subscriber replacement, abort, immutable definitions, counter exhaustion and actual SaveStore
 quarantine. Crash cuts copy only committed MemoryBackend bytes before disposal
 could flush. Tests use real equipment/modifier/save implementations; the condition
 table and threshold policies are explicitly fixture-owned.
 
-The repository's newer `tools/**/*.test.ts` discovery pattern includes this file.
-The branch baseline's older test command does not; until that discovery change is
-integrated, use the explicit command above. There is no wrapper that would cause
-duplicate execution once the broader pattern is present.
+The repository's `tools/**/*.test.ts` discovery pattern includes this file directly.
+There is no importing test wrapper to cause duplicate execution.
 
 No full CI, browser, visual, physical-device, performance or runtime playability
 acceptance is claimed. Public API graduation is deferred: this experiment does not
