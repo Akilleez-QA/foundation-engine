@@ -226,7 +226,7 @@ export function hasSettled(windows, {stableWindows = SETTLE.stableWindows, toler
  */
 export async function settle(b, o = {}) {
   const {windowMs, stableWindows, tolerance, maxMs} = {...SETTLE, ...o};
-  const window = o.measure ?? measure;
+  const measureWindow = o.measure ?? measure;
   const t0 = Date.now(),
     windows = [];
   const redraws = async () => {
@@ -235,7 +235,7 @@ export async function settle(b, o = {}) {
       await sleep(windowMs / 5);
     }
   };
-  do windows.push(await window(b, redraws, windowMs));
+  do windows.push(await measureWindow(b, redraws, windowMs));
   while (!hasSettled(windows, {stableWindows, tolerance}) && Date.now() - t0 < maxMs);
   return {
     warmUp: windows[0],
