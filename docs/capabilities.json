@@ -9,6 +9,13 @@
       "evidence": ["@kits/assignments exports createAssignments"]
     },
     {
+      "id": "ITINERARY-01",
+      "title": "Bounded editable destination itineraries with owned completion attempts",
+      "shipped": true,
+      "docs": "src/kits/itinerary/README.md",
+      "evidence": ["@kits/itinerary exports createItinerary"]
+    },
+    {
       "id": "VIS-01",
       "title": "Tone mapping and exposure per scene (view.output)",
       "shipped": true,
@@ -508,6 +515,7 @@
         "qualifiedInventoryId"
       ]
     },
+    {"name": "itinerary", "exports": ["createItinerary"]},
     {
       "name": "learn",
       "exports": [

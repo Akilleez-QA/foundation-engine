@@ -13,6 +13,7 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [concept-explorer](../../src/kits/concept-explorer/README.md) | Orbit a model, tap parts, toggle layers, a parameter slider, a mini quiz | learn |
 | [terrain](../../src/kits/terrain/README.md) | Canonical surface, exact contact queries, bounded chunks and coherent revisions | terrain, expedition |
 | [procgen](../../src/kits/procgen/README.md) | Hierarchical seed derivation, bounded seeded grid generation on the worker host, a strict root-seed save section; sparse cell edits and a bounded IndexedDB chunk store (GEN-02) | None yet. GEN-01 integrated in v0.2.0 (PR #38); GEN-02 implemented, candidate (PR #56), not integrated |
+| [itinerary](../../src/kits/itinerary/README.md) | Editable destination orders, preserved active cursor and owned completion attempts | Patrol and delivery/service headless lab consumers; public candidate, no device evidence |
 | [navigation](../../src/kits/navigation/README.md) | Incremental bounded route search with cancellation | expedition |
 | [dialogue](../../src/kits/dialogue/README.md) | Stable choices, revision guards and validated graph exits; optional declared variables, visit counts and bounded conditions (TB-02 candidate, PR #50) | expedition |
 | [objectives](../../src/kits/objectives/README.md) | Counted event runs, explicit stage composition and retry-safe completion claims | expedition |

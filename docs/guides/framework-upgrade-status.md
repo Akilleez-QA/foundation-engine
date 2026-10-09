@@ -1050,3 +1050,20 @@ Evidence: 15 focused Node tests passed, including a 600-command independent allo
 The independently implemented `@kits/assignments` helper graduates the service/worksite ownership mechanism into a typed optional public surface. It retains bounded actors, targets, weighted claims and retry counts, preserves existing claims on failed transfer, rejects retired tokens, and supports explicit disposal. Existing navigation/command/save/inventory owners keep their responsibilities; no matching policy, global scheduler or persistence format is added. The original lab now imports the kit through two consumer modules. [Contract](assignments.md).
 
 Evidence: 23 focused tests passed (8 typed kit/consumer tests plus 15 retained lab regressions), including real route-owner cancellation, stale result rejection, an independent allocation model and bounded churn. `npm run check` passed with 27/27 tests across four selected files, and the migrated demo ran successfully. This is a local candidate; hosted/full integration gates, playable consumers and browser/physical-device acceptance remain pending.
+
+## Editable itinerary experiment — candidate, 2026-10-09
+
+[Lab contract](itinerary-lab.md): bounded order edits preserve the active cursor;
+opaque attempts reject late/replayed completion. Nineteen headless tests and scoped
+controller typechecking passed. Unexported prototype; no navigation/scheduler owner
+added, no production persistence or browser/device acceptance. Not integrated.
+
+## Public itinerary helper — graduation candidate, 2026-10-09
+
+ITINERARY-01 exposes createItinerary from @kits/itinerary with caller-owned lifetime
+and no registration or execution owner. The lab now consumes this implementation.
+Base: reviewed prototype e7aa2e55; branch feat/itinerary-kit. Twenty-four focused
+tests and scoped strict typechecking passed, including a real SaveStore/fresh-store
+round trip. This supersedes the prototype's unexported status, not its evidence
+limits. No full gate, browser, durable custody transaction or physical-device claim;
+not integrated. See the [contract](../../src/kits/itinerary/README.md).

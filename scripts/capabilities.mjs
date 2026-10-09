@@ -47,6 +47,13 @@ export const FEATURES = [
     title: 'Optional bounded service and worksite assignment ownership',
     docs: 'docs/guides/assignments.md',
     evidence: [{kit: 'assignments', export: 'createAssignments'}],
+
+  },
+  {
+    id: 'ITINERARY-01',
+    title: 'Bounded editable destination itineraries with owned completion attempts',
+    docs: 'src/kits/itinerary/README.md',
+    evidence: [{kit: 'itinerary', export: 'createItinerary'}],
   },
   {
     id: 'VIS-01',
