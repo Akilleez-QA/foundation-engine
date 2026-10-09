@@ -76,6 +76,15 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'CAP-EFFECT-CHECKPOINT',
+    title: 'Portable timed contribution checkpoints',
+    docs: 'docs/guides/timed-effects.md',
+    evidence: [
+      {kit: 'capabilities', export: 'createTimedEffects'},
+      {path: 'src/kits/capabilities/timed-effects-checkpoint.test.ts'},
+    ],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,

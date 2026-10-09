@@ -13,6 +13,49 @@ export interface TimedEffect extends Readonly<TimedEffectInput> {
   readonly handle: EffectHandle;
   readonly modifiers: readonly Readonly<Modifier>[];
 }
+/** Portable accepted state; array order preserves same-key contribution ordering. */
+export interface TimedEffectsCheckpoint {
+  readonly version: 1;
+  readonly now: number;
+  readonly maxEffects: number;
+  readonly maxModifiers: number;
+  readonly base: Readonly<Record<string, number>>;
+  readonly effects: readonly Readonly<TimedEffectInput>[];
+}
+
+// Portable input is plain data. Do not execute accessors or caller array iterators.
+function dataRecord(value: unknown, fields: readonly string[]): Record<string, unknown> {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)
+  )
+    throw Error('effects: invalid checkpoint record');
+  const keys = Reflect.ownKeys(value);
+  if (keys.length !== fields.length || keys.some(key => typeof key !== 'string' || !fields.includes(key)))
+    throw Error('effects: invalid checkpoint fields');
+  const captured: Record<string, unknown> = Object.create(null);
+  for (const key of fields) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !('value' in descriptor)) throw Error('effects: checkpoint accessor');
+    captured[key] = descriptor.value;
+  }
+  return captured;
+}
+function dataArray(value: unknown, maximum: number): unknown[] {
+  if (!Array.isArray(value)) throw Error('effects: invalid checkpoint array');
+  const length = Object.getOwnPropertyDescriptor(value, 'length')?.value;
+  if (!Number.isSafeInteger(length) || length < 0 || length > maximum || Reflect.ownKeys(value).length !== length + 1)
+    throw Error('effects: checkpoint array limit');
+  const captured: unknown[] = [];
+  for (let i = 0; i < length; i++) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(i));
+    if (!descriptor || !('value' in descriptor)) throw Error('effects: checkpoint array hole or accessor');
+    captured.push(descriptor.value);
+  }
+  return captured;
+}
+
 export type EffectPolicy = 'replace' | 'stack' | 'reject';
 export type EffectAdmission =
   {readonly kind: 'applied'; readonly effect: TimedEffect} | {readonly kind: 'conflict' | 'capacity' | 'expired'};
@@ -159,6 +202,78 @@ export function createTimedEffects(options: {
     },
     values: (): Readonly<Record<string, number>> => Object.freeze(modifiers.values()),
     snapshot: (): readonly TimedEffect[] => Object.freeze(ordered(records)),
+    /** Detached portable data. Persist with creator-owned state in one save section. */
+    checkpoint(): TimedEffectsCheckpoint {
+      return Object.freeze({
+        version: 1 as const,
+        now,
+        maxEffects,
+        maxModifiers,
+        base: Object.freeze({...initial}),
+        effects: Object.freeze(
+          ordered(records).map(effect =>
+            Object.freeze({
+              key: effect.key,
+              expiresAt: effect.expiresAt,
+              modifiers: Object.freeze(effect.modifiers.map(row => Object.freeze({...row}))),
+            }),
+          ),
+        ),
+      });
+    },
+    /** Replaces accepted state in one transaction, including time; all old handles retire. */
+    restore(saved: unknown): readonly TimedEffect[] {
+      return mutate(() => {
+        const data = dataRecord(saved, ['version', 'now', 'maxEffects', 'maxModifiers', 'base', 'effects']);
+        if (
+          data.version !== 1 ||
+          !finite(data.now) ||
+          data.maxEffects !== maxEffects ||
+          data.maxModifiers !== maxModifiers
+        )
+          throw Error('effects: incompatible checkpoint');
+        const savedBase = dataRecord(data.base, keys);
+        for (const key of keys) if (savedBase[key] !== initial[key]) throw Error('effects: incompatible base');
+        const supplied = dataArray(data.effects, maxEffects);
+        if (serial > Number.MAX_SAFE_INTEGER - supplied.length) throw Error('effects: exhausted handles');
+        const candidate = new Map<EffectHandle, TimedEffect>();
+        let count = 0;
+        for (const row of supplied) {
+          const effect = dataRecord(row, ['key', 'expiresAt', 'modifiers']);
+          if (!identity(effect.key) || !finite(effect.expiresAt) || effect.expiresAt <= data.now)
+            throw Error('effects: invalid saved effect');
+          const captured: Readonly<Modifier>[] = [];
+          for (const value of dataArray(effect.modifiers, maxModifiers - count)) {
+            const modifier = dataRecord(value, ['stat', 'add', 'multiply']);
+            if (
+              !identity(modifier.stat) ||
+              !Object.hasOwn(initial, modifier.stat) ||
+              !finite(modifier.add) ||
+              !finite(modifier.multiply) ||
+              modifier.multiply < 0
+            )
+              throw Error('effects: invalid saved contribution');
+            captured.push(Object.freeze({stat: modifier.stat, add: modifier.add, multiply: modifier.multiply}));
+          }
+          count += captured.length;
+          const handle = Object.freeze({serial: serial + candidate.size + 1});
+          candidate.set(
+            handle,
+            Object.freeze({
+              key: effect.key,
+              expiresAt: effect.expiresAt,
+              modifiers: Object.freeze(captured),
+              handle,
+            }),
+          );
+        }
+        // Do not apply records one by one: safe final aggregates can have unsafe prefixes.
+        publish(candidate);
+        serial += candidate.size;
+        now = data.now;
+        return Object.freeze(ordered(records));
+      });
+    },
     /** Exact immutable handles intentionally retain cancellation identity within this owner. */
     explain(stat: string): TimedEffectExplanation | null {
       const trace = modifiers.explain(stat);

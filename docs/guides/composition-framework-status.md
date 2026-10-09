@@ -723,3 +723,14 @@ This combined implementation supersedes the earlier lab-only export status: assi
 Existing procgen helper extension; ADR0082 proposed. Ten focused tests pass, including
 endpoint/no-draw/refusal/eviction and saved RNG/history continuation via real SaveStore.
 Two headless consumers; no browser/full-gate/device claim. See [contract](weighted-choice.md).
+
+## Timed contribution checkpoint candidate (2026-10-09)
+
+The existing capabilities owner now exposes separate portable checkpoint/restore.
+Configured base and bounds, saved time and ordered contributions validate before a
+single modifier transaction; successful load retires old runtime handles. Seven
+focused new tests exercise continuation, malformed/overflow atomicity, safe batch
+aggregation and real SaveStore failed-write recovery. See
+[timed contribution continuation](timed-effects.md#portable-continuation).
+This is a local candidate pending independent review and complete integration CI;
+no whole action-session persistence or device-performance acceptance is implied.
