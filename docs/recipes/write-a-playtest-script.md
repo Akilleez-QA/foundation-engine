@@ -80,7 +80,7 @@ The arcade template's `game/playtest/best-reload.json`:
 |---|---|
 | `"equals": v` | the value is `v` (compared as JSON) |
 | `"contains": v` | the value is a list containing `v` |
-| `"atLeast": n` | the value is a number ≥ `n` |
+| `"atLeast": n` | the value is a finite number ≥ `n` |
 | `"exists": true` / `false` | the value is (or is not) present and not null |
 
 There is no `atMost` or `below`. To check an upper bound, assert on a value the game computes, such as a
@@ -118,6 +118,12 @@ To test the same thing without a browser, use `createTestSaves()` in a game test
   tests cannot reach).
 - A script asserts on `engine.state()` only. It cannot read the DOM or audio.
 
+A selected observation containing NaN or either infinity fails every matcher,
+including nested arrays/objects, instead of passing as JSON null or an unbounded
+number. Other paths are unaffected. Resource observations reject non-finite
+numeric JSON values before delivery; explicit creator JSON projections remain
+the creator's selected coverage.
+
 Resource observation failures raise RESOURCE_CAPTURE_FAILED instead of returning
 empty state. A script stops on observation/execution failure and writes a terminal
 failed report, including cleanup errors; polling cannot retry that failed sample
@@ -130,3 +136,4 @@ If the final evidence file cannot be written, the runner throws an aggregate err
 whose message includes earlier observation and cleanup failures plus the write
 failure. Its `report` property retains the collected evidence for programmatic
 callers; batch failure details keep the combined message.
+

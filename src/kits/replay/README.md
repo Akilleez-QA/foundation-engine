@@ -49,3 +49,11 @@ Floating-point results are not guaranteed identical across devices, browsers or 
 such divergence, it does not prevent it. To replay a browser log in Node, keep `Math` transcendental functions out of fixed
 systems: use `dmath` from `@engine` and the kits' `math: 'deterministic'` option ([deterministic maths](../../../docs/guides/deterministic-math.md)). Typical cost: one creator digest per sampled tick; the recorder is O(1) per
 tick except a canonical parse of that tick's input.
+
+World and selected-state digests reject non-finite numeric JSON values instead of
+coercing them to null. A rejected sample fails the trace and cannot compare equal.
+Excluded state remains outside the digest; creator state projections and ordinary
+JSON serialization semantics are unchanged. Finite values retain canonical v1
+encoding, including negative zero normalizing to zero. Existing JSON byte, node
+and depth limits still apply during capture; creator callbacks and serialization
+are not a sandbox or a CPU deadline.
