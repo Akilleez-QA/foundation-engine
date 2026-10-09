@@ -54,6 +54,13 @@ export const FEATURES = [
     title: 'Bounded editable destination itineraries with owned completion attempts',
     docs: 'src/kits/itinerary/README.md',
     evidence: [{kit: 'itinerary', export: 'createItinerary'}],
+
+  },
+  {
+    id: 'ALN-01',
+    title: 'Planar interaction preparation with bounded proposals and exact-ticket acknowledgment',
+    docs: 'src/kits/alignment/README.md',
+    evidence: [{kit: 'alignment', export: 'createAlignment'}, {path: 'src/kits/alignment/alignment.test.ts'}],
   },
   {
     id: 'VIS-01',

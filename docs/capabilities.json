@@ -16,6 +16,13 @@
       "evidence": ["@kits/itinerary exports createItinerary"]
     },
     {
+      "id": "ALN-01",
+      "title": "Planar interaction preparation with bounded proposals and exact-ticket acknowledgment",
+      "shipped": true,
+      "docs": "src/kits/alignment/README.md",
+      "evidence": ["@kits/alignment exports createAlignment", "src/kits/alignment/alignment.test.ts exists"]
+    },
+    {
       "id": "VIS-01",
       "title": "Tone mapping and exposure per scene (view.output)",
       "shipped": true,
@@ -403,6 +410,7 @@
     ]
   },
   "kits": [
+    {"name": "alignment", "exports": ["alignmentDestination", "createAlignment"]},
     {
       "name": "animation",
       "exports": [

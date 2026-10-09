@@ -1067,3 +1067,11 @@ tests and scoped strict typechecking passed, including a real SaveStore/fresh-st
 round trip. This supersedes the prototype's unexported status, not its evidence
 limits. No full gate, browser, durable custody transaction or physical-device claim;
 not integrated. See the [contract](../../src/kits/itinerary/README.md).
+
+### Interaction alignment prototype — 2026-10-09
+
+Unexported planar alignment candidate: [contract and limits](interaction-alignment-lab.md). Creator-owned poses, clock and clearance assertions; bounded approach proposals and identity-checked prepare/acknowledge tickets. Observed drift revokes prepared tickets even during paused or zero-duration calls. Ten focused tests pass; independent review completed. Hosted integration CI is pending. No collision oracle, movement owner, public kit export, performance claim or physical-device acceptance.
+
+## Planar alignment public kit candidate — 2026-10-09
+
+The earlier unexported experiment is graduated in this candidate to optional `@kits/alignment` (ALN-01), reusing frames identity validation without installing a system or requiring kit registration. It provides bounded target-relative proposals and exact-ticket acknowledgment; creators retain movement, clearance, eligibility, clock and effect ownership. Lab consumers now use the kit; no duplicate tool implementation or new installed system remains. Public yaw matches author Y rotation, with focused frame-composition coverage. Evidence: 15 focused headless tests, isolated typecheck and formatting. Full CI, browser/runtime playability, physics, save composition and devices remain unverified; this does not establish integration. [Contract](../../src/kits/alignment/README.md) and [consumer guide](interaction-alignment-lab.md).

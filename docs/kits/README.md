@@ -22,6 +22,7 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [capabilities](../../src/kits/capabilities/README.md) | Evidence, prerequisite graphs, source-owned modifiers and optional action lifetimes | expedition, mechanics |
 | [equipment](../../src/kits/equipment/README.md) | Unique-instance acquisition/release, arrangements and atomic multi-slot changes | expedition, mechanics |
 | [frames](../../src/kits/frames/README.md) | Versioned coordinate frames and bounded delayed updates | mechanics |
+| [alignment](../../src/kits/alignment/README.md) | Target-relative planar approach proposals and exact-ticket acknowledgment; creator-owned movement, clearance and effects | Two headless lab fixtures; no runtime template consumer |
 | [vehicles](../../src/kits/vehicles/README.md) | Local seat ownership and validated exits | mechanics |
 | [locomotion](../../src/kits/locomotion/README.md) | Authored root motion through character collision; tunable jump feel (coyote, buffer, variable height, apex gravity) with a fixed-step adapter; moving platforms (ride, leave policy, one-way catch) | mechanics (root motion); jump feel and moving platforms have no template consumer |
 | [control](../../src/kits/control/README.md) | Explicit actor ownership and discontinuity resets | mechanics |
