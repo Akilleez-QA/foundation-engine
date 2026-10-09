@@ -120,7 +120,19 @@ To test the same thing without a browser, use `createTestSaves()` in a game test
 
 A selected observation containing NaN or either infinity fails every matcher,
 including nested arrays/objects, instead of passing as JSON null or an unbounded
-number. Other paths are unaffected. This validates the value delivered to the
-matcher: it cannot recover invalid numbers that an earlier state projection has
-already converted to null. In particular, resource snapshots currently pass
-through JSON cloning before delivery; named transform observations do not.
+number. Other paths are unaffected. Resource observations reject non-finite
+numeric JSON values before delivery; explicit creator JSON projections remain
+the creator's selected coverage.
+
+Resource observation failures raise RESOURCE_CAPTURE_FAILED instead of returning
+empty state. A script stops on observation/execution failure and writes a terminal
+failed report, including cleanup errors; polling cannot retry that failed sample
+into a pass. Held keys and the browser are released. Batch reports retain completed
+and failed scripts and mark remaining scripts not-run after terminal execution
+failure. Snapshot reports mark a failed view incomplete and retain any screenshot;
+unavailable world state is never reported as zero entities or empty resources.
+
+If the final evidence file cannot be written, the runner throws an aggregate error
+whose message includes earlier observation and cleanup failures plus the write
+failure. Its `report` property retains the collected evidence for programmatic
+callers; batch failure details keep the combined message.

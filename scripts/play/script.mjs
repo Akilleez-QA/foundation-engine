@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {describeDiagnostic, writeDiagnosticEvidence} from './diagnostic-report.mjs';
 // scripts/play/script.mjs (`npm run play:script -- <file.json>`): a scripted playtest in a muted, isolated browser.
 // A script is JSON: {"name", "scene"?, "seed"?, "steps": [...]}. The step format (goto, key, press, teleport, wait,
 // snap, expect, waitUntil, pressUntil, holdUntil, reload) is in docs/recipes/write-a-playtest-script.md and checked by
@@ -41,18 +42,21 @@ export function judge(state, e) {
 /** After a reload: the app is up again and its scene is active (the hash keeps the scene, seed and flags). */
 const ACTIVE = `!!window.engine && !!document.querySelector('#app[data-scene-state="active"]')`;
 
-export async function runScript(script, url) {
+export async function runScript(script, url, runtime = {}) {
   assertScript(script);
-  const {launch} = await import('../perf/bench-browser.mjs');
-  const dir = freshOut(join(OUT, script.name));
-  const report = {name: script.name, steps: [], pass: true};
-  const b = await launch({width: 1280, height: 800});
+  const launch = runtime.launch ?? (await import('../perf/bench-browser.mjs')).launch;
+  const dir = runtime.directory ?? freshOut(join(OUT, script.name));
+  const report = {name: script.name, steps: [], pass: true, errors: []};
+  let current, b;
   try {
-    await open(b, url, script.scene ?? homeScene(), {seed: script.seed ?? 1});
+    b = await launch({width: 1280, height: 800});
+    await (runtime.open ?? open)(b, url, script.scene ?? homeScene(), {seed: script.seed ?? 1});
     let n = 0;
     for (const step of script.steps) {
       const row = {step},
         kind = stepKind(step);
+      current = row;
+      report.steps.push(row);
       if (kind === 'reload') {
         // A page reload: pagehide flushes saves as for a player; the same URL reopens the current scene.
         await b.page.reload({waitUntil: 'load'});
@@ -102,20 +106,43 @@ export async function runScript(script, url) {
             await sleep(Number(step.every ?? 100));
           }
         } finally {
-          if (step.holdUntil) await b.key(step.holdUntil, false);
+          if (step.holdUntil)
+            try {
+              await b.key(step.holdUntil, false);
+            } catch (error) {
+              report.pass = false;
+              report.errors.push('key release: ' + describeDiagnostic(error));
+            }
         }
         row.expect = want;
         if (!row.ok) report.pass = false;
       } else throw Error('unknown step ' + JSON.stringify(step));
       if (row.ok === false && step.teleport) report.pass = false;
-      report.steps.push(row);
+      if (report.errors.length) {
+        report.terminal = true;
+        break;
+      }
     }
-    report.errors = b.errors;
-    if (b.errors.length) report.pass = false;
+  } catch (error) {
+    report.pass = false;
+    report.terminal = true;
+    report.errors.push(describeDiagnostic(error));
+    if (current) {
+      current.ok = false;
+      current.error = describeDiagnostic(error);
+    }
   } finally {
-    await b.close();
+    try {
+      await b?.close();
+    } catch (error) {
+      report.pass = false;
+      report.terminal = true;
+      report.errors.push('browser close: ' + describeDiagnostic(error));
+    }
   }
-  write(dir, 'report.json', report);
+  report.errors.push(...(b?.errors ?? []));
+  if (report.errors.length) report.pass = false;
+  writeDiagnosticEvidence(report, () => write(dir, 'report.json', report));
   return report;
 }
 
