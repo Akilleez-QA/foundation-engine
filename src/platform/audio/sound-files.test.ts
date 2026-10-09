@@ -307,3 +307,63 @@ test('budgets follow the minimum device', () => {
   assert.ok(soundBudgets('phone').maxDecodedBytes < soundBudgets('desktop').maxDecodedBytes);
   assert.deepEqual(soundBudgets(), soundBudgets('laptop'));
 });
+
+for (const outcome of ['resolve', 'reject'] as const) {
+  test(`timed-out decode retains admission until underlying ${outcome}`, async () => {
+    const pending: {resolve: (value: AudioBuffer) => void; reject: (error: Error) => void}[] = [];
+    const context = {
+      sampleRate: 48000,
+      decodeAudioData: () => new Promise<AudioBuffer>((resolve, reject) => pending.push({resolve, reject})),
+    } as unknown as BaseAudioContext;
+    const files = createSoundFiles({
+      report() {}, maxDecodes: 1, timeoutMs: 15, compressedRatio: 4,
+      fetchBytes: async () => new ArrayBuffer(10),
+    });
+    const first = files.decode('first', 'first', context).catch(() => null);
+    await new Promise(resolve => setTimeout(resolve, 35));
+    assert.equal(await first, null);
+    const second = files.decode('second', 'second', context).catch(() => null);
+    try {
+      await flush();
+      assert.equal(pending.length, 1, 'native decode slot remains occupied after caller timeout');
+      assert.equal(files.stats.reservedBytes, 40);
+      const buffer = {length: 10, numberOfChannels: 1} as AudioBuffer;
+      if (outcome === 'resolve') pending[0]!.resolve(buffer);
+      else pending[0]!.reject(Error('late decoder failure'));
+      await flush();
+      assert.equal(pending.length, 2);
+      assert.equal(files.buffer('first'), undefined, 'late output cannot enter cache');
+      pending[1]!.resolve(buffer);
+      assert.equal(await second, buffer);
+      assert.equal(files.stats.reservedBytes, 0);
+    } finally {
+      files.dispose();
+      for (const work of pending) work.reject(Error('cleanup'));
+      await second;
+    }
+  });
+}
+
+test('disposal retains unsettled reservations and retires them once without negative accounting', async () => {
+  let finish!: (value: AudioBuffer) => void;
+  const context = {
+    sampleRate: 48000,
+    decodeAudioData: () => new Promise<AudioBuffer>(resolve => { finish = resolve; }),
+  } as unknown as BaseAudioContext;
+  const files = createSoundFiles({
+    report() {}, compressedRatio: 4, fetchBytes: async () => new ArrayBuffer(10),
+  });
+  const result = files.decode('sound', 'sound', context).catch(() => null);
+  await flush();
+  assert.equal(files.stats.reservedBytes, 40);
+  files.dispose();
+  assert.equal(await result, null);
+  assert.equal(files.stats.reservedBytes, 40, 'reservation represents still-running decode');
+  finish({length: 10, numberOfChannels: 1} as AudioBuffer);
+  await flush();
+  assert.equal(files.stats.reservedBytes, 0);
+  assert.equal(files.stats.decodedBytes, 0);
+  assert.equal(files.buffer('sound'), undefined);
+  files.dispose();
+  assert.equal(files.stats.reservedBytes, 0);
+});

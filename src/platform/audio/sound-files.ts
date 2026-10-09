@@ -412,10 +412,15 @@ export function createSoundFiles(o: SoundFileOptions): SoundFiles {
         return Promise.resolve(e.buffer);
       }
       return (e.decoding ??= (async () => {
-        let reserved = 0;
         try {
           const bytes = await encoded(id, e);
           await decodes.enter();
+          let reserved = 0, started = false;
+          const retire = () => {
+            stats.reservedBytes -= reserved;
+            reserved = 0;
+            decodes.leave();
+          };
           try {
             const estimate = estimateDecodedBytes(bytes, context.sampleRate, ratio);
             evict(id, estimate);
@@ -425,14 +430,14 @@ export function createSoundFiles(o: SoundFileOptions): SoundFiles {
             stats.reservedBytes += reserved;
             stats.decodes++;
             // decodeAudioData detaches its argument: decode a copy so the kept bytes survive.
+            const work = Promise.resolve(context.decodeAudioData(bytes.slice(0))).finally(retire);
+            started = true;
             const buffer = await bounded(
-              context.decodeAudioData(bytes.slice(0)),
+              work,
               AbortSignal.any([life.signal, AbortSignal.timeout(timeoutMs)]),
             );
             if (life.signal.aborted) throw Error('sounds: disposed');
             const size = buffer.length * buffer.numberOfChannels * 4;
-            stats.reservedBytes -= reserved;
-            reserved = 0;
             if (!Number.isSafeInteger(size) || size > maxDecoded)
               throw Error('decoded sound exceeds the decoded budget');
             if (entries.get(id) === e) {
@@ -444,10 +449,10 @@ export function createSoundFiles(o: SoundFileOptions): SoundFiles {
             }
             return buffer;
           } finally {
-            decodes.leave();
+            // Once started, only settlement of the opaque decoder retires its admission.
+            if (!started) retire();
           }
         } catch (error) {
-          stats.reservedBytes -= reserved;
           e.decoding = undefined;
           return fail(id, error);
         } finally {
@@ -462,7 +467,7 @@ export function createSoundFiles(o: SoundFileOptions): SoundFiles {
       stats.files = 0;
       stats.encodedBytes = 0;
       stats.decodedBytes = 0;
-      stats.reservedBytes = 0;
+      // Unsettled decoders keep their reservations until their own completion.
     },
   };
 }
