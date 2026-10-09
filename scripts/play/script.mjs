@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {describeDiagnostic} from './diagnostic-report.mjs';
 // scripts/play/script.mjs (`npm run play:script -- <file.json>`): a scripted playtest in a muted, isolated browser.
 // A script is JSON: {"name", "scene"?, "seed"?, "steps": [...]}. The step format (goto, key, press, teleport, wait,
 // snap, expect, waitUntil, pressUntil, holdUntil, reload) is in docs/recipes/write-a-playtest-script.md and checked by
@@ -94,7 +95,7 @@ export async function runScript(script, url, runtime = {}) {
               await b.key(step.holdUntil, false);
             } catch (error) {
               report.pass = false;
-              report.errors.push('key release: ' + String(error));
+              report.errors.push('key release: ' + describeDiagnostic(error));
             }
         }
         row.expect = want;
@@ -109,10 +110,10 @@ export async function runScript(script, url, runtime = {}) {
   } catch (error) {
     report.pass = false;
     report.terminal = true;
-    report.errors.push(String(error));
+    report.errors.push(describeDiagnostic(error));
     if (current) {
       current.ok = false;
-      current.error = String(error);
+      current.error = describeDiagnostic(error);
     }
   } finally {
     try {
@@ -120,7 +121,7 @@ export async function runScript(script, url, runtime = {}) {
     } catch (error) {
       report.pass = false;
       report.terminal = true;
-      report.errors.push('browser close: ' + String(error));
+      report.errors.push('browser close: ' + describeDiagnostic(error));
     }
   }
   report.errors.push(...b.errors);

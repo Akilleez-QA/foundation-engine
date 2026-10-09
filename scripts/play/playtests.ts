@@ -1,3 +1,4 @@
+import {describeDiagnostic} from './diagnostic-report.mjs';
 // scripts/play/playtests.ts (`npm run play:playtests`): every scripted playtest of the game, in a muted, isolated
 // browser, on one dev server. The gate runs it (scripts/perf/gate.mjs), so a game whose browser playtests fail cannot
 // pass the gate. It runs the union of:
@@ -86,7 +87,7 @@ export async function runPlaytests(
         name: script.name,
         pass: false,
         status: 'failed',
-        detail: 'script execution failed: ' + String(error),
+        detail: 'script execution failed: ' + describeDiagnostic(error),
       });
       stopped = true;
       continue;

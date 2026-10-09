@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {describeDiagnostic} from './diagnostic-report.mjs';
 // scripts/play/snap.mjs (`npm run play:snap [-- --scene <id>] [--mobile] [--quality <preset>] [--calm]`): see the game.
 // A muted, isolated browser opens the scene, takes a desktop screenshot (and a phone one with --mobile), holds the
 // arrow keys a little to measure
@@ -133,15 +134,15 @@ export async function snap({scene, mobile = false, url, quality, calm = false}, 
         status: 'incomplete',
         viewport: view,
         ...(shot ? {screenshot: shot} : {}),
-        error: String(error),
+        error: describeDiagnostic(error),
       };
-      probe.errors.push(name + ': ' + String(error));
+      probe.errors.push(name + ': ' + describeDiagnostic(error));
     } finally {
       try {
         await b.close();
       } catch (error) {
-        probe.errors.push(name + ': browser close: ' + String(error));
-        probe.views[name] = {...probe.views[name], status: 'incomplete', cleanupError: String(error)};
+        probe.errors.push(name + ': browser close: ' + describeDiagnostic(error));
+        probe.views[name] = {...probe.views[name], status: 'incomplete', cleanupError: describeDiagnostic(error)};
       }
     }
   }

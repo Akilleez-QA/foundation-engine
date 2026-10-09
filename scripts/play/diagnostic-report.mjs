@@ -1,6 +1,6 @@
 import {writeFileSync} from 'node:fs';
 
-const describe = value => {
+export const describeDiagnostic = value => {
   try {
     return String(value);
   } catch {
@@ -15,7 +15,7 @@ export function diagnosticReport(report, path, write = writeFileSync) {
   report.failures = [];
   const fail = (error, stage = 'scenario') => {
     causes.push(error);
-    report.failures.push({stage, error: describe(error)});
+    report.failures.push({stage, error: describeDiagnostic(error)});
     report.passed = false;
   };
   return {
