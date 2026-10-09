@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {scriptProblems, assertScript, STEPS} from './script-schema.mjs';
-import {runScript} from './script.mjs';
+import {judge, runScript} from './script.mjs';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const ok = steps => ({name: 'check', scene: 'play', seed: 1, steps});
@@ -140,4 +140,36 @@ test('the recipe shows the committed arcade reload script, and documents every s
   assert.equal(shown, readFileSync(join(ROOT, 'templates/arcade/game/playtest/best-reload.json'), 'utf8'));
   for (const kind of Object.keys(STEPS))
     assert.match(recipe, new RegExp(`\\| \`\\{"${kind}":`), `the step table documents ${kind}`);
+});
+
+test('numeric observation failures cannot pass script matchers', () => {
+  for (const value of [NaN, Infinity, -Infinity]) {
+    const state = {world: {named: {actor: {x: value}}}};
+    const path = 'world.named.actor.x';
+    assert.equal(judge(state, {path, equals: null}).ok, false);
+    assert.equal(judge(state, {path, atLeast: -100}).ok, false);
+    assert.equal(judge(state, {path, exists: true}).ok, false);
+    assert.equal(judge({value: [value]}, {path: 'value', equals: [null]}).ok, false);
+    assert.equal(judge({value: {nested: value}}, {path: 'value', equals: {nested: null}}).ok, false);
+    assert.equal(judge({value: ['ready', value]}, {path: 'value', contains: 'ready'}).ok, false);
+  }
+});
+
+test('finite observations preserve null, boolean, array and path matcher behavior', () => {
+  const state = {bad: NaN, value: {list: [1, null, false], yes: true, empty: null, number: 2}};
+  for (const expectation of [
+    {path: 'value.list', equals: [1, null, false]},
+    {path: 'value.list', contains: false},
+    {path: 'value.list', contains: null},
+    {path: 'value.yes', equals: true},
+    {path: 'value.empty', equals: null},
+    {path: 'value.empty', exists: false},
+    {path: 'value.absent', exists: false},
+    {path: 'value.number', exists: true},
+    {path: 'value.number', atLeast: 2},
+  ])
+    assert.equal(judge(state, expectation).ok, true);
+  assert.equal(judge(state, {path: 'value.number', atLeast: 3}).ok, false);
+  assert.equal(judge(state, {path: 'value.yes', atLeast: 0}).ok, false);
+  assert.equal(judge(state, {path: 'value.list', equals: [null, 1, false]}).ok, false);
 });
