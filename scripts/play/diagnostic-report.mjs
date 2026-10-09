@@ -1,6 +1,6 @@
 import {writeFileSync} from 'node:fs';
 
-const describe = value => {
+export const describeDiagnostic = value => {
   try {
     return String(value);
   } catch {
@@ -15,7 +15,7 @@ export function diagnosticReport(report, path, write = writeFileSync) {
   report.failures = [];
   const fail = (error, stage = 'scenario') => {
     causes.push(error);
-    report.failures.push({stage, error: describe(error)});
+    report.failures.push({stage, error: describeDiagnostic(error)});
     report.passed = false;
   };
   return {
@@ -38,4 +38,25 @@ export function diagnosticReport(report, path, write = writeFileSync) {
       if (causes.length) throw new AggregateError(causes, 'Diagnostic failed; scenario and cleanup causes retained');
     },
   };
+}
+
+/** Preserve completed observations and prior failures when the final evidence file cannot be written. */
+export function writeDiagnosticEvidence(report, write) {
+  try {
+    write();
+  } catch (cause) {
+    const prior = [...report.errors];
+    report.errors.push('report write: ' + describeDiagnostic(cause));
+    if ('pass' in report) {
+      report.pass = false;
+      report.terminal = true;
+    }
+    const error = new AggregateError(
+      [...prior, cause],
+      'Diagnostic evidence write failed: ' + report.errors.join(' | '),
+      {cause},
+    );
+    error.report = report;
+    throw error;
+  }
 }

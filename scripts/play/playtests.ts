@@ -1,3 +1,4 @@
+import {describeDiagnostic} from './diagnostic-report.mjs';
 // scripts/play/playtests.ts (`npm run play:playtests`): every scripted playtest of the game, in a muted, isolated
 // browser, on one dev server. The gate runs it (scripts/perf/gate.mjs), so a game whose browser playtests fail cannot
 // pass the gate. It runs the union of:
@@ -20,6 +21,7 @@ export interface PlaytestFile {
 export interface PlaytestResult extends PlaytestFile {
   name: string;
   pass: boolean;
+  status: 'completed' | 'failed' | 'not-run';
   detail: string;
 }
 interface Criterion {
@@ -52,25 +54,51 @@ export async function runPlaytests(
   o: {url: () => Promise<string>; run: Runner; problems: (s: unknown) => string[]},
 ): Promise<PlaytestResult[]> {
   const out: PlaytestResult[] = [];
+  let stopped = false;
   for (const f of files) {
+    if (stopped) {
+      out.push({...f, name: f.file, pass: false, status: 'not-run', detail: 'not run after terminal script failure'});
+      continue;
+    }
     let script: Script;
     try {
       script = JSON.parse(readFileSync(join(ROOT, f.file), 'utf8')) as Script;
     } catch (error) {
-      out.push({...f, name: f.file, pass: false, detail: `cannot read: ${(error as Error).message}`});
+      out.push({...f, name: f.file, pass: false, status: 'failed', detail: `cannot read: ${(error as Error).message}`});
       continue;
     }
     const problems = o.problems(script);
     if (problems.length) {
-      out.push({...f, name: String(script?.name ?? f.file), pass: false, detail: problems.join('; ')});
+      out.push({
+        ...f,
+        name: String(script?.name ?? f.file),
+        pass: false,
+        status: 'failed',
+        detail: problems.join('; '),
+      });
       continue;
     }
-    const r = await o.run(script, await o.url());
+    let r: Awaited<ReturnType<Runner>>;
+    try {
+      r = await o.run(script, await o.url());
+    } catch (error) {
+      out.push({
+        ...f,
+        name: script.name,
+        pass: false,
+        status: 'failed',
+        detail: 'script execution failed: ' + describeDiagnostic(error),
+      });
+      stopped = true;
+      continue;
+    }
+    if (r.terminal) stopped = true;
     const failed = r.steps.filter(s => s.ok === false).length;
     out.push({
       ...f,
       name: script.name,
       pass: r.pass,
+      status: r.pass ? 'completed' : 'failed',
       detail: r.pass
         ? `${r.steps.length} step(s); evidence playtest/latest/${script.name}/`
         : `${failed} failing step(s)${r.errors?.length ? `, page errors: ${r.errors.slice(0, 2).join(' | ')}` : ''}; see playtest/latest/${script.name}/report.json`,
@@ -99,9 +127,10 @@ if (process.argv[1]?.endsWith('playtests.ts')) {
       });
       for (const r of results)
         console.log(
-          `  ${r.pass ? 'PASS' : 'FAIL'} ${r.file}${r.criteria.length ? ` (${r.criteria.join(', ')})` : ''}: ${r.detail}`,
+          `  ${r.status === 'not-run' ? 'NOT RUN' : r.pass ? 'PASS' : 'FAIL'} ${r.file}${r.criteria.length ? ` (${r.criteria.join(', ')})` : ''}: ${r.detail}`,
         );
-      const failed = results.filter(r => !r.pass);
+      const failed = results.filter(r => r.status === 'failed'),
+        notRun = results.filter(r => r.status === 'not-run');
       const out = join(ROOT, 'playtest', 'latest');
       mkdirSync(out, {recursive: true});
       writeFileSync(
@@ -109,9 +138,9 @@ if (process.argv[1]?.endsWith('playtests.ts')) {
         JSON.stringify({when: new Date().toISOString(), game: rel(dir), results}, null, 2) + '\n',
       );
       console.log(
-        `play:playtests: ${results.length - failed.length} pass, ${failed.length} fail in ${((Date.now() - t0) / 1000).toFixed(0)} s · playtest/latest/playtests.json`,
+        `play:playtests: ${results.length - failed.length - notRun.length} pass, ${failed.length} fail, ${notRun.length} not run in ${((Date.now() - t0) / 1000).toFixed(0)} s · playtest/latest/playtests.json`,
       );
-      process.exitCode = failed.length ? 1 : 0;
+      process.exitCode = failed.length || notRun.length ? 1 : 0;
     } catch (error) {
       // A missing test browser is one actionable line (scripts/perf/bench-browser.mjs), not a stack.
       if ((error as {code?: string})?.code !== 'ENGINE_NO_BROWSER') throw error;

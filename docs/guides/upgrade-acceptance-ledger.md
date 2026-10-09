@@ -1090,6 +1090,31 @@ scene preflight and queued action delivery. These exercise headless ownership
 boundaries; production scene wiring and physical resource reclamation are not
 certified. Full CI on the combined candidate remains required before integration.
 
+### Integrated continuation and diagnostic boundary fixes — 2026-10-09
+
+[PR #213](https://github.com/Akilleez-QA/foundation-engine/pull/213) integrated
+the unexported condition and recurring-phase compositions, shared dependency
+preflight ownership regression, and queued action-delivery regression at main
+`0a873d2070fecf605c25e0f9b98dee0f4a5f26d7`.
+[Candidate CI](https://github.com/Akilleez-QA/foundation-engine/actions/runs/37889789566)
+completed successfully on `1961cc0638cf76385aa17f50b61700ff64c78517`.
+This closes the earlier integration-pending status for that batch, not its
+concrete-game or physical-device acceptance questions.
+
+[PR #218](https://github.com/Akilleez-QA/foundation-engine/pull/218) integrated
+frame identity and adapter caching, camera reset admission, decoder retirement
+accounting, replay numeric validation and script observation matching at main
+`0214411f89badbefabc16712039967b7799fc37a`.
+[Candidate CI](https://github.com/Akilleez-QA/foundation-engine/actions/runs/37891867717)
+completed successfully on `1cfece534241c563be5ebc6f2ffffcfc8dc16db8`.
+The combined candidate preserved the independently reviewed component files and
+passed 331 affected tests locally. Decoder admission and retained-byte accounting
+do not establish a browser native-heap ceiling.
+
+These receipts cover those merged batches only. Resource-observation failure
+reporting is a subsequent candidate; further source coverage, application wiring,
+device experience and physical reclamation evidence remain separate obligations.
+
 
 ## Fixed-step numeric admission candidate (2026-10-09)
 
