@@ -132,6 +132,57 @@ work, not kernel or browser buffers, and they are not a CPU deadline: `apply`,
 - **Disposal.** `session.dispose()` closes the transport and cancels the retry
   schedule; `host.dispose()` closes every connection with 1001 `host-closing`.
 
+## Optional host liveness
+
+Games that need recovery from an open but silent connection can pair client
+deadlines with host view refresh. Both are opt-in; local play, CLI defaults and
+the shared-world template keep their existing behavior.
+
+```ts
+const session = createSession({
+  rules, endpoint, pingMs: 5000,
+  liveness: {connectTimeoutMs: 10000, hostTimeoutMs: 15000},
+});
+// On the host, or startSessionServer from scripts/host.mjs:
+const host = createSessionHost({rules, joinCode, ports, refreshOnPing: true});
+```
+
+`connectTimeoutMs` is a positive safe integer, measured from socket creation to
+the first adopted baseline, including connecting, waiting for welcome and waiting
+for a view. `hostTimeoutMs` is a safe integer greater than `pingMs`, measured since
+the last accepted advancing view. Choose margin for the expected update and host
+pump cadence. Configured limits are captured at construction. An incompatible
+idle host will time out; pairing is explicit, with no capability negotiation.
+
+Checks run only in `session.update(now)`. That call drains at most four queued
+frames before checking deadlines, so a fresh view processed at the deadline can
+renew liveness. These are processing-time deadlines, not receive timestamps or
+background timers. Regressing time stays clamped; a long pause creates no catch-up
+ping burst. While awaiting a baseline, expiration uses the connection deadline;
+after adoption it uses the host deadline. Duplicate, obsolete and foreign views
+do not renew it. A welcome alone does not reset the retry schedule.
+
+Pings continue independently of actions and view acknowledgements. The host only
+marks its existing view publisher dirty; only `pump` publishes a new sequence.
+One outstanding credit still bounds publication and coalesces repeated probes.
+An unchanged world is valid liveness evidence without incrementing the visible
+world revision or triggering redraw. This proves progress through host projection
+and publication, not simulation advancement or delivery of every action.
+
+Expiration retires transport, receiver and prediction, restores the last confirmed
+display, marks it stale and uses the existing bounded retry schedule. Unconfirmed
+actions are never resent. Disposal cancels reconnecting. An action may have been
+applied before a disconnect even if its view was not received; this is not an
+exactly-once delivery claim.
+
+Focused unit coverage includes silent sockets, welcome-only attempts, a stopped
+pump, stale frames, exact deadlines, option capture, send refusal and disposal.
+`scripts/host.test.mjs` also drives real loopback WebSockets while stopping only
+the existing host pump: it checks idle refresh, timeout, confirmed-view rollback
+and fresh-baseline reconnect without resending the uncertain action. The old
+connection is retired before pumping resumes in that scenario. This is loopback
+evidence, not WAN, physical-device or latency acceptance.
+
 ## Integrity (SEC-01) in observe mode by default
 
 `rules.integrity` takes the kit's integrity rules over
@@ -170,7 +221,7 @@ empty world.
 
 ## Evidence
 
-- `src/kits/network/session.test.ts` (15 tests): rule validation, local play, two
+- `src/kits/network/session.test.ts` (27 tests): rule validation, local play, two
   in-memory clients joining one host with prediction and authoritative views,
   reconciliation after an enforced rejection, observe mode, terminal refusals (wrong
   code, rules mismatch), paced reconnect that resumes the slot without resending,
@@ -179,7 +230,7 @@ empty world.
   idle-socket flood (one address, then many) that neither blocks new players nor a
   returning player, `act` on every 60 Hz tick for ten seconds without a close, and a
   40-action burst stopping at the host queue size.
-- `scripts/host.test.mjs` (6 tests): real loopback WebSockets through `npm run host`'s
+- `scripts/host.test.mjs` (7 tests): real loopback WebSockets through `npm run host`'s
   server: two clients share one world, a wrong code closes 1008 `auth-rejected`,
   origins are limited by mode (loopback only by default; LAN with `--lan`; public
   sites never), `--join` reuses a code across a restart and refuses weak codes, and
@@ -223,8 +274,8 @@ empty world.
 - **Prediction is of the disclosed world.** `apply` runs on the client over what the
   player can see; when `disclose` hides data that `apply` needs, the prediction can
   differ until the next view corrects it.
-- **No host liveness check from the client.** A silent host whose TCP connection stays
-  open is not detected until the connection closes.
+- **Host liveness is opt-in.** Default clients do not detect a silent host while
+  TCP stays open. Paired client deadlines require host `refreshOnPing` as described above.
 - **Drain (NW-08) is not wired** into this path; a restart is seen as a transient loss.
 - Evidence is unit, loopback-socket and desktop headless Chromium on one machine:
   **loopback only**. LAN mode (`--lan`) is supported but has no evidence between

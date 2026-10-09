@@ -813,3 +813,12 @@ evidence; report-write failures retain prior causes and the in-memory report.
 This receipt does not certify every diagnostic caller, physical-device behavior,
 or completion of the wider engine work. The fixed-step numeric candidate above
 still requires CI on its combined head after integration with this base.
+
+
+## Optional shared-session liveness — candidate (2026-10-09)
+
+The existing session client accepts paired connection/host deadlines and the host
+can refresh its existing one-credit view on ping. Defaults remain unchanged; no
+new timer or protocol owner. See [the contract](multiplayer-session.md#optional-host-liveness).
+Focused unit and real loopback acceptance is recorded in the upgrade ledger;
+independent review and full hosted integration CI remain required.

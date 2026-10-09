@@ -1140,3 +1140,21 @@ evidence; report-write failures retain prior causes and the in-memory report.
 This receipt does not certify every diagnostic caller, physical-device behavior,
 or completion of the wider engine work. The fixed-step numeric candidate above
 still requires CI on its combined head after integration with this base.
+
+
+## Optional shared-session liveness — reconciled candidate (2026-10-09)
+
+Branch `feat/session-liveness-reconcile`, baseline `6dfbcf944098afe96daf79e468decda1516102eb`.
+Existing session/retry/transport/view owners provide opt-in paired deadlines and
+unchanged-world view refresh; default behavior remains unchanged. The contract
+distinguishes processing-time progress from simulation advancement and action delivery.
+
+Initial focused run: 33 unit and real loopback tests passed. After adding the
+single-capture configuration regression and adapting historical tests to current
+strict typing, `npm run check` passed: typecheck, applicable lints and all 198
+affected tests in 13 files, including the real loopback and CLI tests. The loopback test
+stops the existing host pump while the socket stays open, observes timeout and
+confirmed-state rollback, then reconnects after old-peer retirement without
+resending its uncertain action. Independent review and full hosted integration CI
+are pending. No new browser,
+WAN, physical-device, scalability or full-CI acceptance is claimed.
