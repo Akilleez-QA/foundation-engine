@@ -868,3 +868,15 @@ charging. Cube, array, volume, authored mip and non-RGBA8 descriptor support rem
 explicit accounting limitations. See [asset residency](asset-residency.md).
 Focused and affected checks plus independent review are required before hosted
 integration; no physical memory or device evidence is implied.
+
+
+## Common texture descriptor accounting — candidate (2026-10-09)
+
+The existing byte estimator now forecasts full logical mip chains for common
+R/RG/RGBA unsigned-byte, half-float and float descriptors, including valid cubes,
+fixed array layers and shrinking volume depth. Existing model admission and
+cleanup own refusal and retry; budgets are unchanged. Unsupported descriptors
+retain compatibility fallback and remain an explicit accounting gap. See
+[asset residency](asset-residency.md). Headless arithmetic and model lifecycle
+regressions cover the corrected domain; physical allocation and device acceptance
+are unverified. Independent review and hosted integration remain pending.
