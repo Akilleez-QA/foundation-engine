@@ -57,7 +57,8 @@ export function createSystemRunner<C>(
   const fixed = systems.filter(s => (s.phase ?? 'fixed') === 'fixed'),
     perFrame = systems.filter(s => s.phase === 'frame');
   const stats: RunnerStats = {frames: 0, steps: 0, dropped: 0, errors: 0};
-  let acc = 0;
+  let acc = 0,
+    correction = 0;
   const run = (s: SystemSpec<C>, ctx: C, dt: number) => {
     try {
       s.run(ctx, dt);
@@ -77,14 +78,18 @@ export function createSystemRunner<C>(
     },
     frame(ctx, dt) {
       if (!Number.isFinite(dt)) throw Error('frame time must be finite');
-      const total = acc + Math.max(0, Math.min(dt, 1));
+      // Carry rounding lost by addition/subtraction across frames rather than
+      // repeatedly converting the retained phase between seconds and ticks.
+      const elapsed = Math.max(0, Math.min(dt, 1)) - correction;
+      const total = acc + elapsed;
+      const addedCorrection = total - acc - elapsed;
       const quotient = total / step;
       if (!Number.isFinite(quotient) || quotient > Number.MAX_SAFE_INTEGER)
         throw Error('frame step count exceeds safe numeric accounting');
       // Correct only a few rounding bits at a whole-step boundary, in step units.
       // An absolute seconds tolerance can manufacture ticks when step is tiny.
       const nearest = Math.round(quotient);
-      const due = nearest >= 1 && Math.abs(quotient - nearest) <= 8 * Number.EPSILON ? nearest : Math.floor(quotient);
+      const due = nearest >= 1 && Math.abs(quotient - nearest) <= 64 * Number.EPSILON ? nearest : Math.floor(quotient);
       const count = Math.min(due, maxSteps);
       const dropped = due - count;
       if (
@@ -93,7 +98,9 @@ export function createSystemRunner<C>(
         !Number.isSafeInteger(stats.dropped + dropped)
       )
         throw Error('runner counters exceed safe numeric accounting');
-      const remainder = Math.max(0, quotient - due) * step;
+      const spent = due * step + addedCorrection;
+      const remainder = total - spent;
+      const nextCorrection = remainder - total + spent;
       stats.frames++;
       acc = total;
       let n = 0;
@@ -103,7 +110,8 @@ export function createSystemRunner<C>(
         acc = Math.max(0, acc - step);
         n++;
       }
-      acc = remainder;
+      acc = Math.max(0, remainder);
+      correction = remainder <= 0 ? 0 : nextCorrection;
       stats.dropped += dropped;
       stats.steps += n;
       o.beforeFrameLane?.();

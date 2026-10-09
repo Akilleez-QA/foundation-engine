@@ -41,8 +41,9 @@ test('runner numeric refusal preserves partial phase, counters and every callbac
   assert.equal(runner.alpha, 0);
 });
 
-test('runner keeps ordinary 30/60/144 Hz partitions at sixty ticks without negative phase', () => {
-  for (const hz of [30, 60, 144]) {
+test('runner keeps 12 through 1000 Hz one-second partitions at sixty ticks without negative phase', () => {
+  // Includes 30/60/144 and the 49/103 Hz cases that expose repeated phase-rounding drift.
+  for (let hz = 12; hz <= 1000; hz++) {
     let ticks = 0;
     const runner = createSystemRunner([{id: 'tick', run: () => ticks++}]);
     for (let i = 0; i < hz; i++) {

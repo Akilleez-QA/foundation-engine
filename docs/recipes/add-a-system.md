@@ -49,7 +49,7 @@ Nonfinite deltas, unsafe whole-step counts, and overflowing frame/step/drop coun
 are refused before callbacks or accumulator/counter changes, so a later admissible
 frame can continue from the retained phase.
 
-Whole-step boundary tolerance is eight machine epsilons in step units, not an
+Accumulation carries rounding compensation across frames. Whole-step boundary tolerance is 64 machine epsilons in step units, not an
 absolute number of seconds. Zero accumulated time never creates a fixed tick, even
 with subnormal step sizes. Completed frames retain an interpolation fraction in
 `[0, 1)`. This is JavaScript Number accounting, not exact elapsed-time arithmetic;
