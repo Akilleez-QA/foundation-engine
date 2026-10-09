@@ -3,6 +3,7 @@
 - **Status:** Proposed (candidate implementation)
 - **Date:** 2026-10-09
 - **Area:** Procedural generation
+- **Tracking:** [Issue #200](https://github.com/Akilleez-QA/foundation-engine/issues/200)
 
 ## Context
 

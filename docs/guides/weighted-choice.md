@@ -8,11 +8,11 @@ same stream with explicit state/restore for persistence.
 ```ts
 import { createChoiceHistory } from '@kits/procgen';
 import { createSaveableRng } from '@engine';
-const rng = createSaveableRng('rooms');
+const rng = createSaveableRng('regions');
 const history = createChoiceHistory({
   maxCandidates: 32, maxIdLength: 64, maxLabels: 4, windowSize: 2,
 });
-const planned = history.prepare('rooms', [
+const planned = history.prepare('regions', [
   { id: 'courtyard', weight: 3, eligible: true },
   { id: 'hall', weight: 1, eligible: true },
 ], rng);
@@ -80,7 +80,7 @@ Commit changes history only; it is not proof of durable rewards, inventory effec
 or an external operation. Coordinate those through their existing receipt/save
 owner. There is no new persistence, eligibility or assignment authority.
 
-Ten focused tests cover room-theme generation with rejected proposals, objective
+Ten focused tests cover region-theme generation with rejected proposals, objective
 activity admission, exact saved RNG/history continuation through real SaveStore
 and fresh reload, interval endpoints, no-draw/overflow, isolated eviction, malformed
 restore and lifetimes. No browser, native-source parity, fairness, network authority
