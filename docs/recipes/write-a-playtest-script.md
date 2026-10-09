@@ -125,3 +125,8 @@ into a pass. Held keys and the browser are released. Batch reports retain comple
 and failed scripts and mark remaining scripts not-run after terminal execution
 failure. Snapshot reports mark a failed view incomplete and retain any screenshot;
 unavailable world state is never reported as zero entities or empty resources.
+
+If the final evidence file cannot be written, the runner throws an aggregate error
+whose message includes earlier observation and cleanup failures plus the write
+failure. Its `report` property retains the collected evidence for programmatic
+callers; batch failure details keep the combined message.

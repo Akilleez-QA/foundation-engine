@@ -7,6 +7,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {ROOT} from '../lib/game-dir.mjs';
 import {scriptProblems} from './script-schema.mjs';
+import {runScript} from './script.mjs';
 import {playtestFiles, runPlaytests} from './playtests';
 
 const ok = {name: 'ok', steps: [{expect: {path: 'scene', equals: 'scene.main'}}]};
@@ -144,3 +145,38 @@ for (const terminal of ['throw', 'report'] as const) {
     }
   });
 }
+
+test('batch formatting retains actual runner causes when report writing fails', async () => {
+  const {root, dir} = game();
+  const directory = join(root, 'failed-output');
+  mkdirSync(join(directory, 'report.json'), {recursive: true});
+  const browser = {
+    errors: [],
+    page: {},
+    evaluate: async () => {
+      throw Error('RESOURCE_CAPTURE_FAILED');
+    },
+    close: async () => {
+      throw Error('browser close failed');
+    },
+  };
+  try {
+    const results = await runPlaytests(playtestFiles(dir, []), {
+      url: async () => '',
+      problems: scriptProblems,
+      run: (script, url) =>
+        runScript(script, url, {
+          directory,
+          launch: async () => browser,
+          open: async () => {},
+        }),
+    });
+    assert.equal(results[0]!.status, 'failed');
+    assert.equal(results[1]!.status, 'not-run');
+    assert.match(results[0]!.detail, /RESOURCE_CAPTURE_FAILED/);
+    assert.match(results[0]!.detail, /browser close failed/);
+    assert.match(results[0]!.detail, /report write:.*EISDIR/);
+  } finally {
+    rmSync(root, {recursive: true, force: true});
+  }
+});

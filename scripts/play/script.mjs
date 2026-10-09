@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import {describeDiagnostic} from './diagnostic-report.mjs';
+import {describeDiagnostic, writeDiagnosticEvidence} from './diagnostic-report.mjs';
 // scripts/play/script.mjs (`npm run play:script -- <file.json>`): a scripted playtest in a muted, isolated browser.
 // A script is JSON: {"name", "scene"?, "seed"?, "steps": [...]}. The step format (goto, key, press, teleport, wait,
 // snap, expect, waitUntil, pressUntil, holdUntil, reload) is in docs/recipes/write-a-playtest-script.md and checked by
@@ -126,7 +126,7 @@ export async function runScript(script, url, runtime = {}) {
   }
   report.errors.push(...(b?.errors ?? []));
   if (report.errors.length) report.pass = false;
-  write(dir, 'report.json', report);
+  writeDiagnosticEvidence(report, () => write(dir, 'report.json', report));
   return report;
 }
 

@@ -8,3 +8,8 @@ export function diagnosticReport(
   close(owner: {close(): unknown} | null | undefined, stage: string): Promise<void>;
   finish(): void;
 };
+
+export function writeDiagnosticEvidence(
+  report: {errors: string[]; pass?: boolean; terminal?: boolean},
+  write: () => unknown,
+): void;

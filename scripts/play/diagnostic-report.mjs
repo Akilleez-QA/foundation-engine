@@ -39,3 +39,24 @@ export function diagnosticReport(report, path, write = writeFileSync) {
     },
   };
 }
+
+/** Preserve completed observations and prior failures when the final evidence file cannot be written. */
+export function writeDiagnosticEvidence(report, write) {
+  try {
+    write();
+  } catch (cause) {
+    const prior = [...report.errors];
+    report.errors.push('report write: ' + describeDiagnostic(cause));
+    if ('pass' in report) {
+      report.pass = false;
+      report.terminal = true;
+    }
+    const error = new AggregateError(
+      [...prior, cause],
+      'Diagnostic evidence write failed: ' + report.errors.join(' | '),
+      {cause},
+    );
+    error.report = report;
+    throw error;
+  }
+}

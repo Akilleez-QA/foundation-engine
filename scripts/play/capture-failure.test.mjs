@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync, readFileSync, rmSync} from 'node:fs';
+import {mkdirSync, mkdtempSync, readFileSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {runScript} from './script.mjs';
@@ -160,3 +160,64 @@ test('later view launch failure preserves completed snapshot evidence', async ()
     rmSync(directory, {recursive: true, force: true});
   }
 });
+
+for (const kind of ['script', 'snap']) {
+  test(`${kind} report write failure exposes accumulated causes and attached evidence`, async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'write-failure-'));
+    mkdirSync(join(directory, kind === 'script' ? 'report.json' : 'probe.json'));
+    let closed = 0;
+    const browser = {
+      errors: ['page diagnostic'],
+      page: {addInitScript: async () => {}, screenshot: async () => Buffer.from('image')},
+      evaluate: async code => {
+        if (code === 'window.engine.state()') throw Error('RESOURCE_CAPTURE_FAILED');
+        return null;
+      },
+      key: async (_key, down) => {
+        if (!down) throw Error('key release failed');
+      },
+      close: async () => {
+        closed++;
+        throw Error('browser close failed');
+      },
+    };
+    try {
+      const runtime = {
+        directory,
+        launch: async () => browser,
+        open: async () => [],
+        measure: async () => ({renders: 1}),
+        activity: async () => ({}),
+        gpuCensus: async () => null,
+      };
+      const work =
+        kind === 'script'
+          ? runScript(
+              {name: 'failure', steps: [{holdUntil: 'x', until: {path: 'world.state', exists: true}}]},
+              '',
+              runtime,
+            )
+          : snap({scene: 'test', url: ''}, runtime);
+      await assert.rejects(work, error => {
+        assert.ok(error instanceof AggregateError);
+        assert.match(String(error), /RESOURCE_CAPTURE_FAILED/);
+        assert.match(String(error), /browser close failed/);
+        assert.match(String(error), /page diagnostic/);
+        assert.match(String(error), /report write:.*EISDIR/);
+        if (kind === 'script') {
+          assert.match(String(error), /key release failed/);
+          assert.equal(error.report.pass, false);
+          assert.equal(error.report.terminal, true);
+        } else {
+          assert.equal(error.report.views.desktop.status, 'incomplete');
+          assert.ok(error.report.views.desktop.screenshot);
+        }
+        assert.match(error.cause.message, /EISDIR/);
+        return true;
+      });
+      assert.equal(closed, 1);
+    } finally {
+      rmSync(directory, {recursive: true, force: true});
+    }
+  });
+}

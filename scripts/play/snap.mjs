@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import {describeDiagnostic} from './diagnostic-report.mjs';
+import {describeDiagnostic, writeDiagnosticEvidence} from './diagnostic-report.mjs';
 // scripts/play/snap.mjs (`npm run play:snap [-- --scene <id>] [--mobile] [--quality <preset>] [--calm]`): see the game.
 // A muted, isolated browser opens the scene, takes a desktop screenshot (and a phone one with --mobile), holds the
 // arrow keys a little to measure
@@ -148,7 +148,7 @@ export async function snap({scene, mobile = false, url, quality, calm = false}, 
       probe.console.push(...lines.filter(l => !l.startsWith('debug')).map(l => `${name}: ${l}`));
     }
   }
-  write(dir, 'probe.json', probe);
+  writeDiagnosticEvidence(probe, () => write(dir, 'probe.json', probe));
   return probe;
 }
 
