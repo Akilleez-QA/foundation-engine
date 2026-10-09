@@ -1,0 +1,25 @@
+# Planar interaction alignment lab
+
+The creator requirement is to approach an authored target-relative pose and admit an interaction only after the creator observes acceptable alignment. The experiment lives in `tools/interaction-alignment-lab`; it adds no public engine export, registry, gameplay requirement, or runtime system.
+
+## Contract
+
+An attempt binds one target identity/generation, revision, resolved planar frame and local destination. It reuses the frames kit's `FrameRef` validation. The creator resolves any frame hierarchy first; the lab does not build a competing hierarchy or transform owner. Positions are creator world units; yaw is radians, with positive yaw rotating +X toward +Z. Scale, height, pitch, roll and general 3D rotation are deferred.
+
+The creator supplies observed actor pose, current target snapshot, eligibility and clearance on every step and acknowledgment. Clearance must cover the sweep from the actor through the authored destination, not just the destination point. This boolean is a creator assertion, not collision evidence established by the lab. Never apply a proposal after its clearance evidence or target snapshot becomes stale. Changed target identity, generation, revision, or even an unversioned frame change retires the attempt.
+
+The existing clock remains the time owner. Feed each active simulation interval through `step`, including time spent waiting for acknowledgment. `seconds` must be finite and between zero and the configured maximum step duration. The creator must pass the current pause state to both `step` and `acknowledge`; no independent clock or pause source is polled. Paused or zero-duration steps consume no time, work budget, or alignment progress. Target loss and invalid eligibility/clearance can still invalidate an attempt while paused. This is an active-simulation timeout, not a wall-clock deadline; omitting clock calls cannot be detected here.
+
+Each positive unpaused step performs constant-size math with no retries or collection scans. Position and shortest yaw change are bounded by configured speeds and duration. Maximum approach distance/angle refuse excessive corrections. Distance/angle tolerances, step count, per-step duration and elapsed timeout are creator-selected positive finite bounds; the step count must be a safe integer. Timeout expires at the configured deadline; the attempt permits at most `maxSteps` successful work steps. One live attempt retains at most one ticket, no queue or historical ledger. These bounds do not bound arbitrary creator physics or callbacks.
+
+`proposal` returns a detached frozen pose and never writes movement state. Once the observed pose is within tolerance, a positive step returns `prepared` with a frozen ticket. The creator then calls `acknowledge` with that exact ticket and a fresh sample. Identity, eligibility, clearance and alignment are checked again. Only `accepted` admits the creator's action. Preparing is not reward, activation, placement, or inventory transfer. Copying a ticket, submitting one from another attempt, replaying an accepted ticket, or acknowledging after cancellation/disposal is refused.
+
+The creator owns one attempt within its interaction/scene owner and calls `cancel` or `dispose` on owner loss. Both retire pending work idempotently. A new attempt is the explicit recovery path after refusal. Drift while prepared retires the attempt instead of silently authorizing a different pose. Invalid numeric inputs throw without being treated as successful progress. No subscriptions, timers, workers, reservations, or physics objects are acquired.
+
+## Effect boundary and evidence
+
+Acceptance is in-memory admission only. It is not a durable exactly-once transaction and does not call an effect callback. A creator needing persistent effects must compose an operation receipt and persistence owner, including its own recovery for failure after acknowledgment. Tickets are process-local object capabilities and cannot be serialized/restored. They prevent accidental stale reuse, not malicious code with direct access to the creator's authority.
+
+The headless tests exercise console activation at a rotated offset and socket placement at a different asymmetric offset. Fixture counters/custody change only after acceptance; neither fixture integrates physics or inventory. Adversarial cases cover duplicate/foreign/copied tickets, all target identity dimensions, unversioned target motion, changed eligibility/clearance, observed drift, cancellation/disposal, pause/resume, zero time, exact timeout, exhausted step budgets, invalid numbers, bounded movement, and shortest-angle turning.
+
+Local evidence: nine Node tests and the isolated TypeScript configuration. Runtime playability, actual collision clearance, input comfort, browser behavior, persistence composition, physical devices, and full repository CI remain unverified. This lab is a reviewable contract experiment; graduation needs real creator integrations and their acceptance evidence.
