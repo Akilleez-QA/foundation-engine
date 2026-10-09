@@ -452,6 +452,9 @@ export function createSoundFiles(o: SoundFileOptions): SoundFiles {
             reserved = 0;
             if (!Number.isSafeInteger(size) || size > maxDecoded)
               throw Error('decoded sound exceeds the decoded budget');
+            evict(id, size);
+            if (stats.decodedBytes + stats.reservedBytes + size > maxDecoded)
+              throw Error('decoded sound does not fit the decoded budget beside active reservations');
             if (entries.get(id) === e) {
               e.buffer = buffer;
               e.decodedBytes = size;

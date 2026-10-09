@@ -468,3 +468,31 @@ test('successful decode transfers its reservation before admitting the next deco
   assert.equal(files.stats.reservedBytes, 0);
   files.dispose();
 });
+
+test('actual decoded output must fit beside other unsettled reservations', async () => {
+  const pending: ((buffer: AudioBuffer) => void)[] = [];
+  const context = {
+    sampleRate: 48000,
+    decodeAudioData: () => new Promise<AudioBuffer>(resolve => pending.push(resolve)),
+  } as unknown as BaseAudioContext;
+  const files = createSoundFiles({
+    report() {},
+    maxDecodes: 2,
+    maxDecodedBytes: 100,
+    compressedRatio: 4,
+    fetchBytes: async () => new ArrayBuffer(10),
+  });
+  const first = files.decode('a', 'a', context);
+  const refused = assert.rejects(first, /decoded budget/);
+  const second = files.decode('b', 'b', context);
+  await flush();
+  pending[0]!({length: 20, numberOfChannels: 1} as AudioBuffer);
+  await refused;
+  assert.equal(files.stats.decodedBytes, 0);
+  assert.equal(files.stats.reservedBytes, 40);
+  pending[1]!({length: 10, numberOfChannels: 1} as AudioBuffer);
+  await second;
+  assert.equal(files.stats.decodedBytes, 40);
+  assert.equal(files.stats.reservedBytes, 0);
+  files.dispose();
+});
