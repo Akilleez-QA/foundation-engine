@@ -80,3 +80,5 @@ playtest/sky/
 tools/visual-courtyard/game/public/
 playtest/three-kit/
 playtest/post/
+
+playtest/cellular-wasm/

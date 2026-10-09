@@ -296,3 +296,9 @@ cover:
   It shows that the discovered row loads, that worker, fallback and direct output are
   bit-identical, and that cancellation and stale outcomes are named. Physical-device
   timing and generation quality are not established.
+
+## Optional cellular compute backend
+
+See [cellular WASM workers](../../../docs/guides/cellular-wasm.md) for
+`prepareCellularGridWasm`, its per-job fixed memory, unchanged seeded output,
+JavaScript fallback and browser acceptance boundaries. The existing JavaScript job remains the default.

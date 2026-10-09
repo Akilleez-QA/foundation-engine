@@ -88,6 +88,13 @@
       "evidence": ["@kits/procgen exports deriveSeed"]
     },
     {
+      "id": "GEN-03",
+      "title": "Optional bounded cellular Rust/WASM worker kernel",
+      "shipped": true,
+      "docs": "docs/guides/cellular-wasm.md",
+      "evidence": ["@kits/procgen exports prepareCellularGridWasm"]
+    },
+    {
       "id": "GEN-02",
       "title": "Bounded binary record store for large edited worlds",
       "shipped": true,
@@ -613,6 +620,7 @@
         "baselineChecksum",
         "cellularGenerator",
         "cellularGridJob",
+        "cellularWasmGridJob",
         "chunkDatabaseDeleting",
         "createCellEdits",
         "createChunkStore",
@@ -627,6 +635,7 @@
         "parseGenerationSeed",
         "parseGridParameters",
         "prepareCellularGrid",
+        "prepareCellularGridWasm",
         "procgen"
       ]
     },

@@ -992,3 +992,22 @@ was tooling rather than content.
 | ID | Contract | State |
 |---|---|---|
 | DX-03 | Asset provenance and AI disclosure: one record per shipped model, texture and sound (beside the file as `<name>.provenance.json`, or in `<game>/assets.provenance.json`) with origin (`hand`, `agent-blender`, `ai-generator`, `library`), author, licence, source, SHA-256 and, for AI origins, tool, model, prompt or reference, human edits and (generators) weights and output licences; `tooling` and `liveGenerated` for what is not a file. `lint:provenance` in `npm run check` warns by default and fails when the brief sets `assets: { provenance: 'required' }`; `npm run disclosure` drafts Steam (pre-generated, live-generated, tooling apart) and itch.io (Graphics, Sound, Text & Dialog, Code) text. Owner: the creator writes records; `scripts/lib/provenance.ts` only reads. [Guide](asset-provenance.md) | **Implemented and checked (candidate PR, 2026-10-03).** Evidence: focused tests (`scripts/lib/provenance.test.ts`, `src/author/build.test.ts`) and `npm run check`. Tooling only: no runtime, browser or store-acceptance claim; licence claims are not verified; `defineAsset` fields are not cross-checked; no stock template has records yet (the mechanics template's nine files and the showcase template's two textures warn). |
+
+## 2026-10-08 — Optional cellular WASM candidate (GEN-03)
+
+Candidate branch: `feat/cellular-wasm`, based on `e7e42706`. Adds an explicit
+`prepareCellularGridWasm` choice; JavaScript remains the default. The original
+Rust kernel performs smoothing only, reusing seeded generation, WorkerHost,
+validation and resource publication. Each active job owns fixed linear memory;
+compiled modules alone are shared. A bounded fixed scratch charge is captured
+by the generic generator adapter.
+
+Focused checks cover exact JavaScript parity, ABI bounds, concurrency, cancellation
+and recovery. The isolated desktop Chromium check exercised two actual module
+workers, 40,960 compared cells, JS fallback, supersession, owner loss, refusal and
+zero terminal reservations. A full hosted candidate gate and physical-device
+timing/thermal acceptance are not established by those checks. This is candidate
+implementation evidence, not a claim of integration or deployment.
+
+Contract, reproduction and verification:
+[cellular WASM](cellular-wasm.md), [ADR 0080](../adr/0080-optional-cellular-wasm.md).

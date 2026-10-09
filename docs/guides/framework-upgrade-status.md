@@ -1036,3 +1036,22 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   an error. **Disclosure.** `npm run disclosure` drafts Steam and itch.io AI-disclosure text from the records, with
   development tooling kept apart from content players see. Evidence: focused tests and `npm run check`. Tooling only;
   no store-acceptance or licence-truth claim. [Guide](asset-provenance.md).
+
+## 2026-10-08 — Optional cellular WASM candidate (GEN-03)
+
+Candidate branch: `feat/cellular-wasm`, based on `e7e42706`. Adds an explicit
+`prepareCellularGridWasm` choice; JavaScript remains the default. The original
+Rust kernel performs smoothing only, reusing seeded generation, WorkerHost,
+validation and resource publication. Each active job owns fixed linear memory;
+compiled modules alone are shared. A bounded fixed scratch charge is captured
+by the generic generator adapter.
+
+Focused checks cover exact JavaScript parity, ABI bounds, concurrency, cancellation
+and recovery. The isolated desktop Chromium check exercised two actual module
+workers, 40,960 compared cells, JS fallback, supersession, owner loss, refusal and
+zero terminal reservations. A full hosted candidate gate and physical-device
+timing/thermal acceptance are not established by those checks. This is candidate
+implementation evidence, not a claim of integration or deployment.
+
+Contract, reproduction and verification:
+[cellular WASM](cellular-wasm.md), [ADR 0080](../adr/0080-optional-cellular-wasm.md).
