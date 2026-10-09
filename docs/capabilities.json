@@ -23,6 +23,13 @@
       "evidence": ["@kits/alignment exports createAlignment", "src/kits/alignment/alignment.test.ts exists"]
     },
     {
+      "id": "VISIBILITY-01",
+      "title": "Bounded source-owned visibility and explored history",
+      "shipped": true,
+      "docs": "src/kits/visibility/README.md",
+      "evidence": ["@kits/visibility exports createVisibility"]
+    },
+    {
       "id": "VIS-01",
       "title": "Tone mapping and exposure per scene (view.output)",
       "shipped": true,
@@ -798,7 +805,8 @@
     {
       "name": "vehicles",
       "exports": ["VehicleRider", "boardVehicle", "createVehicles", "exitVehicle", "vehicleRiderSystem", "vehicles"]
-    }
+    },
+    {"name": "visibility", "exports": ["createVisibility"]}
   ],
   "knobs": [
     {"id": "graphics.settings", "readBy": ["src/core/settings/settings.ts"]},

@@ -1040,3 +1040,7 @@ Local unexported development candidate: [contract and limits](../../tools/accept
 ### Combined optional-helper implementation — 2026-10-09
 
 This combined implementation supersedes the earlier lab-only export status: assignments, itinerary and alignment are public optional pure helpers; the lab fixtures consume those helpers. Acceptance reporting remains a development-only tool. Historical candidate evidence above is retained as history, not a claim of current integration. [ADR 0080](../adr/0080-optional-interaction-ownership.md) records ownership and limitations. Full hosted CI on the combined candidate is the integration prerequisite; physical-device and concrete-game acceptance remain unverified.
+
+## Visibility contributions — VISIBILITY-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/visibility/README.md), [decision](../adr/0081-visibility-contributions.md), [discussion #198](https://github.com/Akilleez-QA/foundation-engine/issues/198). Pure optional per-observer cell contributions with atomic replacement, stale calculation refusal, explored history and bounded coalesced draining. Creator geometry, relationships and disclosure remain external. Evidence: focused lifetime/refusal/drain tests, two distinct headless sensor/facility consumers and a 600-command set-union/history model. Validation: eight focused tests and scoped strict typechecking pass; `npm run check` passes all steps and 12 selected tests across three files. Candidate only; no integrated game, full CI, browser, save or physical-device acceptance claimed here.
