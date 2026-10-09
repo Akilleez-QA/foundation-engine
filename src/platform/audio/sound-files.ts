@@ -8,16 +8,18 @@
  * Memory (the cue cache is separate and keeps its own 16 MiB): encoded bytes kept and decoded PCM kept each have a
  * budget, least recently used first out (a playing voice keeps its own buffer). A decode is admitted only when its
  * ESTIMATED decoded size fits the decoded budget beside what is kept and what other decodes have reserved: a PCM WAV
- * is estimated exactly from its header, any other format as `compressedRatio` × its file size (default 48: a 64 kbps
- * stereo file at 48 kHz). A file whose estimate cannot fit is refused before it is decoded, so a small compressed file
- * cannot briefly allocate hundreds of MiB. The real size is checked again after decoding. `soundBudgets(device)` gives
- * the defaults for the brief's minimum device.
+ * uses header-derived sample bytes, any other format `compressedRatio` × its file size (default 48: a 64 kbps
+ * stereo file at 48 kHz). A file whose estimate cannot fit is refused before decoding. The real size is checked
+ * before retaining the decoded result. Estimates and retained-byte limits do not cap transient allocations inside
+ * the browser's decoder; compressed files can exceed their estimate. `soundBudgets(device)` gives the defaults
+ * for the brief's minimum device.
  *
- * Bounds: file size (checked while streaming, with a running cap), encoded and decoded bytes, concurrent fetches and
- * decodes (more wait in order), tracked files (an idle entry, then the least recently used held file, is dropped; a
+ * Bounds: file size (checked while streaming, with a running cap), retained bytes and decode reservations, logical
+ * concurrent fetches and decodes (more wait in order), tracked files (an idle entry, then the least recently used held file, is dropped; a
  * refusal is reported), and a per-load timeout. Cancellation: `dispose()` aborts every fetch and rejects every waiter;
  * a caller's signal only stops its own wait. Recovery: a failed fetch or decode is reported once and remembered, so
  * repeated plays of a broken file do not hit the network again; `retry(id)` (a scene's preload) forgets the failure.
+ * Timeout or disposal ends the wait, but an opaque decodeAudioData operation may continue after its slot is released.
  * Pure apart from `fetch`; no AudioContext is created here.
  */
 
@@ -123,7 +125,7 @@ async function defaultFetch(url: string, signal: AbortSignal, limit: number): Pr
 }
 
 /**
- * Decoded bytes (float32 per channel at `contextRate`) estimated before decoding: exact for a PCM WAV header, else
+ * Decoded bytes (float32 per channel at `contextRate`) estimated before decoding: derived from WAV header fields, else
  * `ratio` × the encoded size.
  */
 export function estimateDecodedBytes(bytes: ArrayBuffer, contextRate: number, ratio = 48): number {
@@ -153,7 +155,7 @@ export function estimateDecodedBytes(bytes: ArrayBuffer, contextRate: number, ra
   return Math.ceil(bytes.byteLength * ratio);
 }
 
-/** Settles with `work`, or rejects as soon as `signal` aborts (a fetch or decoder that ignores its signal is bounded). */
+/** Bounds the caller's wait; rejecting on abort does not stop underlying work that ignores cancellation. */
 const bounded = <T>(work: Promise<T>, signal: AbortSignal): Promise<T> =>
   new Promise<T>((resolve, reject) => {
     if (signal.aborted) {

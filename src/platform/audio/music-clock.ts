@@ -10,8 +10,9 @@
  * Bounds: music voices at once (`maxVoices`, default 2; each voice holds at most two sources, during a seek's
  * hand-off), the music store's file, encoded and decoded budgets (decodes are admitted on the estimated decoded size
  * before decoding, one at a time, with a fetch/decode timeout scaled to the file budget), and the output's start
- * horizon. A playing voice keeps its own buffer reference, so peak decoded memory is at
- * most (1 + maxVoices) × the decoded budget. Overload: beyond `maxVoices` a play is refused (null, counted as skipped).
+ * horizon. A playing voice keeps its own buffer reference: accepted buffers retained by the store and current
+ * voices account for at most (1 + maxVoices) × the decoded budget. This excludes in-flight decoding, browser
+ * scratch allocations and references held by callers. Overload: beyond `maxVoices` a play is refused (null, counted as skipped).
  * Lateness: a file that finishes decoding after its start time starts at once, skipped ahead to where the song should
  * be (`late: 'skip-ahead'`, the default, keeping sync), or is dropped (`late: 'drop'`). Cancellation: `stop(at?)`,
  * the output's dispose, and a scene's exit (author layer). Recovery: a failed fetch or decode is reported once by the
@@ -32,7 +33,8 @@ export const musicTimeoutMs = (maxFileBytes: number) => Math.max(10_000, Math.ce
  * Default music bounds for the brief's minimum device. Decoded PCM is float32 per channel at the context rate, so the
  * decoded budget sets the longest song (48 kHz stereo: 48 MiB ≈ 2 min 11 s, 72 MiB ≈ 3 min 16 s, 96 MiB ≈ 4 min
  * 22 s). The file budget is the decoded budget ÷ `MUSIC_COMPRESSED_RATIO`, so a compressed song that downloads in
- * full also fits when decoded (128 kbps: the same lengths). A 16-bit stereo 48 kHz WAV is 192 000 B/s on disk, so the
+ * full is estimated to fit when decoded at the assumed 128 kbps/48 kHz stereo rates; actual output is checked too.
+ * A 16-bit stereo 48 kHz WAV is 192 000 B/s on disk, so the
  * file budget caps it far sooner: about 11 s (phone), 16 s (tablet), 22 s (laptop, desktop).
  */
 export function musicBudgets(device: 'phone' | 'tablet' | 'laptop' | 'desktop' = 'laptop') {

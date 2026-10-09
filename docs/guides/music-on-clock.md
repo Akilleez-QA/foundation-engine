@@ -64,9 +64,9 @@ either path, or both.
 | Start horizon | The output's `maxStartAhead`, 10 s | null and reported once; a seek throws |
 | File size | `musicBudgets(device).maxFileBytes` = decoded budget ÷ 24: phone 2 MiB, tablet 3, laptop/desktop 4 | Refused while streaming (running cap) |
 | Encoded bytes kept | Twice the file budget: phone 4 MiB, tablet 6, laptop/desktop 8 | Least recently used first out |
-| Decoded PCM bytes | Phone 48 MiB, tablet 72, laptop/desktop 96 | Refused before decoding, on an estimate |
-| Fetch or decode time | `musicTimeoutMs(maxFileBytes)`: 10 s, or 1 s per 128 KiB if longer (phone 16 s, tablet 24, laptop/desktop 32) | The load fails and is reported once |
-| Decodes at once | 1 | Further decodes wait in order |
+| Retained PCM bytes and decode reservations | Phone 48 MiB, tablet 72, laptop/desktop 96 | Estimate checked before decoding; actual output checked before retention |
+| Fetch or decode wait | `musicTimeoutMs(maxFileBytes)`: 10 s, or 1 s per 128 KiB if longer (phone 16 s, tablet 24, laptop/desktop 32) | The load fails and is reported once; opaque decoding may continue |
+| Logical decodes at once | 1 | Further decodes wait in order; timed-out native work may outlive its slot |
 | Files tracked | 16 | An idle entry, then the least recently used held file, is dropped |
 
 The app passes `musicBudgets(brief.devices.minimum)`. A creator may pass their own
@@ -74,18 +74,25 @@ bounds through `audioModule(…, { musicFiles })`.
 
 The decoded size is estimated before decoding:
 
-- **PCM WAV** is estimated exactly from its header.
+- **PCM WAV** uses header-derived sample bytes at the context sample rate.
 - **Other formats** are estimated as `compressedRatio` × the file size. Music
   uses 24 (`MUSIC_COMPRESSED_RATIO`), which matches 128 kbps stereo decoded to
   float32 at 48 kHz. The ratio is decoded bytes per encoded byte, so a
   lower-bitrate file decodes to more than its estimate: 64 kbps decodes to twice
   as much. For such files set `compressedRatio` higher (48 for 64 kbps). With the
-  default, a 64 kbps file can briefly allocate up to twice its estimate before the
-  after-decode check refuses it.
-- **After decoding** the real size is checked again.
+  default, its decoded PCM may be about twice the estimate before the after-decode
+  check refuses it. This comparison excludes decoder scratch allocations.
+- **After decoding** the real size is checked before the store retains the result.
+
+These are admission and retained-buffer limits, not a cap on browser decoder peak
+memory. A ratio is an estimate, and neither timeout nor disposal forcibly cancels
+an opaque `decodeAudioData` operation. Its logical slot and reservation can be
+released while browser work continues. Measure native allocation and reclamation
+separately on the intended devices.
 
 Because the file budget is the decoded budget ÷ 24, a 128 kbps song that
-downloads in full also fits when decoded. Real limits per format (48 kHz stereo):
+downloads in full is estimated to fit at the assumed rates. Approximate accepted
+durations per format (48 kHz stereo):
 
 | Minimum device | Compressed, 128 kbps | Compressed, 64 kbps | 16-bit WAV |
 |---|---|---|---|
@@ -96,8 +103,10 @@ downloads in full also fits when decoded. Real limits per format (48 kHz stereo)
 A context running at 44.1 kHz decodes about 8% smaller, so songs can be
 correspondingly longer.
 
-A playing voice keeps its own buffer reference. Peak decoded music memory is
-therefore at most (1 + maxMusicVoices) × the decoded budget.
+A playing voice keeps its own buffer reference. Accepted buffers retained by the
+store and current voices account for at most (1 + maxMusicVoices) × the decoded
+budget. This excludes in-flight decoding, browser scratch allocations and
+references held by callers; it is not a peak process-memory guarantee.
 
 ## Lateness, cancellation and recovery
 
