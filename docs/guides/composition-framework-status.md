@@ -822,3 +822,14 @@ can refresh its existing one-credit view on ping. Defaults remain unchanged; no
 new timer or protocol owner. See [the contract](multiplayer-session.md#optional-host-liveness).
 Focused unit and real loopback acceptance is recorded in the upgrade ledger;
 independent review and full hosted integration CI remain required.
+
+
+## Editable-focus keyboard retirement candidate (2026-10-09)
+
+The existing document input bridge selectively retires prior non-inText keyboard
+work when editable focus begins, including queued actions and reentrant press
+completion. Explicit text actions and non-keyboard sources retain their policies;
+no new owner or global cancellation is introduced. See the input README for
+recovery and focus-event limitations. Dispatcher and bridge regressions cover
+selectivity, stale repeats, fresh presses and listener retirement. This is a
+candidate; full hosted integration and physical-device acceptance remain separate.

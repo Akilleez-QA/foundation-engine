@@ -1158,3 +1158,14 @@ confirmed-state rollback, then reconnects after old-peer retirement without
 resending its uncertain action. Independent review and full hosted integration CI
 are pending. No new browser,
 WAN, physical-device, scalability or full-CI acceptance is claimed.
+
+
+## Editable-focus keyboard retirement candidate (2026-10-09)
+
+The existing document input bridge selectively retires prior non-inText keyboard
+work when editable focus begins, including queued actions and reentrant press
+completion. Explicit text actions and non-keyboard sources retain their policies;
+no new owner or global cancellation is introduced. See the input README for
+recovery and focus-event limitations. Dispatcher and bridge regressions cover
+selectivity, stale repeats, fresh presses and listener retirement. This is a
+candidate; full hosted integration and physical-device acceptance remain separate.

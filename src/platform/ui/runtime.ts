@@ -189,6 +189,10 @@ export function createInput(
     {capture: true, ...listen},
   );
   const cancel = () => actions.cancel('blur');
+  win.addEventListener('focusin', e => actions.focusEntered(e.composedPath?.()[0] ?? e.target), {
+    capture: true,
+    ...listen,
+  });
   win.addEventListener('blur', cancel, {...listen});
   win.addEventListener('pagehide', cancel, {...listen});
   return actions;
