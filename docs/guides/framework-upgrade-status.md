@@ -1132,3 +1132,15 @@ The combined follow-up candidate also retains real-owner regressions for failed
 scene preflight and queued action delivery. These exercise headless ownership
 boundaries; production scene wiring and physical resource reclamation are not
 certified. Full CI on the combined candidate remains required before integration.
+
+
+## Fixed-step numeric admission candidate (2026-10-09)
+
+The existing core runner now rejects nonfinite configuration/frame inputs and unsafe
+step-count or frame/step/drop-counter arithmetic before frame work. Zero step budgets
+remain valid; finite negative deltas retain their fixed-lane clamp and presentation
+value. Step-relative tolerance replaces the absolute seconds tolerance, preventing
+phantom ticks for tiny steps. See [the system recipe](../recipes/add-a-system.md#core-runner-numeric-boundary).
+Targeted tests cover ordinary30/60/144Hz, tiny/subnormal steps, zero budgets, retained
+phase after refusal and overflow. This is a numeric-boundary candidate, not full
+engine, browser or physical-device acceptance; hosted integration remains required.
