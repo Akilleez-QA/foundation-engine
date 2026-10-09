@@ -52,7 +52,7 @@ advance. The host chooses retry/dispatch cadence. The clock's existing owner pau
 set controls delivery. Catch-up uses the provided game time; no wall-clock read,
 catch-up subscription or clock driver is added.
 
-A callback checks its AbortController, exact captured state and current scheduled
+A callback checks its AbortController and exact current scheduled
 identity before publication. Restore and disposal abort it. Reentry during
 validation/persistence is refused; disposal remains allowed and prevents later
 publication. Failed input/overflow preserves accepted state. Explicit restore
@@ -83,7 +83,7 @@ external delivery. Existing sink receipts/transactions remain necessary for that
 
 ## Evidence ceiling
 
-Eleven tests cover exact boundaries; all three due policies; large jumps; malformed
+Twelve tests cover exact boundaries; all three due policies; large jumps; malformed
 data and arithmetic exhaustion; pause through the real clock; explicit backlog
 dispatch; alert capacity failure; stale callbacks and replaced definitions; reentry;
 two consumers through real SaveStore; failed writes; and mid-period reload.

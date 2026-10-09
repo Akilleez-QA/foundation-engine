@@ -252,3 +252,21 @@ test('mid-period checkpoint saves existing clock time without resetting recurrin
   second.owner.dispose();
   second.store.dispose();
 });
+
+test('mid-period save while armed preserves both consumer schedules, including failed durability', () => {
+  for (const factory of [createStation, createAlerts])
+    for (const fail of [false, true]) {
+      const {owner, driver, store, backend} = setup(factory);
+      owner.arm();
+      driver.advance(0.25);
+      backend.failSet = () => fail;
+      const status = owner.retrySave();
+      assert.equal(status === 'saved', !fail);
+      for (let i = 0; i < 7; i++) driver.advance(0.25);
+      assert.equal(owner.read().value, 1);
+      assert.equal(owner.read().phase.next, 1);
+      assert.equal(owner.arm(), true);
+      owner.dispose();
+      store.dispose();
+    }
+});

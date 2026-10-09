@@ -671,7 +671,7 @@ Tooling, not runtime: per-file provenance records, a `npm run check` step and a 
 
 The [unexported recurring phase lab](../../tools/recurring-lab/README.md) tests
 explicit skip/coalesce/bounded-replay policies while reusing the existing clock
-and SaveStore. Eleven headless tests cover two consumer projections, pause,
+and SaveStore. Twelve headless tests cover two consumer projections, pause,
 mid-period reload, large jumps, stale callbacks, reentry and failed durability.
 It is a composition experiment, not a public scheduler or whole-game persistence
 claim. Callbacks stage state without storage writes; explicit host save boundaries flush.

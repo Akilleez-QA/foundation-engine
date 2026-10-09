@@ -61,13 +61,16 @@ function consumer({clock, save, definition, policy, kind, capacity}) {
     /** Host calls at most once per chosen dispatch boundary. Never rearms from its own callback. */
     arm() {
       if (!active || busy || scheduled) return false;
-      const token = new AbortController(),
-        captured = state;
+      const token = new AbortController();
       scheduled = token;
       clock.schedule(
         deadline(state.phase),
         () => {
-          if (!active || scheduled !== token || state !== captured || token.signal.aborted || busy) return;
+          if (!active || scheduled !== token || token.signal.aborted) return;
+          if (busy) {
+            retire();
+            return;
+          }
           busy = true;
           try {
             const now = clock.ut;

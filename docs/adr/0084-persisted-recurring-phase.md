@@ -33,6 +33,6 @@ authority. The fixture stages callback results and flushes only at an explicit
 host save boundary. Production integration must coordinate the existing clock's restore with consumer restore; this headless lab
 does not grant itself clock-driver access.
 
-Eleven tests cover two consumers, real clock pause and SaveStore continuation,
+Twelve tests cover two consumers, real clock pause and SaveStore continuation,
 bounded catch-up, mid-period reload, malformed state, stale callbacks, reentry and
 failure. Public API graduation, rendering and device acceptance remain separate.
