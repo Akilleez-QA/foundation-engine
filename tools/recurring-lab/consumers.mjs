@@ -127,6 +127,7 @@ function consumer({clock, save, definition, policy, kind, capacity}) {
         if (!active) return false;
         retire();
         state = next;
+        lastStatus = 'staged';
         return true;
       } finally {
         busy = false;

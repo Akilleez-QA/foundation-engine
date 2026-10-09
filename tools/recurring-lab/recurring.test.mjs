@@ -133,6 +133,7 @@ test('old callbacks retire on restore/disposal; malformed restore preserves the 
   const old = callbacks[0];
   runtime.driver.restore({ut: 2, lastRealMs: null});
   assert.equal(owner.restore(owner.read()), true);
+  assert.equal(owner.status, 'staged');
   owner.arm();
   old();
   assert.equal(owner.read().value, 0);
