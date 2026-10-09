@@ -8,6 +8,7 @@ a capped replenishment station and a bounded alert count. It is not a new clock,
 scheduler, public kit, world director or durable external-effect service.
 
 Run `node --import tsx --test tools/recurring-lab/recurring.test.mjs`.
+Typecheck the planner with `node node_modules/typescript/bin/tsc --noEmit -p tools/recurring-lab/tsconfig.json`; the root configuration does not include this lab's TypeScript helper.
 
 ## Contract
 
