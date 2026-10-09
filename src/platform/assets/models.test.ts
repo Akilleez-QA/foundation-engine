@@ -158,7 +158,40 @@ test('modelBytes counts buffers and mipmapped texels', () => {
   g.setAttribute('position', new T.BufferAttribute(new Float32Array(9), 3));
   g.setIndex([0, 1, 2]);
   const scene = new T.Mesh(g, new T.MeshBasicMaterial({map: new T.Texture({width: 3, height: 3})}));
-  assert.equal(modelBytes(scene), 36 + 6 + 48);
+  assert.equal(modelBytes(scene), 36 + 6 + 40);
+});
+
+test('thin image mip admission retires rejected resources and permits a clean retry', async () => {
+  const disposed: number[] = [];
+  let attempts = 0;
+  const library = createModelLibrary({
+    def: () => defs[0],
+    fetchBytes: async () => new ArrayBuffer(0),
+    maxResidentBytes: 3000,
+    parse: async () => {
+      const attempt = attempts++;
+      const texture = new T.Texture({width: attempt === 0 ? 512 : 256, height: 1});
+      const geometry = new T.BufferGeometry();
+      const material = new T.MeshBasicMaterial({map: texture});
+      for (const resource of [texture, geometry, material])
+        resource.addEventListener('dispose', () => disposed.push(attempt));
+      // The same texture is referenced twice, but is charged and retired once.
+      material.alphaMap = texture;
+      return new T.Mesh(geometry, material);
+    },
+  });
+  const signal = new AbortController().signal;
+  await assert.rejects(library.model(statue, {signal}), /resident budget exceeded/);
+  assert.deepEqual(disposed, [0, 0, 0]);
+  assert.equal(library.stats().residentMiB, 0);
+  assert.equal(library.stats().instances, 0);
+  const lease = await library.model(statue, {signal});
+  assert.equal(attempts, 2);
+  assert.equal(library.stats().residentMiB * 1048576, 2044);
+  lease.release();
+  library.dispose();
+  assert.deepEqual(disposed, [0, 0, 0, 1, 1, 1]);
+  assert.equal(library.stats().residentMiB, 0);
 });
 
 test('no model loader registers Draco (meshopt is the only mesh compression)', () => {

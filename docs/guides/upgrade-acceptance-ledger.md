@@ -1140,3 +1140,19 @@ evidence; report-write failures retain prior causes and the in-memory report.
 This receipt does not certify every diagnostic caller, physical-device behavior,
 or completion of the wider engine work. The fixed-step numeric candidate above
 still requires CI on its combined head after integration with this base.
+
+
+## Ordinary image mip accounting correction — candidate (2026-10-09)
+
+Ordinary 2D image estimates now sum the full RGBA8 mip chain using integer
+dimensions with independent axis clamping. Thin images no longer use the
+undercharging four-thirds approximation. The existing model owner refuses an
+over-budget thin image, retires its resources, and permits a valid retry.
+Compressed accounting is unchanged; no-mip images retain conservative full-chain
+charging. Cube, array, volume, authored mip and non-RGBA8 descriptor support remain
+explicit accounting limitations. See [asset residency](asset-residency.md).
+`npm run check -- --base origin/main` passed all applicable checks and 164 tests
+in 18 asset test files. The independent dimension oracle covers 1517 shapes,
+plus explicit thin/square/odd anchors and model refusal/retry. Independent review
+and full hosted integration remain pending; no physical memory or device evidence
+is implied.

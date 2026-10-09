@@ -77,12 +77,35 @@ every retained entry, pinned or not, through the library `dispose` path.
 - Live leases and pins are never evicted for a budget. Pending loads hold no
   bytes and are never evicted; their publication re-checks the ceiling.
 - Recent eviction memory for the `reloads` counter is bounded to 1024 keys.
-- Bytes are the libraries' existing descriptor estimates (texels × 4 × 4/3 for
-  a mipmapped RGBA8 texture; the transcoded level bytes for a compressed KTX2
+- Bytes are logical estimates (the sum of integer mip-level dimensions × 4 for
+  an ordinary 2D RGBA8 image; the transcoded level bytes for a compressed KTX2
   model texture, see [KTX2 model textures](compressed-textures.md); vertex, index
   and morph buffers plus textures and animation tracks for a model). They are not measured driver or browser memory.
   The existing model estimate counts each attribute's array, so attributes that
   share one interleaved buffer are over-counted (conservative).
+
+Ordinary images are charged a complete mip chain, halving each dimension with
+integer floor and clamping each axis to one until the final 1×1 level. A 512×1
+image therefore costs 4092 bytes; 64×64 costs 21844 bytes. This replaces the
+four-thirds approximation, which undercharged thin images. The full-chain charge
+remains even when a sampler disables mipmaps: it is a conservative image policy,
+not an exact forecast of each descriptor's allocation. These numbers exclude
+driver padding/copies and decoded CPU image storage.
+
+General texture descriptors remain an accounting limitation. Ordinary cube faces,
+array layers, volume depth, authored mip layouts and non-RGBA8 types require
+separate support; the image formula may undercount them, including a zero estimate
+for an ordinary cube. A custom model parser can supply these descriptors, so its
+`maxResidentBytes` check must not be treated as a complete bound for those formats.
+Compressed level-byte accounting is unchanged. Correcting ordinary 2D mip sums
+does not resolve these broader descriptor cases.
+
+Headless regressions cover thin, square and odd dimensions, compressed payloads,
+and real model admission at a 3000-byte ceiling: the 4092-byte image is refused,
+its resources retire once, and a subsequent 2044-byte model loads successfully.
+Texture residency still reports pressure and preserves live leases; hard model
+admission is a separate existing policy. This correction adds no browser or
+physical-device allocation evidence.
 
 ### Overload
 
