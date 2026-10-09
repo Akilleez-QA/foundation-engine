@@ -69,8 +69,11 @@ none. The incoming clip plays from its first frame at full weight, so its contac
 in flight into the next one when a switch interrupts another, and stretch the decay for large offsets so peak
 acceleration stays bounded. Phase-match locomotion switches (start the new gait at the foot phase the old one is in).
 
-The engine does not inertialize: `Model` plays one clip at a time with no blending, and `@kits/animation`'s
-`blendPoseLayers` blends masked pose layers by weight. An inertializer is the game's own code on top of those poses.
+`@kits/animation`'s `createInertializer` (#182) implements the pose-level switch: position and shortest-arc rotation
+offsets with their velocity, decayed to zero by a quintic over a bounded blend time, a new switch replacing one in
+flight ([kit README](../../src/kits/animation/README.md)). It does not stretch the decay for large offsets or
+phase-match locomotion, and `Model` still plays one glTF clip at a time with no blending, so feeding glTF clips
+through it is the game's own code.
 
 ## Night, wet and graded looks
 
@@ -79,21 +82,25 @@ The engine does not inertialize: `Model` plays one clip at a time with no blendi
   lab capped at about half the bloom threshold) so highlights read as glints. The engine's [post-processing](post-processing.md)
   exposes the bloom `threshold`; a specular cap is part of the surface's own material code.
 - **Put an HDR ceiling before bloom.** One glossy edge near a lamp could bloom a white disc across the sky. Clamping
-  scene colour to a ceiling before the bloom pass stops a single hot pixel from dominating.
+  scene colour to a ceiling before the bloom pass stops a single hot pixel from dominating. The engine's post has an
+  opt-in `view.post.ceiling` for this (#179, [post-processing](post-processing.md)).
 - **Planar mirror reflections redraw the scene.** A mirror reflection renders the scene again from a mirrored camera
   every frame it updates, with its own draws for every visible person. Budget that pass like any other, keep far and
   small things out of it (layers work for the mirror camera), update it at reduced resolution, and give lower quality
   tiers a fallback that samples only a cube or environment map. The engine has no planar reflection; the lab built
-  one through `@kits/three`.
+  one through `@kits/three`. For a fixed dark surround with a few lamps, an `environment.reflection` of kind
+  `interior` (#183, [scene look](scene-look.md)) is built once from data and costs nothing per frame.
 - **Grade with a lookup table fitted to reference art.** Fitting a 3D colour lookup table from untreated renders to the
   creator's reference images (a tone curve on lightness plus a colour transfer, blended rather than applied at full
-  strength) matched the art faster than tuning lights. Record the fit's inputs as provenance. The engine's grade is
-  lift, gain and saturation; it does not apply a 3D lookup table.
+  strength) matched the art faster than tuning lights. Record the fit's inputs as provenance. The engine's grade
+  applies a `.cube` table through `view.post.grade.lut` (#179, [post-processing](post-processing.md)), and
+  `cubeLutText` writes one from a game's own tool; fitting the table to reference art is the game's work.
 - **Shadow the static world once per light.** Redrawing every shadow map every frame because people move is the
   expensive case. Draw static geometry into a light's map once and add only the moving casters per frame (or keep a
   separate map for them), and limit people's shadows by distance with a cheap blob under the rest. The engine's
   [shadows](scene-look.md) redraw a map only when something in it moves; they do not keep a separate static layer,
-  and `Model` entities do not take part in them yet.
+  and `Model` entities do not take part in them yet. Opt-in [blob shadows](blob-shadows.md) (#184) draw soft contact
+  ellipses, in one instanced draw, under entities no real sun shadow reaches.
 - **Fewer real lights.** Every light compiles into every lit shader. Keep real shadowed lights for the few near the
   action and give the rest glowing heads and painted pools. The engine's scene lights have caps for the same reason
   ([scene look](scene-look.md)).
@@ -102,10 +109,13 @@ The engine does not inertialize: `Model` plays one clip at a time with no blendi
 
 - **Check which GPU the benchmark used.** Headless Chromium on Linux silently fell back to software GL when asked
   for a GPU, so a "GPU" run was a software run. `npm run bench` uses software GL by default and records the renderer
-  string in each run's `gpu` field; with `--gpu`, read that field before believing the numbers.
+  string in each run's `gpu` field; `--gpu` now selects ANGLE on Linux and fails a run whose renderer is a software
+  rasteriser, but still read that field before believing the numbers.
 - **Warm up, then judge, and report the warm-up.** First frames compile shaders and fill shadow maps and reflection
   targets; the lab also staged its expensive passes over the first frames to avoid losing the WebGL context on a cold
   start. Judge snapshots after warm-up, but report the warm-up hitches separately rather than hiding them.
+  `npm run play:snap` waits (bounded) for each view's counts to settle before judging and prints the warm-up window
+  apart (#180).
 - **Count every pass.** Read draw and triangle counts after the whole frame, including post-processing and
   off-screen passes; a counter reset per `render` call under-reports a multi-pass frame.
 - **Budgets per tier, measured on the real minimum device.** A desktop measurement does not certify a laptop's

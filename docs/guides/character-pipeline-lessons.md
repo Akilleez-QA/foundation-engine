@@ -10,8 +10,9 @@ What the engine ships for this pipeline today:
 
 - `Model` plays one glTF clip per entity, with no blending between clips ([load a model](../recipes/load-a-model.md)).
 - `@kits/animation` evaluates clips with shortest-arc quaternion interpolation (`createPoseSampler`), blends up to
-  eight masked pose layers (`blendPoseLayers`) and solves two-bone IK (`solveTwoBone`); it does not import glTF or
-  skin meshes ([kit README](../../src/kits/animation/README.md)).
+  eight masked pose layers (`blendPoseLayers`), inertializes pose switches (`createInertializer`, #182) and solves
+  two-bone IK (`solveTwoBone`); it does not import glTF or skin meshes
+  ([kit README](../../src/kits/animation/README.md)).
 - `npm run asset:verify` checks a GLB against its [model contract](model-contracts.md), including the optional
   `skin` limits: joints per skin, at most 1 to 4 non-zero influences per vertex, weights summing to 1.
 - The [pose-to-pose pipeline](../recipes/animate-pose-to-pose.md) rigs and interpolates key poses you author and
