@@ -11,6 +11,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 
 | ID | Feature | PR | Docs |
 |---|---|---|---|
+| VISIBILITY-01 | Bounded source-owned visibility and explored history |  | [README.md](../src/kits/visibility/README.md) |
 | VIS-01 | Tone mapping and exposure per scene (view.output) | [#124](https://github.com/Akilleez-QA/foundation-engine/pull/124) | [scene-look.md](guides/scene-look.md) |
 | VIS-02 | Point and spot lights in fixed per-scene slots | [#138](https://github.com/Akilleez-QA/foundation-engine/pull/138) | [scene-look.md](guides/scene-look.md) |
 | VIS-03 | Shadows from the sun, local lights and shapes | [#148](https://github.com/Akilleez-QA/foundation-engine/pull/148) | [scene-look.md](guides/scene-look.md) |
@@ -44,7 +45,7 @@ Tracked so that a correct "not yet" in the docs is recognised. A row moves up wh
 
 Each kit's value exports are listed in [capabilities.json](capabilities.json).
 
-`@kits/animation`, `@kits/audio-mixer`, `@kits/authoring`, `@kits/camera`, `@kits/capabilities`, `@kits/chalkboard`, `@kits/character`, `@kits/combat`, `@kits/concept-explorer`, `@kits/control`, `@kits/dialogue`, `@kits/equipment`, `@kits/explore`, `@kits/frames`, `@kits/housing`, `@kits/input-history`, `@kits/inventory`, `@kits/learn`, `@kits/locomotion`, `@kits/market`, `@kits/navigation`, `@kits/network`, `@kits/objectives`, `@kits/procgen`, `@kits/replay`, `@kits/resources`, `@kits/rollback`, `@kits/space`, `@kits/spatial`, `@kits/spatial-audio`, `@kits/terrain`, `@kits/three`, `@kits/turns`, `@kits/ui`, `@kits/vehicles`
+`@kits/animation`, `@kits/audio-mixer`, `@kits/authoring`, `@kits/camera`, `@kits/capabilities`, `@kits/chalkboard`, `@kits/character`, `@kits/combat`, `@kits/concept-explorer`, `@kits/control`, `@kits/dialogue`, `@kits/equipment`, `@kits/explore`, `@kits/frames`, `@kits/housing`, `@kits/input-history`, `@kits/inventory`, `@kits/learn`, `@kits/locomotion`, `@kits/market`, `@kits/navigation`, `@kits/network`, `@kits/objectives`, `@kits/procgen`, `@kits/replay`, `@kits/resources`, `@kits/rollback`, `@kits/space`, `@kits/spatial`, `@kits/spatial-audio`, `@kits/terrain`, `@kits/three`, `@kits/turns`, `@kits/ui`, `@kits/vehicles`, `@kits/visibility`
 
 ## Templates
 

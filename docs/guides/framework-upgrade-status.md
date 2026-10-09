@@ -1036,3 +1036,7 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   an error. **Disclosure.** `npm run disclosure` drafts Steam and itch.io AI-disclosure text from the records, with
   development tooling kept apart from content players see. Evidence: focused tests and `npm run check`. Tooling only;
   no store-acceptance or licence-truth claim. [Guide](asset-provenance.md).
+
+## Visibility contributions — VISIBILITY-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/visibility/README.md), [decision](../adr/0081-visibility-contributions.md), [discussion #198](https://github.com/Akilleez-QA/foundation-engine/issues/198). Pure optional per-observer cell contributions with atomic replacement, stale calculation refusal, explored history and bounded coalesced draining. Creator geometry, relationships and disclosure remain external. Evidence: focused lifetime/refusal/drain tests, two distinct headless sensor/facility consumers and a 600-command set-union/history model. Validation: eight focused tests and scoped strict typechecking pass; `npm run check` passes all steps and 12 selected tests across three files. Candidate only; no integrated game, full CI, browser, save or physical-device acceptance claimed here.

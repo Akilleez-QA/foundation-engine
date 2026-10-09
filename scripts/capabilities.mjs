@@ -43,6 +43,12 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'VISIBILITY-01',
+    title: 'Bounded source-owned visibility and explored history',
+    docs: 'src/kits/visibility/README.md',
+    evidence: [{kit: 'visibility', export: 'createVisibility'}],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,
