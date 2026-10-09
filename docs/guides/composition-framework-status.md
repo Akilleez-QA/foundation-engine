@@ -665,3 +665,14 @@ Tooling, not runtime: per-file provenance records, a `npm run check` step and a 
 | ID | Contract | State |
 |---|---|---|
 | DX-03 | Asset provenance and AI disclosure: one record per shipped model, texture and sound (beside the file as `<name>.provenance.json`, or in `<game>/assets.provenance.json`) with origin (`hand`, `agent-blender`, `ai-generator`, `library`), author, licence, source, SHA-256 and, for AI origins, tool, model, prompt or reference, human edits and (generators) weights and output licences; `tooling` and `liveGenerated` for what is not a file. `lint:provenance` in `npm run check` warns by default and fails when the brief sets `assets: { provenance: 'required' }`; `npm run disclosure` drafts Steam (pre-generated, live-generated, tooling apart) and itch.io (Graphics, Sound, Text & Dialog, Code) text. Owner: the creator writes records; `scripts/lib/provenance.ts` only reads. [Guide](asset-provenance.md) | **Implemented and checked (candidate PR, 2026-10-03).** Evidence: focused tests (`scripts/lib/provenance.test.ts`, `src/author/build.test.ts`) and `npm run check`. Tooling only: no runtime, browser or store-acceptance claim; licence claims are not verified; `defineAsset` fields are not cross-checked; no stock template has records yet (the mechanics template's nine files and the showcase template's two textures warn). |
+
+## 2026-10-08 — Operation-boundary candidate
+
+Branch `test/consistency-boundaries` adds regression evidence for independent
+reservations, pending-effect checkpoint/reload, paused presentation and late terrain
+candidate retirement. No production bug was found in those exercised paths.
+Creator fixture responsibilities and unverified GPU/application behavior are
+documented in [operation-boundary acceptance](operation-boundary-acceptance.md).
+A headless shared-navigation experiment shows workload-dependent reuse benefits;
+it is not an exported capability or a production default. Full hosted CI remains
+required before integration.

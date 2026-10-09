@@ -1036,3 +1036,14 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   an error. **Disclosure.** `npm run disclosure` drafts Steam and itch.io AI-disclosure text from the records, with
   development tooling kept apart from content players see. Evidence: focused tests and `npm run check`. Tooling only;
   no store-acceptance or licence-truth claim. [Guide](asset-provenance.md).
+
+## 2026-10-08 — Operation-boundary candidate
+
+Branch `test/consistency-boundaries` adds regression evidence for independent
+reservations, pending-effect checkpoint/reload, paused presentation and late terrain
+candidate retirement. No production bug was found in those exercised paths.
+Creator fixture responsibilities and unverified GPU/application behavior are
+documented in [operation-boundary acceptance](operation-boundary-acceptance.md).
+A headless shared-navigation experiment shows workload-dependent reuse benefits;
+it is not an exported capability or a production default. Full hosted CI remains
+required before integration.
