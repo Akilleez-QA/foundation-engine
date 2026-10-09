@@ -1036,3 +1036,14 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   an error. **Disclosure.** `npm run disclosure` drafts Steam and itch.io AI-disclosure text from the records, with
   development tooling kept apart from content players see. Evidence: focused tests and `npm run check`. Tooling only;
   no store-acceptance or licence-truth claim. [Guide](asset-provenance.md).
+
+
+## Recurring phase lab candidate (2026-10-09)
+
+The [unexported recurring phase lab](../../tools/recurring-lab/README.md) tests
+explicit skip/coalesce/bounded-replay policies while reusing the existing clock
+and SaveStore. Eleven headless tests cover two consumer projections, pause,
+mid-period reload, large jumps, stale callbacks, reentry and failed durability.
+It is a composition experiment, not a public scheduler or whole-game persistence
+claim. Callbacks stage state without storage writes; explicit host save boundaries flush.
+Production integration still needs coordinated clock/consumer restore, full CI and creator acceptance.

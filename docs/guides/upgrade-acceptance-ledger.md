@@ -992,3 +992,14 @@ was tooling rather than content.
 | ID | Contract | State |
 |---|---|---|
 | DX-03 | Asset provenance and AI disclosure: one record per shipped model, texture and sound (beside the file as `<name>.provenance.json`, or in `<game>/assets.provenance.json`) with origin (`hand`, `agent-blender`, `ai-generator`, `library`), author, licence, source, SHA-256 and, for AI origins, tool, model, prompt or reference, human edits and (generators) weights and output licences; `tooling` and `liveGenerated` for what is not a file. `lint:provenance` in `npm run check` warns by default and fails when the brief sets `assets: { provenance: 'required' }`; `npm run disclosure` drafts Steam (pre-generated, live-generated, tooling apart) and itch.io (Graphics, Sound, Text & Dialog, Code) text. Owner: the creator writes records; `scripts/lib/provenance.ts` only reads. [Guide](asset-provenance.md) | **Implemented and checked (candidate PR, 2026-10-03).** Evidence: focused tests (`scripts/lib/provenance.test.ts`, `src/author/build.test.ts`) and `npm run check`. Tooling only: no runtime, browser or store-acceptance claim; licence claims are not verified; `defineAsset` fields are not cross-checked; no stock template has records yet (the mechanics template's nine files and the showcase template's two textures warn). |
+
+
+## Recurring phase lab candidate (2026-10-09)
+
+The [unexported recurring phase lab](../../tools/recurring-lab/README.md) tests
+explicit skip/coalesce/bounded-replay policies while reusing the existing clock
+and SaveStore. Eleven headless tests cover two consumer projections, pause,
+mid-period reload, large jumps, stale callbacks, reentry and failed durability.
+It is a composition experiment, not a public scheduler or whole-game persistence
+claim. Callbacks stage state without storage writes; explicit host save boundaries flush.
+Production integration still needs coordinated clock/consumer restore, full CI and creator acceptance.
