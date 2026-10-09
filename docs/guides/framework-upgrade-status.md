@@ -1036,3 +1036,10 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   an error. **Disclosure.** `npm run disclosure` drafts Steam and itch.io AI-disclosure text from the records, with
   development tooling kept apart from content players see. Evidence: focused tests and `npm run check`. Tooling only;
   no store-acceptance or licence-truth claim. [Guide](asset-provenance.md).
+
+
+## Service assignment experiment — isolated candidate, 2026-10-09
+
+`tools/service-assignment-lab/` contains an unexported bounded ownership prototype with service-request and weighted-worksite fixtures. It demonstrates exclusive actor claims, generation-scoped token refusal, capacity admission, atomic failed-transfer preservation, bounded explicit retry withdrawals and disposal. It adds no installed kit, scheduler, thread, persistence adapter or product API. [Contract and limitations](service-assignment-lab.md).
+
+Evidence: 15 focused Node tests passed, including a 600-command independent allocation model and 1000 admission/removal cycles; both Node fixtures ran, and `npm run check` passed with the one prototype test file selected (15/15). Integration gates, browser behavior and physical-device performance are not accepted by this evidence. This entry records a branch candidate, not integration or production readiness.
