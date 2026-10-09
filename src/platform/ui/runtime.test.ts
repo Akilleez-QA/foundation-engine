@@ -11,7 +11,7 @@ import {must} from '../../testing/must';
  * of every event path, so its capture listener runs first), and a bubble listener on it stands in for
  * src/input/keyboard.ts, which marks the keyboard device on every key in the bubble phase.
  */
-function app() {
+function app(registry?: ReturnType<typeof inputActionRegistry>, signal?: AbortSignal) {
   const fake = installFakeDom(),
     doc = fake.document as unknown as Document;
   const header = doc.createElement('header'),
@@ -23,7 +23,7 @@ function app() {
   scene.append(mover);
   main.append(scene);
   layers.open({id: 'scene', kind: 'scene', element: scene, owner: 'scene:home', cover: 'none', modal: false});
-  const input = createInput(doc as unknown as InputWindow, layers);
+  const input = createInput(doc as unknown as InputWindow, layers, signal, registry);
   const muted: ActionEvent[] = [];
   input.onAction('core.mute', e => {
     muted.push(e);
@@ -58,6 +58,44 @@ function app() {
   };
   return {fake, doc, layers, input, muted, seen, mover, send, press, modal, now: () => t};
 }
+
+test('focus capture retires keyboard holds for editable targets without consuming native focus and respects abort', () => {
+  const ctl = new AbortController();
+  const a = app(
+    inputActionRegistry([
+      {id: 'test.move', label: 'move', scope: 'global', kind: 'hold', defaults: {keys: ['w'], pad: ['ls-up']}},
+    ]),
+    ctl.signal,
+  );
+  const {fake, doc, input, mover: scene} = a;
+  input.claimFrames('scene:home');
+  const down = () => input.keyDown({key: 'w', code: 'KeyW', target: scene, preventDefault() {}, stopPropagation() {}});
+  try {
+    for (const tag of ['input', 'textarea', 'select', 'div']) {
+      const field = doc.createElement(tag);
+      if (tag === 'div') field.setAttribute('contenteditable', 'true');
+      scene.append(field);
+      down();
+      assert.equal(input.held('test.move'), true);
+      assert.equal(field.dispatchEvent({type: 'focusin'} as Event), true, 'native focus not prevented');
+      assert.equal(input.held('test.move'), false, tag);
+      assert.deepEqual(input.drain('scene:home'), []);
+      input.keyUp({key: 'w', code: 'KeyW'});
+    }
+    const button = doc.createElement('button');
+    scene.append(button);
+    down();
+    button.dispatchEvent({type: 'focusin'} as Event);
+    assert.equal(input.held('test.move'), true, 'noneditable focus preserves hold');
+    ctl.abort();
+    const field = doc.createElement('input');
+    scene.append(field);
+    field.dispatchEvent({type: 'focusin'} as Event);
+    assert.equal(input.held('test.move'), true, 'aborted bridge no longer observes focus');
+  } finally {
+    fake.restore();
+  }
+});
 
 test('M mutes under a modal, even when the modal stops keydown, and the key is not consumed', () => {
   const a = app();

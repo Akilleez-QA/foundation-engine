@@ -787,3 +787,14 @@ do not establish a browser native-heap ceiling.
 These receipts cover those merged batches only. Resource-observation failure
 reporting is a subsequent candidate; further source coverage, application wiring,
 device experience and physical reclamation evidence remain separate obligations.
+
+
+## Editable-focus keyboard retirement candidate (2026-10-09)
+
+The existing document input bridge selectively retires prior non-inText keyboard
+work when editable focus begins, including queued actions and reentrant press
+completion. Explicit text actions and non-keyboard sources retain their policies;
+no new owner or global cancellation is introduced. See the input README for
+recovery and focus-event limitations. Dispatcher and bridge regressions cover
+selectivity, stale repeats, fresh presses and listener retirement. This is a
+candidate; full hosted integration and physical-device acceptance remain separate.

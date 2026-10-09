@@ -456,6 +456,7 @@ export class InputActions {
   private blocked = new Set<string>();
   private cancelListeners = new Set<(reason: CancelReason) => void>();
   private epochValue = 0;
+  private textFocusRevision = 0;
   private topKey: string | null;
   /** The row that took the current key press (or its repeat) asked not to consume the event. */
   private passing = false;
@@ -588,6 +589,21 @@ export class InputActions {
   }
 
   // ── raw input in ──
+
+  /** Editable focus retires prior keyboard work except rows explicitly allowed in text.
+   * Other devices and the owner epoch are unchanged; retired keys need release or a fresh press. */
+  focusEntered(target: EventTarget | null): void {
+    if (!isTyping(target)) return;
+    this.textFocusRevision++;
+    const retires = (source: string, action: ActionId) =>
+      source.startsWith('key:') && !this.opts.registry.find(action)?.inText;
+    for (const [source, down] of this.down) {
+      if (!retires(source, down.action)) continue;
+      this.down.delete(source);
+      this.blocked.add(source);
+    }
+    this.queue = this.queue.filter(({event}) => !retires(event.source, event.action));
+  }
 
   /** A keydown from the one capture listener. Returns true when an action consumed it (default prevented). */
   keyDown(e: KeyEventLike): boolean {
@@ -846,9 +862,14 @@ export class InputActions {
     valid?: () => boolean,
   ): boolean {
     if ((valid && !valid()) || this.epochValue !== epoch) return true;
+    const textFocusRevision = this.textFocusRevision;
     const event = this.event(d.id, 'press', source, device);
     const ok = this.deliver(target, event);
     if (valid && !valid()) return true;
+    if (source.startsWith('key:') && !d.inText && textFocusRevision !== this.textFocusRevision) {
+      this.blocked.add(source);
+      return true;
+    }
     if (this.epochValue !== epoch) {
       this.blocked.add(source);
       return true;
