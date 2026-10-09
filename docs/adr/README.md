@@ -69,3 +69,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0080](0080-optional-interaction-ownership.md) | Optional assignment, itinerary and alignment ownership | Kits / Verification | Accepted for implementation |
 
 | [0081](0081-visibility-contributions.md) | Source-owned visibility contributions | Optional kits | Accepted for candidate |
+
+| [0082](0082-bounded-weighted-choice-history.md) | Bounded weighted choice and separately committed history | Procgen | Proposed |

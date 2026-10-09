@@ -30,6 +30,13 @@
       "evidence": ["@kits/visibility exports createVisibility"]
     },
     {
+      "id": "GEN-WEIGHTED",
+      "title": "Bounded eligible weighted choice with separately committed recent history",
+      "shipped": true,
+      "docs": "docs/guides/weighted-choice.md",
+      "evidence": ["@kits/procgen exports chooseWeighted", "@kits/procgen exports createChoiceHistory"]
+    },
+    {
       "id": "VIS-01",
       "title": "Tone mapping and exposure per scene (view.output)",
       "shipped": true,
@@ -644,8 +651,10 @@
         "baselineChecksum",
         "cellularGenerator",
         "cellularGridJob",
+        "chooseWeighted",
         "chunkDatabaseDeleting",
         "createCellEdits",
+        "createChoiceHistory",
         "createChunkStore",
         "createGridGenerationJob",
         "createRng",

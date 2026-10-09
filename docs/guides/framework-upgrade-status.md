@@ -1087,3 +1087,9 @@ This combined implementation supersedes the earlier lab-only export status: assi
 ## Visibility contributions — VISIBILITY-01 candidate, 2026-10-09
 
 [Contract](../../src/kits/visibility/README.md), [decision](../adr/0081-visibility-contributions.md), [discussion #198](https://github.com/Akilleez-QA/foundation-engine/issues/198). Pure optional per-observer cell contributions with atomic replacement, stale calculation refusal, explored history and bounded coalesced draining. Creator geometry, relationships and disclosure remain external. Evidence: focused lifetime/refusal/drain tests, two distinct headless sensor/facility consumers and a 600-command set-union/history model. Validation: eight focused tests and scoped strict typechecking pass; `npm run check` passes all steps and 12 selected tests across three files. Candidate only; no integrated game, full CI, browser, save or physical-device acceptance claimed here.
+
+## Weighted choice/history — candidate, 2026-10-09
+
+Existing procgen helper extension; ADR0082 proposed. Ten focused tests pass, including
+endpoint/no-draw/refusal/eviction and saved RNG/history continuation via real SaveStore.
+Two headless consumers; no browser/full-gate/device claim. See [contract](weighted-choice.md).

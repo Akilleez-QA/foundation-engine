@@ -67,6 +67,15 @@ export const FEATURES = [
     evidence: [{kit: 'visibility', export: 'createVisibility'}],
   },
   {
+    id: 'GEN-WEIGHTED',
+    title: 'Bounded eligible weighted choice with separately committed recent history',
+    docs: 'docs/guides/weighted-choice.md',
+    evidence: [
+      {kit: 'procgen', export: 'chooseWeighted'},
+      {kit: 'procgen', export: 'createChoiceHistory'},
+    ],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,
