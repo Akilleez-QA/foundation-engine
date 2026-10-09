@@ -1207,3 +1207,17 @@ in 18 asset test files. The independent dimension oracle covers 1517 shapes,
 plus explicit thin/square/odd anchors and model refusal/retry. Independent review
 and full hosted integration remain pending; no physical memory or device evidence
 is implied.
+
+
+## Shared-stage retirement recovery — candidate (2026-10-09)
+
+The existing stage pool now retires logical view ownership despite cleanup errors
+and rolls back failed setup. Cleanup preserves original causes and still attempts
+independent retirement work. Surviving sibling leases are not swept or forced lost;
+uncertain slots refuse new sharing until their last sibling leaves. Borrowed canvas
+attachment rollback and once-only underlying renderer disposal are exercised.
+See [render backend](render-backend.md#stage-setup-and-retirement-failures).
+`npm run check -- --base 6fab99a7` passed typecheck, applicable lints and 238
+tests in 30 render test files, including 22 focused stage tests. Independent
+review and full hosted integration remain pending. Logical cleanup is not proof
+of successful GPU reclamation or physical-device acceptance.

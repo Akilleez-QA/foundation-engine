@@ -128,6 +128,9 @@ interface StageSlot {
   pending: View | null;
   lost: boolean;
   off: AbortController;
+  retired: boolean;
+  uncertain: boolean;
+  cleaning: number;
 }
 
 /** The three.js entry points that touch GL state; a view that calls one takes the context first. */
@@ -150,14 +153,29 @@ const ENTRIES = [
 
 export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
   const slots = new Map<boolean, StageSlot>();
+  const attempt = (errors: unknown[], action: () => void) => {
+    try {
+      action();
+    } catch (error) {
+      errors.push(error);
+    }
+  };
+  const finish = (errors: unknown[]) => {
+    if (errors.length === 1) throw errors[0];
+    if (errors.length) throw new AggregateError(errors, 'stage: lifecycle cleanup failed');
+  };
 
-  const retire = (slot: StageSlot, lose: boolean) => {
+  const retire = (slot: StageSlot, lose: boolean, errors: unknown[]) => {
+    if (slot.retired) return;
+    slot.retired = true;
     if (slots.get(slot.key) === slot) slots.delete(slot.key);
-    slot.off.abort();
-    if (lose && !slot.lost) d.backend.lose(slot.gl);
-    slot.tracker.live.clear();
-    slot.tracker.validation.clear();
     d.stats.contexts = Math.max(0, d.stats.contexts - 1);
+    slot.pending = null;
+    slot.drawer = null;
+    attempt(errors, () => slot.off.abort());
+    if (lose && !slot.lost) attempt(errors, () => d.backend.lose(slot.gl));
+    attempt(errors, () => slot.tracker.live.clear());
+    attempt(errors, () => slot.tracker.validation.clear());
   };
 
   const forward = (slot: StageSlot, lost: boolean) => {
@@ -174,47 +192,67 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
     }
   };
 
-  const newSlot = (key: boolean): StageSlot => {
+  const newSlot = (key: boolean, cleanupErrors: unknown[]): StageSlot => {
     const {canvas, gl} = d.createContext(key);
-    const slot: StageSlot = {
-      key,
-      canvas,
-      gl,
-      tracker: d.backend.track(gl),
-      views: new Set(),
-      drawer: null,
-      pending: null,
-      lost: false,
-      off: new AbortController(),
-    };
-    d.stats.created++;
-    d.stats.contexts++;
-    const signal = slot.off.signal;
-    canvas.addEventListener(
-      d.backend.lostEvent,
-      e => {
-        e.preventDefault();
-        slot.lost = true;
-        slot.tracker.live.clear();
-        slot.tracker.validation.clear();
-        slot.pending = null;
-        slot.drawer = null;
-        d.stats.losses++;
-        if (slot.views.size) forward(slot, true);
-        else retire(slot, false);
-      },
-      {signal},
-    );
-    canvas.addEventListener(
-      d.backend.restoredEvent,
-      () => {
-        slot.lost = false;
-        forward(slot, false);
-      },
-      {signal},
-    );
-    slots.set(key, slot);
-    return slot;
+    const off = new AbortController();
+    let tracker: ContextObjects | undefined;
+    try {
+      tracker = d.backend.track(gl);
+      const slot: StageSlot = {
+        key,
+        canvas,
+        gl,
+        tracker,
+        views: new Set(),
+        drawer: null,
+        pending: null,
+        lost: false,
+        off,
+        retired: false,
+        uncertain: false,
+        cleaning: 0,
+      };
+      const signal = slot.off.signal;
+      canvas.addEventListener(
+        d.backend.lostEvent,
+        e => {
+          e.preventDefault();
+          slot.lost = true;
+          slot.tracker.live.clear();
+          slot.tracker.validation.clear();
+          slot.pending = null;
+          slot.drawer = null;
+          d.stats.losses++;
+          if (slot.views.size) forward(slot, true);
+          else {
+            const errors: unknown[] = [];
+            retire(slot, false, errors);
+            finish(errors);
+          }
+        },
+        {signal},
+      );
+      canvas.addEventListener(
+        d.backend.restoredEvent,
+        () => {
+          slot.lost = false;
+          forward(slot, false);
+        },
+        {signal},
+      );
+      slots.set(key, slot);
+      d.stats.created++;
+      d.stats.contexts++;
+      return slot;
+    } catch (error) {
+      attempt(cleanupErrors, () => off.abort());
+      attempt(cleanupErrors, () => d.backend.lose(gl));
+      if (tracker) {
+        attempt(cleanupErrors, () => tracker!.live.clear());
+        attempt(cleanupErrors, () => tracker!.validation.clear());
+      }
+      throw error;
+    }
   };
 
   /** Copy the view's rectangle (bottom-left of the shared buffer) into its canvas. */
@@ -227,9 +265,15 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
     if (!w || !h) return;
     const g = (v.g2d ??= (v.canvas.getContext?.('2d') as CanvasRenderingContext2D | null) ?? null);
     if (!g) return;
-    g.globalCompositeOperation = 'copy';
-    g.drawImage(slot.canvas, 0, slot.canvas.height - h, w, h, 0, 0, w, h);
-    g.globalCompositeOperation = 'source-over';
+    const errors: unknown[] = [];
+    attempt(errors, () => {
+      g.globalCompositeOperation = 'copy';
+      g.drawImage(slot.canvas, 0, slot.canvas.height - h, w, h, 0, 0, w, h);
+    });
+    attempt(errors, () => {
+      g.globalCompositeOperation = 'source-over';
+    });
+    finish(errors);
   };
 
   /** `v` is about to use the context: copy out the last view, fit the buffer, and hand `v`'s renderer a clean state. */
@@ -282,75 +326,82 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
   };
 
   /** Everything the context held, freed when no view is left; the context kept unless the valve says otherwise. */
-  const idle = (slot: StageSlot, audit: LeaseAudit) => {
+  const idle = (slot: StageSlot, audit: LeaseAudit | undefined, errors: unknown[]) => {
     slot.drawer = null;
     slot.pending = null;
-    for (const [obj, del] of [...slot.tracker.live]) {
-      audit.glObjects++;
-      try {
-        d.backend.deleteObject(slot.gl, del, obj);
-      } catch {
-        /* lost */
+    attempt(errors, () => {
+      for (const [obj, del] of [...slot.tracker.live]) {
+        if (audit) audit.glObjects++;
+        attempt(errors, () => d.backend.deleteObject(slot.gl, del, obj));
       }
-    }
-    slot.tracker.live.clear();
-    slot.tracker.validation.clear();
-    if (slot.lost || d.backend.isLost(slot.gl)) {
-      retire(slot, false);
+    });
+    attempt(errors, () => slot.tracker.live.clear());
+    attempt(errors, () => slot.tracker.validation.clear());
+    let lost = slot.lost;
+    attempt(errors, () => {
+      lost ||= d.backend.isLost(slot.gl);
+    });
+    if (lost || slot.uncertain || errors.length) {
+      retire(slot, !lost, errors);
       return;
     }
-    if (audit.textures > d.valve.textures || audit.geometries > d.valve.geometries) {
+    if (audit && (audit.textures > d.valve.textures || audit.geometries > d.valve.geometries)) {
       d.stats.recycles++;
-      retire(slot, true);
+      retire(slot, true, errors);
       return;
     }
     // An idle stage keeps its context but not its (possibly large) drawing buffer.
-    slot.canvas.width = 1;
-    slot.canvas.height = 1;
+    attempt(errors, () => {
+      slot.canvas.width = 1;
+    });
+    attempt(errors, () => {
+      slot.canvas.height = 1;
+    });
+    if (errors.length) retire(slot, true, errors);
   };
 
   const lease = (req: StageSurfaceRequest<P>): StageSurface | null => {
+    const cleanupErrors: unknown[] = [];
     const key = req.antialias ?? true;
     let slot = slots.get(key) ?? null;
+    if (slot && (slot.cleaning || slot.uncertain)) return null;
     if (slot && (slot.lost || d.backend.isLost(slot.gl))) {
       // Never hand on a lost context. One with views still on it lives until they release.
-      if (!slot.views.size) retire(slot, false);
+      if (!slot.views.size) retire(slot, false, cleanupErrors);
       else slots.delete(key);
       d.stats.recreations++;
       slot = null;
     }
     // An idle stage context with the other antialias setting is not kept alongside a new one.
-    for (const other of [...slots.values()]) if (other.key !== key && !other.views.size) retire(other, true);
+    for (const other of [...slots.values()])
+      if (other.key !== key && !other.views.size && !other.cleaning) retire(other, true, cleanupErrors);
+    finish(cleanupErrors);
     const doc = d.doc();
     const canvas = req.canvas ?? (doc?.createElement('canvas') as HTMLCanvasElement | undefined);
     if (!canvas) return null;
     let r: PoolRenderer;
     try {
-      slot ??= newSlot(key);
+      slot ??= newSlot(key, cleanupErrors);
       r = d.createRenderer(canvas, slot.gl);
-    } catch {
+    } catch (error) {
+      if (slot) {
+        slot.uncertain = true;
+        if (!slot.views.size) retire(slot, true, cleanupErrors);
+      }
+      if (cleanupErrors.length) finish([error, ...cleanupErrors]);
       return null;
     }
     const s = slot;
     d.stats.leases++;
     const v: View = {canvas, r, g2d: null, lost: new Set(), restored: new Set(), released: false};
     s.views.add(v);
-    // As three does for a renderer made with `alpha: false` (its contexts always have an alpha channel).
-    if (!req.alpha) (r as T.WebGLRenderer).setClearColor?.(0x000000, 1);
-    wrap(s, v);
-    const dispose = r.dispose.bind(r);
-    // `renderer.dispose()` (an owner's existing teardown) ends the lease; `forceContextLoss` must not end the context.
-    (r as {dispose(): void}).dispose = () => {
-      if (!v.released) surface.release();
-      else dispose();
+    let dispose: (() => void) | undefined;
+    let disposeAttempted = false;
+    const disposeOnce = () => {
+      if (disposeAttempted) return;
+      disposeAttempted = true;
+      dispose?.();
     };
-    (r as {forceContextLoss(): void}).forceContextLoss = () => {};
-    d.pixelRatio(r, req.maxPixelRatio);
-    d.applyProfile(r, req.profile);
-    if (req.host) {
-      if (req.insert === 'prepend') req.host.prepend(canvas);
-      else req.host.append(canvas);
-    }
     const surface: StageSurface = {
       renderer: r as T.WebGLRenderer,
       canvas,
@@ -367,35 +418,91 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
       release() {
         if (v.released) return;
         v.released = true;
-        if (s.pending === v) flush(s);
+        s.cleaning++;
+        s.views.delete(v);
+        const errors: unknown[] = [];
+        if (s.pending === v) attempt(errors, () => flush(s));
         v.lost.clear();
         v.restored.clear();
-        const m = r.info.memory as {textures: number; geometries: number};
-        const audit: LeaseAudit = {
-          textures: m.textures,
-          geometries: m.geometries,
-          programs: (r.info as {programs?: unknown[] | null}).programs?.length ?? 0,
-          glObjects: 0,
-        };
-        if (s.drawer === v) s.drawer = null;
+        let audit: LeaseAudit | undefined;
+        attempt(errors, () => {
+          const m = r.info.memory;
+          audit = {
+            textures: m.textures,
+            geometries: m.geometries,
+            programs: r.info.programs?.length ?? 0,
+            glObjects: 0,
+          };
+        });
+        s.drawer = null;
         // The outermost dispose (a `livePixelRatio` wrapper unsubscribes there) reaches three's own dispose last.
-        (r as {dispose(): void}).dispose();
-        s.views.delete(v);
-        d.stats.lastRelease = audit;
-        if (!s.views.size) idle(s, audit);
+        attempt(errors, () => r.dispose());
+        // A wrapper may throw before it forwards. Raw cleanup still gets exactly one attempt.
+        attempt(errors, disposeOnce);
+        s.drawer = null;
+        if (audit) d.stats.lastRelease = audit;
+        if (errors.length) s.uncertain = true;
+        s.cleaning--;
+        if (!s.views.size && !s.cleaning) idle(s, audit, errors);
+        finish(errors);
       },
       dispose() {
         surface.release();
       },
     };
-    req.ctx?.own(surface);
-    return surface;
+    let attachmentAttempted = false;
+    const parent = canvas.parentNode,
+      next = canvas.nextSibling;
+    const restoreAttachment = () => {
+      if (!attachmentAttempted) return;
+      if (parent) parent.insertBefore(canvas, next?.parentNode === parent ? next : null);
+      else canvas.remove();
+    };
+    try {
+      dispose = r.dispose.bind(r);
+      // Establish the release route before any setup hook can dispose the renderer.
+      r.dispose = () => {
+        if (v.released) disposeOnce();
+        else surface.release();
+      };
+      r.forceContextLoss = () => {};
+      wrap(s, v);
+      // As three does for a renderer made with alpha:false.
+      if (!req.alpha) r.setClearColor?.(0x000000, 1);
+      if (v.released) return null;
+      d.pixelRatio(r, req.maxPixelRatio);
+      if (v.released) return null;
+      d.applyProfile(r, req.profile);
+      if (v.released) return null;
+      if (req.host) {
+        attachmentAttempted = true;
+        if (req.insert === 'prepend') req.host.prepend(canvas);
+        else req.host.append(canvas);
+      }
+      req.ctx?.own(surface);
+      if (v.released) {
+        restoreAttachment();
+        return null;
+      }
+      return surface;
+    } catch (error) {
+      const errors: unknown[] = [error];
+      // This setup never published a live handle; do not park its uncertain state.
+      s.uncertain = true;
+      attempt(errors, () => surface.release());
+      if (!s.views.size && !s.cleaning) retire(s, true, errors);
+      attempt(errors, restoreAttachment);
+      finish(errors);
+      return null;
+    }
   };
 
   return {
     lease,
     settle() {
-      for (const s of [...slots.values()]) if (!s.views.size) retire(s, true);
+      const errors: unknown[] = [];
+      for (const s of [...slots.values()]) if (!s.views.size && !s.cleaning) retire(s, true, errors);
+      finish(errors);
     },
     counts() {
       let views = 0;

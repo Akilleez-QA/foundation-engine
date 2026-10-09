@@ -1238,3 +1238,15 @@ charging. Cube, array, volume, authored mip and non-RGBA8 descriptor support rem
 explicit accounting limitations. See [asset residency](asset-residency.md).
 Focused and affected checks plus independent review are required before hosted
 integration; no physical memory or device evidence is implied.
+
+
+## Shared-stage retirement recovery — candidate (2026-10-09)
+
+The existing stage pool now retires logical view ownership despite cleanup errors
+and rolls back failed setup. Cleanup preserves original causes and still attempts
+independent retirement work. Surviving sibling leases are not swept or forced lost;
+uncertain slots refuse new sharing until their last sibling leaves. Borrowed canvas
+attachment rollback and once-only underlying renderer disposal are exercised.
+See [render backend](render-backend.md#stage-setup-and-retirement-failures).
+Affected checks and independent review precede hosted integration; logical cleanup
+is not proof of successful GPU reclamation or physical-device acceptance.
