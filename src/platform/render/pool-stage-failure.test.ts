@@ -378,6 +378,49 @@ test('partial pixel-ratio setup uses installed wrapper cleanup and preserves an 
   assert.equal(f.counts().disposed, 1);
   assert.deepEqual(f.pool.counts(), {contexts: 1, views: 1});
   assert.equal(f.counts().losses, 0);
+  // A clean rollback leaves nothing uncertain: the shared context still admits new leases.
+  f.deps.pixelRatio = original;
+  const next = f.pool.lease({role: 'stage'});
+  assert.ok(next, 'a setup failure with clean rollback does not refuse later sharing');
+  next.release();
   sibling.release();
+  assert.equal(f.counts().losses, 0, 'the clean idle context parks as usual');
+  f.pool.settle();
   assert.equal(f.counts().losses, 1);
+});
+
+test('a setup failure whose rollback also fails refuses new sharing until the last sibling leaves', () => {
+  const f = fixture(),
+    sibling = f.pool.lease({role: 'stage'})!;
+  f.fail.profile = f.fail.dispose = true;
+  assert.throws(
+    () => f.pool.lease({role: 'stage'}),
+    e => e instanceof AggregateError && e.errors[0] === f.errors.profile && e.errors[1] === f.errors.dispose,
+  );
+  f.fail.profile = f.fail.dispose = false;
+  assert.equal(f.pool.lease({role: 'stage'}), null);
+  assert.deepEqual(f.pool.counts(), {contexts: 1, views: 1});
+  sibling.release();
+  assert.deepEqual(f.pool.counts(), {contexts: 0, views: 0});
+  assert.equal(f.counts().losses, 1, 'the uncertain context is retired, not parked');
+  assert.ok(f.pool.lease({role: 'stage'}), 'a fresh context is admitted afterwards');
+});
+
+test('a failed renderer construction beside a live sibling keeps sharing open and invalidates the drawer', () => {
+  const f = fixture(),
+    sibling = f.pool.lease({role: 'stage'})!;
+  let resets = 0;
+  sibling.renderer.resetState = () => void resets++;
+  sibling.renderer.render({} as never, {} as never);
+  assert.equal(resets, 1);
+  f.fail.construct = true;
+  assert.equal(f.pool.lease({role: 'stage'}), null);
+  f.fail.construct = false;
+  sibling.renderer.render({} as never, {} as never);
+  assert.equal(resets, 2, 'the sibling resets state the failed constructor may have changed');
+  assert.deepEqual(f.pool.counts(), {contexts: 1, views: 1});
+  const next = f.pool.lease({role: 'stage'});
+  assert.ok(next);
+  next.release();
+  sibling.release();
 });

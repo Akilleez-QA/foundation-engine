@@ -385,7 +385,9 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
       r = d.createRenderer(canvas, slot.gl);
     } catch (error) {
       if (slot) {
-        slot.uncertain = true;
+        // A constructor may have changed GL state before it failed: a sibling resets before drawing again.
+        // Nothing was released uncleanly, so live siblings keep sharing; an idle context is not parked.
+        slot.drawer = null;
         if (!slot.views.size) retire(slot, true, cleanupErrors);
       }
       if (cleanupErrors.length) finish([error, ...cleanupErrors]);
@@ -484,11 +486,13 @@ export function createStagePool<P>(d: StagePoolDeps<P>): StagePool<P> {
         restoreAttachment();
         return null;
       }
+      // Construction and the setup hooks above set GL state behind the current drawer's state cache.
+      s.drawer = null;
       return surface;
     } catch (error) {
       const errors: unknown[] = [error];
-      // This setup never published a live handle; do not park its uncertain state.
-      s.uncertain = true;
+      // Roll back through the ordinary release. Only a failed cleanup makes the shared context uncertain; a setup
+      // hook's own failure does not refuse siblings' future leases. A context this lease leaves idle is not parked.
       attempt(errors, () => surface.release());
       if (!s.views.size && !s.cleaning) retire(s, true, errors);
       attempt(errors, restoreAttachment);

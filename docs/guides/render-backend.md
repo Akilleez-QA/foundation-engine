@@ -86,10 +86,19 @@ at most one attempt even when an outer pixel-ratio wrapper throws before forward
 Private resources inside a failing third-party wrapper cannot be guaranteed freed.
 
 A failed view never triggers a shared-object sweep or context loss while a sibling
-lease remains live. The surviving views can continue drawing. The uncertain slot
-refuses new same-antialias leases (returns null) until its last sibling retires; it
-is then retired instead of parked for reuse. This avoids creating a replacement
-context alongside those siblings. The ordinary successful reuse policy is unchanged.
+lease remains live. The surviving views can continue drawing. A slot becomes
+uncertain only when a release's cleanup fails. The uncertain slot refuses new
+same-antialias leases (returns null) until its last sibling retires; it is then
+retired instead of parked for reuse. This avoids creating a replacement context
+alongside those siblings, at the cost of stage unavailability for that setting
+while a long-lived sibling stays open. A setup or renderer-construction failure
+whose rollback succeeds does not refuse later sharing. The ordinary successful
+reuse policy is unchanged.
+
+Constructing a renderer on the shared context, and its setup (clear colour, pixel
+ratio), sets GL state behind the current drawing view's three.js state cache. Every
+new lease, successful or not, therefore makes the next drawing view reset its state
+first.
 
 Setup hooks run only after a callable release route exists. Pixel-ratio/profile,
 canvas attachment and owner-registration failures roll back the acquired view.

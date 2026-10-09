@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Shared stage leases retire across setup and cleanup failures.** A stage view whose flush, audit, renderer wrapper, renderer disposal or idle cleanup throws is still retired once, with every cause re-thrown (one unchanged, several as an `AggregateError`); failed setup rolls back the view and a borrowed canvas attachment. Live sibling views keep drawing; a context whose cleanup failed refuses new leases until its last view leaves, then is retired rather than reused. A new lease now makes the current drawing view reset its GL state cache before drawing again. Headless failure fixtures only: no GPU reclamation, context restoration or device evidence. See [render backend](docs/guides/render-backend.md#stage-setup-and-retirement-failures).
+
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.
