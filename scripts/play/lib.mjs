@@ -203,9 +203,9 @@ export function windowsAgree(a, b, tolerance = SETTLE.tolerance) {
   if (!a?.renders || !b?.renders) return false;
   const near = (x, y) => Math.abs(x - y) <= tolerance * Math.max(Math.abs(x), Math.abs(y), 1);
   return (
-    near(a.drawsPerFrame, b.drawsPerFrame) &&
+    near(a.drawsPerFrame ?? 0, b.drawsPerFrame ?? 0) &&
     near(a.postDrawsPerFrame ?? 0, b.postDrawsPerFrame ?? 0) &&
-    near(a.trisPerFrame, b.trisPerFrame)
+    near(a.trisPerFrame ?? 0, b.trisPerFrame ?? 0)
   );
 }
 
@@ -222,9 +222,11 @@ export function hasSettled(windows, {stableWindows = SETTLE.stableWindows, toler
  * stream or build geometry, render shadow maps or other passes only on its first frames, or cull nothing until its
  * bounds are known. Each window asks the loop for a few redraws through the test API, so a still scene draws too.
  * Returns the first window (`warmUp`), the last (`steady`), whether it settled, the windows taken and the time.
+ * `o` overrides SETTLE's bounds; `o.measure` replaces the window measurement (tests and injected runtimes).
  */
 export async function settle(b, o = {}) {
   const {windowMs, stableWindows, tolerance, maxMs} = {...SETTLE, ...o};
+  const window = o.measure ?? measure;
   const t0 = Date.now(),
     windows = [];
   const redraws = async () => {
@@ -233,7 +235,7 @@ export async function settle(b, o = {}) {
       await sleep(windowMs / 5);
     }
   };
-  do windows.push(await measure(b, redraws, windowMs));
+  do windows.push(await window(b, redraws, windowMs));
   while (!hasSettled(windows, {stableWindows, tolerance}) && Date.now() - t0 < maxMs);
   return {
     warmUp: windows[0],

@@ -147,6 +147,7 @@ test('play:snap settle: windows agree within the tolerance on draws, post draws 
   assert.equal(windowsAgree(win(60, 1000), win(40, 1000)), false, 'draws differ');
   assert.equal(windowsAgree(win(40, 1000, 10), win(40, 1000, 0)), false, 'post draws differ');
   assert.equal(windowsAgree(win(0, 0, 0, 0), win(0, 0, 0, 0)), false, 'no frames is never settled');
+  assert.equal(windowsAgree({renders: 1}, {renders: 1}), true, 'absent counts compare as zero, never NaN');
 });
 
 test('play:snap settle: settled after stableWindows consecutive agreeing windows, so a warm-up window never counts', () => {
@@ -198,4 +199,13 @@ test('play:snap settle: a scene that warms up is judged on its settled frames an
   const never = await settle(warmingPage({heavy: Infinity, warm: [1, 1]}), {windowMs: 5, maxMs: 0});
   assert.equal(never.windows, 1, 'maxMs bounds the wait');
   assert.equal(never.settled, false);
+});
+
+test('play:snap settle: an injected window measurement replaces the browser one and still bounds the wait', async () => {
+  let calls = 0;
+  const fake = async () => (calls++, {renders: 1, drawsPerFrame: 3, trisPerFrame: 12});
+  const s = await settle({evaluate: async () => null}, {measure: fake, maxMs: 50});
+  assert.equal(s.settled, true);
+  assert.equal(s.windows, 3);
+  assert.equal(calls, 3);
 });

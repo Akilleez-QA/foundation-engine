@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {describeDiagnostic, writeDiagnosticEvidence} from './diagnostic-report.mjs';
 // scripts/play/snap.mjs (`npm run play:snap [-- --scene <id>] [--mobile] [--quality <preset>] [--calm]`): see the game.
 // A muted, isolated browser opens the scene, takes a desktop screenshot (and a phone one with --mobile), holds the
 // arrow keys a little to measure
@@ -62,9 +63,9 @@ const arg = f => {
 const scene = arg('--scene') ?? homeScene();
 const quality = arg('--quality');
 
-export async function snap({scene, mobile = false, url, quality, calm = false}) {
-  const {launch} = await import('../perf/bench-browser.mjs');
-  const dir = freshOut();
+export async function snap({scene, mobile = false, url, quality, calm = false}, runtime = {}) {
+  const launch = runtime.launch ?? (await import('../perf/bench-browser.mjs')).launch;
+  const dir = runtime.directory ?? freshOut();
   const probe = {
     scene,
     when: new Date().toISOString(),
@@ -75,23 +76,26 @@ export async function snap({scene, mobile = false, url, quality, calm = false}) 
   };
   for (const [name, view] of Object.entries(VIEWS).filter(([n]) => n === 'desktop' || mobile)) {
     const pin = viewPreset(name, quality);
-    const b = await launch(view);
+    let b,
+      shot,
+      lines = [];
     try {
+      b = await launch(view);
       await b.page.addInitScript(PROBE);
       // Calm: the OS reduced-motion preference, the default of the comfort.calm setting (STD-SET-2).
       if (calm) await b.page.emulateMedia({reducedMotion: 'reduce'});
-      const lines = await open(b, url, scene, pin ? {query: {quality: pin}} : {});
+      lines = await (runtime.open ?? open)(b, url, scene, pin ? {query: {quality: pin}} : {});
       const preset = await b.evaluate(`window.engine.probe('quality') ?? null`);
       const calmOn = calm ? !!(await b.evaluate(`window.engine.probe('settings')?.calm`)) : undefined;
       // From the open until the per-frame counts settle; the warm-up window is reported, the settled frames judged.
-      const settled = await settle(b);
-      const shot = evidencePath(
+      const settled = await (runtime.settle ?? settle)(b, runtime.measure ? {measure: runtime.measure} : {});
+      shot = evidencePath(
         write(dir, `${scene}-${name}${calm ? '-calm' : ''}.png`, await b.page.screenshot({type: 'png'})),
       );
       // What moves on its own with no input: frames, picture changes and particles (with --calm: did it all stop?).
-      const still = await measure(b, null, 600);
-      const idle = await activity(b);
-      const moving = await measure(b, async () => {
+      const still = await (runtime.measure ?? measure)(b, null, 600);
+      const idle = await (runtime.activity ?? activity)(b);
+      const moving = await (runtime.measure ?? measure)(b, async () => {
         await b.key('ArrowUp', true);
         await sleep(500);
         await b.key('ArrowUp', false);
@@ -103,7 +107,7 @@ export async function snap({scene, mobile = false, url, quality, calm = false}) 
       // sanctioned test API path so the budget is judged on real frames, not on an empty window.
       const redrawn = moving.renders
         ? null
-        : await measure(
+        : await (runtime.measure ?? measure)(
             b,
             async () => {
               for (let i = 0; i < 5; i++) {
@@ -115,8 +119,9 @@ export async function snap({scene, mobile = false, url, quality, calm = false}) 
           );
       const judged = redrawn ?? moving;
       // Texture memory now, and the busiest frame's shadow passes and draws since the scene opened (the bench probe).
-      const gpu = await gpuCensus(b);
+      const gpu = await (runtime.gpuCensus ?? gpuCensus)(b);
       probe.views[name] = {
+        status: 'complete',
         screenshot: shot,
         viewport: view,
         quality: {preset: preset?.preset ?? null, source: preset?.source ?? null, requested: pin},
@@ -136,13 +141,26 @@ export async function snap({scene, mobile = false, url, quality, calm = false}) 
           window: redrawn ? 'redrawn' : 'moving',
         },
       };
-      probe.errors.push(...b.errors.map(e => `${name}: ${e}`));
-      probe.console.push(...lines.filter(l => !l.startsWith('debug')).map(l => `${name}: ${l}`));
+    } catch (error) {
+      probe.views[name] = {
+        status: 'incomplete',
+        viewport: view,
+        ...(shot ? {screenshot: shot} : {}),
+        error: describeDiagnostic(error),
+      };
+      probe.errors.push(name + ': ' + describeDiagnostic(error));
     } finally {
-      await b.close();
+      try {
+        await b?.close();
+      } catch (error) {
+        probe.errors.push(name + ': browser close: ' + describeDiagnostic(error));
+        probe.views[name] = {...probe.views[name], status: 'incomplete', cleanupError: describeDiagnostic(error)};
+      }
+      probe.errors.push(...(b?.errors ?? []).map(e => `${name}: ${e}`));
+      probe.console.push(...lines.filter(l => !l.startsWith('debug')).map(l => `${name}: ${l}`));
     }
   }
-  write(dir, 'probe.json', probe);
+  writeDiagnosticEvidence(probe, () => write(dir, 'probe.json', probe));
   return probe;
 }
 
@@ -158,7 +176,14 @@ function qualityLine(name, v) {
 }
 
 /** The console report of a snap: pictures, world, frames, the budget verdict (with what was measured) and errors. */
-function report(p) {
+export function report(p) {
+  if (p.views.desktop?.status === 'incomplete') {
+    console.log('play:snap ' + p.scene + ': incomplete observation');
+    for (const [name, view] of Object.entries(p.views)) console.log('  ' + name + ': ' + view.status);
+    console.log('  errors: ' + p.errors.join(' | '));
+    console.log('  details: playtest/latest/probe.json');
+    return 1;
+  }
   const d = p.views.desktop,
     st = d.state;
   console.log(
@@ -182,6 +207,10 @@ function report(p) {
   console.log(`  ${p.calm ? 'calm' : 'activity'}: ${activityLine(d.activity, d.calm)}`);
   for (const [name, v] of Object.entries(p.views)) {
     if (name === 'desktop') continue;
+    if (v.status === 'incomplete') {
+      console.log('  ' + name + ': incomplete observation');
+      continue;
+    }
     console.log(viewLine(name, v));
     const c = countsLine(v.budget);
     if (c) console.log(`    counts: ${c}`);
@@ -191,7 +220,10 @@ function report(p) {
   }
   if (p.errors.length) console.log(`  page errors:\n    ${p.errors.join('\n    ')}`);
   console.log('  details: playtest/latest/probe.json');
-  return p.errors.length || Object.values(p.views).some(v => v.budget.status === 'OVER BUDGET') ? 1 : 0;
+  return p.errors.length ||
+    Object.values(p.views).some(v => v.status === 'incomplete' || v.budget.status === 'OVER BUDGET')
+    ? 1
+    : 0;
 }
 
 if (process.argv[1] && process.argv[1].endsWith('snap.mjs')) {
