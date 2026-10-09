@@ -25,17 +25,19 @@ export interface RunnerStats {
 }
 
 export interface SystemRunner<C> {
-  /** Advance by `dt` seconds of frame time; returns how many fixed steps ran. */
+  /** Advance by finite `dt` seconds; invalid or unsafe numeric accounting throws before any frame work. */
   frame(ctx: C, dt: number): number;
   readonly stats: RunnerStats;
-  /** Fraction of a step left in the accumulator (for interpolation). */
+  /** Fraction of a step left after a completed frame, in [0, 1) (for interpolation). */
   readonly alpha: number;
 }
 
 export function createSystemRunner<C>(
   systems: readonly SystemSpec<C>[],
   o: {
+    /** Finite positive seconds. A frame must have a representable safe-integer whole-step count. */
     step?: number;
+    /** Nonnegative safe integer; zero drops all due whole steps and still runs the frame lane. */
     maxSteps?: number;
     report?: (id: string, error: unknown) => void;
     after?: () => void;
@@ -45,7 +47,8 @@ export function createSystemRunner<C>(
 ): SystemRunner<C> {
   const step = o.step ?? 1 / 60,
     maxSteps = o.maxSteps ?? 5;
-  if (!(step > 0)) throw Error('the fixed step must be positive');
+  if (!Number.isFinite(step) || !(step > 0)) throw Error('the fixed step must be finite and positive');
+  if (!Number.isSafeInteger(maxSteps) || maxSteps < 0) throw Error('maxSteps must be a nonnegative safe integer');
   const ids = new Set<string>();
   for (const s of systems) {
     if (ids.has(s.id)) throw Error(`two systems are called ${s.id}`);
@@ -54,7 +57,8 @@ export function createSystemRunner<C>(
   const fixed = systems.filter(s => (s.phase ?? 'fixed') === 'fixed'),
     perFrame = systems.filter(s => s.phase === 'frame');
   const stats: RunnerStats = {frames: 0, steps: 0, dropped: 0, errors: 0};
-  let acc = 0;
+  let acc = 0,
+    correction = 0;
   const run = (s: SystemSpec<C>, ctx: C, dt: number) => {
     try {
       s.run(ctx, dt);
@@ -73,20 +77,42 @@ export function createSystemRunner<C>(
       return acc / step;
     },
     frame(ctx, dt) {
+      if (!Number.isFinite(dt)) throw Error('frame time must be finite');
+      // Carry rounding lost by addition/subtraction across frames rather than
+      // repeatedly converting the retained phase between seconds and ticks.
+      const elapsed = Math.max(0, Math.min(dt, 1)) - correction;
+      const total = acc + elapsed;
+      const addedCorrection = total - acc - elapsed;
+      const quotient = total / step;
+      if (!Number.isFinite(quotient) || quotient > Number.MAX_SAFE_INTEGER)
+        throw Error('frame step count exceeds safe numeric accounting');
+      // Correct only a few rounding bits at a whole-step boundary, in step units.
+      // An absolute seconds tolerance can manufacture ticks when step is tiny.
+      const nearest = Math.round(quotient);
+      const due = nearest >= 1 && Math.abs(quotient - nearest) <= 64 * Number.EPSILON ? nearest : Math.floor(quotient);
+      const count = Math.min(due, maxSteps);
+      const dropped = due - count;
+      if (
+        !Number.isSafeInteger(stats.frames + 1) ||
+        !Number.isSafeInteger(stats.steps + count) ||
+        !Number.isSafeInteger(stats.dropped + dropped)
+      )
+        throw Error('runner counters exceed safe numeric accounting');
+      const spent = due * step + addedCorrection;
+      const remainder = total - spent;
+      const nextCorrection = remainder - total + spent;
       stats.frames++;
-      acc += Math.max(0, Math.min(dt, 1));
+      acc = total;
       let n = 0;
-      while (acc >= step - 1e-9 && n < maxSteps) {
+      while (n < count) {
         o.beforeStep?.();
         for (const s of fixed) run(s, ctx, step);
-        acc -= step;
+        acc = Math.max(0, acc - step);
         n++;
       }
-      if (acc >= step - 1e-9) {
-        const extra = Math.floor(acc / step + 1e-9);
-        stats.dropped += extra;
-        acc -= extra * step;
-      }
+      acc = Math.max(0, remainder);
+      correction = remainder <= 0 ? 0 : nextCorrection;
+      stats.dropped += dropped;
       stats.steps += n;
       o.beforeFrameLane?.();
       for (const s of perFrame) run(s, ctx, dt);
