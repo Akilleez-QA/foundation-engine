@@ -1,4 +1,1 @@
-{
-  "extends": "../../tsconfig.json",
-  "include": ["./itinerary.ts"]
-}
+{"extends": "../../tsconfig.json", "include": ["../../src/kits/itinerary/**/*.ts"]}

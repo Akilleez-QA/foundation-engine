@@ -673,3 +673,13 @@ focused controller/consumer tests and scoped strict typechecking passed. Patrol
 and delivery/service fixtures exercise edits and retired completions. Synthetic
 custody is not SaveStore/resource transaction evidence. No browser, full gate or
 physical-device acceptance. See [contract and limitations](itinerary-lab.md).
+
+## Public itinerary helper — graduation candidate, 2026-10-09
+
+ITINERARY-01 exposes createItinerary from @kits/itinerary with caller-owned lifetime
+and no registration or execution owner. The lab now consumes this implementation.
+Base: reviewed prototype e7aa2e55; branch feat/itinerary-kit. Twenty-four focused
+tests and scoped strict typechecking passed, including a real SaveStore/fresh-store
+round trip. This supersedes the prototype's unexported status, not its evidence
+limits. No full gate, browser, durable custody transaction or physical-device claim;
+not integrated. See the [contract](../../src/kits/itinerary/README.md).

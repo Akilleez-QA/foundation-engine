@@ -1,8 +1,8 @@
-# Editable itinerary prototype
+# Editable itinerary helper and lab
 
 The [headless lab](../../tools/itinerary-lab/README.md) explores preserving active
-work while editing its surrounding itinerary. It is deliberately outside engine
-exports and capability registration. Creators choose order tags, destination
+work while editing its surrounding itinerary. The public candidate is now imported from @kits/itinerary with no registration
+hook. The lab consumers share that implementation. Creators choose order tags, destination
 identities, action meaning, looping, arrival criteria, costs and recovery policy.
 
 ## Owner, inputs and bounds
@@ -101,10 +101,13 @@ The delivery fixture exercises collect, deliver and service rules, refusal of an
 impossible transfer, preserved carried quantity and rejection of duplicate effects.
 Its finite counters are synthetic custody, not production inventory or save evidence.
 
-Scoped strict TypeScript checking passed for the controller. Fixtures/tests run as
+Five additional public-kit tests cover plain-data command capture, reentrancy,
+real SaveStore persistence, counter limits and terminal deletion (24 tests total).
+Scoped strict TypeScript checking passed for the public kit and its TypeScript tests. Fixtures/tests run as
 JavaScript under Node with tsx; they are not included in that TypeScript check. The
 repository's existing `tools/**/*.test.mjs` test discovery includes this suite.
 No full gate, browser, rendering, network authority, durable-effect transaction,
 real collision/arrival adapter or physical-device timing acceptance was performed.
-No public kit adoption is claimed. Two distinct fixtures justify further evaluation,
-not immediate graduation into a supported API.
+The public helper is a candidate on its own branch, not an integrated release.
+The two fixtures remain headless; production movement and durable custody integration
+need their own acceptance.

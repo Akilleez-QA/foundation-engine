@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createItinerary} from './itinerary.ts';
+import {createItinerary} from '../../src/kits/itinerary/index.ts';
 import {patrolFixture, deliveryFixture} from './fixtures.mjs';
 
 const order = (id = 'tower', generation = 0, tag = 'visit', value = 1) => ({tag, destination: {id, generation}, value});

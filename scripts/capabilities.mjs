@@ -43,6 +43,12 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'ITINERARY-01',
+    title: 'Bounded editable destination itineraries with owned completion attempts',
+    docs: 'src/kits/itinerary/README.md',
+    evidence: [{kit: 'itinerary', export: 'createItinerary'}],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,

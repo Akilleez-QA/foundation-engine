@@ -1000,3 +1000,13 @@ via node --import tsx --test tools/itinerary-lab/itinerary.test.mjs; strict cont
 check passed via tsc --noEmit -p tools/itinerary-lab/tsconfig.json. Two headless
 consumers; no exported API, full gate, browser, durable custody or physical-device
 claim. See [detailed evidence and boundaries](itinerary-lab.md).
+
+## Public itinerary helper — graduation candidate, 2026-10-09
+
+ITINERARY-01 exposes createItinerary from @kits/itinerary with caller-owned lifetime
+and no registration or execution owner. The lab now consumes this implementation.
+Base: reviewed prototype e7aa2e55; branch feat/itinerary-kit. Twenty-four focused
+tests and scoped strict typechecking passed, including a real SaveStore/fresh-store
+round trip. This supersedes the prototype's unexported status, not its evidence
+limits. No full gate, browser, durable custody transaction or physical-device claim;
+not integrated. See the [contract](../../src/kits/itinerary/README.md).

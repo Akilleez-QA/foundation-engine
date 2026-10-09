@@ -1,33 +1,33 @@
-/** Lab-local data controller. The consuming owner performs and cancels external work. */
-export interface Destination {
+/** ItineraryDestination-based order data; the consuming owner performs and cancels external work. */
+export interface ItineraryDestination {
   readonly id: string;
   readonly generation: number;
 }
-export interface OrderInput {
+export interface ItineraryOrderInput {
   readonly tag: string;
-  readonly destination: Destination;
+  readonly destination: ItineraryDestination;
   readonly value: number;
 }
-export interface Order extends OrderInput {
+export interface ItineraryOrder extends ItineraryOrderInput {
   readonly id: number;
   readonly generation: number;
   readonly valid: boolean;
 }
-export interface Snapshot {
+export interface ItinerarySnapshot {
   readonly version: 1;
   readonly revision: number;
   readonly nextId: number;
   readonly activeId: number | null;
-  readonly orders: readonly Order[];
+  readonly orders: readonly ItineraryOrder[];
 }
-export interface Ticket {
-  readonly order: Order;
+export interface ItineraryTicket {
+  readonly order: ItineraryOrder;
 }
-export type Edit =
-  | {readonly type: 'insert'; readonly index: number; readonly order: OrderInput}
-  | {readonly type: 'replace'; readonly id: number; readonly order: OrderInput}
+export type ItineraryEdit =
+  | {readonly type: 'insert'; readonly index: number; readonly order: ItineraryOrderInput}
+  | {readonly type: 'replace'; readonly id: number; readonly order: ItineraryOrderInput}
   | {readonly type: 'remove'; readonly id: number; readonly current: 'stop' | 'advance'};
-export type Result = 'accepted' | 'stale' | 'saturated' | 'exhausted' | 'closed';
+export type ItineraryResult = 'accepted' | 'stale' | 'saturated' | 'exhausted' | 'closed';
 
 const MAX = Number.MAX_SAFE_INTEGER;
 function integer(value: unknown, min = 0): number {
@@ -51,7 +51,7 @@ function record(value: unknown, keys: readonly string[]): Record<string, unknown
   return result;
 }
 
-/** Snapshot/config arrays are plain dense data, not executable iterables. */
+/** ItinerarySnapshot/config arrays are plain dense data, not executable iterables. */
 function arrayData(value: readonly unknown[], maxLength: number): unknown[] {
   const length = integer(Object.getOwnPropertyDescriptor(value, 'length')?.value);
   if (
@@ -69,37 +69,52 @@ function arrayData(value: readonly unknown[], maxLength: number): unknown[] {
   return result;
 }
 
-export function createItinerary(options: {
+export interface ItineraryOptions {
   readonly maxOrders: number;
   readonly maxTextLength: number;
   readonly tags: readonly string[];
-}) {
-  const maxOrders = integer(options.maxOrders, 1);
-  const maxTextLength = integer(options.maxTextLength, 1);
+}
+export interface Itinerary {
+  snapshot(): ItinerarySnapshot;
+  edit(expectedRevision: number, change: ItineraryEdit): ItineraryResult;
+  start(expectedRevision: number, id: number): ItineraryResult;
+  begin(): ItineraryTicket | null;
+  check(ticket: ItineraryTicket): boolean;
+  finish(ticket: ItineraryTicket): boolean;
+  cancel(): boolean;
+  invalidateDestination(destination: ItineraryDestination): ItineraryResult;
+  restore(expectedRevision: number, snapshot: unknown): ItineraryResult;
+  dispose(): void;
+}
+
+export function createItinerary(options: ItineraryOptions): Itinerary {
+  const configuration = record(options, ['maxOrders', 'maxTextLength', 'tags']);
+  const maxOrders = integer(configuration.maxOrders, 1);
+  const maxTextLength = integer(configuration.maxTextLength, 1);
   function text(value: unknown): string {
     if (typeof value !== 'string' || value.length === 0 || value.length > maxTextLength)
       throw new TypeError('Invalid text length');
     return value;
   }
-  if (!Array.isArray(options.tags) || options.tags.length === 0 || options.tags.length > maxOrders)
+  if (!Array.isArray(configuration.tags) || configuration.tags.length === 0 || configuration.tags.length > maxOrders)
     throw new TypeError('Tag count must fit maxOrders');
-  const tags = new Set(arrayData(options.tags, maxOrders).map(text));
-  if (tags.size !== options.tags.length) throw new TypeError('Duplicate tags');
-  function destination(value: unknown): Destination {
+  const tags = new Set(arrayData(configuration.tags, maxOrders).map(text));
+  if (tags.size !== configuration.tags.length) throw new TypeError('Duplicate tags');
+  function destination(value: unknown): ItineraryDestination {
     const data = record(value, ['id', 'generation']);
     return Object.freeze({id: text(data.id), generation: integer(data.generation)});
   }
-  function input(value: unknown): OrderInput {
+  function input(value: unknown): ItineraryOrderInput {
     const data = record(value, ['tag', 'destination', 'value']);
     const tag = text(data.tag);
     if (!tags.has(tag)) throw new TypeError('Unknown order tag');
     return Object.freeze({tag, destination: destination(data.destination), value: integer(data.value)});
   }
-  let orders: readonly Order[] = Object.freeze([]);
+  let orders: readonly ItineraryOrder[] = Object.freeze([]);
   let activeId: number | null = null;
   let revision = 0;
   let nextId = 1;
-  let pending: Ticket | null = null;
+  let pending: ItineraryTicket | null = null;
   let closed = false;
   let busy = false;
   function mutation<T>(operation: () => T): T {
@@ -111,44 +126,54 @@ export function createItinerary(options: {
       busy = false;
     }
   }
-  function admit(expected: number): Result {
+  function admit(expected: number): ItineraryResult {
     integer(expected);
     if (closed) return 'closed';
     if (expected !== revision) return 'stale';
     return revision === MAX ? 'exhausted' : 'accepted';
   }
-  function snapshot(): Snapshot {
+  function snapshot(): ItinerarySnapshot {
     return Object.freeze({version: 1, revision, nextId, activeId, orders});
   }
-  function edit(expected: number, change: Edit): Result {
+  function edit(expected: number, change: ItineraryEdit): ItineraryResult {
     return mutation(() => {
       const status = admit(expected);
       if (status !== 'accepted') return status;
-      // Copy only after validation; no rejected edit can retire the current ticket.
-      if (change.type === 'insert') {
-        const index = integer(change.index);
+      // Capture plain data once before publication, including the deletion policy.
+      const type: unknown = Object.getOwnPropertyDescriptor(change, 'type')?.value;
+      if (type !== 'insert' && type !== 'replace' && type !== 'remove') throw new TypeError('Unknown edit');
+      const data = record(
+        change,
+        type === 'insert'
+          ? ['type', 'index', 'order']
+          : type === 'replace'
+            ? ['type', 'id', 'order']
+            : ['type', 'id', 'current'],
+      );
+      if (type === 'insert') {
+        const index = integer(data.index);
         if (index > orders.length) throw new RangeError('Insertion index outside itinerary');
-        const value = input(change.order);
+        const value = input(data.order);
         if (orders.length >= maxOrders) return 'saturated';
         if (nextId === MAX) return 'exhausted';
         const inserted = Object.freeze({...value, id: nextId, generation: 0, valid: true});
         orders = Object.freeze([...orders.slice(0, index), inserted, ...orders.slice(index)]);
         nextId++;
-      } else if (change.type === 'replace' || change.type === 'remove') {
-        const id = integer(change.id, 1);
+      } else if (type === 'replace' || type === 'remove') {
+        const id = integer(data.id, 1);
         const index = orders.findIndex(order => order.id === id);
         const previous = orders[index];
         if (!previous) return 'stale';
-        if (change.type === 'replace') {
-          const value = input(change.order);
+        if (type === 'replace') {
+          const value = input(data.order);
           if (previous.generation === MAX) return 'exhausted';
           const replacement = Object.freeze({...value, id, generation: previous.generation + 1, valid: true});
           orders = Object.freeze(orders.map(order => (order.id === id ? replacement : order)));
         } else {
-          if (change.current !== 'stop' && change.current !== 'advance')
+          if (data.current !== 'stop' && data.current !== 'advance')
             throw new TypeError('Explicit current deletion policy required');
           orders = Object.freeze(orders.filter(order => order.id !== id));
-          if (activeId === id) activeId = change.current === 'advance' ? (orders[index]?.id ?? null) : null;
+          if (activeId === id) activeId = data.current === 'advance' ? (orders[index]?.id ?? null) : null;
         }
         if (pending?.order.id === id) pending = null;
       } else throw new TypeError('Unknown edit');
@@ -156,7 +181,7 @@ export function createItinerary(options: {
       return 'accepted';
     });
   }
-  function start(expected: number, id: number): Result {
+  function start(expected: number, id: number): ItineraryResult {
     return mutation(() => {
       const status = admit(expected);
       if (status !== 'accepted') return status;
@@ -168,7 +193,7 @@ export function createItinerary(options: {
       return 'accepted';
     });
   }
-  function begin(): Ticket | null {
+  function begin(): ItineraryTicket | null {
     return mutation(() => {
       if (closed || pending || revision === MAX) return null;
       const order = orders.find(entry => entry.id === activeId);
@@ -177,10 +202,10 @@ export function createItinerary(options: {
       return pending;
     });
   }
-  function check(ticket: Ticket): boolean {
+  function check(ticket: ItineraryTicket): boolean {
     return !closed && pending !== null && pending === ticket;
   }
-  function finish(ticket: Ticket): boolean {
+  function finish(ticket: ItineraryTicket): boolean {
     return mutation(() => {
       if (!check(ticket) || revision === MAX) return false;
       const index = orders.findIndex(order => order.id === activeId);
@@ -197,11 +222,11 @@ export function createItinerary(options: {
       return hadPending;
     });
   }
-  function invalidateDestination(value: Destination): Result {
+  function invalidateDestination(value: ItineraryDestination): ItineraryResult {
     return mutation(() => {
       if (closed) return 'closed';
       const target = destination(value);
-      const matches = (order: Order) =>
+      const matches = (order: ItineraryOrder) =>
         order.destination.id === target.id && order.destination.generation === target.generation;
       if (!orders.some(order => order.valid && matches(order))) return 'stale';
       // Invalidation must revoke authority even when revision space is exhausted.
@@ -211,7 +236,7 @@ export function createItinerary(options: {
       return 'accepted';
     });
   }
-  function restore(expected: number, value: unknown): Result {
+  function restore(expected: number, value: unknown): ItineraryResult {
     return mutation(() => {
       const status = admit(expected);
       if (status !== 'accepted') return status;
@@ -223,7 +248,7 @@ export function createItinerary(options: {
       if (!Array.isArray(data.orders)) throw new TypeError('Expected orders');
       if (data.orders.length > maxOrders) return 'saturated';
       const ids = new Set<number>();
-      const restored = arrayData(data.orders, maxOrders).map((entry: unknown): Order => {
+      const restored = arrayData(data.orders, maxOrders).map((entry: unknown): ItineraryOrder => {
         const row = record(entry, ['id', 'generation', 'tag', 'destination', 'value', 'valid']);
         const id = integer(row.id, 1);
         if (id >= restoredNext || ids.has(id)) throw new TypeError('Invalid order identity');

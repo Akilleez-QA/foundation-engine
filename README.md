@@ -187,4 +187,5 @@ Brand assets, palette and copy-paste banners: [docs/brand.md](docs/brand.md).
 ### Optional editable itinerary experiment
 
 The [editable itinerary lab](tools/itinerary-lab/README.md) is a headless prototype
-for preserving active tasks across bounded list edits. It is not an exported kit.
+for preserving active tasks across bounded list edits. It now exercises the optional
+[public itinerary helper candidate](src/kits/itinerary/README.md).

@@ -1043,3 +1043,13 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
 opaque attempts reject late/replayed completion. Nineteen headless tests and scoped
 controller typechecking passed. Unexported prototype; no navigation/scheduler owner
 added, no production persistence or browser/device acceptance. Not integrated.
+
+## Public itinerary helper — graduation candidate, 2026-10-09
+
+ITINERARY-01 exposes createItinerary from @kits/itinerary with caller-owned lifetime
+and no registration or execution owner. The lab now consumes this implementation.
+Base: reviewed prototype e7aa2e55; branch feat/itinerary-kit. Twenty-four focused
+tests and scoped strict typechecking passed, including a real SaveStore/fresh-store
+round trip. This supersedes the prototype's unexported status, not its evidence
+limits. No full gate, browser, durable custody transaction or physical-device claim;
+not integrated. See the [contract](../../src/kits/itinerary/README.md).
