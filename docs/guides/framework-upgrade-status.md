@@ -1042,7 +1042,7 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
 
 The [unexported recurring phase lab](../../tools/recurring-lab/README.md) tests
 explicit skip/coalesce/bounded-replay policies while reusing the existing clock
-and SaveStore. Twelve headless tests cover two consumer projections, pause,
+and SaveStore. Thirteen headless tests cover two consumer projections, pause,
 mid-period reload, large jumps, stale callbacks, reentry and failed durability.
 It is a composition experiment, not a public scheduler or whole-game persistence
 claim. Callbacks stage state without storage writes; explicit host save boundaries flush.

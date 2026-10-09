@@ -83,7 +83,7 @@ external delivery. Existing sink receipts/transactions remain necessary for that
 
 ## Evidence ceiling
 
-Twelve tests cover exact boundaries; all three due policies; large jumps; malformed
+Thirteen tests cover exact boundaries; all three due policies; large jumps; malformed
 data and arithmetic exhaustion; pause through the real clock; explicit backlog
 dispatch; alert capacity failure; stale callbacks and replaced definitions; reentry;
 two consumers through real SaveStore; failed writes; and mid-period reload.

@@ -19,7 +19,7 @@ function consumer({clock, save, definition, policy, kind, capacity}) {
       !Number.isFinite(data.time) ||
       data.time < 0 ||
       data.time > Number.MAX_SAFE_INTEGER ||
-      (data.lastFiring !== null && (typeof data.lastFiring !== 'string' || data.lastFiring.length > 160))
+      (data.lastFiring !== null && typeof data.lastFiring !== 'string')
     )
       throw Error('consumer: invalid envelope');
     const phase = restorePhase(definition, data.phase);

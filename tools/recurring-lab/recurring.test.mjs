@@ -270,3 +270,38 @@ test('mid-period save while armed preserves both consumer schedules, including f
       store.dispose();
     }
 });
+
+test('maximum escaped definition IDs remain valid through delivery and reload', () => {
+  for (const factory of [createStation, createAlerts]) {
+    const runtime = createClock({realNow: () => 0, state: {ut: 0, lastRealMs: null}});
+    const backend = new MemoryBackend(),
+      store = open(backend);
+    const escaped = {...definition, id: String.fromCharCode(1).repeat(64), firstAt: 0};
+    const owner = factory({
+      clock: runtime.clock,
+      save: authorSaveHandle(store, section),
+      definition: escaped,
+      policy: 'coalesce',
+      capacity: 4,
+    });
+    owner.arm();
+    runtime.driver.advance(0.25);
+    assert.equal(owner.read().value, 1);
+    assert.ok(owner.read().lastFiring.length > 160);
+    assert.equal(owner.retrySave(), 'saved');
+    const before = owner.read();
+    owner.dispose();
+    store.dispose();
+    const restoredStore = open(backend, 1);
+    const restored = factory({
+      clock: runtime.clock,
+      save: authorSaveHandle(restoredStore, section),
+      definition: escaped,
+      policy: 'coalesce',
+      capacity: 4,
+    });
+    assert.deepEqual(restored.read(), before);
+    restored.dispose();
+    restoredStore.dispose();
+  }
+});
