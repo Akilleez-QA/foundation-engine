@@ -43,6 +43,48 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'ASG-01',
+    title: 'Optional bounded service and worksite assignment ownership',
+    docs: 'docs/guides/assignments.md',
+    evidence: [{kit: 'assignments', export: 'createAssignments'}],
+  },
+  {
+    id: 'ITINERARY-01',
+    title: 'Bounded editable destination itineraries with owned completion attempts',
+    docs: 'src/kits/itinerary/README.md',
+    evidence: [{kit: 'itinerary', export: 'createItinerary'}],
+  },
+  {
+    id: 'ALN-01',
+    title: 'Planar interaction preparation with bounded proposals and exact-ticket acknowledgment',
+    docs: 'src/kits/alignment/README.md',
+    evidence: [{kit: 'alignment', export: 'createAlignment'}, {path: 'src/kits/alignment/alignment.test.ts'}],
+  },
+  {
+    id: 'VISIBILITY-01',
+    title: 'Bounded source-owned visibility and explored history',
+    docs: 'src/kits/visibility/README.md',
+    evidence: [{kit: 'visibility', export: 'createVisibility'}],
+  },
+  {
+    id: 'GEN-WEIGHTED',
+    title: 'Bounded eligible weighted choice with separately committed recent history',
+    docs: 'docs/guides/weighted-choice.md',
+    evidence: [
+      {kit: 'procgen', export: 'chooseWeighted'},
+      {kit: 'procgen', export: 'createChoiceHistory'},
+    ],
+  },
+  {
+    id: 'CAP-EFFECT-CHECKPOINT',
+    title: 'Portable timed contribution checkpoints',
+    docs: 'docs/guides/timed-effects.md',
+    evidence: [
+      {kit: 'capabilities', export: 'createTimedEffects'},
+      {path: 'src/kits/capabilities/timed-effects-checkpoint.test.ts'},
+    ],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,

@@ -1,3 +1,4 @@
+import {captureResourceState} from './resource-state';
 import {FrameReadinessError} from '../platform/render/frame-readiness';
 import {ProgramLinkError} from '../platform/render/program-validation';
 import {t as failureText} from '../core/i18n/app-i18n';
@@ -120,14 +121,6 @@ const voiceOptions = (o: PlayOptions | undefined): CueVoiceOptions => ({
   ...(o?.pitch !== undefined ? {rate: o.pitch} : {}),
   ...(o?.position ? {spatial: {position: [...o.position] as [number, number, number]}} : {}),
 });
-
-const json = (v: unknown): Record<string, unknown> => {
-  try {
-    return JSON.parse(JSON.stringify(v ?? {})) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-};
 
 /** The scatter drawing chunk, once a scene that opted in has prepared (so its first frame already draws scatters). */
 let scatterModule: typeof import('./scene-scatter') | null = null;
@@ -1162,7 +1155,7 @@ export async function enterScene(o: {
           const named: Record<string, {x: number; y: number; z: number}> = {};
           for (const [, n, tr] of world.query(Name, Transform))
             if (n.name) named[n.name] = {x: +tr.x.toFixed(3), y: +tr.y.toFixed(3), z: +tr.z.toFixed(3)};
-          return {scene: scene.id, entities: world.count, state: json(world.resources), named, frame};
+          return {scene: scene.id, entities: world.count, state: captureResourceState(world.resources), named, frame};
         },
         teleport(x, z, name = 'player') {
           const e = ctx.named(name),

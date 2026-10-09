@@ -52,6 +52,13 @@ export interface SessionClientOptions<A extends DocumentValue> {
   readonly closePolicy?: ClosePolicyOptions;
   /** Keep-alive interval while joined (the reference host closes silent connections). Default 5000 ms. */
   readonly pingMs?: number;
+  /** Optional paired host liveness. Requires host `refreshOnPing: true`; uses the existing update clock. */
+  readonly liveness?: Readonly<{
+    /** Transport creation to first adopted baseline, milliseconds (positive safe integer). */
+    connectTimeoutMs: number;
+    /** Silence since an adopted advancing view, milliseconds (safe integer greater than pingMs). */
+    hostTimeoutMs: number;
+  }>;
   /**
    * Unconfirmed predicted actions. At the bound `act` refuses `busy`. Default 16. Keep it at or below the host's
    * `maxQueuedActionsPerPeer` (default 16), or a burst can fill the host queue and close the connection.
@@ -123,6 +130,20 @@ export function createSession<A extends DocumentValue>(options: SessionClientOpt
     actionsPerSecond > 1000
   )
     throw Error('session: invalid pingMs, maxPending or actionsPerSecond');
+  const configured = options.liveness;
+  let liveness: SessionClientOptions<A>['liveness'] | null = null;
+  if (configured !== undefined) {
+    if (!exactKeys(configured, ['connectTimeoutMs', 'hostTimeoutMs'])) throw Error('session: invalid liveness');
+    const {connectTimeoutMs, hostTimeoutMs} = configured;
+    if (
+      !Number.isSafeInteger(connectTimeoutMs) ||
+      connectTimeoutMs <= 0 ||
+      !Number.isSafeInteger(hostTimeoutMs) ||
+      hostTimeoutMs <= pingMs
+    )
+      throw Error('session: invalid liveness');
+    liveness = Object.freeze({connectTimeoutMs, hostTimeoutMs});
+  }
   const pacing = createRateAdmission({maxKeys: 1, capacity: actionsPerSecond, refillPerSecond: actionsPerSecond});
   if (endpoint && (typeof endpoint.url !== 'string' || typeof endpoint.joinCode !== 'string'))
     throw Error('session: invalid endpoint');
@@ -157,6 +178,10 @@ export function createSession<A extends DocumentValue>(options: SessionClientOpt
     session: string | null = null,
     joinSent = false,
     lastSentAt = 0;
+  let openedAt = 0,
+    lastViewAt = 0,
+    lastPingAt = 0,
+    baselineReceived = false;
 
   const local = endpoint ? null : safeWorld(rules, () => rules.join(rules.initial(), 'p1'));
   if (!endpoint && !local) throw Error('session: rules.join(initial, "p1") returned an invalid world');
@@ -206,6 +231,10 @@ export function createSession<A extends DocumentValue>(options: SessionClientOpt
   }
   function open() {
     retryAt = null;
+    openedAt = lastNow;
+    lastPingAt = lastNow;
+    lastViewAt = lastNow;
+    baselineReceived = false;
     try {
       transport = createBrowserTransport({
         url: endpoint!.url,
@@ -237,6 +266,7 @@ export function createSession<A extends DocumentValue>(options: SessionClientOpt
   /** Lost the connection: classify the host's close, then stop or pace a fresh attempt. */
   function lost(remote: BrowserRemoteClose | null, local: string) {
     teardown();
+    if (liveness && confirmed) show(confirmed);
     const kind = policy.classify(remote);
     lastClose = Object.freeze({code: remote?.code ?? null, reason: remote?.reason ?? local, class: kind});
     if (kind === 'terminal') {
@@ -337,13 +367,18 @@ export function createSession<A extends DocumentValue>(options: SessionClientOpt
       everJoined = true;
       status = 'joined';
       reason = null;
-      retry!.succeeded(lastNow);
+      if (!liveness) retry!.succeeded(lastNow);
       return true;
     }
     const result = receiver.receive(raw),
       state = receiver.read();
     if (state.state === 'retired') return false;
-    if (result.status === 'accepted' && (!state.view || !adopt(state.view))) return false;
+    if (result.status === 'accepted') {
+      if (!state.view || !adopt(state.view)) return false;
+      lastViewAt = lastNow;
+      if (liveness && !baselineReceived) retry!.succeeded(lastNow);
+      baselineReceived = true;
+    }
     // The host could not project this player's view: in-flight actions cannot be renumbered, so resynchronise.
     if (result.status === 'unavailable') return false;
     if (result.status === 'accepted' || result.status === 'duplicate')
@@ -399,7 +434,21 @@ export function createSession<A extends DocumentValue>(options: SessionClientOpt
         lost(read.remoteClose, read.reason ?? 'closed');
         return;
       }
-      if (receiver && lastNow - lastSentAt >= pingMs) send({v: 1, type: 'ping'});
+      if (liveness) {
+        if (!baselineReceived && lastNow - openedAt >= liveness.connectTimeoutMs) {
+          fail('connect-timeout');
+          return;
+        }
+        if (baselineReceived && lastNow - lastViewAt >= liveness.hostTimeoutMs) {
+          fail('host-timeout');
+          return;
+        }
+        // Actions and acks do not establish host pump progress.
+        if (receiver && lastNow - lastPingAt >= pingMs) {
+          lastPingAt = lastNow;
+          send({v: 1, type: 'ping'});
+        }
+      } else if (receiver && lastNow - lastSentAt >= pingMs) send({v: 1, type: 'ping'});
     },
     act(action: A) {
       if (disposed) return refused('disposed');

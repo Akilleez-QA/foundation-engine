@@ -1,10 +1,51 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Matrix4} from 'three';
-import {createFrames, createFrameUpdates, frameReplicaSystem, FrameReplica} from './index';
+import {createFrames, createFrameUpdates, frameReplicaSystem, FrameReplica, frameRef, type FrameRef} from './index';
 import {defineScene, testScene, Transform, Name} from '../../author';
 const pose = (x: number) => new Matrix4().makeTranslation(x, 0, 0).toArray();
 const ref = (id: string, generation = 1) => ({id, generation});
+test('runtime identities reject nonstring IDs before retaining frames or owner capacity', () => {
+  for (const id of [1, true, {}, [], new String('frame'), Symbol('frame'), '']) {
+    const invalid = {id, generation: 1} as FrameRef,
+      f = createFrames(1),
+      q = createFrameUpdates(f, 1);
+    assert.throws(() => frameRef(invalid), /invalid frame identity/);
+    assert.throws(() => f.set({...invalid, matrix: pose(0)}), /invalid frame identity/);
+    assert.throws(() => q.register(invalid.id, 1), /invalid frame identity/);
+    assert.equal(f.size, 0);
+    assert.equal(q.size, 0);
+    assert.equal(f.set({...ref('valid'), matrix: pose(2)}), true);
+    q.register('owner', 1);
+    assert.throws(() => f.remove(invalid), /invalid frame identity/);
+    assert.throws(() => f.resolve(invalid), /invalid frame identity/);
+    assert.throws(
+      () => q.offer('owner', {generation: 1, sequence: 4, frame: invalid, local: pose(0)}),
+      /invalid frame identity/,
+    );
+    assert.equal(q.state('owner')!.newestSeen, -1);
+    assert.equal(f.resolve(ref('valid'))![12], 2);
+  }
+});
+test('frame identity admission captures each field once and resolution uses that capture', () => {
+  const f = createFrames();
+  f.set({...ref('valid'), matrix: pose(2)});
+  let ids = 0,
+    generations = 0;
+  const changing = (): FrameRef => ({
+    get id() {
+      return ++ids === 1 ? 'valid' : 'wrong';
+    },
+    get generation() {
+      return ++generations === 1 ? 1 : 2;
+    },
+  });
+  assert.equal(f.resolve(changing())![12], 2);
+  assert.deepEqual([ids, generations], [1, 1]);
+  ids = generations = 0;
+  assert.equal(f.remove(changing()), true);
+  assert.deepEqual([ids, generations], [1, 1]);
+});
 test('missing parents delay newer updates; older poses cannot overwrite newest-seen identity', () => {
   const f = createFrames(),
     q = createFrameUpdates(f);
@@ -99,4 +140,64 @@ test('applied local pose follows parent motion without another sequence and hold
   s.run(1 / 60);
   assert.equal(q.state('actor')!.world, null);
   assert.equal(s.world.get(s.ctx.named('actor')!, Transform)!.x, 24);
+});
+
+test('author pose cache includes owner generation, owner name and native transform identity', async () => {
+  const f = createFrames(),
+    q = createFrameUpdates(f);
+  f.set({...ref('room'), matrix: pose(0)});
+  q.register('actor', 1);
+  const s = await testScene(
+    defineScene({
+      id: 'replica-rebind',
+      title: 'replica.rebind',
+      entities: [[Name({name: 'actor'}), Transform(), FrameReplica({owner: 'actor', generation: 1})]],
+      systems: [frameReplicaSystem(q)],
+    }),
+  );
+  const entity = s.ctx.named('actor')!,
+    replica = s.world.get(entity, FrameReplica)!;
+  const offer = (owner: string, generation: number, x: number) =>
+    q.offer(owner, {generation, sequence: 0, frame: ref('room'), local: pose(x)});
+  offer('actor', 1, 4);
+  s.run(1 / 60);
+  const firstRevision = replica.revision;
+  assert.equal(s.world.get(entity, Transform)!.x, 4);
+  q.cancel('actor', 1);
+  q.register('actor', 2);
+  offer('actor', 2, 9);
+  s.run(1 / 60);
+  assert.equal(s.world.get(entity, Transform)!.x, 4); // Component still owns the old generation.
+  replica.generation = 2;
+  s.run(1 / 60);
+  assert.equal(q.state('actor')!.revision, firstRevision);
+  assert.equal(s.world.get(entity, Transform)!.x, 9);
+
+  q.register('other', 2);
+  offer('other', 2, 12);
+  replica.owner = 'other';
+  s.run(1 / 60);
+  assert.equal(q.state('other')!.revision, firstRevision);
+  assert.equal(s.world.get(entity, Transform)!.x, 12);
+  s.world.add(entity, Transform({x: 99}));
+  s.run(1 / 60);
+  assert.equal(s.world.get(entity, Transform)!.x, 12);
+});
+
+test('attached pose cannot follow a replaced frame generation without an explicit newer update', () => {
+  const f = createFrames(),
+    q = createFrameUpdates(f);
+  f.set({...ref('platform'), matrix: pose(10)});
+  q.register('actor', 1);
+  q.offer('actor', {generation: 1, sequence: 0, frame: ref('platform'), local: pose(3)});
+  q.pump(1);
+  assert.equal(q.state('actor')!.world![12], 13);
+  f.remove(ref('platform'));
+  f.set({...ref('platform', 2), matrix: pose(100)});
+  q.pump(1);
+  assert.equal(q.state('actor')!.world, null);
+  assert.equal(q.state('actor')!.frame!.generation, 1);
+  q.offer('actor', {generation: 1, sequence: 1, frame: ref('platform', 2), local: pose(3)});
+  q.pump(1);
+  assert.equal(q.state('actor')!.world![12], 103);
 });
