@@ -103,3 +103,44 @@ test('every template playtest script is found for the template gates', () => {
     assert.deepEqual(files, want, t);
   }
 });
+
+for (const terminal of ['throw', 'report'] as const) {
+  test(`batch preserves completed, failed and not-run rows after terminal ${terminal}`, async () => {
+    const {root, dir} = game();
+    try {
+      writeFileSync(join(dir, 'playtest', 'c.json'), JSON.stringify({...ok, name: 'c'}));
+      const files = playtestFiles(dir, []);
+      let calls = 0;
+      const results = await runPlaytests(files, {
+        url: async () => '',
+        problems: scriptProblems,
+        run: async script => {
+          calls++;
+          if (calls === 2) {
+            if (terminal === 'throw') throw Error('RESOURCE_CAPTURE_FAILED');
+            return {
+              name: script.name,
+              pass: false,
+              terminal: true,
+              steps: [{step: {}, ok: false}],
+              errors: ['RESOURCE_CAPTURE_FAILED'],
+            };
+          }
+          return {name: script.name, pass: true, steps: [{step: {}, ok: true}]};
+        },
+      });
+      assert.equal(calls, 2);
+      assert.deepEqual(
+        results.map(row => row.status),
+        ['completed', 'failed', 'not-run'],
+      );
+      assert.deepEqual(
+        results.map(row => row.pass),
+        [true, false, false],
+      );
+      assert.match(results[1]!.detail, /RESOURCE_CAPTURE_FAILED/);
+    } finally {
+      rmSync(root, {recursive: true, force: true});
+    }
+  });
+}

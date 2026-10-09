@@ -117,3 +117,11 @@ To test the same thing without a browser, use `createTestSaves()` in a game test
   failure. The engine's own save store tests cover storage failures (with failure-injecting memory storage that game
   tests cannot reach).
 - A script asserts on `engine.state()` only. It cannot read the DOM or audio.
+
+Resource observation failures raise RESOURCE_CAPTURE_FAILED instead of returning
+empty state. A script stops on observation/execution failure and writes a terminal
+failed report, including cleanup errors; polling cannot retry that failed sample
+into a pass. Held keys and the browser are released. Batch reports retain completed
+and failed scripts and mark remaining scripts not-run after terminal execution
+failure. Snapshot reports mark a failed view incomplete and retain any screenshot;
+unavailable world state is never reported as zero entities or empty resources.

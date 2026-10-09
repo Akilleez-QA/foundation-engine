@@ -20,6 +20,7 @@ export interface PlaytestFile {
 export interface PlaytestResult extends PlaytestFile {
   name: string;
   pass: boolean;
+  status: 'completed' | 'failed' | 'not-run';
   detail: string;
 }
 interface Criterion {
@@ -52,25 +53,51 @@ export async function runPlaytests(
   o: {url: () => Promise<string>; run: Runner; problems: (s: unknown) => string[]},
 ): Promise<PlaytestResult[]> {
   const out: PlaytestResult[] = [];
+  let stopped = false;
   for (const f of files) {
+    if (stopped) {
+      out.push({...f, name: f.file, pass: false, status: 'not-run', detail: 'not run after terminal script failure'});
+      continue;
+    }
     let script: Script;
     try {
       script = JSON.parse(readFileSync(join(ROOT, f.file), 'utf8')) as Script;
     } catch (error) {
-      out.push({...f, name: f.file, pass: false, detail: `cannot read: ${(error as Error).message}`});
+      out.push({...f, name: f.file, pass: false, status: 'failed', detail: `cannot read: ${(error as Error).message}`});
       continue;
     }
     const problems = o.problems(script);
     if (problems.length) {
-      out.push({...f, name: String(script?.name ?? f.file), pass: false, detail: problems.join('; ')});
+      out.push({
+        ...f,
+        name: String(script?.name ?? f.file),
+        pass: false,
+        status: 'failed',
+        detail: problems.join('; '),
+      });
       continue;
     }
-    const r = await o.run(script, await o.url());
+    let r: Awaited<ReturnType<Runner>>;
+    try {
+      r = await o.run(script, await o.url());
+    } catch (error) {
+      out.push({
+        ...f,
+        name: script.name,
+        pass: false,
+        status: 'failed',
+        detail: 'script execution failed: ' + String(error),
+      });
+      stopped = true;
+      continue;
+    }
+    if (r.terminal) stopped = true;
     const failed = r.steps.filter(s => s.ok === false).length;
     out.push({
       ...f,
       name: script.name,
       pass: r.pass,
+      status: r.pass ? 'completed' : 'failed',
       detail: r.pass
         ? `${r.steps.length} step(s); evidence playtest/latest/${script.name}/`
         : `${failed} failing step(s)${r.errors?.length ? `, page errors: ${r.errors.slice(0, 2).join(' | ')}` : ''}; see playtest/latest/${script.name}/report.json`,
