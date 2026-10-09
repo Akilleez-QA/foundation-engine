@@ -38,3 +38,22 @@ assert.deepEqual(t.cues, ['ui.click']);
 ```
 
 Every option and result field of `testScene` (`went`, `plays`, `voices`, `music`, `particles`, …) is in [test a scene](test-a-scene.md).
+
+## Core runner numeric boundary
+
+The internal fixed-step runner accepts finite positive step sizes and a nonnegative
+safe-integer step budget. A zero budget drops due whole steps while still running
+presentation. Fixed time retains the existing clamp to zero through one second per
+frame; presentation receives the original finite delta, including a negative value.
+Nonfinite deltas, unsafe whole-step counts, and overflowing frame/step/drop counters
+are refused before callbacks or accumulator/counter changes, so a later admissible
+frame can continue from the retained phase.
+
+Accumulation carries rounding compensation across frames. Whole-step boundary tolerance is 64 machine epsilons in step units, not an
+absolute number of seconds. Zero accumulated time never creates a fixed tick, even
+with subnormal step sizes. Completed frames retain an interpolation fraction in
+`[0, 1)`. This is JavaScript Number accounting, not exact elapsed-time arithmetic;
+extreme ratios that exceed safe-integer counts are refused even with a zero budget.
+This does not add a scheduler, change the scene's default60Hz step, or impose a
+minimum creator tick interval. Callback failures retain the existing runner policy;
+numeric admission is not rollback of arbitrary callback side effects.

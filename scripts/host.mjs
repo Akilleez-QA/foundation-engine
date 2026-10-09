@@ -64,6 +64,7 @@ export async function loadSessionRules(dir = gameDir()) {
 /**
  * Start the WebSocket host. Returns `{url, port, joinCode, read, close}`. The timer and sockets belong to this owner;
  * `close()` stops the driver, closes every connection with `host-closing` and the server.
+ * `refreshOnPing` opts into paired application liveness; default false, CLI defaults unchanged.
  */
 export async function startSessionServer({
   rules,
@@ -72,6 +73,7 @@ export async function startSessionServer({
   joinCode = randomBytes(18).toString('base64url'),
   integrity = 'observe',
   driverMs = 20,
+  refreshOnPing = false,
   limits,
   log,
   lan = host !== '127.0.0.1',
@@ -85,6 +87,7 @@ export async function startSessionServer({
     rules,
     joinCode,
     integrity,
+    refreshOnPing,
     limits,
     log,
     ports: {
