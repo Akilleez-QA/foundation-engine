@@ -13,8 +13,24 @@ import {assertScript, MATCHERS, stepKind} from './script-schema.mjs';
 
 const at = (obj, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
 
+// Browser observations are data graphs; inspect the selected value before JSON equality can turn NaN into null.
+function hasNonfinite(value) {
+  const pending = [value],
+    seen = new Set();
+  while (pending.length) {
+    const entry = pending.pop();
+    if (typeof entry === 'number' && !Number.isFinite(entry)) return true;
+    if (entry && typeof entry === 'object' && !seen.has(entry)) {
+      seen.add(entry);
+      for (const child of Object.values(entry)) pending.push(child);
+    }
+  }
+  return false;
+}
+
 export function judge(state, e) {
   const got = at(state, e.path);
+  if (hasNonfinite(got)) return {ok: false, got};
   if ('equals' in e) return {ok: JSON.stringify(got) === JSON.stringify(e.equals), got};
   if ('contains' in e) return {ok: Array.isArray(got) && got.includes(e.contains), got};
   if ('atLeast' in e) return {ok: typeof got === 'number' && got >= e.atLeast, got};

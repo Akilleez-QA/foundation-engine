@@ -80,7 +80,7 @@ The arcade template's `game/playtest/best-reload.json`:
 |---|---|
 | `"equals": v` | the value is `v` (compared as JSON) |
 | `"contains": v` | the value is a list containing `v` |
-| `"atLeast": n` | the value is a number ≥ `n` |
+| `"atLeast": n` | the value is a finite number ≥ `n` |
 | `"exists": true` / `false` | the value is (or is not) present and not null |
 
 There is no `atMost` or `below`. To check an upper bound, assert on a value the game computes, such as a
@@ -117,3 +117,10 @@ To test the same thing without a browser, use `createTestSaves()` in a game test
   failure. The engine's own save store tests cover storage failures (with failure-injecting memory storage that game
   tests cannot reach).
 - A script asserts on `engine.state()` only. It cannot read the DOM or audio.
+
+A selected observation containing NaN or either infinity fails every matcher,
+including nested arrays/objects, instead of passing as JSON null or an unbounded
+number. Other paths are unaffected. This validates the value delivered to the
+matcher: it cannot recover invalid numbers that an earlier state projection has
+already converted to null. In particular, resource snapshots currently pass
+through JSON cloning before delivery; named transform observations do not.
