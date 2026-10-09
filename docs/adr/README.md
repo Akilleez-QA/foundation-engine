@@ -73,3 +73,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0082](0082-bounded-weighted-choice-history.md) | Bounded weighted choice and separately committed history | Procgen | Proposed |
 
 | [0083](0083-portable-timed-contribution-checkpoints.md) | Portable timed contribution checkpoints through the existing owner | Capabilities / Persistence | Proposed |
+
+| [0084](0084-persisted-recurring-phase.md) | Persisted recurring phase with explicit bounded catch-up | Optional composition / Time / Persistence | Proposed |
