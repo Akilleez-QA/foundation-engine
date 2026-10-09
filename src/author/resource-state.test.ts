@@ -46,6 +46,7 @@ test('real probe and test API propagate resource failure then recover without re
     [
       defineModule({
         id: 'feature.capture-test',
+        version: '1.0.0',
         install(s) {
           s.probes.register(
             'world',
@@ -72,7 +73,7 @@ test('real probe and test API propagate resource failure then recover without re
     assert.equal(world.resources, resources);
     assert.ok(Number.isNaN(world.resources.value));
     world.resources.value = null;
-    assert.equal(api.state().world?.state.value, null);
+    assert.deepEqual(api.state().world, {scene: 'test', entities: 0, state: {value: null}, named: {}, frame: 0});
   } finally {
     app.dispose();
   }
