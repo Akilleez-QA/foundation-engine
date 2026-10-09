@@ -109,4 +109,4 @@ This is an experiment, not a proposed universal quest engine. The authored repla
 validator deliberately understands these two consumers. Extending it to arbitrary
 effects would require a creator-defined schema, revision/migration policy and
 documented sink guarantees. Review this composition before deciding whether any
-shared helper is warranted. The [proposal draft](ISSUE.md) records that decision.
+shared helper is warranted. The [proposal](ISSUE.md) records that decision.

@@ -1,6 +1,6 @@
 # Proposal: validate durable interaction continuation through existing owners
 
-Issue draft for review; this file does not represent a published tracker issue.
+Tracked in [issue #201](https://github.com/Akilleez-QA/foundation-engine/issues/201).
 
 ## Problem and smallest consumers
 
