@@ -183,3 +183,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development and contribution guidance
 ```
 
 Brand assets, palette and copy-paste banners: [docs/brand.md](docs/brand.md).
+
+### Optional editable itinerary experiment
+
+The [editable itinerary lab](tools/itinerary-lab/README.md) is a headless prototype
+for preserving active tasks across bounded list edits. It is not an exported kit.

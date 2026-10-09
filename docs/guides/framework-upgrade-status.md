@@ -1036,3 +1036,10 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   an error. **Disclosure.** `npm run disclosure` drafts Steam and itch.io AI-disclosure text from the records, with
   development tooling kept apart from content players see. Evidence: focused tests and `npm run check`. Tooling only;
   no store-acceptance or licence-truth claim. [Guide](asset-provenance.md).
+
+## Editable itinerary experiment — candidate, 2026-10-09
+
+[Lab contract](itinerary-lab.md): bounded order edits preserve the active cursor;
+opaque attempts reject late/replayed completion. Seventeen headless tests and scoped
+controller typechecking passed. Unexported prototype; no navigation/scheduler owner
+added, no production persistence or browser/device acceptance. Not integrated.
