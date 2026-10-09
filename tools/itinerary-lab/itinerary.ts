@@ -51,6 +51,24 @@ function record(value: unknown, keys: readonly string[]): Record<string, unknown
   return result;
 }
 
+/** Snapshot/config arrays are plain dense data, not executable iterables. */
+function arrayData(value: readonly unknown[], maxLength: number): unknown[] {
+  const length = integer(Object.getOwnPropertyDescriptor(value, 'length')?.value);
+  if (
+    length > maxLength ||
+    Object.getPrototypeOf(value) !== Array.prototype ||
+    Reflect.ownKeys(value).length !== length + 1
+  )
+    throw new TypeError('Expected plain array data');
+  const result: unknown[] = [];
+  for (let index = 0; index < length; index++) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || !('value' in descriptor)) throw new TypeError('Expected dense array data');
+    result.push(descriptor.value);
+  }
+  return result;
+}
+
 export function createItinerary(options: {
   readonly maxOrders: number;
   readonly maxTextLength: number;
@@ -65,7 +83,7 @@ export function createItinerary(options: {
   }
   if (!Array.isArray(options.tags) || options.tags.length === 0 || options.tags.length > maxOrders)
     throw new TypeError('Tag count must fit maxOrders');
-  const tags = new Set(Array.from(options.tags, text));
+  const tags = new Set(arrayData(options.tags, maxOrders).map(text));
   if (tags.size !== options.tags.length) throw new TypeError('Duplicate tags');
   function destination(value: unknown): Destination {
     const data = record(value, ['id', 'generation']);
@@ -205,7 +223,7 @@ export function createItinerary(options: {
       if (!Array.isArray(data.orders)) throw new TypeError('Expected orders');
       if (data.orders.length > maxOrders) return 'saturated';
       const ids = new Set<number>();
-      const restored = Array.from(data.orders, (entry: unknown): Order => {
+      const restored = arrayData(data.orders, maxOrders).map((entry: unknown): Order => {
         const row = record(entry, ['id', 'generation', 'tag', 'destination', 'value', 'valid']);
         const id = integer(row.id, 1);
         if (id >= restoredNext || ids.has(id)) throw new TypeError('Invalid order identity');

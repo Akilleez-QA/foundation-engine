@@ -668,7 +668,7 @@ Tooling, not runtime: per-file provenance records, a `npm run check` step and a 
 
 ## Editable itinerary lab — candidate, 2026-10-09
 
-Optional headless prototype in tools/itinerary-lab; no engine export. Seventeen
+Optional headless prototype in tools/itinerary-lab; no engine export. Nineteen
 focused controller/consumer tests and scoped strict typechecking passed. Patrol
 and delivery/service fixtures exercise edits and retired completions. Synthetic
 custody is not SaveStore/resource transaction evidence. No browser, full gate or

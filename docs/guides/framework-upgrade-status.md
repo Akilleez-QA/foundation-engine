@@ -1040,6 +1040,6 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
 ## Editable itinerary experiment — candidate, 2026-10-09
 
 [Lab contract](itinerary-lab.md): bounded order edits preserve the active cursor;
-opaque attempts reject late/replayed completion. Seventeen headless tests and scoped
+opaque attempts reject late/replayed completion. Nineteen headless tests and scoped
 controller typechecking passed. Unexported prototype; no navigation/scheduler owner
 added, no production persistence or browser/device acceptance. Not integrated.

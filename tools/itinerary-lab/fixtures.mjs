@@ -10,18 +10,22 @@ export function patrolFixture() {
   let position = 'gate';
   let observations = 0;
   let search = null;
+  let searchTicket = null;
   function prepare(ticket) {
+    if (!itinerary.check(ticket)) throw new Error('Cannot prepare a retired patrol attempt');
     search?.cancel();
     search = createPathSearch(graph, position, ticket.order.destination.id);
+    searchTicket = ticket;
     return search;
   }
   function arrive(ticket, physicalPosition, observedGeneration) {
     if (physicalPosition !== ticket.order.destination.id || observedGeneration !== ticket.order.destination.generation)
       return false;
-    if (search?.result.status !== 'arrived' || !itinerary.finish(ticket)) return false;
+    if (searchTicket !== ticket || search?.result.status !== 'arrived' || !itinerary.finish(ticket)) return false;
     position = physicalPosition;
     if (ticket.order.tag === 'observe') observations += ticket.order.value;
     search = null;
+    searchTicket = null;
     return true;
   }
   return {
@@ -32,11 +36,13 @@ export function patrolFixture() {
     cancel: () => {
       search?.cancel();
       search = null;
+      searchTicket = null;
       itinerary.cancel();
     },
     dispose: () => {
       search?.cancel();
       search = null;
+      searchTicket = null;
       itinerary.dispose();
     },
   };

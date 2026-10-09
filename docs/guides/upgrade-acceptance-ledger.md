@@ -995,7 +995,7 @@ was tooling rather than content.
 
 ## Editable itinerary prototype — 2026-10-09 candidate receipt
 
-Base: origin/main e7e42706; branch feat/itinerary-lab. Seventeen focused tests passed
+Base: origin/main e7e42706; branch feat/itinerary-lab. Nineteen focused tests passed
 via node --import tsx --test tools/itinerary-lab/itinerary.test.mjs; strict controller
 check passed via tsc --noEmit -p tools/itinerary-lab/tsconfig.json. Two headless
 consumers; no exported API, full gate, browser, durable custody or physical-device

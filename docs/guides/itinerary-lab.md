@@ -77,7 +77,7 @@ worker request too; ticket refusal cannot physically stop external work.
 `snapshot()` returns detached immutable records, including schema version, cursor,
 order generations, validity, next ID and revision. `restore(expectedRevision, data)`
 validates the whole snapshot before committing; malformed, duplicate, missing-active,
-sparse and oversized records cannot replace current state. Restore advances local
+sparse, executable-iterator, accessor and oversized records cannot replace current state. Restore advances local
 revision beyond both old and supplied revisions and retires every pending attempt.
 It never resurrects external jobs or imports tickets. Validate destination references
 against the accepted world after loading and before starting work; persisted validity
@@ -86,7 +86,7 @@ section or supply schema migrations. Unknown versions are refused without reset.
 
 ## Evidence and remaining work
 
-Seventeen focused tests passed on this candidate, covering insertion slots before,
+Nineteen focused tests passed on this candidate, covering insertion slots before,
 at and after the active cursor; neighbor/current deletion; capacity refusal without
 mutation; revision conflicts; replacement; invalidation and destination reuse;
 copied/foreign/replayed completions; cancellation/disposal; immutable and corrupted
@@ -95,6 +95,8 @@ snapshot handling; rollback ID monotonicity and revision exhaustion.
 The patrol fixture uses the existing incremental path search with caller-issued
 one-unit steps. A computed path does not count as arrival: the test observes no
 position or observation change until a separate matching physical-arrival input.
+Each search is bound to its exact attempt; an old completed route cannot authorize
+a replacement task, and stale preparation cannot cancel the current search.
 The delivery fixture exercises collect, deliver and service rules, refusal of an
 impossible transfer, preserved carried quantity and rejection of duplicate effects.
 Its finite counters are synthetic custody, not production inventory or save evidence.

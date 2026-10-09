@@ -251,3 +251,52 @@ test('delivery/services use authored quantity rules, refuse impossible transfer 
   assert.deepEqual(fixture.state(), {stock: 1, carried: 0, delivered: 3, services: 1});
   assert.equal(route.snapshot().activeId, null);
 });
+
+test('array admission rejects executable iterators and accessors before they run', () => {
+  let executions = 0;
+  const tags = ['visit'];
+  tags[Symbol.iterator] = function* () {
+    executions++;
+    yield 'visit';
+    yield 'extra';
+  };
+  assert.throws(() => createItinerary({maxOrders: 1, maxTextLength: 32, tags}));
+  const {route, ticket} = seeded();
+  const before = route.snapshot();
+  const iterable = [];
+  iterable[Symbol.iterator] = function* () {
+    executions++;
+    while (true) yield before.orders[0];
+  };
+  assert.throws(() => route.restore(before.revision, {...before, orders: iterable}));
+  const accessor = [before.orders[0]];
+  Object.defineProperty(accessor, '0', {
+    get() {
+      executions++;
+      return before.orders[0];
+    },
+  });
+  assert.throws(() => route.restore(before.revision, {...before, orders: accessor}));
+  assert.equal(executions, 0);
+  assert.deepEqual(route.snapshot(), before);
+  assert.equal(route.check(ticket), true);
+});
+
+test('patrol route evidence belongs to its exact attempt and stale preparation cannot cancel current work', () => {
+  const fixture = patrolFixture();
+  const route = fixture.itinerary;
+  const id = insert(route, 0, order('tower'));
+  route.start(route.snapshot().revision, id);
+  const original = route.begin();
+  const oldSearch = fixture.prepare(original);
+  for (let i = 0; i < 32 && oldSearch.result.status === 'pending'; i++) oldSearch.step(1);
+  assert.equal(oldSearch.result.status, 'arrived');
+  edit(route, {type: 'replace', id, order: order('gate')});
+  const replacement = route.begin();
+  assert.equal(fixture.arrive(replacement, 'gate', 0), false);
+  const currentSearch = fixture.prepare(replacement);
+  assert.throws(() => fixture.prepare(original), /retired/);
+  assert.equal(currentSearch.result.status, 'pending');
+  for (let i = 0; i < 32 && currentSearch.result.status === 'pending'; i++) currentSearch.step(1);
+  assert.equal(fixture.arrive(replacement, 'gate', 0), true);
+});
