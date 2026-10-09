@@ -843,3 +843,15 @@ and ADR0085. Configured limits and exact contact ordering are runtime contracts;
 focused geometric, persistence and consumer tests are candidate evidence. Hosted
 full CI, browser/GPU and physical-device acceptance are not established here.
 No new scheduler, material policy or whole-engine completion claim.
+
+
+## Shared navigation distance-field candidate (2026-10-09)
+
+The optional navigation helper prepares immutable multi-goal distances and acyclic
+next hops over existing directed weighted graphs. Reverse adjacency, search and
+output publication are incrementally budgeted; graph admission and storage setup
+remain explicit synchronous preparation. It installs no scheduler or movement
+policy. Independent integer-graph oracles and two activity-lifetime compositions
+exercise cancellation and stale publication; floating accumulation order is
+documented separately from forward route parity. See the navigation README.
+Full hosted integration and physical-performance acceptance remain separate.

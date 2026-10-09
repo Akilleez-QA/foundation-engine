@@ -31,3 +31,11 @@ export {
   type LifetimeRouteAdmission,
 } from './lifetimes';
 export {createRouteDependencies, type RouteScope, type DependencyTicket, type DependencyStatus} from './dependencies';
+export {
+  createDistanceField,
+  type DistanceLabel,
+  type NavigationField,
+  type FieldResult,
+  type FieldPhase,
+  type FieldSearch,
+} from './field';

@@ -43,6 +43,12 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'NAV-FIELD-01',
+    title: 'Optional incremental shared navigation distance fields',
+    docs: 'src/kits/navigation/README.md',
+    evidence: [{kit: 'navigation', export: 'createDistanceField'}, {path: 'src/kits/navigation/field.test.ts'}],
+  },
+  {
     id: 'ASG-01',
     title: 'Optional bounded service and worksite assignment ownership',
     docs: 'docs/guides/assignments.md',
