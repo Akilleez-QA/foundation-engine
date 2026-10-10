@@ -28,6 +28,12 @@ export interface AwarenessOptions {
   readonly alerted?: readonly [number, number];
   /** Seconds after the last stimulus before an unaware target is forgotten (whatever its awareness), (0, 1e6]. Default 30. */
   readonly forgetAfter?: number;
+  /**
+   * Most seconds of rate-based gain (sight, reports) credited by one update, (0, 10]. Default 0.25. A long gap between
+   * updates therefore cannot turn one stimulus into full awareness; update at least every `maxStep` seconds for gains
+   * independent of the update rate.
+   */
+  readonly maxStep?: number;
   /** Targets remembered at once, [1, 256]. Default 32. */
   readonly maxTargets?: number;
 }
@@ -39,6 +45,9 @@ export interface TargetMemory {
   /** Time of the last stimulus of any kind, of the last sight or sound (null if only reported), and of the last sight. */
   readonly lastStimulus: number;
   readonly lastDirect: number | null;
+  /** Where and how strongly the target was last perceived directly (null and 0 if only reported). */
+  readonly directPosition: Vec3 | null;
+  readonly directStrength: number;
   readonly lastSeen: number | null;
   /** True when sight reported this target in the latest update. */
   readonly visible: boolean;
@@ -67,7 +76,8 @@ export function createAwareness(options: AwarenessOptions = {}) {
     reportRate = bounded(options.reportRate, 0.5, 0, 100, 'reportRate'),
     decay = bounded(options.decay, 0.1, 0, 100, 'decay', false),
     forgetAfter = bounded(options.forgetAfter, 30, 0, 1e6, 'forgetAfter'),
-    maxTargets = bounded(options.maxTargets, 32, 0, 256, 'maxTargets');
+    maxTargets = bounded(options.maxTargets, 32, 0, 256, 'maxTargets'),
+    maxStep = bounded(options.maxStep, 0.25, 0, 10, 'maxStep');
   if (!Number.isSafeInteger(maxTargets)) fail('maxTargets must be an integer');
   const suspicious = pair(options.suspicious, [0.3, 0.15], 'suspicious'),
     alerted = pair(options.alerted, [0.8, 0.5], 'alerted');
@@ -77,8 +87,10 @@ export function createAwareness(options: AwarenessOptions = {}) {
     level: AlertLevel;
     lastKnown: Vec3;
     lastStimulus: number;
-    /** Last sight or sound (not report): what squads may share. */
+    /** Last sight or sound (not report), where and how strongly: what squads may share. */
     lastDirect: number | null;
+    directPosition: Vec3 | null;
+    directStrength: number;
     lastSeen: number | null;
     visible: boolean;
   }
@@ -100,6 +112,8 @@ export function createAwareness(options: AwarenessOptions = {}) {
       lastKnown: frozenVec(e.lastKnown),
       lastStimulus: e.lastStimulus,
       lastDirect: e.lastDirect,
+      directPosition: e.directPosition ? frozenVec(e.directPosition) : null,
+      directStrength: e.directStrength,
       lastSeen: e.lastSeen,
       visible: e.visible,
     });
@@ -112,7 +126,9 @@ export function createAwareness(options: AwarenessOptions = {}) {
      * update lose `decay × elapsed`. Sight adds `sightRate × strength × elapsed` and reports `reportRate × confidence ×
      * elapsed` (each the strongest per target, so several eyes or reporters do not add up); each sound adds an impulse
      * (submit a sound once, when it happens). Last-known position prefers sight, then the loudest sound, then a report.
-     * Nothing changes if any stimulus is invalid. Returns the number of targets dropped because memory was full.
+     * A report moves the last-known position only for a target never perceived directly. At most `maxStep` seconds of
+     * rate gain are credited per update. Nothing changes if any stimulus is invalid. Returns the number of targets lost
+     * to a full memory this update (newcomers refused plus remembered targets evicted).
      */
     update(now: number, stimuli: readonly Stimulus[] = []): number {
       if (!finite(now) || now < 0) fail('now must be a nonnegative finite time');
@@ -151,9 +167,10 @@ export function createAwareness(options: AwarenessOptions = {}) {
         } else m.sounds.push(s);
         merged.set(s.target, m);
       }
+      const credited = Math.min(elapsed, maxStep);
       const gainOf = (m: Merged) =>
-        (m.sight ? sightRate * m.sight.strength * elapsed : 0) +
-        (m.report ? reportRate * m.report.strength * elapsed : 0) +
+        (m.sight ? sightRate * m.sight.strength * credited : 0) +
+        (m.report ? reportRate * m.report.strength * credited : 0) +
         m.sounds.reduce((sum, s) => sum + soundImpulse * s.strength, 0);
       for (const [id, e] of targets) {
         e.visible = false;
@@ -172,6 +189,7 @@ export function createAwareness(options: AwarenessOptions = {}) {
               continue;
             }
             targets.delete(weakest[0]);
+            lost++;
           }
           const first = m.sight ?? m.sounds[0] ?? m.report!;
           e = {
@@ -180,6 +198,8 @@ export function createAwareness(options: AwarenessOptions = {}) {
             lastKnown: first.position,
             lastStimulus: now,
             lastDirect: null,
+            directPosition: null,
+            directStrength: 0,
             lastSeen: null,
             visible: false,
           };
@@ -193,10 +213,15 @@ export function createAwareness(options: AwarenessOptions = {}) {
           e.visible = true;
           e.lastSeen = now;
           e.lastDirect = now;
+          e.directPosition = m.sight.position;
+          e.directStrength = m.sight.strength;
         } else if (m.sounds.length) {
-          e.lastKnown = m.sounds.reduce((a, b) => (b.strength > a.strength ? b : a)).position;
+          const loudest = m.sounds.reduce((a, b) => (b.strength > a.strength ? b : a));
+          e.lastKnown = loudest.position;
           e.lastDirect = now;
-        } else if (m.report) e.lastKnown = m.report.position;
+          e.directPosition = loudest.position;
+          e.directStrength = loudest.strength;
+        } else if (m.report && e.lastDirect === null) e.lastKnown = m.report.position;
       }
       for (const [id, e] of targets) {
         e.level = levelFor(e);

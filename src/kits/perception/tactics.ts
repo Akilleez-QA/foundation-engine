@@ -17,7 +17,8 @@ export interface SquadReport {
 
 /**
  * Shared squad knowledge: the newest report per target (ties: higher confidence, then reporter id). `share` copies an
- * agent's suspicious-or-alerted targets that it perceived directly (sight or sound), with the time of that perception,
+ * agent's suspicious-or-alerted targets that it perceived directly (sight or sound), with the time, position and
+ * strength (as confidence) of that perception,
  * so reports never refresh themselves through re-sharing. `inform` turns fresh reports into `report` stimuli for a
  * member, scaled by confidence and by age (fading to 0 at `maxAge`), skipping what the member reported itself; reports
  * act as a rate in awareness, so calling it every update is independent of the update rate. A full board first drops
@@ -68,11 +69,12 @@ export function createSquadKnowledge(options: {readonly maxTargets?: number; rea
         if (
           t.level !== 'unaware' &&
           t.lastDirect !== null &&
+          t.directPosition !== null &&
           api.report({
             target: t.target,
-            position: t.lastKnown,
+            position: t.directPosition,
             time: t.lastDirect,
-            confidence: t.awareness,
+            confidence: t.directStrength,
             reporter,
           }) === 'stored'
         )

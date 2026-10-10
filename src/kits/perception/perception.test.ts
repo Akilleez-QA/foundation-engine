@@ -58,6 +58,7 @@ test('awareness rises with sight, jumps with sound, decays, and changes level wi
     decay: 0.1,
     suspicious: [0.3, 0.15],
     alerted: [0.8, 0.5],
+    maxStep: 10,
   });
   a.update(0);
   a.update(0.5, [{target: 'p', kind: 'sight', strength: 1, position: [1, 0, 1]}]);
@@ -107,7 +108,7 @@ test('awareness forgets quiet targets and keeps the most aware when memory is fu
 
 test('squad knowledge shares the newest reports and informs members with fading report stimuli', () => {
   const squad = createSquadKnowledge({maxAge: 10});
-  const scout = createAwareness({sightRate: 2});
+  const scout = createAwareness({sightRate: 2, maxStep: 1});
   scout.update(0);
   scout.update(1, [{target: 'p', kind: 'sight', strength: 1, position: [5, 0, 5]}]);
   assert.equal(squad.share('scout', scout), 1);
@@ -116,7 +117,7 @@ test('squad knowledge shares the newest reports and informs members with fading 
   assert.equal(stimuli.length, 1);
   close(stimuli[0]!.strength, 1 * (1 - 5 / 10));
   assert.deepEqual(squad.inform('scout', 6), [], 'no echo of your own report');
-  const guard = createAwareness({reportRate: 0.5});
+  const guard = createAwareness({reportRate: 0.5, maxStep: 1});
   guard.update(5);
   guard.update(6, stimuli);
   close(guard.recall('p')!.awareness, 0.25, 1e-9, 'rate 0.5 × confidence 0.5 × 1 s');
@@ -129,8 +130,8 @@ test('squad knowledge shares the newest reports and informs members with fading 
 test('review fixes: no rumour loop, rate-independent reports, atomic updates, sight priority, forgetting', () => {
   // Re-sharing reported knowledge never refreshes it.
   const squad = createSquadKnowledge({maxAge: 5});
-  const a = createAwareness({sightRate: 10, reportRate: 2, decay: 0.05}),
-    b = createAwareness({reportRate: 2, decay: 0.05});
+  const a = createAwareness({sightRate: 10, reportRate: 2, decay: 0.05, maxStep: 1}),
+    b = createAwareness({reportRate: 2, decay: 0.05, maxStep: 1});
   a.update(0);
   b.update(0);
   a.update(1, [{target: 'p', kind: 'sight', strength: 1, position: [1, 0, 1]}]);
@@ -146,7 +147,7 @@ test('review fixes: no rumour loop, rate-independent reports, atomic updates, si
   const once = (hz: number) => {
     const s = createSquadKnowledge({maxAge: 100});
     s.report({target: 'q', position: [0, 0, 0], time: 0, confidence: 0.5, reporter: 'x'});
-    const m = createAwareness({reportRate: 0.5, decay: 0});
+    const m = createAwareness({reportRate: 0.5, decay: 0, maxStep: 1});
     m.update(0);
     for (let i = 1; i <= hz; i++) m.update(i / hz, s.inform('m', 0));
     return m.recall('q')!.awareness;
@@ -235,4 +236,28 @@ test('utility scores compensated products, applies momentum and refuses invalid 
   assert.equal(torn.choice, 'retreat', 'momentum keeps the current choice when close');
   assert.equal(chooseUtility(options, {hp: 0, ammo: 0}, {minScore: 2}).choice, null);
   assert.throws(() => chooseUtility([{id: 'x', considerations: [() => 2]}], {}), RangeError);
+});
+
+test('re-review fixes: credited step cap, direct-only sharing, report positions, eviction counting', () => {
+  const gap = createAwareness({reportRate: 1, maxStep: 0.25});
+  gap.update(0);
+  gap.update(5, [{target: 'p', kind: 'report', strength: 1, position: [0, 0, 0]}]);
+  assert.ok(gap.recall('p')!.awareness <= 0.25 + 1e-12, 'one report after a long gap credits at most maxStep');
+  const relay = createAwareness({reportRate: 1, maxStep: 1});
+  relay.update(0, [{target: 'q', kind: 'sound', strength: 0.05, position: [50, 0, 0]}]);
+  relay.update(1, [{target: 'q', kind: 'report', strength: 1, position: [1, 0, 0]}]);
+  relay.update(2, [{target: 'q', kind: 'report', strength: 1, position: [1, 0, 0]}]);
+  assert.deepEqual(relay.recall('q')!.lastKnown, [50, 0, 0], 'reports never move a directly perceived target');
+  const board = createSquadKnowledge();
+  board.share('relay', relay);
+  const r = board.recall('q');
+  if (r) {
+    assert.deepEqual(r.position, [50, 0, 0], 'shared position is the direct one');
+    assert.equal(r.confidence, 0.05, 'confidence is the direct strength');
+    assert.equal(r.time, 0);
+  }
+  const full = createAwareness({maxTargets: 1, soundImpulse: 0.5});
+  full.update(0, [{target: 'x', kind: 'sound', strength: 0.1, position: [0, 0, 0]}]);
+  assert.equal(full.update(0, [{target: 'y', kind: 'sound', strength: 1, position: [0, 0, 0]}]), 1, 'eviction counted');
+  assert.equal(full.recall('x'), null);
 });
