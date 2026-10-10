@@ -880,3 +880,9 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Optional retro look candidate — RETRO-01, 2026-10-10
+
+`@kits/retro` is an independently implemented render override on `@kits/three`: the scene is drawn into a low-resolution viewport of the canvas (engine tone mapping, output encoding and main-pass accounting kept), copied into a texture, and one full-screen triangle applies an ordered Bayer dither and quantises to a creator palette (nearest 3D lookup table) or per-channel levels. Optional wide pixels give the column look. It replaces built-in post on its scene and is not a quality knob. [Guide](retro-look.md), [ADR 0132](../adr/0132-optional-retro-look.md), [verification](../verification/retro-look-20261010/README.md).
+
+Evidence: 8 headless tests (CPU reference arithmetic, lookup table against brute force, the override's draw sequence), a software-GL `play:snap` of the showcase courtyard with the look (within its budgets) and a GPU bench at 4K (one extra draw, no post draws, 20 MiB fewer textures; display-paced, GPU time not measured). The scene change was measurement-only. WebGL2 only; no phone, tablet or physical-device acceptance; no template consumer.

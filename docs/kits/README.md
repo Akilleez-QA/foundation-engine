@@ -40,6 +40,8 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 
 The optional [assignments](../../src/kits/assignments/README.md) candidate supplies exclusive actor claims, weighted target capacity and atomic transfer refusal. Two headless service/worksite fixtures and route-owner composition tests exercise it; no playable template consumer or browser/device acceptance is claimed. [Guide](../guides/assignments.md).
 
+The optional [retro](../../src/kits/retro/README.md) candidate draws a scene at low resolution with wide pixels, a creator palette or levels and ordered dithering through `@kits/three`. Headless tests, a software-GL screenshot and a GPU bench of the showcase courtyard; no template uses it and no device acceptance is claimed. [Guide](../guides/retro-look.md).
+
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.
 
 
