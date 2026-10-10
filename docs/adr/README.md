@@ -79,3 +79,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0085](0085-atomic-cell-batches-and-occupancy.md) | Atomic cell batches and immutable occupancy | Procgen / Spatial | Proposed |
 
 | [0130](0130-offline-format-converters.md) | Offline format converters with provenance receipts | Tooling / Assets | Proposed |
+
+| [0133](0133-legacy-format-decoders.md) | Legacy game and multimedia format decoders in the converter toolchain | Tooling / Assets | Proposed |

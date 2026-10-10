@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- Legacy format decoders in `npm run convert`: game archives (LZSS or zlib members), palette sprite frame sets, planar LZ77 screens, console TIM textures and ADPCM/VAG sound, multimedia-movie bitmap cast members and Cinepak QuickTime frames, to PNG or WAV with sidecar metadata and provenance receipts. Bounded by declared sizes and fuzzed. See [ADR 0133](docs/adr/0133-legacy-format-decoders.md).
+
 - Offline converters (`npm run convert`): OBJ/MTL, PLY, BVH (with bone-map retargeting) and S3O unit models to GLB, and PCX, BMP and raw palette images to indexed or RGBA PNG, each with a provenance receipt that `npm run check` accepts. The runtime still loads only glTF. See [ADR 0130](docs/adr/0130-offline-format-converters.md) and [tools/convert](tools/convert/README.md).
 
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).

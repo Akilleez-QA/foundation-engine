@@ -187,6 +187,13 @@
       "evidence": ["npm run asset:verify"]
     },
     {
+      "id": "ASSET-LEGACY",
+      "title": "Legacy game and multimedia format decoders in npm run convert",
+      "shipped": true,
+      "docs": "tools/convert/README.md",
+      "evidence": ["tools/convert/legacy.mjs exists", "tools/convert/legacy.test.mjs exists"]
+    },
+    {
       "id": "ASSET-CONVERT",
       "title": "Offline converters to glTF and PNG with provenance receipts (npm run convert)",
       "shipped": true,

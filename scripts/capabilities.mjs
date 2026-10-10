@@ -214,6 +214,12 @@ export const FEATURES = [
     evidence: [{script: 'asset:verify'}],
   },
   {
+    id: 'ASSET-LEGACY',
+    title: 'Legacy game and multimedia format decoders in npm run convert',
+    docs: 'tools/convert/README.md',
+    evidence: [{path: 'tools/convert/legacy.mjs'}, {path: 'tools/convert/legacy.test.mjs'}],
+  },
+  {
     id: 'ASSET-CONVERT',
     title: 'Offline converters to glTF and PNG with provenance receipts (npm run convert)',
     docs: 'tools/convert/README.md',

@@ -23,6 +23,7 @@ import {bvhToGlb} from './bvh.mjs';
 import {s3oToGlb} from './s3o.mjs';
 import {decodeBmp, decodePcx, decodeRaw, imageToPng, readPalette} from './indexed.mjs';
 import {recordProblems} from '../../scripts/lib/provenance.ts';
+import {LEGACY_KINDS, convertLegacy, listLegacy} from './legacy.mjs';
 
 export const VERSION = 1;
 const ORIGINS = ['hand', 'library', 'agent-blender', 'ai-generator'];
@@ -64,6 +65,13 @@ const FLAGS = {
   transparent: 'number',
   rgba: 'bool',
   'keep-v': 'bool',
+  member: 'text',
+  list: 'bool',
+  'clut-row': 'number',
+  opaque: 'bool',
+  rate: 'number',
+  prediction: 'text',
+  frame: 'number',
   'no-provenance': 'bool',
   json: 'bool',
 };
@@ -91,7 +99,12 @@ export function parseArgs(argv) {
       } else flags[name] = v;
     }
   }
-  if (positional.length !== 3) throw Error('usage: convert <obj|ply|bvh|s3o|image> <input> <output> [options]');
+  if (flags.list && positional.length !== 2) throw Error('--list takes a kind and an input, no output');
+  if (positional.length === 2 && flags.list) return {kind: positional[0], input: positional[1], output: null, flags};
+  if (positional.length !== 3)
+    throw Error(
+      `usage: convert <obj|ply|bvh|s3o|image|${LEGACY_KINDS.join('|')}> <input> <output> [options] (or <archive|director> <input> --list)`,
+    );
   return {kind: positional[0], input: positional[1], output: positional[2], flags};
 }
 
@@ -106,6 +119,7 @@ export function convert({kind, input, output, flags}, cwd = process.cwd()) {
     if (size > maxBytes) throw Error(`${path} is ${size} bytes, above --max-bytes ${maxBytes}`);
     return readFileSync(full);
   };
+  if (flags.list) return {list: listLegacy(kind, new Uint8Array(read(input)))};
   if (!flags['no-provenance']) {
     if (!flags.author?.trim() || !flags.licence?.trim())
       throw Error('--author and --licence are required for the provenance receipt (or pass --no-provenance)');
@@ -134,6 +148,7 @@ export function convert({kind, input, output, flags}, cwd = process.cwd()) {
   const options = {scale: flags.scale ?? 1, normals: flags.normals ?? 'smooth'};
   if (!['smooth', 'none'].includes(options.normals)) throw Error('--normals must be smooth or none');
   let bytes, summary;
+  let meta = null;
   const ext = extname(output).toLowerCase();
   if (kind === 'obj' || kind === 'ply' || kind === 'bvh' || kind === 's3o') {
     if (ext !== '.glb') throw Error(`${kind} converts to .glb`);
@@ -180,12 +195,25 @@ export function convert({kind, input, output, flags}, cwd = process.cwd()) {
       transparent: flags.transparent ?? null,
       output: flags.rgba ? 'rgba' : 'indexed',
     }));
-  } else throw Error(`unknown kind ${kind}: obj, ply, bvh, s3o or image`);
+  } else if (LEGACY_KINDS.includes(kind)) {
+    const result = convertLegacy(kind, new Uint8Array(inputBytes), flags, path => {
+      const b = read(path);
+      sources.push({path: shown(path), sha256: sha256(b)});
+      return new Uint8Array(b);
+    });
+    if (result.ext && ext !== result.ext) throw Error(`${kind} converts to ${result.ext}`);
+    bytes = result.bytes;
+    summary = result.summary;
+    meta = result.meta ?? null;
+  } else throw Error(`unknown kind ${kind}: obj, ply, bvh, s3o, image or ${LEGACY_KINDS.join(', ')}`);
 
   const out = resolve(cwd, output);
   const args = Object.entries(flags)
     .filter(([k]) => ![...RECEIPT, 'json', 'no-provenance'].includes(k))
-    .map(([k, v]) => (v === true ? `--${k}` : `--${k} ${v}`));
+    // Paths are recorded as the inputs list shows them (never machine-specific), values with spaces quoted.
+    .map(([k, v]) =>
+      v === true ? `--${k}` : `--${k} ${JSON.stringify(['palette', 'bone-map'].includes(k) ? shown(v) : v)}`,
+    );
   const receipt = flags['no-provenance']
     ? null
     : {
@@ -225,29 +253,47 @@ export function convert({kind, input, output, flags}, cwd = process.cwd()) {
     if (existing.artifact && existing.artifact !== receipt.artifact)
       throw Error(`${receiptPath} belongs to ${existing.artifact}; record this file in assets.provenance.json instead`);
   }
+  // Sidecar metadata (frame rectangles, registration points, loop points) sits beside the output as plain data.
+  const metaFile = join(dirname(out), `${basename(out, extname(out))}.meta.json`);
+  const metaPath = meta ? metaFile : null;
   const tmp = `${out}.tmp-${process.pid}`,
-    tmpReceipt = `${receiptPath}.tmp-${process.pid}`;
+    tmpReceipt = `${receiptPath}.tmp-${process.pid}`,
+    tmpMeta = metaPath ? `${metaPath}.tmp-${process.pid}` : null;
   try {
     writeFileSync(tmp, bytes);
     if (receipt) writeFileSync(tmpReceipt, JSON.stringify(receipt, null, 2) + '\n');
-    renameSync(tmp, out);
+    if (meta) writeFileSync(tmpMeta, JSON.stringify(meta, null, 2) + '\n');
+    // Sidecar and receipt first, output last: a failure never leaves a new output beside an old receipt.
+    if (meta) renameSync(tmpMeta, metaPath);
+    else rmSync(metaFile, {force: true}); // a stale sidecar from an earlier conversion would describe other data
     if (receipt) renameSync(tmpReceipt, receiptPath);
+    renameSync(tmp, out);
   } finally {
     rmSync(tmp, {force: true});
     rmSync(tmpReceipt, {force: true});
+    if (tmpMeta) rmSync(tmpMeta, {force: true});
   }
-  return {output: out, receipt: receipt ? receiptPath : null, summary: {...summary, bytes: bytes.length}};
+  return {
+    output: out,
+    receipt: receipt ? receiptPath : null,
+    meta: metaPath,
+    summary: {...summary, bytes: bytes.length},
+  };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const args = parseArgs(process.argv.slice(2));
     const result = convert(args);
-    if (args.flags.json) console.log(JSON.stringify(result));
-    else {
-      console.log(`wrote ${relative(process.cwd(), result.output)} ${JSON.stringify(result.summary)}`);
-      if (result.receipt) console.log(`receipt ${relative(process.cwd(), result.receipt)}`);
-      else console.log('no provenance receipt written: npm run check will report this file until one exists');
+    if (result.list) {
+      console.log(JSON.stringify(result.list, null, args.flags.json ? 0 : 2)); // --json: one machine-readable line
+    } else {
+      if (args.flags.json) console.log(JSON.stringify(result));
+      else {
+        console.log(`wrote ${relative(process.cwd(), result.output)} ${JSON.stringify(result.summary)}`);
+        if (result.receipt) console.log(`receipt ${relative(process.cwd(), result.receipt)}`);
+        else console.log('no provenance receipt written: npm run check will report this file until one exists');
+      }
     }
   } catch (error) {
     console.error(`convert: ${error.message}`);
