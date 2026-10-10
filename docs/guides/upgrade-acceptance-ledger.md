@@ -1509,7 +1509,7 @@ The re-review found that:
 - a straight-up normal produced NaN queries;
 - dt 0 still capped the speed.
 
-A third round confirmed those fixes, then found that the edge-contact rule took walkable
+A third round confirmed those fixes, then found that the edge-contact rule took gentle
 ramps for ledges, that a body flush against a tall wall got no-top, and that `origin`
 was validated only in snap mode. These are fixed too: an edge contact now needs a level
 top and a drop in front of it, the deciding cast starts slightly back from the wall, and
