@@ -193,3 +193,49 @@ test('composition: a scene hears from a blended listener and escalates pickup pi
   assert.ok(near(l.position[0], 1.5) && near(l.position[1], 8 * 0.25 + 1.6 * 0.75));
   assert.ok(rates.length >= 3 && rates[2]! > rates[1]! && rates[1]! > rates[0]!);
 });
+
+test('review regressions: stale keys, intensity ladder, due changes, read-only named, track caps, top-down frame', () => {
+  const limits = createInstanceLimits({defaultLimit: 1, policy: 'refuse', maxKeys: 2});
+  const a = fakeVoice(),
+    b = fakeVoice();
+  limits.admit('a');
+  limits.track('a', a);
+  limits.admit('b');
+  limits.track('b', b);
+  a.stop();
+  b.stop();
+  assert.equal(limits.admit('c'), true, 'keys whose voices all ended are swept');
+  const capped = createInstanceLimits({defaultLimit: 1, policy: 'refuse'});
+  const first = fakeVoice(),
+    second = fakeVoice();
+  capped.admit('k');
+  capped.admit('k');
+  capped.track('k', first);
+  capped.track('k', second);
+  assert.equal(second.stopped, true, 'track enforces the cap when admit was called twice');
+  assert.equal(capped.count('k'), 1);
+
+  const clock = createMusicClock({bpm: 120, origin: 0});
+  const director = createMusicDirector({
+    clock,
+    stems: ['a', 'b'],
+    states: {
+      calm: {stems: {a: 1}, minIntensity: 0},
+      victory: {stems: {b: 1}},
+      combat: {stems: {a: 1, b: 1}, minIntensity: 0.6},
+    },
+    initial: 'calm',
+  });
+  assert.equal(director.setIntensity(0.1, 0), null, 'a state without minIntensity never joins the ladder');
+  director.request('combat', 0.5); // due at 2
+  assert.equal(director.request('calm', 2.5)?.at, 4, 'the due change started first; calm is scheduled after it');
+  assert.equal(director.state, 'combat');
+  assert.deepEqual(director.named(100), director.named(100), 'named does not advance or mutate');
+  assert.doesNotThrow(() => director.pump(3));
+  const down = blendListener({camera: {position: [0, 10, 0], target: [0, 0, 0]}, character: [0, 0, 0], blend: 0});
+  assert.deepEqual(down.up, [0, 0, -1], 'matches a look-at camera looking down, so screen right is audio right');
+  const r = createRetrigger({window: 1, semitones: 1, maxSteps: 2});
+  r.trigger('x', 10);
+  r.reset();
+  assert.doesNotThrow(() => r.trigger('x', 0), 'a full reset accepts a restarted timebase');
+});

@@ -73,7 +73,7 @@ export function createMusicClock(options: {
 export interface MusicState {
   /** Stem gains in [0, 1]; stems not listed are silent. */
   readonly stems: Readonly<Record<string, number>>;
-  /** Lowest intensity that selects this state (used by `setIntensity`). Default 0. */
+  /** Lowest intensity that selects this state. Only states with a `minIntensity` take part in `setIntensity`. */
   readonly minIntensity?: number;
 }
 
@@ -126,12 +126,14 @@ export function createMusicDirector(options: MusicDirectorOptions) {
       if (!(typeof g === 'number' && g >= 0 && g <= 1)) fail(`state ${name} gain for ${s} must be in [0, 1]`);
       return g as number;
     });
-    const minIntensity = st.minIntensity ?? 0;
-    if (!finite(minIntensity)) fail(`state ${name} minIntensity must be finite`);
-    states.set(name, {gains, minIntensity});
+    const minIntensity = st.minIntensity;
+    if (minIntensity !== undefined && !finite(minIntensity)) fail(`state ${name} minIntensity must be finite`);
+    states.set(name, {gains, minIntensity: minIntensity ?? NaN});
   }
   if (!states.has(initial)) fail('initial must name a state');
-  const byIntensity = [...states.entries()].sort((a, b) => a[1].minIntensity - b[1].minIntensity);
+  const byIntensity = [...states.entries()]
+    .filter(([, st]) => !Number.isNaN(st.minIntensity))
+    .sort((a, b) => a[1].minIntensity - b[1].minIntensity);
   const spb = 60 / clock.bpm;
 
   let current = initial;
@@ -155,6 +157,23 @@ export function createMusicDirector(options: MusicDirectorOptions) {
     return t;
   };
 
+  const changes: MusicChange[] = [];
+  /** Start a pending change whose boundary has passed (so a later request never delays a due change). */
+  const advance = (t: number) => {
+    if (pending && t >= pending.at) {
+      from = gainsAt(pending.at);
+      current = pending.state;
+      fadeStart = pending.at;
+      fadeEnd = pending.at + fadeBeats * spb;
+      changes.push(Object.freeze({kind: 'started', state: current, at: pending.at}));
+      pending = null;
+      settledReported = false;
+    }
+    if (!settledReported && t >= fadeEnd) {
+      settledReported = true;
+      changes.push(Object.freeze({kind: 'settled', state: current, at: fadeEnd}));
+    }
+  };
   const director = {
     get state() {
       return current;
@@ -169,6 +188,7 @@ export function createMusicDirector(options: MusicDirectorOptions) {
     request(state: string, now: number, o: {readonly quantum?: Quantum} = {}): MusicChange | null {
       if (!states.has(state)) fail(`unknown state ${state}`);
       const t = check(now);
+      advance(t);
       if (state === current && !pending) return null;
       if (state === current) {
         pending = null;
@@ -181,17 +201,17 @@ export function createMusicDirector(options: MusicDirectorOptions) {
     /** Choose the state for an intensity (highest minIntensity <= intensity, with hysteresis) and request it. */
     setIntensity(intensity: number, now: number): MusicChange | null {
       if (!finite(intensity)) fail('intensity must be finite');
+      if (byIntensity.length === 0) fail('no state has a minIntensity');
+      advance(check(now));
       const target = pending?.state ?? current;
       const targetMin = states.get(target)!.minIntensity;
       let choice = byIntensity[0]![0];
       for (const [name, st] of byIntensity) if (st.minIntensity <= intensity) choice = name;
       // Stay in the current target while intensity is within its hysteresis band below it.
       const chosenMin = states.get(choice)!.minIntensity;
+      // A target outside the intensity ladder (NaN) is left as soon as intensity selects a ladder state.
       if (chosenMin < targetMin && intensity >= targetMin - hysteresis) choice = target;
-      if (choice === target) {
-        check(now);
-        return null;
-      }
+      if (choice === target || (chosenMin === targetMin && !Number.isNaN(targetMin))) return null;
       return director.request(choice, now);
     },
     /**
@@ -200,25 +220,14 @@ export function createMusicDirector(options: MusicDirectorOptions) {
      */
     pump(now: number): {readonly gains: readonly number[]; readonly changes: readonly MusicChange[]} {
       const t = check(now);
-      const changes: MusicChange[] = [];
-      if (pending && t >= pending.at) {
-        from = gainsAt(pending.at);
-        current = pending.state;
-        fadeStart = pending.at;
-        fadeEnd = pending.at + fadeBeats * spb;
-        changes.push(Object.freeze({kind: 'started', state: current, at: pending.at}));
-        pending = null;
-        settledReported = false;
-      }
-      if (!settledReported && t >= fadeEnd) {
-        settledReported = true;
-        changes.push(Object.freeze({kind: 'settled', state: current, at: fadeEnd}));
-      }
-      return Object.freeze({gains: Object.freeze(gainsAt(t)), changes: Object.freeze(changes)});
+      advance(t);
+      const out = changes.splice(0);
+      return Object.freeze({gains: Object.freeze(gainsAt(t)), changes: Object.freeze(out)});
     },
-    /** Gains as `{stem: gain}` at the last pumped time (for logging and tests). */
+    /** Gains as `{stem: gain}` at `now` as of the last pump (read-only: no time check, no transition). */
     named(now: number): Readonly<Record<string, number>> {
-      const g = gainsAt(check(now));
+      if (!finite(now)) fail('time must be finite');
+      const g = gainsAt(now);
       return Object.freeze(Object.fromEntries(stems.map((s, i) => [s, g[i]!])));
     },
   };

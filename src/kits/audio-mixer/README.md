@@ -27,7 +27,8 @@ These are optional helpers (`extras.ts`). Each is pure or caller-owned.
 - **`blendListener({camera, character, blend, up?})`** returns a listener pose. Its position is blended from the
   camera (`blend` 0) to the character (1); its orientation comes from the camera, so left and right match what the
   player sees. Assign the pose to `ctx.view.listener`, the optional author field the runtime now sends to the audio
-  output in place of the camera position. Pass the same position to spatial-audio `pump` so that audibility and
+  output in place of the camera position. A listener-only change re-sends the listener without redrawing. Invalid or
+  degenerate values (forward parallel to up, non-finite or larger than 1e9) are reported once and the camera is used. Pass the same position to spatial-audio `pump` so that audibility and
   panning agree. A camera looking straight down still gets a valid frame.
 - **`dopplerRate({source, sourceVelocity, listener, listenerVelocity?, speedOfSound?, factor?, min?, max?})`** returns
   `(c + v_l·n) / (c − v_s·n)`.
@@ -41,7 +42,9 @@ These are optional helpers (`extras.ts`). Each is pure or caller-owned.
   (at most two octaves in total). A longer gap resets the key. Keys are bounded, and the oldest is forgotten first.
 - **`createInstanceLimits({limits, defaultLimit, policy, maxKeys?})`** sets per-sound voice caps.
   - `admit(key)` with policy `oldest` stops that key's oldest live voice to make room. With `refuse`, it declines.
-  - `track(key, voice)` records the started voice. An ended voice frees its slot.
+  - `track(key, voice)` records the started voice. Call `admit`, play, then `track`; a voice beyond the key's limit
+    or the key capacity is stopped by `track`. An ended voice frees its slot, and keys whose voices have all ended are
+    swept before a new key is refused.
   - This is independent of the mixer's global `maxAudible`.
 
 ## Adaptive music on a quantized clock
@@ -60,10 +63,12 @@ audio-context seconds or a song's `songTime`. It provides:
 - **Requests.** `request(state, now)` schedules a change for the next boundary (strictly after `now`), at the
   default `quantum` or one given per call. A newer request replaces a pending one. Requesting the current state
   cancels the pending change.
-- **Intensity.** `setIntensity(x, now)` picks the state with the highest `minIntensity` not above `x`. A state is
-  left downward only once `x` falls below its own `minIntensity` minus `hysteresis`.
-- **Pumping.** `pump(now)` starts a pending change once its boundary has passed. It then returns the stem gains to
-  apply now, faded linearly over `fadeBeats` from the gains heard at the boundary, together with the `started` and
+- **Intensity.** Only states that declare a `minIntensity` form the intensity ladder; others (victory, menu) are
+  reached by `request`. `setIntensity(x, now)` picks the ladder state with the highest `minIntensity` not above
+  `x`. A state is left downward only once `x` falls below its own `minIntensity` minus `hysteresis`.
+- **Pumping.** Every call (`pump`, `request`, `setIntensity`) first starts a pending change whose boundary has
+  passed, so a later request never delays or cancels a change that is already due. `named(now)` is a read-only view.
+  `pump(now)` then returns the stem gains to apply now, faded linearly over `fadeBeats` from the gains heard at the boundary, together with the `started` and
   `settled` changes.
 
 Start all stems together with one shared start time, for example `ctx.playMusic(stem, {at, loop})`. Then apply the

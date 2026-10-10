@@ -56,7 +56,8 @@ export function blendListener(input: {
   // Make up perpendicular to forward (a camera looking straight down keeps a valid frame).
   const d = up[0] * forward[0] + up[1] * forward[1] + up[2] * forward[2];
   let ortho: AudioVec3 = [up[0] - d * forward[0], up[1] - d * forward[1], up[2] - d * forward[2]];
-  if (Math.hypot(...ortho) < 1e-6) ortho = Math.abs(forward[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+  // Straight up or down: use the screen-up a look-at camera would have (-z looking down, +z looking up).
+  if (Math.hypot(...ortho) < 1e-6) ortho = [0, 0, forward[1] < 0 ? -1 : 1];
   up = unit(ortho, 'up');
   return Object.freeze({
     position: Object.freeze([
@@ -143,14 +144,17 @@ export function createRetrigger(options: {
       if (keys.size > maxKeys) keys.delete(keys.keys().next().value!);
       return Math.min(RATE_LIMITS.max, Math.max(RATE_LIMITS.min, 2 ** ((step * semitones) / 12)));
     },
-    /** The step a key would play at `now` without triggering it. */
+    /** The escalation step (0 = base pitch) a trigger of `key` at `now` would play, without triggering it. */
     peek(key: string, now: number): number {
+      if (typeof key !== 'string' || key.length === 0 || key.length > 256) fail('key must be 1-256 characters');
       const prev = keys.get(key);
       return prev && finite(now) && now - prev.at <= window ? Math.min(prev.step + 1, maxSteps) : 0;
     },
     reset(key?: string): void {
-      if (key === undefined) keys.clear();
-      else keys.delete(key);
+      if (key === undefined) {
+        keys.clear();
+        last = -Infinity; // a restarted timebase (e.g. song time) may begin again from 0
+      } else keys.delete(key);
     },
   };
 }
@@ -198,7 +202,12 @@ export function createInstanceLimits(options: {
       if (typeof key !== 'string' || key.length === 0 || key.length > 256) fail('key must be 1-256 characters');
       const list = prune(key);
       const limit = limits.get(key) ?? defaultLimit;
-      if (list.length < limit) return live.has(key) || live.size < maxKeys || (refused++, false);
+      if (!live.has(key) && live.size >= maxKeys) for (const other of [...live.keys()]) prune(other);
+      if (list.length < limit) {
+        if (live.has(key) || live.size < maxKeys) return true;
+        refused++;
+        return false;
+      }
       if (policy === 'refuse') {
         refused++;
         return false;
@@ -208,9 +217,19 @@ export function createInstanceLimits(options: {
       return true;
     },
     /** Record a started voice (null from a skipped play is ignored). */
+    /**
+     * Record a started voice (null from a skipped play is ignored). Call `admit`, play, then `track` with no other
+     * `admit` of the same key in between; a voice beyond the key's limit or the key capacity is stopped at once.
+     */
     track(key: string, voice: CueVoice | null): void {
       if (!voice || voice.ended) return;
       const list = prune(key);
+      const limit = limits.get(key) ?? defaultLimit;
+      if (list.length >= limit || (!live.has(key) && live.size >= maxKeys)) {
+        voice.stop();
+        refused++;
+        return;
+      }
       list.push(voice);
       live.set(key, list);
     },
