@@ -1207,3 +1207,7 @@ in 18 asset test files. The independent dimension oracle covers 1517 shapes,
 plus explicit thin/square/odd anchors and model refusal/retry. Independent review
 and full hosted integration remain pending; no physical memory or device evidence
 is implied.
+
+## Replication schedule — REPL-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/replication/README.md), [guide](replication-schedule.md), [decision](../adr/0094-replication-schedule.md). Optional quantized field schema, per-recipient byte-budgeted packets (removals, creations, field-mask updates) ranked by accumulated weighted priority with per-entry minimum interval, loss/acknowledgment recovery, and an order-safe replica with tombstones. Addresses the interest sets limits (starvation rotation, per-entity cadence, delta encoding). Evidence: eight focused headless tests including a lossy, duplicating, reordering composition with interest sets that converges exactly (48,306 vs 547,046 characters for complete views of the same sets). Candidate only; transport, WAN, browser, physical-device and full-CI acceptance are not claimed here.

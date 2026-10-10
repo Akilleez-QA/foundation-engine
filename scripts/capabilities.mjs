@@ -67,6 +67,15 @@ export const FEATURES = [
     evidence: [{kit: 'alignment', export: 'createAlignment'}, {path: 'src/kits/alignment/alignment.test.ts'}],
   },
   {
+    id: 'REPL-01',
+    title: 'Per-recipient quantized replication under a byte budget',
+    docs: 'src/kits/replication/README.md',
+    evidence: [
+      {kit: 'replication', export: 'createReplicationSchedule'},
+      {path: 'src/kits/replication/replication.test.ts'},
+    ],
+  },
+  {
     id: 'VISIBILITY-01',
     title: 'Bounded source-owned visibility and explored history',
     docs: 'src/kits/visibility/README.md',

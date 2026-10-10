@@ -4,6 +4,7 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 
 | Kit | What | Used by |
 |---|---|---|
+| [replication](../../src/kits/replication/README.md) | Quantized per-recipient deltas ranked to a byte budget with loss recovery and an order-safe replica; pure helper | Headless tests and a lossy interest-set composition; no integrated game |
 | [visibility](../../src/kits/visibility/README.md) | Bounded source contributions, current visibility and explored history; pure helper | Two headless sensor/facility fixtures; no integrated game |
 | [ui](../../src/kits/ui/README.md) | HUD lines, a banner and a prompt over a scene | arcade, explorer |
 | [camera](../../src/kits/camera/README.md) | Camera poses: follow, orbit, first-person, top-down, side-scroll, fixed | explorer |
