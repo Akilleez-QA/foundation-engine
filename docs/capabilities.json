@@ -421,6 +421,13 @@
       "evidence": ["npm run convert", "tools/convert/bvh.mjs exists", "tools/convert/convert.test.mjs exists"]
     },
     {
+      "id": "DUPES-01",
+      "title": "Duplicate and near-duplicate detector (npm run dupes)",
+      "shipped": true,
+      "docs": "tools/dupes/README.md",
+      "evidence": ["npm run dupes", "tools/dupes/scan.mjs exists", "tools/dupes/dupes.test.mjs exists"]
+    },
+    {
       "id": "ASSET-OPTIMIZE",
       "title": "Model optimisation (npm run asset:optimize)",
       "shipped": true,
@@ -1340,6 +1347,7 @@
     "dev",
     "disclosure",
     "dmath:golden",
+    "dupes",
     "faults:network",
     "format",
     "format:check",

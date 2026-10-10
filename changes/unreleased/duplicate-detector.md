@@ -1,0 +1,1 @@
+- Duplicate detector (`npm run dupes`): exact duplicates with git blob ids, GLBs with identical mesh data, similar PNGs and similar source or data files, in a game's assets, any folders, or across two trees (`--against`). Read-only; `--fail-on` for scripted checks. See [ADR 0131](docs/adr/0131-duplicate-detector.md) and [tools/dupes](tools/dupes/README.md).

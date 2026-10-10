@@ -60,6 +60,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | DX-03 | Asset provenance records and npm run disclosure | [#137](https://github.com/Akilleez-QA/foundation-engine/pull/137) | [asset-provenance.md](guides/asset-provenance.md) |
 | ASSET-VERIFY | Model contracts (npm run asset:verify) | [#126](https://github.com/Akilleez-QA/foundation-engine/pull/126) | [model-contracts.md](guides/model-contracts.md) |
 | ASSET-CONVERT | Offline converters to glTF and PNG with provenance receipts (npm run convert) |  | [README.md](../tools/convert/README.md) |
+| DUPES-01 | Duplicate and near-duplicate detector (npm run dupes) |  | [README.md](../tools/dupes/README.md) |
 | ASSET-OPTIMIZE | Model optimisation (npm run asset:optimize) | [#135](https://github.com/Akilleez-QA/foundation-engine/pull/135) |  |
 | SHOWCASE | The showcase template | [#128](https://github.com/Akilleez-QA/foundation-engine/pull/128) | [README.md](../templates/showcase/README.md) |
 | POSE-TO-POSE | Pose-to-pose rigging and animation pipeline | [#142](https://github.com/Akilleez-QA/foundation-engine/pull/142) | [animate-pose-to-pose.md](recipes/animate-pose-to-pose.md) |
@@ -302,6 +303,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `dev`
 - `disclosure`
 - `dmath:golden`
+- `dupes`
 - `faults:network`
 - `format`
 - `format:check`

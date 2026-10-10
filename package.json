@@ -59,6 +59,7 @@
     "asset:optimize": "node scripts/asset-optimize.mjs",
     "formulas:import": "node --import tsx tools/formula-import/cli.mjs",
     "convert": "node --import tsx tools/convert/cli.mjs",
+    "dupes": "node tools/dupes/cli.mjs",
     "play:criteria": "node scripts/generate.mjs && tsx scripts/play/criteria.ts",
     "content:publish": "node scripts/publish-content.mjs",
     "test:diagnostics-browser": "node -r ./scripts/silent-browser.cjs scripts/play/event-trace-check.mjs playtest/diagnostics/event-trace && node -r ./scripts/silent-browser.cjs scripts/play/terrain-inspect-check.mjs playtest/diagnostics/terrain-inspect && node -r ./scripts/silent-browser.cjs scripts/play/entity-inspect-check.mjs playtest/diagnostics/entity-inspect && node -r ./scripts/silent-browser.cjs scripts/play/system-timing-check.mjs playtest/diagnostics/system-timing && node -r ./scripts/silent-browser.cjs scripts/play/scene-entry-order-check.mjs playtest/diagnostics/scene-entry-order && node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/session-recorder-check.mjs playtest/diagnostics/session-recorder --minutes 0.5",

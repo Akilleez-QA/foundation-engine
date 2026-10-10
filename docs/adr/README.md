@@ -135,3 +135,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0132](0132-optional-retro-look.md) | Optional retro software-raster look | Optional kits / Rendering | Proposed |
 
 | [0130](0130-offline-format-converters.md) | Offline format converters with provenance receipts | Tooling / Assets | Proposed |
+
+| [0131](0131-duplicate-detector.md) | Duplicate and near-duplicate detection as a read-only repo tool | Tooling / Assets | Proposed |
