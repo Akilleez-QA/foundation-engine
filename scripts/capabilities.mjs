@@ -274,6 +274,15 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'COMPANION-RECOVERY-01',
+    title: 'Companion catch-up and safe teleport recovery on breadcrumb trails',
+    docs: 'src/kits/breadcrumbs/README.md',
+    evidence: [
+      {kit: 'breadcrumbs', export: 'createCompanionRecovery'},
+      {path: 'src/kits/breadcrumbs/recovery.test.ts'},
+    ],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,

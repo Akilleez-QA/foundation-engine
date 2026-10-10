@@ -39,6 +39,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | RENDER-INTERP | Opt-in render interpolation of fixed-step Transforms |  | [render-interpolation.md](guides/render-interpolation.md) |
 | BALLISTICS-01 | Drag-free ballistic launch solves, evaluation and arc samples |  | [README.md](../src/kits/ballistics/README.md) |
 | BREADCRUMBS-01 | Bounded leader trails with exact lag and path-distance retracing |  | [README.md](../src/kits/breadcrumbs/README.md) |
+| COMPANION-RECOVERY-01 | Companion catch-up and safe teleport recovery on breadcrumb trails |  | [README.md](../src/kits/breadcrumbs/README.md) |
 | VIS-01 | Tone mapping and exposure per scene (view.output) | [#124](https://github.com/Akilleez-QA/foundation-engine/pull/124) | [scene-look.md](guides/scene-look.md) |
 | VIS-02 | Point and spot lights in fixed per-scene slots | [#138](https://github.com/Akilleez-QA/foundation-engine/pull/138) | [scene-look.md](guides/scene-look.md) |
 | VIS-03 | Shadows from the sun, local lights and shapes | [#148](https://github.com/Akilleez-QA/foundation-engine/pull/148) | [scene-look.md](guides/scene-look.md) |

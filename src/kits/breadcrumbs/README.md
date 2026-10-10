@@ -46,6 +46,50 @@ trail.cut();
     `movingLag` steps forward with the leader, and one farther back closes in one crumb per tick.
   - While nothing is recorded, it closes in one crumb every `catchUpEvery` ticks down to `idleLag`.
 
+## Companion recovery
+
+`createCompanionRecovery(trail, options)` decides, once per fixed step for each follower, whether a companion that
+retraces the trail has fallen behind or is stranded.
+
+```ts
+const recovery = createCompanionRecovery(trail, { catchUpDistance: 2, teleportDistance: 12, landing: [3, 5, 8], stuckSeconds: 3 });
+const want = trail.along(spacing);
+const d = recovery.update(buddy, {
+  position: [tr.x, tr.y, tr.z],
+  desired: want && [want.x, want.y, want.z],
+  now: ctx.time.t,
+  canLand: p => free(p) && !onScreen(p),   // land somewhere safe and out of view
+});
+if (d.kind === 'teleport') place(buddy, d.to);
+else move(buddy, toward(want), speed * (d.kind === 'follow' ? 1 : d.boost));
+```
+
+The `kind` of the result:
+
+- **`follow`:** within `catchUpDistance` of the desired point.
+- **`catch-up`:** farther away. `boost` rises linearly from 1 at `catchUpDistance` to `maxBoost` (default 2) at
+  `teleportDistance`.
+- **`teleport`:** the follower is stranded, and a landing point passed `canLand`. The landing point is the first trail
+  point at the given `landing` distances behind the newest crumb. A follower is stranded in either case:
+  - it is beyond `teleportDistance` (reason `distance`);
+  - it has stayed beyond `catchUpDistance` for `stuckSeconds` without closing `minProgress` (reason `stuck`), for
+    example walking into a wall or falling into a pit.
+
+  Landing points never cross a segment cut. A `canLand` that throws counts as a refusal. A `cooldown` (default 2 s)
+  separates the teleports of one follower.
+- **`stranded`:** stranded, but no landing point is allowed yet (or the cooldown is running). It keeps the boost.
+  Try again later.
+
+Bounds and failure:
+
+- At most `maxFollowers` followers (default 16) and 32 landing distances.
+- Time must not go backwards for a follower.
+- Malformed input throws `RangeError`.
+- `remove(id)` forgets a follower.
+
+The kit does not choose visibility or placement. `canLand` is where the creator checks collision, camera view and
+area.
+
 ## Owner, bounds and failure
 
 - The caller owns the trail and calls `record` from its fixed-step system, so replays are identical.
@@ -65,6 +109,8 @@ trail.cut();
 - One trail per leader. Several followers share it at different lags or distances.
 
 ## Evidence
+
+`recovery.test.ts` covers follow, catch-up boost, distance and stuck teleports, the landing order with `canLand`, cooldown, refusals (including a throwing `canLand` and an empty trail), validation, and a `testScene` companion that falls into a pit and is put back on the trail behind the leader.
 
 `breadcrumbs.test.ts` covers:
 
