@@ -1333,3 +1333,13 @@ Defaults unchanged; no new owner. See [ADR 0090](../adr/0090-camera-support-fram
 and [the camera kit README](../../src/kits/camera/README.md). Headless scene tests
 are recorded in the upgrade ledger; independent review and full hosted CI remain
 required. No browser, visual or device acceptance.
+
+## Optional action phases — candidate (2026-10-09)
+
+`createActionPhases` in the existing capabilities kit adds creator-authored action
+windows, once-only marks and per-range claims over plain, fingerprinted caller states.
+It installs no clock, effect or persistence owner, and no template uses it. See
+[action phases](action-phases.md), [issue #229](https://github.com/Akilleez-QA/foundation-engine/issues/229)
+and ADR 0088. The evidence is headless unit and composition tests recorded in the upgrade ledger.
+Independent review findings were addressed before publication. Full hosted CI and
+integration remain required.

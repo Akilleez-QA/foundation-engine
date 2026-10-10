@@ -109,6 +109,15 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'CAP-ACTION-PHASES',
+    title: 'Creator-authored action phase windows, once-only marks and per-range claims',
+    docs: 'docs/guides/action-phases.md',
+    evidence: [
+      {kit: 'capabilities', export: 'createActionPhases'},
+      {path: 'src/kits/capabilities/action-phases.test.ts'},
+    ],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,

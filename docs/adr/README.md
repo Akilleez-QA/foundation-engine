@@ -87,3 +87,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0089](0089-model-clip-transitions.md) | Model clip transitions through the existing model owner | Author API / Animation presentation | Proposed |
 
 | [0090](0090-camera-support-framing.md) | Support-anchored vertical camera framing | Camera kit | Proposed |
+
+| [0088](0088-action-phase-windows.md) | Optional action phase windows, once-only marks and per-range claims | Optional kits / Capabilities | Proposed |

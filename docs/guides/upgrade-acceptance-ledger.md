@@ -1311,3 +1311,20 @@ and per-frame refusal without publication) and the existing camera tests pass un
 moved without tracking, support changes triggering teleport snaps and floating-point
 redraw churn; all three were fixed before publication. Evidence is headless; no
 browser, visual-quality, physical-device or full-CI acceptance is claimed.
+
+## Optional action phases — candidate (2026-10-09)
+
+- **Scope:** pure `createActionPhases` in `src/kits/capabilities/action-phases.ts`, exported through the
+  capabilities barrel and feature `CAP-ACTION-PHASES`.
+- **Evidence:** `src/kits/capabilities/action-phases.test.ts` (11 headless tests). They cover boundaries,
+  jumps, claims, suppression, capture, the 32-bit bound, single-read state validation, definition
+  fingerprints, unreachable-state rejection, per-request cancel windows and an input-history and
+  `resolveAction` composition with restored-state replay. The focused `npm run check` passed.
+- **Review:** an independent adversarial review found two major issues: positional bits were
+  reinterpreted after a definition edit, and there was no way to read a range identity without
+  claiming it. It also found minor issues: fields were read twice, error types were inconsistent,
+  overlapping ranges were accepted and unreachable restores were allowed. All were fixed in the
+  same candidate, and a re-review approved them. That re-review included a 2,000-sequence fuzz showing
+  that reachable states always restore.
+- **Not established:** browser, template, device, persistence-integration or multiplayer acceptance;
+  hosted CI on the candidate head; integration into `main`.
