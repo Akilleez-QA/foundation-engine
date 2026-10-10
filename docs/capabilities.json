@@ -478,7 +478,10 @@
         "closeUpPose",
         "createCameraTransition",
         "createCameraVolumes",
+        "createEasedBounds",
         "createLetterbox",
+        "createLookAhead",
+        "createRoomCamera",
         "railPose",
         "shotPose",
         "stringPose"

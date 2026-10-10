@@ -1233,3 +1233,11 @@ state across worlds, a wrong default carry pivot, unvalidated heading, overstate
 docs, mutable returned poses and rare ulp redraws; all were fixed and the re-review was
 clean. No browser,
 visual or device evidence.
+
+## Camera director rigs — candidate (2026-10-09)
+
+Branch `feat/camera-director-rigs` from the camera director head `8749f5bb`. Four
+headless tests: look-ahead lead, catch-up on stop and on reversal; area hold, pan
+timing from the on-screen pose and keeping the last area outside every area; eased
+bounds with fast rate, snap, clamping and edges that never cross; and the rigs
+composed as a director setting in a scene. No browser, visual or device evidence.

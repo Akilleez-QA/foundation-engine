@@ -172,3 +172,4 @@ export {
   type StringRig,
   type VolumeShape,
 } from './director';
+export {createEasedBounds, createLookAhead, createRoomCamera, type CameraRoom} from './rigs-2d';

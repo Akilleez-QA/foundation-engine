@@ -60,3 +60,21 @@ frozen; invalid input throws `RangeError`. Work per frame is the number of volum
 evaluation. Not provided: occlusion steering, corner or wall-climb solving,
 multi-subject framing, lock-on, shake, splines through more than a polyline, or a
 renderer letterbox. Headless evidence only.
+
+### More director rigs (`rigs-2d.ts`)
+
+- `createLookAhead({lead, maxLead, catchUp})` leads the focus in the subject's direction
+  of travel by up to `maxLead` (`lead` seconds of travel). The focus moves toward that
+  goal no faster than the subject's speed plus `catchUp`, so a fast subject never
+  outruns the camera and stopping or turning swings the lead across at a bounded rate.
+- `createRoomCamera({rooms, panTicks})` holds the framing of the room (a horizontal
+  rectangle) containing the subject. Entering another room pans over `panTicks` with
+  smoothstep, starting from what is on screen. `panning` lets a game hold the player
+  meanwhile. Outside every room the last room is kept; up to 1,024 rooms.
+- `createEasedBounds(bounds, {rate, fastRate})` eases camera limits edge by edge
+  toward newly set limits, faster when `step(dt, true)` is used (for example while the
+  subject is airborne). `set(bounds, true)` snaps at a cut. `clamp(point)` keeps a
+  position or focus inside, and eased edges never cross.
+
+All three are pure, validate their input and return frozen values. They compose as
+rig functions for `cameraDirectorSystem` or standalone with `cameraSystem` options.

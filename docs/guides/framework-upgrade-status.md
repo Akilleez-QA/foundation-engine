@@ -1258,3 +1258,9 @@ pose-sized transitions landing on moving goals (including the scripted-shot retu
 support carry, letterbox amount and an optional director system. See
 [ADR 0112](../adr/0112-camera-director.md). Headless tests in the ledger; independent
 review and hosted CI remain required.
+
+## Camera director rigs — candidate (2026-10-09)
+
+Look-ahead with speed-matched catch-up, area-locked pan framing and eased bounds as
+pure director rigs (extends the camera director, ADR 0112). Headless tests in the
+ledger; independent review and hosted CI remain required.
