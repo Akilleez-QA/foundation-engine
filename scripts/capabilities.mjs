@@ -49,6 +49,15 @@ export const FEATURES = [
     evidence: [{kit: 'navigation', export: 'createDistanceField'}, {path: 'src/kits/navigation/field.test.ts'}],
   },
   {
+    id: 'ACTIVATION-01',
+    title: 'Optional bounded region activation from observer positions',
+    docs: 'docs/guides/region-activation.md',
+    evidence: [
+      {kit: 'region-activation', export: 'createRegionActivation'},
+      {kit: 'region-activation', export: 'createRegionUpdateResult'},
+    ],
+  },
+  {
     id: 'ASG-01',
     title: 'Optional bounded service and worksite assignment ownership',
     docs: 'docs/guides/assignments.md',
