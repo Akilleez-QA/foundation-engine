@@ -1219,3 +1219,9 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Grid-step kit — candidate (2026-10-09)
+
+- **Scope:** `src/kits/grid-step` (ADR 0099).
+- **Evidence:** `grid-step.test.ts` covers timing, reservations, the refusal order, ledges, forced tiles, follower lines, snapshots, validation and reentrancy.
+- **Not established:** template or browser consumers and hosted CI.

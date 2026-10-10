@@ -54,6 +54,13 @@
       ]
     },
     {
+      "id": "GRID-STEP-01",
+      "title": "Grid-step actor movement with classified bumps, ledges, forced tiles and follower lines",
+      "shipped": true,
+      "docs": "src/kits/grid-step/README.md",
+      "evidence": ["@kits/grid-step exports createGridStepper", "src/kits/grid-step/grid-step.test.ts exists"]
+    },
+    {
       "id": "VIS-01",
       "title": "Tone mapping and exposure per scene (view.output)",
       "shipped": true,
@@ -540,6 +547,18 @@
         "frameReplicaSystem",
         "frames",
         "poseMatrix"
+      ]
+    },
+    {
+      "name": "grid-step",
+      "exports": [
+        "DIRECTIONS",
+        "GRID_STEP_LIMITS",
+        "HANDHELD_TILE_PRESET",
+        "createGridStepper",
+        "directionBit",
+        "gridStep",
+        "opposite"
       ]
     },
     {"name": "housing", "exports": ["createStructure", "housing"]},

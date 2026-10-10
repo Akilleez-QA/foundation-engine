@@ -91,6 +91,12 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'GRID-STEP-01',
+    title: 'Grid-step actor movement with classified bumps, ledges, forced tiles and follower lines',
+    docs: 'src/kits/grid-step/README.md',
+    evidence: [{kit: 'grid-step', export: 'createGridStepper'}, {path: 'src/kits/grid-step/grid-step.test.ts'}],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,
