@@ -1230,5 +1230,6 @@ volume's setting, stops rewriting at rest and returns from a scripted override t
 live gameplay pose; plus per-world stickiness, carry about the pre-move pivot,
 validation and frozen poses. An independent adversarial review found shared sticky
 state across worlds, a wrong default carry pivot, unvalidated heading, overstated
-docs, mutable returned poses and rare ulp redraws; all were fixed. No browser,
+docs, mutable returned poses and rare ulp redraws; all were fixed and the re-review was
+clean. No browser,
 visual or device evidence.

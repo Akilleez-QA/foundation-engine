@@ -49,7 +49,10 @@ Pure helpers in `director.ts`, plus one optional frame system. The existing
   `ctx.view.camera` (position, target and fov) only when the pose moved by more than
   1e-9. Rigs are checked against every volume and fallback setting when the system is
   built; an override setting without a rig throws in its frame. Ladder stickiness and
-  transitions are kept per world.
+  transitions are kept per world. The scene camera's fov must stay within (1, 170)
+  degrees while the director runs. `stringPose` can differ by a few ulp between calls
+  at the band edge; the director's threshold absorbs this, and direct callers should
+  not compare poses exactly.
 
 Bounds and failure: shapes, overrides, rigs, poses (finite coordinates, fov in
 (1, 170)) and shot paths are validated with single reads and returned poses are

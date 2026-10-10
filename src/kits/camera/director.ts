@@ -152,6 +152,7 @@ export function createCameraVolumes(input: {
       overrides: readonly {readonly id: string; readonly setting: string}[] = [],
       key: object = shared,
     ): CameraSelection {
+      if (key === null || (typeof key !== 'object' && typeof key !== 'function')) fail('key must be an object');
       const p = vec(subject, 'subject');
       if (!Array.isArray(overrides) || overrides.length > 64) fail('overrides must be an array of at most 64');
       const count = overrides.length;
@@ -174,6 +175,7 @@ export function createCameraVolumes(input: {
         : Object.freeze({setting: fallback, source: 'fallback', kind: 'fallback'});
     },
     reset(key: object = shared): void {
+      if (key === null || (typeof key !== 'object' && typeof key !== 'function')) fail('key must be an object');
       currents.delete(key);
     },
   };
