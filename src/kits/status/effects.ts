@@ -1,4 +1,4 @@
-import {isStatusId, StatusError, type StatusDefinition, type StatusRules} from './rules';
+import {isStatusId, StatusError, statusTable, type StatusDefinition, type StatusRules} from './rules';
 
 /** One active status on one target. Ticks are the owner's clock. */
 export interface StatusInstance {
@@ -19,15 +19,27 @@ export interface Immunity {
   /** Tick at which it ends, or null until cleared. */
   readonly until: number | null;
 }
+/**
+ * Events. Loss events carry the stacks lost and the stacks `remaining` (0 when the status ended); a partial loss
+ * (some independent timers expired, a decay step, a partial removal) is reported too, so a game can redraw only
+ * what changed.
+ */
 export type StatusEvent = Readonly<
-  | {kind: 'applied' | 'stacked'; target: string; id: string; stacks: number}
-  | {kind: 'periodic'; target: string; id: string; stacks: number}
-  | {kind: 'expired' | 'decayed' | 'removed' | 'consumed' | 'replaced'; target: string; id: string; stacks: number}
-  | {kind: 'triggered'; target: string; id: string; trigger: string; stacks: number}
+  | {kind: 'applied' | 'stacked'; target: string; id: string; stacks: number; source: string | null}
+  | {kind: 'periodic'; target: string; id: string; stacks: number; source: string | null}
+  | {
+      kind: 'expired' | 'decayed' | 'removed' | 'consumed' | 'replaced';
+      target: string;
+      id: string;
+      stacks: number;
+      remaining: number;
+    }
+  | {kind: 'triggered'; target: string; id: string; trigger: string; stacks: number; source: string | null}
   | {kind: 'transformed'; target: string; id: string; into: string}
+  | {kind: 'immunity-dropped'; target: string; id: string}
 >;
 export type ApplyResult = Readonly<{
-  /** applied: the status changed; immune, blocked and capacity change nothing. */
+  /** applied: accepted (stacks may already be at the cap); immune, blocked and capacity change nothing. */
   outcome: 'applied' | 'immune' | 'blocked' | 'capacity';
   events: readonly StatusEvent[];
 }>;
@@ -68,17 +80,36 @@ interface Target {
   immunities: Map<string, Immunity>;
 }
 
-const MAX_TICK = 2 ** 50;
+/** The clock stops here; durations (≤ 2^40) past it remain representable. */
+const MAX_NOW = 2 ** 50;
+const MAX_TICK_VALUE = MAX_NOW + 2 ** 41;
+/** Immunity ids/tags per immunity, both in `setImmunity` and in restore. */
+const MAX_IMMUNITY_LIST = 64;
+const AFTER = 'after:';
+const KEY = /^[A-Za-z0-9_.:-]{1,72}$/;
+const isKey = (v: unknown): v is string => typeof v === 'string' && KEY.test(v);
 const freezeInstance = (s: Live): StatusInstance => Object.freeze({...s, timers: Object.freeze([...s.timers])});
+const cloneTarget = (t: Target): Target => ({
+  statuses: new Map([...t.statuses].map(([k, s]) => [k, {...s, timers: [...s.timers]}])),
+  immunities: new Map(t.immunities),
+});
+const loss = (
+  kind: 'expired' | 'decayed' | 'removed' | 'consumed' | 'replaced',
+  target: string,
+  id: string,
+  stacks: number,
+  remaining: number,
+): StatusEvent => Object.freeze({kind, target, id, stacks, remaining});
 
 /**
- * Status effects for many targets on one fixed clock. Every mutation validates first and applies completely; reentry
- * from creator callbacks is impossible because the owner calls none. Processing order is deterministic: targets and
- * statuses in id order.
+ * Status effects for many targets on one fixed clock. `apply` works on a copy of the one target and publishes it only
+ * when accepted. `advance` mutates in place: with validated rules it cannot fail part-way. Processing order is
+ * deterministic: targets and statuses in id order.
  */
 export function createStatusEffects(rules: StatusRules, options: StatusOptions = {}) {
-  const defs = new Map(rules.statuses);
+  const defs = statusTable(rules);
   const signature = rules.signature;
+  if (!options || typeof options !== 'object') throw new StatusError('options must be an object');
   const bound = (v: number | undefined, fallback: number, max: number, what: string) => {
     const value = v ?? fallback;
     if (!Number.isSafeInteger(value) || value < 1 || value > max) throw new StatusError(`${what} must be in 1..${max}`);
@@ -89,8 +120,15 @@ export function createStatusEffects(rules: StatusRules, options: StatusOptions =
   const maxImmunities = bound(options.maxImmunities, 32, 256, 'maxImmunities');
   const maxAdvance = bound(options.maxAdvance, 600, 3600, 'maxAdvance');
   let now = options.now ?? 0;
-  if (!Number.isSafeInteger(now) || now < 0 || now > MAX_TICK) throw new StatusError('now must be a tick');
+  if (!Number.isSafeInteger(now) || now < 0 || now > MAX_NOW) throw new StatusError('now must be a tick');
   let targets = new Map<string, Target>();
+  let order: string[] | null = null; // cached sorted target ids
+  const setTarget = (key: string, t: Target) => {
+    if (t.statuses.size || t.immunities.size) {
+      if (!targets.has(key)) order = null;
+      targets.set(key, t);
+    } else if (targets.delete(key)) order = null;
+  };
 
   const def = (sid: string): StatusDefinition => {
     const d = typeof sid === 'string' ? defs.get(sid) : undefined;
@@ -107,27 +145,30 @@ export function createStatusEffects(rules: StatusRules, options: StatusOptions =
       if (im.ids.includes(d.id) || im.tags.some(tag => d.tags.includes(tag))) return true;
     return false;
   };
+  /** Remove a status entirely, granting its after-immunity when it ended on its own. */
   const end = (
     target: Target,
-    targetKey: string,
+    key: string,
     live: Live,
     kind: 'expired' | 'decayed' | 'removed' | 'consumed' | 'replaced',
+    lost: number,
     events: StatusEvent[],
   ) => {
     target.statuses.delete(live.id);
-    events.push(Object.freeze({kind, target: targetKey, id: live.id, stacks: live.stacks}));
+    events.push(loss(kind, key, live.id, lost, 0));
     const after = def(live.id).afterImmunity;
     if (after && kind !== 'removed' && kind !== 'replaced') {
-      const key = `after:${live.id}`;
-      if (target.immunities.has(key) || target.immunities.size < maxImmunities)
-        target.immunities.set(key, Object.freeze({key, ids: after.ids, tags: after.tags, until: now + after.ticks}));
+      const ik = AFTER + live.id;
+      if (target.immunities.has(ik) || target.immunities.size < maxImmunities)
+        target.immunities.set(ik, Object.freeze({key: ik, ids: after.ids, tags: after.tags, until: now + after.ticks}));
+      else events.push(Object.freeze({kind: 'immunity-dropped', target: key, id: live.id}));
     }
   };
 
-  // Apply to a working copy; `depth` bounds transform chains (validated acyclic, so depth ≤ status count).
+  // Apply to a working copy. Transform chains are validated acyclic, so depth ≤ the number of definitions.
   const applyTo = (
     target: Target,
-    targetKey: string,
+    key: string,
     d: StatusDefinition,
     stacks: number,
     source: string | null,
@@ -142,12 +183,12 @@ export function createStatusEffects(rules: StatusRules, options: StatusOptions =
         const occupant = [...target.statuses.values()].find(s => def(s.id).group === d.group);
         if (occupant) {
           if (d.groupPolicy === 'block') return 'blocked';
-          end(target, targetKey, occupant, 'replaced', events);
+          end(target, key, occupant, 'replaced', occupant.stacks, events);
         }
       }
       if (target.statuses.size >= maxPerTarget) return 'capacity';
       const count = Math.min(stacks, d.maxStacks);
-      const live: Live = {
+      target.statuses.set(d.id, {
         id: d.id,
         stacks: count,
         appliedAt: now,
@@ -155,9 +196,8 @@ export function createStatusEffects(rules: StatusRules, options: StatusOptions =
         expiresAt: d.duration === null ? null : now + d.duration,
         timers: d.policy === 'independent' ? Array.from({length: count}, () => now + d.duration!) : [],
         source,
-      };
-      target.statuses.set(d.id, live);
-      events.push(Object.freeze({kind: 'applied', target: targetKey, id: d.id, stacks: count}));
+      });
+      events.push(Object.freeze({kind: 'applied', target: key, id: d.id, stacks: count, source}));
     } else {
       const added = Math.min(stacks, d.maxStacks - existing.stacks);
       existing.stacks += added;
@@ -168,84 +208,112 @@ export function createStatusEffects(rules: StatusRules, options: StatusOptions =
         else if (d.policy === 'extend')
           existing.expiresAt = Math.min(now + d.maxDuration!, (existing.expiresAt ?? now) + d.duration);
         else if (d.policy === 'independent') {
-          for (let i = 0; i < added; i++) existing.timers.push(now + d.duration);
-          // At the cap, a new application refreshes the oldest timer instead of being lost.
-          if (added < stacks && existing.timers.length) existing.timers[0] = now + d.duration;
+          // At the cap, each surplus application refreshes one oldest timer.
+          const refresh = Math.min(stacks - added, existing.timers.length);
+          existing.timers.splice(0, refresh);
+          for (let i = 0; i < added + refresh; i++) existing.timers.push(now + d.duration);
           existing.timers.sort((a, b) => a - b);
           existing.expiresAt = existing.timers[existing.timers.length - 1]!;
         }
       }
-      events.push(Object.freeze({kind: 'stacked', target: targetKey, id: d.id, stacks: existing.stacks}));
+      events.push(
+        Object.freeze({kind: 'stacked', target: key, id: d.id, stacks: existing.stacks, source: existing.source}),
+      );
     }
     const live = target.statuses.get(d.id)!;
     const t = d.threshold;
     if (t && live.stacks >= t.stacks) {
-      const into = t.become === null ? null : def(t.become);
-      if (into && immuneTo(target, into)) return 'applied'; // capped, not transformed
+      // Try the whole threshold on a copy: if the transform would be refused (immunity, including one granted by
+      // the consumed status itself, an exclusive group or capacity), nothing fires and the stacks stay capped.
+      const trial = cloneTarget(target);
+      const trialEvents: StatusEvent[] = [];
+      const trialLive = trial.statuses.get(d.id)!;
       if (t.trigger !== null)
-        events.push(
-          Object.freeze({kind: 'triggered', target: targetKey, id: d.id, trigger: t.trigger, stacks: live.stacks}),
+        trialEvents.push(
+          Object.freeze({
+            kind: 'triggered',
+            target: key,
+            id: d.id,
+            trigger: t.trigger,
+            stacks: trialLive.stacks,
+            source: trialLive.source,
+          }),
         );
-      if (t.consume) end(target, targetKey, live, 'consumed', events);
-      if (into) {
-        events.push(Object.freeze({kind: 'transformed', target: targetKey, id: d.id, into: into.id}));
-        applyTo(target, targetKey, into, t.becomeStacks, source, events, depth + 1);
+      if (t.consume) end(trial, key, trialLive, 'consumed', trialLive.stacks, trialEvents);
+      if (t.become !== null) {
+        trialEvents.push(Object.freeze({kind: 'transformed', target: key, id: d.id, into: t.become}));
+        const outcome = applyTo(trial, key, def(t.become), t.becomeStacks, source, trialEvents, depth + 1);
+        if (outcome !== 'applied') return 'applied';
       }
+      target.statuses = trial.statuses;
+      target.immunities = trial.immunities;
+      events.push(...trialEvents);
     }
     return 'applied';
   };
 
-  const clone = (t: Target): Target => ({
-    statuses: new Map([...t.statuses].map(([k, s]) => [k, {...s, timers: [...s.timers]}])),
-    immunities: new Map(t.immunities),
-  });
   const read = (t: unknown) => targets.get(targetId(t));
+  const optionRecord = <T extends object>(o: T | undefined, what: string): Partial<T> => {
+    if (o === undefined) return {};
+    if (!o || typeof o !== 'object') throw new StatusError(`${what} must be an object`);
+    return o;
+  };
 
   const tick = (events: StatusEvent[]) => {
     now++;
-    for (const key of [...targets.keys()].sort()) {
-      const target = targets.get(key)!;
+    order ??= [...targets.keys()].sort();
+    for (const key of order) {
+      const target = targets.get(key);
+      if (!target) continue;
       for (const sid of [...target.statuses.keys()].sort()) {
-        const live = target.statuses.get(sid);
-        if (!live) continue;
+        const live = target.statuses.get(sid)!;
         const d = def(sid);
         if (d.period !== null && now > live.appliedAt && (now - live.appliedAt) % d.period === 0)
-          events.push(Object.freeze({kind: 'periodic', target: key, id: sid, stacks: live.stacks}));
+          events.push(
+            Object.freeze({kind: 'periodic', target: key, id: sid, stacks: live.stacks, source: live.source}),
+          );
         if (d.policy === 'independent') {
           let gone = 0;
           while (gone < live.timers.length && live.timers[gone]! <= now) gone++;
           if (gone) {
             live.timers.splice(0, gone);
-            live.stacks = live.timers.length;
-            if (!live.stacks) {
-              live.stacks = gone;
-              end(target, key, live, 'expired', events);
+            if (!live.timers.length) {
+              end(target, key, live, 'expired', gone, events);
               continue;
             }
+            live.stacks = live.timers.length;
+            events.push(loss('expired', key, sid, gone, live.stacks));
           }
         }
         if (d.decay && now - live.lastChange >= d.decay.every) {
           live.lastChange = now;
-          live.stacks -= Math.min(live.stacks, d.decay.stacks);
-          if (live.stacks === 0) {
-            end(target, key, live, 'decayed', events);
+          const lost = Math.min(live.stacks, d.decay.stacks);
+          if (lost === live.stacks) {
+            end(target, key, live, 'decayed', lost, events);
             continue;
           }
-          if (d.policy === 'independent') live.timers.splice(0, live.timers.length - live.stacks);
+          live.stacks -= lost;
+          if (d.policy === 'independent') live.timers.splice(0, lost);
+          events.push(loss('decayed', key, sid, lost, live.stacks));
         }
-        if (live.expiresAt !== null && live.expiresAt <= now) end(target, key, live, 'expired', events);
+        if (live.expiresAt !== null && live.expiresAt <= now) end(target, key, live, 'expired', live.stacks, events);
       }
       for (const [k, im] of target.immunities) if (im.until !== null && im.until <= now) target.immunities.delete(k);
-      if (!target.statuses.size && !target.immunities.size) targets.delete(key);
+      if (!target.statuses.size && !target.immunities.size) {
+        targets.delete(key);
+        order = null;
+      }
     }
   };
 
-  const mutate = <T>(targetKey: string, op: (target: Target) => T): T => {
-    const existing = targets.get(targetKey);
-    const draft = existing ? clone(existing) : {statuses: new Map(), immunities: new Map()};
-    const result = op(draft);
-    if (draft.statuses.size || draft.immunities.size) targets.set(targetKey, draft);
-    else targets.delete(targetKey);
+  /** Run `op` on a copy of one target and publish it only when `accept` says so. */
+  const draft = <T>(key: string, op: (t: Target) => T, accept: (r: T) => boolean = () => true): T => {
+    const existing = targets.get(key);
+    const copy = existing
+      ? cloneTarget(existing)
+      : {statuses: new Map<string, Live>(), immunities: new Map<string, Immunity>()};
+    const result = op(copy);
+    if (accept(result)) setTarget(key, copy);
     return result;
   };
 
@@ -254,41 +322,39 @@ export function createStatusEffects(rules: StatusRules, options: StatusOptions =
       return now;
     },
     /** Apply stacks of a status. Immune, blocked (exclusive group) and capacity outcomes change nothing. */
-    apply(target: string, status: string, o: {stacks?: number; source?: string} = {}): ApplyResult {
+    apply(target: string, status: string, opts?: {stacks?: number; source?: string}): ApplyResult {
       const key = targetId(target);
       const d = def(status);
+      const o = optionRecord(opts, 'apply options');
       const stacks = o.stacks ?? 1;
       if (!Number.isSafeInteger(stacks) || stacks < 1 || stacks > 65535)
         throw new StatusError('stacks must be 1..65535');
       const source = o.source === undefined ? null : targetId(o.source);
       if (!targets.has(key) && targets.size >= maxTargets)
         return Object.freeze({outcome: 'capacity', events: Object.freeze([])});
-      const existing = targets.get(key);
-      const draft = existing
-        ? clone(existing)
-        : {statuses: new Map<string, Live>(), immunities: new Map<string, Immunity>()};
       const events: StatusEvent[] = [];
-      const outcome = applyTo(draft, key, d, stacks, source, events, 0);
-      if (outcome !== 'applied') return Object.freeze({outcome, events: Object.freeze([])});
-      if (draft.statuses.size || draft.immunities.size) targets.set(key, draft);
-      else targets.delete(key);
-      return Object.freeze({outcome, events: Object.freeze(events)});
+      const outcome = draft(
+        key,
+        t => applyTo(t, key, d, stacks, source, events, 0),
+        r => r === 'applied',
+      );
+      return Object.freeze({outcome, events: Object.freeze(outcome === 'applied' ? events : [])});
     },
-    /** Remove stacks (default all). Returns the events; removing an absent status returns none. */
+    /** Remove stacks (default all). Manual removal grants no after-immunity. */
     remove(target: string, status: string, stacks?: number): readonly StatusEvent[] {
       const key = targetId(target);
       def(status);
       if (stacks !== undefined && (!Number.isSafeInteger(stacks) || stacks < 1))
         throw new StatusError('invalid stacks');
       if (!targets.get(key)?.statuses.has(status)) return Object.freeze([]);
-      return mutate(key, t => {
+      return draft(key, t => {
         const live = t.statuses.get(status)!;
         const events: StatusEvent[] = [];
-        if (stacks === undefined || stacks >= live.stacks) end(t, key, live, 'removed', events);
+        if (stacks === undefined || stacks >= live.stacks) end(t, key, live, 'removed', live.stacks, events);
         else {
           live.stacks -= stacks;
           live.timers.splice(0, stacks);
-          events.push(Object.freeze({kind: 'removed', target: key, id: status, stacks}));
+          events.push(loss('removed', key, status, stacks, live.stacks));
         }
         return Object.freeze(events);
       });
@@ -298,60 +364,74 @@ export function createStatusEffects(rules: StatusRules, options: StatusOptions =
       const key = targetId(target);
       if (!isStatusId(tag)) throw new StatusError('invalid tag');
       if (!targets.has(key)) return Object.freeze([]);
-      return mutate(key, t => {
+      return draft(key, t => {
         const events: StatusEvent[] = [];
         for (const sid of [...t.statuses.keys()].sort())
-          if (def(sid).tags.includes(tag)) end(t, key, t.statuses.get(sid)!, 'removed', events);
+          if (def(sid).tags.includes(tag)) {
+            const live = t.statuses.get(sid)!;
+            end(t, key, live, 'removed', live.stacks, events);
+          }
         return Object.freeze(events);
       });
     },
-    /** Grant or replace a keyed immunity to ids and/or tags, for `ticks` or (null) until cleared. */
+    /**
+     * Grant or replace a keyed immunity to ids and/or tags (≤ 64 each), for `ticks` or (null) until cleared. It
+     * refuses future applications; it does not remove statuses already active (cleanse or remove them). Keys starting
+     * with `after:` are reserved for after-immunities. Returns false at the target or immunity capacity.
+     */
     setImmunity(
       target: string,
       immunity: {key: string; ids?: readonly string[]; tags?: readonly string[]; ticks: number | null},
     ) {
       const key = targetId(target);
+      if (!immunity || typeof immunity !== 'object') throw new StatusError('immunity must be an object');
       const ik = targetId(immunity.key);
-      const list = (v: readonly string[] | undefined) => Object.freeze([...new Set((v ?? []).map(targetId))].sort());
+      if (ik.startsWith(AFTER)) throw new StatusError('immunity keys starting with after: are reserved');
+      const list = (v: readonly string[] | undefined) => {
+        if (v !== undefined && (!Array.isArray(v) || v.length > MAX_IMMUNITY_LIST))
+          throw new StatusError(`immunity lists hold at most ${MAX_IMMUNITY_LIST} entries`);
+        return Object.freeze([...new Set((v ?? []).map(targetId))].sort());
+      };
       const idsList = list(immunity.ids),
         tags = list(immunity.tags);
       for (const sid of idsList) def(sid);
       if (!idsList.length && !tags.length) throw new StatusError('an immunity needs ids or tags');
-      if (immunity.ticks !== null && (!Number.isSafeInteger(immunity.ticks) || immunity.ticks < 1))
-        throw new StatusError('immunity ticks must be a positive integer or null');
+      if (
+        immunity.ticks !== null &&
+        (!Number.isSafeInteger(immunity.ticks) || immunity.ticks < 1 || immunity.ticks > 2 ** 40)
+      )
+        throw new StatusError('immunity ticks must be an integer in 1..2^40 or null');
       const until = immunity.ticks === null ? null : now + immunity.ticks;
       if (!targets.has(key) && targets.size >= maxTargets) return false;
-      return mutate(key, t => {
-        if (!t.immunities.has(ik) && t.immunities.size >= maxImmunities) return false;
-        t.immunities.set(ik, Object.freeze({key: ik, ids: idsList, tags, until}));
-        return true;
-      });
+      return draft(
+        key,
+        t => {
+          if (!t.immunities.has(ik) && t.immunities.size >= maxImmunities) return false;
+          t.immunities.set(ik, Object.freeze({key: ik, ids: idsList, tags, until}));
+          return true;
+        },
+        ok => ok,
+      );
     },
     clearImmunity(target: string, key: string): boolean {
       const tk = targetId(target);
+      if (typeof key !== 'string' || key.startsWith(AFTER)) return false;
       if (!targets.get(tk)?.immunities.has(key)) return false;
-      return mutate(tk, t => t.immunities.delete(key));
+      return draft(tk, t => t.immunities.delete(key));
     },
     /** Forget a target (despawn, scene exit). No events: it is cancellation, not expiry. */
     removeTarget(target: string): boolean {
-      return targets.delete(targetId(target));
+      const removed = targets.delete(targetId(target));
+      if (removed) order = null;
+      return removed;
     },
     /** Advance the clock by whole ticks (≤ maxAdvance), in order: periodic, timers, decay, expiry, immunities. */
     advance(ticks = 1): readonly StatusEvent[] {
       if (!Number.isSafeInteger(ticks) || ticks < 1 || ticks > maxAdvance)
         throw new StatusError(`advance takes 1..${maxAdvance} ticks`);
-      if (now + ticks > MAX_TICK) throw new StatusError('clock exhausted');
-      const saved = targets;
-      const savedNow = now;
-      targets = new Map([...targets].map(([k, t]) => [k, clone(t)]));
+      if (now + ticks > MAX_NOW) throw new StatusError('clock exhausted');
       const events: StatusEvent[] = [];
-      try {
-        for (let i = 0; i < ticks; i++) tick(events);
-      } catch (error) {
-        targets = saved;
-        now = savedNow;
-        throw error;
-      }
+      for (let i = 0; i < ticks; i++) tick(events);
       return Object.freeze(events);
     },
     stacks(target: string, status: string): number {
@@ -426,6 +506,7 @@ export function createStatusEffects(rules: StatusRules, options: StatusOptions =
       const next = parseSnapshot(raw, signature, defs, {maxTargets, maxPerTarget, maxImmunities});
       targets = next.targets;
       now = next.now;
+      order = null;
     },
   });
 }
@@ -456,8 +537,8 @@ function array(v: unknown, max: number, what: string): unknown[] {
   }
   return out;
 }
-const tick = (v: unknown, what: string): number => {
-  if (typeof v !== 'number' || !Number.isSafeInteger(v) || v < 0 || v > MAX_TICK)
+const tickValue = (v: unknown, what: string, max = MAX_TICK_VALUE): number => {
+  if (typeof v !== 'number' || !Number.isSafeInteger(v) || v < 0 || v > max)
     throw new StatusError(`${what} must be a tick`);
   return v;
 };
@@ -471,7 +552,7 @@ function parseSnapshot(
   const s = record(raw, ['version', 'signature', 'now', 'targets'], 'snapshot');
   if (s.version !== 1) throw new StatusError('unsupported snapshot version');
   if (s.signature !== signature) throw new StatusError('snapshot was saved with different status rules');
-  const now = tick(s.now, 'now');
+  const now = tickValue(s.now, 'now', MAX_NOW);
   const targets = new Map<string, Target>();
   for (const entry of array(s.targets, b.maxTargets, 'targets')) {
     const t = record(entry, ['target', 'statuses', 'immunities'], 'target');
@@ -484,21 +565,30 @@ function parseSnapshot(
       const stacks = r.stacks;
       if (typeof stacks !== 'number' || !Number.isSafeInteger(stacks) || stacks < 1 || stacks > d.maxStacks)
         throw new StatusError(`${d.id}: invalid stacks`);
-      const appliedAt = tick(r.appliedAt, 'appliedAt'),
-        lastChange = tick(r.lastChange, 'lastChange');
+      if (d.threshold && d.threshold.consume && d.threshold.become === null && stacks >= d.threshold.stacks)
+        throw new StatusError(`${d.id}: stacks at a consuming threshold`);
+      const appliedAt = tickValue(r.appliedAt, 'appliedAt'),
+        lastChange = tickValue(r.lastChange, 'lastChange');
       if (appliedAt > now || lastChange > now || lastChange < appliedAt)
         throw new StatusError(`${d.id}: invalid ticks`);
-      const expiresAt = r.expiresAt === null ? null : tick(r.expiresAt, 'expiresAt');
-      if ((expiresAt === null) !== (d.duration === null) || (expiresAt !== null && expiresAt <= now))
+      const expiresAt = r.expiresAt === null ? null : tickValue(r.expiresAt, 'expiresAt');
+      const longest = d.duration === null ? 0 : (d.maxDuration ?? d.duration);
+      if (
+        (expiresAt === null) !== (d.duration === null) ||
+        (expiresAt !== null && (expiresAt <= now || expiresAt > now + longest))
+      )
         throw new StatusError(`${d.id}: invalid expiry`);
-      const timers = array(r.timers, 256, 'timers').map(x => tick(x, 'timer'));
+      const timers = array(r.timers, 256, 'timers').map(x => tickValue(x, 'timer'));
       if (d.policy === 'independent') {
-        if (timers.length !== stacks || timers.some((x, i) => x <= now || (i > 0 && x < timers[i - 1]!)))
+        if (
+          timers.length !== stacks ||
+          timers.some((x, i) => x <= now || x > now + d.duration! || (i > 0 && x < timers[i - 1]!))
+        )
           throw new StatusError(`${d.id}: invalid timers`);
         if (expiresAt !== timers[timers.length - 1]) throw new StatusError(`${d.id}: expiry must equal the last timer`);
       } else if (timers.length) throw new StatusError(`${d.id}: timers need the independent policy`);
-      const source = r.source === null ? null : isStatusId(r.source) ? r.source : null;
-      if (r.source !== null && source === null) throw new StatusError(`${d.id}: invalid source`);
+      if (r.source !== null && !isStatusId(r.source)) throw new StatusError(`${d.id}: invalid source`);
+      const source = r.source as string | null;
       statuses.set(d.id, {id: d.id, stacks, appliedAt, lastChange, expiresAt, timers, source});
     }
     const groups = new Set<string>();
@@ -510,9 +600,12 @@ function parseSnapshot(
     const immunities = new Map<string, Immunity>();
     for (const item of array(t.immunities, b.maxImmunities, 'immunities')) {
       const r = record(item, ['key', 'ids', 'tags', 'until'], 'immunity');
-      if (!isStatusId(r.key) || immunities.has(r.key)) throw new StatusError('invalid or duplicate immunity key');
+      if (!isKey(r.key) || immunities.has(r.key)) throw new StatusError('invalid or duplicate immunity key');
+      if (r.key.startsWith(AFTER) && !defs.get(r.key.slice(AFTER.length))?.afterImmunity)
+        throw new StatusError('after-immunity of a status without one');
+      if (!r.key.startsWith(AFTER) && !isStatusId(r.key)) throw new StatusError('invalid immunity key');
       const list = (v: unknown) => {
-        const xs = array(v, 64, 'immunity list');
+        const xs = array(v, MAX_IMMUNITY_LIST, 'immunity list');
         if (!xs.every(isStatusId)) throw new StatusError('invalid immunity entry');
         return Object.freeze([...new Set(xs as string[])].sort());
       };
@@ -520,7 +613,7 @@ function parseSnapshot(
         tags = list(r.tags);
       if (ids.some(x => !defs.has(x))) throw new StatusError('immunity names an unknown status');
       if (!ids.length && !tags.length) throw new StatusError('empty immunity');
-      const until = r.until === null ? null : tick(r.until, 'until');
+      const until = r.until === null ? null : tickValue(r.until, 'until');
       if (until !== null && until <= now) throw new StatusError('expired immunity');
       immunities.set(r.key, Object.freeze({key: r.key, ids, tags, until}));
     }

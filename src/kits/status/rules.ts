@@ -90,7 +90,8 @@ export interface StatusDefinition {
   } | null;
 }
 export interface StatusRules {
-  readonly statuses: ReadonlyMap<string, StatusDefinition>;
+  /** The validated definitions in id order (frozen). */
+  readonly statuses: readonly StatusDefinition[];
   /** Stable text of the normalized rules; snapshots record it and restore refuses a different one. */
   readonly signature: string;
 }
@@ -214,7 +215,16 @@ export function defineStatusRules(input: readonly StatusDefinitionInput[]): Stat
       seen.add(at);
     }
   }
-  const ordered = [...map.keys()].sort();
-  const statuses = new Map(ordered.map(k => [k, map.get(k)!]));
-  return Object.freeze({statuses, signature: JSON.stringify([...statuses.values()])});
+  const statuses = Object.freeze([...map.keys()].sort().map(k => map.get(k)!));
+  const rules: StatusRules = Object.freeze({statuses, signature: JSON.stringify(statuses)});
+  VALIDATED.set(rules, new Map(statuses.map(d => [d.id, d])));
+  return rules;
+}
+
+const VALIDATED = new WeakMap<StatusRules, ReadonlyMap<string, StatusDefinition>>();
+/** The private table of rules made by `defineStatusRules`; anything else is refused. */
+export function statusTable(rules: StatusRules): ReadonlyMap<string, StatusDefinition> {
+  const table = typeof rules === 'object' && rules !== null ? VALIDATED.get(rules) : undefined;
+  if (!table) throw new StatusError('use rules returned by defineStatusRules');
+  return table;
 }

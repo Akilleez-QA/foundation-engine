@@ -32,20 +32,28 @@ change, removed at zero); `period` (a `periodic` event every N ticks after first
 (default) or `replace`; `flags`; `contributes` rows (`{key, value, perStack?}`); `afterImmunity`
 (`{ids?, tags?, ticks}` granted when the status ends by expiry, decay or threshold consumption, not by manual
 removal or replacement). Up to 256 definitions. Unknown `become`/immunity targets and transform cycles are refused.
-`rules.signature` identifies the normalised rules.
+`rules.statuses` is the frozen, id-ordered list and `rules.signature` identifies it; the owner accepts only rules
+returned by `defineStatusRules`.
 
 ## The owner (`createStatusEffects`)
 
 - `apply(target, id, {stacks?, source?})` returns `{outcome, events}`. `immune`, `blocked` (exclusive group) and
-  `capacity` change nothing. A threshold fires on reaching its stack count: it emits `triggered`, removes the status
-  when `consume` (default), emits `transformed` and applies `become`. If the target is immune to `become`, nothing
-  transforms and the stacks stay capped. With `consume: false` the threshold fires again on each later application
-  at or above it.
+  `capacity` change nothing. Every accepted re-application emits `stacked`, including one at the cap (it still
+  refreshes timers and the decay clock). A threshold fires on reaching its stack count: it emits `triggered`, removes
+  the status when `consume` (default, granting its after-immunity), emits `transformed` and applies `become`. The
+  whole threshold is tried first: if `become` would be refused (immune, including immunity granted by the consumed
+  status itself, an occupied exclusive group, or capacity), nothing fires (no trigger, no consumption) and the stacks
+  stay capped. With `consume: false` the threshold fires again on each later application at or above it. At the cap,
+  each surplus stack of an `independent` status refreshes one oldest timer.
 - `advance(ticks = 1)` (≤ `maxAdvance`, default 600) moves the clock. Per tick, targets and statuses in id order:
   periodic pulse, independent timers, decay, expiry, then immunity expiry. A pulse and the expiry on the same tick
-  both happen (pulse first). The whole advance is applied to a copy and published only if it completes.
-- `remove(target, id, stacks?)`, `cleanse(target, tag)`, `setImmunity(target, {key, ids?, tags?, ticks | null})`,
-  `clearImmunity`, `removeTarget` (cancellation: no events, no after-immunity).
+  both happen (pulse first). Loss events (`expired`, `decayed`, `removed`, `consumed`, `replaced`) carry the stacks
+  lost and the stacks `remaining`, so partial losses are reported too; `periodic`, `applied`, `stacked` and
+  `triggered` carry the latest `source`. `advance` mutates in place: with validated rules it has no failure path
+  after its argument checks.
+- `remove(target, id, stacks?)`, `cleanse(target, tag)`, `setImmunity(target, {key, ids?, tags?, ticks | null})`
+  (≤ 64 ids and 64 tags; refuses future applications but does not remove active statuses; keys starting `after:` are
+  reserved for after-immunities), `clearImmunity`, `removeTarget` (cancellation: no events, no after-immunity).
 - Reads: `stacks`, `has`, `list`, `immunities`, `isImmune`, `flags`, `contributions`, `targets`, `now`.
 - `snapshot()` is detached plain data (version, rules signature, clock, every target); `restore(raw)` validates all
   of it (rules signature, fields, ranges, timer order, groups, bounds) before replacing anything.
@@ -61,9 +69,11 @@ removal or replacement). Up to 256 definitions. Unknown `become`/immunity target
 ## Bounds, overload and failure
 
 Defaults: 1,024 targets (≤ 65,536), 32 statuses and 32 immunities per target (≤ 256), 600 ticks per advance
-(≤ 3,600). Work per tick is O(active statuses + immunities); events per tick are at most four per active status
-(a transform chain adds at most one per definition). Overload is explicit: `capacity` outcomes or `false` from
-`setImmunity`; after-immunities that would exceed the per-target bound are skipped. Invalid ids, stacks, ticks and
+(≤ 3,600). A tick visits every active status and immunity once and sorts each target's status ids (target ids are
+sorted only when the set of targets changes): O(S log S) with no copying. `apply`, `remove`, `cleanse` and immunity
+changes copy the one target they touch. Events per tick are at most four per active status. Overload is explicit:
+`capacity` outcomes or `false` from `setImmunity`; an after-immunity that would exceed the per-target bound is
+skipped and reported as an `immunity-dropped` event. Invalid ids, stacks, ticks and
 unknown statuses throw `StatusError` without changing state. A target with no statuses and no immunities is
 forgotten.
 
@@ -71,7 +81,8 @@ forgotten.
 
 `statusPresets.damageOverTime` (independent poison stacks), `buildup` (chill → frozen transform with after-immunity,
 burn → `ignite` trigger), `exclusiveAilments` (one major ailment at a time, collectible-RPG archetype) and
-`controlImmunity` (stun with diminishing-returns immunity, extendable haste). Ticks assume 60 Hz. Copy and rename the
+`controlImmunity` (stun with diminishing-returns immunity, extendable haste). Ticks assume 60 Hz. Preset ids do not
+collide, so they can be combined (`[...a, ...b]`). Copy and rename the
 vocabulary to the game's. The numbers are tuning starting points, not any game's tables.
 
 ## Limitations

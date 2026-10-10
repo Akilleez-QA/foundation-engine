@@ -50,7 +50,7 @@ export const statusPresets = Object.freeze({
     {id: 'poisoned', group: 'major', period: 60, tags: ['ailment']},
     {id: 'burned', group: 'major', period: 60, contributes: [{key: 'attack', value: -0.5}], tags: ['ailment']},
     {id: 'paralyzed', group: 'major', contributes: [{key: 'speed', value: -0.75}], tags: ['ailment']},
-    {id: 'frozen', group: 'major', flags: ['cannot-act'], tags: ['ailment']},
+    {id: 'frozen-solid', group: 'major', flags: ['cannot-act'], tags: ['ailment']},
   ] satisfies StatusDefinitionInput[]),
 
   /** Control with diminishing returns: a stun grants 5 s of stun immunity when it ends. */

@@ -181,3 +181,91 @@ test('removing a target is cancellation: no events and no after-immunity', () =>
   fx.advance(90);
   assert.equal(fx.apply('t', 'stunned').outcome, 'immune', 'expiry does');
 });
+
+test('review: a refused transform keeps the source capped and emits nothing beyond the stacking', () => {
+  const rules = defineStatusRules([
+    {id: 'chill', maxStacks: 3, threshold: {stacks: 3, become: 'frozen', trigger: 'shatter'}},
+    {id: 'frozen', group: 'major', tags: ['cold']},
+    {id: 'asleep', group: 'major'},
+    {
+      id: 'spark',
+      maxStacks: 2,
+      threshold: {stacks: 2, become: 'charged'},
+      tags: ['volt'],
+      afterImmunity: {tags: ['volt'], ticks: 5},
+    },
+    {id: 'charged', tags: ['volt']},
+  ]);
+  const fx = createStatusEffects(rules);
+  fx.apply('t', 'asleep');
+  const blocked = fx.apply('t', 'chill', {stacks: 5});
+  assert.equal(blocked.outcome, 'applied');
+  assert.deepEqual(kinds(blocked.events), ['applied:chill']);
+  assert.equal(fx.stacks('t', 'chill'), 3);
+  const self = fx.apply('u', 'spark', {stacks: 2});
+  assert.deepEqual(
+    kinds(self.events),
+    ['applied:spark'],
+    "the consumed status's own after-immunity refuses the transform",
+  );
+  assert.equal(fx.stacks('u', 'spark'), 2);
+});
+
+test('review: partial losses are events with remaining stacks; multiple cap refreshes', () => {
+  const fx = createStatusEffects(
+    defineStatusRules([
+      {id: 'dot', maxStacks: 3, duration: 10, policy: 'independent'},
+      {id: 'heap', maxStacks: 10, decay: {every: 2, stacks: 3}},
+    ]),
+  );
+  fx.apply('t', 'dot');
+  fx.advance(5);
+  fx.apply('t', 'dot', {stacks: 2});
+  fx.apply('t', 'heap', {stacks: 10});
+  const events = fx.advance(5);
+  assert.deepEqual(
+    events.map(e => ('remaining' in e ? `${e.kind}:${e.id}:${e.stacks}:${e.remaining}` : e.kind)),
+    ['decayed:heap:3:7', 'decayed:heap:3:4', 'expired:dot:1:2'],
+  );
+  fx.apply('t', 'dot', {stacks: 3});
+  assert.deepEqual(
+    fx.list('t').find(s => s.id === 'dot')!.timers,
+    [20, 20, 20],
+    'three surplus applications refresh three timers',
+  );
+  assert.deepEqual(
+    fx.remove('t', 'heap', 1).map(e => ('remaining' in e ? e.remaining : -1)),
+    [3],
+  );
+});
+
+test('review: rules must come from defineStatusRules; bounds round-trip through snapshots', () => {
+  const rules = defineStatusRules([
+    {id: 'x'.repeat(64), duration: 5, afterImmunity: {tags: Array.from({length: 32}, (_, i) => `t${i}`), ticks: 9}},
+  ]);
+  assert.throws(() => createStatusEffects({statuses: rules.statuses, signature: rules.signature}), /defineStatusRules/);
+  assert.ok(Object.isFrozen(rules.statuses));
+  const fx = createStatusEffects(rules);
+  fx.apply('t', 'x'.repeat(64));
+  fx.setImmunity('t', {key: 'gear', tags: Array.from({length: 64}, (_, i) => `g${i}`), ticks: null});
+  assert.throws(
+    () => fx.setImmunity('t', {key: 'big', tags: Array.from({length: 65}, (_, i) => `g${i}`), ticks: 1}),
+    /at most 64/,
+  );
+  assert.throws(() => fx.setImmunity('t', {key: 'after:x', tags: ['a'], ticks: 1}), /reserved/);
+  fx.advance(5);
+  const saved = JSON.parse(JSON.stringify(fx.snapshot()));
+  assert.equal(saved.targets[0].immunities.length, 2);
+  const again = createStatusEffects(rules);
+  again.restore(saved);
+  assert.deepEqual(again.snapshot(), fx.snapshot());
+  const stretched = structuredClone(saved);
+  stretched.targets[0].immunities[0].until = 2 ** 40;
+  assert.doesNotThrow(() => createStatusEffects(rules).restore(stretched));
+  const live = createStatusEffects(rules);
+  live.apply('t', 'x'.repeat(64));
+  const bad = JSON.parse(JSON.stringify(live.snapshot()));
+  bad.targets[0].statuses[0].expiresAt = 2 ** 49;
+  assert.throws(() => createStatusEffects(rules).restore(bad), /invalid expiry/);
+  assert.throws(() => live.apply('t', 'x'.repeat(64), null as never), /object/);
+});
