@@ -73,3 +73,5 @@ export {
   type ChunkFailed,
   type ChunkStatus,
 } from '../../core/save/chunk-store';
+
+export {cellularWasmGridJob, prepareCellularGridWasm} from './cellular-wasm';

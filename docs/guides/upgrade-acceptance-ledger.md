@@ -1654,3 +1654,22 @@ corners, silent truncation and unchecked preconditions; all were fixed. A re-rev
 fixed: a point a rounding error below the mesh minimum was unlocatable, the corridor
 limit message was stale, and the inside tolerance was not uniform on tiny polygons.
 No game, browser or device evidence.
+
+## 2026-10-08 — Optional cellular WASM candidate (GEN-03)
+
+Candidate branch: `feat/cellular-wasm`, based on `e7e42706`. Adds an explicit
+`prepareCellularGridWasm` choice; JavaScript remains the default. The original
+Rust kernel performs smoothing only, reusing seeded generation, WorkerHost,
+validation and resource publication. Each active job owns fixed linear memory;
+compiled modules alone are shared. A bounded fixed scratch charge is captured
+by the generic generator adapter.
+
+Focused checks cover exact JavaScript parity, ABI bounds, concurrency, cancellation
+and recovery. The isolated desktop Chromium check exercised two actual module
+workers, 40,960 compared cells, JS fallback, supersession, owner loss, refusal and
+zero terminal reservations. A full hosted candidate gate and physical-device
+timing/thermal acceptance are not established by those checks. This is candidate
+implementation evidence, not a claim of integration or deployment.
+
+Contract, reproduction and verification:
+[cellular WASM](cellular-wasm.md), [ADR 0080](../adr/0080-optional-cellular-wasm.md).

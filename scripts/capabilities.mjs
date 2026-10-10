@@ -428,6 +428,12 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'GEN-03',
+    title: 'Optional bounded cellular Rust/WASM worker kernel',
+    docs: 'docs/guides/cellular-wasm.md',
+    evidence: [{kit: 'procgen', export: 'prepareCellularGridWasm'}],
+  },
+  {
     id: 'GEN-02',
     title: 'Bounded binary record store for large edited worlds',
     pr: 56,

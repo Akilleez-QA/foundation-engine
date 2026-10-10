@@ -421,6 +421,13 @@
       "evidence": ["@kits/scripting exports loadScriptVm", "@kits/scripting exports createScriptHost"]
     },
     {
+      "id": "GEN-03",
+      "title": "Optional bounded cellular Rust/WASM worker kernel",
+      "shipped": true,
+      "docs": "docs/guides/cellular-wasm.md",
+      "evidence": ["@kits/procgen exports prepareCellularGridWasm"]
+    },
+    {
       "id": "GEN-02",
       "title": "Bounded binary record store for large edited worlds",
       "shipped": true,
@@ -1226,6 +1233,7 @@
         "baselineChecksum",
         "cellularGenerator",
         "cellularGridJob",
+        "cellularWasmGridJob",
         "chooseWeighted",
         "chunkDatabaseDeleting",
         "createCellEdits",
@@ -1242,6 +1250,7 @@
         "parseGenerationSeed",
         "parseGridParameters",
         "prepareCellularGrid",
+        "prepareCellularGridWasm",
         "procgen"
       ]
     },
