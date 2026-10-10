@@ -88,6 +88,6 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0090](0090-camera-support-framing.md) | Support-anchored vertical camera framing | Camera kit | Proposed |
 
-| [0088](0088-action-phase-windows.md) | Optional action phase windows, once-only marks and per-range claims | Optional kits / Capabilities | Proposed |
+| [0097](0097-action-phase-windows.md) | Optional action phase windows, once-only marks and per-range claims | Optional kits / Capabilities | Proposed |
 
-| [0087](0087-bounded-volume-queries.md) | Bounded optional volume queries | Optional composition / Spatial queries | Proposed |
+| [0098](0098-bounded-volume-queries.md) | Bounded optional volume queries | Optional composition / Spatial queries | Proposed |

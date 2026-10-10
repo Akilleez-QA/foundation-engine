@@ -1342,4 +1342,4 @@ and closed-form oracles, ray/endpoint/centre-ray discriminators, a portal consum
 and a fixed-runner body-height consumer. Meshes, heightfields, moving colliders,
 rotation during motion, depenetration and device timing are not covered. Independent
 review found and fixed two defects (PR #237, head before this note `7c9680ab`); affected
-check passed 18 tests. Full hosted CI remains required. See ADR 0087.
+check passed 18 tests. Full hosted CI remains required. See ADR 0098.

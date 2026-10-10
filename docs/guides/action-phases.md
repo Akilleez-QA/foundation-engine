@@ -9,7 +9,7 @@ optional. It stores no actors and installs no clock, callback, scheduler, effect
 persistence owner. A game that does not import it is unchanged.
 
 Tracking: [issue #229](https://github.com/Akilleez-QA/foundation-engine/issues/229),
-[ADR 0088](../adr/0088-action-phase-windows.md).
+[ADR 0097](../adr/0097-action-phase-windows.md).
 
 ## Creator requirement and seam
 

@@ -1,4 +1,4 @@
-# ADR 0087: Bounded optional volume queries
+# ADR 0098: Bounded optional volume queries
 
 Status: Proposed
 

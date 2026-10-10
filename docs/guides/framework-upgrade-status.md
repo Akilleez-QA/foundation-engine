@@ -1340,7 +1340,7 @@ required. No browser, visual or device acceptance.
 windows, once-only marks and per-range claims over plain, fingerprinted caller states.
 It installs no clock, effect or persistence owner, and no template uses it. See
 [action phases](action-phases.md), [issue #229](https://github.com/Akilleez-QA/foundation-engine/issues/229)
-and ADR 0088. The evidence is headless unit and composition tests recorded in the upgrade ledger.
+and ADR 0097. The evidence is headless unit and composition tests recorded in the upgrade ledger.
 Independent review findings were addressed before publication. Full hosted CI and
 integration remain required.
 
@@ -1357,4 +1357,4 @@ and closed-form oracles, ray/endpoint/centre-ray discriminators, a portal consum
 and a fixed-runner body-height consumer. Meshes, heightfields, moving colliders,
 rotation during motion, depenetration and device timing are not covered. Independent
 review found and fixed two defects (PR #237, head before this note `7c9680ab`); affected
-check passed 18 tests. Full hosted CI remains required. See ADR 0087.
+check passed 18 tests. Full hosted CI remains required. See ADR 0098.

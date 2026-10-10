@@ -1,4 +1,4 @@
-# ADR 0088: optional action phase windows
+# ADR 0097: optional action phase windows
 
 - **Status:** Proposed
 - **Date:** 2026-10-09
