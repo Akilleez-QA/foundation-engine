@@ -27,6 +27,17 @@
       ]
     },
     {
+      "id": "STATUS-01",
+      "title": "Optional stacked status effects with transforms, immunities and save/restore",
+      "shipped": true,
+      "docs": "src/kits/status/README.md",
+      "evidence": [
+        "@kits/status exports createStatusEffects",
+        "@kits/status exports defineStatusRules",
+        "src/kits/status/status.test.ts exists"
+      ]
+    },
+    {
       "id": "NAV-FIELD-01",
       "title": "Optional incremental shared navigation distance fields",
       "shipped": true,
@@ -1056,6 +1067,10 @@
         "spatialAudio",
         "validateSoundClass"
       ]
+    },
+    {
+      "name": "status",
+      "exports": ["StatusError", "createStatusEffects", "defineStatusRules", "isStatusId", "status", "statusPresets"]
     },
     {
       "name": "terrain",

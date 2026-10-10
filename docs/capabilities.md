@@ -14,6 +14,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | POOL-01 | Optional bounded entity pool with eviction classes |  | [entity-pool.md](guides/entity-pool.md) |
 | FORMULA-DATA-01 | Spreadsheet import for formula sheets and lookup tables (npm run formulas:import) |  | [README.md](../src/kits/formulas/README.md) |
 | FORMULA-01 | Optional data-defined stat and damage formulas with stacking stages |  | [README.md](../src/kits/formulas/README.md) |
+| STATUS-01 | Optional stacked status effects with transforms, immunities and save/restore |  | [README.md](../src/kits/status/README.md) |
 | NAV-FIELD-01 | Optional incremental shared navigation distance fields |  | [README.md](../src/kits/navigation/README.md) |
 | WORK-01 | Optional bounded fair work roster |  | [README.md](../src/kits/work-roster/README.md) |
 | VOLUME-01 | Optional bounded sphere and capsule overlap, sweep and headroom queries |  | [README.md](../src/kits/volume-query/README.md) |
@@ -110,6 +111,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/space`
 - `@kits/spatial`
 - `@kits/spatial-audio`
+- `@kits/status`
 - `@kits/terrain`
 - `@kits/three`
 - `@kits/turns`
