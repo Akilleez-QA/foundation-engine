@@ -341,7 +341,10 @@ port and the transport; the decoder sits between the transport and
 const encoder = createViewDeltaEncoder({session, limits}); // same ViewLimits as the publisher
 const publisher = createViewPublisher({session, limits, ports: {...ports, send: json => transport(encoder.encode(json))}});
 // host, on the client's acknowledgment message {sequence, adopted}:
-encoder.ack(session, sequence, adopted); publisher.ack(session, sequence);
+encoder.ack(session, sequence, adopted); // adopted is required: true or false
+publisher.ack(session, sequence);
+if (!adopted) publisher.markDirty(); // releasing credit does not mark dirty; the client needs a fresh complete frame
+// in the publisher's retire port: encoder.dispose();
 
 const decoder = createViewDeltaDecoder({session, limits});
 const d = decoder.decode(wireJson); // complete | reconstructed | baseline-missing | obsolete | foreign | invalid | retired
@@ -350,15 +353,20 @@ if (d.status === 'complete' || d.status === 'reconstructed') {
 }
 ```
 
-- **Wire.** `{v:1,type:'view-delta',session,sequence,baseSequence,worldRevision,
-  upserts,removes,order?}`. `upserts` are whole entities that are new or whose
+- **Wire.** `{v:1,type:'view-delta',session,sequence,baseSequence,baseLength,
+  worldRevision,upserts,removes,order?}`. `baseLength` is the UTF-16 length of the
+  base frame's complete JSON, a cheap check against a mismatched baseline. Only
+  text starting with the encoder's exact `{"v":1,"type":"view-delta",` prefix is
+  treated as a delta, so content that mentions the type stays a complete frame. `upserts` are whole entities that are new or whose
   `incarnation`/`fields` JSON changed; `removes` are baseline IDs that left;
   `order` appears only when the complete order differs from the default merge
   (baseline order without removals, then new IDs in upsert order). Granularity is
   the entity, not the field.
 - **Baseline.** The encoder's baseline is the last frame acknowledged with
-  `adopted` true (default); `adopted: false`, an acknowledged unavailable frame or
-  `requireComplete()` clears it, so the next frame is complete. The decoder's
+  `adopted: true`; `adopted: false`, an acknowledged unavailable frame or
+  `requireComplete()` clears it, so the next frame is complete. `requireComplete`
+  holds until a frame sent complete after it is adopted, even if a delta was
+  already pending. The decoder's
   baseline is the frame passed to `adopt` after the receiver accepted it;
   `invalidate()` clears it. With the publisher's single credit, the acknowledged
   frame is the only one a delta can refer to.
@@ -370,13 +378,17 @@ if (d.status === 'complete' || d.status === 'reconstructed') {
 - **Bounds.** Delta frames are captured under the same `ViewLimits` (bytes,
   nodes, depth, entities, identity length) before use. A rebuilt frame above
   `maxEntities`, a removal of an unknown ID, duplicate upserts, a malformed order
-  or unknown keys are `invalid`; the decoder's baseline is untouched. Each side
+  or unknown keys are `invalid`; a rebuilt frame is captured again under the same
+  limits (bytes, nodes, depth) and is `invalid` if it exceeds them, so a hostile
+  host cannot make the receiver retire through the decoder. The decoder's baseline
+  is untouched. Each side
   retains at most two complete frames (baseline and pending). Encoding costs a
   serialization per entity plus one capture and rebuild per delta.
 - **Recovery.** `baseline-missing` (the decoder no longer has `baseSequence`)
   means: invalidate the receiver and replica, acknowledge with `adopted: false`
   and mark the publisher dirty; the next frame is complete. `obsolete` deltas are
-  older than the adopted baseline. `invalid` and `foreign` change nothing; the
+  older than the newest frame the decoder has produced, including after
+  `invalidate`, so a redelivered stale delta does not trigger another recovery. `invalid` and `foreign` change nothing; the
   creator decides whether to close the connection. `dispose` is terminal on both
   sides (the encoder then passes frames through).
 

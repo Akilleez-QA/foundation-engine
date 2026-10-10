@@ -201,11 +201,11 @@ test('acknowledgments only promote the exact pending frame of this session', () 
   const l = link(crowd(10));
   l.publisher.pump();
   const seq = 1;
-  assert.equal(l.encoder.ack('other', seq), false);
-  assert.equal(l.encoder.ack(session, seq + 1), false);
+  assert.equal(l.encoder.ack('other', seq, true), false);
+  assert.equal(l.encoder.ack(session, seq + 1, true), false);
   assert.equal(l.encoder.read().baseline, null);
-  assert.equal(l.encoder.ack(session, seq), true);
-  assert.equal(l.encoder.ack(session, seq), false);
+  assert.equal(l.encoder.ack(session, seq, true), true);
+  assert.equal(l.encoder.ack(session, seq, true), false);
   assert.equal(l.encoder.read().baseline, seq);
   assert.equal(l.decoder.adopt(seq), false); // nothing decoded yet
 });
@@ -230,13 +230,13 @@ test('an unavailable frame passes through and its adoption clears the baseline',
   const first = enc.encode(full(1, 0));
   assert.equal(dec.decode(first).status, 'complete');
   dec.adopt(1);
-  enc.ack(session, 1);
+  enc.ack(session, 1, true);
   const gone = JSON.stringify({v: 1, type: 'view-unavailable', session, sequence: 2, reason: 'projection-failed'});
   assert.equal(enc.encode(gone), gone);
   const decoded = dec.decode(gone);
   assert.equal(decoded.status, 'complete');
   assert.equal(dec.adopt(2), true);
-  assert.equal(enc.ack(session, 2), true);
+  assert.equal(enc.ack(session, 2, true), true);
   assert.equal(enc.read().baseline, null);
   assert.equal(dec.read().baseline, null);
   const third = enc.encode(full(3, 1));
@@ -256,4 +256,69 @@ test('redelivering a delta before adoption reproduces identical bytes (receiver 
   if (a.status !== 'reconstructed' || b.status !== 'reconstructed') return;
   assert.equal(l.receiver.receive(a.json).status, 'accepted');
   assert.equal(l.receiver.receive(b.json).status, 'duplicate');
+});
+
+test('a complete frame that mentions the delta type in its content is still a complete frame', () => {
+  const tagged = crowd(10).map(e => ({...e, fields: {...e.fields, label: 'view-delta'}}));
+  const l = link(tagged);
+  assert.equal(l.step(), 'complete');
+  const next = tagged.map((e, i) => (i === 0 ? {...e, fields: {...e.fields, y: 1}} : e));
+  l.set(next);
+  assert.equal(l.step(), 'reconstructed');
+  assert.equal(l.receiver.read().view?.entities.length, 10);
+});
+
+test('requireComplete during a pending delta still yields a complete frame next', () => {
+  const l = link(crowd(10));
+  l.step();
+  l.set(crowd(10, 1));
+  l.publisher.pump(); // a delta is pending
+  l.encoder.requireComplete();
+  const d = l.decoder.decode(l.wire.at(-1)!);
+  assert.equal(d.status, 'reconstructed');
+  if (d.status !== 'reconstructed') return;
+  l.receiver.receive(d.json);
+  l.decoder.adopt(d.sequence);
+  l.encoder.ack(session, d.sequence, true);
+  l.publisher.ack(session, d.sequence);
+  l.set(crowd(10, 2));
+  assert.equal(l.step(), 'complete');
+});
+
+test('a hostile delta whose rebuilt frame exceeds the limits is invalid, not a receiver retirement', () => {
+  const small = {...limits, maxBytes: 900};
+  const enc = createViewDeltaEncoder({session, limits: small});
+  const dec = createViewDeltaDecoder({session, limits: small});
+  const base = JSON.stringify({v: 1, type: 'view', session, sequence: 1, worldRevision: 1, entities: crowd(8)});
+  assert.equal(dec.decode(enc.encode(base)).status, 'complete');
+  dec.adopt(1);
+  const big = Array.from({length: 8}, (_, i) => ({id: `z${i}`, incarnation: 0, fields: 'x'.repeat(40)}));
+  const hostile = JSON.stringify({
+    v: 1,
+    type: 'view-delta',
+    session,
+    sequence: 2,
+    baseSequence: 1,
+    baseLength: base.length,
+    worldRevision: 2,
+    upserts: big,
+    removes: [],
+  });
+  assert.ok(hostile.length < 900);
+  assert.equal(dec.decode(hostile).status, 'invalid');
+  assert.equal(dec.read().baseline, 1);
+});
+
+test('after invalidate a redelivered older delta is obsolete; ack requires an explicit adoption flag', () => {
+  const l = link(crowd(10));
+  l.step();
+  l.set(crowd(10, 1));
+  l.step();
+  const old = l.wire.at(-1)!;
+  l.set(crowd(10, 2));
+  l.step();
+  l.decoder.invalidate();
+  assert.equal(l.decoder.decode(old).status, 'obsolete');
+  // @ts-expect-error adopted is required
+  assert.throws(() => l.encoder.ack(session, 9));
 });

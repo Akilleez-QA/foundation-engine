@@ -18,6 +18,8 @@ export type ViewDeltaFrame = Readonly<{
   session: string;
   sequence: number;
   baseSequence: number;
+  /** UTF-16 length of the base frame's complete JSON: a cheap fingerprint against a mismatched baseline. */
+  baseLength: number;
   worldRevision: number;
   /** New entities and entities whose incarnation or fields changed, in their complete-frame order. */
   upserts: readonly ViewEntity[];
@@ -47,7 +49,7 @@ export type ViewDeltaEncoder = Readonly<{
    * Records the receiving side's acknowledgment of `sequence`. `adopted: false` (the receiver could not apply it
    * and invalidated) clears the baseline so the next frame is complete. Returns true only for the pending frame.
    */
-  ack(session: string, sequence: number, adopted?: boolean): boolean;
+  ack(session: string, sequence: number, adopted: boolean): boolean;
   /** Forces the next frame to be complete (for example after a disclosure change or a peer request). */
   requireComplete(): void;
   read(): ViewDeltaEncoderState;
@@ -71,7 +73,8 @@ export type ViewDeltaDecoder = Readonly<{
   dispose(): void;
 }>;
 
-type Baseline = Readonly<{sequence: number; frame: ViewFrame | null}>;
+type Baseline = Readonly<{sequence: number; frame: ViewFrame | null; length: number; complete: boolean}>;
+const DELTA_PREFIX = '{"v":1,"type":"view-delta",';
 
 const entityJson = (e: ViewEntity) => JSON.stringify(e);
 
@@ -147,14 +150,15 @@ function validDelta(value: DocumentValue, limits: ViewLimits): boolean {
   if (
     !exactKeys(
       value,
-      ['v', 'type', 'session', 'sequence', 'baseSequence', 'worldRevision', 'upserts', 'removes'],
+      ['v', 'type', 'session', 'sequence', 'baseSequence', 'baseLength', 'worldRevision', 'upserts', 'removes'],
       ['order'],
     )
   )
     return false;
   if (!viewIdentity(value.session, limits) || !integer(value.sequence, 1) || !integer(value.baseSequence, 1))
     return false;
-  if (value.baseSequence >= value.sequence || !integer(value.worldRevision)) return false;
+  if (value.baseSequence >= value.sequence || !integer(value.worldRevision) || !integer(value.baseLength, 1))
+    return false;
   if (!ids(value.removes, limits) || (value.order !== undefined && !ids(value.order, limits))) return false;
   const upserts = value.upserts;
   if (!Array.isArray(upserts) || upserts.length > limits.maxEntities) return false;
@@ -201,7 +205,7 @@ export function createViewDeltaEncoder(options: {session: string; limits: ViewLi
     return wire;
   }
 
-  function tryDelta(base: ViewFrame, next: ViewFrame, json: string): string | null {
+  function tryDelta(base: ViewFrame, baseLength: number, next: ViewFrame, json: string): string | null {
     const before = new Map(base.entities.map(e => [e.id, entityJson(e)]));
     const present = new Set(next.entities.map(e => e.id));
     const upserts = next.entities.filter(e => before.get(e.id) !== entityJson(e));
@@ -218,6 +222,7 @@ export function createViewDeltaEncoder(options: {session: string; limits: ViewLi
       session,
       sequence: next.sequence,
       baseSequence: base.sequence,
+      baseLength,
       worldRevision: next.worldRevision,
       upserts,
       removes,
@@ -241,21 +246,33 @@ export function createViewDeltaEncoder(options: {session: string; limits: ViewLi
         return emit(json, json, false); // not ours to judge: the receiver will reject it
       }
       if (frame.session !== session) return emit(json, json, false);
-      pending = {sequence: frame.sequence, frame: frame.type === 'view' ? frame : null};
-      if (frame.type !== 'view' || forceComplete || !baseline?.frame || baseline.sequence >= frame.sequence)
+      const complete = (): string => {
+        pending = {
+          sequence: frame.sequence,
+          frame: frame.type === 'view' ? frame : null,
+          length: json.length,
+          complete: true,
+        };
         return emit(json, json, false);
+      };
+      if (frame.type !== 'view' || forceComplete || !baseline?.frame || baseline.sequence >= frame.sequence)
+        return complete();
       let wire: string | null = null;
       try {
-        wire = tryDelta(baseline.frame, frame, json);
+        wire = tryDelta(baseline.frame, baseline.length, frame, json);
       } catch {
         wire = null;
       }
-      return wire === null ? emit(json, json, false) : emit(json, wire, true);
+      if (wire === null) return complete();
+      pending = {sequence: frame.sequence, frame, length: json.length, complete: false};
+      return emit(json, wire, true);
     },
-    ack(ackSession: string, sequence: number, adopted = true) {
+    ack(ackSession: string, sequence: number, adopted: boolean) {
+      if (typeof adopted !== 'boolean') throw TypeError('network view delta: ack needs adopted true or false');
       if (retired || ackSession !== session || !pending || sequence !== pending.sequence) return false;
       baseline = adopted ? pending : null;
-      if (adopted && pending.frame) forceComplete = false;
+      // Only an adopted complete frame satisfies requireComplete; an earlier pending delta does not.
+      if (adopted && pending.frame && pending.complete) forceComplete = false;
       pending = null;
       return true;
     },
@@ -288,20 +305,16 @@ export function createViewDeltaDecoder(options: {session: string; limits: ViewLi
   if (!viewIdentity(session, limits)) throw Error('network view delta: invalid session');
   let retired = false,
     baseline: Baseline | null = null,
-    pending: Baseline | null = null;
+    pending: Baseline | null = null,
+    floor = 0;
   const done = <T extends ViewDeltaDecodeResult>(r: T): T => Object.freeze(r);
 
   return Object.freeze({
     decode(json: string): ViewDeltaDecodeResult {
       if (retired) return done({status: 'retired'});
-      let isDelta = false;
-      try {
-        // Cheap discrimination before bounded capture; a malformed frame falls through to the receiver's checks.
-        isDelta = typeof json === 'string' && json.length <= limits.maxBytes && json.includes('"view-delta"');
-      } catch {
-        isDelta = false;
-      }
-      if (!isDelta) {
+      // The encoder always emits this exact prefix; anything else is judged as a complete frame.
+      if (typeof json !== 'string') return done({status: 'invalid'});
+      if (!json.startsWith(DELTA_PREFIX)) {
         let frame;
         try {
           frame = captureViewFrame(json, limits).value;
@@ -309,7 +322,13 @@ export function createViewDeltaDecoder(options: {session: string; limits: ViewLi
           return done({status: 'invalid'});
         }
         if (frame.session !== session) return done({status: 'foreign'});
-        pending = {sequence: frame.sequence, frame: frame.type === 'view' ? frame : null};
+        pending = {
+          sequence: frame.sequence,
+          frame: frame.type === 'view' ? frame : null,
+          length: json.length,
+          complete: true,
+        };
+        floor = Math.max(floor, frame.sequence);
         return done({status: 'complete', sequence: frame.sequence, json});
       }
       let delta: ViewDeltaFrame;
@@ -319,13 +338,21 @@ export function createViewDeltaDecoder(options: {session: string; limits: ViewLi
         return done({status: 'invalid'});
       }
       if (delta.session !== session) return done({status: 'foreign'});
-      if (baseline && delta.sequence <= baseline.sequence) return done({status: 'obsolete'});
-      if (!baseline?.frame || baseline.sequence !== delta.baseSequence)
+      if (delta.sequence < floor || (baseline && delta.sequence <= baseline.sequence))
+        return done({status: 'obsolete'});
+      if (!baseline?.frame || baseline.sequence !== delta.baseSequence || baseline.length !== delta.baseLength)
         return done({status: 'baseline-missing', sequence: delta.sequence});
       const frame = rebuild(baseline.frame, delta, limits);
       if (!frame) return done({status: 'invalid'});
-      pending = {sequence: frame.sequence, frame};
-      return done({status: 'reconstructed', sequence: frame.sequence, json: completeJson(frame)});
+      const rebuilt = completeJson(frame);
+      try {
+        captureViewFrame(rebuilt, limits); // a rebuilt frame obeys the same limits as a complete one
+      } catch {
+        return done({status: 'invalid'});
+      }
+      pending = {sequence: frame.sequence, frame, length: rebuilt.length, complete: false};
+      floor = Math.max(floor, frame.sequence);
+      return done({status: 'reconstructed', sequence: frame.sequence, json: rebuilt});
     },
     adopt(sequence: number) {
       if (retired || !pending || pending.sequence !== sequence) return false;

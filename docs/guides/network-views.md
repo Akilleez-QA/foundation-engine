@@ -211,8 +211,9 @@ wraps the publisher's `send` port and the receiver's input: the host sends a
 delta against the last frame the client acknowledged as adopted, proves locally
 that it rebuilds the publisher's exact bytes, and otherwise sends the complete
 frame. The client's acknowledgment message carries `adopted` so a failed
-adoption returns credit and forces the next frame complete. Everything above
+adoption returns credit and forces the next frame complete; the host also marks
+the publisher dirty so that frame is sent. Everything above
 (ordering, duplicates, conflicts, scene suspension, recovery) applies unchanged
-to rebuilt frames. Its evidence is ten headless tests with a real publisher and
-receiver and one local byte measurement; WAN, browser and device behavior are
+to rebuilt frames. Its evidence is 14 headless tests with a real publisher and
+receiver and one local length measurement; WAN, browser and device behavior are
 not established by it.
