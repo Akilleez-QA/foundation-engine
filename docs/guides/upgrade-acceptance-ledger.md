@@ -1630,3 +1630,10 @@ ones and uncounted evictions; these are fixed (a `maxStep` credit cap, direct-on
 position and strength for sharing, report positions only when newer than direct perception,
 eviction counting) and covered by a ninth test.
 No game, browser or device evidence.
+
+## Medium volumes kit — candidate (2026-10-09)
+
+- **Scope:** `src/kits/media` (ADR 0152).
+- **Evidence:** `media.test.ts` covers probe selection and seams, hysteresis, the under state, event order, the
+  accelerations, snapshots and a `testScene` floating-body consumer.
+- **Not established:** template or browser consumers and hosted CI.

@@ -279,6 +279,17 @@
       "evidence": ["@kits/grid-step exports createGridStepper", "src/kits/grid-step/grid-step.test.ts exists"]
     },
     {
+      "id": "MEDIA-01",
+      "title": "Medium volumes with hysteresis state tracking and buoyancy, drag and current accelerations",
+      "shipped": true,
+      "docs": "src/kits/media/README.md",
+      "evidence": [
+        "@kits/media exports createMediumVolumes",
+        "@kits/media exports createMediumTracker",
+        "src/kits/media/media.test.ts exists"
+      ]
+    },
+    {
       "id": "VIS-01",
       "title": "Tone mapping and exposure per scene (view.output)",
       "shipped": true,
@@ -1071,6 +1082,10 @@
       ]
     },
     {"name": "market", "exports": ["createMarket", "market"]},
+    {
+      "name": "media",
+      "exports": ["MEDIUM_LIMITS", "createMediumTracker", "createMediumVolumes", "media", "mediumAcceleration"]
+    },
     {
       "name": "navigation",
       "exports": [
