@@ -1,7 +1,7 @@
 /**
  * Traversal helpers: ledge detection, ladders and pushable blocks. Pure functions and small state over creator
- * geometry queries, so any collision owner can answer them; the optional volume-query kit's `sweepVolume` fits the
- * `cast` shape (sphere sweep returning a fraction and a normal). No entity, clock or physics owner is installed: the
+ * geometry queries, so any collision owner can answer them; the optional volume-query kit's sphere `sweepVolume` can
+ * back `cast` through a small adapter (see the README). No entity, clock or physics owner is installed: the
  * caller decides when to grab, climb, push or let go, and applies the returned positions through its own movement.
  */
 export type TraversalVec3 = readonly [number, number, number];
@@ -58,6 +58,8 @@ export interface LedgeQuery {
   readonly maxClimb: number;
   /** Largest |normal.y| accepted for the wall (default 0.3: near vertical). */
   readonly wallSlope?: number;
+  /** Smallest cosine between the facing and the wall's inward normal, [0, 1] (default 0.5: within 60°). */
+  readonly minFacing?: number;
 }
 export type LedgeResult =
   | {
@@ -69,18 +71,26 @@ export type LedgeResult =
       /** Top height minus feet height. */
       readonly climb: number;
     }
-  | {readonly status: 'no-wall' | 'not-a-wall' | 'no-top' | 'too-low' | 'too-high' | 'no-headroom'};
+  | {readonly status: 'no-wall' | 'not-a-wall' | 'oblique' | 'no-top' | 'too-low' | 'too-high' | 'no-headroom'};
 
 /**
- * Look for a ledge ahead: a near-vertical wall within `reach` at chest height, a walkable top just beyond it within
- * [minClimb, maxClimb] above the feet, and headroom for the whole body on top. Uses four creator queries at most
- * (wall cast, a cast over the top to make sure the space above the edge is open, the ground probe, the headroom cast).
+ * Look for a ledge ahead: a near-vertical wall within `reach` facing the body, a walkable top just past the wall face
+ * within [minClimb, maxClimb] above the feet, open space from the body over the edge at the top height, and headroom
+ * for the whole body on top. Uses four creator queries at most (wall cast, ground probe, clearance cast, headroom
+ * cast; or wall cast, ground probe and one disambiguating cast). The wall cast runs at `minClimb + radius` above the feet (at most `height − radius`), so a wall lower than
+ * that reports `no-wall`; `too-low` remains for a top found under `minClimb` (for example a top sloping down). Steps
+ * past the face follow the wall normal, not the facing, so oblique approaches find the same edge. When the probe
+ * finds a top below the wall cast, one more cast at the probe start height tells a wall too tall (`too-high`) from a
+ * top sloping down (`too-low`). Tops are assumed
+ * near flat: a top rising away from the edge can report `no-headroom`.
  */
 export function findLedge(q: LedgeQuery, cast: SphereCast, ground: GroundProbe): LedgeResult {
+  if (!q || typeof q !== 'object') fail('query must be an object');
   const p = vec(q.position, 'position');
-  if (!Array.isArray(q.facing) || q.facing.length !== 2) fail('facing must be [x, z]');
-  const fx0: unknown = q.facing[0],
-    fz0: unknown = q.facing[1];
+  const facing: unknown = q.facing;
+  if (!Array.isArray(facing) || facing.length !== 2) fail('facing must be [x, z]');
+  const fx0: unknown = facing[0],
+    fz0: unknown = facing[1];
   if (!finite(fx0) || !finite(fz0) || Math.hypot(fx0, fz0) < 1e-9) fail('facing must be a nonzero direction');
   const fl = Math.hypot(fx0, fz0),
     fx = fx0 / fl,
@@ -89,38 +99,55 @@ export function findLedge(q: LedgeQuery, cast: SphereCast, ground: GroundProbe):
     radius = positive(q.radius, 10, 'radius'),
     reach = positive(q.reach, 100, 'reach'),
     maxClimb = positive(q.maxClimb, 100, 'maxClimb'),
-    minClimb = q.minClimb ?? 0,
-    wallSlope = q.wallSlope ?? 0.3;
+    minClimb: unknown = q.minClimb ?? 0,
+    wallSlope: unknown = q.wallSlope ?? 0.3,
+    minFacing: unknown = q.minFacing ?? 0.5;
+  if (radius * 2 > height) fail('radius must be at most height / 2');
   if (!finite(minClimb) || minClimb < 0 || minClimb > maxClimb) fail('minClimb must be within [0, maxClimb]');
   if (!finite(wallSlope) || wallSlope < 0 || wallSlope > 1) fail('wallSlope must be within [0, 1]');
-  // 1. A wall at chest height.
-  const chest: TraversalVec3 = [p[0], p[1] + height * 0.5, p[2]];
-  const wall = castOnce(cast, chest, [chest[0] + fx * reach, chest[1], chest[2] + fz * reach], radius);
+  if (!finite(minFacing) || minFacing < 0 || minFacing > 1) fail('minFacing must be within [0, 1]');
+  const skin = Math.max(1e-4, radius * 0.05);
+  // 1. A wall at the lowest climbable height.
+  const castY = p[1] + Math.min(height - radius, minClimb + radius + skin);
+  const wall = castOnce(cast, [p[0], castY, p[2]], [p[0] + fx * reach, castY, p[2] + fz * reach], radius);
   if (!wall) return Object.freeze({status: 'no-wall'});
   if (Math.abs(wall.normal[1]) > wallSlope) return Object.freeze({status: 'not-a-wall'});
+  // The wall's horizontal outward normal; the body must face into it (this also rejects back faces).
+  const nl = Math.hypot(wall.normal[0], wall.normal[2]);
+  const nx = wall.normal[0] / nl,
+    nz = wall.normal[2] / nl;
+  if (-(fx * nx + fz * nz) < minFacing) return Object.freeze({status: 'oblique'});
+  // Contact on the face: the sphere centre at the hit, minus the normal times the radius.
   const dist = wall.fraction * reach;
-  // 2. The space above the ledge must be open: cast forward at the highest climbable height.
-  const over: TraversalVec3 = [p[0], p[1] + maxClimb + radius, p[2]];
-  const ahead = dist + radius * 2;
-  if (castOnce(cast, over, [over[0] + fx * ahead, over[1], over[2] + fz * ahead], radius))
-    return Object.freeze({status: 'too-high'});
-  // 3. The top surface just beyond the wall.
-  const tx = p[0] + fx * ahead,
-    tz = p[2] + fz * ahead;
-  const topY = ground(tx, tz, over[1], maxClimb + radius);
+  const cx = p[0] + fx * dist - nx * radius,
+    cz = p[2] + fz * dist - nz * radius;
+  // 2. The top surface a body radius past the face, searched down from the highest climbable height.
+  const tx = cx - nx * radius * 2,
+    tz = cz - nz * radius * 2;
+  const topY: unknown = ground(tx, tz, p[1] + maxClimb + radius, maxClimb + radius);
   if (topY === null) return Object.freeze({status: 'no-top'});
   if (!finite(topY)) fail('ground must return a finite height or null');
   const climb = topY - p[1];
-  if (climb < minClimb) return Object.freeze({status: 'too-low'});
+  if (climb < minClimb) {
+    // The wall stands at least as high as the wall cast, yet the probe found a top below it: either the wall reaches
+    // above the probe start (too high), or the top slopes down past the edge (too low).
+    const startY = p[1] + maxClimb + radius;
+    return Object.freeze({
+      status: castOnce(cast, [p[0], startY, p[2]], [tx, startY, tz], radius) ? 'too-high' : 'too-low',
+    });
+  }
   if (climb > maxClimb) return Object.freeze({status: 'too-high'});
+  // 3. Open space from the body over the edge at the top height: if the wall continues above the found top, the probe
+  // found something other than the ledge top.
+  const overY = topY + radius + skin;
+  if (castOnce(cast, [p[0], overY, p[2]], [tx, overY, tz], radius)) return Object.freeze({status: 'too-high'});
   // 4. Headroom: the body stands on top.
-  const top: TraversalVec3 = [tx, topY, tz];
-  if (castOnce(cast, [tx, topY + radius, tz], [tx, topY + Math.max(radius, height - radius), tz], radius))
+  if (castOnce(cast, [tx, overY, tz], [tx, topY + Math.max(height - radius, radius + skin * 2), tz], radius))
     return Object.freeze({status: 'no-headroom'});
   return Object.freeze({
     status: 'ledge',
-    edge: frozen([p[0] + fx * (dist + radius), topY, p[2] + fz * (dist + radius)]),
-    top: frozen(top),
+    edge: frozen([cx, topY, cz]),
+    top: frozen([tx, topY, tz]),
     normal: wall.normal,
     climb,
   });
@@ -143,10 +170,26 @@ export interface LadderGrip {
   readonly t: number;
 }
 
+export interface LadderAttachOptions {
+  /** Largest horizontal distance from the grip pose, (0, 100]. Default 0.8. */
+  readonly maxDistance?: number;
+  /** Largest vertical distance between the body and the grip pose, [0, 100]. Default 1. */
+  readonly maxVertical?: number;
+}
+
+const readPair = (v: unknown, what: string): [number, number] => {
+  if (!Array.isArray(v) || v.length !== 2) fail(`${what} must be [x, z]`);
+  const a: unknown = v[0],
+    b: unknown = v[1];
+  if (!finite(a) || !finite(b)) fail(`${what} must be finite`);
+  return [a, b];
+};
+
 /**
- * Ladders as authored segments. `attach` finds the nearest ladder within `maxDistance` whose climbing side the body
- * faces, `climb` moves along it at `speed` (units per second) by input in [−1, 1] and reports exits at either end, and
- * `pose` gives the body position for a grip. Pure: the caller switches its own movement owner while attached.
+ * Ladders as authored segments. `attach` finds the nearest ladder whose grip pose is within `maxDistance`
+ * horizontally and `maxVertical` vertically and whose climbing side the body faces (ties go to list order), `climb`
+ * moves along it at `speed` (units per second) by input in [−1, 1] and reports exits at either end, and `pose` gives
+ * the body position for a grip. Pure: the caller switches its own movement owner while attached.
  */
 export function createLadders(list: readonly Ladder[]) {
   if (!Array.isArray(list) || list.length < 1 || list.length > 1024) fail('1-1,024 ladders');
@@ -161,21 +204,20 @@ export function createLadders(list: readonly Ladder[]) {
     length: number;
   }[] = [];
   for (let i = 0; i < list.length; i++) {
-    const l = list[i];
-    if (!l || typeof l !== 'object') fail(`ladder ${i} must be an object`);
-    const id: unknown = l.id;
+    const entry = list[i];
+    if (!entry || typeof entry !== 'object') fail(`ladder ${i} must be an object`);
+    const id: unknown = entry.id;
     if (typeof id !== 'string' || !id || ids.has(id)) fail('ladder ids must be unique names');
     ids.add(id);
-    const bottom = vec(l.bottom, `${id} bottom`),
-      top = vec(l.top, `${id} top`);
+    const bottom = vec(entry.bottom, `${id} bottom`),
+      top = vec(entry.top, `${id} top`);
     const length = Math.hypot(top[0] - bottom[0], top[1] - bottom[1], top[2] - bottom[2]);
     if (length < 1e-6 || top[1] <= bottom[1]) fail(`${id}: top must be above bottom`);
-    if (!Array.isArray(l.outward) || l.outward.length !== 2) fail(`${id}: outward is [x, z]`);
-    const ox0: unknown = l.outward[0],
-      oz0: unknown = l.outward[1];
-    if (!finite(ox0) || !finite(oz0) || Math.hypot(ox0, oz0) < 1e-9) fail(`${id}: outward must be nonzero`);
+    const [ox0, oz0] = readPair(entry.outward, `${id} outward`);
     const ol = Math.hypot(ox0, oz0);
-    const offset = l.offset === undefined ? 0.4 : positive(l.offset, 10, `${id} offset`);
+    if (ol < 1e-9) fail(`${id}: outward must be nonzero`);
+    const offsetIn: unknown = entry.offset;
+    const offset = offsetIn === undefined ? 0.4 : positive(offsetIn, 10, `${id} offset`);
     ladders.push({id, bottom, top, ox: ox0 / ol, oz: oz0 / ol, offset, length});
   }
   const byId = new Map(ladders.map(l => [l.id, l]));
@@ -185,18 +227,34 @@ export function createLadders(list: readonly Ladder[]) {
       l.bottom[1] + (l.top[1] - l.bottom[1]) * t,
       l.bottom[2] + (l.top[2] - l.bottom[2]) * t + l.oz * l.offset,
     ]);
+  const read = (grip: LadderGrip) => {
+    if (!grip || typeof grip !== 'object') fail('grip must be an object');
+    const name: unknown = grip.ladder,
+      t: unknown = grip.t;
+    const l = typeof name === 'string' ? byId.get(name) : undefined;
+    if (!l) fail(`unknown ladder ${String(name)}`);
+    if (!finite(t) || t < 0 || t > 1) fail('grip t must be within [0, 1]');
+    return {l, t};
+  };
   return {
-    /** The nearest ladder within `maxDistance` that `facing` points at (from its outward side), or null. */
-    attach(position: TraversalVec3, facing: readonly [number, number], maxDistance = 0.8): LadderGrip | null {
+    /** The nearest ladder the body can grip from here while facing into it, or null. */
+    attach(position: TraversalVec3, facing: readonly [number, number], options: LadderAttachOptions = {}) {
       const p = vec(position, 'position');
-      if (!Array.isArray(facing) || facing.length !== 2 || !finite(facing[0]) || !finite(facing[1]))
-        fail('facing must be [x, z]');
-      if (!finite(maxDistance) || maxDistance <= 0) fail('maxDistance must be positive');
+      const [fx0, fz0] = readPair(facing, 'facing');
+      const fl = Math.hypot(fx0, fz0);
+      if (fl < 1e-9) fail('facing must be a nonzero direction');
+      if (!options || typeof options !== 'object') fail('options must be an object');
+      const maxDistance: unknown = options.maxDistance ?? 0.8,
+        maxVertical: unknown = options.maxVertical ?? 1;
+      if (!finite(maxDistance) || maxDistance <= 0 || maxDistance > 100) fail('maxDistance must be within (0, 100]');
+      if (!finite(maxVertical) || maxVertical < 0 || maxVertical > 100) fail('maxVertical must be within [0, 100]');
+      const fx = fx0 / fl,
+        fz = fz0 / fl;
       let best: LadderGrip | null = null,
         bestD = Infinity;
       for (const l of ladders) {
-        // Facing into the ladder means opposite to its outward direction.
-        if (facing[0] * l.ox + facing[1] * l.oz > -0.5 * Math.hypot(facing[0], facing[1])) continue;
+        // Facing into the ladder means opposite to its outward direction (within 60°).
+        if (fx * l.ox + fz * l.oz > -0.5) continue;
         const dx = l.top[0] - l.bottom[0],
           dy = l.top[1] - l.bottom[1],
           dz = l.top[2] - l.bottom[2];
@@ -209,7 +267,7 @@ export function createLadders(list: readonly Ladder[]) {
         );
         const g = at(l, t);
         const d = Math.hypot(g[0] - p[0], g[2] - p[2]);
-        if (d <= maxDistance && Math.abs(g[1] - p[1]) <= l.length && d < bestD) {
+        if (d <= maxDistance && Math.abs(g[1] - p[1]) <= maxVertical && d < bestD) {
           bestD = d;
           best = Object.freeze({ladder: l.id, t});
         }
@@ -223,26 +281,23 @@ export function createLadders(list: readonly Ladder[]) {
       speed: number,
       dt: number,
     ): {readonly grip: LadderGrip; readonly exit: 'top' | 'bottom' | null} {
-      const l = byId.get(grip.ladder);
-      if (!l) fail(`unknown ladder ${String(grip.ladder)}`);
-      if (!finite(grip.t) || grip.t < 0 || grip.t > 1) fail('grip t must be within [0, 1]');
+      const {l, t: t0} = read(grip);
       if (!finite(input) || input < -1 || input > 1) fail('input must be within [-1, 1]');
       if (!finite(speed) || speed < 0 || !finite(dt) || dt < 0) fail('speed and dt must be ≥ 0');
-      const t = grip.t + (input * speed * dt) / l.length;
+      const t = t0 + (input * speed * dt) / l.length;
       const exit = t > 1 ? 'top' : t < 0 ? 'bottom' : null;
       return Object.freeze({grip: Object.freeze({ladder: l.id, t: Math.max(0, Math.min(1, t))}), exit});
     },
     /** Body position for a grip (on the outward side). */
     pose(grip: LadderGrip): TraversalVec3 {
-      const l = byId.get(grip.ladder);
-      if (!l) fail(`unknown ladder ${String(grip.ladder)}`);
-      return at(l, Math.max(0, Math.min(1, grip.t)));
+      const {l, t} = read(grip);
+      return at(l, t);
     },
-    /** Where to stand after leaving at the top: past the top, away from the outward side by `step`. */
+    /** Where to stand after leaving at the top: past the top, away from the outward side by `step`, (0, 10]. */
     topExit(grip: LadderGrip, step = 0.5): TraversalVec3 {
-      const l = byId.get(grip.ladder);
-      if (!l) fail(`unknown ladder ${String(grip.ladder)}`);
-      return frozen([l.top[0] - l.ox * step, l.top[1], l.top[2] - l.oz * step]);
+      const {l} = read(grip);
+      const s = positive(step, 10, 'step');
+      return frozen([l.top[0] - l.ox * s, l.top[1], l.top[2] - l.oz * s]);
     },
   };
 }
@@ -258,10 +313,15 @@ export interface PushableState {
   readonly velocity: readonly [number, number];
 }
 /**
- * One step of a pushable block: a horizontal push force (x, z, newtons-like units) accelerates it by force / mass,
- * friction decelerates it by `friction` (units per second²) when nothing pushes, speed is capped by `maxSpeed`, and
- * the move is limited by the creator's `sweep` (a hit stops that axis). With `snap`, pushes move it whole cells of
- * that size along the dominant axis only. Returns the new state and whether it was blocked.
+ * One step of a pushable block. A horizontal push force (x, z, newtons-like units) accelerates it by force / mass;
+ * kinetic friction (`friction`, units per second²) always opposes the motion, so a push weaker than friction × mass
+ * never starts it (a static threshold) and a released block slows to rest. Speed is capped by `maxSpeed`, and the move
+ * is limited by the creator's `sweep`: each axis is resolved separately, larger displacement first, and a hit stops
+ * that axis so the block slides along walls.
+ *
+ * With `snap`, each call is one grid push: the block moves from its nearest grid line to the next one (multiples of
+ * the cell size) along the dominant push axis, or stays and reports `blocked`. The caller edge-triggers grid pushes
+ * (one per press or per its own cooldown); `mass`, `friction`, `maxSpeed` and `dt` are unused in that mode.
  */
 export function pushStep(
   state: PushableState,
@@ -273,64 +333,54 @@ export function pushStep(
     readonly sweep: BoxSweep;
     readonly friction?: number;
     readonly maxSpeed?: number;
-    /** Cell size for grid pushing, (0, 1e3]; the block moves to the next cell centre along the dominant push axis. */
+    /** Cell size for grid pushing, (0, 1e3]. */
     readonly snap?: number;
   },
 ): {readonly state: PushableState; readonly blocked: boolean} {
+  if (!state || typeof state !== 'object') fail('state must be an object');
+  if (!options || typeof options !== 'object') fail('options must be an object');
   const pos = vec(state.position, 'position');
-  if (!Array.isArray(state.velocity) || state.velocity.length !== 2) fail('velocity must be [x, z]');
-  const vx0: unknown = state.velocity[0],
-    vz0: unknown = state.velocity[1];
-  if (!finite(vx0) || !finite(vz0)) fail('velocity must be finite');
-  let vx: number = vx0,
-    vz: number = vz0;
+  let [vx, vz] = readPair(state.velocity, 'velocity');
   const half = vec(options.half, 'half');
   if (!half.every(h => h > 0)) fail('half extents must be positive');
   const mass = positive(options.mass, 1e6, 'mass'),
     dtIn: unknown = options.dt,
-    friction = options.friction ?? 8,
-    maxSpeed = options.maxSpeed ?? 2;
+    friction: unknown = options.friction ?? 8,
+    maxSpeed: unknown = options.maxSpeed ?? 2,
+    snapIn: unknown = options.snap,
+    sweepFn = options.sweep;
   if (!finite(dtIn) || dtIn < 0 || dtIn > 1) fail('dt must be within [0, 1]');
   const dt: number = dtIn;
   if (!finite(friction) || friction < 0 || !finite(maxSpeed) || maxSpeed <= 0) fail('friction ≥ 0 and maxSpeed > 0');
-  if (!Array.isArray(options.force) || options.force.length !== 2) fail('force must be [x, z]');
-  const fx: unknown = options.force[0],
-    fz: unknown = options.force[1];
-  if (!finite(fx) || !finite(fz)) fail('force must be finite');
-  const sweep = (d: TraversalVec3) => {
-    const f = options.sweep(pos, half, d);
+  if (typeof sweepFn !== 'function') fail('sweep must be a function');
+  const [fx, fz] = readPair(options.force, 'force');
+  const frozenHalf = frozen(half);
+  const sweep = (center: TraversalVec3, d: TraversalVec3): number => {
+    const f: unknown = sweepFn(frozen(center), frozenHalf, frozen(d));
     if (!finite(f) || f < 0 || f > 1) fail('sweep must return a fraction within [0, 1]');
     return f;
   };
-  if (options.snap !== undefined) {
-    const cell = positive(options.snap, 1e3, 'snap');
-    if (fx === 0 && fz === 0)
-      return Object.freeze({
-        state: Object.freeze({position: frozen(pos), velocity: Object.freeze([0, 0] as [number, number])}),
-        blocked: false,
-      });
-    const alongX = Math.abs(fx) >= Math.abs(fz);
-    const dir = Math.sign(alongX ? fx : fz);
-    const d: TraversalVec3 = alongX ? [dir * cell, 0, 0] : [0, 0, dir * cell];
-    const f = sweep(d);
-    if (f < 1)
-      return Object.freeze({
-        state: Object.freeze({position: frozen(pos), velocity: Object.freeze([0, 0] as [number, number])}),
-        blocked: true,
-      });
-    return Object.freeze({
-      state: Object.freeze({
-        position: frozen([pos[0] + d[0], pos[1], pos[2] + d[2]]),
-        velocity: Object.freeze([0, 0] as [number, number]),
-      }),
-      blocked: false,
+  const result = (position: readonly number[], velocity: [number, number], blocked: boolean) =>
+    Object.freeze({
+      state: Object.freeze({position: frozen(position), velocity: Object.freeze(velocity)}),
+      blocked,
     });
+  if (snapIn !== undefined) {
+    const cell = positive(snapIn, 1e3, 'snap');
+    if (fx === 0 && fz === 0) return result(pos, [0, 0], false);
+    const axis = Math.abs(fx) >= Math.abs(fz) ? 0 : 2;
+    const dir = Math.sign(axis === 0 ? fx : fz);
+    const target = Math.round(pos[axis] / cell) * cell + dir * cell;
+    const move = target - pos[axis];
+    const d: TraversalVec3 = axis === 0 ? [move, 0, 0] : [0, 0, move];
+    if (sweep(pos, d) < 1) return result(pos, [0, 0], true);
+    return result([pos[0] + d[0], pos[1], pos[2] + d[2]], [0, 0], false);
   }
-  // Accelerate by the push, then apply friction to what remains, then cap speed.
+  // Accelerate by the push, then apply kinetic friction against the resulting motion, then cap speed.
   vx += (fx / mass) * dt;
   vz += (fz / mass) * dt;
   const speed = Math.hypot(vx, vz);
-  if (fx === 0 && fz === 0 && speed > 0) {
+  if (speed > 0) {
     const slowed = Math.max(0, speed - friction * dt);
     vx = (vx / speed) * slowed;
     vz = (vz / speed) * slowed;
@@ -340,26 +390,23 @@ export function pushStep(
     vx = (vx / capped) * maxSpeed;
     vz = (vz / capped) * maxSpeed;
   }
-  // Resolve each axis separately so a block slides along a wall instead of sticking.
+  // Resolve each axis separately, larger displacement first, so a block slides along a wall instead of sticking.
   let blocked = false,
     x = pos[0],
     z = pos[2];
-  for (const axis of [0, 2] as const) {
-    const v = axis === 0 ? vx : vz;
-    if (v === 0) continue;
-    const d: TraversalVec3 = axis === 0 ? [v * dt, 0, 0] : [0, 0, v * dt];
-    const f = options.sweep([x, pos[1], z], half, d);
-    if (!finite(f) || f < 0 || f > 1) fail('sweep must return a fraction within [0, 1]');
-    if (axis === 0) x += d[0] * f;
-    else z += d[2] * f;
+  const order: readonly (0 | 2)[] = Math.abs(vx) >= Math.abs(vz) ? [0, 2] : [2, 0];
+  for (const axis of order) {
+    const step = (axis === 0 ? vx : vz) * dt;
+    if (step === 0) continue;
+    const d: TraversalVec3 = axis === 0 ? [step, 0, 0] : [0, 0, step];
+    const f = sweep([x, pos[1], z], d);
+    if (axis === 0) x += step * f;
+    else z += step * f;
     if (f < 1) {
       blocked = true;
       if (axis === 0) vx = 0;
       else vz = 0;
     }
   }
-  return Object.freeze({
-    state: Object.freeze({position: frozen([x, pos[1], z]), velocity: Object.freeze([vx, vz] as [number, number])}),
-    blocked,
-  });
+  return result([x, pos[1], z], [vx, vz], blocked);
 }

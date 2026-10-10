@@ -218,40 +218,70 @@ checked at 120 Hz. There is no browser, template or device evidence.
 
 ## Traversal helpers: ledges, ladders, pushables
 
-Pure helpers over creator geometry queries. A `SphereCast` sweeps a sphere and
-returns `{hit, fraction, normal}`, the same shape as the optional volume-query kit's
-sphere `sweepVolume`. A `GroundProbe` returns a surface height or null. A `BoxSweep`
-returns the fraction of a box move that is free. The caller owns movement, animation
-and when to grab or let go.
+Pure helpers over creator geometry queries:
+
+- A `SphereCast` sweeps a sphere and returns `{hit: false}` or `{hit: true, fraction, normal}`.
+- A `GroundProbe` returns a surface height at most `fromY`, or null.
+- A `BoxSweep` returns the fraction of a box move that is free.
+
+The caller owns movement, animation and when to grab or let go.
+
+The optional volume-query kit's sphere `sweepVolume` can back `SphereCast` and
+`GroundProbe` through a small adapter. The adapter decides what each sweep status
+means; the tests run this adapter against a real `defineVolumeSet`:
+
+```ts
+const cast: SphereCast = (from, to, radius) => {
+  const d = [to[0] - from[0], to[1] - from[1], to[2] - from[2]] as const;
+  const r = sweepVolume(set, {kind: 'sphere', center: from, radius}, d);
+  if (r.status === 'clear') return {hit: false};
+  if (r.status === 'hit') return {hit: true, fraction: r.fraction, normal: r.normal};
+  if (r.status === 'start-overlap') {
+    // Already touching: a blocking hit facing back along the cast.
+    const len = Math.hypot(...d);
+    return {hit: true, fraction: 0, normal: [-d[0] / len, -d[1] / len, -d[2] / len]};
+  }
+  throw new Error(`sweep ${r.status}`); // unresolved or over-budget: never treat as clear
+};
+const ground: GroundProbe = (x, z, fromY, maxDrop) => {
+  const r = sweepVolume(set, {kind: 'sphere', center: [x, fromY, z], radius: 1e-3}, [0, -maxDrop, 0]);
+  if (r.status === 'clear') return null;
+  if (r.status === 'hit') return fromY - r.fraction * maxDrop - 1e-3;
+  if (r.status === 'start-overlap') return fromY; // inside solid: reads as too high
+  throw new Error(`probe ${r.status}`);
+};
+```
+
+The volume-query kit has no box body, so `BoxSweep` needs the creator's own
+collision (or a sphere or capsule approximation).
 
 - **`findLedge(query, cast, ground)`** makes at most four queries:
-  1. a near-vertical wall within `reach` at chest height (`|normal.y| ≤ wallSlope`);
-  2. open space above the edge at the highest climbable height;
-  3. a top surface just beyond the wall within [minClimb, maxClimb] above the feet;
-  4. headroom for the body on top.
+  1. **Wall cast.** It looks for a near-vertical wall within `reach` (`|normal.y| ≤ wallSlope`).
+     - The cast runs at `minClimb + radius`, capped at `height − radius`. A wall lower than that reads as `no-wall`.
+     - The body must face into the wall within `minFacing` (default within 60°). Otherwise the result is `oblique`, which also rejects back faces.
+  2. **Ground probe.** It looks for the top surface a body width past the face, along the wall normal, so oblique approaches find the same edge.
+  3. **Clearance cast.** It checks for open space from the body over the edge at the top height. If the top found is under `minClimb`, a cast at the probe start height decides instead between `too-high` (the wall reaches above it) and `too-low`.
+  4. **Headroom cast.** It checks room for the body standing on top.
 
-  It returns `ledge` with the edge point, standing point, wall normal and climb
-  height, or a reason: `no-wall`, `not-a-wall`, `no-top`, `too-low`, `too-high` or
-  `no-headroom`.
-- **`createLadders(list)`** holds 1–1,024 authored segments (bottom, top, outward
-  side, offset).
-  - `attach(position, facing, maxDistance)` grips the nearest ladder the body faces
-    into.
-  - `climb(grip, input, speed, dt)` moves along it and reports `top` or `bottom`
-    exits, clamping the grip at the end.
+  It returns `ledge` with the edge point on the wall face, the standing point, the wall
+  normal and the climb height. Otherwise it returns a reason: `no-wall`, `not-a-wall`,
+  `oblique`, `no-top`, `too-low`, `too-high` or `no-headroom`.
+
+  Limits:
+  - `radius` must be at most `height / 2`.
+  - Tops are assumed near flat; a top rising away from the edge can read as `no-headroom`.
+- **`createLadders(list)`** holds 1–1,024 authored segments (bottom, top, outward side, offset).
+  - `attach(position, facing, {maxDistance, maxVertical})` grips the nearest ladder that the body faces into. The grip pose must be within 0.8 horizontally and 1 vertically by default. Ties go to list order, and a zero facing throws.
+  - `climb(grip, input, speed, dt)` moves along the ladder and reports `top` or `bottom` exits, clamping the grip at the end.
   - `pose(grip)` gives the body position.
   - `topExit(grip, step)` gives where to stand after climbing off the top.
-- **`pushStep(state, {half, mass, force, dt, sweep, friction, maxSpeed, snap})`**
-  moves a pushable box one step.
-  - A push accelerates it by force / mass. Friction slows it when nothing pushes, and
-    speed is capped.
-  - Each horizontal axis is swept separately, so a block slides along a wall instead
-    of sticking; a blocked axis stops.
-  - With `snap`, each push moves one whole cell along the dominant axis, or nothing
-    when blocked.
+- **`pushStep(state, {half, mass, force, dt, sweep, friction, maxSpeed, snap})`** moves a pushable box one step.
+  - A push accelerates it by force / mass, and kinetic friction always opposes the motion. A push no stronger than friction × mass therefore never starts a resting block, and a released block slows to rest. Speed is capped.
+  - Each horizontal axis is swept separately, larger displacement first, so a block slides along a wall instead of sticking. A blocked axis stops.
+  - With `snap`, each call is one grid push to the next grid line along the dominant axis, or nothing when blocked. The caller edge-triggers grid pushes. `mass`, `friction`, `maxSpeed` and `dt` are unused in this mode.
 
-Bounds and failure: inputs are validated with single reads, and outputs are frozen.
-Malformed queries (fractions outside [0, 1], zero normals, non-finite heights) throw
-`RangeError`. Not provided: hang or climb animation, ledge shimmying, rope or pole
-swinging, stacked pushables or pushing up slopes, and per-frame engine integration.
-Headless evidence only.
+Bounds and failure:
+- Inputs are copied into locals once before use, and outputs are frozen. The creator's sweep receives frozen copies.
+- Malformed queries throw `RangeError`. Examples: fractions outside [0, 1], zero normals, non-finite heights, grips outside [0, 1], or a radius over half the height.
+- Not provided: hang or climb animation, ledge shimmying, rope or pole swinging, stacked pushables or pushing up slopes, and per-frame engine integration.
+- Evidence is headless only.

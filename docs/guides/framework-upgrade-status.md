@@ -1432,6 +1432,8 @@ review and hosted CI remain required.
 ## Traversal helpers — candidate (2026-10-09)
 
 Locomotion kit extension: ledge detection, ladders and pushable blocks over creator
-cast, ground and box-sweep queries (compatible with the volume-query sweep). See
+cast, ground and box-sweep queries. The volume-query kit's sphere sweep can back the
+cast and ground queries through a documented adapter, which a test exercises; it has no
+box body, so the box sweep needs the creator's own collision. See
 [ADR 0115](../adr/0115-traversal-helpers.md). Headless tests in the ledger; independent
-review and hosted CI remain required.
+review done, hosted CI remains required.

@@ -14,15 +14,18 @@ Characters need a few common traversal checks beyond kinematic movement and jump
 - pushing blocks that stop at walls or move in cells.
 
 Each check needs geometry queries. The optional volume-query kit provides sphere sweeps
-over authored colliders; other games use their own collision.
+over authored colliders. A small adapter backs the cast and ground queries with it,
+mapping every sweep status explicitly. It has no box body, so other games, and box
+pushing, use their own collision.
 
 ## Decision
 
 Add pure helpers to the locomotion kit that take creator query functions: a sphere
 cast, a ground probe and a box sweep. `findLedge` performs a fixed sequence of at most
 four queries and reports a reason when it fails. `createLadders` handles attachment,
-movement along the ladder, and exits at both ends. `pushStep` covers mass and friction
-pushing with per-axis sliding, or whole-cell pushes.
+movement along the ladder within horizontal and vertical reach, and exits at both ends.
+`pushStep` covers pushing with mass, kinetic friction and its static threshold, and
+per-axis sliding; or edge-triggered pushes to the next grid line.
 
 No owner, clock or physics engine is installed; the caller switches its own movement
 mode.
@@ -30,5 +33,5 @@ mode.
 ## Consequences
 
 Correctness depends on the creator's queries. There is no animation, shimmying or
-stacking. Evidence is headless tests over a sampled box-world query; no game, browser
-or device acceptance.
+stacking. Ledge tops are assumed near flat. Evidence is headless tests over a sampled
+box-world query and the volume-query adapter; no game, browser or device acceptance.
