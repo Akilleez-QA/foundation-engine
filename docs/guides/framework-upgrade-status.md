@@ -1250,3 +1250,8 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+
+## Worker render pipelining finding — PIPELINE-01, 2026-10-10
+
+Not built, by decision. A GPU bench of the showcase template at 3840×2160 (RTX 4080, ANGLE, Chromium 141, `a6211bd3`) measured 0.35–0.64 ms of main-thread task time per drawn frame, with every window display-paced at a 16.7–16.8 ms p95; GPU work already runs in Chromium's GPU process. Pipelining through a worker renderer could hide at most that time while moving nearly every render owner. [Verification](../verification/render-pipelining-20261010/README.md), [ADR 0099](../adr/0099-defer-worker-render-pipelining.md). Unmeasured: phones, tablets, thermal behaviour, WebGPU. The revisit condition is physical-device main-thread work above about half the frame interval with submission or sync dominant.

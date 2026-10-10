@@ -43,6 +43,12 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'PIPELINE-01',
+    title: 'Worker render pipelining (deferred: not built; see ADR 0099)',
+    docs: 'docs/verification/render-pipelining-20261010/README.md',
+    evidence: [{path: 'src/platform/render/worker-renderer.ts'}],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',
