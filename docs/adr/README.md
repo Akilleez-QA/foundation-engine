@@ -81,3 +81,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0086](0086-bounded-work-roster.md) | Bounded optional work roster | Optional composition | Proposed |
 
 | [0087](0087-rewind-history.md) | Optional bounded rewind history | Optional kits / Network authority | Proposed |
+
+| [0088](0088-view-deltas.md) | Optional acknowledged-baseline view deltas | Network | Proposed |

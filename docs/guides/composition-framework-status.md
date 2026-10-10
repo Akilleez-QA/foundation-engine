@@ -934,3 +934,7 @@ acceptance.
 ## Rewind history — REWIND-01 candidate, 2026-10-09
 
 [Contract](../../src/kits/rewind/README.md), [guide](rewind-history.md), [decision](../adr/0087-rewind-history.md). Optional pure per-subject sample rings with time-addressed, never-extrapolating queries that respect creator-marked discontinuities, plus a pure time choice that clamps an untrusted claimed view time to a creator cap. Hosts record from their existing fixed step and query from existing command dispatch; nothing moves or restores live state. Evidence: 17 focused headless tests including a composition with `@kits/combat` `sweep`, and one local micro-measurement. Candidate only; latency estimation, protocol, multiplayer, browser and physical-device acceptance and full CI are not claimed here.
+
+## View deltas — NW-DELTA candidate, 2026-10-09
+
+[Contract](../../src/kits/network/README.md#optional-acknowledged-baseline-view-deltas), [guide](network-views.md#optional-acknowledged-baseline-deltas), [decision](../adr/0088-view-deltas.md). Optional encoder/decoder around the existing complete-view publisher and receiver: entity-level deltas against the last acknowledged adopted frame, each proven to rebuild the publisher's exact bytes before it is sent, with complete-frame fallback and `adopted: false` recovery. Evidence: 14 focused headless tests with a real publisher and receiver, hostile frames, and one local length measurement (9.1 % of complete length at 4 of 64 entities changing). Candidate only; WAN, browser, physical-device and full-CI acceptance are not claimed here.

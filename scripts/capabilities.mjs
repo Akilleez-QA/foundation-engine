@@ -79,6 +79,12 @@ export const FEATURES = [
     evidence: [{kit: 'rewind', export: 'createRewindHistory'}, {path: 'src/kits/rewind/history.test.ts'}],
   },
   {
+    id: 'NW-DELTA',
+    title: 'Acknowledged-baseline deltas for complete network views',
+    docs: 'src/kits/network/README.md',
+    evidence: [{kit: 'network', export: 'createViewDeltaEncoder'}, {path: 'src/kits/network/view-delta.test.ts'}],
+  },
+  {
     id: 'VISIBILITY-01',
     title: 'Bounded source-owned visibility and explored history',
     docs: 'src/kits/visibility/README.md',

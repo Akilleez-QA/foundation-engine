@@ -44,6 +44,13 @@
       "evidence": ["@kits/rewind exports createRewindHistory", "src/kits/rewind/history.test.ts exists"]
     },
     {
+      "id": "NW-DELTA",
+      "title": "Acknowledged-baseline deltas for complete network views",
+      "shipped": true,
+      "docs": "src/kits/network/README.md",
+      "evidence": ["@kits/network exports createViewDeltaEncoder", "src/kits/network/view-delta.test.ts exists"]
+    },
+    {
       "id": "VISIBILITY-01",
       "title": "Bounded source-owned visibility and explored history",
       "shipped": true,
@@ -714,6 +721,8 @@
         "createRetrySchedule",
         "createSession",
         "createSessionHost",
+        "createViewDeltaDecoder",
+        "createViewDeltaEncoder",
         "createViewPublisher",
         "createViewReceiver",
         "defineSessionRules",

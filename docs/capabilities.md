@@ -17,6 +17,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | ITINERARY-01 | Bounded editable destination itineraries with owned completion attempts |  | [README.md](../src/kits/itinerary/README.md) |
 | ALN-01 | Planar interaction preparation with bounded proposals and exact-ticket acknowledgment |  | [README.md](../src/kits/alignment/README.md) |
 | REWIND-01 | Bounded rewind history for judging remote commands against past state |  | [README.md](../src/kits/rewind/README.md) |
+| NW-DELTA | Acknowledged-baseline deltas for complete network views |  | [README.md](../src/kits/network/README.md) |
 | VISIBILITY-01 | Bounded source-owned visibility and explored history |  | [README.md](../src/kits/visibility/README.md) |
 | GEN-WEIGHTED | Bounded eligible weighted choice with separately committed recent history |  | [weighted-choice.md](guides/weighted-choice.md) |
 | CAP-EFFECT-CHECKPOINT | Portable timed contribution checkpoints |  | [timed-effects.md](guides/timed-effects.md) |
