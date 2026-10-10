@@ -113,3 +113,29 @@ Each file records one decision: its context, the decision and its consequences (
 | [0112](0112-camera-director.md) | Optional camera director helpers | Camera kit | Proposed |
 
 | [0153](0153-audio-listener-and-adaptive-music.md) | Listener placement, voice rate and adaptive music | Author view / Platform audio / Optional kits | Proposed |
+
+| [0124](0124-data-defined-formulas.md) | Data-defined stat and damage formulas | Optional kits / Rules | Proposed |
+
+| [0135](0135-formula-data-import.md) | Spreadsheet import for formula sheets and lookup tables | Optional kits / Rules / Tooling | Proposed |
+
+| [0125](0125-status-effects.md) | Status effects with transforms on the fixed clock | Optional kits / Rules | Proposed |
+
+| [0122](0122-behaviour-trees.md) | Deterministic resumable behaviour trees | Optional kits / Rules | Proposed |
+
+| [0123](0123-flow-economy-and-production.md) | Flow economy, production queues and reclaim | Optional kits / Rules | Proposed |
+
+| [0126](0126-inventory-rule-presets.md) | Slot, stack and key-item rules over the inventory ledger | Optional kits / Inventory | Proposed |
+
+| [0102](0102-ballistic-trajectories.md) | Optional ballistic trajectory solves | Optional kits | Proposed |
+
+| [0103](0103-breadcrumb-trails.md) | Optional breadcrumb trails for followers | Optional kits | Proposed |
+
+| [0130](0130-optional-streaming-queue.md) | Optional on-demand streaming queue | Optional kits / Assets | Proposed |
+
+| [0131](0131-defer-worker-render-pipelining.md) | Defer worker render pipelining until a measured need | Render / Frame loop / Workers | Accepted (not built) |
+
+| [0132](0132-optional-retro-look.md) | Optional retro software-raster look | Optional kits / Rendering | Proposed |
+
+| [0133](0133-offline-format-converters.md) | Offline format converters with provenance receipts | Tooling / Assets | Proposed |
+
+| [0134](0134-duplicate-detector.md) | Duplicate and near-duplicate detection as a read-only repo tool | Tooling / Assets | Proposed |
