@@ -22,7 +22,10 @@ export interface CellViewOptions {
   readonly outside: 'all' | 'none' | readonly number[];
   /** Optional PVS table of the same graph: a pre-filter in `portals` mode, the whole answer in `pvs` mode. */
   readonly pvs?: CellPvs;
-  /** `portals` (default) narrows through open portals; `pvs` uses only the table rows of the camera's cells. */
+  /**
+   * `portals` (default) narrows through open portals; `pvs` uses only the table rows of the camera's cells, and then
+   * `maxVisits` and `maxDepth` are not used (the table's own depth applies).
+   */
   readonly mode?: 'portals' | 'pvs';
 }
 
@@ -64,6 +67,9 @@ export interface CellView {
 }
 
 export const VISIT_CEILING = 16_777_216;
+
+/** Which view last wrote each result record. */
+const lastWriter = new WeakMap<CellViewResult, object>();
 
 /** A result record sized for the graph; reuse one per view. */
 export function createCellViewResult(graph: CellGraph): CellViewResult {
@@ -124,13 +130,20 @@ export function createCellView(graph: CellGraph, options: CellViewOptions): Cell
     lastVp = new Float64Array(16);
   let lastOut: CellViewResult | undefined,
     lastRevision = -1;
+  const token = {};
 
-  const pvsAllows = (seedCount: number, o: number): boolean => {
-    if (!pvs) return true;
+  /** Union of the PVS rows of the camera's cells, built once per update (cells x camera cells bit reads). */
+  const allow = new Uint8Array(n);
+  const buildAllow = (seedCount: number): void => {
+    if (!pvs) return;
     const {bits, words} = pvs;
-    for (let s = 0; s < seedCount; s++) if ((bits[seeds[s]! * words + (o >>> 5)]! >>> (o & 31)) & 1) return true;
-    return false;
+    allow.fill(0);
+    for (let s = 0; s < seedCount; s++) {
+      const row = seeds[s]! * words;
+      for (let c = 0; c < n; c++) if ((bits[row + (c >>> 5)]! >>> (c & 31)) & 1) allow[c] = 1;
+    }
   };
+  const pvsAllows = (_seedCount: number, o: number): boolean => !pvs || allow[o] === 1;
 
   /** Narrow `cover` rectangle of cell `from` by portal `p`; writes `rect`, returns false when nothing shows. */
   const narrow = (p: number, from: number, cam: CellCamera): boolean => {
@@ -333,7 +346,8 @@ export function createCellView(graph: CellGraph, options: CellViewOptions): Cell
         if (!Number.isFinite(vp[i])) throw new TypeError('cells: viewProjection must be finite');
       if (!out || !(out.visible instanceof Uint8Array) || out.visible.length !== n || out.rects.length !== 4 * n)
         throw new TypeError('cells: out must be a result created for this graph');
-      let same = lastOut === out && lastRevision === graph.revision;
+      // The cache is keyed on this view too: another view writing the same result invalidates it.
+      let same = lastOut === out && lastWriter.get(out) === token && lastRevision === graph.revision;
       for (let i = 0; same && i < 3; i++) same = lastPos[i] === pos[i];
       for (let i = 0; same && i < 16; i++) same = lastVp[i] === vp[i];
       if (same) {
@@ -344,8 +358,10 @@ export function createCellView(graph: CellGraph, options: CellViewOptions): Cell
       for (let i = 0; i < 16; i++) lastVp[i] = vp[i]!;
       lastRevision = graph.revision;
       lastOut = out;
+      lastWriter.set(out, token);
       prev.set(out.visible);
       const seedCount = cellsContaining(boxes, n, pos[0]!, pos[1]!, pos[2]!, tol, seeds);
+      buildAllow(seedCount);
       out.cameraCells = seedCount;
       out.visits = 0;
       out.depthLimited = 0;

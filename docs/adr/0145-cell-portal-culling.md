@@ -36,6 +36,6 @@ flags it is given.
 
 ## Evidence
 
-Nineteen headless tests, including 960 seeded cameras on 24 generated multi-level grids compared with an independent
+Twenty-four headless tests, including 960 seeded cameras on 24 generated multi-level grids and 480 wide, asymmetric and parented three.js cameras on 12 more, compared with an independent
 ray-marching reference (no cell the reference sees is ever hidden), culled-object counts on a generated fixture and a
 composition with the real `World`, `Shape` and three.js objects. No browser, GPU or device measurement.

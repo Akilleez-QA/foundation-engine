@@ -243,3 +243,109 @@ test('composition: ECS Shape entities and three.js objects through the real Worl
   assert.equal(world.get(entities[2]!, Shape)!.visible, true);
   assert.equal(world.version, version + 2, 'one despawn and one touch for the apply');
 });
+
+test('remove and dispose show targets left unknown by resync or a throwing sink; a failed dispose can be retried', () => {
+  let failId = -1;
+  const sink: CellVisibilitySink<Thing> = {
+    set(t, v) {
+      if (t.id === failId) throw new Error('sink failed');
+      t.visible = v;
+    },
+  };
+  // resync, then remove: the hidden target is shown although its state is unknown.
+  let culler = createCellCuller<Thing>({cellCount: 2, maxObjects: 4, maxCellsPerObject: 1, sink});
+  const a = {id: 0, visible: true},
+    b = {id: 1, visible: true};
+  const ha = culler.add(a, 0);
+  culler.add(b, 1);
+  culler.apply(result(2, []));
+  culler.resync();
+  culler.remove(ha);
+  assert.equal(a.visible, true);
+  // A throwing sink during apply, then dispose: every target ends shown.
+  failId = 1;
+  culler.add(a, 0);
+  assert.throws(() => culler.apply(result(2, [0])));
+  failId = -1;
+  culler.dispose();
+  assert.deepEqual([a.visible, b.visible], [true, true]);
+
+  // A sink throwing mid-dispose: not disposed, the retry finishes the rest.
+  culler = createCellCuller<Thing>({cellCount: 3, maxObjects: 4, maxCellsPerObject: 1, sink});
+  const things = [0, 1, 2].map(id => ({id, visible: true}));
+  things.forEach((t, i) => culler.add(t, i));
+  culler.apply(result(3, []));
+  failId = 1;
+  assert.throws(() => culler.dispose(), /sink failed/);
+  assert.deepEqual(
+    things.map(t => t.visible),
+    [true, false, false],
+  );
+  assert.doesNotThrow(() => culler.apply(result(3, [])), 'still usable after a failed dispose');
+  failId = -1;
+  culler.dispose();
+  assert.deepEqual(
+    things.map(t => t.visible),
+    [true, true, true],
+  );
+  assert.throws(() => culler.apply(result(3, [])), /disposed/);
+});
+
+test('seeded model fuzz: no target ends hidden after remove or dispose, and every clean apply matches its cells', () => {
+  const random = (() => {
+    let s = 0x9e3779b9;
+    return () => {
+      s = (Math.imul(s ^ (s >>> 15), 0x2c1b3c6d) + 0x6d2b79f5) >>> 0;
+      return s / 4294967296;
+    };
+  })();
+  for (let round = 0; round < 60; round++) {
+    const n = 2 + Math.floor(random() * 5);
+    let failing = false;
+    const sink: CellVisibilitySink<Thing & {cells: number[]}> = {
+      set(t, v) {
+        if (failing && random() < 0.5) throw new Error('sink failed');
+        t.visible = v;
+      },
+    };
+    const culler = createCellCuller({cellCount: n, maxObjects: 6, maxCellsPerObject: 2, sink});
+    const live = new Map<number, Thing & {cells: number[]}>();
+    const removed: (Thing & {cells: number[]})[] = [];
+    for (let step = 0; step < 80; step++) {
+      failing = random() < 0.25;
+      const op = random();
+      try {
+        if (op < 0.25) {
+          const cells = [Math.floor(random() * n)];
+          if (random() < 0.4) cells.push((cells[0]! + 1) % n);
+          const t = {id: step, visible: random() < 0.5, cells};
+          const h = culler.add(t, cells);
+          if (h >= 0) live.set(h, t);
+        } else if (op < 0.4 && live.size) {
+          const h = [...live.keys()][Math.floor(random() * live.size)]!;
+          const t = live.get(h)!;
+          culler.remove(h);
+          live.delete(h);
+          removed.push(t);
+          assert.equal(t.visible, true, 'shown after a successful remove');
+        } else if (op < 0.48) culler.resync();
+        else {
+          const on = Array.from({length: n}, (_, c) => c).filter(() => random() < 0.4);
+          const r = result(n, on);
+          culler.apply(r);
+          for (const t of live.values())
+            assert.equal(
+              t.visible,
+              t.cells.some(c => r.visible[c] === 1),
+              'a clean apply matches the cells',
+            );
+        }
+      } catch (error) {
+        assert.match(String(error), /sink failed/);
+      }
+    }
+    failing = false;
+    culler.dispose();
+    for (const t of [...live.values(), ...removed]) assert.equal(t.visible, true, 'shown after dispose');
+  }
+});

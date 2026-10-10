@@ -37,7 +37,10 @@ export interface CellCullStats {
 export interface CellCuller<T> {
   /** Register a target in one or more cells; returns its handle, or -1 when `maxObjects` are registered. */
   add(target: T, cells: number | readonly number[]): number;
-  /** Unregister. With `restore` (default true) a target the culler hid is shown again through the sink. */
+  /**
+   * Unregister. With `restore` (default true) a target not known to be shown (hidden, or unknown after `resync` or a
+   * throwing sink) is shown again through the sink; if the sink throws, the target stays registered.
+   */
   remove(handle: number, restore?: boolean): void;
   /** Apply a view result. Returns the number of targets written. */
   apply(result: CellViewResult): number;
@@ -45,7 +48,10 @@ export interface CellCuller<T> {
   resync(): void;
   stats(): CellCullStats;
   isVisible(handle: number): boolean;
-  /** Terminal and idempotent. With `restore` (default true) every hidden target is shown again. */
+  /**
+   * Terminal and idempotent once it returns. With `restore` (default true) every target not known to be shown is
+   * shown again first; if the sink throws, the culler is not disposed and a retry continues.
+   */
   dispose(restore?: boolean): void;
 }
 
@@ -170,10 +176,12 @@ export function createCellCuller<T>(options: CellCullerOptions<T>): CellCuller<T
     remove(handle, restore = true) {
       guard();
       const h = liveHandle(handle);
-      if (restore && state[h] === 2) {
+      // Restore anything not known to be shown: hidden, or unknown after resync() or a throwing sink. A throwing
+      // sink leaves the target registered so the removal can be retried.
+      if (restore && state[h] !== 1) {
         busy = true;
         try {
-          sink.set(targets[h] as T, true);
+          write(h, true);
           sink.commit?.();
         } finally {
           busy = false;
@@ -265,21 +273,24 @@ export function createCellCuller<T>(options: CellCullerOptions<T>): CellCuller<T
     dispose(restore = true) {
       if (disposed) return;
       if (busy) throw new Error('cells: culler is busy (reentrant call from a sink)');
-      disposed = true;
-      if (!restore) return;
-      let any = false;
-      busy = true;
-      try {
-        for (let h = 0; h < top; h++)
-          if (live[h] && state[h] === 2) {
-            sink.set(targets[h] as T, true);
-            any = true;
-          }
-        if (any) sink.commit?.();
-      } finally {
-        busy = false;
-        targets.fill(undefined);
+      if (restore) {
+        // Show every target not known to be shown. Disposal completes only after the whole loop: a sink that
+        // throws leaves the culler usable, and a retry continues with the targets still not shown.
+        let any = false;
+        busy = true;
+        try {
+          for (let h = 0; h < top; h++)
+            if (live[h] && state[h] !== 1) {
+              write(h, true);
+              any = true;
+            }
+          if (any) sink.commit?.();
+        } finally {
+          busy = false;
+        }
       }
+      disposed = true;
+      targets.fill(undefined);
     },
   };
 }

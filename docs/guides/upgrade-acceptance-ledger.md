@@ -1472,7 +1472,7 @@ visual or device evidence.
 
 ## Cell and portal culling — candidate (2026-10-09)
 
-Branch `feat/cell-culling` from `9345d07b`. Nineteen new headless tests: graph
+Branch `feat/cell-culling` from `9345d07b`. Twenty-four new headless tests: graph
 refusals; corridor narrowing; a cell reached through a narrow then a wider portal;
 closed portals and revisions; portals behind or crossing the eye plane; a camera on
 or within tolerance of a portal plane; outside fallbacks; a four-cell cycle; depth
@@ -1485,3 +1485,9 @@ hidden visible cell; deliberately weakened variants (near-plane clipping, a shru
 rectangle, first-visit-only traversal) each failed it. Local headless probe, not a
 device budget: 95 % of 768 objects culled on average on an 8 x 8 fixture. No browser,
 GPU, draw-call, frame-time or device evidence.
+An independent review of `7a59f93b` found culler restore gaps (targets left unknown by
+`resync` or a throwing sink stayed hidden after remove/dispose; a sink throwing during
+dispose ended disposal early) and a three.js snippet using the local camera position;
+both were fixed with a seeded culler model fuzz, a reference test with wide, asymmetric
+and parented three.js cameras on portal planes and corners, and documented orthographic
+and near-plane limits.

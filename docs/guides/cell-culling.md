@@ -41,7 +41,7 @@ Register each render target in the cells it occupies; a target spanning an openi
 - `objectVisibility(() => three.requestRender())` for `Object3D`s under `@kits/three`.
 - Your own `{set, commit}` for anything else.
 
-Update the view after the camera moves and call `apply`. A still camera costs one comparison; a moving camera
+Update the view for the frame being drawn and call `apply` after every update (targets added since the last apply are written even when the cell set did not change). With three.js, read the camera's world position and `matrixWorldInverse` after `updateMatrixWorld()`, not its local `position`. A still camera costs one comparison; a moving camera
 re-evaluates only the targets of cells whose visibility changed, and a target is written only when it flips. The
 renderer's own frustum culling still runs on every visible target.
 
@@ -51,4 +51,5 @@ Headless tests only: geometry cases, a seeded comparison on generated multi-leve
 ray-marching reference (no visible cell is ever hidden), culled-object counts on a generated fixture, and composition
 with the real `World` and three.js objects. Hardware occlusion queries are out of scope. No browser, GPU or
 physical-device measurement of draw calls or frame time was made, and shadow casters outside the visible cells need
-the creator's own decision.
+the creator's own decision. A perspective camera closer than its near plane to a wall can see through the clipped
+wall into a cell the kit hides; keep cameras at least `near` from walls.

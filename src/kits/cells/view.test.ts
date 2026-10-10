@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
 import {
   buildCellPvs,
   cellCameraFromView,
@@ -333,4 +334,37 @@ test('the same inputs give the same cells and rectangles in the same order', () 
   createCellView(g, {maxVisits: 64, maxDepth: 3, outside: 'all'}).update(c, b);
   assert.deepEqual(visibleOf(a), visibleOf(b));
   assert.deepEqual([...a.rects], [...b.rects]);
+});
+
+test("two views sharing one result record never reuse each other's answer", () => {
+  const g = corridor();
+  const out = createCellViewResult(g);
+  const c = cam([1, 1, 2], [12, 1, 2]);
+  const wide = createCellView(g, {maxVisits: 64, maxDepth: 3, outside: 'all'});
+  const shallow = createCellView(g, {maxVisits: 64, maxDepth: 1, outside: 'all'});
+  wide.update(c, out);
+  assert.deepEqual(visibleOf(out), [0, 1, 2]);
+  shallow.update(c, out);
+  assert.deepEqual(visibleOf(out), [0, 1]);
+  wide.update(c, out);
+  assert.deepEqual(visibleOf(out), [0, 1, 2], "recomputed, not the other view's cached set");
+});
+
+test('an orthographic camera inside a cell floods through the portals it faces', () => {
+  const g = corridor();
+  const view = createCellView(g, {maxVisits: 64, maxDepth: 3, outside: 'none'});
+  const out = createCellViewResult(g);
+  const ortho = (x: number, tx: number) => {
+    const c = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
+    c.position.set(x, 1, 2);
+    c.lookAt(tx, 1, 2);
+    c.updateMatrixWorld();
+    const m = new THREE.Matrix4().multiplyMatrices(c.projectionMatrix, c.matrixWorldInverse);
+    view.update({position: [x, 1, 2], viewProjection: m.elements}, out);
+    return visibleOf(out);
+  };
+  assert.deepEqual(ortho(1, 12), [0, 1, 2]);
+  // Orthographic projection has no eye plane (w = 1): portals behind the camera still project. Conservative, not
+  // tight; the near rectangle must lie inside the camera's cells (see the README limits).
+  assert.deepEqual(ortho(1, -12), [0, 1, 2]);
 });
