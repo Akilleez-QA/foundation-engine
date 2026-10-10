@@ -112,6 +112,8 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0112](0112-camera-director.md) | Optional camera director helpers | Camera kit | Proposed |
 
+| [0117](0117-actor-day-schedules.md) | Optional day-cycle schedules for actors | Optional kits / Simulation scale | Proposed |
+
 | [0124](0124-data-defined-formulas.md) | Data-defined stat and damage formulas | Optional kits / Rules | Proposed |
 
 | [0135](0135-formula-data-import.md) | Spreadsheet import for formula sheets and lookup tables | Optional kits / Rules / Tooling | Proposed |

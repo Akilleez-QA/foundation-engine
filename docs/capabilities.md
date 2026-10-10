@@ -26,6 +26,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | ACTIVATION-01 | Optional bounded region activation from observer positions |  | [region-activation.md](guides/region-activation.md) |
 | CADENCE-01 | Optional bounded per-member update cadence |  | [update-cadence.md](guides/update-cadence.md) |
 | ASG-01 | Optional bounded service and worksite assignment ownership |  | [assignments.md](guides/assignments.md) |
+| SCHEDULE-01 | Optional day-cycle actor schedules with bounded catch-up |  | [README.md](../src/kits/schedules/README.md) |
 | ITINERARY-01 | Bounded editable destination itineraries with owned completion attempts |  | [README.md](../src/kits/itinerary/README.md) |
 | ALN-01 | Planar interaction preparation with bounded proposals and exact-ticket acknowledgment |  | [README.md](../src/kits/alignment/README.md) |
 | REWIND-01 | Bounded rewind history for judging remote commands against past state |  | [README.md](../src/kits/rewind/README.md) |
@@ -122,6 +123,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/retro`
 - `@kits/rewind`
 - `@kits/rollback`
+- `@kits/schedules`
 - `@kits/sequence`
 - `@kits/space`
 - `@kits/spatial`

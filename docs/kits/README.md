@@ -58,6 +58,8 @@ The optional [assignments](../../src/kits/assignments/README.md) candidate suppl
 
 The optional [region-activation](../../src/kits/region-activation/README.md) candidate decides which grid regions a game simulates from observer positions, with release hysteresis, linger, pins, per-update transition budgets and epochs for stale loads. Headless model and ECS/chunk-store consumer tests only; no template consumer or browser/device acceptance is claimed. [Guide](../guides/region-activation.md).
 
+The optional [schedules](../../src/kits/schedules/README.md) candidate places actors by authored day-cycle windows on the game clock (weekday patterns, flag-chosen variants, travel segments) and reports skipped windows after a time jump, bounded and in order, with the exact current entry. Headless unit and clock/itinerary/region-activation consumer tests only; no template consumer or browser/device acceptance is claimed.
+
 The optional [cadence](../../src/kits/cadence/README.md) candidate runs members at their own integer periods on the caller's tick, spread by id, bounded per take with deferral, elapsed-tick reporting and saveable state. Headless model, ECS and interest-set consumer tests only; no template consumer or browser/device acceptance is claimed. [Guide](../guides/update-cadence.md).
 
 The optional [entity-pool](../../src/kits/entity-pool/README.md) candidate keeps pooled entities under a creator count and cost cap, evicting expendable classes first in a deterministic order, with pins, atomic refusal and World eviction events. Headless model and World consumer tests only; no template consumer or browser/device acceptance is claimed. [Guide](../guides/entity-pool.md).

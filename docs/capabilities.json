@@ -137,6 +137,17 @@
       "evidence": ["@kits/assignments exports createAssignments"]
     },
     {
+      "id": "SCHEDULE-01",
+      "title": "Optional day-cycle actor schedules with bounded catch-up",
+      "shipped": true,
+      "docs": "src/kits/schedules/README.md",
+      "evidence": [
+        "@kits/schedules exports schedulePlacement",
+        "@kits/schedules exports scheduleCatchUp",
+        "src/kits/schedules/consumers.test.ts exists"
+      ]
+    },
+    {
       "id": "ITINERARY-01",
       "title": "Bounded editable destination itineraries with owned completion attempts",
       "shipped": true,
@@ -1175,6 +1186,18 @@
         "createRollbackSyncTest",
         "rollback",
         "rollbackChecksum"
+      ]
+    },
+    {
+      "name": "schedules",
+      "exports": [
+        "SCHEDULE_LIMITS",
+        "createScheduleRoster",
+        "defineSchedule",
+        "defineScheduleCalendar",
+        "scheduleCatchUp",
+        "scheduleItineraryOrder",
+        "schedulePlacement"
       ]
     },
     {

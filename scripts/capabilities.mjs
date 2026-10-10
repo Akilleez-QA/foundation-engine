@@ -175,6 +175,16 @@ export const FEATURES = [
     evidence: [{kit: 'assignments', export: 'createAssignments'}],
   },
   {
+    id: 'SCHEDULE-01',
+    title: 'Optional day-cycle actor schedules with bounded catch-up',
+    docs: 'src/kits/schedules/README.md',
+    evidence: [
+      {kit: 'schedules', export: 'schedulePlacement'},
+      {kit: 'schedules', export: 'scheduleCatchUp'},
+      {path: 'src/kits/schedules/consumers.test.ts'},
+    ],
+  },
+  {
     id: 'ITINERARY-01',
     title: 'Bounded editable destination itineraries with owned completion attempts',
     docs: 'src/kits/itinerary/README.md',
