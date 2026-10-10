@@ -162,6 +162,71 @@ test('duplicates, release, sweep and dispose', () => {
   assert.equal(pool.stats().closed, true);
 });
 
+test('review: a cheap class is not emptied when a later class must give a member anyway', () => {
+  const limits: EntityPoolLimits = {
+    maxMembers: 100,
+    maxCost: 150,
+    classes: {
+      spark: {priority: 0, evictable: true},
+      debris: {priority: 1, evictable: true, cost: 100},
+      boss: {priority: 9, cost: 100},
+    },
+  };
+  const pool = createEntityPool(limits),
+    out = createPoolResult(limits);
+  for (let id = 1; id <= 50; id++) pool.admit(id, 'spark', out);
+  pool.admit(99, 'debris', out);
+  assert.equal(pool.admit(200, 'boss', out), 'admitted', 'one eviction fits the default limit of 16');
+  assert.deepEqual(ids(out), [99]);
+  assert.equal(pool.stats().classes.spark!.live, 50);
+  // A mix: 30 sparks + 1 debris give 130; a 60-cost request needs 40 -> one debris; then sparks return.
+  const p2 = createEntityPool({...limits, classes: {...limits.classes, mid: {priority: 5, cost: 60}}});
+  for (let id = 1; id <= 30; id++) p2.admit(id, 'spark', out);
+  p2.admit(99, 'debris', out);
+  p2.admit(300, 'mid', out);
+  assert.deepEqual(ids(out), [99]);
+});
+
+test('review: sweep tolerates re-entrant callbacks and bounds its work', () => {
+  const limits: EntityPoolLimits = {maxMembers: 4, classes: {a: {priority: 0, evictable: true}}};
+  const out = createPoolResult(limits);
+  const p = createEntityPool(limits);
+  p.admit(1, 'a', out);
+  p.admit(2, 'a', out);
+  assert.equal(
+    p.sweep(id => (id === 1 ? (p.release(1), false) : true), 1),
+    0,
+    'already released by the callback',
+  );
+  assert.equal(p.size, 1);
+  assert.equal(p.has(2), true);
+  assert.equal(p.stats().classes.a!.released, 1);
+  assert.equal(p.stats().classes.a!.pinned, 0);
+  const q = createEntityPool(limits);
+  q.admit(1, 'a', out);
+  assert.equal(
+    q.sweep(id => (q.release(id), q.admit(9, 'a', out), false), 1),
+    0,
+  );
+  assert.equal(q.has(9), true, 'a member admitted during the callback survives');
+  const r = createEntityPool(limits);
+  r.admit(1, 'a', out);
+  r.admit(2, 'a', out);
+  const seen: number[] = [];
+  r.sweep(id => (seen.push(id), r.dispose(), true), 10);
+  assert.deepEqual(seen, [1], 'dispose inside the callback stops the sweep');
+  const big = createEntityPool({maxMembers: 1 << 16, classes: {a: {priority: 0}}});
+  big.admit(7, 'a', createPoolResult({maxMembers: 1 << 16}));
+  let calls = 0;
+  big.sweep(() => (calls++, true), 2000);
+  assert.equal(calls, 1, 'each member is checked at most once per sweep');
+  assert.throws(() => createEntityPool({maxMembers: 4, maxCost: 3, classes: {a: {priority: 0, cost: 4}}}), RangeError);
+  assert.throws(
+    () => createEntityPool({maxMembers: 4, classes: JSON.parse('{"__proto__": {"priority": 0}}')}),
+    RangeError,
+  );
+});
+
 // ---- Independent model: one victim at a time over plain arrays. ----
 
 interface MMember {
@@ -198,10 +263,15 @@ function modelAdmit(
     .filter(n => defs[n]!.evictable && defs[n]!.priority < c.priority)
     .sort((a, b) => defs[a]!.priority - defs[b]!.priority || names.indexOf(a) - names.indexOf(b));
   if (c.replaceOwn) victimsOrder.push(cls);
+  const removed: MMember[] = [];
   const remove = (m: MMember) => {
     cand.splice(cand.indexOf(m), 1);
-    evicted.push(m.id);
+    removed.push(m);
   };
+  const fits = () =>
+    cand.filter(m => m.cls === cls).length + 1 <= (c.max ?? limits.maxMembers) &&
+    cand.length + 1 <= limits.maxMembers &&
+    cand.reduce((s, m) => s + costOf(m.cls), 0) + costOf(cls) <= limits.maxCost;
   for (;;) {
     const classCount = cand.filter(m => m.cls === cls).length;
     if (classCount + 1 > (c.max ?? limits.maxMembers)) {
@@ -217,13 +287,20 @@ function modelAdmit(
     if (!v) return {status: 'refused', reason: 'capacity', evicted: []};
     remove(v);
   }
+  // Give back, latest evicted first, every victim whose return still leaves room.
+  for (let i = removed.length - 1; i >= 0; i--) {
+    cand.push(removed[i]!);
+    if (fits()) removed.splice(i, 1);
+    else cand.pop();
+  }
+  evicted.push(...removed.map(m => m.id));
   if (evicted.length > limits.maxEvict) return {status: 'refused', reason: 'eviction-limit', evicted: []};
   members.length = 0;
   members.push(...cand, {id, cls, seq, score: 0, pinned: false});
   return {status: 'admitted', reason: 'none', evicted};
 }
 
-test('a 6,000-operation randomized run matches an independent one-victim-at-a-time model', () => {
+test('a 6,000-operation randomized run matches an independent one-victim-at-a-time model with give-back', () => {
   let state = 0x9e3779b9;
   const rnd = () => (state = (Math.imul(state ^ (state >>> 15), 0x2c1b3c6d) + 0x6d2b79f5) >>> 0) / 2 ** 32;
   const seen = {admitted: 0, evicted: 0, refused: new Set<string>()};

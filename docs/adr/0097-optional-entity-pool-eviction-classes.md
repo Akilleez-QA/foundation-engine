@@ -18,7 +18,7 @@ what exists.
 
 Add `@kits/entity-pool`, a pure bounded helper: creator classes with priority, cost, class cap, eviction order
 (oldest, newest, lowest score) and `evictable`/`replaceOwn` flags; a member-count cap and a cost cap; atomic
-admission with a bounded eviction plan; pins; per-class statistics; `sweep` recovery; and a `World` adapter that
+admission with a bounded eviction plan (lowest priority first, then unnecessary cheap victims given back); pins; per-class statistics; `sweep` recovery; and a `World` adapter that
 spawns only on admission, despawns evicted entities and emits one world event per eviction. No system, clock,
 callback, persistence owner or registration is installed.
 
@@ -33,6 +33,6 @@ reported, never silent. One cost unit per pool is a deliberate simplification.
 
 ## Evidence
 
-Six unit tests including a 6,000-operation comparison with an independent one-victim-at-a-time model, and two consumer
+Eight unit tests including a 6,000-operation comparison with an independent one-victim-at-a-time model with give-back, and two consumer
 tests (World fixed-step spawner under a triangle-cost cap with events; owner recovery). Headless only; a local
 micro-probe is recorded in the kit README as an order-of-magnitude indication.

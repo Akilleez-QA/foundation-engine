@@ -12,8 +12,9 @@
  *
  * The caller owns what a member is, creating and destroying it (the World adapter in ./world.ts does that for ECS
  * entities and emits events), what an eviction means to the game, and the cap values (a scene's budget, a device
- * profile). Nothing here schedules, reads a clock or calls back. Tables are allocated at construction; steady-state
- * admit, release, pin and setScore allocate nothing beyond the id map's own bounded entries.
+ * profile). Nothing here schedules, reads a clock or calls back. Slot tables are allocated at construction; class heaps
+ * grow on demand up to their class `max`; admit, release, pin and setScore allocate nothing else beyond the id map's
+ * own bounded entries.
  */
 
 export type EvictionOrder = 'oldest' | 'newest' | 'score';
@@ -141,7 +142,7 @@ interface ClassRec {
   /** Lower classes this class may evict, in eviction order (ascending priority, then declaration order). */
   victims: ClassRec[];
   /** Indexed binary heap of evictable (unpinned) slots of this class. */
-  readonly heap: Int32Array;
+  readonly heap: number[];
   heapSize: number;
   live: number;
   pinned: number;
@@ -182,7 +183,8 @@ export function createEntityPool(limits: EntityPoolLimits): EntityPool {
   const byName = new Map<string, ClassRec>();
   let maxClassCost = 1;
   for (const name of names) {
-    if (name.length === 0) throw new RangeError('entity pool: class names must be nonempty');
+    if (name.length === 0 || name === '__proto__')
+      throw new RangeError('entity pool: class names must be nonempty and not __proto__');
     const c = decl[name];
     if (!c || typeof c !== 'object') throw new TypeError(`entity pool: class ${name} must be an object`);
     const order = c.order ?? 'oldest';
@@ -204,7 +206,7 @@ export function createEntityPool(limits: EntityPoolLimits): EntityPool {
       order,
       replaceOwn: c.replaceOwn === true,
       victims: [],
-      heap: new Int32Array(max),
+      heap: [],
       heapSize: 0,
       live: 0,
       pinned: 0,
@@ -224,6 +226,9 @@ export function createEntityPool(limits: EntityPoolLimits): EntityPool {
     limits.maxCost === undefined
       ? maxMembers * maxClassCost
       : int(limits.maxCost, 1, Number.MAX_SAFE_INTEGER, 'maxCost');
+  for (const c of classes)
+    if (c.cost > maxCost)
+      throw new RangeError(`entity pool: class ${c.name} cost exceeds maxCost and could never be admitted`);
 
   // Slot tables.
   const slotId = new Float64Array(maxMembers);
@@ -310,34 +315,67 @@ export function createEntityPool(limits: EntityPoolLimits): EntityPool {
     return c;
   };
 
-  /** Fill `plan`; return the refusal, or 'none' with the eviction total in `out.count`. */
+  // Plan state (factory scope so planning and applying allocate nothing).
+  let countNeed = 0,
+    costNeed = 0,
+    total = 0,
+    takenCount = 0;
+  const takenOrder = new Int32Array(classes.length);
+  const take = (v: ClassRec) => {
+    const avail = v.heapSize - plan[v.index]!;
+    if (avail <= 0 || (countNeed <= 0 && costNeed <= 0)) return;
+    const n = Math.min(avail, Math.max(countNeed, Math.ceil(costNeed / v.cost)));
+    plan[v.index]! += n;
+    total += n;
+    countNeed -= n;
+    costNeed -= n * v.cost;
+    takenOrder[takenCount++] = v.index;
+  };
+
+  /**
+   * Fill `plan` (evictions per class, own forced replacements excluded); return the refusal, or 'none' with the
+   * eviction total in `out.count`. Lowest priority first; then members taken from earlier classes that the later ones
+   * made unnecessary are returned (latest taken class first), so a cheap class is not emptied for nothing.
+   */
   const makePlan = (c: ClassRec, out: PoolResult): PoolRefusal => {
     plan.fill(0);
-    let total = 0;
+    total = 0;
+    takenCount = 0;
     // A full class can only make room by replacing its own members.
     const ownNeed = Math.max(0, c.live + 1 - c.max);
-    if (ownNeed > 0) {
-      if (!c.replaceOwn || c.heapSize < ownNeed) return 'class-full';
-      plan[c.index] = ownNeed;
-      total = ownNeed;
-    }
-    let countNeed = Math.max(0, size + 1 - total - maxMembers);
-    let costNeed = Math.max(0, cost + c.cost - total * c.cost - maxCost);
-    const take = (v: ClassRec) => {
-      const avail = v.heapSize - plan[v.index]!;
-      if (avail <= 0 || (countNeed <= 0 && costNeed <= 0)) return;
-      const n = Math.min(avail, Math.max(countNeed, Math.ceil(costNeed / v.cost)));
-      plan[v.index]! += n;
-      total += n;
-      countNeed -= n;
-      costNeed -= n * v.cost;
-    };
+    if (ownNeed > 0 && (!c.replaceOwn || c.heapSize < ownNeed)) return 'class-full';
+    total = ownNeed;
+    countNeed = Math.max(0, size + 1 - ownNeed - maxMembers);
+    costNeed = Math.max(0, cost + c.cost - ownNeed * c.cost - maxCost);
+    // Own forced replacements are reserved: take() sees them as unavailable.
+    plan[c.index] = ownNeed;
     for (const v of c.victims) take(v);
     if (c.replaceOwn) take(c);
+    plan[c.index]! -= ownNeed;
     if (countNeed > 0 || costNeed > 0) return 'capacity';
+    for (let i = takenCount - 2; i >= 0; i--) {
+      const v = classes[takenOrder[i]!]!;
+      const back = Math.min(plan[v.index]!, -countNeed, Math.floor(-costNeed / v.cost));
+      if (back <= 0) continue;
+      plan[v.index]! -= back;
+      total -= back;
+      countNeed += back;
+      costNeed += back * v.cost;
+    }
     if (total > maxEvict) return 'eviction-limit';
     out.count = total;
     return 'none';
+  };
+
+  let applied = 0;
+  const evictFrom = (v: ClassRec, n: number, out: PoolResult) => {
+    for (let i = 0; i < n; i++) {
+      const s = v.heap[0]!;
+      out.evicted[applied] = slotId[s]!;
+      out.evictedClass[applied++] = v.name;
+      v.evicted++;
+      removeSlot(s);
+    }
   };
 
   const finish = (out: PoolResult, status: PoolStatus, reason: PoolRefusal): PoolStatus => {
@@ -357,10 +395,10 @@ export function createEntityPool(limits: EntityPoolLimits): EntityPool {
     classNames: Object.freeze(names.slice()),
     admit(id, cls, out) {
       checkOut(out);
-      out.count = 0;
-      if (closed) return finish(out, 'closed', 'none');
+      if (closed) return ((out.count = 0), finish(out, 'closed', 'none'));
       checkId(id);
       const c = classFor(cls);
+      out.count = 0;
       if (slots.has(id)) return finish(out, 'duplicate', 'none');
       const reason = makePlan(c, out);
       if (reason !== 'none') {
@@ -369,22 +407,11 @@ export function createEntityPool(limits: EntityPoolLimits): EntityPool {
         return finish(out, 'refused', reason);
       }
       // Apply: own-class replacements first when the class was full, then victims in plan order.
-      let k = 0;
-      const evictFrom = (v: ClassRec, n: number) => {
-        for (let i = 0; i < n; i++) {
-          const s = v.heap[0]!;
-          out.evicted[k] = slotId[s]!;
-          out.evictedClass[k++] = v.name;
-          v.evicted++;
-          removeSlot(s);
-        }
-      };
-      const ownForced = Math.max(0, c.live + 1 - c.max);
-      evictFrom(c, ownForced);
-      plan[c.index]! -= ownForced;
-      for (const v of c.victims) evictFrom(v, plan[v.index]!);
-      if (c.replaceOwn) evictFrom(c, plan[c.index]!);
-      out.count = k;
+      applied = 0;
+      evictFrom(c, Math.max(0, c.live + 1 - c.max), out);
+      for (const v of c.victims) evictFrom(v, plan[v.index]!, out);
+      if (c.replaceOwn) evictFrom(c, plan[c.index]!, out);
+      out.count = applied;
       const s = free[--freeTop]!;
       slotUsed[s] = 1;
       slotId[s] = id;
@@ -401,9 +428,9 @@ export function createEntityPool(limits: EntityPoolLimits): EntityPool {
     },
     check(cls, out, countRefusal = false) {
       checkOut(out);
-      out.count = 0;
-      if (closed) return finish(out, 'closed', 'none');
+      if (closed) return ((out.count = 0), finish(out, 'closed', 'none'));
       const c = classFor(cls);
+      out.count = 0;
       const reason = makePlan(c, out);
       if (reason !== 'none') {
         out.count = 0;
@@ -472,19 +499,22 @@ export function createEntityPool(limits: EntityPoolLimits): EntityPool {
       if (typeof alive !== 'function') throw new TypeError('entity pool: alive must be a function');
       int(maxChecks, 0, POOL_CEILING.members, 'maxChecks');
       if (closed) return 0;
-      let released = 0;
-      for (let i = 0; i < maxChecks && size > 0; i++) {
-        // Visit used slots only: skip free ones without charging a check.
-        let guard = maxMembers;
-        while (!slotUsed[cursor] && guard-- > 0) cursor = (cursor + 1) % maxMembers;
+      let released = 0,
+        checks = 0,
+        scanned = 0;
+      // At most maxChecks members and one pass over the slot table per sweep. `alive` may call back into the pool
+      // (release, admit, dispose): a slot is removed only if it still holds the id that was checked.
+      while (checks < maxChecks && scanned < maxMembers && !closed && size > 0) {
         const s = cursor;
         cursor = (cursor + 1) % maxMembers;
-        if (!slotUsed[s]) break;
-        if (!alive(slotId[s]!)) {
-          classes[slotClass[s]!]!.released++;
-          removeSlot(s);
-          released++;
-        }
+        scanned++;
+        if (!slotUsed[s]) continue;
+        checks++;
+        const id = slotId[s]!;
+        if (alive(id) || closed || !slotUsed[s] || slotId[s] !== id) continue;
+        classes[slotClass[s]!]!.released++;
+        removeSlot(s);
+        released++;
       }
       return released;
     },
