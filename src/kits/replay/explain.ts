@@ -5,7 +5,7 @@
  * difference; for the selection shape (`{entities: [[id, {componentId: fields}]...], resources?, count?}`, see
  * state.ts) the path is translated to an entity, component and field, or a resource. Bounded by the parse limits.
  */
-import {captureJson, type JsonLimits} from '../network/captured-json';
+import {captureJson, captureJsonLimits, type JsonLimits} from '../network/captured-json';
 
 export interface DivergenceExplainOptions {
   /** Parse limits for each detail text (default 8 MiB, 2^20 nodes, depth 32). Over the limit: `detail-unreadable`. */
@@ -199,7 +199,7 @@ export interface DifferenceListOptions {
   readonly maxPaths?: number;
   /** Parse limits for each text (default as `explainDivergence`). */
   readonly limits?: JsonLimits;
-  /** Longest value preview, in UTF-16 code units (default 160). */
+  /** Longest value preview, in UTF-16 code units: [1, 4096] (default 160). */
   readonly maxValueChars?: number;
 }
 /** One differing path. `a` and `b` are bounded JSON previews; null when the value is absent on that side. */
@@ -216,19 +216,25 @@ export type DifferenceList =
 /**
  * List up to `maxPaths` differing paths between two JSON texts, in the same depth-first canonical order as
  * `explainDivergence` (so the first entry is its first difference). Generic: no entity or resource translation. Never
- * throws for text it cannot read. O(text size) plus at most `maxPaths` previews.
+ * throws for text it cannot read; invalid options throw RangeError. O(text size) plus at most `maxPaths` previews.
  */
 export function listDifferences(a: string, b: string, options: DifferenceListOptions = {}): DifferenceList {
   const maxPaths = options.maxPaths ?? 16,
     maxValueChars = options.maxValueChars ?? 160;
   if (!Number.isSafeInteger(maxPaths) || maxPaths < 1 || maxPaths > 1024)
     throw RangeError('replay explain: maxPaths must be an integer in [1, 1024]');
-  if (!Number.isSafeInteger(maxValueChars) || maxValueChars < 1)
-    throw RangeError('replay explain: maxValueChars must be a positive integer');
+  if (!Number.isSafeInteger(maxValueChars) || maxValueChars < 1 || maxValueChars > 4096)
+    throw RangeError('replay explain: maxValueChars must be an integer in [1, 4096]');
+  let limits: JsonLimits;
+  try {
+    limits = captureJsonLimits(options.limits ?? LIMITS);
+  } catch {
+    throw RangeError('replay explain: limits must be positive integers');
+  }
   let x: Json, y: Json;
   try {
-    x = captureJson(a, options.limits ?? LIMITS).value as Json;
-    y = captureJson(b, options.limits ?? LIMITS).value as Json;
+    x = captureJson(a, limits).value as Json;
+    y = captureJson(b, limits).value as Json;
   } catch {
     return Object.freeze({status: 'unavailable', reason: 'detail-unreadable'});
   }

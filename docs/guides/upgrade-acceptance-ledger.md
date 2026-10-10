@@ -1542,16 +1542,17 @@ Evidence: focused headless tests (blob ids equal `git hash-object`; geometry, im
 
 `createShadowRunner` in `@kits/replay` (`shadow.ts`) runs two implementations of one deterministic step in lockstep
 over the rollback kit's `save`/`load`/`step` ports with the same inputs (any step-addressed source, or a replay log
-through `replayInputs`), compares canonical state digests (`hashText`) after every step and reports the first
-`state`, `threw`, `unreadable` or `anchor-mismatch` divergence with the step, input, up to `maxDiffPaths` differing
-paths (`listDifferences`, sharing `explainDivergence`'s search) and the last agreeing state. A bounded ring of snapshot
-anchors allows replay from the nearest anchor. Bounded by `maxSteps` (`over-budget`), `maxAnchors`, state bytes, nodes
-and depth; cancellable by `cancel()`, an `AbortSignal` or caller-sized `run(slice)`. [Kit
+through `replayInputs`), compares canonical states exactly after every step and reports the first `state`, `threw`,
+`unreadable` or `anchor-mismatch` divergence with the step, input, up to `maxDiffPaths` differing paths
+(`listDifferences`, sharing `explainDivergence`'s search) and the last agreeing state. A bounded ring of snapshot
+anchors allows replay from the nearest anchor; anchor checks see only what `save` returns (hidden state needs the
+rollback sync test). Bounded by `maxSteps` (`over-budget`), `maxAnchors`, state bytes, nodes and depth; cancellable by
+`cancel()`, an `AbortSignal` or caller-sized `run(slice)`. [Kit
 README](../../src/kits/replay/README.md#differential-shadow-runner-and-snapshot-anchors-shadowts), [ADR
 0118](../adr/0118-shadow-runner.md).
 
-Evidence: implemented with 13 headless node tests (agreement, an off-by-one at step 37 and a summation-order change
-found at their exact step and path, replay from the nearest anchor and from the last agreeing state, composition with
-a recorded and reopened replay log and the rollback kit's test simulation, thrown steps, saves and loads, anchor
-mismatch, every bound, abort, cancel and slices) and `npm run check` on the branch. Independent review and hosted CI
-remain required. No browser, dev-surface or device evidence; not integrated.
+Evidence: implemented with 19 headless node tests and `npm run check` on the branch. An independent review of the
+first candidate (`c755328b`) found ten issues, from inputs re-read after validation (high) and an anchor-check
+overclaim in the docs to lesser read-once, bounds and wording defects; all were fixed with regression tests and the
+documentation corrected (see the ADR's review section). Hosted CI and a re-review of the fixes remain required. No
+browser, dev-surface or device evidence; not integrated.

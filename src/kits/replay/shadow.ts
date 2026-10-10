@@ -2,9 +2,9 @@
  * kits/replay/shadow.ts: a differential shadow runner with snapshot anchors.
  *
  * Two implementations of the same deterministic step (a reference and an optimised one, old and new code) advance in
- * lockstep from the same starting state with the same recorded inputs. After every step the runner digests both
- * states (canonical JSON, the replay kit's `hashText`) and stops at the first step whose digests differ, a side that
- * throws, or a state it cannot read. The report names the step, its input, a bounded list of differing paths and the
+ * lockstep from the same starting state with the same recorded inputs. After every step the runner canonicalises both
+ * compared states (the network kit's canonical JSON) and stops at the first step where they differ, a side that throws,
+ * or a state it cannot read; digests (`hashText`) identify states in reports and anchors. The report names the step, its input, a bounded list of differing paths and the
  * last agreeing state; periodic anchors (both sides' saved states at an agreeing boundary) let the divergence be
  * replayed from the nearest anchor instead of from the start.
  *
@@ -22,10 +22,15 @@ import type {ReplayPlayer} from './log';
 
 /** One implementation under comparison. Not sandboxed: calls are synchronous creator code. */
 export interface ShadowSide extends Pick<RollbackPorts, 'save' | 'load' | 'step'> {
-  /** JSON text of the state to compare (default: `save()`). Leave out fields that may legitimately differ. */
+  /** JSON text of the state to compare (default: `save()`, which must then be JSON — narrower than the rollback
+   *  ports, whose codec is free). Leave out fields that may legitimately differ. */
   view?(): string;
 }
-/** The inputs of step `step`, or undefined when the recording ends. The same frozen array reaches both sides. */
+/**
+ * The inputs of step `step`, or undefined when the recording ends. Any undefined ends the run as `agree` at that step
+ * (`steps` shows how far it got), so a source with a hole stops early. The runner copies each array once and the same
+ * frozen copy reaches both sides.
+ */
 export type ShadowInputs = (step: number) => readonly string[] | undefined;
 
 export interface ShadowLimits {
@@ -46,6 +51,9 @@ export interface ShadowLimits {
   readonly state?: JsonLimits;
   /** Longest value preview in a difference: [1, 4096]. Default 160. */
   readonly maxValueChars?: number;
+  /** Also restore every anchor into both sides as it is taken and check each reproduces it (default false). Costs a
+   *  `load` and a re-read per side per anchor; a mismatch ends the run early as `anchor-mismatch`. */
+  readonly verifyAnchors?: boolean;
 }
 
 export const SHADOW_DEFAULTS = Object.freeze({
@@ -57,6 +65,7 @@ export const SHADOW_DEFAULTS = Object.freeze({
   maxInputsPerStep: 8,
   state: Object.freeze({maxBytes: 1 << 20, maxNodes: 1 << 16, maxDepth: 32}),
   maxValueChars: 160,
+  verifyAnchors: false,
 });
 export const SHADOW_LIMIT_RANGES = Object.freeze({
   maxSteps: [1, 10_000_000],
@@ -101,7 +110,8 @@ export type ShadowDivergence =
       lastAgreed: ShadowAnchor | null;
       anchor: ShadowAnchor | null;
     }>
-  /** A side's saved or compared state is not a string, is not JSON, or exceeds the state bounds. */
+  /** A side's saved text is not a string or exceeds `state.maxBytes`, or its compared text (the view, else the saved
+   *  text) is not a string, not JSON or exceeds the state bounds. A saved text is parsed only when there is no view. */
   | Readonly<{
       kind: 'unreadable';
       step: number | null;
@@ -111,8 +121,13 @@ export type ShadowDivergence =
       lastAgreed: ShadowAnchor | null;
       anchor: ShadowAnchor | null;
     }>
-  /** Restoring the anchor at `step` did not reproduce its digest: an incomplete `load` or state outside `save`. */
-  | Readonly<{kind: 'anchor-mismatch'; step: number; side: ShadowSideName; expected: string; actual: string}>;
+  /**
+   * After `load` of the anchor at `step`, a side's compared state does not have the anchor's digest: typically an
+   * incomplete `load`. `a` and `b` are each side's digest after the restore. This checks only what `save`/`view` show:
+   * state kept outside `save` is invisible to it (use the rollback kit's sync test to find such hidden state), and
+   * reproducing a divergence from an anchor assumes `save` and `load` are complete.
+   */
+  | Readonly<{kind: 'anchor-mismatch'; step: number; side: ShadowSideName; expected: string; a: string; b: string}>;
 
 export type ShadowStatus = 'running' | 'agree' | 'diverged' | 'over-budget' | 'cancelled' | 'failed';
 export interface ShadowReport {
@@ -127,7 +142,7 @@ export interface ShadowReport {
   readonly anchorsEvicted: number;
   readonly divergence: ShadowDivergence | null;
   /** Why the run stopped without a verdict: 'aborted' or 'cancelled' (status 'cancelled'); 'invalid-input' or
-   *  'inputs-threw: …' (status 'failed': the input source broke its contract). Else null. */
+   *  'inputs-threw: …' (status 'failed': the input source broke its contract). Null for every other status. */
   readonly reason: string | null;
 }
 export interface ShadowRunner {
@@ -138,7 +153,11 @@ export interface ShadowRunner {
   read(): ShadowReport;
   /** Retained anchors, oldest first. */
   anchors(): readonly ShadowAnchor[];
-  /** Stop now; the report keeps its progress and the anchors stay readable. Idempotent. */
+  /**
+   * Stop; the report keeps its progress and the anchors stay readable. Idempotent. Called (or the signal aborted)
+   * from inside a side during a step, it takes effect after that step's comparison: a divergence found by that step
+   * wins (status 'diverged', reason null); otherwise the step counts and the status becomes 'cancelled'.
+   */
   cancel(): void;
 }
 export interface ShadowOptions {
@@ -148,14 +167,16 @@ export interface ShadowOptions {
   readonly limits?: ShadowLimits;
   /** Restore both sides to this anchor and start at its step (verifying its digest), instead of their current state. */
   readonly from?: ShadowAnchor;
-  /** Abort cancels the run at the next call. */
+  /** Abort cancels the run before the next step (or after the current one, as `cancel`). */
   readonly signal?: AbortSignal;
 }
 
 type Captured = Required<Omit<ShadowLimits, 'state'>> & {state: JsonLimits};
 const within = (n: unknown, [min, max]: readonly [number, number]): n is number =>
   Number.isSafeInteger(n) && (n as number) >= min && (n as number) <= max;
-const utf8 = (s: string) => new TextEncoder().encode(s).length;
+/** UTF-8 length of `s` is at most `max`. Encodes only when the UTF-16 length cannot decide (length <= bytes <= 3×). */
+const bytesWithin = (s: string, max: number): boolean =>
+  s.length > max ? false : s.length * 3 <= max ? true : new TextEncoder().encode(s).length <= max;
 
 export function captureShadowLimits(l: ShadowLimits = {}): Readonly<Captured> {
   if (l === null || typeof l !== 'object') throw RangeError('shadow: limits must be an object');
@@ -173,6 +194,8 @@ export function captureShadowLimits(l: ShadowLimits = {}): Readonly<Captured> {
     throw RangeError('shadow: state limits must be positive integers');
   }
   if (!within(state.maxBytes, r.stateBytes)) throw RangeError('shadow: state.maxBytes must be at most 16 MiB');
+  const verifyAnchors = l.verifyAnchors ?? d.verifyAnchors;
+  if (typeof verifyAnchors !== 'boolean') throw RangeError('shadow: verifyAnchors must be a boolean');
   return Object.freeze({
     maxSteps: pick('maxSteps'),
     anchorEvery: pick('anchorEvery'),
@@ -181,6 +204,7 @@ export function captureShadowLimits(l: ShadowLimits = {}): Readonly<Captured> {
     maxInputBytes: pick('maxInputBytes'),
     maxInputsPerStep: pick('maxInputsPerStep'),
     maxValueChars: pick('maxValueChars'),
+    verifyAnchors,
     state,
   });
 }
@@ -193,7 +217,7 @@ export function replayInputs(player: ReplayPlayer): ShadowInputs {
   };
 }
 
-/** The newest anchor at or before `step`, or null. */
+/** The newest anchor at or before `step`, or null. Any order; O(anchors), no copy. */
 export function nearestAnchor(anchors: readonly ShadowAnchor[], step: number): ShadowAnchor | null {
   let best: ShadowAnchor | null = null;
   for (const anchor of anchors) if (anchor.step <= step && (!best || anchor.step > best.step)) best = anchor;
@@ -212,45 +236,79 @@ const messageOf = (e: unknown) => {
 };
 const sideOf = (a: boolean, b: boolean): ShadowSideName | null => (a && b ? 'both' : a ? 'a' : b ? 'b' : null);
 
+/** A side's functions, read once at creation and called with the side as `this`. */
+interface Port {
+  readonly save: () => unknown;
+  readonly load: (text: string) => unknown;
+  readonly step: (inputs: readonly string[], step: number) => unknown;
+  readonly view: (() => unknown) | null;
+}
+function capturePort(side: ShadowSide): Port {
+  if (side === null || typeof side !== 'object')
+    throw RangeError('shadow: each side needs save, load and step functions');
+  const save: unknown = side.save,
+    load: unknown = side.load,
+    step: unknown = side.step,
+    view: unknown = side.view;
+  if (typeof save !== 'function' || typeof load !== 'function' || typeof step !== 'function')
+    throw RangeError('shadow: each side needs save, load and step functions');
+  if (view !== undefined && typeof view !== 'function') throw RangeError('shadow: a side view must be a function');
+  return Object.freeze({
+    save: () => save.call(side) as unknown,
+    load: (text: string) => load.call(side, text) as unknown,
+    step: (inputs: readonly string[], at: number) => step.call(side, inputs, at) as unknown,
+    view: typeof view === 'function' ? () => view.call(side) as unknown : null,
+  });
+}
+
 type Read =
-  | {ok: true; saved: string; digest: string; view: string}
+  | {ok: true; saved: string; canonical: string; view: string}
   | {ok: false; kind: 'threw'; phase: 'save' | 'view'; message: string}
   | {ok: false; kind: 'unreadable'; reason: 'not-string' | 'over-limit-or-not-json'};
+type Good = Extract<Read, {ok: true}>;
+/** The last agreeing boundary; its digest is computed only when reported or anchored. */
+interface Agreed {
+  readonly step: number;
+  readonly canonical: string;
+  readonly a: string;
+  readonly b: string;
+}
 
 /**
  * Create a step-by-step differential runner. Bounds: `maxSteps` steps; per step two `step`, two `save` (plus two
- * `view` when given) and two canonical parses of at most `state.maxBytes`; memory at most `maxAnchors` anchors of two
- * states, plus the last agreeing pair. Throws RangeError only for an invalid configuration.
+ * `view` when given), two canonical parses of at most `state.maxBytes` and one string comparison; memory at most
+ * `maxAnchors` anchors of two states, plus the last agreeing pair and its canonical text. Throws RangeError only for
+ * an invalid configuration.
  */
 export function createShadowRunner(options: ShadowOptions): ShadowRunner {
   if (options === null || typeof options !== 'object') throw RangeError('shadow: options must be an object');
   const limits = captureShadowLimits(options.limits);
-  const sides = [options.a, options.b] as const;
-  for (const side of sides)
-    if (
-      side === null ||
-      typeof side !== 'object' ||
-      ![side.save, side.load, side.step].every(f => typeof f === 'function') ||
-      (side.view !== undefined && typeof side.view !== 'function')
-    )
-      throw RangeError('shadow: each side needs save, load and step functions (and view, if given, a function)');
-  const source = options.inputs;
+  const ports = [capturePort(options.a), capturePort(options.b)] as const;
+  const source: unknown = options.inputs;
   if (typeof source !== 'function') throw RangeError('shadow: inputs must be a function of the step');
   const signal = options.signal;
   if (signal !== undefined && (signal === null || typeof signal.aborted !== 'boolean'))
     throw RangeError('shadow: signal must be an AbortSignal');
-  const start = options.from;
-  if (
-    start !== undefined &&
-    (start === null ||
-      typeof start !== 'object' ||
-      !Number.isSafeInteger(start.step) ||
-      start.step < 0 ||
-      typeof start.digest !== 'string' ||
-      typeof start.a !== 'string' ||
-      typeof start.b !== 'string')
-  )
-    throw RangeError('shadow: from must be an anchor');
+  const given: unknown = options.from;
+  let start: ShadowAnchor | null = null;
+  if (given !== undefined) {
+    if (given === null || typeof given !== 'object') throw RangeError('shadow: from must be an anchor');
+    const g = given as Record<string, unknown>;
+    // Each field is read exactly once.
+    const step = g.step,
+      digest = g.digest,
+      a = g.a,
+      b = g.b;
+    if (
+      !Number.isSafeInteger(step) ||
+      (step as number) < 0 ||
+      typeof digest !== 'string' ||
+      typeof a !== 'string' ||
+      typeof b !== 'string'
+    )
+      throw RangeError('shadow: from must be an anchor');
+    start = Object.freeze({step: step as number, digest, a, b});
+  }
   const from = start?.step ?? 0;
 
   let status: ShadowStatus = 'running',
@@ -260,12 +318,22 @@ export function createShadowRunner(options: ShadowOptions): ShadowRunner {
     anchorsTaken = 0,
     anchorsEvicted = 0,
     busy = false,
-    started = false;
-  let last: ShadowAnchor | null = null;
+    started = false,
+    pendingCancel: string | null = null;
+  let last: Agreed | null = null;
   const ring: ShadowAnchor[] = [];
   let head = 0;
 
-  const retained = (): ShadowAnchor[] => [...ring.slice(head), ...ring.slice(0, head)];
+  let cachedFor: Agreed | null = null,
+    cached: ShadowAnchor | null = null;
+  /** The boundary as an anchor; the digest is computed once per boundary, and only when needed. */
+  const anchorOf = (g: Agreed): ShadowAnchor => {
+    if (cachedFor !== g || !cached) {
+      cached = Object.freeze({step: g.step, digest: hashText(g.canonical), a: g.a, b: g.b});
+      cachedFor = g;
+    }
+    return cached;
+  };
   const keep = (anchor: ShadowAnchor) => {
     anchorsTaken++;
     if (ring.length < limits.maxAnchors) ring.push(anchor);
@@ -275,40 +343,38 @@ export function createShadowRunner(options: ShadowOptions): ShadowRunner {
       anchorsEvicted++;
     }
   };
+  /** Divergence context, built only when a divergence is reported. */
+  const context = (at: number) => ({lastAgreed: last && anchorOf(last), anchor: nearestAnchor(ring, at)});
 
   const report = (): ShadowReport =>
-    Object.freeze({
-      status,
-      from,
-      next,
-      steps: next - from,
-      anchorsTaken,
-      anchorsEvicted,
-      divergence,
-      reason,
-    });
+    Object.freeze({status, from, next, steps: next - from, anchorsTaken, anchorsEvicted, divergence, reason});
   const diverge = (d: ShadowDivergence): ShadowReport => {
     status = 'diverged';
+    reason = null;
+    pendingCancel = null;
     divergence = Object.freeze(d);
     return report();
   };
 
-  const readSide = (side: ShadowSide): Read => {
+  const readSide = (port: Port): Read => {
     let saved: unknown, view: unknown;
     try {
-      saved = side.save();
+      saved = port.save();
     } catch (e) {
       return {ok: false, kind: 'threw', phase: 'save', message: messageOf(e)};
     }
     if (typeof saved !== 'string') return {ok: false, kind: 'unreadable', reason: 'not-string'};
-    if (utf8(saved) > limits.state.maxBytes) return {ok: false, kind: 'unreadable', reason: 'over-limit-or-not-json'};
-    if (side.view) {
+    if (!bytesWithin(saved, limits.state.maxBytes))
+      return {ok: false, kind: 'unreadable', reason: 'over-limit-or-not-json'};
+    if (port.view) {
       try {
-        view = side.view();
+        view = port.view();
       } catch (e) {
         return {ok: false, kind: 'threw', phase: 'view', message: messageOf(e)};
       }
       if (typeof view !== 'string') return {ok: false, kind: 'unreadable', reason: 'not-string'};
+      if (!bytesWithin(view, limits.state.maxBytes))
+        return {ok: false, kind: 'unreadable', reason: 'over-limit-or-not-json'};
     } else view = saved;
     let canonical: string;
     try {
@@ -316,31 +382,52 @@ export function createShadowRunner(options: ShadowOptions): ShadowRunner {
     } catch {
       return {ok: false, kind: 'unreadable', reason: 'over-limit-or-not-json'};
     }
-    return {ok: true, saved, digest: hashText(canonical), view: view as string};
+    return {ok: true, saved, canonical, view: view as string};
   };
 
-  /** Read both sides at boundary `at`; returns a verdict to stop with, or the agreeing anchor. */
-  const compare = (
+  /** A thrown or unreadable read as a divergence, or null when both reads are good. */
+  const readFailure = (
     at: number,
     step: number | null,
     inputs: readonly string[] | null,
-    ra: Read = readSide(sides[0]),
-    rb: Read = readSide(sides[1]),
-  ): ShadowReport | ShadowAnchor => {
-    const context = {step, inputs, lastAgreed: last, anchor: nearestAnchor(retained(), at)};
+    ra: Read,
+    rb: Read,
+  ): ShadowReport | null => {
     const threw = sideOf(!ra.ok && ra.kind === 'threw', !rb.ok && rb.kind === 'threw');
     if (threw) {
       const t = (!ra.ok && ra.kind === 'threw' ? ra : rb) as Extract<Read, {kind: 'threw'}>;
-      return diverge({kind: 'threw', ...context, step: step ?? at, side: threw, phase: t.phase, message: t.message});
+      return diverge({
+        kind: 'threw',
+        step: step ?? at,
+        inputs,
+        side: threw,
+        phase: t.phase,
+        message: t.message,
+        ...context(at),
+      });
     }
     const unreadable = sideOf(!ra.ok, !rb.ok);
     if (unreadable) {
       const u = (!ra.ok ? ra : rb) as Extract<Read, {kind: 'unreadable'}>;
-      return diverge({kind: 'unreadable', ...context, side: unreadable, reason: u.reason});
+      return diverge({kind: 'unreadable', step, inputs, side: unreadable, reason: u.reason, ...context(at)});
     }
-    const x = ra as Extract<Read, {ok: true}>,
-      y = rb as Extract<Read, {ok: true}>;
-    if (x.digest !== y.digest) {
+    return null;
+  };
+
+  /** Compare both reads at boundary `at`; a verdict to stop with, or the agreeing boundary. */
+  const compare = (
+    at: number,
+    step: number | null,
+    inputs: readonly string[] | null,
+    ra: Read,
+    rb: Read,
+  ): ShadowReport | Agreed => {
+    const failed = readFailure(at, step, inputs, ra, rb);
+    if (failed) return failed;
+    const x = ra as Good,
+      y = rb as Good;
+    // Exact canonical text equality: the per-step verdict does not depend on the 64-bit digest.
+    if (x.canonical !== y.canonical) {
       const listed = listDifferences(x.view, y.view, {
         maxPaths: limits.maxDiffPaths,
         limits: limits.state,
@@ -348,89 +435,130 @@ export function createShadowRunner(options: ShadowOptions): ShadowRunner {
       });
       return diverge({
         kind: 'state',
-        ...context,
-        a: x.digest,
-        b: y.digest,
+        step,
+        inputs,
+        a: hashText(x.canonical),
+        b: hashText(y.canonical),
         differences: listed.status === 'listed' ? listed.differences : Object.freeze([]),
         truncated: listed.status === 'listed' && listed.truncated,
         unavailable: listed.status === 'listed' ? null : listed.reason,
+        ...context(at),
       });
     }
-    return Object.freeze({step: at, digest: x.digest, a: x.saved, b: y.saved});
+    return Object.freeze({step: at, canonical: x.canonical, a: x.saved, b: y.saved});
   };
 
-  const agreed = (anchor: ShadowAnchor) => {
-    last = anchor;
-    if (anchor.step === from || anchor.step % limits.anchorEvery === 0) keep(anchor);
+  /** Load `anchor` into both sides and check each reproduces its digest. The reads on success, else a verdict. */
+  const restore = (anchor: ShadowAnchor, inputs: readonly string[] | null): ShadowReport | readonly [Read, Read] => {
+    const failed = [false, false];
+    let message = '';
+    ports.forEach((port, i) => {
+      try {
+        port.load(i === 0 ? anchor.a : anchor.b);
+      } catch (e) {
+        failed[i] = true;
+        message ||= messageOf(e);
+      }
+    });
+    const threw = sideOf(failed[0]!, failed[1]!);
+    if (threw)
+      return diverge({
+        kind: 'threw',
+        step: anchor.step,
+        inputs,
+        side: threw,
+        phase: 'load',
+        message,
+        ...context(anchor.step),
+      });
+    const ra = readSide(ports[0]),
+      rb = readSide(ports[1]);
+    const bad = readFailure(anchor.step, anchor.step, inputs, ra, rb);
+    if (bad) return bad;
+    const da = hashText((ra as Good).canonical),
+      db = hashText((rb as Good).canonical);
+    // Each side must reproduce the anchor, whatever the other side did.
+    const mismatch = sideOf(da !== anchor.digest, db !== anchor.digest);
+    if (mismatch)
+      return diverge({
+        kind: 'anchor-mismatch',
+        step: anchor.step,
+        side: mismatch,
+        expected: anchor.digest,
+        a: da,
+        b: db,
+      });
+    return [ra, rb] as const;
   };
 
-  const cancelled = (): boolean => {
-    if (status === 'running' && signal?.aborted) {
-      status = 'cancelled';
-      reason = 'aborted';
+  /** Record an agreeing boundary; anchor it on the interval (verifying the restore when configured). */
+  const agreed = (g: Agreed): ShadowReport | null => {
+    last = g;
+    if (g.step !== from && g.step % limits.anchorEvery !== 0) return null;
+    const anchor = anchorOf(g);
+    if (limits.verifyAnchors && g.step !== from) {
+      const restored = restore(anchor, null);
+      if (!Array.isArray(restored)) return restored as ShadowReport;
     }
-    return status !== 'running';
+    keep(anchor);
+    return null;
+  };
+
+  /** Apply a cancellation requested during the current call (it never overrides a divergence). */
+  const settle = (): ShadowReport => {
+    if (status === 'running' && (pendingCancel || signal?.aborted)) {
+      status = 'cancelled';
+      reason = pendingCancel ?? 'aborted';
+    }
+    pendingCancel = null;
+    return report();
   };
 
   /** Restore the starting anchor (when given) and compare the starting boundary. */
   const begin = (): ShadowReport | null => {
     started = true;
+    let reads: readonly [Read, Read];
     if (start) {
-      const failed = [false, false];
-      let message = '';
-      sides.forEach((side, i) => {
-        try {
-          side.load(i === 0 ? start.a : start.b);
-        } catch (e) {
-          failed[i] = true;
-          message ||= messageOf(e);
-        }
-      });
-      const threw = sideOf(failed[0]!, failed[1]!);
-      if (threw)
-        return diverge({
-          kind: 'threw',
-          step: from,
-          inputs: null,
-          side: threw,
-          phase: 'load',
-          message,
-          lastAgreed: null,
-          anchor: null,
-        });
+      const restored = restore(start, null);
+      if (!Array.isArray(restored)) return restored as ShadowReport;
+      reads = restored as readonly [Read, Read];
+    } else reads = [readSide(ports[0]), readSide(ports[1])];
+    const result = compare(from, null, null, reads[0], reads[1]);
+    if (!('canonical' in result)) return result;
+    return agreed(result);
+  };
+
+  /** Read the step's inputs once each into a frozen copy, or null when they break the contract. */
+  const captureInputs = (supplied: unknown): readonly string[] | null => {
+    if (!Array.isArray(supplied)) return null;
+    const n: unknown = supplied.length;
+    if (!within(n, [1, limits.maxInputsPerStep])) return null;
+    const copy: string[] = [];
+    for (let i = 0; i < n; i++) {
+      const item: unknown = supplied[i];
+      if (typeof item !== 'string' || !bytesWithin(item, limits.maxInputBytes)) return null;
+      copy.push(item);
     }
-    const ra = readSide(sides[0]),
-      rb = readSide(sides[1]);
-    if (start && ra.ok && rb.ok) {
-      // Each side must reproduce the anchor it was restored from, whatever the other side did.
-      const mismatch = sideOf(ra.digest !== start.digest, rb.digest !== start.digest);
-      if (mismatch)
-        return diverge({
-          kind: 'anchor-mismatch',
-          step: from,
-          side: mismatch,
-          expected: start.digest,
-          actual: mismatch === 'b' ? rb.digest : ra.digest,
-        });
-    }
-    const result = compare(from, null, null, ra, rb);
-    if (!('digest' in result)) return result;
-    agreed(result);
-    return null;
+    return Object.freeze(copy);
   };
 
   const once = (): ShadowReport => {
-    if (cancelled()) return report();
+    if (status === 'running' && signal?.aborted) {
+      status = 'cancelled';
+      reason = 'aborted';
+    }
+    if (status !== 'running') return report();
     if (busy) throw Error('shadow: step called re-entrantly from a side');
     busy = true;
     try {
       if (!started) {
         const stopped = begin();
         if (stopped) return stopped;
+        if (pendingCancel || signal?.aborted) return settle();
       }
       let supplied: unknown;
       try {
-        supplied = source(next);
+        supplied = (source as ShadowInputs)(next);
       } catch (e) {
         status = 'failed';
         reason = `inputs-threw: ${messageOf(e)}`;
@@ -444,46 +572,32 @@ export function createShadowRunner(options: ShadowOptions): ShadowRunner {
         status = 'over-budget';
         return report();
       }
-      if (
-        !Array.isArray(supplied) ||
-        supplied.length < 1 ||
-        supplied.length > limits.maxInputsPerStep ||
-        !supplied.every(i => typeof i === 'string' && utf8(i) <= limits.maxInputBytes)
-      ) {
+      const inputs = captureInputs(supplied);
+      if (!inputs) {
         status = 'failed';
         reason = 'invalid-input';
         return report();
       }
-      const inputs = Object.freeze([...(supplied as readonly string[])]);
       const at = next;
       const failed = [false, false];
       let message = '';
-      sides.forEach((side, i) => {
+      ports.forEach((port, i) => {
         try {
-          side.step(inputs, at);
+          port.step(inputs, at);
         } catch (e) {
           failed[i] = true;
           message ||= messageOf(e);
         }
       });
       const threw = sideOf(failed[0]!, failed[1]!);
-      if (threw)
-        return diverge({
-          kind: 'threw',
-          step: at,
-          inputs,
-          side: threw,
-          phase: 'step',
-          message,
-          lastAgreed: last,
-          anchor: nearestAnchor(retained(), at),
-        });
+      if (threw) return diverge({kind: 'threw', step: at, inputs, side: threw, phase: 'step', message, ...context(at)});
       // A state verdict for the boundary after `at` names `at` as the step that produced it.
-      const result = compare(at + 1, at, inputs);
-      if (!('digest' in result)) return result;
+      const result = compare(at + 1, at, inputs, readSide(ports[0]), readSide(ports[1]));
+      if (!('canonical' in result)) return result;
       next = at + 1;
-      agreed(result);
-      return report();
+      const stopped = agreed(result);
+      if (stopped) return stopped;
+      return settle();
     } finally {
       busy = false;
     }
@@ -502,9 +616,11 @@ export function createShadowRunner(options: ShadowOptions): ShadowRunner {
       return result;
     },
     read: report,
-    anchors: () => Object.freeze(retained()),
+    anchors: () => Object.freeze([...ring.slice(head), ...ring.slice(0, head)]),
     cancel() {
-      if (status === 'running') {
+      if (status !== 'running') return;
+      if (busy) pendingCancel ??= 'cancelled';
+      else {
         status = 'cancelled';
         reason = 'cancelled';
       }

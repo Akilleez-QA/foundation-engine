@@ -10,6 +10,7 @@ import {
   nearestAnchor,
   replayInputs,
   type ShadowDivergence,
+  type ShadowAnchor,
   type ShadowInputs,
   type ShadowSide,
 } from './shadow';
@@ -241,13 +242,12 @@ test('SHADOW reports a restore that does not reproduce its anchor as anchor-mism
   );
   const r = createShadowRunner({a: toyPorts(), b: partial, inputs: from(log), from: anchor}).run();
   assert.equal(r.status, 'diverged');
-  assert.deepEqual(r.divergence, {
-    kind: 'anchor-mismatch',
-    step: 32,
-    side: 'b',
-    expected: anchor.digest,
-    actual: (r.divergence as {actual: string}).actual,
-  });
+  const m = r.divergence as Extract<ShadowDivergence, {kind: 'anchor-mismatch'}>;
+  assert.deepEqual(
+    [m.kind, m.step, m.side, m.expected, m.a],
+    ['anchor-mismatch', 32, 'b', anchor.digest, anchor.digest],
+  );
+  assert.notEqual(m.b, anchor.digest);
   assert.equal(r.steps, 0);
 
   const ignoring = () => {
@@ -256,7 +256,11 @@ test('SHADOW reports a restore that does not reproduce its anchor as anchor-mism
     return p;
   };
   const both = createShadowRunner({a: ignoring(), b: ignoring(), inputs: from(log), from: anchor}).run();
-  assert.equal((both.divergence as {side: string}).side, 'both');
+  const bm = both.divergence as Extract<ShadowDivergence, {kind: 'anchor-mismatch'}>;
+  assert.equal(bm.side, 'both');
+  // Both sides' restored digests are reported (here both still hold the fresh start state).
+  assert.equal(bm.a, bm.b);
+  assert.notEqual(bm.a, anchor.digest);
 
   const refusing = toyPorts();
   refusing.load = () => {
@@ -408,10 +412,10 @@ test('SHADOW fails on an input source that breaks its contract and refuses re-en
   assert.match(must(throwing.reason), /inputs-threw: Error: source/);
 
   const re = toyPorts();
-  const runner = createShadowRunner({a: re, b: toyPorts(), inputs: from(recording(10))});
   re.step = () => {
     runner.step();
   };
+  const runner = createShadowRunner({a: re, b: toyPorts(), inputs: from(recording(10))});
   const r = runner.run();
   const d = r.divergence as Extract<ShadowDivergence, {kind: 'threw'}>;
   assert.deepEqual([d.kind, d.side, d.phase], ['threw', 'a', 'step']);
@@ -484,4 +488,217 @@ test('SHADOW difference lists follow the first-difference order and stay bounded
   const long = listDifferences('{"s":"' + 'x'.repeat(50) + '"}', '{"s":"y"}', {maxValueChars: 10});
   assert.equal(long.status === 'listed' && must(long.differences[0]).a, '"xxxxxxxx…');
   assert.throws(() => listDifferences(a, b, {maxPaths: 0}), RangeError);
+});
+
+test('SHADOW reads each input once into its own copy (getter and Proxy cannot swap a value after validation)', () => {
+  const seen: unknown[][] = [];
+  const recordingSide = (): ShadowSide => {
+    const p = toyPorts();
+    const inner = p.step;
+    p.step = (inputs, step) => {
+      seen.push([...inputs]);
+      inner(
+        inputs.map(i => (i === 'n' || i === 'l' || i === 'r' || i === 'a' ? i : 'n')),
+        step,
+      );
+    };
+    return p;
+  };
+  // A getter that answers 'n' once, then a huge string or a number.
+  let reads = 0;
+  const tricky: string[] = ['n', 'n'];
+  Object.defineProperty(tricky, 0, {
+    get: () => (++reads === 1 ? 'n' : reads === 2 ? 'x'.repeat(10 << 20) : 7),
+  });
+  const getter = createShadowRunner({
+    a: recordingSide(),
+    b: recordingSide(),
+    inputs: s => (s === 0 ? tricky : undefined),
+  });
+  assert.equal(getter.run().status, 'agree');
+  assert.equal(reads, 1);
+  assert.deepEqual(seen, [
+    ['n', 'n'],
+    ['n', 'n'],
+  ]);
+
+  seen.length = 0;
+  let proxyReads = 0;
+  const proxy = new Proxy(['n', 'l'], {
+    get(target, key, receiver) {
+      if (key === '1') return ++proxyReads === 1 ? 'l' : 42;
+      if (key === 'length') return proxyReads === 0 ? 2 : 1e9;
+      return Reflect.get(target, key, receiver) as unknown;
+    },
+  });
+  const proxied = createShadowRunner({
+    a: recordingSide(),
+    b: recordingSide(),
+    inputs: s => (s === 0 ? proxy : undefined),
+  });
+  assert.equal(proxied.run().status, 'agree');
+  assert.equal(proxyReads, 1);
+  assert.deepEqual(seen, [
+    ['n', 'l'],
+    ['n', 'l'],
+  ]);
+
+  // Multi-byte inputs are measured in UTF-8 bytes, not code units.
+  const euro = (text: string) =>
+    createShadowRunner({
+      a: toyPorts(),
+      b: toyPorts(),
+      inputs: s => (s === 0 ? [text, 'n'] : undefined),
+      limits: {maxInputBytes: 8},
+    }).run();
+  assert.equal(euro('\u20ac\u20ac\u20ac').reason, 'invalid-input'); // 9 bytes in 3 code units
+  assert.equal(euro('ab\u20ac').status, 'agree'); // 5 bytes
+});
+
+test('SHADOW verifyAnchors restores each anchor as it is taken and reports an incomplete load early', () => {
+  const log = recording(100);
+  const partial = () => {
+    const p = toyPorts();
+    p.load = text => {
+      const next = JSON.parse(text) as Toy;
+      p.state = {...next, hits: 0, v: next.v.map(() => 0)};
+    };
+    return p;
+  };
+  // Off by default: the live run never calls load, so the incomplete load goes unseen.
+  const quiet = createShadowRunner({a: toyPorts(), b: partial(), inputs: from(log), limits: {anchorEvery: 10}}).run();
+  assert.equal(quiet.status, 'agree');
+  const a = toyPorts();
+  const checked = createShadowRunner({
+    a,
+    b: partial(),
+    inputs: from(log),
+    limits: {anchorEvery: 10, verifyAnchors: true},
+  }).run();
+  const m = checked.divergence as Extract<ShadowDivergence, {kind: 'anchor-mismatch'}>;
+  assert.equal(m.kind, 'anchor-mismatch');
+  assert.equal(m.side, 'b');
+  assert.equal(m.step % 10, 0);
+  assert.equal(m.a, m.expected);
+  assert.notEqual(m.b, m.expected);
+  assert.equal(checked.next, m.step);
+  assert.ok(a.calls.load >= 1);
+  // A complete load passes verification and keeps every anchor.
+  const ok = createShadowRunner({
+    a: toyPorts(),
+    b: toyPorts(),
+    inputs: from(log),
+    limits: {anchorEvery: 10, verifyAnchors: true},
+  });
+  assert.equal(ok.run().status, 'agree');
+  assert.equal(ok.read().anchorsTaken, 11);
+  assert.throws(
+    () => createShadowRunner({a: toyPorts(), b: toyPorts(), inputs: from(log), limits: {verifyAnchors: 1 as never}}),
+    RangeError,
+  );
+});
+
+test('SHADOW cancellation from inside a step takes effect after that step, and never hides its divergence', () => {
+  const log = recording(60);
+  let runner: ReturnType<typeof createShadowRunner>;
+  const cancelling = (at: number, diverge: boolean) => {
+    const p = toyPorts(2, diverge ? offByOneAt(at) : undefined);
+    const inner = p.step;
+    p.step = (inputs, step) => {
+      inner(inputs, step);
+      if (step === at) runner.cancel();
+    };
+    return p;
+  };
+  runner = createShadowRunner({a: toyPorts(), b: cancelling(20, true), inputs: from(log)});
+  const diverged = runner.run();
+  assert.deepEqual([diverged.status, diverged.reason, diverged.divergence?.kind], ['diverged', null, 'state']);
+  assert.equal((diverged.divergence as {step: number}).step, 20);
+
+  runner = createShadowRunner({a: toyPorts(), b: cancelling(20, false), inputs: from(log)});
+  const cancelled = runner.run();
+  assert.deepEqual(
+    [cancelled.status, cancelled.reason, cancelled.steps, cancelled.divergence],
+    ['cancelled', 'cancelled', 21, null],
+  );
+  assert.deepEqual(runner.step(), cancelled);
+});
+
+test('SHADOW reads anchor fields and side functions once at creation', () => {
+  const log = recording(40);
+  const source = createShadowRunner({a: toyPorts(), b: toyPorts(), inputs: from(log), limits: {anchorEvery: 16}});
+  source.run();
+  const anchor = must(source.anchors()[1]);
+  const reads: Record<string, number> = {};
+  const counted = Object.create(null) as Record<string, unknown>;
+  for (const key of ['step', 'digest', 'a', 'b'] as const)
+    Object.defineProperty(counted, key, {
+      get: () => {
+        reads[key] = (reads[key] ?? 0) + 1;
+        return anchor[key];
+      },
+    });
+  const a = toyPorts();
+  let viewReads = 0;
+  const side = Object.defineProperty(toyPorts(), 'view', {
+    get: () => {
+      viewReads++;
+      return () => JSON.stringify(side.state);
+    },
+  }) as ToyPorts & ShadowSide;
+  const runner = createShadowRunner({a, b: side, inputs: from(log), from: counted as ShadowAnchor});
+  // Swapping a function after creation has no effect.
+  a.step = () => {
+    throw Error('swapped');
+  };
+  assert.equal(runner.run().status, 'agree');
+  assert.deepEqual(reads, {step: 1, digest: 1, a: 1, b: 1});
+  assert.equal(viewReads, 1);
+  // A throwing accessor is a configuration error at creation, not an escape from step().
+  const bad = Object.defineProperty(toyPorts(), 'view', {
+    get: () => {
+      throw Error('getter');
+    },
+  });
+  assert.throws(() => createShadowRunner({a: toyPorts(), b: bad, inputs: from(log)}), /getter/);
+});
+
+test('SHADOW bounds the state by nodes and by depth as well as bytes', () => {
+  const log = recording(20);
+  const shaped = (make: (frame: number) => unknown): ShadowSide & ToyPorts => {
+    const p = toyPorts();
+    return Object.assign(p, {save: () => JSON.stringify({...p.state, extra: make(p.state.frame)})});
+  };
+  const nodes = createShadowRunner({
+    a: shaped(f => new Array<number>(f * 4).fill(1)),
+    b: shaped(f => new Array<number>(f * 4).fill(1)),
+    inputs: from(log),
+    limits: {state: {maxBytes: 1 << 16, maxNodes: 40, maxDepth: 8}},
+  }).run();
+  assert.deepEqual([nodes.divergence?.kind, (nodes.divergence as {side: string}).side], ['unreadable', 'both']);
+  assert.ok(nodes.steps > 0 && nodes.steps < 20);
+  const nest = (d: number): unknown => (d === 0 ? 1 : [nest(d - 1)]);
+  const depth = createShadowRunner({
+    a: shaped(f => nest(f)),
+    b: shaped(() => 1),
+    inputs: from(log),
+    limits: {state: {maxBytes: 1 << 16, maxNodes: 1 << 12, maxDepth: 6}},
+  }).run();
+  // Only side a nests, so the views differ (a state divergence) before a reaches the depth limit.
+  assert.equal(depth.divergence?.kind, 'state');
+  const deep = createShadowRunner({
+    a: shaped(f => nest(f)),
+    b: shaped(f => nest(f)),
+    inputs: from(log),
+    limits: {state: {maxBytes: 1 << 16, maxNodes: 1 << 12, maxDepth: 6}},
+  }).run();
+  const u = deep.divergence as Extract<ShadowDivergence, {kind: 'unreadable'}>;
+  assert.deepEqual([u.kind, u.side, u.reason], ['unreadable', 'both', 'over-limit-or-not-json']);
+  assert.ok(deep.steps >= 3 && deep.steps <= 6);
+});
+
+test('SHADOW difference lists reject invalid limits and preview bounds', () => {
+  assert.throws(() => listDifferences('1', '2', {limits: {maxBytes: 0, maxNodes: 1, maxDepth: 1}}), RangeError);
+  assert.throws(() => listDifferences('1', '2', {maxValueChars: 5000}), RangeError);
+  assert.equal(listDifferences('1', '2', {maxValueChars: 4096}).status, 'listed');
 });

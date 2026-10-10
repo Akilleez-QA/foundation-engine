@@ -193,7 +193,8 @@ imports from `@kits/replay` are game code and are bundled with it.
 lockstep from the same state with the same inputs, compares canonical state digests after every step and stops at the
 first divergence with the step, its input, up to `maxDiffPaths` differing paths and the last agreeing state. Periodic
 anchors (both sides' saved states at agreeing boundaries, a bounded ring) let a divergence be replayed from the nearest
-anchor rather than from the first step; a restore that does not reproduce its anchor is reported as `anchor-mismatch`.
+anchor rather than from the first step; a restore that does not reproduce its anchor is reported as `anchor-mismatch`
+(this sees only what `save` returns: use the rollback sync test for hidden state).
 Sides use the rollback kit's `save`/`load`/`step` ports; inputs can come from an opened replay log through
 `replayInputs`. Inputs, owner, bounds, overload, cancellation, recovery, limits and evidence are in the
 [kit README](../../src/kits/replay/README.md#differential-shadow-runner-and-snapshot-anchors-shadowts) and
