@@ -54,7 +54,7 @@ contacts.setEnabled(player, false);   // intangible (e.g. invulnerability frames
   - The rest are refused and produce no events. `update().refused` counts them.
   - Results do not depend on insertion order.
 - **Cost.** `update()` sorts enabled bodies along x and sweeps them: O(n log n + candidate pairs). It allocates
-  its event list. `set`, `move`, `setEnabled` and `remove` are O(1). `touching(id)` is O(current pairs).
+  its event list. `set`, `move`, `setEnabled` and `remove` are O(1). `touching(id)` lists contacts as of the last update and is O(current pairs).
 - **Reentrancy.** Calling back into the layer during an operation throws.
 - **Validation.** Malformed input throws `RangeError` before any change. Fields are copied once.
 - **Events.** Events are frozen values; dispatch is the creator's. A handler that removes a body cannot corrupt

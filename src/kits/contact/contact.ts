@@ -409,6 +409,7 @@ export function createContactLayer(options: ContactOptions) {
           nextBodies.set(id as number, body);
         }
         const nextPairs = new Map<string, Pair>();
+        const seenIds = new Set<string>();
         const perBody = new Map<number, number>();
         for (let i = 0; i < np; i++) {
           const item: unknown = (pairList as unknown[])[i];
@@ -425,7 +426,9 @@ export function createContactLayer(options: ContactOptions) {
               fail('pair incarnations must be from 1 to the snapshot counter');
           if (typeof r.aSenses !== 'boolean' || typeof r.bSenses !== 'boolean') fail('pair senses must be booleans');
           const k = pairKey({a: a as number, b: b as number, ai: ai as number, bi: bi as number});
-          if (nextPairs.has(k)) fail('duplicate pair');
+          const ids = `${a as number}:${b as number}`;
+          if (nextPairs.has(k) || seenIds.has(ids)) fail('duplicate pair');
+          seenIds.add(ids);
           for (const id of [a as number, b as number]) {
             const n = (perBody.get(id) ?? 0) + 1;
             if (n > maxPerBody) fail('snapshot exceeds maxPerBody');
@@ -446,7 +449,7 @@ export function createContactLayer(options: ContactOptions) {
         incarnations = counter;
       });
     },
-    /** Ids currently in contact with `id`, ascending. */
+    /** Ids in contact with `id` as of the last update (or restore), ascending. O(current pairs). */
     touching(id: number): readonly number[] {
       const out: number[] = [];
       for (const p of current.values()) {
