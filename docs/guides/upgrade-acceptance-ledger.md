@@ -1260,3 +1260,12 @@ of successful GPU reclamation or physical-device acceptance.
   implementation, all pass on the candidate. Local Node microbenchmark, 10,000 entities: typed queries no slower,
   untyped query within run-to-run noise. Not a frame-budget or device claim.
 - **Not established:** template or browser frame measurements; hosted CI.
+
+## Finished one-shot model clip stillness — candidate (2026-10-09)
+
+- **Scope:** owner repair in `src/author/scene-model.ts` clip sync. A `loop: false` clip clamped at its end was
+  un-paused by every sync while `playing` was `true`, re-finished, and made `sync` report a change every frame.
+- **Evidence:** `src/author/scene-model.test.ts` "a finished one-shot clip holds its last pose…" fails on the
+  previous implementation (sync keeps returning `true`) and passes on the candidate; a looping-clip case confirms
+  playing loops still report change and paused models do not. Headless Three mixer, not a browser frame trace.
+- **Not established:** browser redraw counts in a template scene; hosted CI.

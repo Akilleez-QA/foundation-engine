@@ -67,6 +67,34 @@ test('model playback moves owned named nodes, pauses, and never moves the actor 
   assert.equal(f.owner.socket(f.e, 'hand'), null);
   assert.deepEqual(f.errors, []);
 });
+test('a finished one-shot clip holds its last pose and reports no change while still playing', async () => {
+  const f = fixture();
+  f.owner.sync();
+  await waitFor(() => f.owner.socket(f.e, 'hand') !== null);
+  // The one-second clip reaches its end on the fourth frame, which still reports the final pose.
+  for (let i = 0; i < 4; i++) assert.equal(f.owner.sync(0.25), true, `frame ${i} advances the clip`);
+  assert.equal(f.owner.socket(f.e, 'hand')!.matrix[13], 2);
+  for (let i = 0; i < 3; i++) assert.equal(f.owner.sync(0.25), false, 'a finished clip is still: nothing to redraw');
+  assert.equal(f.owner.socket(f.e, 'hand')!.matrix[13], 2, 'clamped at the last pose');
+  assert.equal(f.world.get(f.e, Model)!.playing, true, 'the author-owned playing flag is untouched');
+  f.world.get(f.e, Model)!.revision++;
+  assert.equal(f.owner.sync(0.25), true, 'a new revision restarts the clip');
+  assert.equal(f.owner.socket(f.e, 'hand')!.matrix[13], 0.5);
+  assert.equal(f.owner.sync(0.25), true, 'and it plays again');
+  assert.deepEqual(f.errors, []);
+  f.life.abort();
+});
+test('a looping clip keeps reporting change while playing and none while paused', async () => {
+  const f = fixture();
+  f.world.get(f.e, Model)!.loop = true;
+  f.owner.sync();
+  await waitFor(() => f.owner.socket(f.e, 'hand') !== null);
+  for (let i = 0; i < 8; i++) assert.equal(f.owner.sync(0.25), true, `looping frame ${i}`);
+  f.world.get(f.e, Model)!.playing = false;
+  f.owner.sync(0.25);
+  assert.equal(f.owner.sync(0.25), false, 'paused is still');
+  f.life.abort();
+});
 test('replacement and despawn release instances and obsolete async results cannot attach', async () => {
   const f = fixture();
   f.owner.sync();

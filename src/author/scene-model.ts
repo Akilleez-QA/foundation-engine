@@ -391,7 +391,10 @@ export function createSceneModels(o: {
             changed = true;
           }
           if (slot.action) {
-            slot.action.paused = !data.playing;
+            // A finished one-shot clip stays clamped: the mixer pauses it at the end, and un-pausing it would
+            // re-finish it (and report a change) on every playing frame. `revision` restarts it.
+            const finished = !data.loop && slot.action.time >= slot.action.getClip().duration;
+            slot.action.paused = !data.playing || finished;
             slot.action.timeScale = data.speed;
             if (data.playing && data.speed > 0 && dt > 0 && slot.action.isRunning()) {
               slot.mixer!.update(dt);
