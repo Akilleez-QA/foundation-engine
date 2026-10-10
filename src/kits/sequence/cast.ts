@@ -114,10 +114,17 @@ export function createCast(def: CastDefinition, options: {readonly freeze?: bool
       if (missing.length) return Object.freeze({status: 'missing', roles: Object.freeze(missing)});
       for (const [e, roles] of owner)
         if (roles.length > 1) return Object.freeze({status: 'conflict', entity: e, roles: Object.freeze(roles)});
-      const ex = extra.exempt ?? [],
-        busy = extra.busy ?? [];
-      if (ex.length > CAST_LIMITS.exempt) fail(`at most ${CAST_LIMITS.exempt} exempt entities`);
-      if (busy.length > CAST_LIMITS.settling) fail(`at most ${CAST_LIMITS.settling} busy entities`);
+      const copy = (v: readonly number[] | undefined, max: number, what: string): number[] => {
+        if (v === undefined) return [];
+        if (!Array.isArray(v)) fail(`${what} must be an array`);
+        const n = v.length;
+        if (n > max) fail(`at most ${max} ${what} entities`);
+        const out: number[] = [];
+        for (let i = 0; i < n; i++) out.push(v[i]!);
+        return out;
+      };
+      const ex = copy(extra.exempt, CAST_LIMITS.exempt, 'exempt'),
+        busy = copy(extra.busy, CAST_LIMITS.settling, 'busy');
       for (const e of [...ex, ...busy]) if (!isEntity(e)) fail('exempt and busy entries must be entity ids');
       for (const [role, e] of bound) {
         byRole.set(role, e);

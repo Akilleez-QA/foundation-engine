@@ -22,8 +22,9 @@ Extend the optional sequence kit with three pure helpers:
   until they settle, and returns released channels.
 - **Graph:** sequence definitions joined at held branch cues. A choice cancels the rest
   of the node and starts the chosen node as a new run with a per-step session, which
-  keeps exactly-once ids distinct. Skip follows defaults and lands only what choosing
-  at the branch would have landed. Steps are bounded and snapshots are validated.
+  keeps exactly-once ids distinct. Skip follows defaults and lands only the effects the branch cue depends on; parallel
+  cues are abandoned. Reaching the step bound ends the graph (`limited`). Snapshots are
+  validated.
 - **Arbiter:** one claim at a time, priority by declaration order, per-source
   cooldowns, refusal of stale releases, and a bounded number of offers per tick.
 

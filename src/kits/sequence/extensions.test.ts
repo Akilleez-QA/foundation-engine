@@ -187,8 +187,26 @@ test('graph definitions are validated and loops are bounded by maxSteps', () => 
   g.advance(2);
   g.choose('again');
   g.advance(2);
-  assert.throws(() => g.choose('again'), /maxSteps/);
-  assert.throws(() => createSequenceGraph(loop, 's').skip(), /maxSteps/);
+  const before = g.step;
+  assert.equal(g.choose('again').status, 'chosen');
+  assert.equal(g.status, 'finished', 'the step bound ends the graph instead of throwing');
+  assert.equal(g.limited, true);
+  assert.equal(g.step, before);
+  const skipping = createSequenceGraph(loop, 's');
+  const out = skipping.skip();
+  assert.equal(out.status, 'skipped');
+  assert.equal(skipping.limited, true);
+  assert.equal(out.events.filter(e => e.kind === 'effect').length, 3, 'one greet per node visited, none lost');
+  assert.throws(
+    () =>
+      defineSequenceGraph({
+        id: 'g',
+        start: 'intro',
+        nodes: {intro},
+        branches: [{node: 'intro', at: 'ask', choices: {a: null}, default: 'toString'}],
+      }),
+    /default/,
+  );
 });
 
 test('the arbiter lets one event claim the stage, by priority, with cooldown and stale-release refusal', () => {
@@ -208,7 +226,46 @@ test('the arbiter lets one event claim the stage, by priority, with cooldown and
   assert.equal(arb.offer('trigger', 'door'), 'cooling');
   arb.tick();
   arb.tick();
+  assert.equal(arb.offer('trigger', 'door'), 'cooling', 'cooldown 3 refuses the three ticks after release');
+  arb.tick();
   assert.equal(arb.offer('trigger', 'door'), 'offered');
   assert.throws(() => arb.offer('nope', 'x'), RangeError);
   assert.throws(() => createEventArbiter({sources: [{id: 'a'}, {id: 'a'}]}), RangeError);
+});
+
+test('branches are offered only once the run is settled; a directly released branch cue follows the default once', () => {
+  const side = defineSequence({
+    id: 'side',
+    tracks: [
+      {id: 'main', cues: [{id: 'q', ticks: 0, hold: true}]},
+      {
+        id: 'aside',
+        cues: [
+          {id: 's0', ticks: 0},
+          {id: 's1', ticks: 0, effect: 'S'},
+        ],
+      },
+    ],
+  });
+  const g2 = defineSequenceGraph({
+    id: 'g2',
+    start: 'side',
+    nodes: {side},
+    branches: [{node: 'side', at: 'q', choices: {go: null}, default: 'go'}],
+  });
+  const g = createSequenceGraph(g2, 'x', null, {maxTransitions: 1});
+  g.advance(0);
+  assert.equal(g.offered(), null, 'not settled yet');
+  const seen: string[] = [];
+  while (!g.run!.settled) seen.push(...effects(g.advance(0).events));
+  assert.deepEqual(seen, ['["side","x#0","s1"]']);
+  assert.deepEqual(g.offered(), ['go']);
+  const direct = createSequenceGraph(g2, 'y');
+  direct.advance(0);
+  direct.run!.release('q');
+  const out = direct.advance(0);
+  assert.equal(out.events.filter(e => e.kind === 'finished').length, 1);
+  assert.equal(direct.status, 'finished');
+  const forged = {...createSequenceGraph(graph, 'z').snapshot(), node: 'yes'};
+  assert.throws(() => parseSequenceGraphState(graph, forged), RangeError);
 });

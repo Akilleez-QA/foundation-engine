@@ -5,9 +5,9 @@
  * node (or `null` to end). When that cue is active and waiting, `choose(choice)` ends the current run at that point:
  * effects already returned stay landed, effects after the branch cue are abandoned (never returned), and the chosen
  * node starts as a new run with its own session `<session>#<step>`, so exactly-once effect ids stay distinct per step.
- * `skip()` follows each branch's `default` choice, bounded by `maxSteps`: a node with a branch lands the skip effects
- * of the incomplete cues its branch cue depends on (what choosing there would already have landed) and abandons the
- * rest, exactly as `choose` would; a node without a branch is skipped whole.
+ * `skip()` follows each branch's `default` choice: a node with a branch lands the skip effects of the incomplete cues
+ * its branch cue depends on and abandons the rest; a node without a branch is skipped whole. Reaching `maxSteps` ends
+ * the graph and sets `limited` instead of throwing.
  * Snapshots hold the node, step and the current run's snapshot for one save section.
  */
 import {
@@ -94,14 +94,14 @@ export function defineSequenceGraph(input: SequenceGraphInput) {
     if (!choicesIn || typeof choicesIn !== 'object') fail(`branch ${node}: choices must be an object`);
     const keys = Object.keys(choicesIn);
     if (keys.length < 1 || keys.length > GRAPH_LIMITS.choices) fail(`branch ${node}: 1-16 choices`);
-    const choices: Record<string, string | null> = {};
+    const choices: Record<string, string | null> = Object.create(null);
     for (const k of keys) {
       const target: unknown = (choicesIn as Record<string, unknown>)[k];
       if (!isId(k) || (target !== null && (!isId(target) || !nodes.has(target))))
         fail(`branch ${node}: choice ${k} must lead to a node or null`);
       choices[k] = target as string | null;
     }
-    if (!isId(dflt) || !(dflt in choices)) fail(`branch ${node}: default must be one of its choices`);
+    if (!isId(dflt) || !Object.hasOwn(choices, dflt)) fail(`branch ${node}: default must be one of its choices`);
     branches.set(node, Object.freeze({node, at, choices: Object.freeze(choices), default: dflt}));
   }
   return Object.freeze({id, start, nodes, branches, maxSteps});
@@ -127,6 +127,7 @@ export function parseSequenceGraphState(graph: SequenceGraph, raw: unknown): Seq
   if (!Number.isSafeInteger(step) || (step as number) < 0 || (step as number) >= graph.maxSteps) fail('invalid step');
   if (status === 'running') {
     if (!isId(node) || !graph.nodes.has(node)) fail('a running state names a node');
+    if (step === 0 && node !== graph.start) fail('step 0 must be the start node');
     if (run === null) fail('a running state has a run');
     const parsed = parseSequenceState(graph.nodes.get(node)!, run);
     if (parsed.session !== `${session}#${step}`) fail('run session does not match the graph step');
@@ -182,22 +183,24 @@ export function createSequenceGraph(
     createSequence(graph.nodes.get(name)!, `${session}#${s}`, state, options);
   let run: SequenceRunner | null = node === null ? null : runOf(node, step, start?.run);
 
-  const enter = (next: string | null, events: SequenceEvent[]) => {
-    if (next === null) {
-      const tick = run?.tick ?? 0;
+  let limited = false;
+  /** Move to `next`; at the step bound the graph ends (with `limited`) instead of starting another node. */
+  const enter = (next: string | null, events: SequenceEvent[], announce: boolean) => {
+    const tick = run?.tick ?? 0;
+    if (next !== null && step + 1 >= graph.maxSteps) limited = true;
+    if (next === null || limited) {
       node = null;
       run = null;
       status = 'finished';
-      events.push(Object.freeze({kind: 'finished', tick}));
+      if (announce) events.push(Object.freeze({kind: 'finished', tick}));
       return;
     }
-    if (step + 1 >= graph.maxSteps) fail('maxSteps exceeded: the graph loops without end');
     step++;
     node = next;
     run = runOf(next, step);
   };
   const offered = (): readonly string[] | null => {
-    if (status !== 'running' || !run || node === null) return null;
+    if (status !== 'running' || !run || node === null || !run.settled) return null;
     const b = graph.branches.get(node);
     if (!b) return null;
     const current = run;
@@ -216,90 +219,105 @@ export function createSequenceGraph(
     get status() {
       return status;
     },
+    /** True when the graph ended because `maxSteps` was reached rather than by a `null` choice or a final node. */
+    get limited() {
+      return limited;
+    },
     /** The current node's runner (for `active`, `release`, `settled`), or null when stopped. */
     get run(): SequenceRunner | null {
       return run;
     },
-    /** Advance the current node. A node that finishes without a branch ends the graph. */
+    /**
+     * Advance the current node. A node that finishes without a branch ends the graph. Ticks left over when a node
+     * changes are not carried into the next node; the next node starts on the following advance.
+     */
     advance(ticks: number): AdvanceResult & {readonly node: string | null} {
       if (status !== 'running' || !run) return Object.freeze({status, events: Object.freeze([]), node});
       const r = run.advance(ticks);
       const events = [...r.events];
       if (run.status === 'finished') {
         // A node without a branch ends the graph. A branch node only finishes if its held branch cue was released
-        // directly; that follows the branch default.
+        // directly; that follows the branch default. The node already reported 'finished'.
         const b = graph.branches.get(node!);
         if (!b) {
           node = null;
           run = null;
           status = 'finished';
-        } else enter(b.choices[b.default]!, events);
+        } else enter(b.choices[b.default]!, events, false);
       }
       return Object.freeze({status: r.status === 'partial' ? 'partial' : status, events: Object.freeze(events), node});
     },
-    /** The choices offered now (the current node's branch cue is active and waiting), or null. */
+    /** The choices offered now (branch cue active and waiting, and the run settled), or null. */
     offered,
     /**
-     * Take a branch while it is offered. Abandons the rest of the current node (its later effects never land) and
-     * starts the chosen node, or ends the graph. Returns 'not-offered' otherwise.
+     * Take a branch while it is offered. Cancels the rest of the current node at this moment (its incomplete cues,
+     * including parallel ones and the branch cue's own effect, never land) and starts the chosen node, or ends the
+     * graph. At the step bound the graph ends instead (`limited`). Returns 'not-offered' otherwise.
      */
     choose(choice: string): {readonly status: 'chosen' | 'not-offered'; readonly events: readonly SequenceEvent[]} {
       const choices = offered();
       if (!choices) return Object.freeze({status: 'not-offered', events: Object.freeze([])});
       if (!choices.includes(choice)) fail(`unknown choice ${String(choice)}`);
       const b = graph.branches.get(node!)!;
-      run!.cancel();
+      const target = b.choices[choice]!;
       const events: SequenceEvent[] = [];
-      enter(b.choices[choice]!, events);
+      run!.cancel();
+      enter(target, events, true);
       return Object.freeze({status: 'chosen', events: Object.freeze(events)});
     },
     /**
-     * Skip the whole remaining graph: each node lands its skip effects, then its branch's default is followed, until
-     * the graph ends. Bounded by maxSteps; refused (status 'refused') when the current node is not skippable.
+     * Skip the remaining graph, following each branch's default. A branch node lands the skip effects of the
+     * incomplete cues its branch cue depends on (track predecessors and barriers, transitively) and abandons the rest,
+     * including parallel cues that time alone would have completed first. A node without a branch is skipped whole.
+     * Stops with status 'partial' at a node that is not skippable; ends (`limited`) at the step bound.
      */
-    skip(): {readonly status: 'skipped' | 'refused' | 'inactive'; readonly events: readonly SequenceEvent[]} {
+    skip(): {
+      readonly status: 'skipped' | 'partial' | 'refused' | 'inactive';
+      readonly events: readonly SequenceEvent[];
+    } {
       if (status !== 'running' || !run) return Object.freeze({status: 'inactive', events: Object.freeze([])});
       if (!run.definition.skippable) return Object.freeze({status: 'refused', events: Object.freeze([])});
       const events: SequenceEvent[] = [];
       while (run) {
         const name: string = node!;
-        if (!run.definition.skippable) break;
+        if (!run.definition.skippable) return Object.freeze({status: 'partial', events: Object.freeze(events)});
         const b = graph.branches.get(name);
-        if (b) {
-          // Skipping to a branch lands what choosing there would already have landed: the incomplete cues the branch
-          // cue depends on (its track predecessors and barriers, transitively). Everything else is abandoned.
-          const current = run;
-          for (const cue of ancestors(current.definition, b.at)) {
-            if (current.completed(cue.id) || cue.effect === undefined || cue.onSkip === 'drop') continue;
-            events.push(
-              Object.freeze({
-                kind: 'effect',
-                effect: cue.effect,
-                cue: cue.id,
-                id: JSON.stringify([current.definition.id, current.session, cue.id]),
-                tick: current.tick,
-              }),
-            );
-          }
-          current.cancel();
-        } else events.push(...run.skip().events);
         if (!b) {
+          events.push(...run.skip().events);
           node = null;
           run = null;
           break;
         }
+        const current = run;
+        for (const cue of ancestors(current.definition, b.at)) {
+          if (current.completed(cue.id) || cue.effect === undefined || cue.onSkip === 'drop') continue;
+          events.push(
+            Object.freeze({
+              kind: 'effect',
+              effect: cue.effect,
+              cue: cue.id,
+              id: JSON.stringify([current.definition.id, current.session, cue.id]),
+              tick: current.tick,
+            }),
+          );
+        }
+        current.cancel();
         const next = b.choices[b.default]!;
         if (next === null) {
           node = null;
           run = null;
           break;
         }
-        if (step + 1 >= graph.maxSteps) fail('maxSteps exceeded while skipping');
+        if (step + 1 >= graph.maxSteps) {
+          limited = true;
+          node = null;
+          run = null;
+          break;
+        }
         step++;
         node = next;
         run = runOf(next, step);
       }
-      if (run) return Object.freeze({status: 'skipped', events: Object.freeze(events)});
       status = 'skipped';
       return Object.freeze({status: 'skipped', events: Object.freeze(events)});
     },
