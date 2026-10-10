@@ -1432,3 +1432,10 @@ review and hosted CI remain required.
 ## Data-defined formulas (FORMULA-01) — candidate, 2026-10-09
 
 Optional `formulas` kit ([contract](../../src/kits/formulas/README.md), [ADR 0120](../adr/0120-data-defined-formulas.md)): validated JSON/text expressions, ordered sheets, stacking stages and a damage model; deterministic arithmetic and caller-supplied randomness. Evidence: eleven focused headless tests (parsing, refusal, ordering, seeded/restored streams, stacking, damage pipeline, 2,000-case named-preset transcription check, review-hardening cases); one independent adversarial review with its findings addressed. Candidate only; no game integration, browser, full CI or device acceptance claimed.
+
+
+## Formula data import candidate — FORMULA-DATA-01, 2026-10-09
+
+`npm run formulas:import` and the formulas kit's `parseDelimited`, `importFormulaSheet`, `importFormulaTable`, `defineFormulaTable`, `tableValue` and `tableRow` turn spreadsheet exports into committed formula sheets, keyed tables and matrices with attributable `meta`; loading runs the same checks, and refusals name the spreadsheet row. Stacked on the formulas kit candidate (ADR 0120). [Kit README](../../src/kits/formulas/README.md#importing-spreadsheet-data), [ADR 0132](../adr/0132-formula-data-import.md).
+
+Evidence: focused headless tests (RFC 4180 parsing, sheet import equal to the hand-written sheet, row-named refusals, tables feeding sheet inputs, matrices, re-validation of committed JSON, the command's output loading in the kit). An independent adversarial review found nine issues (a silent no-op CLI under paths with spaces, row attribution errors, quadratic refusal search, unsnapshotted table arrays, unchecked limits and meta, quote/whitespace and cell-length handling, decoding and flag parsing); each is fixed with a regression test. Hosted full CI and a game consumer remain pending.
