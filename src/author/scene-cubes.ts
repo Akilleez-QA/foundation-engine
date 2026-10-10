@@ -2,11 +2,26 @@ import * as T from 'three';
 import type {leaseCube, CubeSpec} from '../platform/assets/cube';
 import type {TextureLibrary} from '../platform/assets/textures';
 import {isAbortError, type Lease} from '../platform/assets/lease-cache';
+import {isInteriorReflection, interiorReflectionKey, type InteriorReflection} from './interior-reflection';
+import type {leaseInteriorReflection} from './scene-interior-reflection';
 
 export type CubeLoader = () => Promise<{leaseCube: typeof leaseCube}>;
 const loadCube: CubeLoader = () => import('../platform/assets/cube');
+export type InteriorLoader = () => Promise<{leaseInteriorReflection: typeof leaseInteriorReflection}>;
+const loadInterior: InteriorLoader = () => import('./scene-interior-reflection');
 
-/** Background and reflection are independent bindings with generation-safe replacement. */
+const keyOf = (spec: CubeSpec | InteriorReflection): string => {
+  if (isInteriorReflection(spec))
+    try {
+      return interiorReflectionKey(spec);
+    } catch {
+      /* Malformed: key by its JSON; building it reports the error. */
+    }
+  return JSON.stringify(spec);
+};
+
+/** Background and reflection are independent bindings with generation-safe replacement. An interior reflection
+ *  (`{ kind: 'interior' }`) is built once per distinct interior data and disposed when replaced, cleared or on exit. */
 export function bindSceneCubes(
   scene: T.Scene,
   library: TextureLibrary,
@@ -14,11 +29,12 @@ export function bindSceneCubes(
   invalidate: () => void,
   report: (error: unknown) => void,
   load: CubeLoader = loadCube,
+  interior: InteriorLoader = loadInterior,
 ) {
   type Slot = {
     key: string;
     life?: AbortController | undefined;
-    lease?: Lease<T.CubeTexture> | undefined;
+    lease?: Lease<T.Texture> | undefined;
     pending?: Promise<void>;
   };
   const slots: {background: Slot; environment: Slot} = {background: {key: ''}, environment: {key: ''}};
@@ -32,7 +48,7 @@ export function bindSceneCubes(
       /* Never create an unhandled rejection from a diagnostic. */
     }
   };
-  const release = (lease: Lease<T.CubeTexture> | undefined, errors?: unknown[]) => {
+  const release = (lease: Lease<T.Texture> | undefined, errors?: unknown[]) => {
     try {
       lease?.release();
     } catch (error) {
@@ -41,12 +57,26 @@ export function bindSceneCubes(
     }
   };
 
-  function replace(name: keyof typeof slots, slot: Slot, spec: CubeSpec): void {
+  function replace(name: keyof typeof slots, slot: Slot, spec: CubeSpec | InteriorReflection): void {
     // Snapshot authored values before the optional module boundary; callers may mutate their row later.
     // Runtime callers can still supply malformed rows: retain the previous binding and report safely.
-    let request: CubeSpec;
+    // Loads the optional module, then allocates only if this request is still the live one.
+    let acquire: (signal: AbortSignal, live: () => boolean) => Promise<Lease<T.Texture> | undefined>;
     try {
-      request = {faces: [...spec.faces], screenPx: spec.screenPx};
+      if (isInteriorReflection(spec)) {
+        const request = structuredClone(spec);
+        // Built synchronously from data inside the lazy chunk: no decode, nothing in flight to cancel.
+        acquire = async (_signal, live) => {
+          const module = await interior();
+          return live() ? module.leaseInteriorReflection(request) : undefined;
+        };
+      } else {
+        const request: CubeSpec = {faces: [...spec.faces], screenPx: spec.screenPx};
+        acquire = async (signal, live) => {
+          const module = await load();
+          return live() ? module.leaseCube(library, request, signal, 16 * 1024 * 1024, safeReport) : undefined;
+        };
+      }
     } catch (error) {
       safeReport(error);
       return;
@@ -57,9 +87,7 @@ export function bindSceneCubes(
     slot.pending = Promise.resolve()
       .then(async () => {
         if (!live()) return;
-        const module = await load();
-        if (!live()) return;
-        return module.leaseCube(library, request, life.signal, 16 * 1024 * 1024, safeReport);
+        return acquire(life.signal, live);
       })
       .then(
         lease => {
@@ -82,16 +110,16 @@ export function bindSceneCubes(
       .catch(safeReport);
   }
 
-  function syncSlot(name: keyof typeof slots, spec: CubeSpec | undefined): boolean {
+  function syncSlot(name: keyof typeof slots, spec: CubeSpec | InteriorReflection | undefined): boolean {
     const slot = slots[name],
-      key = spec ? JSON.stringify(spec) : '';
+      key = spec ? keyOf(spec) : '';
     let changed = false;
     if (key !== slot.key) {
       slot.key = key;
       slot.life?.abort();
       slot.life = undefined;
       if (!spec) {
-        if (scene[name] === slot.lease?.value) scene[name] = original[name] as T.CubeTexture | null;
+        if (scene[name] === slot.lease?.value) scene[name] = original[name] as T.Texture | null;
         const old = slot.lease;
         slot.lease = undefined;
         release(old);
@@ -106,7 +134,7 @@ export function bindSceneCubes(
   }
 
   const owner = {
-    sync(background?: CubeSpec, reflection?: CubeSpec, fallback?: number) {
+    sync(background?: CubeSpec, reflection?: CubeSpec | InteriorReflection, fallback?: number) {
       if (closed) return false;
       const clearing = !!slots.background.key && !background;
       const a = syncSlot('background', background),
@@ -122,7 +150,7 @@ export function bindSceneCubes(
       for (const name of ['background', 'environment'] as const) {
         const slot = slots[name];
         slot.life?.abort();
-        if (scene[name] === slot.lease?.value) scene[name] = original[name] as T.CubeTexture | null;
+        if (scene[name] === slot.lease?.value) scene[name] = original[name] as T.Texture | null;
         const old = slot.lease;
         slot.lease = undefined;
         release(old, errors);

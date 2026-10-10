@@ -207,6 +207,18 @@ export {
   type ActionAdmission,
   type ActionTransition,
 } from './action-runs.js';
+export {
+  createActionPhases,
+  type ActionPhases,
+  type PhaseAdvance,
+  type PhaseClaim,
+  type PhaseMark,
+  type PhaseMarkInput,
+  type PhaseRestore,
+  type PhaseState,
+  type PhaseTimelineInput,
+  type PhaseWindowInput,
+} from './action-phases.js';
 export * from './timed-effects.js';
 export * from './progression.js';
 export * from './resource-values.js';

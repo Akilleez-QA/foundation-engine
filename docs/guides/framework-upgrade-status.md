@@ -701,6 +701,16 @@ failure is reported once and the visit draws direct; a WebGPU visit reports no i
 bloom beside an emissive box at full only, a still scene draws no frame, release audit at the author-API baseline);
 `quality:guard` identical for the blank and explorer templates. No reference-GPU cost, physical-device or
 visual-quality acceptance; the stock shell does not install the Graphics screen, so the live knob is unit-tested only.
+**Grade tools (POST-02, 2026-10-04): integrated (PR #179 via combined integration PR #253).** `grade.lut`
+(a `.cube` 3D lookup table under `public/`, strength 0 to 1) and `ceiling` (an opt-in HDR clamp, 1 to 65504) in the same
+combined pass, no extra post draw. Owner: the visit's post seam (fetch with the visit signal after the chunk, 4 parsed
+tables per page, one half-float 3D texture per visit). Overload: a file over 8 MiB or a side over 65 is refused.
+Cancellation: a file change or the visit's end aborts the fetch. Recovery: a failed table is reported once per file per
+visit and post draws without it. Evidence: unit tests (reader and writer, settings, pipeline variants and texture
+lifetime, the seam's fetch, cache, cancellation and failure) and `npm run test:post-browser` (`grade-post`, full and
+basic, software GL). Not reproduced in a browser: the ceiling's NaN and infinity paths. The table is not in the probe's
+`textureMiB`. No reference-GPU, physical-device or visual-quality acceptance.
+
 See the [guide](post-processing.md).
 
 ## Three.js escape hatch (VIS-09) — implemented, candidate
@@ -780,6 +790,20 @@ while an opted-in scene prepares. Bounds: 65,536 copies per scatter; 32 scatters
 change or freed capacity, never per frame. Cancellation: leaving disposes instance buffers and returns geometry and
 surfaces. Recovery: CPU-side buffers re-upload after context loss; a failed chunk load is reported and the visit draws
 without scatters. Determinism: a derived stream per scatter, never `ctx.random()`. See the [guide](scatter.md).
+
+## Blob shadows — VIS-10, integrated (PR #184 via #253)
+
+New author component `BlobShadow` with `validateBlobShadow`, `BLOB_SHADOW_DEFAULTS`/`BLOB_SHADOW_LIMITS`, and the
+per-scene opt-in `sceneBlobShadows({ max, ground, crossfade, distance })` (`SCENE_BLOB_SHADOW_LIMITS`); platform layer
+`createBlobShadowLayer`; dev `engine.blobShadows()` counters (capacity, candidates, drawn, dropped, draws, uploads).
+Owner: the scene visit; the drawing is a lazy chunk loaded while an opted-in scene prepares. Inputs: entity `Transform`
+x, z, `ry` and scale, the scene's `sceneShadows` flags, the environment sun's `shadow.extent` and the live
+`shadows.quality` knob. Bounds: `max` 64 by default (1…1024), allocated once. Overload: the nearest `max` to the camera
+are drawn, the rest counted in `dropped` and reported once per visit at info level. Cancellation: leaving disposes the
+mesh, material and instance buffers. Recovery: CPU-side buffers re-upload after context loss; a failed chunk load is
+reported and the visit draws without blobs. Cost: +1 draw and +2 triangles per blob on every preset, no shadow pass, no
+texture. Browser acceptance (`npm run test:blob-shadows-browser`) passed 2026-10-05 in local software GL on the reference and low presets (7 candidates, 4 drawn in 1 draw, +8 triangles, 1 dropped; shadows off 4 drawn, 3 dropped; idle 0 frames; a move uploads once; disposed on exit). See the
+[guide](blob-shadows.md).
 
 ## Game sound files — DX P1-10, integrated in v0.2.0
 
@@ -1027,6 +1051,12 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   sun-like discs and stars from one CPU-generated texture on an unlit sphere (no custom shader, backend-neutral);
   `haze` gains `{ kind: 'exp2', density }` and `color: 'sky'`. Evidence: unit tests and `npm run test:sky-browser`
   (desktop headless Chromium, software GL). No physical-device evidence.
+- **Interior reflection (VIS-11), integrated (PR #183 via #253).** `defineEnvironment({ reflection:
+  { kind: 'interior', size, eyeHeight, wall, floor, ceiling, lights } })`: a procedural box interior with at most 8 glowing
+  spheres, validated at definition, built once per distinct interior (keyed by its data) as one 512 x 256 half-float
+  equirectangular texture in a lazy chunk, prefiltered once by the renderer, disposed on change, clear or exit. Owner:
+  the visit's reflection binding (`author/scene-cubes.ts`). No per-frame cost and not tiered, like cube reflections.
+  Evidence: unit tests (`interior-reflection.test.ts`). `npm run test:interior-reflection-browser` passed 2026-10-05 in local software GL on the reference and low presets (mirror sphere centre 255,255,255, rim 8,8,8; relit after one change; draws 1/1; idle 0). No physical-device, GPU prefilter time or visual-quality evidence.
 
 ## Asset provenance and AI disclosure — DX-03, implemented
 
@@ -1250,3 +1280,81 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Optional bounded work roster candidate
+
+The [work roster](../../src/kits/work-roster/README.md) supplies finite admission, fair
+visit batches and exact registration membership, with no scheduler or payload owner.
+Two headless consumers use the existing fixed runner for World observations and
+revision-checked inspections. An independent array model covers 10,000 churn operations.
+These are candidate headless contracts; hosted combined CI and physical-device
+timing/native-memory acceptance are not implied. Creator result revisions and
+consumer cleanup remain explicit; runtime tickets are not saved. See ADR 0086.
+
+## Shared-stage retirement recovery — candidate (2026-10-09)
+
+The existing stage pool now retires logical view ownership despite cleanup errors
+and rolls back failed setup. Cleanup preserves original causes and still attempts
+independent retirement work. Surviving sibling leases are not swept or forced lost;
+only a failed release cleanup makes a slot uncertain, and an uncertain slot refuses
+new sharing until its last sibling leaves. A new lease makes the drawing view reset
+its GL state cache. Borrowed canvas attachment rollback and once-only underlying
+renderer disposal are exercised.
+See [render backend](render-backend.md#stage-setup-and-retirement-failures).
+Independent review found and fixed over-broad uncertainty after clean setup rollback
+and a stale drawer state cache after new leases. Hosted full CI is the integration
+gate; logical cleanup is not proof of successful GPU reclamation or physical-device
+acceptance.
+
+## Rewind history — REWIND-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/rewind/README.md), [guide](rewind-history.md), [decision](../adr/0087-rewind-history.md). Optional pure per-subject sample rings with time-addressed, never-extrapolating queries that respect creator-marked discontinuities, plus a pure time choice that clamps an untrusted claimed view time to a creator cap. Hosts record from their existing fixed step and query from existing command dispatch; nothing moves or restores live state. Evidence: 17 focused headless tests including a composition with `@kits/combat` `sweep`, and one local micro-measurement. Candidate only; latency estimation, protocol, multiplayer, browser and physical-device acceptance and full CI are not claimed here.
+
+## View deltas — NW-DELTA candidate, 2026-10-09
+
+[Contract](../../src/kits/network/README.md#optional-acknowledged-baseline-view-deltas), [guide](network-views.md#optional-acknowledged-baseline-deltas), [decision](../adr/0088-view-deltas.md). Optional encoder/decoder around the existing complete-view publisher and receiver: entity-level deltas against the last acknowledged adopted frame, each proven to rebuild the publisher's exact bytes before it is sent, with complete-frame fallback and `adopted: false` recovery. Evidence: 14 focused headless tests with a real publisher and receiver, hostile frames, and one local length measurement (9.1 % of complete length at 4 of 64 entities changing). Candidate only; WAN, browser, physical-device and full-CI acceptance are not claimed here.
+
+## Model clip transitions — candidate (2026-10-09)
+
+Optional `Model.transition` (seconds, default 0) eases skinned-model clip changes,
+revision restarts and returns to the bind pose from the displayed pose instead of
+cutting. The existing scene model owner keeps playback; no new system or mixer.
+Bounded to 512 animated nodes per model; larger rigs cut and report. See
+[ADR 0089](../adr/0089-model-clip-transitions.md) and
+[the model recipe](../recipes/load-a-model.md). Focused headless tests against the
+real three.js mixer are recorded in the upgrade ledger; independent review and full
+hosted integration CI remain required. No browser, visual or device acceptance.
+
+## Camera support framing — candidate (2026-10-09)
+
+Optional `support` query on the existing `cameraSystem` anchors vertical framing to
+the creator-defined support height (scaled, clamped), so jumps do not bob the view.
+Defaults unchanged; no new owner. See [ADR 0090](../adr/0090-camera-support-framing.md)
+and [the camera kit README](../../src/kits/camera/README.md). Headless scene tests
+are recorded in the upgrade ledger; independent review and full hosted CI remain
+required. No browser, visual or device acceptance.
+
+## Optional action phases — candidate (2026-10-09)
+
+`createActionPhases` in the existing capabilities kit adds creator-authored action
+windows, once-only marks and per-range claims over plain, fingerprinted caller states.
+It installs no clock, effect or persistence owner, and no template uses it. See
+[action phases](action-phases.md), [issue #229](https://github.com/Akilleez-QA/foundation-engine/issues/229)
+and ADR 0097. The evidence is headless unit and composition tests recorded in the upgrade ledger.
+Independent review findings were addressed before publication. Full hosted CI and
+integration remain required.
+
+## Optional bounded volume queries — candidate (2026-10-09)
+
+The [volume query kit](../../src/kits/volume-query/README.md) answers overlap,
+fixed-orientation sweep and capsule headroom for a sphere or capsule body against
+an immutable snapshot of static spheres, capsules and oriented boxes. It installs
+no physics world, controller, clock or dependency; results carry the creator's
+snapshot revision and existing owners (portal crossing, alignment, camera
+obstruction, creator systems) apply effects. Evaluation and iteration ceilings
+report `over-budget` or `unresolved`, never clear. Evidence is headless: sampled
+and closed-form oracles, ray/endpoint/centre-ray discriminators, a portal consumer
+and a fixed-runner body-height consumer. Meshes, heightfields, moving colliders,
+rotation during motion, depenetration and device timing are not covered. Independent
+review found and fixed two defects (PR #237, head before this note `7c9680ab`); affected
+check passed 18 tests. Full hosted CI remains required. See ADR 0098.

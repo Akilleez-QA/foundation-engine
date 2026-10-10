@@ -46,6 +46,7 @@ human-newcomer, physical-device, LAN-between-machines or WAN evidence exists.
 |---|---|---|
 | Equipment custody | `createEquipment` acquires/releases unique instances under its existing revision and capacity checks. Equipped release requires explicit unequipping. `equipped()` includes cosmetics; `active()` remains functional-only. | Production exchange and custody consumers validate coherent inventory/equipment/receipt envelopes with real SaveStore retry and reload. The optional custody browser also projects world/bag/equipped locations. These are finite single-writer compositions, not network transactions. |
 | Action runs | Optional `createActionRuns` in capabilities accepts creator-fed time, retains bounded identities, reports readiness and supports explicit acknowledgment/cancellation. | Headless consequence retry and scene-system timing/teardown consumers. The optional action workbench adds session consequence composition, integrated in PR #117 at `2aabe49` after native desktop browser and all seven template gates. No automatic effect, scheduler, save owner or replicated action. |
+| Action phases | Optional pure `createActionPhases` in capabilities: creator windows, once-only marks, per-range claims and range identities, suppression and validated restore over plain, definition-fingerprinted caller states (32 marks/ranges per timeline). Proposed in issue #229 / ADR 0088. | Headless unit and composition tests with input-history and `resolveAction`, including restored-state replay. Not integrated; no template, browser, device or network evidence. |
 | Staged objectives | Optional `createStagedObjectives` composes existing counters using pinned definitions, explicit authored choices and run/stage identities. The initial helper supports finite acyclic graphs. | The staged journal and objective workbench cover coherent rewards, explicit adoption, historical branch outcomes, shared-work cancellation and save/reload. The staged helper itself does not own UI or delivery. |
 | Production acceptance | Existing frame adapter accepts only synchronous literal `true`; all other results retain the pending envelope and prevent further production until retry succeeds. | Regression exercises Promise/object and other rejected results, detached retry payload and resumed work. Acceptance remains the publisher's claim, not storage durability. |
 
@@ -420,6 +421,16 @@ failure is reported once and the visit draws direct; a WebGPU visit reports no i
 bloom beside an emissive box at full only, a still scene draws no frame, release audit at the author-API baseline);
 `quality:guard` identical for the blank and explorer templates. No reference-GPU cost, physical-device or
 visual-quality acceptance; the stock shell does not install the Graphics screen, so the live knob is unit-tested only.
+**Grade tools (POST-02, 2026-10-04): integrated (PR #179 via combined integration PR #253).** `grade.lut`
+(a `.cube` 3D lookup table under `public/`, strength 0 to 1) and `ceiling` (an opt-in HDR clamp, 1 to 65504) in the same
+combined pass, no extra post draw. Owner: the visit's post seam (fetch with the visit signal after the chunk, 4 parsed
+tables per page, one half-float 3D texture per visit). Overload: a file over 8 MiB or a side over 65 is refused.
+Cancellation: a file change or the visit's end aborts the fetch. Recovery: a failed table is reported once per file per
+visit and post draws without it. Evidence: unit tests (reader and writer, settings, pipeline variants and texture
+lifetime, the seam's fetch, cache, cancellation and failure) and `npm run test:post-browser` (`grade-post`, full and
+basic, software GL). Not reproduced in a browser: the ceiling's NaN and infinity paths. The table is not in the probe's
+`textureMiB`. No reference-GPU, physical-device or visual-quality acceptance.
+
 See the [guide](post-processing.md).
 
 ## Three.js escape hatch (VIS-09) — implemented, candidate
@@ -495,6 +506,17 @@ triangles counted per copy. See the [guide](scatter.md) and [recipe](../recipes/
 unit tests, recipe test and `npm run test:scatter-browser` (desktop headless Chromium, software GL). No template uses
 it, so template budgets are unchanged. glTF `Model` scatter is a follow-up. No physical-device or GPU timing
 acceptance.
+
+## Blob shadows (VIS-10) — integrated (PR #184 via #253)
+
+`BlobShadow` / `sceneBlobShadows` (author API) draw a soft ground ellipse under each opted-in entity where it has no
+real sun shadow (beyond the sun's shadow box with a crossfade, in a scene without `sceneShadows()`, with the player's
+`shadows.quality: off`, or for a `Model` or non-caster), every blob of a scene in one instanced draw. Owner: the scene
+visit (`author/scene-blob-shadows.ts`, a lazy chunk; policy in `author/blob-shadow.ts`; GPU layer in
+`platform/render/blob-shadows.ts`). Bounded by `max` (64 by default, cap 1024), allocated once; over it the nearest to
+the camera are kept, the rest counted and reported once. Buffers upload only on change; leaving disposes them. See the
+[guide](blob-shadows.md). Evidence: unit tests and `npm run check`; the browser acceptance `npm run test:blob-shadows-browser` passed 2026-10-05 in local software GL on the reference and low presets (7 candidates, 4 drawn in 1 draw, +8 triangles, 1 dropped; shadows off 4 drawn, 3 dropped; idle 0 frames; a move uploads once; disposed on exit). No template uses it, so template budgets are
+unchanged. No physical-device, GPU timing or visual-quality acceptance.
 
 ## Game sound files (DX P1-10) — integrated in v0.2.0
 
@@ -656,6 +678,10 @@ per-entity `Shadow`; shadowed local slots fixed per visit and bounded by `lights
 change. Status: integrated (PR #148, merge `e84afcf`). Evidence: unit tests and `npm run test:shadows-browser`.
 Sky and haze (VIS-05): `defineEnvironment({ sky })` draws a gradient sky with optional discs and stars from
 one texture on an unlit sphere; `haze` gains `exp2` and `color: 'sky'`. Status: implemented and checked as a candidate PR #150. Evidence: unit tests and `npm run test:sky-browser`.
+Interior reflection (VIS-11): `defineEnvironment({ reflection: { kind: 'interior' } })` builds a procedural interior (walls,
+floor, ceiling, at most 8 lights) once per distinct interior into the scene's reflection environment; no per-frame cost.
+Status: integrated (PR #183 via combined integration PR #253). Evidence: unit tests;
+`npm run test:interior-reflection-browser` passed 2026-10-05 in local software GL on the reference and low presets (mirror sphere centre 255,255,255, rim 8,8,8; relit after one change; draws 1/1; idle 0). No physical-device or visual-quality acceptance.
 
 ## Asset provenance and AI disclosure (DX-03) — implemented, candidate
 
@@ -880,3 +906,71 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Optional bounded work roster candidate
+
+The [work roster](../../src/kits/work-roster/README.md) supplies finite admission, fair
+visit batches and exact registration membership, with no scheduler or payload owner.
+Two headless consumers use the existing fixed runner for World observations and
+revision-checked inspections. An independent array model covers 10,000 churn operations.
+These are candidate headless contracts; hosted combined CI and physical-device
+timing/native-memory acceptance are not implied. Creator result revisions and
+consumer cleanup remain explicit; runtime tickets are not saved. See ADR 0086.
+
+## Shared-stage retirement recovery — candidate (2026-10-09)
+
+The existing stage pool now retires logical view ownership despite cleanup errors
+and rolls back failed setup. Cleanup preserves original causes and still attempts
+independent retirement work. Surviving sibling leases are not swept or forced lost;
+only a failed release cleanup makes a slot uncertain, and an uncertain slot refuses
+new sharing until its last sibling leaves. A new lease makes the drawing view reset
+its GL state cache. Borrowed canvas attachment rollback and once-only underlying
+renderer disposal are exercised.
+See [render backend](render-backend.md#stage-setup-and-retirement-failures).
+Independent review found and fixed over-broad uncertainty after clean setup rollback
+and a stale drawer state cache after new leases. Hosted full CI is the integration
+gate; logical cleanup is not proof of successful GPU reclamation or physical-device
+acceptance.
+
+## Rewind history — REWIND-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/rewind/README.md), [guide](rewind-history.md), [decision](../adr/0087-rewind-history.md). Optional pure per-subject sample rings with time-addressed, never-extrapolating queries that respect creator-marked discontinuities, plus a pure time choice that clamps an untrusted claimed view time to a creator cap. Hosts record from their existing fixed step and query from existing command dispatch; nothing moves or restores live state. Evidence: 17 focused headless tests including a composition with `@kits/combat` `sweep`, and one local micro-measurement. Candidate only; latency estimation, protocol, multiplayer, browser and physical-device acceptance and full CI are not claimed here.
+
+## View deltas — NW-DELTA candidate, 2026-10-09
+
+[Contract](../../src/kits/network/README.md#optional-acknowledged-baseline-view-deltas), [guide](network-views.md#optional-acknowledged-baseline-deltas), [decision](../adr/0088-view-deltas.md). Optional encoder/decoder around the existing complete-view publisher and receiver: entity-level deltas against the last acknowledged adopted frame, each proven to rebuild the publisher's exact bytes before it is sent, with complete-frame fallback and `adopted: false` recovery. Evidence: 14 focused headless tests with a real publisher and receiver, hostile frames, and one local length measurement (9.1 % of complete length at 4 of 64 entities changing). Candidate only; WAN, browser, physical-device and full-CI acceptance are not claimed here.
+
+## Model clip transitions — candidate (2026-10-09)
+
+Optional `Model.transition` (seconds, default 0) eases skinned-model clip changes,
+revision restarts and returns to the bind pose from the displayed pose instead of
+cutting. The existing scene model owner keeps playback; no new system or mixer.
+Bounded to 512 animated nodes per model; larger rigs cut and report. See
+[ADR 0089](../adr/0089-model-clip-transitions.md) and
+[the model recipe](../recipes/load-a-model.md). Focused headless tests against the
+real three.js mixer are recorded in the upgrade ledger; independent review and full
+hosted integration CI remain required. No browser, visual or device acceptance.
+
+## Camera support framing — candidate (2026-10-09)
+
+Optional `support` query on the existing `cameraSystem` anchors vertical framing to
+the creator-defined support height (scaled, clamped), so jumps do not bob the view.
+Defaults unchanged; no new owner. See [ADR 0090](../adr/0090-camera-support-framing.md)
+and [the camera kit README](../../src/kits/camera/README.md). Headless scene tests
+are recorded in the upgrade ledger; independent review and full hosted CI remain
+required. No browser, visual or device acceptance.
+
+## Optional bounded volume queries — candidate (2026-10-09)
+
+The [volume query kit](../../src/kits/volume-query/README.md) answers overlap,
+fixed-orientation sweep and capsule headroom for a sphere or capsule body against
+an immutable snapshot of static spheres, capsules and oriented boxes. It installs
+no physics world, controller, clock or dependency; results carry the creator's
+snapshot revision and existing owners (portal crossing, alignment, camera
+obstruction, creator systems) apply effects. Evaluation and iteration ceilings
+report `over-budget` or `unresolved`, never clear. Evidence is headless: sampled
+and closed-form oracles, ray/endpoint/centre-ray discriminators, a portal consumer
+and a fixed-runner body-height consumer. Meshes, heightfields, moving colliders,
+rotation during motion, depenetration and device timing are not covered. Independent
+review found and fixed two defects (PR #237, head before this note `7c9680ab`); affected
+check passed 18 tests. Full hosted CI remains required. See ADR 0098.

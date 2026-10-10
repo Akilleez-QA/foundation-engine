@@ -49,6 +49,18 @@ export const FEATURES = [
     evidence: [{kit: 'navigation', export: 'createDistanceField'}, {path: 'src/kits/navigation/field.test.ts'}],
   },
   {
+    id: 'WORK-01',
+    title: 'Optional bounded fair work roster',
+    docs: 'src/kits/work-roster/README.md',
+    evidence: [{kit: 'work-roster', export: 'createWorkRoster'}, {path: 'src/kits/work-roster/consumers.test.ts'}],
+  },
+  {
+    id: 'VOLUME-01',
+    title: 'Optional bounded sphere and capsule overlap, sweep and headroom queries',
+    docs: 'src/kits/volume-query/README.md',
+    evidence: [{kit: 'volume-query', export: 'sweepVolume'}, {path: 'src/kits/volume-query/oracle.test.ts'}],
+  },
+  {
     id: 'ASG-01',
     title: 'Optional bounded service and worksite assignment ownership',
     docs: 'docs/guides/assignments.md',
@@ -65,6 +77,18 @@ export const FEATURES = [
     title: 'Planar interaction preparation with bounded proposals and exact-ticket acknowledgment',
     docs: 'src/kits/alignment/README.md',
     evidence: [{kit: 'alignment', export: 'createAlignment'}, {path: 'src/kits/alignment/alignment.test.ts'}],
+  },
+  {
+    id: 'REWIND-01',
+    title: 'Bounded rewind history for judging remote commands against past state',
+    docs: 'src/kits/rewind/README.md',
+    evidence: [{kit: 'rewind', export: 'createRewindHistory'}, {path: 'src/kits/rewind/history.test.ts'}],
+  },
+  {
+    id: 'NW-DELTA',
+    title: 'Acknowledged-baseline deltas for complete network views',
+    docs: 'src/kits/network/README.md',
+    evidence: [{kit: 'network', export: 'createViewDeltaEncoder'}, {path: 'src/kits/network/view-delta.test.ts'}],
   },
   {
     id: 'VISIBILITY-01',
@@ -88,6 +112,15 @@ export const FEATURES = [
     evidence: [
       {kit: 'capabilities', export: 'createTimedEffects'},
       {path: 'src/kits/capabilities/timed-effects-checkpoint.test.ts'},
+    ],
+  },
+  {
+    id: 'CAP-ACTION-PHASES',
+    title: 'Creator-authored action phase windows, once-only marks and per-range claims',
+    docs: 'docs/guides/action-phases.md',
+    evidence: [
+      {kit: 'capabilities', export: 'createActionPhases'},
+      {path: 'src/kits/capabilities/action-phases.test.ts'},
     ],
   },
   {
@@ -133,10 +166,23 @@ export const FEATURES = [
     evidence: [{engine: 'Scatter'}, {engine: 'defineScatter'}, {engine: 'sceneScatter'}],
   },
   {
+    id: 'VIS-10',
+    title: 'Blob (contact) shadows: one instanced draw of soft ground ellipses where no real shadow reaches',
+    docs: 'docs/guides/blob-shadows.md',
+    evidence: [{engine: 'BlobShadow'}, {engine: 'sceneBlobShadows'}, {script: 'test:blob-shadows-browser'}],
+  },
+  {
     id: 'VIS-09',
     title: 'Opt-in full three.js kit (@kits/three)',
     pr: 136,
     evidence: [{kit: 'three'}],
+  },
+  {
+    id: 'VIS-11',
+    title: 'Procedural interior reflection environment (reflection kind interior)',
+    pr: 183,
+    docs: 'docs/guides/scene-look.md',
+    evidence: [{engine: 'validateInteriorReflection'}, {engine: 'INTERIOR_REFLECTION_LIMITS'}],
   },
   {
     id: 'POST-01',
@@ -144,6 +190,13 @@ export const FEATURES = [
     pr: 161,
     docs: 'docs/guides/post-processing.md',
     evidence: [{knobRead: 'post.mode'}],
+  },
+  {
+    id: 'POST-02',
+    title: 'Post grade lookup tables (.cube, view.post.grade.lut) and an HDR ceiling before bloom (view.post.ceiling)',
+    pr: 179,
+    docs: 'docs/guides/post-processing.md',
+    evidence: [{engine: 'cubeLutText'}, {engine: 'parseCubeLut'}, {path: 'src/platform/render/post/lut.ts'}],
   },
   {
     id: 'FX-01',
@@ -389,6 +442,7 @@ export function renderMarkdown(m) {
     'evidence (exports, kits, scripts, files) is present; that says it exists on this revision, not that it has device',
     'acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).',
     '',
+    // Lists are one item per line so pull requests that each add an export, script or kit merge without conflict.
     '## Shipped features',
     '',
     '| ID | Feature | PR | Docs |',
@@ -407,11 +461,11 @@ export function renderMarkdown(m) {
     '',
     "Each kit's value exports are listed in [capabilities.json](capabilities.json).",
     '',
-    m.kits.map(k => `\`@kits/${k.name}\``).join(', '),
+    ...m.kits.map(k => `- \`@kits/${k.name}\``),
     '',
     '## Templates',
     '',
-    m.templates.map(t => `\`${t}\``).join(', '),
+    ...m.templates.map(t => `- \`${t}\``),
     '',
     '## Quality knobs',
     '',
@@ -423,11 +477,11 @@ export function renderMarkdown(m) {
     '',
     '## `@engine` value exports',
     '',
-    m.engine.values.map(v => `\`${v}\``).join(', '),
+    ...m.engine.values.map(v => `- \`${v}\``),
     '',
     '## npm scripts',
     '',
-    m.scripts.map(s => `\`${s}\``).join(', '),
+    ...m.scripts.map(s => `- \`${s}\``),
     '',
   ];
   return lines.join('\n');

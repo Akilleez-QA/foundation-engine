@@ -220,6 +220,21 @@ test('another view drawing first copies the pending one out and resets the state
   b.release();
 });
 
+test('a new lease on the shared context makes the current drawer reset before it draws again', () => {
+  const {pool, log} = harness();
+  const a = pool.lease({role: 'stage'})!;
+  a.renderer.render({} as never, {} as never);
+  // Constructing a renderer and its setup (clear colour, pixel ratio) set GL state behind a's state cache.
+  const b = pool.lease({role: 'stage'})!;
+  a.renderer.render({} as never, {} as never);
+  assert.deepEqual(
+    log.filter(x => x.startsWith('reset') || x.startsWith('render')),
+    ['reset0', 'render0', 'reset0', 'render0'],
+  );
+  a.release();
+  b.release();
+});
+
 test('an opaque view clears to opaque black; a transparent one keeps alpha 0', () => {
   const {pool, renderers} = harness();
   pool.lease({role: 'stage'})!;

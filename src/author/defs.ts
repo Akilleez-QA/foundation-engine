@@ -30,6 +30,7 @@ import {validateExtensions, type SceneExtension} from './scene-extension';
 import type {SceneScatter} from './scatter-contract';
 import type {SceneLights} from './lights';
 import type {SceneShadows} from './shadow-casting';
+import type {SceneBlobShadows} from './blob-shadow';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const need = (ok: boolean, message: string) => {
@@ -308,6 +309,11 @@ export interface SceneInput extends SceneBody {
    *  and sets which shapes cast and receive by default (`Shadow` overrides one entity). Lights opt in one by one:
    *  the environment's `directional.shadow`, `PointLight({ shadow: true })`, `SpotLight({ shadow: true })`. */
   shadows?: SceneShadows | undefined;
+  /** Blob (contact) shadows (VIS-10, docs/guides/blob-shadows.md): `sceneBlobShadows({ max, ground, crossfade,
+   *  distance })`. Every `BlobShadow` entity gets a soft ground ellipse where it has no real sun shadow, all in one
+   *  instanced draw of at most `max` (default 64) blobs; over that the nearest to the camera are kept (reported once).
+   *  Without it the scene's blob shadows are not drawn (reported once). */
+  blobShadows?: SceneBlobShadows | undefined;
   id: string;
   title: string;
   /** Open, game-defined ('level', 'menu', 'world', 'cutscene', …). */
@@ -377,6 +383,10 @@ export function defineScene(s: SceneInput): SceneDefinition {
   need(
     captured.shadows === undefined || (captured.shadows as {kind?: unknown})?.kind === 'scene-shadows',
     `scene ${s.id}: shadows must be sceneShadows(...)`,
+  );
+  need(
+    captured.blobShadows === undefined || (captured.blobShadows as {kind?: unknown})?.kind === 'scene-blob-shadows',
+    `scene ${s.id}: blobShadows must be sceneBlobShadows(...)`,
   );
   return {...captured, kind: 'scene', type: captured.type ?? 'scene'};
 }

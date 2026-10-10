@@ -24,7 +24,7 @@ import {
 } from '../../author';
 
 import {clearCamera, type CameraObstruction, type Pose} from './clearance';
-export {clearCamera, type CameraObstruction, type Pose} from './clearance';
+export {CAMERA_MIN_DISTANCE, clearCamera, type CameraObstruction, type Pose} from './clearance';
 
 export type CameraMode = 'follow' | 'orbit' | 'first-person' | 'top-down' | 'side-scroll' | 'fixed';
 export interface CameraOptions {
@@ -86,6 +86,49 @@ export function cameraPose(mode: CameraMode, t: Target, o: CameraOptions = {}): 
   }
 }
 
+/**
+ * Optional support-anchored vertical framing. `support` returns the height of whatever the target stands on or over
+ * (ground, water, a platform), or null when there is none. The pose's position and look target then move by
+ * clamp((support - target.y) * weight, ±limit), so a jump or a short drop does not bob the view while a lasting
+ * change of support level is followed. Weights 0 leave that point on the target's own height.
+ */
+export interface SupportFraming {
+  support?: (ctx: SceneContext, target: {x: number; y: number; z: number}) => number | null;
+  /** Share in [0, 1] of the support offset applied to the camera position (default 1). */
+  supportWeight?: number;
+  /** Share in [0, 1] applied to the look target (default: `supportWeight`). */
+  supportTargetWeight?: number;
+  /** Largest vertical shift in world units, (0, 1e6] (default 2). */
+  supportLimit?: number;
+}
+/**
+ * Validated support framing, or undefined when `support` is absent (the weights and limit are still validated).
+ * The returned function gives the anchored heights for the camera position and the look target. Inside the limit
+ * the height is `support * w + y * (1 - w)`, exactly the support height at weight 1 and exactly `y` at weight 0, so a
+ * still support never perturbs the pose; outside it, `y ± limit`.
+ */
+export function supportHeights(
+  o: SupportFraming,
+): ((support: number | null, y: number) => {position: number; target: number} | null) | undefined {
+  const weight = o.supportWeight ?? 1,
+    targetWeight = o.supportTargetWeight ?? weight,
+    limit = o.supportLimit ?? 2;
+  if (![weight, targetWeight].every(w => Number.isFinite(w) && w >= 0 && w <= 1))
+    throw new RangeError('camera: support weights must be within [0, 1]');
+  if (!Number.isFinite(limit) || limit <= 0 || limit > 1e6)
+    throw new RangeError('camera: support limit must be within (0, 1e6]');
+  if (!o.support) return undefined;
+  return (support, y) => {
+    if (support === null) return null;
+    if (!Number.isFinite(support)) throw new RangeError('camera: support height must be finite or null');
+    const height = (w: number) => {
+      const shift = (support - y) * w;
+      return Math.abs(shift) <= limit ? support * w + y * (1 - w) : y + Math.sign(shift) * limit;
+    };
+    return {position: height(weight), target: height(targetWeight)};
+  };
+}
+
 /** A frame system that eases `ctx.view.camera` to the mode's pose around the named target. */
 export function cameraSystem(
   mode: CameraMode,
@@ -96,14 +139,22 @@ export function cameraSystem(
     obstruction?: CameraObstruction;
     clearanceRadius?: number;
     clearancePadding?: number;
+    /**
+     * Closest approach to the target after clearance (default `CAMERA_MIN_DISTANCE`, 0.05). The floor wins
+     * over obstructions: while the requested distance is at or below it, clearance does not move the camera.
+     */
+    clearanceMinDistance?: number;
     teleportDistance?: number;
     resetRevision?: (ctx: SceneContext) => number;
-  } = {},
+  } & SupportFraming = {},
 ): SystemDefinition {
   const previous = new WeakMap<object, Vec3>();
   const revisions = new WeakMap<object, number>();
   if (o.teleportDistance !== undefined && (!Number.isFinite(o.teleportDistance) || o.teleportDistance <= 0))
     throw new RangeError('camera: teleport distance must be positive');
+  if (o.clearanceMinDistance !== undefined && (!Number.isFinite(o.clearanceMinDistance) || o.clearanceMinDistance <= 0))
+    throw new RangeError('camera: clearance minimum distance must be positive');
+  const anchor = supportHeights(o);
   return defineSystem({
     id: `camera-${mode}`,
     phase: 'frame',
@@ -118,15 +169,28 @@ export function cameraSystem(
         previous.delete(ctx.world);
         return;
       }
-      const pose = cameraPose(mode, tr ? {x: tr.x, y: tr.y, z: tr.z, heading: tr.ry} : {x: 0, y: 0, z: 0, heading: 0}, {
-        ...o,
-        ...o.options?.(ctx),
-      });
+      const options = {...o, ...o.options?.(ctx)};
+      const raw = tr ? {x: tr.x, y: tr.y, z: tr.z, heading: tr.ry} : {x: 0, y: 0, z: 0, heading: 0};
+      const unanchored = cameraPose(mode, raw, options);
+      // Support framing re-poses the mode at the anchored heights. A fixed camera keeps its position; without
+      // tracking it ignores the target entirely, so support does not apply.
+      const heights =
+        anchor && tr && (mode !== 'fixed' || options.track) ? anchor(o.support!(ctx, {...raw}), tr.y) : null;
+      let pose = unanchored;
+      if (heights) {
+        const at = (y: number) => cameraPose(mode, {...raw, y}, options),
+          moved = at(heights.position);
+        pose = {
+          position: mode === 'fixed' ? unanchored.position : moved.position,
+          target: heights.target === heights.position ? moved.target : at(heights.target).target,
+        };
+      }
       const old = revisionChanged ? undefined : previous.get(ctx.world);
+      // Discontinuities are judged on the target itself, so a change of support never reads as a teleport.
       const discontinuity =
         old &&
         o.teleportDistance !== undefined &&
-        Math.hypot(...pose.target.map((v, i) => v - old[i]!)) > o.teleportDistance;
+        Math.hypot(...unanchored.target.map((v, i) => v - old[i]!)) > o.teleportDistance;
       const k =
         revisionChanged || discontinuity ? 1 : (o.smooth ?? 0.12) <= 0 ? 1 : 1 - Math.exp(-dt / (o.smooth ?? 0.12));
       const cam = ctx.view.camera;
@@ -137,14 +201,14 @@ export function cameraSystem(
       };
       const eased = {position: ease(cam.position, pose.position), target: ease(cam.target, pose.target)};
       const {position, target} = o.obstruction
-        ? clearCamera(eased, o.obstruction, o.clearanceRadius, o.clearancePadding)
+        ? clearCamera(eased, o.obstruction, o.clearanceRadius, o.clearancePadding, o.clearanceMinDistance)
         : eased;
       if (position.some((v, i) => v !== cam.position[i]) || target.some((v, i) => v !== cam.target[i])) {
         cam.position = position;
         cam.target = target;
       }
       // A missing target or failed clearance must not consume a reset request.
-      previous.set(ctx.world, [...pose.target]);
+      previous.set(ctx.world, [...unanchored.target]);
       if (revision !== undefined) revisions.set(ctx.world, revision);
     },
   });

@@ -96,7 +96,9 @@ reuse existing owners unless concrete evidence demonstrates an incompatible seam
 | VIS-04 | Material options: shading (standard, matte, flat, toon), double side, alpha cut-out, vertex colours; `Material` on `Mesh` and `Model` | **Implemented and checked in PR #127** (not integrated until it merges). Defaults reproduce the previous materials: templates draw identically under the quality guard's `identical` mode against the base revision (views that change between captures cannot be compared and are listed in the PR). Bounded program set (three classes, two-valued options); toon bands are shared data textures (no shader hooks: batching eligibility and the ADR 0078 seam hold); model overrides are per entity, shared per (material, look) and never touch library resources. Evidence: unit tests, recipe test and `npm run test:material-options-browser` on reference and low (desktop headless Chromium, software GL). No physical-device, GPU timing or visual-quality acceptance; see the [guide](material-options.md). |
 | VIS-06 | Instanced scatter of a `Shape` or `Mesh` (glTF `Model` scatter is a follow-up) | **Implemented and checked in PR #144** (not integrated until it merges). One instanced draw per scatter through the batching layer (`instanceStatic`); placement from a stream derived from the scene id, scatter seed and `?seed=`, never `ctx.random()` (a unit test compares a gameplay sequence with and without scatters); `effects.scatter-density` thins non-essential scatters to a nested deterministic subset; bounded per scatter and per scene with counted, reported refusals; static instance buffers rebuilt only on data change; disposal on exit; the drawing is a lazy chunk. Evidence: unit tests, recipe test and `npm run test:scatter-browser` on reference and low (draw and triangle counts matched against the renderer, idle 0 frames, same layout on re-entry, disposal counted; desktop headless Chromium, software GL). The fix-budget skill and add-a-budget recipe now name `Scatter` as the instancing recovery. No template consumer, physical-device, GPU timing or fill-rate acceptance; see the [guide](scatter.md). |
 | VIS-07 | Post-processing tiers for `post.mode` (`view.post`: bloom, vignette, grade) with `postDraws` counted apart | **Implemented, candidate** (PR `feat/post-processing`); not integrated. Unit tests (settings and exact tier mapping, the GLSL pipeline against a recording renderer, the scene seam and fallbacks, preparation and drawing through post, the budget metric) and `npm run test:post-browser` (courtyard fixture at reference, medium and low: 10, 1 and 0 post draws, equal scene draws, bloom at full only, a still scene draws no frame, release audit at the author-API baseline; desktop and phone-sized headless Chromium, software GL). `quality:guard` identical for blank and explorer. No reference-GPU cost, physical-device or visual-quality acceptance. |
+| POST-02 | Post grade lookup tables (`view.post.grade.lut`, `.cube`) and an HDR ceiling before bloom (`view.post.ceiling`) | **Integrated** (PR #179 via combined integration PR #253). Unit tests (the `.cube` reader and writer, settings bounds, pipeline variants and 3D texture lifetime, the seam's fetch, page cache, cancellation and failure) and `npm run test:post-browser` (`grade-post` at full and basic: a generated 33³ table loads, adds no post draw and changes the picture; a ceiling dims the glow beside an over-range box at full; software GL). The ceiling's NaN and infinity paths are unit-level only; the table texture is not in the probe's `textureMiB`. No reference-GPU cost, physical-device or visual-quality acceptance. |
 | VIS-09 | Opt-in full three.js: `@kits/three` (imports in an opted-in game only, `useThree(ctx)` handle, render override, `customObject`) | **Implemented, candidate** (PR `feat/kit-three`); not integrated. Unit tests (handle lifecycle, disposal registry and leak report, custom-object caps and limits, lint allowance for opted-in games only) and `npm run test:three-kit-browser` (courtyard fixture: point lights, shadows, UnrealBloom via EffectComposer; frames drawn, draws and triangles counted within the fixture rows, still scene draws nothing, release audit leaves no texture or geometry; desktop and phone-sized headless Chromium, software GL). Unstable across three.js upgrades by contract; WebGPU material refusal and an unreported-change warning are follow-ups. No template consumer, physical-device, GPU timing or visual-quality acceptance. |
+| VIS-10 | Blob (contact) shadows: `sceneBlobShadows({ max, ground, crossfade, distance })` per scene and `BlobShadow({ width, depth, opacity, ground, visible })` per entity; soft ground ellipses where an entity has no real sun shadow (beyond the sun box with a crossfade, no `sceneShadows()`, player `shadows.quality: off`, `Model` or non-caster), all in one instanced draw | **Integrated** (PR #184 via combined integration PR #253). Owner: the scene visit (lazy chunk `author/scene-blob-shadows.ts`; pure policy `author/blob-shadow.ts`; GPU layer `platform/render/blob-shadows.ts`). Bounds: `max` 64 by default, cap 1024, allocated once; overload keeps the nearest to the camera, counts `dropped`, reports once at info level. Same policy and cost on every preset (`shadows.quality` floor is `low`): +1 draw, +2 triangles per blob, 0 shadow passes, no texture. Evidence: unit tests (`blob-shadow.test.ts`, `platform/render/blob-shadows.test.ts`: validation, policy, preset gating, capacity and overload, change-only uploads, disposal, one draw that never casts) and `npm run check`. Browser acceptance `npm run test:blob-shadows-browser` passed 2026-10-05 in local software GL on the reference and low presets (7 candidates, 4 drawn in 1 draw, +8 triangles, 1 dropped; shadows off 4 drawn, 3 dropped; idle 0 frames; a move uploads once; disposed on exit). No template consumer (template budgets unchanged), physical-device, GPU timing, fill-rate or visual-quality acceptance; see the [guide](blob-shadows.md). |
 | GEN-02 | Bounded IndexedDB store for large edited worlds and sparse cell edits | **Integrated 2026-10-03** (PR #56, merged to `main` at `2fb6e69`). Before integration: implemented, candidate (`feat/gen02-chunk-store`). `src/core/save/chunk-port.ts` (sole IndexedDB user, lint rule `indexed-db`) and `chunk-store.ts`: atomic multi-record writes, in-transaction revision checks, creator schema, CRC-32 quarantine before overwrite, bounded keys/bytes/records/batch/pending/quarantine, opt-in LRU eviction, session fallback. `createCellEdits` in the procgen kit. Evidence and limits are in the GEN-02 section below. No physical-device, private-mode, quota-exhaustion or multi-browser claim. |
 | DV-01 | Supported-device experience and sustained performance evidence | In progress. The stock matrix, lesson visit cleanup and compact layout repair are integrated in v0.2.0 (PR #9, merged to main at `97288f8`); DV-01 itself remains open. [Stock matrix](../kits/stock-device-acceptance-matrix.md) covers all seven declarations. The [first receipt](../verification/stock-device-20261001/README.md) records 16 passing emulated target/tap checks and a compact lesson content overlap; lesson visit cleanup and a measured learn layout seam repair it, with a fake-DOM regression and emulated separation checks across board, sim and quiz at four profiles ([layout receipt](../verification/stock-device-20261002/README.md)). Full consumer workflows, in-panel touch scrolling, 200% text, named minimum devices and sustained physical evidence remain open; minimum phone, tablet and laptop/desktop profiles are pending creator selection. No physical-device or accessibility certification. |
 | SC-01 | Bounded spatial index for neighbour, range and interest queries at scale | Integrated in v0.2.0 (PR #23, merged to main at `2c87e3b`). Optional `spatial` kit `createSpatialGrid`: preallocated uniform grid, admission before write, `too-wide` refusal before scanning, explicitly `truncated` results, terminal disposal. Checked: 12 focused unit tests (seeded brute-force oracle, refusals without mutation, narrow-buffer rejection, ECS interest consumer handling despawn and out-of-bounds and failing closed) and a work-count test of the 1,000/10,000-entry micro-benchmark. Headless Node medians recorded in the [guide](spatial-index.md#measured-cost). No template consumer, browser, worker or physical-device evidence; no budget change. |
@@ -651,7 +653,7 @@ See the [procgen kit](../../src/kits/procgen/README.md) and the
 
 | ID | Contract | State |
 |---|---|---|
-| DX-01 | Boot input check and generator: [`src/author/input-registry.ts`](../../src/author/input-registry.ts) rebuilds the boot's `inputActions` table (engine rows, then game and kit inputs) with the registry's own options. `npm run check` (lint:brief) reports every problem; `npm run new -- input` picks bindings that table leaves free. Dev/test `engine.redraw()` ([`SceneHandle.redraw`](../../src/author/play.ts)) asks the running stock scene for one real draw, so `play:snap` judges budgets on rendered frames and reports `not measured` instead of a vacuous pass. [Recipe](../recipes/add-an-input-action.md) | Integrated in v0.2.0 (PR #39; batch PR #45). Unit and lint regressions plus emulated `play:snap` runs on the PR head. A dev/test boot throws on a clash; production drops the row with a warning. `engine.redraw()` covers the stock scene runtime only; the bench's idle windows are unchanged. Forced redraws can make a gate fail where it used to pass vacuously, and `not measured` exits 0. No device claim. |
+| DX-01 | Boot input check and generator: [`src/author/input-registry.ts`](../../src/author/input-registry.ts) rebuilds the boot's `inputActions` table (engine rows, then game and kit inputs) with the registry's own options. `npm run check` (lint:brief) reports every problem; `npm run new -- input` picks bindings that table leaves free. Dev/test `engine.redraw()` ([`SceneHandle.redraw`](../../src/author/play.ts)) asks the running stock scene for one real draw, so `play:snap` judges budgets on rendered frames and reports `not measured` instead of a vacuous pass. [Recipe](../recipes/add-an-input-action.md) | Integrated in v0.2.0 (PR #39; batch PR #45). Unit and lint regressions plus emulated `play:snap` runs on the PR head. A dev/test boot throws on a clash; production drops the row with a warning. `engine.redraw()` covers the stock scene runtime only; the bench's idle windows are unchanged. Forced redraws can make a gate fail where it used to pass vacuously, and `not measured` exits 0. No device claim. Follow-up (PR #180): play:snap measures from the open until the per-frame counts settle (three agreeing 600 ms windows within 5 %, at most 8 s), judges the budget after that, and reports the first window as `warmUp`; shadow and texture metrics keep their since-open peaks. Unit tests (agreement, settle detection, a warming page stand-in, the summary line) and `play:snap` on blank (desktop and phone), showcase, terrain and expedition, plus a scratch scene that sheds 40 boxes over 4.5 s (old snap judged 6 draws mid-warm-up; new: warm-up 31, settled 2). |
 
 ## Template polish semantics (DX-02) — integrated in v0.2.0
 
@@ -979,6 +981,7 @@ three.js. Each row is opt-in per scene, and a scene that does not opt in keeps i
 
 | ID | Contract | State |
 |---|---|---|
+| VIS-11 | Optional procedural interior reflection in `defineEnvironment`: `reflection: { kind: 'interior', size, eyeHeight, wall, floor, ceiling, lights }` (surfaces as packed sRGB times intensity in [0, 16]; at most 8 spheres with radius (0, 10] m and intensity [0, 1000], inside the interior and not containing the probe). One 512 x 256 half-float equirectangular `DataTexture` (1 MiB) from a lazy chunk, set as the scene environment and prefiltered once by the renderer. Owner: the visit's reflection binding (`author/scene-cubes.ts`), keyed by the interior's data; cube reflections unchanged. | **Integrated** (PR #183 via combined integration PR #253). Evidence: unit tests (`interior-reflection.test.ts`: validation, deterministic pixels, key, texture, built once per data, replace and dispose, exit, malformed run-time data). Browser acceptance `npm run test:interior-reflection-browser` passed 2026-10-05 in local software GL on the reference and low presets (mirror sphere centre 255,255,255, rim 8,8,8; relit after one change; draws 1/1; idle 0). No physical-device, GPU prefilter time or visual-quality acceptance; no parallax (one probe point). |
 | VIS-05 | Optional gradient sky and exp2 haze in `defineEnvironment`: `sky: { kind: 'gradient', top, horizon, bottom, exponent, discs, stars }` (one RGBA `DataTexture`, 1 KiB plain or 512 KiB with a disc, on an inverted sphere with `MeshBasicMaterial`, no custom shader; stars as one additive points draw), `haze: { kind: 'exp2', color, density }`, `color: 'sky'` for either haze. Owner: the environment binding of the visit; the texture regenerates only on a sky change; sky and cube are exclusive. | **Implemented and checked (candidate PR #150).** Evidence: unit tests (`sky.test.ts`), `npm run test:sky-browser` (reference and low; desktop headless Chromium, software GL: horizon and top within 10/255 of the gradient, far crate in exp2 haze takes the horizon colour, +2 draws for sky and stars, idle 0 frames, texture replaced and disposed once, disposed on exit), `quality:guard` *identical* on blank and explorer. No physical-device or display-banding evidence; discs are soft (texture-based). |
 | VIS-03 | Optional shadows: `sceneShadows({ cast, receive })` per scene (shadow map enabled through the lease profile only then, PCF), environment `directional.shadow: { extent, softness }`, `PointLight`/`SpotLight` `shadow: true`, per-entity `Shadow`. Owner: the scene visit; sun and local shadows from the lazy `scene-light-rig` chunk through `liveShadowMap` and the shadow scheduler (maps redraw only on change). Shadowed local slots fixed per visit (essential, then entity order), bounded by `lights.shadowed-max` (4/2/1/0, registered, unwired); unmet requests drawn without a shadow and reported once per cause (`shadow`, `no-shadows`). | **Integrated (PR #148, merge `e84afcf`, 2026-10-04).** Evidence: unit tests (`shadow-casting.test.ts`), `npm run test:shadows-browser` (reference and low; desktop headless Chromium, software GL: contact luminance 86 with shadows vs 163 without, 0 shadow-map draws on a still redraw, moved caster redraws, no off-screen pass without shadows, reports once), courtyard bench (`shadowCasters` 215, idle off-screen 0, 56.9 MiB textures), `quality:guard` *identical* on blank and explorer. No `shadowMapMiB` row (shadow maps count in `textureMiB`), no physical-device GPU time or memory evidence. Follow-up (D4 shadow cost accounting): a gated `shadowPasses` row (bench probe checked by `test:shadows-browser`: sun 1, sun plus one point light 7; templates measured 0, budget 1), `refused` counts lights not reports, and the per-light and per-shadow cost table in the scene-look guide (software GL). |
 | VIS-02 | Optional point and spot lights: `PointLight`/`SpotLight` components and `defineScene({ lights: sceneLights({ point ≤ 16, spot ≤ 4 }) })`. Owner: the scene visit (`author/light-slots.ts` admission, also in `testScene`; `author/scene-light-rig.ts` built on `platform/render/light-rig.ts`). Slots are created once per visit (STD-REN-11): claim and release never change the light count; overflow refused essential-first then spawn order, admitted when a slot frees, each cause (`full`, `invalid`, `no-slots`) reported once per visit; `lights.local-max` knob (16/8/4/2, registered, unwired) caps slots per kind once per visit. | **Integrated (PR #138, merge `ef0d1bb`, 2026-10-04).** Evidence: unit tests (`lights.test.ts`, `scene-light-rig.test.ts`), `npm run test:lights-browser` (reference and low; desktop headless Chromium, software GL: lit floor near a lantern vs 10 m away, no program link on spawn/despawn, one redraw per change, idle 0 frames, refusal reported once at low and admitted when a slot frees, lights removed on exit), `quality:guard` *identical* on blank and explorer. No `localLights` budget row (the bench does not measure slots), no physical-device fill-rate evidence. Follow-up (PR #172): a non-essential light refused only because the quality tier created fewer slots than the scene asked for is cause `tier`, reported once at info level (never a page error); an essential light refused stays `full` (error). The showcase marks its two front posts essential; `play:snap --mobile` passes on every template and the CI phone smoke runs at the default phone tier (medium) instead of `--quality reference`. |
@@ -1219,3 +1222,124 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Optional bounded work roster candidate
+
+The [work roster](../../src/kits/work-roster/README.md) supplies finite admission, fair
+visit batches and exact registration membership, with no scheduler or payload owner.
+Two headless consumers use the existing fixed runner for World observations and
+revision-checked inspections. An independent array model covers 10,000 churn operations.
+These are candidate headless contracts; hosted combined CI and physical-device
+timing/native-memory acceptance are not implied. Creator result revisions and
+consumer cleanup remain explicit; runtime tickets are not saved. See ADR 0086.
+
+## Shared-stage retirement recovery — candidate (2026-10-09)
+
+The existing stage pool now retires logical view ownership despite cleanup errors
+and rolls back failed setup. Cleanup preserves original causes and still attempts
+independent retirement work. Surviving sibling leases are not swept or forced lost;
+only a failed release cleanup makes a slot uncertain, and an uncertain slot refuses
+new sharing until its last sibling leaves. A new lease makes the drawing view reset
+its GL state cache. Borrowed canvas attachment rollback and once-only underlying
+renderer disposal are exercised.
+See [render backend](render-backend.md#stage-setup-and-retirement-failures).
+Independent review fixed over-broad uncertainty after clean setup rollback and a
+stale drawer state cache after new leases; both have discriminating tests that fail
+before the fix. `npm run check -- --base cbaf8060` passed typecheck, applicable lints
+and 241 tests in 30 render test files.
+Full hosted integration remains pending. Logical cleanup is not proof
+of successful GPU reclamation or physical-device acceptance.
+
+## World query iteration under mutation — candidate (2026-10-09)
+
+- **Scope:** owner repair of `World.query` in `src/core/ecs/world.ts`. Before: a single-component query yielded
+  `[entity, undefined]` after an earlier row despawned the entity or removed its component; a multi-component query
+  did the same when the removed component was in the smallest store; an entity gaining a component mid-pass was
+  visited or not depending on store sizes; the untyped query visited entities spawned mid-pass.
+- **Contract:** candidates are fixed when iteration begins; each is yielded only if it still has every listed
+  component when reached, with its current values. Spawned or newly matching entities wait for the next query.
+- **Evidence:** `src/core/ecs/query-iteration.test.ts` (8 cases: despawn and removal before, at and after the cursor
+  for one and two components, re-add before reach, spawn and gain mid-pass, untyped query); 5 fail on the previous
+  implementation, all pass on the candidate. Local Node microbenchmark, 10,000 entities: typed queries no slower,
+  untyped query within run-to-run noise. Not a frame-budget or device claim.
+- **Not established:** template or browser frame measurements; hosted CI.
+
+## Finished one-shot model clip stillness — candidate (2026-10-09)
+
+- **Scope:** owner repair in `src/author/scene-model.ts` clip sync. A `loop: false` clip clamped at its end was
+  un-paused by every sync while `playing` was `true`, re-finished, and made `sync` report a change every frame.
+- **Evidence:** `src/author/scene-model.test.ts` "a finished one-shot clip holds its last pose…" fails on the
+  previous implementation (sync keeps returning `true`) and passes on the candidate; a looping-clip case confirms
+  playing loops still report change and paused models do not. Headless Three mixer, not a browser frame trace.
+- **Not established:** browser redraw counts in a template scene; hosted CI.
+
+## Rewind history — REWIND-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/rewind/README.md), [guide](rewind-history.md), [decision](../adr/0087-rewind-history.md). Optional pure per-subject sample rings with time-addressed, never-extrapolating queries that respect creator-marked discontinuities, plus a pure time choice that clamps an untrusted claimed view time to a creator cap. Hosts record from their existing fixed step and query from existing command dispatch; nothing moves or restores live state. Evidence: 17 focused headless tests including a composition with `@kits/combat` `sweep`, and one local micro-measurement. Candidate only; latency estimation, protocol, multiplayer, browser and physical-device acceptance and full CI are not claimed here.
+
+## View deltas — NW-DELTA candidate, 2026-10-09
+
+[Contract](../../src/kits/network/README.md#optional-acknowledged-baseline-view-deltas), [guide](network-views.md#optional-acknowledged-baseline-deltas), [decision](../adr/0088-view-deltas.md). Optional encoder/decoder around the existing complete-view publisher and receiver: entity-level deltas against the last acknowledged adopted frame, each proven to rebuild the publisher's exact bytes before it is sent, with complete-frame fallback and `adopted: false` recovery. Evidence: 14 focused headless tests with a real publisher and receiver, hostile frames, and one local length measurement (9.1 % of complete length at 4 of 64 entities changing). Candidate only; WAN, browser, physical-device and full-CI acceptance are not claimed here.
+
+## Model clip transitions — candidate (2026-10-09)
+
+Branch `feat/model-clip-transition` from `db1f7a85`. `npm run check` passed: typecheck,
+format, lints and 380 affected tests, including ten new
+`scene-model-transition` tests (default cut unchanged, continuity on the switching
+frame and smoothstep progress for position and scale, a node only the old clip drove
+easing back and not left part-way after an interrupting switch, same-clip revision
+restart, completion while playback is paused with redraws reported only while moving,
+a cut in the middle of a transition, despawn mid-transition, pose overrides over a
+blend, unknown-clip and validation refusal, node-budget cut with one report) and the
+existing 21 scene model tests. An independent adversarial review found no blend,
+restore or buffer defect; its findings (a paused model never reaching a new pose,
+undocumented override and object-path limits, an unexported bound) were fixed before
+publication.
+Evidence is headless; no browser, visual-quality, physical-device or full-CI
+acceptance is claimed. Morph-target and material tracks still cut.
+
+## Camera support framing — candidate (2026-10-09)
+
+Branch `feat/camera-support-anchor` from `db1f7a85`. Ten new `support.test.ts` scene
+tests (unchanged poses without a query, jumps over level support leaving position
+and target exactly still, no camera rewrite under a still non-zero support, weights and
+limit including falls beyond the limit, null support and query arguments, orbit plus
+smoothing convergence, fixed camera with and without tracking, a support change easing
+instead of reading as a teleport, a failing query keeping a reset pending, construction
+and per-frame refusal without publication) and the existing camera tests pass under
+`npm run check`. An independent adversarial review found a fixed-camera look target
+moved without tracking, support changes triggering teleport snaps and floating-point
+redraw churn; all three were fixed before publication. Evidence is headless; no
+browser, visual-quality, physical-device or full-CI acceptance is claimed.
+
+## Optional action phases — candidate (2026-10-09)
+
+- **Scope:** pure `createActionPhases` in `src/kits/capabilities/action-phases.ts`, exported through the
+  capabilities barrel and feature `CAP-ACTION-PHASES`.
+- **Evidence:** `src/kits/capabilities/action-phases.test.ts` (11 headless tests). They cover boundaries,
+  jumps, claims, suppression, capture, the 32-bit bound, single-read state validation, definition
+  fingerprints, unreachable-state rejection, per-request cancel windows and an input-history and
+  `resolveAction` composition with restored-state replay. The focused `npm run check` passed.
+- **Review:** an independent adversarial review found two major issues: positional bits were
+  reinterpreted after a definition edit, and there was no way to read a range identity without
+  claiming it. It also found minor issues: fields were read twice, error types were inconsistent,
+  overlapping ranges were accepted and unreachable restores were allowed. All were fixed in the
+  same candidate, and a re-review approved them. That re-review included a 2,000-sequence fuzz showing
+  that reachable states always restore.
+- **Not established:** browser, template, device, persistence-integration or multiplayer acceptance;
+  hosted CI on the candidate head; integration into `main`.
+
+## Optional bounded volume queries — candidate (2026-10-09)
+
+The [volume query kit](../../src/kits/volume-query/README.md) answers overlap,
+fixed-orientation sweep and capsule headroom for a sphere or capsule body against
+an immutable snapshot of static spheres, capsules and oriented boxes. It installs
+no physics world, controller, clock or dependency; results carry the creator's
+snapshot revision and existing owners (portal crossing, alignment, camera
+obstruction, creator systems) apply effects. Evaluation and iteration ceilings
+report `over-budget` or `unresolved`, never clear. Evidence is headless: sampled
+and closed-form oracles, ray/endpoint/centre-ray discriminators, a portal consumer
+and a fixed-runner body-height consumer. Meshes, heightfields, moving colliders,
+rotation during motion, depenetration and device timing are not covered. Independent
+review found and fixed two defects (PR #237, head before this note `7c9680ab`); affected
+check passed 18 tests. Full hosted CI remains required. See ADR 0098.

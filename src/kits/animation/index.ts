@@ -16,3 +16,4 @@ export {
 } from './pose-clip';
 export {createRootMotion, type RootKey, type RootClip, type RootDelta} from './root-motion';
 export {blendPoseLayers, solveTwoBone, type PoseLayer} from './pose-layers';
+export {createInertializer, MAX_INERTIAL_BLEND, type Inertializer, type InertialSwitch} from './inertialize';

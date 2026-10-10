@@ -15,8 +15,10 @@ Start with one route; the rest is reference.
 - [Capabilities](capabilities.md): what this checkout ships, generated from the code ([JSON](capabilities.json)). When a page and this list disagree, the list is right.
 - [Cookbook and building blocks](recipes/README.md): one recipe per task (models, HUD and buttons, collision, camera, saves, budgets).
 - [Scene look](guides/scene-look.md): opt-in tone mapping, exposure, local point and spot lights, shadows, and a gradient sky with haze for a scene, as plain data.
+- [Blob shadows](guides/blob-shadows.md): soft ground ellipses under entities where no shadow map reaches, all in one instanced draw.
 - [Kit catalog](kits/README.md): optional patterns a game can choose, configure or leave out.
 - [Labs](guides/labs.md): prove one system (a mechanic, a kit, a technique) in a small isolated game before building a world on it, then graduate it into the engine.
+- [Character pipeline lessons](guides/character-pipeline-lessons.md) and [crowd and night rendering lessons](guides/crowd-and-night-rendering-lessons.md): practices learned in a character-crowd lab (retargeting, weights, LOD, clip QA, crowd cost, transitions, wet looks, measuring), with what the engine does and does not provide.
 - [Working with your agent](guides/working-with-your-agent.md): the author's side of the operating manual.
 
 ## Contribute to the engine

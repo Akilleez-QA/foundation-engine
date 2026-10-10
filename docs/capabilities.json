@@ -9,6 +9,20 @@
       "evidence": ["@kits/navigation exports createDistanceField", "src/kits/navigation/field.test.ts exists"]
     },
     {
+      "id": "WORK-01",
+      "title": "Optional bounded fair work roster",
+      "shipped": true,
+      "docs": "src/kits/work-roster/README.md",
+      "evidence": ["@kits/work-roster exports createWorkRoster", "src/kits/work-roster/consumers.test.ts exists"]
+    },
+    {
+      "id": "VOLUME-01",
+      "title": "Optional bounded sphere and capsule overlap, sweep and headroom queries",
+      "shipped": true,
+      "docs": "src/kits/volume-query/README.md",
+      "evidence": ["@kits/volume-query exports sweepVolume", "src/kits/volume-query/oracle.test.ts exists"]
+    },
+    {
       "id": "ASG-01",
       "title": "Optional bounded service and worksite assignment ownership",
       "shipped": true,
@@ -28,6 +42,20 @@
       "shipped": true,
       "docs": "src/kits/alignment/README.md",
       "evidence": ["@kits/alignment exports createAlignment", "src/kits/alignment/alignment.test.ts exists"]
+    },
+    {
+      "id": "REWIND-01",
+      "title": "Bounded rewind history for judging remote commands against past state",
+      "shipped": true,
+      "docs": "src/kits/rewind/README.md",
+      "evidence": ["@kits/rewind exports createRewindHistory", "src/kits/rewind/history.test.ts exists"]
+    },
+    {
+      "id": "NW-DELTA",
+      "title": "Acknowledged-baseline deltas for complete network views",
+      "shipped": true,
+      "docs": "src/kits/network/README.md",
+      "evidence": ["@kits/network exports createViewDeltaEncoder", "src/kits/network/view-delta.test.ts exists"]
     },
     {
       "id": "VISIBILITY-01",
@@ -51,6 +79,16 @@
       "evidence": [
         "@kits/capabilities exports createTimedEffects",
         "src/kits/capabilities/timed-effects-checkpoint.test.ts exists"
+      ]
+    },
+    {
+      "id": "CAP-ACTION-PHASES",
+      "title": "Creator-authored action phase windows, once-only marks and per-range claims",
+      "shipped": true,
+      "docs": "docs/guides/action-phases.md",
+      "evidence": [
+        "@kits/capabilities exports createActionPhases",
+        "src/kits/capabilities/action-phases.test.ts exists"
       ]
     },
     {
@@ -102,11 +140,30 @@
       "evidence": ["@engine exports Scatter", "@engine exports defineScatter", "@engine exports sceneScatter"]
     },
     {
+      "id": "VIS-10",
+      "title": "Blob (contact) shadows: one instanced draw of soft ground ellipses where no real shadow reaches",
+      "shipped": true,
+      "docs": "docs/guides/blob-shadows.md",
+      "evidence": [
+        "@engine exports BlobShadow",
+        "@engine exports sceneBlobShadows",
+        "npm run test:blob-shadows-browser"
+      ]
+    },
+    {
       "id": "VIS-09",
       "title": "Opt-in full three.js kit (@kits/three)",
       "shipped": true,
       "pr": 136,
       "evidence": ["@kits/three exists"]
+    },
+    {
+      "id": "VIS-11",
+      "title": "Procedural interior reflection environment (reflection kind interior)",
+      "shipped": true,
+      "pr": 183,
+      "docs": "docs/guides/scene-look.md",
+      "evidence": ["@engine exports validateInteriorReflection", "@engine exports INTERIOR_REFLECTION_LIMITS"]
     },
     {
       "id": "POST-01",
@@ -115,6 +172,18 @@
       "pr": 161,
       "docs": "docs/guides/post-processing.md",
       "evidence": ["engine code reads the post.mode knob"]
+    },
+    {
+      "id": "POST-02",
+      "title": "Post grade lookup tables (.cube, view.post.grade.lut) and an HDR ceiling before bloom (view.post.ceiling)",
+      "shipped": true,
+      "pr": 179,
+      "docs": "docs/guides/post-processing.md",
+      "evidence": [
+        "@engine exports cubeLutText",
+        "@engine exports parseCubeLut",
+        "src/platform/render/post/lut.ts exists"
+      ]
     },
     {
       "id": "FX-01",
@@ -221,15 +290,21 @@
   "engine": {
     "module": "@engine",
     "values": [
+      "BLOB_SHADOW_DEFAULTS",
+      "BLOB_SHADOW_LIMITS",
       "BUILT_IN_CUES",
+      "BlobShadow",
       "EMITTER_DEFAULTS",
       "Emitter",
+      "INTERIOR_REFLECTION_LIMITS",
       "LIGHT_LIMITS",
       "LOCAL_LIGHT_CAPS",
+      "LUT_SIZE_LIMITS",
       "MATERIAL_DEFAULTS",
       "MATERIAL_LIMITS",
       "MATERIAL_SHADINGS",
       "MAX_CALIBRATION_MS",
+      "MAX_MODEL_TRANSITION",
       "MUSIC_START_MARGIN",
       "Material",
       "Mesh",
@@ -249,6 +324,7 @@
       "RenderMask",
       "SCATTER_DEFAULTS",
       "SCATTER_LIMITS",
+      "SCENE_BLOB_SHADOW_LIMITS",
       "SCENE_LIGHT_DEFAULTS",
       "SCENE_SCATTER_LIMITS",
       "SHADOWED_LIGHT_CAPS",
@@ -271,6 +347,7 @@
       "createSaveableRng",
       "createTestSaves",
       "createTestWorkerHost",
+      "cubeLutText",
       "defineAsset",
       "defineBuild",
       "defineComponent",
@@ -294,10 +371,12 @@
       "hazeColor",
       "measureUiOcclusion",
       "musicBudgets",
+      "parseCubeLut",
       "platformMath",
       "pointerOnGround",
       "projectToView",
       "scalarMath",
+      "sceneBlobShadows",
       "sceneLights",
       "sceneParticles",
       "sceneScatter",
@@ -305,8 +384,10 @@
       "shapeParser",
       "skyGradientAt",
       "testScene",
+      "validateBlobShadow",
       "validateCalibration",
       "validateEmitter",
+      "validateInteriorReflection",
       "validateMaterial",
       "validateModel",
       "validatePlayOptions",
@@ -332,10 +413,12 @@
       "AudioTimelineStats",
       "AudioVector",
       "AuthorDef",
+      "BlobShadowData",
       "BuildBrief",
       "BuildInput",
       "ComponentInit",
       "ComponentType",
+      "CubeLut",
       "CueFilter",
       "CueVoice",
       "CueVoiceOptions",
@@ -358,6 +441,9 @@
       "InputDefinition",
       "InputSource",
       "InputState",
+      "InteriorLight",
+      "InteriorReflection",
+      "InteriorSurface",
       "KitDefinition",
       "LightRefusal",
       "LightReportLevel",
@@ -391,6 +477,7 @@
       "PointLightData",
       "PostBloom",
       "PostGrade",
+      "PostLut",
       "PostMode",
       "PostSettings",
       "PostVignette",
@@ -409,6 +496,8 @@
       "ScatterShapeKind",
       "ScatterStats",
       "SceneActivityFacts",
+      "SceneBlobShadowLimits",
+      "SceneBlobShadows",
       "SceneBody",
       "SceneContext",
       "SceneDefinition",
@@ -452,8 +541,10 @@
     {
       "name": "animation",
       "exports": [
+        "MAX_INERTIAL_BLEND",
         "animation",
         "blendPoseLayers",
+        "createInertializer",
         "createMarkerTrack",
         "createPoseSampler",
         "createRootMotion",
@@ -467,11 +558,15 @@
     {"name": "assignments", "exports": ["createAssignments"]},
     {"name": "audio-mixer", "exports": ["audioMixer", "createCueMixer", "createDucking"]},
     {"name": "authoring", "exports": ["authoredReference", "createAuthoredDocument", "createAuthoringSession"]},
-    {"name": "camera", "exports": ["camera", "cameraPose", "cameraSystem", "clearCamera"]},
+    {
+      "name": "camera",
+      "exports": ["CAMERA_MIN_DISTANCE", "camera", "cameraPose", "cameraSystem", "clearCamera", "supportHeights"]
+    },
     {
       "name": "capabilities",
       "exports": [
         "capabilities",
+        "createActionPhases",
         "createActionRuns",
         "createCapabilities",
         "createModifiers",
@@ -648,6 +743,8 @@
         "createRetrySchedule",
         "createSession",
         "createSessionHost",
+        "createViewDeltaDecoder",
+        "createViewDeltaEncoder",
         "createViewPublisher",
         "createViewReceiver",
         "defineSessionRules",
@@ -754,6 +851,7 @@
         "sampleDeposit"
       ]
     },
+    {"name": "rewind", "exports": ["chooseRewindTime", "createRewindHistory"]},
     {
       "name": "rollback",
       "exports": [
@@ -843,14 +941,30 @@
       "name": "vehicles",
       "exports": ["VehicleRider", "boardVehicle", "createVehicles", "exitVehicle", "vehicleRiderSystem", "vehicles"]
     },
-    {"name": "visibility", "exports": ["createVisibility"]}
+    {"name": "visibility", "exports": ["createVisibility"]},
+    {
+      "name": "volume-query",
+      "exports": [
+        "VOLUME_MAX_COLLIDERS",
+        "VOLUME_MAX_EXTENT",
+        "VOLUME_MAX_ID_LENGTH",
+        "defineVolumeSet",
+        "headroom",
+        "overlapVolume",
+        "sweepVolume"
+      ]
+    },
+    {"name": "work-roster", "exports": ["WORK_ROSTER_MAX_ENTRIES", "WORK_ROSTER_MAX_ID_LENGTH", "createWorkRoster"]}
   ],
   "knobs": [
     {"id": "graphics.settings", "readBy": ["src/core/settings/settings.ts"]},
     {"id": "resolution.scale", "readBy": []},
     {"id": "resolution.max-pixel-ratio", "readBy": []},
     {"id": "resolution.antialias", "readBy": ["src/author/runtime.ts"]},
-    {"id": "shadows.quality", "readBy": ["src/platform/render/shadow-cascades.ts", "src/platform/render/shadows.ts"]},
+    {
+      "id": "shadows.quality",
+      "readBy": ["src/author/runtime.ts", "src/platform/render/shadow-cascades.ts", "src/platform/render/shadows.ts"]
+    },
     {"id": "textures.max-size", "readBy": []},
     {"id": "textures.anisotropy", "readBy": ["src/author/runtime.ts"]},
     {"id": "textures.canvas-budget-mib", "readBy": ["src/platform/assets/painted-surfaces.ts"]},
@@ -883,6 +997,7 @@
     "bench:spatial",
     "build",
     "capabilities",
+    "changelog",
     "check",
     "content:publish",
     "deploy:production",
@@ -904,6 +1019,7 @@
     "lint:arch",
     "lint:brief",
     "lint:budgets",
+    "lint:changelog",
     "lint:css",
     "lint:docs-claims",
     "lint:game",
@@ -935,6 +1051,7 @@
     "test:authoring-browser",
     "test:authority-workbench-browser",
     "test:blender-export-browser",
+    "test:blob-shadows-browser",
     "test:capture-browser",
     "test:crafting-workbench-browser",
     "test:creator-journey-browser",
@@ -944,6 +1061,7 @@
     "test:first-use-browser",
     "test:first-use-browser:production",
     "test:framework-browser",
+    "test:interior-reflection-browser",
     "test:ktx2-browser",
     "test:lights-browser",
     "test:material-browser",
