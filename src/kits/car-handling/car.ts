@@ -175,8 +175,7 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
     damp = 2 * c.suspension.damping * mw * omega,
     maxSpring = c.suspension.maxForce * mw * (g > 0 ? g : 9.81);
   const rest = c.suspension.restLength,
-    radius = c.suspension.radius,
-    lift = radius;
+    radius = c.suspension.radius;
   const nFront = c.wheels.filter(w => w.front).length,
     nRear = n - nFront,
     nHand = c.wheels.filter(w => w.handbrake).length;
@@ -186,13 +185,66 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
   const tmp = new Float64Array(n * 10); // cx,cy,cz (centre), nx,ny,nz, grip, rolling, load, contact
 
   const finiteVec = (...v: number[]) => v.every(Number.isFinite);
+  // Body axes of the sub-step in progress (rotation matrix columns: L = +x left, U = +y, F = +z) and the output of
+  // invI, kept in the closure so a sub-step allocates nothing.
+  let Lx = 1,
+    Ly = 0,
+    Lz = 0,
+    Ux = 0,
+    Uy = 1,
+    Uz = 0,
+    Fx = 0,
+    Fy = 0,
+    Fz = 1,
+    ox = 0,
+    oy = 0,
+    oz = 0;
+  /** World inverse inertia applied to a vector, into (ox, oy, oz): sum over body axes of axis (axis . t) / I. */
+  const invI = (tx: number, ty: number, tz: number) => {
+    const a = (Lx * tx + Ly * ty + Lz * tz) / ix,
+      b = (Ux * tx + Uy * ty + Uz * tz) / iy,
+      d = (Fx * tx + Fy * ty + Fz * tz) / iz;
+    ox = Lx * a + Ux * b + Fx * d;
+    oy = Ly * a + Uy * b + Fy * d;
+    oz = Lz * a + Uz * b + Fz * d;
+  };
+  /** Ask the ground port, with the hit record reset first so nothing from an earlier answer can leak into this one. */
+  const cast = (
+    ground: GroundQuery,
+    ox2: number,
+    oy2: number,
+    oz2: number,
+    dx: number,
+    dy: number,
+    dz: number,
+    max: number,
+  ) => {
+    hit.distance = 0;
+    hit.nx = 0;
+    hit.ny = 1;
+    hit.nz = 0;
+    hit.grip = 1;
+    hit.rolling = 0;
+    if (!ground(ox2, oy2, oz2, dx, dy, dz, max, hit)) return false;
+    checkHit(hit, max);
+    // Normalise without overflow: scale by the largest component first.
+    const big = Math.max(Math.abs(hit.nx), Math.abs(hit.ny), Math.abs(hit.nz));
+    const sx = hit.nx / big,
+      sy = hit.ny / big,
+      sz = hit.nz / big,
+      nl = Math.sqrt(sx * sx + sy * sy + sz * sz);
+    hit.nx = sx / nl;
+    hit.ny = sy / nl;
+    hit.nz = sz / nl;
+    return true;
+  };
   const placeInto = (A: Float64Array, x: number, y: number, z: number, yaw: number) => {
     A.fill(0);
-    A[P] = x;
-    A[P + 1] = y;
-    A[P + 2] = z;
-    A[Q + 1] = m.sin(yaw / 2);
-    A[Q + 3] = m.cos(yaw / 2);
+    A[P] = x + 0;
+    A[P + 1] = y + 0;
+    A[P + 2] = z + 0;
+    A[Q + 1] = m.sin(yaw / 2) + 0;
+    A[Q + 3] = m.cos(yaw / 2) + 0;
   };
   const checkPose = (pose: {x: number; y: number; z: number; yaw?: number}) => {
     if (!pose || typeof pose !== 'object') throw new RangeError('car-handling: pose required');
@@ -233,28 +285,18 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
       qy = A[Q + 1]!,
       qz = A[Q + 2]!,
       qw = A[Q + 3]!;
-    // Body axes (rotation matrix columns): L = +x (left), U = +y, F = +z.
-    const Lx = 1 - 2 * (qy * qy + qz * qz),
-      Ly = 2 * (qx * qy + qw * qz),
-      Lz = 2 * (qx * qz - qw * qy);
-    const Ux = 2 * (qx * qy - qw * qz),
-      Uy = 1 - 2 * (qx * qx + qz * qz),
-      Uz = 2 * (qy * qz + qw * qx);
-    const Fx = 2 * (qx * qz + qw * qy),
-      Fy = 2 * (qy * qz - qw * qx),
-      Fz = 1 - 2 * (qx * qx + qy * qy);
-    // World inverse inertia applied to a vector: sum over body axes of axis (axis . t) / I.
-    let ox = 0,
-      oy = 0,
-      oz = 0;
-    const invI = (tx: number, ty: number, tz: number) => {
-      const a = (Lx * tx + Ly * ty + Lz * tz) / ix,
-        b = (Ux * tx + Uy * ty + Uz * tz) / iy,
-        d = (Fx * tx + Fy * ty + Fz * tz) / iz;
-      ox = Lx * a + Ux * b + Fx * d;
-      oy = Ly * a + Uy * b + Fy * d;
-      oz = Lz * a + Uz * b + Fz * d;
-    };
+    Lx = 1 - 2 * (qy * qy + qz * qz);
+    Ly = 2 * (qx * qy + qw * qz);
+    Lz = 2 * (qx * qz - qw * qy);
+    Ux = 2 * (qx * qy - qw * qz);
+    Uy = 1 - 2 * (qx * qx + qz * qz);
+    Uz = 2 * (qy * qz + qw * qx);
+    Fx = 2 * (qx * qz + qw * qy);
+    Fy = 2 * (qy * qz - qw * qx);
+    Fz = 1 - 2 * (qx * qx + qy * qy);
+    // Rays reach back by this sub-step's travel as well, so a fast body cannot pass a surface between two casts.
+    const reachBack = Math.sqrt(vx * vx + vy * vy + vz * vz) * h,
+      lift = radius + reachBack;
     let fx = 0,
       fy = -mass * g,
       fz = 0,
@@ -308,12 +350,10 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
       let contact = false,
         comp = 0,
         over = 0;
-      if (ground(ax + Ux * lift, ay + Uy * lift, az + Uz * lift, -Ux, -Uy, -Uz, length, hit)) {
-        checkHit(hit, length);
-        const nl = Math.sqrt(hit.nx * hit.nx + hit.ny * hit.ny + hit.nz * hit.nz);
-        const nx = hit.nx / nl,
-          ny = hit.ny / nl,
-          nz = hit.nz / nl;
+      if (cast(ground, ax + Ux * lift, ay + Uy * lift, az + Uz * lift, -Ux, -Uy, -Uz, length)) {
+        const nx = hit.nx,
+          ny = hit.ny,
+          nz = hit.nz;
         // The surface must face the ray (n . -U < 0).
         if (nx * Ux + ny * Uy + nz * Uz > 0) {
           const reach = rest + radius - (hit.distance - lift);
@@ -368,6 +408,24 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
       tz += rx * (Uy * spring) - ry * (Ux * spring);
     }
 
+    // Aerodynamics.
+    const v2 = vx * vx + vy * vy + vz * vz,
+      vlen = Math.sqrt(v2);
+    fx -= c.aero.drag * vx * vlen;
+    fy -= c.aero.drag * vy * vlen;
+    fz -= c.aero.drag * vz * vlen;
+    if (grounded > 0) {
+      const down = Math.min(c.aero.downforce * v2, c.aero.maxDownforce);
+      fx -= Ux * down;
+      fy -= Uy * down;
+      fz -= Uz * down;
+    }
+
+    // Everything but the tyres, for predicting where each patch is heading this sub-step.
+    const ax0 = fx / mass,
+      ay0 = fy / mass,
+      az0 = fz / mass;
+
     // Pass 2: tyre forces.
     for (let i = 0; i < n; i++) {
       const s = i * 10;
@@ -411,9 +469,10 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
         pvz = vz + (wx * ry - wy * rx);
       const vl = pvx * hx2 + pvy * hy2 + pvz * hz2,
         vs = pvx * sx + pvy * sy + pvz * sz;
-      // Velocities predicted after this sub-step's gravity, so brakes and side grip can hold a car still on a slope.
-      const vlp = vl - g * hy2 * h,
-        vsp = vs - g * sy * h;
+      // Velocities predicted after this sub-step's non-tyre forces (gravity, springs, aerodynamics), so brakes, rolling
+      // resistance and side grip can hold a car still, on a slope too.
+      const vlp = vl + (ax0 * hx2 + ay0 * hy2 + az0 * hz2) * h,
+        vsp = vs + (ax0 * sx + ay0 * sy + az0 * sz) * h;
       // Caps that stop, but never reverse, the motion: each grounded wheel may remove at most its share of the body's
       // momentum along the direction in one sub-step.
       const share = mass / (h * grounded);
@@ -422,8 +481,10 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
       // Longitudinal.
       let fl = wcfg.drive && drivenGrounded > 0 ? drive / drivenGrounded : 0;
       let resist = (c.tyre.rolling + surfaceRolling) * load;
-      if (wcfg.front) resist += nFront > 0 ? (foot * c.brakes.force * c.brakes.bias) / nFront : 0;
-      else resist += nRear > 0 ? (foot * c.brakes.force * (1 - c.brakes.bias)) / nRear : 0;
+      // An axle with no wheels hands its share of the foot brake to the other.
+      const frontShare = nRear === 0 ? 1 : nFront === 0 ? 0 : c.brakes.bias;
+      if (wcfg.front) resist += (foot * c.brakes.force * frontShare) / nFront;
+      else resist += (foot * c.brakes.force * (1 - frontShare)) / nRear;
       if (wcfg.handbrake && nHand > 0) resist += (hb * c.brakes.handbrakeForce) / nHand;
       const applied = Math.min(resist, stopCapL);
       fl += vlp > 0 ? -applied : vlp < 0 ? applied : 0;
@@ -470,19 +531,6 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
       tz += ax * tfy - ay * tfx;
     }
 
-    // Aerodynamics.
-    const v2 = vx * vx + vy * vy + vz * vz,
-      vlen = Math.sqrt(v2);
-    fx -= c.aero.drag * vx * vlen;
-    fy -= c.aero.drag * vy * vlen;
-    fz -= c.aero.drag * vz * vlen;
-    if (grounded > 0) {
-      const down = Math.min(c.aero.downforce * v2, c.aero.maxDownforce);
-      fx -= Ux * down;
-      fy -= Uy * down;
-      fz -= Uz * down;
-    }
-
     // Velocity update.
     vx += (fx / mass) * h;
     vy += (fy / mass) * h;
@@ -519,7 +567,7 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
         dnx = 0,
         dny = 0,
         dnz = 0;
-      const probe = hy;
+      const probe = hy + reachBack;
       for (let cI = 0; cI < 8; cI++) {
         const sxc = cI & 1 ? hx : -hx,
           syc = cI & 2 ? hy : -hy,
@@ -528,14 +576,12 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
           ry = Ly * sxc + Uy * syc + Fy * szc,
           rz = Lz * sxc + Uz * syc + Fz * szc;
         queries++;
-        if (!ground(px + rx, py + ry + probe, pz + rz, 0, -1, 0, probe, hit)) continue;
-        checkHit(hit, probe);
+        if (!cast(ground, px + rx, py + ry + probe, pz + rz, 0, -1, 0, probe)) continue;
         const pen = probe - hit.distance;
         if (pen <= 0) continue;
-        const nl = Math.sqrt(hit.nx * hit.nx + hit.ny * hit.ny + hit.nz * hit.nz);
-        const nx = hit.nx / nl,
-          ny = hit.ny / nl,
-          nz = hit.nz / nl;
+        const nx = hit.nx,
+          ny = hit.ny,
+          nz = hit.nz;
         if (ny <= 0) continue;
         if (pen > deepest) {
           deepest = pen;
@@ -646,9 +692,10 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
     return clamped ? queries | (1 << 20) : queries;
   };
 
+  const out = {throttle: 0, brake: 0, steer: 0, handbrake: 0, pitch: 0, roll: 0};
+  /** Validate controls into one reused record (a refused value leaves the car untouched; the record is scratch). */
   const controlsOf = (ct: CarControls) => {
     if (!ct || typeof ct !== 'object') throw new RangeError('car-handling: controls required');
-    const out = {throttle: 0, brake: 0, steer: 0, handbrake: 0, pitch: 0, roll: 0};
     for (const key of CONTROL_KEYS) {
       const v = ct[key] ?? 0;
       const lo = key === 'steer' || key === 'pitch' || key === 'roll' ? -1 : 0;
@@ -707,62 +754,75 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
     );
   };
 
+  const stepNow = (dt: number, controls: CarControls, ground: GroundQuery): CarStepResult => {
+    if (typeof dt !== 'number' || !Number.isFinite(dt) || dt <= 0 || dt > 0.25)
+      throw new RangeError('car-handling: dt must be within (0, 0.25]');
+    if (typeof ground !== 'function') throw new RangeError('car-handling: ground query required');
+    const ct = controlsOf(controls);
+    const substeps = Math.max(1, Math.ceil(dt / c.limits.maxSubstep - 1e-9));
+    if (substeps > c.limits.maxSubsteps)
+      throw new RangeError(
+        `car-handling: dt ${dt} needs ${substeps} sub-steps, more than limits.maxSubsteps ${c.limits.maxSubsteps}`,
+      );
+    const h = dt / substeps;
+    const wasGrounded = S[GROUNDED]! > 0;
+    Wk.set(S);
+    let queries = 0,
+      clamped = false;
+    for (let i = 0; i < substeps; i++) {
+      const r = substep(h, ct, ground);
+      if (r & (1 << 20)) clamped = true;
+      queries += r & ((1 << 20) - 1);
+    }
+    // Upside-down watch, once per step.
+    const qx = Wk[Q]!,
+      qz = Wk[Q + 2]!;
+    const upDot = 1 - 2 * (qx * qx + qz * qz);
+    const speed = Math.sqrt(Wk[V]! * Wk[V]! + Wk[V + 1]! * Wk[V + 1]! + Wk[V + 2]! * Wk[V + 2]!);
+    Wk[FLIP] = upDot < c.reset.upDot && speed < c.reset.maxSpeed ? Wk[FLIP]! + dt : 0;
+    const flipped = Wk[FLIP]! >= c.reset.delay && upDot < c.reset.upDot && speed < c.reset.maxSpeed;
+    const reset = flipped && c.reset.auto;
+    if (reset) resetInto(Wk);
+    commit();
+    const grounded = S[GROUNDED]!;
+    return Object.freeze({
+      substeps,
+      queries,
+      grounded,
+      airborne: grounded === 0,
+      landed: !wasGrounded && grounded > 0,
+      flipped,
+      reset,
+      clamped,
+    });
+  };
+  let busy = false;
+
   placeInto(S, 0, 0, 0, 0);
   return Object.freeze({
     config: c,
     fingerprint,
     maxQueriesPerStep,
     place(pose: {x: number; y: number; z: number; yaw?: number}) {
+      if (busy) throw new RangeError('car-handling: place called from inside a step');
       const yaw = checkPose(pose);
       placeInto(S, pose.x, pose.y, pose.z, yaw);
     },
     reset(pose?: {x: number; y: number; z: number; yaw?: number}) {
+      if (busy) throw new RangeError('car-handling: reset called from inside a step');
       if (pose !== undefined) checkPose(pose);
       Wk.set(S);
       resetInto(Wk, pose);
       commit();
     },
     step(dt: number, controls: CarControls, ground: GroundQuery): CarStepResult {
-      if (typeof dt !== 'number' || !Number.isFinite(dt) || dt <= 0 || dt > 0.25)
-        throw new RangeError('car-handling: dt must be within (0, 0.25]');
-      if (typeof ground !== 'function') throw new RangeError('car-handling: ground query required');
-      const ct = controlsOf(controls);
-      const substeps = Math.max(1, Math.ceil(dt / c.limits.maxSubstep - 1e-9));
-      if (substeps > c.limits.maxSubsteps)
-        throw new RangeError(
-          `car-handling: dt ${dt} needs ${substeps} sub-steps, more than limits.maxSubsteps ${c.limits.maxSubsteps}`,
-        );
-      const h = dt / substeps;
-      const wasGrounded = S[GROUNDED]! > 0;
-      Wk.set(S);
-      let queries = 0,
-        clamped = false;
-      for (let i = 0; i < substeps; i++) {
-        const r = substep(h, ct, ground);
-        if (r & (1 << 20)) clamped = true;
-        queries += r & ((1 << 20) - 1);
+      if (busy) throw new RangeError('car-handling: step called from inside a step (a port re-entered the car)');
+      busy = true;
+      try {
+        return stepNow(dt, controls, ground);
+      } finally {
+        busy = false;
       }
-      // Upside-down watch, once per step.
-      const qx = Wk[Q]!,
-        qz = Wk[Q + 2]!;
-      const upDot = 1 - 2 * (qx * qx + qz * qz);
-      const speed = Math.sqrt(Wk[V]! * Wk[V]! + Wk[V + 1]! * Wk[V + 1]! + Wk[V + 2]! * Wk[V + 2]!);
-      Wk[FLIP] = upDot < c.reset.upDot && speed < c.reset.maxSpeed ? Wk[FLIP]! + dt : 0;
-      const flipped = Wk[FLIP]! >= c.reset.delay && upDot < c.reset.upDot && speed < c.reset.maxSpeed;
-      const reset = flipped && c.reset.auto;
-      if (reset) resetInto(Wk);
-      commit();
-      const grounded = S[GROUNDED]!;
-      return Object.freeze({
-        substeps,
-        queries,
-        grounded,
-        airborne: grounded === 0,
-        landed: !wasGrounded && grounded > 0,
-        flipped,
-        reset,
-        clamped,
-      });
     },
     read(): CarState {
       const wheels: CarWheelState[] = [];
@@ -832,6 +892,7 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
       });
     },
     restore(snapshot: CarSnapshot) {
+      if (busy) throw new RangeError('car-handling: restore called from inside a step');
       if (!snapshot || typeof snapshot !== 'object') throw new RangeError('car-handling: snapshot required');
       if (snapshot.kind !== 'car-handling' || snapshot.version !== 1)
         throw new RangeError('car-handling: not a version 1 car snapshot');
@@ -845,20 +906,55 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
           throw new RangeError('car-handling: snapshot values must be finite');
       const ql = Math.sqrt(values[Q]! ** 2 + values[Q + 1]! ** 2 + values[Q + 2]! ** 2 + values[Q + 3]! ** 2);
       if (Math.abs(ql - 1) > 1e-6) throw new RangeError('car-handling: snapshot orientation is not a unit quaternion');
+      let contacts = 0;
       for (let i = 0; i < n; i++) {
-        const contact = values[WHEEL0 + WS * i + CONTACT];
+        const base = WHEEL0 + WS * i,
+          contact = values[base + CONTACT];
         if (contact !== 0 && contact !== 1) throw new RangeError('car-handling: snapshot wheel contact must be 0 or 1');
+        contacts += contact;
+        if (!(values[base + COMP]! >= 0 && values[base + COMP]! <= rest) || !(values[base + LOAD]! >= 0))
+          throw new RangeError('car-handling: snapshot wheel compression or load is out of range');
+        if (
+          !(Math.abs(values[base + SPIN]!) <= Math.PI + 1e-9) ||
+          !(Math.abs(values[base + SLIP]!) <= Math.PI / 2 + 1e-9)
+        )
+          throw new RangeError('car-handling: snapshot wheel spin or slip is out of range');
       }
+      const e = c.limits.extent;
+      if (Math.abs(values[P]!) > e || Math.abs(values[P + 1]!) > e || Math.abs(values[P + 2]!) > e)
+        throw new RangeError('car-handling: snapshot position is outside limits.extent');
+      if (
+        values[GROUNDED] !== contacts ||
+        !(Math.abs(values[STEER]!) <= 1.2) ||
+        !(values[DRIFT]! >= 0 && values[DRIFT]! <= 1) ||
+        !(values[AIR]! >= 0) ||
+        !(values[FLIP]! >= 0) ||
+        !(values[TIME]! >= 0)
+      )
+        throw new RangeError('car-handling: snapshot fields are out of range');
       for (let i = 0; i < size; i++) S[i] = values[i]! + 0;
     },
   });
 }
 
 function checkHit(hit: GroundHit, maxDistance: number) {
-  const {distance, nx, ny, nz, grip, rolling} = hit;
+  const distance = hit.distance,
+    nx = hit.nx,
+    ny = hit.ny,
+    nz = hit.nz,
+    grip = hit.grip,
+    rolling = hit.rolling;
   if (typeof distance !== 'number' || !(distance >= 0 && distance <= maxDistance * (1 + 1e-9)))
     throw new RangeError('car-handling: ground hit distance must be within [0, maxDistance]');
-  if (![nx, ny, nz].every(v => typeof v === 'number' && Number.isFinite(v)) || nx * nx + ny * ny + nz * nz < 1e-12)
+  if (
+    typeof nx !== 'number' ||
+    typeof ny !== 'number' ||
+    typeof nz !== 'number' ||
+    !Number.isFinite(nx) ||
+    !Number.isFinite(ny) ||
+    !Number.isFinite(nz) ||
+    (nx === 0 && ny === 0 && nz === 0)
+  )
     throw new RangeError('car-handling: ground hit normal must be finite and nonzero');
   if (typeof grip !== 'number' || !(grip >= 0 && grip <= 4))
     throw new RangeError('car-handling: ground hit grip must be within [0, 4]');

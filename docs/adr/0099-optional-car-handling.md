@@ -25,9 +25,11 @@ Add `@kits/car-handling`, a pure controller and an optional fixed-step adapter:
   air control and levelling; optional body-corner ground contacts; an upside-down watch
   that reports or resets.
 - The ground is a creator port that writes a ray hit into a caller record (no
-  allocation); `planeGround` and `sampledGround` (terrain `Surface.sample`) are supplied.
+  allocation in the controller); `planeGround` and `sampledGround` (terrain `Surface.sample`) are supplied.
 - Steps are split into bounded equal sub-steps; a step is a transaction committed only
-  when finite and inside the configured extent. Work per step is at most
+  when finite and inside the configured extent. Suspension tunings too stiff for the
+  sub-step are refused, and rays reach back by the sub-step's travel so fast bodies do
+  not tunnel. Work per step is at most
   `(wheels + 8) × maxSubsteps` ground queries.
 - `math: 'deterministic'` routes every transcendental through `dmath`; the state is a
   fixed array with a JSON-exact `snapshot`/`restore`, refused across configurations.
@@ -49,7 +51,7 @@ or replace the kit.
 
 ## Evidence
 
-23 headless tests: behavioural checks for both presets, transactional refusal, query
-bound, clamps, identical bits after repeated runs and JSON snapshot round trips in both
+28 headless tests: behavioural checks for both presets, transactional refusal, query
+bound, clamps, creep, tunnelling and slope hold, configuration stability bounds, identical bits after repeated runs and JSON snapshot round trips in both
 math modes, an ECS fixed-step consumer, a terrain-kit consumer and the rollback kit's
 sync test. No template, browser, feel or device acceptance is claimed.

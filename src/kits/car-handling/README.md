@@ -70,9 +70,12 @@ backwards. Out-of-range controls throw before anything changes.
 **Ground port.** `ground(ox, oy, oz, dx, dy, dz, maxDistance, out)` casts a ray along a
 unit direction and writes the nearest hit into `out` (`distance`, normal `nx/ny/nz`,
 surface `grip` [0, 4] and extra `rolling` [0, 1]), returning true, or returns false.
-Writing into `out` keeps the step free of allocation. Each wheel casts along the
-body's down axis from one wheel radius above its mount; with `body.contacts`, each of
-the eight body-box corners casts straight down from half the body height above it. A
+The kit resets `out` to defaults (grip 1, rolling 0) before every query, so a port that
+writes only some fields never inherits an earlier answer. Each wheel casts along the
+body's down axis from one wheel radius plus the sub-step's travel (`|v| × h`) above its
+mount; with `body.contacts`, each of the eight body-box corners casts straight down from
+half the body height plus the same travel above it. Reaching back by the travel means a
+fast body cannot pass a surface between two casts. A
 hit with a distance outside [0, maxDistance], a non-finite or zero normal, or grip or
 rolling outside their ranges throws. A surface facing away from a wheel ray is ignored.
 `planeGround` (exact, optionally sloped) and `sampledGround` (a height field, see
@@ -100,10 +103,10 @@ Both presets are generic starting points, not any particular game's values.
 | `wheels[i].drive` / `handbrake` / `front` | boolean | rear drive, rear handbrake | same | Engine force split, handbrake wheels, foot-brake axle |
 | `suspension.restLength` | (0, 5] m | 0.3 | 0.25 | Travel to the bump stop |
 | `suspension.radius` | (0, 3] m | 0.34 | 0.33 | Wheel radius |
-| `suspension.frequency` | [0.2, 20] Hz | 2.2 | 1.6 | Corner natural frequency with its mass share; sets the spring rate |
-| `suspension.damping` | [0, 5] | 0.7 | 0.45 | Damping ratio (1 is critical) |
+| `suspension.frequency` | [0.2, 20] Hz, and 2π·f·maxSubstep ≤ 0.35 | 2.2 | 1.6 | Corner natural frequency with its mass share; sets the spring rate |
+| `suspension.damping` | [0, 5], and 2·ζ·2π·f·maxSubstep ≤ 1 | 0.7 | 0.45 | Damping ratio (1 is critical) |
 | `suspension.maxForce` | [1, 100] × static load | 6 | 6 | Ceiling of one corner's spring and damper force |
-| `suspension.bumpStop` | [1, 1000] × spring | 10 | 12 | Stiffness beyond full travel |
+| `suspension.bumpStop` | [1, 1000] × spring, and 2π·f·√bumpStop·maxSubstep ≤ 1 | 10 | 12 | Stiffness beyond full travel |
 | `tyre.grip` | (0, 5] | 1.5 | 1.05 | Peak lateral friction coefficient |
 | `tyre.driveGrip` | (0, 5] | 1.4 | 1.0 | Peak longitudinal coefficient (drive, brake) |
 | `tyre.peakSlip` | [0.01, 1] rad | 0.14 | 0.1 | Slip angle of peak lateral grip |
@@ -127,7 +130,7 @@ Both presets are generic starting points, not any particular game's values.
 | `aero.downforce` / `maxDownforce` | N·s²/m² / N | 3 / 8000 | 1.2 / 4000 | Downforce along body -y while any wheel is down |
 | `aero.angularDamping` | [0, 50] 1/s | 0.5 | 0.1 | Always-on angular damping |
 | `air.pitch` / `roll` / `yaw` | [0, 100] rad/s² | 6 / 6 / 4 | 0 / 0 / 0 | Air control angular acceleration at full input |
-| `air.levelling` | [0, 100] | 3 | 0 | Pull toward upright while airborne |
+| `air.levelling` | [0, 100] | 3 | 0 | Pull toward upright with no wheel down, in rad/s² per unit sine of tilt (none at exactly upside down) |
 | `air.damping` | [0, 50] 1/s | 1 | 0 | Extra angular damping while airborne |
 | `reset.auto` | boolean | true | true | Act on a flip, or only report it |
 | `reset.upDot` / `maxSpeed` / `delay` / `lift` | [-1, 0.9] / m/s / s / m | 0.2 / 2 / 1.5 / 1 | 0.2 / 1 / 3 / 1 | Upside down: up · world up below `upDot` and speed below `maxSpeed` for `delay`; the reset raises by `lift` |
@@ -154,9 +157,12 @@ adds foot brake by axle bias, handbrake and rolling resistance, and computes a l
 force from the slip angle `atan2(|v_side|, max(|v_long|, lowSpeed))` through a curve
 rising linearly to the peak, falling to `slideGrip` at twice the peak; brake, rolling
 and lateral forces can stop but never reverse the patch's motion (each grounded wheel
-may remove at most its share of the body's momentum, predicted after gravity so a
-braked car holds on a slope); the pair is scaled into the friction ellipse of `grip`
-and `driveGrip` times load and surface grip; (4) adds drag and downforce; (5)
+may remove at most its share of the body's momentum, predicted after this sub-step's
+gravity, spring and aerodynamic forces, so a car at rest does not creep and a braked
+car holds on a slope); an axle with no wheels hands its foot-brake share to the other;
+the pair is scaled into the friction ellipse of `grip`
+and `driveGrip` times load and surface grip (drag and downforce were added before the
+tyres); (4)-(5)
 integrates velocities semi-implicitly with world-frame box inertia, applies air
 control, levelling and damping with no wheel down; (6) with `body.contacts`, removes
 approach velocity at each penetrating body corner with an impulse and Coulomb friction
@@ -172,11 +178,18 @@ missed.
 ## Bounds, overload and failure
 
 - Wheels 2–8; per step at most `(wheels + 8 if body.contacts) × maxSubsteps` ground
-  queries (`maxQueriesPerStep`; 96 for the presets). Constant memory per car. No
-  allocation per sub-step; `step` allocates its result record only.
+  queries (`maxQueriesPerStep`; 96 for the presets). Constant memory per car. The
+  controller allocates nothing per sub-step or query; `step` allocates its result record.
+  The cost of the ground port is the creator's.
+- Configuration refuses unknown fields at every level and suspension tunings too stiff
+  for the sub-step (the three suspension conditions in the tuning table). Those bounds
+  are necessary for stable explicit integration, not sufficient for every combination:
+  zero damping keeps oscillating, and very light or very soft cars settle slowly.
+- A port that calls back into the same car (`step`, `place`, `reset`, `restore`) is
+  refused, and the outer step fails whole.
 - A step needing more than `maxSubsteps` is refused with `RangeError`; the creator's
   fixed-step host supplies steady steps, and a long frame should not be passed whole.
-- A step is a transaction. It works on a copy of the state and commits only when every
+- A step is a transaction (`place`, `reset` and `restore` are too). It works on a copy of the state and commits only when every
   sub-step finished, every value is finite and the position is inside `limits.extent`.
   A throwing ground query, an invalid hit, invalid controls or a refused step leave the
   car exactly as before; the adapter then writes no Transform and the runner reports
@@ -195,10 +208,12 @@ deterministic too. The default `platform` mode uses `Math.*` and can differ betw
 JavaScript engines.
 
 `snapshot()` returns a frozen, JSON-safe `{kind, version: 1, fingerprint, wheels,
-values}`; the state never holds -0, so `JSON.stringify` round-trips it bit for bit.
-`restore` refuses a snapshot from another configuration (FNV-1a fingerprint of the
-validated configuration), a wrong length, non-finite values, a non-unit quaternion or
-an invalid contact flag, and changes nothing when it refuses. A four-wheel snapshot is
+values}`; every write to the state turns -0 into 0, so `JSON.stringify` round-trips it
+bit for bit. `restore` refuses a snapshot from another configuration (FNV-1a fingerprint
+of the validated configuration), a wrong length, non-finite values, a non-unit
+quaternion, a position outside `limits.extent`, and contact, grounded, compression, load,
+spin, slip, steering, drift and timer fields outside their ranges, and changes nothing
+when it refuses. A four-wheel snapshot is
 39 numbers, about 0.7 KB as JSON text; it is not a save format with migrations.
 For a saved game, store the creator's own pose and re-`place` the car.
 
@@ -213,21 +228,36 @@ volume-query or combat kits' sweeps for the body and apply the result); no car-t
 contact, traffic, damage or audio; render interpolation between ticks is the
 creator's. Camera, seating, ownership and network authority stay with their kits.
 
+Ray reach-back covers a fall up to `limits.maxSpeed`, but only against surfaces the
+ground port reports from above; a car that does end below a one-sided surface (for
+example placed there) is not recovered. A car resting on its roof or side has no wheel
+down, so it counts as airborne: air control, levelling and air damping act, `airTime`
+grows, and arcade levelling can right a car lying on its side. With the presets'
+`brakes.brakeToReverse`, brake alone at standstill drives backwards; to hold on a slope
+with the brake, turn it off or hold a little throttle. A braked car on a steep (24°)
+slope still slides a few millimetres per minute. The adapter skips stepping while its
+target entity is missing, so simulated time pauses with it; an `after` callback that
+throws fails the tick after the step and Transform were already written.
+
 ## Evidence
 
-`car.test.ts` (19 tests): for both presets, settling to the static spring compression
-with no creep, straight-line acceleration under the curve's top speed, braking without
+`car.test.ts` (24 tests): for both presets, settling to the static spring compression
+with under 1 µm of creep in a minute, straight-line acceleration under the curve's top speed, braking without
 reversing then brake-to-reverse, right-turn sign and speed-widened turns, handbrake
 slip and grip recovery; downforce load; a ledge with airborne, air pitch, levelling
 and landing; an upside-down car resting on its body and auto-reset after the delay (and
 report-only reset); the sampled height field against the exact plane; configuration
 refusal and freezing; transactional refusal of bad steps and bad ground answers; the
 query bound and speed clamps; identical bits across repeated runs and after a JSON
-snapshot round trip in both math modes; snapshot refusal. `consumers.test.ts` (4
+snapshot round trip in both math modes; snapshot refusal; no tunnelling from a 199 m/s
+fall; a braked hold within 1 mm per minute on a 15 % slope with brake-to-reverse off;
+refusal of unknown fields and unstable suspension; brake hand-off from an empty axle; no
+-0, no state leaked through the hit record across a restore, refused re-entry and
+refused unusable restores. `consumers.test.ts` (4
 tests): the adapter on the ECS fixed-step runner (Transform written, neutral coasting
 while not owned, no write on a failing tick), a terrain-kit sampled ramp (rolls
-downhill on four wheels, holds on the brake) and the rollback kit's sync test over 600
+downhill on four wheels, then holds on the brake within 1 mm for a minute) and the rollback kit's sync test over 600
 frames with no hidden state. A local micro-measurement on one desktop CPU (Node 26)
-gave about 2.3 µs per 60 Hz step of the arcade preset on a plane (2.7 µs with dmath):
+gave about 2.2 µs per 60 Hz step of the arcade preset on a plane (2.7 µs with dmath):
 an order-of-magnitude indication only. These are headless contract tests: no
 template, browser, feel, controller or physical-device acceptance is claimed.

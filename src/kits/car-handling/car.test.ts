@@ -42,9 +42,9 @@ for (const preset of ['arcade', 'sim-lite'] as const) {
     const expected = (mw * c.gravity) / k;
     for (const w of s.wheels) assert.ok(Math.abs(w.compression - expected) < expected * 0.2, `${w.compression}`);
     const p = s.position;
-    run(car, {}, 5);
+    run(car, {}, 60);
     const q = car.read().position;
-    assert.ok(Math.hypot(q[0] - p[0], q[2] - p[2]) < 1e-3, 'no creep at rest');
+    assert.ok(Math.hypot(q[0] - p[0], q[2] - p[2]) < 1e-6, `no creep at rest over a minute: ${q[2] - p[2]}`);
     assert.ok(Math.abs(yawOf(car) - 0.4) < 1e-3);
   });
 
@@ -388,4 +388,110 @@ test('car-handling: restore refuses foreign, malformed or non-unit snapshots and
   assert.throws(() => car.restore({...good, values: contact}), /contact/);
   assert.deepEqual(car.snapshot(), good);
   assert.ok(Object.isFrozen(good) && Object.isFrozen(good.values));
+});
+
+test('car-handling: a fast fall or drop cannot tunnel through the ground (rays reach back by the sub-step travel)', () => {
+  for (const preset of ['arcade', 'sim-lite'] as const) {
+    const car = createCarHandling(carConfig(preset));
+    car.place({x: 0, y: 1, z: 0});
+    const values = [...car.snapshot().values];
+    values[4] = -199; // falling at 199 m/s, close to limits.maxSpeed
+    car.restore({...car.snapshot(), values});
+    let lowest = Infinity;
+    for (let i = 0; i < 600; i++) {
+      car.step(DT, {}, flat);
+      lowest = Math.min(lowest, car.read().position[1]);
+    }
+    assert.ok(lowest > -0.5, `${preset}: never far below the ground (${lowest})`);
+    assert.equal(car.grounded, 4, `${preset} grounded`);
+    assert.ok(car.read().position[1] > 0, `${preset} back above the ground`);
+  }
+});
+
+test('car-handling: a braked car holds on a slope when brake-to-reverse is off', () => {
+  const slope = planeGround({slopeZ: -0.15});
+  for (const preset of ['arcade', 'sim-lite'] as const) {
+    const car = createCarHandling(carConfig(preset, {brakes: {brakeToReverse: false}}));
+    car.place({x: 0, y: 1, z: 0});
+    run(car, {brake: 1}, 5, slope);
+    const p = car.read().position;
+    run(car, {brake: 1}, 60, slope);
+    const q = car.read().position;
+    assert.ok(Math.hypot(q[0] - p[0], q[2] - p[2]) < 1e-3, `${preset}: held within 1 mm for a minute`);
+  }
+  // With the presets' brake-to-reverse, brake alone at standstill drives backwards instead (documented).
+  const reversing = createCarHandling(carConfig('arcade'));
+  reversing.place({x: 0, y: 1, z: 0});
+  run(reversing, {brake: 1}, 3, slope);
+  assert.ok(reversing.forwardSpeed < -1);
+});
+
+test('car-handling: configuration refuses unknown fields and unstable suspension for the sub-step', () => {
+  assert.throws(() => carConfig('arcade', {engine: {topSpeeed: 10} as never}), /unknown field engine.topSpeeed/);
+  assert.throws(() => carConfig('arcade', {suspension: {frequency: 20}}), /too stiff/);
+  assert.throws(() => carConfig('arcade', {suspension: {bumpStop: 1000}}), /bumpStop/);
+  assert.throws(() => carConfig('arcade', {suspension: {damping: 5}}), /damping/);
+  assert.throws(() => carConfig('arcade', {limits: {maxSubstep: 1 / 15}}), /too stiff|bumpStop/);
+  assert.doesNotThrow(() => carConfig('arcade', {suspension: {frequency: 6.6, bumpStop: 2}}));
+});
+
+test('car-handling: an axle without wheels hands its foot-brake share to the other', () => {
+  const allFront = CAR_PRESETS.arcade.wheels.map(w => ({...w, front: true}));
+  const car = createCarHandling(carConfig('arcade', {wheels: allFront, brakes: {bias: 0, brakeToReverse: false}}));
+  car.place({x: 0, y: 1, z: 0});
+  settle(car);
+  while (car.forwardSpeed < 25) car.step(DT, {throttle: 1}, flat);
+  run(car, {brake: 1}, 4);
+  assert.ok(car.forwardSpeed < 0.1, `stopped: ${car.forwardSpeed}`);
+});
+
+test('car-handling: no -0, no hidden port state, no re-entry and no unusable restores', () => {
+  const car = createCarHandling(carConfig('arcade'));
+  car.place({x: -0, y: 1, z: -0, yaw: -0});
+  assert.ok(car.snapshot().values.every(v => !Object.is(v, -0)));
+  // A port that writes only distance and normal: grip and rolling fall back to defaults, never an earlier answer.
+  const partial: GroundQuery = (ox, oy, oz, dx, dy, dz, max, out) => {
+    const full = createGroundHit();
+    if (!flat(ox, oy, oz, dx, dy, dz, max, full)) return false;
+    out.distance = full.distance;
+    out.nx = full.nx;
+    out.ny = full.ny;
+    out.nz = full.nz;
+    return true;
+  };
+  const slick: GroundQuery = (...args) => {
+    const r = flat(...args);
+    args[7].grip = 0.1;
+    return r;
+  };
+  const a = createCarHandling(carConfig('arcade')),
+    b = createCarHandling(carConfig('arcade'));
+  for (const c of [a, b]) c.place({x: 0, y: 1, z: 0});
+  run(a, {throttle: 1}, 1, slick); // leaves grip 0.1 in a's scratch record
+  b.restore(a.snapshot());
+  run(a, {throttle: 1, steer: 1}, 1, partial);
+  run(b, {throttle: 1, steer: 1}, 1, partial);
+  assert.deepEqual(a.snapshot(), b.snapshot());
+  // Re-entry from a port is refused, and the outer step is refused whole.
+  const before = JSON.stringify(a.snapshot());
+  const sneaky: GroundQuery = (...args) => {
+    a.step(DT, {}, flat);
+    return flat(...args);
+  };
+  assert.throws(() => a.step(DT, {}, sneaky), /inside a step/);
+  assert.equal(JSON.stringify(a.snapshot()), before);
+  // Restores that would wedge the car are refused.
+  const values = [...a.snapshot().values];
+  for (const [i, v] of [
+    [0, 2e6],
+    [14, 7],
+    [13, 99],
+    [18, 3.5],
+    [16, -1],
+  ] as const) {
+    const bad = [...values];
+    bad[i] = v;
+    assert.throws(() => a.restore({...a.snapshot(), values: bad}), RangeError, `index ${i}`);
+  }
+  assert.equal(JSON.stringify(a.snapshot()), before);
 });

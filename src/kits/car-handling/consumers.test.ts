@@ -82,7 +82,7 @@ test('car-handling consumer: on a terrain-kit sampled surface the car rolls down
     heights,
   });
   const ground = sampledGround((x, z) => surface.sample(x, z));
-  const car = createCarHandling(carConfig('sim-lite'));
+  const car = createCarHandling(carConfig('sim-lite', {brakes: {brakeToReverse: false}}));
   car.place({x: 0, y: 10 - 0.15 * 4 + 0.8, z: 4});
   let minGrounded = 4;
   for (let i = 0; i < 240; i++) {
@@ -92,10 +92,10 @@ test('car-handling consumer: on a terrain-kit sampled surface the car rolls down
   assert.equal(minGrounded, 4);
   assert.ok(car.forwardSpeed > 2, `rolled downhill: ${car.forwardSpeed}`);
   // Held on the brake it stops and stays (static friction through predicted-velocity caps).
-  for (let i = 0; i < 300; i++) car.step(1 / 60, {brake: 1, throttle: 1e-6}, ground);
+  for (let i = 0; i < 300; i++) car.step(1 / 60, {brake: 1}, ground);
   const z = car.read().position[2];
-  for (let i = 0; i < 120; i++) car.step(1 / 60, {brake: 1, throttle: 1e-6}, ground);
-  assert.ok(Math.abs(car.read().position[2] - z) < 0.01, 'holds on the slope');
+  for (let i = 0; i < 3600; i++) car.step(1 / 60, {brake: 1}, ground);
+  assert.ok(Math.abs(car.read().position[2] - z) < 1e-3, 'holds on the slope for a minute');
 });
 
 test('car-handling consumer: the rollback kit sync test finds no hidden state across 600 frames', () => {

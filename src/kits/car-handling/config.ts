@@ -38,7 +38,7 @@ export interface CarConfig {
     restLength: number;
     /** Wheel radius (m): (0, 3]. */
     radius: number;
-    /** Natural frequency of each corner with its share of the mass (Hz): [0.2, 20]. Sets the spring rate. */
+    /** Natural frequency of each corner with its share of the mass (Hz): [0.2, 20], and 2*pi*f*maxSubstep <= 0.35. */
     frequency: number;
     /** Damping ratio of each corner: [0, 5]. 1 is critical. */
     damping: number;
@@ -121,7 +121,7 @@ export interface CarConfig {
     roll: number;
     /** From `steer` input (rad/s²): [0, 100]. */
     yaw: number;
-    /** Pull toward upright while airborne (rad/s² per rad of tilt): [0, 100]. */
+    /** Pull toward upright with no wheel down (rad/s² per unit sine of tilt): [0, 100]. */
     levelling: number;
     /** Extra angular damping while airborne (1/s): [0, 50]. */
     damping: number;
@@ -317,9 +317,12 @@ const bool = (path: string, v: unknown): boolean => {
   if (typeof v !== 'boolean') throw new RangeError(`car-handling: ${path} must be a boolean`);
   return v;
 };
-const section = (path: string, v: unknown): Record<string, unknown> => {
+const section = (path: string, v: unknown, keys: readonly string[]): Readonly<Record<string, unknown>> => {
   if (!v || typeof v !== 'object' || Array.isArray(v)) throw new RangeError(`car-handling: ${path} must be an object`);
-  return v as Record<string, unknown>;
+  const copy: Readonly<Record<string, unknown>> = {...v};
+  for (const key of Object.keys(copy))
+    if (!keys.includes(key)) throw new RangeError(`car-handling: unknown field ${path}.${key}`);
+  return copy;
 };
 const vec = (path: string, v: unknown, min: number, max: number, openMin = false): Vec3Tuple => {
   if (!Array.isArray(v) || v.length !== 3) throw new RangeError(`car-handling: ${path} must be [x, y, z]`);
@@ -352,12 +355,29 @@ const curve = (
 
 /** Validate a complete configuration and return a frozen copy. Throws `RangeError` on the first bad value. */
 export function validateCarConfig(input: unknown): CarConfig {
-  const c = section('config', input);
+  const c = section('config', input, [
+    'mass',
+    'halfExtents',
+    'inertiaScale',
+    'gravity',
+    'wheels',
+    'suspension',
+    'tyre',
+    'engine',
+    'brakes',
+    'steering',
+    'drift',
+    'aero',
+    'air',
+    'reset',
+    'body',
+    'limits',
+  ]);
   const wheelsIn = c.wheels;
   if (!Array.isArray(wheelsIn) || wheelsIn.length < 2 || wheelsIn.length > 8)
     throw new RangeError('car-handling: wheels must list 2 to 8 wheels');
   const wheels = wheelsIn.map((w: unknown, i) => {
-    const s = section(`wheels[${i}]`, w);
+    const s = section(`wheels[${i}]`, w, ['position', 'steer', 'drive', 'handbrake', 'front']);
     return Object.freeze({
       position: Object.freeze(vec(`wheels[${i}].position`, s.position, -20, 20)),
       steer: num(`wheels[${i}].steer`, s.steer, -1, 1),
@@ -366,17 +386,42 @@ export function validateCarConfig(input: unknown): CarConfig {
       front: bool(`wheels[${i}].front`, s.front),
     });
   });
-  const su = section('suspension', c.suspension),
-    ty = section('tyre', c.tyre),
-    en = section('engine', c.engine),
-    br = section('brakes', c.brakes),
-    st = section('steering', c.steering),
-    dr = section('drift', c.drift),
-    ae = section('aero', c.aero),
-    ai = section('air', c.air),
-    re = section('reset', c.reset),
-    bo = section('body', c.body),
-    li = section('limits', c.limits);
+  const su = section('suspension', c.suspension, [
+      'restLength',
+      'radius',
+      'frequency',
+      'damping',
+      'maxForce',
+      'bumpStop',
+    ]),
+    ty = section('tyre', c.tyre, ['grip', 'driveGrip', 'peakSlip', 'slideGrip', 'lowSpeed', 'rolling', 'forceHeight']),
+    en = section('engine', c.engine, ['force', 'topSpeed', 'reverseForce', 'reverseTopSpeed', 'curve']),
+    br = section('brakes', c.brakes, ['force', 'bias', 'handbrakeForce', 'brakeToReverse', 'reverseSpeed']),
+    st = section('steering', c.steering, ['maxAngle', 'rate', 'returnRate']),
+    dr = section('drift', c.drift, ['handbrakeGrip', 'recoveryTime']),
+    ae = section('aero', c.aero, ['drag', 'downforce', 'maxDownforce', 'angularDamping']),
+    ai = section('air', c.air, ['pitch', 'roll', 'yaw', 'levelling', 'damping']),
+    re = section('reset', c.reset, ['auto', 'upDot', 'maxSpeed', 'delay', 'lift']),
+    bo = section('body', c.body, ['contacts', 'friction']),
+    li = section('limits', c.limits, ['maxSubstep', 'maxSubsteps', 'maxSpeed', 'maxAngularSpeed', 'extent']);
+  // Explicit integration of a stiff spring is stable only while the spring's angular frequency times the sub-step stays
+  // small. These bounds keep the suspension and the bump stop well inside it (see the README's stability note).
+  const h = num('limits.maxSubstep', li.maxSubstep, 1 / 1000, 1 / 15),
+    omega = 2 * Math.PI * num('suspension.frequency', su.frequency, 0.2, 20),
+    zeta = num('suspension.damping', su.damping, 0, 5),
+    bump = num('suspension.bumpStop', su.bumpStop, 1, 1000);
+  if (omega * h > 0.35)
+    throw new RangeError(
+      `car-handling: suspension.frequency ${su.frequency} Hz is too stiff for limits.maxSubstep ${h} s (need 2*pi*f*maxSubstep <= 0.35)`,
+    );
+  if (omega * Math.sqrt(bump) * h > 1)
+    throw new RangeError(
+      'car-handling: suspension.bumpStop is too stiff for limits.maxSubstep (need 2*pi*f*sqrt(bumpStop)*maxSubstep <= 1)',
+    );
+  if (2 * zeta * omega * h > 1)
+    throw new RangeError(
+      'car-handling: suspension.damping is too high for limits.maxSubstep (need 2*damping*2*pi*f*maxSubstep <= 1)',
+    );
   return deepFreeze({
     mass: num('mass', c.mass, 50, 50000),
     halfExtents: vec('halfExtents', c.halfExtents, 0, 20, true),
