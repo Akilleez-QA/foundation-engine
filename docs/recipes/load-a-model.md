@@ -139,5 +139,6 @@ model, with RGBA8 textures. Limits and failure behaviour are in the [KTX2 guide]
 - One GLB per asset; embedded buffers and images only. Large files cost load time and memory against the scene's budget (`npm run play:snap` reports draws and triangles).
 - Mesh compression is meshopt only (no Draco). KTX2 images must be Basis Universal (ETC1S or UASTC), one 2D image each, at most 16,384 texels a side.
 - Clips play one at a time per entity; there is no blending between clips in the `Model` component.
+- Skinned characters in numbers (retargeted clips, weights on LOD levels, crowd cost, transitions): see the [character pipeline lessons](../guides/character-pipeline-lessons.md) and [crowd and night rendering lessons](../guides/crowd-and-night-rendering-lessons.md). They are practices, not engine features.
 - Asset URLs are resolved against the build base. For a sub-path, build with `npm run build -- --base ./` or a known prefix; see [host under a sub-path](host-under-a-sub-path.md). Arbitrary root-absolute URLs outside asset declarations still need your own base handling.
 - More: [model attachments](../guides/model-attachments.md), [model readiness](../guides/model-readiness.md), [model inspection](../guides/model-inspection.md), and the `mechanics` template, which uses this same fixture.
