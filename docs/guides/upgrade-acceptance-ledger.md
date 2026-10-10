@@ -1565,7 +1565,7 @@ Evidence: 25 focused headless tests (22 unit tests over both presets, landing ju
 
 ## Grid-step kit — candidate (2026-10-09)
 
-- **Scope:** `src/kits/grid-step` (ADR 0099).
+- **Scope:** `src/kits/grid-step` (ADR 0104).
 - **Evidence:** `grid-step.test.ts` covers timing, reservations, the refusal order, ledges, forced tiles, follower lines, snapshots, validation and reentrancy.
 - **Not established:** template or browser consumers and hosted CI.
 
