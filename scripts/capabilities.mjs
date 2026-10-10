@@ -143,6 +143,16 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'BOARD-01',
+    title: 'Optional board traversal with authored rails',
+    docs: 'src/kits/board-traversal/README.md',
+    evidence: [
+      {kit: 'board-traversal', export: 'createBoard'},
+      {kit: 'board-traversal', export: 'defineRails'},
+      {path: 'src/kits/board-traversal/board.test.ts'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',

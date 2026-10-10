@@ -21,6 +21,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | STREAM-01 | Optional on-demand streaming queue with byte and concurrency budgets |  | [streaming-queue.md](guides/streaming-queue.md) |
 | RETRO-01 | Optional retro software-raster look (low resolution, palette, ordered dither) |  | [retro-look.md](guides/retro-look.md) |
 | CAR-01 | Optional car handling on ray-cast wheels |  | [README.md](../src/kits/car-handling/README.md) |
+| BOARD-01 | Optional board traversal with authored rails |  | [README.md](../src/kits/board-traversal/README.md) |
 | NAV-FIELD-01 | Optional incremental shared navigation distance fields |  | [README.md](../src/kits/navigation/README.md) |
 | WORK-01 | Optional bounded fair work roster |  | [README.md](../src/kits/work-roster/README.md) |
 | VOLUME-01 | Optional bounded sphere and capsule overlap, sweep and headroom queries |  | [README.md](../src/kits/volume-query/README.md) |
@@ -87,6 +88,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/authoring`
 - `@kits/ballistics`
 - `@kits/behavior`
+- `@kits/board-traversal`
 - `@kits/breadcrumbs`
 - `@kits/cadence`
 - `@kits/camera`

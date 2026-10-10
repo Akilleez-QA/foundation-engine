@@ -139,3 +139,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0134](0134-duplicate-detector.md) | Duplicate and near-duplicate detection as a read-only repo tool | Tooling / Assets | Proposed |
 
 | [0140](0140-optional-car-handling.md) | Optional car handling on ray-cast wheels | Optional kits / Simulation | Proposed |
+
+| [0141](0141-optional-board-traversal.md) | Optional board traversal with authored rails | Optional kits / Simulation | Proposed |
