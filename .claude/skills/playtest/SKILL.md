@@ -6,7 +6,7 @@ description: Run a playtest round and report it against the brief's success crit
 # Playtest round
 
 1. `npm run check` must pass first.
-2. See it: `npm run play:snap -- [--scene <id>] [--mobile]`. Open the PNGs in `playtest/latest/` and look at them yourself: is everything framed, readable, not overlapping? Read `playtest/latest/probe.json` for fps, draws, triangles, budget status and page errors. A still scene is redrawn on request so the budget is judged on real frames; `not measured (no frames rendered)` is not a pass.
+2. See it: `npm run play:snap -- [--scene <id>] [--mobile]`. Open the PNGs in `playtest/latest/` and look at them yourself: is everything framed, readable, not overlapping? Read `playtest/latest/probe.json` for fps, draws, triangles, budget status and page errors. A still scene is redrawn on request so the budget is judged on real frames; `not measured (no frames rendered)` is not a pass. The budget is judged after the scene settles; the `warm-up` line shows the first frames after open next to the settled ones (and says when a scene did not settle within the wait).
 3. Check the criteria: `npm run play:criteria` (tests and playtest scripts per the brief; add `-- --gate` to include the gate).
 4. Report to the author in this shape:
    - what changed since the last round (one line);
