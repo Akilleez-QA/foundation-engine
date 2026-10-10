@@ -73,3 +73,50 @@ its own WebGL2 context and needs `capabilities.syncReadback`.
 - A WebGPU device claim needs physical-device evidence per
   [DEVICE-EXPERIENCE.md](../policy/DEVICE-EXPERIENCE.md). Headless Chromium is not
   device evidence.
+
+
+## Stage setup and retirement failures
+
+The existing shared-context stage pool retires a view logically before invoking
+cleanup callbacks. Flush, audit, renderer wrappers, underlying renderer disposal
+and final idle-context cleanup are attempted independently. One failure is
+re-thrown unchanged; multiple failures retain their causes in an AggregateError.
+Repeated surface release is a no-op, and the underlying renderer disposer gets
+at most one attempt even when an outer pixel-ratio wrapper throws before forwarding.
+Private resources inside a failing third-party wrapper cannot be guaranteed freed.
+
+A failed view never triggers a shared-object sweep or context loss while a sibling
+lease remains live. The surviving views can continue drawing. A slot becomes
+uncertain only when a release's cleanup fails. The uncertain slot refuses new
+same-antialias leases (returns null) until its last sibling retires; it is then
+retired instead of parked for reuse. This avoids creating a replacement context
+alongside those siblings, at the cost of stage unavailability for that setting
+while a long-lived sibling stays open. A setup or renderer-construction failure
+whose rollback succeeds does not refuse later sharing. The ordinary successful
+reuse policy is unchanged.
+
+Constructing a renderer on the shared context, and its setup (clear colour, pixel
+ratio), sets GL state behind the current drawing view's three.js state cache. Every
+new lease, successful or not, therefore makes the next drawing view reset its state
+first.
+
+Setup hooks run only after a callable release route exists. Pixel-ratio/profile,
+canvas attachment and owner-registration failures roll back the acquired view.
+Failed attachment restores a borrowed canvas to its original parent/position where
+possible; restoration failures join the original setup error. Ordinary successful
+release retains the existing caller-owned DOM policy. An owner that disposes during
+registration receives no live surface. Initial context/renderer unavailability
+still returns null when rollback succeeds; cleanup failures preserve the creation
+cause together with rollback errors instead of silently returning null.
+
+Slot retirement updates logical identity/counts before backend callbacks, so a
+throwing loss operation cannot strand registration or decrement it twice. Settling
+multiple idle slots attempts all of them before surfacing errors. Failed audit
+collection leaves the prior lastRelease audit unchanged, rather than fabricating
+zero resource counts. Retirement proves pool bookkeeping cleanup, not successful
+GPU reclamation when a driver/backend/disposer failed.
+
+Headless tests exercise actual stage owners with throwing setup, flush, audit,
+wrapper, renderer, tracked-object deletion, resize and context-loss operations;
+real existing pool tests retain sharing, loss forwarding and render-target behavior.
+No new browser, pixel, context-restoration or physical-memory evidence is claimed.

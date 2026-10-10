@@ -1260,3 +1260,18 @@ revision-checked inspections. An independent array model covers 10,000 churn ope
 These are candidate headless contracts; hosted combined CI and physical-device
 timing/native-memory acceptance are not implied. Creator result revisions and
 consumer cleanup remain explicit; runtime tickets are not saved. See ADR 0086.
+
+## Shared-stage retirement recovery — candidate (2026-10-09)
+
+The existing stage pool now retires logical view ownership despite cleanup errors
+and rolls back failed setup. Cleanup preserves original causes and still attempts
+independent retirement work. Surviving sibling leases are not swept or forced lost;
+only a failed release cleanup makes a slot uncertain, and an uncertain slot refuses
+new sharing until its last sibling leaves. A new lease makes the drawing view reset
+its GL state cache. Borrowed canvas attachment rollback and once-only underlying
+renderer disposal are exercised.
+See [render backend](render-backend.md#stage-setup-and-retirement-failures).
+Independent review found and fixed over-broad uncertainty after clean setup rollback
+and a stale drawer state cache after new leases. Hosted full CI is the integration
+gate; logical cleanup is not proof of successful GPU reclamation or physical-device
+acceptance.
