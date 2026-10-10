@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- Optional `economy` kit: integer flow economy with storage caps, keyed income/upkeep, production queues (upfront or streamed cost with equal slowdown), prerequisites unlocked by completed items, refunds, reclaimable pools with decay, per-tick reports and validated snapshots. See [ADR 0123](docs/adr/0123-flow-economy-and-production.md).
+
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.

@@ -1250,3 +1250,7 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Flow economy and production (ECON-01) — candidate, 2026-10-09
+
+Optional `economy` kit ([contract](../../src/kits/economy/README.md), [ADR 0123](../adr/0123-flow-economy-and-production.md)): integer stock and storage, income/upkeep, upfront or streamed production queues with prerequisites, refunds, reclaim pools, validated snapshots. Evidence: focused headless tests in `src/kits/economy/economy.test.ts`; independent adversarial review pending at publication. Candidate only; no game integration, browser, full CI or device acceptance claimed.
