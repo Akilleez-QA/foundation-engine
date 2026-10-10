@@ -869,6 +869,18 @@ explicit accounting limitations. See [asset residency](asset-residency.md).
 Focused and affected checks plus independent review are required before hosted
 integration; no physical memory or device evidence is implied.
 
+
+## Common texture descriptor accounting — candidate (2026-10-09)
+
+The existing byte estimator now forecasts full logical mip chains for common
+R/RG/RGBA unsigned-byte, half-float and float descriptors, including valid cubes,
+fixed array layers and shrinking volume depth. Existing model admission and
+cleanup own refusal and retry; budgets are unchanged. Unsupported descriptors
+retain compatibility fallback and remain an explicit accounting gap. See
+[asset residency](asset-residency.md). Headless arithmetic and model lifecycle
+regressions cover the corrected domain; physical allocation and device acceptance
+are unverified. Independent review and hosted integration remain pending.
+
 ## Data-defined formulas (FORMULA-01) — candidate, 2026-10-09
 
 Optional `formulas` kit ([contract](../../src/kits/formulas/README.md), [ADR 0120](../adr/0120-data-defined-formulas.md)): validated JSON/text expressions, ordered sheets, stacking stages and a damage model; deterministic arithmetic and caller-supplied randomness. Evidence: eleven focused headless tests (parsing, refusal, ordering, seeded/restored streams, stacking, damage pipeline, 2,000-case named-preset transcription check, review-hardening cases); one independent adversarial review with its findings addressed. Candidate only; no game integration, browser, full CI or device acceptance claimed.

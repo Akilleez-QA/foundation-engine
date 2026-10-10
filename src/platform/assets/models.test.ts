@@ -194,6 +194,81 @@ test('thin image mip admission retires rejected resources and permits a clean re
   assert.equal(library.stats().residentMiB, 0);
 });
 
+test('custom model descriptors enforce corrected estimates and recover after refusal', async () => {
+  for (const [kind, make, limit, expected] of [
+    [
+      'cube',
+      (size: number) => new T.CubeTexture(Array.from({length: 6}, () => ({width: size, height: size}))),
+      1000,
+      24,
+    ],
+    ['float', (size: number) => new T.DataTexture(null, size, size, T.RGBAFormat, T.FloatType), 2000, 16],
+    ['array', (size: number) => new T.DataArrayTexture(null, size, size, 3), 2000, 12],
+    ['volume', (size: number) => new T.Data3DTexture(null, size, size, 3), 2000, 16],
+    [
+      'cube face count',
+      (size: number) => new T.CubeTexture(Array.from({length: size === 16 ? 5 : 6}, () => ({width: 1, height: 1}))),
+      1000,
+      24,
+    ],
+    [
+      'cube rectangle',
+      (size: number) => new T.CubeTexture(Array.from({length: 6}, () => ({width: size, height: 1}))),
+      1000,
+      24,
+    ],
+    [
+      'cube mismatch',
+      (size: number) =>
+        new T.CubeTexture(Array.from({length: 6}, (_, i) => ({width: i === 5 ? size : 1, height: i === 5 ? size : 1}))),
+      1000,
+      24,
+    ],
+  ] as const) {
+    let attempt = 0;
+    const disposed: string[] = [];
+    const library = createModelLibrary({
+      def: () => defs[0],
+      fetchBytes: async () => new ArrayBuffer(0),
+      maxResidentBytes: limit,
+      parse: async () => {
+        const current = attempt++,
+          texture = make(current === 0 ? 16 : 1),
+          geometry = new T.BufferGeometry();
+        const material = new T.MeshBasicMaterial({map: texture, envMap: texture});
+        for (const [name, resource] of [
+          ['texture', texture],
+          ['geometry', geometry],
+          ['material', material],
+        ] as const)
+          resource.addEventListener('dispose', () => disposed.push(`${current}:${name}`));
+        return new T.Mesh(geometry, material);
+      },
+    });
+    await assert.rejects(
+      library.model(statue, {signal: new AbortController().signal}),
+      /resident budget exceeded/,
+      kind,
+    );
+    assert.equal(library.stats().residentMiB, 0);
+    assert.equal(library.stats().instances, 0);
+    assert.deepEqual(disposed.slice().sort(), ['0:geometry', '0:material', '0:texture']);
+    const lease = await library.model(statue, {signal: new AbortController().signal});
+    assert.equal(library.stats().residentMiB * 1048576, expected, kind);
+    lease.release();
+    library.dispose();
+    assert.deepEqual(disposed.slice().sort(), [
+      '0:geometry',
+      '0:material',
+      '0:texture',
+      '1:geometry',
+      '1:material',
+      '1:texture',
+    ]);
+    assert.equal(library.stats().residentMiB, 0);
+  }
+});
+
 test('no model loader registers Draco (meshopt is the only mesh compression)', () => {
   const src = join(import.meta.dirname, '../..');
   const traversal = (dir: string): string[] =>
