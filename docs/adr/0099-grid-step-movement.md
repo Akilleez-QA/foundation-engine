@@ -6,7 +6,7 @@
 
 ## Context
 
-Tile-based adventure, puzzle and tactics games move actors one tile at a time. They need facing, turning in place, classified refusals (walls, one-way tiles, water versus land, elevation layers, other actors, home leashes), ledge jumps, forced movement tiles and lines of followers. Independent decompilations of classic handheld games show these as one ordered collision classifier, with an actor holding both its previous and current tile while it moves. Foundation has continuous character movement, navigation search and static raster occupancy, but no tile-stepping actor owner.
+Tile-based adventure, puzzle and tactics games move actors one tile at a time. They need facing, turning in place, classified refusals (walls, one-way tiles, water versus land, elevation layers, other actors, home leashes), ledge jumps, forced movement tiles and lines of followers. Classic handheld games show these as one ordered collision classifier, with an actor holding both its previous and current tile while it moves. Foundation has continuous character movement, navigation search and static raster occupancy, but no tile-stepping actor owner.
 
 ## Decision
 
