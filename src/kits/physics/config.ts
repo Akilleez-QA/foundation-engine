@@ -27,6 +27,9 @@ export interface PhysicsLimits {
   readonly maxQueryHits: number;
   /** Debug-line vertices copied per draw (two per segment): [2, 1048576]. */
   readonly maxDebugVertices: number;
+  /** Largest accepted |coordinate| (m) and |Euler angle| (rad) entering the library: [1, 10000000]. Larger or
+   *  non-finite Transform values refuse admission, skip a kinematic target and refuse a teleport. */
+  readonly maxCoordinate: number;
 }
 
 export const PHYSICS_LIMIT_RANGES: Readonly<Record<keyof PhysicsLimits, readonly [number, number]>> = Object.freeze({
@@ -37,6 +40,7 @@ export const PHYSICS_LIMIT_RANGES: Readonly<Record<keyof PhysicsLimits, readonly
   maxSnapshotBytes: [1024, 64 * 1024 * 1024],
   maxQueryHits: [1, 4096],
   maxDebugVertices: [2, 1 << 20],
+  maxCoordinate: [1, 10_000_000],
 });
 
 export const PHYSICS_DEFAULT_LIMITS: PhysicsLimits = Object.freeze({
@@ -47,6 +51,7 @@ export const PHYSICS_DEFAULT_LIMITS: PhysicsLimits = Object.freeze({
   maxSnapshotBytes: 4 * 1024 * 1024,
   maxQueryHits: 64,
   maxDebugVertices: 65536,
+  maxCoordinate: 1_000_000,
 });
 
 export interface PhysicsVector {

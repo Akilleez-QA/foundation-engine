@@ -7,6 +7,7 @@ import {
   createPhysicsLoader,
   createPhysicsWorld,
   loadPhysics,
+  PhysicsCharacter,
   physicsConfig,
   RigidBody,
   scenePhysics,
@@ -417,4 +418,87 @@ test('scene: current() never creates a world; of() adopts the visit signal even 
   controller.abort();
   assert.equal(created.disposed, true, 'the visit signal disposes a world created before the signal was seen');
   assert.equal(physics.current({world}), null);
+});
+
+test('transforms: non-finite or out-of-bound positions and rotations are refused at admission, skipped as kinematic targets and refused by teleport', async () => {
+  const rapier = await ready();
+  const pw = createPhysicsWorld(rapier, {limits: {maxCoordinate: 1000}});
+  const w = new World();
+  const bad = [
+    w.spawn(Transform({x: Number.NaN}), RigidBody(), Collider()),
+    w.spawn(Transform({y: 1e39}), RigidBody(), Collider()),
+    w.spawn(Transform({rz: 1e300}), RigidBody()),
+    w.spawn(Transform({z: 2000}), Collider()),
+    w.spawn(Transform({x: Number.POSITIVE_INFINITY}), PhysicsCharacter()),
+  ];
+  const k = w.spawn(Transform({x: 1}), RigidBody({kind: 'kinematic'}), Collider());
+  const d = w.spawn(Transform({x: 5, y: 2}), RigidBody(), Collider());
+  pw.tick(w);
+  for (const e of bad) assert.equal(pw.handles(e), null);
+  const s = pw.status();
+  assert.equal(s.refused['invalid-body'], 3);
+  assert.equal(s.refused['invalid-collider'], 1);
+  assert.equal(s.refused['invalid-character'], 1);
+  const tr = w.get(k, Transform)!;
+  tr.x = Number.NaN;
+  pw.tick(w);
+  tr.x = 1e300;
+  pw.tick(w);
+  assert.equal(pw.status().skippedPoses, 2, 'each skipped kinematic target is counted');
+  const hit = pw.raycast({x: 1, y: 10, z: 0}, {x: 0, y: -1, z: 0}, 20);
+  assert.equal(hit.status === 'ok' && hit.hits[0]?.entity, k, 'the body keeps its last valid target');
+  assert.equal(pw.teleport(d, {x: 1e300, y: 0, z: 0}), false);
+  assert.equal(pw.teleport(d, {x: 0, y: Number.NaN, z: 0}), false);
+  assert.equal(pw.teleport(d, {x: 0, y: 2, z: 0, ry: 5000}), false);
+  assert.equal(pw.teleport(d, {x: 0, y: 2, z: 0}), true);
+  pw.tick(w);
+  const dt = w.get(d, Transform)!;
+  assert.ok([dt.x, dt.y, dt.z, dt.rx, dt.ry, dt.rz].every(Number.isFinite), 'no NaN is written back');
+  assert.equal(pw.raycast({x: 1e300, y: 0, z: 0}, {x: 0, y: -1, z: 0}, 1).status, 'invalid');
+  assert.equal(pw.overlap({shape: 'ball', radius: 1}, {x: 0, y: 0, z: 5000}).status, 'invalid');
+  assert.throws(() => physicsConfig({limits: {maxCoordinate: 0}}), RangeError);
+  assert.equal(physicsConfig().limits.maxCoordinate, 1_000_000);
+  pw.dispose();
+});
+
+test('queries: past maxHits, raycastAll keeps the nearest and overlap the lowest entity ids, whatever the library order', async () => {
+  const rapier = await ready();
+  const pw = createPhysicsWorld(rapier, {limits: {maxQueryHits: 3}});
+  const w = new World();
+  const boxes: number[] = [];
+  for (let i = 0; i < 40; i++) boxes.push(w.spawn(Transform({y: 100 - i * 2}), Collider({hx: 0.4, hy: 0.4, hz: 0.4})));
+  assert.deepEqual(boxes.slice(0, 3), [1, 2, 3]);
+  pw.tick(w);
+  const ray = pw.raycastAll({x: 0, y: 200, z: 0}, {x: 0, y: -1, z: 0}, 1000, {maxHits: 3});
+  assert.equal(ray.status, 'ok');
+  if (ray.status === 'ok') {
+    assert.deepEqual(
+      ray.hits.map(h => h.entity),
+      [1, 2, 3],
+    );
+    assert.equal(ray.truncated, true);
+  }
+  const all = pw.overlap({shape: 'cuboid', hx: 1, hy: 60, hz: 1}, {x: 0, y: 50, z: 0}, {maxHits: 3});
+  assert.deepEqual(all.status === 'ok' && all.hits, [1, 2, 3]);
+  assert.equal(all.status === 'ok' && all.truncated, true);
+  const few = pw.overlap({shape: 'ball', radius: 0.5}, {x: 0, y: 98, z: 0});
+  assert.deepEqual(few.status === 'ok' && [few.hits, few.truncated], [[2], false]);
+  pw.dispose();
+});
+
+test('scene: exit removes the visit abort listener', async () => {
+  await ready();
+  const physics = scenePhysics();
+  const world = new World();
+  const controller = new AbortController();
+  let listeners = 0;
+  const signal = controller.signal;
+  const add = signal.addEventListener.bind(signal),
+    remove = signal.removeEventListener.bind(signal);
+  signal.addEventListener = ((...a: Parameters<typeof add>) => (listeners++, add(...a))) as typeof add;
+  signal.removeEventListener = ((...a: Parameters<typeof remove>) => (listeners--, remove(...a))) as typeof remove;
+  assert.ok(physics.of({world, view: {signal}} as never));
+  assert.equal(listeners, 1);
+  physics.exit({world});
+  assert.equal(listeners, 0);
 });

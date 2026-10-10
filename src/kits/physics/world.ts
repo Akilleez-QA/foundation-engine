@@ -82,6 +82,9 @@ export interface PhysicsStatus {
   readonly droppedEvents: number;
   /** Collision events for already removed colliders since creation (see PhysicsEvents.unmapped). */
   readonly unmappedEvents: number;
+  /** Kinematic targets skipped and dynamic poses not written back because a value was non-finite or beyond
+   *  `maxCoordinate`, since creation. */
+  readonly skippedPoses: number;
   /** Library objects released by this owner: worlds, event queues, character controllers. */
   readonly released: Readonly<{worlds: number; queues: number; controllers: number}>;
 }
@@ -191,6 +194,8 @@ const SNAPSHOT_FORMAT = 'foundation-physics';
 const SNAPSHOT_VERSION = 1;
 const MAX_DISPLACEMENT = 100;
 const MAX_QUERY_DISTANCE = 1e5;
+/** Candidates one multi-hit query examines before choosing the nearest / lowest `maxHits`. Past it, `truncated`. */
+export const QUERY_SCAN_CAP = 16384;
 const EMPTY: readonly PhysicsCollision[] = Object.freeze([]);
 const REASONS: readonly RefusalReason[] = [
   'limit-bodies',
@@ -212,6 +217,13 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
   const m: ScalarMath = scalarMath(config.math);
   const R = rapier;
   const limits = config.limits;
+  const bound = limits.maxCoordinate;
+  const inBound = (v: number) => Number.isFinite(v) && Math.abs(v) <= bound;
+  /** Position and rotation finite and within `maxCoordinate`. */
+  const poseOk = (p: {x: number; y: number; z: number; rx?: number; ry?: number; rz?: number}) =>
+    inBound(p.x) && inBound(p.y) && inBound(p.z) && inBound(p.rx ?? 0) && inBound(p.ry ?? 0) && inBound(p.rz ?? 0);
+  const vectorOk = (v: PhysicsVector | undefined | null): v is PhysicsVector =>
+    !!v && inBound(v.x) && inBound(v.y) && inBound(v.z);
   let world: RWorld | null = makeWorld();
   let queue: InstanceType<Rapier['EventQueue']> | null = new R.EventQueue(true);
   const records = new Map<Entity, Rec>();
@@ -222,6 +234,7 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
     refusals = 0,
     droppedEvents = 0,
     unmappedEvents = 0,
+    skippedPoses = 0,
     bodyCount = 0,
     colliderCount = 0,
     characterCount = 0;
@@ -317,7 +330,7 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
 
   type TransformData = ReturnType<typeof Transform.initial>;
   function admitCharacter(e: Entity, tr: TransformData, ch: PhysicsCharacterData, prev: Map<Entity, RefusalReason>) {
-    if (characterProblem(ch)) return refuse(e, 'invalid-character', prev);
+    if (characterProblem(ch) || !poseOk(tr)) return refuse(e, 'invalid-character', prev);
     if (characterCount + 1 > limits.maxCharacters) return refuse(e, 'limit-characters', prev);
     if (bodyCount + 1 > limits.maxBodies) return refuse(e, 'limit-bodies', prev);
     if (colliderCount + 1 > limits.maxColliders) return refuse(e, 'limit-colliders', prev);
@@ -348,7 +361,7 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
     c: ColliderData | undefined,
     prev: Map<Entity, RefusalReason>,
   ) {
-    if (bodyProblem(b)) return refuse(e, 'invalid-body', prev);
+    if (bodyProblem(b) || !poseOk(tr)) return refuse(e, 'invalid-body', prev);
     if (c && colliderProblem(c)) return refuse(e, 'invalid-collider', prev);
     if (bodyCount + 1 > limits.maxBodies) return refuse(e, 'limit-bodies', prev);
     if (c && colliderCount + 1 > limits.maxColliders) return refuse(e, 'limit-colliders', prev);
@@ -381,7 +394,7 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
     }
   }
   function admitStatic(e: Entity, tr: TransformData, c: ColliderData, prev: Map<Entity, RefusalReason>) {
-    if (colliderProblem(c)) return refuse(e, 'invalid-collider', prev);
+    if (colliderProblem(c) || !poseOk(tr)) return refuse(e, 'invalid-collider', prev);
     if (colliderCount + 1 > limits.maxColliders) return refuse(e, 'limit-colliders', prev);
     const q = eulerToQuat(tr.rx, tr.ry, tr.rz, m);
     const collider = world!.createCollider(colliderOf(c).setTranslation(tr.x, tr.y, tr.z).setRotation(q));
@@ -450,6 +463,10 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
     for (const rec of records.values()) {
       if (rec.bodyKind !== 'kinematic') continue;
       const tr = w.get(rec.entity, Transform)!;
+      if (!poseOk(tr)) {
+        skippedPoses++; // the body keeps its last valid target
+        continue;
+      }
       const body = world.getRigidBody(rec.body!);
       body.setNextKinematicTranslation({x: tr.x, y: tr.y, z: tr.z});
       if (rec.kind === 'body') body.setNextKinematicRotation(eulerToQuat(tr.rx, tr.ry, tr.rz, m));
@@ -498,6 +515,10 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
       const body = world.getRigidBody(rec.body!);
       const t = body.translation(),
         e = quatToEuler(body.rotation(), m);
+      if (!poseOk({x: t.x, y: t.y, z: t.z, ...e})) {
+        skippedPoses++; // never write a non-finite or runaway pose into Transform
+        continue;
+      }
       if (tr.x !== t.x || tr.y !== t.y || tr.z !== t.z || tr.rx !== e.rx || tr.ry !== e.ry || tr.rz !== e.rz) {
         tr.x = t.x;
         tr.y = t.y;
@@ -548,7 +569,7 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
       const w = live();
       if (!w) return Object.freeze({status: 'disposed'});
       const dir = finite(direction) ? unit(direction) : null;
-      if (!finite(origin) || !dir || !distanceOk(maxDistance)) return Object.freeze({status: 'invalid'});
+      if (!vectorOk(origin) || !dir || !distanceOk(maxDistance)) return Object.freeze({status: 'invalid'});
       const ex = excludeOf(o);
       const hit = w.castRayAndGetNormal(
         new R.Ray(origin, dir),
@@ -579,9 +600,11 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
       if (!w) return Object.freeze({status: 'disposed'});
       const dir = finite(direction) ? unit(direction) : null;
       const max = hitsBound(o?.maxHits);
-      if (!finite(origin) || !dir || !distanceOk(maxDistance) || max === null)
+      if (!vectorOk(origin) || !dir || !distanceOk(maxDistance) || max === null)
         return Object.freeze({status: 'invalid'});
       const ex = excludeOf(o);
+      // Collect every candidate (up to the scan cap), then keep the nearest: the result never depends on the
+      // library's traversal order.
       const hits: PhysicsHit[] = [];
       let truncated = false;
       w.intersectionsWithRay(
@@ -591,7 +614,7 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
         hit => {
           const rec = byCollider.get(hit.collider.handle);
           if (!rec) return true;
-          if (hits.length >= max) {
+          if (hits.length >= QUERY_SCAN_CAP) {
             truncated = true;
             return false;
           }
@@ -612,14 +635,15 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
         ex.body,
       );
       hits.sort((a, b) => a.distance - b.distance || a.entity - b.entity);
-      return Object.freeze({status: 'ok', hits: Object.freeze(hits), truncated});
+      if (hits.length > max) truncated = true;
+      return Object.freeze({status: 'ok', hits: Object.freeze(hits.slice(0, max)), truncated});
     },
     overlap(shape, pose, o) {
       const w = live();
       if (!w) return Object.freeze({status: 'disposed'});
       const s = queryShape(shape),
         max = hitsBound(o?.maxHits);
-      if (!s || !finitePose(pose) || max === null) return Object.freeze({status: 'invalid'});
+      if (!s || !finitePose(pose) || !poseOk(pose) || max === null) return Object.freeze({status: 'invalid'});
       const ex = excludeOf(o);
       const found = new Set<Entity>();
       let truncated = false;
@@ -630,7 +654,7 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
         c => {
           const rec = byCollider.get(c.handle);
           if (!rec) return true;
-          if (found.size >= max) {
+          if (found.size >= QUERY_SCAN_CAP) {
             truncated = true;
             return false;
           }
@@ -642,14 +666,17 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
         ex.collider,
         ex.body,
       );
-      return Object.freeze({status: 'ok', hits: Object.freeze([...found].sort((a, b) => a - b)), truncated});
+      const sorted = [...found].sort((a, b) => a - b);
+      if (sorted.length > max) truncated = true;
+      return Object.freeze({status: 'ok', hits: Object.freeze(sorted.slice(0, max)), truncated});
     },
     castShape(shape, pose, direction, maxDistance, o) {
       const w = live();
       if (!w) return Object.freeze({status: 'disposed'});
       const s = queryShape(shape);
       const dir = finite(direction) ? unit(direction) : null;
-      if (!s || !finitePose(pose) || !dir || !distanceOk(maxDistance)) return Object.freeze({status: 'invalid'});
+      if (!s || !finitePose(pose) || !poseOk(pose) || !dir || !distanceOk(maxDistance))
+        return Object.freeze({status: 'invalid'});
       const ex = excludeOf(o);
       const hit = w.castShape(
         {x: pose.x, y: pose.y, z: pose.z},
@@ -692,7 +719,7 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
     teleport(entity, pose, stop = true) {
       const w = live();
       const rec = records.get(entity);
-      if (!w || !rec || rec.body === null || !finitePose(pose)) return false;
+      if (!w || !rec || rec.body === null || !finitePose(pose) || !poseOk(pose)) return false;
       const body = w.getRigidBody(rec.body);
       body.setTranslation({x: pose.x, y: pose.y, z: pose.z}, true);
       if (rec.kind !== 'character') body.setRotation(eulerToQuat(pose.rx ?? 0, pose.ry ?? 0, pose.rz ?? 0, m), true);
@@ -757,7 +784,9 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
       if (!Array.isArray(p.records) || p.records.length > limits.maxBodies + limits.maxColliders)
         return fail('records');
       const next: Rec[] = [];
-      const seen = new Set<Entity>();
+      const seen = new Set<Entity>(),
+        bodyHandles = new Set<number>(),
+        colliderHandles = new Set<number>();
       let bodies = 0,
         colliders = 0,
         characters = 0;
@@ -776,6 +805,10 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
         if ((kind === 'static') !== (body === null) || (kind !== 'body' && collider === null))
           return fail('shape of record');
         if ((body === null) !== (bk === null) || (kind === 'character' && bk !== 'kinematic')) return fail('body kind');
+        if ((body !== null && bodyHandles.has(body)) || (collider !== null && colliderHandles.has(collider)))
+          return fail('duplicate handle');
+        if (body !== null) bodyHandles.add(body);
+        if (collider !== null) colliderHandles.add(collider);
         seen.add(entity as number);
         if (body !== null) bodies++;
         if (collider !== null) colliders++;
@@ -804,8 +837,23 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
       for (const r of next) {
         if (r.body !== null && !candidate.bodies.contains(r.body)) return reject('missing body');
         if (r.collider !== null && !candidate.colliders.contains(r.collider)) return reject('missing collider');
-        if (r.body !== null && r.collider !== null && candidate.getCollider(r.collider).parent()?.handle !== r.body)
-          return reject('collider parent');
+        const c = r.collider === null ? null : candidate.getCollider(r.collider);
+        // The raw parent query: in 0.21.0 a deserialised world's `Collider.parent()` reports a body even for a
+        // parentless collider, so the wrapper cannot be trusted here.
+        const parent = r.collider === null ? undefined : candidate.colliders.raw.coParent(r.collider);
+        if (r.body !== null && c && parent !== r.body) return reject('collider parent');
+        if (r.kind === 'static' && parent !== undefined) return reject('collider parent');
+        if (c && c.isSensor() !== r.sensor) return reject('sensor');
+        if (r.body !== null) {
+          const type = candidate.getRigidBody(r.body).bodyType();
+          const want =
+            r.bodyKind === 'dynamic'
+              ? R.RigidBodyType.Dynamic
+              : r.bodyKind === 'fixed'
+                ? R.RigidBodyType.Fixed
+                : R.RigidBodyType.KinematicPositionBased;
+          if (type !== want) return reject('body type');
+        }
       }
       if (
         candidate.timestep !== Math.fround(config.step) ||
@@ -827,6 +875,7 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
         records.set(r.entity, r);
         if (r.collider !== null) byCollider.set(r.collider, r);
       }
+      refusedNow = new Map(); // refusals are re-evaluated against the restored mapping at the next sync
       bodyCount = bodies;
       colliderCount = colliders;
       characterCount = characters;
@@ -861,6 +910,7 @@ export function createPhysicsWorld(rapier: Rapier, options: PhysicsOptions = {})
         refusals,
         droppedEvents,
         unmappedEvents,
+        skippedPoses,
         released: Object.freeze({...released}),
       });
     },

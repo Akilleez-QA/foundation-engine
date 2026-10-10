@@ -96,6 +96,10 @@ ports: {
 - Run `createRollbackSyncTest` in a test before any network, as the kit's own tests do.
 - Snapshot text grows with the world: 41.6 KB for 14 boxes, 285 KB for 100. A rollback window multiplies that per tick, so measure before choosing the window.
 
+A restore cross-checks every record against the decoded library world: handles,
+counts, body types, sensor flags, collider parents and the configuration. Any mismatch
+is refused, and the live world is left as it was.
+
 ## 5. Determinism checklist
 
 The deterministic build guarantees identical results for an identical sequence of
@@ -120,6 +124,19 @@ it, and is disposed with the visit.
 `scenePhysics({ loader: createPhysicsLoader(() => import('…')) })` substitutes another
 build of the same API, for example the SIMD build for speed. Doing so voids the
 determinism and snapshot evidence: record that in the game's acceptance notes.
+
+## Bounds worth knowing
+
+- `limits.maxCoordinate` (default 1,000,000) bounds every position and Euler angle
+  entering the library.
+  - A non-finite or larger `Transform` refuses admission and skips that tick's kinematic target.
+  - Such a pose also refuses `teleport` and queries.
+  - Skips are counted in `status().skippedPoses`.
+- Multi-hit queries examine all hits, up to an internal scan cap, before keeping the
+  nearest (`raycastAll`) or the lowest entity ids (`overlap`). `truncated` says when
+  anything was left out.
+- Debug lines: the GPU copy is bounded, but the library builds its whole debug buffer
+  on each refresh.
 
 ## Limitations
 

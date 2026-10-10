@@ -49,6 +49,7 @@ export function scenePhysics(options: ScenePhysicsOptions = {}): ScenePhysics {
   const states = new WeakMap<World, ScenePhysicsState>();
   const retired = new WeakSet<World>();
   const watched = new WeakSet<World>();
+  const unwatch = new WeakMap<World, () => void>();
 
   /** Follow the visit's abort signal once it is seen (a caller without `view` may have created the world). */
   const watch = (key: World, ctx: object) => {
@@ -56,8 +57,10 @@ export function scenePhysics(options: ScenePhysicsOptions = {}): ScenePhysics {
     const signal = 'view' in ctx ? (ctx as Pick<SceneContext, 'view'>).view?.signal : undefined;
     if (!signal) return;
     watched.add(key);
-    if (signal.aborted) dispose(key);
-    else signal.addEventListener('abort', () => dispose(key), {once: true});
+    if (signal.aborted) return dispose(key);
+    const onAbort = () => dispose(key);
+    signal.addEventListener('abort', onAbort, {once: true});
+    unwatch.set(key, () => signal.removeEventListener('abort', onAbort));
   };
   const of: ScenePhysics['of'] = ctx => {
     const key = ctx.world;
@@ -72,6 +75,8 @@ export function scenePhysics(options: ScenePhysicsOptions = {}): ScenePhysics {
     return w.disposed ? null : w;
   };
   function dispose(key: World) {
+    unwatch.get(key)?.();
+    unwatch.delete(key);
     retired.add(key);
     worlds.get(key)?.dispose();
     states.set(key, 'disposed');

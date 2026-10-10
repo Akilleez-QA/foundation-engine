@@ -34,7 +34,7 @@ export function physicsDebugDraw(physics: ScenePhysics, o: PhysicsDebugDrawOptio
       closed = false;
     const ensure = (limit: number) => {
       if (geometry) return;
-      capacity = capacity || limit;
+      capacity = Math.min(capacity || limit, limit); // never more than the world's own bound
       capacity -= capacity % 2;
       geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(capacity * 3), 3));

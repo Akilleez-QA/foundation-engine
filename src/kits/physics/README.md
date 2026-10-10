@@ -97,11 +97,16 @@ An entity with `PhysicsCharacter` is always a character: a `RigidBody` or `Colli
 on it is ignored. `of(ctx)` creates the visit's world once the library is ready;
 `current(ctx)` only looks it up.
 
-**Queries** return entity ids and refuse non-finite or out-of-range input with `{status: 'invalid'}`:
+**Queries** return entity ids. Non-finite input, positions or angles beyond
+`maxCoordinate`, and out-of-range distances or hit counts are refused with
+`{status: 'invalid'}`:
 
 - `raycast` returns the nearest hit, with distance, point and normal.
-- `raycastAll` returns up to `maxHits` hits; `truncated` reports a cut.
-- `overlap(shape, pose)` returns ascending entity ids, up to `maxHits`.
+- `raycastAll` examines every hit (up to an internal scan cap of 16,384,
+  `QUERY_SCAN_CAP`), then returns the nearest `maxHits`, ties broken by entity id.
+- `overlap(shape, pose)` examines the same way, then returns the lowest `maxHits` entity ids.
+- In both, `truncated` is true when hits were left out, including when the scan cap
+  itself was reached. The result never depends on the library's traversal order.
 - `castShape(shape, pose, direction, maxDistance)` returns the first hit.
 
 Options are `exclude` (an entity) and `sensors` (default false).
@@ -110,6 +115,17 @@ Options are `exclude` (an entity) and `sensors` (default false).
 
 - `snapshot()` returns `{text}`: JSON holding the library bytes in base64, the entity↔handle records and the tick.
 - `restore(text)` validates the text and rebuilds atomically. It returns `restored`, `invalid {reason}` or `too-large`.
+  Before committing, it checks every record against the decoded world:
+  - each handle exists and appears in only one record;
+  - object counts match;
+  - each body's type matches its recorded kind;
+  - each collider's sensor flag matches;
+  - an attached collider's parent is its body, and a static collider has no parent;
+  - gravity, step and solver iterations match the configuration.
+
+  The parent check uses the library's raw parent query: in 0.21.0 a deserialised
+  world's `Collider.parent()` wrapper was observed to report a body for a parentless
+  collider.
 
 ## Owner, lifetime and cancellation
 
@@ -134,6 +150,7 @@ world. The world is created on the first fixed tick after the library is ready.
 | `maxSnapshotBytes` | 1 KiB–64 MiB (4 MiB) | `snapshot` / `restore` return `too-large` |
 | `maxQueryHits` | 1–4,096 (64) | Multi-hit queries stop and report `truncated` |
 | `maxDebugVertices` | 2–1,048,576 (65,536) | Debug lines copy at most this many vertices; `truncated` is reported |
+| `maxCoordinate` | 1–10,000,000 (1,000,000) | A non-finite or larger \|coordinate\| (m) or \|Euler angle\| (rad) refuses admission (`invalid-body`, `invalid-collider`, `invalid-character`), skips that tick's kinematic target (counted in `skippedPoses`; the body keeps its last valid target), refuses `teleport` (false) and refuses a query. A dynamic pose outside it is not written back to `Transform` (also counted). |
 | `substeps` | 1–8 (1) | Library steps per engine tick: the step bound |
 | `solverIterations` | 1–16 (4) | n/a |
 | `timeScale` | (0, 4] (1) | Not 1 is a deliberate time-scale decision |
@@ -147,6 +164,7 @@ A count limit is not a CPU deadline.
 ## Recovery
 
 - A refused restore leaves the live world untouched. A decoded candidate world that fails validation is freed.
+- A restore clears the current refusals; they are re-evaluated against the restored mapping at the next sync.
 - After a restore, events are empty until the next step.
 - Snapshot entities that the game no longer has are removed at the next sync, and current entities the snapshot did not know are admitted.
 - Restore the ECS state first, then the physics snapshot.
@@ -174,7 +192,10 @@ List it before the step system. Add `physics({ characters: true })` and
 `character()` to the game's kits, because the adapter reads the character kit's axes.
 
 An entity with both `Character` and `PhysicsCharacter` is refused and counted as
-`conflicts`, because the stock system would move it too. The capsule is upright.
+`conflicts`, because the stock system would move it too. The refusal is only the
+adapter's movement: the physics world still admits the entity as a character, a
+kinematic capsule that follows `Transform` (moved by the stock system), blocks other
+bodies and emits collision events. The capsule is upright.
 `Transform.ry` is facing only. Pushing dynamic bodies is off.
 
 The one change to the character kit is additive: `createMotion({velocity})` starts the
@@ -185,8 +206,11 @@ reload. Without the option, behaviour is unchanged.
 
 `physicsDebugDraw(physics, { maxVertices?, enabled? })` is a scene extension, and it
 is off unless the scene lists it. It allocates one line buffer at the first enabled
-frame and refreshes it once per physics tick from the library's debug renderer, up to
-the bound. It removes and disposes its geometry and material with the visit. Its cost
+frame, capped at the world's `maxDebugVertices`, and refreshes it once per physics
+tick from the library's debug renderer, up to the bound. Only the copy into the GPU
+buffer is bounded: each refresh, the library's `debugRender()` produces and copies its
+whole line buffer (proportional to every collider) into JavaScript before the kit takes
+its bounded slice. It removes and disposes its geometry and material with the visit. Its cost
 is one draw call.
 
 ## Determinism
@@ -225,6 +249,10 @@ The 100- and 500-body piles settle and sleep, so these timings are optimistic fo
 
 - Stock first-load JS is 175.6 KiB with or without this kit in the tree.
 - A fixture game importing the kit has 202.1 KiB first-load JS, which includes the kit code. The library is not in it.
+  The kit index statically imports the character adapter, which imports `@kits/character`. The character kit's
+  module-level definitions (its move inputs) were present in that fixture's first-load chunk even though the fixture
+  used no character, so the figure includes them. A separate entry point would avoid it; the `@kits/<name>` alias
+  supports one entry per kit.
 - The library is one dynamically imported chunk: 4,366,824 bytes, 1,658,896 bytes with `gzip -9`. It exceeds the 500 kB large-chunk rule, so a game using the kit must list `rapier` in its own `largeChunkAllow`. That is the creator's budget decision.
 
 ## Evidence
@@ -241,12 +269,16 @@ The 100- and 500-body piles settle and sleep, so these timings are optimistic fo
 - event order, the bound and drops, and sensor events;
 - stop events of a despawned entity counted as `unmapped`;
 - the four queries and invalid input;
+- nearest-first `raycastAll` and lowest-id `overlap` past `maxHits` (40 boxes, `maxHits` 3, giving [1, 2, 3]);
+- NaN, 1e39, 1e300 and out-of-bound `Transform` values refused at admission, kinematic targets skipped and counted, teleports refused, no NaN written back;
 - the debug bound;
 - `rebuild`;
 - kinematic and fixed authority;
 - byte-identical snapshots from two worlds after 180 ticks;
 - snapshot at tick 40, then restore and replay to 150, equal to the uninterrupted run byte for byte, poses included. The replay includes a tick that despawns a static collider and three bodies and spawns a ball; Map-order removal fails this test;
 - invalid, foreign and oversized restores refused with the world untouched;
+- forged snapshots refused with the world untouched: swapped body kinds, flipped sensor flags, a static record pointing at an attached collider, duplicate body and collider handles;
+- refusals re-evaluated after a restore; exit removes the visit abort listener;
 - stale entities after restore;
 - `createRollbackSyncTest` at distance 8 for 90 frames;
 - two `createRollbackSession` peers on a delayed link ending with equal confirmed checksums after rollbacks;

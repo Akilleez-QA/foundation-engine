@@ -1231,8 +1231,10 @@ the one new runtime dependency, approved for this kit only. Core stays physics-f
   in its own `largeChunkAllow`. No budget changed.
 - **Runtime contracts:** configured admission, event, query, snapshot and debug-vertex
   limits; refusals and drops are counted; disposal is exactly once per visit.
-- **Candidate evidence:** focused Node tests of lifecycle, refusals, ordering, queries,
-  snapshot determinism, the rollback sync test and two-peer session, and the character
-  adapter, plus one software-GL `play:snap` of an uncommitted fixture.
+- **Candidate evidence:** 35 focused Node tests in `src/kits/physics` (plus one
+  character-kit motion test): lifecycle, refusals, `Transform` bound validation,
+  ordering, order-independent query truncation, snapshot determinism, forged-snapshot
+  refusal, the rollback sync test and two-peer session, and the character adapter. Also
+  one software-GL `play:snap` of an uncommitted fixture.
 - **Not established:** hosted CI, cross-browser bit identity, GPU/physical-device
   performance and memory, and multiplayer acceptance.

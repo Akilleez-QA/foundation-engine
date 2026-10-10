@@ -250,3 +250,66 @@ test('rollback: two peers on a delayed link end with identical physics state', a
   for (const s of sessions) s.dispose();
   for (const p of peers) p.pw.dispose();
 });
+
+test('restore: forged records that disagree with the library world are refused and the live world is untouched', async () => {
+  const rapier = await ready();
+  const pw = createPhysicsWorld(rapier);
+  const w = new World();
+  const dyn = w.spawn(Transform({y: 2}), RigidBody(), Collider());
+  const kin = w.spawn(Transform({x: 3}), RigidBody({kind: 'kinematic'}), Collider());
+  const zone = w.spawn(Transform({x: -3}), Collider({sensor: true}));
+  const floor = w.spawn(Transform(), Collider({hx: 5, hy: 0.1, hz: 5}));
+  pw.tick(w);
+  const before = bytesOf(pw);
+  type Row = [number, string, string, string, string, number];
+  const good = JSON.parse(before) as {records: Row[]};
+  const row = (e: number) => good.records.findIndex(r => r[0] === e);
+  const forge = (edit: (rows: Row[]) => void) => {
+    const rows = good.records.map(r => [...r] as Row);
+    edit(rows);
+    return JSON.stringify({...JSON.parse(before), records: rows});
+  };
+  const cases: [string, string][] = [
+    // swapped kinds: the dynamic body claimed kinematic and the kinematic one dynamic
+    [forge(r => ((r[row(dyn)]![2] = 'kinematic'), (r[row(kin)]![2] = 'dynamic'))), 'body type'],
+    // a sensor claimed solid, and a solid claimed sensor
+    [forge(r => (r[row(zone)]![5] = 0)), 'sensor'],
+    [forge(r => (r[row(floor)]![5] = 1)), 'sensor'],
+    // a static record pointing at an attached collider (handles swapped, so no duplicate)
+    [
+      forge(r => {
+        const attached = r[row(dyn)]![4];
+        r[row(dyn)]![4] = r[row(floor)]![4];
+        r[row(floor)]![4] = attached;
+      }),
+      'collider parent',
+    ],
+    // the same handles claimed twice
+    [forge(r => (r[row(kin)]![4] = r[row(dyn)]![4])), 'duplicate handle'],
+    [forge(r => (r[row(kin)]![3] = r[row(dyn)]![3])), 'duplicate handle'],
+  ];
+  for (const [text, reason] of cases) {
+    const r = pw.restore(text);
+    assert.deepEqual(r, {status: 'invalid', reason});
+    assert.equal(bytesOf(pw), before, `${reason}: unchanged`);
+  }
+  assert.equal(pw.restore(before).status, 'restored', 'the genuine snapshot still restores');
+  pw.dispose();
+});
+
+test('restore: refusals are re-evaluated after a restore', async () => {
+  const rapier = await ready();
+  const pw = createPhysicsWorld(rapier, {limits: {maxBodies: 1}});
+  const w = new World();
+  w.spawn(Transform({y: 1}), RigidBody(), Collider());
+  pw.tick(w);
+  const snap = bytesOf(pw);
+  w.spawn(Transform({y: 3}), RigidBody(), Collider());
+  pw.tick(w);
+  assert.equal(pw.status().refused['limit-bodies'], 1);
+  pw.restore(snap);
+  assert.equal(pw.status().refused['limit-bodies'], 0, 'stale refusals do not survive a restore');
+  pw.tick(w);
+  assert.equal(pw.status().refused['limit-bodies'], 1);
+  pw.dispose();
+});
