@@ -43,6 +43,12 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'FORMULA-DATA-01',
+    title: 'Spreadsheet import for formula sheets and lookup tables (npm run formulas:import)',
+    docs: 'src/kits/formulas/README.md',
+    evidence: [{kit: 'formulas', export: 'importFormulaTable'}, {script: 'formulas:import'}],
+  },
+  {
     id: 'FORMULA-01',
     title: 'Optional data-defined stat and damage formulas with stacking stages',
     docs: 'src/kits/formulas/README.md',

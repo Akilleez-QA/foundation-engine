@@ -79,3 +79,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0085](0085-atomic-cell-batches-and-occupancy.md) | Atomic cell batches and immutable occupancy | Procgen / Spatial | Proposed |
 
 | [0120](0120-data-defined-formulas.md) | Data-defined stat and damage formulas | Optional kits / Rules | Proposed |
+
+| [0132](0132-formula-data-import.md) | Spreadsheet import for formula sheets and lookup tables | Optional kits / Rules / Tooling | Proposed |

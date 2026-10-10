@@ -43,3 +43,18 @@ export {
   type DamageResult,
 } from './damage';
 export {formulaPresets} from './presets';
+export {
+  parseDelimited,
+  importFormulaSheet,
+  importFormulaTable,
+  captureMeta,
+  defineFormulaTable,
+  tableValue,
+  tableRow,
+  DEFAULT_DATA_LIMITS,
+  type DelimitedLimits,
+  type FormulaDataMeta,
+  type FormulaTable,
+  type FormulaTableInput,
+  type ImportOptions,
+} from './data';

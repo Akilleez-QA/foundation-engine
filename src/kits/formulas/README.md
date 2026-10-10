@@ -102,9 +102,32 @@ amounts. Its test compares the formula data against a direct TypeScript translit
 2,000 seeded cases (including negative modifiers): that checks this kit's evaluation of the transcription, not the
 reconstruction's fidelity to the original executable, which is its own claim.
 
+## Importing spreadsheet data
+
+Creators often keep balance in a spreadsheet, or recover tables (level curves, type charts, item lists) from an
+original game's data or a published reference. `npm run formulas:import -- <file.csv|tsv> <out.json> --kind
+sheet|table|matrix` turns the export into JSON to commit; the same checks run in the command and when the game
+loads the file, and every refusal names the line (and column) of the export; blank lines and all-empty `,,` rows
+are skipped. Input is UTF-8 (BOM optional) or UTF-16 with a BOM; invalid bytes are refused.
+
+- `sheet`: rows `kind,id,value` with `input` (no value), `constant` (a number) or `step` (formula text). Load with
+  `defineFormulaSheet(json)`.
+- `table`: a header (`key`, then column names), one row per key (`1`, `2`, `12`, `sword`): load with
+  `defineFormulaTable(json)`, read with `tableValue(table, row, column)` or pass `tableRow(table, row, prefix,
+  columns)` as sheet inputs. Column names must be formula names; row keys are any short text.
+- `matrix`: a header of column keys (first cell ignored), one row per row key: a type chart, read with `tableValue`.
+
+Numbers are plain decimal or exponent notation (no hex, thousands separators or locale commas), finite, and not
+underflowing to zero. The output keeps `meta`: `source` (default the file name), `sourceSha256` of the input, and
+`--author`, `--licence`, `--note`, so a recovered table stays attributable. In code, `parseDelimited`,
+`importFormulaSheet` and `importFormulaTable` do the same without files. Bounds: 4,096 rows, 256 columns,
+4,096-character cells (all adjustable in code), 16 MiB of input. Tables are frozen; the lookups refuse unknown rows
+and columns (a missing type in a chart is a data bug, not zero). [ADR 0132](../../../docs/adr/0132-formula-data-import.md).
+
 ## Cost and limitations
 
 Zero draws/triangles and no idle work. Evaluation is a tree walk that allocates small arrays for variadic operators;
 it is meant for per-action resolution, not thousands of evaluations per frame (measure before using it in a hot loop).
-It is not a scripting language: no loops, strings, tables or side effects. Lookup tables (type charts, resistances)
-stay creator data that the caller reads into inputs. No browser, game or device acceptance is claimed.
+It is not a scripting language: no loops, strings, tables or side effects inside expressions. Lookup tables (type
+charts, resistances, level curves) are separate frozen data (`defineFormulaTable`, see Importing spreadsheet data)
+that the caller reads into inputs. No browser, game or device acceptance is claimed.

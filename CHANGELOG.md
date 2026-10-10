@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- Formula data import (`npm run formulas:import`, `@kits/formulas`): spreadsheet exports (CSV/TSV) become formula sheets, keyed tables and matrices (type charts) as committed JSON with source, hash and licence; loading re-runs the checks and refusals name the row. See [ADR 0132](docs/adr/0132-formula-data-import.md).
+
 - Optional `formulas` kit: data-defined stat and damage expressions (JSON or text), ordered formula sheets, declared modifier stacking stages and a damage model with a fixed resolution order (miss, stacking, resistance/immunity, rounding, floors). Deterministic arithmetic, randomness only from `ctx.random`-style sources, bounded work. Generic presets plus a named transcription of one game's documented damage arithmetic. See [ADR 0120](docs/adr/0120-data-defined-formulas.md).
 
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
