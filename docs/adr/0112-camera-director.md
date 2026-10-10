@@ -45,6 +45,6 @@ tests; no browser, visual or device acceptance.
 ## Extension: look-ahead, area-locked and eased-bound rigs
 
 Three more pure helpers compose with the director in the same way. A look-ahead focus
-catches up at no more than the subject's speed plus a margin. An area camera pans
-between authored area framings. Bounds ease edge by edge toward new limits. None
+(`createLookAhead`) moves in world space at no more than the subject's speed plus a
+margin. An area camera (`createAreaCamera`) pans between authored area framings. Bounds ease edge by edge toward new limits. None
 installs an owner.

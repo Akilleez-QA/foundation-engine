@@ -1,6 +1,6 @@
 /**
- * More director rigs: a look-ahead focus with speed-matched catch-up, room-locked framing with pan transitions between
- * rooms, and camera bounds that ease toward new limits instead of snapping. Pure, stateful helpers that produce focus
+ * More director rigs (mostly planar framing, hence the file name): a look-ahead focus with speed-matched catch-up,
+ * area-locked framing with pan transitions between areas, and camera bounds that ease toward new limits instead of snapping. Pure, stateful helpers that produce focus
  * points, poses or clamps for a creator's rig function (see `cameraDirectorSystem`); they own no clock or entity.
  */
 import type {Vec3} from '../../author';
@@ -20,26 +20,33 @@ const vec = (v: unknown, what: string): Vec3 => {
 const frozen = (v: Vec3): Vec3 => Object.freeze<Vec3>([v[0], v[1], v[2]]) as Vec3;
 
 /**
- * Look-ahead focus: the camera looks at the subject plus a lead in its direction of travel (horizontal velocity), up to
- * `maxLead`, growing with speed (`lead` seconds of travel). The focus moves toward that goal at the subject's own speed
- * plus `catchUp` (units per second), so a fast subject never outruns its camera and a stop does not snap the view back;
- * when the subject turns, the lead swings across at that same bounded rate.
+ * Look-ahead focus: the camera looks at the subject plus a lead in its direction of travel (horizontal velocity, x/z),
+ * up to `maxLead`, growing with speed (`lead` seconds of travel). The focus is a world point that moves toward that goal
+ * at no more than the subject's speed plus `catchUp` (units per second): leading builds up at `catchUp`, a stop does
+ * not snap the view back, and a turn swings the focus across at that bounded world speed. The focus never trails the
+ * subject by more than `maxLead`.
  */
-export function createLookAhead(options: {
-  /** Seconds of travel to lead by, (0, 10]. Default 0.5. */
-  readonly lead?: number;
-  /** Largest lead distance, (0, 1e4]. Default 3. */
-  readonly maxLead?: number;
-  /** Extra focus speed above the subject's, (0, 1e4] units per second. Default 4. */
-  readonly catchUp?: number;
-}) {
+export function createLookAhead(
+  options: {
+    /** Seconds of travel to lead by, (0, 10]. Default 0.5. */
+    readonly lead?: number;
+    /** Largest lead distance, (0, 1e4]. Default 3. */
+    readonly maxLead?: number;
+    /** Extra focus speed above the subject's, (0, 1e4] units per second. Default 4. */
+    readonly catchUp?: number;
+  } = {},
+) {
+  if (!options || typeof options !== 'object') fail('options must be an object');
   const lead = options.lead ?? 0.5,
     maxLead = options.maxLead ?? 3,
     catchUp = options.catchUp ?? 4;
   if (!positive(lead, 10)) fail('lead must be within (0, 10] seconds');
   if (!positive(maxLead, 1e4)) fail('maxLead must be within (0, 1e4]');
   if (!positive(catchUp, 1e4)) fail('catchUp must be within (0, 1e4]');
-  let offset: [number, number] = [0, 0];
+  // The focus is a world point chasing subject + lead, at most (subject speed + catchUp) per second, so leading
+  // gains on the subject at catchUp and a stop or turn swings the view at a bounded world speed.
+  let focus: [number, number] | null = null,
+    offset: [number, number] = [0, 0];
   return {
     /** Advance by `dt` seconds for a subject at `position` moving at `velocity`; returns the focus point. */
     step(dt: number, position: Vec3, velocity: Vec3): Vec3 {
@@ -47,14 +54,22 @@ export function createLookAhead(options: {
       const p = vec(position, 'position'),
         v = vec(velocity, 'velocity');
       const speed = Math.hypot(v[0], v[2]);
+      if (!Number.isFinite(speed)) fail('velocity is too large');
       const scale = speed > 0 ? Math.min(maxLead, speed * lead) / speed : 0;
-      const goal: [number, number] = [v[0] * scale, v[2] * scale];
-      const dx = goal[0] - offset[0],
-        dz = goal[1] - offset[1],
+      const goal: [number, number] = [p[0] + v[0] * scale, p[2] + v[2] * scale];
+      if (!focus) focus = [p[0], p[2]];
+      const dx = goal[0] - focus[0],
+        dz = goal[1] - focus[1],
         gap = Math.hypot(dx, dz),
         reach = (speed + catchUp) * dt;
-      offset = gap <= reach ? goal : [offset[0] + (dx / gap) * reach, offset[1] + (dz / gap) * reach];
-      return frozen([p[0] + offset[0], p[1], p[2] + offset[1]]);
+      focus = gap <= reach ? goal : [focus[0] + (dx / gap) * reach, focus[1] + (dz / gap) * reach];
+      // Never trail the subject by more than maxLead (for example after a teleport the chase starts from the subject).
+      const ox = focus[0] - p[0],
+        oz = focus[1] - p[2],
+        o = Math.hypot(ox, oz);
+      if (o > maxLead) focus = [p[0] + (ox / o) * maxLead, p[2] + (oz / o) * maxLead];
+      offset = [focus[0] - p[0], focus[1] - p[2]];
+      return frozen([focus[0], p[1], focus[1]]);
     },
     /** Current lead offset (x, z). */
     get offset(): readonly [number, number] {
@@ -62,37 +77,43 @@ export function createLookAhead(options: {
     },
     /** Drop the lead (for example after a teleport). */
     reset(): void {
+      focus = null;
       offset = [0, 0];
     },
   };
 }
 
-export interface CameraRoom {
+export interface CameraArea {
   readonly id: string;
   /** Horizontal rectangle [minX, minZ, maxX, maxZ] the subject must be inside. */
   readonly area: readonly [number, number, number, number];
-  /** The framing for this room (often fixed, looking at the room centre). */
+  /** The framing for this area (often fixed, looking at its centre). */
   readonly pose: CameraPose;
 }
 
 /**
- * Room-locked framing: the camera holds the pose of the room containing the subject. Entering another room starts a pan
- * of `panTicks` steps (smoothstep) from the previous room's pose to the new one; `panning` lets a game hold the player
- * during the pan. Outside every room the last room is kept. Rooms are checked in order; overlaps keep the current room.
+ * Area-locked framing: the camera holds the pose of the area (a horizontal rectangle) containing the subject. Entering
+ * another area starts a pan from the pose on screen to the new one with smoothstep; it reaches the new pose on the
+ * `panTicks`-th step, so `panning` is true for `panTicks − 1` steps (0 and 1 both cut). Areas are checked in order and
+ * overlaps keep the current one. Before any step, and when the first step is outside every area, the first area is
+ * used; later, outside every area the last one is kept.
  */
-export function createRoomCamera(input: {readonly rooms: readonly CameraRoom[]; readonly panTicks?: number}) {
-  const list = input.rooms,
+export function createAreaCamera(input: {readonly areas: readonly CameraArea[]; readonly panTicks?: number}) {
+  if (!input || typeof input !== 'object') fail('input must be an object');
+  const list = input.areas,
     panTicks = input.panTicks ?? 30;
-  if (!Array.isArray(list) || list.length < 1 || list.length > 1024) fail('1-1,024 rooms');
+  if (!Array.isArray(list) || list.length < 1 || list.length > 1024) fail('1-1,024 areas');
   if (!Number.isSafeInteger(panTicks) || panTicks < 0 || panTicks > 10_000)
     fail('panTicks must be an integer in [0, 10,000]');
   const ids = new Set<string>();
-  const rooms = list.map((r, i) => {
-    if (!r || typeof r !== 'object') fail(`room ${i} must be an object`);
+  const rooms: {id: string; area: [number, number, number, number]; pose: CameraPose}[] = [];
+  for (let i = 0; i < list.length; i++) {
+    const r = list[i];
+    if (!r || typeof r !== 'object') fail(`area ${i} must be an object`);
     const id: unknown = r.id,
       areaIn: unknown = r.area,
       poseIn = r.pose;
-    if (typeof id !== 'string' || !id || ids.has(id)) fail('room ids must be unique names');
+    if (typeof id !== 'string' || !id || ids.has(id)) fail('area ids must be unique names');
     ids.add(id);
     if (!Array.isArray(areaIn) || areaIn.length !== 4) fail(`${id}: area is [minX, minZ, maxX, maxZ]`);
     const area = [areaIn[0], areaIn[1], areaIn[2], areaIn[3]] as [number, number, number, number];
@@ -105,8 +126,8 @@ export function createRoomCamera(input: {readonly rooms: readonly CameraRoom[]; 
       target: frozen(vec(poseIn.target, `${id} target`)),
       fov,
     });
-    return {id, area, pose};
-  });
+    rooms.push({id, area, pose});
+  }
   type Room = (typeof rooms)[number];
   const contains = (r: Room, x: number, z: number) =>
     x >= r.area[0] && x <= r.area[2] && z >= r.area[1] && z <= r.area[3];
@@ -131,7 +152,7 @@ export function createRoomCamera(input: {readonly rooms: readonly CameraRoom[]; 
   };
   return {
     /** Advance one tick for a subject at `position`; returns the pose, the room and whether a pan is running. */
-    step(position: Vec3): {readonly pose: CameraPose; readonly room: string; readonly panning: boolean} {
+    step(position: Vec3): {readonly pose: CameraPose; readonly area: string; readonly panning: boolean} {
       const p = vec(position, 'position');
       if (!current || !contains(current, p[0], p[2])) {
         const next = rooms.find(r => contains(r, p[0], p[2])) ?? current ?? rooms[0]!;
@@ -145,7 +166,7 @@ export function createRoomCamera(input: {readonly rooms: readonly CameraRoom[]; 
       if (from) elapsed++;
       if (from && elapsed >= panTicks) from = null;
       const pose = poseNow();
-      return Object.freeze({pose, room: current.id, panning: from !== null});
+      return Object.freeze({pose, area: current.id, panning: from !== null});
     },
     /** The pose for the current tick (without advancing). */
     get pose(): CameraPose {
@@ -192,13 +213,7 @@ export function createEasedBounds(
         if (next !== v) moved = true;
         return next;
       });
-      // Easing edges independently can cross briefly; keep min ≤ max by meeting in the middle.
-      for (let i = 0; i < 3; i++)
-        if (current[i]! > current[i + 3]!) {
-          const mid = (current[i]! + current[i + 3]!) / 2;
-          current[i] = mid;
-          current[i + 3] = mid;
-        }
+      // Every edge moves toward its own ordered target by the same reach, so min ≤ max always holds.
       return moved;
     },
     clamp(point: Vec3): Vec3 {

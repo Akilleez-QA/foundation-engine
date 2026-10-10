@@ -63,18 +63,23 @@ renderer letterbox. Headless evidence only.
 
 ### More director rigs (`rigs-2d.ts`)
 
-- `createLookAhead({lead, maxLead, catchUp})` leads the focus in the subject's direction
-  of travel by up to `maxLead` (`lead` seconds of travel). The focus moves toward that
-  goal no faster than the subject's speed plus `catchUp`, so a fast subject never
-  outruns the camera and stopping or turning swings the lead across at a bounded rate.
-- `createRoomCamera({rooms, panTicks})` holds the framing of the room (a horizontal
-  rectangle) containing the subject. Entering another room pans over `panTicks` with
-  smoothstep, starting from what is on screen. `panning` lets a game hold the player
-  meanwhile. Outside every room the last room is kept; up to 1,024 rooms.
+- `createLookAhead({lead, maxLead, catchUp})` leads the focus in the subject's horizontal
+  direction of travel by up to `maxLead` (`lead` seconds of travel). The focus is a
+  world point that moves at no more than the subject's speed plus `catchUp`, so the
+  lead builds up at `catchUp`, and stopping or turning swings the focus at that bounded
+  world speed. It never trails the subject by more than `maxLead`.
+- `createAreaCamera({areas, panTicks})` holds the framing of the area (a horizontal
+  rectangle) containing the subject. Entering another area pans from the pose on screen
+  with smoothstep, reaching the new pose on the `panTicks`-th step (`panning` is true for
+  `panTicks − 1` steps; 0 and 1 both cut), so a game can hold the player meanwhile.
+  Overlaps keep the current area. Before any step, or if the first step is outside
+  every area, the first area is used; after that, outside every area the last one is
+  kept. Up to 1,024 areas.
 - `createEasedBounds(bounds, {rate, fastRate})` eases camera limits edge by edge
   toward newly set limits, faster when `step(dt, true)` is used (for example while the
   subject is airborne). `set(bounds, true)` snaps at a cut. `clamp(point)` keeps a
-  position or focus inside, and eased edges never cross.
+  position or focus inside. Every edge moves toward its own ordered target at the same
+  rate, so min ≤ max always holds.
 
 All three are pure, validate their input and return frozen values. They compose as
 rig functions for `cameraDirectorSystem` or standalone with `cameraSystem` options.

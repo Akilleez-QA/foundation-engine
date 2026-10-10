@@ -476,12 +476,12 @@
         "cameraSystem",
         "clearCamera",
         "closeUpPose",
+        "createAreaCamera",
         "createCameraTransition",
         "createCameraVolumes",
         "createEasedBounds",
         "createLetterbox",
         "createLookAhead",
-        "createRoomCamera",
         "railPose",
         "shotPose",
         "stringPose"

@@ -1240,4 +1240,8 @@ Branch `feat/camera-director-rigs` from the camera director head `8749f5bb`. Fou
 headless tests: look-ahead lead, catch-up on stop and on reversal; area hold, pan
 timing from the on-screen pose and keeping the last area outside every area; eased
 bounds with fast rate, snap, clamping and edges that never cross; and the rigs
-composed as a director setting in a scene. No browser, visual or device evidence.
+composed as a director setting in a scene. An independent adversarial review found
+the look-ahead's world speed was twice the documented bound; that is fixed with a
+world-space chase and a test of the world focus speed. It also found sparse area lists,
+non-object options, dead crossing code and naming drift, all fixed. No browser,
+visual or device evidence.
