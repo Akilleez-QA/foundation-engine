@@ -88,6 +88,16 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'ECON-01',
+    title: 'Optional flow economy with production queues, prerequisites and reclaim',
+    docs: 'src/kits/economy/README.md',
+    evidence: [
+      {kit: 'economy', export: 'createEconomy'},
+      {kit: 'economy', export: 'defineEconomyRules'},
+      {path: 'src/kits/economy/economy.test.ts'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',

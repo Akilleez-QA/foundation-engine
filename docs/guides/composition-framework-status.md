@@ -1063,3 +1063,7 @@ Optional `status` kit ([contract](../../src/kits/status/README.md), [ADR 0121](.
 ## Behaviour trees (BT-01) — candidate, 2026-10-09
 
 Optional `behavior` kit ([contract](../../src/kits/behavior/README.md), [ADR 0122](../adr/0122-behaviour-trees.md)): data trees, bounded deterministic tick, blackboard, decorators, resume and abort, validated snapshots, trace. Evidence: eleven focused headless tests in `src/kits/behavior/behavior.test.ts`; an independent adversarial review (2 major, 6 minor, 5 nits) whose findings were addressed in the second commit (abort handlers after commit, restore accepts only reachable states, cooldown length, parallel early decision, live contexts, guarded reads). Candidate only; no game integration, browser, full CI or device acceptance claimed.
+
+## Flow economy and production (ECON-01) — candidate, 2026-10-09
+
+Optional `economy` kit ([contract](../../src/kits/economy/README.md), [ADR 0123](../adr/0123-flow-economy-and-production.md)): integer stock and storage, income/upkeep, upfront or streamed production queues with prerequisites, refunds, reclaim pools, validated snapshots. Evidence: nine focused headless tests in `src/kits/economy/economy.test.ts`; an independent adversarial review (1 blocker, 3 major, 4 minor, 3 nits) whose findings were addressed in the second commit (reclaimers released mid-tick, unlock bounds that cannot fail during a tick, reserved ids, cached capacities, refreshed queue states, exact slowdown comparison). Candidate only; no game integration, browser, full CI or device acceptance claimed.

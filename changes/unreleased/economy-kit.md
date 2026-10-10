@@ -1,0 +1,1 @@
+- Optional `economy` kit: integer flow economy with storage caps, keyed income/upkeep, production queues (upfront or streamed cost with equal slowdown), prerequisites unlocked by completed items, refunds, reclaimable pools with decay, per-tick reports and validated snapshots. See [ADR 0123](docs/adr/0123-flow-economy-and-production.md).

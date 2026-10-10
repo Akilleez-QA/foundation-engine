@@ -119,3 +119,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0121](0121-status-effects.md) | Status effects with transforms on the fixed clock | Optional kits / Rules | Proposed |
 
 | [0122](0122-behaviour-trees.md) | Deterministic resumable behaviour trees | Optional kits / Rules | Proposed |
+
+| [0123](0123-flow-economy-and-production.md) | Flow economy, production queues and reclaim | Optional kits / Rules | Proposed |

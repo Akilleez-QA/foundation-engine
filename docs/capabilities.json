@@ -49,6 +49,17 @@
       ]
     },
     {
+      "id": "ECON-01",
+      "title": "Optional flow economy with production queues, prerequisites and reclaim",
+      "shipped": true,
+      "docs": "src/kits/economy/README.md",
+      "evidence": [
+        "@kits/economy exports createEconomy",
+        "@kits/economy exports defineEconomyRules",
+        "src/kits/economy/economy.test.ts exists"
+      ]
+    },
+    {
       "id": "NAV-FIELD-01",
       "title": "Optional incremental shared navigation distance fields",
       "shipped": true,
@@ -744,6 +755,20 @@
     },
     {"name": "control", "exports": ["control", "createControl"]},
     {"name": "dialogue", "exports": ["DIALOGUE_LIMITS", "createDialogue", "dialogue"]},
+    {
+      "name": "economy",
+      "exports": [
+        "EconomyError",
+        "MAX_AMOUNT",
+        "MAX_WORK",
+        "RATE_ONE",
+        "createEconomy",
+        "defineEconomyRules",
+        "economy",
+        "economyPresets",
+        "isEconomyRules"
+      ]
+    },
     {
       "name": "entity-pool",
       "exports": [

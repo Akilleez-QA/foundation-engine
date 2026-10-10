@@ -15,6 +15,8 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [status](../../src/kits/status/README.md) | Stacked status effects: timers, decay, transforms, immunities, save/restore | Headless tests only; no integrated game |
 
 | [behavior](../../src/kits/behavior/README.md) | Behaviour trees: bounded tick, blackboard, decorators, resume, abort, save/restore, trace | Headless tests only; no integrated game |
+
+| [economy](../../src/kits/economy/README.md) | Flow economy: income/storage, production queues with prerequisites, reclaim, save/restore | Headless tests only; no integrated game |
 | [visibility](../../src/kits/visibility/README.md) | Bounded source contributions, current visibility and explored history; pure helper | Two headless sensor/facility fixtures; no integrated game |
 | [ui](../../src/kits/ui/README.md) | HUD lines, a banner and a prompt over a scene | arcade, explorer |
 | [camera](../../src/kits/camera/README.md) | Camera poses: follow, orbit, first-person, top-down, side-scroll, fixed | explorer |
