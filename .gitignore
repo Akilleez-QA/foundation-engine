@@ -28,6 +28,7 @@ playtest/action-hints/
 playtest/ui/
 playtest/diagnostics/
 playtest/audio/
+playtest/blob-shadows/
 playtest/authority-workbench/
 playtest/network-faults/
 playtest/authoring/

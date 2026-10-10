@@ -25,6 +25,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | VIS-04 | Material options (shading, double side, alpha cut-out, vertex colours) and Material on Mesh and Model | [#127](https://github.com/Akilleez-QA/foundation-engine/pull/127) | [give-a-shape-a-material.md](recipes/give-a-shape-a-material.md) |
 | VIS-05 | Gradient sky, discs, stars and exponential haze | [#150](https://github.com/Akilleez-QA/foundation-engine/pull/150) | [scene-look.md](guides/scene-look.md) |
 | VIS-06 | Instanced scatter of a Shape or Mesh (one draw per scatter) | [#144](https://github.com/Akilleez-QA/foundation-engine/pull/144) | [scatter.md](guides/scatter.md) |
+| VIS-10 | Blob (contact) shadows: one instanced draw of soft ground ellipses where no real shadow reaches |  | [blob-shadows.md](guides/blob-shadows.md) |
 | VIS-09 | Opt-in full three.js kit (@kits/three) | [#136](https://github.com/Akilleez-QA/foundation-engine/pull/136) |  |
 | POST-01 | Post-processing (bloom, vignette, grade): a consumer of the post.mode quality knob | [#161](https://github.com/Akilleez-QA/foundation-engine/pull/161) | [post-processing.md](guides/post-processing.md) |
 | POST-02 | Post grade lookup tables (.cube, view.post.grade.lut) and an HDR ceiling before bloom (view.post.ceiling) | [#179](https://github.com/Akilleez-QA/foundation-engine/pull/179) | [post-processing.md](guides/post-processing.md) |
@@ -115,7 +116,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 | `resolution.scale` | registry only |
 | `resolution.max-pixel-ratio` | registry only |
 | `resolution.antialias` | `src/author/runtime.ts` |
-| `shadows.quality` | `src/platform/render/shadow-cascades.ts`, `src/platform/render/shadows.ts` |
+| `shadows.quality` | `src/author/runtime.ts`, `src/platform/render/shadow-cascades.ts`, `src/platform/render/shadows.ts` |
 | `textures.max-size` | registry only |
 | `textures.anisotropy` | `src/author/runtime.ts` |
 | `textures.canvas-budget-mib` | `src/platform/assets/painted-surfaces.ts` |
@@ -130,7 +131,10 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 
 ## `@engine` value exports
 
+- `BLOB_SHADOW_DEFAULTS`
+- `BLOB_SHADOW_LIMITS`
 - `BUILT_IN_CUES`
+- `BlobShadow`
 - `EMITTER_DEFAULTS`
 - `Emitter`
 - `LIGHT_LIMITS`
@@ -159,6 +163,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `RenderMask`
 - `SCATTER_DEFAULTS`
 - `SCATTER_LIMITS`
+- `SCENE_BLOB_SHADOW_LIMITS`
 - `SCENE_LIGHT_DEFAULTS`
 - `SCENE_SCATTER_LIMITS`
 - `SHADOWED_LIGHT_CAPS`
@@ -210,6 +215,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `pointerOnGround`
 - `projectToView`
 - `scalarMath`
+- `sceneBlobShadows`
 - `sceneLights`
 - `sceneParticles`
 - `sceneScatter`
@@ -217,6 +223,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `shapeParser`
 - `skyGradientAt`
 - `testScene`
+- `validateBlobShadow`
 - `validateCalibration`
 - `validateEmitter`
 - `validateMaterial`
@@ -295,6 +302,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `test:authoring-browser`
 - `test:authority-workbench-browser`
 - `test:blender-export-browser`
+- `test:blob-shadows-browser`
 - `test:capture-browser`
 - `test:crafting-workbench-browser`
 - `test:creator-journey-browser`

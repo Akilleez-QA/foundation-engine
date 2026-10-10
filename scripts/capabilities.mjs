@@ -139,6 +139,12 @@ export const FEATURES = [
     evidence: [{engine: 'Scatter'}, {engine: 'defineScatter'}, {engine: 'sceneScatter'}],
   },
   {
+    id: 'VIS-10',
+    title: 'Blob (contact) shadows: one instanced draw of soft ground ellipses where no real shadow reaches',
+    docs: 'docs/guides/blob-shadows.md',
+    evidence: [{engine: 'BlobShadow'}, {engine: 'sceneBlobShadows'}, {script: 'test:blob-shadows-browser'}],
+  },
+  {
     id: 'VIS-09',
     title: 'Opt-in full three.js kit (@kits/three)',
     pr: 136,
