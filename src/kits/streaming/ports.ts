@@ -45,10 +45,26 @@ export function promisePort<T>(
       const settle = (poll: StreamPoll<T>) => {
         settled = true;
         signal.removeEventListener('abort', onAbort);
-        if (cancelled) {
-          if (poll.status === 'ready') poll.release();
-          result = {status: 'failed', retry: false};
-        } else result = poll;
+        if (!cancelled) {
+          result = poll;
+          return;
+        }
+        // Settled after cancellation: report settlement first, then release what arrived (errors swallowed so a
+        // throwing release can never keep the queue's slot).
+        result = {status: 'failed', retry: false};
+        if (poll.status === 'ready')
+          try {
+            poll.release();
+          } catch {
+            // The value is abandoned either way.
+          }
+      };
+      const canRetry = (error: unknown) => {
+        try {
+          return retryable(error) === true;
+        } catch {
+          return false;
+        }
       };
       let promise: Promise<StreamValue<T>>;
       try {
@@ -74,7 +90,7 @@ export function promisePort<T>(
             },
           });
         },
-        error => settle({status: 'failed', error, retry: retryable(error)}),
+        error => settle({status: 'failed', error, retry: canRetry(error)}),
       );
       return {
         poll: () => result,
@@ -83,8 +99,13 @@ export function promisePort<T>(
           cancelled = true;
           own.abort();
           if (settled && result.status === 'ready') {
-            result.release();
+            const ready = result;
             result = {status: 'failed', retry: false};
+            try {
+              ready.release();
+            } catch {
+              // The value is abandoned either way.
+            }
           }
         },
       };

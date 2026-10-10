@@ -63,7 +63,7 @@ export const STREAM_CEILING = Object.freeze({entries: 65_536, requests: 1 << 20,
 
 export type StreamState = 'absent' | 'queued' | 'waiting' | 'running' | 'ready' | 'failed';
 
-export type StreamEventKind = 'started' | 'ready' | 'retrying' | 'failed' | 'preempted';
+export type StreamEventKind = 'started' | 'ready' | 'retrying' | 'requeued' | 'failed' | 'preempted';
 
 /**
  * - `idle`: nothing queued.
@@ -76,7 +76,10 @@ export type StreamPumpStatus = 'idle' | 'complete' | 'blocked' | 'budget' | 'clo
 
 export interface StreamPumpResult {
   status: StreamPumpStatus;
-  /** Events of this pump in order: completions (in start order), retries, preemptions, then starts. */
+  /**
+   * Events of this pump in the order they happened: outcomes of settled loads in start order (`ready`, `failed`,
+   * `retrying`, `requeued`), then preemptions and starts as the queue is served (a preemption may follow a start).
+   */
   readonly kinds: StreamEventKind[];
   readonly keys: string[];
   count: number;
@@ -122,8 +125,10 @@ export interface StreamStats {
   readonly cancelled: number;
   /** Ready values whose actual bytes exceeded their estimate but still fit the budget. */
   readonly overEstimate: number;
-  /** Ready values refused because their actual bytes did not fit the budget. */
+  /** Values refused because their actual bytes exceed `maxBytes` (failed without retry). */
   readonly oversize: number;
+  /** Values larger than their estimate that did not fit beside held bytes: released and queued again at their real size. */
+  readonly resized: number;
   /** `release` calls that threw; counted, never rethrown. */
   readonly releaseErrors: number;
   readonly closed: boolean;
@@ -154,6 +159,8 @@ interface Entry<T> {
   readonly key: string;
   phase: Phase;
   priority: number;
+  /** How many live requests have exactly `priority`. */
+  atMax: number;
   /** Order of first request; ties in priority start in this order. */
   readonly seq: number;
   /** Start order, for publishing completions and choosing preemption victims. */
@@ -227,6 +234,7 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
     cancelled: 0,
     overEstimate: 0,
     oversize: 0,
+    resized: 0,
     releaseErrors: 0,
   };
 
@@ -273,9 +281,29 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
     up(i);
     down(last.heapPos);
   };
-  const reprioritise = (e: Entry<T>) => {
-    let p = -Infinity;
-    for (const h of e.handles) p = Math.max(p, handles.get(h)!.priority);
+  /** A request of `e` changed from `before` (undefined: added) to `after` (undefined: removed). */
+  const reprioritise = (e: Entry<T>, before: number | undefined, after: number | undefined) => {
+    if (before !== undefined && before === e.priority) e.atMax--;
+    let p: number;
+    if (after !== undefined && after > e.priority) {
+      p = after;
+      e.atMax = 1;
+    } else if (after !== undefined && after === e.priority) {
+      e.atMax++;
+      return;
+    } else if (e.atMax > 0) return;
+    else {
+      // The last request at the highest priority went down or away: rescan this key's requests.
+      p = -Infinity;
+      let n = 0;
+      for (const h of e.handles) {
+        const q = handles.get(h)!.priority;
+        if (q > p) ((p = q), (n = 1));
+        else if (q === p) n++;
+      }
+      e.atMax = n;
+      if (n === 0) return;
+    }
     if (p === e.priority) return;
     e.priority = p;
     if (e.phase === 'queued') {
@@ -329,6 +357,60 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
     }
   };
 
+  /**
+   * Cancel running loads of strictly lower priority than `head` (lowest first, latest started first) only if, once
+   * they and every retiring load settle, the head would fit; otherwise cancel nothing. Each preemption keeps the key's
+   * requests in a fresh queued entry while the cancelled load retires, so preemption also needs a free table entry.
+   */
+  const victims: Entry<T>[] = [];
+  const preemptFor = (head: Entry<T>, emit: (kind: StreamEventKind, key: string) => void) => {
+    let retiringSlots = 0,
+      retiringBytes = 0;
+    victims.length = 0;
+    for (const r of running)
+      if (r.phase === 'retiring') {
+        retiringSlots++;
+        retiringBytes += r.charged;
+      } else if (r.priority < head.priority) victims.push(r);
+    victims.sort((a, b) => a.priority - b.priority || b.startSeq - a.startSeq);
+    const wouldFit = (slots: number, held: number) =>
+      running.length - slots < maxConcurrent && bytes - held + head.estimate <= maxBytes;
+    let n = 0,
+      slots = retiringSlots,
+      held = retiringBytes;
+    while (!wouldFit(slots, held) && n < victims.length) {
+      slots++;
+      held += victims[n++]!.charged;
+    }
+    if (!wouldFit(slots, held)) return;
+    if (entries.size + retiringSlots + n > maxEntries) return;
+    for (let i = 0; i < n; i++) {
+      const victim = victims[i]!;
+      victim.phase = 'retiring';
+      stopWork(victim);
+      counters.preemptions++;
+      emit('preempted', victim.key);
+      const fresh: Entry<T> = {
+        key: victim.key,
+        phase: 'queued',
+        priority: victim.priority,
+        atMax: victim.atMax,
+        seq: victim.seq,
+        startSeq: -1,
+        handles: victim.handles,
+        estimate: victim.estimate,
+        charged: 0,
+        attempts: victim.attempts - 1,
+        retryAt: 0,
+        heapPos: -1,
+      };
+      for (const h of fresh.handles) handles.get(h)!.entry = fresh;
+      entries.set(fresh.key, fresh);
+      enqueue(fresh);
+    }
+    victims.length = 0;
+  };
+
   const finish = (out: StreamPumpResult, status: StreamPumpStatus) => {
     out.status = status;
     return status;
@@ -352,6 +434,7 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
           key,
           phase: 'queued',
           priority,
+          atMax: 1,
           seq: nextSeq++,
           startSeq: -1,
           handles: new Set(),
@@ -370,7 +453,7 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
         if ((e.phase === 'queued' || e.phase === 'waiting') && est > e.estimate) e.estimate = est;
         handles.set(handle, {entry: e, priority});
         e.handles.add(handle);
-        reprioritise(e);
+        reprioritise(e, undefined, priority);
       }
       return {status: 'accepted', handle};
     },
@@ -379,8 +462,9 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
       if (closed) return false;
       const h = handles.get(handle);
       if (!h) return false;
+      const before = h.priority;
       h.priority = p;
-      reprioritise(h.entry);
+      reprioritise(h.entry, before, p);
       return true;
     },
     cancel(handle) {
@@ -391,7 +475,7 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
       const e = h.entry;
       e.handles.delete(handle);
       if (e.handles.size === 0) drop(e);
-      else reprioritise(e);
+      else reprioritise(e, h.priority, undefined);
       return true;
     },
     state(key) {
@@ -449,7 +533,8 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
         }
         if (p.status === 'ready') {
           const actual = typeof p.bytes === 'number' && Number.isSafeInteger(p.bytes) && p.bytes >= 0 ? p.bytes : NaN;
-          if (Number.isNaN(actual) || bytes + actual > maxBytes) {
+          if (Number.isNaN(actual) || actual > maxBytes) {
+            // Can never fit: fail without retry.
             safeRelease(() => p.release());
             counters.oversize++;
             e.error = new RangeError(
@@ -459,6 +544,17 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
             e.phase = 'failed';
             counters.failures++;
             emit('failed', e.key);
+            continue;
+          }
+          if (bytes + actual > maxBytes) {
+            // Larger than its estimate and does not fit beside what is held now: release it and queue the key
+            // again with its real size, without spending an attempt.
+            safeRelease(() => p.release());
+            counters.resized++;
+            e.estimate = actual;
+            e.attempts--;
+            enqueue(e);
+            emit('requeued', e.key);
             continue;
           }
           if (actual > e.estimate) counters.overEstimate++;
@@ -502,55 +598,7 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
           status = fits() ? 'budget' : 'blocked';
           break;
         }
-        if (!fits() && preempt) {
-          // Lowest priority first, latest started first; only strictly lower than the head; never retiring ones.
-          // Stop once the head would fit after every retiring work settles (their slots and bytes are still held).
-          let retiringSlots = 0,
-            retiringBytes = 0;
-          for (const r of running)
-            if (r.phase === 'retiring') {
-              retiringSlots++;
-              retiringBytes += r.charged;
-            }
-          for (;;) {
-            if (running.length - retiringSlots < maxConcurrent && bytes - retiringBytes + head.estimate <= maxBytes)
-              break;
-            let victim: Entry<T> | undefined;
-            for (const r of running)
-              if (
-                r.phase === 'running' &&
-                r.priority < head.priority &&
-                (!victim ||
-                  r.priority < victim.priority ||
-                  (r.priority === victim.priority && r.startSeq > victim.startSeq))
-              )
-                victim = r;
-            if (!victim) break;
-            victim.phase = 'retiring';
-            retiringSlots++;
-            retiringBytes += victim.charged;
-            stopWork(victim);
-            counters.preemptions++;
-            emit('preempted', victim.key);
-            // The key keeps its requests: a fresh entry takes its place in the queue; the old one retires.
-            const fresh: Entry<T> = {
-              key: victim.key,
-              phase: 'queued',
-              priority: victim.priority,
-              seq: victim.seq,
-              startSeq: -1,
-              handles: victim.handles,
-              estimate: victim.estimate,
-              charged: 0,
-              attempts: victim.attempts - 1,
-              retryAt: 0,
-              heapPos: -1,
-            };
-            for (const h of fresh.handles) handles.get(h)!.entry = fresh;
-            entries.set(fresh.key, fresh);
-            enqueue(fresh);
-          }
-        }
+        if (!fits() && preempt) preemptFor(head, emit);
         if (!fits()) {
           status = 'blocked';
           break;
@@ -565,16 +613,26 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
         head.controller = controller;
         counters.starts++;
         starts++;
+        let work: StreamWork<T> | undefined;
         try {
-          head.work = port.start(head.key, controller.signal);
-          if (!head.work || typeof head.work.poll !== 'function' || typeof head.work.cancel !== 'function')
+          work = port.start(head.key, controller.signal);
+          if (!work || typeof work.poll !== 'function' || typeof work.cancel !== 'function')
             throw new TypeError('streaming: port.start must return a work with poll and cancel');
+          head.work = work;
         } catch (error) {
-          const bad = head.work;
-          head.work = {poll: () => ({status: 'failed', error}), cancel: () => bad?.cancel?.()};
+          // A throwing or malformed start is a failed attempt, observed on the next pump; stop whatever it began.
+          controller.abort();
+          try {
+            (work as {cancel?: () => void} | undefined)?.cancel?.();
+          } catch {
+            // Nothing more can be done for a malformed work.
+          }
+          head.work = {poll: () => ({status: 'failed', error}), cancel: () => {}};
         }
         running.push(head);
         emit('started', head.key);
+        // A request cancelled from inside start: stop the work now that it exists.
+        if ((head.phase as Phase) === 'retiring') stopWork(head);
       }
       return finish(out, status);
     },

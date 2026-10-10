@@ -173,3 +173,28 @@ test('consumer 3: promisePort releases a value that resolves after cancellation 
   aborting.pump(1, out);
   assert.equal(aborting.state('x'), 'failed', 'an abort is not retried');
 });
+
+test('review: a throwing late release in promisePort cannot hold the slot', async () => {
+  let resolve!: (v: {value: string; bytes: number; release(): void}) => void;
+  const limits: StreamLimits = {maxEntries: 4, maxConcurrent: 1, maxBytes: 100};
+  const q = createStreamQueue(
+    promisePort<string>(() => new Promise(r => (resolve = r))),
+    limits,
+  );
+  const out = createStreamResult(limits);
+  const h = q.request('a', {priority: 0, bytes: 10}).handle;
+  q.pump(0, out);
+  q.cancel(h);
+  resolve({
+    value: 'v',
+    bytes: 10,
+    release() {
+      throw new Error('boom');
+    },
+  });
+  await tick();
+  q.request('b', {priority: 0, bytes: 10});
+  q.pump(1, out);
+  assert.equal(q.stats().retiring, 0);
+  assert.equal(q.state('b'), 'running');
+});

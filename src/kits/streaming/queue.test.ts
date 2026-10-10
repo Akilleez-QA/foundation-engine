@@ -231,17 +231,26 @@ test('actual bytes: over-estimate values are kept if they fit, refused otherwise
   m.ready('a', 60);
   const b = m.ready('b', 60);
   q.pump(1, out);
-  assert.deepEqual(events(out), ['ready a', 'failed b']);
+  assert.deepEqual(
+    events(out),
+    ['ready a', 'requeued b'],
+    'b does not fit beside a now: queued again at its real size',
+  );
   assert.equal(b.released, 1);
   assert.equal(q.stats().overEstimate, 1);
+  assert.equal(q.stats().resized, 1);
+  assert.equal(q.state('b'), 'queued');
+  const c = m.ready('c', 150);
+  q.pump(2, out);
+  assert.deepEqual(events(out), ['failed c'], 'larger than the whole budget: fails without retry');
+  assert.equal(c.released, 1);
   assert.equal(q.stats().oversize, 1);
   q.dispose();
   assert.equal(m.last('a').released, 1);
-  assert.equal(m.last('c').cancelled, true);
   q.dispose();
   assert.equal(m.last('a').released, 1);
   assert.equal(q.request('z', {priority: 0, bytes: 0}).status, 'closed');
-  assert.equal(q.pump(2, out), 'closed');
+  assert.equal(q.pump(3, out), 'closed');
 });
 
 test('randomized: budgets hold, every produced value is released exactly once, and runs replay identically', () => {
@@ -262,8 +271,21 @@ test('randomized: budgets hold, every produced value is released exactly once, a
             else {
               const rec = {released: 0, held: () => false};
               produced.push(rec);
-              const bytes = Math.floor(rnd() * 30);
-              poll = {status: 'ready', value: bytes, bytes, release: () => void rec.released++};
+              const bytes = Math.floor(rnd() * 45);
+              const throws = rnd() < 0.1;
+              const release = () => {
+                rec.released++;
+                if (throws) throw new Error('release failed');
+              };
+              if (w.cancelled) {
+                // The port releases a value that arrives after cancellation itself.
+                try {
+                  release();
+                } catch {
+                  // counted by the record
+                }
+                poll = {status: 'failed', retry: false};
+              } else poll = {status: 'ready', value: bytes, bytes, release};
             }
           },
         };
@@ -271,7 +293,8 @@ test('randomized: budgets hold, every produced value is released exactly once, a
         void key;
         void signal;
         return {
-          poll: () => poll,
+          // After cancel: pending until execution settles, then a final failure; a late value is released here.
+          poll: () => (cancelled && poll.status !== 'pending' ? {status: 'failed', retry: false} : poll),
           cancel() {
             cancelled = true;
             w.cancelled = cancelled;
@@ -332,4 +355,57 @@ test('randomized: budgets hold, every produced value is released exactly once, a
     assert.deepEqual(a.log, b.log, 'same seed, same event log');
     assert.ok(a.produced > 25, `coverage (${a.produced} values)`);
   }
+});
+
+test('review: preemption cancels nothing when it cannot make the head fit, and never overfills the entry table', () => {
+  const m = manualPort();
+  const limits: StreamLimits = {maxEntries: 8, maxConcurrent: 2, maxBytes: 100, preempt: true};
+  const q = createStreamQueue(m.port, limits),
+    out = createStreamResult(limits);
+  q.request('held', {priority: 9, bytes: 50});
+  q.pump(0, out);
+  m.ready('held', 50);
+  q.request('a', {priority: 0, bytes: 40});
+  q.pump(1, out);
+  q.request('c', {priority: 5, bytes: 60});
+  assert.equal(q.pump(2, out), 'blocked');
+  assert.deepEqual(events(out), [], 'preempting a (40) cannot make room for c (60) beside held (50)');
+  assert.equal(q.state('a'), 'running');
+  // A full table: preemption would need a fresh entry while the victim retires.
+  const m2 = manualPort();
+  const small: StreamLimits = {maxEntries: 2, maxConcurrent: 1, maxBytes: 100, preempt: true};
+  const q2 = createStreamQueue(m2.port, small),
+    o2 = createStreamResult(small);
+  q2.request('a', {priority: 0, bytes: 1});
+  q2.pump(0, o2);
+  q2.request('b', {priority: 5, bytes: 1});
+  q2.pump(1, o2);
+  assert.deepEqual(events(o2), []);
+  assert.ok(q2.stats().entries + q2.stats().retiring <= 2);
+});
+
+test('review: bulk cancellation of one key is not quadratic; cancel inside start stops the new work', () => {
+  const m = manualPort();
+  const limits: StreamLimits = {maxEntries: 4, maxRequests: 200_000, maxConcurrent: 1, maxBytes: 10};
+  const q = createStreamQueue(m.port, limits);
+  const hs: number[] = [];
+  for (let i = 0; i < 100_000; i++) hs.push(q.request('k', {priority: i % 7, bytes: 1}).handle);
+  const t0 = performance.now();
+  for (const h of hs) q.cancel(h);
+  assert.ok(performance.now() - t0 < 2000, 'cancelling 100,000 requests of one key stays fast');
+  assert.equal(q.state('k'), 'absent');
+  let cancels = 0;
+  let handle = -1;
+  const re = createStreamQueue<string>(
+    {
+      start() {
+        re.cancel(handle);
+        return {poll: () => ({status: 'pending'}), cancel: () => void cancels++};
+      },
+    },
+    {maxEntries: 2, maxConcurrent: 1, maxBytes: 10},
+  );
+  handle = re.request('x', {priority: 0, bytes: 1}).handle;
+  re.pump(0, createStreamResult({maxConcurrent: 1}));
+  assert.equal(cancels, 1);
 });

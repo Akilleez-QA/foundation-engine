@@ -34,6 +34,10 @@ estimates.
 
 ## Evidence
 
-Eight unit tests including a randomised run asserting budgets every tick, release-exactly-once and replay of the
-event log, and three consumer tests (a real lease cache, a fixed-step model-owner consumer, promise cancellation).
+Ten unit tests including a randomised run asserting budgets every tick, release-exactly-once and replay of the
+event log, and four consumer tests (a real lease cache, a fixed-step model-owner consumer, promise cancellation and a
+throwing late release). An independent adversarial review found two high (a throwing late release could hold a slot
+forever; preemption could cancel loads without freeing enough capacity) and four medium problems; all were fixed with regression
+tests. Ports settle when their owner rejects delivery, not necessarily when the owner's work stops; that remaining
+work is bounded by the owner.
 Headless only; a local micro-probe is recorded in the kit README as an order-of-magnitude indication.
