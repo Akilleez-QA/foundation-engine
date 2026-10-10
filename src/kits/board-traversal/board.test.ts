@@ -659,6 +659,13 @@ test('board-traversal: the re-catch delay applies only to the rail just left, un
   ride(b, {}, 600, world);
   const again = pass(b);
   assert.ok(again.includes('grind-start'), `caught again after landing: ${again.join(',')}`);
+  // Also after a balance bail off the rail and a recovery.
+  const fall = fresh('arcade', {grind: {recatchTime: 2, instability: 50}, ollie: {minPop: 3, maxPop: 3}});
+  const e1 = pass(fall);
+  for (let i = 0; i < 300 && fall.mode !== 'rolling'; i++) e1.push(...fall.step(DT, {}, world).events);
+  assert.ok(e1.includes('grind-start') && e1.includes('bail') && e1.includes('recover'), e1.join(','));
+  ride(fall, {}, 300, world);
+  assert.ok(pass(fall).includes('grind-start'), 'caught again after a bail landing');
 });
 
 test('board-traversal: a trick starts once per step; manuals end before a wall bail; walls cost speed once', () => {
@@ -701,6 +708,14 @@ test('board-traversal: lost control does not pop a held ollie; huge normals, -0,
     return true;
   };
   ride(b, {}, 5, {ground: huge});
+  const flatish: BoardGround = (_x, _z, below, out) => {
+    if (below < 0) return false;
+    Object.assign(out, {height: 0, nx: 1e300, ny: 1e-300, nz: 0});
+    return true;
+  };
+  const kept = JSON.stringify(b.snapshot());
+  assert.throws(() => b.step(DT, {}, {ground: flatish}), /horizontal/);
+  assert.equal(JSON.stringify(b.snapshot()), kept);
   assert.doesNotThrow(() => b.restore(JSON.parse(JSON.stringify(b.snapshot()))));
   const z = fresh();
   z.place({x: -0, y: -0, z: -0, yaw: -0});
@@ -711,6 +726,16 @@ test('board-traversal: lost control does not pop a held ollie; huge normals, -0,
     return flat(...args);
   };
   assert.throws(() => z.step(DT, {}, {ground: sneaky}), /inside a step/);
+  assert.equal(JSON.stringify(z.snapshot()), before);
+  const swallowing: BoardGround = (...args) => {
+    try {
+      z.step(DT, {}, W);
+    } catch {
+      // the port hides the refusal
+    }
+    return flat(...args);
+  };
+  assert.throws(() => z.step(DT, {}, {ground: swallowing}), /re-entered/);
   assert.equal(JSON.stringify(z.snapshot()), before);
   const values = [...z.snapshot().values];
   for (const [i, v] of [

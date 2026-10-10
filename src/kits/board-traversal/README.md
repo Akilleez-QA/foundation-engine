@@ -49,7 +49,10 @@ that motion model and reuses:
 - `scalarMath`: `math: 'deterministic'` uses `dmath` for every sine, cosine and arctangent;
 - the character kit's `Walls`/`Solid`s (or any `Area`) as the wall port, through
   `characterSlide(worldOrArea, radius, board.math)`, which splits each move into pieces
-  of at most half the board radius and evaluates solids with the board's arithmetic;
+  of at most half the board radius and evaluates solids with the board's arithmetic.
+  A port built over a world reads its walls and solids once, on first use, and keeps
+  them: build a new port each tick (the adapter does), or moved and added solids are
+  ignored;
 - the terrain kit's `Surface.sample` through `sampledBoardGround`;
 - the rollback kit's save/load/step ports through `snapshot`/`restore`
   (`consumers.test.ts` runs its sync test through pushes, grinds, tricks and bails);

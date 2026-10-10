@@ -207,7 +207,9 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
     railChecks = 0,
     /** A trick starts at most once per step, whatever the sub-step count. */
     trickUsed = false,
-    busy = false;
+    busy = false,
+    /** A port tried to re-enter the board during this step; the step is refused even if the port caught that. */
+    reentered = false;
 
   const queryGround = (world: BoardWorld, x: number, z: number, below: number) => {
     groundQueries++;
@@ -237,6 +239,7 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
     hit.nx = sx / l;
     hit.ny = sy / l;
     hit.nz = sz / l;
+    if (!(hit.ny > 0)) throw new RangeError('board-traversal: ground normal is too close to horizontal');
     return true;
   };
   /** The planar displacement the last `moveXZ` achieved, and the share of the requested speed it kept. */
@@ -575,8 +578,9 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
       vz = A[VZ]!,
       down = -A[VY]!;
     if (A[MODE] === BAIL) {
-      // A bail that was airborne slides out on the ground.
+      // A bail that was airborne slides out on the ground; landing clears the re-catch delay.
       A[BAILAIR] = 0;
+      A[LASTRAIL] = -1;
       A[HEAD] = vx * vx + vz * vz > 1e-12 ? m.atan2(vx, vz) : A[HEAD]!;
       A[SPEED] = Math.sqrt(vx * vx + vz * vz);
       A[VX] = 0;
@@ -794,6 +798,7 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
   placeInto(0, 0, 0, 0);
 
   const commit = () => {
+    if (reentered) throw new RangeError('board-traversal: a port re-entered the board during this step');
     for (let i = 0; i < SIZE; i++)
       if (!Number.isFinite(A[i]!)) throw new RangeError('board-traversal: the step produced a non-finite state');
     const e = c.limits.extent;
@@ -852,7 +857,10 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
       return {groundQueries: c.limits.maxSubsteps, railChecks: c.limits.maxSubsteps * segments};
     },
     place(pose: {x: number; y: number; z: number; yaw?: number}) {
-      if (busy) throw new RangeError('board-traversal: place called from inside a step');
+      if (busy) {
+        reentered = true;
+        throw new RangeError('board-traversal: place called from inside a step');
+      }
       const yaw = pose?.yaw ?? 0;
       if (!pose || ![pose.x, pose.y, pose.z, yaw].every(Number.isFinite) || Math.abs(yaw) > 1e6)
         throw new RangeError('board-traversal: pose must be finite');
@@ -862,8 +870,12 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
       placeInto(pose.x, pose.y, pose.z, yaw);
     },
     step(dt: number, controls: BoardControls, world: BoardWorld): BoardStepResult {
-      if (busy) throw new RangeError('board-traversal: step called from inside a step (a port re-entered the board)');
+      if (busy) {
+        reentered = true;
+        throw new RangeError('board-traversal: step called from inside a step (a port re-entered the board)');
+      }
       busy = true;
+      reentered = false;
       try {
         return stepNow(dt, controls, world);
       } finally {
@@ -871,7 +883,10 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
       }
     },
     cancelInput() {
-      if (busy) throw new RangeError('board-traversal: cancelInput called from inside a step');
+      if (busy) {
+        reentered = true;
+        throw new RangeError('board-traversal: cancelInput called from inside a step');
+      }
       // Forget a held ollie (no pop on its release) and its charge, e.g. when the rider loses its controller.
       S[PREVOLLIE] = 0;
       S[CHARGE] = 0;
@@ -939,7 +954,10 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
       });
     },
     restore(snapshot: BoardSnapshot) {
-      if (busy) throw new RangeError('board-traversal: restore called from inside a step');
+      if (busy) {
+        reentered = true;
+        throw new RangeError('board-traversal: restore called from inside a step');
+      }
       if (!snapshot || typeof snapshot !== 'object' || snapshot.kind !== 'board-traversal' || snapshot.version !== 1)
         throw new RangeError('board-traversal: not a version 1 board snapshot');
       if (snapshot.fingerprint !== fingerprint)

@@ -19,18 +19,21 @@ import type {Rails} from './rails';
 const MAX_SLIDE_STEPS = 64;
 
 /**
- * A wall port over the character kit's `Walls` and `Solid`s in a world (read once, on the port's first use: build a
- * new port each tick, as `boardSystem` does) or over a fixed `Area`. Each move is split into pieces no longer than half
+ * A wall port over the character kit's `Walls` and `Solid`s in a world (read once, on the port's first use and then
+ * cached: build a new port each tick, as `boardSystem` does, or moved and added solids are ignored) or over a fixed
+ * `Area`. Each move is split into pieces no longer than half
  * the board radius, so a piece cannot cross a solid's outline inflated by the radius. `math` should match the board's
  * (`board.math`) so rotated and round solids are evaluated with the same arithmetic. The character kit's `slide`
  * allocates a point per piece; that cost is the wall port's, not the board's.
  */
-export function characterSlide(source: World | Area, radius = 0.3, math: ScalarMathMode = 'platform'): BoardSlide {
+export function characterSlide(source: World | Area, radius = 0.3, math?: ScalarMathMode): BoardSlide {
   if (!source || typeof source !== 'object') throw new RangeError('board-traversal: a world or an area is required');
   if (!Number.isFinite(radius) || radius <= 0 || radius > 10)
     throw new RangeError('board-traversal: radius must be within (0, 10]');
   const m = scalarMath(math);
-  let area: Area | null = 'minX' in source ? {...source, body: radius, math: m} : null;
+  // A fixed area keeps its own arithmetic unless `math` is given.
+  let area: Area | null =
+    'minX' in source ? {...source, body: radius, ...(math !== undefined || !source.math ? {math: m} : {})} : null;
   return (x, z, dx, dz, out) => {
     if (area === null) area = areaOf(source as World, radius, m);
     const steps = Math.max(1, Math.ceil(Math.sqrt(dx * dx + dz * dz) / (radius / 2)));
