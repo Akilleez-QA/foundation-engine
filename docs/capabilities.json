@@ -9,6 +9,89 @@
       "evidence": ["@kits/entity-pool exports createEntityPool", "@kits/entity-pool exports spawnPooled"]
     },
     {
+      "id": "FORMULA-DATA-01",
+      "title": "Spreadsheet import for formula sheets and lookup tables (npm run formulas:import)",
+      "shipped": true,
+      "docs": "src/kits/formulas/README.md",
+      "evidence": ["@kits/formulas exports importFormulaTable", "npm run formulas:import"]
+    },
+    {
+      "id": "FORMULA-01",
+      "title": "Optional data-defined stat and damage formulas with stacking stages",
+      "shipped": true,
+      "docs": "src/kits/formulas/README.md",
+      "evidence": [
+        "@kits/formulas exports defineFormulaSheet",
+        "@kits/formulas exports createDamageModel",
+        "src/kits/formulas/formulas.test.ts exists"
+      ]
+    },
+    {
+      "id": "STATUS-01",
+      "title": "Optional stacked status effects with transforms, immunities and save/restore",
+      "shipped": true,
+      "docs": "src/kits/status/README.md",
+      "evidence": [
+        "@kits/status exports createStatusEffects",
+        "@kits/status exports defineStatusRules",
+        "src/kits/status/status.test.ts exists"
+      ]
+    },
+    {
+      "id": "BT-01",
+      "title": "Optional deterministic resumable behaviour trees with blackboard and saveable state",
+      "shipped": true,
+      "docs": "src/kits/behavior/README.md",
+      "evidence": [
+        "@kits/behavior exports defineBehaviorTree",
+        "@kits/behavior exports createBehavior",
+        "src/kits/behavior/behavior.test.ts exists"
+      ]
+    },
+    {
+      "id": "ECON-01",
+      "title": "Optional flow economy with production queues, prerequisites and reclaim",
+      "shipped": true,
+      "docs": "src/kits/economy/README.md",
+      "evidence": [
+        "@kits/economy exports createEconomy",
+        "@kits/economy exports defineEconomyRules",
+        "src/kits/economy/economy.test.ts exists"
+      ]
+    },
+    {
+      "id": "INV-RULES-01",
+      "title": "Optional slot, stack and key-item rules over the inventory ledger",
+      "shipped": true,
+      "docs": "src/kits/inventory/README.md",
+      "evidence": [
+        "@kits/inventory exports createRuledInventory",
+        "@kits/inventory exports inventoryPresets",
+        "src/kits/inventory/rules.test.ts exists"
+      ]
+    },
+    {
+      "id": "STREAM-01",
+      "title": "Optional on-demand streaming queue with byte and concurrency budgets",
+      "shipped": true,
+      "docs": "docs/guides/streaming-queue.md",
+      "evidence": ["@kits/streaming exports createStreamQueue", "@kits/streaming exports leasePort"]
+    },
+    {
+      "id": "PIPELINE-01",
+      "title": "Worker render pipelining",
+      "shipped": false,
+      "docs": "docs/verification/render-pipelining-20261010/README.md",
+      "evidence": ["src/platform/render/worker-renderer.ts exists"]
+    },
+    {
+      "id": "RETRO-01",
+      "title": "Optional retro software-raster look (low resolution, palette, ordered dither)",
+      "shipped": true,
+      "docs": "docs/guides/retro-look.md",
+      "evidence": ["@kits/retro exports sceneRetro", "@kits/retro exports retroReference"]
+    },
+    {
       "id": "NAV-FIELD-01",
       "title": "Optional incremental shared navigation distance fields",
       "shipped": true,
@@ -141,6 +224,29 @@
         "@engine exports Interpolated",
         "@engine exports presentTransform",
         "src/author/interpolation.test.ts exists"
+      ]
+    },
+    {
+      "id": "BALLISTICS-01",
+      "title": "Drag-free ballistic launch solves, evaluation and arc samples",
+      "shipped": true,
+      "docs": "src/kits/ballistics/README.md",
+      "evidence": [
+        "@kits/ballistics exports solveByLaunchSpeed",
+        "@kits/ballistics exports solveLead",
+        "@kits/ballistics exports samplePoints",
+        "src/kits/ballistics/ballistics.test.ts exists"
+      ]
+    },
+    {
+      "id": "BREADCRUMBS-01",
+      "title": "Bounded leader trails with exact lag and path-distance retracing",
+      "shipped": true,
+      "docs": "src/kits/breadcrumbs/README.md",
+      "evidence": [
+        "@kits/breadcrumbs exports createBreadcrumbTrail",
+        "@kits/breadcrumbs exports nextFollowerLag",
+        "src/kits/breadcrumbs/breadcrumbs.test.ts exists"
       ]
     },
     {
@@ -306,6 +412,20 @@
       "pr": 126,
       "docs": "docs/guides/model-contracts.md",
       "evidence": ["npm run asset:verify"]
+    },
+    {
+      "id": "ASSET-CONVERT",
+      "title": "Offline converters to glTF and PNG with provenance receipts (npm run convert)",
+      "shipped": true,
+      "docs": "tools/convert/README.md",
+      "evidence": ["npm run convert", "tools/convert/bvh.mjs exists", "tools/convert/convert.test.mjs exists"]
+    },
+    {
+      "id": "DUPES-01",
+      "title": "Duplicate and near-duplicate detector (npm run dupes)",
+      "shipped": true,
+      "docs": "tools/dupes/README.md",
+      "evidence": ["npm run dupes", "tools/dupes/scan.mjs exists", "tools/dupes/dupes.test.mjs exists"]
     },
     {
       "id": "ASSET-OPTIMIZE",
@@ -616,6 +736,36 @@
     {"name": "assignments", "exports": ["createAssignments"]},
     {"name": "audio-mixer", "exports": ["audioMixer", "createCueMixer", "createDucking"]},
     {"name": "authoring", "exports": ["authoredReference", "createAuthoredDocument", "createAuthoringSession"]},
+    {
+      "name": "ballistics",
+      "exports": [
+        "BALLISTIC_LIMITS",
+        "apex",
+        "ballistics",
+        "positionAt",
+        "samplePoints",
+        "solveByApexHeight",
+        "solveByDuration",
+        "solveByHorizontalSpeed",
+        "solveByLaunchSpeed",
+        "solveByVerticalSpeed",
+        "solveLead",
+        "timeAtHeight",
+        "velocityAt"
+      ]
+    },
+    {
+      "name": "behavior",
+      "exports": [
+        "BehaviorError",
+        "behavior",
+        "createBehavior",
+        "defineBehaviorTree",
+        "isBehaviorName",
+        "isBlackboardValue"
+      ]
+    },
+    {"name": "breadcrumbs", "exports": ["TRAIL_LIMITS", "breadcrumbs", "createBreadcrumbTrail", "nextFollowerLag"]},
     {"name": "cadence", "exports": ["CADENCE_CEILING", "MAX_CADENCE_TICK", "createCadence", "createCadenceResult"]},
     {
       "name": "camera",
@@ -694,6 +844,20 @@
     {"name": "control", "exports": ["control", "createControl"]},
     {"name": "dialogue", "exports": ["DIALOGUE_LIMITS", "createDialogue", "dialogue"]},
     {
+      "name": "economy",
+      "exports": [
+        "EconomyError",
+        "MAX_AMOUNT",
+        "MAX_WORK",
+        "RATE_ONE",
+        "createEconomy",
+        "defineEconomyRules",
+        "economy",
+        "economyPresets",
+        "isEconomyRules"
+      ]
+    },
+    {
       "name": "entity-pool",
       "exports": [
         "POOL_CEILING",
@@ -708,6 +872,33 @@
     {
       "name": "explore",
       "exports": ["Interactable", "explore", "exploreSystem", "interact", "nearest", "progress", "usedCount"]
+    },
+    {
+      "name": "formulas",
+      "exports": [
+        "DEFAULT_DATA_LIMITS",
+        "DEFAULT_EXPRESSION_LIMITS",
+        "FORMULA_OPERATORS",
+        "FormulaError",
+        "applyStacking",
+        "captureMeta",
+        "compileExpression",
+        "createDamageModel",
+        "defineFormulaSheet",
+        "defineFormulaTable",
+        "defineStacking",
+        "evaluateExpression",
+        "evaluateSheet",
+        "formulaPresets",
+        "formulas",
+        "importFormulaSheet",
+        "importFormulaTable",
+        "isFormulaName",
+        "parseDelimited",
+        "parseFormula",
+        "tableRow",
+        "tableValue"
+      ]
     },
     {
       "name": "frames",
@@ -734,7 +925,10 @@
         "createCheckpointInventory",
         "createInventoryLedger",
         "createRetirementInventory",
+        "createRuledInventory",
+        "defineInventoryRules",
         "inventory",
+        "inventoryPresets",
         "parseDimensionalStock",
         "prepareStockChange",
         "prepareStockTransfers",
@@ -954,6 +1148,23 @@
         "sampleDeposit"
       ]
     },
+    {
+      "name": "retro",
+      "exports": [
+        "RETRO_LIMITS",
+        "bayerMatrix",
+        "buildPaletteLut",
+        "ditherThreshold",
+        "installRetro",
+        "nearestPaletteIndex",
+        "paletteSpread",
+        "resolveRetroLook",
+        "retro",
+        "retroReference",
+        "retroTargetSize",
+        "sceneRetro"
+      ]
+    },
     {"name": "rewind", "exports": ["chooseRewindTime", "createRewindHistory"]},
     {
       "name": "rollback",
@@ -1011,6 +1222,14 @@
         "spatialAudio",
         "validateSoundClass"
       ]
+    },
+    {
+      "name": "status",
+      "exports": ["StatusError", "createStatusEffects", "defineStatusRules", "isStatusId", "status", "statusPresets"]
+    },
+    {
+      "name": "streaming",
+      "exports": ["STREAM_CEILING", "createStreamQueue", "createStreamResult", "leasePort", "modelPort", "promisePort"]
     },
     {
       "name": "terrain",
@@ -1123,13 +1342,16 @@
     "changelog",
     "check",
     "content:publish",
+    "convert",
     "deploy:production",
     "dev",
     "disclosure",
     "dmath:golden",
+    "dupes",
     "faults:network",
     "format",
     "format:check",
+    "formulas:import",
     "fx:pack",
     "gate",
     "gate:ci",

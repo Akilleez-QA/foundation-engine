@@ -1,0 +1,1 @@
+- **Worker render pipelining finding recorded.** Recorded the worker render pipelining finding: on the GPU bench at 4K the heaviest stock scene spends about 0.6 ms of main-thread time per drawn frame, so frame-pipelining through a worker renderer is not built; the revisit condition is physical-device evidence. See [ADR 0131](docs/adr/0131-defer-worker-render-pipelining.md).

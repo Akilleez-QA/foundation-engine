@@ -1,0 +1,1 @@
+- **Optional behaviour trees.** Optional `behavior` kit: data-defined behaviour trees with a bounded deterministic tick, blackboard, composites (including reactive and weighted shuffle), decorators (repeat, retry, timeout, cooldown, guard), running-node resume, abort handlers, saveable mid-run state and a per-tick trace. See [ADR 0122](docs/adr/0122-behaviour-trees.md).
