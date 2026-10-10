@@ -123,6 +123,18 @@
       ]
     },
     {
+      "id": "INPUT-ASSIST-01",
+      "title": "Optional aim assist, flick detection and scripted input playback",
+      "shipped": true,
+      "docs": "src/kits/input-assist/README.md",
+      "evidence": [
+        "@kits/input-assist exports createAimAssist",
+        "@kits/input-assist exports createFlickDetector",
+        "@kits/input-history exports createInputPlayback",
+        "src/kits/input-history/playback.test.ts exists"
+      ]
+    },
+    {
       "id": "CADENCE-01",
       "title": "Optional bounded per-member update cadence",
       "shipped": true,
@@ -915,8 +927,30 @@
     },
     {"name": "housing", "exports": ["createStructure", "housing"]},
     {
+      "name": "input-assist",
+      "exports": [
+        "AIM_ASSIST_LIMITS",
+        "FLICK_DIRECTIONS_4",
+        "FLICK_DIRECTIONS_8",
+        "FLICK_LIMITS",
+        "aimAngles",
+        "aimDirection",
+        "createAimAssist",
+        "createFlickDetector",
+        "inputAssist"
+      ]
+    },
+    {
       "name": "input-history",
-      "exports": ["INPUT_HISTORY_LIMITS", "createInputHistory", "inputHistory", "sampleActions"]
+      "exports": [
+        "INPUT_HISTORY_LIMITS",
+        "PLAYBACK_LIMITS",
+        "createInputHistory",
+        "createInputPlayback",
+        "inputHistory",
+        "sampleActions",
+        "timelineFromHistory"
+      ]
     },
     {
       "name": "inventory",

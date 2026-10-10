@@ -160,6 +160,17 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'INPUT-ASSIST-01',
+    title: 'Optional aim assist, flick detection and scripted input playback',
+    docs: 'src/kits/input-assist/README.md',
+    evidence: [
+      {kit: 'input-assist', export: 'createAimAssist'},
+      {kit: 'input-assist', export: 'createFlickDetector'},
+      {kit: 'input-history', export: 'createInputPlayback'},
+      {path: 'src/kits/input-history/playback.test.ts'},
+    ],
+  },
+  {
     id: 'CADENCE-01',
     title: 'Optional bounded per-member update cadence',
     docs: 'docs/guides/update-cadence.md',

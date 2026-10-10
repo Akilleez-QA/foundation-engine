@@ -24,6 +24,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | WORK-01 | Optional bounded fair work roster |  | [README.md](../src/kits/work-roster/README.md) |
 | VOLUME-01 | Optional bounded sphere and capsule overlap, sweep and headroom queries |  | [README.md](../src/kits/volume-query/README.md) |
 | ACTIVATION-01 | Optional bounded region activation from observer positions |  | [region-activation.md](guides/region-activation.md) |
+| INPUT-ASSIST-01 | Optional aim assist, flick detection and scripted input playback |  | [README.md](../src/kits/input-assist/README.md) |
 | CADENCE-01 | Optional bounded per-member update cadence |  | [update-cadence.md](guides/update-cadence.md) |
 | ASG-01 | Optional bounded service and worksite assignment ownership |  | [assignments.md](guides/assignments.md) |
 | ITINERARY-01 | Bounded editable destination itineraries with owned completion attempts |  | [README.md](../src/kits/itinerary/README.md) |
@@ -103,6 +104,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/formulas`
 - `@kits/frames`
 - `@kits/housing`
+- `@kits/input-assist`
 - `@kits/input-history`
 - `@kits/inventory`
 - `@kits/itinerary`

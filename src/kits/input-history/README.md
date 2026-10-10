@@ -5,7 +5,9 @@ buffered inputs, release-triggered ("negative edge") inputs, opposite-direction
 cleaning (SOCD), and timed command sequences such as motion inputs. It gives the
 same answers when a rollback simulation replays a frame. The kit is generic: it
 knows actions and frames, not moves or genres. It owns no device reader, clock,
-timer or scheduler and installs no definitions. A game can omit it.
+timer or scheduler and installs no definitions. A game can omit it. It also plays
+scripted action timelines (and converted recordings) back as normal input for tests
+and attract mode: see [scripted playback](#scripted-playback).
 
 The recipe is [add input history](../../../docs/recipes/add-input-history.md).
 
@@ -116,9 +118,80 @@ rollback consumer test runs a buffered motion with a `createSaveableRng` damage
 roll through `createRollbackSyncTest`, and passes only while both are in the saved
 state.
 
+## Scripted playback
+
+`createInputPlayback` plays a timeline of action events into an `InputSource`, the
+shape `ctx.input` has. Systems read scripted actions exactly as they read a player's.
+It serves tests, demos and attract mode. `timelineFromHistory(history, {from?, to?})`
+converts recorded frames into a timeline.
+
+```ts
+import { createInputPlayback, timelineFromHistory } from '@kits/input-history';
+
+// A test: the scene's systems see the timeline as ctx.input.
+const playback = createInputPlayback({ events: [
+  { tick: 0, action: 'move', kind: 'axis', value: 1 },
+  { tick: 30, action: 'jump', kind: 'tap' },
+  { t: 1.5, action: 'move', kind: 'axis', value: 0 },     // seconds, rounded to the tick
+] });
+const t = await testScene(scene, { input: playback.source }); // call playback.step() once per fixed tick
+
+// Attract mode: loop, and stop when the user touches anything.
+const demo = createInputPlayback({ ...timelineFromHistory(recorded), loop: true, watch: ['move', 'jump', 'menu'] });
+defineSystem({ id: 'my-game-attract', run(ctx) {
+  if (demo.step(ctx.input).status === 'cancelled') ctx.scene.goto('title');
+  const input = demo.over(ctx.input);  // scripted while playing, live afterwards
+  // ... the game's normal logic reads `input`
+} });
+```
+
+| Event | Meaning |
+|---|---|
+| `press` | Pressed on its tick, held until `release`. |
+| `release` | Released. In the same tick as its press, the action is a tap. |
+| `tap` | Pressed and held for its tick only. |
+| `axis` | `value` in [−1, 1] from its tick until changed. |
+
+An action is either a button or an axis. Events may come in any order; within one
+tick they apply in the given order. `step(live?)` makes the next tick current. Given
+`live`, it first checks the watched actions (default: the timeline's own) for held,
+pressed, or |axis| > `deadzone` (default 0.2), and the pointer (`watchPointer`,
+default true). Any of these cancels with reason `'input'`.
+
+**Ending:**
+- Cancelling or finishing releases every scripted action.
+- `over(live)` switches to the live input on the same tick, so the touch that ended
+  the demo is not lost.
+- After the last tick, `loop: true` restarts at tick 0 with everything released;
+  otherwise the status is `'finished'`.
+- `cancel(reason)` ends playback (idempotent); `restart()` returns to `'ready'`.
+- Scripted presses have no `pressedAt` timestamp (null), as in the replay kit.
+- The scripted pointer is idle.
+
+**Converter:**
+- Played one tick per recorded frame and sampled with `sampleActions`, a converted
+  history records the same cleaned held masks and edges again (tested in a `testScene`
+  round trip).
+- Actions held at `from` become presses at tick 0.
+- Consumption marks are game decisions and are not part of the timeline.
+
+**Bounds and overload:**
+- `maxEvents` is 1–65,536 (default 4096). A timeline is at most 216,000 ticks (an hour
+  at 60 Hz), with at most 64 distinct actions and 64 watched ids.
+- A malformed or oversized timeline throws `RangeError` at construction, never mid-play.
+- A step applies only that tick's events, so per-tick work is that tick's events plus
+  the watched actions.
+
+**Placement:** playback lives here because this kit owns action-level recording; the
+two formats convert directly. The replay kit is a different owner with a different
+job: it verifies a scene against logged ticks and digests, and its dev-only tick tap
+can replace `ctx.input` in a visit. Playback is for authored timelines and attract
+mode, so it never replaces `ctx.input` in a live visit. A scene opts in by reading
+`over(ctx.input)`.
+
 ## Evidence (this candidate)
 
-**Checked (`src/kits/input-history/*.test.ts`, 17 tests):**
+**Checked (`src/kits/input-history/*.test.ts`, 23 tests):**
 - Option bounds.
 - Contiguity refusals, exact edges, taps and baselines.
 - Buffer windows: consumption, the start-of-history rule and refusal of evicted windows.
@@ -132,6 +205,13 @@ state.
   - 13 tampered or foreign snapshots refused, with the history left unchanged.
 - Rollback sync-test integration, with negative controls for an unsaved history and an unsaved random word.
 - A `testScene` fixed-lane consumer showing a one-tick tap recorded once.
+- Scripted playback (`playback.test.ts`, 6 tests):
+  - option bounds;
+  - press, release, tap, same-tick tap, axis and seconds-to-tick semantics, tick by tick;
+  - deterministic loops;
+  - cancellation by held, pressed, axis and pointer input, with the deadzone and unwatched actions;
+  - a recorded `testScene` session (opposites, taps) converted and played back through `testScene({input})`, giving an identical snapshot;
+  - an attract-mode scene ended by a real press, after which live input drives it.
 - Review regressions: opposites held across `reset` report no false edges under all five policies; frames before the first record are outside every window; an explicit frame on an empty history throws.
 - Mutation checks each fail the suite: a greedy predecessor, a gap off by one, sequences ignoring consumption, and `last` behaving as `first`.
 
