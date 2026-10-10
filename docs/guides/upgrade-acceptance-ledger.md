@@ -1612,3 +1612,21 @@ the one new runtime dependency, approved for this kit only. Core stays physics-f
 Seven kinds added to `npm run convert` (stacked on the ASSET-CONVERT candidate): `archive`, `frames`, `planar`, `tim`, `vag`, `director`, `cinepak`. Independent implementations from documented format facts; PNG/WAV output with `.meta.json` sidecars and provenance receipts; decompressors bounded by declared sizes. [README](../../tools/convert/README.md#legacy-formats), [ADR 0133](../adr/0133-legacy-format-decoders.md).
 
 Evidence: headless tests with fixtures built by test-side encoders (exact value checks for every kind), mutation fuzzing of every fixture and bomb tests; with ffmpeg installed, Cinepak frames match an independent decoder within one colour level and the truncated ADPCM prediction matches sample for sample. An independent adversarial review found two resource amplifications and several smaller deviations, each fixed with a regression test. No real game data was used or committed; hosted full CI pending.
+
+## Perception kit — candidate (2026-10-09)
+
+Branch `feat/perception-kit` from `a6211bd3`. Nine headless tests: sight range, cone,
+peripheral falloff, near radius and occlusion queried only when needed; hearing
+falloff, path distance, unreachable and attenuation; awareness growth, impulses, decay,
+hysteretic levels and blackboard facts; forgetting and full-memory replacement; squad
+sharing, older-report refusal, fading inform and expiry; cover band, reservations and
+bounded checks; utility compensation, momentum and refusal of invalid considerations;
+and the review fixes (no rumour loop through re-sharing, report gain independent of the
+update rate, atomic updates, sight priority for last-known positions, forgetting with
+no decay). An independent adversarial review found those squad and awareness defects
+and several smaller issues; all were fixed. Its re-review found a gap-credit effect,
+relayed report data shared as direct perception, report positions overriding direct
+ones and uncounted evictions; these are fixed (a `maxStep` credit cap, direct-only
+position and strength for sharing, report positions only when newer than direct perception,
+eviction counting) and covered by a ninth test.
+No game, browser or device evidence.

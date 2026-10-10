@@ -1140,6 +1140,19 @@
     },
     {"name": "objectives", "exports": ["createObjectiveRun", "createStagedObjectives", "objectives"]},
     {
+      "name": "perception",
+      "exports": [
+        "chooseCover",
+        "chooseUtility",
+        "createAwareness",
+        "createCoverReservations",
+        "createSquadKnowledge",
+        "hearingStrength",
+        "perception",
+        "sightStrength"
+      ]
+    },
+    {
       "name": "physics",
       "exports": [
         "Collider",

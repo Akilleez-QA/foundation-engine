@@ -1542,3 +1542,10 @@ the one new runtime dependency, approved for this kit only. Core stays physics-f
 Seven kinds added to `npm run convert` (stacked on the ASSET-CONVERT candidate): `archive`, `frames`, `planar`, `tim`, `vag`, `director`, `cinepak`. Independent implementations from documented format facts; PNG/WAV output with `.meta.json` sidecars and provenance receipts; decompressors bounded by declared sizes. [README](../../tools/convert/README.md#legacy-formats), [ADR 0133](../adr/0133-legacy-format-decoders.md).
 
 Evidence: headless tests with fixtures built by test-side encoders (exact value checks for every kind), mutation fuzzing of every fixture and bomb tests; with ffmpeg installed, Cinepak frames match an independent decoder within one colour level and the truncated ADPCM prediction matches sample for sample. An independent adversarial review found two resource amplifications and several smaller deviations, each fixed with a regression test. No real game data was used or committed; hosted full CI pending.
+
+## Perception kit — candidate (2026-10-09)
+
+Optional `@kits/perception`: sight/hearing strengths over creator queries, awareness
+with alert levels and blackboard facts, squad knowledge, cover selection and utility
+scoring. See [the guide](perception.md) and [ADR 0113](../adr/0113-perception-kit.md).
+Headless tests in the ledger; independent review and hosted CI remain required.
