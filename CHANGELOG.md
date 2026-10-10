@@ -7,7 +7,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
-- **Model clip transitions:** optional `Model.transition` (seconds, 0 to 2, default 0) eases from the displayed pose into a new clip, a revision restart or the bind pose instead of cutting. Interrupting a transition starts from the part-blended pose; it completes on presentation time even while playback is paused; nodes only the old clip drove return to their original values. Presentation only, bounded to 512 animated nodes (larger rigs cut and report). Existing models are unchanged. See [ADR 0087](docs/adr/0087-model-clip-transitions.md).
+- **Model clip transitions:** optional `Model.transition` (seconds, 0 to 2, default 0) eases from the displayed pose into a new clip, a revision restart or the bind pose instead of cutting. Interrupting a transition starts from the part-blended pose; it completes on presentation time even while playback is paused; nodes only the old clip drove return to their original values. Presentation only, bounded to 512 animated nodes (larger rigs cut and report). Existing models are unchanged. See [ADR 0089](docs/adr/0089-model-clip-transitions.md).
 
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 

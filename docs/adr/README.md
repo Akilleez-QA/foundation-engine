@@ -76,4 +76,4 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0084](0084-persisted-recurring-phase.md) | Persisted recurring phase with explicit bounded catch-up | Optional composition / Time / Persistence | Proposed |
 
-| [0087](0087-model-clip-transitions.md) | Model clip transitions through the existing model owner | Author API / Animation presentation | Proposed |
+| [0089](0089-model-clip-transitions.md) | Model clip transitions through the existing model owner | Author API / Animation presentation | Proposed |

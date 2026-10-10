@@ -1,4 +1,4 @@
-# ADR 0087: model clip transitions through the existing model owner
+# ADR 0089: model clip transitions through the existing model owner
 
 - **Status:** Proposed
 - **Date:** 2026-10-09
