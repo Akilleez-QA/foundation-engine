@@ -880,3 +880,9 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Optional streaming queue candidate — STREAM-01, 2026-10-09
+
+`@kits/streaming` is an independently implemented pure queue for play-time loads. Requests carry a creator priority and byte estimate and are counted per key; `pump(now)` publishes completions in start order, requeues due retries (deterministic backoff in caller ticks) and starts the highest-priority keys within `maxConcurrent` and `maxBytes` (estimates while loading, actual bytes when ready), with head-of-line blocking and optional preemption of lower-priority loads. Cancellation releases values and aborts loads while holding their slot and charge until execution settles. Ports compose with existing owners: `leasePort` (lease caches and their residency measure), `promisePort` (worker jobs, fetches) and `modelPort` (the scene model owner through hidden `Model` entities and `modelState`). No system, loader, cache, worker or registration is added. [Guide](streaming-queue.md), [ADR 0098](../adr/0098-optional-streaming-queue.md).
+
+Evidence: 11 focused headless tests (8 unit tests including a randomised run asserting budgets every tick, release-exactly-once and same-seed event replay; 3 consumers: a real `LeaseCache`, a fixed-step model-owner consumer with simulated owner state, promise cancellation). A local micro-measurement is recorded in the kit README as an order-of-magnitude indication only. Animation clips stream only as the model assets that carry them. This is a branch candidate: hosted full CI, a playable template consumer, browser load timing and physical-device acceptance remain pending.

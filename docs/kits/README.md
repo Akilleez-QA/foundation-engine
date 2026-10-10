@@ -40,6 +40,8 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 
 The optional [assignments](../../src/kits/assignments/README.md) candidate supplies exclusive actor claims, weighted target capacity and atomic transfer refusal. Two headless service/worksite fixtures and route-owner composition tests exercise it; no playable template consumer or browser/device acceptance is claimed. [Guide](../guides/assignments.md).
 
+The optional [streaming](../../src/kits/streaming/README.md) candidate ranks play-time load requests under concurrency and byte budgets, with cancellation, retry and preemption, through ports onto the existing lease caches and model owner. Headless unit and consumer tests only; no template consumer or browser/device acceptance is claimed. [Guide](../guides/streaming-queue.md).
+
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.
 
 
