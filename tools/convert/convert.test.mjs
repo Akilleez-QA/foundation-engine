@@ -736,3 +736,85 @@ test('convert: review regressions — referenced files stay inside the input fol
     rmSync(dir, {recursive: true, force: true});
   }
 });
+
+// ---- S3O ----------------------------------------------------------------------------------------------------------
+import {s3oToGlb} from './s3o.mjs';
+/** A synthetic S3O: a root quad piece with one child strip piece (with a restart). */
+function makeS3o() {
+  const parts = [];
+  let size = 52;
+  const place = buf => {
+    const offset = size;
+    parts.push(buf);
+    size += buf.length;
+    return offset;
+  };
+  const cstr = s => place(Buffer.from(s + '\0', 'latin1'));
+  const verts = list => {
+    const b = Buffer.alloc(list.length * 32);
+    list.forEach(([x, y, z, u, v], i) => {
+      [x, y, z, 0, 0, 2, u, v].forEach((f, k) => b.writeFloatLE(f, i * 32 + k * 4));
+    });
+    return place(b);
+  };
+  const table = list => {
+    const b = Buffer.alloc(list.length * 4);
+    list.forEach((v, i) => b.writeUInt32LE(v >>> 0, i * 4));
+    return place(b);
+  };
+  const piece = ({name, children = [], v, prim, idx, off}) => {
+    const nameAt = cstr(name);
+    const vAt = verts(v),
+      iAt = table(idx),
+      cAt = children.length ? table(children) : 0;
+    const p = Buffer.alloc(52);
+    [nameAt, children.length, cAt, v.length, vAt, 0, prim, idx.length, iAt, 0].forEach((n, k) =>
+      p.writeInt32LE(n, k * 4),
+    );
+    off.forEach((f, k) => p.writeFloatLE(f, 40 + k * 4));
+    return place(p);
+  };
+  const quad = [
+    [0, 0, 0, 0, 0],
+    [1, 0, 0, 1, 0],
+    [1, 1, 0, 1, 1],
+    [0, 1, 0, 0, 1],
+  ];
+  const strip = [...quad, [2, 0, 0, 0, 0], [2, 1, 0, 0, 1]];
+  const child = piece({name: 'turret', v: strip, prim: 1, idx: [0, 1, 3, 2, 0xffffffff, 1, 4, 2, 5], off: [0, 2, 0]});
+  const root = piece({name: 'base', v: quad, prim: 2, idx: [0, 1, 2, 3], off: [0, 0, 0], children: [child]});
+  const t1 = cstr('unit_tex1.dds');
+  const head = Buffer.alloc(52);
+  head.write('Spring unit\0', 0, 'latin1');
+  [0].forEach(() => head.writeInt32LE(0, 12));
+  [10, 5, 0, 2, 0].forEach((f, k) => head.writeFloatLE(f, 16 + k * 4));
+  [root, 0, t1, 0].forEach((n, k) => head.writeInt32LE(n, 36 + k * 4));
+  return Buffer.concat([head, ...parts]);
+}
+
+test('convert: S3O pieces become named glTF nodes with triangulated quads and strips', async () => {
+  const bytes = makeS3o();
+  const {glb, summary} = s3oToGlb(new Uint8Array(bytes));
+  await validate(glb);
+  assert.deepEqual(summary, {pieces: 2, vertices: 10, triangles: 6, textures: ['unit_tex1.dds']});
+  const json = readGlbJson(glb);
+  assert.deepEqual(
+    json.nodes.map(n => n.name),
+    ['base', 'turret'],
+  );
+  assert.deepEqual(json.nodes[1].translation, [0, 2, 0]);
+  assert.deepEqual(json.nodes[0].children, [1]);
+  assert.deepEqual(json.materials[0].extras.s3oTextures, ['unit_tex1.dds', '']);
+  // Strips 0,1,3,2 and (after the restart) 1,4,2,5: odd triangles swap their first two corners to keep the winding.
+  const idx = accessor(glb, json.meshes[1].primitives[0].indices);
+  assert.deepEqual(idx, [0, 1, 3, 3, 1, 2, 1, 4, 2, 2, 4, 5]);
+  const uv = accessor(glb, json.meshes[0].primitives[0].attributes.TEXCOORD_0);
+  assert.deepEqual(uv.slice(0, 4), [0, 1, 1, 1], 'v is flipped to glTF orientation');
+  const loaded = await loadGlb(glb);
+  assert.ok(loaded.scene.getObjectByName('turret'));
+  assert.ok(s3oToGlb(new Uint8Array(bytes)).glb.equals(glb));
+  const broken = Buffer.from(bytes);
+  broken.writeInt32LE(1 << 30, 36);
+  assert.throws(() => s3oToGlb(new Uint8Array(broken)), /outside the file/);
+  assert.throws(() => s3oToGlb(new Uint8Array(Buffer.from('nope'))), /not an S3O/);
+});

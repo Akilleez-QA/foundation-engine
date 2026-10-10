@@ -11,6 +11,7 @@ only glTF/GLB for models: these converters feed that pipeline, they do not widen
 | `obj` | Wavefront OBJ (`v`, `vt`, `vn`, `f` with any polygon size and negative indices, `usemtl`), its MTL (`Kd`, `d`/`Tr`, `map_Kd` PNG/JPEG embedded) | `.glb`: one primitive per material, `uint16`/`uint32` indices, smooth normals when the file has none (`--normals none` to skip) |
 | `ply` | PLY ascii, binary little- and big-endian; vertex `x y z`, optional `nx ny nz`, `s t`/`u v`, `red green blue [alpha]` (uchar, ushort or float, each scaled by its declared type); `face` lists; other elements skipped | `.glb`: triangles, or points when there are no faces; all-byte colours as normalised bytes, others as floats in `COLOR_0` |
 | `bvh` | BVH motion capture (one `ROOT`, any channel order, end sites) | `.glb`: the joint hierarchy as nodes and one animation (linear translation and rotation channels) |
+| `s3o` | S3O unit models from an open-source RTS engine (piece hierarchy; triangles, strips with restarts, quads; 32-byte vertices) | `.glb`: one named node per piece with its offset, meshes for pieces with geometry, texture names kept in material `extras` (usually DDS/TGA: convert or assign them separately); `--keep-v` keeps the file's v orientation (default flips to glTF's top-left origin) |
 | `image` | PCX (8-bit palette, or 8-bit 3/4-plane), BMP (1/4/8-bit palette incl. RLE8/RLE4, 24/32-bit incl. whole-byte `BI_BITFIELDS` masks), or raw one-byte indices (exactly width × height bytes) with `--palette` (768-byte RGB, `--six-bit` VGA values, JASC-PAL, GIMP `.gpl`) | `.png`: indexed (palette kept, for palette effects) or `--rgba`; `--transparent <index>` makes one entry transparent |
 
 ```sh
@@ -87,7 +88,7 @@ rights: converting a file does not change its licence.
 `tools/convert/convert.test.mjs` (in `npm test`): OBJ triangles equal three.js's
 `OBJLoader`; PLY positions equal `PLYLoader` (ascii, both binary byte orders, extra
 elements, point clouds); BVH rotations and translations equal `BVHLoader` frame by
-frame; folding preserves mapped joints' world positions; PCX, BMP and BMP-RLE8
+frame; folding preserves mapped joints' world positions; a synthetic S3O (quads, strips with restarts, child pieces) converts to named nodes with consistent winding, and two real S3O tree models from an open-source engine's base content validated with 0 errors and 0 warnings (local run, not committed; texture orientation and handedness not visually reviewed); PCX, BMP and BMP-RLE8
 indices and palettes survive into indexed PNGs; every GLB passes the glTF validator
 (when installed) and loads in `GLTFLoader`; a converted file's receipt passes the
 provenance check; refusals for malformed input. An independent adversarial review

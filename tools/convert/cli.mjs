@@ -15,10 +15,12 @@
 // joint, frame and pixel limits in each converter. Failure: a refused input writes nothing; output and receipt are
 // written to temporary names and renamed into place. The receipt records what was done, not whether rights are real.
 import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
 import {existsSync, readFileSync, renameSync, statSync, writeFileSync, mkdirSync, rmSync} from 'node:fs';
 import {basename, dirname, extname, isAbsolute, join, relative, resolve, sep} from 'node:path';
 import {objToGlb, plyToGlb} from './mesh.mjs';
 import {bvhToGlb} from './bvh.mjs';
+import {s3oToGlb} from './s3o.mjs';
 import {decodeBmp, decodePcx, decodeRaw, imageToPng, readPalette} from './indexed.mjs';
 import {recordProblems} from '../../scripts/lib/provenance.ts';
 
@@ -61,6 +63,7 @@ const FLAGS = {
   height: 'number',
   transparent: 'number',
   rgba: 'bool',
+  'keep-v': 'bool',
   'no-provenance': 'bool',
   json: 'bool',
 };
@@ -88,7 +91,7 @@ export function parseArgs(argv) {
       } else flags[name] = v;
     }
   }
-  if (positional.length !== 3) throw Error('usage: convert <obj|ply|bvh|image> <input> <output> [options]');
+  if (positional.length !== 3) throw Error('usage: convert <obj|ply|bvh|s3o|image> <input> <output> [options]');
   return {kind: positional[0], input: positional[1], output: positional[2], flags};
 }
 
@@ -132,10 +135,12 @@ export function convert({kind, input, output, flags}, cwd = process.cwd()) {
   if (!['smooth', 'none'].includes(options.normals)) throw Error('--normals must be smooth or none');
   let bytes, summary;
   const ext = extname(output).toLowerCase();
-  if (kind === 'obj' || kind === 'ply' || kind === 'bvh') {
+  if (kind === 'obj' || kind === 'ply' || kind === 'bvh' || kind === 's3o') {
     if (ext !== '.glb') throw Error(`${kind} converts to .glb`);
     if (kind === 'obj') ({glb: bytes, summary} = objToGlb(inputBytes.toString('utf8'), sibling, options));
     else if (kind === 'ply') ({glb: bytes, summary} = plyToGlb(new Uint8Array(inputBytes), options));
+    else if (kind === 's3o')
+      ({glb: bytes, summary} = s3oToGlb(new Uint8Array(inputBytes), {scale: options.scale, flipV: !flags['keep-v']}));
     else {
       let boneMap = null;
       if (flags['bone-map']) {
@@ -175,7 +180,7 @@ export function convert({kind, input, output, flags}, cwd = process.cwd()) {
       transparent: flags.transparent ?? null,
       output: flags.rgba ? 'rgba' : 'indexed',
     }));
-  } else throw Error(`unknown kind ${kind}: obj, ply, bvh or image`);
+  } else throw Error(`unknown kind ${kind}: obj, ply, bvh, s3o or image`);
 
   const out = resolve(cwd, output);
   const args = Object.entries(flags)
@@ -234,7 +239,7 @@ export function convert({kind, input, output, flags}, cwd = process.cwd()) {
   return {output: out, receipt: receipt ? receiptPath : null, summary: {...summary, bytes: bytes.length}};
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname)) {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const args = parseArgs(process.argv.slice(2));
     const result = convert(args);
