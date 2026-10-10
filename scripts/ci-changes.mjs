@@ -78,6 +78,9 @@ export function shasFromPayload(event, payload, sha = '') {
  * @param {(range: {from: string, to: string, dots: string}) => string[]} listPaths
  */
 export function classify(event, shas, listPaths) {
+  // The weekly run has no diff. code=true lets node-current's schedule clause run; Node 22 jobs still
+  // require a push or pull request, so they stay skipped.
+  if (event === 'schedule') return {code: true, reason: ''};
   try {
     const range = diffRange(event, shas);
     const paths = listPaths(range);

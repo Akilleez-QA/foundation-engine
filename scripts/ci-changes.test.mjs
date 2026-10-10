@@ -35,6 +35,13 @@ test('pull requests diff base...head and pushes diff before..head; a missing sha
   ]);
   assert.throws(() => diffRange('push', {before: '0'.repeat(40), sha: head}));
   assert.throws(() => diffRange('schedule', {sha: head}));
+  let listed = false;
+  const scheduled = classify('schedule', {}, () => {
+    listed = true;
+    return ['src/a.ts'];
+  });
+  assert.deepEqual(scheduled, {code: true, reason: ''});
+  assert.equal(listed, false);
   const open = classify('push', {before: '', sha: head}, () => {
     throw Error('should not list');
   });

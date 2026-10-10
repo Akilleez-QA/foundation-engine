@@ -16,10 +16,11 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Path filter for docs/** and **/*.md. The workflow always starts so the required check job reports,
-  # including on a docs-only pull request. Heavy jobs skip when every changed path is docs or Markdown.
+  # Path filter for docs/** and **/*.md. Runs on every event so dependents are not skipped behind it:
+  # node-current needs this job and its if has no status function, so a skipped changes job would skip
+  # node-current too. The weekly schedule reports code=true and does not diff. Node 22 jobs still require
+  # the event to be a push or pull request, so that output does not start them on Monday.
   changes:
-    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:

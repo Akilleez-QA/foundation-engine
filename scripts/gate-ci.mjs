@@ -51,7 +51,6 @@ const JOB_KEYS = new Set(['runs-on', 'timeout-minutes', 'steps', 'env', 'permiss
 /** Hosted event filters the local runner accepts and does not evaluate. Absent `if` means the job always runs. */
 const NODE22_IF = "github.event_name != 'schedule' && needs.changes.outputs.code == 'true'";
 export const JOB_EVENT_IF = {
-  changes: "github.event_name != 'schedule'",
   browser: NODE22_IF,
   'templates-1': NODE22_IF,
   'templates-2': NODE22_IF,
@@ -73,11 +72,9 @@ const aggregateEnvOk = env => {
 function validateChangesJob(job) {
   const where = `${WORKFLOW}: job changes`;
   if (!job || typeof job !== 'object' || Array.isArray(job)) throw Error(`${where} is missing`);
-  const allowed = new Set([...JOB_KEYS, 'if', 'outputs']);
+  const allowed = new Set([...JOB_KEYS, 'outputs']);
   for (const key of Object.keys(job))
     if (!allowed.has(key)) throw Error(`${where} key "${key}" cannot be mirrored locally; extend scripts/gate-ci.mjs`);
-  if (job.if !== JOB_EVENT_IF.changes)
-    throw Error(`${where} if cannot be mirrored locally; extend scripts/gate-ci.mjs`);
   if (job['runs-on'] !== 'ubuntu-latest') throw Error(`${where} requires ubuntu-latest`);
   if (JSON.stringify(job.outputs) !== JSON.stringify({code: CHANGES_OUTPUT_EXPRESSION}))
     throw Error(`${where} output must be the paths step`);

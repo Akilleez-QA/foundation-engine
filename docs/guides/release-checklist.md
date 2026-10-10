@@ -138,11 +138,13 @@ Those three jobs run on pull requests and on pushes to `main` when the diff cont
 newest Node major (26; raise it when a newer major ships), with no browser or template
 gates. It runs on a code push to `main` and on a weekly Monday 06:00 UTC schedule, not on pull requests.
 The weekly run does not start the Node 22 jobs. A `changes` job reads the diff (the same paths as `docs/**`
-and `**/*.md`). When every changed path is docs or Markdown, the heavy jobs are skipped. The workflow
+and `**/*.md`) on pushes and pull requests, and on the weekly schedule it reports code with no diff.
+It always runs: `node-current` needs it, and a skipped `changes` job would skip `node-current` as well.
+When every changed path is docs or Markdown, the heavy jobs are skipped. The workflow
 still starts, and the terminal required check remains `check`: it depends on `changes` and all four work
 jobs, and it passes for that skip. On a pull request that changes code it accepts success from the three
 Node 22 jobs and a skipped `node-current`. On a code push to `main` it accepts only explicit success from
-all four. On the weekly schedule it accepts success from `node-current` and skipped Node 22 jobs.
+all four. On the weekly schedule it accepts success from `changes` and `node-current`, and skipped Node 22 jobs.
 Failure, cancellation, or a missing result does not pass. A skipped result passes only for a job that this
 event does not run. In-progress runs are cancelled only for pull requests. No job uploads an artifact.
 Existing budgets, runner permissions, pinned actions and timeouts are unchanged.
@@ -157,7 +159,8 @@ under that Node with `npm run gate:ci -- --only node-current/test,node-current/c
 or pass `--any-node` to run everything under the local Node. Install dependencies and Chromium first as
 shown above. This reproduces the checks, not GitHub runner isolation or hardware.
 Unsupported job graphs, conditions and expressions fail before execution. The hosted event
-filters on `changes` and the four work jobs are the only job `if` values the reader accepts, and it does not evaluate them.
+filters on the four work jobs are the only job `if` values the reader accepts, and it does not evaluate them.
+`changes` has no `if`: it runs on push, pull request, and the weekly schedule.
 
 `npm run gate:ci -- --list` prints job-qualified step IDs. `--from` and `--only`
 produce partial results and omit the terminal aggregate; they cannot establish full

@@ -16,6 +16,7 @@ const CHANGES_JOB = 'changes';
 /**
  * Result the aggregate accepts for one work job.
  * Pull requests skip node-current. The weekly schedule skips the Node 22 jobs.
+ * changes runs on every hosted event, including the schedule, and must succeed.
  * Docs-only pushes and pull requests (`codeChanged === 'false'`) skip every work job.
  * Anything else, including an unknown code flag, requires success. Absence is never success.
  * @param {string} id
@@ -30,8 +31,7 @@ export function expectedJobResult(id, event = '', codeChanged = '') {
 }
 
 function changesResult(event) {
-  if (event === 'schedule') return 'skipped';
-  if (event === 'pull_request' || event === 'push') return 'success';
+  if (event === 'schedule' || event === 'pull_request' || event === 'push') return 'success';
   return '';
 }
 

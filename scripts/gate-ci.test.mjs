@@ -76,7 +76,8 @@ test('gate:ci: every run step of ci.yml is executed locally, except the document
   assert.deepEqual(parsed.on.schedule, [{cron: '0 6 * * 1'}]);
   assert.equal(parsed.concurrency.group, 'ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}');
   assert.equal(parsed.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
-  for (const id of ['changes', 'browser', 'templates-1', 'templates-2', 'node-current'])
+  assert.equal(parsed.jobs.changes.if, undefined);
+  for (const id of ['browser', 'templates-1', 'templates-2', 'node-current'])
     assert.equal(parsed.jobs[id].if, JOB_EVENT_IF[id]);
   for (const id of ['browser', 'templates-1', 'templates-2', 'node-current'])
     assert.deepEqual(parsed.jobs[id].needs, ['changes']);

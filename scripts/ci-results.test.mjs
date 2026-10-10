@@ -46,27 +46,25 @@ test('pull requests accept a skipped node-current job and still require the Node
   );
 });
 
-test('the weekly schedule accepts skipped Node 22 jobs and requires node-current success', () => {
-  const weekly = hosted(
-    {
-      browser: {result: 'skipped'},
-      'templates-1': {result: 'skipped'},
-      'templates-2': {result: 'skipped'},
-      'node-current': {result: 'success'},
-    },
-    'skipped',
-  );
-  assert.doesNotThrow(() => requireSuccessfulJobs(weekly, 'schedule'));
-  assert.throws(() => requireSuccessfulJobs(hosted(success(), 'skipped'), 'schedule'), /browser=success/);
+test('the weekly schedule accepts skipped Node 22 jobs and requires node-current and changes to succeed', () => {
+  const weekly = hosted({
+    browser: {result: 'skipped'},
+    'templates-1': {result: 'skipped'},
+    'templates-2': {result: 'skipped'},
+    'node-current': {result: 'success'},
+  });
+  assert.doesNotThrow(() => requireSuccessfulJobs(weekly, 'schedule', 'true'));
+  assert.throws(() => requireSuccessfulJobs(hosted(success()), 'schedule', 'true'), /browser=success/);
   assert.throws(
-    () => requireSuccessfulJobs({...weekly, 'node-current': {result: 'skipped'}}, 'schedule'),
+    () => requireSuccessfulJobs({...weekly, 'node-current': {result: 'skipped'}}, 'schedule', 'true'),
     /node-current=skipped/,
   );
   assert.throws(
-    () => requireSuccessfulJobs({...weekly, 'node-current': {result: 'failure'}}, 'schedule'),
+    () => requireSuccessfulJobs({...weekly, 'node-current': {result: 'failure'}}, 'schedule', 'true'),
     /node-current=failure/,
   );
-  assert.throws(() => requireSuccessfulJobs(hosted(weekly, 'success'), 'schedule'), /changes=success/);
+  assert.throws(() => requireSuccessfulJobs(hosted(weekly, 'skipped'), 'schedule', 'true'), /changes=skipped/);
+  assert.throws(() => requireSuccessfulJobs(hosted(weekly, 'failure'), 'schedule', 'true'), /changes=failure/);
 });
 
 test('a push still requires every work job to succeed when code changed', () => {
