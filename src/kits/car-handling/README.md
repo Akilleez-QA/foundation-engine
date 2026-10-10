@@ -72,10 +72,11 @@ unit direction and writes the nearest hit into `out` (`distance`, normal `nx/ny/
 surface `grip` [0, 4] and extra `rolling` [0, 1]), returning true, or returns false.
 The kit resets `out` to defaults (grip 1, rolling 0) before every query, so a port that
 writes only some fields never inherits an earlier answer. Each wheel casts along the
-body's down axis from one wheel radius plus the sub-step's travel (`|v| × h`) above its
-mount; with `body.contacts`, each of the eight body-box corners casts straight down from
-half the body height plus the same travel above it. Reaching back by the travel means a
-fast body cannot pass a surface between two casts. A
+body's down axis from one wheel radius above its mount, plus the sub-step's travel toward
+the surface along the ray (`max(0, -v·up) × h`); with `body.contacts`, each of the eight
+body-box corners casts straight down from half the body height plus `max(0, -vy) × h`
+above it. Reaching back by the approach means a fast fall cannot pass a surface between
+two casts, while horizontal speed casts no higher (driving under an overhang is safe). A
 hit with a distance outside [0, maxDistance], a non-finite or zero normal, or grip or
 rolling outside their ranges throws. A surface facing away from a wheel ray is ignored.
 `planeGround` (exact, optionally sloped) and `sampledGround` (a height field, see
@@ -182,11 +183,14 @@ missed.
   controller allocates nothing per sub-step or query; `step` allocates its result record.
   The cost of the ground port is the creator's.
 - Configuration refuses unknown fields at every level and suspension tunings too stiff
-  for the sub-step (the three suspension conditions in the tuning table). Those bounds
-  are necessary for stable explicit integration, not sufficient for every combination:
-  zero damping keeps oscillating, and very light or very soft cars settle slowly.
+  for the sub-step: the three suspension conditions in the tuning table, and the same
+  three for the pitch and roll modes (corner spring rate times the summed squared lever
+  arms over the body's inertia about that axis, so a low `inertiaScale` with a stiff
+  suspension is refused). These bounds are necessary for stable explicit integration,
+  not a guarantee for every combination: zero damping keeps oscillating, and very soft
+  cars settle slowly.
 - A port that calls back into the same car (`step`, `place`, `reset`, `restore`) is
-  refused, and the outer step fails whole.
+  refused, and the outer step fails whole even if the port caught that refusal.
 - A step needing more than `maxSubsteps` is refused with `RangeError`; the creator's
   fixed-step host supplies steady steps, and a long frame should not be passed whole.
 - A step is a transaction (`place`, `reset` and `restore` are too). It works on a copy of the state and commits only when every
@@ -235,13 +239,14 @@ down, so it counts as airborne: air control, levelling and air damping act, `air
 grows, and arcade levelling can right a car lying on its side. With the presets'
 `brakes.brakeToReverse`, brake alone at standstill drives backwards; to hold on a slope
 with the brake, turn it off or hold a little throttle. A braked car on a steep (24°)
-slope still slides a few millimetres per minute. The adapter skips stepping while its
+slope still slides a few micrometres per minute, and a car at rest with full steering
+held can drift about 2 mm per minute (the wheels' toe-in against the stop caps). The adapter skips stepping while its
 target entity is missing, so simulated time pauses with it; an `after` callback that
 throws fails the tick after the step and Transform were already written.
 
 ## Evidence
 
-`car.test.ts` (24 tests): for both presets, settling to the static spring compression
+`car.test.ts` (25 tests): for both presets, settling to the static spring compression
 with under 1 µm of creep in a minute, straight-line acceleration under the curve's top speed, braking without
 reversing then brake-to-reverse, right-turn sign and speed-widened turns, handbrake
 slip and grip recovery; downforce load; a ledge with airborne, air pitch, levelling
@@ -250,7 +255,7 @@ report-only reset); the sampled height field against the exact plane; configurat
 refusal and freezing; transactional refusal of bad steps and bad ground answers; the
 query bound and speed clamps; identical bits across repeated runs and after a JSON
 snapshot round trip in both math modes; snapshot refusal; no tunnelling from a 199 m/s
-fall; a braked hold within 1 mm per minute on a 15 % slope with brake-to-reverse off;
+fall; driving at 40–150 m/s under an overhead deck without being lifted onto it; a braked hold within 1 mm per minute on a 15 % slope with brake-to-reverse off;
 refusal of unknown fields and unstable suspension; brake hand-off from an empty axle; no
 -0, no state leaked through the hit record across a restore, refused re-entry and
 refused unusable restores. `consumers.test.ts` (4

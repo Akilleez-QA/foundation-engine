@@ -418,6 +418,25 @@ export function validateCarConfig(input: unknown): CarConfig {
     throw new RangeError(
       'car-handling: suspension.bumpStop is too stiff for limits.maxSubstep (need 2*pi*f*sqrt(bumpStop)*maxSubstep <= 1)',
     );
+  // The pitch and roll modes: corner springs on their lever arms against the body's inertia about each axis.
+  const mass = num('mass', c.mass, 50, 50000),
+    [hx, hy, hz] = vec('halfExtents', c.halfExtents, 0, 20, true),
+    scale = num('inertiaScale', c.inertiaScale, 0.1, 10);
+  const kCorner = (mass / wheels.length) * omega * omega;
+  let pitchArm = 0,
+    rollArm = 0;
+  for (const w of wheels) {
+    pitchArm += w.position[2] * w.position[2];
+    rollArm += w.position[0] * w.position[0];
+  }
+  const ipitch = (mass / 3) * (hy * hy + hz * hz) * scale,
+    iroll = (mass / 3) * (hx * hx + hy * hy) * scale;
+  const omegaRot = Math.sqrt(Math.max((kCorner * pitchArm) / ipitch, (kCorner * rollArm) / iroll));
+  if (omegaRot * h > 0.35 || omegaRot * Math.sqrt(bump) * h > 1 || 2 * zeta * omegaRot * h > 1)
+    throw new RangeError(
+      'car-handling: the suspension is too stiff for the body pitch and roll inertia at limits.maxSubstep ' +
+        '(raise inertiaScale, soften the suspension or shorten the sub-step)',
+    );
   if (2 * zeta * omega * h > 1)
     throw new RangeError(
       'car-handling: suspension.damping is too high for limits.maxSubstep (need 2*damping*2*pi*f*maxSubstep <= 1)',

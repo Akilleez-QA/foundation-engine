@@ -430,9 +430,13 @@ test('car-handling: configuration refuses unknown fields and unstable suspension
   assert.throws(() => carConfig('arcade', {engine: {topSpeeed: 10} as never}), /unknown field engine.topSpeeed/);
   assert.throws(() => carConfig('arcade', {suspension: {frequency: 20}}), /too stiff/);
   assert.throws(() => carConfig('arcade', {suspension: {bumpStop: 1000}}), /bumpStop/);
-  assert.throws(() => carConfig('arcade', {suspension: {damping: 5}}), /damping/);
+  assert.throws(() => carConfig('arcade', {suspension: {damping: 5}}), /damping|pitch and roll/);
+  assert.throws(
+    () => carConfig('arcade', {suspension: {frequency: 4, bumpStop: 1}, inertiaScale: 0.1}),
+    /pitch and roll/,
+  );
   assert.throws(() => carConfig('arcade', {limits: {maxSubstep: 1 / 15}}), /too stiff|bumpStop/);
-  assert.doesNotThrow(() => carConfig('arcade', {suspension: {frequency: 6.6, bumpStop: 2}}));
+  assert.doesNotThrow(() => carConfig('arcade', {suspension: {frequency: 5, bumpStop: 2}}));
 });
 
 test('car-handling: an axle without wheels hands its foot-brake share to the other', () => {
@@ -480,6 +484,16 @@ test('car-handling: no -0, no hidden port state, no re-entry and no unusable res
   };
   assert.throws(() => a.step(DT, {}, sneaky), /inside a step/);
   assert.equal(JSON.stringify(a.snapshot()), before);
+  const swallowing: GroundQuery = (...args) => {
+    try {
+      a.step(DT, {}, flat);
+    } catch {
+      // the port hides the refusal
+    }
+    return flat(...args);
+  };
+  assert.throws(() => a.step(DT, {}, swallowing), /re-entered/);
+  assert.equal(JSON.stringify(a.snapshot()), before);
   // Restores that would wedge the car are refused.
   const values = [...a.snapshot().values];
   for (const [i, v] of [
@@ -494,4 +508,35 @@ test('car-handling: no -0, no hidden port state, no re-entry and no unusable res
     assert.throws(() => a.restore({...a.snapshot(), values: bad}), RangeError, `index ${i}`);
   }
   assert.equal(JSON.stringify(a.snapshot()), before);
+});
+
+test('car-handling: driving fast under an overhead deck does not lift the car onto it', () => {
+  // A deck answered only from above at height 2 over 100 < z < 130, above a flat floor.
+  const deck: GroundQuery = (ox, oy, oz, dx, dy, dz, max, out) => {
+    if (dy >= 0) return false;
+    let best = Infinity;
+    for (const h of oz > 100 && oz < 130 ? [0, 2] : [0]) {
+      if (oy < h) continue;
+      const t = (oy - h) / -dy;
+      if (t <= max && t < best) best = t;
+    }
+    if (best === Infinity) return false;
+    Object.assign(out, {distance: best, nx: 0, ny: 1, nz: 0, grip: 1, rolling: 0});
+    return true;
+  };
+  for (const speed of [40, 90, 150]) {
+    const car = createCarHandling(carConfig('arcade'));
+    car.place({x: 0, y: 0.7, z: 0});
+    settle(car, deck, 1);
+    const values = [...car.snapshot().values];
+    values[5] = speed;
+    car.restore({...car.snapshot(), values});
+    let top = 0;
+    for (let i = 0; i < 300; i++) {
+      car.step(DT, {}, deck);
+      top = Math.max(top, car.read().position[1]);
+    }
+    assert.ok(top < 1, `${speed} m/s stayed on the floor: ${top}`);
+    assert.ok(car.read().position[2] > 130, 'passed under the deck');
+  }
 });

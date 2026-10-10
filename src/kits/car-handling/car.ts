@@ -294,9 +294,9 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
     Fx = 2 * (qx * qz + qw * qy);
     Fy = 2 * (qy * qz - qw * qx);
     Fz = 1 - 2 * (qx * qx + qy * qy);
-    // Rays reach back by this sub-step's travel as well, so a fast body cannot pass a surface between two casts.
-    const reachBack = Math.sqrt(vx * vx + vy * vy + vz * vz) * h,
-      lift = radius + reachBack;
+    // Rays also reach back by this sub-step's travel toward the surface along them, so a fast fall cannot pass a
+    // surface between two casts; horizontal speed adds nothing, so driving under an overhang casts no higher.
+    const lift = radius + Math.max(0, -(vx * Ux + vy * Uy + vz * Uz)) * h;
     let fx = 0,
       fy = -mass * g,
       fz = 0,
@@ -567,7 +567,7 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
         dnx = 0,
         dny = 0,
         dnz = 0;
-      const probe = hy + reachBack;
+      const probe = hy + Math.max(0, -vy) * h;
       for (let cI = 0; cI < 8; cI++) {
         const sxc = cI & 1 ? hx : -hx,
           syc = cI & 2 ? hy : -hy,
@@ -707,6 +707,7 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
   };
 
   const commit = () => {
+    if (reentered) throw new RangeError('car-handling: a port re-entered the car during this step');
     for (let i = 0; i < size; i++) {
       const v = Wk[i]!;
       if (!Number.isFinite(v)) throw new RangeError('car-handling: the step produced a non-finite state');
@@ -796,7 +797,9 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
       clamped,
     });
   };
-  let busy = false;
+  let busy = false,
+    /** A port tried to re-enter the car during this step; the step is refused even if the port caught that. */
+    reentered = false;
 
   placeInto(S, 0, 0, 0, 0);
   return Object.freeze({
@@ -804,20 +807,30 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
     fingerprint,
     maxQueriesPerStep,
     place(pose: {x: number; y: number; z: number; yaw?: number}) {
-      if (busy) throw new RangeError('car-handling: place called from inside a step');
+      if (busy) {
+        reentered = true;
+        throw new RangeError('car-handling: place called from inside a step');
+      }
       const yaw = checkPose(pose);
       placeInto(S, pose.x, pose.y, pose.z, yaw);
     },
     reset(pose?: {x: number; y: number; z: number; yaw?: number}) {
-      if (busy) throw new RangeError('car-handling: reset called from inside a step');
+      if (busy) {
+        reentered = true;
+        throw new RangeError('car-handling: reset called from inside a step');
+      }
       if (pose !== undefined) checkPose(pose);
       Wk.set(S);
       resetInto(Wk, pose);
       commit();
     },
     step(dt: number, controls: CarControls, ground: GroundQuery): CarStepResult {
-      if (busy) throw new RangeError('car-handling: step called from inside a step (a port re-entered the car)');
+      if (busy) {
+        reentered = true;
+        throw new RangeError('car-handling: step called from inside a step (a port re-entered the car)');
+      }
       busy = true;
+      reentered = false;
       try {
         return stepNow(dt, controls, ground);
       } finally {
@@ -892,7 +905,10 @@ export function createCarHandling(config: CarConfig, options: {math?: ScalarMath
       });
     },
     restore(snapshot: CarSnapshot) {
-      if (busy) throw new RangeError('car-handling: restore called from inside a step');
+      if (busy) {
+        reentered = true;
+        throw new RangeError('car-handling: restore called from inside a step');
+      }
       if (!snapshot || typeof snapshot !== 'object') throw new RangeError('car-handling: snapshot required');
       if (snapshot.kind !== 'car-handling' || snapshot.version !== 1)
         throw new RangeError('car-handling: not a version 1 car snapshot');
