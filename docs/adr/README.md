@@ -77,3 +77,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0084](0084-persisted-recurring-phase.md) | Persisted recurring phase with explicit bounded catch-up | Optional composition / Time / Persistence | Proposed |
 
 | [0085](0085-atomic-cell-batches-and-occupancy.md) | Atomic cell batches and immutable occupancy | Procgen / Spatial | Proposed |
+
+| [0120](0120-optional-sandboxed-script-runtime.md) | Optional sandboxed script runtime (amends 0005 for creators who opt in) | Optional kits / Content | Proposed |

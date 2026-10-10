@@ -30,6 +30,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | FX-01a | Flipbook (sprite-sheet) particles and npm run fx:pack | [#141](https://github.com/Akilleez-QA/foundation-engine/pull/141) | [particles.md](guides/particles.md) |
 | GEN-01 | Seeded hierarchical generation (deriveSeed) |  | [README.md](kits/README.md) |
 | GRID-01 | Atomic sparse cell batches and bounded immutable occupancy queries |  | [cell-occupancy.md](guides/cell-occupancy.md) |
+| SCRIPT-01 | Optional sandboxed Lua scripts with capability-scoped host functions and exact per-call budgets |  | [scripting.md](guides/scripting.md) |
 | GEN-02 | Bounded binary record store for large edited worlds | [#56](https://github.com/Akilleez-QA/foundation-engine/pull/56) | [store-large-world-records.md](recipes/store-large-world-records.md) |
 | MP-01 | Newcomer shared session (LAN/loopback) and npm run host | [#61](https://github.com/Akilleez-QA/foundation-engine/pull/61) | [multiplayer-session.md](guides/multiplayer-session.md) |
 | KTX2 | KTX2 (Basis Universal) model textures | [#146](https://github.com/Akilleez-QA/foundation-engine/pull/146) | [compressed-textures.md](guides/compressed-textures.md) |
@@ -52,7 +53,7 @@ Tracked so that a correct "not yet" in the docs is recognised. A row moves up wh
 
 Each kit's value exports are listed in [capabilities.json](capabilities.json).
 
-`@kits/alignment`, `@kits/animation`, `@kits/assignments`, `@kits/audio-mixer`, `@kits/authoring`, `@kits/camera`, `@kits/capabilities`, `@kits/chalkboard`, `@kits/character`, `@kits/combat`, `@kits/concept-explorer`, `@kits/control`, `@kits/dialogue`, `@kits/equipment`, `@kits/explore`, `@kits/frames`, `@kits/housing`, `@kits/input-history`, `@kits/inventory`, `@kits/itinerary`, `@kits/learn`, `@kits/locomotion`, `@kits/market`, `@kits/navigation`, `@kits/network`, `@kits/objectives`, `@kits/procgen`, `@kits/replay`, `@kits/resources`, `@kits/rollback`, `@kits/space`, `@kits/spatial`, `@kits/spatial-audio`, `@kits/terrain`, `@kits/three`, `@kits/turns`, `@kits/ui`, `@kits/vehicles`, `@kits/visibility`
+`@kits/alignment`, `@kits/animation`, `@kits/assignments`, `@kits/audio-mixer`, `@kits/authoring`, `@kits/camera`, `@kits/capabilities`, `@kits/chalkboard`, `@kits/character`, `@kits/combat`, `@kits/concept-explorer`, `@kits/control`, `@kits/dialogue`, `@kits/equipment`, `@kits/explore`, `@kits/frames`, `@kits/housing`, `@kits/input-history`, `@kits/inventory`, `@kits/itinerary`, `@kits/learn`, `@kits/locomotion`, `@kits/market`, `@kits/navigation`, `@kits/network`, `@kits/objectives`, `@kits/procgen`, `@kits/replay`, `@kits/resources`, `@kits/rollback`, `@kits/scripting`, `@kits/space`, `@kits/spatial`, `@kits/spatial-audio`, `@kits/terrain`, `@kits/three`, `@kits/turns`, `@kits/ui`, `@kits/vehicles`, `@kits/visibility`
 
 ## Templates
 

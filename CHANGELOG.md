@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Optional sandboxed scripts (`@kits/scripting`, SCRIPT-01):** Lua 5.4 text loaded at run time, each script in its own capped state, reaching the game only through host functions the creator grants by name, with exact uncatchable per-call instruction budgets, a wall-time stop, fixed-tick timers, a seeded saveable random stream, JSON save/restore, atomic hot reload and per-script faulting. Adds one exact-pinned runtime dependency, `wasmoon` 1.16.0 (MIT), loaded only when a game calls `loadScriptVm`. See [ADR 0120](docs/adr/0120-optional-sandboxed-script-runtime.md) and the [guide](docs/guides/scripting.md).
+
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.
