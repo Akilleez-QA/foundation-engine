@@ -128,7 +128,10 @@ export default defineConfig({
   // `PORT=4174 npm run preview` serves on that port and stops if it is taken (as `npm run play` does); without PORT,
   // preview starts at 4173 and moves to the next free port, printing the address it chose.
   preview: {host: devHost(process.env.ENGINE_HOST), ...previewPort(process.env.PORT)},
-  optimizeDeps: {entries: ['index.html']},
+  // The optional physics kit's library (src/kits/physics/loader.ts) is a self-contained ES module reached only by a
+  // dynamic import. Pre-bundling it on discovery made the dev server re-optimise mid-load (504 Outdated Optimize Dep);
+  // serving it as is avoids that and costs nothing for games that never import the kit.
+  optimizeDeps: {entries: ['index.html'], exclude: ['@dimforge/rapier3d-deterministic-compat']},
   // src/author/index.ts is a pure re-export barrel (scripts/vite-config.test.mjs keeps it so). Declaring it free of
   // side effects lets Rolldown (Vite 8) drop the unused test helpers' static edge to the worker host, so the host
   // stays a lazy chunk as it was under Rollup instead of joining first-load JS.

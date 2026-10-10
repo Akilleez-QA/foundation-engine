@@ -133,6 +133,26 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'CAR-01',
+    title: 'Optional car handling on ray-cast wheels',
+    docs: 'src/kits/car-handling/README.md',
+    evidence: [
+      {kit: 'car-handling', export: 'createCarHandling'},
+      {kit: 'car-handling', export: 'carHandlingSystem'},
+      {path: 'src/kits/car-handling/car.test.ts'},
+    ],
+  },
+  {
+    id: 'BOARD-01',
+    title: 'Optional board traversal with authored rails',
+    docs: 'src/kits/board-traversal/README.md',
+    evidence: [
+      {kit: 'board-traversal', export: 'createBoard'},
+      {kit: 'board-traversal', export: 'defineRails'},
+      {path: 'src/kits/board-traversal/board.test.ts'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',
@@ -274,6 +294,12 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'GRID-STEP-01',
+    title: 'Grid-step actor movement with classified bumps, ledges, forced tiles and follower lines',
+    docs: 'src/kits/grid-step/README.md',
+    evidence: [{kit: 'grid-step', export: 'createGridStepper'}, {path: 'src/kits/grid-step/grid-step.test.ts'}],
+  },
+  {
     id: 'AUDIO-EXTRAS-01',
     title: 'Character listener blend, Doppler, retrigger pitch, instance limits and quantized adaptive music',
     docs: 'src/kits/audio-mixer/README.md',
@@ -389,6 +415,15 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'SCRIPT-01',
+    title: 'Optional sandboxed Lua scripts with capability-scoped host functions and deterministic per-call budgets',
+    docs: 'docs/guides/scripting.md',
+    evidence: [
+      {kit: 'scripting', export: 'loadScriptVm'},
+      {kit: 'scripting', export: 'createScriptHost'},
+    ],
+  },
+  {
     id: 'GEN-02',
     title: 'Bounded binary record store for large edited worlds',
     pr: 56,
@@ -467,8 +502,13 @@ export const FEATURES = [
   },
   {
     id: 'PHYSICS',
-    title: 'Rigid-body physics',
-    evidence: [{kit: 'physics'}],
+    title: 'Rigid-body physics (optional adapter kit over a lazily loaded WebAssembly library)',
+    docs: 'docs/guides/physics-adapter.md',
+    evidence: [
+      {kit: 'physics', export: 'scenePhysics'},
+      {kit: 'physics', export: 'createPhysicsWorld'},
+      {path: 'src/kits/physics/snapshot.test.ts'},
+    ],
   },
 ];
 

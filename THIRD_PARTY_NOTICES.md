@@ -19,6 +19,16 @@ package. The installed license credits Einar Otto Stangvik (2011), Arnout Kazemi
 and contributors (2013), and Luigi Pinca and contributors (2016). No optional native
 WebSocket acceleration package is required by this integration.
 
+## Optional script runtime dependency
+
+Added and checked on 2026-10-09: **wasmoon 1.16.0**, MIT, Copyright (c) 2023 Gabriel Francisco, an exact-pinned
+runtime dependency used only by the optional `@kits/scripting` kit (ADR 0120). It bundles a WebAssembly build of
+**Lua 5.4** (MIT, Copyright © Lua.org, PUC-Rio; the exact patch level is not printed by the binary, which
+reports `_VERSION` "Lua 5.4"). It is loaded only by a dynamic import when a game calls `loadScriptVm`; games that do
+not import the kit contain none of it. It brings one types-only package, **@types/emscripten 1.39.10** (MIT), which
+emits no code. [Source](https://github.com/ceifa/wasmoon) (npm 1.16.0); [Lua](https://www.lua.org/license.html).
+Retain `node_modules/wasmoon/LICENSE` and the Lua notice with distributed builds that contain the kit's chunks.
+
 ## Brand asset generator dependency
 
 Added and checked on 2026-10-03: **@resvg/resvg-js 2.6.2**, MPL-2.0, a development
@@ -84,6 +94,17 @@ user-controlled glob patterns to it, and the dependency is development-only.
   [ktx-parse](https://github.com/donmccurdy/KTX-Parse),
   [zstddec](https://github.com/donmccurdy/zstddec),
   [Zstandard](https://github.com/facebook/zstd).
+- **wasmoon 1.16.0** (MIT) and the **Lua 5.4** interpreter it compiles to WebAssembly (MIT, Lua.org, PUC-Rio),
+  only in builds of games that import `@kits/scripting`: a lazily loaded JavaScript chunk and a hashed
+  `glue-*.wasm` asset, fetched when the game calls `loadScriptVm` (added 2026-10-09).
+- **Rapier 0.21.0** (`@dimforge/rapier3d-deterministic-compat`, the deterministic
+  compat build of the 3D physics bindings, including its WebAssembly module inlined as
+  base64), Apache-2.0, Copyright 2020 Dimforge EURL.
+  [Source](https://github.com/dimforge/rapier). Only a game that imports the optional
+  `@kits/physics` kit contains it, as one lazily loaded chunk (about 4.4 MB) fetched
+  when a scene loads physics (added 2026-10-09, `src/kits/physics/loader.ts`, ADR 0121).
+  Stock builds and games without the kit do not contain it. The package ships the
+  Apache License 2.0 text in its `LICENSE` file and no NOTICE file.
 - Vite can generate browser preload helpers, and its Rolldown bundler (Vite 8)
   emits small module-namespace runtime helpers into browser chunks. Keep the
   relevant Vite and Rolldown (MIT) notices when redistributing those helpers;
@@ -148,6 +169,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+### Rapier license
+
+Copyright 2020 Dimforge EURL. Licensed under the Apache License, Version 2.0. The
+package's `LICENSE` file carries the standard Apache License 2.0 terms, as reproduced
+in full under the Basis Universal transcoder license below, followed by this
+copyright line and the standard application notice. No NOTICE file accompanies the
+package. Preserve this notice and the licence text in builds that contain the
+physics chunk.
 
 ### Basis Universal transcoder license
 
@@ -396,14 +426,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## Locked dependency inventory
 
-The lockfile contains 294 dependency entries. Its declared licenses are 216 MIT,
-25 MPL-2.0 (Lightning CSS, resvg-js and their platform binaries), 19 Apache-2.0, 11 ISC,
+The lockfile contains 297 dependency entries. Its declared licenses are 218 MIT,
+25 MPL-2.0 (Lightning CSS, resvg-js and their platform binaries), 20 Apache-2.0, 11 ISC,
 10 LGPL-3.0-or-later and four combined Apache-2.0/LGPL-3.0-or-later (sharp's prebuilt libvips binaries),
 five BlueOak-1.0.0, two BSD-3-Clause, one BSD-2-Clause and one 0BSD. These include transitive tools,
 types, and optional platform binaries; the table is not a statement that all
 packages ship in a browser build. The original 2026-09-30 audit installed 29 packages on its
-host; the separately documented network-host addition followed on 2026-10-01, and the model optimiser's 199 entries
-on 2026-10-03. Optional binaries for other operating systems were inspected through
+host; the separately documented network-host addition followed on 2026-10-01, the model optimiser's 199 entries
+on 2026-10-03, the optional script runtime's two entries (wasmoon and its types package) on 2026-10-09, and the
+optional physics kit's one runtime entry (`@dimforge/rapier3d-deterministic-compat`, no dependencies of its own)
+on 2026-10-09. Optional binaries for other operating systems were inspected through
 lockfile metadata only.
 
 | Package | Pinned version | Declared license | Installation condition |
@@ -412,6 +444,7 @@ lockfile metadata only.
 | `@colors/colors` | 1.6.0 | MIT | Required by dependency graph |
 | `@dabh/diagnostics` | 2.0.9 | MIT | Required by dependency graph |
 | `@dimforge/rapier3d-compat` | 0.12.0 | Apache-2.0 | Required by dependency graph |
+| `@dimforge/rapier3d-deterministic-compat` | 0.21.0 | Apache-2.0 | Runtime dependency; shipped only in builds of games that import `@kits/physics` |
 | `@donmccurdy/caporal` | 0.0.10 | MIT | Required by dependency graph |
 | `@emnapi/runtime` | 1.11.3 | MIT | Optional |
 | `@esbuild/aix-ppc64` | 0.28.2 | MIT | Optional |
@@ -506,6 +539,7 @@ lockfile metadata only.
 | `@so-ric/colorspace` | 1.1.6 | MIT | Required by dependency graph |
 | `@tweenjs/tween.js` | 23.1.3 | MIT | Required by dependency graph |
 | `@types/braces` | 3.0.5 | MIT | Required by dependency graph |
+| `@types/emscripten` | 1.39.10 | MIT | Required by dependency graph |
 | `@types/glob` | 8.1.0 | MIT | Required by dependency graph |
 | `@types/lodash` | 4.17.25 | MIT | Required by dependency graph |
 | `@types/micromatch` | 4.0.10 | MIT | Required by dependency graph |
@@ -693,6 +727,7 @@ lockfile metadata only.
 | `uri-js` | 4.4.1 | BSD-2-Clause | Required by dependency graph |
 | `util-deprecate` | 1.0.2 | MIT | Required by dependency graph |
 | `vite` | 8.3.2 | MIT | Required by dependency graph |
+| `wasmoon` | 1.16.0 | MIT | Required by dependency graph |
 | `watlas` | 1.0.1 | MIT | Required by dependency graph |
 | `which` | 2.0.2 | ISC | Required by dependency graph |
 | `winston` | 3.10.0 | MIT | Required by dependency graph |
@@ -711,7 +746,8 @@ installed notice paths include:
   `THIRD-PARTY-LICENSE`, and `node_modules/esbuild/LICENSE.md` (including their
   bundled notices).
 - `node_modules/typescript/LICENSE.txt`,
-  `node_modules/@dimforge/rapier3d-compat/LICENSE` and
+  `node_modules/@dimforge/rapier3d-compat/LICENSE`,
+  `node_modules/@dimforge/rapier3d-deterministic-compat/LICENSE` and
   `node_modules/detect-libc/LICENSE` (Apache-2.0).
 - `node_modules/lightningcss/LICENSE` (MPL-2.0, a build-time CSS minifier; its
   native `lightningcss-<platform>` subpackages carry the same license).

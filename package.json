@@ -116,7 +116,9 @@
     "fx:pack": "node scripts/fx-pack.mjs"
   },
   "dependencies": {
-    "three": "^0.186.1"
+    "@dimforge/rapier3d-deterministic-compat": "0.21.0",
+    "three": "^0.186.1",
+    "wasmoon": "1.16.0"
   },
   "devDependencies": {
     "@gltf-transform/cli": "4.5.1",

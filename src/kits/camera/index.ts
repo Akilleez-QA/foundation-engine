@@ -240,3 +240,4 @@ export {
   type StringRig,
   type VolumeShape,
 } from './director';
+export {createEasedBounds, createLookAhead, createAreaCamera, type CameraArea} from './rigs-2d';
