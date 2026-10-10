@@ -137,3 +137,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0133](0133-offline-format-converters.md) | Offline format converters with provenance receipts | Tooling / Assets | Proposed |
 
 | [0134](0134-duplicate-detector.md) | Duplicate and near-duplicate detection as a read-only repo tool | Tooling / Assets | Proposed |
+
+| [0140](0140-optional-car-handling.md) | Optional car handling on ray-cast wheels | Optional kits / Simulation | Proposed |

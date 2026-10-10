@@ -92,6 +92,17 @@
       "evidence": ["@kits/retro exports sceneRetro", "@kits/retro exports retroReference"]
     },
     {
+      "id": "CAR-01",
+      "title": "Optional car handling on ray-cast wheels",
+      "shipped": true,
+      "docs": "src/kits/car-handling/README.md",
+      "evidence": [
+        "@kits/car-handling exports createCarHandling",
+        "@kits/car-handling exports carHandlingSystem",
+        "src/kits/car-handling/car.test.ts exists"
+      ]
+    },
+    {
       "id": "NAV-FIELD-01",
       "title": "Optional incremental shared navigation distance fields",
       "shipped": true,
@@ -807,6 +818,21 @@
         "parseResourceValue",
         "prepareProgressionChange",
         "prepareResourceChange"
+      ]
+    },
+    {
+      "name": "car-handling",
+      "exports": [
+        "CAR_PRESETS",
+        "carConfig",
+        "carConfigFingerprint",
+        "carHandlingSystem",
+        "createCarHandling",
+        "createGroundHit",
+        "evalCurve",
+        "planeGround",
+        "sampledGround",
+        "validateCarConfig"
       ]
     },
     {"name": "chalkboard", "exports": ["BOARD", "createBoardView", "lengthOf", "pathOf", "tickLabels"]},

@@ -66,6 +66,8 @@ The optional [streaming](../../src/kits/streaming/README.md) candidate ranks pla
 
 The optional [retro](../../src/kits/retro/README.md) candidate draws a scene at low resolution with wide pixels, a creator palette or levels and ordered dithering through `@kits/three`. Headless tests, a software-GL screenshot and a GPU bench of the showcase courtyard; no template uses it and no device acceptance is claimed. [Guide](../guides/retro-look.md).
 
+The optional [car-handling](../../src/kits/car-handling/README.md) candidate steps a car on ray-cast wheels against a creator ground query (suspension, tyre slip and grip, drive, brake and steering curves, handbrake drifts, downforce, air control, upside-down reset) with bounded sub-steps, transactional steps and deterministic snapshot/restore; `arcade` and `sim-lite` presets. Headless tests with ECS, terrain and rollback consumers only; no template consumer or browser/device acceptance is claimed.
+
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.
 
 
