@@ -62,13 +62,13 @@ void main() {
 export interface RetroStats {
   readonly width: number;
   readonly height: number;
-  /** Bytes of the low-res half-float target, the LUT and the dither texture (estimates). */
+  /** Bytes of the low-res RGBA8 copy, the LUT and the dither texture (estimates). */
   readonly bytes: number;
 }
 
 export interface RetroController {
-  /** Change the look; rebuilds the LUT only when the palette or its size changed. */
-  set(look: RetroLookInput): void;
+  /** Change the look (undefined keeps a value; unknown keys throw); rebuilds the LUT only when the palette or its size changed. */
+  set(look: {readonly [K in keyof RetroLookInput]?: RetroLookInput[K] | undefined}): void;
   /** Turn the look off (the engine draws normally) or on again. */
   enable(on: boolean): void;
   stats(): RetroStats;
@@ -101,7 +101,14 @@ export function installRetro(three: RetroHost, input: RetroLookInput = {}): Retr
     return t;
   }
   let frameTexture: THREE.FramebufferTexture = makeFrameTexture(1, 1);
-  three.own({dispose: () => frameTexture.dispose()});
+  // One owner for every replaceable texture: replacements are disposed when replaced, the current ones at visit end.
+  three.own({
+    dispose: () => {
+      frameTexture.dispose();
+      lut?.dispose();
+      bayer?.dispose();
+    },
+  });
   let lut: THREE.Data3DTexture | null = null;
   let lutKey = '';
   let bayer: THREE.DataTexture | null = null;
@@ -140,7 +147,7 @@ export function installRetro(three: RetroHost, input: RetroLookInput = {}): Retr
   const placeholderLut = () => {
     const t = new T.Data3DTexture(new Uint8Array(4), 1, 1, 1);
     t.needsUpdate = true;
-    return three.own(t);
+    return t;
   };
   const apply = () => {
     const u = material.uniforms as Record<string, {value: unknown}>;
@@ -158,7 +165,6 @@ export function installRetro(three: RetroHost, input: RetroLookInput = {}): Retr
         lut.minFilter = lut.magFilter = T.NearestFilter;
         lut.unpackAlignment = 1;
         lut.needsUpdate = true;
-        three.own(lut);
       } else lut = placeholderLut();
       lutKey = key;
     }
@@ -172,7 +178,7 @@ export function installRetro(three: RetroHost, input: RetroLookInput = {}): Retr
         const data = new Uint8Array(n * n * 4);
         for (let i = 0; i < n * n; i++) data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = m[i]!;
         for (let i = 0; i < n * n; i++) data[i * 4 + 3] = 255;
-        bayer = three.own(new T.DataTexture(data, n, n));
+        bayer = new T.DataTexture(data, n, n);
         bayer.minFilter = bayer.magFilter = T.NearestFilter;
         bayer.needsUpdate = true;
       }
@@ -194,8 +200,8 @@ export function installRetro(three: RetroHost, input: RetroLookInput = {}): Retr
   const resize = () => {
     const s = three.size();
     const pixels = {
-      w: Math.max(1, Math.round(s.width * s.pixelRatio)),
-      h: Math.max(1, Math.round(s.height * s.pixelRatio)),
+      w: Math.max(1, Math.floor(s.width * s.pixelRatio)),
+      h: Math.max(1, Math.floor(s.height * s.pixelRatio)),
     };
     const t = retroTargetSize(look, pixels.w, pixels.h);
     // The low-res corner must fit inside the drawing buffer.
@@ -212,14 +218,19 @@ export function installRetro(three: RetroHost, input: RetroLookInput = {}): Retr
   const draw = ({renderer, scene, camera}: RetroFrame) => {
     const ratio = renderer.getPixelRatio();
     renderer.getViewport(full);
-    renderer.setViewport(0, 0, lowW / ratio, lowH / ratio);
-    renderer.render(scene, camera);
-    renderer.copyFramebufferToTexture(frameTexture, origin);
-    renderer.setViewport(full);
     const clear = renderer.autoClear;
-    renderer.autoClear = false;
-    renderer.render(quadScene, quadCamera);
-    renderer.autoClear = clear;
+    try {
+      renderer.setViewport(0, 0, lowW / ratio, lowH / ratio);
+      renderer.render(scene, camera);
+      renderer.copyFramebufferToTexture(frameTexture, origin);
+      renderer.setViewport(full);
+      renderer.autoClear = false;
+      renderer.render(quadScene, quadCamera);
+    } finally {
+      // A throw anywhere above must not leave the engine drawing into the corner without clearing.
+      renderer.setViewport(full);
+      renderer.autoClear = clear;
+    }
   };
   const origin = new T.Vector2(0, 0);
   three.onResize(resize);
@@ -228,7 +239,14 @@ export function installRetro(three: RetroHost, input: RetroLookInput = {}): Retr
   three.setRenderOverride(draw);
   return {
     set(next) {
-      look = resolveRetroLook({...look, ...next});
+      if (!next || typeof next !== 'object') throw new TypeError('retro: set takes a look object');
+      const known = ['width', 'pixelAspect', 'palette', 'levels', 'dither', 'ditherAmount', 'lutSize'];
+      for (const k of Object.keys(next))
+        if (!known.includes(k)) throw new RangeError(`retro: unknown look setting ${k}`);
+      // `undefined` keeps the current value; `palette: null` switches to levels.
+      const merged: Record<string, unknown> = {...look};
+      for (const [k, v] of Object.entries(next)) if (v !== undefined) merged[k] = v;
+      look = resolveRetroLook(merged as RetroLookInput);
       apply();
     },
     enable(on) {

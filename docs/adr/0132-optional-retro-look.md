@@ -28,6 +28,8 @@ and quantises in display sRGB.
 
 ## Evidence
 
-Eight headless tests (reference arithmetic, lookup table against brute force, draw sequence), a software-GL screenshot
-of the showcase courtyard and a GPU bench at 4K, recorded in the verification folder. No phone or physical-device
-evidence.
+Nine headless tests (reference arithmetic, lookup table against brute force, draw sequence, ownership, state
+restoration), software-GL screenshots of the showcase courtyard (desktop and emulated phone), a GPU bench at 4K and an
+independent pixel-by-pixel comparison of the shader with the reference in software GL (zero mismatches over nine
+configurations), recorded in the verification folder. No quality-guard comparison, GPU time, phone or physical-device
+evidence. A scene using the look should drop `view.post`, whose target is still allocated.

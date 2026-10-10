@@ -47,6 +47,7 @@ function fakeHandle(size: ThreeSize = {width: 1280, height: 720, pixelRatio: 1})
     owned,
     calls,
     draw: () => override?.(frame),
+    drawWith: (r: RetroRenderer, scene: THREE.Scene) => override?.({renderer: r, scene, camera: frame.camera}),
     hasOverride: () => override !== null,
     resizeTo: (s: ThreeSize) => ((current = s), resize?.(s)),
     renders: () => renders,
@@ -57,7 +58,14 @@ test('the override renders the scene at low resolution, then one full-screen tri
   const f = fakeHandle();
   const c = installRetro(f.handle, {width: 320, pixelAspect: 2});
   f.draw();
-  assert.deepEqual(f.calls, ['viewport 320x360', 'scene', 'copy 320x360', 'viewport 1280x720', 'quad (no clear)']);
+  assert.deepEqual(f.calls, [
+    'viewport 320x360',
+    'scene',
+    'copy 320x360',
+    'viewport 1280x720',
+    'quad (no clear)',
+    'viewport 1280x720',
+  ]);
   assert.equal(c.stats().width, 320);
   assert.equal(c.stats().height, 360);
   f.resizeTo({width: 1000, height: 1000, pixelRatio: 2});
@@ -78,12 +86,24 @@ test('set() rebuilds the palette table only when the palette changes; enable() h
   const f = fakeHandle();
   const c = installRetro(f.handle, {palette: [0, 0xffffff], lutSize: 16});
   const ownedAfterInstall = f.owned.length;
-  const lutBefore = f.owned.filter(o => o instanceof THREE.Data3DTexture).length;
-  c.set({ditherAmount: 0.5});
-  assert.equal(f.owned.filter(o => o instanceof THREE.Data3DTexture).length, lutBefore, 'same palette: no new table');
-  c.set({palette: [0, 0xff0000, 0xffffff]});
-  assert.equal(f.owned.filter(o => o instanceof THREE.Data3DTexture).length, lutBefore + 1);
-  assert.ok(f.owned.length > ownedAfterInstall);
+  let disposedLuts = 0;
+  const realDispose = THREE.Data3DTexture.prototype.dispose;
+  THREE.Data3DTexture.prototype.dispose = function () {
+    disposedLuts++;
+    realDispose.call(this);
+  };
+  try {
+    c.set({ditherAmount: 0.5});
+    assert.equal(disposedLuts, 0, 'same palette: the table is kept');
+    for (let i = 0; i < 20; i++) c.set({palette: [0, 0xff0000 + i, 0xffffff]});
+    assert.equal(disposedLuts, 20, 'each replaced table is disposed at once');
+  } finally {
+    THREE.Data3DTexture.prototype.dispose = realDispose;
+  }
+  assert.equal(f.owned.length, ownedAfterInstall, 'replacements do not grow the owned list');
+  c.set({palette: [0, 0xff0000, 0xffffff], width: undefined});
+  assert.equal(c.stats().width, 320, 'undefined keeps the current value');
+  assert.throws(() => c.set({pallete: [0, 1]} as never), RangeError, 'unknown settings are refused');
   assert.equal(c.stats().bytes, 320 * 180 * 4 + 16 ** 3 * 4 + 16 * 4);
   c.enable(false);
   assert.equal(f.hasOverride(), false);
@@ -92,6 +112,35 @@ test('set() rebuilds the palette table only when the palette changes; enable() h
   assert.throws(() => c.set({width: 4}), RangeError);
   assert.equal(c.stats().width, 320, 'a refused change keeps the previous look');
   for (const o of f.owned) o.dispose();
+});
+
+test('a throw during the draw restores the viewport and clearing', () => {
+  const f = fakeHandle();
+  installRetro(f.handle, {width: 320});
+  const scene = new THREE.Scene();
+  let autoClear = true;
+  const viewport = new THREE.Vector4(0, 0, 1280, 720);
+  const renderer = {
+    get autoClear() {
+      return autoClear;
+    },
+    set autoClear(v: boolean) {
+      autoClear = v;
+    },
+    getPixelRatio: () => 1,
+    getViewport: (v: THREE.Vector4) => v.copy(viewport),
+    setViewport(x: number | THREE.Vector4, y?: number, w?: number, h?: number) {
+      if (typeof x === 'number') viewport.set(x, y!, w!, h!);
+      else viewport.copy(x);
+    },
+    copyFramebufferToTexture() {
+      throw new Error('context lost');
+    },
+    render() {},
+  };
+  assert.throws(() => f.drawWith(renderer, scene), /context lost/);
+  assert.deepEqual(viewport.toArray(), [0, 0, 1280, 720]);
+  assert.equal(autoClear, true);
 });
 
 test('the kit requires three and sceneRetro refuses a malformed look at definition time', () => {

@@ -13,8 +13,9 @@ export interface RetroLookInput {
   /** Low-resolution width in pixels. Integer 16..1920. Default 320. */
   readonly width?: number;
   /**
-   * Width of one low-res pixel relative to its height. 1 is square; 2 doubles pixel width (half the columns for the
-   * same rows). 0.25..4. Default 1.
+   * Low-res rows per column relative to a square-pixel grid. 1 is square; 2 doubles the rows for the same columns, so
+   * each pixel is twice as wide as it is tall (the column look; shading cost ×2; use a smaller `width` to keep the
+   * cost). 0.25..4. Default 1.
    */
   readonly pixelAspect?: number;
   /** Up to 256 colours as 0xRRGGBB (display sRGB). Omit or null to quantise per channel with `levels`. */

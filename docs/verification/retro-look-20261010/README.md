@@ -20,7 +20,7 @@ the scene pass is the main pass and the counters keep their meaning.
 ## Cost (GPU bench, 4K)
 
 `npx tsx scripts/perf/bench.mjs --gpu --viewport 4k --only courtyard --no-check` on an RTX 4080 (ANGLE, Chromium 141,
-3840×2160, reference preset; the retro run's tree is marked dirty because of the measurement-only scene change):
+3840×2160, reference preset; the retro run's tree is marked dirty because of the measurement-only scene change; load average 6.9 for the baseline run and 4.6 for the retro run):
 
 | Window | Baseline (built-in post) | With the retro look |
 |---|---|---|
@@ -29,6 +29,21 @@ the scene pass is the main pass and the counters keep their meaning.
 
 Raw runs: [baseline](bench-courtyard-baseline-gpu-4k.json), [retro](bench-courtyard-retro-gpu-4k.json). Both are
 display-paced; GPU time is not visible in these numbers (the bench has no GPU timer). Main-thread task time is a mean
-that includes the bench's instrumentation, and the runs were taken with other work on the machine (load average about
-7), so the 0.2–0.5 ms difference is within run-to-run noise and is not claimed as the look's cost. The texture drop is
-the built-in post targets the look replaces. No phone, tablet or physical-device measurement.
+that includes the bench's instrumentation, and the runs were taken with other work on the machine, so the 0.2–0.5 ms
+difference is not separated from run-to-run noise and is not claimed as the look's cost. The 20 MiB texture drop is
+only the bloom chain: the scene kept `view.post`, whose full-resolution target (about 62 MiB at this size) is still
+allocated during preparation although the look replaces the draw; a scene using the look should remove `view.post`.
+No GPU time, quality-guard comparison, phone, tablet or physical-device measurement.
+
+## Phone-sized viewport (emulated)
+
+`play:snap -- --scene courtyard --mobile` (software GL, emulated phone viewport, not a device):
+[courtyard-retro-phone-emulated.png](courtyard-retro-phone-emulated.png); 41/46 draws, 0/1 post draws, 26,192/31,000
+triangles, 7/10 shadow casters, 1/1 shadow passes, 35.9/47 MiB textures, within budget. The probe JSON of the snap
+runs was not kept; the counts above are from the snap output.
+
+## Shader against the reference
+
+An independent reviewer bundled the kit into headless Chromium (software GL), drew known colours, and compared every
+device pixel of the output with `retroReference`: nine configurations, zero mismatching pixels. The harness was not
+committed; it certifies software GL only.

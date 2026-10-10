@@ -14,6 +14,8 @@ cost and evidence.
   rebuilds the table on the main thread, so prefer setting it once.
 - Settings: the look is not a quality knob. To let players turn it off, keep a setting in a save section and call
   `enable` from the scene.
+- Post: remove `view.post` from a scene with the look. The look replaces the draw, but a declared post still
+  allocates its full-resolution target and compiles its programs.
 - Budgets: the scene's draws gain one triangle draw, post draws drop to zero, and textures gain the low-res copy and
   the table. The gate measures the scene as usual.
 
