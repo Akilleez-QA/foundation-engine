@@ -177,3 +177,11 @@ test('review regressions: closed-form apex, bracketed lead, domain-safe results,
   assert.equal(solveByLaunchSpeed([0, 0, 0], [0, 0, 0], 10, G, 'low').status, 'unreachable');
   assert.ok(Math.abs(traj(solveByLaunchSpeed([0, 0, 0], [0, 0, 0], 10, G, 'high')).duration - 20 / G) < 1e-12);
 });
+
+test('the low lead arc finds roots below the scan floor and never returns the lob instead', () => {
+  const low = traj(solveLead([0, 0, 0], [10, 0, 0], [0, 0, 0], 1e6, G));
+  const direct = traj(solveByLaunchSpeed([0, 0, 0], [10, 0, 0], 1e6, G, 'low'));
+  assert.ok(Math.abs(low.duration - direct.duration) / direct.duration < 1e-6, String(low.duration));
+  assert.equal(solveLead([0, 0, 0], [0, 0, 0], [1, 0, 0], 20, G).status, 'unreachable');
+  assert.equal(solveLead([0, 0, 0], [0, 0, 0], [1, 0, 0], 20, G, {arc: 'high'}).status, 'solved');
+});

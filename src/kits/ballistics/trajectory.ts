@@ -181,7 +181,7 @@ function byLaunchSpeed(a: BallisticVec3, b: BallisticVec3, v: number, g: number,
  * Hit a target moving at constant velocity with a fixed launch speed. Finds flight times t where the launch
  * speed needed to meet the target at t equals `speed`: the earliest for `low`, the latest for `high`. The search
  * brackets roots on `samples` (default 256, maximum 4096) log-spaced times up to a bound derived from the inputs,
- * then bisects to `tolerance` seconds (default 1e-9). Two solutions closer together than one sample interval, or
+ * then bisects to a relative `tolerance` (default 1e-9 of the flight time). Two solutions closer together than one sample interval, or
  * a tangent (single) solution, can be missed and reported `unreachable`.
  */
 export function solveLead(
@@ -223,7 +223,25 @@ export function solveLead(
   for (let i = 0; i < samples; i++) times.push(tMin * Math.pow(tMax / tMin, i / (samples - 1)));
   const order = arc === 'low' ? times.keys() : [...times.keys()].reverse()[Symbol.iterator]();
   let found: number | null = null;
-  for (const i of order) {
+  const bisect = (lo: number, hi: number) => {
+    let flo = f(lo);
+    for (let k = 0; k < 200 && hi - lo > tolerance * hi; k++) {
+      const mid = (lo + hi) / 2,
+        fm = f(mid);
+      if (fm > 0 === flo > 0) {
+        lo = mid;
+        flo = fm;
+      } else hi = mid;
+    }
+    return (lo + hi) / 2;
+  };
+  if (arc === 'low' && f(times[0]!) <= 0) {
+    // The earliest root lies below the scan floor: f(0) = |D(0)|^2 > 0 unless the target starts at the muzzle.
+    const d0 = Math.hypot(p[0] - a[0], p[1] - a[1], p[2] - a[2]);
+    if (d0 === 0) return unreachable('the target starts at the launch point');
+    found = bisect(0, times[0]!);
+  }
+  for (const i of found === null ? order : []) {
     const j = arc === 'low' ? i + 1 : i - 1;
     if (j < 0 || j >= samples) continue;
     let lo = Math.min(times[i]!, times[j]!),
@@ -236,7 +254,7 @@ export function solveLead(
       break;
     }
     if (flo > 0 === fhi > 0 && fhi !== 0) continue;
-    for (let k = 0; k < 200 && hi - lo > tolerance; k++) {
+    for (let k = 0; k < 200 && hi - lo > tolerance * hi; k++) {
       const mid = (lo + hi) / 2,
         fm = f(mid);
       if (fm > 0 === flo > 0) {
