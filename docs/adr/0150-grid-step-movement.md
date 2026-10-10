@@ -1,4 +1,4 @@
-# ADR 0099: optional grid-step actor movement
+# ADR 0150: optional grid-step actor movement
 
 - **Status:** Proposed
 - **Date:** 2026-10-09

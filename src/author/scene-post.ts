@@ -15,6 +15,13 @@
  * context that cannot render to a half-float target, or a pipeline error is reported once and the scene stays on
  * `off` for the rest of the visit. A shader link or frame readiness failure is the scene's own (it propagates).
  * Lifetime: owned by the visit; `dispose` releases every target, material and geometry the pipeline made.
+ *
+ * Lookup tables (`view.post.grade.lut`): the `.cube` file under `public/` is fetched once the chunk is ready (its reader
+ * ships in the chunk), with the visit's signal, and parsed; up to `LUT_CACHE` parsed tables are kept per page, so a
+ * return visit or a switch back draws without a fetch. Until a table arrives the picture is drawn without it, and it
+ * arrives with one redraw. A fetch or parse failure is reported once per file per visit and the scene keeps drawing
+ * without the table; changing `file` cancels the previous fetch. The first picture waits (bounded, with the chunk)
+ * for the table too.
  */
 import type * as T from 'three';
 import {FrameReadinessError} from '../platform/render/frame-readiness';
@@ -30,6 +37,9 @@ import {
   type PostSettings,
 } from '../platform/render/post/settings';
 import type {PostPipeline} from '../platform/render/backends/webgl/post';
+import type {CubeLut} from '../platform/render/post/lut';
+import {LUT_MAX_BYTES} from '../platform/render/post/lut';
+import {publicUrl} from '../platform/assets/public-base';
 
 type PostModule = typeof import('../platform/render/backends/webgl/post');
 
@@ -42,6 +52,23 @@ export function loadPostModule(): Promise<PostModule> {
       throw error;
     });
   return module;
+}
+
+/** Parsed lookup tables kept per page (least recently used dropped first): about 0.4 MiB each at 33³. */
+export const LUT_CACHE = 4;
+const luts = new Map<string, CubeLut>();
+const remember = (file: string, lut: CubeLut) => {
+  luts.delete(file);
+  luts.set(file, lut);
+  while (luts.size > LUT_CACHE) luts.delete(luts.keys().next().value!);
+};
+/** Fetch a `.cube` file's text from `public/`, refusing a response larger than the reader accepts. */
+async function fetchLutText(file: string, signal: AbortSignal): Promise<string> {
+  const response = await fetch(publicUrl(file), {signal});
+  if (!response.ok) throw Error(`post: ${file}: HTTP ${response.status}`);
+  const length = Number(response.headers.get('content-length') ?? 0);
+  if (length > LUT_MAX_BYTES) throw Error(`post: ${file}: larger than ${LUT_MAX_BYTES} bytes`);
+  return response.text();
 }
 
 export interface ScenePostStats {
@@ -59,8 +86,11 @@ export interface ScenePostStats {
   /** Frames drawn through post and the post draws they issued. */
   frames: number;
   draws: number;
-  /** Reports made (invalid settings, a load failure, an unsupported context, a pipeline error). */
+  /** Reports made (invalid settings, a load failure, an unsupported context, a pipeline error, a table failure). */
   reports: number;
+  /** The lookup table: 'none' (not asked for), 'loading', 'ready' or 'failed'; bytes its 3D texture holds. */
+  lut: 'none' | 'loading' | 'ready' | 'failed';
+  lutBytes: number;
 }
 
 export interface ScenePost {
@@ -84,7 +114,9 @@ export interface ScenePostOptions {
   /** MSAA samples for the scene target (the `resolution.antialias` knob). */
   samples(): number;
   /** The chunk (default `loadPostModule`; tests pass their own). */
-  load?(): Promise<Pick<PostModule, 'createWebGLPost' | 'postUnsupported'>>;
+  load?(): Promise<Pick<PostModule, 'createWebGLPost' | 'postUnsupported' | 'parseCubeLut'>>;
+  /** Fetch a lookup table's text (default: `fetch` under `public/`; tests pass their own). */
+  fetchLut?(file: string, signal: AbortSignal): Promise<string>;
   /** The chunk arrived (or failed): draw again. */
   changed(): void;
   report(error: unknown): void;
@@ -99,7 +131,16 @@ export function createScenePost(o: ScenePostOptions): ScenePost {
     plan: PostPlan | null = null,
     key = 'off',
     reports = 0,
-    disposed = false;
+    disposed = false,
+    parse: PostModule['parseCubeLut'] | null = null;
+  // The lookup table: the file asked for, its parsed table once here, the fetch in flight, files that failed.
+  let lutFile: string | null = null,
+    lut: CubeLut | null = null,
+    lutLife: AbortController | null = null,
+    lutState: ScenePostStats['lut'] = 'none';
+  const lutFailed = new Set<string>();
+  let lutArrived: () => void = () => {};
+  let lutArrival: Promise<void> = Promise.resolve();
   let arrived: () => void = () => {};
   const arrival = new Promise<void>(resolve => {
     arrived = resolve;
@@ -123,6 +164,10 @@ export function createScenePost(o: ScenePostOptions): ScenePost {
     }
     report(error);
     arrived();
+    // Without the chunk there is no table to wait for.
+    lutLife?.abort();
+    lutLife = null;
+    lutArrived();
   };
   const load = () => {
     if (state !== 'idle' || disposed) return;
@@ -138,12 +183,14 @@ export function createScenePost(o: ScenePostOptions): ScenePost {
           const problem = m.postUnsupported(o.renderer);
           if (problem) throw Error(problem);
           pipeline = m.createWebGLPost(o.renderer, {samples: o.samples});
+          parse = m.parseCubeLut;
           state = 'ready';
         } catch (error) {
           fail(error);
           return;
         }
         arrived();
+        syncLut();
         o.changed();
       },
       error => {
@@ -152,6 +199,55 @@ export function createScenePost(o: ScenePostOptions): ScenePost {
         o.changed();
       },
     );
+  };
+  const settleLut = () => {
+    lutLife = null;
+    lutArrived();
+  };
+  /** Start, keep or cancel the table fetch for the current settings. Needs the chunk (the reader is in it). */
+  const syncLut = () => {
+    const file = resolved?.grade.lut?.file ?? null;
+    if (file !== lutFile) {
+      lutLife?.abort();
+      settleLut();
+      lutFile = file;
+      lut = null;
+      lutState = file ? 'loading' : 'none';
+      if (file) {
+        const cached = luts.get(file);
+        if (cached) {
+          remember(file, cached);
+          lut = cached;
+          lutState = 'ready';
+        } else if (lutFailed.has(file)) lutState = 'failed';
+        else lutArrival = new Promise<void>(resolve => (lutArrived = resolve));
+      }
+    }
+    if (!file || lut || lutLife || lutState === 'failed' || state !== 'ready' || !parse || disposed) return;
+    const life = (lutLife = new AbortController()),
+      read = parse,
+      abort = () => life.abort();
+    o.signal.addEventListener('abort', abort, {once: true});
+    (o.fetchLut ?? fetchLutText)(file, life.signal)
+      .then(text => read(text, file))
+      .then(
+        table => {
+          if (life.signal.aborted || disposed || lutFile !== file) return;
+          remember(file, table);
+          lut = table;
+          lutState = 'ready';
+          settleLut();
+          o.changed();
+        },
+        error => {
+          if (life.signal.aborted || disposed || lutFile !== file) return;
+          lutFailed.add(file);
+          lutState = 'failed';
+          settleLut();
+          report(error);
+        },
+      )
+      .finally(() => o.signal.removeEventListener('abort', abort));
   };
   const current = (): PostPlan | null => (state === 'ready' ? postPlan(resolved, knob) : null);
   return {
@@ -169,8 +265,9 @@ export function createScenePost(o: ScenePostOptions): ScenePost {
       }
       knob = mode;
       if (resolved) load();
+      syncLut();
       const next = current(),
-        nextKey = postKey(next);
+        nextKey = next?.grade.lut && lut ? `${postKey(next)}|lut` : postKey(next);
       plan = next;
       if (nextKey === key) return false;
       key = nextKey;
@@ -179,7 +276,7 @@ export function createScenePost(o: ScenePostOptions): ScenePost {
     render(scene, camera) {
       if (disposed || !plan || !pipeline) return false;
       try {
-        pipeline.render(scene, camera, plan);
+        pipeline.render(scene, camera, plan, lut);
         return true;
       } catch (error) {
         if (isSceneFailure(error)) throw error;
@@ -192,7 +289,7 @@ export function createScenePost(o: ScenePostOptions): ScenePost {
     compile(scene, camera) {
       if (disposed || !plan || !pipeline) return;
       try {
-        pipeline.compile(scene, camera, plan);
+        pipeline.compile(scene, camera, plan, lut);
       } catch (error) {
         if (isSceneFailure(error)) throw error;
         fail(error);
@@ -201,8 +298,9 @@ export function createScenePost(o: ScenePostOptions): ScenePost {
       }
     },
     settled(ms) {
-      if (state !== 'loading') return Promise.resolve();
-      return Promise.race([arrival, new Promise<void>(resolve => setTimeout(resolve, ms))]);
+      if (state !== 'loading' && lutState !== 'loading') return Promise.resolve();
+      // The chunk first, then the table (its fetch starts when the chunk is ready), within one bound.
+      return Promise.race([arrival.then(() => lutArrival), new Promise<void>(resolve => setTimeout(resolve, ms))]);
     },
     stats() {
       const p = pipeline?.stats();
@@ -216,12 +314,16 @@ export function createScenePost(o: ScenePostOptions): ScenePost {
         frames: p?.frames ?? 0,
         draws: p?.draws ?? 0,
         reports,
+        lut: lutState,
+        lutBytes: p?.lutBytes ?? 0,
       };
     },
     dispose() {
       if (disposed) return;
       disposed = true;
       arrived();
+      lutLife?.abort();
+      settleLut();
       const old = pipeline;
       pipeline = null;
       plan = null;

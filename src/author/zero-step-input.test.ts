@@ -59,7 +59,7 @@ function fixture(tapRunning?: () => boolean) {
     {id: 'frame-reader', phase: 'frame' as const, run: read('frame')},
   ];
   const run = ts.transpile(
-    `let programFailed=false,simulating=true,arrived=true,frame=0,t=0,calm=false,frameMs=0;const FIXED_STEP=1/60,tap=tapRunning?{running:tapRunning,beforeTick(){},afterTick(){},get input(){return liveInput;}}:null;const timing=undefined,body={systems},world={clearEvents(){}},scene={id:'test'};
+    `let programFailed=false,simulating=true,arrived=true,frame=0,t=0,calm=false,frameMs=0;const FIXED_STEP=1/60,tap=tapRunning?{running:tapRunning,beforeTick(){},afterTick(){},get input(){return liveInput;}}:null;const timing=undefined,body={systems},world={clearEvents(){}},scene={id:'test'};let alphaSource=()=>0;const captureInterpolation=()=>{};
 ${wiring}
 ${runnerLine}
 ${liveInputLine}

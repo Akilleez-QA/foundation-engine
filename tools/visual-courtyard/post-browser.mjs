@@ -7,7 +7,10 @@
 //     beside the box at full and not at off. A still scene draws no frame. A scene without post fetches no post code;
 //   - leaving the scene leaves no geometry and no more textures than leaving the author-API courtyard (release audit);
 //   - courtyard-post: the trial courtyard with tone mapping, bloom, vignette and grade at each tier, and the courtyard
-//     without post ("before"), as screenshots, desktop and phone-sized.
+//     without post ("before"), as screenshots, desktop and phone-sized;
+//   - grade-post (still) at full and basic: a 3D lookup table (`luts/invert.cube`) loads, is drawn in the same combined
+//     pass (post draws unchanged) and turns the dark floor light; an HDR ceiling holds the over-range box down so the
+//     glow beside it is dimmer than without one (full only: bloom).
 // Limitations: software GL; no physical device, GPU timing or visual-quality judgement beyond the screenshots.
 import assert from 'node:assert/strict';
 import {mkdirSync, writeFileSync} from 'node:fs';
@@ -76,8 +79,10 @@ const frames = b =>
     },
     1200,
   );
-const goto = async (b, scene) => {
-  await b.evaluate(`window.engine.goto(${JSON.stringify(scene)})`);
+const goto = async (b, scene, params) => {
+  await b.evaluate(
+    `window.engine.goto(${JSON.stringify(scene)}, ${JSON.stringify(params ?? null) ?? 'null'} ?? undefined)`,
+  );
   await b.page.waitForFunction(
     s => document.querySelector(`#app[data-scene="scene.${s}"][data-scene-state="active"]`),
     scene,
@@ -144,6 +149,51 @@ try {
     t.reference.beside > t.low.beside + 8,
     `bloom spreads light beside the box: ${t.reference.beside} vs ${t.low.beside}`,
   );
+
+  // The grade: a lookup table and an HDR ceiling, at full (bloom) and basic (no bloom).
+  report.grade = {};
+  for (const [preset, tier] of [
+    ['reference', 'full'],
+    ['medium', 'basic'],
+  ]) {
+    browser = await launch({...VIEWS.desktop, strictClose: true});
+    watch(browser, `grade ${preset}`);
+    await browser.page.addInitScript(PROBE);
+    await open(browser, server.url, 'courtyard', {query: {quality: preset}});
+    const g = (report.grade[preset] = {tier});
+    for (const look of ['plain', 'lut', 'ceiling']) {
+      await goto(browser, 'grade-post', {look});
+      await browser.page.waitForFunction(
+        ([t, l]) => window.engine.post()?.mode === t && (l !== 'lut' || window.engine.post()?.lut === 'ready'),
+        [tier, look],
+        {timeout: 60000},
+      );
+      await sleep(300);
+      const m = await frames(browser);
+      assert.equal(m.postDrawsPerFrame, POST_DRAWS[tier], `${tier} ${look}: the grade adds no post draw`);
+      const png = await shot(browser, `grade-post-${look}-${tier}-desktop`);
+      g[look] = {
+        stats: await postStats(browser),
+        beside: +luminance(png, [Math.round(png.width / 2 + png.width * 0.05), Math.round(png.height * 0.53)]).toFixed(
+          1,
+        ),
+        floor: +luminance(png, [Math.round(png.width / 2), Math.round(png.height * 0.9)]).toFixed(1),
+      };
+    }
+    assert.equal(g.lut.stats.lutBytes, 33 ** 3 * 8, 'one 33³ half-float table');
+    assert.equal(g.plain.stats.lut, 'none');
+    assert.ok(
+      g.lut.floor > g.plain.floor + 100,
+      `the inverting table turns the floor light: ${g.lut.floor} vs ${g.plain.floor}`,
+    );
+    if (tier === 'full')
+      assert.ok(
+        g.ceiling.beside < g.plain.beside - 4,
+        `the ceiling dims the glow beside the box: ${g.ceiling.beside} vs ${g.plain.beside}`,
+      );
+    await browser.close();
+    browser = null;
+  }
 
   for (const scene of ['courtyard-post', 'courtyard']) {
     browser = await launch({...VIEWS.mobile, strictClose: true});

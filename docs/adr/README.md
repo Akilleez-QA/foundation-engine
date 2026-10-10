@@ -76,6 +76,40 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0084](0084-persisted-recurring-phase.md) | Persisted recurring phase with explicit bounded catch-up | Optional composition / Time / Persistence | Proposed |
 
+| [0096](0096-optional-update-cadence.md) | Optional per-member update cadence | Optional kits / Simulation scale | Proposed |
+
 | [0085](0085-atomic-cell-batches-and-occupancy.md) | Atomic cell batches and immutable occupancy | Procgen / Spatial | Proposed |
 
-| [0099](0099-grid-step-movement.md) | Optional grid-step actor movement | Optional kits | Proposed |
+| [0150](0150-grid-step-movement.md) | Optional grid-step actor movement | Optional kits | Proposed |
+
+| [0086](0086-bounded-work-roster.md) | Bounded optional work roster | Optional composition | Proposed |
+
+| [0087](0087-rewind-history.md) | Optional bounded rewind history | Optional kits / Network authority | Proposed |
+
+| [0088](0088-view-deltas.md) | Optional acknowledged-baseline view deltas | Network | Proposed |
+
+| [0089](0089-model-clip-transitions.md) | Model clip transitions through the existing model owner | Author API / Animation presentation | Proposed |
+
+| [0090](0090-camera-support-framing.md) | Support-anchored vertical camera framing | Camera kit | Proposed |
+
+| [0097](0097-action-phase-windows.md) | Optional action phase windows, once-only marks and per-range claims | Optional kits / Capabilities | Proposed |
+
+| [0098](0098-bounded-volume-queries.md) | Bounded optional volume queries | Optional composition / Spatial queries | Proposed |
+
+| [0091](0091-bounded-cue-sequences.md) | Bounded cue sequences as an optional kit | Optional kits / Scripting | Proposed |
+
+| [0111](0111-sequence-cast-branches-arbitration.md) | Cast binding, branching and event arbitration for sequences | Optional kits / Scripting | Proposed |
+
+| [0092](0092-population-placements-and-tiers.md) | Placements with persistent depletion and update tiers | Optional kits / Simulation scale | Proposed |
+
+| [0095](0095-optional-region-activation.md) | Optional region activation from observer positions | Optional kits / Simulation scale | Proposed |
+
+| [0093](0093-remote-playout.md) | Optional remote playout and clock offset | Optional kits / Network presentation | Proposed |
+
+| [0100](0100-optional-entity-pool-eviction-classes.md) | Optional entity pool with eviction classes | Optional kits / Simulation scale | Proposed |
+
+| [0094](0094-replication-schedule.md) | Optional per-recipient replication schedule | Optional kits / Network | Proposed |
+
+| [0110](0110-look-at-constraint.md) | Bounded look-at constraint in the animation kit | Optional kits / Animation | Proposed |
+
+| [0112](0112-camera-director.md) | Optional camera director helpers | Camera kit | Proposed |

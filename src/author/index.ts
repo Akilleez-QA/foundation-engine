@@ -20,7 +20,9 @@
  *   Scatter, defineScatter, sceneScatter            optional instanced scatter: many copies of a shape or mesh, one draw
  *   PointLight, SpotLight, sceneLights               optional local lights in fixed per-visit slots
  *   Shadow, sceneShadows                             optional shadows: per scene, per light and per entity
+ *   BlobShadow, sceneBlobShadows                     optional blob (contact) shadows: one instanced draw per scene
  *   defineEnvironment({ sky, haze })                 optional gradient sky, discs, stars, exp2 haze
+ *   defineEnvironment({ reflection: { kind: 'interior' } })  optional procedural interior reflection, built once per visit
  *
  * Budgets are data in game/budgets.json (the ratchet compares them across revisions without running code).
  */
@@ -165,6 +167,13 @@ export {dmath, platformMath, scalarMath, type ScalarMath, type ScalarMathMode} f
 export {defineEnvironment, hazeColor, type EnvironmentState, type LinearHaze, type ExpHaze} from './environment';
 export {validateSky, skyGradientAt, SKY_LIMITS, type Sky, type GradientSky, type SkyDisc, type SkyStars} from './sky';
 export {
+  validateInteriorReflection,
+  INTERIOR_REFLECTION_LIMITS,
+  type InteriorReflection,
+  type InteriorSurface,
+  type InteriorLight,
+} from './interior-reflection';
+export {
   PointLight,
   SpotLight,
   sceneLights,
@@ -190,6 +199,17 @@ export {
   type SceneShadowDefaults,
 } from './shadow-casting';
 export {
+  BlobShadow,
+  sceneBlobShadows,
+  validateBlobShadow,
+  BLOB_SHADOW_DEFAULTS,
+  BLOB_SHADOW_LIMITS,
+  SCENE_BLOB_SHADOW_LIMITS,
+  type BlobShadowData,
+  type SceneBlobShadows,
+  type SceneBlobShadowLimits,
+} from './blob-shadow';
+export {
   validateSceneOutput,
   OUTPUT_DEFAULTS,
   OUTPUT_LIMITS,
@@ -205,10 +225,19 @@ export {
   type PostBloom,
   type PostVignette,
   type PostGrade,
+  type PostLut,
   type PostMode,
 } from '../platform/render/post/settings';
+export {cubeLutText, parseCubeLut, LUT_SIZE_LIMITS, type CubeLut} from '../platform/render/post/lut';
 
-export {Model, validateModel, type ModelData, type ModelSocketPose} from './model';
+export {Model, validateModel, MAX_MODEL_TRANSITION, type ModelData, type ModelSocketPose} from './model';
+export {
+  Interpolated,
+  presentTransform,
+  presentedTransform,
+  type InterpolatedData,
+  type TransformPose,
+} from './interpolation';
 export {RenderMask, validateRenderMask} from './render-mask';
 export {
   createDependencyLease,

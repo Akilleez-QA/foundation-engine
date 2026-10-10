@@ -4,6 +4,11 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 
 | Kit | What | Used by |
 |---|---|---|
+| [rewind](../../src/kits/rewind/README.md) | Bounded per-subject sample history and capped time choice for judging remote commands against past state; pure helper | Headless tests and a combat-sweep composition; no integrated game |
+
+| [playout](../../src/kits/playout/README.md) | Authority clock offset and adaptive playout buffers for smooth presentation of remote views; pure helper | Headless tests and a jittered receiver composition; no integrated game |
+
+| [replication](../../src/kits/replication/README.md) | Quantized per-recipient deltas ranked to a byte budget with loss recovery and an order-safe replica; pure helper | Headless tests and a lossy interest-set composition; no integrated game |
 | [visibility](../../src/kits/visibility/README.md) | Bounded source contributions, current visibility and explored history; pure helper | Two headless sensor/facility fixtures; no integrated game |
 | [ui](../../src/kits/ui/README.md) | HUD lines, a banner and a prompt over a scene | arcade, explorer |
 | [camera](../../src/kits/camera/README.md) | Camera poses: follow, orbit, first-person, top-down, side-scroll, fixed | explorer |
@@ -40,6 +45,12 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [spatial-audio](../../src/kits/spatial-audio/README.md) | Logical sound sources: virtual tracking, importance ranking with HRTF for the sounds that matter, class distance curves with a hard cutoff, budgeted occlusion driving the smoothed filter | None yet; implemented, candidate (AUD-02, PR #55, [recipe](../recipes/3d-sound-for-shooters.md)) |
 
 The optional [assignments](../../src/kits/assignments/README.md) candidate supplies exclusive actor claims, weighted target capacity and atomic transfer refusal. Two headless service/worksite fixtures and route-owner composition tests exercise it; no playable template consumer or browser/device acceptance is claimed. [Guide](../guides/assignments.md).
+
+The optional [region-activation](../../src/kits/region-activation/README.md) candidate decides which grid regions a game simulates from observer positions, with release hysteresis, linger, pins, per-update transition budgets and epochs for stale loads. Headless model and ECS/chunk-store consumer tests only; no template consumer or browser/device acceptance is claimed. [Guide](../guides/region-activation.md).
+
+The optional [cadence](../../src/kits/cadence/README.md) candidate runs members at their own integer periods on the caller's tick, spread by id, bounded per take with deferral, elapsed-tick reporting and saveable state. Headless model, ECS and interest-set consumer tests only; no template consumer or browser/device acceptance is claimed. [Guide](../guides/update-cadence.md).
+
+The optional [entity-pool](../../src/kits/entity-pool/README.md) candidate keeps pooled entities under a creator count and cost cap, evicting expendable classes first in a deterministic order, with pins, atomic refusal and World eviction events. Headless model and World consumer tests only; no template consumer or browser/device acceptance is claimed. [Guide](../guides/entity-pool.md).
 
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.
 

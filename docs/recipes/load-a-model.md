@@ -67,12 +67,13 @@ The `pause` system reads the `turn` action from the `blank` template; in another
 | `asset` | | the asset id |
 | `clip` | `''` | the animation clip's name in the GLB; empty shows the bind pose |
 | `playing` | `true` | `false` pauses the clip where it is |
-| `loop` | `true` | `false` plays once and holds the last frame |
+| `loop` | `true` | `false` plays once and holds the last frame; a held clip is still (no redraw) even while `playing` stays `true` |
 | `speed` | `1` | playback rate, 0 to 16 |
 | `revision` | `0` | add one to restart the clip from the beginning (also when the clip name is unchanged) |
+| `transition` | `0` | seconds (0 to 2) to ease from the pose on screen into a new `clip`, a `revision` restart or the bind pose; `0` cuts |
 | `visible` | `true` | hide without unloading |
 
-Systems change these fields in place: switch `clip` to change animation, flip `playing`, or bump `revision` to replay. The clip names are the animation (action) names stored in the GLB; a name that does not match exactly one clip logs `model: unknown or ambiguous clip <name>` in the browser console. Size and turn the model with the entity's `Transform` (`scale`, `ry`).
+Systems change these fields in place: switch `clip` to change animation, flip `playing`, or bump `revision` to replay. With `transition` above zero, a change starts from whatever the model is showing (including a blend still in progress) and eases into the new clip, which plays from its first frame meanwhile. The blend runs on presentation time, so it also completes while `playing` is `false` (a paused model switched to the bind pose still gets there). It is presentation only: markers, the actor's `Transform` and game timing never wait for it. The first clip after a model loads, an unknown clip, `pose` overrides, object-path tracks (such as `.bones[name]`) and morph-target or material tracks still change at once, and a model whose clips animate more than 512 nodes cuts and logs `model: more than 512 animated nodes`. The clip names are the animation (action) names stored in the GLB; a name that does not match exactly one clip logs `model: unknown or ambiguous clip <name>` in the browser console. Size and turn the model with the entity's `Transform` (`scale`, `ry`).
 
 `ctx.modelState(entity).status` reports `'loading'`, `'ready'` or `'failed'` if a system needs to wait for the model.
 
@@ -139,5 +140,6 @@ model, with RGBA8 textures. Limits and failure behaviour are in the [KTX2 guide]
 - One GLB per asset; embedded buffers and images only. Large files cost load time and memory against the scene's budget (`npm run play:snap` reports draws and triangles).
 - Mesh compression is meshopt only (no Draco). KTX2 images must be Basis Universal (ETC1S or UASTC), one 2D image each, at most 16,384 texels a side.
 - Clips play one at a time per entity; there is no blending between clips in the `Model` component.
+- Skinned characters in numbers (retargeted clips, weights on LOD levels, crowd cost, transitions): see the [character pipeline lessons](../guides/character-pipeline-lessons.md) and [crowd and night rendering lessons](../guides/crowd-and-night-rendering-lessons.md). They are practices, not engine features.
 - Asset URLs are resolved against the build base. For a sub-path, build with `npm run build -- --base ./` or a known prefix; see [host under a sub-path](host-under-a-sub-path.md). Arbitrary root-absolute URLs outside asset declarations still need your own base handling.
 - More: [model attachments](../guides/model-attachments.md), [model readiness](../guides/model-readiness.md), [model inspection](../guides/model-inspection.md), and the `mechanics` template, which uses this same fixture.

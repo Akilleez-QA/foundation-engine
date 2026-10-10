@@ -77,6 +77,26 @@
           }
         }
       }
+    },
+    "grade-post": {
+      "scene": "scene.grade-post",
+      "route": "#scene/grade-post",
+      "budget": {
+        "draws": 10,
+        "postDraws": 10,
+        "triangles": 2000,
+        "textureMiB": 64,
+        "heapMiB": 64,
+        "contexts": 1,
+        "ports": {
+          "medium": {
+            "postDraws": 1
+          },
+          "low": {
+            "postDraws": 0
+          }
+        }
+      }
     }
   }
 }

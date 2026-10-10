@@ -43,10 +43,49 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'POOL-01',
+    title: 'Optional bounded entity pool with eviction classes',
+    docs: 'docs/guides/entity-pool.md',
+    evidence: [
+      {kit: 'entity-pool', export: 'createEntityPool'},
+      {kit: 'entity-pool', export: 'spawnPooled'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',
     evidence: [{kit: 'navigation', export: 'createDistanceField'}, {path: 'src/kits/navigation/field.test.ts'}],
+  },
+  {
+    id: 'WORK-01',
+    title: 'Optional bounded fair work roster',
+    docs: 'src/kits/work-roster/README.md',
+    evidence: [{kit: 'work-roster', export: 'createWorkRoster'}, {path: 'src/kits/work-roster/consumers.test.ts'}],
+  },
+  {
+    id: 'VOLUME-01',
+    title: 'Optional bounded sphere and capsule overlap, sweep and headroom queries',
+    docs: 'src/kits/volume-query/README.md',
+    evidence: [{kit: 'volume-query', export: 'sweepVolume'}, {path: 'src/kits/volume-query/oracle.test.ts'}],
+  },
+  {
+    id: 'ACTIVATION-01',
+    title: 'Optional bounded region activation from observer positions',
+    docs: 'docs/guides/region-activation.md',
+    evidence: [
+      {kit: 'region-activation', export: 'createRegionActivation'},
+      {kit: 'region-activation', export: 'createRegionUpdateResult'},
+    ],
+  },
+  {
+    id: 'CADENCE-01',
+    title: 'Optional bounded per-member update cadence',
+    docs: 'docs/guides/update-cadence.md',
+    evidence: [
+      {kit: 'cadence', export: 'createCadence'},
+      {kit: 'cadence', export: 'createCadenceResult'},
+    ],
   },
   {
     id: 'ASG-01',
@@ -65,6 +104,33 @@ export const FEATURES = [
     title: 'Planar interaction preparation with bounded proposals and exact-ticket acknowledgment',
     docs: 'src/kits/alignment/README.md',
     evidence: [{kit: 'alignment', export: 'createAlignment'}, {path: 'src/kits/alignment/alignment.test.ts'}],
+  },
+  {
+    id: 'REWIND-01',
+    title: 'Bounded rewind history for judging remote commands against past state',
+    docs: 'src/kits/rewind/README.md',
+    evidence: [{kit: 'rewind', export: 'createRewindHistory'}, {path: 'src/kits/rewind/history.test.ts'}],
+  },
+  {
+    id: 'NW-DELTA',
+    title: 'Acknowledged-baseline deltas for complete network views',
+    docs: 'src/kits/network/README.md',
+    evidence: [{kit: 'network', export: 'createViewDeltaEncoder'}, {path: 'src/kits/network/view-delta.test.ts'}],
+  },
+  {
+    id: 'PLAYOUT-01',
+    title: 'Remote clock offset and adaptive playout buffers',
+    docs: 'src/kits/playout/README.md',
+    evidence: [{kit: 'playout', export: 'createPlayout'}, {path: 'src/kits/playout/playout.test.ts'}],
+  },
+  {
+    id: 'REPL-01',
+    title: 'Per-recipient quantized replication under a byte budget',
+    docs: 'src/kits/replication/README.md',
+    evidence: [
+      {kit: 'replication', export: 'createReplicationSchedule'},
+      {path: 'src/kits/replication/replication.test.ts'},
+    ],
   },
   {
     id: 'VISIBILITY-01',
@@ -95,6 +161,20 @@ export const FEATURES = [
     title: 'Grid-step actor movement with classified bumps, ledges, forced tiles and follower lines',
     docs: 'src/kits/grid-step/README.md',
     evidence: [{kit: 'grid-step', export: 'createGridStepper'}, {path: 'src/kits/grid-step/grid-step.test.ts'}],
+
+    id: 'CAP-ACTION-PHASES',
+    title: 'Creator-authored action phase windows, once-only marks and per-range claims',
+    docs: 'docs/guides/action-phases.md',
+    evidence: [
+      {kit: 'capabilities', export: 'createActionPhases'},
+      {path: 'src/kits/capabilities/action-phases.test.ts'},
+    ],
+  },
+  {
+    id: 'RENDER-INTERP',
+    title: 'Opt-in render interpolation of fixed-step Transforms',
+    docs: 'docs/guides/render-interpolation.md',
+    evidence: [{engine: 'Interpolated'}, {engine: 'presentTransform'}, {path: 'src/author/interpolation.test.ts'}],
   },
   {
     id: 'VIS-01',
@@ -139,10 +219,23 @@ export const FEATURES = [
     evidence: [{engine: 'Scatter'}, {engine: 'defineScatter'}, {engine: 'sceneScatter'}],
   },
   {
+    id: 'VIS-10',
+    title: 'Blob (contact) shadows: one instanced draw of soft ground ellipses where no real shadow reaches',
+    docs: 'docs/guides/blob-shadows.md',
+    evidence: [{engine: 'BlobShadow'}, {engine: 'sceneBlobShadows'}, {script: 'test:blob-shadows-browser'}],
+  },
+  {
     id: 'VIS-09',
     title: 'Opt-in full three.js kit (@kits/three)',
     pr: 136,
     evidence: [{kit: 'three'}],
+  },
+  {
+    id: 'VIS-11',
+    title: 'Procedural interior reflection environment (reflection kind interior)',
+    pr: 183,
+    docs: 'docs/guides/scene-look.md',
+    evidence: [{engine: 'validateInteriorReflection'}, {engine: 'INTERIOR_REFLECTION_LIMITS'}],
   },
   {
     id: 'POST-01',
@@ -150,6 +243,13 @@ export const FEATURES = [
     pr: 161,
     docs: 'docs/guides/post-processing.md',
     evidence: [{knobRead: 'post.mode'}],
+  },
+  {
+    id: 'POST-02',
+    title: 'Post grade lookup tables (.cube, view.post.grade.lut) and an HDR ceiling before bloom (view.post.ceiling)',
+    pr: 179,
+    docs: 'docs/guides/post-processing.md',
+    evidence: [{engine: 'cubeLutText'}, {engine: 'parseCubeLut'}, {path: 'src/platform/render/post/lut.ts'}],
   },
   {
     id: 'FX-01',
@@ -395,6 +495,7 @@ export function renderMarkdown(m) {
     'evidence (exports, kits, scripts, files) is present; that says it exists on this revision, not that it has device',
     'acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).',
     '',
+    // Lists are one item per line so pull requests that each add an export, script or kit merge without conflict.
     '## Shipped features',
     '',
     '| ID | Feature | PR | Docs |',
@@ -413,11 +514,11 @@ export function renderMarkdown(m) {
     '',
     "Each kit's value exports are listed in [capabilities.json](capabilities.json).",
     '',
-    m.kits.map(k => `\`@kits/${k.name}\``).join(', '),
+    ...m.kits.map(k => `- \`@kits/${k.name}\``),
     '',
     '## Templates',
     '',
-    m.templates.map(t => `\`${t}\``).join(', '),
+    ...m.templates.map(t => `- \`${t}\``),
     '',
     '## Quality knobs',
     '',
@@ -429,11 +530,11 @@ export function renderMarkdown(m) {
     '',
     '## `@engine` value exports',
     '',
-    m.engine.values.map(v => `\`${v}\``).join(', '),
+    ...m.engine.values.map(v => `- \`${v}\``),
     '',
     '## npm scripts',
     '',
-    m.scripts.map(s => `\`${s}\``).join(', '),
+    ...m.scripts.map(s => `- \`${s}\``),
     '',
   ];
   return lines.join('\n');

@@ -233,3 +233,57 @@ test('runner: lane hooks bracket each fixed step and the per-frame lane, includi
     'dropped steps call no hook',
   );
 });
+
+test('world: changes during a query are safe and do not depend on component store sizes', () => {
+  const w = new World();
+  const a = w.spawn(Position(), Velocity());
+  const b = w.spawn(Position(), Velocity());
+  const c = w.spawn(Position(), Velocity());
+  // Single-component query: an entity despawned by an earlier row is skipped, never yielded with a missing value.
+  const single: [number, unknown][] = [];
+  for (const [e, p] of w.query(Position)) {
+    single.push([e, p]);
+    if (e === a) w.despawn(b);
+  }
+  assert.deepEqual(
+    single.map(([e]) => e),
+    [a, c],
+  );
+  assert.ok(single.every(([, p]) => p !== undefined));
+  // A listed component removed earlier in the pass also skips the entity, whichever store is smallest.
+  const d = w.spawn(Position(), Velocity());
+  for (const extra of [0, 3]) {
+    for (let i = 0; i < extra; i++) w.spawn(Velocity());
+    const seen: number[] = [];
+    for (const [e, p, v] of w.query(Position, Velocity)) {
+      assert.ok(p && v, 'values are present');
+      seen.push(e);
+      if (e === a) w.remove(c, Position);
+    }
+    assert.deepEqual(seen, [a, d]);
+    w.add(c, Position());
+  }
+  // Entities spawned or starting to match during the pass appear in the next query, for every query shape.
+  const lateBefore = w.count;
+  const untyped: number[] = [];
+  for (const [e] of w.query()) {
+    untyped.push(e);
+    if (untyped.length === 1) w.spawn(Position(), Velocity());
+  }
+  assert.equal(untyped.length, lateBefore, 'untyped query does not visit entities spawned mid-pass');
+  const gained = w.spawn(Position());
+  const matched: number[] = [];
+  for (const [e] of w.query(Position, Velocity)) {
+    matched.push(e);
+    if (e === a) w.add(gained, Velocity());
+  }
+  assert.equal(matched.includes(gained), false, 'starts matching mid-pass: next query');
+  assert.ok([...w.query(Position, Velocity)].some(([e]) => e === gained));
+  // Despawned during an untyped pass: skipped.
+  const visited: number[] = [];
+  for (const [e] of w.query()) {
+    visited.push(e);
+    if (e === a) w.despawn(d);
+  }
+  assert.equal(visited.includes(d), false);
+});

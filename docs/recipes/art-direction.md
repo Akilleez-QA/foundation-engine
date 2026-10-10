@@ -427,6 +427,19 @@ With bloom, keep the emissive near 1 and lower the bloom `threshold` below 1 ins
 Post renders the scene into a half-float target first: at 1280×800 that and the bloom mips added about 10 MiB of
 textures to the courtyard. On phones prefer `basic` (vignette and grade) or none.
 
+**Grade to a reference.** When the look has a reference (concept art, a mood board), lift, gain and saturation get
+the broad strokes; a 3D lookup table gets the rest: `grade: {lut: {file: 'luts/night.cube', strength: 0.75}}`, a
+`.cube` file under `game/public/`, drawn in the same pass at `basic` and `full`. Make the table with a grading tool from
+a `?quality=` screenshot taken without it, or generate one in `game/tools/` with `cubeLutText` from `@engine`; keep
+`strength` below 1 at first so the scene's own colour still shows. Fit and judge it under the tone mapping the scene
+ships with: for night scenes with saturated lamps, `view.output: {toneMapping: 'agx'}` keeps sodium and neon colours
+from flattening to yellow-white as quickly as `'aces'`.
+
+**Fireflies.** A glossy edge under a strong light can produce a single pixel far brighter than anything else, which
+bloom spreads into a bright disc that flickers as the camera moves. Set `ceiling` (linear light, above the brightest
+glow you want, for example `ceiling: 24`) to hold every pixel at or below it before bloom; it also clears NaN and
+infinite pixels. Reach for it when a disc appears, not by default.
+
 **What shadows and sky cost** (measured on software GL at the reference preset):
 
 | Feature | Draws | Texture memory |
@@ -436,6 +449,7 @@ textures to the courtyard. On phones prefer `basic` (vignette and grade) or none
 | A shadowed spot light | one extra pass | 1024 at reference |
 | Gradient sky | +1 draw (+1 more with `stars`) | 1 KiB, or 512 KiB with `discs` |
 | Post (`view.post`) at `full` | +10 fullscreen passes (`postDraws`, counted apart from `draws`) | the scene target and bloom mips, about 10 MiB at 1280×800 |
+| A lookup table (`grade.lut`) or `ceiling` | none (inside the combined pass) | the table's 3D texture, 281 KiB at 33³ (reported as `lutBytes`, not in `textureMiB`) |
 | Point or spot light without shadow | none | none (fragment cost on every lit pixel) |
 
 A trial scene with a shadowed sun and lamps measured 32.5 MiB of textures against its template's 8 MiB budget.

@@ -30,6 +30,7 @@ import {validateExtensions, type SceneExtension} from './scene-extension';
 import type {SceneScatter} from './scatter-contract';
 import type {SceneLights} from './lights';
 import type {SceneShadows} from './shadow-casting';
+import type {SceneBlobShadows} from './blob-shadow';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const need = (ok: boolean, message: string) => {
@@ -170,6 +171,12 @@ export interface SceneContext {
     readonly calm: boolean;
     /** This frame's timestamp in page monotonic milliseconds (`performance.now()` timebase; 0-based in testScene). */
     readonly now: number;
+    /**
+     * Fraction of the next fixed step already elapsed after this frame's steps, in [0, 1) for frame systems and
+     * drawing. Presentation only: `presentTransform` blends opted-in (`Interpolated`) entities by it. During fixed
+     * steps it is not meaningful (it can exceed 1); do not read it there.
+     */
+    readonly alpha: number;
   };
   readonly view: ViewState;
   readonly brief: BuildBrief;
@@ -308,6 +315,11 @@ export interface SceneInput extends SceneBody {
    *  and sets which shapes cast and receive by default (`Shadow` overrides one entity). Lights opt in one by one:
    *  the environment's `directional.shadow`, `PointLight({ shadow: true })`, `SpotLight({ shadow: true })`. */
   shadows?: SceneShadows | undefined;
+  /** Blob (contact) shadows (VIS-10, docs/guides/blob-shadows.md): `sceneBlobShadows({ max, ground, crossfade,
+   *  distance })`. Every `BlobShadow` entity gets a soft ground ellipse where it has no real sun shadow, all in one
+   *  instanced draw of at most `max` (default 64) blobs; over that the nearest to the camera are kept (reported once).
+   *  Without it the scene's blob shadows are not drawn (reported once). */
+  blobShadows?: SceneBlobShadows | undefined;
   id: string;
   title: string;
   /** Open, game-defined ('level', 'menu', 'world', 'cutscene', …). */
@@ -377,6 +389,10 @@ export function defineScene(s: SceneInput): SceneDefinition {
   need(
     captured.shadows === undefined || (captured.shadows as {kind?: unknown})?.kind === 'scene-shadows',
     `scene ${s.id}: shadows must be sceneShadows(...)`,
+  );
+  need(
+    captured.blobShadows === undefined || (captured.blobShadows as {kind?: unknown})?.kind === 'scene-blob-shadows',
+    `scene ${s.id}: blobShadows must be sceneBlobShadows(...)`,
   );
   return {...captured, kind: 'scene', type: captured.type ?? 'scene'};
 }
