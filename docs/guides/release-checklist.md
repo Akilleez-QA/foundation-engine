@@ -133,27 +133,31 @@ do not delete a repository merely because an orphan export has been prepared.
 Hosted CI runs framework/browser checks serially in `browser`, alongside two
 isolated template runners, all on Node 22. Each sorted discovered template belongs to exactly one
 shard; each still runs the complete gate (including full tests) and phone smoke.
-Those three jobs run on pull requests and on pushes to `main`. A fourth, cheap `node-current` job runs `npm run test` and `npm run check` on the
+Those three jobs run on pull requests and on pushes to `main` when the diff contains a path outside
+`docs/` and Markdown. A fourth, cheap `node-current` job runs `npm run test` and `npm run check` on the
 newest Node major (26; raise it when a newer major ships), with no browser or template
-gates. It runs on a push to `main` and on a weekly Monday 06:00 UTC schedule, not on pull requests.
-The weekly run does not start the Node 22 jobs. The terminal required check remains `check`
-and still depends on all four work jobs. On a pull request it accepts success from the three Node 22
-jobs and a skipped `node-current`. On a push to `main` it accepts only explicit success from
+gates. It runs on a code push to `main` and on a weekly Monday 06:00 UTC schedule, not on pull requests.
+The weekly run does not start the Node 22 jobs. A `changes` job reads the diff (the same paths as `docs/**`
+and `**/*.md`). When every changed path is docs or Markdown, the heavy jobs are skipped. The workflow
+still starts, and the terminal required check remains `check`: it depends on `changes` and all four work
+jobs, and it passes for that skip. On a pull request that changes code it accepts success from the three
+Node 22 jobs and a skipped `node-current`. On a code push to `main` it accepts only explicit success from
 all four. On the weekly schedule it accepts success from `node-current` and skipped Node 22 jobs.
-Failure, cancellation, or a missing result does not pass. A skipped result passes only for a job
-that this event does not run. Pushes and pull requests that change only `docs/**` or Markdown do not
-start the workflow. No job uploads an artifact. Existing budgets, runner permissions, pinned actions and timeouts are unchanged.
+Failure, cancellation, or a missing result does not pass. A skipped result passes only for a job that this
+event does not run. In-progress runs are cancelled only for pull requests. No job uploads an artifact.
+Existing budgets, runner permissions, pinned actions and timeouts are unchanged.
 
 On a suitable local machine, `npm run gate:ci` reads this workflow and executes all
 work jobs serially, then checks their actual results. It does not apply the hosted event
-filters, so a full local run still executes `node-current` and requires every work job to succeed.
+filters or the docs path filter, so a full local run still executes `node-current` and requires every work job to succeed.
+The `changes` job is not executed locally.
 A failed step stops its job; other independent jobs still execute. Steps of a job that uses another Node major than
 the local one are skipped and the run is reported as partial (no aggregate); run them
 under that Node with `npm run gate:ci -- --only node-current/test,node-current/check`,
 or pass `--any-node` to run everything under the local Node. Install dependencies and Chromium first as
 shown above. This reproduces the checks, not GitHub runner isolation or hardware.
 Unsupported job graphs, conditions and expressions fail before execution. The hosted event
-filters on the four work jobs are the only job `if` values the reader accepts, and it does not evaluate them.
+filters on `changes` and the four work jobs are the only job `if` values the reader accepts, and it does not evaluate them.
 
 `npm run gate:ci -- --list` prints job-qualified step IDs. `--from` and `--only`
 produce partial results and omit the terminal aggregate; they cannot establish full

@@ -2,11 +2,9 @@ name: ci
 on:
   push:
     branches: [main]
-    paths-ignore: ['docs/**', '**/*.md']
   pull_request:
-    paths-ignore: ['docs/**', '**/*.md']
   # Monday 06:00 UTC runs node-current only. The concurrency group includes the event name so this
-  # schedule does not cancel an in-progress push to main (both use refs/heads/main).
+  # schedule does not queue behind a push to main. cancel-in-progress is only for pull requests.
   schedule:
     - cron: '0 6 * * 1'
 
@@ -15,12 +13,30 @@ permissions:
   contents: read
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  browser:
-    # The weekly schedule is the Node 26 canary. Pull requests and pushes to main still run these jobs.
+  # Path filter for docs/** and **/*.md. The workflow always starts so the required check job reports,
+  # including on a docs-only pull request. Heavy jobs skip when every changed path is docs or Markdown.
+  changes:
     if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      code: ${{ steps.paths.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # The diff needs the pull-request base or the previous push.
+          persist-credentials: false
+      - id: paths
+        name: Detect changes outside docs and Markdown
+        run: node scripts/ci-changes.mjs
+
+  browser:
+    needs: [changes]
+    # Pull requests and pushes to main run this job when the diff contains code. The weekly schedule does not.
+    if: github.event_name != 'schedule' && needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -105,7 +121,8 @@ jobs:
         run: npm run test:subpath-browser
 
   templates-1:
-    if: github.event_name != 'schedule'
+    needs: [changes]
+    if: github.event_name != 'schedule' && needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -124,7 +141,8 @@ jobs:
         run: npm run gate:templates -- --shard 1/2 --phone
 
   templates-2:
-    if: github.event_name != 'schedule'
+    needs: [changes]
+    if: github.event_name != 'schedule' && needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -145,9 +163,11 @@ jobs:
   # The supported range is Node 22.18 or newer; the other jobs use 22. This cheap job (no browser, no template
   # gates) runs the complete test suite and the quick check on the newest Node major, so a Node change (such as the
   # Node 23 default test reporter) fails here first. Raise node-version when a newer Node major is released.
-  # It runs on a push to main (the push trigger lists only main) and on the weekly schedule, not on pull requests.
+  # It runs on a push to main that changes code (the push trigger lists only main) and on the weekly
+  # schedule, not on pull requests and not on a docs-only push.
   node-current:
-    if: github.event_name == 'push' || github.event_name == 'schedule'
+    needs: [changes]
+    if: github.event_name == 'schedule' || (github.event_name == 'push' && needs.changes.outputs.code == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -166,7 +186,7 @@ jobs:
         run: npm run check
 
   check:
-    needs: [browser, templates-1, templates-2, node-current]
+    needs: [changes, browser, templates-1, templates-2, node-current]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -181,4 +201,5 @@ jobs:
         env:
           CI_JOB_RESULTS: ${{ toJSON(needs) }}
           CI_EVENT_NAME: ${{ github.event_name }}
+          CI_CODE_CHANGED: ${{ needs.changes.outputs.code }}
         run: node scripts/ci-results.mjs
