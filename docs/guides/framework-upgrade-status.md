@@ -1255,10 +1255,11 @@ are unverified. Independent review and hosted integration remain pending.
 
 `@kits/scripting` (SCRIPT-01, [guide](scripting.md), ADR 0120) adds opt-in Lua 5.4 scripts on the exact-pinned
 `wasmoon` 1.16.0 dependency, loaded lazily by `loadScriptVm`. Runtime contracts: per-script Lua state with an
-allocation cap, exact uncatchable per-call instruction budgets, host-call limits, a wall-time stop, capability-scoped
+allocation cap, deterministic, uncatchable per-call instruction budgets, host-call limits, a wall-time stop, capability-scoped
 host functions, plain-data marshalling bounds, fixed-tick timers, a seeded saveable random stream, atomic
 save/restore/reload with a stated restart contract (only `state` survives), and per-script faulting. Checked
-evidence: 17 focused headless tests, including a `@kits/rollback` sync-test consumer and a `testScene` consumer;
+evidence: 23 focused headless tests (after an independent adversarial review whose findings are fixed: metered native
+work, deferred dispose, metatable copies, strict UTF-8, pre-call argument checks), including a `@kits/rollback` sync-test consumer and a `testScene` consumer;
 headless Chromium runs of a fixture game through the development server and a production-mode build (VM chunk and
 binary fetched lazily, no page errors). Not established: hosted full CI on this branch, physical devices,
 long-session memory behaviour, or any template consumer. Stock-game first-load JavaScript is unchanged.

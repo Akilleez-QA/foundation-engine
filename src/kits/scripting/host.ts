@@ -20,13 +20,13 @@ export interface ScriptLimits {
   readonly maxScripts: number;
   /** UTF-16 code units of one script's source. */
   readonly maxSourceLength: number;
-  /** VM instructions for one call or timer callback (exact; host calls are charged their `cost`). */
+  /** VM instructions for one call or timer callback (deterministic; stops within one 1,000-instruction slice after the limit; host calls and metered native library work count too). */
   readonly instructionsPerCall: number;
   /** VM instructions for a script's top level when it is loaded, reloaded or restored. */
   readonly instructionsPerLoad: number;
   /** Wall-clock milliseconds for one call: a safety stop, not a deterministic outcome. */
   readonly wallMsPerCall: number;
-  /** Bytes one script state may allocate, including its standard library (about 30 KiB). */
+  /** Bytes one script state may allocate, including its standard library (about 23 KiB). */
   readonly memoryBytes: number;
   /** Host function invocations in one call. */
   readonly maxHostCallsPerCall: number;
@@ -310,7 +310,7 @@ export function createScriptHost(vm: ScriptVm, options: ScriptHostOptions): Scri
       : () => {
           try {
             const t = userClock();
-            return typeof t === 'number' && !Number.isNaN(t) ? t : Infinity;
+            return typeof t === 'number' && Number.isFinite(t) ? t : Infinity;
           } catch {
             return Infinity;
           }
@@ -351,6 +351,15 @@ export function createScriptHost(vm: ScriptVm, options: ScriptHostOptions): Scri
   let nextTimerId = 1;
   let disposed = false;
   let busy = false;
+  let disposeRequested = false;
+  /** Leave a call; a `dispose()` requested by a host function during it happens now. */
+  const endBusy = () => {
+    busy = false;
+    if (disposeRequested) {
+      disposeRequested = false;
+      self.dispose();
+    }
+  };
   let scripts = new Map<string, Script>();
   const log: ScriptLogEntry[] = [];
   let dropped = 0;
@@ -521,7 +530,8 @@ export function createScriptHost(vm: ScriptVm, options: ScriptHostOptions): Scri
       return tick;
     },
 
-    load(id, source, o = {}) {
+    load(id, source, options) {
+      const o = options ?? {};
       const g = guard();
       if (g) return g;
       if (typeof id !== 'string' || !ID.test(id)) return refused('invalid', 'script ids are 1-64 of a-z, 0-9 and -');
@@ -537,14 +547,18 @@ export function createScriptHost(vm: ScriptVm, options: ScriptHostOptions): Scri
       } catch (e) {
         return refused('invalid', e instanceof ScriptValueError ? e.message : String(e));
       }
+      const savedNextTimer = nextTimerId;
       busy = true;
       try {
         const built = build(id, source, caps, state, null, new Map(), null);
-        if (!built.ok) return {status: 'failed', reason: built.reason, message: built.message};
+        if (!built.ok) {
+          nextTimerId = savedNextTimer;
+          return {status: 'failed', reason: built.reason, message: built.message};
+        }
         scripts.set(id, built.script);
         return {status: 'loaded', digest: built.script.digest};
       } finally {
-        busy = false;
+        endBusy();
       }
     },
 
@@ -557,16 +571,20 @@ export function createScriptHost(vm: ScriptVm, options: ScriptHostOptions): Scri
       if (bad) return refused('invalid', bad);
       const current = old.vm.read('state', stateLimits);
       if (!current.ok) return {status: 'failed', reason: 'value', message: `state: ${current.message}`};
+      const savedNextTimer = nextTimerId;
       busy = true;
       try {
         const timers = new Map([...old.timers].map(([k, t]) => [k, {...t}] as const));
         const built = build(id, source, old.capabilities, current.value, old.rng.state(), timers, 'on_reload');
-        if (!built.ok) return {status: 'failed', reason: built.reason, message: built.message};
+        if (!built.ok) {
+          nextTimerId = savedNextTimer;
+          return {status: 'failed', reason: built.reason, message: built.message};
+        }
         old.vm.close();
         scripts.set(id, built.script);
         return {status: 'loaded', digest: built.script.digest};
       } finally {
-        busy = false;
+        endBusy();
       }
     },
 
@@ -590,7 +608,9 @@ export function createScriptHost(vm: ScriptVm, options: ScriptHostOptions): Scri
       let captured: ScriptValue;
       try {
         if (!Array.isArray(args)) throw new ScriptValueError('args must be an array');
-        captured = captureScriptValue(args, valueLimits, 'args');
+        if (args.length > limits.maxValueNodes) throw new ScriptValueError('args: too many arguments');
+        // Each argument is one value; a null argument is nil in the script.
+        captured = Object.freeze(args.map((a: unknown, i) => captureScriptValue(a, valueLimits, `args[${i}]`)));
       } catch (e) {
         return refused('invalid', e instanceof Error ? e.message : String(e));
       }
@@ -598,7 +618,7 @@ export function createScriptHost(vm: ScriptVm, options: ScriptHostOptions): Scri
       try {
         return invoke(s, fn, captured as readonly ScriptValue[]);
       } finally {
-        busy = false;
+        endBusy();
       }
     },
 
@@ -624,7 +644,10 @@ export function createScriptHost(vm: ScriptVm, options: ScriptHostOptions): Scri
       try {
         for (; next < due.length && fired < limits.maxTimerFiresPerTick; next++) {
           const {s, t} = due[next] as {s: Script; t: Timer};
-          if (!live(s, t)) continue;
+          if (!live(s, t)) {
+            if (scripts.get(s.id) === s && s.faulted && s.timers.has(t.id)) skipped++;
+            continue;
+          }
           fired++;
           if (t.every > 0) t.due = tick + t.every;
           else s.timers.delete(t.id);
@@ -633,7 +656,7 @@ export function createScriptHost(vm: ScriptVm, options: ScriptHostOptions): Scri
           if (result.status !== 'ok') failures.push({script: s.id, timer: t.id, result});
         }
       } finally {
-        busy = false;
+        endBusy();
       }
       let deferred = 0;
       for (; next < due.length; next++) {
@@ -667,6 +690,7 @@ export function createScriptHost(vm: ScriptVm, options: ScriptHostOptions): Scri
 
     save() {
       if (disposed) return {ok: false, script: '', message: 'the script host is disposed'};
+      if (busy) return {ok: false, script: '', message: 'save() was called from inside a script call (reentrant)'};
       const out: ScriptSnapshot[] = [];
       for (const id of [...scripts.keys()].sort()) {
         const s = scripts.get(id) as Script;
@@ -739,16 +763,21 @@ export function createScriptHost(vm: ScriptVm, options: ScriptHostOptions): Scri
           r.script.faulted = s.faulted;
           built.push(r.script);
         }
+        for (const s of scripts.values()) s.vm.close();
+        scripts = new Map(built.map(s => [s.id, s]));
+        return {ok: true};
       } finally {
-        busy = false;
+        endBusy();
       }
-      for (const s of scripts.values()) s.vm.close();
-      scripts = new Map(built.map(s => [s.id, s]));
-      return {ok: true};
     },
 
     dispose() {
       if (disposed) return;
+      if (busy) {
+        // A host function asked for disposal mid-call: the running state cannot be freed under itself.
+        disposeRequested = true;
+        return;
+      }
       disposed = true;
       for (const s of scripts.values()) s.vm.close();
       scripts.clear();

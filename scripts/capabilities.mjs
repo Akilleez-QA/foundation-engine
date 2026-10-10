@@ -176,7 +176,7 @@ export const FEATURES = [
   },
   {
     id: 'SCRIPT-01',
-    title: 'Optional sandboxed Lua scripts with capability-scoped host functions and exact per-call budgets',
+    title: 'Optional sandboxed Lua scripts with capability-scoped host functions and deterministic per-call budgets',
     docs: 'docs/guides/scripting.md',
     evidence: [
       {kit: 'scripting', export: 'loadScriptVm'},

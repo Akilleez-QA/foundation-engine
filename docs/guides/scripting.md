@@ -25,14 +25,16 @@ that makes them; there is no background execution.
 
 | Stop | Deterministic | Effect on the script |
 |---|---|---|
-| `instructions` (exact VM instruction count per call; host calls charged their `cost`) | Yes | Counts toward `failuresBeforeFault` |
+| `instructions` (VM instructions per call, deterministic, stopping within one 1,000-instruction slice of the limit; host calls charge their `cost` and native library calls charge 1 per 16 bytes or elements) | Yes | Counts toward `failuresBeforeFault` |
 | `host-calls` (invocations per call) | Yes | Counts toward `failuresBeforeFault` |
 | `error` (a Lua error or a host function that threw) | Yes | Counts toward `failuresBeforeFault` |
 | `value` (a result or argument outside the plain-data domain or its bounds) | Yes | Counts toward `failuresBeforeFault` |
 | `wall` (`wallMsPerCall`, checked every 1,000 instructions; only when you pass `clock`, e.g. `() => performance.now()`; a clock that throws or returns NaN fails closed) | No | Faults at once |
 | `memory` (`memoryBytes` per script) | No | Faults at once |
 
-A script cannot catch a budget stop: `pcall`/`xpcall` re-raise it, and after the stop the VM refuses every further
+Native library calls are metered into the instruction budget at one instruction per 16 bytes or elements they touch,
+so loops over large strings or tables run out of instructions. One native call can still take milliseconds on large
+data, and with `allowPatterns` a pattern can be super-linear: pass a `clock` for a wall-time stop. A script cannot catch a budget stop: `pcall`/`xpcall` re-raise it, and after the stop the VM refuses every further
 instruction of that call. A faulted script is refused (`refused: faulted`) and its timers are skipped until you
 `reload` or `restore` it. A failed call does not undo changes it already made to `state`; design scripts so a
 partial update is harmless, or restore a snapshot.
@@ -49,6 +51,11 @@ use `instructionsPerCall` as the real bound.
   the seeded `ctx.random()` (for example `Math.floor(ctx.random() * 2 ** 32)` at scene entry) so `?seed=` replays.
 - `pairs` visits keys in a fixed order (numbers ascending, strings in byte order, then `false`, `true`) and refuses
   other key types; raw `next` is not available. Addresses are not printable; `__gc` and `__mode` are refused.
+- `setmetatable` gives a table a private copy of its metatable, so `__gc` or `__mode` added later has no effect;
+  metamethods added to a metatable after `setmetatable` are not seen (define them first). `getmetatable` returns the
+  table you passed.
+- Numbers in `state` are saved as JSON numbers: an integral float such as `2.0` comes back as the integer `2`, and
+  `-0.0` as `0`. Keep values that must stay floats non-integral, or do not depend on `math.type`/`tostring` of them.
 - **Only `state` survives a restore.** Lua locals, upvalues, closures and other globals are rebuilt by running the
   script's top level again in a fresh state, then `on_restore()` if it exists. Keep every simulation value in
   `state`; make the top level define functions and defaults (`state.x = state.x or 0`), and start timers from a

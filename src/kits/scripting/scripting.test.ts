@@ -366,3 +366,114 @@ test('SCRIPT a host function that throws a non-Error value raises an ordinary sc
   assert.deepEqual(ok(h.call('s', 'f')), [false, 'plain string']);
   h.dispose();
 });
+
+test('SCRIPT native library work is charged to the budget: no zero-instruction loops, no unbounded copies', async () => {
+  const h = await loaded(
+    `
+    function move() table.move({}, 1, 100000000, 1) end
+    function rep_empty() return #string.rep('', 1e8) .. #string.rep('', 2^62, '') end
+    function rep_huge() return string.rep('ab', 2^62) end
+    function churn() while true do local x = string.rep('a', 400000) end end
+    function small() local t = {} for i = 1, 10 do t[i] = i end table.move(t, 1, 10, 2) return {#t, t[11], #string.rep('ab', 3, ',')} end
+  `,
+    {limits: {failuresBeforeFault: 100}},
+  );
+  const started = Date.now();
+  const move = h.call('s', 'move');
+  assert.equal(move.status === 'failed' && move.reason, 'instructions');
+  assert.equal(ok(h.call('s', 'rep_empty')), '00');
+  const huge = h.call('s', 'rep_huge');
+  assert.equal(huge.status === 'failed' && huge.reason, 'instructions');
+  const churn = h.call('s', 'churn');
+  assert.equal(churn.status === 'failed' && churn.reason, 'instructions');
+  assert.ok(Date.now() - started < 5000, `took ${Date.now() - started} ms`);
+  assert.deepEqual(ok(h.call('s', 'small')), [11, 10, 8]);
+  h.dispose();
+});
+
+test('SCRIPT dispose requested by a host function waits until the running call has finished', async () => {
+  let ref: ScriptHost | null = null;
+  const h = await loaded(
+    `function f() host.stop() return 'finished' end`,
+    {api: {stop: {run: () => void ref!.dispose()}}},
+    ['stop'],
+  );
+  ref = h;
+  assert.equal(ok(h.call('s', 'f')), 'finished');
+  assert.equal(h.call('s', 'f').status, 'refused');
+  const other = await loaded(`function g() return 2 end`);
+  assert.equal(ok(other.call('s', 'g')), 2);
+  other.dispose();
+});
+
+test('SCRIPT a __mode added to a metatable after setmetatable has no effect', async () => {
+  const h = await loaded(
+    `
+    function weak()
+      local mt = {}
+      local w = setmetatable({}, mt)
+      mt.__mode = 'v'
+      for i = 1, 100 do w[i] = {} end
+      for i = 1, 300000 do local junk = {i, i, i} end
+      local n = 0
+      for _ in pairs(w) do n = n + 1 end
+      return {n, getmetatable(w) == mt}
+    end
+  `,
+    {limits: {instructionsPerCall: 50_000_000, memoryBytes: 8 * 1024 * 1024}},
+  );
+  assert.deepEqual(ok(h.call('s', 'weak')), [100, true]);
+  h.dispose();
+});
+
+test('SCRIPT value domain is checked before the call, and strings read back strictly', async () => {
+  const h = await loaded(
+    `function f(x) return x end function bad() return '\\xC2A' end function nul() return 'a\\0b' end`,
+    {limits: {maxStateDepth: 3, failuresBeforeFault: 2}},
+  );
+  for (let i = 0; i < 3; i++) assert.equal(h.call('s', 'f', [[1, null]]).status, 'refused');
+  assert.equal(h.call('s', 'f', ['a\0b']).status, 'refused');
+  assert.equal(ok(h.call('s', 'f', [null])), null);
+  const bad = h.call('s', 'bad');
+  assert.equal(bad.status === 'failed' && bad.reason, 'value');
+  assert.equal(h.status('s')?.faulted, false);
+  const deep = await host({limits: {maxStateDepth: 3}});
+  assert.equal(deep.load('d', 'x = 1', {state: {a: {b: {}}}}).status, 'loaded');
+  assert.equal(deep.save().ok, true);
+  h.dispose();
+  deep.dispose();
+});
+
+test('SCRIPT host functions throwing Infinity, and reentrant save, are refused cleanly', async () => {
+  let ref: ScriptHost | null = null;
+  const h = await loaded(
+    `function f() local ok, e = pcall(host.boom) return {ok, e} end function g() return host.snap() end`,
+    {
+      api: {
+        boom: {
+          run: () => {
+            throw Infinity;
+          },
+        },
+        snap: {run: () => (ref!.save().ok ? 'saved' : 'refused')},
+      },
+    },
+    ['boom', 'snap'],
+  );
+  ref = h;
+  assert.deepEqual(ok(h.call('s', 'f')), [false, 'Infinity']);
+  assert.equal(ok(h.call('s', 'g')), 'refused');
+  h.dispose();
+});
+
+test('SCRIPT a failed load leaves timer ids unchanged; math.random(0) draws a full integer', async () => {
+  const h = await host();
+  assert.equal(h.load('bad', `after(1, 'x') error('no')`).status, 'failed');
+  h.load(
+    'good',
+    `function x() end function start() return after(1, 'x') end function r() return math.type(math.random(0)) end`,
+  );
+  assert.equal(ok(h.call('good', 'start')), 1);
+  assert.equal(ok(h.call('good', 'r')), 'integer');
+  h.dispose();
+});

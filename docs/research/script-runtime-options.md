@@ -42,8 +42,9 @@ maintained npm package found).
 
 ## Choice: option 1, wasmoon (Lua 5.4)
 
-- **Budgets** are exact: the exported count hook stops a call after exactly N VM instructions, re-armed per call, and
-  reads the wall clock every 1,000 instructions. The per-state allocator cap is enforced inside the VM.
+- **Budgets** are deterministic: the exported count hook stops a call within one 1,000-instruction slice after the
+  limit, native library work is metered into the same budget by the sandbox prelude, and an injected clock is read
+  every 1,000 instructions and at every metered native call. The per-state allocator cap is enforced inside the VM.
 - **One package**, MIT, Lua itself MIT; the WebAssembly binary is a separate 272 KB asset that Vite emits with a hash
   and fetches only when `loadScriptVm` runs.
 - **Control**: wasmoon exports the raw Lua C API, so the kit does not use wasmoon's JavaScript-object proxying at
@@ -64,7 +65,7 @@ maintained npm package found).
 | An in-house interpreter (19) would have no dependency at all. | It would also have no users, documentation or tooling, and its correctness would be ours to establish. The creator asked for a starting point; an established language serves that better. |
 | Lua's own hash seed still varies; is iteration order really fixed? | Only `pairs` is reachable; it sorts keys (numbers, strings, then booleans) and refuses table/function keys. `#t` and `ipairs` are defined by the language. Raw `next` is removed. |
 | Can a script escape the budget with `pcall`, `xpcall` or an error handler? | `pcall`/`xpcall` re-raise the private budget sentinel, and after exhaustion the hook fires on every instruction, so any recovery attempt stops again. Tests cover loops wrapped in `pcall` and `xpcall`. |
-| Native library calls are not interrupted by the hook. | Remaining native calls are linear in data already bounded by the memory cap (`string.rep`, `table.concat`, `table.sort`), or are off by default (patterns). The wall-time stop is reported as non-deterministic and faults the script. |
+| Native library calls are not interrupted by the hook. | An independent review found zero-length `string.rep` and `table.move` loops that ran for seconds with no instruction charged, and loops of large copies that took far longer than the budget implied. The prelude now meters native calls by the data they touch (1 instruction per 16 bytes or elements), short-circuits empty `string.rep`, and implements `table.move` in Lua. A single native call can still take milliseconds on large data, and patterns (off by default) can be super-linear; the wall-time stop needs an injected clock. |
 | Memory exhaustion inside host-side marshalling could reach Lua's panic handler and abort the shared VM. | Every host-side touch runs inside one protected call; an allocation failure becomes an ordinary `memory` result. |
 | The WebAssembly memory is shared by all scripts on the page. | Each script's allocations are capped; the page-wide total is bounded by `maxScripts × memoryBytes` plus the VM's own memory. A browser that cannot grow memory makes allocations fail, which scripts see as `memory`. |
 | wasmoon's own build is a development-flavoured emscripten output (152 KB JS with assertions). | Measured lazily loaded cost is 121 KB minified JS (40 KB gzip) plus the 272 KB wasm (111 KB gzip), only for games that call `loadScriptVm`. |

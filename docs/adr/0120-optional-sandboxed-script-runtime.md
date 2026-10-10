@@ -26,7 +26,7 @@ contract, and a pure TypeScript host that owns everything the scripts may affect
   `collectgarbage` and `string.dump` are absent. Source is compiled as text only. A script reaches the game only
   through host functions the creator registers and grants to that script by name (`host.<name>`), plus the kit's
   built-ins (`now`, `log`, `after`, `every`, `cancel`, `state`, `math.random`).
-- **Budgets.** Every call has an exact VM instruction budget (a count hook), a host-call count and per-call cost, a
+- **Budgets.** Every call has a deterministic VM instruction budget (a count hook, stopping within one 1,000-instruction slice of the limit; native library work is metered into it), a host-call count and per-call cost, a
   wall-time stop and the memory cap. A budget stop cannot be caught by the script. Instruction, host-call, error and
   value failures are deterministic; wall-time and memory stops are reported as not deterministic and fault the
   script at once. Repeated failures fault a script; a faulted script is refused until reloaded or restored.

@@ -4,7 +4,7 @@
  *
  * Each script gets its own `lua_State` with a capped allocator. Every host-side touch of a state runs inside one
  * protected call (`protect`), so an allocation failure or a script error can never reach Lua's panic handler. Script
- * code runs under a count hook that enforces the exact instruction budget and the wall-time guard.
+ * code runs under a count hook that enforces the instruction budget and the wall-time guard.
  */
 import * as wasmoonModule from 'wasmoon';
 import type {
@@ -36,6 +36,10 @@ const LUA_OK = 0,
   T_FUNCTION = 6;
 /** The hook fires at most this many VM instructions apart, so the wall clock is read often enough to stop a loop. */
 const HOOK_SLICE = 1000;
+/** Bytes or elements of native library work charged as one instruction. */
+const METER_BYTES = 16;
+/** The internal host function the prelude uses to charge native work (never visible to scripts by name). */
+const METER: VmHostFunction = Object.freeze({cost: 0, run: () => undefined});
 /** Error messages handed back to the host are cut to this many code units. */
 const MESSAGE_LIMIT = 1000;
 
@@ -163,26 +167,55 @@ function luaVmFrom(lua: LuaWasm): ScriptVm {
       pushMessage(L, 'unknown host function');
       return lua.lua_error(L);
     }
+    if (entry === METER) {
+      // Native library work charged by the sandbox prelude: 1 instruction per METER_BYTES of data.
+      const units = lua.lua_tonumberx(L, 1, null);
+      a.used += Number.isFinite(units) && units > 0 ? Math.ceil(units / METER_BYTES) : 0;
+      if (a.used >= a.budget.instructions) return exhaust(r, 'instructions');
+      if (a.budget.clock !== null && a.budget.clock() > a.deadline) return exhaust(r, 'wall');
+      return 0;
+    }
     if (++a.hostCalls > a.budget.hostCalls) return exhaust(r, 'host-calls');
     a.used += entry.cost;
     if (a.used >= a.budget.instructions) return exhaust(r, 'instructions');
-    let result: ScriptValue | undefined;
+    // Kit work (marshalling) may unwind with a real Lua error; creator code never may, so it is fenced separately.
+    let args: readonly ScriptValue[] = [];
     let failure: Error | null = null;
     try {
       const n = lua.lua_gettop(L);
-      const args: ScriptValue[] = [];
+      const list: ScriptValue[] = [];
       const counter = {nodes: 0};
-      for (let i = 1; i <= n; i++) args.push(toJs(L, i, r.valueLimits, counter, 0));
-      const value = entry.run(Object.freeze(args));
-      result = value === undefined ? undefined : captureScriptValue(value, r.valueLimits, 'host function result');
-      if (result !== undefined) push(L, result);
+      for (let i = 1; i <= n; i++) list.push(toJs(L, i, r.valueLimits, counter, 0));
+      args = Object.freeze(list);
     } catch (e) {
       if (mustUnwind(e)) throw e;
       failure = asError(e);
     }
+    let result: ScriptValue | undefined;
+    if (!failure)
+      try {
+        const value = entry.run(args);
+        result = value === undefined ? undefined : captureScriptValue(value, r.valueLimits, 'host function result');
+      } catch (e) {
+        // Whatever creator code throws (even a number such as Infinity) is an ordinary script error.
+        failure = asError(e);
+      }
     if (failure) {
       pushMessage(L, failure.message);
       return lua.lua_error(L);
+    }
+    if (result !== undefined) {
+      let pushFailure: Error | null = null;
+      try {
+        push(L, result);
+      } catch (e) {
+        if (mustUnwind(e)) throw e;
+        pushFailure = asError(e);
+      }
+      if (pushFailure) {
+        pushMessage(L, pushFailure.message);
+        return lua.lua_error(L);
+      }
     }
     return result === undefined ? 0 : 1;
   }, 'ii');
@@ -194,6 +227,24 @@ function luaVmFrom(lua: LuaWasm): ScriptVm {
     const n: unknown = lua.lua_rawlen(L, idx);
     return typeof n === 'bigint' || typeof n === 'number' ? Number(n) : NaN;
   };
+  const decoder = new TextDecoder('utf-8', {fatal: true});
+  /** A Lua string as JS text: strict UTF-8 (no NUL, no malformed sequences), so it round-trips byte for byte. */
+  function readString(L: LuaState, idx: number, limits: ScriptValueLimits): string {
+    const bytes = rawlen(L, idx);
+    if (!(bytes <= limits.maxStringLength * 3)) throw new ScriptValueError('a string is too long');
+    const ptr: unknown = mod.ccall('lua_tolstring', 'number', ['number', 'number', 'number'], [L, idx, 0]);
+    if (typeof ptr !== 'number' || ptr === 0) throw new ScriptValueError('a string could not be read');
+    const view = mod.HEAPU8.subarray(ptr, ptr + bytes);
+    if (view.includes(0)) throw new ScriptValueError('strings must not contain NUL characters');
+    let text: string;
+    try {
+      text = decoder.decode(view);
+    } catch {
+      throw new ScriptValueError('strings must be valid UTF-8 text');
+    }
+    if (text.length > limits.maxStringLength) throw new ScriptValueError('a string is too long');
+    return text;
+  }
   function toJs(
     L: LuaState,
     idx: number,
@@ -219,16 +270,10 @@ function luaVmFrom(lua: LuaWasm): ScriptVm {
         if (!Number.isFinite(n)) throw new ScriptValueError('numbers must be finite');
         return Object.is(n, -0) ? 0 : n;
       }
-      case T_STRING: {
-        const bytes = rawlen(L, idx);
-        if (bytes > limits.maxStringLength * 3) throw new ScriptValueError('a string is too long');
-        const s = lua.lua_tolstring(L, idx, null);
-        if (utf8Length(s) !== bytes) throw new ScriptValueError('strings must be UTF-8 text without NUL characters');
-        if (s.length > limits.maxStringLength) throw new ScriptValueError('a string is too long');
-        return s;
-      }
+      case T_STRING:
+        return readString(L, idx, limits);
       case T_TABLE: {
-        if (depth + 1 >= limits.maxDepth) throw new ScriptValueError(`nested deeper than ${limits.maxDepth}`);
+        if (depth >= limits.maxDepth) throw new ScriptValueError(`nested deeper than ${limits.maxDepth}`);
         lua.luaL_checkstack(L, 4, null);
         const t = lua.lua_absindex(L, idx);
         const named: [string, ScriptValue][] = [];
@@ -237,10 +282,7 @@ function luaVmFrom(lua: LuaWasm): ScriptVm {
         while (lua.lua_next(L, t) !== 0) {
           const keyType = lua.lua_type(L, -2);
           if (keyType === T_STRING) {
-            const bytes = rawlen(L, -2);
-            const key = lua.lua_tolstring(L, -2, null);
-            if (utf8Length(key) !== bytes || key.length > limits.maxStringLength)
-              throw new ScriptValueError('table keys must be short UTF-8 text');
+            const key = readString(L, -2, limits);
             named.push([key, toJs(L, -1, limits, counter, depth + 1)]);
           } else if (keyType === T_NUMBER && lua.lua_isinteger(L, -2)) {
             const k = Number(lua.lua_tointegerx(L, -2, null));
@@ -387,7 +429,8 @@ function luaVmFrom(lua: LuaWasm): ScriptVm {
       lua.lua_rawgeti(L, REG, BigInt(r.sentinelRef));
       lua.lua_pushboolean(L, o.allowPatterns ? 1 : 0);
       addFunction({cost: 1, run: () => o.random()});
-      lua.lua_callk(L, 3, 0, 0, null);
+      addFunction(METER);
+      lua.lua_callk(L, 4, 0, 0, null);
     });
     if (setup.status !== LUA_OK) {
       states.delete(L);
@@ -527,6 +570,8 @@ function luaVmFrom(lua: LuaWasm): ScriptVm {
       memoryUsed: () => (closed ? 0 : global.getMemoryUsed()),
       close() {
         if (closed) return;
+        if (r.active !== null || r.pending !== null)
+          throw Error('scripting: a script state cannot be closed while it is running');
         closed = true;
         states.delete(L);
         global.close();

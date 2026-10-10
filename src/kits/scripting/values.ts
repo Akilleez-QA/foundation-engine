@@ -3,7 +3,8 @@
  * explicit bounds, so a call can never hand a script (or the host) an object graph, a function or an unbounded value.
  */
 
-/** null, a boolean, a finite number, a string, an array or a plain string-keyed object of script values. */
+/** null, a boolean, a finite number, a string without NUL, an array (no null items) or a plain string-keyed object of
+ *  script values. Object members that are null mean "absent" in a script. */
 export type ScriptValue =
   null | boolean | number | string | readonly ScriptValue[] | {readonly [key: string]: ScriptValue};
 
@@ -47,6 +48,7 @@ export function captureScriptValue(value: unknown, limits: ScriptValueLimits, wh
     }
     if (typeof v === 'string') {
       if (v.length > limits.maxStringLength) throw new ScriptValueError(`${what}: a string is too long`);
+      if (v.includes('\0')) throw new ScriptValueError(`${what}: strings must not contain NUL characters`);
       return v;
     }
     if (typeof v !== 'object') throw new ScriptValueError(`${what}: ${typeof v} is not a script value`);
@@ -58,7 +60,10 @@ export function captureScriptValue(value: unknown, limits: ScriptValueLimits, wh
         const out: ScriptValue[] = [];
         for (let i = 0; i < v.length; i++) {
           if (!(i in v)) throw new ScriptValueError(`${what}: sparse arrays are not script values`);
-          out.push(walk(v[i], depth + 1));
+          const item = walk(v[i], depth + 1);
+          // A Lua sequence cannot hold nil, so an array item may not be null.
+          if (item === null) throw new ScriptValueError(`${what}: arrays must not contain null`);
+          out.push(item);
         }
         return Object.freeze(out);
       }
@@ -66,6 +71,7 @@ export function captureScriptValue(value: unknown, limits: ScriptValueLimits, wh
       const out: Record<string, ScriptValue> = {};
       for (const key of Object.keys(v)) {
         if (key.length > limits.maxStringLength) throw new ScriptValueError(`${what}: a key is too long`);
+        if (key.includes('\0')) throw new ScriptValueError(`${what}: keys must not contain NUL characters`);
         const d = Object.getOwnPropertyDescriptor(v, key);
         if (!d || !('value' in d)) throw new ScriptValueError(`${what}: accessor properties are not script values`);
         const child = d.value as unknown;
