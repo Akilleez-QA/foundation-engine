@@ -1,0 +1,1 @@
+- Offline converters (`npm run convert`): OBJ/MTL, PLY, BVH (with bone-map retargeting) and S3O unit models to GLB, and PCX, BMP and raw palette images to indexed or RGBA PNG, each with a provenance receipt that `npm run check` accepts. The runtime still loads only glTF. See [ADR 0130](docs/adr/0130-offline-format-converters.md) and [tools/convert](tools/convert/README.md).
