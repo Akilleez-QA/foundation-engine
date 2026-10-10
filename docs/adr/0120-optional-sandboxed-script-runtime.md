@@ -3,6 +3,7 @@
 - Status: Proposed for this implementation; integration is gated by full CI.
 - Date: 2026-10-09
 - Area: Optional kits / content
+- Discussion: [#268](https://github.com/Akilleez-QA/foundation-engine/issues/268)
 - Amends: [ADR 0005](0005-registries-and-typed-content.md) ("content is typed TypeScript") for creators who opt in.
 - Research: [script runtime options](../research/script-runtime-options.md) (twenty options and a critic pass).
 
