@@ -209,6 +209,13 @@ export {
 } from '../platform/render/post/settings';
 
 export {Model, validateModel, type ModelData, type ModelSocketPose} from './model';
+export {
+  Interpolated,
+  presentTransform,
+  presentedTransform,
+  type InterpolatedData,
+  type TransformPose,
+} from './interpolation';
 export {RenderMask, validateRenderMask} from './render-mask';
 export {
   createDependencyLease,

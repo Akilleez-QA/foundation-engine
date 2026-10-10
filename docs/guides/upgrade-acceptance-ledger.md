@@ -1219,3 +1219,16 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Optional render interpolation — candidate (2026-10-09)
+
+- **Scope:** `src/author/interpolation.ts` adds the `Interpolated` component, `presentTransform` and
+  `presentedTransform`, and `ctx.time.alpha`. Runtime capture runs in the runner's `beforeStep`. Shape,
+  Mesh and Model drawing and `cameraSystem` use the drawn pose for opted-in entities. This is the "next
+  slice" named for MV-02.
+- **Evidence:** `src/author/interpolation.test.ts` and `src/kits/camera/interpolation.test.ts`. They show
+  uniform per-frame motion at 144 Hz against whole-step jumps without opt-in, a lag under one step,
+  revision snapping, the ±π seam and the camera following the drawn pose. Entities that do not opt in
+  are unchanged.
+- **Not established:** browser runtime drawing (the runtime paths were changed without a browser run),
+  physical high-refresh displays, template adoption and hosted CI.

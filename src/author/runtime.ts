@@ -1,4 +1,5 @@
 import {captureResourceState} from './resource-state';
+import {captureInterpolation, Interpolated, presentTransform, type TransformPose} from './interpolation';
 import {FrameReadinessError} from '../platform/render/frame-readiness';
 import {ProgramLinkError} from '../platform/render/program-validation';
 import {t as failureText} from '../core/i18n/app-i18n';
@@ -407,6 +408,9 @@ export async function enterScene(o: {
         !s.app.has('platform.audio') || actx.signal.aborted ? null : s.audio.playMusic(id, options),
       );
       actx.own(() => songs.dispose());
+      // Render interpolation (author/interpolation.ts): the runner's alpha once it exists, 0 before.
+      let alphaSource = () => 0;
+      const present = (e: Entity, tr: TransformPose) => presentTransform(tr, world.get(e, Interpolated), alphaSource());
       const ctx: SceneContext = {
         world,
         state: world.resources,
@@ -423,7 +427,7 @@ export async function enterScene(o: {
         },
         input: tap ? tap.input : liveInput,
         get time() {
-          return {t, frame, calm, now: frameMs};
+          return {t, frame, calm, now: frameMs, alpha: alphaSource()};
         },
         view: viewState,
         spawn: (prefab, ...extra) => spawnInto(world, prefab, extra),
@@ -572,6 +576,7 @@ export async function enterScene(o: {
             actx.invalidate();
           },
           report: error => s.log.error(`${scene.id}: model failed`, error),
+          present,
         });
         models = owner;
         actx.own(() => owner.dispose());
@@ -794,10 +799,11 @@ export async function enterScene(o: {
         for (const [e, tr, sh] of world.query(Transform, Shape)) {
           if (world.has(e, Mesh) || world.has(e, Model)) continue; // Deterministic precedence; never draw two representations.
           seen.add(e);
+          const p = present(e, tr);
           const look = world.get(e, Material),
             lookKey = look ? materialKey(look) : '';
           const shade = scene.shadows ? shadowFlags(scene.shadows, world.get(e, Shadow)) : NO_SHADOW;
-          const sig = `${tr.x},${tr.y},${tr.z},${tr.rx},${tr.ry},${tr.rz},${tr.scale},${sh.kind},${sh.size},${sh.color},${sh.visible},${maskOf(e)},${lookKey},${shade.cast},${shade.receive}`;
+          const sig = `${p.x},${p.y},${p.z},${p.rx},${p.ry},${p.rz},${p.scale},${sh.kind},${sh.size},${sh.color},${sh.visible},${maskOf(e)},${lookKey},${shade.cast},${shade.receive}`;
           let m = meshes.get(e);
           if (!m) {
             const geometry = geometries.acquire(sh.kind, sh.size);
@@ -850,9 +856,9 @@ export async function enterScene(o: {
             previous.dispose();
             if (actx.signal.aborted) return;
           }
-          mesh.position.set(tr.x, tr.y, tr.z);
-          mesh.rotation.set(tr.rx, tr.ry, tr.rz);
-          mesh.scale.setScalar(tr.scale);
+          mesh.position.set(p.x, p.y, p.z);
+          mesh.rotation.set(p.rx, p.ry, p.rz);
+          mesh.scale.setScalar(p.scale);
           m.surface.material.color.setHex(sh.color);
           mesh.visible = sh.visible;
           mesh.layers.mask = maskOf(e);
@@ -924,7 +930,8 @@ export async function enterScene(o: {
               continue;
           }
           const shade = scene.shadows ? shadowFlags(scene.shadows, world.get(e, Shadow)) : NO_SHADOW;
-          const sig = `${tr.x},${tr.y},${tr.z},${tr.rx},${tr.ry},${tr.rz},${tr.scale},${data.color},${data.visible},${maskOf(e)},${lookKey},${shade.cast},${shade.receive}`;
+          const p = present(e, tr);
+          const sig = `${p.x},${p.y},${p.z},${p.rx},${p.ry},${p.rz},${p.scale},${data.color},${data.visible},${maskOf(e)},${lookKey},${shade.cast},${shade.receive}`;
           if (m.sig !== sig) {
             if (m.surface && m.surface.key !== lookKey && !m.surface.update(look)) {
               // A Material added, removed, made invalid or given another shading class: one new surface.
@@ -934,9 +941,9 @@ export async function enterScene(o: {
               previous.dispose();
               if (actx.signal.aborted) return;
             }
-            m.mesh.position.set(tr.x, tr.y, tr.z);
-            m.mesh.rotation.set(tr.rx, tr.ry, tr.rz);
-            m.mesh.scale.setScalar(tr.scale);
+            m.mesh.position.set(p.x, p.y, p.z);
+            m.mesh.rotation.set(p.rx, p.ry, p.rz);
+            m.mesh.scale.setScalar(p.scale);
             m.mesh.material.color.setHex(data.color);
             m.mesh.visible = data.visible;
             m.mesh.layers.mask = maskOf(e);
@@ -1086,9 +1093,13 @@ export async function enterScene(o: {
         step: FIXED_STEP,
         report: (id, error) => s.log.error(`${scene.id}: system ${id} failed`, error),
         after: () => world.clearEvents(),
-        beforeStep: pressed.beginStep,
+        beforeStep: () => {
+          pressed.beginStep();
+          captureInterpolation(world);
+        },
         beforeFrameLane: pressed.beginFrameLane,
       });
+      alphaSource = () => runner.alpha;
       const live =
         body.systems.length > 0 || [...world.query(Model)].length > 0 || !!particles?.busy(world) || extensionsBusy();
       const handle: SceneHandle = {

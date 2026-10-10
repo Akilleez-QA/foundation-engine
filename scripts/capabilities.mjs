@@ -91,6 +91,12 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'RENDER-INTERP',
+    title: 'Opt-in render interpolation of fixed-step Transforms',
+    docs: 'docs/guides/render-interpolation.md',
+    evidence: [{engine: 'Interpolated'}, {engine: 'presentTransform'}, {path: 'src/author/interpolation.test.ts'}],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,
