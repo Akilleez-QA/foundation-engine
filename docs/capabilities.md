@@ -12,6 +12,16 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | ID | Feature | PR | Docs |
 |---|---|---|---|
 | POOL-01 | Optional bounded entity pool with eviction classes |  | [entity-pool.md](guides/entity-pool.md) |
+| FORMULA-DATA-01 | Spreadsheet import for formula sheets and lookup tables (npm run formulas:import) |  | [README.md](../src/kits/formulas/README.md) |
+| FORMULA-01 | Optional data-defined stat and damage formulas with stacking stages |  | [README.md](../src/kits/formulas/README.md) |
+| STATUS-01 | Optional stacked status effects with transforms, immunities and save/restore |  | [README.md](../src/kits/status/README.md) |
+| BT-01 | Optional deterministic resumable behaviour trees with blackboard and saveable state |  | [README.md](../src/kits/behavior/README.md) |
+| ECON-01 | Optional flow economy with production queues, prerequisites and reclaim |  | [README.md](../src/kits/economy/README.md) |
+| INV-RULES-01 | Optional slot, stack and key-item rules over the inventory ledger |  | [README.md](../src/kits/inventory/README.md) |
+| STREAM-01 | Optional on-demand streaming queue with byte and concurrency budgets |  | [streaming-queue.md](guides/streaming-queue.md) |
+| RETRO-01 | Optional retro software-raster look (low resolution, palette, ordered dither) |  | [retro-look.md](guides/retro-look.md) |
+| CAR-01 | Optional car handling on ray-cast wheels |  | [README.md](../src/kits/car-handling/README.md) |
+| BOARD-01 | Optional board traversal with authored rails |  | [README.md](../src/kits/board-traversal/README.md) |
 | NAV-FIELD-01 | Optional incremental shared navigation distance fields |  | [README.md](../src/kits/navigation/README.md) |
 | WORK-01 | Optional bounded fair work roster |  | [README.md](../src/kits/work-roster/README.md) |
 | VOLUME-01 | Optional bounded sphere and capsule overlap, sweep and headroom queries |  | [README.md](../src/kits/volume-query/README.md) |
@@ -29,6 +39,10 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | CAP-EFFECT-CHECKPOINT | Portable timed contribution checkpoints |  | [timed-effects.md](guides/timed-effects.md) |
 | CAP-ACTION-PHASES | Creator-authored action phase windows, once-only marks and per-range claims |  | [action-phases.md](guides/action-phases.md) |
 | RENDER-INTERP | Opt-in render interpolation of fixed-step Transforms |  | [render-interpolation.md](guides/render-interpolation.md) |
+| BALLISTICS-01 | Drag-free ballistic launch solves, evaluation and arc samples |  | [README.md](../src/kits/ballistics/README.md) |
+| BREADCRUMBS-01 | Bounded leader trails with exact lag and path-distance retracing |  | [README.md](../src/kits/breadcrumbs/README.md) |
+| GRID-STEP-01 | Grid-step actor movement with classified bumps, ledges, forced tiles and follower lines |  | [README.md](../src/kits/grid-step/README.md) |
+| CAP-ACTION-PHASES | Creator-authored action phase windows, once-only marks and per-range claims |  | [action-phases.md](guides/action-phases.md) |
 | VIS-01 | Tone mapping and exposure per scene (view.output) | [#124](https://github.com/Akilleez-QA/foundation-engine/pull/124) | [scene-look.md](guides/scene-look.md) |
 | VIS-02 | Point and spot lights in fixed per-scene slots | [#138](https://github.com/Akilleez-QA/foundation-engine/pull/138) | [scene-look.md](guides/scene-look.md) |
 | VIS-03 | Shadows from the sun, local lights and shapes | [#148](https://github.com/Akilleez-QA/foundation-engine/pull/148) | [scene-look.md](guides/scene-look.md) |
@@ -44,14 +58,18 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | FX-01a | Flipbook (sprite-sheet) particles and npm run fx:pack | [#141](https://github.com/Akilleez-QA/foundation-engine/pull/141) | [particles.md](guides/particles.md) |
 | GEN-01 | Seeded hierarchical generation (deriveSeed) |  | [README.md](kits/README.md) |
 | GRID-01 | Atomic sparse cell batches and bounded immutable occupancy queries |  | [cell-occupancy.md](guides/cell-occupancy.md) |
+| SCRIPT-01 | Optional sandboxed Lua scripts with capability-scoped host functions and deterministic per-call budgets |  | [scripting.md](guides/scripting.md) |
 | GEN-02 | Bounded binary record store for large edited worlds | [#56](https://github.com/Akilleez-QA/foundation-engine/pull/56) | [store-large-world-records.md](recipes/store-large-world-records.md) |
 | MP-01 | Newcomer shared session (LAN/loopback) and npm run host | [#61](https://github.com/Akilleez-QA/foundation-engine/pull/61) | [multiplayer-session.md](guides/multiplayer-session.md) |
 | KTX2 | KTX2 (Basis Universal) model textures | [#146](https://github.com/Akilleez-QA/foundation-engine/pull/146) | [compressed-textures.md](guides/compressed-textures.md) |
 | DX-03 | Asset provenance records and npm run disclosure | [#137](https://github.com/Akilleez-QA/foundation-engine/pull/137) | [asset-provenance.md](guides/asset-provenance.md) |
 | ASSET-VERIFY | Model contracts (npm run asset:verify) | [#126](https://github.com/Akilleez-QA/foundation-engine/pull/126) | [model-contracts.md](guides/model-contracts.md) |
+| ASSET-CONVERT | Offline converters to glTF and PNG with provenance receipts (npm run convert) |  | [README.md](../tools/convert/README.md) |
+| DUPES-01 | Duplicate and near-duplicate detector (npm run dupes) |  | [README.md](../tools/dupes/README.md) |
 | ASSET-OPTIMIZE | Model optimisation (npm run asset:optimize) | [#135](https://github.com/Akilleez-QA/foundation-engine/pull/135) |  |
 | SHOWCASE | The showcase template | [#128](https://github.com/Akilleez-QA/foundation-engine/pull/128) | [README.md](../templates/showcase/README.md) |
 | POSE-TO-POSE | Pose-to-pose rigging and animation pipeline | [#142](https://github.com/Akilleez-QA/foundation-engine/pull/142) | [animate-pose-to-pose.md](recipes/animate-pose-to-pose.md) |
+| PHYSICS | Rigid-body physics (optional adapter kit over a lazily loaded WebAssembly library) |  | [physics-adapter.md](guides/physics-adapter.md) |
 
 ## Not shipped yet
 
@@ -59,8 +77,8 @@ Tracked so that a correct "not yet" in the docs is recognised. A row moves up wh
 
 | ID | Feature | PR | Docs |
 |---|---|---|---|
+| PIPELINE-01 | Worker render pipelining |  | [README.md](verification/render-pipelining-20261010/README.md) |
 | WEBGPU | WebGPU render backend |  | [render-backend.md](guides/render-backend.md) |
-| PHYSICS | Rigid-body physics |  |  |
 
 ## Kits
 
@@ -71,9 +89,14 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/assignments`
 - `@kits/audio-mixer`
 - `@kits/authoring`
+- `@kits/ballistics`
+- `@kits/behavior`
+- `@kits/board-traversal`
+- `@kits/breadcrumbs`
 - `@kits/cadence`
 - `@kits/camera`
 - `@kits/capabilities`
+- `@kits/car-handling`
 - `@kits/chalkboard`
 - `@kits/character`
 - `@kits/combat`
@@ -81,10 +104,13 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/contact`
 - `@kits/control`
 - `@kits/dialogue`
+- `@kits/economy`
 - `@kits/entity-pool`
 - `@kits/equipment`
 - `@kits/explore`
+- `@kits/formulas`
 - `@kits/frames`
+- `@kits/grid-step`
 - `@kits/housing`
 - `@kits/input-history`
 - `@kits/inventory`
@@ -95,6 +121,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/navigation`
 - `@kits/network`
 - `@kits/objectives`
+- `@kits/physics`
 - `@kits/playout`
 - `@kits/population`
 - `@kits/procgen`
@@ -102,12 +129,16 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/replay`
 - `@kits/replication`
 - `@kits/resources`
+- `@kits/retro`
 - `@kits/rewind`
 - `@kits/rollback`
+- `@kits/scripting`
 - `@kits/sequence`
 - `@kits/space`
 - `@kits/spatial`
 - `@kits/spatial-audio`
+- `@kits/status`
+- `@kits/streaming`
 - `@kits/terrain`
 - `@kits/three`
 - `@kits/turns`
@@ -278,13 +309,16 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `changelog`
 - `check`
 - `content:publish`
+- `convert`
 - `deploy:production`
 - `dev`
 - `disclosure`
 - `dmath:golden`
+- `dupes`
 - `faults:network`
 - `format`
 - `format:check`
+- `formulas:import`
 - `fx:pack`
 - `gate`
 - `gate:ci`

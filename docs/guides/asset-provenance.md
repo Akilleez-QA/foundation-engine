@@ -13,6 +13,8 @@ Either beside the file, or in one file for the game. Each shipped file has exact
 | `<public>/<dir>/<name>.provenance.json` | any file, and the receipt a model export already writes ([Blender export sample](../../tools/blender-export/README.md)) | `game/public/models/lantern.glb` → `game/public/models/lantern.provenance.json` |
 | `game/assets.provenance.json`, under `assets`, keyed by the path inside `public/` | many small files (sounds, textures) | `"sounds/jump.ogg": { … }` |
 
+`npm run convert` ([converters](../../tools/convert/README.md)) writes this receipt beside each file it converts, with the hashes of every input it read.
+
 A record beside the file may name it in `artifact`. When two files share a name with different extensions (`wood.png`, `wood.webp`), the sidecar belongs to the one its `artifact` names; give the other an entry in `assets.provenance.json`.
 
 Checked kinds: models (`.glb`, `.gltf`), textures and images (`.png`, `.jpg`, `.jpeg`, `.webp`, `.avif`, `.ktx2`, `.hdr`, `.exr`) and sounds (`.ogg`, `.oga`, `.opus`, `.mp3`, `.wav`, `.m4a`, `.aac`, `.flac`, `.weba`). Decoders, JSON data and the records themselves are not.

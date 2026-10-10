@@ -44,3 +44,4 @@ automatically to a browser engine. New dependencies need a separate adoption dec
 
 - [Callback ownership and bounded diagnostics](CALLBACK-OWNERSHIP.md)
 - [Runtime pose chains: interpolating key poses at runtime (recommendation: not now)](runtime-pose-chains.md)
+- [Physics middleware options for an optional adapter kit (20 options; decision in ADR 0121)](physics-middleware.md)

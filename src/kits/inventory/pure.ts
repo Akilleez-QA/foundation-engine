@@ -17,3 +17,15 @@ export {
   type RetirementInventorySnapshot,
 } from './retirement.js';
 export * from './dimensional.js';
+export {
+  defineInventoryRules,
+  createRuledInventory,
+  inventoryPresets,
+  type InventoryRules,
+  type InventoryRulesInput,
+  type ContainerRule,
+  type MaterialRule,
+  type RuleRefusal,
+  type RuledResult,
+  type RuledInventory,
+} from './rules.js';

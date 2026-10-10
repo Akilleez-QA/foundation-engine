@@ -41,3 +41,10 @@ Creators name settings and supply rigs per setting. Volume data is creator-autho
 The director does not include occlusion steering, multi-subject framing, lock-on or
 shake, and the letterbox is a value, not a renderer feature. Evidence is headless
 tests; no browser, visual or device acceptance.
+
+## Extension: look-ahead, area-locked and eased-bound rigs
+
+Three more pure helpers compose with the director in the same way. A look-ahead focus
+(`createLookAhead`) moves in world space at no more than the subject's speed plus a
+margin. An area camera (`createAreaCamera`) pans between authored area framings. Bounds ease edge by edge toward new limits. None
+installs an owner.

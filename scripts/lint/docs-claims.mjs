@@ -141,6 +141,14 @@ export const CLAIMS = [
     patterns: [re('\\bno (?:newcomer-runnable )?(?:shared|multiplayer) session\\b')],
   },
   {
+    id: 'PIPELINE-01',
+    patterns: [
+      re('\\bworker render pipelining\\b[^.]{0,60}\\b(?:not built|deferred)\\b'),
+      re('\\bdefer(?:red|s)? worker render pipelining\\b'),
+    ],
+    item: re('\\bworker render pipelining\\b'),
+  },
+  {
     id: 'WEBGPU',
     patterns: [re('\\bno WebGPU backend\\b'), re(`\\bWebGPU\\b[^.]{0,40}${NOT_YET}`)],
     item: re('\\bWebGPU\\b'),
