@@ -22,6 +22,7 @@
  *   Shadow, sceneShadows                             optional shadows: per scene, per light and per entity
  *   BlobShadow, sceneBlobShadows                     optional blob (contact) shadows: one instanced draw per scene
  *   defineEnvironment({ sky, haze })                 optional gradient sky, discs, stars, exp2 haze
+ *   defineEnvironment({ reflection: { kind: 'interior' } })  optional procedural interior reflection, built once per visit
  *
  * Budgets are data in game/budgets.json (the ratchet compares them across revisions without running code).
  */
@@ -165,6 +166,13 @@ export {dmath, platformMath, scalarMath, type ScalarMath, type ScalarMathMode} f
 
 export {defineEnvironment, hazeColor, type EnvironmentState, type LinearHaze, type ExpHaze} from './environment';
 export {validateSky, skyGradientAt, SKY_LIMITS, type Sky, type GradientSky, type SkyDisc, type SkyStars} from './sky';
+export {
+  validateInteriorReflection,
+  INTERIOR_REFLECTION_LIMITS,
+  type InteriorReflection,
+  type InteriorSurface,
+  type InteriorLight,
+} from './interior-reflection';
 export {
   PointLight,
   SpotLight,

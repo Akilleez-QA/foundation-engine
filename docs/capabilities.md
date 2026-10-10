@@ -27,6 +27,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | VIS-06 | Instanced scatter of a Shape or Mesh (one draw per scatter) | [#144](https://github.com/Akilleez-QA/foundation-engine/pull/144) | [scatter.md](guides/scatter.md) |
 | VIS-10 | Blob (contact) shadows: one instanced draw of soft ground ellipses where no real shadow reaches |  | [blob-shadows.md](guides/blob-shadows.md) |
 | VIS-09 | Opt-in full three.js kit (@kits/three) | [#136](https://github.com/Akilleez-QA/foundation-engine/pull/136) |  |
+| VIS-11 | Procedural interior reflection environment (reflection kind interior) | [#183](https://github.com/Akilleez-QA/foundation-engine/pull/183) | [scene-look.md](guides/scene-look.md) |
 | POST-01 | Post-processing (bloom, vignette, grade): a consumer of the post.mode quality knob | [#161](https://github.com/Akilleez-QA/foundation-engine/pull/161) | [post-processing.md](guides/post-processing.md) |
 | POST-02 | Post grade lookup tables (.cube, view.post.grade.lut) and an HDR ceiling before bloom (view.post.ceiling) | [#179](https://github.com/Akilleez-QA/foundation-engine/pull/179) | [post-processing.md](guides/post-processing.md) |
 | FX-01 | Particle emitters | [#63](https://github.com/Akilleez-QA/foundation-engine/pull/63) | [particles.md](guides/particles.md) |
@@ -137,6 +138,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `BlobShadow`
 - `EMITTER_DEFAULTS`
 - `Emitter`
+- `INTERIOR_REFLECTION_LIMITS`
 - `LIGHT_LIMITS`
 - `LOCAL_LIGHT_CAPS`
 - `LUT_SIZE_LIMITS`
@@ -226,6 +228,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `validateBlobShadow`
 - `validateCalibration`
 - `validateEmitter`
+- `validateInteriorReflection`
 - `validateMaterial`
 - `validateModel`
 - `validatePlayOptions`
@@ -312,6 +315,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `test:first-use-browser`
 - `test:first-use-browser:production`
 - `test:framework-browser`
+- `test:interior-reflection-browser`
 - `test:ktx2-browser`
 - `test:lights-browser`
 - `test:material-browser`

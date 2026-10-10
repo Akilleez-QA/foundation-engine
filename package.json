@@ -95,6 +95,7 @@
     "test:material-options-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/material-options-check.mjs playtest/material-options",
     "test:shadows-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/shadows-check.mjs playtest/shadows",
     "test:sky-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/sky-check.mjs playtest/sky",
+    "test:interior-reflection-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/interior-reflection-check.mjs playtest/interior-reflection",
     "test:dmath-browser": "node --import tsx -r ./scripts/silent-browser.cjs scripts/play/dmath-check.mjs playtest/dmath",
     "bench:dmath": "node --import tsx tools/dmath-bench/bench.mjs",
     "dmath:golden": "node --import tsx scripts/dmath-golden.mjs",

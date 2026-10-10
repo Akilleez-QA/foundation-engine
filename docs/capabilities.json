@@ -127,6 +127,14 @@
       "evidence": ["@kits/three exists"]
     },
     {
+      "id": "VIS-11",
+      "title": "Procedural interior reflection environment (reflection kind interior)",
+      "shipped": true,
+      "pr": 183,
+      "docs": "docs/guides/scene-look.md",
+      "evidence": ["@engine exports validateInteriorReflection", "@engine exports INTERIOR_REFLECTION_LIMITS"]
+    },
+    {
       "id": "POST-01",
       "title": "Post-processing (bloom, vignette, grade): a consumer of the post.mode quality knob",
       "shipped": true,
@@ -257,6 +265,7 @@
       "BlobShadow",
       "EMITTER_DEFAULTS",
       "Emitter",
+      "INTERIOR_REFLECTION_LIMITS",
       "LIGHT_LIMITS",
       "LOCAL_LIGHT_CAPS",
       "LUT_SIZE_LIMITS",
@@ -346,6 +355,7 @@
       "validateBlobShadow",
       "validateCalibration",
       "validateEmitter",
+      "validateInteriorReflection",
       "validateMaterial",
       "validateModel",
       "validatePlayOptions",
@@ -399,6 +409,9 @@
       "InputDefinition",
       "InputSource",
       "InputState",
+      "InteriorLight",
+      "InteriorReflection",
+      "InteriorSurface",
       "KitDefinition",
       "LightRefusal",
       "LightReportLevel",
@@ -997,6 +1010,7 @@
     "test:first-use-browser",
     "test:first-use-browser:production",
     "test:framework-browser",
+    "test:interior-reflection-browser",
     "test:ktx2-browser",
     "test:lights-browser",
     "test:material-browser",

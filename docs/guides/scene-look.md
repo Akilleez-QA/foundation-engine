@@ -1,4 +1,4 @@
-# Scene look: output, lights, shadows and sky
+# Scene look: output, lights, shadows, sky and reflections
 
 How a scene turns lit geometry into the picture on screen. Every capability here is
 plain data on `@engine` scene options and components; game code never imports
@@ -12,6 +12,7 @@ picture it drew before, with the same draws and budgets.
 | Shadows | `defineScene({ shadows: sceneShadows() })`, light `shadow`, `Shadow` | [Shadows](#shadows) |
 | Blob (contact) shadows where no shadow map reaches | `defineScene({ blobShadows: sceneBlobShadows() })`, `BlobShadow` | [Blob shadows](blob-shadows.md) |
 | Gradient sky, discs, stars, exp2 haze | `defineEnvironment({ sky, haze })` | [Sky and haze](#sky-and-haze) |
+| Procedural interior reflection | `defineEnvironment({ reflection: { kind: 'interior', … } })` | [Interior reflection](#interior-reflection) |
 | Bloom, vignette and grade, per the player's `post.mode` | `defineScene({ view: { post } })` | [Post-processing](post-processing.md) |
 
 ## Output: tone mapping and exposure
@@ -526,3 +527,108 @@ export const night = defineEnvironment({
 - The disc is texture-based: at 512 × 256 a 3° disc is about 4 texels across, so
   it is soft-edged, not a crisp disc. A sharp disc needs a later sprite or shader
   module.
+
+## Interior reflection
+
+Metal, glass, polished and wet surfaces show what their environment reflects.
+Without a reflection they mirror nothing but the scene's lights, so metal reads as
+dull grey; a bright studio environment makes a dim interior or a night street look
+lit by softboxes. `reflection: { kind: 'interior' }` describes a simple interior as data
+(walls, floor, ceiling and a few glowing lights) and the engine builds it once into
+the scene's reflection environment. The interior is never drawn: only reflections and
+image-based light on physical materials see it.
+
+```ts
+import { defineEnvironment } from '@engine';
+
+export const lampInterior = defineEnvironment({
+  background: 0x05060a,
+  ambient: { sky: 0x1a1d2a, ground: 0x0a0806, intensity: 0.3 },
+  directional: { color: 0x8ea8ff, intensity: 0.2, position: [-6, 12, -4] },
+  haze: null, points: [], pointSize: 2,
+  reflection: {
+    kind: 'interior',
+    size: [24, 6, 24],                          // width, height, depth (metres)
+    eyeHeight: 1.6,                             // where the reflection is seen from
+    wall: { color: 0x2a241e, intensity: 0.25 },
+    floor: { color: 0x141210, intensity: 0.2 },
+    ceiling: { color: 0x0c0b0a, intensity: 0.1 },
+    lights: [
+      { position: [0, 5, -8], radius: 1.2, color: 0xffd6a0, intensity: 12 },  // a warm lamp
+      { position: [-9, 3, 4], radius: 0.8, color: 0x9fc4ff, intensity: 4 },   // a cool window
+    ],
+  },
+});
+```
+
+### Inputs and outputs
+
+- **`reflection: { kind: 'interior', … }`** (optional; the cube form `{ faces, screenPx }`
+  is unchanged and still the form without a `kind`):
+  - `size` `[width, height, depth]` in metres, each in [1, 200]; default `[20, 8, 20]`.
+    The floor's centre is the origin, y up.
+  - `eyeHeight`: the probe's height above the floor, inside (0, height); default
+    `min(1.6, height / 2)`. The interior is seen from `[0, eyeHeight, 0]`.
+  - `wall`, `floor`, `ceiling`: `{ color, intensity? }`, a packed sRGB colour times an
+    intensity in [0, 16] (default 1) in linear light.
+  - `lights`: at most 8 spheres `{ position, radius, color?, intensity }`. The centre
+    lies inside the interior, the radius is in (0, 10] metres and must not contain the
+    probe, the colour defaults to white, the intensity is in [0, 1000]. Values well
+    above 1 read as light sources in a reflection; a nearer light covers a farther one.
+- **Output:** pixels only, through physical materials (`roughness`, `metalness`)
+  that reflect the scene environment. The background and the direct lights are
+  unchanged; `background` or `sky` stay the visible backdrop.
+
+### Owner, bounds and cost
+
+- **Owner:** the scene visit's reflection binding (`author/scene-cubes.ts`, the
+  owner of cube reflections), which keys the interior by its data. `author/interior-reflection.ts`
+  holds the data, validation and pixel maths; `author/scene-interior-reflection.ts` is a
+  lazy chunk that turns them into one texture.
+- **Built once.** The interior is one 512 × 256 half-float equirectangular texture
+  (1 MiB), computed on the CPU (about 131,000 rays against the box and at most 8
+  spheres) and set as the scene's environment. The renderer prefilters it (PMREM)
+  once, the first time a physical material needs it, and caches that per texture.
+  A republished environment with equal interior data (in any field order) builds
+  nothing; a changed interior builds one replacement.
+- **Cost per frame: none.** No render target, no camera, no extra draw. Materials
+  sample the prefiltered map as they would any environment map, on every quality
+  tier. Like cube reflections, the interior is not tiered: it costs the same small fixed
+  load at every preset, so no quality knob turns it off.
+- **Backend-neutral.** A data texture with three's standard equirectangular mapping;
+  no WebGL-specific code.
+
+### Overload, cancellation and recovery
+
+- **Overload:** none. `defineEnvironment` validates the interior (and again when a new
+  environment is published), naming the field
+  (`environment: reflection.lights[0].radius must be in (0, 10] metres`). A malformed
+  interior reaching the binding at run time is reported and the previous reflection stays.
+- **Cancellation:** a replacement that is superseded before its chunk arrives
+  builds nothing. A replaced interior's texture is disposed once the new one is
+  bound; clearing the reflection or leaving the scene disposes it, and the renderer
+  frees its prefiltered map with it.
+- **Recovery:** the texture is CPU data; three re-uploads and re-prefilters it after
+  a context loss.
+
+### Evidence and limitations
+
+- **Unit:** `src/author/interior-reflection.test.ts` (validation of bounds, finite numbers
+  and colours naming the field; cube reflections unchanged; deterministic linear
+  pixels with surfaces and lights where they belong; a key independent of field
+  order; a half-float equirectangular texture released once; equal data built once
+  per visit, a change replaced and disposed, clearing and exit dispose; malformed
+  run-time data reported with the previous reflection kept).
+- **Browser:** `npm run test:interior-reflection-browser` (reference and low; desktop
+  headless Chromium, software GL) checks a mirror-like sphere showing the light at
+  its centre and the walls near its rim, one prefilter per interior, equal data kept,
+  a change replaced and disposed, the same redraw draws as without an interior, idle 0
+  frames, and disposal on exit. **Not yet run** for this change.
+- **Templates:** no template uses an interior reflection; their pictures, draws and
+  budgets are unchanged.
+- **Not verified:** physical devices, GPU prefilter time on phones, and visual quality.
+- The interior is a single empty box seen from one point: reflections have no parallax
+  (an object near a wall reflects the same as one in the middle), and nothing in the
+  scene appears in them. Lights are uniform spheres, not shaped panels or textured
+  windows. Planar mirrors, screen-space reflections and per-object probes are not
+  provided. A sharp mirror sees the 512-pixel width (about 0.7° per texel).
