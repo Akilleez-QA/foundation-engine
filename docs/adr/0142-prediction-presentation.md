@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-10-09
 - **Area:** Network kit / Prediction presentation
-- **Tracking:** discussion issue linked from the pull request
+- **Tracking:** [Issue #293](https://github.com/Akilleez-QA/foundation-engine/issues/293)
 
 ## Context
 
