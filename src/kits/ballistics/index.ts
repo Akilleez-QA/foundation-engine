@@ -2,7 +2,7 @@
  * kits/ballistics: drag-free trajectories under constant gravity. Launch solves (by duration, horizontal speed,
  * vertical speed, apex height, fixed launch speed with low/high arcs, moving-target lead), evaluation (position,
  * velocity, apex, time at a height) and bounded arc samples for previews.
- * Cost: no draws, no per-frame work, no allocation beyond each returned value.
+ * Cost: no draws and no per-frame work; `samplePoints` can write into a reused buffer.
  */
 import {defineKit, type KitDefinition} from '../../author';
 

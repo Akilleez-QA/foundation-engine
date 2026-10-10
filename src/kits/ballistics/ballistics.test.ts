@@ -112,7 +112,6 @@ test('moving-target lead converges and the projectile meets the target', () => {
   const t = traj(s);
   const meet = positionAt(t, t.duration);
   assert.ok(near(meet, [target[0], target[1], target[2] + v[2] * t.duration], 1e-5), JSON.stringify(meet));
-  assert.ok((s as {iterations?: number}).iterations! <= 16);
   assert.equal(solveLead([0, 0, 0], [50, 0, 0], [40, 0, 0], 15, G).status, 'unreachable', 'outrun');
 });
 
@@ -124,10 +123,57 @@ test('inputs are validated and bounded', () => {
   assert.throws(() => solveByDuration([0, 0] as never, to, 1, G), RangeError);
   assert.throws(() => solveByDuration([0, NaN, 0], to, 1, G), RangeError);
   assert.throws(() => solveByLaunchSpeed(from, to, 10, G, 'mid' as never), RangeError);
-  assert.throws(() => solveLead(from, to, [0, 0, 0], 10, G, {maxIterations: 65}), RangeError);
+  assert.throws(() => solveLead(from, to, [0, 0, 0], 10, G, {samples: 4097}), RangeError);
+  assert.throws(() => solveLead(from, to, [0, 0, 0], 10, G, {tolerance: 1e-300}), RangeError);
+  assert.throws(() => solveLead(from, to, [0, 0, 0], 10, G, null as never), RangeError);
+  assert.throws(() => timeAtHeight(traj(solveByDuration(from, to, 1, G)), 0, 'mid' as never), RangeError);
   const t = traj(solveByDuration(from, to, 1, G));
   for (const count of [1, 4097, 2.5]) assert.throws(() => samplePoints(t, count), RangeError);
   assert.throws(() => samplePoints(t, 4, new Float64Array(11)), RangeError);
   assert.throws(() => positionAt({...t, gravity: 0}, 0), RangeError);
   assert.equal(ballistics().id, 'ballistics');
+});
+
+test('review regressions: closed-form apex, bracketed lead, domain-safe results, stable roots', () => {
+  // Zero apex height onto a higher target used to round the discriminant below zero.
+  const zero = traj(solveByApexHeight([0, 0, 0], [3, 16.75565323414017, 1], 0, 12.380467571998722));
+  assert.ok(near(positionAt(zero, zero.duration), [3, 16.75565323414017, 1], 1e-9));
+  let failures = 0;
+  for (let i = 0; i < 2000; i++) {
+    const g = 0.1 + ((i * 7919) % 300) / 10,
+      y = 0.01 + ((i * 104729) % 2000) / 100;
+    if (solveByApexHeight([0, 0, 0], [1 + (i % 7), y, 2], 0, g).status !== 'solved') failures++;
+  }
+  assert.equal(failures, 0);
+  // A target approaching the shooter: an intermediate aim point used to abort the search.
+  const lead = traj(solveLead([0, 0, 0], [25, 0, 0], [-10, 0, 0], 15, G));
+  assert.ok(Math.abs(Math.hypot(...lead.velocity) - 15) < 1e-6);
+  assert.ok(near(positionAt(lead, lead.duration), [25 - 10 * lead.duration, 0, 0], 1e-6));
+  const high = traj(solveLead([0, 0, 0], [25, 0, 0], [-10, 0, 0], 15, G, {arc: 'high'}));
+  assert.ok(high.duration > lead.duration && Math.abs(Math.hypot(...high.velocity) - 15) < 1e-6);
+  // Randomized lead: every solved result meets the moving target at the requested speed.
+  for (let i = 0; i < 300; i++) {
+    const r = (k: number) => (((i + 1) * k) % 1000) / 1000;
+    const target: BallisticVec3 = [5 + 40 * r(613), 10 * r(331) - 5, 40 * r(797) - 20];
+    const vel: BallisticVec3 = [10 * r(211) - 5, 2 * r(101) - 1, 10 * r(457) - 5];
+    const s = solveLead([0, 0, 0], target, vel, 30, G, {arc: i % 2 ? 'high' : 'low'});
+    if (s.status !== 'solved') continue;
+    const t = s.trajectory;
+    assert.ok(Math.abs(Math.hypot(...t.velocity) - 30) < 1e-5);
+    const meet = target.map((v, k) => v + vel[k]! * t.duration);
+    assert.ok(near(positionAt(t, t.duration), meet, 1e-6));
+  }
+  // Results outside the numeric domain are unreachable, never solved-but-unusable or thrown mid-solve.
+  assert.equal(solveByDuration([0, 0, 0], [100, 0, 0], 1e-8, G).status, 'unreachable');
+  assert.equal(solveByHorizontalSpeed([-1e9, 0, 0], [1e9, 0, 0], 1e-9, G).status, 'unreachable');
+  assert.doesNotThrow(() => solveByVerticalSpeed([0, 0, 0], [1, 0, 0], 1e3, 1e-7));
+  // Cancellation-free crossings: a tiny rise at a huge vertical speed is still after launch.
+  const quick = traj(solveByVerticalSpeed([0, 0, 0], [0, 1e-6, 0], 1e8, G, 'ascending'));
+  assert.ok(Math.abs(quick.velocity[1] - 1e8) / 1e8 < 1e-9);
+  // Straight-up shots honour the arc: low is direct, high goes up and falls back; same point is high-only.
+  const direct = traj(solveByLaunchSpeed([0, 0, 0], [0, 2, 0], 10, G, 'low')),
+    lobbed = traj(solveByLaunchSpeed([0, 0, 0], [0, 2, 0], 10, G, 'high'));
+  assert.ok(direct.duration < lobbed.duration);
+  assert.equal(solveByLaunchSpeed([0, 0, 0], [0, 0, 0], 10, G, 'low').status, 'unreachable');
+  assert.ok(Math.abs(traj(solveByLaunchSpeed([0, 0, 0], [0, 0, 0], 10, G, 'high')).duration - 20 / G) < 1e-12);
 });

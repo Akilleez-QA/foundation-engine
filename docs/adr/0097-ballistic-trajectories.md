@@ -10,7 +10,7 @@ Throws, lobbed projectiles, launch pads, jump arcs onto ledges, aim previews and
 
 ## Decision
 
-Add an optional pure `@kits/ballistics`. It offers six solves, each with an explicit `unreachable` result: duration, horizontal speed, vertical speed (with a crossing branch), apex height, fixed launch speed (low or high arc) and moving-target lead (bounded iteration). It also offers closed-form evaluation, apex, time at height and bounded samples. Trajectories are frozen plain values that callers evaluate by fixed-step age. It has no clock, world, entity or registration.
+Add an optional pure `@kits/ballistics`. It offers six solves, each with an explicit `unreachable` result: duration, horizontal speed, vertical speed (with a crossing branch), apex height, fixed launch speed (low or high arc) and moving-target lead (bounded root bracketing and bisection). It also offers closed-form evaluation, apex, time at height and bounded samples. Trajectories are frozen plain values that callers evaluate by fixed-step age. It has no clock, world, entity or registration.
 
 ## Consequences
 
