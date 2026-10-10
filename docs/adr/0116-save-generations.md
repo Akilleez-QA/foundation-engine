@@ -37,8 +37,12 @@ Add an optional kit, `@kits/save-generations`, layered on the existing port seam
   readers the last loaded or committed generation as one frozen snapshot. A commit refuses with `conflict` when the
   disk no longer holds the generation the owner last saw (another tab). After writing its record, a commit reads the
   slots back as a loader would and reports `committed` only if its generation is then the newest fully valid one;
-  otherwise `lost` (or `unconfirmed` if the read-back threw), and the owner does not adopt it. `committed` is true at
-  that moment, not a lock: owners on different port objects are not excluded and a later writer can supersede it.
+  otherwise `lost` (or `unconfirmed` if the read-back threw), and the owner does not adopt it. Just before writing
+  its record, a commit also stands down with `lost` if another writer already landed a fully valid generation in the
+  target slot. `committed` is true at that moment, not a lock: owners on different port objects are not excluded, and
+  a racing writer that targeted the same slot can later supersede the confirmed generation or invalidate it by
+  landing its own record over its keys; load then falls back to the generation before, and the confirmed owner's next
+  commit reports `conflict`. The pre-record check narrows that window but does not close it.
   The post-commit sweep removes only keys of older generations named by the slot's previous record or under its
   prefix, and is skipped once the owner is stopped.
 - **Statuses, never silent loss.** Load: `loaded`, `recovered` (the other slot torn or invalid), `empty` (no record
@@ -76,7 +80,11 @@ Web Storage, which has no multi-key atomicity.
   several times, that lone surrogates were indistinguishable and that the record lacked the namespace. All were fixed
   with regression tests, including a two-owner race and a seeded fuzz of racing asynchronous owners that replays the
   mutation log and checks every `committed` result was the head at some moment.
-- Not a cross-writer lock: racing commits mostly end `lost` or `conflict`; a confirmed commit can be superseded later,
+- A re-review of those fixes found no blocking defect. It noted that a confirmed commit can be invalidated, not only
+  superseded, by a racing writer's later record; the wording, a deterministic repro of exactly that behaviour and the
+  optional pre-record check (with its own repro) were added.
+- Not a cross-writer lock: racing commits mostly end `lost` or `conflict`; a confirmed commit can later be superseded
+  or invalidated (load falls back to the generation before),
   and the sweep's read-then-remove has a small window against another writer. Loads stay coherent. Ports without
   `keys()` can leave unnamed keys of an interrupted commit until a reset. Bound ceilings can exceed a browser's Web
   Storage quota (refused at runtime as `failed`). A save store must not use the namespace `<namespace>-gen`.

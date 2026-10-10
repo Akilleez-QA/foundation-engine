@@ -408,3 +408,93 @@ test('review fuzz: racing async writers — every committed result was the head 
   }
   assert.ok(committedTotal > 40 && lostTotal > 0, `${committedTotal} committed, ${lostTotal} lost`);
 });
+
+/** A port over `inner` whose chosen operations wait for `release()` (another writer runs meanwhile). */
+function heldPort(inner: StoragePort, holdGet: (key: string, n: number) => boolean, holdSet: (key: string) => boolean) {
+  let release!: () => void;
+  const gate = new Promise<void>(r => (release = r));
+  const gets = new Map<string, number>();
+  let reached!: () => void;
+  const waiting = new Promise<void>(r => (reached = r));
+  const port: GenerationPort = {
+    async get(k) {
+      const n = (gets.get(k) ?? 0) + 1;
+      gets.set(k, n);
+      if (holdGet(k, n)) {
+        reached();
+        await gate;
+      }
+      return inner.get(k);
+    },
+    async set(k, v) {
+      if (holdSet(k)) {
+        reached();
+        await gate;
+      }
+      inner.set(k, v);
+    },
+    remove: k => inner.remove(k),
+    keys: () => inner.keys(),
+  };
+  return {port, release: () => release(), waiting};
+}
+
+test('re-review repro: a racing record landing after a confirmed commit invalidates it; load falls back and the owner sees conflict', async () => {
+  const backend = new MemoryBackend();
+  const seed = fresh(backend, 0);
+  await seed.load();
+  await seed.commit({k: 'gen1'}); // slot a
+  seed.close();
+  // W: holds its record write (after its narrowing check passed: slot b had no record yet)
+  const w = heldPort(
+    backend.port(1),
+    () => false,
+    k => k === 'game-gen|run|b#commit',
+  );
+  const writerW = createSaveGenerations({port: w.port, name: 'run'});
+  const writerX = fresh(backend, 2);
+  await writerW.load();
+  await writerX.load();
+  const pendingW = writerW.commit({k: 'from-w'});
+  await w.waiting;
+  const rx = await writerX.commit({k: 'from-x'}); // same target slot b, completes and confirms
+  assert.equal(rx.status, 'committed');
+  assert.deepEqual(rx.snapshot!.entries, {k: 'from-x'});
+  w.release();
+  const rw = await pendingW; // W's record lands over X's keys: slot b invalid
+  assert.equal(rw.status, 'lost');
+  const loaded = await reload(backend, 9);
+  assert.equal(loaded.status, 'recovered');
+  assert.deepEqual(loaded.snapshot!.entries, {k: 'gen1'}); // the generation before both
+  assert.equal(loaded.slots.find(s => s.slot === 'b')!.state, 'invalid');
+  assert.equal((await writerX.commit({k: 'again'})).status, 'conflict'); // X learns on its next commit
+});
+
+test('re-review: the narrowing check makes a writer stand down when a valid generation already landed in its slot', async () => {
+  const backend = new MemoryBackend();
+  const seed = fresh(backend, 0);
+  await seed.load();
+  await seed.commit({k: 'gen1'});
+  seed.close();
+  // W: holds its second read of slot b's record, which is the check just before its record write
+  const w = heldPort(
+    backend.port(1),
+    (k, n) => k === 'game-gen|run|b#commit' && n === 3, // 1: load, 2: commit's scan, 3: the check
+    () => false,
+  );
+  const writerW = createSaveGenerations({port: w.port, name: 'run'});
+  const writerX = fresh(backend, 2);
+  await writerW.load();
+  await writerX.load();
+  const pendingW = writerW.commit({k: 'from-w'});
+  await w.waiting;
+  // W has written its key; X rewrites it, writes its record and confirms
+  assert.equal((await writerX.commit({k: 'from-x'})).status, 'committed');
+  w.release();
+  const rw = await pendingW;
+  assert.equal(rw.status, 'lost');
+  assert.match(rw.reason!, /valid generation into this slot first/);
+  const loaded = await reload(backend, 9);
+  assert.equal(loaded.status, 'loaded');
+  assert.deepEqual(loaded.snapshot!.entries, {k: 'from-x'}); // X's confirmed generation survives
+});

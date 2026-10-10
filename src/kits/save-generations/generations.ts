@@ -11,8 +11,9 @@
  * (`busy`), never queued. After writing its record a commit reads the slots back and reports `committed` only if its
  * generation is the newest valid one at that moment (`lost` otherwise). Owners on different port objects (other
  * tabs, or a second `browserPort()` call) are not excluded: that read-back and the `conflict` check keep loads
- * coherent, but they are not a lock. Runs on any `get`/`set`/`remove` port, synchronous (the save store's `StoragePort`) or
- * asynchronous. Time and randomness are not used.
+ * coherent, but they are not a lock: a confirmed generation can still be superseded, or invalidated by a racing
+ * writer's later record (load then falls back to the generation before). Runs on any `get`/`set`/`remove` port,
+ * synchronous (the save store's `StoragePort`) or asynchronous. Time and randomness are not used.
  */
 import {crc32} from '../../core/save/chunk-store';
 import {savePrefixes} from '../../core/save/prefixes';
@@ -62,8 +63,10 @@ export interface LoadResult {
 }
 /**
  * `committed`: the record was written and a read-back, as a loader would do it, found this generation as the newest
- * fully valid one at that moment. It is not a lock: another writer can supersede it afterwards. Other statuses:
- * `lost` (the record was written but by the read-back another writer had replaced a key or the record, or committed
+ * fully valid one at that moment. It is not a lock: a racing writer that targeted the same slot can later supersede it,
+ * or invalidate it by landing its own record over this one's keys (load then falls back to the generation before, and
+ * this owner's next commit reports `conflict`). Other statuses: `lost` (another writer's valid generation was already in
+ * the target slot just before ours would be written, so ours was not written; or ours was written but by the read-back another writer had replaced a key or the record, or committed
  * a newer generation; this owner does not adopt it), `unconfirmed` (the record was written but the read-back threw;
  * load again to learn the head). Every remaining status leaves the previous authoritative generation on disk
  * unchanged as far as this owner is concerned: `busy` (another operation of this owner in flight), `not-loaded`
@@ -437,7 +440,14 @@ export function createSaveGenerations(options: SaveGenerationsOptions): SaveGene
             out[k] = payload;
           }
           if (stop()) return commitResult(closed ? 'closed' : 'cancelled', writes, 0, 'stopped before the record');
-          // 2. The record goes last: only now can the new generation be valid.
+          // 2. Narrowing check: if another writer that targeted the same slot already landed a fully valid record
+          // there, it wins; writing ours over it would leave its keys under our record (an invalid slot). An invalid
+          // record there (keys mixed by the race) is overwritten. This narrows the race but does not close it: a
+          // record that lands between this check and our write still invalidates the slot.
+          const there = await readSlot(target);
+          if (there.manifest && typeof (await verify(there)) !== 'string')
+            return commitResult('lost', writes, 0, 'another writer committed a valid generation into this slot first');
+          // 3. The record goes last: only now can the new generation be valid.
           const body = JSON.stringify({f: 1, ns: namespace, n: name, s: target, g: generation, k: manifest});
           record = `${hex(checksum(body))}|${body}`;
           await port.set(recordKey(target), record);
@@ -445,7 +455,7 @@ export function createSaveGenerations(options: SaveGenerationsOptions): SaveGene
         } catch (e) {
           return commitResult('failed', writes, 0, errorText(e));
         }
-        // 3. Confirm: read back as a loader would. Another writer may have overwritten a key, replaced the record or
+        // 4. Confirm: read back as a loader would. Another writer may have overwritten a key, replaced the record or
         // committed a newer generation in the other slot; then this generation is not the head and is not adopted.
         let confirm: Scan;
         try {
@@ -461,7 +471,7 @@ export function createSaveGenerations(options: SaveGenerationsOptions): SaveGene
           return commitResult('lost', writes, 0, reason);
         }
         known = {snapshot: Object.freeze({generation, slot: target, entries: Object.freeze(out)}), record};
-        // 4. Sweep the overwritten generation's keys that the new one does not list. Only keys named by the slot's
+        // 5. Sweep the overwritten generation's keys that the new one does not list. Only keys named by the slot's
         // previous record or found under its prefix, and only while their stored generation is older than ours, so a
         // newer writer's keys are never removed. Stopped owners skip it; failures are harmless leftovers.
         const written = new Set(list.map(([k]) => dataKey(target, k)));
