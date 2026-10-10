@@ -868,3 +868,13 @@ charging. Cube, array, volume, authored mip and non-RGBA8 descriptor support rem
 explicit accounting limitations. See [asset residency](asset-residency.md).
 Focused and affected checks plus independent review are required before hosted
 integration; no physical memory or device evidence is implied.
+
+## Optional cue sequences — candidate (2026-10-09)
+
+`@kits/sequence` runs creator-defined multi-track cue lists on caller ticks with
+barriers, holds, exactly-once effect intents, skip, cancellation, a bounded
+per-call transition budget and validated save-section snapshots. It installs no
+owner; the creator's fixed-step system, camera, audio-mixer and dialogue kits keep
+theirs. See [the guide](sequences.md) and [ADR 0091](../adr/0091-bounded-cue-sequences.md).
+Headless tests are recorded in the upgrade ledger; independent review and full
+hosted CI remain required.

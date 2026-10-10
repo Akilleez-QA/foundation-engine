@@ -765,6 +765,17 @@
         "rollbackChecksum"
       ]
     },
+    {
+      "name": "sequence",
+      "exports": [
+        "SEQUENCE_LIMITS",
+        "createSequence",
+        "defineSequence",
+        "defineSequenceSection",
+        "parseSequenceState",
+        "sequence"
+      ]
+    },
     {"name": "space", "exports": ["decorativeStars", "environmentTransition", "horizon", "space"]},
     {
       "name": "spatial",

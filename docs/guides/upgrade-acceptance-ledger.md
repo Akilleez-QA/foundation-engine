@@ -1207,3 +1207,18 @@ in 18 asset test files. The independent dimension oracle covers 1517 shapes,
 plus explicit thin/square/odd anchors and model refusal/retry. Independent review
 and full hosted integration remain pending; no physical memory or device evidence
 is implied.
+
+## Optional cue sequences — candidate (2026-10-09)
+
+Branch `feat/sequence-kit` from `cbaf8060`. Ten headless tests: parallel tracks,
+cross-track barriers and held cues with exact ticks; one large advance equal to
+many small ones and to a one-transition budget (identical event order, owed ticks
+drained); skip landing each remaining gameplay effect once, dropping presentation
+effects and producing no presentation events, refused when not skippable; cancel;
+a budget-stopped snapshot restored through JSON to the same future; refusal of an
+edited definition, another session and twelve forged or inconsistent states;
+definition validation and isolation; a real save store round trip across a fresh
+store composed with the dialogue kit; and a scene in which a fixed-step system
+drives the sequence, the camera kit follows cue alpha and the audio-mixer plays a
+cue once, with skip landing the effect and playing nothing. No browser, device or
+template evidence.

@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Optional cue sequences (`@kits/sequence`):** multi-track cue definitions with barriers, held cues, effect intents returned exactly once, skip (gameplay effects land, presentation ones drop), cancellation, a bounded per-call transition budget with budget-independent event order, and validated snapshots for a save section. No system or owner is installed. See [the guide](docs/guides/sequences.md) and [ADR 0091](docs/adr/0091-bounded-cue-sequences.md).
+
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.
