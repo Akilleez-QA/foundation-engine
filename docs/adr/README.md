@@ -107,3 +107,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0100](0100-optional-entity-pool-eviction-classes.md) | Optional entity pool with eviction classes | Optional kits / Simulation scale | Proposed |
 
 | [0094](0094-replication-schedule.md) | Optional per-recipient replication schedule | Optional kits / Network | Proposed |
+
+| [0110](0110-look-at-constraint.md) | Bounded look-at constraint in the animation kit | Optional kits / Animation | Proposed |

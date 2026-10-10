@@ -17,3 +17,11 @@ export {
 export {createRootMotion, type RootKey, type RootClip, type RootDelta} from './root-motion';
 export {blendPoseLayers, solveTwoBone, type PoseLayer} from './pose-layers';
 export {createInertializer, MAX_INERTIAL_BLEND, type Inertializer, type InertialSwitch} from './inertialize';
+export {
+  createLookAt,
+  type LookAt,
+  type LookAtJoint,
+  type LookAtJointOutput,
+  type LookAtOptions,
+  type LookAtState,
+} from './look-at';

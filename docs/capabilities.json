@@ -602,6 +602,7 @@
         "animation",
         "blendPoseLayers",
         "createInertializer",
+        "createLookAt",
         "createMarkerTrack",
         "createPoseSampler",
         "createRootMotion",

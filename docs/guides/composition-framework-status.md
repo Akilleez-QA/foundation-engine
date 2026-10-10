@@ -1028,3 +1028,11 @@ Evidence: 10 focused headless tests (8 unit tests including a 6,000-operation co
 ## Replication schedule — REPL-01 candidate, 2026-10-09
 
 [Contract](../../src/kits/replication/README.md), [guide](replication-schedule.md), [decision](../adr/0094-replication-schedule.md). Optional quantized field schema, per-recipient byte-budgeted packets (removals, creations, field-mask updates) ranked in one queue by accumulated weighted priority with per-entry minimum interval, per-recipient epochs, loss/acknowledgment recovery, and an order-safe replica with tombstones. Addresses the interest sets limits (starvation rotation, per-entity cadence, delta encoding). Evidence: thirteen focused headless tests including a lossy, duplicating, reordering composition with interest sets that converges exactly and a randomized 40-seed convergence test (52,771 vs 557,712 characters for complete views of the same sets). Candidate only; transport, WAN, browser, physical-device and full-CI acceptance are not claimed here.
+
+## Look-at constraint — candidate (2026-10-09)
+
+`createLookAt` in the animation kit aims a bounded joint chain at a root-frame
+direction with per-joint shares and limits, a front cone, smoothing and a speed cap,
+returning deltas that compose onto pose arrays. Pure; the caller owns targets, clock
+and skeleton. See [ADR 0110](../adr/0110-look-at-constraint.md). Headless tests are in
+the upgrade ledger; independent review and full hosted CI remain required.
