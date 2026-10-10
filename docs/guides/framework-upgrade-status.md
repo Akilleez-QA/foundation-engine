@@ -1324,3 +1324,12 @@ Bounded to 512 animated nodes per model; larger rigs cut and report. See
 [the model recipe](../recipes/load-a-model.md). Focused headless tests against the
 real three.js mixer are recorded in the upgrade ledger; independent review and full
 hosted integration CI remain required. No browser, visual or device acceptance.
+
+## Camera support framing — candidate (2026-10-09)
+
+Optional `support` query on the existing `cameraSystem` anchors vertical framing to
+the creator-defined support height (scaled, clamped), so jumps do not bob the view.
+Defaults unchanged; no new owner. See [ADR 0090](../adr/0090-camera-support-framing.md)
+and [the camera kit README](../../src/kits/camera/README.md). Headless scene tests
+are recorded in the upgrade ledger; independent review and full hosted CI remain
+required. No browser, visual or device acceptance.

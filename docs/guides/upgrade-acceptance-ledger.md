@@ -1297,3 +1297,17 @@ undocumented override and object-path limits, an unexported bound) were fixed be
 publication.
 Evidence is headless; no browser, visual-quality, physical-device or full-CI
 acceptance is claimed. Morph-target and material tracks still cut.
+
+## Camera support framing — candidate (2026-10-09)
+
+Branch `feat/camera-support-anchor` from `db1f7a85`. Ten new `support.test.ts` scene
+tests (unchanged poses without a query, jumps over level support leaving position
+and target exactly still, no camera rewrite under a still non-zero support, weights and
+limit including falls beyond the limit, null support and query arguments, orbit plus
+smoothing convergence, fixed camera with and without tracking, a support change easing
+instead of reading as a teleport, a failing query keeping a reset pending, construction
+and per-frame refusal without publication) and the existing camera tests pass under
+`npm run check`. An independent adversarial review found a fixed-camera look target
+moved without tracking, support changes triggering teleport snaps and floating-point
+redraw churn; all three were fixed before publication. Evidence is headless; no
+browser, visual-quality, physical-device or full-CI acceptance is claimed.
