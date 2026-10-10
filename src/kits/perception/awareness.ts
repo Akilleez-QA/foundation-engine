@@ -13,6 +13,8 @@ export interface Stimulus {
   readonly strength: number;
   /** Where the target was perceived (the sound's origin for hearing). */
   readonly position: Vec3;
+  /** For reports: when the reporter perceived it (seconds); defaults to the update time. */
+  readonly time?: number;
 }
 export interface AwarenessOptions {
   /** Awareness gained per second of full-strength sight, (0, 100]. Default 2. */
@@ -29,9 +31,9 @@ export interface AwarenessOptions {
   /** Seconds after the last stimulus before an unaware target is forgotten (whatever its awareness), (0, 1e6]. Default 30. */
   readonly forgetAfter?: number;
   /**
-   * Most seconds of rate-based gain (sight, reports) credited by one update, (0, 10]. Default 0.25. A long gap between
+   * Most seconds of rate-based gain (sight, reports) credited by one update, (0, 10]. A long gap between
    * updates therefore cannot turn one stimulus into full awareness; update at least every `maxStep` seconds for gains
-   * independent of the update rate.
+   * independent of the update rate. Default 1.
    */
   readonly maxStep?: number;
   /** Targets remembered at once, [1, 256]. Default 32. */
@@ -77,7 +79,7 @@ export function createAwareness(options: AwarenessOptions = {}) {
     decay = bounded(options.decay, 0.1, 0, 100, 'decay', false),
     forgetAfter = bounded(options.forgetAfter, 30, 0, 1e6, 'forgetAfter'),
     maxTargets = bounded(options.maxTargets, 32, 0, 256, 'maxTargets'),
-    maxStep = bounded(options.maxStep, 0.25, 0, 10, 'maxStep');
+    maxStep = bounded(options.maxStep, 1, 0, 10, 'maxStep');
   if (!Number.isSafeInteger(maxTargets)) fail('maxTargets must be an integer');
   const suspicious = pair(options.suspicious, [0.3, 0.15], 'suspicious'),
     alerted = pair(options.alerted, [0.8, 0.5], 'alerted');
@@ -126,7 +128,8 @@ export function createAwareness(options: AwarenessOptions = {}) {
      * update lose `decay × elapsed`. Sight adds `sightRate × strength × elapsed` and reports `reportRate × confidence ×
      * elapsed` (each the strongest per target, so several eyes or reporters do not add up); each sound adds an impulse
      * (submit a sound once, when it happens). Last-known position prefers sight, then the loudest sound, then a report.
-     * A report moves the last-known position only for a target never perceived directly. At most `maxStep` seconds of
+     * A report moves the last-known position only when it is newer than the agent's own last direct perception
+     * (its `time`, default now). At most `maxStep` seconds of
      * rate gain are credited per update. Nothing changes if any stimulus is invalid. Returns the number of targets lost
      * to a full memory this update (newcomers refused plus remembered targets evicted).
      */
@@ -144,7 +147,15 @@ export function createAwareness(options: AwarenessOptions = {}) {
         if (typeof target !== 'string' || !target || target.length > 256) fail('stimulus target must be a name');
         if (kind !== 'sight' && kind !== 'sound' && kind !== 'report') fail('stimulus kind is sight, sound or report');
         if (!finite(strength) || strength < 0 || strength > 1) fail('stimulus strength must be within [0, 1]');
-        copies.push({target, kind, strength, position: vec(s.position, 'stimulus position')});
+        const time: unknown = s.time;
+        if (time !== undefined && (!finite(time) || time < 0)) fail('stimulus time must be a nonnegative finite time');
+        copies.push({
+          target,
+          kind,
+          strength,
+          position: vec(s.position, 'stimulus position'),
+          ...(time === undefined ? {} : {time}),
+        });
       }
       // Everything validated: only now does time advance.
       const elapsed = clock === null ? 0 : now - clock;
@@ -221,7 +232,8 @@ export function createAwareness(options: AwarenessOptions = {}) {
           e.lastDirect = now;
           e.directPosition = loudest.position;
           e.directStrength = loudest.strength;
-        } else if (m.report && e.lastDirect === null) e.lastKnown = m.report.position;
+        } else if (m.report && (e.lastDirect === null || (m.report.time ?? now) > e.lastDirect))
+          e.lastKnown = m.report.position;
       }
       for (const [id, e] of targets) {
         e.level = levelFor(e);

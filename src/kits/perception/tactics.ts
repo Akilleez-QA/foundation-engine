@@ -16,7 +16,8 @@ export interface SquadReport {
 }
 
 /**
- * Shared squad knowledge: the newest report per target (ties: higher confidence, then reporter id). `share` copies an
+ * Shared squad knowledge: the newest report per target (ties: higher confidence, then reporter id); newest wins even
+ * when it is weaker, so a fresh faint cue replaces an older strong one. `share` copies an
  * agent's suspicious-or-alerted targets that it perceived directly (sight or sound), with the time, position and
  * strength (as confidence) of that perception,
  * so reports never refresh themselves through re-sharing. `inform` turns fresh reports into `report` stimuli for a
@@ -94,6 +95,7 @@ export function createSquadKnowledge(options: {readonly maxTargets?: number; rea
             kind: 'report',
             strength: r.confidence * (1 - age / maxAge),
             position: r.position,
+            time: r.time,
           }),
         );
       }

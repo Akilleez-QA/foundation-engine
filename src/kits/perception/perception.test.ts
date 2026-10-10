@@ -245,9 +245,11 @@ test('re-review fixes: credited step cap, direct-only sharing, report positions,
   assert.ok(gap.recall('p')!.awareness <= 0.25 + 1e-12, 'one report after a long gap credits at most maxStep');
   const relay = createAwareness({reportRate: 1, maxStep: 1});
   relay.update(0, [{target: 'q', kind: 'sound', strength: 0.05, position: [50, 0, 0]}]);
-  relay.update(1, [{target: 'q', kind: 'report', strength: 1, position: [1, 0, 0]}]);
-  relay.update(2, [{target: 'q', kind: 'report', strength: 1, position: [1, 0, 0]}]);
-  assert.deepEqual(relay.recall('q')!.lastKnown, [50, 0, 0], 'reports never move a directly perceived target');
+  relay.update(1, [{target: 'q', kind: 'report', strength: 1, position: [1, 0, 0], time: 0}]);
+  relay.update(2, [{target: 'q', kind: 'report', strength: 1, position: [1, 0, 0], time: 0}]);
+  assert.deepEqual(relay.recall('q')!.lastKnown, [50, 0, 0], 'reports older than the direct perception do not move it');
+  relay.update(3, [{target: 'q', kind: 'report', strength: 1, position: [9, 0, 0], time: 2.5}]);
+  assert.deepEqual(relay.recall('q')!.lastKnown, [9, 0, 0], 'a report newer than the direct perception does');
   const board = createSquadKnowledge();
   board.share('relay', relay);
   const r = board.recall('q');

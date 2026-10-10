@@ -1234,6 +1234,6 @@ no decay). An independent adversarial review found those squad and awareness def
 and several smaller issues; all were fixed. Its re-review found a gap-credit effect,
 relayed report data shared as direct perception, report positions overriding direct
 ones and uncounted evictions; these are fixed (a `maxStep` credit cap, direct-only
-position and strength for sharing, report positions only for unperceived targets,
+position and strength for sharing, report positions only when newer than direct perception,
 eviction counting) and covered by a ninth test.
 No game, browser or device evidence.
