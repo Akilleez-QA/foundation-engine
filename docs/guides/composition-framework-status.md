@@ -878,3 +878,11 @@ owner; the creator's fixed-step system, camera, audio-mixer and dialogue kits ke
 theirs. See [the guide](sequences.md) and [ADR 0091](../adr/0091-bounded-cue-sequences.md).
 Headless tests are recorded in the upgrade ledger; independent review and full
 hosted CI remain required.
+
+## Sequence cast, branches and arbitration — candidate (2026-10-09)
+
+Builds on the cue sequence kit (#249): cast binding with driven channels and a
+settle-aware freeze gate, branching sequence graphs, and a one-claim event arbiter.
+Pure helpers; see [ADR 0111](../adr/0111-sequence-cast-branches-arbitration.md) and
+[the guide](sequences.md). Headless tests are in the ledger; independent review and
+hosted CI remain required.

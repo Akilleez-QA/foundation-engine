@@ -1228,3 +1228,13 @@ drives the sequence, the camera kit follows cue alpha and the audio-mixer plays 
 cue once, with skip landing the effect and playing nothing; unambiguous effect ids,
 the `settled` signal and -0 normalisation; and arrays copied without iteration. No
 browser, device or template evidence.
+
+## Sequence cast, branches and arbitration — candidate (2026-10-09)
+
+Branch `feat/sequence-extensions` from the #249 head `b58a0f02`. Six new headless tests:
+cast binding, refusal, channel ownership, settle-aware freeze and release; an ECS
+consumer whose bystander is frozen while the cast member is driven; branch offer,
+choose and abandonment of later effects; graph snapshots mid-node and at a branch,
+skip following defaults and landing only what choosing would have; graph validation
+and bounded loops; and arbiter priority, held refusals, stale release and cooldown.
+The 12 #249 tests still pass. No browser or device evidence.

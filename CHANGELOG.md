@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Sequence cast, branches and arbitration (`@kits/sequence`):** cast binding with per-role driven channels, non-participant freeze that waits for busy entities to settle, branching sequence graphs at held cues (choose abandons the rest of a node; skip follows defaults and lands what choosing would have), and a one-claim event arbiter with priorities and cooldowns. Pure helpers. See [ADR 0111](docs/adr/0111-sequence-cast-branches-arbitration.md).
+
 - **Optional cue sequences (`@kits/sequence`):** multi-track cue definitions with barriers, held cues, effect intents returned exactly once, skip (gameplay effects land, presentation ones drop), cancellation, a bounded per-call transition budget with budget-independent event order, and validated snapshots for a save section. No system or owner is installed. See [the guide](docs/guides/sequences.md) and [ADR 0091](docs/adr/0091-bounded-cue-sequences.md).
 
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).

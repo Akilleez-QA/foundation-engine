@@ -79,3 +79,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0085](0085-atomic-cell-batches-and-occupancy.md) | Atomic cell batches and immutable occupancy | Procgen / Spatial | Proposed |
 
 | [0091](0091-bounded-cue-sequences.md) | Bounded cue sequences as an optional kit | Optional kits / Scripting | Proposed |
+
+| [0111](0111-sequence-cast-branches-arbitration.md) | Cast binding, branching and event arbitration for sequences | Optional kits / Scripting | Proposed |

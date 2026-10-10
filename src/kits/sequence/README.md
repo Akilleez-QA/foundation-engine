@@ -36,3 +36,36 @@ for (const e of run.advance(1).events) if (e.kind === 'effect') applyEffect(e.ef
 | Save/restore | `snapshot()` is plain frozen data with the definition fingerprint and session. `parseSequenceState` copies arrays with one length read and refuses an edited definition, unknown fields, out-of-range or inconsistent positions (a cue past its barrier, a release of a non-active cue, drops outside a skip, owed time on a stopped run). The section quarantines such a record and play continues from `{run: null}`. `createSequence` additionally refuses a state of another session. Validation catches corruption, not tampering: a hand-edited save can mark a cue complete whose effect never landed. |
 | Cost | `advance` is O(transitions × tracks + barriers); allocation is limited to returned events and small per-call closures. No draws. |
 | Limits | Ticks only: map seconds to ticks in your fixed step. No branching, conditions or loops inside a definition (compose with the dialogue kit or choose another definition); no camera splines, interpolation curves or participation freezing of other entities. Headless evidence only. |
+
+## Cast, branching and event arbitration
+
+**Cast** (`defineCast`, `createCast`). Roles (1–32) each declare the channels the
+sequence drives (1–16 creator names such as `position`, `clip`, `ai`) and whether
+they are `required` or `optional`. `start(resolve, {exempt, busy})` binds roles to
+entities, or returns `missing`/`conflict` and binds nothing. Gameplay systems ask
+`drives(entity, channel)` and skip writing what the sequence owns. `gate(entity)` is
+`freeze` for everyone outside the cast, except exempt entities and busy entities that
+have not yet called `settled(entity)`. `ready()` turns true once nobody is still
+settling, so a sequence can hold its first cue until the stage is quiet. `release()`
+returns each member with its channels so gameplay can re-sync, and after that every
+query answers as if no cast were active. The cast is not saved: re-bind roles when a
+saved run is restored.
+
+**Branching** (`defineSequenceGraph`, `createSequenceGraph`). A graph of 1–64 nodes,
+each a sequence definition, joined at held branch cues. A branch has 1–16 choices,
+each leading to a node or `null` (end), plus a `default`. `offered()` lists the
+choices while the branch cue is active and waiting. `choose(choice)` cancels the rest
+of the node (effects after that point never land) and starts the chosen node as a new
+run with session `<session>#<step>`. `skip()` follows defaults. On a branch node it
+lands only the skip effects of the cues the branch cue depends on, exactly as
+choosing there would; nodes without a branch are skipped whole. `maxSteps` (default
+64, max 1,024) bounds loops. Snapshots (`parseSequenceGraphState`) hold the node, the
+step and the current run.
+
+**Event arbitration** (`createEventArbiter`). Sources (1–64) are declared in priority
+order, each with an optional cooldown in ticks. Each tick the caller calls `tick()`
+and then, at a safe point only (for example when the player has settled and no claim
+is running), `offer(source, payload)`. `resolve()` claims the stage for the first
+offered source in declaration order. While a claim is held every offer returns `held`.
+`release(claim)` refuses stale claims and starts the source's cooldown. There are at
+most 256 offers per tick.
