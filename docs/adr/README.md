@@ -77,3 +77,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0084](0084-persisted-recurring-phase.md) | Persisted recurring phase with explicit bounded catch-up | Optional composition / Time / Persistence | Proposed |
 
 | [0085](0085-atomic-cell-batches-and-occupancy.md) | Atomic cell batches and immutable occupancy | Procgen / Spatial | Proposed |
+
+| [0121](0121-optional-physics-adapter-kit.md) | Optional physics adapter kit over a lazily loaded WebAssembly library; amends the no-physics stance only for creators who opt in | Optional kits / Simulation / Dependencies | Proposed |

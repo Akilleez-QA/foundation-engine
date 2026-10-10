@@ -38,6 +38,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | ASSET-OPTIMIZE | Model optimisation (npm run asset:optimize) | [#135](https://github.com/Akilleez-QA/foundation-engine/pull/135) |  |
 | SHOWCASE | The showcase template | [#128](https://github.com/Akilleez-QA/foundation-engine/pull/128) | [README.md](../templates/showcase/README.md) |
 | POSE-TO-POSE | Pose-to-pose rigging and animation pipeline | [#142](https://github.com/Akilleez-QA/foundation-engine/pull/142) | [animate-pose-to-pose.md](recipes/animate-pose-to-pose.md) |
+| PHYSICS | Rigid-body physics (optional adapter kit over a lazily loaded WebAssembly library) |  | [physics-adapter.md](guides/physics-adapter.md) |
 
 ## Not shipped yet
 
@@ -46,13 +47,12 @@ Tracked so that a correct "not yet" in the docs is recognised. A row moves up wh
 | ID | Feature | PR | Docs |
 |---|---|---|---|
 | WEBGPU | WebGPU render backend |  | [render-backend.md](guides/render-backend.md) |
-| PHYSICS | Rigid-body physics |  |  |
 
 ## Kits
 
 Each kit's value exports are listed in [capabilities.json](capabilities.json).
 
-`@kits/alignment`, `@kits/animation`, `@kits/assignments`, `@kits/audio-mixer`, `@kits/authoring`, `@kits/camera`, `@kits/capabilities`, `@kits/chalkboard`, `@kits/character`, `@kits/combat`, `@kits/concept-explorer`, `@kits/control`, `@kits/dialogue`, `@kits/equipment`, `@kits/explore`, `@kits/frames`, `@kits/housing`, `@kits/input-history`, `@kits/inventory`, `@kits/itinerary`, `@kits/learn`, `@kits/locomotion`, `@kits/market`, `@kits/navigation`, `@kits/network`, `@kits/objectives`, `@kits/procgen`, `@kits/replay`, `@kits/resources`, `@kits/rollback`, `@kits/space`, `@kits/spatial`, `@kits/spatial-audio`, `@kits/terrain`, `@kits/three`, `@kits/turns`, `@kits/ui`, `@kits/vehicles`, `@kits/visibility`
+`@kits/alignment`, `@kits/animation`, `@kits/assignments`, `@kits/audio-mixer`, `@kits/authoring`, `@kits/camera`, `@kits/capabilities`, `@kits/chalkboard`, `@kits/character`, `@kits/combat`, `@kits/concept-explorer`, `@kits/control`, `@kits/dialogue`, `@kits/equipment`, `@kits/explore`, `@kits/frames`, `@kits/housing`, `@kits/input-history`, `@kits/inventory`, `@kits/itinerary`, `@kits/learn`, `@kits/locomotion`, `@kits/market`, `@kits/navigation`, `@kits/network`, `@kits/objectives`, `@kits/physics`, `@kits/procgen`, `@kits/replay`, `@kits/resources`, `@kits/rollback`, `@kits/space`, `@kits/spatial`, `@kits/spatial-audio`, `@kits/terrain`, `@kits/three`, `@kits/turns`, `@kits/ui`, `@kits/vehicles`, `@kits/visibility`
 
 ## Templates
 

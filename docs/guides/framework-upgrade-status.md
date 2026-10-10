@@ -1250,3 +1250,20 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Optional physics adapter kit candidate (2026-10-09)
+
+`@kits/physics` (ADR 0121, [guide](physics-adapter.md)) adapts one lazily loaded
+WebAssembly library: `@dimforge/rapier3d-deterministic-compat` 0.21.0, Apache-2.0,
+the one new runtime dependency, approved for this kit only. Core stays physics-free.
+
+- **Bundle:** stock first-load JS is unchanged at 175.6 KiB. The library is a dynamic
+  chunk of 4,366,824 bytes (1,658,896 bytes `gzip -9`) that a consuming game must list
+  in its own `largeChunkAllow`. No budget changed.
+- **Runtime contracts:** configured admission, event, query, snapshot and debug-vertex
+  limits; refusals and drops are counted; disposal is exactly once per visit.
+- **Candidate evidence:** focused Node tests of lifecycle, refusals, ordering, queries,
+  snapshot determinism, the rollback sync test and two-peer session, and the character
+  adapter, plus one software-GL `play:snap` of an uncommitted fixture.
+- **Not established:** hosted CI, cross-browser bit identity, GPU/physical-device
+  performance and memory, and multiplayer acceptance.

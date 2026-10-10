@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Optional physics adapter kit (`@kits/physics`, ADR 0121).** Rigid bodies and colliders as components, one fixed-step world per scene visit, ordered and bounded collision events, ray/shape/overlap queries, validated text snapshots for `@kits/rollback`, a character adapter that resolves the character kit's motion through a slope/step/snap controller, and opt-in debug lines. The one new runtime dependency, `@dimforge/rapier3d-deterministic-compat` 0.21.0 (Apache-2.0), is loaded by dynamic import only: stock first-load JS is unchanged (175.6 KiB), and a game that uses the kit fetches a 4.4 MB (1.6 MB gzip) chunk it must allow in its own budgets. `createMotion` in the character kit takes an optional starting `velocity`. The dev server serves the library unoptimised. Evidence is Node tests and one software-GL snapshot; cross-browser determinism and devices are not established.
+
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.

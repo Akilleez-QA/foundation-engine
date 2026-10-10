@@ -216,7 +216,17 @@
       "docs": "docs/guides/render-backend.md",
       "evidence": ["src/platform/render/backends/webgpu exists"]
     },
-    {"id": "PHYSICS", "title": "Rigid-body physics", "shipped": false, "evidence": ["@kits/physics exists"]}
+    {
+      "id": "PHYSICS",
+      "title": "Rigid-body physics (optional adapter kit over a lazily loaded WebAssembly library)",
+      "shipped": true,
+      "docs": "docs/guides/physics-adapter.md",
+      "evidence": [
+        "@kits/physics exports scenePhysics",
+        "@kits/physics exports createPhysicsWorld",
+        "src/kits/physics/snapshot.test.ts exists"
+      ]
+    }
   ],
   "engine": {
     "module": "@engine",
@@ -662,6 +672,29 @@
       ]
     },
     {"name": "objectives", "exports": ["createObjectiveRun", "createStagedObjectives", "objectives"]},
+    {
+      "name": "physics",
+      "exports": [
+        "Collider",
+        "ENGINE_FIXED_STEP",
+        "PHYSICS_DEFAULT_LIMITS",
+        "PHYSICS_LIMIT_RANGES",
+        "PhysicsCharacter",
+        "RigidBody",
+        "createPhysicsLoader",
+        "createPhysicsWorld",
+        "eulerToQuat",
+        "loadPhysics",
+        "physics",
+        "physicsCharacterStats",
+        "physicsCharacterSystem",
+        "physicsConfig",
+        "physicsDebugDraw",
+        "physicsLoader",
+        "quatToEuler",
+        "scenePhysics"
+      ]
+    },
     {
       "name": "procgen",
       "exports": [
