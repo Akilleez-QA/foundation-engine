@@ -92,13 +92,25 @@ remains even when a sampler disables mipmaps: it is a conservative image policy,
 not an exact forecast of each descriptor's allocation. These numbers exclude
 driver padding/copies and decoded CPU image storage.
 
-General texture descriptors remain an accounting limitation. Ordinary cube faces,
-array layers, volume depth, authored mip layouts and non-RGBA8 types require
-separate support; the image formula may undercount them, including a zero estimate
-for an ordinary cube. A custom model parser can supply these descriptors, so its
-`maxResidentBytes` check must not be treated as a complete bound for those formats.
-Compressed level-byte accounting is unchanged. Correcting ordinary 2D mip sums
-does not resolve these broader descriptor cases.
+Common uncompressed descriptors also receive a full-chain logical forecast:
+R, RG and RGBA with unsigned-byte, half-float or float components. Array textures
+retain their layer count at every level; volume textures halve depth as well as
+width and height, continuing until all three reach one. This conservative volume
+policy can charge more levels than a backend creates. Data textures retain the
+full-chain charge even when their default settings disable generated mipmaps.
+Cube textures require six equal nonempty square faces; the parent texture's
+format and type determine bytes, including when faces are DataTextures.
+An empty cube keeps its zero unpopulated estimate. Nonempty malformed cube faces
+within this format domain produce an invalid estimate and model admission refuses them.
+
+General texture descriptors remain an accounting limitation. Explicit internal
+formats, authored mip layouts, packed/integer/depth formats outside the table,
+render-target textures retain the ordinary 2D RGBA8
+fallback for compatibility. That fallback can undercount, including zero for an
+unsupported cube. A custom model parser can supply these descriptors, so its
+`maxResidentBytes` check must not be treated as a universal bound. Unsupported
+descriptor accounting remains follow-up work. Compressed level-byte accounting
+is unchanged. No physical allocation or renderer support guarantee is implied.
 
 Headless regressions cover thin, square and odd dimensions, compressed payloads,
 and real model admission at a 3000-byte ceiling: the 4092-byte image is refused,
