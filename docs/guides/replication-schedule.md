@@ -39,7 +39,10 @@ if (b.oversize) report('a single entry exceeds the budget'); // creator policy
 ```
 
 The client applies packets with `replica.apply(json)` and acknowledges
-`applied.sequence`. On acknowledgment call `schedule.ack(conn, seq)`; when the
+`applied.sequence` only when the status is `applied` (`expired` and
+`stale-epoch` packets must not be acknowledged). When a connection is replaced,
+`removeRecipient` then `addRecipient` starts a new epoch; a reused client replica
+discards the old session's state when the new epoch's first packet arrives. On acknowledgment call `schedule.ack(conn, seq)`; when the
 creator's protocol judges a packet lost (an acknowledgment timeout, or a gap after
 later acknowledgments), call `schedule.lost(conn, seq)`. On a reliable ordered
 transport packets are never lost, and the budget and ranking still apply.

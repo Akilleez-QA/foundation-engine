@@ -19,17 +19,17 @@ changes first without starving the rest.
 Add optional `@kits/replication`: a shared quantized numeric field schema, a
 per-recipient schedule that tracks what each entity was last sent to each
 recipient, and an order-safe replica for the receiving side. Each build ranks
-removals, creations and field-mask updates by accumulated weighted priority, fits
+removals, creations and field-mask updates in one queue by accumulated weighted
+priority (updates wait for an acknowledged creation), fits
 them to a byte budget (exact JSON length), honours an optional per-entry minimum
 interval, and records the packet for acknowledgment or loss. Loss requeues
 creations and removals and marks lost fields dirty; values are absolute, so
 resending is safe. The replica orders by packet sequence per entity and field and
-keeps bounded tombstones.
+keeps bounded tombstones with an expiry floor; a per-recipient epoch, announced
+by the first packet of each session, voids an earlier session's state.
 
 No transport, timer, loop or registry is added. Interest sets stay the relevance
-owner; complete views remain the simpler alternative. A general per-member
-cadence helper proposed separately is not required; this kit's minimum interval is
-part of building a packet.
+owner; complete views remain the simpler alternative. This kit's minimum interval is part of building a packet; it does not depend on any separately proposed cadence helper.
 
 ## Consequences
 

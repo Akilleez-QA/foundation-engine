@@ -37,7 +37,7 @@ export interface RelevantOptions {
   readonly minInterval?: number;
 }
 
-export type BuildStatus = 'built' | 'idle' | 'starved' | 'absent' | 'retired';
+export type BuildStatus = 'built' | 'idle' | 'held' | 'starved' | 'absent' | 'retired';
 
 export interface BuildResult {
   readonly status: BuildStatus;
@@ -102,6 +102,8 @@ interface Entry {
   lastSent: number;
   /** Sequence of the in-flight create or remove, 0 when none. */
   lifecycleSeq: number;
+  /** The client may hold this id (a creation was built, or a removal was pending): forgetting must send a removal. */
+  mayKnow: boolean;
 }
 interface FlightItem {
   id: number;
@@ -114,6 +116,10 @@ interface Recipient {
   flights: Map<number, FlightItem[]>;
   nextSeq: number;
   lastNow: number | null;
+  /** Distinguishes this recipient's session from an earlier one with the same id. */
+  epoch: number;
+  /** The new epoch must reach the client even if nothing is relevant: 0 pending, a sequence in flight, -1 done. */
+  announce: number;
 }
 
 function positive(n: number, max = 1 << 24) {
@@ -132,6 +138,9 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
     throw new RangeError('replication: limits must be positive integers');
   if (maxRecipients * maxRelevant * (schema.count + 1) > 1 << 24)
     throw new RangeError('replication: maxRecipients * maxRelevant * (fields + 1) exceeds 2^24');
+  if (maxEntities * schema.count > 1 << 24) throw new RangeError('replication: maxEntities * fields exceeds 2^24');
+  if (maxRecipients * maxInFlight * Math.min(maxItems, maxRelevant) > 1 << 24)
+    throw new RangeError('replication: maxRecipients * maxInFlight * items exceeds 2^24');
   const frozenLimits = Object.freeze({maxEntities, maxRecipients, maxRelevant, maxInFlight, maxItems});
   const width = schema.count;
   const all = (1 << width) - 1;
@@ -140,13 +149,14 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
   const scratch = new Int32Array(width);
   let disposed = false,
     lostCount = 0,
-    expiredCount = 0;
+    expiredCount = 0,
+    epochs = 0;
 
   function forget(r: Recipient, id: number) {
     const e = r.entries.get(id);
     if (!e) return false;
-    // Never sent to the client: drop at once. Otherwise the client must be told.
-    if (e.state === 'create') r.entries.delete(id);
+    // Never possibly sent to the client: drop at once. Otherwise the client must be told.
+    if (e.state === 'create' && !e.mayKnow) r.entries.delete(id);
     else if (e.state !== 'remove' && e.state !== 'removing') {
       e.state = 'remove';
       e.lifecycleSeq = 0;
@@ -158,6 +168,7 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
     const items = r.flights.get(seq);
     if (!items) return false;
     r.flights.delete(seq);
+    if (r.announce === seq) r.announce = 0;
     for (const it of items) {
       if (r.entries.get(it.id) !== it.entry) continue; // replaced or dropped since
       const e = it.entry;
@@ -167,7 +178,7 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
       } else if (it.kind === 'remove' && e.state === 'removing' && e.lifecycleSeq === seq) {
         e.state = 'remove';
         e.lifecycleSeq = 0;
-      } else if (it.kind === 'update' && (e.state === 'live' || e.state === 'creating')) e.forced |= it.mask;
+      } else if (it.kind === 'update' && e.state === 'live') e.forced |= it.mask;
     }
     lostCount++;
     return true;
@@ -206,7 +217,14 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
       if (disposed) return 'retired';
       if (recipients.has(recipient)) return 'duplicate';
       if (recipients.size >= maxRecipients) return 'saturated';
-      recipients.set(recipient, {entries: new Map(), flights: new Map(), nextSeq: 1, lastNow: null});
+      recipients.set(recipient, {
+        entries: new Map(),
+        flights: new Map(),
+        nextSeq: 1,
+        lastNow: null,
+        epoch: ++epochs,
+        announce: 0,
+      });
       return 'added';
     },
     removeRecipient(recipient) {
@@ -242,6 +260,7 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
         minInterval,
         lastSent: Number.NEGATIVE_INFINITY,
         lifecycleSeq: 0,
+        mayKnow: !!e, // replacing a pending removal: the client may still hold the old id
       });
       return 'tracked';
     },
@@ -263,96 +282,108 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
       if (r.lastNow !== null && now < r.lastNow) throw new RangeError('replication: now went backwards');
       const elapsed = r.lastNow === null ? 0 : now - r.lastNow;
       r.lastNow = now;
+      type Candidate = {id: number; e: Entry; kind: 'create' | 'update' | 'remove'; mask: number; held: boolean};
+      const collect = (gain: boolean): Candidate[] => {
+        const list: Candidate[] = [];
+        for (const [id, e] of r.entries) {
+          let kind: Candidate['kind'] | null = null,
+            mask = 0;
+          if (e.state === 'remove') kind = 'remove';
+          else if (e.state === 'create') {
+            kind = 'create';
+            mask = all;
+          } else if (e.state === 'live') {
+            // Updates wait until the creation is acknowledged, so an update can never overtake its creation.
+            const q = entities.get(id);
+            if (q) mask = dirtyMask(e, q);
+            if (mask) kind = 'update';
+          }
+          if (!kind) continue;
+          if (gain) e.acc = Math.min(Number.MAX_VALUE, e.acc + e.weight * elapsed);
+          list.push({id, e, kind, mask, held: kind === 'update' && now - e.lastSent < e.minInterval});
+        }
+        return list;
+      };
+      let candidates = collect(true);
+      if (!candidates.length && r.announce !== 0) return empty('idle');
+      // Expire only when there is something to send, so an idle poll never declares a packet lost.
       let expired = 0;
-      while (r.flights.size >= maxInFlight) {
-        const oldest = r.flights.keys().next().value as number;
-        settleLost(r, oldest);
-        expired++;
-        expiredCount++;
+      if (r.flights.size >= maxInFlight) {
+        while (r.flights.size >= maxInFlight) {
+          settleLost(r, r.flights.keys().next().value as number);
+          expired++;
+          expiredCount++;
+        }
+        candidates = collect(false);
       }
       const seq = r.nextSeq;
-      // Candidates: everything with something to send. Priority accumulates only while waiting.
-      const removes: number[] = [];
-      const ranked: {id: number; e: Entry; mask: number}[] = [];
-      for (const [id, e] of r.entries) {
-        if (e.state === 'remove') removes.push(id);
-        else if (e.state === 'create') {
-          e.acc += e.weight * elapsed;
-          ranked.push({id, e, mask: all});
-        } else if (e.state === 'live' || e.state === 'creating') {
-          const q = entities.get(id);
-          if (!q) continue;
-          const mask = dirtyMask(e, q);
-          if (mask === 0) continue;
-          e.acc += e.weight * elapsed;
-          ranked.push({id, e, mask});
-        }
-      }
-      removes.sort((a, b) => a - b);
-      // Creations before updates, then accumulated priority, then id: deterministic.
-      ranked.sort(
-        (a, b) => Number(b.e.state === 'create') - Number(a.e.state === 'create') || b.e.acc - a.e.acc || a.id - b.id,
+      // One queue: accumulated priority, then removals before creations before updates, then id. Deterministic, and
+      // every kind gains priority while waiting, so sustained churn of one kind cannot starve another.
+      const rank = {remove: 0, create: 1, update: 2};
+      candidates.sort((a, b) =>
+        a.e.acc !== b.e.acc ? (b.e.acc > a.e.acc ? 1 : -1) : rank[a.kind] - rank[b.kind] || a.id - b.id,
       );
-      const base = JSON.stringify({v: 1, type: 'replica', seq, c: [], u: [], r: []}).length;
-      if (base > maxBytes) return empty('starved', {deferred: removes.length + ranked.length, expired});
+      const base = JSON.stringify({v: 1, type: 'replica', epoch: r.epoch, seq, c: [], u: [], r: []}).length;
+      if (base > maxBytes) return empty('starved', {deferred: candidates.length, expired});
       let bytes = base;
       const c: number[][] = [],
         u: number[][] = [],
         rm: number[] = [],
         flight: FlightItem[] = [];
       let deferred = 0,
+        held = 0,
         oversize = 0,
         items = 0;
-      const fits = (len: number, list: unknown[]) => bytes + len + (list.length ? 1 : 0) <= maxBytes;
-      for (const id of removes) {
-        const len = String(id).length;
-        if (items >= maxItems || !fits(len, rm)) {
-          deferred++;
-          if (base + len > maxBytes) oversize++;
+      for (const cand of candidates) {
+        const {id, e, kind, mask} = cand;
+        if (cand.held) {
+          held++;
           continue;
         }
-        bytes += len + (rm.length ? 1 : 0);
-        rm.push(id);
-        items++;
-        const e = r.entries.get(id)!;
-        e.state = 'removing';
-        e.lifecycleSeq = seq;
-        flight.push({id, entry: e, kind: 'remove', mask: 0});
-      }
-      for (const {id, e, mask} of ranked) {
-        const q = entities.get(id);
-        if (!q) continue;
-        const creating = e.state === 'create';
-        if (!creating && now - e.lastSent < e.minInterval) {
-          deferred++;
-          continue;
+        const q = kind === 'remove' ? null : entities.get(id);
+        if (kind !== 'remove' && !q) continue;
+        let item: number | number[];
+        if (kind === 'remove') item = id;
+        else if (kind === 'create') item = [id, ...q!];
+        else {
+          item = [id, mask];
+          for (let f = 0; f < width; f++) if (mask & (1 << f)) item.push(q![f]!);
         }
-        const item: number[] = creating ? [id, ...q] : [id, mask];
-        if (!creating) for (let f = 0; f < width; f++) if (mask & (1 << f)) item.push(q[f]!);
         const len = JSON.stringify(item).length;
-        const list = creating ? c : u;
-        if (items >= maxItems || !fits(len, list)) {
+        const list: unknown[] = kind === 'remove' ? rm : kind === 'create' ? c : u;
+        if (base + len > maxBytes) oversize++;
+        if (items >= maxItems || bytes + len + (list.length ? 1 : 0) > maxBytes) {
           deferred++;
-          if (base + len > maxBytes) oversize++;
           continue;
         }
         bytes += len + (list.length ? 1 : 0);
-        list.push(item);
         items++;
-        e.sent.set(q);
-        e.forced = 0;
         e.acc = 0;
+        if (kind === 'remove') {
+          rm.push(id);
+          e.state = 'removing';
+          e.lifecycleSeq = seq;
+          flight.push({id, entry: e, kind, mask: 0});
+          continue;
+        }
+        (kind === 'create' ? c : u).push(item as number[]);
+        e.sent.set(q!);
+        e.forced = 0;
         e.lastSent = now;
-        if (creating) {
+        if (kind === 'create') {
           e.state = 'creating';
           e.lifecycleSeq = seq;
+          e.mayKnow = true;
         }
-        flight.push({id, entry: e, kind: creating ? 'create' : 'update', mask: creating ? all : mask});
+        flight.push({id, entry: e, kind, mask: kind === 'create' ? all : mask});
       }
-      if (!flight.length) return empty(deferred ? 'starved' : 'idle', {deferred, oversize, expired});
+      // The first packet of an epoch is sent even when empty, so a reused client discards the old session's state.
+      if (!flight.length && r.announce !== 0)
+        return empty(deferred ? 'starved' : held ? 'held' : 'idle', {deferred: deferred + held, oversize, expired});
       r.nextSeq++;
       r.flights.set(seq, flight);
-      const json = JSON.stringify({v: 1, type: 'replica', seq, c, u, r: rm});
+      if (r.announce === 0) r.announce = seq;
+      const json = JSON.stringify({v: 1, type: 'replica', epoch: r.epoch, seq, c, u, r: rm});
       return Object.freeze({
         status: 'built',
         json,
@@ -361,7 +392,7 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
         creates: c.length,
         updates: u.length,
         removes: rm.length,
-        deferred,
+        deferred: deferred + held,
         oversize,
         expired,
       });
@@ -372,6 +403,7 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
       const items = r?.flights.get(sequence);
       if (!r || !items || disposed) return false;
       r.flights.delete(sequence);
+      if (r.announce === sequence) r.announce = -1;
       for (const it of items) {
         if (r.entries.get(it.id) !== it.entry) continue;
         const e = it.entry;

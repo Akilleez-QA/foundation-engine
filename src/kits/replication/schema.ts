@@ -37,7 +37,10 @@ export function defineFieldSchema(fields: readonly FieldSpec[]): FieldSchema {
     if (typeof name !== 'string' || !name || name.length > 64) throw new TypeError(`replication: field ${i} name`);
     if (![min, max, step].every(Number.isFinite) || !(max > min) || !(step > 0))
       throw new RangeError(`replication: field ${name} needs finite min < max and step > 0`);
-    const count = Math.floor((max - min) / step);
+    // Treat a range that is a whole number of steps up to rounding error as exact, so max stays reachable.
+    const ratio = (max - min) / step;
+    const nearest = Math.round(ratio);
+    const count = Math.abs(ratio - nearest) < 1e-9 * Math.max(1, ratio) ? nearest : Math.floor(ratio);
     if (count > MAX_STEPS) throw new RangeError(`replication: field ${name} has more than 2^30 steps`);
     return Object.freeze({name, min, max, step, count});
   });
@@ -59,7 +62,7 @@ export function defineFieldSchema(fields: readonly FieldSpec[]): FieldSchema {
     dequantize(index: number, q: number) {
       const s = specs[index];
       if (!s) throw new RangeError('replication: field index');
-      return s.min + q * s.step;
+      return Math.min(s.max, s.min + q * s.step);
     },
     steps(index: number) {
       const s = specs[index];

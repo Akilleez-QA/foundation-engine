@@ -130,17 +130,19 @@ test('loss puts creations, removals and the lost fields back in line; in-flight 
   s.ack(1, rm2.sequence!);
   assert.equal(s.stats().entries, 0);
   assert.equal(s.ack(1, rm2.sequence!), false);
-  // Two unacknowledged packets outstanding: the next build declares the oldest lost and resends its fields.
+  // Two unacknowledged packets outstanding: the next build declares the oldest lost and requeues its creation.
+  s.set(2, [0, 0, 0, 0]);
+  s.set(3, [0, 0, 0, 0]);
   s.relevant(1, 1);
   const c1 = built(s, 1, 7);
-  s.set(1, [6, 0, 7, 0]);
-  built(s, 1, 8);
-  s.set(1, [6, 1, 7, 0]);
+  s.relevant(1, 2);
+  built(s, 1, 8); // expires the earlier unacknowledged resend
+  s.relevant(1, 3);
   const third = built(s, 1, 9);
   assert.equal(third.expired, 1);
-  assert.equal(third.creates, 1);
+  assert.equal(third.creates, 2); // entity 1 again, and entity 3
   assert.equal(s.ack(1, c1.sequence!), false);
-  assert.equal(s.stats().expired, 2); // the earlier unacknowledged resend expired first
+  assert.equal(s.stats().expired, 2);
 });
 
 test('an entry larger than the budget is reported oversize, never sent partially', () => {
@@ -148,15 +150,21 @@ test('an entry larger than the budget is reported oversize, never sent partially
   s.addRecipient(1);
   s.set(123456, [999.99, 999.99, 359, 15]);
   s.relevant(1, 123456);
-  const b = s.build(1, 0, 60);
+  const first = s.build(1, 0, 70); // the epoch's first packet goes out even though the entry does not fit
+  assert.equal(first.status, 'built');
+  assert.equal(first.creates, 0);
+  assert.equal(first.oversize, 1);
+  s.ack(1, first.sequence!);
+  const b = s.build(1, 1, 70);
   assert.equal(b.status, 'starved');
   assert.equal(b.oversize, 1);
+  assert.equal(s.build(1, 2, 10).status, 'starved'); // smaller than the envelope itself
 });
 
 test('the replica ignores stale, duplicate and resurrecting packets and refuses malformed ones', () => {
   const rep = createReplica({schema, limits: {...replicaLimits, maxEntities: 2}});
   const p = (seq: number, c: number[][], u: number[][], r: number[]) =>
-    JSON.stringify({v: 1, type: 'replica', seq, c, u, r});
+    JSON.stringify({v: 1, type: 'replica', epoch: 1, seq, c, u, r});
   assert.deepEqual(rep.apply(p(1, [[1, 10, 10, 1, 1]], [], [])).created, [1]);
   assert.deepEqual(rep.apply(p(3, [], [[1, 1, 30]], [])).updated, [1]);
   assert.equal(rep.apply(p(2, [], [[1, 1, 20]], [])).stale, 1); // older update for the same field
@@ -164,6 +172,7 @@ test('the replica ignores stale, duplicate and resurrecting packets and refuses 
   assert.deepEqual(rep.apply(p(5, [], [], [1])).removed, [1]);
   assert.equal(rep.apply(p(4, [[1, 0, 0, 0, 0]], [], [])).stale, 1); // delayed creation cannot resurrect
   assert.deepEqual(rep.apply(p(6, [[1, 1, 1, 1, 1]], [], [])).created, [1]); // a newer life can
+  assert.deepEqual(rep.apply(p(6, [[1, 1, 1, 1, 1]], [], [])).created, []); // a duplicate is not a new id
   assert.equal(
     rep.apply(
       p(
@@ -186,7 +195,7 @@ test('the replica ignores stale, duplicate and resurrecting packets and refuses 
     p(8, [], [[1, 1]], []),
     p(8, [], [[1, 32, 1]], []),
     p(8, [[1, 1, 1, 999, 1]], [], []),
-    JSON.stringify({v: 1, type: 'replica', seq: 8, c: [], u: [], r: [], x: 1}),
+    JSON.stringify({v: 1, type: 'replica', epoch: 1, seq: 8, c: [], u: [], r: [], x: 1}),
   ])
     assert.equal(rep.apply(bad).status, 'invalid', bad);
   assert.deepEqual(rep.ids(), [1, 2]);
@@ -313,4 +322,221 @@ test('composition: interest sets drive two recipients over a lossy, reordering l
     }
   }
   assert.ok(replicaBytes * 3 < completeBytes, `${replicaBytes} vs ${completeBytes}`);
+});
+
+test('regressions: a possibly delivered creation is always removed; updates never overtake their creation', () => {
+  const s = createReplicationSchedule({schema, limits});
+  const rep = createReplica({schema, limits: replicaLimits});
+  s.addRecipient(1);
+  s.set(7, [1, 0, 0, 0]);
+  s.relevant(1, 7);
+  const b = built(s, 1, 0);
+  rep.apply(b.json!);
+  s.lost(1, b.sequence!); // the acknowledgment was lost, the packet was not
+  s.irrelevant(1, 7);
+  const rm = built(s, 1, 1);
+  assert.equal(rm.removes, 1);
+  rep.apply(rm.json!);
+  assert.deepEqual(rep.ids(), []);
+  // An update is only built once the creation is acknowledged.
+  s.set(8, [1, 0, 0, 0]);
+  s.relevant(1, 8);
+  const c = built(s, 1, 2);
+  s.set(8, [5, 0, 0, 0]);
+  assert.equal(s.build(1, 3, 4096).status, 'idle');
+  rep.apply(c.json!);
+  s.ack(1, c.sequence!);
+  const u = built(s, 1, 4);
+  rep.apply(u.json!);
+  const out = new Float64Array(4);
+  rep.read(8, out);
+  assert.equal(out[0], 5);
+});
+
+test('regressions: a re-added recipient starts a new epoch; expired tombstones refuse old packets', () => {
+  const s = createReplicationSchedule({schema, limits});
+  const rep = createReplica({schema, limits: {...replicaLimits, maxTombstones: 1}});
+  s.addRecipient(1);
+  s.set(1, [5, 0, 0, 0]);
+  s.relevant(1, 1);
+  const old = built(s, 1, 0);
+  rep.apply(old.json!);
+  s.removeRecipient(1);
+  s.addRecipient(1);
+  s.set(1, [9, 0, 0, 0]);
+  s.relevant(1, 1);
+  const fresh = built(s, 1, 1);
+  assert.equal(fresh.sequence, 1);
+  assert.deepEqual(rep.apply(fresh.json!).created, [1]); // the old session's state was discarded
+  assert.equal(rep.apply(old.json!).status, 'stale-epoch');
+  const out = new Float64Array(4);
+  rep.read(1, out);
+  assert.equal(out[0], 9);
+  const p = (seq: number, c: number[][], r: number[]) =>
+    JSON.stringify({v: 1, type: 'replica', epoch: 2, seq, c, u: [], r});
+  rep.apply(p(5, [], [1]));
+  rep.apply(p(6, [[2, 0, 0, 0, 0]], []));
+  rep.apply(p(7, [], [2])); // evicts the tombstone for id 1 (seq 5)
+  assert.equal(rep.apply(p(4, [[1, 0, 0, 0, 0]], [])).status, 'expired');
+  assert.deepEqual(rep.ids(), []);
+});
+
+test('the top of a range stays reachable; minimum-interval waits report held, not starved', () => {
+  const tenth = defineFieldSchema([{name: 'v', min: 0, max: 0.3, step: 0.1}]);
+  const q = new Int32Array(1);
+  tenth.quantize([0.3], q);
+  assert.equal(tenth.dequantize(0, q[0]!), 0.3);
+  const s = createReplicationSchedule({schema, limits});
+  s.addRecipient(1);
+  s.set(1, [0, 0, 0, 0]);
+  s.relevant(1, 1, {minInterval: 100});
+  s.ack(1, built(s, 1, 0).sequence!);
+  s.set(1, [1, 0, 0, 0]);
+  assert.equal(s.build(1, 1, 1_000_000).status, 'held');
+});
+
+test('S-REPL convergence: randomized operations, loss, duplication, reordering and late delivery converge', () => {
+  const small = defineFieldSchema([
+    {name: 'a', min: 0, max: 10, step: 1},
+    {name: 'b', min: -5, max: 5, step: 0.5},
+    {name: 'c', min: 0, max: 3, step: 1},
+  ]);
+  for (let seed = 1; seed <= 40; seed++) {
+    let x = seed;
+    const rand = () => {
+      x ^= x << 13;
+      x >>>= 0;
+      x ^= x >>> 17;
+      x ^= x << 5;
+      x >>>= 0;
+      return x / 4294967296;
+    };
+    const ri = (n: number) => Math.floor(rand() * n);
+    const s = createReplicationSchedule({
+      schema: small,
+      limits: {maxEntities: 64, maxRecipients: 4, maxRelevant: 64, maxInFlight: 3, maxItems: 64},
+    });
+    const reps = new Map<number, ReturnType<typeof createReplica>>();
+    const wants = new Map<number, Set<number>>();
+    const auth = new Map<number, number[]>();
+    const pending = new Map<number, Set<number>>();
+    let wire: {to: number; seq: number; json: string}[] = [];
+    const add = (r: number) => {
+      s.addRecipient(r);
+      if (!reps.has(r) || rand() < 0.5)
+        reps.set(
+          r,
+          createReplica({
+            schema: small,
+            limits: {maxEntities: 64, maxTombstones: 8, maxBytes: 1 << 20, maxNodes: 1 << 20},
+          }),
+        );
+      wants.set(r, new Set());
+      pending.set(r, new Set());
+    };
+    for (const r of [1, 2, 3]) add(r);
+    const deliver = (p: {to: number; seq: number; json: string}, ack: boolean) => {
+      const a = reps.get(p.to)!.apply(p.json);
+      assert.notEqual(a.status, 'invalid');
+      if (ack && a.status === 'applied' && s.ack(p.to, p.seq)) pending.get(p.to)!.delete(p.seq);
+    };
+    let now = 0;
+    for (let i = 0; i < 1500; i++) {
+      const id = ri(8),
+        r = 1 + ri(3);
+      switch (ri(12)) {
+        case 0:
+        case 1: {
+          const v = [rand() * 12 - 1, rand() * 12 - 6, ri(4)];
+          s.set(id, v);
+          auth.set(id, v);
+          break;
+        }
+        case 2:
+          if (s.delete(id)) {
+            auth.delete(id);
+            for (const w of wants.values()) w.delete(id);
+          }
+          break;
+        case 3: {
+          const res = s.relevant(r, id, {weight: 1 + ri(3), minInterval: ri(3)});
+          if (res === 'tracked' || res === 'updated') wants.get(r)!.add(id);
+          break;
+        }
+        case 4:
+          s.irrelevant(r, id);
+          wants.get(r)!.delete(id);
+          break;
+        case 5:
+        case 6: {
+          now += ri(3);
+          const b = s.build(r, now, 20 + ri(200));
+          if (b.status === 'built') {
+            assert.ok(b.bytes === b.json!.length && b.bytes! <= 220);
+            wire.push({to: r, seq: b.sequence!, json: b.json!});
+            pending.get(r)!.add(b.sequence!);
+          }
+          break;
+        }
+        case 7:
+        case 8: {
+          if (!wire.length) break;
+          const k = ri(wire.length);
+          const p = wire[k]!;
+          if (rand() < 0.8) wire.splice(k, 1); // otherwise it may be delivered again
+          deliver(p, rand() < 0.9);
+          break;
+        }
+        case 9: {
+          const o = [...pending.get(r)!];
+          if (o.length) {
+            const q = o[ri(o.length)]!;
+            s.lost(r, q); // the packet itself may still arrive late
+            pending.get(r)!.delete(q);
+          }
+          break;
+        }
+        case 10:
+          if (rand() < 0.05) {
+            s.removeRecipient(r);
+            wire = wire.filter(p => p.to !== r || rand() < 0.3); // some old-session packets stay in flight
+            add(r);
+          }
+          break;
+        default:
+          break;
+      }
+    }
+    for (const r of [1, 2, 3]) {
+      for (const q of pending.get(r)!) s.lost(r, q);
+      pending.get(r)!.clear();
+    }
+    for (let k = 0; k < 500; k++) {
+      now++;
+      if (wire.length) deliver(wire.pop()!, false);
+      let busy = !!wire.length;
+      for (const r of [1, 2, 3]) {
+        const b = s.build(r, now, 100000);
+        if (b.status !== 'idle') busy = true;
+        if (b.status === 'built') deliver({to: r, seq: b.sequence!, json: b.json!}, true);
+      }
+      if (!busy) break;
+    }
+    const q = new Int32Array(3),
+      out = new Float64Array(3);
+    for (const r of [1, 2, 3]) {
+      const rep = reps.get(r)!;
+      const want = [...wants.get(r)!].sort((a, b) => a - b);
+      assert.deepEqual(rep.ids(), want, `seed ${seed} recipient ${r}`);
+      for (const id of want) {
+        rep.read(id, out);
+        small.quantize(auth.get(id)!, q);
+        assert.deepEqual(
+          [...out],
+          [0, 1, 2].map(f => small.dequantize(f, q[f]!)),
+          `seed ${seed} id ${id}`,
+        );
+      }
+    }
+  }
 });

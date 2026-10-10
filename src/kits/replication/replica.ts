@@ -19,9 +19,16 @@ export interface ReplicaLimits {
 }
 
 export interface ReplicaApplyResult {
-  readonly status: 'applied' | 'invalid' | 'retired';
+  /**
+   * `applied`; `expired`: older than what bounded tombstones can still judge (do not acknowledge it; the sender's
+   * loss path resends current state); `stale-epoch`: from an earlier session of this recipient (ignore it);
+   * `invalid`; `retired`.
+   */
+  readonly status: 'applied' | 'expired' | 'stale-epoch' | 'invalid' | 'retired';
   readonly sequence?: number;
+  /** Ids this replica did not hold before. */
   readonly created: readonly number[];
+  /** Ids whose values changed (including a re-sent creation of an id already held). */
   readonly updated: readonly number[];
   readonly removed: readonly number[];
   /** Items ignored because a newer packet already decided them, or the entity is unknown. */
@@ -59,7 +66,9 @@ export function createReplica(options: {schema: FieldSchema; limits: ReplicaLimi
   const width = schema.count;
   const known = new Map<number, Known>();
   const tombstones = new Map<number, number>(); // id -> removal sequence, insertion order = age
-  let disposed = false;
+  let disposed = false,
+    epoch = 0,
+    floor = 0; // highest sequence of an evicted tombstone: older packets can no longer be judged
 
   function validItem(v: DocumentValue, kind: 'c' | 'u'): boolean {
     if (!Array.isArray(v) || !isInt(v[0])) return false;
@@ -82,9 +91,10 @@ export function createReplica(options: {schema: FieldSchema; limits: ReplicaLimi
   function valid(v: DocumentValue): boolean {
     if (v === null || typeof v !== 'object' || Array.isArray(v)) return false;
     const keys = Object.keys(v);
-    if (keys.length !== 6 || !['v', 'type', 'seq', 'c', 'u', 'r'].every(k => Object.hasOwn(v, k))) return false;
+    if (keys.length !== 7 || !['v', 'type', 'epoch', 'seq', 'c', 'u', 'r'].every(k => Object.hasOwn(v, k)))
+      return false;
     const p = v as {[k: string]: DocumentValue};
-    if (p.v !== 1 || p.type !== 'replica' || !isInt(p.seq, 1)) return false;
+    if (p.v !== 1 || p.type !== 'replica' || !isInt(p.seq, 1) || !isInt(p.epoch, 1)) return false;
     const {c, u, r} = p;
     return (
       Array.isArray(c) &&
@@ -99,7 +109,11 @@ export function createReplica(options: {schema: FieldSchema; limits: ReplicaLimi
   function tomb(id: number, seq: number) {
     tombstones.delete(id);
     tombstones.set(id, seq);
-    while (tombstones.size > maxTombstones) tombstones.delete(tombstones.keys().next().value as number);
+    while (tombstones.size > maxTombstones) {
+      const oldest = tombstones.keys().next().value as number;
+      floor = Math.max(floor, tombstones.get(oldest)!);
+      tombstones.delete(oldest);
+    }
   }
 
   const done = (r: Omit<ReplicaApplyResult, 'stale' | 'saturated'> & Partial<ReplicaApplyResult>) =>
@@ -109,7 +123,7 @@ export function createReplica(options: {schema: FieldSchema; limits: ReplicaLimi
     apply(json: string): ReplicaApplyResult {
       const none = {created: [], updated: [], removed: []};
       if (disposed) return done({status: 'retired', ...none});
-      let packet: {seq: number; c: number[][]; u: number[][]; r: number[]};
+      let packet: {epoch: number; seq: number; c: number[][]; u: number[][]; r: number[]};
       try {
         const doc = createAuthoredDocument({
           id: 'replica-packet',
@@ -122,7 +136,16 @@ export function createReplica(options: {schema: FieldSchema; limits: ReplicaLimi
       } catch {
         return done({status: 'invalid', ...none});
       }
+      if (packet.epoch < epoch) return done({status: 'stale-epoch', ...none});
+      if (packet.epoch > epoch) {
+        // A new session of this recipient: everything from the old one is void.
+        known.clear();
+        tombstones.clear();
+        floor = 0;
+        epoch = packet.epoch;
+      }
       const seq = packet.seq;
+      if (seq <= floor) return done({status: 'expired', ...none});
       const created: number[] = [],
         updated: number[] = [],
         removed: number[] = [];
@@ -147,6 +170,7 @@ export function createReplica(options: {schema: FieldSchema; limits: ReplicaLimi
           continue;
         }
         let target = k;
+        const fresh = !target;
         if (!target) {
           if (known.size >= maxEntities) {
             saturated++;
@@ -162,7 +186,7 @@ export function createReplica(options: {schema: FieldSchema; limits: ReplicaLimi
             target.q[f] = item[f + 1]!;
             target.fieldSeq[f] = seq;
           }
-        created.push(id);
+        (fresh ? created : updated).push(id);
       }
       for (const item of packet.u) {
         const id = item[0]!;
@@ -199,6 +223,8 @@ export function createReplica(options: {schema: FieldSchema; limits: ReplicaLimi
     clear() {
       known.clear();
       tombstones.clear();
+      floor = 0;
+      epoch = 0;
     },
     dispose() {
       disposed = true;
