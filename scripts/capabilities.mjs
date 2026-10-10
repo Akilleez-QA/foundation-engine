@@ -258,6 +258,11 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'CONTACT-01',
+    title: 'Layered contact volumes with deterministic bounded enter/stay/exit pair events',
+    docs: 'src/kits/contact/README.md',
+    evidence: [{kit: 'contact', export: 'createContactLayer'}, {path: 'src/kits/contact/contact.test.ts'}],
+
     id: 'CAP-ACTION-PHASES',
     title: 'Creator-authored action phase windows, once-only marks and per-range claims',
     docs: 'docs/guides/action-phases.md',

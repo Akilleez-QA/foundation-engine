@@ -100,6 +100,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/character`
 - `@kits/combat`
 - `@kits/concept-explorer`
+- `@kits/contact`
 - `@kits/control`
 - `@kits/dialogue`
 - `@kits/economy`

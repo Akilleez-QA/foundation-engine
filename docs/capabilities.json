@@ -922,6 +922,7 @@
         "pickPart"
       ]
     },
+    {"name": "contact", "exports": ["CONTACT_LIMITS", "contact", "createContactLayer"]},
     {"name": "control", "exports": ["control", "createControl"]},
     {"name": "dialogue", "exports": ["DIALOGUE_LIMITS", "createDialogue", "dialogue"]},
     {
