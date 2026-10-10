@@ -1772,3 +1772,10 @@ including seeded randomized bound and exactly-once runs. These are implemented a
 checked on branch `feat/prediction-presentation`, not integrated. Independent review,
 hosted CI, device or browser review of smoothing and multiplayer acceptance remain
 outstanding. See ADR 0142.
+
+## Presentation kit — candidate (2026-10-09)
+
+- **Scope:** `src/kits/presentation` (ADR 0154).
+- **Evidence:** `presentation.test.ts`. It covers transitions, the input lock, CSS, the day clock, curves, weather,
+  the roll-up and a `testScene` door composition.
+- **Not established:** browser or device appearance, template adoption and hosted CI.

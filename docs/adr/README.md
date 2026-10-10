@@ -171,3 +171,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0145](0145-cell-portal-culling.md) | Optional cell and portal render culling | Optional kits / Rendering scale | Proposed |
 
 | [0142](0142-prediction-presentation.md) | Optional prediction correction smoothing and predicted-event deduplication | Network kit / Prediction presentation | Proposed |
+
+| [0154](0154-presentation-kit.md) | Optional presentation kit | Optional kits | Proposed |
