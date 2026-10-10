@@ -139,3 +139,12 @@ Each file records one decision: its context, the decision and its consequences (
 | [0134](0134-duplicate-detector.md) | Duplicate and near-duplicate detection as a read-only repo tool | Tooling / Assets | Proposed |
 
 | [0154](0154-presentation-kit.md) | Optional presentation kit | Optional kits | Proposed |
+| [0140](0140-optional-car-handling.md) | Optional car handling on ray-cast wheels | Optional kits / Simulation | Proposed |
+
+| [0141](0141-optional-board-traversal.md) | Optional board traversal with authored rails | Optional kits / Simulation | Proposed |
+
+| [0104](0104-grid-step-movement.md) | Optional grid-step actor movement | Optional kits | Proposed |
+
+| [0120](0120-optional-sandboxed-script-runtime.md) | Optional sandboxed script runtime (amends 0005 for creators who opt in) | Optional kits / Content | Proposed |
+
+| [0121](0121-optional-physics-adapter-kit.md) | Optional physics adapter kit over a lazily loaded WebAssembly library; amends the no-physics stance only for creators who opt in | Optional kits / Simulation / Dependencies | Proposed |

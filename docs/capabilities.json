@@ -92,6 +92,28 @@
       "evidence": ["@kits/retro exports sceneRetro", "@kits/retro exports retroReference"]
     },
     {
+      "id": "CAR-01",
+      "title": "Optional car handling on ray-cast wheels",
+      "shipped": true,
+      "docs": "src/kits/car-handling/README.md",
+      "evidence": [
+        "@kits/car-handling exports createCarHandling",
+        "@kits/car-handling exports carHandlingSystem",
+        "src/kits/car-handling/car.test.ts exists"
+      ]
+    },
+    {
+      "id": "BOARD-01",
+      "title": "Optional board traversal with authored rails",
+      "shipped": true,
+      "docs": "src/kits/board-traversal/README.md",
+      "evidence": [
+        "@kits/board-traversal exports createBoard",
+        "@kits/board-traversal exports defineRails",
+        "src/kits/board-traversal/board.test.ts exists"
+      ]
+    },
+    {
       "id": "NAV-FIELD-01",
       "title": "Optional incremental shared navigation distance fields",
       "shipped": true,
@@ -250,6 +272,13 @@
       ]
     },
     {
+      "id": "GRID-STEP-01",
+      "title": "Grid-step actor movement with classified bumps, ledges, forced tiles and follower lines",
+      "shipped": true,
+      "docs": "src/kits/grid-step/README.md",
+      "evidence": ["@kits/grid-step exports createGridStepper", "src/kits/grid-step/grid-step.test.ts exists"]
+    },
+    {
       "id": "PRESENTATION-01",
       "title": "Screen transitions with input lock, time-of-day curves, weather blending and HUD roll-ups",
       "shipped": true,
@@ -385,6 +414,13 @@
       "evidence": ["@kits/spatial exports createOccupancy", "@kits/procgen exports CELL_BATCH_CEILING"]
     },
     {
+      "id": "SCRIPT-01",
+      "title": "Optional sandboxed Lua scripts with capability-scoped host functions and deterministic per-call budgets",
+      "shipped": true,
+      "docs": "docs/guides/scripting.md",
+      "evidence": ["@kits/scripting exports loadScriptVm", "@kits/scripting exports createScriptHost"]
+    },
+    {
       "id": "GEN-02",
       "title": "Bounded binary record store for large edited worlds",
       "shipped": true,
@@ -468,7 +504,17 @@
       "docs": "docs/guides/render-backend.md",
       "evidence": ["src/platform/render/backends/webgpu exists"]
     },
-    {"id": "PHYSICS", "title": "Rigid-body physics", "shipped": false, "evidence": ["@kits/physics exists"]}
+    {
+      "id": "PHYSICS",
+      "title": "Rigid-body physics (optional adapter kit over a lazily loaded WebAssembly library)",
+      "shipped": true,
+      "docs": "docs/guides/physics-adapter.md",
+      "evidence": [
+        "@kits/physics exports scenePhysics",
+        "@kits/physics exports createPhysicsWorld",
+        "src/kits/physics/snapshot.test.ts exists"
+      ]
+    }
   ],
   "engine": {
     "module": "@engine",
@@ -776,6 +822,23 @@
         "isBlackboardValue"
       ]
     },
+    {
+      "name": "board-traversal",
+      "exports": [
+        "BOARD_PRESETS",
+        "RAIL_MAX_POINTS",
+        "RAIL_MAX_RAILS",
+        "RAIL_MAX_SEGMENTS",
+        "boardConfig",
+        "boardConfigFingerprint",
+        "boardSystem",
+        "characterSlide",
+        "createBoard",
+        "defineRails",
+        "sampledBoardGround",
+        "validateBoardConfig"
+      ]
+    },
     {"name": "breadcrumbs", "exports": ["TRAIL_LIMITS", "breadcrumbs", "createBreadcrumbTrail", "nextFollowerLag"]},
     {"name": "cadence", "exports": ["CADENCE_CEILING", "MAX_CADENCE_TICK", "createCadence", "createCadenceResult"]},
     {
@@ -788,9 +851,12 @@
         "cameraSystem",
         "clearCamera",
         "closeUpPose",
+        "createAreaCamera",
         "createCameraTransition",
         "createCameraVolumes",
+        "createEasedBounds",
         "createLetterbox",
+        "createLookAhead",
         "railPose",
         "shotPose",
         "stringPose",
@@ -815,6 +881,21 @@
         "parseResourceValue",
         "prepareProgressionChange",
         "prepareResourceChange"
+      ]
+    },
+    {
+      "name": "car-handling",
+      "exports": [
+        "CAR_PRESETS",
+        "carConfig",
+        "carConfigFingerprint",
+        "carHandlingSystem",
+        "createCarHandling",
+        "createGroundHit",
+        "evalCurve",
+        "planeGround",
+        "sampledGround",
+        "validateCarConfig"
       ]
     },
     {"name": "chalkboard", "exports": ["BOARD", "createBoardView", "lengthOf", "pathOf", "tickLabels"]},
@@ -922,6 +1003,18 @@
         "frameReplicaSystem",
         "frames",
         "poseMatrix"
+      ]
+    },
+    {
+      "name": "grid-step",
+      "exports": [
+        "DIRECTIONS",
+        "GRID_STEP_LIMITS",
+        "HANDHELD_TILE_PRESET",
+        "createGridStepper",
+        "directionBit",
+        "gridStep",
+        "opposite"
       ]
     },
     {"name": "housing", "exports": ["createStructure", "housing"]},
@@ -1049,6 +1142,29 @@
       ]
     },
     {"name": "objectives", "exports": ["createObjectiveRun", "createStagedObjectives", "objectives"]},
+    {
+      "name": "physics",
+      "exports": [
+        "Collider",
+        "ENGINE_FIXED_STEP",
+        "PHYSICS_DEFAULT_LIMITS",
+        "PHYSICS_LIMIT_RANGES",
+        "PhysicsCharacter",
+        "RigidBody",
+        "createPhysicsLoader",
+        "createPhysicsWorld",
+        "eulerToQuat",
+        "loadPhysics",
+        "physics",
+        "physicsCharacterStats",
+        "physicsCharacterSystem",
+        "physicsConfig",
+        "physicsDebugDraw",
+        "physicsLoader",
+        "quatToEuler",
+        "scenePhysics"
+      ]
+    },
     {"name": "playout", "exports": ["createClockOffset", "createPlayout"]},
     {
       "name": "population",
@@ -1201,6 +1317,17 @@
         "createRollbackSyncTest",
         "rollback",
         "rollbackChecksum"
+      ]
+    },
+    {
+      "name": "scripting",
+      "exports": [
+        "DEFAULT_SCRIPT_LIMITS",
+        "SCRIPT_LIMIT_RANGES",
+        "canonicalScriptJson",
+        "createScriptHost",
+        "loadScriptVm",
+        "scriptTickSystem"
       ]
     },
     {

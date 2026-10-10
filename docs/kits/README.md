@@ -53,7 +53,12 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 
 | [breadcrumbs](../../src/kits/breadcrumbs/README.md) | Leader path ring with exact crumb-lag and path-distance retracing, segment cuts, snapshots and a wait/keep-pace/catch-up lag controller; pure helpers | None yet; headless tests only |
 | [presentation](../../src/kits/presentation/README.md) | Screen transitions (fade/wipe/iris) with an input lock, day clock and cyclic lighting curves, a blending weather director, HUD roll-up counters; pure helpers | None yet; headless tests only |
+
+| [grid-step](../../src/kits/grid-step/README.md) | Tile-to-tile actors: facing, classified bumps, ledges, conveyor/ice tiles, reservations while moving, follower lines, snapshots; creator tile rules | None yet; headless tests only |
 | [spatial-audio](../../src/kits/spatial-audio/README.md) | Logical sound sources: virtual tracking, importance ranking with HRTF for the sounds that matter, class distance curves with a hard cutoff, budgeted occlusion driving the smoothed filter | None yet; implemented, candidate (AUD-02, PR #55, [recipe](../recipes/3d-sound-for-shooters.md)) |
+| [physics](../../src/kits/physics/README.md) | Optional rigid bodies, colliders, ordered bounded collision events, queries, rollback snapshots and a slope/step character adapter over a lazily loaded WebAssembly library (ADR 0121) | None yet; candidate with Node tests and one software-GL fixture snapshot ([guide](../guides/physics-adapter.md)) |
+
+The optional [scripting](../../src/kits/scripting/README.md) candidate runs sandboxed Lua 5.4 scripts with capability-scoped host functions, deterministic per-call instruction budgets, a memory cap, fixed-tick timers and save/restore of each script's `state`; its VM loads lazily. Headless unit, rollback sync-test and scene consumer tests plus headless Chromium fixture runs only; no template consumer or device acceptance is claimed. [Guide](../guides/scripting.md).
 
 The optional [assignments](../../src/kits/assignments/README.md) candidate supplies exclusive actor claims, weighted target capacity and atomic transfer refusal. Two headless service/worksite fixtures and route-owner composition tests exercise it; no playable template consumer or browser/device acceptance is claimed. [Guide](../guides/assignments.md).
 
@@ -66,6 +71,10 @@ The optional [entity-pool](../../src/kits/entity-pool/README.md) candidate keeps
 The optional [streaming](../../src/kits/streaming/README.md) candidate ranks play-time load requests under concurrency and byte budgets, with cancellation, retry and preemption, through ports onto the existing lease caches and model owner. Headless unit and consumer tests only; no template consumer or browser/device acceptance is claimed. [Guide](../guides/streaming-queue.md).
 
 The optional [retro](../../src/kits/retro/README.md) candidate draws a scene at low resolution with wide pixels, a creator palette or levels and ordered dithering through `@kits/three`. Headless tests, a software-GL screenshot and a GPU bench of the showcase courtyard; no template uses it and no device acceptance is claimed. [Guide](../guides/retro-look.md).
+
+The optional [car-handling](../../src/kits/car-handling/README.md) candidate steps a car on ray-cast wheels against a creator ground query (suspension, tyre slip and grip, drive, brake and steering curves, handbrake drifts, downforce, air control, upside-down reset) with bounded sub-steps, transactional steps and deterministic snapshot/restore; `arcade` and `sim-lite` presets. Headless tests with ECS, terrain and rollback consumers only; no template consumer or browser/device acceptance is claimed.
+
+The optional [board-traversal](../../src/kits/board-traversal/README.md) candidate rides a board over a creator ground query: push, carve, charged ollies, landings judged by board angle, grinds on authored rail snapshots with balance, manuals and bails, with bounded sub-steps and rail checks, transactional steps and deterministic snapshot/restore; `arcade` and `sim-lite` presets. Headless tests with ECS (character-kit walls), terrain and rollback consumers only; no template consumer or browser/device acceptance is claimed.
 
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.
 
