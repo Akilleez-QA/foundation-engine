@@ -420,7 +420,7 @@ failure is reported once and the visit draws direct; a WebGPU visit reports no i
 bloom beside an emissive box at full only, a still scene draws no frame, release audit at the author-API baseline);
 `quality:guard` identical for the blank and explorer templates. No reference-GPU cost, physical-device or
 visual-quality acceptance; the stock shell does not install the Graphics screen, so the live knob is unit-tested only.
-**Grade tools (POST-02, 2026-10-04): implemented, candidate (PR #179, `feat/post-grade`); not integrated.** `grade.lut`
+**Grade tools (POST-02, 2026-10-04): integrated (PR #179 via combined integration PR #253).** `grade.lut`
 (a `.cube` 3D lookup table under `public/`, strength 0 to 1) and `ceiling` (an opt-in HDR clamp, 1 to 65504) in the same
 combined pass, no extra post draw. Owner: the visit's post seam (fetch with the visit signal after the chunk, 4 parsed
 tables per page, one half-float 3D texture per visit). Overload: a file over 8 MiB or a side over 65 is refused.
@@ -506,7 +506,7 @@ unit tests, recipe test and `npm run test:scatter-browser` (desktop headless Chr
 it, so template budgets are unchanged. glTF `Model` scatter is a follow-up. No physical-device or GPU timing
 acceptance.
 
-## Blob shadows (VIS-10) — implemented, candidate
+## Blob shadows (VIS-10) — integrated (PR #184 via #253)
 
 `BlobShadow` / `sceneBlobShadows` (author API) draw a soft ground ellipse under each opted-in entity where it has no
 real sun shadow (beyond the sun's shadow box with a crossfade, in a scene without `sceneShadows()`, with the player's
@@ -679,7 +679,7 @@ Sky and haze (VIS-05): `defineEnvironment({ sky })` draws a gradient sky with op
 one texture on an unlit sphere; `haze` gains `exp2` and `color: 'sky'`. Status: implemented and checked as a candidate PR #150. Evidence: unit tests and `npm run test:sky-browser`.
 Interior reflection (VIS-11): `defineEnvironment({ reflection: { kind: 'interior' } })` builds a procedural interior (walls,
 floor, ceiling, at most 8 lights) once per distinct interior into the scene's reflection environment; no per-frame cost.
-Status: implemented, candidate (PR #183); not integrated. Evidence: unit tests;
+Status: integrated (PR #183 via combined integration PR #253). Evidence: unit tests;
 `npm run test:interior-reflection-browser` passed 2026-10-05 in local software GL on the reference and low presets (mirror sphere centre 255,255,255, rim 8,8,8; relit after one change; draws 1/1; idle 0). No physical-device or visual-quality acceptance.
 
 ## Asset provenance and AI disclosure (DX-03) — implemented, candidate
