@@ -40,7 +40,8 @@ A move from tile A in direction `d` is checked in this order. The first failure 
      tile beyond. The landing tile must not itself be a ledge.
 4. **`elevation`:** the destination's elevation differs from the actor's. Undefined is compatible with everything, and
    so is a `transition` tile (stairs or a ramp).
-5. **`occupied`:** another actor with a compatible elevation holds the destination, either standing or moving.
+5. **`occupied`:** another actor holds the destination, either standing or moving, at an elevation compatible with
+   the mover's once both are on that tile. A stairs tile clears elevation, so anyone on it blocks.
 
 Other behaviour:
 
@@ -67,8 +68,8 @@ Other behaviour:
   - Step and jump ticks: 1–65536.
   - Forced chain: 0–4096 moves.
 - **Cost.**
-  - A request costs a constant number of tile lookups, plus a scan of that tile's claimants (at most two
-    blocking actors), plus the same for each pulled follower.
+  - A request costs a constant number of tile lookups, plus a scan of that tile's claimants (only actors at a
+    compatible elevation block), plus the same for each pulled follower.
   - `step()` is O(m log m) for m moving actors, plus pulled followers. Followers are indexed by leader.
 - **Failure.** Malformed creator input to the stepper's own methods throws `RangeError` before any change. A tile
   function that throws, reenters the stepper or returns a malformed rule (unknown direction, elevation outside
@@ -77,9 +78,10 @@ Other behaviour:
 - **Placement.** `add()` refuses impassable tiles and tiles with no matching class, unless the actor has
   `ignoreTiles` set.
 - **Saving and restoring.** `snapshot()` is plain data. `restore(snapshot)` validates every actor: move geometry,
-  leaders, cycles, the forced-chain bound and tile claims. Two actors may share a tile only while one of them is
-  leaving it, and only if it is the other's destination or the tile the other already stands on. A refused
-  restore leaves the stepper unchanged.
+  leaders, cycles, the forced-chain bound and tile claims. Actors at incompatible elevations may always share a
+  tile. Otherwise two actors may share one only while one of them is leaving it, and only if it is the other's
+  destination or the tile the other already stands on. Restore does not require the two to be leader and
+  follower (an unfollow mid-move produces such a state). A refused restore leaves the stepper unchanged.
 
 ## Presets
 

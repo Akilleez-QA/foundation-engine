@@ -303,3 +303,20 @@ test('review regressions: self-produced snapshots restore, malformed tiles fail 
   assert.throws(() => stairs.add(2, {x: 0, y: 0}), RangeError);
   assert.throws(() => stairs.move(1, 'west', null as never), RangeError);
 });
+
+test('second review: stairs never let two actors share a tile; layered actors restore', () => {
+  const s = createGridStepper({
+    width: 3,
+    height: 1,
+    maxActors: 3,
+    turnBeforeMove: false,
+    stepTicks: 1,
+    tile: x => (x === 0 ? {elevation: 1} : x === 1 ? {transition: true} : {elevation: 2}),
+  });
+  s.add(2, {x: 1, y: 0, elevation: 2});
+  s.add(1, {x: 0, y: 0, elevation: 1});
+  assert.deepEqual(s.move(1, 'east'), {kind: 'bumped', reason: 'occupied'});
+  const bridge = createGridStepper({width: 2, height: 1, maxActors: 3, tile: () => ({})});
+  for (const elevation of [0, 1, 2]) bridge.add(elevation, {x: 0, y: 0, elevation});
+  assert.doesNotThrow(() => bridge.restore(bridge.snapshot()));
+});

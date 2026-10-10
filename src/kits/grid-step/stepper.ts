@@ -278,13 +278,19 @@ export function createGridStepper(options: GridStepOptions) {
     } else if (!inside(tx, ty)) return {kind: 'bumped', reason: 'impassable'};
     if (!a.ignoreActors) {
       const holders = claims.get(key(tx, ty));
-      if (holders)
+      if (holders) {
+        // Compare the elevations both actors will have on this tile: a stairs tile clears elevation (so anyone
+        // there blocks), a tile with an elevation sets it, and an untagged tile keeps each actor's own.
+        const destination = a.ignoreTiles ? {} : rule(tx, ty);
+        const onTile = (e: number | undefined) =>
+          destination.transition === true ? undefined : (destination.elevation ?? e);
         for (const other of holders) {
           if (other === a.id || other === exempt) continue;
           const o = actors.get(other)!;
           if (o.ignoreActors) continue;
-          if (compatible(a.elevation, o.elevation)) return {kind: 'bumped', reason: 'occupied'};
+          if (compatible(onTile(a.elevation), onTile(o.elevation))) return {kind: 'bumped', reason: 'occupied'};
         }
+      }
     }
     return {kind: jumped ? 'jumped' : 'started', toX: tx, toY: ty, ticks};
   }
@@ -614,8 +620,6 @@ export function createGridStepper(options: GridStepOptions) {
           add(a.x, a.y, a);
           if (a.duration > 0) add(a.toX, a.toY, a);
         }
-        for (const set of nextClaims.values())
-          if ([...set].filter(id => !next.get(id)!.ignoreActors).length > 2) fail('more than two actors share a tile');
         actors.clear();
         followers.clear();
         moving.clear();
