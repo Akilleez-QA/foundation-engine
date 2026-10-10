@@ -404,6 +404,15 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'SCRIPT-01',
+    title: 'Optional sandboxed Lua scripts with capability-scoped host functions and deterministic per-call budgets',
+    docs: 'docs/guides/scripting.md',
+    evidence: [
+      {kit: 'scripting', export: 'loadScriptVm'},
+      {kit: 'scripting', export: 'createScriptHost'},
+    ],
+  },
+  {
     id: 'GEN-02',
     title: 'Bounded binary record store for large edited worlds',
     pr: 56,

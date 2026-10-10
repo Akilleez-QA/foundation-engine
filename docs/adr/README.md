@@ -143,3 +143,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0141](0141-optional-board-traversal.md) | Optional board traversal with authored rails | Optional kits / Simulation | Proposed |
 
 | [0099](0099-grid-step-movement.md) | Optional grid-step actor movement | Optional kits | Proposed |
+
+| [0120](0120-optional-sandboxed-script-runtime.md) | Optional sandboxed script runtime (amends 0005 for creators who opt in) | Optional kits / Content | Proposed |
