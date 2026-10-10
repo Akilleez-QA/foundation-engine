@@ -21,13 +21,20 @@
  */
 import * as T from 'three';
 import {bloomSizes, BLOOM_MIPS, postDrawsOf, postTargetBytes, type PostPlan} from '../../post/settings';
+import {lutBytes, parseCubeLut, type CubeLut} from '../../post/lut';
 
-/** What the scene runtime drives. A WebGPU implementation provides the same surface. */
+/** The `.cube` reader, here so the scene seam loads it with the chunk rather than in every game's first load. */
+export {parseCubeLut};
+
+/**
+ * What the scene runtime drives. A WebGPU implementation provides the same surface. `lut` is the parsed table of
+ * `plan.grade.lut` once it has loaded; without it (still loading, failed, or none asked for) no table is applied.
+ */
 export interface PostPipeline {
   /** Draw `scene` through `plan` into the canvas. */
-  render(scene: T.Object3D, camera: T.Camera, plan: PostPlan): void;
+  render(scene: T.Object3D, camera: T.Camera, plan: PostPlan, lut?: CubeLut | null): void;
   /** Compile the scene's target variant and the plan's passes before the first draw (STD-REN-37). */
-  compile(scene: T.Object3D, camera: T.Camera, plan: PostPlan): void;
+  compile(scene: T.Object3D, camera: T.Camera, plan: PostPlan, lut?: CubeLut | null): void;
   stats(): PostPipelineStats;
   dispose(): void;
 }
@@ -36,6 +43,8 @@ export interface PostPipelineStats {
   targetBytes: number;
   /** Target (re)allocations: 1 after the first draw, +1 per size or sample change. */
   allocations: number;
+  /** Bytes the lookup table's 3D texture holds (0 without one). */
+  lutBytes: number;
   width: number;
   height: number;
   samples: number;
@@ -76,14 +85,38 @@ vec3 box4(sampler2D src, vec2 uv, vec2 texel) {
   return 0.25 * (texture2D(src, uv + o.xy).rgb + texture2D(src, uv + o.zy).rgb + texture2D(src, uv + o.xw).rgb +
     texture2D(src, uv + o.zw).rgb);
 }`;
+// The HDR ceiling (opt-in, the CEILING define): a NaN pixel goes black, an infinite channel is clipped, and a pixel brighter
+// than the ceiling is scaled down to it with its hue kept. Applied to every tap before it is averaged, so one
+// over-range pixel cannot spread into a bright disc.
+const CEIL = /* glsl */ `
+uniform float ceiling;
+vec3 hdrCeiling(vec3 v) {
+  if (any(isnan(v))) return vec3(0.0);
+  v = max(v, vec3(0.0));
+  if (any(isinf(v))) return min(v, vec3(ceiling));
+  float peak = max(v.r, max(v.g, v.b));
+  return peak > ceiling ? v * (ceiling / peak) : v;
+}
+#define TAP(src, uv) hdrCeiling(texture2D(src, uv).rgb)`;
+const TAP = /* glsl */ `
+#ifndef CEILING
+#define TAP(src, uv) texture2D(src, uv).rgb
+#endif`;
 const PREFILTER = /* glsl */ `
 uniform sampler2D src;
 uniform vec2 texel;
 uniform float threshold;
 varying vec2 vUv;
-${BOX}
+#ifdef CEILING
+${CEIL}
+#endif
+${TAP}
+vec3 box4t(sampler2D src, vec2 uv, vec2 texel) {
+  vec4 o = texel.xyxy * vec4(-1.0, -1.0, 1.0, 1.0);
+  return 0.25 * (TAP(src, uv + o.xy) + TAP(src, uv + o.zy) + TAP(src, uv + o.xw) + TAP(src, uv + o.zw));
+}
 void main() {
-  vec3 c = min(box4(src, vUv, texel), vec3(256.0));
+  vec3 c = min(box4t(src, vUv, texel), vec3(256.0));
   float b = max(c.r, max(c.g, c.b));
   float knee = max(threshold * 0.5, 1e-4);
   float soft = clamp(b - threshold + knee, 0.0, 2.0 * knee);
@@ -119,9 +152,18 @@ uniform float vignette;
 uniform vec3 lift;
 uniform vec3 gain;
 uniform float saturation;
+#ifdef LUT
+uniform sampler3D lut;
+uniform vec2 lutMap;
+uniform float lutStrength;
+#endif
 varying vec2 vUv;
+#ifdef CEILING
+${CEIL}
+#endif
+${TAP}
 void main() {
-  vec3 c = texture2D(scene, vUv).rgb;
+  vec3 c = TAP(scene, vUv);
 #ifdef BLOOM
   c += texture2D(bloom, vUv).rgb * strength;
 #endif
@@ -132,6 +174,11 @@ void main() {
   vec3 g = sRGBTransferOETF(vec4(clamp(c, 0.0, 1.0), 1.0)).rgb;
   g = g * gain + lift * (1.0 - g);
   g = mix(vec3(dot(g, vec3(0.2126, 0.7152, 0.0722))), g, saturation);
+#ifdef LUT
+  // Lattice centres: 0 maps to the first texel's centre and 1 to the last's (lutMap = [(N - 1) / N, 0.5 / N]).
+  vec3 graded = texture(lut, clamp(g, 0.0, 1.0) * lutMap.x + lutMap.y).rgb;
+  g = mix(g, graded, lutStrength);
+#endif
   g *= 1.0 - vignette * smoothstep(0.35, 1.0, length(vUv - 0.5) * 1.41421356);
   gl_FragColor = vec4(sRGBTransferEOTF(vec4(clamp(g, 0.0, 1.0), 1.0)).rgb, 1.0);
   #include <colorspace_fragment>
@@ -172,7 +219,12 @@ export function createWebGLPost(renderer: T.WebGLRenderer, options: {samples(): 
   const geometry = new T.BufferGeometry();
   geometry.setAttribute('position', new T.Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3));
   geometry.setAttribute('uv', new T.Float32BufferAttribute([0, 0, 2, 0, 0, 2], 2));
-  const prefilter = pass(PREFILTER, {src: {value: null}, texel: {value: new T.Vector2()}, threshold: {value: 1}});
+  const prefilterUniforms = () => ({
+    src: {value: null},
+    texel: {value: new T.Vector2()},
+    threshold: {value: 1},
+    ceiling: {value: 65504},
+  });
   const down = pass(DOWN, {src: {value: null}, texel: {value: new T.Vector2()}});
   const up = pass(
     UP,
@@ -187,13 +239,39 @@ export function createWebGLPost(renderer: T.WebGLRenderer, options: {samples(): 
     lift: {value: new T.Vector3()},
     gain: {value: new T.Vector3(1, 1, 1)},
     saturation: {value: 1},
+    ceiling: {value: 65504},
+    lut: {value: null},
+    lutMap: {value: new T.Vector2(1, 0)},
+    lutStrength: {value: 0},
   });
-  const combine = {
-    basic: pass(COMBINE, combineUniforms()),
-    full: pass(COMBINE, combineUniforms(), {defines: {BLOOM: 1}}),
+  const materials: T.ShaderMaterial[] = [];
+  const variants = new Map<string, T.ShaderMaterial>();
+  /**
+   * The threshold and combined passes, one material per define set, made on first use and kept for the visit (at
+   * most 2 threshold and 8 combined variants; each is one program). `bloom`, `lut` and `ceiling` are the defines.
+   */
+  const variant = (kind: 'prefilter' | 'combine', bloom: boolean, lut: boolean, ceiling: boolean) => {
+    const key = `${kind}:${+bloom}${+lut}${+ceiling}`;
+    let m = variants.get(key);
+    if (!m) {
+      const defines: Record<string, number> = {};
+      if (bloom) defines.BLOOM = 1;
+      if (lut) defines.LUT = 1;
+      if (ceiling) defines.CEILING = 1;
+      m =
+        kind === 'prefilter'
+          ? pass(PREFILTER, prefilterUniforms(), {defines})
+          : pass(COMBINE, combineUniforms(), {defines});
+      variants.set(key, m);
+      materials.push(m);
+    }
+    return m;
   };
-  const materials = [prefilter, down, up, combine.basic, combine.full];
-  const quad = new T.Mesh(geometry, prefilter);
+  variant('prefilter', false, false, false);
+  materials.push(down, up);
+  variant('combine', false, false, false);
+  variant('combine', true, false, false);
+  const quad = new T.Mesh(geometry, materials[0]);
   quad.frustumCulled = false;
   const camera = new T.Camera();
   const gl = renderer.getContext() as WebGL2RenderingContext;
@@ -205,6 +283,38 @@ export function createWebGLPost(renderer: T.WebGLRenderer, options: {samples(): 
     draws = 0,
     disposed = false;
   const size2 = new T.Vector2();
+  let lutTexture: T.Data3DTexture | null = null,
+    lutSource: CubeLut | null = null;
+  /** The table's 3D texture: made once per table, released when the plan stops asking for it or the table changes. */
+  const ensureLut = (plan: PostPlan, lut: CubeLut | null | undefined): T.Data3DTexture | null => {
+    const want = plan.grade.lut && lut ? lut : null;
+    if (want === lutSource) return lutTexture;
+    lutTexture?.dispose();
+    lutTexture = null;
+    lutSource = want;
+    if (!want) return null;
+    const n = want.size,
+      count = n * n * n,
+      half = new Uint16Array(count * 4),
+      one = T.DataUtils.toHalfFloat(1);
+    for (let i = 0; i < count; i++) {
+      for (let c = 0; c < 3; c++)
+        half[i * 4 + c] = T.DataUtils.toHalfFloat(Math.max(-65504, Math.min(65504, want.data[i * 3 + c]!)));
+      half[i * 4 + 3] = one;
+    }
+    const t = new T.Data3DTexture(half, n, n, n);
+    t.format = T.RGBAFormat;
+    t.type = T.HalfFloatType;
+    t.minFilter = T.LinearFilter;
+    t.magFilter = T.LinearFilter;
+    t.wrapS = t.wrapT = t.wrapR = T.ClampToEdgeWrapping;
+    t.generateMipmaps = false;
+    t.unpackAlignment = 1;
+    t.colorSpace = T.NoColorSpace;
+    t.needsUpdate = true;
+    lutTexture = t;
+    return t;
+  };
 
   const release = () => {
     scene?.dispose();
@@ -239,9 +349,20 @@ export function createWebGLPost(renderer: T.WebGLRenderer, options: {samples(): 
   };
   const texel = (m: T.ShaderMaterial, t: T.WebGLRenderTarget) =>
     (m.uniforms.texel!.value as T.Vector2).set(1 / t.width, 1 / t.height);
-  const configure = (plan: PostPlan) => {
-    const c = plan.bloom ? combine.full : combine.basic,
+  const configure = (plan: PostPlan, lut: CubeLut | null | undefined) => {
+    const table = ensureLut(plan, lut),
+      ceiling = plan.ceiling !== null,
+      c = variant('combine', !!plan.bloom, !!table, ceiling),
+      prefilter = variant('prefilter', false, false, ceiling),
       u = c.uniforms;
+    u.ceiling!.value = plan.ceiling ?? 65504;
+    prefilter.uniforms.ceiling!.value = plan.ceiling ?? 65504;
+    if (table && plan.grade.lut) {
+      const n = table.image.width;
+      u.lut!.value = table;
+      (u.lutMap!.value as T.Vector2).set((n - 1) / n, 0.5 / n);
+      u.lutStrength!.value = plan.grade.lut.strength;
+    } else u.lut!.value = null;
     u.scene!.value = scene!.texture;
     u.vignette!.value = plan.vignette.amount;
     (u.lift!.value as T.Vector3).set(...plan.grade.lift);
@@ -257,7 +378,7 @@ export function createWebGLPost(renderer: T.WebGLRenderer, options: {samples(): 
       prefilter.uniforms.threshold!.value = plan.bloom.threshold;
       up.uniforms.weight!.value = weight;
     }
-    return c;
+    return {combined: c, prefilter};
   };
   const guarded = (body: () => void) => {
     const before = renderer.getRenderTarget(),
@@ -271,10 +392,10 @@ export function createWebGLPost(renderer: T.WebGLRenderer, options: {samples(): 
   };
 
   return {
-    render(three, view, plan) {
+    render(three, view, plan, lut) {
       if (disposed) throw Error('post: pipeline disposed');
       ensure(plan);
-      const combined = configure(plan),
+      const {combined, prefilter} = configure(plan, lut),
         sceneTarget = scene!;
       guarded(() => {
         renderer.setRenderTarget(sceneTarget);
@@ -306,10 +427,10 @@ export function createWebGLPost(renderer: T.WebGLRenderer, options: {samples(): 
       frames++;
       draws += postDrawsOf(plan);
     },
-    compile(three, view, plan) {
+    compile(three, view, plan, lut) {
       if (disposed) throw Error('post: pipeline disposed');
       ensure(plan);
-      const combined = configure(plan);
+      const {combined, prefilter} = configure(plan, lut);
       guarded(() => {
         // Programs depend on the target: the scene into a linear target has no tone mapping; the combined pass does.
         renderer.setRenderTarget(scene);
@@ -327,6 +448,7 @@ export function createWebGLPost(renderer: T.WebGLRenderer, options: {samples(): 
     stats: () => ({
       targetBytes: scene ? postTargetBytes(size.bloom, size.width, size.height, size.samples) : 0,
       allocations,
+      lutBytes: lutSource ? lutBytes(lutSource.size) : 0,
       width: size.width,
       height: size.height,
       samples: Math.max(0, size.samples),
@@ -337,7 +459,12 @@ export function createWebGLPost(renderer: T.WebGLRenderer, options: {samples(): 
       if (disposed) return;
       disposed = true;
       const errors: unknown[] = [];
-      for (const step of [release, () => geometry.dispose(), ...materials.map(m => () => m.dispose())])
+      const table = () => {
+        lutTexture?.dispose();
+        lutTexture = null;
+        lutSource = null;
+      };
+      for (const step of [release, table, () => geometry.dispose(), ...materials.map(m => () => m.dispose())])
         try {
           step();
         } catch (error) {

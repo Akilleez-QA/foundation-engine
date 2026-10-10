@@ -205,8 +205,10 @@ export {
   type PostBloom,
   type PostVignette,
   type PostGrade,
+  type PostLut,
   type PostMode,
 } from '../platform/render/post/settings';
+export {cubeLutText, parseCubeLut, LUT_SIZE_LIMITS, type CubeLut} from '../platform/render/post/lut';
 
 export {Model, validateModel, type ModelData, type ModelSocketPose} from './model';
 export {RenderMask, validateRenderMask} from './render-mask';

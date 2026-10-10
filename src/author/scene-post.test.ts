@@ -7,12 +7,14 @@ import type {PostPipeline} from '../platform/render/backends/webgl/post';
 import {ProgramLinkError} from '../platform/render/program-validation';
 import {defineScene} from './defs';
 import {testScene} from './testing';
+import {cubeLutText, parseCubeLut, type CubeLut} from '../platform/render/post/lut';
 
 const turn = () => new Promise<void>(resolve => setImmediate(resolve));
 const scene = {} as T.Object3D,
   camera = {} as T.Camera;
 
 function harness(o: Partial<ScenePostOptions> & {unsupported?: string | null; fail?: unknown} = {}) {
+  const tables: (CubeLut | null | undefined)[] = [];
   const plans: (PostPlan | null)[] = [],
     reports: unknown[] = [],
     events: string[] = [];
@@ -20,15 +22,25 @@ function harness(o: Partial<ScenePostOptions> & {unsupported?: string | null; fa
     changed = 0,
     resolveLoad!: () => void;
   const pipeline: PostPipeline & {throwOnRender?: unknown} = {
-    render(_s, _c, plan) {
+    render(_s, _c, plan, lut) {
       if (pipeline.throwOnRender) throw pipeline.throwOnRender;
       plans.push(plan);
+      tables.push(lut);
       events.push(`render ${plan.mode}`);
     },
     compile(_s, _c, plan) {
       events.push(`compile ${plan.mode}`);
     },
-    stats: () => ({targetBytes: 100, allocations: 1, width: 1, height: 1, samples: 0, frames: plans.length, draws: 0}),
+    stats: () => ({
+      targetBytes: 100,
+      allocations: 1,
+      lutBytes: 0,
+      width: 1,
+      height: 1,
+      samples: 0,
+      frames: plans.length,
+      draws: 0,
+    }),
     dispose: () => events.push('dispose'),
   };
   const gate = new Promise<void>(resolve => {
@@ -47,6 +59,7 @@ function harness(o: Partial<ScenePostOptions> & {unsupported?: string | null; fa
       return {
         createWebGLPost: () => pipeline,
         postUnsupported: () => o.unsupported ?? null,
+        parseCubeLut,
       };
     },
     changed: () => changed++,
@@ -57,6 +70,7 @@ function harness(o: Partial<ScenePostOptions> & {unsupported?: string | null; fa
     post,
     pipeline,
     plans,
+    tables,
     reports,
     events,
     controller,
@@ -191,4 +205,75 @@ test('defineScene validates view.post and keeps a copy; testScene exposes it on 
   const t = await testScene(def);
   assert.deepEqual(t.ctx.view.post, {bloom: {strength: 0.8}, vignette: {amount: 0.4}});
   t.dispose();
+});
+
+const identity = cubeLutText((r, g, b) => [r, g, b], {size: 2});
+
+test('a lookup table is fetched once the chunk is ready, arrives with one redraw and is kept for the next visit', async () => {
+  const fetched: string[] = [];
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => (release = resolve));
+  const fetchLut = async (file: string) => {
+    fetched.push(file);
+    await gate;
+    return identity;
+  };
+  const settings = {grade: {lut: {file: 'luts/visit.cube', strength: 0.5}}};
+  const h = harness({fetchLut});
+  h.post.sync(settings, 'basic');
+  assert.equal(h.post.stats().lut, 'loading');
+  assert.equal(fetched.length, 0, 'the reader ships in the chunk: no fetch before it');
+  await h.arrive();
+  assert.deepEqual(fetched, ['luts/visit.cube']);
+  assert.equal(h.post.sync(settings, 'basic'), true, 'the chunk arrived');
+  assert.equal(h.post.render(scene, camera), true);
+  assert.equal(h.tables.at(-1), null, 'drawn without the table until it arrives');
+  const changed = h.changed;
+  release();
+  await h.post.settled(10_000);
+  await turn();
+  assert.equal(h.changed, changed + 1, 'the table arrives with one redraw');
+  assert.equal(h.post.stats().lut, 'ready');
+  assert.equal(h.post.sync(settings, 'basic'), true);
+  assert.equal(h.post.sync(settings, 'basic'), false);
+  h.post.render(scene, camera);
+  assert.equal(h.tables.at(-1)!.size, 2);
+  assert.equal(h.plans.at(-1)!.grade.lut!.strength, 0.5);
+  h.post.dispose();
+
+  const again = harness({fetchLut});
+  again.post.sync(settings, 'basic');
+  await again.arrive();
+  assert.equal(fetched.length, 1, 'a return visit draws from the page cache');
+  assert.equal(again.post.sync(settings, 'basic'), true);
+  again.post.render(scene, camera);
+  assert.equal(again.tables.at(-1)!.size, 2);
+});
+
+test('a table that fails is reported once and the scene draws without it; changing the file cancels the fetch', async () => {
+  const signals: AbortSignal[] = [];
+  const h = harness({
+    fetchLut: async (file, signal) => {
+      signals.push(signal);
+      if (file.includes('broken')) return 'LUT_3D_SIZE 2\n0 0 0\n';
+      return new Promise<string>(() => {});
+    },
+  });
+  h.post.sync({grade: {lut: {file: 'luts/slow.cube'}}}, 'full');
+  await h.arrive();
+  assert.equal(signals.length, 1);
+  h.post.sync({grade: {lut: {file: 'luts/broken.cube'}}}, 'full');
+  assert.equal(signals[0]!.aborted, true, 'the old fetch is cancelled');
+  await turn();
+  assert.equal(h.post.stats().lut, 'failed');
+  assert.equal(h.reports.length, 1);
+  assert.match(String(h.reports[0]), /1 rows, expected 2³ = 8/);
+  h.post.sync({grade: {lut: {file: 'luts/broken.cube'}}}, 'full');
+  assert.equal(h.post.render(scene, camera), true, 'post still draws');
+  assert.equal(h.tables.at(-1), null);
+  assert.equal(signals.length, 2, 'a failed file is not fetched again in the visit');
+  assert.equal(h.reports.length, 1);
+  h.post.sync({grade: {lut: {file: 'luts/slow.cube'}}}, 'full');
+  h.post.dispose();
+  assert.equal(signals.at(-1)!.aborted, true, 'leaving the scene cancels the fetch');
 });

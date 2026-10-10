@@ -152,6 +152,13 @@ export const FEATURES = [
     evidence: [{knobRead: 'post.mode'}],
   },
   {
+    id: 'POST-02',
+    title: 'Post grade lookup tables (.cube, view.post.grade.lut) and an HDR ceiling before bloom (view.post.ceiling)',
+    pr: 179,
+    docs: 'docs/guides/post-processing.md',
+    evidence: [{engine: 'cubeLutText'}, {engine: 'parseCubeLut'}, {path: 'src/platform/render/post/lut.ts'}],
+  },
+  {
     id: 'FX-01',
     title: 'Particle emitters',
     pr: 63,
