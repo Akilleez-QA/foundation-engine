@@ -26,6 +26,12 @@ export interface ReplicationLimits {
 export interface ReplicationOptions {
   readonly schema: FieldSchema;
   readonly limits: ReplicationLimits;
+  /**
+   * Epochs start above this nonnegative safe integer (default 0). A schedule recreated for the same clients (a host
+   * restart) must pass a value above every epoch the previous one issued (for example a persisted boot counter times
+   * 2^20), or clients must discard their replicas.
+   */
+  readonly epochBase?: number;
 }
 
 export type ReplicationEntityId = number;
@@ -44,6 +50,8 @@ export interface BuildResult {
   /** Packet JSON when built. */
   readonly json?: string;
   readonly sequence?: number;
+  /** The recipient's epoch carried by the packet. */
+  readonly epoch?: number;
   readonly bytes?: number;
   readonly creates: number;
   readonly updates: number;
@@ -114,7 +122,6 @@ interface FlightItem {
 interface Recipient {
   entries: Map<number, Entry>;
   flights: Map<number, FlightItem[]>;
-  nextSeq: number;
   lastNow: number | null;
   /** Distinguishes this recipient's session from an earlier one with the same id. */
   epoch: number;
@@ -141,6 +148,9 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
   if (maxEntities * schema.count > 1 << 24) throw new RangeError('replication: maxEntities * fields exceeds 2^24');
   if (maxRecipients * maxInFlight * Math.min(maxItems, maxRelevant) > 1 << 24)
     throw new RangeError('replication: maxRecipients * maxInFlight * items exceeds 2^24');
+  const epochBase = options.epochBase ?? 0;
+  if (!Number.isSafeInteger(epochBase) || epochBase < 0)
+    throw new RangeError('replication: epochBase must be a nonnegative safe integer');
   const frozenLimits = Object.freeze({maxEntities, maxRecipients, maxRelevant, maxInFlight, maxItems});
   const width = schema.count;
   const all = (1 << width) - 1;
@@ -150,7 +160,10 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
   let disposed = false,
     lostCount = 0,
     expiredCount = 0,
-    epochs = 0;
+    epochs = options.epochBase ?? 0,
+    // One sequence space for the whole schedule: a sequence is never reused, even by a re-added recipient, so a late
+    // acknowledgment from an earlier session can never confirm a newer packet.
+    nextSequence = 1;
 
   function forget(r: Recipient, id: number) {
     const e = r.entries.get(id);
@@ -220,7 +233,6 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
       recipients.set(recipient, {
         entries: new Map(),
         flights: new Map(),
-        nextSeq: 1,
         lastNow: null,
         epoch: ++epochs,
         announce: 0,
@@ -316,7 +328,7 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
         }
         candidates = collect(false);
       }
-      const seq = r.nextSeq;
+      const seq = nextSequence;
       // One queue: accumulated priority, then removals before creations before updates, then id. Deterministic, and
       // every kind gains priority while waiting, so sustained churn of one kind cannot starve another.
       const rank = {remove: 0, create: 1, update: 2};
@@ -380,7 +392,7 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
       // The first packet of an epoch is sent even when empty, so a reused client discards the old session's state.
       if (!flight.length && r.announce !== 0)
         return empty(deferred ? 'starved' : held ? 'held' : 'idle', {deferred: deferred + held, oversize, expired});
-      r.nextSeq++;
+      nextSequence++;
       r.flights.set(seq, flight);
       if (r.announce === 0) r.announce = seq;
       const json = JSON.stringify({v: 1, type: 'replica', epoch: r.epoch, seq, c, u, r: rm});
@@ -388,6 +400,7 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
         status: 'built',
         json,
         sequence: seq,
+        epoch: r.epoch,
         bytes: json.length,
         creates: c.length,
         updates: u.length,

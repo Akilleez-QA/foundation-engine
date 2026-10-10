@@ -58,9 +58,13 @@ replica.read(id, out);
 - **Packets.** `build(recipient, now, maxBytes)` returns JSON
   `{v:1,type:'replica',epoch,seq,c,u,r}`: `r` removed ids, `c` creations
   `[id, ...every field]`, `u` updates `[id, mask, ...changed fields in order]`.
-  `bytes` equals the JSON's UTF-16 length and never exceeds `maxBytes`. Each
-  recipient has its own sequence from 1 and an `epoch` that is new every time the
-  recipient id is added; the first packet of an epoch is sent even if empty (and
+  `bytes` equals the JSON's UTF-16 length and never exceeds `maxBytes`. Sequences
+  come from one schedule-wide counter and are never reused, even by a re-added
+  recipient, so a late acknowledgment from an earlier session cannot confirm a newer
+  packet. Each recipient has an `epoch` that is new every time its id is added
+  (above the optional `epochBase`; a schedule recreated for the same clients, such
+  as after a host restart, must pass a base above every earlier epoch or clients
+  must discard their replicas); the first packet of an epoch is sent even if empty (and
   resent if lost), so a client that reuses its replica discards the previous
   session's state. `held` means only minimum intervals kept items back. `now` is the creator's time (any unit),
   non-decreasing per recipient.
@@ -102,7 +106,9 @@ creator prefers one, composes separately.)
   `maxRecipients x maxRelevant x (fields + 1) <= 2^24` is checked at construction.
   Construction also checks `maxEntities x fields <= 2^24` and
   `maxRecipients x maxInFlight x min(maxItems, maxRelevant) <= 2^24`.
-  The replica keeps at most `maxEntities` entities and `maxTombstones` tombstones.
+  The replica keeps at most `maxEntities` entities and `maxTombstones` tombstones
+  (exceeded by at most one packet's removals while that packet is applied, then
+  evicted oldest first); its limits are integers up to 2^24.
 - **Work.** `build` is O(entries log entries) for one recipient; one local run of
   an uncommitted script (Node 26, x86_64, an order of magnitude only, not a gate)
   measured 0.8 ms per step for 64 recipients x 128
@@ -113,6 +119,9 @@ creator prefers one, composes separately.)
   drain. Building with something to send while `maxInFlight` packets are
   outstanding declares the oldest lost (`expired`); an idle build expires nothing. A budget too small for the envelope or any item is `starved`.
   Nothing is queued without bound.
+- **Latency.** Updates wait for the creation's acknowledgment, so a newly relevant
+  entity shows its creation values for at least one round trip (plus any loss)
+  before changes arrive.
 - **Loss.** A lost creation is queued again with every field; a lost removal is
   queued again; a lost update marks its fields dirty, so the current value is
   resent. An entry whose creation may have reached the client is always removed
@@ -123,7 +132,7 @@ creator prefers one, composes separately.)
 
 ## Evidence and limits
 
-Twelve headless tests: quantization and schema validation; creation, field-mask
+Thirteen headless tests: quantization and schema validation; creation, field-mask
 updates and sub-step noise; byte budget, weighted priority and no starvation over
 60 builds with 20 constantly changing entries (no entry waited more than 20
 builds); cadence; loss of creations, updates and removals and in-flight expiry;
@@ -136,12 +145,13 @@ replication packets totalled 48,306 characters against 547,046 for complete view
 of the same relevant sets. A randomized convergence test (40 seeds x 1,500
 operations: set, delete, relevance changes, builds at random budgets, duplicated,
 reordered and late delivery after declared loss, lost acknowledgments, in-flight
-expiry, recipient re-adding with reused or fresh replicas and stale old-session
-packets) checks that after settling every replica equals the authority's quantized
-state for exactly its relevant set. Independent review fuzzing (seven delivery
-models, 200 seeds x 4,000 steps each) found no divergence after the fixes, and a
-heavy entity under one-in/one-out churn received updates at every budget that fits
-an item. Packet sender authentication is the transport's job: a forged packet with
+expiry, recipient re-adding with reused or fresh replicas, stale old-session
+packets and only two tombstones) checks that after settling every replica equals the authority's quantized
+state for exactly its relevant set; deterministic regressions cover each failure
+an independent review's fuzzing found (ids leaked after a declared-lost creation,
+an update overtaking its creation, a tombstone evicted inside the packet that
+needed it, and an old session's acknowledgment confirming a newer packet).
+Packet sender authentication is the transport's job: a forged packet with
 a huge sequence would freeze an id.
 
 Not established: transport, acknowledgment protocol and loss timing (creator

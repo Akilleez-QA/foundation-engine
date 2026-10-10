@@ -26,6 +26,8 @@ export interface ReplicaApplyResult {
    */
   readonly status: 'applied' | 'expired' | 'stale-epoch' | 'invalid' | 'retired';
   readonly sequence?: number;
+  /** The packet's epoch, when applied. */
+  readonly epoch?: number;
   /** Ids this replica did not hold before. */
   readonly created: readonly number[];
   /** Ids whose values changed (including a re-sent creation of an id already held). */
@@ -61,8 +63,9 @@ export function createReplica(options: {schema: FieldSchema; limits: ReplicaLimi
   const {schema, limits} = options ?? ({} as {schema: FieldSchema; limits: ReplicaLimits});
   if (!schema || typeof schema.dequantize !== 'function') throw new TypeError('replica: schema required');
   const {maxEntities, maxTombstones, maxBytes, maxNodes} = limits ?? ({} as ReplicaLimits);
-  if (![maxEntities, maxTombstones, maxBytes, maxNodes].every(n => Number.isSafeInteger(n) && n >= 1))
-    throw new RangeError('replica: limits must be positive integers');
+  if (![maxEntities, maxTombstones, maxBytes, maxNodes].every(n => Number.isSafeInteger(n) && n >= 1 && n <= 1 << 24))
+    throw new RangeError('replica: limits must be integers 1..2^24');
+  if (maxEntities * schema.count > 1 << 24) throw new RangeError('replica: maxEntities * fields exceeds 2^24');
   const width = schema.count;
   const known = new Map<number, Known>();
   const tombstones = new Map<number, number>(); // id -> removal sequence, insertion order = age
@@ -109,6 +112,9 @@ export function createReplica(options: {schema: FieldSchema; limits: ReplicaLimi
   function tomb(id: number, seq: number) {
     tombstones.delete(id);
     tombstones.set(id, seq);
+  }
+  /** Evicts oldest tombstones after a whole packet, so a packet never evicts a tombstone it still needs to consult. */
+  function evict() {
     while (tombstones.size > maxTombstones) {
       const oldest = tombstones.keys().next().value as number;
       floor = Math.max(floor, tombstones.get(oldest)!);
@@ -210,7 +216,8 @@ export function createReplica(options: {schema: FieldSchema; limits: ReplicaLimi
         if (wrote) updated.push(id);
         else stale++;
       }
-      return done({status: 'applied', sequence: seq, created, updated, removed, stale, saturated});
+      evict();
+      return done({status: 'applied', epoch: packet.epoch, sequence: seq, created, updated, removed, stale, saturated});
     },
     read(entity: number, out: Float64Array) {
       const k = known.get(entity);

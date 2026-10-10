@@ -366,7 +366,7 @@ test('regressions: a re-added recipient starts a new epoch; expired tombstones r
   s.set(1, [9, 0, 0, 0]);
   s.relevant(1, 1);
   const fresh = built(s, 1, 1);
-  assert.equal(fresh.sequence, 1);
+  assert.ok(fresh.sequence! > old.sequence!); // sequences are never reused, even by a re-added recipient
   assert.deepEqual(rep.apply(fresh.json!).created, [1]); // the old session's state was discarded
   assert.equal(rep.apply(old.json!).status, 'stale-epoch');
   const out = new Float64Array(4);
@@ -428,7 +428,7 @@ test('S-REPL convergence: randomized operations, loss, duplication, reordering a
           r,
           createReplica({
             schema: small,
-            limits: {maxEntities: 64, maxTombstones: 8, maxBytes: 1 << 20, maxNodes: 1 << 20},
+            limits: {maxEntities: 64, maxTombstones: 2, maxBytes: 1 << 20, maxNodes: 1 << 20},
           }),
         );
       wants.set(r, new Set());
@@ -539,4 +539,41 @@ test('S-REPL convergence: randomized operations, loss, duplication, reordering a
       }
     }
   }
+});
+
+test('regressions: one packet never evicts a tombstone it needs; an old session cannot acknowledge a new one', () => {
+  const small = defineFieldSchema([{name: 'a', min: 0, max: 10, step: 1}]);
+  const rep = createReplica({schema: small, limits: {maxEntities: 8, maxTombstones: 2, maxBytes: 4096, maxNodes: 512}});
+  const p = (seq: number, c: number[][], r: number[]) =>
+    JSON.stringify({v: 1, type: 'replica', epoch: 1, seq, c, u: [], r});
+  rep.apply(p(3, [], [5])); // the removal overtook the creation
+  const late = rep.apply(p(2, [[5, 1]], [1, 4]));
+  assert.deepEqual(late.created, []);
+  assert.deepEqual(rep.ids(), []);
+
+  const s = createReplicationSchedule({
+    schema: small,
+    limits: {maxEntities: 8, maxRecipients: 1, maxRelevant: 8, maxInFlight: 8, maxItems: 8},
+  });
+  const client = createReplica({
+    schema: small,
+    limits: {maxEntities: 8, maxTombstones: 8, maxBytes: 4096, maxNodes: 512},
+  });
+  s.addRecipient(1);
+  s.set(7, [1]);
+  s.relevant(1, 7);
+  const delayed = built(s, 1, 0); // epoch 1, still in flight
+  s.removeRecipient(1);
+  s.addRecipient(1);
+  s.set(8, [2]);
+  s.relevant(1, 8);
+  const lostInTransit = built(s, 1, 1);
+  const a = client.apply(delayed.json!);
+  assert.equal(a.status, 'applied');
+  assert.equal(s.ack(1, a.sequence!), false); // cannot confirm the newer session's packet
+  assert.equal(s.lost(1, lostInTransit.sequence!), true);
+  const again = built(s, 1, 2);
+  assert.equal(client.apply(again.json!).status, 'applied');
+  s.ack(1, again.sequence!);
+  assert.deepEqual(client.ids(), [8]);
 });
