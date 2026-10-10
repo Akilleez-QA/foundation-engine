@@ -1207,3 +1207,12 @@ in 18 asset test files. The independent dimension oracle covers 1517 shapes,
 plus explicit thin/square/odd anchors and model refusal/retry. Independent review
 and full hosted integration remain pending; no physical memory or device evidence
 is implied.
+
+## Finished one-shot model clip stillness — candidate (2026-10-09)
+
+- **Scope:** owner repair in `src/author/scene-model.ts` clip sync. A `loop: false` clip clamped at its end was
+  un-paused by every sync while `playing` was `true`, re-finished, and made `sync` report a change every frame.
+- **Evidence:** `src/author/scene-model.test.ts` "a finished one-shot clip holds its last pose…" fails on the
+  previous implementation (sync keeps returning `true`) and passes on the candidate; a looping-clip case confirms
+  playing loops still report change and paused models do not. Headless Three mixer, not a browser frame trace.
+- **Not established:** browser redraw counts in a template scene; hosted CI.

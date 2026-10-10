@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **A finished one-shot model clip is still.** A `loop: false` clip that had reached its last frame was un-paused on every sync while `playing` stayed `true`, so it re-finished and reported a change (a redraw, and a repeated mixer `finished` event) every frame, breaking "nothing redraws when nothing changed". It now holds its last frame without reporting change; `revision` still restarts it, and looping clips are unchanged.
+
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.

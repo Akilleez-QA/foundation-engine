@@ -67,7 +67,7 @@ The `pause` system reads the `turn` action from the `blank` template; in another
 | `asset` | | the asset id |
 | `clip` | `''` | the animation clip's name in the GLB; empty shows the bind pose |
 | `playing` | `true` | `false` pauses the clip where it is |
-| `loop` | `true` | `false` plays once and holds the last frame |
+| `loop` | `true` | `false` plays once and holds the last frame; a held clip is still (no redraw) even while `playing` stays `true` |
 | `speed` | `1` | playback rate, 0 to 16 |
 | `revision` | `0` | add one to restart the clip from the beginning (also when the clip name is unchanged) |
 | `visible` | `true` | hide without unloading |
