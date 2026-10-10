@@ -44,11 +44,13 @@ defineSystem(
   `changed(T)`) when they are reached. A filter on an untracked type, a cursor from another world or a disposed cursor
   is refused with an error.
 - **Ticks and wraparound:** one world counter, advanced once per recorded add, replace or `markChanged`, never above
-  `maxTick` (default `Number.MAX_SAFE_INTEGER - 1`). When it reaches `maxTick` the world rebases: it shifts every
-  stored tick and cursor down by the oldest live cursor's tick, but by at least half the range. A cursor the shift
-  passes is marked `overflowed` and, until its next `advance()`, every filter treats every present component as added
-  and changed: a conservative superset, never a missed change. Rebases and overflowed cursors are counted in
-  `trackingStats()`.
+  `maxTick` (default `Number.MAX_SAFE_INTEGER - 1`). When it reaches `maxTick` the world rebases around `base`, the
+  oldest live cursor's tick but at least half the range below the current tick: stored ticks at or below `base` become
+  1, later ones shift down by `base - 1` and cursors at or after `base` shift with them, so every stored tick stays at
+  least 1 and a `fromStart` cursor (tick 0) created after any number of rebases still sees every present component. A
+  cursor older than `base` is marked `overflowed` and, until its next `advance()`, every filter treats every present
+  component as added and changed: a conservative superset, never a missed change. Rebases and overflowed cursors are
+  counted in `trackingStats()`. Disposing a cursor during a filtered pass stops that pass with an error.
 - **`version`:** `markChanged` bumps `version` like `touch()`. Nothing else about `version` changes.
 
 ## Observers
@@ -65,18 +67,22 @@ sub.unsubscribe();
 - **When they run:** mutations only queue events; an observer never runs inside `add`, `remove`, `despawn`,
   `markChanged` or a query. Delivery happens in `world.flushObservers()`. The scene runtime and `testScene` call it
   after every system run (the runner's new `afterSystem` hook), so a system's observers have run before the next
-  system starts. Outside a scene, call it yourself.
+  system starts, also after a system that threw. Outside a scene, call it yourself. A scene with no systems never
+  flushes (its runner runs no system), so its observers' events wait, bounded by `maxQueued`; such a scene should call
+  `flushObservers()` itself. The time a flush takes is not part of any system's time in the dev system-timing probe.
 - **Order:** the order the changes happened, then observer registration order. Deterministic for a deterministic run.
 - **Reentrancy:** events queued by observers during a flush are delivered in the same flush (subject to the per-flush
   bound). `flushObservers()` called from inside an observer does nothing and says so (`reentrant: true`).
-  `unsubscribe()` takes effect immediately, also mid-flush.
+  `unsubscribe()` takes effect immediately, also mid-flush, and its queued events stop counting toward `maxQueued`.
 - **Bounds and overload:** pending deliveries are capped by `maxQueued` (default 4096); beyond it, events are dropped,
   counted on the observer (`dropped`), in `trackingStats().dropped` and in the flush report, and the observer's
   optional `overflow(count)` is called once at the end of the next flush. One flush delivers at most
   `maxDeliveriesPerFlush` (default 16384); the rest stay queued (`deferred`). `maxObservers` (default 256) caps
   registrations.
 - **Failure:** an observer that throws does not stop the others; the flush finishes, then throws one `AggregateError`.
-  In a scene this is reported as a failure of the system after which the flush ran, like a system error.
+  In a scene this is reported as a failure of the system after which the flush ran (the last system to run, which may
+  not be the one whose change queued the event, for example when events were queued in `enter` or deferred by the
+  per-flush bound). When that system also threw, both errors are reported once together as one `AggregateError`.
 
 ## Cached queries
 
@@ -125,6 +131,8 @@ integer; `maxTick` at least 8. Exceeding a registration bound throws `RangeError
 - No physical device, browser or multiplayer acceptance; the numbers above are one local Node run.
 - No automatic change detection: direct edits need `markChanged`. Built-in engine systems do not call it, so
   `changed(Transform)` sees only adds, replaces and explicit marks.
-- Observers are not persisted, replicated or saved; cursors and caches are per world and per scene visit.
+- Observers are not persisted, replicated or saved; cursors and caches are per world and per scene visit. Tracking
+  state (ticks, cursors, queued events, cached sets) is not part of saves, world snapshots, rollback or replay
+  digests; a restored or replayed world starts tracking afresh.
 - A cursor whose owner stops advancing it can, after a rebase, report false positives (never misses).
 - No archetype storage: cached queries remove the per-pass candidate scan and sort, not per-row map lookups.

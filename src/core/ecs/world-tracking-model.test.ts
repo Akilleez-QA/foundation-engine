@@ -236,6 +236,17 @@ function runModel(seed: number, operations: number, maxTick?: number): {rebases:
         want.map(r => r[0]),
       );
       got.forEach((row, j) => row.forEach((v, x) => assert.equal(v, want[j]![x])));
+    } else if (r < 0.8) {
+      // A cursor created now from the start sees every present tracked component, rebases or not.
+      const fresh = w.changeCursor({fromStart: true});
+      for (const types of shapes) {
+        const filters = [added(types[0]!), changed(types[types.length - 1]!)];
+        assert.deepEqual(
+          [...w.queryFiltered(fresh, filters, ...types)].map(row => row[0]),
+          m.matching(types),
+        );
+      }
+      fresh.dispose();
     } else if (r < 0.84) {
       // Mutating while iterating: uncached, cached and filtered queries.
       const kind = Math.floor(random() * 3),

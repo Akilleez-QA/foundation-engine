@@ -90,7 +90,7 @@ test('change ticks: a rebase overflows only the cursors it passes; they see a su
   const stats = w.trackingStats();
   assert.equal(stats.rebases, 1);
   assert.equal(stats.cursorsOverflowed, 2);
-  assert.equal(stats.changeTick, 5);
+  assert.equal(stats.changeTick, 6, 'ticks shift by base - 1 = 3, so the new change is 9 - 3');
   assert.equal(atZero.overflowed, true);
   assert.equal(atThree.overflowed, true);
   assert.equal(atFour.overflowed, false);
@@ -115,6 +115,40 @@ test('change ticks: with no cursor a rebase restarts counting without losing lat
   const c = w.changeCursor();
   w.markChanged(e, A);
   assert.deepEqual(ids(w.queryFiltered(c, [changed(A)], A)), [e]);
+});
+
+test('change ticks: a fromStart cursor created after rebases still sees every present component', () => {
+  const w = new World();
+  w.configureTracking({maxTick: 8});
+  w.trackChanges(A);
+  const first = w.spawn(A());
+  for (let i = 0; i < 12; i++) w.markChanged(w.spawn(A()), A); // several rebases with no live cursor
+  assert.ok(w.trackingStats().rebases >= 2);
+  const all = w.changeCursor({fromStart: true});
+  assert.equal(all.overflowed, false);
+  assert.deepEqual(ids(w.queryFiltered(all, [added(A)], A)), ids(w.query(A)));
+  assert.ok(ids(w.queryFiltered(all, [changed(A)], A)).includes(first));
+  const now = w.changeCursor();
+  assert.deepEqual(ids(w.queryFiltered(now, [changed(A)], A)), [], 'a cursor at the current tick sees nothing old');
+  // A later sinceLastRun system on this world sees everything on its first run.
+  const seen: Entity[][] = [];
+  sinceLastRun<World>({
+    id: 'late',
+    world: x => x,
+    run: (x, _dt, since) => void seen.push(ids(x.queryFiltered(since, [added(A)], A)) as Entity[]),
+  }).run(w, 0);
+  assert.equal(seen[0]!.length, 13);
+});
+
+test('change ticks: disposing a cursor during a filtered pass stops the pass with an error', () => {
+  const w = new World();
+  w.trackChanges(A);
+  const c = w.changeCursor({fromStart: true});
+  w.spawn(A());
+  w.spawn(A());
+  assert.throws(() => {
+    for (const _ of w.queryFiltered(c, [added(A)], A)) c.dispose();
+  }, /disposed during iteration/);
 });
 
 test('markChanged: refuses without the component and changes nothing; otherwise counts as a touch', () => {
@@ -215,6 +249,36 @@ test('observers: a full queue drops events and reports them once per flush', () 
   assert.equal(w.flushObservers().dropped, 0);
   assert.deepEqual(overflow, [2]);
   assert.equal(w.trackingStats().dropped, 2);
+});
+
+test('observers: an unsubscribed observer releases its queued events from the bound', () => {
+  const w = new World();
+  w.configureTracking({maxQueued: 2});
+  const seen: number[] = [];
+  const gone = w.observe({on: 'add', type: A, run: () => assert.fail('unsubscribed')});
+  w.spawn(A());
+  w.spawn(A());
+  assert.equal(w.trackingStats().queued, 2);
+  gone.unsubscribe();
+  assert.equal(w.trackingStats().queued, 0);
+  w.observe({on: 'add', type: A, run: ev => seen.push(ev.entity)});
+  w.spawn(A());
+  w.spawn(A());
+  const r = w.flushObservers();
+  assert.deepEqual(seen, [3, 4]);
+  assert.equal(r.dropped, 0);
+  assert.equal(gone.dropped, 0);
+});
+
+test('observers: an idle flush returns one shared frozen report', () => {
+  const w = new World();
+  const idle = w.flushObservers();
+  assert.ok(Object.isFrozen(idle));
+  w.observe({on: 'despawn', run: () => {}});
+  assert.equal(w.flushObservers(), idle);
+  w.despawn(w.spawn());
+  assert.deepEqual(w.flushObservers(), {delivered: 1, dropped: 0, deferred: 0, reentrant: false});
+  assert.equal(w.flushObservers(), idle);
 });
 
 test('observers: the per-flush delivery bound defers the rest to the next flush', () => {
@@ -336,7 +400,7 @@ test('cached query: dispose ends an iteration in progress; later use throws; bou
   }
   assert.deepEqual(seen, [1, 2]);
   assert.equal(q.disposed, true);
-  assert.throws(() => [...q], /disposed/);
+  assert.throws(() => q[Symbol.iterator](), /disposed/, 'refused when the iterator is created');
   q.dispose(); // idempotent
   w.spawn(A()); // no longer maintained, no error
   assert.equal(q.size, 0);
@@ -389,6 +453,37 @@ test('runner: afterSystem runs after each system; an error it throws is reported
   assert.deepEqual(order, ['one', 'after-one', 'after-two', 'three', 'after-three']);
   assert.deepEqual(reported, ['one', 'two']);
   assert.equal(runner.stats.errors, 2);
+});
+
+test('runner: a system failure and its afterSystem failure are reported once, together', () => {
+  const reported: [string, unknown][] = [];
+  const runner = createSystemRunner(
+    [
+      {
+        id: 'both',
+        run: () => {
+          throw Error('system');
+        },
+      },
+    ],
+    {
+      step: 1,
+      report: (id, error) => reported.push([id, error]),
+      afterSystem: () => {
+        throw Error('hook');
+      },
+    },
+  );
+  runner.frame(null, 1);
+  assert.equal(reported.length, 1);
+  assert.equal(runner.stats.errors, 1);
+  const [id, error] = reported[0]!;
+  assert.equal(id, 'both');
+  assert.ok(error instanceof AggregateError);
+  assert.deepEqual(
+    error.errors.map((e: Error) => e.message),
+    ['system', 'hook'],
+  );
 });
 
 test('sinceLastRun: first run sees everything; then changes since its last successful run; a throw repeats them', () => {

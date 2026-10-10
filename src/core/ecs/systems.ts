@@ -9,8 +9,9 @@
  * others still run.
  * - `beforeStep` runs before each fixed step and `beforeFrameLane` before the per-frame lane, so an owner can address
  *   input to the tick that consumes it (STD-SIM-12). They must not throw.
- * - `afterSystem` runs after each system run (the authored runtime flushes world observers there); an error it throws
- *   is reported under that system's id like a system error.
+ * - `afterSystem` runs after each system run, also after one that threw (the authored runtime flushes world observers
+ *   there). An error it throws is reported under that system's id like a system error; when the system also threw,
+ *   both are reported once together (AggregateError) and counted as one error.
  * - `sinceLastRun` wraps a system with a per-world change cursor: the system sees changes made since its last
  *   successful run.
  */
@@ -76,17 +77,26 @@ export function createSystemRunner<C>(
   };
   const after = o.afterSystem;
   const run = (s: SystemSpec<C>, ctx: C, dt: number) => {
+    let failed = false,
+      failure: unknown;
     try {
       s.run(ctx, dt);
     } catch (error) {
-      fail(s, error);
+      failed = true;
+      failure = error;
     }
-    if (!after) return;
-    try {
-      after(s.id);
-    } catch (error) {
-      fail(s, error);
+    if (after) {
+      try {
+        after(s.id);
+      } catch (error) {
+        // One report per system run: a hook failure after a system failure is reported with it.
+        failure = failed
+          ? new AggregateError([failure, error], `system ${s.id} and its afterSystem hook failed`)
+          : error;
+        failed = true;
+      }
     }
+    if (failed) fail(s, failure);
   };
   return {
     stats,

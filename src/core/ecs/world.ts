@@ -18,6 +18,7 @@ import {
   ChangeTicks,
   CursorImpl,
   DEFAULT_TRACKING_LIMITS,
+  NOTHING_FLUSHED,
   ObserverHub,
   resolveTrackingLimits,
   type CachedQuery,
@@ -277,6 +278,7 @@ export class World {
     types: Q,
   ): Generator<[Entity, ...Values<Q>]> {
     next: for (const row of this.query(...types)) {
+      if (since.disposed) throw Error('queryFiltered: the cursor was disposed during iteration');
       for (const {map} of checks) {
         const tick = map.get(row[0]);
         if (tick === undefined || (!since.overflowed && tick <= since.tick)) continue next;
@@ -301,7 +303,7 @@ export class World {
    */
   flushObservers(): FlushReport {
     const hub = this.tracking?.hub;
-    if (!hub) return {delivered: 0, dropped: 0, deferred: 0, reentrant: false};
+    if (!hub) return NOTHING_FLUSHED;
     return hub.flush();
   }
 
@@ -344,14 +346,16 @@ export class World {
         }
         t.cachedCount--;
       },
-      [Symbol.iterator]: () => this.iterateCached<Q>(m, ids),
+      [Symbol.iterator]: () => {
+        if (m.disposed) throw Error('cachedQuery: disposed');
+        return this.iterateCached<Q>(m, ids);
+      },
     };
   }
   private *iterateCached<Q extends readonly ComponentType<object>[]>(
     m: CachedMembership,
     ids: readonly string[],
   ): Generator<[Entity, ...Values<Q>]> {
-    if (m.disposed) throw Error('cachedQuery: disposed');
     const order = m.snapshot(),
       end = order.length;
     if (!end) return;

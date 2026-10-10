@@ -90,6 +90,7 @@ export interface Observer {
   unsubscribe(): void;
 }
 export interface FlushReport {
+  // A report may be a shared frozen object; do not mutate it.
   delivered: number;
   /** Events dropped (queue full) since the previous flush. */
   dropped: number;
@@ -125,26 +126,29 @@ export class ChangeTicks {
     return ++this.tick;
   }
   /**
-   * Shift every tick down so counting can continue. The shift is the oldest cursor tick (nothing at or below it is
-   * new to any cursor, so those ticks become 0), but at least half the range; cursors older than the shift are
-   * marked overflowed (they then see everything as changed until advanced).
+   * Shift every tick down so counting can continue. `base` is the oldest cursor tick, but at least half the range
+   * below the current tick. Ticks at or below `base` (not new to any cursor at or after it) become 1 and later ticks
+   * keep their order above it, so every stored tick stays at least 1 and a cursor at 0 (`fromStart`, created later)
+   * still sees every present component. Cursors older than `base` are marked overflowed (they then see everything as
+   * changed until advanced) and move to 0.
    */
   private rebase(): void {
     const half = Math.floor(this.limits.maxTick / 2);
     let oldest = this.tick;
     for (const c of this.cursors) oldest = Math.min(oldest, c.tick);
-    const base = Math.max(oldest, this.tick - half);
+    const base = Math.max(oldest, this.tick - half); // >= 1: tick >= maxTick >= 8
+    const shift = base - 1;
     for (const {added, changed} of this.tracked.values()) {
-      for (const m of [added, changed]) for (const [e, t] of m) m.set(e, Math.max(0, t - base));
+      for (const m of [added, changed]) for (const [e, t] of m) m.set(e, Math.max(1, t - shift));
     }
     for (const c of this.cursors) {
       if (c.tick < base) {
+        if (!c.overflowed) this.cursorsOverflowed++;
         c.overflowed = true;
-        this.cursorsOverflowed++;
-      }
-      c.tick = Math.max(0, c.tick - base);
+        c.tick = 0;
+      } else c.tick -= shift;
     }
-    this.tick -= base;
+    this.tick -= shift;
     this.rebases++;
   }
   cursor(fromStart: boolean): CursorImpl {
@@ -178,6 +182,8 @@ class ObserverImpl implements Observer {
   active = true;
   dropped = 0;
   pendingOverflow = 0;
+  /** Entries of this observer in the queue (released from the bound on unsubscribe). */
+  queuedEntries = 0;
   constructor(
     readonly spec: ObserverSpec,
     readonly key: string,
@@ -190,11 +196,16 @@ class ObserverImpl implements Observer {
   }
 }
 
+/** The report of a flush that had nothing to do (shared, frozen: an idle flush allocates nothing). */
+export const NOTHING_FLUSHED: FlushReport = Object.freeze({delivered: 0, dropped: 0, deferred: 0, reentrant: false});
+
 export class ObserverHub {
   private readonly byKey = new Map<string, ObserverImpl[]>();
   private count = 0;
   private queue: {observer: ObserverImpl; event: ObserverEvent}[] = [];
   private head = 0;
+  /** Queue entries of active observers: what `maxQueued` bounds. */
+  private pending = 0;
   private flushing = false;
   private droppedSinceFlush = 0;
   private readonly overflowing: ObserverImpl[] = [];
@@ -207,7 +218,7 @@ export class ObserverHub {
     return this.count;
   }
   get queued(): number {
-    return this.queue.length - this.head;
+    return this.pending;
   }
   observe(spec: ObserverSpec): Observer {
     const kinds: readonly ObserverKind[] = ['add', 'remove', 'change', 'despawn'];
@@ -227,6 +238,8 @@ export class ObserverHub {
   }
   detach(o: ObserverImpl): void {
     const list = this.byKey.get(o.key);
+    this.pending -= o.queuedEntries; // its entries are skipped at delivery and no longer count
+    o.queuedEntries = 0;
     if (!list) return;
     // Copy on write: a flush in progress keeps its own references; the observer is skipped as inactive.
     const next = list.filter(x => x !== o);
@@ -241,7 +254,7 @@ export class ObserverHub {
     const list = this.byKey.get(event.type ? `${event.kind}:${event.type.id}` : event.kind);
     if (!list) return;
     for (const observer of list) {
-      if (this.queued >= this.limits.maxQueued) {
+      if (this.pending >= this.limits.maxQueued) {
         observer.dropped++;
         if (observer.pendingOverflow++ === 0) this.overflowing.push(observer);
         this.dropped++;
@@ -249,10 +262,17 @@ export class ObserverHub {
         continue;
       }
       this.queue.push({observer, event});
+      observer.queuedEntries++;
+      this.pending++;
     }
   }
   flush(): FlushReport {
-    if (this.flushing) return {delivered: 0, dropped: 0, deferred: this.queued, reentrant: true};
+    if (this.flushing) return {delivered: 0, dropped: 0, deferred: this.pending, reentrant: true};
+    if (this.head === this.queue.length && !this.overflowing.length && !this.droppedSinceFlush) {
+      if (this.queue.length) this.queue = [];
+      this.head = 0;
+      return NOTHING_FLUSHED;
+    }
     this.flushing = true;
     const errors: unknown[] = [];
     let delivered = 0;
@@ -261,6 +281,8 @@ export class ObserverHub {
         const {observer, event} = this.queue[this.head]!;
         this.queue[this.head++] = undefined!; // release the event
         if (!observer.active) continue;
+        observer.queuedEntries--;
+        this.pending--;
         delivered++;
         try {
           observer.spec.run(event);
@@ -289,7 +311,8 @@ export class ObserverHub {
     const dropped = this.droppedSinceFlush;
     this.droppedSinceFlush = 0;
     if (errors.length) throw new AggregateError(errors, `${errors.length} world observer(s) failed`);
-    return {delivered, dropped, deferred: this.queued, reentrant: false};
+    if (!delivered && !dropped && !this.pending) return NOTHING_FLUSHED;
+    return {delivered, dropped, deferred: this.pending, reentrant: false};
   }
 }
 
