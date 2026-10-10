@@ -110,10 +110,71 @@ test('snapshots replay through the rules; a history that breaks them is refused'
   const tight = defineInventoryRules({
     containers: {hotbar: {slots: 1, stackSize: 64}, pack: {slots: 27, stackSize: 64}},
   });
-  assert.throws(() => createRuledInventory(tight, {}, saved), /capacities|breaks/);
+  assert.throws(() => createRuledInventory(tight, {}, saved), /breaks these rules/);
   assert.throws(() => defineInventoryRules({containers: {}}), /1\.\.64/);
   assert.throws(
     () => defineInventoryRules({containers: {a: {slots: 1, stackSize: 1}}, materials: {x: {containers: ['b']}}}),
     /unknown container/,
+  );
+});
+
+test('review: retries keep ledger idempotency; reservations respect key items and project their inputs', () => {
+  const rules = defineInventoryRules({
+    containers: {bag: {slots: 1, stackSize: 99}},
+    materials: {'key-bike': {key: true, maxOwned: 1}, elixir: {stackSize: 10}},
+  });
+  const inv = createRuledInventory(rules);
+  assert.equal(inv.transact('a', [], [{container: 'bag', batch: potion, quantity: 99}]).ok, true);
+  assert.deepEqual(inv.transact('a', [], [{container: 'bag', batch: potion, quantity: 99}]), {
+    ok: true,
+    duplicate: true,
+  });
+  assert.deepEqual(inv.transact('a', [], [{container: 'bag', batch: potion, quantity: 98}]), {
+    ok: false,
+    reason: 'conflict',
+  });
+  assert.equal(inv.reserve('r', [{container: 'bag', batchId: 'potion', quantity: 99}]).ok, true);
+  assert.equal(
+    inv.commitReservation('c', 'r', [
+      {container: 'bag', batch: {id: 'elixir', material: 'elixir', properties: {}}, quantity: 1},
+    ]).ok,
+    true,
+    'the reserved potions free their slot for the output',
+  );
+  const keyed = createRuledInventory(
+    defineInventoryRules({...inventoryPresets.handheldBag, materials: {'key-bike': {key: true}}}),
+  );
+  keyed.transact('get', [], [{container: 'bag', batch: bike, quantity: 1}]);
+  assert.deepEqual(keyed.reserve('r', [{container: 'bag', batchId: 'bike', quantity: 1}]), {
+    ok: false,
+    reason: 'key-item',
+    container: 'bag',
+    material: 'key-bike',
+  });
+  assert.equal(keyed.quantity('bag', 'bike'), 1);
+  assert.throws(() => keyed.room('nowhere', potion), /unknown container/);
+  assert.equal(keyed.room('bag', {...potion, properties: {strength: 1}}), keyed.room('bag', potion));
+  keyed.transact('p', [], [{container: 'bag', batch: potion, quantity: 1}]);
+  assert.equal(keyed.room('bag', {...potion, properties: {strength: 1}}), 0, 'a conflicting batch id has no room');
+});
+
+test('review: tighter rules with the same containers refuse an old history; new material rules keep saves', () => {
+  const loose = defineInventoryRules({containers: {bag: {slots: 5, stackSize: 99}}, materials: {gem: {maxOwned: 3}}});
+  const inv = createRuledInventory(loose);
+  inv.transact('a', [], [{container: 'bag', batch: {id: 'gem', material: 'gem', properties: {}}, quantity: 3}]);
+  const saved = JSON.parse(JSON.stringify(inv.snapshot()));
+  const tighter = defineInventoryRules({containers: {bag: {slots: 5, stackSize: 99}}, materials: {gem: {maxOwned: 2}}});
+  assert.throws(() => createRuledInventory(tighter, {}, saved), /breaks these rules/);
+  const extended = defineInventoryRules({
+    containers: {bag: {slots: 5, stackSize: 99}},
+    materials: {gem: {maxOwned: 3}, arrows: {stackSize: 999}},
+  });
+  assert.doesNotThrow(() => createRuledInventory(extended, {}, saved));
+  assert.throws(
+    () =>
+      defineInventoryRules(
+        JSON.parse('{"containers":{"bag":{"slots":1,"stackSize":1}},"materials":{"__proto__":{"key":true}}}'),
+      ),
+    /invalid key/,
   );
 });

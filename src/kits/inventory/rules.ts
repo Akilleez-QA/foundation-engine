@@ -57,7 +57,8 @@ function plain(v: unknown, what: string): Record<string, unknown> {
   if (proto !== Object.prototype && proto !== null) throw new Error(`inventory rules: ${what} must be plain data`);
   const out: Record<string, unknown> = Object.create(null);
   for (const key of Reflect.ownKeys(v)) {
-    if (typeof key !== 'string' || !ID.test(key)) throw new Error(`inventory rules: ${what} has an invalid key`);
+    if (typeof key !== 'string' || !ID.test(key) || key === '__proto__')
+      throw new Error(`inventory rules: ${what} has an invalid key`);
     const d = Object.getOwnPropertyDescriptor(v, key)!;
     if (!('value' in d)) throw new Error(`inventory rules: ${what} has an accessor`);
     out[key] = d.value;
@@ -71,7 +72,7 @@ export function defineInventoryRules(input: InventoryRulesInput): InventoryRules
   const containersRaw = plain(raw.containers, 'containers');
   const names = Object.keys(containersRaw).sort();
   if (!names.length || names.length > 64) throw new Error('inventory rules: 1..64 containers');
-  const containers: Record<string, Readonly<Required<ContainerRule>>> = {};
+  const containers: Record<string, Readonly<Required<ContainerRule>>> = Object.create(null);
   for (const name of names) {
     const c = plain(containersRaw[name], `container ${name}`);
     const overflow = c.overflow ?? 'spill';
@@ -84,7 +85,7 @@ export function defineInventoryRules(input: InventoryRulesInput): InventoryRules
   }
   const materialsRaw = raw.materials === undefined ? {} : plain(raw.materials, 'materials');
   if (Object.keys(materialsRaw).length > 4096) throw new Error('inventory rules: at most 4,096 material rules');
-  const materials: Record<string, Readonly<MaterialRule>> = {};
+  const materials: Record<string, Readonly<MaterialRule>> = Object.create(null);
   for (const name of Object.keys(materialsRaw).sort()) {
     const m = plain(materialsRaw[name], `material ${name}`);
     const rule: {-readonly [K in keyof MaterialRule]: MaterialRule[K]} = {};
@@ -114,19 +115,18 @@ export function defineInventoryRules(input: InventoryRulesInput): InventoryRules
 export function createRuledInventory(rules: InventoryRules, options: {maxOperations?: number} = {}, saved?: unknown) {
   const checked = defineInventoryRules(rules);
   const names = Object.keys(checked.containers);
-  const largest = Math.max(1, ...Object.values(checked.materials).map(m => m.stackSize ?? 1));
-  const capacities = Object.fromEntries(
-    names.map(n => {
-      const c = checked.containers[n]!;
-      return [n, Math.min(Number.MAX_SAFE_INTEGER, c.slots * Math.max(c.stackSize, largest))];
-    }),
-  );
+  // The rules are the limit; the ledger's quantity capacity stays out of the way and does not change with content,
+  // so adding a material rule never invalidates existing saves.
+  const capacities = Object.fromEntries(names.map(n => [n, Number.MAX_SAFE_INTEGER]));
+  /** Reservations seen by this facade: their amounts (consumed at commit) and whether key items were allowed. */
+  const reservations = new Map<string, {consume: InventoryAmount[]; allowKey: boolean}>();
   const ledgerOptions =
     options.maxOperations === undefined ? {capacities} : {capacities, maxOperations: options.maxOperations};
-  // Build empty, then replay the saved history through the rules so a hand-edited save cannot bypass them.
+  // Build empty, then replay the saved history through the rules (slots, stacks, ownership and placement; the
+  // history does not record whether a consumption was allowed to take key items, so replay allows it).
   const ledger = createInventoryLedger(ledgerOptions);
   const stackOf = (container: string, material: string) =>
-    checked.materials[material]?.stackSize ?? checked.containers[container]!.stackSize;
+    checked.materials[material]?.stackSize ?? checked.containers[container]?.stackSize ?? 1;
 
   /** Check rules on the projected stock after consuming and producing. Null when allowed. */
   const check = (
@@ -203,33 +203,62 @@ export function createRuledInventory(rules: InventoryRules, options: {maxOperati
       produce: InventoryOutput[],
       o: {allowKey?: boolean} = {},
     ): RuledResult {
+      // A retry gets the ledger's own answer (duplicate or conflict), never a second rule check.
+      if (ledger.hasReceipt(id)) return ledger.transact(id, consume, produce);
       const refusal = check(consume, produce, o.allowKey === true);
       return refusal ?? ledger.transact(id, consume, produce);
     },
     /** Throw away units. Key items are always refused. */
     discard(id: string, container: string, batchId: string, quantity: number): RuledResult {
       const consume = [{container, batchId, quantity}];
+      if (ledger.hasReceipt(id)) return ledger.transact(id, consume, []);
       return check(consume, [], false) ?? ledger.transact(id, consume, []);
     },
     /** Move units between containers under both containers' rules (key items may move). */
     transfer(id: string, from: string, to: string, batchId: string, quantity: number): RuledResult {
       const batch: MaterialBatch | undefined = ledger.material(batchId);
-      if (!batch) return ledger.transfer(id, from, to, batchId, quantity);
+      if (!batch || ledger.hasReceipt(id)) return ledger.transfer(id, from, to, batchId, quantity);
       const refusal = check([{container: from, batchId, quantity}], [{container: to, batch, quantity}], true);
       return refusal ?? ledger.transfer(id, from, to, batchId, quantity);
     },
-    reserve: ledger.reserve,
-    release: ledger.release,
-    /** Complete a reservation; its outputs are checked like any production (reserved inputs may be key items). */
+    /** Lock units for a later commit. Reserving a key item needs `{allowKey: true}`, since the commit consumes it. */
+    reserve(id: string, consume: InventoryAmount[], o: {allowKey?: boolean} = {}): RuledResult {
+      if (ledger.hasReceipt(id)) return ledger.reserve(id, consume);
+      const allowKey = o.allowKey === true;
+      if (!allowKey)
+        for (const a of consume) {
+          const m = ledger.material(a.batchId);
+          if (m && checked.materials[m.material]?.key)
+            return {ok: false, reason: 'key-item', container: a.container, material: m.material};
+        }
+      const result = ledger.reserve(id, consume);
+      if (result.ok && !result.duplicate) reservations.set(id, {consume: consume.map(a => ({...a})), allowKey});
+      return result;
+    },
+    release(id: string, reservationId: string): RuledResult {
+      const result = ledger.release(id, reservationId);
+      if (result.ok && !result.duplicate) reservations.delete(reservationId);
+      return result;
+    },
+    /** Complete a reservation: its reserved inputs are consumed and its outputs checked on that projection. */
     commitReservation(id: string, reservationId: string, produce: InventoryOutput[]): RuledResult {
-      const refusal = check([], produce, true);
-      return refusal ?? ledger.commitReservation(id, reservationId, produce);
+      if (ledger.hasReceipt(id)) return ledger.commitReservation(id, reservationId, produce);
+      const held = reservations.get(reservationId);
+      if (held) {
+        const refusal = check(held.consume, produce, true);
+        if (refusal) return refusal;
+      }
+      const result = ledger.commitReservation(id, reservationId, produce);
+      if (result.ok && !result.duplicate) reservations.delete(reservationId);
+      return result;
     },
     /** How many more units of a batch fit in a container under the rules (0 when none). */
     room(container: string, batch: MaterialBatch): number {
+      if (!Object.hasOwn(checked.containers, container)) throw new Error('inventory rules: unknown container');
+      const known = ledger.material(batch.id);
+      if (known && JSON.stringify(known) !== JSON.stringify({...batch, properties: {...batch.properties}})) return 0; // a different batch under this id would be a batch conflict
       let lo = 0,
-        hi = checked.containers[container]?.slots ?? 0;
-      hi *= stackOf(container, batch.material);
+        hi = checked.containers[container]!.slots * stackOf(container, batch.material);
       while (lo < hi) {
         const mid = Math.ceil((lo + hi) / 2);
         if (check([], [{container, batch, quantity: mid}], true) === null) lo = mid;
@@ -259,8 +288,12 @@ export function createRuledInventory(rules: InventoryRules, options: {maxOperati
 
   function replay(raw: unknown) {
     const s = plain(raw, 'snapshot');
-    if (s.version !== 1 || JSON.stringify(plain(s.capacities, 'capacities')) !== JSON.stringify(capacities))
-      throw new Error('inventory rules: snapshot capacities do not match these rules');
+    // Containers must match; the rules themselves are checked by replaying the history.
+    if (
+      s.version !== 1 ||
+      JSON.stringify(Object.keys(plain(s.capacities, 'capacities')).sort()) !== JSON.stringify(names)
+    )
+      throw new Error('inventory rules: snapshot containers do not match these rules');
     if (!Array.isArray(s.operations)) throw new Error('inventory rules: invalid snapshot');
     for (const rawOp of s.operations as unknown[]) {
       const op = parseInventoryOperation(rawOp);
@@ -268,9 +301,9 @@ export function createRuledInventory(rules: InventoryRules, options: {maxOperati
         op.kind === 'exchange'
           ? ruled.transact(op.id, op.consume, op.produce, {allowKey: true})
           : op.kind === 'reserve'
-            ? ledger.reserve(op.id, op.consume)
+            ? ruled.reserve(op.id, op.consume, {allowKey: true})
             : op.kind === 'release'
-              ? ledger.release(op.id, op.reservationId)
+              ? ruled.release(op.id, op.reservationId)
               : ruled.commitReservation(op.id, op.reservationId, op.produce);
       if (!result.ok || result.duplicate) throw new Error('inventory rules: saved history breaks these rules');
     }
@@ -279,11 +312,13 @@ export function createRuledInventory(rules: InventoryRules, options: {maxOperati
 export type RuledInventory = ReturnType<typeof createRuledInventory>;
 
 /**
- * Starting points. `handheldBag` reproduces the bag of the 1996 handheld monster-collecting RPGs as documented by a
- * community reconstruction (github.com/liuyanghejerry/open-pokered, revision 31b1eda, `items/inventory.rs`): a
- * 20-slot bag and a 50-slot box, 99 per slot, an overflowing stack spilling into a new slot, and key items that
- * cannot be tossed. Not reproduced: slot order and the original's refusal at the first matching stack when the bag
- * is full (a full bag whose first matching stack would overflow refuses even when a later stack has room).
+ * Starting points. `handheldBag` approximates the bag of the 1996 handheld monster-collecting RPGs as documented by
+ * a community reconstruction (github.com/liuyanghejerry/open-pokered, revision 31b1eda, `items/inventory.rs`): a
+ * 20-slot bag and a 50-slot box, 99 per slot, an overflowing stack spilling into a new slot. Differences: slots are
+ * counted from each batch's packed total (the original keeps fragmented stacks after removals, so it can use more
+ * slots), each item type must be one batch (two batches of one material count as two slots), slot order and the
+ * original's refusal at the first matching stack in a full bag are not modelled, and key items are not in the preset:
+ * add the game's key materials with `key: true` to forbid tossing them.
  */
 export const inventoryPresets = Object.freeze({
   handheldBag: Object.freeze({
@@ -292,7 +327,7 @@ export const inventoryPresets = Object.freeze({
       box: Object.freeze({slots: 50, stackSize: 99, overflow: 'spill' as const}),
     }),
   }) satisfies InventoryRulesInput,
-  /** Survival archetype: a 9-slot hotbar and 27-slot pack, stacks of 64, tools unstackable. */
+  /** Survival archetype: a 9-slot hotbar and 27-slot pack, stacks of 64; the material named `tool` is unstackable. */
   hotbarAndPack: Object.freeze({
     containers: Object.freeze({
       hotbar: Object.freeze({slots: 9, stackSize: 64, overflow: 'spill' as const}),

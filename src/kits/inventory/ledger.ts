@@ -198,6 +198,10 @@ export function createInventoryLedger(options: InventoryOptions, saved?: unknown
     commitReservation(id: string, reservationId: string, produce: InventoryOutput[]): InventoryResult {
       return apply({kind: 'commit', id, reservationId, produce});
     },
+    /** Whether an operation id already has a receipt (a retry then gets the ledger's duplicate or conflict answer). */
+    hasReceipt(id: string): boolean {
+      return receipts.has(identifier(id));
+    },
     /** Batches held in one container with their quantities (reserved units included), sorted by batch id. */
     contents(container: string): readonly Readonly<{batchId: string; quantity: number}>[] {
       identifier(container);
