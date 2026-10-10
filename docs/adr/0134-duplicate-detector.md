@@ -1,4 +1,4 @@
-# ADR 0131: duplicate and near-duplicate detection as a read-only repo tool
+# ADR 0134: duplicate and near-duplicate detection as a read-only repo tool
 
 - Status: Proposed for this implementation; integration is gated by full CI.
 - Date: 2026-10-09

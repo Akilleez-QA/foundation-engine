@@ -1,4 +1,4 @@
-# ADR 0098: optional breadcrumb trails for followers
+# ADR 0103: optional breadcrumb trails for followers
 
 - **Status:** Proposed
 - **Date:** 2026-10-09

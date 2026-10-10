@@ -1,4 +1,4 @@
-# ADR 0124: slot, stack and key-item rules over the inventory ledger
+# ADR 0126: slot, stack and key-item rules over the inventory ledger
 
 - **Status:** Proposed (candidate implementation)
 - **Date:** 2026-10-09

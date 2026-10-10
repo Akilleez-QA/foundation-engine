@@ -1,4 +1,4 @@
-# ADR 0097: optional ballistic trajectory solves
+# ADR 0102: optional ballistic trajectory solves
 
 - **Status:** Proposed
 - **Date:** 2026-10-09

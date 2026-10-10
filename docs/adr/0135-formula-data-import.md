@@ -1,12 +1,12 @@
-# ADR 0132: spreadsheet import for formula sheets and lookup tables
+# ADR 0135: spreadsheet import for formula sheets and lookup tables
 
-- Status: Proposed for this implementation; depends on ADR 0120 (the formulas kit); integration is gated by full CI.
+- Status: Proposed for this implementation; depends on ADR 0124 (the formulas kit); integration is gated by full CI.
 - Date: 2026-10-09
 - Area: Optional kits / Rules / Tooling
 
 ## Context
 
-The formulas kit (ADR 0120) evaluates creator-owned rules but leaves lookup tables as "creator data the caller reads
+The formulas kit (ADR 0124) evaluates creator-owned rules but leaves lookup tables as "creator data the caller reads
 into inputs". Creators keep that data, and often the formulas themselves, in spreadsheets, or recover them from an
 original game's data. Hand-copying a 200-row table into TypeScript is error-prone and loses where the numbers came
 from.

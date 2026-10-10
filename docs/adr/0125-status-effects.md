@@ -1,4 +1,4 @@
-# ADR 0121: status effects with transforms on the fixed clock
+# ADR 0125: status effects with transforms on the fixed clock
 
 - **Status:** Proposed (candidate implementation)
 - **Date:** 2026-10-09

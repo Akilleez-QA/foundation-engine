@@ -1472,18 +1472,18 @@ visual or device evidence.
 
 ## Data-defined formulas (FORMULA-01) — candidate, 2026-10-09
 
-Optional `formulas` kit ([contract](../../src/kits/formulas/README.md), [ADR 0120](../adr/0120-data-defined-formulas.md)): validated JSON/text expressions, ordered sheets, stacking stages and a damage model; deterministic arithmetic and caller-supplied randomness. Evidence: eleven focused headless tests (parsing, refusal, ordering, seeded/restored streams, stacking, damage pipeline, 2,000-case named-preset transcription check, review-hardening cases); one independent adversarial review with its findings addressed. Candidate only; no game integration, browser, full CI or device acceptance claimed.
+Optional `formulas` kit ([contract](../../src/kits/formulas/README.md), [ADR 0124](../adr/0124-data-defined-formulas.md)): validated JSON/text expressions, ordered sheets, stacking stages and a damage model; deterministic arithmetic and caller-supplied randomness. Evidence: eleven focused headless tests (parsing, refusal, ordering, seeded/restored streams, stacking, damage pipeline, 2,000-case named-preset transcription check, review-hardening cases); one independent adversarial review with its findings addressed. Candidate only; no game integration, browser, full CI or device acceptance claimed.
 
 
 ## Formula data import candidate — FORMULA-DATA-01, 2026-10-09
 
-`npm run formulas:import` and the formulas kit's `parseDelimited`, `importFormulaSheet`, `importFormulaTable`, `defineFormulaTable`, `tableValue` and `tableRow` turn spreadsheet exports into committed formula sheets, keyed tables and matrices with attributable `meta`; loading runs the same checks, and refusals name the spreadsheet row. Stacked on the formulas kit candidate (ADR 0120). [Kit README](../../src/kits/formulas/README.md#importing-spreadsheet-data), [ADR 0132](../adr/0132-formula-data-import.md).
+`npm run formulas:import` and the formulas kit's `parseDelimited`, `importFormulaSheet`, `importFormulaTable`, `defineFormulaTable`, `tableValue` and `tableRow` turn spreadsheet exports into committed formula sheets, keyed tables and matrices with attributable `meta`; loading runs the same checks, and refusals name the spreadsheet row. Stacked on the formulas kit candidate (ADR 0124). [Kit README](../../src/kits/formulas/README.md#importing-spreadsheet-data), [ADR 0135](../adr/0135-formula-data-import.md).
 
 Evidence: focused headless tests (RFC 4180 parsing, sheet import equal to the hand-written sheet, row-named refusals, tables feeding sheet inputs, matrices, re-validation of committed JSON, the command's output loading in the kit). An independent adversarial review found nine issues (a silent no-op CLI under paths with spaces, row attribution errors, quadratic refusal search, unsnapshotted table arrays, unchecked limits and meta, quote/whitespace and cell-length handling, decoding and flag parsing); each is fixed with a regression test. Hosted full CI and a game consumer remain pending.
 
 ## Status effects (STATUS-01) — candidate, 2026-10-09
 
-Optional `status` kit ([contract](../../src/kits/status/README.md), [ADR 0121](../adr/0121-status-effects.md)): stacks, fixed-clock durations, decay, periodic pulses, threshold transforms/triggers, exclusive groups, immunities, snapshot/restore. Evidence: twelve focused headless tests in `src/kits/status/status.test.ts`; an independent adversarial review (5 major, 9 minor, 3 nits) whose findings were addressed in the second commit (transform dry-run, bounds parity between live state and restore, sealed rules, partial-loss events, advance without copying, restore expiry bounds, reserved after-immunity keys). Candidate only; no game integration, browser, full CI or device acceptance claimed.
+Optional `status` kit ([contract](../../src/kits/status/README.md), [ADR 0125](../adr/0125-status-effects.md)): stacks, fixed-clock durations, decay, periodic pulses, threshold transforms/triggers, exclusive groups, immunities, snapshot/restore. Evidence: twelve focused headless tests in `src/kits/status/status.test.ts`; an independent adversarial review (5 major, 9 minor, 3 nits) whose findings were addressed in the second commit (transform dry-run, bounds parity between live state and restore, sealed rules, partial-loss events, advance without copying, restore expiry bounds, reserved after-immunity keys). Candidate only; no game integration, browser, full CI or device acceptance claimed.
 
 ## Behaviour trees (BT-01) — candidate, 2026-10-09
 
@@ -1495,16 +1495,16 @@ Optional `economy` kit ([contract](../../src/kits/economy/README.md), [ADR 0123]
 
 ## Inventory rule presets (INV-RULES-01) — candidate, 2026-10-09
 
-Inventory kit extension ([contract](../../src/kits/inventory/README.md#optional-slot-stack-and-key-item-rules), [ADR 0124](../adr/0124-inventory-rule-presets.md)): slots, stack sizes with spill, key items, ownership caps and placement checked before the existing ledger applies an operation; ledger `contents(container)` read. Evidence: six focused headless tests in `src/kits/inventory/rules.test.ts`; an independent adversarial review (1 blocker, 4 major, 5 minor, 3 nits) whose findings were addressed in the second commit (idempotent retries, key items through reservations, commit projection, content-independent capacities, preset described as an approximation, reserved names). Candidate only; no game integration, browser, full CI or device acceptance claimed.
+Inventory kit extension ([contract](../../src/kits/inventory/README.md#optional-slot-stack-and-key-item-rules), [ADR 0126](../adr/0126-inventory-rule-presets.md)): slots, stack sizes with spill, key items, ownership caps and placement checked before the existing ledger applies an operation; ledger `contents(container)` read. Evidence: six focused headless tests in `src/kits/inventory/rules.test.ts`; an independent adversarial review (1 blocker, 4 major, 5 minor, 3 nits) whose findings were addressed in the second commit (idempotent retries, key items through reservations, commit projection, content-independent capacities, preset described as an approximation, reserved names). Candidate only; no game integration, browser, full CI or device acceptance claimed.
 
 ## Ballistics kit — candidate (2026-10-09)
 
-- **Scope:** `src/kits/ballistics`, pure solves and evaluation (ADR 0097).
+- **Scope:** `src/kits/ballistics`, pure solves and evaluation (ADR 0102).
 - **Evidence:** `ballistics.test.ts` covers exact landing for every solve, the constraint of each mode, the 45-degree range boundary, vertical shots, unreachable cases, lead convergence and validation.
 
 ## Breadcrumbs kit — candidate (2026-10-09)
 
-- **Scope:** `src/kits/breadcrumbs` (ADR 0098).
+- **Scope:** `src/kits/breadcrumbs` (ADR 0103).
 - **Evidence:** `breadcrumbs.test.ts` covers lag exactness, ring bounds, the moved policy, corner retracing, cuts, snapshots, validation, the lag controller and a `testScene` polyline-retracing consumer.
 - **Not established:** template or browser consumers and hosted CI.
 
@@ -1527,13 +1527,13 @@ Evidence: 9 headless tests (CPU reference arithmetic, lookup table against brute
 
 ## Offline format converters candidate — ASSET-CONVERT, 2026-10-09
 
-`npm run convert` (`tools/convert/`) is an independently implemented offline toolchain: OBJ/MTL, PLY and BVH (bone-map retargeting that folds unmapped joints) to GLB, and PCX, BMP and raw palette images to indexed or RGBA PNG. Each conversion writes a provenance receipt (output and input hashes, tool, options) that `lint:provenance` accepts; failures write nothing. The runtime model loader is unchanged. [README](../../tools/convert/README.md), [ADR 0130](../adr/0130-offline-format-converters.md).
+`npm run convert` (`tools/convert/`) is an independently implemented offline toolchain: OBJ/MTL, PLY and BVH (bone-map retargeting that folds unmapped joints) to GLB, and PCX, BMP and raw palette images to indexed or RGBA PNG. Each conversion writes a provenance receipt (output and input hashes, tool, options) that `lint:provenance` accepts; failures write nothing. The runtime model loader is unchanged. [README](../../tools/convert/README.md), [ADR 0133](../adr/0133-offline-format-converters.md).
 
 Evidence: focused headless tests compare OBJ, PLY and BVH results with three.js's own loaders as oracles, check folded joints keep world positions, check palette and index preservation for PCX/BMP/RLE8, validate every GLB with the glTF validator and GLTFLoader, and run a converted file's receipt through the provenance check. An independent adversarial review found ten defects (including silently invalid GLBs, file embedding through `../` texture paths and memory amplification from small headers), each fixed with a regression test. This is a branch candidate: hosted full CI and review of real creator assets in a game remain pending; rest-pose retargeting is not implemented.
 
 
 ## Duplicate detector candidate — DUPES-01, 2026-10-09
 
-`npm run dupes` (`tools/dupes/`) is an independently implemented read-only scan: exact duplicates with git blob ids, GLBs with identical mesh data (values, any layout), similar PNGs (128-bit difference hash) and similar text (MinHash with banding), over a game's `public/` folder, any paths, or across two trees. Unreadable or uncomparable content is skipped with a reason. [README](../../tools/dupes/README.md), [ADR 0131](../adr/0131-duplicate-detector.md).
+`npm run dupes` (`tools/dupes/`) is an independently implemented read-only scan: exact duplicates with git blob ids, GLBs with identical mesh data (values, any layout), similar PNGs (128-bit difference hash) and similar text (MinHash with banding), over a game's `public/` folder, any paths, or across two trees. Unreadable or uncomparable content is skipped with a reason. [README](../../tools/dupes/README.md), [ADR 0134](../adr/0134-duplicate-detector.md).
 
 Evidence: focused headless tests (blob ids equal `git hash-object`; geometry, image and text matches and non-matches; the PNG decoder against a real renderer; a decompression bomb refused; large families and look-alike images grouped within bounds; CLI statuses). An independent adversarial review found thirteen defects, each fixed with a regression test. A local run over the templates found seven exact groups (including textures shared by two templates) and eight similar-image groups. Not part of `npm run check`; hosted full CI pending.

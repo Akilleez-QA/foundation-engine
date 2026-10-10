@@ -1,4 +1,4 @@
-# ADR 0130: offline format converters with provenance receipts
+# ADR 0133: offline format converters with provenance receipts
 
 - Status: Proposed for this implementation; integration is gated by full CI.
 - Date: 2026-10-09
