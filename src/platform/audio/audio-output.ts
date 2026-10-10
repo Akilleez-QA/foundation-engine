@@ -293,6 +293,11 @@ export interface CueVoice {
    * `timeConstant` in seconds: [0.005, 2], default 0.03; there is no instant path, so changes cannot click.
    */
   setFilter?(filter: CueFilter, timeConstant?: number): void;
+  /**
+   * Ramp the playback rate (pitch and speed together, `RATE_LIMITS`) with `setTargetAtTime`; `timeConstant` in seconds
+   * [0, 2], default 0.03 (0: immediate). For Doppler shift and pitch escalation. Optional so wrappers need not forward it.
+   */
+  setRate?(rate: number, timeConstant?: number): void;
   stop(): void;
 }
 export interface CueVoiceOptions {
@@ -312,6 +317,12 @@ export interface CueVoiceOptions {
 /** Playback rate bounds (`CueVoiceOptions.rate`). */
 export const RATE_LIMITS = {min: 0.25, max: 4} as const;
 export const MAX_WAIT_MS = 5000;
+function validateRate(rate: unknown, timeConstant: unknown = 0): void {
+  if (typeof rate !== 'number' || !(rate >= RATE_LIMITS.min && rate <= RATE_LIMITS.max))
+    throw Error(`playback rate must be in [${RATE_LIMITS.min}, ${RATE_LIMITS.max}]`);
+  if (typeof timeConstant !== 'number' || !(timeConstant >= 0 && timeConstant <= 2))
+    throw Error('rate time constant must be in [0, 2] seconds');
+}
 export interface AudioStats {
   readonly contexts: number;
   readonly played: number;
@@ -421,8 +432,7 @@ export function validateCueVoiceOptions(options: CueVoiceOptions = {}): void {
   if (options.filter) validateFilter(options.filter);
   const rate = options.rate ?? 1,
     wait = options.wait ?? 0;
-  if (typeof rate !== 'number' || !(rate >= RATE_LIMITS.min && rate <= RATE_LIMITS.max))
-    throw Error(`playback rate must be in [${RATE_LIMITS.min}, ${RATE_LIMITS.max}]`);
+  validateRate(rate);
   if (typeof wait !== 'number' || !(wait >= 0 && wait <= MAX_WAIT_MS))
     throw Error(`wait must be in [0, ${MAX_WAIT_MS}] ms`);
   if (options.at !== undefined && (!Number.isFinite(options.at) || options.at < 0))
@@ -850,6 +860,10 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
           write(muffle.gain, value.gain ?? 1, timeConstant);
         }
       },
+      setRate(value, timeConstant = 0.03) {
+        validateRate(value, timeConstant);
+        if (!ended) write(source.playbackRate, value, timeConstant);
+      },
       stop() {
         if (ended) return;
         try {
@@ -894,6 +908,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
       gain = options.gain ?? 1;
     let position = options.spatial ? copy(options.spatial.position) : undefined;
     let filterCall: [CueFilter, number | undefined] | null = null;
+    let rate = options.rate ?? 1;
     const finish = () => {
       if (ended) return;
       ended = true;
@@ -928,6 +943,12 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
         if (inner) inner.setFilter?.(value, timeConstant);
         else filterCall = [{...value}, timeConstant];
       },
+      setRate(value, timeConstant) {
+        validateRate(value, timeConstant ?? 0.03);
+        if (ended) return;
+        rate = value;
+        inner?.setRate?.(value, timeConstant);
+      },
       stop() {
         if (ended) return;
         if (inner) inner.stop();
@@ -961,6 +982,7 @@ export function createAudioOutput(o: AudioOutputOptions): AudioOutput {
           inner = start(c, buffer, {
             ...options,
             gain,
+            rate,
             ...(options.spatial && position ? {spatial: {...options.spatial, position}} : {}),
             onEnded: finish,
           });

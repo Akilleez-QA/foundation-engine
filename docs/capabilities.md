@@ -46,6 +46,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | BREADCRUMBS-01 | Bounded leader trails with exact lag and path-distance retracing |  | [README.md](../src/kits/breadcrumbs/README.md) |
 | GRID-STEP-01 | Grid-step actor movement with classified bumps, ledges, forced tiles and follower lines |  | [README.md](../src/kits/grid-step/README.md) |
 | MEDIA-01 | Medium volumes with hysteresis state tracking and buoyancy, drag and current accelerations |  | [README.md](../src/kits/media/README.md) |
+| AUDIO-EXTRAS-01 | Character listener blend, Doppler, retrigger pitch, instance limits and quantized adaptive music |  | [README.md](../src/kits/audio-mixer/README.md) |
 | VIS-01 | Tone mapping and exposure per scene (view.output) | [#124](https://github.com/Akilleez-QA/foundation-engine/pull/124) | [scene-look.md](guides/scene-look.md) |
 | VIS-02 | Point and spot lights in fixed per-scene slots | [#138](https://github.com/Akilleez-QA/foundation-engine/pull/138) | [scene-look.md](guides/scene-look.md) |
 | VIS-03 | Shadows from the sun, local lights and shapes | [#148](https://github.com/Akilleez-QA/foundation-engine/pull/148) | [scene-look.md](guides/scene-look.md) |

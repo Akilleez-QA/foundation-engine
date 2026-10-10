@@ -56,7 +56,7 @@ function fake(o: {legacyListener?: boolean} = {}) {
   const panners: FakePanner[] = [],
     filters: {type: string; frequency: Param; disconnected: boolean}[] = [],
     gains: {gain: Param; disconnected: boolean}[] = [];
-  const sources: {onended: (() => void) | null}[] = [];
+  const sources: {onended: (() => void) | null; playbackRate: Param}[] = [];
   const node = <T extends object>(n: T) => {
     const x = Object.assign(n, {
       disconnected: false,
@@ -118,7 +118,13 @@ function fake(o: {legacyListener?: boolean} = {}) {
     },
     createBuffer: (_c: number, n: number) => ({length: n, copyToChannel() {}}),
     createBufferSource: () => {
-      const s = node({onended: null as (() => void) | null, buffer: null, start() {}, stop() {}});
+      const s = node({
+        onended: null as (() => void) | null,
+        buffer: null,
+        playbackRate: param(1),
+        start() {},
+        stop() {},
+      });
       sources.push(s);
       return s;
     },
@@ -501,4 +507,33 @@ test('creator spatial options: HRTF limits per quality preset, validation, and t
     defineGame({id: 'demo', title: 'Demo', version: '1.0.0', firstScene: 'start', audio: options}).audio,
     options,
   );
+});
+
+test('voices ramp their playback rate for Doppler and pitch escalation, validated and ignored once ended', () => {
+  const f = fake();
+  const out = output(f);
+  const voice = out.playVoice('ui.click', {rate: 1.5})!;
+  const source = must(f.sources.at(-1));
+  assert.equal(source.playbackRate.value, 1.5);
+  f.ctx.currentTime = 2;
+  voice.setRate!(1.2);
+  assert.deepEqual(source.playbackRate.calls.slice(-2), [
+    ['cancel', 2],
+    ['target', 1.2, 2, 0.03],
+  ]);
+  voice.setRate!(0.8, 0);
+  assert.equal(source.playbackRate.value, 0.8);
+  for (const [rate, tau] of [
+    [0.1, 0.03],
+    [5, 0.03],
+    [NaN, 0.03],
+    [1, -1],
+    [1, 3],
+  ] as const)
+    assert.throws(() => voice.setRate!(rate, tau), /rate/);
+  voice.stop();
+  const calls = source.playbackRate.calls.length;
+  voice.setRate!(2);
+  assert.equal(source.playbackRate.calls.length, calls, 'ended voices ignore updates');
+  out.dispose();
 });

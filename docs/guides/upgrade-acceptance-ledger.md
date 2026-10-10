@@ -1476,6 +1476,16 @@ docs, mutable returned poses and rare ulp redraws; all were fixed and the re-rev
 clean. No browser,
 visual or device evidence.
 
+## Audio extras — candidate (2026-10-09)
+
+- **Scope:**
+  - `ctx.view.listener` (author view and runtime listener sync);
+  - `CueVoice.setRate` (platform output);
+  - in `@kits/audio-mixer`: `blendListener`, `dopplerRate`, `createRetrigger`, `createInstanceLimits`,
+    `createMusicClock` and `createMusicDirector` (ADR 0153).
+- **Evidence:** `src/kits/audio-mixer/extras.test.ts` and the `setRate` test in `src/platform/audio/spatial.test.ts`.
+- **Not established:** a browser listening test of the listener override and rate ramps, device evidence, and hosted CI.
+
 ## Data-defined formulas (FORMULA-01) — candidate, 2026-10-09
 
 Optional `formulas` kit ([contract](../../src/kits/formulas/README.md), [ADR 0124](../adr/0124-data-defined-formulas.md)): validated JSON/text expressions, ordered sheets, stacking stages and a damage model; deterministic arithmetic and caller-supplied randomness. Evidence: eleven focused headless tests (parsing, refusal, ordering, seeded/restored streams, stacking, damage pipeline, 2,000-case named-preset transcription check, review-hardening cases); one independent adversarial review with its findings addressed. Candidate only; no game integration, browser, full CI or device acceptance claimed.

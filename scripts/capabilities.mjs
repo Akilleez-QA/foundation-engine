@@ -347,6 +347,17 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'AUDIO-EXTRAS-01',
+    title: 'Character listener blend, Doppler, retrigger pitch, instance limits and quantized adaptive music',
+    docs: 'src/kits/audio-mixer/README.md',
+    evidence: [
+      {kit: 'audio-mixer', export: 'blendListener'},
+      {kit: 'audio-mixer', export: 'dopplerRate'},
+      {kit: 'audio-mixer', export: 'createMusicDirector'},
+      {path: 'src/kits/audio-mixer/extras.test.ts'},
+    ],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,
