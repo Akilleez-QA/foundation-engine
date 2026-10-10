@@ -25,9 +25,12 @@ gameplay intents and apply them in the same step. The kit never calls your code.
 `skip()` completes everything at once and returns only the effects marked `land`
 (the default); presentation effects marked `onSkip: 'drop'` are dropped, and no
 presentation events are produced, so the camera and audio simply settle on their
-final state. `cancel()` stops without landing anything further.
+final state. Skip happens at the current tick; ticks still owed by a budget-stopped
+call are discarded. `cancel()` stops without landing anything further. With a small
+transition budget, call `advance(0)` until `run.settled` before acting on what it shows.
 
-Store `run.snapshot()` in a `defineSequenceSection` record in the same save as the
+Give each run a session that is unique for that definition and keep it across reloads
+(`createSequence(def, saved.run?.session ?? newRunId(), saved.run)`). Store `run.snapshot()` in a `defineSequenceSection` record in the same save as the
 consequences of the effects you applied. A restored run continues with the same
 future events. Editing a definition changes its fingerprint, so old snapshots are
 refused rather than reinterpreted; give the edited sequence a new section or migrate.

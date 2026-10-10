@@ -61,7 +61,10 @@ export type SequenceEvent =
       readonly kind: 'effect';
       readonly effect: string;
       readonly cue: string;
-      /** `<session>/<cue>`: stable across snapshots, for the creator's own claim or receipt records. */
+      /**
+       * `JSON.stringify([definition, session, cue])`: unambiguous, stable across snapshots, distinct across definitions
+       * and sessions; for the creator's own claim or receipt records.
+       */
       readonly id: string;
       readonly tick: number;
     }
@@ -100,6 +103,15 @@ function fail(message: string): never {
 }
 const isId = (v: unknown): v is string =>
   typeof v === 'string' && v.length >= 1 && v.length <= SEQUENCE_LIMITS.idLength;
+/** Copy an untrusted array with a single length read and indexed access (no iterator, no repeated length). */
+function copyArray(v: unknown, min: number, max: number, what: string): unknown[] {
+  if (!Array.isArray(v)) fail(`${what} must be an array`);
+  const n = (v as unknown[]).length;
+  if (!Number.isSafeInteger(n) || n < min || n > max) fail(`${what} must have ${min}-${max} entries`);
+  const out: unknown[] = [];
+  for (let i = 0; i < n; i++) out.push((v as unknown[])[i]);
+  return out;
+}
 const safeCount = (v: unknown, max = Number.MAX_SAFE_INTEGER): v is number =>
   typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 && v <= max;
 
@@ -125,24 +137,22 @@ export function defineSequence(input: SequenceDefinitionInput): SequenceDefiniti
     skippableIn = input.skippable;
   if (!isId(id)) fail('definition id must be 1-256 characters');
   if (skippableIn !== undefined && typeof skippableIn !== 'boolean') fail('skippable must be a boolean');
-  if (!Array.isArray(tracksIn) || tracksIn.length < 1 || tracksIn.length > SEQUENCE_LIMITS.tracks)
-    fail(`a definition has 1-${SEQUENCE_LIMITS.tracks} tracks`);
+  const trackList = copyArray(tracksIn, 1, SEQUENCE_LIMITS.tracks, 'tracks') as SequenceTrack[];
   const trackIds = new Set<string>(),
     cueIds = new Map<string, {track: number; index: number}>();
   const tracks: SequenceTrack[] = [];
   let total = 0;
-  (tracksIn as readonly SequenceTrack[]).forEach((t, ti) => {
+  trackList.forEach((t, ti) => {
     if (!t || typeof t !== 'object') fail('a track must be an object');
     const tid = t.id,
       cuesIn = t.cues;
     if (!isId(tid) || trackIds.has(tid)) fail('track ids must be unique, 1-256 characters');
     trackIds.add(tid);
-    if (!Array.isArray(cuesIn) || cuesIn.length < 1 || cuesIn.length > SEQUENCE_LIMITS.cuesPerTrack)
-      fail(`a track has 1-${SEQUENCE_LIMITS.cuesPerTrack} cues`);
-    total += cuesIn.length;
+    const cueList = copyArray(cuesIn, 1, SEQUENCE_LIMITS.cuesPerTrack, `track ${tid} cues`) as SequenceCue[];
+    total += cueList.length;
     if (total > SEQUENCE_LIMITS.cues) fail(`a definition has at most ${SEQUENCE_LIMITS.cues} cues`);
     const cues: SequenceCue[] = [];
-    (cuesIn as readonly SequenceCue[]).forEach((c, ci) => {
+    cueList.forEach((c, ci) => {
       if (!c || typeof c !== 'object') fail('a cue must be an object');
       const cid = c.id,
         ticks = c.ticks,
@@ -158,9 +168,7 @@ export function defineSequence(input: SequenceDefinitionInput): SequenceDefiniti
       if (onSkip !== undefined && effect === undefined) fail(`cue ${cid}: onSkip needs an effect`);
       let deps: string[] = [];
       if (after !== undefined) {
-        if (!Array.isArray(after) || after.length > SEQUENCE_LIMITS.after)
-          fail(`cue ${cid}: after lists at most ${SEQUENCE_LIMITS.after} cues`);
-        deps = [...(after as readonly string[])];
+        deps = copyArray(after, 0, SEQUENCE_LIMITS.after, `cue ${cid} after`) as string[];
         if (!deps.every(isId) || new Set(deps).size !== deps.length) fail(`cue ${cid}: after must be unique cue ids`);
         if (deps.includes(cid)) fail(`cue ${cid}: a cue cannot wait for itself`);
       }
@@ -246,10 +254,10 @@ export function parseSequenceState(def: SequenceDefinition, raw: unknown): Seque
   if (!STATUSES.includes(status as SequenceStatus)) fail('unknown state status');
   if (!safeCount(tick) || !safeCount(owed) || tick + owed > Number.MAX_SAFE_INTEGER) fail('invalid state time');
   if (owed > 0 && status !== 'running') fail('only a running sequence can owe ticks');
-  if (!Array.isArray(tracksIn) || tracksIn.length !== def.tracks.length) fail('state tracks do not match');
+  const stateTracks = copyArray(tracksIn, def.tracks.length, def.tracks.length, 'state tracks');
   const position = new Map<string, {track: number; index: number}>();
   def.tracks.forEach((t, ti) => t.cues.forEach((c, ci) => position.set(c.id, {track: ti, index: ci})));
-  const tracks = (tracksIn as unknown[]).map((entry, ti) => {
+  const tracks = stateTracks.map((entry, ti) => {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) fail('state track must be an object');
     const e = entry as Record<string, unknown>;
     const ek = Object.keys(e).sort();
@@ -261,7 +269,7 @@ export function parseSequenceState(def: SequenceDefinition, raw: unknown): Seque
     if (startedAt !== null && !(safeCount(startedAt) && startedAt <= (tick as number)))
       fail('state start tick out of range');
     if (index === len && startedAt !== null) fail('a completed track has no active cue');
-    return Object.freeze({index, startedAt: startedAt as number | null});
+    return Object.freeze({index: index + 0, startedAt: startedAt === null ? null : (startedAt as number) + 0});
   });
   const complete = (cue: string) => {
     const p = position.get(cue)!;
@@ -279,8 +287,7 @@ export function parseSequenceState(def: SequenceDefinition, raw: unknown): Seque
   if ((status === 'finished' || status === 'skipped') && !allDone) fail('a finished state has incomplete cues');
   if (status === 'running' && allDone) fail('a running state has no remaining cues');
   const list = (v: unknown, what: string): string[] => {
-    if (!Array.isArray(v) || v.length > SEQUENCE_LIMITS.cues) fail(`state ${what} must be an array`);
-    const ids = [...(v as unknown[])];
+    const ids = copyArray(v, 0, SEQUENCE_LIMITS.cues, `state ${what}`);
     if (!ids.every(id => isId(id) && position.has(id)) || new Set(ids).size !== ids.length)
       fail(`state ${what} must name unique cues`);
     return ids as string[];
@@ -305,8 +312,8 @@ export function parseSequenceState(def: SequenceDefinition, raw: unknown): Seque
     fingerprint: def.fingerprint,
     session,
     status: status as SequenceStatus,
-    tick,
-    owed,
+    tick: tick + 0,
+    owed: owed + 0,
     tracks: Object.freeze(tracks),
     released: Object.freeze(released),
     dropped: Object.freeze(dropped),
@@ -385,13 +392,29 @@ export function createSequence(
           if (force && c.onSkip === 'drop') dropped.add(c.id);
           else
             events.push(
-              Object.freeze({kind: 'effect', effect: c.effect, cue: c.id, id: `${session}/${c.id}`, tick: now}),
+              Object.freeze({
+                kind: 'effect',
+                effect: c.effect,
+                cue: c.id,
+                id: JSON.stringify([def.id, session, c.id]),
+                tick: now,
+              }),
             );
         }
         moved = true;
       }
       if (!moved) return budget;
     }
+  }
+  /** True when some cue could start or complete at the current tick (work a budget-stopped call left behind). */
+  function eligible(): boolean {
+    return def.tracks.some((t, ti) => {
+      const s = tracks[ti]!;
+      if (s.index >= t.cues.length) return false;
+      const c = t.cues[s.index]!;
+      if (s.startedAt === null) return c.after!.every(complete);
+      return tick - s.startedAt >= c.ticks && (!c.hold || released.has(c.id));
+    });
   }
   function nextDue(): number {
     let next = Infinity;
@@ -514,6 +537,13 @@ export function createSequence(
     },
     get owed(): number {
       return owed;
+    },
+    /**
+     * False while a budget-stopped advance left work: owed ticks, or transitions due at the current tick. Call
+     * `advance(0)` until settled before acting on what the run shows (for example before a `release`).
+     */
+    get settled(): boolean {
+      return status !== 'running' || (owed === 0 && !eligible());
     },
     /** Plain, frozen data for the creator's save section. Store it together with the effects it reports applied. */
     snapshot(): SequenceState {

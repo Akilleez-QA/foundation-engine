@@ -1210,7 +1210,7 @@ is implied.
 
 ## Optional cue sequences — candidate (2026-10-09)
 
-Branch `feat/sequence-kit` from `cbaf8060`. Ten headless tests: parallel tracks,
+Branch `feat/sequence-kit` from `cbaf8060`. Twelve headless tests (after an independent adversarial review with 6,000 fuzzed runs against a reference model; its findings on effect-id collisions across definitions, session handling at reload, a `settled` signal for budget-stopped work, single-read array copies and documentation were fixed): parallel tracks,
 cross-track barriers and held cues with exact ticks; one large advance equal to
 many small ones and to a one-transition budget (identical event order, owed ticks
 drained); skip landing each remaining gameplay effect once, dropping presentation

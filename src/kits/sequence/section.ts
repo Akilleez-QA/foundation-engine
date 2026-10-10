@@ -8,7 +8,8 @@ export interface SequenceRecord {
 
 /**
  * A strict save section for one sequence definition. `id` is `<owner>.<name>` and is never renamed. A stored run of
- * another definition fingerprint, or any inconsistent state, throws in `parse`, so the save store quarantines it and
+ * another definition fingerprint, or any inconsistent state, throws in `parse`,
+ * (the session is not checked here: continue a saved run with its own `run.session`) so the save store quarantines it and
  * play continues from `{run: null}`. Edit a definition by giving it a new section or migrating explicitly.
  */
 export function defineSequenceSection(

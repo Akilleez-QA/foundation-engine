@@ -87,7 +87,7 @@ test('one large advance equals many small ones, and the transition budget only s
         out.push(...brief(r.events));
       }
       // A budgeted caller drains owed ticks (on later frames) before acting on what it observes.
-      for (let i = 0; i < 50 && s.owed > 0; i++) out.push(...brief(s.advance(0).events));
+      for (let i = 0; i < 50 && !s.settled; i++) out.push(...brief(s.advance(0).events));
     }
     return {out, partials, status: s.status};
   };
@@ -103,10 +103,14 @@ test('one large advance equals many small ones, and the transition budget only s
 test('skip lands each remaining gameplay effect exactly once, drops presentation effects, and is final', () => {
   const s = createSequence(defineSequence(scene), 'slot1');
   const landed = effects(s.advance(22).events);
-  assert.deepEqual(landed, ['slot1/walk']);
+  assert.deepEqual(landed, [JSON.stringify(['gate-intro', 'slot1', 'walk'])]);
   const skipped = s.skip();
   assert.equal(skipped.status, 'skipped');
-  assert.deepEqual(effects(skipped.events), ['slot1/open'], 'walk is not repeated; sting is dropped');
+  assert.deepEqual(
+    effects(skipped.events),
+    [JSON.stringify(['gate-intro', 'slot1', 'open'])],
+    'walk is not repeated; sting is dropped',
+  );
   assert.ok(
     skipped.events.every(e => e.kind === 'effect' || e.kind === 'skipped'),
     'no presentation events',
@@ -144,7 +148,7 @@ test('a snapshot taken mid-sequence restores to the same future, including owed 
   out.push(...brief(a.advance(31).events));
   assert.ok(a.owed > 0, 'stopped by its budget');
   const resumed = createSequence(def, 's', JSON.parse(JSON.stringify(a.snapshot())));
-  for (let i = 0; i < 10 && resumed.owed > 0; i++) out.push(...brief(resumed.advance(0).events));
+  for (let i = 0; i < 10 && !resumed.settled; i++) out.push(...brief(resumed.advance(0).events));
   resumed.release('line');
   const again = createSequence(def, 's', resumed.snapshot());
   out.push(...brief(again.advance(3).events));
@@ -179,7 +183,7 @@ test('restore refuses edited definitions, other sessions and inconsistent or for
     ['finished but incomplete', x => (x.status = 'finished')],
     ['owed when cancelled', x => ((x.status = 'cancelled'), (x.owed = 3))],
     ['unsafe time', x => (x.owed = Number.MAX_SAFE_INTEGER)],
-    ['negative zero tolerated only as zero', x => (x.tick = -1)],
+    ['negative tick', x => (x.tick = -1)],
     ['non-plain', x => Object.setPrototypeOf(x, Array.prototype)],
   ];
   for (const [what, mutate] of bad) {
@@ -300,4 +304,60 @@ test('composes with the dialogue kit and a real save section across a fresh stor
   second.dispose();
   assert.throws(() => section.section.parse({run: {...run.snapshot(), session: 'x'.repeat(300)}}), RangeError);
   assert.deepEqual(section.section.parse({run: null}), {run: null});
+});
+
+test('effect ids are unambiguous across definitions and sessions; settled reports budget-stopped work; -0 normalises', () => {
+  const one = defineSequence({id: 'one', tracks: [{id: 't', cues: [{id: 'b/open', ticks: 0, effect: 'e'}]}]});
+  const two = defineSequence({id: 'two', tracks: [{id: 't', cues: [{id: 'open', ticks: 0, effect: 'e'}]}]});
+  const ids = [
+    ...effects(createSequence(one, 'a').advance(0).events),
+    ...effects(createSequence(two, 'a/b').advance(0).events),
+    ...effects(createSequence(two, 'a').advance(0).events),
+  ];
+  assert.equal(new Set(ids).size, 3);
+  const held = defineSequence({
+    id: 'held',
+    tracks: [
+      {
+        id: 't',
+        cues: [
+          {id: 'x', ticks: 1},
+          {id: 'h', ticks: 0, hold: true},
+        ],
+      },
+    ],
+  });
+  const r = createSequence(held, 's', null, {maxTransitions: 1});
+  r.advance(0);
+  assert.equal(r.advance(1).status, 'partial');
+  assert.equal(r.owed, 0);
+  assert.equal(r.settled, false, 'owed is zero but transitions are still due at this tick');
+  while (!r.settled) r.advance(0);
+  assert.equal(r.release('h'), 'released');
+  const snap = JSON.parse(JSON.stringify(r.snapshot()));
+  snap.tracks[0] = {index: 1, startedAt: -0};
+  snap.tick = 1;
+  const parsed = parseSequenceState(held, snap);
+  assert.ok(Object.is(parsed.tracks[0]!.startedAt, 0));
+});
+
+test('untrusted arrays are copied with one length read and never iterated', () => {
+  const sneaky = [{id: 'c', ticks: 0}];
+  Object.defineProperty(sneaky, Symbol.iterator, {
+    value: function* () {
+      for (;;) yield {id: 'x', ticks: 0};
+    },
+  });
+  const def = defineSequence({id: 'sneaky', tracks: [{id: 't', cues: sneaky}]});
+  assert.equal(def.tracks[0]!.cues.length, 1);
+  const s = createSequence(def, 's');
+  const snap = JSON.parse(JSON.stringify(s.snapshot()));
+  const released: string[] = [];
+  Object.defineProperty(released, Symbol.iterator, {
+    value: function* () {
+      for (;;) yield 'c';
+    },
+  });
+  snap.released = released;
+  assert.deepEqual(parseSequenceState(def, snap).released, []);
 });
