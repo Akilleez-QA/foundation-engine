@@ -1,4 +1,4 @@
-# ADR 0099: optional car handling on ray-cast wheels
+# ADR 0140: optional car handling on ray-cast wheels
 
 - Status: Proposed for this implementation; integration is gated by full CI.
 - Date: 2026-10-09

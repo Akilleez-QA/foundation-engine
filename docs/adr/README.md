@@ -78,4 +78,4 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0085](0085-atomic-cell-batches-and-occupancy.md) | Atomic cell batches and immutable occupancy | Procgen / Spatial | Proposed |
 
-| [0099](0099-optional-car-handling.md) | Optional car handling on ray-cast wheels | Optional kits / Simulation | Proposed |
+| [0140](0140-optional-car-handling.md) | Optional car handling on ray-cast wheels | Optional kits / Simulation | Proposed |

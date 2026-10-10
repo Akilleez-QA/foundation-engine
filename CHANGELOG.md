@@ -7,7 +7,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
-- Optional car handling (`@kits/car-handling`): ray-cast wheel suspension against a creator ground query, drive/brake/steering curves, tyre slip with a friction ellipse, handbrake drifts, downforce, air control and upside-down reset; fixed sub-steps with a query bound, transactional steps, `dmath` determinism and JSON-exact snapshot/restore, with `arcade` and `sim-lite` presets. See [ADR 0099](docs/adr/0099-optional-car-handling.md).
+- Optional car handling (`@kits/car-handling`): ray-cast wheel suspension against a creator ground query, drive/brake/steering curves, tyre slip with a friction ellipse, handbrake drifts, downforce, air control and upside-down reset; fixed sub-steps with a query bound, transactional steps, `dmath` determinism and JSON-exact snapshot/restore, with `arcade` and `sim-lite` presets. See [ADR 0140](docs/adr/0140-optional-car-handling.md).
 
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
