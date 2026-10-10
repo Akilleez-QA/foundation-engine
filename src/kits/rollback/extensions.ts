@@ -58,8 +58,10 @@ export function captureExtensions(options: RollbackOptions, limits: RollbackLimi
   if (options.departure !== undefined) {
     const d = options.departure as unknown;
     if (!object(d) || (d.input !== 'neutral' && d.input !== 'repeat')) throw Error('rollback: invalid departure');
-    departure = Object.freeze({input: d.input});
-    suffix += `:departure=${d.input}`;
+    const quorum = d.quorum ?? Math.floor(limits.players / 2) + 1;
+    if (!int(quorum, 1, limits.players)) throw Error('rollback: invalid departure');
+    departure = Object.freeze({input: d.input, quorum});
+    suffix += `:departure=${d.input},${quorum}`;
   }
   const retain = options.retainInputFrames ?? 0;
   if (!int(retain, 0, 3600)) throw Error('rollback: invalid retainInputFrames');

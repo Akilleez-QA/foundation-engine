@@ -22,6 +22,10 @@ export interface NetworkRunOptions {
   link: Omit<LossyLinkOptions, 'seed'>;
   limits?: Partial<RollbackLimits>;
   delay?: RollbackDelayPolicy;
+  /** Peers in `group` cannot exchange messages with the others between ticks `from` and `to` (then it heals). */
+  partition?: {group: readonly number[]; from: number; to: number};
+  /** Departure quorum (default: the session default, a strict majority). */
+  quorum?: number;
   /** Peers that stop at a tick. */
   disconnect?: readonly {player: number; at: number}[];
   /** Spectators: join tick (0 = from the start, otherwise from peer `feed`'s confirmed state). */
@@ -60,7 +64,7 @@ export function runNetwork(o: NetworkRunOptions): NetworkRun {
       limits,
       ports: p,
       adaptiveDelay: delay,
-      departure: {input: 'repeat'},
+      departure: o.quorum === undefined ? {input: 'repeat'} : {input: 'repeat', quorum: o.quorum},
       retainInputFrames: 160,
       evidence: {frames: 4, maxBytes: 4096, chunkBytes: 256},
     }),
@@ -86,6 +90,11 @@ export function runNetwork(o: NetworkRunOptions): NetworkRun {
     if (!row) published.set(frame, (row = new Map()));
     row.set(who, checksum);
   };
+  const parted = (a: number, b: number, tick: number) =>
+    !!o.partition &&
+    tick >= o.partition.from &&
+    tick < o.partition.to &&
+    o.partition.group.includes(a) !== o.partition.group.includes(b);
   const alive = (i: number) => !o.disconnect?.some(d => d.player === i);
   const gone = (i: number, tick: number) => !!o.disconnect?.some(d => d.player === i && tick >= d.at);
   const makeSpectator = (k: number, tick: number) => {
@@ -153,9 +162,10 @@ export function runNetwork(o: NetworkRunOptions): NetworkRun {
         if (!delayLog[i]!.includes(key)) delayLog[i]!.push(key);
       }
       for (let j = 0; j < n; j++) {
-        if (j === i || gone(j, tick) || s.read().departures.some(d => d.player === j)) continue;
+        // Departed peers still get the (input-free) departure notice, so a partitioned one fails closed.
+        if (j === i || gone(j, tick)) continue;
         const text = JSON.stringify({kind: 'msg', body: x.outgoing(j, tick)} satisfies Wire);
-        link.send(i, j, text, tick, text.length);
+        if (!parted(i, j, tick)) link.send(i, j, text, tick, text.length);
       }
     }
     for (let k = 0; k < specs.length; k++) {

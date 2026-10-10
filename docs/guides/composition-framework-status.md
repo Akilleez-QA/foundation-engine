@@ -1109,7 +1109,7 @@ Evidence: focused headless tests (blob ids equal `git hash-object`; geometry, im
 
 - `createRollbackExchange`: redundant resend of unacknowledged inputs with acknowledgement vectors, round-trip echoes, advantage exchange with a pacing recommendation, silence timeouts and relays.
 - `adaptiveDelay`: one authority's bounded decisions ride on its input stream and apply from a frame no peer can have reached.
-- `departure`: survivors gossip reports, agree on the largest, relay missing inputs and fix the departed input by a creator rule.
+- `departure`: survivors gossip reports, decide only with a quorum (default a strict majority, so a partitioned minority stalls and later fails closed), agree on the largest, relay missing inputs and fix the departed input by a creator rule.
 - `createRollbackSpectator`: confirmed-only stepping with a bounded buffer, catch-up and checksum checks.
 - `start` and spectator `join`: begin from a checksum-validated state.
 - `evidence` and `createDesyncEvidenceStore`: bounded, chunked desync evidence, explained with the replay kit when the texts are JSON.
@@ -1125,6 +1125,7 @@ Evidence (headless, local):
   - Relays were exercised.
 - Two near-simultaneous departures converged in the seeds tried.
 - A plain session over the same link fails with `remote-gap`.
+- A partition-then-heal test, and an independent reviewer's fuzzer (500 seeded scenarios with departure notices), showed no two running parties disagreeing.
 - Unit tests cover each refusal, bound, reentrancy and disposal.
 - A scene-system consumer on the fixed lane.
 
@@ -1132,7 +1133,8 @@ This is a branch candidate. Not established:
 
 - real transports or WAN;
 - a new player joining a running match;
-- overlapping departures that disagree (detected and failed closed, not resolved);
+- overlapping departures that disagree (failed closed when the difference reaches a peer, not resolved);
+- partition safety without a majority quorum (two players);
 - delay changes after the authority departs;
 - frame stretching;
 - authentication;

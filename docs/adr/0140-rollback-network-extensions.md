@@ -22,7 +22,8 @@ checksums:
   service of spectators.
 - `adaptiveDelay`: one authority's decisions ride on its input stream and apply from a frame no peer can have reached.
   They are bounded by range, step and spacing. `recommendInputDelay` and `recommendPacing` are pure helpers.
-- `departure`: survivors report and gossip what they hold, agree on the largest report, relay missing inputs and fix
+- `departure`: survivors report and gossip what they hold, decide only with a quorum (default a strict majority),
+  agree on the largest report, relay missing inputs and fix
   the departed input by a creator rule.
 - `createRollbackSpectator`: confirmed-only stepping with a bounded buffer, catch-up and checksum comparison.
 - `start` and spectator `join`: begin from a checksum-validated state.
@@ -35,6 +36,9 @@ All of it is caller-driven: no timers, sockets or new scheduler.
 ## Alternatives and consequences
 
 - A separate kit: rejected. It would duplicate the session's ownership of input history and checksums.
+- Deciding without a quorum: rejected as the default. A false timeout or partition would let both sides decide and
+  keep running with different states. A lower quorum stays available as an explicit, documented creator choice
+  (two players need it).
 - Consensus that survives overlapping departures: rejected for now. A gossiped decision that fails closed on conflict
   is simpler and honest about the remaining case.
 - Allowing out-of-order delivery inside the session: rejected. Ordering is the exchange's job, and the session keeps

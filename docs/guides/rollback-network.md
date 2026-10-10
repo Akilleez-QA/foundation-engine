@@ -65,9 +65,14 @@ if (next !== current) session.proposeDelay(next);
   frame `X`. It applies from `X + maxPredictionFrames + maxDelay + 1`, which no peer's queued input can have reached
   before it confirms `X`. A late decision is a protocol fault, never a quiet difference.
 - **Departures** settle on the largest frame any survivor holds, so nothing already confirmed changes. Survivors
-  relay the missing inputs; after that frame the player's input follows your rule. Two departures whose agreements
-  overlap could disagree in principle. The decisions are gossiped and a difference fails closed.
-- **Spectators** step only fully confirmed frames and compare checksums with the peers.
+  relay the missing inputs; after that frame the player's input follows your rule. A peer decides only while at
+  least `quorum` players remain (default: a strict majority), so the isolated side of a partition stalls instead of
+  deciding. Keep sending `outgoing(peer)` to departed peers for a while: it then carries only the departure notice,
+  and a voted-out peer that hears it fails with `local-departed`. Two players need `quorum: 1`, which is not
+  partition-safe. Two departures whose agreements overlap could disagree in principle; a difference that reaches a
+  peer fails it closed.
+- **Spectators** step only fully confirmed frames, served only once every remaining peer holds them, and compare
+  checksums with the peers.
 - **Resume** requires the start state's checksum, and the start is part of `read().config` for your handshake.
 
 ## Bounds, overload and recovery
@@ -79,8 +84,9 @@ extensions degrade, they do not grow:
 - A spectator buffers at most `maxBufferedFrames` frames; the sender repeats the rest later.
 - Evidence is truncated to `maxBytes`, and the store refuses chunks beyond its budget.
 
-Protocol faults (an out-of-policy delay, a conflicting departure, a peer voted out) fail the session closed, as
-before. Recovery is the creator's: build new sessions from an agreed `confirmedState()` with `start`.
+Structurally malformed messages are rejected without touching the session. Protocol faults (an invalid input, an
+out-of-policy delay, a conflicting departure, a peer voted out) fail the session closed, as before. Below the
+departure quorum the session stalls rather than deciding. Recovery is the creator's: build new sessions from an agreed `confirmedState()` with `start`.
 
 Cancellation: the session's `signal`, a spectator's `signal`, or `dispose()`. The exchange and the evidence store hold
 no resources beyond their bounded maps.
@@ -109,6 +115,7 @@ Not established:
 - real transports or WAN;
 - a new player joining a running match;
 - delay decisions after the authority leaves;
+- partition safety without a strict-majority quorum (and so for two players);
 - frame stretching;
 - message authentication;
 - cross-browser floating point;

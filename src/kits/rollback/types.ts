@@ -74,6 +74,13 @@ export type RollbackDelayChange = Readonly<{delay: number; from: number}>;
 /** What a departed player's input is for frames after the agreed last frame. */
 export interface RollbackDeparturePolicy {
   readonly input: 'neutral' | 'repeat';
+  /**
+   * Players (including this one) that must remain, neither leaving nor departed, before this peer decides a
+   * departure; [1, players], default a strict majority. Below it the departure stays undecided and the session stalls.
+   * With a strict majority two disjoint groups cannot both decide; a lower quorum (two players need 1) gives no
+   * protection against a partition.
+   */
+  readonly quorum?: number;
 }
 /** One departing player's agreement state. `reports` are `[reporter, lastFrame]`; `decided` is the agreed last frame. */
 export type RollbackDeparture = Readonly<{
@@ -224,6 +231,8 @@ export interface RollbackSnapshot {
   readonly startFrame: number;
   /** Input frames retained below the current frame (relay window). */
   readonly retainedInputFrames: number;
+  /** The largest frame lead a peer with identical limits can legitimately have (bounds reported advantages). */
+  readonly maxLead: number;
 }
 
 export interface RollbackConfirmedState {

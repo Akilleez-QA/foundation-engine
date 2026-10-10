@@ -110,7 +110,7 @@ export function createRollbackSpectator(options: RollbackSpectatorOptions): Roll
   const last = new Array<number>(players).fill(floor);
   const inputs = Array.from({length: players}, () => new Map<number, string>());
   const fixed = new Array<number | undefined>(players).fill(undefined);
-  const decided = new Array<{at: number; input: string | null} | undefined>(players).fill(undefined);
+  const decided = new Array<{at: number; input: string} | undefined>(players).fill(undefined);
   const rule = new Array<string>(players).fill(neutral);
   const history = new Map<number, number>();
   const pending = new Map<number, {player: number; checksum: number}>();
@@ -143,8 +143,8 @@ export function createRollbackSpectator(options: RollbackSpectatorOptions): Roll
     const d = decided[p];
     if (!d || fixed[p] !== undefined || last[p]! < d.at) return;
     fixed[p] = d.at;
-    // 'repeat' peers send the input at the agreed frame; a spectator that joined later cannot derive it.
-    rule[p] = d.input ?? (inputs[p]!.get(d.at) as string | undefined) ?? neutral;
+    // Peers send the fixed input with the decision; a spectator that joined later could not derive it.
+    rule[p] = d.input;
   };
   const inputFor = (p: number, f: number) =>
     f < neutralBelow ? neutral : fixed[p] !== undefined && f > fixed[p]! ? rule[p]! : inputs[p]!.get(f);
@@ -170,9 +170,11 @@ export function createRollbackSpectator(options: RollbackSpectatorOptions): Roll
       try {
         for (const d of message.departures) {
           if (d.decided === null) continue;
+          // A decision below the neutral frames, or without the fixed input, cannot come from a valid peer.
+          if (d.decided < neutralBelow - 1 || typeof d.input !== 'string') return fail('remote-departure');
           const known = decided[d.player];
           if (known && known.at !== d.decided) return fail('departure-conflict');
-          decided[d.player] = {at: d.decided, input: d.input ?? null};
+          decided[d.player] = {at: d.decided, input: d.input};
           fix(d.player);
         }
         let accepted = 0;

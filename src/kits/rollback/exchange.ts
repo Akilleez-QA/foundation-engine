@@ -55,6 +55,8 @@ export type RollbackReceiveResult =
   | Readonly<{status: 'applied'; accepted: number; duplicates: number; ignored: number; gaps: number}>
   | Readonly<{status: 'rejected'; reason: string}>
   | Readonly<{status: 'ignored'}>
+  /** Called from inside a session port (reentrancy): nothing was applied; deliver the message again later. */
+  | Readonly<{status: 'busy'}>
   | Readonly<{status: 'stopped'; reason: string | null}>;
 export type RollbackPacing = Readonly<{
   /** Largest halved difference `(mine - theirs) / 2` over peers that reported an advantage; 0 if none. */
@@ -63,7 +65,7 @@ export type RollbackPacing = Readonly<{
   skip: boolean;
 }>;
 export interface RollbackExchange {
-  /** The message for peer `to` now. */
+  /** The message for peer `to` now. To a peer held as departing it carries only the departure reports. */
   outgoing(to: number, now: number): RollbackMessage;
   /** The message for a spectator that acknowledged `ack` (every player's inputs it lacks), or `behind`. */
   toSpectator(ack: readonly number[], now: number): RollbackMessage | Readonly<{status: 'behind'; player: number}>;
@@ -149,7 +151,9 @@ export function createRollbackExchange(options: RollbackExchangeOptions): Rollba
       const snap = session.read(),
         gone = departing(snap);
       const out: RollbackWireInput[] = [];
-      let budget = limits.maxInputsPerMessage;
+      // To a peer held as departing, only the departure notice: it tells a peer on the wrong side of a partition
+      // that it was voted out, so it fails closed instead of waiting forever.
+      let budget = gone.has(to) ? 0 : limits.maxInputsPerMessage;
       const sources = [local, ...[...gone].filter(p => p !== to)];
       for (const s of sources) {
         const n = append(out, s, peerAck[to]![s]! + 1, budget);
@@ -165,7 +169,7 @@ export function createRollbackExchange(options: RollbackExchangeOptions): Rollba
         advantage: snap.frameAdvantage[to]!,
         ack: snap.confirmedInputs,
         inputs: Object.freeze(out),
-        checksums: checksums(),
+        checksums: gone.has(to) ? EMPTY : checksums(),
         departures: departures(snap, false),
       });
     },
@@ -173,7 +177,17 @@ export function createRollbackExchange(options: RollbackExchangeOptions): Rollba
     toSpectator(ack, now) {
       if (!Array.isArray(ack) || ack.length !== players || !ack.every(a => Number.isSafeInteger(a)) || !finite(now))
         throw Error('rollback exchange: invalid spectator ack');
-      const snap = session.read();
+      const snap = session.read(),
+        gone = new Set(snap.departures.filter(d => d.final).map(d => d.player));
+      // Serve a player's frame only once every remaining peer holds it (a peer only suspected of leaving still counts): a frame only this peer holds (its own
+      // unacknowledged input, or more of a leaver than the others) could fall beyond a later departure agreement.
+      const cap = snap.confirmedInputs.map((own, p) => {
+        let through = own;
+        for (let r = 0; r < players; r++)
+          if (r !== local && r !== p && !gone.has(r) && peerAck[r]![p]! < through) through = peerAck[r]![p]!;
+        const d = snap.departures.find(x => x.player === p);
+        return d && d.decided !== null ? Math.min(through, d.decided) : through;
+      });
       const out: RollbackWireInput[] = [];
       let budget = limits.maxInputsPerMessage;
       // Round-robin in small slices so every player's stream advances even under a tight budget.
@@ -183,7 +197,7 @@ export function createRollbackExchange(options: RollbackExchangeOptions): Rollba
       while (budget > 0 && progress) {
         progress = false;
         for (let p = 0; p < players && budget > 0; p++) {
-          const n = append(out, p, next[p]!, Math.min(slice, budget));
+          const n = append(out, p, next[p]!, Math.min(slice, budget, cap[p]! - next[p]! + 1));
           if (n === 'pruned') return Object.freeze({status: 'behind' as const, player: p});
           if (n > 0) {
             progress = true;
@@ -218,7 +232,18 @@ export function createRollbackExchange(options: RollbackExchangeOptions): Rollba
       if (m.from === local) return reject('from');
       const snap = session.read();
       if (snap.status !== 'running') return Object.freeze({status: 'stopped' as const, reason: snap.reason});
-      if (departing(snap).has(m.from)) return Object.freeze({status: 'ignored' as const});
+      const busy = Object.freeze({status: 'busy' as const});
+      if (departing(snap).has(m.from)) {
+        // Only an accusation of this peer matters from a peer it holds as leaving (see remoteDeparture).
+        for (const d of m.departures)
+          if (d.player === local) {
+            const r = session.remoteDeparture(m.from, d.player, d.reports, d.decided);
+            if (r.status === 'busy') return busy;
+            if (r.status !== 'ignored' && r.status !== 'unsupported')
+              return Object.freeze({status: 'stopped' as const, reason: 'reason' in r ? r.reason : null});
+          }
+        return Object.freeze({status: 'ignored' as const});
+      }
       stats.received++;
       heard[m.from] = now;
       const echo = echoes[m.from];
@@ -231,15 +256,21 @@ export function createRollbackExchange(options: RollbackExchangeOptions): Rollba
           if (ring.length > limits.roundTripSamples) ring.shift();
         }
       }
-      remoteAdvantage[m.from] = m.advantage;
+      // A reported advantage beyond what identical limits allow is clamped, so it cannot pin pacing forever.
+      remoteAdvantage[m.from] = Math.max(-snap.maxLead, Math.min(snap.maxLead, m.advantage));
+      // An acknowledgement beyond what this peer holds cannot stop resends of frames it has not sent yet.
       const acks = peerAck[m.from]!;
-      for (let p = 0; p < players; p++) if (m.ack[p]! > acks[p]!) acks[p] = m.ack[p]!;
+      for (let p = 0; p < players; p++) {
+        const ack = Math.min(m.ack[p]!, snap.confirmedInputs[p]!);
+        if (ack > acks[p]!) acks[p] = ack;
+      }
       const stopped = () => {
         const r = session.read();
         return r.status === 'running' ? null : Object.freeze({status: 'stopped' as const, reason: r.reason});
       };
       for (const d of m.departures) {
         const r = session.remoteDeparture(m.from, d.player, d.reports, d.decided);
+        if (r.status === 'busy') return busy;
         if (r.status === 'unsupported') break;
         if (r.status === 'ignored') return Object.freeze({status: 'ignored' as const});
         const halt = stopped();
@@ -249,11 +280,19 @@ export function createRollbackExchange(options: RollbackExchangeOptions): Rollba
         duplicates = 0,
         ignored = 0,
         gaps = 0;
-      const through = [...session.read().confirmedInputs];
+      const after = session.read();
+      const through = [...after.confirmedInputs];
+      // A peer speaks for itself; it relays only players this peer also holds as departing.
+      const relayable = departing(after);
       const blocked = new Set<number>();
       for (const entry of m.inputs) {
         const p = entry.player;
         if (p === local || blocked.has(p)) continue;
+        if (p !== m.from && !relayable.has(p)) {
+          ignored++;
+          blocked.add(p);
+          continue;
+        }
         if (entry.frame <= through[p]!) {
           duplicates++;
           continue;
@@ -271,11 +310,13 @@ export function createRollbackExchange(options: RollbackExchangeOptions): Rollba
           ignored++;
           blocked.add(p);
         } else if (r.status === 'duplicate') duplicates++;
+        else if (r.status === 'busy') return busy;
         else return Object.freeze({status: 'stopped' as const, reason: 'reason' in r ? r.reason : null});
       }
       for (const c of m.checksums) {
         const r = session.remoteChecksum(m.from, c.frame, c.checksum);
-        if (r.status === 'failed' || r.status === 'retired' || r.status === 'busy')
+        if (r.status === 'busy') return busy;
+        if (r.status === 'failed' || r.status === 'retired')
           return Object.freeze({status: 'stopped' as const, reason: r.reason});
         if (r.status === 'desynced') break;
       }
@@ -352,6 +393,16 @@ export function validate(m: unknown, players: number, maxInputs: number): string
     const k = d as Record<string, unknown> | null;
     if (k === null || typeof k !== 'object' || !whole(k.player, 0, players - 1) || !Array.isArray(k.reports))
       return 'departures';
+    if (k.reports.length < 1 || k.reports.length > players) return 'departures';
+    for (const r of k.reports as unknown[])
+      if (
+        !Array.isArray(r) ||
+        r.length !== 2 ||
+        !whole(r[0], 0, players - 1) ||
+        r[0] === k.player ||
+        !whole(r[1], -1, 2 ** 53 - 1)
+      )
+        return 'departures';
     if (!(k.decided === null || whole(k.decided, -1, 2 ** 53 - 1))) return 'departures';
     if (k.input !== undefined && typeof k.input !== 'string') return 'departures';
   }

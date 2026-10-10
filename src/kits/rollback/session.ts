@@ -291,10 +291,15 @@ export function createRollbackSession(options: RollbackOptions): RollbackSession
     for (const [player, entry] of leaving) {
       if (entry.final) continue;
       if (entry.decided === null) {
-        let complete = true;
-        for (let p = 0; p < players && complete; p++)
-          if (p !== player && !leaving.has(p) && !entry.reports.has(p)) complete = false;
-        if (!complete) continue;
+        let complete = true,
+          survivors = 0;
+        for (let p = 0; p < players; p++) {
+          if (leaving.has(p)) continue;
+          survivors++;
+          if (!entry.reports.has(p)) complete = false;
+        }
+        // Without a quorum of remaining players this peer may be the isolated side of a partition: wait.
+        if (!complete || survivors < ext.departure!.quorum!) continue;
         entry.decided = Math.max(...entry.reports.values());
       }
       if (lastConfirmed[player]! < entry.decided) continue;
@@ -539,6 +544,7 @@ export function createRollbackSession(options: RollbackOptions): RollbackSession
         departures: Object.freeze([...leaving.keys()].sort((a, b) => a - b).map(departure)),
         startFrame: S,
         retainedInputFrames: retain,
+        maxLead,
       });
     },
 
@@ -585,7 +591,13 @@ export function createRollbackSession(options: RollbackOptions): RollbackSession
       if (!Number.isSafeInteger(from) || from < 0 || from >= players || from === local) return fail('remote-player');
       if (!Number.isSafeInteger(player) || player < 0 || player >= players || player === from)
         return fail('remote-departure');
-      if (leaving.has(from)) return Object.freeze({status: 'ignored' as const});
+      if (leaving.has(from)) {
+        // A peer this one holds as leaving accuses it in turn. While this peer's own decision on that peer is open
+        // (it may be the isolated side), the accusation wins and this peer fails closed; once decided with a quorum,
+        // the accuser is out and its messages are ignored.
+        if (player === local && leaving.get(from)!.decided === null) return fail('local-departed');
+        return Object.freeze({status: 'ignored' as const});
+      }
       if (player === local) return fail('local-departed');
       if (!Array.isArray(reports) || reports.length < 1 || reports.length > players) return fail('remote-departure');
       if (decided !== null && (!Number.isSafeInteger(decided) || decided < neutralBelow - 1))

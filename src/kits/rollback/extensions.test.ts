@@ -62,7 +62,10 @@ test('EXTENSIONS invalid optional configuration is refused at construction; abse
   const plain = make().read().config;
   assert.doesNotMatch(plain, /delay=|departure=|start=/, 'no extension, no config change');
   assert.match(make({adaptiveDelay: policy}).read().config, /:delay=1,5,2,10,0$/);
-  assert.match(make({departure: {input: 'repeat'}}).read().config, /:departure=repeat$/);
+  assert.match(make({departure: {input: 'repeat'}}).read().config, /:departure=repeat,2$/, 'default: strict majority');
+  assert.match(make({departure: {input: 'repeat', quorum: 1}}).read().config, /:departure=repeat,1$/);
+  for (const quorum of [0, 3, 1.5])
+    assert.throws(() => make({departure: {input: 'repeat', quorum}}), /rollback: invalid departure/);
 });
 
 test('EXTENSIONS delay proposals are refused unless the authority asks for an in-range, rate-limited change', () => {
@@ -170,7 +173,7 @@ for (const rule of ['repeat', 'neutral'] as const)
   test(`EXTENSIONS departure (${rule}): two players agree alone and fix the departed input after the last frame`, () => {
     assert.deepEqual(make().disconnect(1), {status: 'unsupported'});
     const ports = toyPorts();
-    const s = make({departure: {input: rule}}, ports);
+    const s = make({departure: {input: rule, quorum: 1}}, ports);
     tick(s, 'r');
     s.remote(1, 2, 'l');
     s.remote(1, 3, 'r');
@@ -481,7 +484,7 @@ test('EXTENSIONS exchange: malformed messages are rejected untouched; acknowledg
 });
 
 test('EXTENSIONS exchange pacing: the peer that runs ahead is told to skip; timeouts start a departure', () => {
-  const s = make({departure: {input: 'neutral'}});
+  const s = make({departure: {input: 'neutral', quorum: 1}});
   const x = createRollbackExchange({
     session: s,
     limits: {maxInputsPerMessage: 8, maxChecksumsPerMessage: 0, roundTripSamples: 2},
@@ -529,4 +532,84 @@ test('EXTENSIONS new calls refuse while a port runs and after disposal', () => {
   assert.equal(session.history(0, 0, 4).status, 'retired');
   assert.deepEqual(session.recentChecksums(4), []);
   assert.deepEqual(session.evidence(0), {status: 'unavailable', frame: 0, reason: 'disabled'});
+});
+
+test('EXTENSIONS departure quorum: an isolated peer never decides; two players need quorum 1 to decide at all', () => {
+  const two = make({departure: {input: 'neutral'}});
+  assert.deepEqual(two.disconnect(1), {status: 'leaving', decided: null}, 'one of two is not a strict majority');
+  for (let i = 0; i < 20; i++) tick(two);
+  assert.equal(two.read().departures[0]!.decided, null);
+  assert.ok(two.read().stats.stalls > 0, 'it stalls instead of deciding alone');
+  // Three players: peer 0 alone (both others leaving in its view) cannot decide; 2 of 3 can.
+  const alone = make({departure: {input: 'neutral'}, limits: {players: 3}});
+  alone.disconnect(1);
+  alone.disconnect(2);
+  assert.ok(alone.read().departures.every(d => d.decided === null));
+  const pair = make({departure: {input: 'neutral'}, limits: {players: 3}});
+  pair.disconnect(2);
+  pair.remoteDeparture(1, 2, [[1, 1]], null);
+  assert.equal(pair.read().departures[0]!.decided, 1);
+});
+
+test('EXTENSIONS an accusation from a peer held as leaving fails this peer while its own decision is open', () => {
+  const opts = {departure: {input: 'neutral' as const}, limits: {players: 3}};
+  const open = make(opts);
+  open.disconnect(1);
+  open.remoteDeparture(1, 0, [[1, 1]], null);
+  assert.equal(open.read().reason, 'local-departed');
+  const settled = make(opts);
+  settled.disconnect(1);
+  settled.remoteDeparture(2, 1, [[2, 1]], null);
+  assert.equal(settled.read().departures[0]!.decided, 1);
+  assert.deepEqual(settled.remoteDeparture(1, 0, [[1, 1]], null), {status: 'ignored'}, 'decided with a quorum');
+  assert.equal(settled.read().status, 'running');
+});
+
+test('EXTENSIONS exchange hardening: forged relays, acknowledgements and advantages are bounded; reentry is busy', () => {
+  const s = make({departure: {input: 'neutral'}, limits: {players: 3}});
+  const x = createRollbackExchange({
+    session: s,
+    limits: {maxInputsPerMessage: 8, maxChecksumsPerMessage: 0, roundTripSamples: 2},
+  });
+  const m: RollbackMessage = {
+    from: 1,
+    sentAt: 0,
+    echo: null,
+    echoAge: 0,
+    advantage: -(2 ** 31),
+    ack: [2 ** 53 - 1, 1, 1],
+    inputs: [{player: 2, frame: 2, input: 'l'}],
+    checksums: [],
+    departures: [],
+  };
+  assert.deepEqual(x.receive(m, 0), {status: 'applied', accepted: 0, duplicates: 0, ignored: 1, gaps: 0});
+  assert.equal(s.read().confirmedInputs[2], 1, 'peer 1 cannot inject peer 2`s input');
+  assert.ok(x.read().pacing.advantage <= s.read().maxLead, 'advantage clamped');
+  tick(s, 'r');
+  assert.deepEqual(
+    x.outgoing(1, 1).inputs.map(e => e.frame),
+    [2],
+    'an acknowledgement beyond what was sent does not stop resends',
+  );
+  const badReports: (readonly (readonly [number, number])[])[] = [[], [[2, 1]]];
+  for (const reports of badReports)
+    assert.equal(x.receive({...m, departures: [{player: 2, reports, decided: null}]}, 1).status, 'rejected');
+  assert.equal(s.read().status, 'running');
+  // Reentry from a port reports busy, not stopped.
+  let inner: unknown = null;
+  const ports = toyPorts(2);
+  const validate = ports.validateInput!;
+  let ex: ReturnType<typeof createRollbackExchange> | null = null;
+  ports.validateInput = input => {
+    if (input === 'a' && ex)
+      inner = ex.receive({...m, ack: [1, 1], advantage: 0, inputs: [{player: 1, frame: 2, input: 'n'}]}, 2);
+    return validate(input);
+  };
+  const t = make({}, ports);
+  ex = createRollbackExchange({
+    session: t,
+    limits: {maxInputsPerMessage: 8, maxChecksumsPerMessage: 0, roundTripSamples: 2},
+  });
+  t.local('a');
+  assert.deepEqual(inner, {status: 'busy'});
 });

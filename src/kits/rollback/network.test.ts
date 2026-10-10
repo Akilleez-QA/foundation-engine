@@ -211,3 +211,68 @@ test('NETWORK sessions with exchanges run from a scene system over a lossy link 
     ['retired', 'retired'],
   );
 });
+
+test('NETWORK a partition that heals never leaves two running sides: the minority stalls, then fails closed', () => {
+  for (const [players, group] of [
+    [3, [0]],
+    [5, [0, 1]],
+  ] as const)
+    for (const seed of [1, 2, 3]) {
+      const label = `players ${players} seed ${seed}`;
+      const run = runNetwork({
+        seed,
+        players,
+        ticks: 300,
+        link: {loss: 0.1, duplicate: 0.05, reorder: 0.1, latency: [1, 3]},
+        partition: {group, from: 100, to: 160},
+        spectators: [{join: 0, feed: players - 1}],
+        timeout: 30,
+      });
+      const reads = run.sessions.map(s => s.read());
+      for (const i of group) {
+        assert.equal(reads[i]!.status, 'failed', `${label}: minority peer ${i} ${reads[i]!.status}`);
+        assert.equal(reads[i]!.reason, 'local-departed');
+      }
+      const majority = reads.filter((_, i) => !(group as readonly number[]).includes(i));
+      for (const r of majority) assert.equal(r.status, 'running', `${label}: ${r.reason}`);
+      const views = majority.map(r => JSON.stringify(r.departures.map(d => [d.player, d.decided, d.final])));
+      assert.equal(new Set(views).size, 1, `${label}: ${views.join(' vs ')}`);
+      assert.deepEqual(
+        majority[0]!.departures.map(d => d.player),
+        [...group],
+      );
+      // Every checksum published by a party still running (majority peers and the spectator) agrees.
+      const running = new Set([
+        ...majority.map(r => `p${r.local}`),
+        ...run.spectators.flatMap((sp, k) => (must(sp).read().status === 'running' ? [`s${k}`] : [])),
+      ]);
+      assert.ok(running.has('s0'), `${label}: spectator ${must(run.spectators[0]).read().reason}`);
+      for (const [frame, row] of run.published) {
+        const values = new Set([...row].filter(([who]) => running.has(who)).map(([, c]) => c));
+        assert.ok(values.size <= 1, `${label}: frame ${frame} split`);
+      }
+    }
+});
+
+test('NETWORK a lower quorum is the creator`s choice and is not partition-safe', () => {
+  const run = runNetwork({
+    seed: 1,
+    players: 3,
+    ticks: 200,
+    link: {loss: 0, duplicate: 0, reorder: 0, latency: [1, 1]},
+    partition: {group: [0], from: 80, to: 400},
+    timeout: 20,
+    quorum: 1,
+  });
+  // With quorum 1 the isolated peer decides alone and keeps running: two sides, as documented.
+  const reads = run.sessions.map(s => s.read());
+  assert.equal(reads[0]!.status, 'running');
+  assert.deepEqual(
+    reads[0]!.departures.map(d => d.player),
+    [1, 2],
+  );
+  assert.deepEqual(
+    reads[1]!.departures.map(d => d.player),
+    [0],
+  );
+});

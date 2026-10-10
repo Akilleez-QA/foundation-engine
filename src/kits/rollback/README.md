@@ -203,9 +203,9 @@ transport. Nothing here owns a timer, socket, scheduler or game rule. [Guide](..
 
 | Option or helper | Creator choice | Bounds (checked at construction) | Overload or fault |
 |---|---|---|---|
-| `createRollbackExchange({session, limits, pacingThreshold?, timeout?})` | Message budget, repeated checksums, round-trip window, pacing threshold, silence timeout | `maxInputsPerMessage` 1–4096, `maxChecksumsPerMessage` 0–64, `roundTripSamples` 1–64, threshold 0–60 | Oldest unacknowledged inputs go first; the rest wait for a later message. A malformed message is `rejected` and the session is untouched. |
+| `createRollbackExchange({session, limits, pacingThreshold?, timeout?})` | Message budget, repeated checksums, round-trip window, pacing threshold, silence timeout | `maxInputsPerMessage` 1–4096, `maxChecksumsPerMessage` 0–64, `roundTripSamples` 1–64, threshold 0–60 | Oldest unacknowledged inputs go first; the rest wait for a later message. A structurally malformed message is `rejected` and the session is untouched; a well-formed message whose content breaks the protocol (an invalid input, a conflict, a lead, a bad delay decision) fails the session closed, exactly as `remote()` would. |
 | `adaptiveDelay: {minDelay, maxDelay, maxStep, minSpacing, authority}` | Delay range, largest step, spacing, deciding player | Delays 0–30 with `inputDelay` inside; `maxStep` 1–30; `minSpacing` from `maxStep + 1` to 3600 | Out-of-policy decisions from a peer fail the session (`remote-delay`, `delay-late`). |
-| `departure: {input: 'neutral' \| 'repeat'}` | The departed player's input after its agreed last frame | – | Contradictory reports or decisions fail closed (`departure-conflict`); a peer that the others voted out fails with `local-departed`. |
+| `departure: {input: 'neutral' \| 'repeat', quorum?}` | The departed player's input after its agreed last frame; how many players must remain to decide | `quorum` 1–players, default a strict majority | Below the quorum a departure stays undecided and the session stalls. Contradictory reports or decisions fail closed (`departure-conflict`). A peer voted out fails with `local-departed` once it hears the others (see below). |
 | `retainInputFrames` | Input history kept for relays and spectators | 0–3600 frames (memory: players × frames × `maxInputBytes`) | A relay or spectator older than the window gets `pruned` / `behind`. |
 | `start: {frame, state, checksum}` | Resume or join from an agreed state | Frame 0–2³¹−1, state within `maxStateBytes`, checksum must equal `rollbackChecksum(state)` | A mismatch or a `load` that throws refuses construction. |
 | `evidence: {frames, maxBytes, chunkBytes, describe?}` | Retained frames and the digest or trace text | `frames` 1–64 (memory: frames × `maxStateBytes`), `maxBytes` 64 B–1 MiB, `chunkBytes` 64 B–64 KiB | Longer text is truncated and marked; a throwing `describe` gives `describe-failed`. |
@@ -225,7 +225,10 @@ transport. Nothing here owns a timer, socket, scheduler or game rule. [Guide](..
 - the sender's frame advantage and a round-trip echo.
 
 `receive(message, now)` admits only the next contiguous frame of each player. It counts and skips duplicates and gaps
-instead of failing. A stale acknowledgement from a reordered message never moves an acknowledgement backwards. Send a
+instead of failing. A peer speaks only for itself: inputs of another player are accepted only as relays of a player
+this peer also holds as departing (others are counted as `ignored`). An acknowledgement is clamped to what this peer
+holds, and a reported advantage to `read().maxLead`. These clamps bound what a lying peer can do; they do not
+authenticate it. Called from inside a session port, `receive` returns `busy` and applies nothing. A stale acknowledgement from a reordered message never moves an acknowledgement backwards. Send a
 message to every peer every tick (or on any schedule the host chooses). The exchange needs `retainInputFrames` of at
 least `2 × maxPredictionFrames + 2 × maxDelay + 4` for relays to be complete.
 
@@ -260,8 +263,10 @@ silence) starts the agreement. A report from another survivor has the same effec
 1. Each survivor reports the last frame of that player it holds. From then on it accepts the player's inputs only up
    to its own report.
 2. Reports are gossiped, so every survivor eventually holds all of them. When every survivor (every player that is
-   neither leaving nor departed) has reported, the agreed last frame is the **largest** report. No survivor has
-   confirmed beyond it, so nothing already confirmed changes.
+   neither leaving nor departed) has reported, **and** the survivors number at least `quorum` (default: a strict
+   majority of all players), the agreed last frame is the **largest** report. No survivor has confirmed beyond it,
+   so nothing already confirmed changes. Below the quorum the peer may be the isolated side of a partition: the
+   departure stays undecided and the session stalls (the host's timeout and recovery handle it).
 3. Survivors that hold fewer frames receive the missing ones by relay, up to the agreed frame.
 4. From the next frame the player's input is fixed by the creator's rule (`neutral`, or `repeat` the input at the
    agreed frame). Predicted frames that differ are rolled back.
@@ -269,11 +274,26 @@ silence) starts the agreement. A report from another survivor has the same effec
 The decision travels with the reports. A peer that receives a different decision fails closed
 (`departure-conflict`) rather than diverging.
 
+**Partitions and false timeouts.** A timeout cannot tell a crashed peer from a cut link. With a strict-majority
+quorum, two disjoint groups cannot both decide; the minority stalls. When it hears the majority again, a report
+naming it (from any peer, including one it suspects of leaving while its own decision is still open) fails it with
+`local-departed`. That needs the majority to keep talking to it: `outgoing(to)` to a peer held as departing carries
+only the departure reports, and hosts should keep sending it for a while. Without that notice the minority stays
+stalled rather than failing. A quorum below a majority (two players need `quorum: 1`) is the creator's choice and is
+**not** partition-safe: an isolated peer then decides alone and both sides keep running. A tested example of this is
+in `network.test.ts`.
+
+A voted-out or departed peer may already have published checksums for frames past the agreed last frame. Those
+frames used its own inputs that no survivor received, so they are provisional and never authoritative.
+
 ### Spectators
 
 `createRollbackSpectator` steps only frames whose every input is confirmed: no prediction, snapshots or rollback. A
 peer serves it with `exchange.toSpectator(ack, now)`, which returns every player's inputs the spectator lacks
-(round-robin under the message budget) plus final departures and recent checksums. It returns `behind` when the
+(round-robin under the message budget) plus final departures and recent checksums. It serves a frame only once
+every remaining peer has acknowledged it (and never past an agreed departure frame). A frame only the serving peer
+holds could fall beyond a later departure agreement, so spectators lag the peers by about one acknowledgement round
+trip. A spectator refuses a departure decision without its fixed input or below the neutral frames. It returns `behind` when the
 spectator is older than the retained window; join again from a snapshot.
 
 `advance()` runs one ready frame, or up to `catchUpFrames` when more than `catchUpThreshold` frames are ready. It
@@ -287,7 +307,9 @@ inconclusive. `read().config` includes the start, so a handshake that compares `
 a different state.
 
 A spectator joins mid-session with `join: {frame, state, checksum}` (a peer's `confirmedState()`) and `sessionStart`.
-It then needs that peer to retain inputs from `frame`.
+It then needs that peer to retain inputs from `frame`. A peer's confirmed state can include its own inputs that no
+other peer has yet; take the join state from a peer that is not about to be voted out, or the spectator may follow a
+provisional state until the peers' checksums show it as `desynced`.
 
 ### Desync evidence
 
@@ -348,11 +370,23 @@ Isolated outliers reached 42 ms; garbage collection is likely but not establishe
   - Some seeds exercise relays, where survivors held different amounts of the leaver's input.
 - Two departures a few ticks apart (4 peers): both survivors agree. The race described below did not occur in these
   seeds; it is detected, not prevented.
+- Partition then heal (3 peers with one isolated, 5 with two isolated; 60 ticks, then healed). The minority never
+  decides and fails with `local-departed` once healed. The majority agrees, and every running party's checksums
+  agree. With `quorum: 1` the same partition leaves two running sides, as documented.
+- An independent reviewer's fuzzer was run after the review fixes, 100 seeds per mode, 2–8 players, with partitions,
+  false timeouts, extreme loss, mixed runs and simultaneous departures. With departure notices sent to departed
+  peers, no two running, progressing parties published different checksums in any mode.
+  - Without the notices, a voted-out minority stays stalled. It may have published one provisional checksum past the
+    agreed frame: 1 seed each in the partition and false-timeout modes.
+  - 21–46 % of seeds end stalled by design: quorum loss, two-player departures under the default quorum, and
+    successive departures.
 - Without the exchange, the same lossy link makes a plain session fail with `remote-gap`.
 - Unit tests:
   - delay proposal and decision validation, increase fills and decrease skips;
   - recommendations;
   - departures with 2 and 3 players, both rules, relays, caps, conflicts and `local-departed`;
+  - the quorum, and accusations from a peer held as leaving;
+  - forged relays, acknowledgements and advantages, malformed reports, and reentrant `receive`;
   - resume validation and agreement;
   - evidence retention, truncation, chunking, reassembly and JSON explanation;
   - the spectator's buffer, catch-up, desync, join refusal and abort;
@@ -372,16 +406,22 @@ Isolated outliers reached 42 ms; garbage collection is likely but not establishe
 
 - Real WAN, WebRTC unreliable channels or any real transport. The lossy link is a seeded model, not a measurement.
 - Two departures whose agreements overlap can, in principle, reach different decisions. This happens if one survivor
-  counts a report from a peer that leaves before the others see it. The decision is gossiped, and a difference fails
-  closed (`departure-conflict`); it is not resolved.
-- A departure whose survivors never hear from one another stays undecided, so the session stalls. The host's timeout
-  and recovery (a new session from `confirmedState()`) handle it.
+  counts a report from a peer that leaves before the others see it. The decision is gossiped, and a difference
+  that reaches a peer fails it closed (`departure-conflict`). It is not resolved, and not every disagreement is
+  guaranteed to reach every peer.
+- Partition safety holds only with a quorum of at least a strict majority, and only for decisions. A minority's
+  provisional checksums, and a stalled minority that never hears the majority again, are possible. The host's
+  timeout and recovery (a new session from `confirmedState()`) handle them. Two players cannot be partition-safe.
+- A run that falls below the quorum (for example several departures, or any departure of two players under the
+  default) stalls; it does not continue.
+- Lying peers: the clamps bound acknowledgements and advantages, but an authenticated transport is still required.
 - A new **player** joining a running session (only spectators join mid-session; peers resume together).
 - Delay decisions after the delay authority departs.
 - Adaptive delay driven by real round-trip measurements: the tests use synthetic round trips.
 - Frame stretching (pacing is skip-a-tick only).
-- Message integrity or authentication: a peer that lies about inputs or reports is a protocol fault at best. The
-  transport owns integrity.
+- Message integrity or authentication. A peer that lies about its own inputs or reports is, at best, a protocol
+  fault. Forged acknowledgements can still suppress resends of frames already held, and a forged advantage can bias
+  pacing within `maxLead`. The transport owns integrity.
 - Cross-browser floating-point determinism. The kit does not enforce it. A `step` that uses only basic arithmetic,
   `Math.sqrt` and `dmath` from `@engine` (see [deterministic maths](../../../docs/guides/deterministic-math.md))
   gives identical bits in every engine. Physical cross-browser rollback sessions remain unrun.
