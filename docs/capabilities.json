@@ -37,6 +37,13 @@
       "evidence": ["@kits/alignment exports createAlignment", "src/kits/alignment/alignment.test.ts exists"]
     },
     {
+      "id": "REWIND-01",
+      "title": "Bounded rewind history for judging remote commands against past state",
+      "shipped": true,
+      "docs": "src/kits/rewind/README.md",
+      "evidence": ["@kits/rewind exports createRewindHistory", "src/kits/rewind/history.test.ts exists"]
+    },
+    {
       "id": "VISIBILITY-01",
       "title": "Bounded source-owned visibility and explored history",
       "shipped": true,
@@ -813,6 +820,7 @@
         "sampleDeposit"
       ]
     },
+    {"name": "rewind", "exports": ["chooseRewindTime", "createRewindHistory"]},
     {
       "name": "rollback",
       "exports": [

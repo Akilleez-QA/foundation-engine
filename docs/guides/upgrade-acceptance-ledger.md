@@ -1272,3 +1272,7 @@ of successful GPU reclamation or physical-device acceptance.
   previous implementation (sync keeps returning `true`) and passes on the candidate; a looping-clip case confirms
   playing loops still report change and paused models do not. Headless Three mixer, not a browser frame trace.
 - **Not established:** browser redraw counts in a template scene; hosted CI.
+
+## Rewind history — REWIND-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/rewind/README.md), [guide](rewind-history.md), [decision](../adr/0087-rewind-history.md). Optional pure per-subject sample rings with time-addressed, never-extrapolating queries that respect creator-marked discontinuities, plus a pure time choice that clamps an untrusted claimed view time to a creator cap. Hosts record from their existing fixed step and query from existing command dispatch; nothing moves or restores live state. Evidence: 17 focused headless tests including a composition with `@kits/combat` `sweep`, and one local micro-measurement. Candidate only; latency estimation, protocol, multiplayer, browser and physical-device acceptance and full CI are not claimed here.
