@@ -25,8 +25,9 @@ Pure helpers in `director.ts`, plus one optional frame system. The existing
     [min, max] distance, blending height, look offset and fov across the band.
   - `railPose` rides an authored polyline (2–256 points, open or closed) at the point
     nearest the subject.
-  - `closeUpPose` orbits a subject sphere at the distance that fits it in the field of
-    view, for inspection or photo modes; pitch is clamped to ±1.5.
+  - `closeUpPose` orbits a subject sphere at the distance that fits it in the vertical
+    field of view (a portrait view can still crop it horizontally), for inspection or
+    photo modes; pitch is clamped to ±1.5.
   - `shotPose` moves from one pose to another over N ticks with smoothstep, either
     straight or orbiting the interpolated look target so the camera swings rather
     than cutting through the subject; it returns exactly the destination at the end. Drive it with a sequence cue's elapsed ticks.
