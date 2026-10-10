@@ -1158,3 +1158,7 @@ confirmed-state rollback, then reconnects after old-peer retirement without
 resending its uncertain action. Independent review and full hosted integration CI
 are pending. No new browser,
 WAN, physical-device, scalability or full-CI acceptance is claimed.
+
+## View deltas — NW-DELTA candidate, 2026-10-09
+
+[Contract](../../src/kits/network/README.md#optional-acknowledged-baseline-view-deltas), [guide](network-views.md#optional-acknowledged-baseline-deltas), [decision](../adr/0088-view-deltas.md). Optional encoder/decoder around the existing complete-view publisher and receiver: entity-level deltas against the last acknowledged adopted frame, each proven to rebuild the publisher's exact bytes before it is sent, with complete-frame fallback and `adopted: false` recovery. Evidence: ten focused headless tests with a real publisher and receiver, hostile frames, and one local byte measurement (8.7 % of complete length at 4 of 64 entities changing). Candidate only; WAN, browser, physical-device and full-CI acceptance are not claimed here.
