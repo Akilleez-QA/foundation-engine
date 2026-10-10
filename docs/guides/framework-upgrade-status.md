@@ -1548,4 +1548,10 @@ Evidence: headless tests with fixtures built by test-side encoders (exact value 
 Optional `@kits/perception`: sight/hearing strengths over creator queries, awareness
 with alert levels and blackboard facts, squad knowledge, cover selection and utility
 scoring. See [the guide](perception.md) and [ADR 0113](../adr/0113-perception-kit.md).
+
+## Navigation meshes, funnel and avoidance — candidate (2026-10-09)
+
+Navigation kit extension: convex-polygon navigation meshes with a locator, polygon graphs
+for the existing incremental search, funnel string-pulling with clearance, surface
+movement and reciprocal-velocity avoidance. See [ADR 0114](../adr/0114-navmesh-funnel-avoidance.md).
 Headless tests in the ledger; independent review and hosted CI remain required.

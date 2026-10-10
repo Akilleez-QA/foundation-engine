@@ -157,3 +157,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0113](0113-perception-kit.md) | Optional perception kit feeding a blackboard | Optional kits / AI | Proposed |
 
 | [0152](0152-medium-volumes.md) | Optional medium volumes | Optional kits | Proposed |
+
+| [0114](0114-navmesh-funnel-avoidance.md) | Navigation mesh queries, funnel paths and local avoidance | Optional kits / Navigation | Proposed |
