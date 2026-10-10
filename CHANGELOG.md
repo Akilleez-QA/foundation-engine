@@ -7,7 +7,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
-- Recorded the worker render pipelining finding: on the GPU bench at 4K the heaviest stock scene spends about 0.6 ms of main-thread time per drawn frame, so frame-pipelining through a worker renderer is not built; the revisit condition is physical-device evidence. See [ADR 0099](docs/adr/0099-defer-worker-render-pipelining.md).
+- Recorded the worker render pipelining finding: on the GPU bench at 4K the heaviest stock scene spends about 0.6 ms of main-thread time per drawn frame, so frame-pipelining through a worker renderer is not built; the revisit condition is physical-device evidence. See [ADR 0131](docs/adr/0131-defer-worker-render-pipelining.md).
 
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 

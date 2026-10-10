@@ -78,4 +78,4 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0085](0085-atomic-cell-batches-and-occupancy.md) | Atomic cell batches and immutable occupancy | Procgen / Spatial | Proposed |
 
-| [0099](0099-defer-worker-render-pipelining.md) | Defer worker render pipelining until a measured need | Render / Frame loop / Workers | Accepted (not built) |
+| [0131](0131-defer-worker-render-pipelining.md) | Defer worker render pipelining until a measured need | Render / Frame loop / Workers | Accepted (not built) |

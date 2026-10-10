@@ -2,7 +2,7 @@
 
 Question: should Foundation build frame N+1's render state on another thread while frame N draws (double-buffered
 frame data with a back-end render thread, here a worker with `OffscreenCanvas`)? Decision recorded in
-[ADR 0099](../../adr/0099-defer-worker-render-pipelining.md). This page is the evidence. It is a measurement of the
+[ADR 0131](../../adr/0131-defer-worker-render-pipelining.md). This page is the evidence. It is a measurement of the
 stock templates on one desktop GPU, not physical-device evidence.
 
 ## What pipelining could hide

@@ -1,4 +1,4 @@
-# ADR 0099: defer worker render pipelining until a measured need
+# ADR 0131: defer worker render pipelining until a measured need
 
 - Status: Accepted (decision not to build now); revisit on new device evidence.
 - Date: 2026-10-10

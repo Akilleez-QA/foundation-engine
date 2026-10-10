@@ -46,7 +46,7 @@ export const FEATURES = [
     id: 'PIPELINE-01',
     title: 'Worker render pipelining',
     docs: 'docs/verification/render-pipelining-20261010/README.md',
-    // The module a worker renderer would add (ADR 0099 names it); its presence flips this row.
+    // The module a worker renderer would add (ADR 0131 names it); its presence flips this row.
     evidence: [{path: 'src/platform/render/worker-renderer.ts'}],
   },
   {
