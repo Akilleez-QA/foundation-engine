@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-10-09
 - **Area:** Optional kits / Network presentation
-- **Tracking:** discussion issue linked from the pull request
+- **Tracking:** [Issue #244](https://github.com/Akilleez-QA/foundation-engine/issues/244)
 
 ## Context
 
