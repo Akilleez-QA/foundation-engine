@@ -111,3 +111,8 @@ test('camera system publishes a floored pose when geometry touches the target', 
   const {position, target} = t.ctx.view.camera;
   assert.ok(Math.abs(Math.hypot(...position.map((v, i) => v - target[i]!)) - 0.4) < 1e-9);
 });
+
+test('camera system rejects an invalid clearance floor when built', () => {
+  for (const bad of [0, -1, NaN, Infinity])
+    assert.throws(() => cameraSystem('follow', {obstruction: () => null, clearanceMinDistance: bad}), RangeError);
+});

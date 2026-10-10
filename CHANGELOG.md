@@ -7,7 +7,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
-- **Camera clearance keeps a minimum distance.** When an obstruction touched the target, `clearCamera` and `cameraSystem({obstruction})` placed the camera exactly on its target, so the view had no defined direction. Clearance now stops at `clearanceMinDistance` (default 0.05, or the requested distance if shorter) along the requested direction. This is an intentional change for that case only; unobstructed and farther-obstructed poses are unchanged.
+- **Camera clearance keeps a minimum distance.** When an obstruction touched the target, `clearCamera` and `cameraSystem({obstruction})` placed the camera exactly on its target, so the view had no defined direction. Clearance now stops at `clearanceMinDistance` (default 0.05, or the requested distance if shorter) along the requested direction. This is an intentional change wherever clearance would have come closer than the floor. In that case padding can be smaller than requested, and a pose already at or inside the floor is not moved. Poses cleared at or beyond the floor are bit-identical to before, and unobstructed poses now return the requested position exactly.
 
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 

@@ -10,8 +10,9 @@ export type CameraObstruction = (from: Vec3, to: Vec3) => number | null;
 export const CAMERA_MIN_DISTANCE = 0.05;
 /**
  * Resolve after smoothing. Five parallel rays approximate a camera footprint; this is not a swept sphere.
- * The result never comes closer to the target than `minDistance` (or the requested distance, if shorter),
- * so the view keeps a defined direction even when an obstruction touches the target. The floor wins over
+ * Clearance stops at `minDistance` from the target (or the requested distance, if shorter), so the view keeps
+ * a defined direction when an obstruction touches the target. At coordinates whose spacing exceeds the floor
+ * (|x| above about 1e14) floating-point rounding can still return the target itself. The floor wins over
  * the obstruction: inside it the camera may sit within geometry the creator should fade or hide.
  */
 export function clearCamera(

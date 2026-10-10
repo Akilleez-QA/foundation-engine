@@ -96,7 +96,10 @@ export function cameraSystem(
     obstruction?: CameraObstruction;
     clearanceRadius?: number;
     clearancePadding?: number;
-    /** Closest approach to the target after clearance (default `CAMERA_MIN_DISTANCE`, 0.05). */
+    /**
+     * Closest approach to the target after clearance (default `CAMERA_MIN_DISTANCE`, 0.05). The floor wins
+     * over obstructions: while the requested distance is at or below it, clearance does not move the camera.
+     */
     clearanceMinDistance?: number;
     teleportDistance?: number;
     resetRevision?: (ctx: SceneContext) => number;
@@ -106,6 +109,8 @@ export function cameraSystem(
   const revisions = new WeakMap<object, number>();
   if (o.teleportDistance !== undefined && (!Number.isFinite(o.teleportDistance) || o.teleportDistance <= 0))
     throw new RangeError('camera: teleport distance must be positive');
+  if (o.clearanceMinDistance !== undefined && (!Number.isFinite(o.clearanceMinDistance) || o.clearanceMinDistance <= 0))
+    throw new RangeError('camera: clearance minimum distance must be positive');
   return defineSystem({
     id: `camera-${mode}`,
     phase: 'frame',
