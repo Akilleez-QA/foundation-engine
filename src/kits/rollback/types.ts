@@ -44,7 +44,91 @@ export interface RollbackOptions {
   readonly ports: RollbackPorts;
   /** Owner lifetime (for example a scene visit's signal): abort disposes the session. */
   readonly signal?: AbortSignal;
+  /** Optional: agreed input-delay changes (absent: the delay stays `limits.inputDelay`). */
+  readonly adaptiveDelay?: RollbackDelayPolicy;
+  /** Optional: departure agreement (absent: `disconnect` and `remoteDeparture` refuse with `unsupported`). */
+  readonly departure?: RollbackDeparturePolicy;
+  /** Optional: input frames kept below the current frame for relays and spectators, [0, 3600] (default 0). */
+  readonly retainInputFrames?: number;
+  /** Optional: start (resume or join) from an agreed saved state instead of the creator's frame-0 state. */
+  readonly start?: RollbackStart;
+  /** Optional: keep per-frame desync evidence for recent checksum frames. */
+  readonly evidence?: RollbackEvidencePolicy;
 }
+
+/** Bounds for agreed input-delay changes. Every peer must use the same policy (it is part of `read().config`). */
+export interface RollbackDelayPolicy {
+  /** Smallest and largest delay, [0, 30]; `limits.inputDelay` must lie between them. */
+  readonly minDelay: number;
+  readonly maxDelay: number;
+  /** Largest change per decision, [1, 30]. */
+  readonly maxStep: number;
+  /** Fewest frames between two decisions' effective frames, [maxStep + 1, 3600]. */
+  readonly minSpacing: number;
+  /** The only player whose decisions are accepted. If it departs, the delay stays as last decided. */
+  readonly authority: number;
+}
+/** A delay decision: input frames from `from` onward apply `delay` frames after the tick that queued them. */
+export type RollbackDelayChange = Readonly<{delay: number; from: number}>;
+
+/** What a departed player's input is for frames after the agreed last frame. */
+export interface RollbackDeparturePolicy {
+  readonly input: 'neutral' | 'repeat';
+}
+/** One departing player's agreement state. `reports` are `[reporter, lastFrame]`; `decided` is the agreed last frame. */
+export type RollbackDeparture = Readonly<{
+  player: number;
+  reports: readonly (readonly [number, number])[];
+  decided: number | null;
+  /** True once this peer holds every input through `decided` and the player's later input is fixed. */
+  final: boolean;
+  /** The fixed input for frames after `decided` (null until final). */
+  input: string | null;
+}>;
+
+export interface RollbackStart {
+  /** The first frame this session steps; frames below `frame + inputDelay` use the neutral input. */
+  readonly frame: number;
+  /** A text the creator's `save` returned at the start of `frame` (for example from `confirmedState()`). */
+  readonly state: string;
+  /** `rollbackChecksum(state)`; a mismatch refuses construction. */
+  readonly checksum: number;
+}
+
+export interface RollbackEvidencePolicy {
+  /** Checksum frames whose state text is retained for evidence, [1, 64]. */
+  readonly frames: number;
+  /** Largest evidence text in UTF-8 bytes, [64, 1 MiB]; longer text is truncated and marked. */
+  readonly maxBytes: number;
+  /** Largest chunk text in UTF-8 bytes, [64, 65536]. */
+  readonly chunkBytes: number;
+  /** Optional creator digest or trace text for a retained state (default: the state text itself). */
+  describe?(state: string, frame: number): string;
+}
+export type RollbackEvidenceChunk = Readonly<{
+  frame: number;
+  checksum: number;
+  index: number;
+  count: number;
+  truncated: boolean;
+  text: string;
+}>;
+export type RollbackEvidence =
+  | Readonly<{
+      status: 'ready';
+      frame: number;
+      checksum: number;
+      truncated: boolean;
+      chunks: readonly RollbackEvidenceChunk[];
+    }>
+  | Readonly<{status: 'unavailable'; frame: number; reason: 'not-retained' | 'describe-failed' | 'disabled'}>;
+
+/** A confirmed input with any delay decision attached to it, as relayed between peers. */
+export type RollbackWireInput = Readonly<{player: number; frame: number; input: string; delay?: RollbackDelayChange}>;
+export type RollbackHistoryResult =
+  | Readonly<{status: 'ok'; entries: readonly RollbackWireInput[]}>
+  | Readonly<{status: 'pruned'; oldest: number}>
+  | RollbackRefusal;
 
 export type RollbackStatus = 'running' | 'desynced' | 'failed' | 'retired';
 export type RollbackRefusal = Readonly<{status: 'busy' | 'failed' | 'desynced' | 'retired'; reason: string | null}>;
@@ -52,11 +136,28 @@ export type RollbackChecksum = Readonly<{frame: number; checksum: number}>;
 export type RollbackDesync = Readonly<{frame: number; player: number; local: number; remote: number}>;
 
 export type RollbackLocalResult =
-  | Readonly<{status: 'queued'; frame: number; input: string}>
+  /**
+   * `through` (present only when above `frame`): a delay increase filled frames `frame..through` with this input.
+   * `delay`: a decision of this peer (the delay authority) attached to frame `through ?? frame`; send it with it.
+   */
+  | Readonly<{status: 'queued'; frame: number; input: string; through?: number; delay?: RollbackDelayChange}>
   | Readonly<{status: 'full' | 'invalid'; frame: number}>
   | RollbackRefusal;
+/** `ignored`: an input of a departing player beyond the frame this peer may still accept. */
 export type RollbackRemoteResult =
-  Readonly<{status: 'accepted' | 'duplicate'; rollbackFrom: number | null}> | RollbackRefusal;
+  Readonly<{status: 'accepted' | 'duplicate' | 'ignored'; rollbackFrom: number | null}> | RollbackRefusal;
+export type RollbackDelayResult =
+  | Readonly<{status: 'pending'; delay: number}>
+  | Readonly<{
+      status: 'invalid';
+      reason: 'not-authority' | 'disabled' | 'range' | 'step' | 'unchanged' | 'busy-proposal';
+    }>
+  | RollbackRefusal;
+export type RollbackDepartureResult =
+  | Readonly<{status: 'leaving' | 'departed'; decided: number | null}>
+  | Readonly<{status: 'ignored'}>
+  | Readonly<{status: 'unsupported'}>
+  | RollbackRefusal;
 export type RollbackChecksumResult =
   | Readonly<{status: 'match' | 'pending' | 'inconclusive'}>
   | Readonly<{status: 'desynced'; desync: RollbackDesync}>
@@ -114,6 +215,15 @@ export interface RollbackSnapshot {
   readonly frameAdvantage: readonly number[];
   readonly desync: RollbackDesync | null;
   readonly stats: RollbackStats;
+  /** The delay for the next local input frame, and every agreed change (oldest first, at most a few). */
+  readonly delay: number;
+  readonly delayChanges: readonly RollbackDelayChange[];
+  /** Departing and departed players. */
+  readonly departures: readonly RollbackDeparture[];
+  /** The start frame (0 unless resumed); checksum reports below it are inconclusive. */
+  readonly startFrame: number;
+  /** Input frames retained below the current frame (relay window). */
+  readonly retainedInputFrames: number;
 }
 
 export interface RollbackConfirmedState {
@@ -126,8 +236,11 @@ export interface RollbackConfirmedState {
 export interface RollbackSession {
   /** Queue this peer's input for `frame + inputDelay`. Send the returned `{frame, input}` to every peer. */
   local(input: string): RollbackLocalResult;
-  /** Admit a peer's input. Frames must arrive contiguously per player (a reliable, ordered transport). */
-  remote(player: number, frame: number, input: string): RollbackRemoteResult;
+  /**
+   * Admit a peer's input. Frames must arrive contiguously per player (a reliable, ordered transport, or the exchange
+   * helper over a lossy one). `delay` is a decision the delay authority attached to this input frame.
+   */
+  remote(player: number, frame: number, input: string, delay?: RollbackDelayChange): RollbackRemoteResult;
   /** Admit a peer's confirmed-state checksum report. */
   remoteChecksum(player: number, frame: number, checksum: number): RollbackChecksumResult;
   /** Call once per fixed tick: roll back and resimulate if needed, then step one frame unless stalled. */
@@ -137,6 +250,23 @@ export interface RollbackSession {
   confirmedState(): RollbackConfirmedState | null;
   /** Immediate, idempotent, also from inside a port callback. */
   dispose(): void;
+  /** Authority only: decide a new delay; it is attached to the next queued local input. */
+  proposeDelay(delay: number): RollbackDelayResult;
+  /** This peer's transport says `player` left or timed out: start the departure agreement. */
+  disconnect(player: number): RollbackDepartureResult;
+  /** A survivor's departure reports (gossip) and decision for `player`. */
+  remoteDeparture(
+    from: number,
+    player: number,
+    reports: readonly (readonly [number, number])[],
+    decided: number | null,
+  ): RollbackDepartureResult;
+  /** Retained confirmed inputs of `player` from `from`, at most `max`, for relays and spectators. */
+  history(player: number, from: number, max: number): RollbackHistoryResult;
+  /** The newest recorded confirmed checksums, at most `max`, oldest first. */
+  recentChecksums(max: number): readonly RollbackChecksum[];
+  /** Evidence text chunks for a retained checksum frame (default: the desync frame). */
+  evidence(frame?: number): RollbackEvidence;
 }
 
 export interface SyncTestOptions {

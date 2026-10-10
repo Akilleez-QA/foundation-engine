@@ -137,3 +137,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0133](0133-offline-format-converters.md) | Offline format converters with provenance receipts | Tooling / Assets | Proposed |
 
 | [0134](0134-duplicate-detector.md) | Duplicate and near-duplicate detection as a read-only repo tool | Tooling / Assets | Proposed |
+
+| [0140](0140-rollback-network-extensions.md) | Optional lossy-link, delay, departure, spectator, resume and evidence extensions for rollback sessions | Optional kits / Networking | Proposed |

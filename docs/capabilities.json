@@ -92,6 +92,18 @@
       "evidence": ["@kits/retro exports sceneRetro", "@kits/retro exports retroReference"]
     },
     {
+      "id": "ROLLBACK-NET-01",
+      "title": "Optional rollback over lossy links: resend, agreed delay, departures, spectators, resume, desync evidence",
+      "shipped": true,
+      "docs": "docs/guides/rollback-network.md",
+      "evidence": [
+        "@kits/rollback exports createRollbackExchange",
+        "@kits/rollback exports createRollbackSpectator",
+        "@kits/rollback exports createLossyLink",
+        "src/kits/rollback/network.test.ts exists"
+      ]
+    },
+    {
       "id": "NAV-FIELD-01",
       "title": "Optional incremental shared navigation distance fields",
       "shipped": true,
@@ -1169,10 +1181,17 @@
     {
       "name": "rollback",
       "exports": [
+        "ROLLBACK_EXTENSION_RANGES",
         "ROLLBACK_LIMIT_RANGES",
         "captureRollbackLimits",
+        "createDesyncEvidenceStore",
+        "createLossyLink",
+        "createRollbackExchange",
         "createRollbackSession",
+        "createRollbackSpectator",
         "createRollbackSyncTest",
+        "recommendInputDelay",
+        "recommendPacing",
         "rollback",
         "rollbackChecksum"
       ]

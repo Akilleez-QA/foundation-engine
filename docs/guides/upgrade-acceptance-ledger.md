@@ -1537,3 +1537,41 @@ Evidence: focused headless tests compare OBJ, PLY and BVH results with three.js'
 `npm run dupes` (`tools/dupes/`) is an independently implemented read-only scan: exact duplicates with git blob ids, GLBs with identical mesh data (values, any layout), similar PNGs (128-bit difference hash) and similar text (MinHash with banding), over a game's `public/` folder, any paths, or across two trees. Unreadable or uncomparable content is skipped with a reason. [README](../../tools/dupes/README.md), [ADR 0134](../adr/0134-duplicate-detector.md).
 
 Evidence: focused headless tests (blob ids equal `git hash-object`; geometry, image and text matches and non-matches; the PNG decoder against a real renderer; a decompression bomb refused; large families and look-alike images grouped within bounds; CLI statuses). An independent adversarial review found thirteen defects, each fixed with a regression test. A local run over the templates found seven exact groups (including textures shared by two templates) and eight similar-image groups. Not part of `npm run check`; hosted full CI pending.
+
+
+## Rollback network extensions candidate — ROLLBACK-NET-01, 2026-10-10
+
+`@kits/rollback` gains opt-in, transport-neutral, caller-driven mechanisms. Sessions without the new options are unchanged.
+
+- `createRollbackExchange`: redundant resend of unacknowledged inputs with acknowledgement vectors, round-trip echoes, advantage exchange with a pacing recommendation, silence timeouts and relays.
+- `adaptiveDelay`: one authority's bounded decisions ride on its input stream and apply from a frame no peer can have reached.
+- `departure`: survivors gossip reports, agree on the largest, relay missing inputs and fix the departed input by a creator rule.
+- `createRollbackSpectator`: confirmed-only stepping with a bounded buffer, catch-up and checksum checks.
+- `start` and spectator `join`: begin from a checksum-validated state.
+- `evidence` and `createDesyncEvidenceStore`: bounded, chunked desync evidence, explained with the replay kit when the texts are JSON.
+- `createLossyLink`: a seeded test link.
+
+[Guide](rollback-network.md), [ADR 0140](../adr/0140-rollback-network-extensions.md).
+
+Evidence (headless, local):
+
+- Seeded randomized runs: 3 and 4 peers × 6 seeds with an early and a late-joining spectator, over links losing 25–35 %, duplicating and reordering, with delay increases and decreases and one departure.
+  - Every published checksum of every peer and spectator agrees with a no-network reference replay.
+  - All survivors hold one departure decision and one delay schedule.
+  - Relays were exercised.
+- Two near-simultaneous departures converged in the seeds tried.
+- A plain session over the same link fails with `remote-gap`.
+- Unit tests cover each refusal, bound, reentrancy and disposal.
+- A scene-system consumer on the fixed lane.
+
+This is a branch candidate. Not established:
+
+- real transports or WAN;
+- a new player joining a running match;
+- overlapping departures that disagree (detected and failed closed, not resolved);
+- delay changes after the authority departs;
+- frame stretching;
+- authentication;
+- physical-device or multiplayer acceptance.
+
+Hosted full CI is pending.

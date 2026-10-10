@@ -133,6 +133,17 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'ROLLBACK-NET-01',
+    title: 'Optional rollback over lossy links: resend, agreed delay, departures, spectators, resume, desync evidence',
+    docs: 'docs/guides/rollback-network.md',
+    evidence: [
+      {kit: 'rollback', export: 'createRollbackExchange'},
+      {kit: 'rollback', export: 'createRollbackSpectator'},
+      {kit: 'rollback', export: 'createLossyLink'},
+      {path: 'src/kits/rollback/network.test.ts'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',

@@ -20,6 +20,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | INV-RULES-01 | Optional slot, stack and key-item rules over the inventory ledger |  | [README.md](../src/kits/inventory/README.md) |
 | STREAM-01 | Optional on-demand streaming queue with byte and concurrency budgets |  | [streaming-queue.md](guides/streaming-queue.md) |
 | RETRO-01 | Optional retro software-raster look (low resolution, palette, ordered dither) |  | [retro-look.md](guides/retro-look.md) |
+| ROLLBACK-NET-01 | Optional rollback over lossy links: resend, agreed delay, departures, spectators, resume, desync evidence |  | [rollback-network.md](guides/rollback-network.md) |
 | NAV-FIELD-01 | Optional incremental shared navigation distance fields |  | [README.md](../src/kits/navigation/README.md) |
 | WORK-01 | Optional bounded fair work roster |  | [README.md](../src/kits/work-roster/README.md) |
 | VOLUME-01 | Optional bounded sphere and capsule overlap, sweep and headroom queries |  | [README.md](../src/kits/volume-query/README.md) |
