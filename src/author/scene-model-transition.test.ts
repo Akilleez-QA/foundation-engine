@@ -201,7 +201,7 @@ test('a cut in the middle of a transition restores nodes the new clip does not d
   f.life.abort();
 });
 
-test('despawn and asset replacement in the middle of a transition release everything', async () => {
+test('despawn in the middle of a transition releases everything', async () => {
   const f = fixture({transition: 1});
   await ready(f);
   f.owner.sync(0.5);
