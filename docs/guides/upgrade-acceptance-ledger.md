@@ -1162,11 +1162,16 @@ WAN, physical-device, scalability or full-CI acceptance is claimed.
 ## Model clip transitions — candidate (2026-10-09)
 
 Branch `feat/model-clip-transition` from `db1f7a85`. `npm run check` passed: typecheck,
-format, lints and 376 affected tests in 61 files, including eight new
+format, lints and 380 affected tests, including ten new
 `scene-model-transition` tests (default cut unchanged, continuity on the switching
-frame and smoothstep progress, a node only the old clip drove easing back and not left
-part-way after an interrupting switch, same-clip revision restart, pause holding the
-blend without redraw reports, pose overrides over a blend, unknown-clip and validation
-refusal, node-budget cut with one report) and the existing 21 scene model tests.
+frame and smoothstep progress for position and scale, a node only the old clip drove
+easing back and not left part-way after an interrupting switch, same-clip revision
+restart, completion while playback is paused with redraws reported only while moving,
+a cut in the middle of a transition, despawn mid-transition, pose overrides over a
+blend, unknown-clip and validation refusal, node-budget cut with one report) and the
+existing 21 scene model tests. An independent adversarial review found no blend,
+restore or buffer defect; its findings (a paused model never reaching a new pose,
+undocumented override and object-path limits, an unexported bound) were fixed before
+publication.
 Evidence is headless; no browser, visual-quality, physical-device or full-CI
 acceptance is claimed. Morph-target and material tracks still cut.

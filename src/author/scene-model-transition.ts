@@ -34,8 +34,11 @@ export function animatedNodes(root: T.Object3D, clips: readonly T.AnimationClip[
   const nodes = new Set<T.Object3D>();
   for (const clip of clips)
     for (const track of clip.tracks) {
-      const {nodeName, propertyName} = T.PropertyBinding.parseTrackName(track.name);
+      const {nodeName, objectName, propertyName} = T.PropertyBinding.parseTrackName(track.name);
       if (propertyName !== 'position' && propertyName !== 'quaternion' && propertyName !== 'scale') continue;
+      // Object-path tracks (for example `.bones[name].position`) resolve to a sub-object, not the named node; they
+      // are not captured and change at once, as before.
+      if (objectName) continue;
       const node = T.PropertyBinding.findNode(root, nodeName) as T.Object3D | null | undefined;
       if (!node || !(node instanceof T.Object3D)) continue;
       nodes.add(node);

@@ -32,8 +32,11 @@ scheduler or mixer is introduced.
   and for each later sync writes `mix(snapshot, evaluated, smoothstep(t))`.
 - Before each evaluation the owner restores the base, so nodes the new clip does
   not drive return to their original values and nothing is blended twice.
-- Pose overrides still apply last; paused playback holds the blend; clip speed
-  does not scale it.
+- Pose overrides still apply last and are never eased themselves. The blend runs
+  on presentation time, so it completes while clip playback is paused (a paused
+  model switched to the bind pose still reaches it); clip speed does not scale it.
+- Only named-node position, rotation and scale tracks are captured; object-path
+  tracks (`.bones[name]`), morph targets and material tracks change at once.
 - Bounds: 512 animated nodes per model (the node list is built once, on first
   use); a larger rig reports once and keeps cutting. Two snapshot buffers and one
   base buffer are reused per model instance; no per-frame allocation.

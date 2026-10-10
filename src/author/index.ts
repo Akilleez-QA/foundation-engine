@@ -208,7 +208,7 @@ export {
   type PostMode,
 } from '../platform/render/post/settings';
 
-export {Model, validateModel, type ModelData, type ModelSocketPose} from './model';
+export {Model, validateModel, MAX_MODEL_TRANSITION, type ModelData, type ModelSocketPose} from './model';
 export {RenderMask, validateRenderMask} from './render-mask';
 export {
   createDependencyLease,

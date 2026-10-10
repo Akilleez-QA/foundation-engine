@@ -47,7 +47,10 @@ function fixture(model: Partial<ModelData> = {}, extraBones = 0) {
       new T.QuaternionKeyframeTrack('tail.quaternion', [0, 1], [...quarter, ...quarter]),
       ...extra,
     ]),
-    new T.AnimationClip('side', 1, [new T.VectorKeyframeTrack('hand.position', [0, 1], [4, 0, 0, 4, 0, 0])]),
+    new T.AnimationClip('side', 1, [
+      new T.VectorKeyframeTrack('hand.position', [0, 1], [4, 0, 0, 4, 0, 0]),
+      new T.VectorKeyframeTrack('hand.scale', [0, 1], [3, 3, 3, 3, 3, 3]),
+    ]),
   ];
   const library = createModelLibrary({
     def: id => ({
@@ -113,9 +116,11 @@ test('a transition starts from the displayed pose and eases into the new clip ov
   const k = smooth(0.5);
   close(f.node('hand').position.x, 4 * k);
   close(f.node('hand').position.y, 1 - k);
+  close(f.node('hand').scale.x, 1 + 2 * k, 'scale blends too');
   f.owner.sync(0.25);
   close(f.node('hand').position.x, 4);
   close(f.node('hand').position.y, 0);
+  close(f.node('hand').scale.x, 3);
   assert.deepEqual(f.errors, []);
   f.life.abort();
 });
@@ -162,20 +167,50 @@ test('a revision restart of the same clip blends instead of snapping back to its
   f.life.abort();
 });
 
-test('paused playback holds a transition without reporting redraws, and resumes it', async () => {
+test('a transition completes while clip playback is paused, and reports redraws only while it moves', async () => {
   const f = fixture({transition: 0.5});
+  await ready(f);
+  f.owner.sync(0.5);
+  f.model().playing = false;
+  f.model().clip = '';
+  f.owner.sync(0);
+  close(f.node('hand').position.y, 1, 'switching frame shows the paused pose');
+  assert.equal(f.owner.sync(0), false);
+  assert.equal(f.owner.sync(0.25), true);
+  close(f.node('hand').position.y, 1 - smooth(0.5));
+  f.owner.sync(0.25);
+  close(f.node('hand').position.y, 0, 'the bind pose is reached although playback is paused');
+  assert.equal(f.owner.sync(0.25), false);
+  f.life.abort();
+});
+
+test('a cut in the middle of a transition restores nodes the new clip does not drive', async () => {
+  const f = fixture({transition: 1});
+  await ready(f);
+  f.owner.sync(0.5);
+  f.model().clip = 'side';
+  f.owner.sync(0.5);
+  f.model().transition = 0;
+  f.model().clip = 'side';
+  f.model().revision++;
+  f.owner.sync(0);
+  close(f.node('hand').position.x, 4);
+  angle(f.node('tail').quaternion.angleTo(new T.Quaternion()), 0, 'tail back at its original');
+  f.owner.sync(0.5);
+  angle(f.node('tail').quaternion.angleTo(new T.Quaternion()), 0);
+  f.life.abort();
+});
+
+test('despawn and asset replacement in the middle of a transition release everything', async () => {
+  const f = fixture({transition: 1});
   await ready(f);
   f.owner.sync(0.5);
   f.model().clip = 'side';
   f.owner.sync(0.25);
-  const held = f.node('hand').position.clone();
-  f.model().playing = false;
-  f.owner.sync(0);
-  assert.equal(f.owner.sync(0.25), false);
-  close(f.node('hand').position.distanceTo(held), 0);
-  f.model().playing = true;
-  assert.equal(f.owner.sync(0.25), true);
-  close(f.node('hand').position.x, 4);
+  f.world.despawn(f.e);
+  f.owner.sync(0.25);
+  assert.equal(f.scene.children.length, 0);
+  assert.deepEqual(f.errors, []);
   f.life.abort();
 });
 

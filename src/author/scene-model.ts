@@ -429,10 +429,10 @@ export function createSceneModels(o: {
           }
           if (hadOverrides || (slot.fade && !advanced)) slot.mixer!.update(0);
           if (slot.fade) {
-            // Paused playback holds the blend where it is; the clip's own speed does not scale it.
-            const step = data.playing ? dt : 0;
-            if (!slot.fade.blend(step)) slot.fade = undefined;
-            if (step > 0) changed = true;
+            // Presentation time: the blend completes even while clip playback is paused, so a paused model that
+            // switches to another clip or the bind pose still arrives there. Clip speed does not scale it.
+            if (!slot.fade.blend(dt)) slot.fade = undefined;
+            if (dt > 0) changed = true;
           }
           const poseKey = JSON.stringify(data.pose);
           changed = slot.poseKey !== poseKey || changed;
