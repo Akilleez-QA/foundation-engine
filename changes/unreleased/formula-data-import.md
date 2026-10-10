@@ -1,0 +1,1 @@
+- **Formula data import.** Formula data import (`npm run formulas:import`, `@kits/formulas`): spreadsheet exports (CSV/TSV) become formula sheets, keyed tables and matrices (type charts) as committed JSON with source, hash and licence; loading re-runs the checks and refusals name the row. See [ADR 0135](docs/adr/0135-formula-data-import.md).

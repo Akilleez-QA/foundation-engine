@@ -1,6 +1,6 @@
 # Recipe: collision and picking
 
-There is no physics engine (see the README's "Not here yet"). Three simple tools cover most small games:
+Core has no built-in physics. For rigid bodies, colliders, collision events, slopes and steps, a game can opt into the optional [physics adapter kit](../guides/physics-adapter.md) (`@kits/physics`, a lazily loaded WebAssembly library). Without that kit, three simple tools cover most small games:
 
 - **Overlap**: a system compares positions and reacts (collect, hit, trigger).
 - **Blocking**: the character kit moves an entity and slides it along `Walls` (a rectangle it stays inside) and `Solid`s (boxes or circles it cannot enter).

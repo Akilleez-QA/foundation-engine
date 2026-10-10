@@ -52,6 +52,107 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'FORMULA-DATA-01',
+    title: 'Spreadsheet import for formula sheets and lookup tables (npm run formulas:import)',
+    docs: 'src/kits/formulas/README.md',
+    evidence: [{kit: 'formulas', export: 'importFormulaTable'}, {script: 'formulas:import'}],
+  },
+  {
+    id: 'FORMULA-01',
+    title: 'Optional data-defined stat and damage formulas with stacking stages',
+    docs: 'src/kits/formulas/README.md',
+    evidence: [
+      {kit: 'formulas', export: 'defineFormulaSheet'},
+      {kit: 'formulas', export: 'createDamageModel'},
+      {path: 'src/kits/formulas/formulas.test.ts'},
+    ],
+  },
+  {
+    id: 'STATUS-01',
+    title: 'Optional stacked status effects with transforms, immunities and save/restore',
+    docs: 'src/kits/status/README.md',
+    evidence: [
+      {kit: 'status', export: 'createStatusEffects'},
+      {kit: 'status', export: 'defineStatusRules'},
+      {path: 'src/kits/status/status.test.ts'},
+    ],
+  },
+  {
+    id: 'BT-01',
+    title: 'Optional deterministic resumable behaviour trees with blackboard and saveable state',
+    docs: 'src/kits/behavior/README.md',
+    evidence: [
+      {kit: 'behavior', export: 'defineBehaviorTree'},
+      {kit: 'behavior', export: 'createBehavior'},
+      {path: 'src/kits/behavior/behavior.test.ts'},
+    ],
+  },
+  {
+    id: 'ECON-01',
+    title: 'Optional flow economy with production queues, prerequisites and reclaim',
+    docs: 'src/kits/economy/README.md',
+    evidence: [
+      {kit: 'economy', export: 'createEconomy'},
+      {kit: 'economy', export: 'defineEconomyRules'},
+      {path: 'src/kits/economy/economy.test.ts'},
+    ],
+  },
+  {
+    id: 'INV-RULES-01',
+    title: 'Optional slot, stack and key-item rules over the inventory ledger',
+    docs: 'src/kits/inventory/README.md',
+    evidence: [
+      {kit: 'inventory', export: 'createRuledInventory'},
+      {kit: 'inventory', export: 'inventoryPresets'},
+      {path: 'src/kits/inventory/rules.test.ts'},
+    ],
+  },
+  {
+    id: 'STREAM-01',
+    title: 'Optional on-demand streaming queue with byte and concurrency budgets',
+    docs: 'docs/guides/streaming-queue.md',
+    evidence: [
+      {kit: 'streaming', export: 'createStreamQueue'},
+      {kit: 'streaming', export: 'leasePort'},
+    ],
+  },
+  {
+    id: 'PIPELINE-01',
+    title: 'Worker render pipelining',
+    docs: 'docs/verification/render-pipelining-20261010/README.md',
+    // The module a worker renderer would add (ADR 0131 names it); its presence flips this row.
+    evidence: [{path: 'src/platform/render/worker-renderer.ts'}],
+  },
+  {
+    id: 'RETRO-01',
+    title: 'Optional retro software-raster look (low resolution, palette, ordered dither)',
+    docs: 'docs/guides/retro-look.md',
+    evidence: [
+      {kit: 'retro', export: 'sceneRetro'},
+      {kit: 'retro', export: 'retroReference'},
+    ],
+  },
+  {
+    id: 'CAR-01',
+    title: 'Optional car handling on ray-cast wheels',
+    docs: 'src/kits/car-handling/README.md',
+    evidence: [
+      {kit: 'car-handling', export: 'createCarHandling'},
+      {kit: 'car-handling', export: 'carHandlingSystem'},
+      {path: 'src/kits/car-handling/car.test.ts'},
+    ],
+  },
+  {
+    id: 'BOARD-01',
+    title: 'Optional board traversal with authored rails',
+    docs: 'src/kits/board-traversal/README.md',
+    evidence: [
+      {kit: 'board-traversal', export: 'createBoard'},
+      {kit: 'board-traversal', export: 'defineRails'},
+      {path: 'src/kits/board-traversal/board.test.ts'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',
@@ -172,6 +273,33 @@ export const FEATURES = [
     evidence: [{engine: 'Interpolated'}, {engine: 'presentTransform'}, {path: 'src/author/interpolation.test.ts'}],
   },
   {
+    id: 'BALLISTICS-01',
+    title: 'Drag-free ballistic launch solves, evaluation and arc samples',
+    docs: 'src/kits/ballistics/README.md',
+    evidence: [
+      {kit: 'ballistics', export: 'solveByLaunchSpeed'},
+      {kit: 'ballistics', export: 'solveLead'},
+      {kit: 'ballistics', export: 'samplePoints'},
+      {path: 'src/kits/ballistics/ballistics.test.ts'},
+    ],
+  },
+  {
+    id: 'BREADCRUMBS-01',
+    title: 'Bounded leader trails with exact lag and path-distance retracing',
+    docs: 'src/kits/breadcrumbs/README.md',
+    evidence: [
+      {kit: 'breadcrumbs', export: 'createBreadcrumbTrail'},
+      {kit: 'breadcrumbs', export: 'nextFollowerLag'},
+      {path: 'src/kits/breadcrumbs/breadcrumbs.test.ts'},
+    ],
+  },
+  {
+    id: 'GRID-STEP-01',
+    title: 'Grid-step actor movement with classified bumps, ledges, forced tiles and follower lines',
+    docs: 'src/kits/grid-step/README.md',
+    evidence: [{kit: 'grid-step', export: 'createGridStepper'}, {path: 'src/kits/grid-step/grid-step.test.ts'}],
+  },
+  {
     id: 'MEDIA-01',
     title: 'Medium volumes with hysteresis state tracking and buoyancy, drag and current accelerations',
     docs: 'src/kits/media/README.md',
@@ -286,6 +414,15 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'SCRIPT-01',
+    title: 'Optional sandboxed Lua scripts with capability-scoped host functions and deterministic per-call budgets',
+    docs: 'docs/guides/scripting.md',
+    evidence: [
+      {kit: 'scripting', export: 'loadScriptVm'},
+      {kit: 'scripting', export: 'createScriptHost'},
+    ],
+  },
+  {
     id: 'GEN-02',
     title: 'Bounded binary record store for large edited worlds',
     pr: 56,
@@ -325,6 +462,18 @@ export const FEATURES = [
     evidence: [{script: 'asset:verify'}],
   },
   {
+    id: 'ASSET-CONVERT',
+    title: 'Offline converters to glTF and PNG with provenance receipts (npm run convert)',
+    docs: 'tools/convert/README.md',
+    evidence: [{script: 'convert'}, {path: 'tools/convert/bvh.mjs'}, {path: 'tools/convert/convert.test.mjs'}],
+  },
+  {
+    id: 'DUPES-01',
+    title: 'Duplicate and near-duplicate detector (npm run dupes)',
+    docs: 'tools/dupes/README.md',
+    evidence: [{script: 'dupes'}, {path: 'tools/dupes/scan.mjs'}, {path: 'tools/dupes/dupes.test.mjs'}],
+  },
+  {
     id: 'ASSET-OPTIMIZE',
     title: 'Model optimisation (npm run asset:optimize)',
     pr: 135,
@@ -352,8 +501,13 @@ export const FEATURES = [
   },
   {
     id: 'PHYSICS',
-    title: 'Rigid-body physics',
-    evidence: [{kit: 'physics'}],
+    title: 'Rigid-body physics (optional adapter kit over a lazily loaded WebAssembly library)',
+    docs: 'docs/guides/physics-adapter.md',
+    evidence: [
+      {kit: 'physics', export: 'scenePhysics'},
+      {kit: 'physics', export: 'createPhysicsWorld'},
+      {path: 'src/kits/physics/snapshot.test.ts'},
+    ],
   },
 ];
 
