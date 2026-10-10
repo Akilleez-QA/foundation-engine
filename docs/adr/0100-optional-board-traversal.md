@@ -47,7 +47,7 @@ flips and combos are left to creator code on the events.
 
 ## Evidence
 
-19 headless tests: behaviour for both presets, landing judgement, rails, balance, manuals,
+25 headless tests: behaviour for both presets, landing judgement, rails, balance, manuals,
 kicker launch, slopes and walls, refusals and the work bound, bit-identical replay and
 snapshot round trips in both math modes, an ECS consumer with character-kit walls, a
 terrain-kit consumer and the rollback kit's sync test. No template, browser, feel or

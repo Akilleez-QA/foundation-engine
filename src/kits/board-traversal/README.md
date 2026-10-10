@@ -48,7 +48,8 @@ that motion model and reuses:
   once per tick;
 - `scalarMath`: `math: 'deterministic'` uses `dmath` for every sine, cosine and arctangent;
 - the character kit's `Walls`/`Solid`s (or any `Area`) as the wall port, through
-  `characterSlide`, which splits each move into pieces of at most half the board radius;
+  `characterSlide(worldOrArea, radius, board.math)`, which splits each move into pieces
+  of at most half the board radius and evaluates solids with the board's arithmetic;
 - the terrain kit's `Surface.sample` through `sampledBoardGround`;
 - the rollback kit's save/load/step ports through `snapshot`/`restore`
   (`consumers.test.ts` runs its sync test through pushes, grinds, tricks and bails);
@@ -91,7 +92,10 @@ without a pop), `land-clean`, `land-sketchy`, `switch` (rides away switched), `g
 returns the full state (mode, position, velocity, speed, heading, board yaw, stance,
 charge, balance, trick time left, air time, rail id, bail reason `angle | impact | trick
 | balance | wall | manual`); `pose(out?)` writes `x, y, z, ry`; getters `mode` and `speed`
-do not allocate.
+do not allocate. `rail` names the rail from the rails passed to the last step, so it is
+null straight after `restore` until the next step. `cancelInput()` forgets a held ollie
+and its charge without popping; the adapter calls it on ticks its `when` is false, so a
+rider losing its controller mid-crouch does not pop.
 
 ## Behaviour
 
@@ -102,36 +106,47 @@ do not allocate.
   onto a surface up to `landing.snap` higher and follows one up to `snap` lower; it
   leaves the ground when nothing is within `snap` below, or when holding the new
   surface would take a vertical speed change larger than `g·h + landing.stick` (a kicker
-  lip, a crest taken fast). Leaving the ground is a `launch`.
+  lip, a crest taken fast). Leaving the ground is a `launch`. Against a wall, the board
+  keeps the share of its move the wall port allowed and turns to travel along it, so
+  grazing a wall costs speed once rather than every sub-step.
 - **Ollie.** Holding charges to 1 over `ollie.chargeTime`; the release pops at
   `minPop + (maxPop - minPop) × charge` upward on top of the ground velocity.
 - **Air.** An exact ballistic arc with terminal speed; `steer` spins the board yaw at
-  `air.spinRate`; travel direction does not change. Rails are tested before the ground.
+  `air.spinRate`; travel direction does not change. A nonzero `trick` starts a trick at
+  most once per step, and only while none is running. Rails are tested before the ground.
   The ground is swept from the sub-step's start height, so a fast fall lands on any
   surface it crossed.
-- **Landing.** The angle between board yaw and horizontal travel (or the reverse, with
-  `landing.allowFakie`, which flips the stance) is judged: up to `clean` lands clean, up
-  to `sketchy` keeps `sketchyKeep` of the speed, beyond bails (`angle`). A trick still
-  running bails (`trick`); landing faster than `maxImpact` downward bails (`impact`).
-  The rider rides away along the board with the speed the new surface keeps.
+- **Landing.** The angle between the board's forward in its current stance (the nose,
+  or the tail when riding switched) and horizontal travel is judged: up to `clean` lands
+  clean, up to `sketchy` keeps `sketchyKeep` of the speed, beyond bails (`angle`). With
+  `landing.allowFakie`, a landing nearer backwards than forwards is judged against the
+  other end and rides away in the other stance (`switch`); a plain ollie while riding
+  switched lands switched. A trick still running bails (`trick`); landing faster than
+  `maxImpact` downward bails (`impact`). The rider rides away along the board with the
+  speed the new surface keeps; a bail slides the way the board was travelling.
 - **Grinds.** While falling or level and at least `grind.minSpeed` horizontally, the
   closest rail point within `snapRadius` horizontally catches the board when the board
   ends the sub-step no more than `snapAbove` above it and started no more than
   `snapBelow` below it, and travel is within `maxEntryAngle` of the rail (either
   direction). A running trick bails. On the rail: speed along it with gravity along
   its slope, friction and brake; it walks across segments; a pop leaves with the pop
-  speed; leaving the end adds `exitHop` up; below `minSpeed` it drops off. The same
-  rail cannot be caught again for `recatchTime` of air time.
+  speed; leaving the end adds `exitHop` up; below `minSpeed` it drops off. The rail just
+  left cannot be caught again for `recatchTime` of air time; landing clears that. The
+  board's yaw is not aligned to the rail: an angled catch keeps its angle, and the exit
+  landing is judged on it. When the rails passed to a step are not the ones the grind
+  started on (another revision or segment count, or a rail or segment index outside
+  them), the board leaves with its velocity along the rail (`grind-end`, `launch`).
 - **Balance** (grinds and manuals): `rate += (instability × balance + disturbance ×
   side − control × steer) · h`, `balance += rate · h`, starting at 0. `side` is the
   rail entry side (which way the board points across the rail) or the manual direction.
   Reaching |balance| ≥ 1 bails on a rail (`balance`), and in a manual either drops back
   to rolling or bails (`manual.fail`); after a manual fall the manual input must be
-  released before another starts. Instability and disturbance of 0 never fall.
+  released before another starts. With instability and disturbance 0 only steering moves
+  the balance.
 - **Bail.** The rider slides (or falls, then slides) to a stop at `bail.decel`, and
-  after `bail.time` on the ground recovers to rolling. Being stopped by a wall faster
-  than `bail.wallSpeed` (the blocked share of the speed) bails (`wall`); slower contact
-  slides along the wall and loses the blocked share.
+  after `bail.time` counted on the ground recovers to rolling. Being stopped by a wall
+  faster than `bail.wallSpeed` (the speed lost perpendicular to what the wall allowed)
+  bails (`wall`; a manual ends first); slower contact slides along the wall.
 
 ## Tuning
 
@@ -165,8 +180,13 @@ about 0.4 m and 0.9 m. Properties of the presets, not targets.
 
 - Per step at most `maxSubsteps` ground queries (`maxWorkPerStep(segments)`), and in the
   air at most `segments` rail checks per sub-step (each segment is rejected first by its
-  bounding box). Constant memory per rider; the step allocates only its result and event
-  list. For thousands of rails, build smaller snapshots for the area around the rider
+  bounding box). Constant memory per rider; the controller allocates its result and event
+  list per step and nothing per sub-step. The ports' costs are their own: the adapter
+  reads the character kit's walls once per tick, and its `slide` allocates a point per
+  piece; `characterSlide` refuses a move longer than 32 radii in one sub-step.
+- Configuration refuses unknown fields at every level. A port that calls back into the
+  same board (`step`, `place`, `restore`, `cancelInput`) is refused and the outer step
+  fails whole. For thousands of rails, build smaller snapshots for the area around the rider
   (for example from the spatial kit) instead of one large set.
 - A step needing more than `maxSubsteps` is refused with `RangeError`.
 - A step is a transaction: it works on a copy and commits only when every sub-step
@@ -184,12 +204,14 @@ state. With `math: 'deterministic'` every transcendental goes through `dmath`; r
 lengths use square root. The default `platform` mode can differ between JavaScript
 engines. The ports must be deterministic too.
 
-`snapshot()` is a frozen, JSON-safe `{kind, version: 1, fingerprint, values}` (33
-numbers, under 1 KB as JSON); the state never holds -0, so it round-trips bit for bit.
-`restore` refuses another configuration's snapshot, a wrong length, non-finite values
-and out-of-range mode, rail, stance and flag fields, and changes nothing when it
-refuses. A grinding snapshot refers to a rail by index in the rail snapshot of the same
-revision; restoring with other rails makes the board drop off on its next step.
+`snapshot()` is a frozen, JSON-safe `{kind, version: 1, fingerprint, values}` (34
+numbers, under 1 KB as JSON); every write to the state turns -0 into 0, so it round-trips
+bit for bit. `restore` refuses another configuration's snapshot, a wrong length,
+non-finite values, a position outside `limits.extent`, a non-unit or downward ground
+normal, unwrapped angles, and out-of-range mode, rail, stance, charge, timer and flag
+fields, and changes nothing when it refuses. A grinding snapshot refers to a rail by
+index in the rail snapshot it was taken with; stepping it with other rails makes the
+board leave the rail (see Grinds), never fail.
 Snapshots are not a save format with migrations.
 
 ## Limits
@@ -204,7 +226,7 @@ creator's.
 
 ## Evidence
 
-`board.test.ts` (16 tests): for both presets, discrete pushes to the cap with coasting
+`board.test.ts` (22 tests): for both presets, discrete pushes to the cap with coasting
 and braking, tap versus charged ollie heights against `v²/2g`, landing judgement (clean,
 sketchy with speed loss, angle bail, switched); trick and impact bails and recovery;
 catching a two-segment rail, grinding to its end and landing, with no re-catch;
@@ -213,12 +235,16 @@ it; rail revision changes mid-grind; manual start, release, fall and re-entry ru
 kicker launch, slope acceleration against the expected rate, wall slide and wall bail;
 configuration and rail refusal; transactional refusal of bad steps and port answers and
 the work bound; identical bits across runs and JSON snapshot round trips in both math
-modes. `consumers.test.ts` (3 tests): the adapter on the ECS fixed-step runner with the
+modes; a plain ollie while switched; a landing bail sliding along the travel; changed,
+same-revision and out-of-range rails never wedging a grind; the re-catch delay cleared by
+landing; one trick start per step; a manual ending before a wall bail; wall grazing
+independent of the sub-step; no pop after losing control; huge normals, -0, re-entry,
+bad restores and unknown fields. `consumers.test.ts` (3 tests): the adapter on the ECS fixed-step runner with the
 character kit's `Walls` and a `Solid` (Transform written, no pushes while not owned, a
 fast rider bails at the box and never passes it), a terrain-kit sampled hill (rolls,
 pops, lands on the surface) and the rollback kit's sync test over 900 frames through
 pushes, grinds, tricks and bails. A local micro-measurement on one desktop CPU (Node 26)
-gave about 0.6 µs per rolling 60 Hz step and about 9–11 µs per step on average while
+gave about 0.6 µs per rolling 60 Hz step and about 9–10 µs per step on average while
 popping repeatedly over a set of 4,095 rail segments (an order-of-magnitude indication
 only). These are headless contract tests: no template, browser, feel, controller or
 physical-device acceptance is claimed.

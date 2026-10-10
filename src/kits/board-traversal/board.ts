@@ -127,6 +127,10 @@ export interface BoardSnapshot {
 export interface Board {
   readonly config: BoardConfig;
   readonly fingerprint: number;
+  /** The arithmetic this board was created with; pass it to `characterSlide` so walls follow it too. */
+  readonly math: ScalarMathMode;
+  /** Forget a held ollie and its charge without popping (for example when the rider loses its controller). */
+  cancelInput(): void;
   /** Most ground queries and rail segment checks one step can make, for a rail set of `segments`. */
   maxWorkPerStep(segments: number): {groundQueries: number; railChecks: number};
   /** Put the rider at rest, rolling, at (x, y, z) facing `yaw`. */
@@ -174,7 +178,8 @@ const X = 0,
   TIME = 30,
   BAILAIR = 31,
   LASTRAIL = 32,
-  SIZE = 33;
+  RAILSEGS = 33,
+  SIZE = 34;
 const ROLL = 0,
   AIR = 1,
   GRIND = 2,
@@ -199,26 +204,55 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
   /** The rail snapshot of the last step, to name the rail being ground in `read()`. */
   let lastRails: Rails | undefined;
   let groundQueries = 0,
-    railChecks = 0;
+    railChecks = 0,
+    /** A trick starts at most once per step, whatever the sub-step count. */
+    trickUsed = false,
+    busy = false;
 
   const queryGround = (world: BoardWorld, x: number, z: number, below: number) => {
     groundQueries++;
     if (!world.ground(x, z, below, hit)) return false;
-    const {height, nx, ny, nz} = hit;
+    const height = hit.height,
+      nx = hit.nx,
+      ny = hit.ny,
+      nz = hit.nz;
     if (typeof height !== 'number' || !Number.isFinite(height) || height > below + 1e-9)
       throw new RangeError('board-traversal: ground height must be finite and at or below the query');
-    if (![nx, ny, nz].every(v => typeof v === 'number' && Number.isFinite(v)) || !(ny > 0))
+    if (
+      typeof nx !== 'number' ||
+      typeof ny !== 'number' ||
+      typeof nz !== 'number' ||
+      !Number.isFinite(nx) ||
+      !Number.isFinite(nz) ||
+      !Number.isFinite(ny) ||
+      !(ny > 0)
+    )
       throw new RangeError('board-traversal: ground normal must be finite with a positive y');
-    const l = Math.sqrt(nx * nx + ny * ny + nz * nz);
-    hit.nx = nx / l;
-    hit.ny = ny / l;
-    hit.nz = nz / l;
+    // Normalise without overflow: scale by the largest component first.
+    const big = Math.max(Math.abs(nx), ny, Math.abs(nz)),
+      sx = nx / big,
+      sy = ny / big,
+      sz = nz / big,
+      l = Math.sqrt(sx * sx + sy * sy + sz * sz);
+    hit.nx = sx / l;
+    hit.ny = sy / l;
+    hit.nz = sz / l;
     return true;
   };
-  /** Planar move through the optional wall port; returns the share of the move that was blocked (0 to 1). */
+  /** The planar displacement the last `moveXZ` achieved, and the share of the requested speed it kept. */
+  let movedX = 0,
+    movedZ = 0,
+    kept = 1;
+  /**
+   * Planar move through the optional wall port. Returns the share of the move lost against a wall, measured
+   * perpendicular to what was achieved (0 to 1); `kept` is the achieved length over the requested length.
+   */
   const moveXZ = (world: BoardWorld, dx: number, dz: number) => {
     const x = A[X]!,
       z = A[Z]!;
+    movedX = dx;
+    movedZ = dz;
+    kept = 1;
     if (!world.slide || (dx === 0 && dz === 0)) {
       A[X] = x + dx;
       A[Z] = z + dz;
@@ -233,9 +267,21 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
       throw new RangeError('board-traversal: slide must end finite and no further than the move');
     A[X] = slid.x;
     A[Z] = slid.z;
-    const want = dx * dx + dz * dz;
-    const kept = (rx * dx + rz * dz) / want;
-    return Math.min(1, Math.max(0, 1 - kept));
+    movedX = rx;
+    movedZ = rz;
+    const want = Math.sqrt(dx * dx + dz * dz);
+    kept = Math.min(1, Math.sqrt(rx * rx + rz * rz) / want);
+    const lx = dx - rx,
+      lz = dz - rz;
+    return Math.min(1, Math.sqrt(lx * lx + lz * lz) / want);
+  };
+  /** After a wall slide on the ground, travel along what was achieved: the speed keeps only that share. */
+  const followWall = (s: number) => {
+    if (kept < 1 && movedX * movedX + movedZ * movedZ > 1e-18) {
+      A[HEAD] = s >= 0 ? m.atan2(movedX, movedZ) : m.atan2(-movedX, -movedZ);
+      A[YAW] = A[STANCE]! > 0 ? A[HEAD]! : wrap(A[HEAD]! + PI);
+    }
+    return s * kept;
   };
   const bail = (reason: BailReason, airborne: boolean) => {
     A[MODE] = BAIL;
@@ -309,7 +355,7 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
     else if (s < -c.rolling.maxSpeed) s = -c.rolling.maxSpeed;
     // Carve (or balance in a manual).
     if (manual) balanceStep(h, ct.steer, c.manual.instability, c.manual.disturbance, c.manual.control);
-    else A[HEAD] = A[HEAD]! - ct.steer * c.carve.rate * Math.min(1, Math.abs(s) / c.carve.fullSpeed) * h;
+    else A[HEAD] = wrap(A[HEAD]! - ct.steer * c.carve.rate * Math.min(1, Math.abs(s) / c.carve.fullSpeed) * h);
     A[YAW] = A[STANCE]! > 0 ? A[HEAD]! : wrap(A[HEAD]! + PI);
     // Ollie charge and pop.
     if (ct.ollie) A[CHARGE] = c.ollie.chargeTime > 0 ? Math.min(1, A[CHARGE]! + h / c.ollie.chargeTime) : 1;
@@ -318,9 +364,13 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
     const blocked = moveXZ(world, s * h * tx, s * h * tz);
     if (blocked > 0) {
       const impact = Math.abs(s) * blocked;
-      s *= 1 - blocked;
+      s = followWall(s);
       if (impact > c.bail.wallSpeed) {
         A[SPEED] = s;
+        if (manual) {
+          events.push('manual-end');
+          A[MANDIR] = 2;
+        }
         bail('wall', false);
         return;
       }
@@ -453,22 +503,24 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
     A[RDIR] = dir;
     A[SPEED] = Math.abs(vAlong);
     A[RAILREV] = world.rails!.revision;
+    A[RAILSEGS] = world.rails!.segmentCount;
     A[BAL] = 0;
     A[BALRATE] = 0;
     A[BALSIGN] = off >= 0 ? 1 : -1;
     A[X] = segments[o]! + dx * along;
     A[Y] = segments[o + 1]! + dy * along;
     A[Z] = segments[o + 2]! + dz * along;
-    A[VX] = 0;
-    A[VY] = 0;
-    A[VZ] = 0;
+    A[VX] = dx * dir * A[SPEED]!;
+    A[VY] = dy * dir * A[SPEED]!;
+    A[VZ] = dz * dir * A[SPEED]!;
     events.push('grind-start');
   };
 
   const air = (h: number, ct: Ctl, world: BoardWorld) => {
     A[AIRT] = A[AIRT]! + h;
-    if (ct.trick > 0 && A[TRICK] === 0 && A[MODE] === AIR) {
+    if (ct.trick > 0 && !trickUsed && A[TRICK] === 0 && A[MODE] === AIR) {
       A[TRICK] = ct.trick;
+      trickUsed = true;
       events.push('trick-start');
     }
     A[TRICK] = Math.max(0, A[TRICK]! - h);
@@ -493,8 +545,9 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
     const blocked = moveXZ(world, A[VX]! * h, A[VZ]! * h);
     if (blocked > 0) {
       const hv = Math.sqrt(A[VX]! * A[VX]! + A[VZ]! * A[VZ]!);
-      A[VX] = A[VX]! * (1 - blocked);
-      A[VZ] = A[VZ]! * (1 - blocked);
+      // Keep only the motion along the wall.
+      A[VX] = movedX / h;
+      A[VZ] = movedZ / h;
       if (hv * blocked > c.bail.wallSpeed && A[MODE] === AIR) bail('wall', true);
     }
     const x1 = A[X]!,
@@ -532,20 +585,32 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
       return;
     }
     const hv = Math.sqrt(vx * vx + vz * vz);
-    const travel = hv > 1e-6 ? m.atan2(vx, vz) : A[YAW]!;
-    let off = Math.abs(wrap(A[YAW]! - travel)),
-      switched = false;
-    if (off > PI / 2 && c.landing.allowFakie) {
+    A[LASTRAIL] = -1;
+    const stance = A[STANCE]!;
+    // Forward of the board in the stance it is ridden: the nose, or the tail when riding switched.
+    const forward = stance > 0 ? A[YAW]! : wrap(A[YAW]! + PI);
+    const travel = hv > 1e-6 ? m.atan2(vx, vz) : forward;
+    let off = Math.abs(wrap(forward - travel)),
+      next = stance;
+    if (c.landing.allowFakie && off > PI / 2) {
+      // Landing nearer backwards than forwards: ride away in the other stance.
       off = PI - off;
-      switched = true;
+      next = -stance;
     }
-    if (A[TRICK]! > 0) return bail('trick', false);
-    if (down > c.landing.maxImpact) return bail('impact', false);
-    if (off > c.landing.sketchy) return bail('angle', false);
+    const switched = next !== stance;
+    // Any landing, judged or not, now travels the way the board was moving.
+    A[HEAD] = hv > 1e-6 ? travel : A[HEAD]!;
+    A[SPEED] = hv;
+    if (A[TRICK]! > 0 || down > c.landing.maxImpact || off > c.landing.sketchy) {
+      A[VX] = 0;
+      A[VY] = 0;
+      A[VZ] = 0;
+      return bail(A[TRICK]! > 0 ? 'trick' : down > c.landing.maxImpact ? 'impact' : 'angle', false);
+    }
     // Ride away along the board, with the speed the surface keeps.
     A[MODE] = ROLL;
-    A[STANCE] = switched ? -A[STANCE]! : A[STANCE]!;
-    A[HEAD] = A[STANCE]! > 0 ? A[YAW]! : wrap(A[YAW]! + PI);
+    A[STANCE] = next;
+    A[HEAD] = next > 0 ? A[YAW]! : wrap(A[YAW]! + PI);
     tangent(A[HEAD]!, hit.nx, hit.ny, hit.nz);
     let s = Math.max(0, vx * t.x + A[VY]! * t.y + vz * t.z);
     if (off > c.landing.clean) {
@@ -561,94 +626,109 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
   };
 
   const grind = (h: number, ct: Ctl, world: BoardWorld) => {
-    if (!world.rails || world.rails.revision !== A[RAILREV]) {
-      // The rail data changed under the board: drop off with the current velocity.
+    const rail = A[RAIL]!;
+    const data = world.rails && world.rails.revision === A[RAILREV] ? railData(world.rails) : undefined;
+    const starts = data?.starts;
+    if (
+      !data ||
+      !starts ||
+      world.rails!.segmentCount !== A[RAILSEGS] ||
+      rail < 0 ||
+      rail + 1 >= starts.length ||
+      A[SEGI]! < starts[rail]! ||
+      A[SEGI]! >= starts[rail + 1]!
+    ) {
+      // The rail data changed under the board (or never matched it): leave with the velocity it had along the rail.
       events.push('grind-end');
-      A[MODE] = AIR;
-      A[AIRT] = 0;
       A[LASTRAIL] = -1;
+      launch(A[VX]!, A[VY]!, A[VZ]!, 'launch');
       return;
     }
-    const {segments, starts} = railData(world.rails);
-    const rail = A[RAIL]!,
-      first = starts[rail]!,
+    const segments = data.segments;
+    const first = starts[rail]!,
       last = starts[rail + 1]! - 1;
     let k = A[SEGI]!,
       along = A[ALONG]!;
     const dir = A[RDIR]!;
-    const seg = (i: number) => {
-      const o = i * SEG,
-        l = segments[o + 6]!;
-      return {
-        o,
-        l,
-        dx: (segments[o + 3]! - segments[o]!) / l,
-        dy: (segments[o + 4]! - segments[o + 1]!) / l,
-        dz: (segments[o + 5]! - segments[o + 2]!) / l,
-      };
+    // The current segment: offset, length and unit direction (closure scalars, no allocation).
+    let dO = 0,
+      dL = 1,
+      ddx = 0,
+      ddy = 0,
+      ddz = 1;
+    const useSeg = (i: number) => {
+      dO = i * SEG;
+      dL = segments[dO + 6]!;
+      ddx = (segments[dO + 3]! - segments[dO]!) / dL;
+      ddy = (segments[dO + 4]! - segments[dO + 1]!) / dL;
+      ddz = (segments[dO + 5]! - segments[dO + 2]!) / dL;
     };
-    let d = seg(k);
-    let s = A[SPEED]! - g * d.dy * dir * h;
+    useSeg(k);
+    let s = A[SPEED]! - g * ddy * dir * h;
     s = slow(s, c.grind.friction + ct.brake * c.rolling.brake, h);
     if (s > c.rolling.maxSpeed) s = c.rolling.maxSpeed;
+    else if (s < 0) s = 0;
     balanceStep(h, ct.steer, c.grind.instability, c.grind.disturbance, c.grind.control);
     if (ct.ollie) A[CHARGE] = c.ollie.chargeTime > 0 ? Math.min(1, A[CHARGE]! + h / c.ollie.chargeTime) : 1;
     const pop = !ct.ollie && A[PREVOLLIE] === 1;
     A[LASTRAIL] = rail;
     const exit = (vy: number, event: BoardEvent) => {
       events.push('grind-end');
-      launch(d.dx * dir * s, d.dy * dir * s + vy, d.dz * dir * s, event);
+      launch(ddx * dir * s, ddy * dir * s + vy, ddz * dir * s, event);
     };
     if (Math.abs(A[BAL]!) >= 1) {
       events.push('grind-end');
-      A[VX] = d.dx * dir * s;
-      A[VY] = d.dy * dir * s;
-      A[VZ] = d.dz * dir * s;
+      A[VX] = ddx * dir * s;
+      A[VY] = ddy * dir * s;
+      A[VZ] = ddz * dir * s;
       return bail('balance', true);
     }
     if (pop) return exit(popSpeed(), 'pop');
-    if (s < c.grind.minSpeed) {
+    if (s <= 0 || s < c.grind.minSpeed) {
       A[SPEED] = s;
       return exit(0, 'launch');
     }
     // Walk along the polyline (at most every segment of this rail).
     along += s * h * dir;
     for (let guard = 0; guard <= last - first + 1; guard++) {
-      if (along > d.l) {
+      if (along > dL) {
         if (k === last) break;
-        along -= d.l;
+        along -= dL;
         k++;
-        d = seg(k);
+        useSeg(k);
       } else if (along < 0) {
         if (k === first) break;
         k--;
-        d = seg(k);
-        along += d.l;
+        useSeg(k);
+        along += dL;
       } else break;
     }
     A[SPEED] = s;
-    if (along > d.l || along < 0) {
+    if (along > dL || along < 0) {
       // Off the end: carry on through the air from the rail's end point.
-      const endAlong = along > d.l ? d.l : 0;
-      A[X] = segments[d.o]! + d.dx * endAlong;
-      A[Y] = segments[d.o + 1]! + d.dy * endAlong;
-      A[Z] = segments[d.o + 2]! + d.dz * endAlong;
+      const endAlong = along > dL ? dL : 0;
+      A[X] = segments[dO]! + ddx * endAlong;
+      A[Y] = segments[dO + 1]! + ddy * endAlong;
+      A[Z] = segments[dO + 2]! + ddz * endAlong;
       return exit(c.grind.exitHop, 'launch');
     }
     A[SEGI] = k;
     A[ALONG] = along;
-    A[X] = segments[d.o]! + d.dx * along;
-    A[Y] = segments[d.o + 1]! + d.dy * along;
-    A[Z] = segments[d.o + 2]! + d.dz * along;
+    A[X] = segments[dO]! + ddx * along;
+    A[Y] = segments[dO + 1]! + ddy * along;
+    A[Z] = segments[dO + 2]! + ddz * along;
+    // The velocity along the rail, kept so any exit (including changed rail data) leaves with it.
+    A[VX] = ddx * dir * s;
+    A[VY] = ddy * dir * s;
+    A[VZ] = ddz * dir * s;
   };
 
   const bailed = (h: number, world: BoardWorld) => {
-    A[BAILT] = Math.max(0, A[BAILT]! - h);
     if (A[BAILAIR] === 1) return air(h, NEUTRAL, world);
+    A[BAILT] = Math.max(0, A[BAILT]! - h);
     let s = slow(A[SPEED]!, c.bail.decel, h);
     tangent(A[HEAD]!, A[NX]!, A[NY]!, A[NZ]!);
-    const blocked = moveXZ(world, s * h * t.x, s * h * t.z);
-    s *= 1 - blocked;
+    if (moveXZ(world, s * h * t.x, s * h * t.z) > 0) s = followWall(s);
     const yPred = A[Y]! + s * h * t.y;
     if (
       queryGround(world, A[X]!, A[Z]!, Math.max(A[Y]!, yPred) + c.landing.snap) &&
@@ -699,10 +779,10 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
 
   const placeInto = (x: number, y: number, z: number, yaw: number) => {
     S.fill(0);
-    S[X] = x;
-    S[Y] = y;
-    S[Z] = z;
-    S[HEAD] = wrap(yaw);
+    S[X] = x + 0;
+    S[Y] = y + 0;
+    S[Z] = z + 0;
+    S[HEAD] = wrap(yaw) + 0;
     S[YAW] = S[HEAD]!;
     S[STANCE] = 1;
     S[NY] = 1;
@@ -722,15 +802,57 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
     for (let i = 0; i < SIZE; i++) S[i] = A[i]! + 0;
   };
 
+  const stepNow = (dt: number, controls: BoardControls, world: BoardWorld): BoardStepResult => {
+    if (typeof dt !== 'number' || !Number.isFinite(dt) || dt <= 0 || dt > 0.25)
+      throw new RangeError('board-traversal: dt must be within (0, 0.25]');
+    if (!world || typeof world.ground !== 'function') throw new RangeError('board-traversal: world.ground required');
+    if (world.slide !== undefined && typeof world.slide !== 'function')
+      throw new RangeError('board-traversal: world.slide must be a function');
+    if (world.rails !== undefined) railData(world.rails);
+    const ct = controlsOf(controls);
+    const substeps = Math.max(1, Math.ceil(dt / c.limits.maxSubstep - 1e-9));
+    if (substeps > c.limits.maxSubsteps)
+      throw new RangeError(
+        `board-traversal: dt ${dt} needs ${substeps} sub-steps, more than limits.maxSubsteps ${c.limits.maxSubsteps}`,
+      );
+    const h = dt / substeps;
+    events = [];
+    trickUsed = false;
+    groundQueries = 0;
+    railChecks = 0;
+    A.set(S);
+    for (let i = 0; i < substeps; i++) {
+      // The ollie release is an edge against the previous sub-step, so it is seen once.
+      const mode = A[MODE]!;
+      if (mode === ROLL || mode === MANUAL) ground(h, ct, world);
+      else if (mode === AIR) air(h, ct, world);
+      else if (mode === GRIND) grind(h, ct, world);
+      else bailed(h, world);
+      A[PREVOLLIE] = ct.ollie ? 1 : 0;
+      A[TIME] = A[TIME]! + h;
+    }
+    commit();
+    lastRails = world.rails;
+    return Object.freeze({
+      mode: MODES[S[MODE]!]!,
+      events: Object.freeze(events),
+      substeps,
+      groundQueries,
+      railChecks,
+    });
+  };
+
   return Object.freeze({
     config: c,
     fingerprint,
+    math: options.math ?? 'platform',
     maxWorkPerStep(segments: number) {
       if (!Number.isSafeInteger(segments) || segments < 0)
         throw new RangeError('board-traversal: segments must be >= 0');
       return {groundQueries: c.limits.maxSubsteps, railChecks: c.limits.maxSubsteps * segments};
     },
     place(pose: {x: number; y: number; z: number; yaw?: number}) {
+      if (busy) throw new RangeError('board-traversal: place called from inside a step');
       const yaw = pose?.yaw ?? 0;
       if (!pose || ![pose.x, pose.y, pose.z, yaw].every(Number.isFinite) || Math.abs(yaw) > 1e6)
         throw new RangeError('board-traversal: pose must be finite');
@@ -740,42 +862,19 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
       placeInto(pose.x, pose.y, pose.z, yaw);
     },
     step(dt: number, controls: BoardControls, world: BoardWorld): BoardStepResult {
-      if (typeof dt !== 'number' || !Number.isFinite(dt) || dt <= 0 || dt > 0.25)
-        throw new RangeError('board-traversal: dt must be within (0, 0.25]');
-      if (!world || typeof world.ground !== 'function') throw new RangeError('board-traversal: world.ground required');
-      if (world.slide !== undefined && typeof world.slide !== 'function')
-        throw new RangeError('board-traversal: world.slide must be a function');
-      if (world.rails !== undefined) railData(world.rails);
-      const ct = controlsOf(controls);
-      const substeps = Math.max(1, Math.ceil(dt / c.limits.maxSubstep - 1e-9));
-      if (substeps > c.limits.maxSubsteps)
-        throw new RangeError(
-          `board-traversal: dt ${dt} needs ${substeps} sub-steps, more than limits.maxSubsteps ${c.limits.maxSubsteps}`,
-        );
-      const h = dt / substeps;
-      events = [];
-      groundQueries = 0;
-      railChecks = 0;
-      A.set(S);
-      for (let i = 0; i < substeps; i++) {
-        // The ollie release is an edge against the previous sub-step, so it is seen once.
-        const mode = A[MODE]!;
-        if (mode === ROLL || mode === MANUAL) ground(h, ct, world);
-        else if (mode === AIR) air(h, ct, world);
-        else if (mode === GRIND) grind(h, ct, world);
-        else bailed(h, world);
-        A[PREVOLLIE] = ct.ollie ? 1 : 0;
-        A[TIME] = A[TIME]! + h;
+      if (busy) throw new RangeError('board-traversal: step called from inside a step (a port re-entered the board)');
+      busy = true;
+      try {
+        return stepNow(dt, controls, world);
+      } finally {
+        busy = false;
       }
-      commit();
-      lastRails = world.rails;
-      return Object.freeze({
-        mode: MODES[S[MODE]!]!,
-        events: Object.freeze(events),
-        substeps,
-        groundQueries,
-        railChecks,
-      });
+    },
+    cancelInput() {
+      if (busy) throw new RangeError('board-traversal: cancelInput called from inside a step');
+      // Forget a held ollie (no pop on its release) and its charge, e.g. when the rider loses its controller.
+      S[PREVOLLIE] = 0;
+      S[CHARGE] = 0;
     },
     read(): BoardState {
       const mode = S[MODE]!;
@@ -840,6 +939,7 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
       });
     },
     restore(snapshot: BoardSnapshot) {
+      if (busy) throw new RangeError('board-traversal: restore called from inside a step');
       if (!snapshot || typeof snapshot !== 'object' || snapshot.kind !== 'board-traversal' || snapshot.version !== 1)
         throw new RangeError('board-traversal: not a version 1 board snapshot');
       if (snapshot.fingerprint !== fingerprint)
@@ -862,12 +962,22 @@ export function createBoard(config: BoardConfig, options: {math?: ScalarMathMode
         !int(BAILAIR, 0, 1) ||
         !int(LASTRAIL, -1, 1 << 20) ||
         !int(MANDIR, -1, 2) ||
-        !(v[NY]! > 0)
+        !int(BALSIGN, -1, 1) ||
+        !int(RAILSEGS, 0, 1 << 20) ||
+        !(v[NY]! > 0) ||
+        !(Math.abs(v[NX]! * v[NX]! + v[NY]! * v[NY]! + v[NZ]! * v[NZ]! - 1) <= 1e-6) ||
+        !(Math.abs(v[HEAD]!) <= PI + 1e-9 && Math.abs(v[YAW]!) <= PI + 1e-9) ||
+        !(v[CHARGE]! >= 0 && v[CHARGE]! <= 1) ||
+        !(v[TRICK]! >= 0 && v[BAILT]! >= 0 && v[AIRT]! >= 0 && v[PUSHCD]! >= 0 && v[TIME]! >= 0) ||
+        Math.abs(v[X]!) > c.limits.extent ||
+        Math.abs(v[Y]!) > c.limits.extent ||
+        Math.abs(v[Z]!) > c.limits.extent
       )
         throw new RangeError('board-traversal: snapshot fields are out of range');
       if (v[MODE] === GRIND && (v[RAIL]! < 0 || v[SEGI]! < 0))
         throw new RangeError('board-traversal: a grinding snapshot must name a rail');
       for (let i = 0; i < SIZE; i++) S[i] = v[i]! + 0;
+      lastRails = undefined; // `read().rail` names a rail again after the next step
     },
   });
 }

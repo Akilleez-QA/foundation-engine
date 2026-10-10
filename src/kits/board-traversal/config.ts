@@ -204,26 +204,53 @@ const num = (path: string, v: unknown, min: number, max: number, openMin = false
     throw new RangeError(`board-traversal: ${path} must be within ${openMin ? '(' : '['}${min}, ${max}]`);
   return v;
 };
-const section = (path: string, v: unknown): Readonly<Record<string, unknown>> => {
+const section = (path: string, v: unknown, keys: readonly string[]): Readonly<Record<string, unknown>> => {
   if (!v || typeof v !== 'object' || Array.isArray(v))
     throw new RangeError(`board-traversal: ${path} must be an object`);
-  return {...v};
+  const copy: Readonly<Record<string, unknown>> = {...v};
+  for (const key of Object.keys(copy))
+    if (!keys.includes(key)) throw new RangeError(`board-traversal: unknown field ${path}.${key}`);
+  return copy;
 };
 const HALF_PI = Math.PI / 2;
 
 /** Validate a complete configuration and return a frozen copy. Throws `RangeError` naming the first bad value. */
 export function validateBoardConfig(input: unknown): BoardConfig {
-  const c = section('config', input);
-  const pu = section('push', c.push),
-    ro = section('rolling', c.rolling),
-    ca = section('carve', c.carve),
-    ol = section('ollie', c.ollie),
-    ai = section('air', c.air),
-    la = section('landing', c.landing),
-    gr = section('grind', c.grind),
-    ma = section('manual', c.manual),
-    ba = section('bail', c.bail),
-    li = section('limits', c.limits);
+  const c = section('config', input, [
+    'gravity',
+    'push',
+    'rolling',
+    'carve',
+    'ollie',
+    'air',
+    'landing',
+    'grind',
+    'manual',
+    'bail',
+    'limits',
+  ]);
+  const pu = section('push', c.push, ['impulse', 'interval', 'maxSpeed']),
+    ro = section('rolling', c.rolling, ['resistance', 'drag', 'brake', 'maxSpeed']),
+    ca = section('carve', c.carve, ['rate', 'fullSpeed']),
+    ol = section('ollie', c.ollie, ['minPop', 'maxPop', 'chargeTime']),
+    ai = section('air', c.air, ['spinRate', 'maxFall']),
+    la = section('landing', c.landing, ['clean', 'sketchy', 'sketchyKeep', 'maxImpact', 'allowFakie', 'snap', 'stick']),
+    gr = section('grind', c.grind, [
+      'snapRadius',
+      'snapAbove',
+      'snapBelow',
+      'maxEntryAngle',
+      'minSpeed',
+      'friction',
+      'exitHop',
+      'recatchTime',
+      'instability',
+      'disturbance',
+      'control',
+    ]),
+    ma = section('manual', c.manual, ['friction', 'minSpeed', 'instability', 'disturbance', 'control', 'fail']),
+    ba = section('bail', c.bail, ['time', 'decel', 'wallSpeed']),
+    li = section('limits', c.limits, ['maxSubstep', 'maxSubsteps', 'extent']);
   const minPop = num('ollie.minPop', ol.minPop, 0, 30),
     clean = num('landing.clean', la.clean, 0, HALF_PI);
   if (typeof la.allowFakie !== 'boolean') throw new RangeError('board-traversal: landing.allowFakie must be a boolean');

@@ -531,3 +531,199 @@ test('board-traversal: identical runs give identical bits; snapshot JSON round t
   assert.throws(() => s.restore({...good, values: good.values.slice(1)}), /length/);
   assert.deepEqual(s.snapshot(), good);
 });
+
+test('board-traversal: a plain ollie while riding switched lands in the same stance at speed', () => {
+  const b = fresh('arcade', {air: {spinRate: 8}});
+  ride(b, {push: true}, 120);
+  ride(b, {ollie: true}, 1);
+  b.step(DT, {}, W);
+  // Spin half a turn: lands switched.
+  let turned = 0;
+  while (turned < Math.PI - 1e-9 && b.mode === 'air') {
+    const steer = Math.min(1, (Math.PI - turned) / (8 * DT));
+    b.step(DT, {steer}, W);
+    turned += steer * 8 * DT;
+  }
+  untilGrounded(b);
+  assert.equal(b.read().stance, -1);
+  const speed = b.speed;
+  ride(b, {ollie: true}, 1);
+  const events = [...b.step(DT, {}, W).events, ...untilGrounded(b)];
+  assert.deepEqual(events, ['pop', 'land-clean'], 'no switch, no bail');
+  assert.equal(b.read().stance, -1);
+  assert.ok(b.speed > speed - 1, `kept its speed: ${b.speed}`);
+});
+
+test('board-traversal: a bail on landing slides the way the board was travelling', () => {
+  const b = fresh('arcade', {air: {spinRate: 8}});
+  ride(b, {push: true}, 120);
+  ride(b, {ollie: true}, 1);
+  b.step(DT, {}, W);
+  for (let i = 0; i < 10; i++) b.step(DT, {steer: 1}, W); // 1.33 rad of spin: beyond sketchy, short of switched
+  untilGrounded(b);
+  assert.equal(b.read().bailReason, 'angle');
+  assert.ok(Math.abs(b.read().heading) < 1e-9, `slides along +z: ${b.read().heading}`);
+  assert.ok(b.speed > 1);
+  assert.deepEqual(
+    b.read().velocity.map(v => Math.abs(v) > 0),
+    [false, false, true],
+  );
+});
+
+test('board-traversal: changed or foreign rail data never wedges a grinding board', () => {
+  const rails = defineRails({
+    revision: 1,
+    maxSegments: 4,
+    rails: [
+      {
+        id: 'r',
+        points: [
+          [0, 0.4, 2],
+          [0, 0.4, 50],
+        ],
+      },
+    ],
+  });
+  const b = fresh('arcade', {grind: {instability: 0, disturbance: 0}});
+  ride(b, {push: true}, 90, {ground: flat, rails});
+  ride(b, {ollie: true}, 12, {ground: flat, rails});
+  for (let i = 0; i < 120 && b.mode !== 'grind'; i++) b.step(DT, {}, {ground: flat, rails});
+  assert.equal(b.mode, 'grind');
+  const grinding = b.snapshot();
+  const speed = b.speed;
+  // Same revision, different data: a creator reusing a revision number.
+  const other = defineRails({
+    revision: 1,
+    maxSegments: 8,
+    rails: [
+      {
+        id: 'a',
+        points: [
+          [5, 0.4, 0],
+          [5, 0.4, 1],
+        ],
+      },
+      {
+        id: 'b',
+        points: [
+          [9, 0.4, 0],
+          [9, 0.4, 1],
+          [9, 0.4, 2],
+        ],
+      },
+    ],
+  });
+  const r = b.step(DT, {}, {ground: flat, rails: other});
+  assert.deepEqual(r.events, ['grind-end', 'launch']);
+  assert.ok(Math.abs(b.read().velocity[2] - speed) < 0.5, 'left with its rail velocity');
+  untilGrounded(b, {ground: flat, rails: other});
+  assert.ok(b.speed > speed - 1);
+  // A restored grinding snapshot with a rail index beyond the rails given also drops off instead of throwing.
+  const c = fresh('arcade', {grind: {instability: 0, disturbance: 0}});
+  const values = [...grinding.values];
+  values[15] = 7;
+  c.restore({...grinding, values});
+  // (It may catch the real rail below it again on the next sub-step.)
+  assert.deepEqual(c.step(DT, {}, {ground: flat, rails}).events.slice(0, 2), ['grind-end', 'launch']);
+});
+
+test('board-traversal: the re-catch delay applies only to the rail just left, until the board lands', () => {
+  const rails = defineRails({
+    revision: 1,
+    maxSegments: 4,
+    rails: [
+      {
+        id: 'low',
+        points: [
+          [0, 0.15, 3],
+          [0, 0.15, 6],
+        ],
+      },
+    ],
+  });
+  const world = {ground: flat, rails};
+  const pass = (b: Board) => {
+    b.place({x: 0, y: 0, z: 0});
+    ride(b, {push: true}, 40, world);
+    const e = ride(b, {ollie: true}, 1, world);
+    e.push(...b.step(DT, {}, world).events);
+    for (let i = 0; i < 300 && b.mode !== 'rolling'; i++) e.push(...b.step(DT, {}, world).events);
+    return e;
+  };
+  const b = fresh('arcade', {
+    grind: {recatchTime: 2, instability: 0, disturbance: 0},
+    ollie: {minPop: 3, maxPop: 3},
+  });
+  const first = pass(b);
+  assert.ok(first.includes('grind-start'), first.join(','));
+  ride(b, {}, 600, world);
+  const again = pass(b);
+  assert.ok(again.includes('grind-start'), `caught again after landing: ${again.join(',')}`);
+});
+
+test('board-traversal: a trick starts once per step; manuals end before a wall bail; walls cost speed once', () => {
+  const b = fresh('arcade', {limits: {maxSubstep: 1 / 480, maxSubsteps: 16}});
+  ride(b, {push: true}, 60);
+  ride(b, {ollie: true}, 1);
+  b.step(DT, {}, W);
+  const events = [...b.step(DT, {trick: 0.001}, W).events, ...b.step(DT, {trick: 0.001}, W).events];
+  assert.equal(events.filter(e => e === 'trick-start').length, 2, 'one per step, not one per sub-step');
+
+  const area = {minX: -50, maxX: 50, minZ: -50, maxZ: 6};
+  const m = fresh('arcade', {bail: {wallSpeed: 1}, manual: {instability: 0, disturbance: 0}});
+  ride(m, {push: true}, 40, {ground: flat, slide: characterSlide(area, 0.3)});
+  const e2 = ride(m, {manual: 1}, 120, {ground: flat, slide: characterSlide(area, 0.3)});
+  assert.deepEqual(e2.slice(0, 3), ['manual-start', 'manual-end', 'bail']);
+
+  // Grazing a wall at a shallow angle: the speed kept does not depend on the sub-step.
+  const graze = (maxSubstep: number) => {
+    const g = fresh('arcade', {limits: {maxSubstep, maxSubsteps: 16}, bail: {wallSpeed: 100}});
+    g.place({x: 0, y: 0, z: 0, yaw: 0.15});
+    const wall = {minX: -50, maxX: 1, minZ: -50, maxZ: 500};
+    ride(g, {push: true}, 120, {ground: flat, slide: characterSlide(wall, 0.3)});
+    ride(g, {}, 60, {ground: flat, slide: characterSlide(wall, 0.3)});
+    return g.speed;
+  };
+  const coarse = graze(1 / 60),
+    fine = graze(1 / 240);
+  assert.ok(coarse > 6 && Math.abs(coarse - fine) < 0.3, `${coarse} vs ${fine}`);
+});
+
+test('board-traversal: lost control does not pop a held ollie; huge normals, -0, re-entry and bad restores are safe', () => {
+  const b = fresh();
+  ride(b, {push: true}, 60);
+  ride(b, {ollie: true}, 10);
+  b.cancelInput();
+  assert.deepEqual(ride(b, {}, 5), [], 'no pop after the controller was lost');
+  const huge: BoardGround = (_x, _z, below, out) => {
+    if (below < 0) return false;
+    Object.assign(out, {height: 0, nx: 0, ny: 1e200, nz: 1e200});
+    return true;
+  };
+  ride(b, {}, 5, {ground: huge});
+  assert.doesNotThrow(() => b.restore(JSON.parse(JSON.stringify(b.snapshot()))));
+  const z = fresh();
+  z.place({x: -0, y: -0, z: -0, yaw: -0});
+  assert.ok(z.snapshot().values.every(v => !Object.is(v, -0)));
+  const before = JSON.stringify(z.snapshot());
+  const sneaky: BoardGround = (...args) => {
+    z.step(DT, {}, W);
+    return flat(...args);
+  };
+  assert.throws(() => z.step(DT, {}, {ground: sneaky}), /inside a step/);
+  assert.equal(JSON.stringify(z.snapshot()), before);
+  const values = [...z.snapshot().values];
+  for (const [i, v] of [
+    [0, 2e6],
+    [10, 3],
+    [14, 0.5],
+    [7, 10],
+  ] as const) {
+    const bad = [...values];
+    bad[i] = v;
+    assert.throws(() => z.restore({...z.snapshot(), values: bad}), RangeError, `index ${i}`);
+  }
+  assert.throws(() => boardConfig('arcade', {grind: {snapRaduis: 1} as never}), /unknown field grind.snapRaduis/);
+  assert.throws(() => characterSlide(undefined as never), RangeError);
+  assert.equal(createBoard(boardConfig('arcade'), {math: 'deterministic'}).math, 'deterministic');
+});
