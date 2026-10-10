@@ -1513,4 +1513,7 @@ A third round confirmed those fixes, then found that the edge-contact rule took 
 ramps for ledges, that a body flush against a tall wall got no-top, and that `origin`
 was validated only in snap mode. These are fixed too: an edge contact now needs a level
 top and a drop in front of it, the deciding cast starts slightly back from the wall, and
-`origin` is validated in every mode. No independent check of these last fixes yet. No game, browser or device evidence.
+`origin` is validated in every mode. A narrow re-review confirmed these fixes and found
+one low issue: the backed-off start could land in a wall just behind the body, giving
+no-top instead of too-high. That is fixed: the start backs off only as far as the body
+is flush. No game, browser or device evidence.

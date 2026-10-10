@@ -1435,6 +1435,5 @@ Locomotion kit extension: ledge detection, ladders and pushable blocks over crea
 cast, ground and box-sweep queries. The volume-query kit's sphere sweep can back the
 cast and ground queries through a documented adapter, which a test exercises; it has no
 box body, so the box sweep needs the creator's own collision. See
-[ADR 0115](../adr/0115-traversal-helpers.md). Headless tests in the ledger; three
-independent review rounds with findings fixed (the last round's fixes not yet
-re-reviewed); hosted CI remains required.
+[ADR 0115](../adr/0115-traversal-helpers.md). Headless tests in the ledger; independent
+review rounds with all findings fixed; hosted CI remains required.

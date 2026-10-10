@@ -309,6 +309,12 @@ test('ledges: low walls just above minClimb meet the sphere at their edge, and t
   // A body pressed flush against a tall wall still reads it as too high.
   const flush = boxes({id: 'tall', center: [1.3, 1.5, 0], halfExtents: [1, 1.5, 5]});
   assert.equal(findLedge({...q, maxClimb: 1}, flush.cast, flush.ground).status, 'too-high');
+  // A wall just behind the body does not change the reason.
+  const behind = boxes(
+    {id: 'tall', center: [2, 1.5, 0], halfExtents: [1, 1.5, 5]},
+    {id: 'back', center: [-1.31, 1.5, 0], halfExtents: [1, 1.5, 5]},
+  );
+  assert.equal(findLedge({...q, maxClimb: 1}, behind.cast, behind.ground).status, 'too-high');
   // A floor-like normal (straight up) is not a wall, even with wallSlope 1.
   const up: SphereCast = () => ({hit: true, fraction: 0.5, normal: [0, 1, 0]});
   assert.equal(findLedge({...q, wallSlope: 1}, up, () => 0).status, 'not-a-wall');

@@ -155,9 +155,11 @@ export function findLedge(q: LedgeQuery, cast: SphereCast, ground: GroundProbe):
     // narrower than the probe offset or slopes away (no top). A hit ahead at the probe start height that is not
     // ceiling-like (moving into it, normal not pointing down) means the wall continues up there.
     const startY = p[1] + maxClimb + radius;
-    // Start backed off from the wall a little, so a body pressed flush against it still sees the wall ahead.
-    const bx = p[0] + nx * skin * 2,
-      bz = p[2] + nz * skin * 2;
+    // Start backed off from the wall only as far as the body is flush with it, so a flush body still sees the wall
+    // ahead and a body with room is never pushed into anything behind it.
+    const back = Math.max(0, skin * 2 - dist);
+    const bx = p[0] + nx * back,
+      bz = p[2] + nz * back;
     const above = castOnce(cast, [bx, startY, bz], [tx, startY, tz], radius);
     const wallAbove = above !== null && above.fraction > 0 && above.normal[1] >= -wallSlope;
     return Object.freeze({status: wallAbove ? 'too-high' : 'no-top'});
