@@ -49,6 +49,15 @@ export const FEATURES = [
     evidence: [{kit: 'navigation', export: 'createDistanceField'}, {path: 'src/kits/navigation/field.test.ts'}],
   },
   {
+    id: 'CADENCE-01',
+    title: 'Optional bounded per-member update cadence',
+    docs: 'docs/guides/update-cadence.md',
+    evidence: [
+      {kit: 'cadence', export: 'createCadence'},
+      {kit: 'cadence', export: 'createCadenceResult'},
+    ],
+  },
+  {
     id: 'ASG-01',
     title: 'Optional bounded service and worksite assignment ownership',
     docs: 'docs/guides/assignments.md',

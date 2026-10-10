@@ -40,6 +40,8 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 
 The optional [assignments](../../src/kits/assignments/README.md) candidate supplies exclusive actor claims, weighted target capacity and atomic transfer refusal. Two headless service/worksite fixtures and route-owner composition tests exercise it; no playable template consumer or browser/device acceptance is claimed. [Guide](../guides/assignments.md).
 
+The optional [cadence](../../src/kits/cadence/README.md) candidate runs members at their own integer periods on the caller's tick, spread by id, bounded per take with deferral, elapsed-tick reporting and saveable state. Headless model, ECS and interest-set consumer tests only; no template consumer or browser/device acceptance is claimed. [Guide](../guides/update-cadence.md).
+
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.
 
 

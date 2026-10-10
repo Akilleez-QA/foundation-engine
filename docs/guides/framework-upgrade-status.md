@@ -1238,3 +1238,10 @@ charging. Cube, array, volume, authored mip and non-RGBA8 descriptor support rem
 explicit accounting limitations. See [asset residency](asset-residency.md).
 Focused and affected checks plus independent review are required before hosted
 integration; no physical memory or device evidence is implied.
+
+
+## Optional update cadence candidate — CADENCE-01, 2026-10-09
+
+`@kits/cadence` is an independently implemented pure helper that runs members at their own integer periods on the caller's tick. It spreads start phases by id (or explicit phase), returns at most `maxDuePerTake` due members earliest-due-first with elapsed and lateness ticks, defers the rest instead of dropping them, reschedules on each member's phase grid without burst catch-up, and offers JSON-safe snapshot/restore. The fixed-step runner, clock and interest sets keep their responsibilities; no clock, callback, persistence owner or registration is added. [Guide](update-cadence.md), [ADR 0090](../adr/0090-optional-update-cadence.md).
+
+Evidence: 9 focused headless tests (7 unit tests including a 4,000-step comparison with an independent per-tick scan model, plus an ECS fixed-step consumer with distance-banded periods and an interest-set refresh consumer). A local headless micro-measurement is recorded in the kit README as an order-of-magnitude indication only. This is a branch candidate: hosted full CI, a playable template consumer, browser behaviour and physical-device acceptance remain pending.
