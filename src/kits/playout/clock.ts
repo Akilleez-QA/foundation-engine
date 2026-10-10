@@ -42,6 +42,8 @@ export interface ClockOffset {
   dispose(): void;
 }
 
+const MAX_OFFSET = 2 ** 53;
+
 function finite(n: unknown): n is number {
   return typeof n === 'number' && Number.isFinite(n);
 }
@@ -79,7 +81,8 @@ export function createClockOffset(options: ClockOffsetOptions): ClockOffset {
       const trip = received - sent;
       if (!(trip >= 0) || trip > maxRoundTrip) return 'refused';
       const offset = remote - (sent + received) / 2;
-      if (!finite(offset)) return 'refused';
+      // Beyond 2^53 neither clock can be represented exactly: such a sample is not a clock.
+      if (!finite(offset) || Math.abs(offset) > MAX_OFFSET) return 'refused';
       offsets[next] = offset;
       trips[next] = trip;
       next = (next + 1) % maxSamples;
@@ -100,7 +103,8 @@ export function createClockOffset(options: ClockOffsetOptions): ClockOffset {
         const diff = est.offset - applied;
         applied += Math.abs(diff) <= step ? diff : Math.sign(diff) * step;
       }
-      return local + applied;
+      const now = local + applied;
+      return finite(now) ? now : null;
     },
     reset() {
       count = 0;

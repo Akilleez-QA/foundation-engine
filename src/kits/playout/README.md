@@ -10,7 +10,7 @@ game can omit it. Prediction of the local player stays with
 [`createPrediction`](../network/README.md#optional-authority-and-prediction-exports).
 
 The composition guide is [remote playout](../../../docs/guides/remote-playout.md);
-the decision record is [ADR 0089](../../../docs/adr/0089-remote-playout.md).
+the decision record is [ADR 0093](../../../docs/adr/0093-remote-playout.md).
 
 ```ts
 import {createClockOffset, createPlayout} from '@kits/playout';
@@ -27,11 +27,22 @@ clock.sample({sent, remote, received});
 const now = clock.remoteNow(localNow);
 if (now !== null) playout.observe(view.worldRevision, now); // once per frame, stamped with authority time
 for (const e of view.entities) playout.push(e.id, view.worldRevision, positionOf(e)); // remove() ids that left
-// each presented frame:
-const render = playout.advance(clock.remoteNow(localNow)!);
-playout.trim(render);
-const r = playout.sample(id, render, out); // exact | interpolated | extrapolated | held | absent | retired
+// each presented frame (nothing to present until the first ping reply):
+const now = clock.remoteNow(localNow);
+if (now !== null) {
+  const render = playout.advance(now);
+  playout.trim(render);
+  const r = playout.sample(id, render, out); // exact | interpolated | extrapolated | held | absent | retired
+}
 ```
+
+## Time units
+
+Authority stamps, ping times and local time must share one unit **and rate**:
+`remoteNow` is local time plus an offset; no rate is estimated. If the authority
+counts ticks, convert stamps to the local unit (tick × tick length) before calling
+`sample`, `observe` and `push`. Slow drift between clocks is followed only through
+fresh samples, so keep pinging while connected.
 
 ## Clock offset
 
@@ -45,7 +56,10 @@ const r = playout.sample(id, render, out); // exact | interpolated | extrapolate
 - **Application.** `remoteNow(local)` adds an applied offset that moves toward the
   estimate by at most `maxSlew` per unit of local time, so a better sample does not
   make presentation jump; a difference above `snapBeyond` (and the first estimate)
-  applies at once. Local time must be finite and must not decrease (throws).
+  applies at once, so `remoteNow` is non-decreasing only while slewing; a snap or
+  `reset` can step it back (the playout buffer's render time still never goes
+  back). Local time must be finite and must not decrease (throws). Samples whose
+  offset exceeds 2^53 are refused, and a non-representable result reads as null.
 - **Lifetime.** `reset()` forgets samples (another authority); `dispose()` is
   terminal (`retired`).
 
@@ -54,23 +68,32 @@ const r = playout.sample(id, render, out); // exact | interpolated | extrapolate
 - **Push.** `push(subject, remoteTime, values, {discontinuity?})` stores `width`
   finite numbers per snapshot in a per-subject ring. Equal time is `duplicate`,
   older time `out-of-order` (counted); a new subject beyond `maxSubjects` is
-  `saturated`; a full ring evicts its oldest snapshot (counted). A snapshot for a
+  `saturated`; a full ring evicts its oldest snapshot (counted). An equal time
+  with `discontinuity` is `replaced` (the snapshot takes the new values and is cut
+  from its predecessor). A snapshot for a
   time already presented is stored and counted as `late` (the delay was too short).
-  Subjects are nonnegative safe integers or nonempty strings up to 256 code units.
+  Subjects are nonnegative safe integers or nonempty strings up to 256 code units;
+  `1` and `'1'` are different subjects (view ids are strings, ECS entities numbers).
 - **Delay.** `observe(remoteTime, remoteNow)` once per received frame updates
   smoothed lateness, its mean deviation and the snapshot interval (gain 1/8). The
   target delay is `lateness + interval + jitterFactor * deviation`, clamped to
   `[delay.min, delay.max]`. `advance(remoteNow)` moves the applied delay toward the
   target by at most `delay.adapt` per unit of remote time and returns the render
-  time, which never decreases, even if the remote clock estimate steps back.
+  time, which never decreases, even if the remote clock estimate steps back. The
+  first `advance` after the first observation starts at the target delay.
 - **Sample.** Between snapshots: `interpolated` (through the optional `blend`,
   default linear). Past the newest: `extrapolated` from the last two snapshots for
-  at most `maxExtrapolation` beyond it (the value stops advancing there). Across a
+  at most `maxExtrapolation` and at most one snapshot interval beyond it; past
+  that the subject is `held` at the furthest extrapolated value. A custom `blend`
+  sees `t` above 1 (at most 2) only when extrapolating. Across a
   discontinuity the earlier state is `held` until the jump's time, then the jump
   shows (`exact`); nothing extrapolates off a jump. Before the oldest retained
   snapshot the oldest is `held`. `out` is untouched only for `absent` and `retired`.
 - **Trim.** `trim(renderTime)` drops snapshots older than the bracket at
   `renderTime` but always keeps two, so extrapolation remains possible.
+- **Lifetime.** `clear()` forgets subjects but keeps the timeline and delay;
+  `reset()` also forgets the timeline and delay estimate (a new authority or
+  session, together with `clock.reset()`); neither resets the counters.
 
 ## Bounds, overload, cancellation and recovery
 
@@ -81,21 +104,24 @@ per sample is O(retained snapshots of that subject). Overload is counted, never
 queued: eviction, refusal, out-of-order and late snapshots appear in `stats()`,
 which also reports the applied and target delay. There is no asynchronous work to
 cancel; `remove`, `clear` and `dispose` retire state. The creator's `blend` runs
-synchronously inside `sample`; calls back into the same buffer throw, entries it
-leaves unwritten take the earlier snapshot, and a non-finite result throws without
-writing `out`. Invalid host input throws before any change.
+synchronously inside `sample`; calls back into the same buffer throw and entries
+it leaves unwritten take the earlier snapshot. Snapshot values are network data:
+a non-finite blend result (for example overflow between extreme values) is
+reported as `held` at a stored snapshot instead of throwing. Invalid host input
+(non-finite times, wrong widths, bad options) throws before any change.
 
 ## Evidence and limits
 
-Six headless tests: clock estimation, slew, snap and refusal; interpolation,
+Eight headless tests: clock estimation, slew, snap and refusal; interpolation,
 discontinuity holds and capped extrapolation; ordering, capacity, eviction and
 trim; delay adaptation within bounds with non-decreasing render time; blend
-reentry; and a 20-second composition with the real network view receiver, a client
+reentry; late and replaced snapshots, overflow-safe sampling, delay seeding and
+`reset`; and a 20-second composition with the real network view receiver, a client
 clock 5 s behind the authority, 30 to 110 ms one-way jitter and 20 views per
 second. In that run the presented position matched the authority's motion at the
 render time (error below 1e-14 units), the per-frame step deviated from steady
 motion by at most 1.1 ms of motion against 84 ms for presenting the newest view as
-it arrives, the delay settled near 170 ms, four snapshots arrived late, and the
+it arrives, 1,061 of 1,063 measured frames interpolated (2 extrapolated), the delay settled near 170 ms, four snapshots arrived late, and the
 clock estimate was within 3 ms (half the best 80 ms round trip bounds it).
 
 Not established: the ping protocol, transport, local-player prediction, physical

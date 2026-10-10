@@ -78,4 +78,4 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0085](0085-atomic-cell-batches-and-occupancy.md) | Atomic cell batches and immutable occupancy | Procgen / Spatial | Proposed |
 
-| [0089](0089-remote-playout.md) | Optional remote playout and clock offset | Optional kits / Network presentation | Proposed |
+| [0093](0093-remote-playout.md) | Optional remote playout and clock offset | Optional kits / Network presentation | Proposed |

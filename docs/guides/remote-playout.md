@@ -9,10 +9,10 @@ existing owners; it adds no loop, timer, service or transport.
 
 ## 1. Stamp views with authority time
 
-Put the authority's simulation time (or tick) in each complete view. The view's
+Put the authority's simulation time in each complete view, in the same unit and
+rate as the client's local clock (for example milliseconds). The view's
 `worldRevision` is a nonnegative integer and works when the authority advances it
-with time (for example simulation milliseconds or ticks); otherwise put a time in a
-field. One unit throughout.
+with time in that unit; a tick count must be multiplied by the tick length first.
 
 ## 2. Estimate the authority's clock
 
@@ -27,7 +27,7 @@ so better samples do not cause visible jumps.
 After `receiver.receive(json)` reports `accepted` (from the
 [complete scoped-view guide](network-views.md)), call `playout.observe(stamp,
 clock.remoteNow(local))` once, then `push` each entity's presented numbers with the
-same stamp. `remove` ids that left the view. Pass `{discontinuity: true}` when an
+same stamp (skip `observe` while `remoteNow` is still null). `remove` ids that left the view. Pass `{discontinuity: true}` when an
 entity's incarnation changes or the authority reports a jump. If the client uses an
 optional view delta decoder, it feeds the receiver as before; the playout buffer
 only sees adopted complete views.
@@ -41,17 +41,21 @@ const now = clock.remoteNow(localNow);
 if (now !== null) {
   const render = playout.advance(now);
   playout.trim(render);
-  for (const [entity, t, remote] of world.query(Transform, Remote)) {
+  let moved = false;
+  for (const [, t, remote] of world.query(Transform, Remote)) {
     const r = playout.sample(remote.id, render, out);
-    if (r.status !== 'absent' && r.status !== 'retired') {
+    if (r.status === 'absent' || r.status === 'retired') continue;
+    if (t.x !== out[0] || t.z !== out[1]) {
       t.x = out[0]!;
       t.z = out[1]!;
+      moved = true;
     }
   }
-  world.touch();
+  if (moved) world.touch(); // nothing redraws when nothing changed
 }
 ```
 
+On reconnecting to another authority, call `clock.reset()` and `playout.reset()`.
 The local player's own subject is presented from prediction, not from this
 buffer.
 

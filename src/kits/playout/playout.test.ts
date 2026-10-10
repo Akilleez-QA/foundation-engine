@@ -53,7 +53,7 @@ test('sampling interpolates, holds across a discontinuity, extrapolates within t
   assert.deepEqual(at(p, 'a', 1.5), {status: 'interpolated', from: 1, to: 2, values: [15, 0]});
   assert.deepEqual(at(p, 'a', 1), {status: 'exact', time: 1, values: [10, 0]});
   assert.deepEqual(at(p, 'a', 2.25), {status: 'extrapolated', from: 1, to: 2, beyond: 0.25, values: [22.5, 0]});
-  assert.deepEqual(at(p, 'a', 9), {status: 'extrapolated', from: 1, to: 2, beyond: 0.5, values: [25, 0]});
+  assert.deepEqual(at(p, 'a', 9), {status: 'held', time: 2, values: [25, 0]}); // past the cap: held there
   assert.deepEqual(at(p, 'a', -5), {status: 'held', time: 0, values: [0, 0]});
   p.push('a', 3, [500, 0], {discontinuity: true});
   assert.deepEqual(at(p, 'a', 2.5), {status: 'held', time: 2, values: [20, 0]});
@@ -149,6 +149,7 @@ test('composition: jittered complete views through the network receiver present 
   let worstError = 0;
   let naivePrev: number | null = null;
   let naiveWorstStep = 0;
+  const statuses = new Map<string, number>();
   for (let ms = 0; ms <= 20_000; ms++) {
     if (ms % 50 === 0) {
       seq++;
@@ -193,6 +194,7 @@ test('composition: jittered complete views through the network receiver present 
       naivePrev = naive;
       continue;
     }
+    statuses.set(r.status, (statuses.get(r.status) ?? 0) + 1);
     const step = out[0]! - previous!;
     worstStep = Math.max(worstStep, Math.abs(step - 0.016));
     worstError = Math.max(worstError, Math.abs(out[0]! - render / 1000));
@@ -202,10 +204,51 @@ test('composition: jittered complete views through the network receiver present 
     naivePrev = naive;
   }
   const s = playout.stats();
+  const frames = [...statuses.values()].reduce((x, y) => x + y, 0);
+  assert.ok((statuses.get('interpolated') ?? 0) > 0.9 * frames, JSON.stringify([...statuses]));
   assert.ok(worstError < 0.002, `presented position error ${worstError}`);
   assert.ok(worstStep < 0.004, `per-frame step deviation ${worstStep}`);
   assert.ok(naiveWorstStep > 10 * worstStep, `naive ${naiveWorstStep} vs playout ${worstStep}`);
   assert.ok(s.delay >= 50 && s.delay <= 400, String(s.delay));
   assert.ok(s.snapshots <= 16);
   assert.ok(Math.abs(clock.estimate()!.offset - skew) <= clock.estimate()!.roundTrip / 2);
+});
+
+test('late, replaced and overflow-safe sampling', () => {
+  const p = make({maxExtrapolation: 10});
+  p.observe(0, 0);
+  p.advance(5); // render time 5 - delay
+  const render = p.advance(5);
+  p.push('a', 0, [0, 0]);
+  assert.ok(render > 0);
+  assert.equal(p.stats().late, 1);
+  p.push('a', 6, [1, 0]);
+  assert.equal(p.push('a', 6, [99, 0], {discontinuity: true}), 'replaced');
+  assert.deepEqual(at(p, 'a', 3), {status: 'held', time: 0, values: [0, 0]}); // the jump is never blended
+  const q = make({maxExtrapolation: 10});
+  q.push('b', 0, [-1.7e308, 0]);
+  q.push('b', 1, [1.7e308, 0]);
+  assert.deepEqual(at(q, 'b', 0.5), {status: 'held', time: 0, values: [-1.7e308, 0]});
+  q.push('b', 1 + 1e-9, [1.7e308, 0]);
+  const r = at(q, 'b', 5);
+  assert.equal(r.status, 'held'); // extrapolation is capped at one snapshot interval and never overflows
+  assert.ok(r.values.every(Number.isFinite));
+});
+
+test('the first advance after the first observation starts at the target; reset starts a new timeline', () => {
+  const p = createPlayout({
+    limits: {width: 1, maxSubjects: 1, maxSnapshots: 4},
+    delay: {min: 10, max: 500, jitterFactor: 0, adapt: 0.01},
+    maxExtrapolation: 0,
+  });
+  assert.equal(p.advance(1000), 990); // no observation yet: delay.min
+  p.observe(900, 1000); // lateness 100
+  assert.equal(p.advance(1001), 990); // render time never goes back, even though the delay jumped
+  assert.equal(p.stats().delay, 100);
+  p.push('a', 950, [1]);
+  p.reset();
+  assert.equal(p.stats().snapshots, 0);
+  assert.equal(p.advance(5), -5); // a new authority whose clock starts low is presented at once
+  p.observe(0, 5);
+  assert.equal(p.advance(6), -4); // target clamps to delay.min
 });

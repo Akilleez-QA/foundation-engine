@@ -9,7 +9,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
-- Optional `@kits/playout` estimates an authority's clock from round trips and presents remote views a bounded, adaptive delay in the past with interpolation, capped extrapolation and discontinuity holds. Protocol and presented fields remain creator-owned; evidence is headless tests. See [ADR 0089](docs/adr/0089-remote-playout.md).
+- Optional `@kits/playout` estimates an authority's clock from round trips and presents remote views a bounded, adaptive delay in the past with interpolation, capped extrapolation and discontinuity holds. Protocol and presented fields remain creator-owned; evidence is headless tests. See [ADR 0093](docs/adr/0093-remote-playout.md).
 
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.
 

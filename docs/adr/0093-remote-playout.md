@@ -1,4 +1,4 @@
-# ADR 0089: optional remote playout and clock offset
+# ADR 0093: optional remote playout and clock offset
 
 - **Status:** Proposed
 - **Date:** 2026-10-09
@@ -18,7 +18,7 @@ to creators.
 Add optional `@kits/playout` with two pure helpers. `createClockOffset` estimates
 the authority clock from creator round-trip samples, choosing the minimum round
 trip in a bounded window and slewing the applied offset at a bounded rate, with a
-snap threshold. `createPlayout` keeps bounded per-subject snapshot rings stamped
+snap threshold (larger differences step the estimate, while render time still never goes back). `createPlayout` keeps bounded per-subject snapshot rings stamped
 with authority time, presents a render time behind the estimated clock by a delay
 that adapts to smoothed lateness, interval and deviation within creator bounds,
 interpolates between bracketing snapshots, extrapolates for a capped span, holds

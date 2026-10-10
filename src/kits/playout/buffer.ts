@@ -47,7 +47,7 @@ export interface PlayoutOptions {
   readonly blend?: PlayoutBlend;
 }
 
-export type PlayoutPushStatus = 'stored' | 'duplicate' | 'out-of-order' | 'saturated' | 'retired';
+export type PlayoutPushStatus = 'stored' | 'replaced' | 'duplicate' | 'out-of-order' | 'saturated' | 'retired';
 
 export type PlayoutSampleResult =
   | {readonly status: 'exact' | 'held'; readonly time: number}
@@ -88,7 +88,10 @@ export interface Playout {
   /** Drops snapshots no longer needed for `renderTime`, keeping one bracket and at least two. Returns how many. */
   trim(renderTime: number): number;
   remove(subject: PlayoutSubject): boolean;
+  /** Forgets every subject; the timeline, delay estimate and counters are kept. */
   clear(): void;
+  /** Forgets subjects, the timeline and the delay estimate (a new authority or session); counters are kept. */
+  reset(): void;
   dispose(): void;
   stats(): PlayoutStats;
 }
@@ -167,7 +170,8 @@ export function createPlayout(options: PlayoutOptions): Playout {
     lastObserved: number | null = null,
     applied = min,
     lastNow: number | null = null,
-    render = Number.NEGATIVE_INFINITY;
+    render = Number.NEGATIVE_INFINITY,
+    seeded = false;
 
   const idle = (op: string) => {
     if (busy) throw new Error(`playout: ${op} called from inside blend`);
@@ -180,7 +184,7 @@ export function createPlayout(options: PlayoutOptions): Playout {
     const base = slot(track, k) * width;
     for (let i = 0; i < width; i++) out[i] = at(track.values, base + i);
   }
-  function mix(track: Track, a: number, b: number, t: number, out: Float64Array) {
+  function mix(track: Track, a: number, b: number, t: number, out: Float64Array): boolean {
     const sa = slot(track, a) * width,
       sb = slot(track, b) * width;
     for (let i = 0; i < width; i++) {
@@ -194,9 +198,10 @@ export function createPlayout(options: PlayoutOptions): Playout {
     } finally {
       busy = false;
     }
-    for (let i = 0; i < width; i++)
-      if (!finite(mixed[i])) throw new TypeError('playout: blend produced a non-finite value');
+    // Snapshot values are network data: an overflowing blend falls back to holding instead of throwing.
+    for (let i = 0; i < width; i++) if (!finite(mixed[i])) return false;
     out.set(mixed);
+    return true;
   }
 
   const api: Playout = {
@@ -223,8 +228,11 @@ export function createPlayout(options: PlayoutOptions): Playout {
       const elapsed = lastNow === null ? 0 : Math.max(0, remoteNow - lastNow);
       lastNow = lastNow === null ? remoteNow : Math.max(lastNow, remoteNow);
       const goal = target();
-      if (lateMean !== null && render === Number.NEGATIVE_INFINITY) applied = goal;
-      else {
+      if (lateMean !== null && !seeded) {
+        // The first advance after the first observation starts at the target instead of ramping from min.
+        applied = goal;
+        seeded = true;
+      } else {
         const step = adapt * elapsed;
         const diff = goal - applied;
         applied += Math.abs(diff) <= step ? diff : Math.sign(diff) * step;
@@ -247,7 +255,14 @@ export function createPlayout(options: PlayoutOptions): Playout {
       if (track && track.count > 0) {
         const newest = at(track.times, slot(track, track.count - 1));
         if (!finite(remoteTime - newest)) throw new RangeError('playout: remoteTime too far from the newest snapshot');
-        if (remoteTime === newest) return 'duplicate';
+        if (remoteTime === newest) {
+          if (opts?.discontinuity !== true) return 'duplicate';
+          // A jump stamped with the same time: replace the snapshot and cut it from its predecessor.
+          const s = slot(track, track.count - 1);
+          track.breaks[s] = 1;
+          for (let i = 0; i < width; i++) track.values[s * width + i] = at(incoming, i);
+          return 'replaced';
+        }
         if (remoteTime < newest) {
           outOfOrder++;
           return 'out-of-order';
@@ -305,8 +320,14 @@ export function createPlayout(options: PlayoutOptions): Playout {
           return Object.freeze({status: 'held', time: newest});
         }
         const prev = at(track.times, slot(track, newestK - 1));
-        const span = Math.min(beyond, maxExtrapolation);
-        mix(track, newestK - 1, newestK, 1 + span / (newest - prev), out);
+        // Never guess further than the cap, nor further than one snapshot interval.
+        const span = Math.min(beyond, maxExtrapolation, newest - prev);
+        if (!mix(track, newestK - 1, newestK, 1 + span / (newest - prev), out)) {
+          copy(track, newestK, out);
+          return Object.freeze({status: 'held', time: newest});
+        }
+        // Past the cap the subject holds at the furthest extrapolated value.
+        if (span < beyond) return Object.freeze({status: 'held', time: newest});
         return Object.freeze({status: 'extrapolated', from: prev, to: newest, beyond: span});
       }
       for (let k = newestK - 1; k >= 0; k--) {
@@ -322,7 +343,10 @@ export function createPlayout(options: PlayoutOptions): Playout {
             copy(track, k, out);
             return Object.freeze({status: 'held', time: t0});
           }
-          mix(track, k, k + 1, (renderTime - t0) / (t1 - t0), out);
+          if (!mix(track, k, k + 1, (renderTime - t0) / (t1 - t0), out)) {
+            copy(track, k, out);
+            return Object.freeze({status: 'held', time: t0});
+          }
           return Object.freeze({status: 'interpolated', from: t0, to: t1});
         }
       }
@@ -342,7 +366,6 @@ export function createPlayout(options: PlayoutOptions): Playout {
           track.count--;
           dropped++;
         }
-        if (track.count > 0) track.breaks[slot(track, 0)] = 1;
       }
       snapshots -= dropped;
       return dropped;
@@ -360,6 +383,19 @@ export function createPlayout(options: PlayoutOptions): Playout {
       idle('clear');
       tracks.clear();
       snapshots = 0;
+    },
+    reset() {
+      idle('reset');
+      tracks.clear();
+      snapshots = 0;
+      lateMean = null;
+      lateDev = 0;
+      interval = null;
+      lastObserved = null;
+      applied = min;
+      lastNow = null;
+      render = Number.NEGATIVE_INFINITY;
+      seeded = false;
     },
     dispose() {
       idle('dispose');
