@@ -3,6 +3,7 @@
 - **Status:** Proposed (candidate implementation)
 - **Date:** 2026-10-09
 - **Area:** Optional kits / Simulation / Dependencies
+- **Discussion:** [#269](https://github.com/Akilleez-QA/foundation-engine/issues/269)
 
 ## Context
 
