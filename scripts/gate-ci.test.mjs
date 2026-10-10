@@ -4,7 +4,16 @@ import {spawnSync} from 'node:child_process';
 import {mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {ROOT, SETUP_ONLY, WORKFLOW, parseArgs, parseYaml, planFromWorkflow, selectSteps} from './gate-ci.mjs';
+import {
+  JOB_EVENT_IF,
+  ROOT,
+  SETUP_ONLY,
+  WORKFLOW,
+  parseArgs,
+  parseYaml,
+  planFromWorkflow,
+  selectSteps,
+} from './gate-ci.mjs';
 
 const ci = readFileSync(join(ROOT, WORKFLOW), 'utf8');
 
@@ -12,7 +21,15 @@ test('gate:ci: every run step of ci.yml is executed locally, except the document
   const plan = planFromWorkflow(ci);
   // An independent count of `run:` keys, so a parser that dropped a step would fail here.
   const runKeys = ci.split('\n').filter(l => /^\s*(-\s+)?run:/.test(l)).length;
-  assert.equal(plan.steps.length + plan.setup.length, runKeys, 'a ci.yml run step is neither executed nor setup-only');
+  assert.equal(
+    plan.steps.length + plan.setup.length + plan.hosted.length,
+    runKeys,
+    'a ci.yml run step is neither executed, setup-only, nor the hosted path filter',
+  );
+  assert.deepEqual(
+    plan.hosted.map(s => s.run),
+    ['node scripts/ci-changes.mjs'],
+  );
   for (const cmd of Object.keys(SETUP_ONLY))
     assert.ok(
       plan.setup.some(s => s.run === cmd),
@@ -51,8 +68,25 @@ test('gate:ci: every run step of ci.yml is executed locally, except the document
       'each runner retains identical pinned setup',
     );
   }
-  assert.deepEqual(parsed.jobs.check.needs, ['browser', 'templates-1', 'templates-2', 'node-current']);
+  assert.deepEqual(parsed.jobs.check.needs, ['changes', 'browser', 'templates-1', 'templates-2', 'node-current']);
   assert.equal(parsed.jobs.check.if, 'always()');
+  assert.equal(parsed.on.pull_request, null);
+  assert.equal(parsed.on.push['paths-ignore'], undefined);
+  assert.deepEqual(parsed.on.push.branches, ['main']);
+  assert.deepEqual(parsed.on.schedule, [{cron: '0 6 * * 1'}]);
+  assert.equal(parsed.concurrency.group, 'ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}');
+  assert.equal(parsed.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
+  assert.equal(parsed.jobs.changes.if, undefined);
+  for (const id of ['browser', 'templates-1', 'templates-2', 'node-current'])
+    assert.equal(parsed.jobs[id].if, JOB_EVENT_IF[id]);
+  for (const id of ['browser', 'templates-1', 'templates-2', 'node-current'])
+    assert.deepEqual(parsed.jobs[id].needs, ['changes']);
+  const aggregate = parsed.jobs.check.steps.find(s => s.run === 'node scripts/ci-results.mjs');
+  assert.deepEqual(aggregate.env, {
+    CI_JOB_RESULTS: '${{ toJSON(needs) }}',
+    CI_EVENT_NAME: '${{ github.event_name }}',
+    CI_CODE_CHANGED: '${{ needs.changes.outputs.code }}',
+  });
   // Same order as the workflow.
   const order = [...ci.matchAll(/run: (?:GAME_DIR=\S+ )?npm run (?:-s )?([\w:.-]+)/g)].map(m => m[1]);
   assert.deepEqual(
@@ -98,6 +132,7 @@ jobs:
 test('gate:ci: workflow features it cannot mirror are errors, not silent skips', () => {
   const wf = extra => `jobs:\n  a:\n    runs-on: x\n    steps:\n      - run: echo hi\n${extra}`;
   assert.throws(() => planFromWorkflow(wf('        if: always()\n')), /"if" cannot be mirrored/);
+  assert.throws(() => planFromWorkflow(wf('    if: false\n')), /if cannot be mirrored/);
   assert.throws(() => planFromWorkflow(wf('        shell: sh\n')), /"shell" cannot be mirrored/);
   assert.throws(() => planFromWorkflow(wf('    strategy:\n      matrix:\n        os: [a, b]\n')), /strategy/);
   assert.throws(() => planFromWorkflow(wf('  b:\n    runs-on: x\n')), /unsupported job graph/);
