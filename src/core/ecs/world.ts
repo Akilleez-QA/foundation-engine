@@ -120,14 +120,19 @@ export class World {
    * Entities with every listed component, in spawn order, with their live component values.
    *
    * Changes made while iterating are safe and order-independent: an entity is yielded only if it
-   * matched when the query began and still matches when it is reached. An entity despawned, or one
+   * matched when iteration began (the first `next()`) and still matches when it is reached. An entity despawned, or one
    * that lost a listed component, earlier in the same pass is skipped (never yielded with a missing
    * value); one that is spawned or starts matching during the pass appears in the next query.
    */
   *query<Q extends readonly ComponentType<object>[]>(...types: Q): Generator<[Entity, ...Values<Q>]> {
     if (!types.length) {
-      const order = [...this.alive];
-      for (const e of order) if (this.alive.has(e)) yield queryRow<Q>([e]);
+      // Ids are never reused and the live set keeps spawn order, so ids at or past the high-water
+      // mark were spawned during this pass; deleted entries are skipped by Set iteration.
+      const end = this.next;
+      for (const e of this.alive) {
+        if (e >= end) break;
+        yield queryRow<Q>([e]);
+      }
       return;
     }
     const stores = types.map(t => this.stores.get(t.id));

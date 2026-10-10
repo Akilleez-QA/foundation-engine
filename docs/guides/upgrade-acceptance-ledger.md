@@ -1210,11 +1210,14 @@ is implied.
 
 ## World query mutation consistency — candidate (2026-10-09)
 
-- **Scope:** owner repair in `src/core/ecs/world.ts` `query`. Previously a single-component query yielded
-  `[entity, undefined]` for an entity despawned earlier in the same pass. Multi-component results for an
+- **Scope:** owner repair in `src/core/ecs/world.ts` `query`. Previously a query yielded `undefined` values for an entity despawned, or one
+  that lost a listed component, earlier in the same pass. This applied to every single-component query, and to multi-component
+  queries when that component's store was the smallest. Multi-component results for an
   entity gaining a component mid-pass depended on which store was smallest. The untyped query
   visited entities spawned mid-pass.
 - **Evidence:** a new `src/core/ecs/ecs.test.ts` case fails on the previous implementation and passes on
   the candidate. A local microbenchmark (10,000 entities, node) measured a 0.12 ms single-component and
-  0.09 ms pair query increase. This is not a device or frame-budget claim.
+  0.09 ms pair query increase. The untyped query needs no allocation and is unchanged. An independent
+  review ran a 15,000-case randomized model check: no stale or undefined rows, and visit order independent of
+  store sizes. Replay, author, kit and template suites passed. This is not a device or frame-budget claim.
 - **Not established:** template or browser frame measurements; hosted CI.
