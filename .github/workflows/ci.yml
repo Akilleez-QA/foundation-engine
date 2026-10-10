@@ -2,17 +2,25 @@ name: ci
 on:
   push:
     branches: [main]
+    paths-ignore: ['docs/**', '**/*.md']
   pull_request:
+    paths-ignore: ['docs/**', '**/*.md']
+  # Monday 06:00 UTC runs node-current only. The concurrency group includes the event name so this
+  # schedule does not cancel an in-progress push to main (both use refs/heads/main).
+  schedule:
+    - cron: '0 6 * * 1'
 
 # Fork contributions run tests without deployment credentials or repository writes.
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   browser:
+    # The weekly schedule is the Node 26 canary. Pull requests and pushes to main still run these jobs.
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -97,6 +105,7 @@ jobs:
         run: npm run test:subpath-browser
 
   templates-1:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -115,6 +124,7 @@ jobs:
         run: npm run gate:templates -- --shard 1/2 --phone
 
   templates-2:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -135,7 +145,9 @@ jobs:
   # The supported range is Node 22.18 or newer; the other jobs use 22. This cheap job (no browser, no template
   # gates) runs the complete test suite and the quick check on the newest Node major, so a Node change (such as the
   # Node 23 default test reporter) fails here first. Raise node-version when a newer Node major is released.
+  # It runs on a push to main (the push trigger lists only main) and on the weekly schedule, not on pull requests.
   node-current:
+    if: github.event_name == 'push' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -168,4 +180,5 @@ jobs:
       - name: Require every work job to succeed
         env:
           CI_JOB_RESULTS: ${{ toJSON(needs) }}
+          CI_EVENT_NAME: ${{ github.event_name }}
         run: node scripts/ci-results.mjs

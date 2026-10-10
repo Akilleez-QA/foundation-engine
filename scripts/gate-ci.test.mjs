@@ -4,7 +4,16 @@ import {spawnSync} from 'node:child_process';
 import {mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {ROOT, SETUP_ONLY, WORKFLOW, parseArgs, parseYaml, planFromWorkflow, selectSteps} from './gate-ci.mjs';
+import {
+  JOB_EVENT_IF,
+  ROOT,
+  SETUP_ONLY,
+  WORKFLOW,
+  parseArgs,
+  parseYaml,
+  planFromWorkflow,
+  selectSteps,
+} from './gate-ci.mjs';
 
 const ci = readFileSync(join(ROOT, WORKFLOW), 'utf8');
 
@@ -53,6 +62,18 @@ test('gate:ci: every run step of ci.yml is executed locally, except the document
   }
   assert.deepEqual(parsed.jobs.check.needs, ['browser', 'templates-1', 'templates-2', 'node-current']);
   assert.equal(parsed.jobs.check.if, 'always()');
+  assert.deepEqual(parsed.on.push['paths-ignore'], ['docs/**', '**/*.md']);
+  assert.deepEqual(parsed.on.pull_request['paths-ignore'], ['docs/**', '**/*.md']);
+  assert.deepEqual(parsed.on.push.branches, ['main']);
+  assert.deepEqual(parsed.on.schedule, [{cron: '0 6 * * 1'}]);
+  assert.equal(parsed.concurrency.group, 'ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}');
+  for (const id of ['browser', 'templates-1', 'templates-2', 'node-current'])
+    assert.equal(parsed.jobs[id].if, JOB_EVENT_IF[id]);
+  const aggregate = parsed.jobs.check.steps.find(s => s.run === 'node scripts/ci-results.mjs');
+  assert.deepEqual(aggregate.env, {
+    CI_JOB_RESULTS: '${{ toJSON(needs) }}',
+    CI_EVENT_NAME: '${{ github.event_name }}',
+  });
   // Same order as the workflow.
   const order = [...ci.matchAll(/run: (?:GAME_DIR=\S+ )?npm run (?:-s )?([\w:.-]+)/g)].map(m => m[1]);
   assert.deepEqual(
@@ -98,6 +119,7 @@ jobs:
 test('gate:ci: workflow features it cannot mirror are errors, not silent skips', () => {
   const wf = extra => `jobs:\n  a:\n    runs-on: x\n    steps:\n      - run: echo hi\n${extra}`;
   assert.throws(() => planFromWorkflow(wf('        if: always()\n')), /"if" cannot be mirrored/);
+  assert.throws(() => planFromWorkflow(wf('    if: false\n')), /if cannot be mirrored/);
   assert.throws(() => planFromWorkflow(wf('        shell: sh\n')), /"shell" cannot be mirrored/);
   assert.throws(() => planFromWorkflow(wf('    strategy:\n      matrix:\n        os: [a, b]\n')), /strategy/);
   assert.throws(() => planFromWorkflow(wf('  b:\n    runs-on: x\n')), /unsupported job graph/);

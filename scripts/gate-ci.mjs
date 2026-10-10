@@ -9,6 +9,8 @@
 // scripts/gate-ci.test.mjs fails when the workflow and this runner disagree. Jobs may set different Node versions:
 // the first job's is the primary. A step whose job uses another Node major than this process is skipped (a partial
 // run, no aggregate) unless --any-node; run those under that Node, e.g. `--only node-current/test` there.
+// Hosted job `if` filters (pull request, push, weekly schedule) are accepted for the known jobs and are not
+// evaluated here: a full local run still executes every job, and the aggregate requires every one to succeed.
 //
 //   npm run gate:ci                       every job serially; a failed step stops its job, not independent jobs
 //   npm run gate:ci -- --list             the plan (ids, names, env) without running it
@@ -22,7 +24,14 @@ import {spawn} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {WORK_JOBS, AGGREGATE_COMMAND, RESULTS_ENV, RESULTS_EXPRESSION} from './ci-results.mjs';
+import {
+  WORK_JOBS,
+  AGGREGATE_COMMAND,
+  RESULTS_ENV,
+  RESULTS_EXPRESSION,
+  EVENT_ENV,
+  EVENT_EXPRESSION,
+} from './ci-results.mjs';
 
 export const ROOT = fileURLToPath(new URL('..', import.meta.url));
 export const WORKFLOW = '.github/workflows/ci.yml';
@@ -35,6 +44,19 @@ export const SETUP_ONLY = {
 };
 const STEP_KEYS = new Set(['name', 'id', 'run', 'uses', 'with', 'env']);
 const JOB_KEYS = new Set(['runs-on', 'timeout-minutes', 'steps', 'env', 'permissions']);
+/** Hosted event filters the local runner accepts and does not evaluate. Absent `if` means the job always runs. */
+export const JOB_EVENT_IF = {
+  browser: "github.event_name != 'schedule'",
+  'templates-1': "github.event_name != 'schedule'",
+  'templates-2': "github.event_name != 'schedule'",
+  'node-current': "github.event_name == 'push' || github.event_name == 'schedule'",
+};
+const aggregateEnvOk = env => {
+  const resultsOnly = {[RESULTS_ENV]: RESULTS_EXPRESSION};
+  const withEvent = {[RESULTS_ENV]: RESULTS_EXPRESSION, [EVENT_ENV]: EVENT_EXPRESSION};
+  const encoded = JSON.stringify(env);
+  return encoded === JSON.stringify(resultsOnly) || encoded === JSON.stringify(withEvent);
+};
 
 // ---------- A small YAML subset: block mappings and sequences, plain/quoted scalars, flow lists, | scalars. ----------
 const stripComment = s => {
@@ -198,10 +220,12 @@ export function planFromWorkflow(text) {
   const nodes = {};
   for (const [jobName, job] of jobs) {
     const aggregate = graph && jobName === 'check';
-    const allowed = new Set([...JOB_KEYS, ...(aggregate ? ['needs', 'if'] : [])]);
+    const allowed = new Set([...JOB_KEYS, 'if', ...(aggregate ? ['needs'] : [])]);
     for (const k of Object.keys(job))
       if (!allowed.has(k))
         throw Error(`${WORKFLOW}: job ${jobName} key "${k}" cannot be mirrored locally; extend scripts/gate-ci.mjs`);
+    if (!aggregate && Object.hasOwn(job, 'if') && JOB_EVENT_IF[jobName] !== job.if)
+      throw Error(`${WORKFLOW}: job ${jobName} if cannot be mirrored locally; extend scripts/gate-ci.mjs`);
     if (graph && job['runs-on'] !== 'ubuntu-latest') throw Error(`${WORKFLOW}: supported graph requires ubuntu-latest`);
     for (const [key, value] of Object.entries(job))
       if (key !== 'steps' && JSON.stringify(value).includes('${{'))
@@ -233,7 +257,7 @@ export function planFromWorkflow(text) {
       const run = s.run.trim();
       if (run.includes('${{')) throw Error(`${where}: run needs GitHub expressions; extend scripts/gate-ci.mjs`);
       if (aggregate) {
-        if (run !== AGGREGATE_COMMAND || JSON.stringify(s.env) !== JSON.stringify({[RESULTS_ENV]: RESULTS_EXPRESSION}))
+        if (run !== AGGREGATE_COMMAND || !aggregateEnvOk(s.env))
           throw Error(`${where}: unsupported aggregate command or result binding`);
       }
       const stepEnv = aggregate ? {} : envMap(s.env, where);
