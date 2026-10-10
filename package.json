@@ -96,6 +96,7 @@
     "test:dmath-browser": "node --import tsx -r ./scripts/silent-browser.cjs scripts/play/dmath-check.mjs playtest/dmath",
     "bench:dmath": "node --import tsx tools/dmath-bench/bench.mjs",
     "dmath:golden": "node --import tsx scripts/dmath-golden.mjs",
+    "numeric:golden": "node --import tsx scripts/numeric-golden.mjs",
     "test:particle-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/particle-check.mjs playtest/particles",
     "test:scatter-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/scatter-check.mjs playtest/scatter",
     "test:sound-browser": "node scripts/generate.mjs && node -r ./scripts/silent-browser.cjs scripts/play/sound-check.mjs playtest/sound",

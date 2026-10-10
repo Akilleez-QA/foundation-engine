@@ -43,6 +43,16 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'NUM-01',
+    title: 'Optional strict numeric modes: fixed point, binary angles and reduced-precision float',
+    docs: 'src/kits/numeric/README.md',
+    evidence: [
+      {kit: 'numeric', export: 'createFixed'},
+      {kit: 'numeric', export: 'createPrecision'},
+      {path: 'src/kits/numeric/numeric.golden.json'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',

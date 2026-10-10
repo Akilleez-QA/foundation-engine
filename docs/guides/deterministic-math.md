@@ -161,6 +161,17 @@ change to any function changes bits that existing replay logs depend on, so it i
 a deliberate, reviewed change: run `npm run dmath:golden -- --write`, and record
 the change in the changelog.
 
+## Stricter modes: fixed point and reduced precision (optional kit)
+
+`dmath` keeps doubles. When a creator needs integer state that another language can
+reproduce exactly, a faithful fixed-point or single-precision recreation, compact
+integer snapshots, or wrap/saturate semantics, the optional
+[`@kits/numeric`](../../src/kits/numeric/README.md) adds fixed-point words (2–32 bits
+in a `number`, up to 128 bits in a `bigint`), binary-angle `sin`/`cos`/`atan2` tables
+built from `dmath`, and strict reduced-precision float (`f32`, and `pc24`: 24-bit
+significands with the double exponent range). Its golden vectors run in the same
+browser check (`npm run test:dmath-browser`). See [ADR 0099](../adr/0099-strict-numeric-modes.md).
+
 ## Kits that use it (creator option)
 
 Default behaviour is unchanged. Each option below defaults to `'platform'`, which is
