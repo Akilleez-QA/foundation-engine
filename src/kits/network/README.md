@@ -394,8 +394,8 @@ if (d.status === 'complete' || d.status === 'reconstructed') {
 
 Measured locally (Node 26, x86_64, one run, not a gate): 64 entities per view,
 300 frames, entity JSON of about 90 characters. With 4 entities changing per
-frame the emitted length was 8.7 % of the complete frames, with 16 changing
-27.7 %, and with all 64 changing 100 % (complete frames sent); encoding cost about
+frame the emitted length was 9.1 % of the complete frames, with 16 changing
+28.0 %, and with all 64 changing 100 % (complete frames sent); encoding cost about
 0.16 ms per frame. Field-level deltas, quantization, binary encoding, priority
 ordering under a byte budget and interpolation are not provided.
 

@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-10-09
 - **Area:** Network
-- **Tracking:** discussion issue linked from the pull request
+- **Tracking:** [Issue #232](https://github.com/Akilleez-QA/foundation-engine/issues/232)
 
 ## Context
 
