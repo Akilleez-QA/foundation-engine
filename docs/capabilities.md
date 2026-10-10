@@ -59,6 +59,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | KTX2 | KTX2 (Basis Universal) model textures | [#146](https://github.com/Akilleez-QA/foundation-engine/pull/146) | [compressed-textures.md](guides/compressed-textures.md) |
 | DX-03 | Asset provenance records and npm run disclosure | [#137](https://github.com/Akilleez-QA/foundation-engine/pull/137) | [asset-provenance.md](guides/asset-provenance.md) |
 | ASSET-VERIFY | Model contracts (npm run asset:verify) | [#126](https://github.com/Akilleez-QA/foundation-engine/pull/126) | [model-contracts.md](guides/model-contracts.md) |
+| ASSET-CONVERT | Offline converters to glTF and PNG with provenance receipts (npm run convert) |  | [README.md](../tools/convert/README.md) |
 | ASSET-OPTIMIZE | Model optimisation (npm run asset:optimize) | [#135](https://github.com/Akilleez-QA/foundation-engine/pull/135) |  |
 | SHOWCASE | The showcase template | [#128](https://github.com/Akilleez-QA/foundation-engine/pull/128) | [README.md](../templates/showcase/README.md) |
 | POSE-TO-POSE | Pose-to-pose rigging and animation pipeline | [#142](https://github.com/Akilleez-QA/foundation-engine/pull/142) | [animate-pose-to-pose.md](recipes/animate-pose-to-pose.md) |
@@ -296,6 +297,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `changelog`
 - `check`
 - `content:publish`
+- `convert`
 - `deploy:production`
 - `dev`
 - `disclosure`
