@@ -62,7 +62,8 @@ export function createLookAhead(
         dz = goal[1] - focus[1],
         gap = Math.hypot(dx, dz),
         reach = (speed + catchUp) * dt;
-      focus = gap <= reach ? goal : [focus[0] + (dx / gap) * reach, focus[1] + (dz / gap) * reach];
+      focus =
+        gap <= reach || !Number.isFinite(gap) ? goal : [focus[0] + (dx / gap) * reach, focus[1] + (dz / gap) * reach];
       // Never trail the subject by more than maxLead (for example after a teleport the chase starts from the subject).
       const ox = focus[0] - p[0],
         oz = focus[1] - p[2],
@@ -106,7 +107,7 @@ export function createAreaCamera(input: {readonly areas: readonly CameraArea[]; 
   if (!Number.isSafeInteger(panTicks) || panTicks < 0 || panTicks > 10_000)
     fail('panTicks must be an integer in [0, 10,000]');
   const ids = new Set<string>();
-  const rooms: {id: string; area: [number, number, number, number]; pose: CameraPose}[] = [];
+  const areas: {id: string; area: [number, number, number, number]; pose: CameraPose}[] = [];
   for (let i = 0; i < list.length; i++) {
     const r = list[i];
     if (!r || typeof r !== 'object') fail(`area ${i} must be an object`);
@@ -126,12 +127,12 @@ export function createAreaCamera(input: {readonly areas: readonly CameraArea[]; 
       target: frozen(vec(poseIn.target, `${id} target`)),
       fov,
     });
-    rooms.push({id, area, pose});
+    areas.push({id, area, pose});
   }
-  type Room = (typeof rooms)[number];
-  const contains = (r: Room, x: number, z: number) =>
+  type Area = (typeof areas)[number];
+  const contains = (r: Area, x: number, z: number) =>
     x >= r.area[0] && x <= r.area[2] && z >= r.area[1] && z <= r.area[3];
-  let current: Room | null = null,
+  let current: Area | null = null,
     from: CameraPose | null = null,
     elapsed = 0;
   const mix = (a: Vec3, b: Vec3, t: number): Vec3 => [
@@ -140,22 +141,22 @@ export function createAreaCamera(input: {readonly areas: readonly CameraArea[]; 
     a[2] + (b[2] - a[2]) * t,
   ];
   const poseNow = (): CameraPose => {
-    const room = current ?? rooms[0]!;
-    if (!from || panTicks === 0) return room.pose;
+    const area = current ?? areas[0]!;
+    if (!from || panTicks === 0) return area.pose;
     const t0 = Math.min(1, elapsed / panTicks),
       t = t0 * t0 * (3 - 2 * t0);
     return Object.freeze({
-      position: frozen(mix(from.position, room.pose.position, t)),
-      target: frozen(mix(from.target, room.pose.target, t)),
-      fov: from.fov + (room.pose.fov - from.fov) * t,
+      position: frozen(mix(from.position, area.pose.position, t)),
+      target: frozen(mix(from.target, area.pose.target, t)),
+      fov: from.fov + (area.pose.fov - from.fov) * t,
     });
   };
   return {
-    /** Advance one tick for a subject at `position`; returns the pose, the room and whether a pan is running. */
+    /** Advance one tick for a subject at `position`; returns the pose, the area and whether a pan is running. */
     step(position: Vec3): {readonly pose: CameraPose; readonly area: string; readonly panning: boolean} {
       const p = vec(position, 'position');
       if (!current || !contains(current, p[0], p[2])) {
-        const next = rooms.find(r => contains(r, p[0], p[2])) ?? current ?? rooms[0]!;
+        const next = areas.find(r => contains(r, p[0], p[2])) ?? current ?? areas[0]!;
         if (current && next !== current) {
           // Start from what is on screen, even mid-pan.
           from = poseNow();

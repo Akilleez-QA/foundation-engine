@@ -53,7 +53,7 @@ test('area camera holds an area pose and pans to the next area over panTicks', (
   assert.equal(last.panning, false);
   assert.deepEqual(last.pose.position, [15, 10, 5]);
   assert.equal(last.pose.fov, 40);
-  assert.equal(areas.step([50, 0, 50]).area, 'b', 'outside every room keeps the last');
+  assert.equal(areas.step([50, 0, 50]).area, 'b', 'outside every area keeps the last');
   assert.throws(
     () =>
       createAreaCamera({
