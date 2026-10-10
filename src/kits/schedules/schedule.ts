@@ -163,6 +163,11 @@ export interface ScheduleCatchUp {
   readonly rewound: boolean;
   /** The placement at `to`. */
   readonly final: SchedulePlacement;
+  /**
+   * Days whose boundaries were examined (a deterministic work count). Every visited day except the first and last
+   * reports at least one change, so this is at most `transitions.length + 2`.
+   */
+  readonly daysVisited: number;
 }
 
 function fail(message: string): never {
@@ -303,6 +308,12 @@ export function defineSchedule(calendar: ScheduleCalendar, input: ScheduleInput)
     if (cursor > 0 && cursor < cal.dayLength) shortest = Math.min(shortest, cal.dayLength - cursor);
     return Object.freeze({id: vid, days, when, unless, idle: vIdle, windows: Object.freeze(windows)});
   });
+  // Even times near the epoch must resolve every segment; otherwise no time could be evaluated.
+  if (4 * ulp2(Math.abs(cal.epoch) + 2 * cal.dayLength) > shortest)
+    fail(
+      `the shortest segment (${shortest}) is below the float resolution of this calendar near its epoch ` +
+        `(|epoch| + 2 * dayLength); lengthen it or move the epoch toward 0`,
+    );
   const mask = (names: readonly string[]) => names.reduce((m, f) => (m | (1 << flags.indexOf(f))) >>> 0, 0);
   const schedule: Schedule = Object.freeze({
     id,
@@ -373,7 +384,10 @@ function checkTime(schedule: Schedule, time: number, what: string): void {
   if (Math.abs(time - cal.epoch) > SCHEDULE_LIMITS.span) fail(`|${what} - epoch| must be <= ${SCHEDULE_LIMITS.span}`);
   const magnitude = Math.max(Math.abs(time), Math.abs(cal.epoch)) + 2 * cal.dayLength;
   if (4 * ulp2(magnitude) > schedule.shortestSegment)
-    fail(`${what} ${time} is too far from 0 to resolve this schedule's ${schedule.shortestSegment} segments`);
+    fail(
+      `${what} ${time}: float spacing at magnitude ${magnitude} cannot resolve this schedule's shortest segment ` +
+        `(${schedule.shortestSegment}); use a time closer to 0 or longer segments`,
+    );
 }
 
 /** Day index containing `time`: `dayStartOf(d) <= time < dayStartOf(d + 1)`, using the same expression. */
@@ -492,7 +506,8 @@ export function scheduleCatchUp(
   if (!intIn(max, 0, SCHEDULE_LIMITS.transitions)) fail(`maxTransitions must be 0..${SCHEDULE_LIMITS.transitions}`);
   const on = readFlags(schedule, flags);
   const final = place(schedule, c, on, to);
-  if (to < from) return Object.freeze({transitions: Object.freeze([]), truncated: false, rewound: true, final});
+  if (to < from)
+    return Object.freeze({transitions: Object.freeze([]), truncated: false, rewound: true, final, daysVisited: 0});
   const cal = schedule.calendar,
     n = cal.cycleDays;
   const owner = Int16Array.from({length: n}, (_, wd) => ownerOn(schedule, c, on, wd));
@@ -520,7 +535,8 @@ export function scheduleCatchUp(
   const firstDay = dayIndexOf(cal, from),
     lastDay = dayIndexOf(cal, to);
   let truncated = false;
-  let day = firstDay;
+  let day = firstDay,
+    daysVisited = 0;
   while (day <= lastDay) {
     const weekday = mod(day, n);
     const skip = ahead[weekday]!;
@@ -529,6 +545,7 @@ export function scheduleCatchUp(
       day += skip;
       continue;
     }
+    daysVisited++;
     const start = dayStartOf(cal, day),
       next = dayStartOf(cal, day + 1);
     const variant = variantOf(weekday);
@@ -562,7 +579,7 @@ export function scheduleCatchUp(
     if (!going) break;
     day++;
   }
-  return Object.freeze({transitions: Object.freeze(out), truncated, rewound: false, final});
+  return Object.freeze({transitions: Object.freeze(out), truncated, rewound: false, final, daysVisited});
 }
 
 /** Plain order data accepted by the itinerary kit's `edit({type: 'insert', order})`. */

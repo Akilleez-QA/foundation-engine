@@ -220,10 +220,10 @@ test('catch-up overflow is truncated with the exact final state, and long skips 
   assert.deepEqual(r.final, schedulePlacement(s, at(700, 13.5)));
   assert.equal(scheduleCatchUp(s, at(0, 0), at(1, 0), undefined, {maxTransitions: 0}).truncated, true);
   // A billion-day skip of a busy schedule stops at the limit.
-  const started = performance.now();
   const huge = scheduleCatchUp(s, at(0, 0), at(1e9, 3), undefined, {maxTransitions: 4096});
   assert.equal(huge.transitions.length, 4096);
   assert.equal(huge.truncated, true);
+  assert.ok(huge.daysVisited <= huge.transitions.length + 2, `visited ${huge.daysVisited} days`);
   // A schedule with no change at all stops after one pattern cycle, not after a billion days.
   const still = defineSchedule(cal, {
     id: 'statue',
@@ -234,6 +234,7 @@ test('catch-up overflow is truncated with the exact final state, and long skips 
   assert.equal(none.transitions.length, 0);
   assert.equal(none.truncated, false);
   assert.equal(none.final.entry.id, 'stand');
+  assert.equal(none.daysVisited, 0, 'a schedule that never changes visits no day');
   // Changes only once per pattern cycle are still all found.
   const weekly = defineSchedule(cal, {
     id: 'weekly',
@@ -242,7 +243,7 @@ test('catch-up overflow is truncated with the exact final state, and long skips 
   });
   const wk = scheduleCatchUp(weekly, at(0, 0), at(70, 0));
   assert.equal(wk.transitions.length, 20);
-  assert.ok(performance.now() - started < 2000, 'bounded work');
+  assert.equal(wk.daysVisited, 10, 'only the changing weekday of each pattern cycle is visited');
 });
 
 /** Reference model: sample every integer time and detect occupant changes directly. */
@@ -433,8 +434,18 @@ test('times too large to resolve a schedule are refused, not silently merged', (
     variants: [{id: 'v', windows: [w('work', 0.2, 0.7, 'p')]}],
   });
   assert.equal(fine.shortestSegment, 0.2);
-  assert.throws(() => schedulePlacement(fine, 1e15), /too far from 0/);
-  assert.throws(() => scheduleCatchUp(fine, 0, 1e15), /too far from 0/);
+  assert.throws(() => schedulePlacement(fine, 1e15), /cannot resolve this schedule's shortest segment \(0\.2\)/);
+  assert.throws(() => scheduleCatchUp(fine, 0, 1e15), /to 1000000000000000: float spacing/);
+  // A segment no time could resolve is refused at definition, not at the first evaluation.
+  assert.throws(
+    () =>
+      defineSchedule(defineScheduleCalendar({dayLength: 24}), {
+        id: 'tiny',
+        idle: {id: 'home', anchor: 'h', activity: 'x'},
+        variants: [{id: 'v', windows: [w('blink', 1, 1 + 1e-14, 'p')]}],
+      }),
+    /shortest segment .* below the float resolution/,
+  );
   assert.equal(schedulePlacement(fine, 1e12).schedule, 'fine');
   const coarse = defineSchedule(defineScheduleCalendar({dayLength: 86400, cycleDays: 7}), baker);
   assert.equal(schedulePlacement(coarse, 1e15 - 1).schedule, 'baker');
@@ -464,11 +475,11 @@ test('catch-up worst case stays bounded: 366-day pattern, 4,096 transitions, spa
     idle: {id: 'home', anchor: 'h', activity: 'x'},
     variants: [{id: 'v', days: [365], windows: [w('fair', 3600, 7200, 'square')]}],
   });
-  const started = performance.now();
   const r = scheduleCatchUp(rare, -9e14, 9e14, undefined, {maxTransitions: 4096});
-  const ms = performance.now() - started;
   assert.equal(r.transitions.length, 4096);
   assert.equal(r.truncated, true);
   for (let k = 1; k < r.transitions.length; k++) assert.ok(r.transitions[k]!.at > r.transitions[k - 1]!.at);
-  assert.ok(ms < 200, `took ${ms.toFixed(1)} ms`);
+  // Deterministic work bound instead of wall-clock time: 2,048 fair days give 4,096 changes (two each), and one more
+  // fair day is visited where the limit is reached.
+  assert.equal(r.daysVisited, 2049);
 });

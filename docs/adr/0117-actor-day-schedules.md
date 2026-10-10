@@ -56,11 +56,13 @@ fraction, not a path.
 
 Eighteen headless tests: definition refusals, placements, variants and flag reads, transition rules, truncation and
 bounded long skips, a 300-schedule integer brute-force comparison, a 400-schedule decimal fuzz near zero and near 1e15
-comparing catch-up with a wake-at-`windowEnd` sequence, resolution refusals, a timed worst case, the roster, and five
+comparing catch-up with a wake-at-`windowEnd` sequence, resolution refusals, a worst case bounded by a deterministic `daysVisited` work count, the roster, and five
 compositions with real owners (core clock wake-ups and a restored jump, the non-dyadic wake repro on the core clock,
 the itinerary controller, region activation waking a region, and a region that stays active receiving a dormant actor
 through a clock wake). An independent review of the first candidate found inconsistent float boundaries between
 placement and catch-up (a wake loop; critical), an overstated region-activation composition, accepted hand-built
 schedules, slow worst-case catch-up, a wrong complexity claim, undocumented midnight transitions, flag-source gaps and
-a stale itinerary deadline; all were fixed or documented with regression tests. No browser, template or device
+a stale itinerary deadline; all were fixed or documented with regression tests. A re-review of the fixes was clean;
+its two low notes were applied (an unresolvable segment is refused at definition with a clear message, and test
+timing assertions became deterministic work counts). No browser, template or device
 evidence; hosted CI remains required.
