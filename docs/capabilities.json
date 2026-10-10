@@ -766,12 +766,15 @@
       "exports": [
         "applyRootMotion",
         "createJumpFeel",
+        "createLadders",
         "createPlatforms",
         "deriveJump",
+        "findLedge",
         "jumpStateCount",
         "jumpSystem",
         "locomotion",
         "platformSystem",
+        "pushStep",
         "resetJump"
       ]
     },

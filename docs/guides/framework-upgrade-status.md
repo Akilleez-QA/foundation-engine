@@ -1428,3 +1428,10 @@ pose-sized transitions landing on moving goals (including the scripted-shot retu
 support carry, letterbox amount and an optional director system. See
 [ADR 0112](../adr/0112-camera-director.md). Headless tests in the ledger; independent
 review and hosted CI remain required.
+
+## Traversal helpers — candidate (2026-10-09)
+
+Locomotion kit extension: ledge detection, ladders and pushable blocks over creator
+cast, ground and box-sweep queries (compatible with the volume-query sweep). See
+[ADR 0115](../adr/0115-traversal-helpers.md). Headless tests in the ledger; independent
+review and hosted CI remain required.

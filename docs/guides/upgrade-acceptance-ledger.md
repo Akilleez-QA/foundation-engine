@@ -1469,3 +1469,12 @@ state across worlds, a wrong default carry pivot, unvalidated heading, overstate
 docs, mutable returned poses and rare ulp redraws; all were fixed and the re-review was
 clean. No browser,
 visual or device evidence.
+
+## Traversal helpers — candidate (2026-10-09)
+
+Branch `feat/traversal-helpers` from `a6211bd3`. Three headless tests over a sampled
+box-world query: ledge found with climb height, top and wall normal, plus no-wall,
+too-high, too-low and no-headroom; ladder attach facing rules, climbing to a top exit,
+bottom exit, top standing point and validation; pushable acceleration, speed cap,
+blocking with sliding on the other axis, friction stop and grid pushes. No game,
+browser or device evidence.

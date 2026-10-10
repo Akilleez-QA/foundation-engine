@@ -215,3 +215,43 @@ its current top.
 
 Identical arcs at aligned times run at 30, 60, 120 and 240 Hz. The boost policy is
 checked at 120 Hz. There is no browser, template or device evidence.
+
+## Traversal helpers: ledges, ladders, pushables
+
+Pure helpers over creator geometry queries. A `SphereCast` sweeps a sphere and
+returns `{hit, fraction, normal}`, the same shape as the optional volume-query kit's
+sphere `sweepVolume`. A `GroundProbe` returns a surface height or null. A `BoxSweep`
+returns the fraction of a box move that is free. The caller owns movement, animation
+and when to grab or let go.
+
+- **`findLedge(query, cast, ground)`** makes at most four queries:
+  1. a near-vertical wall within `reach` at chest height (`|normal.y| ≤ wallSlope`);
+  2. open space above the edge at the highest climbable height;
+  3. a top surface just beyond the wall within [minClimb, maxClimb] above the feet;
+  4. headroom for the body on top.
+
+  It returns `ledge` with the edge point, standing point, wall normal and climb
+  height, or a reason: `no-wall`, `not-a-wall`, `no-top`, `too-low`, `too-high` or
+  `no-headroom`.
+- **`createLadders(list)`** holds 1–1,024 authored segments (bottom, top, outward
+  side, offset).
+  - `attach(position, facing, maxDistance)` grips the nearest ladder the body faces
+    into.
+  - `climb(grip, input, speed, dt)` moves along it and reports `top` or `bottom`
+    exits, clamping the grip at the end.
+  - `pose(grip)` gives the body position.
+  - `topExit(grip, step)` gives where to stand after climbing off the top.
+- **`pushStep(state, {half, mass, force, dt, sweep, friction, maxSpeed, snap})`**
+  moves a pushable box one step.
+  - A push accelerates it by force / mass. Friction slows it when nothing pushes, and
+    speed is capped.
+  - Each horizontal axis is swept separately, so a block slides along a wall instead
+    of sticking; a blocked axis stops.
+  - With `snap`, each push moves one whole cell along the dominant axis, or nothing
+    when blocked.
+
+Bounds and failure: inputs are validated with single reads, and outputs are frozen.
+Malformed queries (fractions outside [0, 1], zero normals, non-finite heights) throw
+`RangeError`. Not provided: hang or climb animation, ledge shimmying, rope or pole
+swinging, stacked pushables or pushing up slopes, and per-frame engine integration.
+Headless evidence only.
