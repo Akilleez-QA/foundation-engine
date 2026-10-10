@@ -1543,3 +1543,66 @@ Evidence: focused headless tests (blob ids equal `git hash-object`; geometry, im
 - **Scope:** `createCompanionRecovery` in `src/kits/breadcrumbs/recovery.ts` (ADR 0155).
 - **Evidence:** `recovery.test.ts` (6 tests, including a `testScene` pit recovery).
 - **Not established:** template or browser consumers and hosted CI.
+
+## Camera director rigs — candidate (2026-10-09)
+
+Branch `feat/camera-director-rigs` from the camera director head `8749f5bb`. Four
+headless tests: look-ahead lead, catch-up on stop and on reversal; area hold, pan
+timing from the on-screen pose and keeping the last area outside every area; eased
+bounds with fast rate, snap, clamping and edges that never cross; and the rigs
+composed as a director setting in a scene. An independent adversarial review found
+the look-ahead's world speed was twice the documented bound; that is fixed with a
+world-space chase and a test of the world focus speed. It also found sparse area lists,
+non-object options, dead crossing code and naming drift, all fixed. No browser,
+visual or device evidence.
+
+## Optional car handling candidate — CAR-01, 2026-10-09
+
+`@kits/car-handling` is an independently implemented pure controller with an optional fixed-step adapter. One rigid body on 2–8 ray-cast suspension corners against a creator ground port (`planeGround`, `sampledGround` over the terrain kit's `Surface.sample`, or the creator's own ray or sweep), with corner-frequency springs, slip-curve tyres inside a friction ellipse, speed curves for drive and steering, axle-biased brakes, a handbrake with timed grip recovery, drag, downforce, air control and levelling, optional body-corner contacts and an upside-down watch that reports or resets. Steps split into at most `limits.maxSubsteps` sub-steps (at most `(wheels + 8) × maxSubsteps` ground queries), commit only when finite and inside `limits.extent`, and leave the car unchanged on any throw. `math: 'deterministic'` uses `dmath`; `snapshot`/`restore` is JSON-exact and refused across configurations. The vehicles, control, camera, terrain and rollback kits keep their responsibilities; no registration, clock or collision owner is added. [README](../../src/kits/car-handling/README.md), [ADR 0140](../adr/0140-optional-car-handling.md).
+
+Evidence: 29 focused headless tests (25 unit tests over both presets, creep, tunnelling, overhead decks, slope hold, refusal, bounds and bit-identical replay and snapshot round trips in both math modes; 4 consumer tests: ECS fixed-step adapter, terrain-kit sampled ramp, rollback kit sync test over 600 frames). An independent adversarial review found creep at rest from an incomplete stop-cap prediction, wheel-ray tunnelling in fast falls, accepted suspension tunings too stiff for the sub-step, a foot-brake share lost on an empty axle, permissive restores, silently dropped unknown fields, port state leaking through the hit record, re-entry, and overstated -0 and allocation claims; all were fixed with regression tests. A verification pass found that the first tunnelling fix lifted fast cars onto overhead decks, that the stability bound ignored pitch and roll, and that a port could hide a re-entry refusal; those were fixed too, with regression tests. A car on its roof counting as airborne and the presets' brake-to-reverse are documented limits. This is a branch candidate: hosted full CI, a playable template consumer, browser behaviour, driving feel and physical-device acceptance remain pending.
+
+
+## Optional board traversal candidate — BOARD-01, 2026-10-09
+
+`@kits/board-traversal` is an independently implemented pure controller with an optional fixed-step adapter. One rider in rolling, air, grind, manual or bail mode: discrete pushes, slope acceleration, resistance, brake and carving along the ground tangent; a step-up/step-down ground window and a launch rule from the vertical speed change a contact can absorb; charged ollies; an exact ballistic arc with board spin and a creator trick timer; landings judged by board-to-travel angle (clean, sketchy, switched, bail by angle, impact or unfinished trick); grinds on creator-authored `defineRails` snapshots (revisioned, segment-bounded, id-ordered) with a catch window, alignment, one-scalar balance, pop, end and drop exits and a re-catch delay; manuals with balance; bails with recovery. Ports per step: a one-way ground query (`sampledBoardGround` over the terrain kit's samples), rails and an optional wall slide (`characterSlide` over the character kit's walls and solids). At most `maxSubsteps` ground queries and `maxSubsteps × segments` rail checks per step; steps commit only when finite and inside `limits.extent` and leave the rider unchanged on any throw. `math: 'deterministic'` uses `dmath`; `snapshot`/`restore` is JSON-exact and refused across configurations. No registration, trick catalogue, scoring or camera is added. [README](../../src/kits/board-traversal/README.md), [ADR 0141](../adr/0141-optional-board-traversal.md).
+
+Evidence: 25 focused headless tests (22 unit tests over both presets, landing judgement, rails, balance, manuals, kicker, slopes, walls, refusals, the work bound and bit-identical replay and snapshot round trips in both math modes; 3 consumer tests: ECS adapter with character-kit walls, terrain-kit sampled hill, rollback kit sync test over 900 frames through pushes, grinds, tricks and bails). An independent adversarial review found a plain ollie while riding switched judged as a switch with lost speed, speed lost and boards wedged when rail data changed or did not match mid-grind, the re-catch delay outliving a landing, stale heading after landing bails, repeated trick starts within one step, an unpaired manual end on wall bails, sub-step-dependent wall grazing, platform arithmetic in adapter walls, a pop on lost control, normal overflow, -0, re-entry, permissive restores, silently dropped unknown fields and overstated allocation claims; all were fixed with regression tests, and a verification pass found and closed three more (the re-catch delay after a bail landing, normal underflow, re-entry hidden by a port). Unaligned board yaw on rails and the wall port's own allocation are documented limits. This is a branch candidate: hosted full CI, a playable template consumer, browser behaviour, riding feel and physical-device acceptance remain pending.
+
+## Grid-step kit — candidate (2026-10-09)
+
+- **Scope:** `src/kits/grid-step` (ADR 0104).
+- **Evidence:** `grid-step.test.ts` covers timing, reservations, the refusal order, ledges, forced tiles, follower lines, snapshots, validation and reentrancy.
+- **Not established:** template or browser consumers and hosted CI.
+
+## Optional sandboxed script runtime candidate (2026-10-09)
+
+`@kits/scripting` (SCRIPT-01, [guide](scripting.md), ADR 0120) adds opt-in Lua 5.4 scripts on the exact-pinned
+`wasmoon` 1.16.0 dependency, loaded lazily by `loadScriptVm`. Runtime contracts: per-script Lua state with an
+allocation cap, deterministic, uncatchable per-call instruction budgets, host-call limits, a wall-time stop, capability-scoped
+host functions, plain-data marshalling bounds, fixed-tick timers, a seeded saveable random stream, atomic
+save/restore/reload with a stated restart contract (only `state` survives), and per-script faulting. Checked
+evidence: 23 focused headless tests (after an independent adversarial review whose findings are fixed: metered native
+work, deferred dispose, metatable copies, strict UTF-8, pre-call argument checks), including a `@kits/rollback` sync-test consumer and a `testScene` consumer;
+headless Chromium runs of a fixture game through the development server and a production-mode build (VM chunk and
+binary fetched lazily, no page errors). Not established: hosted full CI on this branch, physical devices,
+long-session memory behaviour, or any template consumer. Stock-game first-load JavaScript is unchanged.
+
+## Optional physics adapter kit candidate (2026-10-09)
+
+`@kits/physics` (ADR 0121, [guide](physics-adapter.md)) adapts one lazily loaded
+WebAssembly library: `@dimforge/rapier3d-deterministic-compat` 0.21.0, Apache-2.0,
+the one new runtime dependency, approved for this kit only. Core stays physics-free.
+
+- **Bundle:** stock first-load JS is unchanged at 175.6 KiB. The library is a dynamic
+  chunk of 4,366,824 bytes (1,658,896 bytes `gzip -9`) that a consuming game must list
+  in its own `largeChunkAllow`. No budget changed.
+- **Runtime contracts:** configured admission, event, query, snapshot and debug-vertex
+  limits; refusals and drops are counted; disposal is exactly once per visit.
+- **Candidate evidence:** 35 focused Node tests in `src/kits/physics` (plus one
+  character-kit motion test): lifecycle, refusals, `Transform` bound validation,
+  ordering, order-independent query truncation, snapshot determinism, forged-snapshot
+  refusal, the rollback sync test and two-peer session, and the character adapter. Also
+  one software-GL `play:snap` of an uncommitted fixture.
+- **Not established:** hosted CI, cross-browser bit identity, GPU/physical-device
+  performance and memory, and multiplayer acceptance.
