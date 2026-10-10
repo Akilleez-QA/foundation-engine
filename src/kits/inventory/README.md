@@ -118,3 +118,35 @@ collector. Inputs/snapshots are detached, and reentrant mutation through input
 getters throws. The current test evidence is a headless consumer with stock,
 reservation and job references, including reload and failed all-or-nothing
 retirement; no game, production pipeline or browser integration is implied.
+
+## Optional slot, stack and key-item rules
+
+`createRuledInventory(defineInventoryRules({containers, materials}), {maxOperations?}, snapshot?)` wraps the same
+ledger with the limits of item bags. It is additive: existing ledgers and producers do not change. The ledger also
+gains a read-only `contents(container)` listing (batch ids and quantities, sorted) that the rules use.
+
+- **Containers**: `slots` (1–4,096), `stackSize` (1–1,000,000), `overflow`: `spill` (default; a batch occupies
+  ⌈quantity / stack⌉ slots, so a full stack overflows into a new slot) or `single` (one slot per batch, quantity at
+  most the stack).
+- **Materials** (by the batch's `material`): `stackSize` (1 = unstackable), `key` (cannot be discarded; consumed
+  only when the operation passes `{allowKey: true}`, such as a scripted use), `maxOwned` (total units across all
+  containers; 1 = unique) and `containers` (where it may be placed).
+- Every `transact`, `discard`, `transfer` and `commitReservation` is checked on the projected contents before the
+  ledger applies it. A refusal returns `{ok: false, reason: 'slots' | 'stack' | 'key-item' | 'owned' |
+  'container', container?, material?}` and changes nothing (no receipt, so a corrected retry may reuse the id).
+  Ledger refusals (`insufficient`, `conflict`, …) pass through unchanged. Transfers may move key items.
+- `room(container, batch)` (how many more units fit), `slotsUsed(container)`, plus the ledger's reads.
+- Ledger capacities are derived from the rules (slots × the largest stack a container can hold), so the ledger is
+  never stricter than the rules. Snapshots are the ledger's; restoring replays the history through the rules and
+  refuses a history that breaks them or capacities that differ (changing rules needs a migration).
+
+Presets (`inventoryPresets`): `handheldBag` reproduces the bag of the 1996 handheld monster-collecting RPGs as
+documented by the community reconstruction github.com/liuyanghejerry/open-pokered (revision 31b1eda,
+`items/inventory.rs`; no code included): a 20-slot bag and 50-slot box, 99 per slot with spill, key items that cannot
+be tossed (add your key materials with `key: true`). Slot order and the original's refusal at the first matching
+stack in a full bag are not reproduced. `hotbarAndPack` (survival archetype: 9 + 27 slots, stacks of 64, unstackable
+tools) and `adventureSlots` (one item per slot, unique kept quest items) are generic starting points.
+
+Costs: each checked operation lists the touched containers' contents and, for `maxOwned` materials, every
+container: O(batches held). This is a per-action check, not a per-frame one. No UI, sorting, weights or equipment
+slots (see the equipment kit).

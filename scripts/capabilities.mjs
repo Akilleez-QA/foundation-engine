@@ -43,6 +43,16 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'INV-RULES-01',
+    title: 'Optional slot, stack and key-item rules over the inventory ledger',
+    docs: 'src/kits/inventory/README.md',
+    evidence: [
+      {kit: 'inventory', export: 'createRuledInventory'},
+      {kit: 'inventory', export: 'inventoryPresets'},
+      {path: 'src/kits/inventory/rules.test.ts'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',
