@@ -131,6 +131,13 @@ export interface ViewState {
   /** `fov` is vertical, in degrees. `minWidthFov` (degrees) keeps at least that much horizontal view on a narrow
    *  (portrait) screen by widening the vertical field of view, so a phone sees the whole play area. */
   camera: {position: Vec3; target: Vec3; fov: number; minWidthFov?: number; mask?: number};
+  /**
+   * Optional audio listener. Absent: sounds are heard from the camera. Set `position` (e.g. the player character's
+   * head) to hear from there; `forward` and `up` default to the camera's orientation. Replace the value each frame it
+   * moves (`@kits/audio-mixer` `blendListener` mixes camera and character positions). Invalid values are reported
+   * and the camera is used.
+   */
+  listener?: {position: Vec3; forward?: Vec3 | undefined; up?: Vec3 | undefined} | undefined;
   background: number;
   /** Replace this value to publish an environment change. */
   environment?: EnvironmentState | undefined;

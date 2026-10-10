@@ -144,6 +144,18 @@
       ]
     },
     {
+      "id": "AUDIO-EXTRAS-01",
+      "title": "Character listener blend, Doppler, retrigger pitch, instance limits and quantized adaptive music",
+      "shipped": true,
+      "docs": "src/kits/audio-mixer/README.md",
+      "evidence": [
+        "@kits/audio-mixer exports blendListener",
+        "@kits/audio-mixer exports dopplerRate",
+        "@kits/audio-mixer exports createMusicDirector",
+        "src/kits/audio-mixer/extras.test.ts exists"
+      ]
+    },
+    {
       "id": "VIS-01",
       "title": "Tone mapping and exposure per scene (view.output)",
       "shipped": true,
@@ -614,7 +626,20 @@
       ]
     },
     {"name": "assignments", "exports": ["createAssignments"]},
-    {"name": "audio-mixer", "exports": ["audioMixer", "createCueMixer", "createDucking"]},
+    {
+      "name": "audio-mixer",
+      "exports": [
+        "audioMixer",
+        "blendListener",
+        "createCueMixer",
+        "createDucking",
+        "createInstanceLimits",
+        "createMusicClock",
+        "createMusicDirector",
+        "createRetrigger",
+        "dopplerRate"
+      ]
+    },
     {"name": "authoring", "exports": ["authoredReference", "createAuthoredDocument", "createAuthoringSession"]},
     {"name": "cadence", "exports": ["CADENCE_CEILING", "MAX_CADENCE_TICK", "createCadence", "createCadenceResult"]},
     {
