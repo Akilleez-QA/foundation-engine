@@ -31,16 +31,20 @@ const input = lockedInput(ctx.input, () => transition.peek().locked);
   of `cover` until coverage returns to 0.
 - **Reversal:** calling `cover` while uncovering, or `uncover` while covering, reverses from the coverage currently
   shown, so the overlay never jumps.
-- **Repeat calls:** a repeated call within the same phase does nothing.
+- **Repeat calls:** a repeated call within the same phase does nothing. `setStyle` during a fade keeps the coverage
+  shown and continues with the new durations.
+- **Swap on `reached`:** `reached: 'covered'` is reported by `update`. If you call `uncover` before an `update`
+  reports it, the swap point is skipped, so swap only after seeing `reached`.
 - **Time:** time must not go backwards.
 - **Kinds and CSS:** `transitionCss(style, coverage)` returns the styles for the overlay element. It uses smoothstep
   easing.
   - `fade`: opacity.
   - `wipe`: a hard-edged linear gradient from a chosen side.
   - `iris`: a circle closing on `center`, for example the player's projected position.
-- **Colour:** a simple CSS colour; values such as `url(...)` are refused.
+- **Colour:** `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, comma `rgb()`/`rgba()`, or a named colour. Values that would
+  not cover (`transparent`, `inherit`, ...) and anything else (such as `url(...)`) are refused.
 - **Input lock:** `lockedInput(input, locked)` reads neutral while `locked()` is true: nothing pressed or held, axes
-  at 0, pointer up.
+  at 0, pointer up and centred. Presses during the lock are dropped, not deferred.
 
 ## Time of day
 
@@ -67,7 +71,8 @@ const w = weather.sample(ctx.time.t).named;                  // feed haze densit
 ```
 
 - **States:** each named state gives a value for each parameter. Blends use smoothstep.
-- **Retargeting:** changing state mid-blend starts from the values currently shown, with no jump.
+- **Retargeting:** changing state mid-blend starts from the values currently shown, with no jump. Setting the state
+  it is already heading to does nothing, so a system may request the zone's weather every frame.
 - **`progress`:** reports how far the current blend has gone.
 
 ## HUD roll-up
@@ -83,12 +88,13 @@ const w = weather.sample(ctx.time.t).named;                  // feed haze densit
 ## Ownership, bounds and failure
 
 - **Bounds:** at most 64 curve keys, 32 weather states and 32 parameters, and 16 tuple components. Times and values
-  must be finite. Transitions take 0–30 s.
+  must be finite with magnitude at most 1e12. Transitions take 0–30 s.
 - **Failure:** malformed input throws `RangeError` before any change.
 - **Time:** time-driven helpers refuse time that goes backwards. Saving their state is the creator's job; restart
   them from your saved game time.
-- **Overlay:** the element is `aria-hidden`, is removed when the visit's signal aborts, and is restyled only when
-  its CSS changes.
+- **Overlay:** the element is `aria-hidden`, is removed when the visit's signal aborts (and is not created when it
+  already has), and is restyled only when its CSS changes. It sets no z-index: mount it last, or style it above
+  other overlay content.
 
 ## Limits
 

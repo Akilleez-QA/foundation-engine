@@ -50,7 +50,16 @@ test('transition CSS: fade opacity, hard-edged wipe, iris closing on its centre'
   const iris = transitionCss({kind: 'iris', coverSeconds: 1, uncoverSeconds: 1, center: [0.25, 0.75]}, 1);
   assert.match(iris['background']!, /circle at 25\.00% 75\.00%, transparent 0\.000%/);
   assert.equal(transitionCss({kind: 'iris', coverSeconds: 1, uncoverSeconds: 1}, 0)['pointer-events'], 'none');
-  for (const bad of [{color: 'url(x)'}, {center: [2, 0]}, {coverSeconds: -1}, {kind: 'spin'}])
+  for (const bad of [
+    {color: 'url(x)'},
+    {color: 'red;background:url(x)'},
+    {color: 'transparent'},
+    {color: '#12345'},
+    {color: 'rgb(,,,%)'},
+    {center: [2, 0]},
+    {coverSeconds: -1},
+    {kind: 'spin'},
+  ])
     assert.throws(() => transitionCss({kind: 'fade', coverSeconds: 1, uncoverSeconds: 1, ...bad} as never, 0.5));
   assert.equal(mountTransitionOverlay(null).element, null, 'headless overlay is a no-op');
 });
@@ -198,4 +207,25 @@ test('composition: a scene transition locks movement while covered and the count
   assert.equal(transition.phase, 'idle');
   assert.equal(t.ctx.state.shown, 250);
   assert.equal(presentation().id, 'presentation');
+});
+
+test('review regressions: style changes keep coverage, weather re-requests do not stall, aborted overlays, nextAt', () => {
+  const t = createScreenTransition({kind: 'fade', coverSeconds: 1, uncoverSeconds: 1});
+  t.cover(0);
+  assert.equal(t.update(0.5).coverage, 0.5);
+  t.setStyle({kind: 'fade', coverSeconds: 10, uncoverSeconds: 1});
+  assert.equal(t.peek().coverage, 0.5, 'coverage carries over');
+  const w = createWeatherDirector({params: ['fog'], states: {clear: {}, storm: {fog: 1}}, initial: 'clear'});
+  w.set('storm', 0, 20);
+  for (let i = 1; i <= 1260; i++) w.set('storm', i / 60, 20);
+  assert.equal(w.sample(21).named['fog'], 1);
+  const proto = createWeatherDirector({params: ['toString'], states: {a: {}}, initial: 'a'});
+  assert.deepEqual(proto.sample(0).values, [0]);
+  const ac = new AbortController();
+  ac.abort();
+  assert.equal(mountTransitionOverlay({ownerDocument: null} as never, ac.signal).element, null);
+  const clock = createDayClock({dayLength: 1e7});
+  for (const time of [123456789.123, 9.87654321e11, 5e11 + 0.3])
+    assert.ok(clock.nextAt(time, clock.timeOfDay(time)) >= time);
+  assert.throws(() => createCycleCurve([null as never]), RangeError);
 });

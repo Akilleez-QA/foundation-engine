@@ -47,7 +47,7 @@ export function createDayClock(options: {readonly dayLength: number; readonly st
       const p = position(t);
       let target = Math.floor(p) + fraction;
       if (target < p - 1e-12) target += 1;
-      return (target - start) * dayLength;
+      return Math.max(t, (target - start) * dayLength);
     },
   };
   return Object.freeze(clock);
@@ -74,7 +74,11 @@ export function createCycleCurve<V extends CurveValue>(
   if (!Array.isArray(keys) || keys.length < 1 || keys.length > 64) fail('a curve needs 1 to 64 keys');
   const interpolation = options.interpolation ?? 'linear';
   if (interpolation !== 'linear' && interpolation !== 'smooth') fail('interpolation must be linear or smooth');
-  const width = Array.isArray(keys[0]!.value) ? (keys[0]!.value as readonly number[]).length : -1;
+  const head: unknown = keys[0];
+  if (typeof head !== 'object' || head === null) return fail('keys must be objects');
+  const width = Array.isArray((head as CurveKey<V>).value)
+    ? ((head as CurveKey<V>).value as readonly number[]).length
+    : -1;
   if (width === 0 || width > 16) fail('tuple values need 1 to 16 numbers');
   const captured = keys.map((k, i) => {
     if (typeof k !== 'object' || k === null) fail('keys must be objects');
@@ -157,7 +161,7 @@ export function createWeatherDirector(options: WeatherDirectorOptions) {
     states.set(
       name,
       names.map(n => {
-        const x = v[n] ?? 0;
+        const x = Object.hasOwn(v, n) ? v[n] : 0;
         return finite(x) ? x : fail(`state ${name} param ${n} must be finite`);
       }),
     );
@@ -189,6 +193,7 @@ export function createWeatherDirector(options: WeatherDirectorOptions) {
       if (!states.has(state)) fail(`unknown weather state ${state}`);
       if (!finite(seconds) || seconds < 0 || seconds > 3600) fail('seconds must be in [0, 3600]');
       const t = time(now);
+      if (state === target) return; // already heading there: re-requesting each frame never restarts the blend
       from = valuesAt(t).values;
       target = state;
       start = t;

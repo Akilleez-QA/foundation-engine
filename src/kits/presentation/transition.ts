@@ -33,7 +33,11 @@ const fail = (message: string): never => {
   throw new RangeError(`presentation: ${message}`);
 };
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-const COLOR = /^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,20}|rgba?\([0-9., %]+\))$/;
+const NAMED = /^[a-zA-Z]{3,20}$/;
+const COLOR =
+  /^(#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|rgba?\(\s*\d{1,3}(?:\s*,\s*\d{1,3}){2}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\))$/;
+/** Named colours that would not cover the view. */
+const NON_COVERING = new Set(['transparent', 'inherit', 'initial', 'unset', 'revert', 'currentcolor']);
 
 function captureStyle(input: TransitionStyle): Required<TransitionStyle> {
   if (typeof input !== 'object' || input === null) return fail('style must be an object');
@@ -44,7 +48,11 @@ function captureStyle(input: TransitionStyle): Required<TransitionStyle> {
     if (!finite(v) || v < 0 || v > 30) fail(`${k} must be in [0, 30]`);
   }
   const color = r.color ?? '#000';
-  if (typeof color !== 'string' || !COLOR.test(color)) fail('color must be a simple CSS colour');
+  if (
+    typeof color !== 'string' ||
+    !(COLOR.test(color) || (NAMED.test(color) && !NON_COVERING.has(color.toLowerCase())))
+  )
+    fail('color must be #rgb/#rrggbb(aa), rgb()/rgba() with commas, or a named colour that covers');
   const direction = r.direction ?? 'right';
   if (!['left', 'right', 'up', 'down'].includes(direction as string)) fail('direction must be left, right, up or down');
   const center = r.center ?? [0.5, 0.5];
@@ -99,7 +107,14 @@ export function createScreenTransition(initial: TransitionStyle) {
     },
     /** Change the look for the next transition (or the current one: the coverage carries over). */
     setStyle(next: TransitionStyle): void {
-      style = captureStyle(next);
+      const captured = captureStyle(next);
+      // Rebase an active fade so the coverage shown now carries over into the new durations.
+      if (phase === 'covering' || phase === 'uncovering') {
+        const now = last === -Infinity ? 0 : last;
+        from = coverageAt(now);
+        start = now;
+      }
+      style = captured;
     },
     /** Begin covering from the current coverage (reverses an uncover in progress). */
     cover(now: number): void {
@@ -179,6 +194,7 @@ export function mountTransitionOverlay(
   signal?: AbortSignal,
 ): {render(transition: ScreenTransition): void; readonly element: HTMLElement | null} {
   if (!overlay) return {render() {}, element: null};
+  if (signal?.aborted) return {render() {}, element: null};
   const el = overlay.ownerDocument.createElement('div');
   el.setAttribute('aria-hidden', 'true');
   el.dataset.presentationTransition = '';
