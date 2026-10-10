@@ -123,6 +123,17 @@
       ]
     },
     {
+      "id": "DORMANCY-01",
+      "title": "Optional zone and view-volume entity dormancy",
+      "shipped": true,
+      "docs": "src/kits/dormancy/README.md",
+      "evidence": [
+        "@kits/dormancy exports createDormancy",
+        "@kits/dormancy exports dormantAsFar",
+        "src/kits/dormancy/consumers.test.ts exists"
+      ]
+    },
+    {
       "id": "CADENCE-01",
       "title": "Optional bounded per-member update cadence",
       "shipped": true,
@@ -843,6 +854,7 @@
     },
     {"name": "control", "exports": ["control", "createControl"]},
     {"name": "dialogue", "exports": ["DIALOGUE_LIMITS", "createDialogue", "dialogue"]},
+    {"name": "dormancy", "exports": ["DORMANCY_CEILING", "createDormancy", "dormancy", "dormantAsFar"]},
     {
       "name": "economy",
       "exports": [

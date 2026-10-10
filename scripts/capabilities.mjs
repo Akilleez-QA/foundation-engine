@@ -160,6 +160,16 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'DORMANCY-01',
+    title: 'Optional zone and view-volume entity dormancy',
+    docs: 'src/kits/dormancy/README.md',
+    evidence: [
+      {kit: 'dormancy', export: 'createDormancy'},
+      {kit: 'dormancy', export: 'dormantAsFar'},
+      {path: 'src/kits/dormancy/consumers.test.ts'},
+    ],
+  },
+  {
     id: 'CADENCE-01',
     title: 'Optional bounded per-member update cadence',
     docs: 'docs/guides/update-cadence.md',
