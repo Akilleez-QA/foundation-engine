@@ -34,8 +34,10 @@ export interface TileRule {
   readonly ledge?: Direction;
   /** Arriving here forces another step: a fixed direction (conveyor) or `'continue'` (ice: keep going). */
   readonly forced?: Direction | 'continue';
-  /** Height layer; an actor arriving takes it. Undefined: compatible with every elevation. */
+  /** Height layer 0-255; an actor arriving takes it. Undefined: compatible with every elevation, no change. */
   readonly elevation?: number;
+  /** A stair or ramp tile: enterable at any elevation, and arriving clears the actor's elevation. */
+  readonly transition?: boolean;
 }
 
 export interface GridStepOptions {
@@ -71,7 +73,7 @@ export interface ActorInput {
   readonly stepTicks?: number;
 }
 
-export type Refusal = 'busy' | 'outside-range' | 'impassable' | 'elevation' | 'occupied';
+export type Refusal = 'busy' | 'outside-range' | 'impassable' | 'elevation' | 'occupied' | 'chain-limit';
 export type MoveResult =
   | {readonly kind: 'started' | 'jumped'; readonly toX: number; readonly toY: number; readonly ticks: number}
   | {readonly kind: 'turned'}
@@ -150,13 +152,66 @@ export function createGridStepper(options: GridStepOptions) {
 
   const key = (x: number, y: number) => y * width + x;
   const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < width && y < height;
+  let malformedTiles = 0;
+  const CLOSED: TileRule = Object.freeze({passable: false});
+  const isDir = (v: unknown): v is Direction => typeof v === 'string' && (DIRECTIONS as readonly string[]).includes(v);
+  const mask = (v: unknown) =>
+    v === undefined || (Number.isSafeInteger(v) && (v as number) >= 0 && (v as number) <= 15);
+  /**
+   * The normalized rule for a tile. Reads each field once. A tile function that throws or returns a malformed rule
+   * fails closed (impassable) and is counted in `diagnostics().malformedTiles`, so no request can be half-applied.
+   */
   const rule = (x: number, y: number): TileRule => {
-    if (!inside(x, y)) return {passable: false};
-    const r = tileOf(x, y);
+    if (!inside(x, y)) return CLOSED;
+    let r: unknown;
+    try {
+      r = tileOf(x, y);
+    } catch {
+      malformedTiles++;
+      return CLOSED;
+    }
     if (r === undefined) return {};
-    if (typeof r !== 'object' || r === null) return fail('tile rules must be objects or undefined');
-    return r;
+    try {
+      if (typeof r !== 'object' || r === null) throw 0;
+      const src: Record<string, unknown> = {...r};
+      const {passable, classes, blockEnter, blockLeave, ledge, forced, elevation, transition} = src;
+      if (passable !== undefined && typeof passable !== 'boolean') throw 0;
+      if (transition !== undefined && typeof transition !== 'boolean') throw 0;
+      if (
+        classes !== undefined &&
+        !(Number.isSafeInteger(classes) && (classes as number) >= 0 && (classes as number) <= 0xffffffff)
+      )
+        throw 0;
+      if (!mask(blockEnter) || !mask(blockLeave)) throw 0;
+      if (ledge !== undefined && !isDir(ledge)) throw 0;
+      if (forced !== undefined && forced !== 'continue' && !isDir(forced)) throw 0;
+      if (
+        elevation !== undefined &&
+        !(Number.isSafeInteger(elevation) && (elevation as number) >= 0 && (elevation as number) <= 255)
+      )
+        throw 0;
+      return {passable, classes, blockEnter, blockLeave, ledge, forced, elevation, transition} as TileRule;
+    } catch {
+      malformedTiles++;
+      return CLOSED;
+    }
   };
+  /** Leader id -> follower ids. */
+  const followers = new Map<number, Set<number>>();
+  const setLeader = (f: Actor, leader: number | null) => {
+    if (f.leader !== null) {
+      const set = followers.get(f.leader);
+      set?.delete(f.id);
+      if (set && set.size === 0) followers.delete(f.leader);
+    }
+    f.leader = leader;
+    if (leader !== null) {
+      let set = followers.get(leader);
+      if (!set) followers.set(leader, (set = new Set()));
+      set.add(f.id);
+    }
+  };
+  const moving = new Set<number>();
   const claim = (x: number, y: number, id: number) => {
     const k = key(x, y);
     let set = claims.get(k);
@@ -200,12 +255,13 @@ export function createGridStepper(options: GridStepOptions) {
       const here = rule(a.x, a.y);
       if ((here.blockLeave ?? 0) & BIT[dir]) return {kind: 'bumped', reason: 'impassable'};
       let target = rule(tx, ty);
-      if (target.ledge === dir) {
+      if (target.ledge === dir && target.passable !== false && ((target.blockEnter ?? 0) & BIT[dir]) === 0) {
         // Jump over the ledge tile and land one beyond it.
         tx += dx;
         ty += dy;
         if (!inside(tx, ty)) return {kind: 'bumped', reason: 'impassable'};
         target = rule(tx, ty);
+        if (target.ledge !== undefined) return {kind: 'bumped', reason: 'impassable'};
         ticks = jumpTicks;
         jumped = true;
         if (a.leash) {
@@ -217,7 +273,8 @@ export function createGridStepper(options: GridStepOptions) {
       if (target.passable === false || ((target.blockEnter ?? 0) & BIT[dir]) !== 0)
         return {kind: 'bumped', reason: 'impassable'};
       if (((target.classes ?? 0xffffffff) & a.classes) === 0) return {kind: 'bumped', reason: 'impassable'};
-      if (!compatible(a.elevation, target.elevation)) return {kind: 'bumped', reason: 'elevation'};
+      if (target.transition !== true && !compatible(a.elevation, target.elevation))
+        return {kind: 'bumped', reason: 'elevation'};
     } else if (!inside(tx, ty)) return {kind: 'bumped', reason: 'impassable'};
     if (!a.ignoreActors) {
       const holders = claims.get(key(tx, ty));
@@ -240,22 +297,42 @@ export function createGridStepper(options: GridStepOptions) {
     a.elapsed = 0;
     a.duration = result.ticks;
     claim(a.toX, a.toY, a.id);
+    moving.add(a.id);
   }
 
-  /** Followers (in id order) step into the tile `leader` is leaving. */
-  function pullFollowers(leader: Actor, events: StepEvent[] | null) {
-    const ordered = [...actors.values()].filter(f => f.leader === leader.id).sort((p, q) => p.id - q.id);
-    for (const f of ordered) {
-      if (f.duration > 0) continue;
-      const dx = leader.x - f.x,
-        dy = leader.y - f.y;
-      const dir = DIRECTIONS.find(d => DELTA[d][0] === dx && DELTA[d][1] === dy);
-      const result: MoveResult = dir ? classify(f, dir, leader.id) : {kind: 'bumped', reason: 'outside-range'};
-      if (dir && (result.kind === 'started' || result.kind === 'jumped')) {
-        begin(f, dir, result);
-        pullFollowers(f, events);
+  /**
+   * Followers step into the tile their leader is leaving: breadth-first down the chain, followers of one leader in
+   * id order, iterative (no recursion). A follower two tiles straight behind with a ledge between jumps it.
+   */
+  function pullFollowers(first: Actor, events: StepEvent[] | null) {
+    const queue: Actor[] = [first];
+    for (let head = 0; head < queue.length; head++) {
+      const leader = queue[head]!;
+      const ids = followers.get(leader.id);
+      if (!ids) continue;
+      for (const fid of [...ids].sort((p, q) => p - q)) {
+        const f = actors.get(fid)!;
+        if (f.duration > 0) continue;
+        const dx = leader.x - f.x,
+          dy = leader.y - f.y;
+        const span = Math.abs(dx) + Math.abs(dy);
+        const dir =
+          (span === 1 || span === 2) && (dx === 0 || dy === 0)
+            ? DIRECTIONS.find(d => DELTA[d][0] === Math.sign(dx) && DELTA[d][1] === Math.sign(dy))
+            : undefined;
+        let result: MoveResult = dir ? classify(f, dir, leader.id) : {kind: 'bumped', reason: 'outside-range'};
+        if (
+          (result.kind === 'started' || result.kind === 'jumped') &&
+          (result.toX !== leader.x || result.toY !== leader.y)
+        )
+          result = {kind: 'bumped', reason: 'outside-range'};
+        if (dir && (result.kind === 'started' || result.kind === 'jumped')) {
+          f.forcedChain = 0;
+          begin(f, dir, result);
+          queue.push(f);
+        }
+        events?.push(Object.freeze({kind: 'followed', id: f.id, leader: leader.id, result: Object.freeze(result)}));
       }
-      events?.push(Object.freeze({kind: 'followed', id: f.id, leader: leader.id, result}));
     }
   }
 
@@ -315,6 +392,11 @@ export function createGridStepper(options: GridStepOptions) {
           leader: null,
           forcedChain: 0,
         };
+        if (!a.ignoreTiles) {
+          const here = rule(x, y);
+          if (here.passable === false || ((here.classes ?? 0xffffffff) & a.classes) === 0)
+            fail(`tile ${x},${y} cannot hold this actor`);
+        }
         if (!a.ignoreActors) {
           const holders = claims.get(key(x, y));
           if (
@@ -334,8 +416,10 @@ export function createGridStepper(options: GridStepOptions) {
         if (!a) return false;
         release(a.x, a.y, id);
         release(a.toX, a.toY, id);
+        setLeader(a, null);
+        for (const fid of [...(followers.get(id) ?? [])]) setLeader(actors.get(fid)!, null);
         actors.delete(id);
-        for (const f of actors.values()) if (f.leader === id) f.leader = null;
+        moving.delete(id);
         return true;
       });
     },
@@ -359,6 +443,7 @@ export function createGridStepper(options: GridStepOptions) {
       return guarded(() => {
         const a = get(id);
         const d = direction(dir);
+        if (typeof o !== 'object' || o === null) fail('move options must be an object');
         if (a.duration > 0) return Object.freeze({kind: 'bumped', reason: 'busy'}) as MoveResult;
         if (o.turnOnly === true || (turnBeforeMove && a.facing !== d)) {
           a.facing = d;
@@ -377,7 +462,7 @@ export function createGridStepper(options: GridStepOptions) {
       guarded(() => {
         const a = get(id);
         if (leader === null) {
-          a.leader = null;
+          setLeader(a, null);
           return;
         }
         get(leader);
@@ -385,16 +470,24 @@ export function createGridStepper(options: GridStepOptions) {
           if (cursor === id || n > maxActors) fail('follower chains must not form a cycle');
           cursor = actors.get(cursor)!.leader;
         }
-        a.leader = leader;
+        setLeader(a, leader);
       });
     },
-    /** Advance every moving actor by one tick, in id order. Arrivals may trigger forced moves and pull followers. */
+    /**
+     * Advance every moving actor by one tick, in id order. Arrivals may start forced moves. Followers of every
+     * actor that started a move this tick are pulled after all arrivals, so the outcome does not depend on ids.
+     * Event order: arrivals and forced moves in id order, then follower moves breadth-first per leader.
+     */
     step(): readonly StepEvent[] {
       return guarded(() => {
         const events: StepEvent[] = [];
-        const moving = [...actors.values()].filter(a => a.duration > 0).sort((p, q) => p.id - q.id);
-        for (const a of moving) {
-          if (actors.get(a.id) !== a || a.duration === 0) continue;
+        const started: Actor[] = [];
+        for (const id of [...moving].sort((p, q) => p - q)) {
+          const a = actors.get(id);
+          if (!a || a.duration === 0) {
+            moving.delete(id);
+            continue;
+          }
           a.elapsed++;
           if (a.elapsed < a.duration) continue;
           release(a.x, a.y, a.id);
@@ -402,28 +495,35 @@ export function createGridStepper(options: GridStepOptions) {
           a.y = a.toY;
           a.elapsed = 0;
           a.duration = 0;
+          moving.delete(id);
           claim(a.x, a.y, a.id);
           const arrivedOn = a.ignoreTiles ? {} : rule(a.x, a.y);
-          if (arrivedOn.elevation !== undefined) a.elevation = arrivedOn.elevation;
+          if (arrivedOn.transition === true) a.elevation = undefined;
+          else if (arrivedOn.elevation !== undefined) a.elevation = arrivedOn.elevation;
           events.push(Object.freeze({kind: 'arrived', id: a.id, x: a.x, y: a.y}));
           const forced = arrivedOn.forced;
           if (forced !== undefined) {
             const dir = forced === 'continue' ? a.facing : forced;
             let result: MoveResult;
-            if (a.forcedChain >= maxForcedChain) result = {kind: 'bumped', reason: 'busy'};
+            if (a.forcedChain >= maxForcedChain) result = {kind: 'bumped', reason: 'chain-limit'};
             else {
               result = classify(a, dir, null);
               begin(a, dir, result);
               if (result.kind === 'started' || result.kind === 'jumped') {
                 a.forcedChain++;
-                pullFollowers(a, events);
+                started.push(a);
               }
             }
             events.push(Object.freeze({kind: 'forced', id: a.id, direction: dir, result: Object.freeze(result)}));
           } else a.forcedChain = 0;
         }
+        for (const a of started) pullFollowers(a, events);
         return Object.freeze(events);
       });
+    },
+    /** Counters for creator diagnostics. */
+    diagnostics(): {readonly malformedTiles: number; readonly moving: number} {
+      return Object.freeze({malformedTiles, moving: moving.size});
     },
     /** Tiles currently claimed by actors (standing tiles and both ends of moves), for debugging and tests. */
     occupants(x: number, y: number): readonly number[] {
@@ -473,7 +573,7 @@ export function createGridStepper(options: GridStepOptions) {
             elapsed: int(r.elapsed, 0, GRID_STEP_LIMITS.maxTicks, 'elapsed'),
             duration: int(r.duration, 0, GRID_STEP_LIMITS.maxTicks, 'duration'),
             leader: r.leader === null ? null : int(r.leader, 0, Number.MAX_SAFE_INTEGER, 'leader'),
-            forcedChain: int(r.forcedChain, 0, 4096, 'forcedChain'),
+            forcedChain: int(r.forcedChain, 0, maxForcedChain, 'forcedChain'),
           };
           const span = Math.abs(a.toX - a.x) + Math.abs(a.toY - a.y);
           const straight = a.toX === a.x || a.toY === a.y;
@@ -500,16 +600,11 @@ export function createGridStepper(options: GridStepOptions) {
           if (!a.ignoreActors)
             for (const o of set) {
               const other = next.get(o)!;
-              // A moving follower may share only the tile its moving leader is leaving.
-              const enters = (f: Actor, l: Actor) =>
-                f.leader === l.id &&
-                f.duration > 0 &&
-                l.duration > 0 &&
-                f.toX === l.x &&
-                f.toY === l.y &&
-                x === l.x &&
-                y === l.y;
-              const linked = enters(a, other) || enters(other, a);
+              // Two actors may share a tile only when one is moving away from it and it is the other's
+              // destination or standing tile (a follower stepping into, or already arrived on, a vacating tile).
+              const vacates = (p: Actor, q: Actor) =>
+                p.duration > 0 && p.x === x && p.y === y && ((q.toX === x && q.toY === y) || (q.x === x && q.y === y));
+              const linked = o !== a.id && (vacates(a, other) || vacates(other, a));
               if (o !== a.id && !linked && !other.ignoreActors && compatible(a.elevation, other.elevation))
                 fail(`actors ${o} and ${a.id} claim tile ${x},${y}`);
             }
@@ -519,8 +614,20 @@ export function createGridStepper(options: GridStepOptions) {
           add(a.x, a.y, a);
           if (a.duration > 0) add(a.toX, a.toY, a);
         }
+        for (const set of nextClaims.values())
+          if ([...set].filter(id => !next.get(id)!.ignoreActors).length > 2) fail('more than two actors share a tile');
         actors.clear();
-        for (const [id, a] of next) actors.set(id, a);
+        followers.clear();
+        moving.clear();
+        for (const [id, a] of next) {
+          actors.set(id, a);
+          if (a.duration > 0) moving.add(id);
+        }
+        for (const a of next.values()) {
+          const leader = a.leader;
+          a.leader = null;
+          setLeader(a, leader);
+        }
         claims.clear();
         for (const [k, set] of nextClaims) claims.set(k, set);
       });

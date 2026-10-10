@@ -118,7 +118,7 @@ test('forced tiles chain moves; ice continues until blocked; the chain is bounde
   loop.add(1, {x: 1, y: 0});
   loop.move(1, 'east');
   const bounded = run(loop, 50);
-  assert.ok(bounded.some(e => e.kind === 'forced' && e.result.kind === 'bumped' && e.result.reason === 'busy'));
+  assert.ok(bounded.some(e => e.kind === 'forced' && e.result.kind === 'bumped' && e.result.reason === 'chain-limit'));
   assert.equal(loop.get(1)!.duration, 0, 'the forced loop stops at the chain bound');
 });
 
@@ -193,9 +193,113 @@ test('options and inputs are validated; tile rules cannot reenter', () => {
       return {};
     },
   });
-  reenter = r;
   r.add(1, {x: 0, y: 0});
-  assert.throws(() => r.move(1, 'east'), /reentrant/);
+  reenter = r;
+  assert.deepEqual(r.move(1, 'east'), {kind: 'bumped', reason: 'impassable'}, 'a reentrant tile rule fails closed');
+  assert.ok(r.diagnostics().malformedTiles > 0);
   assert.equal(gridStep().id, 'grid-step');
   assert.equal(HANDHELD_TILE_PRESET.stepTicks, 16);
+});
+
+test('review regressions: self-produced snapshots restore, malformed tiles fail closed, chains, ledges, stairs', () => {
+  // A follower that arrives while its leader is still jumping a ledge, and an unfollow mid-move, both restore.
+  const ledge = createGridStepper({
+    width: 1,
+    height: 6,
+    maxActors: 2,
+    turnBeforeMove: false,
+    tile: (_x, y) => (y === 2 ? {ledge: 'south'} : {}),
+  });
+  ledge.add(1, {x: 0, y: 1});
+  ledge.add(2, {x: 0, y: 0});
+  ledge.follow(2, 1);
+  ledge.move(1, 'south');
+  run(ledge, 16);
+  const mid = ledge.snapshot();
+  const copy = createGridStepper({
+    width: 1,
+    height: 6,
+    maxActors: 2,
+    turnBeforeMove: false,
+    tile: (_x, y) => (y === 2 ? {ledge: 'south'} : {}),
+  });
+  assert.doesNotThrow(() => copy.restore(mid));
+  ledge.follow(2, null);
+  assert.doesNotThrow(() => copy.restore(ledge.snapshot()));
+  // Malformed tile rules never half-apply a step: they are impassable and counted.
+  const bad = createGridStepper({
+    width: 3,
+    height: 1,
+    maxActors: 1,
+    turnBeforeMove: false,
+    stepTicks: 1,
+    tile: x => (x === 1 ? ({forced: 'up'} as never) : x === 2 ? ({elevation: 300} as never) : {}),
+  });
+  bad.add(1, {x: 0, y: 0});
+  assert.deepEqual(bad.move(1, 'east'), {kind: 'bumped', reason: 'impassable'});
+  assert.ok(bad.diagnostics().malformedTiles >= 1);
+  // A 4096-actor follower line starts without recursion.
+  const line = createGridStepper({width: 4097, height: 1, maxActors: 4096, turnBeforeMove: false, tile: () => ({})});
+  for (let i = 0; i < 4096; i++) line.add(i, {x: 4095 - i, y: 0});
+  for (let i = 1; i < 4096; i++) line.follow(i, i - 1);
+  assert.equal(line.move(0, 'east').kind, 'started');
+  assert.equal(line.get(4095)!.toX, 1, 'the last follower starts in the same call');
+  // Followers on a conveyor stay in line regardless of id order.
+  for (const [leader, follower] of [
+    [1, 2],
+    [2, 1],
+  ] as const) {
+    const belt = createGridStepper({
+      width: 8,
+      height: 1,
+      maxActors: 2,
+      turnBeforeMove: false,
+      stepTicks: 1,
+      tile: x => (x >= 2 && x <= 4 ? {forced: 'east'} : {}),
+    });
+    belt.add(leader, {x: 1, y: 0});
+    belt.add(follower, {x: 0, y: 0});
+    belt.follow(follower, leader);
+    belt.move(leader, 'east');
+    run(belt, 6);
+    assert.equal(belt.get(leader)!.x - belt.get(follower)!.x, 1, `leader ${leader} follower ${follower}`);
+  }
+  // A follower jumps the ledge behind its leader and the line continues.
+  const jump = createGridStepper({
+    width: 1,
+    height: 8,
+    maxActors: 2,
+    turnBeforeMove: false,
+    stepTicks: 2,
+    jumpTicks: 2,
+    tile: (_x, y) => (y === 2 ? {ledge: 'south'} : {}),
+  });
+  jump.add(1, {x: 0, y: 1});
+  jump.add(2, {x: 0, y: 0});
+  jump.follow(2, 1);
+  jump.move(1, 'south');
+  run(jump, 2);
+  jump.move(1, 'south');
+  run(jump, 2);
+  assert.equal(jump.get(1)!.y, 4);
+  assert.equal(jump.get(2)!.y, 3, "the follower jumped the ledge to the leader's previous tile");
+  // Stairs: a transition tile lets an actor change elevation.
+  const stairs = createGridStepper({
+    width: 3,
+    height: 1,
+    maxActors: 1,
+    turnBeforeMove: false,
+    stepTicks: 1,
+    tile: x => (x === 0 ? {elevation: 1} : x === 1 ? {transition: true} : {elevation: 2}),
+  });
+  stairs.add(1, {x: 0, y: 0, elevation: 1});
+  stairs.move(1, 'east');
+  run(stairs, 1);
+  assert.equal(stairs.get(1)!.elevation, undefined);
+  assert.equal(stairs.move(1, 'east').kind, 'started');
+  run(stairs, 1);
+  assert.equal(stairs.get(1)!.elevation, 2);
+  // Actors cannot be placed on walls; move options must be objects.
+  assert.throws(() => stairs.add(2, {x: 0, y: 0}), RangeError);
+  assert.throws(() => stairs.move(1, 'west', null as never), RangeError);
 });
