@@ -20,8 +20,11 @@ Add optional `support`, `supportWeight`, `supportTargetWeight` and `supportLimit
 to `cameraSystem`. The existing system remains the only camera owner. The creator
 supplies the support query; the kit validates weights in `[0, 1]` and the limit in
 `(0, 1e6]` at construction and refuses non-finite heights per frame before any
-publication. The offset is applied to the mode's pose before the existing
-smoothing, teleport snap and clearance; `null` support means no offset.
+publication. The mode's pose is re-evaluated at the anchored heights
+(`support * w + y * (1 - w)` inside the limit, so weight 1 is exact and a still
+support never perturbs the pose). A fixed camera keeps its position and applies support
+to a tracked look target only. Teleport detection keeps comparing the unanchored
+target, so support changes ease rather than snap. `null` support means no offset.
 
 ## Consequences
 

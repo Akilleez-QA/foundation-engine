@@ -101,8 +101,13 @@ export interface SupportFraming {
   /** Largest vertical shift in world units, (0, 1e6] (default 2). */
   supportLimit?: number;
 }
-/** Validated offset function for support framing, or undefined when it is off. */
-export function supportOffsets(
+/**
+ * Validated support framing, or undefined when `support` is absent (the weights and limit are still validated).
+ * The returned function gives the anchored heights for the camera position and the look target. Inside the limit
+ * the height is `support * w + y * (1 - w)`, exactly the support height at weight 1 and exactly `y` at weight 0, so a
+ * still support never perturbs the pose; outside it, `y ± limit`.
+ */
+export function supportHeights(
   o: SupportFraming,
 ): ((support: number | null, y: number) => {position: number; target: number} | null) | undefined {
   const weight = o.supportWeight ?? 1,
@@ -116,9 +121,11 @@ export function supportOffsets(
   return (support, y) => {
     if (support === null) return null;
     if (!Number.isFinite(support)) throw new RangeError('camera: support height must be finite or null');
-    const gap = support - y,
-      clamp = (v: number) => Math.min(limit, Math.max(-limit, v));
-    return {position: clamp(gap * weight), target: clamp(gap * targetWeight)};
+    const height = (w: number) => {
+      const shift = (support - y) * w;
+      return Math.abs(shift) <= limit ? support * w + y * (1 - w) : y + Math.sign(shift) * limit;
+    };
+    return {position: height(weight), target: height(targetWeight)};
   };
 }
 
@@ -140,7 +147,7 @@ export function cameraSystem(
   const revisions = new WeakMap<object, number>();
   if (o.teleportDistance !== undefined && (!Number.isFinite(o.teleportDistance) || o.teleportDistance <= 0))
     throw new RangeError('camera: teleport distance must be positive');
-  const anchor = supportOffsets(o);
+  const anchor = supportHeights(o);
   return defineSystem({
     id: `camera-${mode}`,
     phase: 'frame',
@@ -155,20 +162,28 @@ export function cameraSystem(
         previous.delete(ctx.world);
         return;
       }
-      // Support framing moves the whole pose to the anchored height (every mode is linear in the target height),
-      // then shifts the look target by the difference of the two weights.
-      const offset = anchor && tr ? anchor(o.support!(ctx, {x: tr.x, y: tr.y, z: tr.z}), tr.y) : null;
-      const pose = cameraPose(
-        mode,
-        tr ? {x: tr.x, y: tr.y + (offset?.position ?? 0), z: tr.z, heading: tr.ry} : {x: 0, y: 0, z: 0, heading: 0},
-        {...o, ...o.options?.(ctx)},
-      );
-      if (offset && offset.target !== offset.position) pose.target[1] += offset.target - offset.position;
+      const options = {...o, ...o.options?.(ctx)};
+      const raw = tr ? {x: tr.x, y: tr.y, z: tr.z, heading: tr.ry} : {x: 0, y: 0, z: 0, heading: 0};
+      const unanchored = cameraPose(mode, raw, options);
+      // Support framing re-poses the mode at the anchored heights. A fixed camera keeps its position; without
+      // tracking it ignores the target entirely, so support does not apply.
+      const heights =
+        anchor && tr && (mode !== 'fixed' || options.track) ? anchor(o.support!(ctx, {...raw}), tr.y) : null;
+      let pose = unanchored;
+      if (heights) {
+        const at = (y: number) => cameraPose(mode, {...raw, y}, options),
+          moved = at(heights.position);
+        pose = {
+          position: mode === 'fixed' ? unanchored.position : moved.position,
+          target: heights.target === heights.position ? moved.target : at(heights.target).target,
+        };
+      }
       const old = revisionChanged ? undefined : previous.get(ctx.world);
+      // Discontinuities are judged on the target itself, so a change of support never reads as a teleport.
       const discontinuity =
         old &&
         o.teleportDistance !== undefined &&
-        Math.hypot(...pose.target.map((v, i) => v - old[i]!)) > o.teleportDistance;
+        Math.hypot(...unanchored.target.map((v, i) => v - old[i]!)) > o.teleportDistance;
       const k =
         revisionChanged || discontinuity ? 1 : (o.smooth ?? 0.12) <= 0 ? 1 : 1 - Math.exp(-dt / (o.smooth ?? 0.12));
       const cam = ctx.view.camera;
@@ -186,7 +201,7 @@ export function cameraSystem(
         cam.target = target;
       }
       // A missing target or failed clearance must not consume a reset request.
-      previous.set(ctx.world, [...pose.target]);
+      previous.set(ctx.world, [...unanchored.target]);
       if (revision !== undefined) revisions.set(ctx.world, revision);
     },
   });

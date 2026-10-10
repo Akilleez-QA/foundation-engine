@@ -453,7 +453,7 @@
     {"name": "assignments", "exports": ["createAssignments"]},
     {"name": "audio-mixer", "exports": ["audioMixer", "createCueMixer", "createDucking"]},
     {"name": "authoring", "exports": ["authoredReference", "createAuthoredDocument", "createAuthoringSession"]},
-    {"name": "camera", "exports": ["camera", "cameraPose", "cameraSystem", "clearCamera", "supportOffsets"]},
+    {"name": "camera", "exports": ["camera", "cameraPose", "cameraSystem", "clearCamera", "supportHeights"]},
     {
       "name": "capabilities",
       "exports": [

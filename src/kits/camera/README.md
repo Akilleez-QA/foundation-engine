@@ -10,18 +10,28 @@ Optional `resetRevision(ctx)` returns a safe integer identifying the creator's c
 
 Optional `support(ctx, target)` returns the height of what the target stands on or
 over (ground, water, a platform) or `null` when there is none; the creator supplies
-the query, usually the same ground sampler as movement. The pose's camera position
-and look target then shift by `clamp((support - target.y) * weight, ±supportLimit)`
-(`supportWeight` for the position, default 1; `supportTargetWeight` for the look
-target, default the position weight; `supportLimit` default 2 world units, at most
-1e6). A jump or a short drop therefore leaves the view on the support height, while
-a lasting change of support level, or a fall beyond the limit, is followed. The
-shift is applied to the mode's pose before smoothing, teleport detection and
-clearance, so those behave as before. `null` frames follow the target's own height.
+the query, usually the same ground sampler as movement. The mode's pose is then
+re-evaluated at anchored heights: inside `supportLimit` (default 2 world units, at
+most 1e6) the height is `support * w + y * (1 - w)`, with `w = supportWeight`
+(default 1) for the camera position and `supportTargetWeight` (default the position
+weight) for the look target; beyond the limit it is the target height ± the limit.
+A jump or a short drop therefore leaves the view on the support height, while a
+lasting change of support level, or a fall beyond the limit, is followed through the
+existing `smooth`. With weight 1 a still support gives an exactly still pose, so
+nothing is redrawn.
+
+Modes: `follow`, `orbit`, `top-down` and `side-scroll` move position and target.
+`fixed` keeps its position; untracked it ignores support, tracked only its look
+target is anchored. `first-person` would pin the eye to the support height during a
+jump; use `supportWeight: 0` there or leave `support` out. Teleport detection
+(`teleportDistance`) compares the target's own positions, so a change of support never
+snaps; it eases like other motion. A `null` frame removes the offset at once (smoothing
+still applies).
 
 Weights outside `[0, 1]` or an invalid limit throw `RangeError` when the system is
-built; a non-finite support height throws in that frame, publishes no pose and
-leaves a pending reset revision pending. Without `support`, poses are unchanged.
-Cost: one creator query per frame. The kit does not decide what counts as support,
-does not lag or ease the offset separately (the existing `smooth` applies), and is
-not a look-ahead, frustum fit or occlusion steering.
+built, even without `support`. Support settings are fixed at construction; the
+per-frame `options(ctx)` callback does not change them. A non-finite support height
+throws in that frame, publishes no pose and leaves a pending reset revision pending.
+Without `support`, poses are unchanged. Cost: one creator query and up to two extra
+pose evaluations per frame. The kit does not decide what counts as support and is not
+a look-ahead, frustum fit or occlusion steering.
