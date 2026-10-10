@@ -101,7 +101,8 @@ when the first position should count, as the per-request example in the tests do
 - Malformed definitions, including non-object entries and array holes, throw `RangeError`
   at creation. No partial set is created. A throwing input getter propagates its own error.
 - `suppress` accepts at most 32 ids per call.
-- `advance` and the queries visit at most 32 marks or ranges. Results allocate only their own records.
+- Each call does a bounded amount of work: state validation checks at most 32 marks and 32
+  ranges, then the operation scans at most the same again. Results allocate only their own records.
 - Every operation reads a state's fields exactly once and validates that copy. An invalid
   delta, a nonfinite position sum, an unknown timeline, window or mark, or a state that
   `restore` would reject throws `RangeError` before any result is produced.

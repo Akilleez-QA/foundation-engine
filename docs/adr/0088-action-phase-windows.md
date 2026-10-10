@@ -21,9 +21,8 @@ Add an optional pure `createActionPhases` helper to the existing capabilities ki
 definitions declare windows (half-open ranges) and marks (once-only positions). Instance
 state is a frozen plain value with a definition fingerprint, a position and two bit sets,
 capped at 32 marks and 32 ranges per timeline. Because the bits are positional, the
-fingerprint makes any definition edit invalidate older states instead of reinterpreting them. `advance` delivers every due mark once in a deterministic order.
-`claim` records one use per open range. `suppress` retires marks for handover. `restore`
-validates untrusted data without throwing. There is no clock, scheduler, callback, service
+fingerprint makes any definition edit invalidate older states instead of reinterpreting
+them. `advance` delivers every due mark once in a deterministic order. `claim` records one use per open range. `suppress` retires marks for handover. `restore` validates untrusted data without throwing. There is no clock, scheduler, callback, service
 or persistence owner.
 
 ## Consequences

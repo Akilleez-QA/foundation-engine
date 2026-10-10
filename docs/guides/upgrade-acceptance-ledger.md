@@ -1232,6 +1232,7 @@ are unverified. Independent review and hosted integration remain pending.
   reinterpreted after a definition edit, and there was no way to read a range identity without
   claiming it. It also found minor issues: fields were read twice, error types were inconsistent,
   overlapping ranges were accepted and unreachable restores were allowed. All were fixed in the
-  same candidate.
+  same candidate, and a re-review approved them. That re-review included a 2,000-sequence fuzz showing
+  that reachable states always restore.
 - **Not established:** browser, template, device, persistence-integration or multiplayer acceptance;
   hosted CI on the candidate head; integration into `main`.
