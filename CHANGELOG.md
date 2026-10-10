@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Optional breadcrumbs kit** (`@kits/breadcrumbs`): a leader records its path in a bounded ring, and followers retrace it exactly, either at a crumb lag (tick-delay partners, party lines with wait, keep-pace and catch-up) or at a distance along the path (spaced trains and escorts that never cut corners). Segment cuts handle teleports, and snapshots handle save and rollback. See [ADR 0098](docs/adr/0098-breadcrumb-trails.md).
+
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.

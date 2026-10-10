@@ -1219,3 +1219,9 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Breadcrumbs kit — candidate (2026-10-09)
+
+- **Scope:** `src/kits/breadcrumbs` (ADR 0098).
+- **Evidence:** `breadcrumbs.test.ts` covers lag exactness, ring bounds, the moved policy, corner retracing, cuts, snapshots, validation, the lag controller and a `testScene` polyline-retracing consumer.
+- **Not established:** template or browser consumers and hosted CI.
