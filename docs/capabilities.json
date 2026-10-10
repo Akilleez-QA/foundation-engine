@@ -23,6 +23,16 @@
       "evidence": ["@kits/volume-query exports sweepVolume", "src/kits/volume-query/oracle.test.ts exists"]
     },
     {
+      "id": "ACTIVATION-01",
+      "title": "Optional bounded region activation from observer positions",
+      "shipped": true,
+      "docs": "docs/guides/region-activation.md",
+      "evidence": [
+        "@kits/region-activation exports createRegionActivation",
+        "@kits/region-activation exports createRegionUpdateResult"
+      ]
+    },
+    {
       "id": "ASG-01",
       "title": "Optional bounded service and worksite assignment ownership",
       "shipped": true,
@@ -805,6 +815,7 @@
         "procgen"
       ]
     },
+    {"name": "region-activation", "exports": ["REGION_CEILING", "createRegionActivation", "createRegionUpdateResult"]},
     {
       "name": "replay",
       "exports": [

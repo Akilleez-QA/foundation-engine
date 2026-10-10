@@ -95,3 +95,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0091](0091-bounded-cue-sequences.md) | Bounded cue sequences as an optional kit | Optional kits / Scripting | Proposed |
 
 | [0092](0092-population-placements-and-tiers.md) | Placements with persistent depletion and update tiers | Optional kits / Simulation scale | Proposed |
+
+| [0095](0095-optional-region-activation.md) | Optional region activation from observer positions | Optional kits / Simulation scale | Proposed |

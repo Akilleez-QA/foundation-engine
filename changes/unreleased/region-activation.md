@@ -1,0 +1,1 @@
+- Optional region activation (`@kits/region-activation`): decide which grid regions a game simulates from observer positions, with release hysteresis, linger, pins, bounded per-update transitions and epochs for stale loads. Loading, saving and catch-up stay with the creator's existing owners. See [ADR 0095](docs/adr/0095-optional-region-activation.md).

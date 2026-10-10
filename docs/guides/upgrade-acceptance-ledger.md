@@ -1383,3 +1383,9 @@ always/near/background with conserved background time, hysteresis, owed-time
 delivery and refusal of oversized steps, unchanged state after a throwing callback,
 slot balance and limits; sparse definitions, bounded default exit and dispose; and a fixed-step runner consumer
 integrating only due entities. No browser, device or performance acceptance.
+
+## Optional region activation candidate — ACTIVATION-01, 2026-10-09
+
+`@kits/region-activation` is an independently implemented pure helper that decides which uniform grid regions a game simulates from observer positions. It provides activate/release radius hysteresis, update-count linger with cancel-on-return, refcounted pins, per-update activation (nearest first) and deactivation budgets, a hard `maxActive` refusal, per-region epochs for refusing stale asynchronous loads and `dormantFor` for creator catch-up rules. ECS systems, the chunk store and worker host keep their responsibilities; no loader, scheduler, persistence or registration is added. [Guide](region-activation.md), [ADR 0095](../adr/0095-optional-region-activation.md).
+
+Evidence: 13 focused headless tests (11 unit tests including a 3,000-step brute-force model comparison asserting statuses and counters and 2,000 non-dyadic boundary-geometry trials, plus an ECS fixed-step gating consumer and a chunk-store load/save consumer with epoch refusal). An independent adversarial review found an off-grid query crash, boundary rounding in the scan range, unasserted statuses and index-ordered deactivation starvation; all were fixed with regression tests before publication. A local headless micro-measurement is recorded in the kit README as an order-of-magnitude indication only. This is a branch candidate: hosted full CI, a playable template consumer, browser behaviour and physical-device acceptance remain pending.
