@@ -1365,6 +1365,21 @@ cue once, with skip landing the effect and playing nothing; unambiguous effect i
 the `settled` signal and -0 normalisation; and arrays copied without iteration. No
 browser, device or template evidence.
 
+## Sequence cast, branches and arbitration — candidate (2026-10-09)
+
+Branch `feat/sequence-extensions` from the #249 head `b58a0f02`. Seven new headless tests:
+cast binding, refusal, channel ownership, settle-aware freeze and release; an ECS
+consumer whose bystander is frozen while the cast member is driven; branch offer,
+choose and abandonment of later effects; graph snapshots mid-node and at a branch,
+skip following defaults and landing only what choosing would have; graph validation
+and step-bounded loops that end with `limited`; and arbiter priority, held refusals,
+stale release and cooldown; plus settle-gated offers and single finish on a directly
+released branch cue. An independent adversarial review (external 3,000-graph fuzz, not
+checked in) found no duplicate effect but found wedging at the step bound, prototype
+names accepted as defaults, an overstated skip claim, unsettled offers, re-reads and
+documentation gaps; all were fixed, and a re-review with a 3,000-graph fuzz was clean.
+The 12 #249 tests still pass. No browser or device evidence.
+
 ## Optional population kit — candidate (2026-10-09)
 
 Branch `feat/population-kit` from `cbaf8060`. Eleven checked-in headless tests. An

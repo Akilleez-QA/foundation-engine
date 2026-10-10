@@ -40,3 +40,14 @@ refused rather than reinterpreted; give the edited sequence a new section or mig
 See the [kit README](../../src/kits/sequence/README.md) for the full contract:
 definition limits, the per-call transition budget with `owed` ticks, canonical
 event order, validation and limits.
+
+## Cast, branches and one event at a time
+
+Bind the entities a sequence moves with a cast. Your systems ask `cast.drives(e,
+'position')` before writing a channel and `cast.gate(e)` before updating anyone, so
+the rest of the world holds still. Entities that were mid-action finish first, and
+`cast.ready()` tells you when the stage is quiet. Join sequences at held cues to
+branch on a player's choice; `choose` abandons the rest of the current scene, and
+`skip` follows each branch's default. Use the event arbiter to let only one trigger,
+conversation or scene claim the stage at a time, by priority, with cooldowns so a
+trigger the player is standing in does not refire.

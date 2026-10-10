@@ -35,4 +35,44 @@ for (const e of run.advance(1).events) if (e.kind === 'effect') applyEffect(e.ef
 | Cancellation | `cancel()` lands nothing further and returns the effect cues that never will; later calls are inert. Held cues can only be released while active; `release` of an unknown or non-held cue throws. |
 | Save/restore | `snapshot()` is plain frozen data with the definition fingerprint and session. `parseSequenceState` copies arrays with one length read and refuses an edited definition, unknown fields, out-of-range or inconsistent positions (a cue past its barrier, a release of a non-active cue, drops outside a skip, owed time on a stopped run). The section quarantines such a record and play continues from `{run: null}`. `createSequence` additionally refuses a state of another session. Validation catches corruption, not tampering: a hand-edited save can mark a cue complete whose effect never landed. |
 | Cost | `advance` is O(transitions × tracks + barriers); allocation is limited to returned events and small per-call closures. No draws. |
-| Limits | Ticks only: map seconds to ticks in your fixed step. No branching, conditions or loops inside a definition (compose with the dialogue kit or choose another definition); no camera splines, interpolation curves or participation freezing of other entities. Headless evidence only. |
+| Limits | Ticks only: map seconds to ticks in your fixed step. No conditions or loops inside one definition: branch between definitions with a sequence graph (below) or compose with the dialogue kit. No camera splines or interpolation curves. Freezing non-participants is the cast's gate (below); systems must consult it. Headless evidence only. |
+
+## Cast, branching and event arbitration
+
+**Cast** (`defineCast`, `createCast`). Roles (1–32) each declare the channels the
+sequence drives (1–16 creator names such as `position`, `clip`, `ai`) and whether
+they are `required` or `optional`. `start(resolve, {exempt, busy})` binds roles to
+entities, or returns `missing`/`conflict` and binds nothing. Gameplay systems ask
+`drives(entity, channel)` and skip writing what the sequence owns. `gate(entity)` is
+`freeze` for everyone outside the cast, except exempt entities and busy entities that
+have not yet called `settled(entity)`. `ready()` turns true once nobody is still
+settling, so a sequence can hold its first cue until the stage is quiet. `release()`
+returns each member with its channels so gameplay can re-sync, and after that every
+query answers as if no cast were active. The cast is not saved: re-bind roles when a
+saved run is restored.
+
+**Branching** (`defineSequenceGraph`, `createSequenceGraph`). A graph of 1–64 nodes,
+each a sequence definition, joined at held branch cues. A branch has 1–16 choices,
+each leading to a node or `null` (end), plus a `default`. `offered()` lists the
+choices once the branch cue is active and waiting and the run is settled.
+`choose(choice)` cancels the rest of the node at that moment: its incomplete cues,
+including parallel ones and the branch cue's own effect, never land. It then starts
+the chosen node as a new run with session `<session>#<step>`. A branch cue released
+directly instead finishes the node and follows the default. `skip()` follows
+defaults. On a branch node it lands only the skip effects of the incomplete cues the
+branch cue depends on (track predecessors and barriers, transitively) and abandons
+parallel cues, even ones that time alone would have completed first. A node without a
+branch is skipped whole, and `skip` stops with `partial` at a node that is not
+skippable. `maxSteps` (default 64, max 1,024) bounds loops: reaching it ends the graph
+and sets `limited` (session only, not saved), never throwing with effects in hand. Ticks left over when a node
+changes are not carried into the next node. Snapshots (`parseSequenceGraphState`)
+hold the node, step and current run; step 0 must be the start node.
+
+**Event arbitration** (`createEventArbiter`). Sources (1–64) are declared in priority
+order, each with an optional cooldown in ticks. Each tick the caller calls `tick()`
+and then, at a safe point only (for example when the player has settled and no claim
+is running), `offer(source, payload)`, at most one per source per tick. `resolve()`
+claims the stage for the first offered source in declaration order. While a claim is
+held every offer returns `held`. `release(claim)` refuses stale claims, and offers from
+that source are then refused for its `cooldown` ticks after the release tick. Claims
+and cooldowns are not saved.

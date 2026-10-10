@@ -939,10 +939,19 @@
     {
       "name": "sequence",
       "exports": [
+        "ARBITER_LIMITS",
+        "CAST_LIMITS",
+        "GRAPH_LIMITS",
         "SEQUENCE_LIMITS",
+        "createCast",
+        "createEventArbiter",
         "createSequence",
+        "createSequenceGraph",
+        "defineCast",
         "defineSequence",
+        "defineSequenceGraph",
         "defineSequenceSection",
+        "parseSequenceGraphState",
         "parseSequenceState",
         "sequence"
       ]
