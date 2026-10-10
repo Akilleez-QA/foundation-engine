@@ -165,3 +165,32 @@ test('composition: a follower entity retraces the leader through a fixed-step sc
   // The leader can be up to minDistance ahead of its newest crumb.
   assert.ok(Math.hypot(l.x - f.x, l.z - f.z) <= 2 + 0.25 + 1e-9);
 });
+
+test('review regressions: stationary crumbs, sparse or hostile snapshots, revision ceiling, over-long lag', () => {
+  const trail = createBreadcrumbTrail({capacity: 8, record: {mode: 'every-tick'}});
+  trail.record(crumb(0, 0, 1, 0));
+  trail.record(crumb(1, 0, 2, 0.5));
+  trail.record(crumb(1, 0, 3, 1.0));
+  trail.record(crumb(1, 0, 4, 1.5));
+  assert.deepEqual(trail.along(0), trail.behind(0), 'distance 0 is the newest crumb, facing and flags included');
+  assert.equal(trail.along(0.5)!.x, 0.5);
+  const options = {capacity: 4, record: {mode: 'every-tick'} as const};
+  // eslint-disable-next-line no-sparse-arrays
+  const sparse = {v: 1, capacity: 4, crumbs: [crumb(0), , crumb(2)], segment: 3, revision: 3};
+  assert.throws(() => createBreadcrumbTrail(options, sparse as never), RangeError);
+  let reads = 0;
+  const growing = new Proxy([crumb(0), crumb(1)], {
+    get(target, key, receiver) {
+      if (key === 'length') return reads++ === 0 ? 2 : 6;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const restored = createBreadcrumbTrail(options, {v: 1, capacity: 4, crumbs: growing, segment: 2, revision: 2});
+  assert.ok(restored.size <= 4);
+  assert.throws(
+    () =>
+      createBreadcrumbTrail(options, {v: 1, capacity: 4, crumbs: [], segment: 0, revision: Number.MAX_SAFE_INTEGER}),
+    RangeError,
+  );
+  assert.equal(nextFollowerLag(30, {recorded: true, movingLag: 15, idleLag: 9, catchUpEvery: 4, tick: 0}), 29);
+});

@@ -33,7 +33,8 @@ trail.cut();
 - **Lookups:**
   - `behind(lag)` returns the exact recorded crumb, clamped to the oldest crumb of the current segment.
   - `along(distance)` interpolates along the recorded polyline. Heading blends along the shorter arc;
-    flags come from the older crumb of the pair. It is clamped the same way. Followers retrace corners
+    flags come from the older crumb of the pair. At distance 0 it is the newest crumb, so a leader that turns
+    in place is followed exactly. It is clamped the same way. Followers retrace corners
     and never take shortcuts.
 - **Segments:** `cut()` starts a new segment, and lookups never reach back across a cut. `clear()` drops
   everything.
@@ -41,8 +42,8 @@ trail.cut();
   `createBreadcrumbTrail(options, snapshot)` restores an identical trail. The snapshot is validated
   (version, capacity, finite crumbs, segment range).
 - **`nextFollowerLag`:** a pure lag controller.
-  - While crumbs are recorded, a follower closer than `movingLag` waits on its crumb, and one at
-    `movingLag` steps forward with the leader.
+  - While crumbs are recorded, a follower closer than `movingLag` waits on its crumb, one at
+    `movingLag` steps forward with the leader, and one farther back closes in one crumb per tick.
   - While nothing is recorded, it closes in one crumb every `catchUpEvery` ticks down to `idleLag`.
 
 ## Owner, bounds and failure
@@ -71,7 +72,8 @@ trail.cut();
 - moved-policy skipping;
 - exact corner retracing, distance clamping and flags;
 - cuts after a teleport;
-- snapshot round-trip and validation;
+- snapshot round-trip and validation, including sparse and hostile arrays and the revision ceiling;
+- stationary crumbs and an over-long lag (independent review regressions);
 - input validation;
 - the wait, keep-pace and catch-up controller;
 - a `testScene` composition where a follower stays on the leader's recorded polyline around a corner.

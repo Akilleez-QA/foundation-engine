@@ -43,7 +43,7 @@ export interface BreadcrumbTrail {
   readonly size: number;
   /** Crumbs in the current segment (since the last `cut`), at most `size`. */
   readonly segment: number;
-  /** Increments on every accepted record, cut or restore. */
+  /** Counts accepted changes (record, effective cut, clear); a restored trail keeps the snapshot's value. */
   readonly revision: number;
   /** Offer the leader's current state. `skipped` when the moved-policy distance was not reached. */
   record(crumb: CrumbInput): 'recorded' | 'skipped';
@@ -51,7 +51,8 @@ export interface BreadcrumbTrail {
   behind(lag: number): Crumb | null;
   /**
    * The point `distance` along the recorded path behind the newest crumb, interpolated between crumbs (heading
-   * from the older crumb of the pair, flags too). Clamped to the oldest crumb of the current segment.
+   * along the shorter arc, flags from the older crumb of the pair; at distance 0, the newest crumb itself).
+   * Clamped to the oldest crumb of the current segment.
    */
   along(distance: number): Crumb | null;
   /** Start a new segment: queries never interpolate across a cut (use after a teleport or respawn). */
@@ -122,12 +123,16 @@ export function createBreadcrumbTrail(options: TrailOptions, restore?: TrailSnap
       fail('snapshot must be a v1 trail snapshot');
     if (restore.capacity !== capacity) fail('snapshot capacity differs from the trail capacity');
     const crumbs = restore.crumbs;
-    if (!Array.isArray(crumbs) || crumbs.length > capacity) fail('snapshot crumbs must be an array within capacity');
-    const captured = crumbs.map(captureCrumb);
+    if (!Array.isArray(crumbs)) fail('snapshot crumbs must be an array');
+    const count = crumbs.length;
+    if (!Number.isSafeInteger(count) || count > capacity) fail('snapshot crumbs exceed the capacity');
+    const captured: Crumb[] = [];
+    for (let i = 0; i < count; i++) captured.push(captureCrumb(crumbs[i]));
     const seg = restore.segment,
       rev = restore.revision;
     if (!Number.isSafeInteger(seg) || seg < 0 || seg > captured.length) fail('snapshot segment out of range');
-    if (!Number.isSafeInteger(rev) || rev < 0) fail('snapshot revision must be a nonnegative integer');
+    if (!Number.isSafeInteger(rev) || rev < 0 || rev >= Number.MAX_SAFE_INTEGER)
+      fail('snapshot revision must be a nonnegative integer below the safe-integer ceiling');
     captured.forEach((c, i) => (ring[i] = c));
     size = captured.length;
     head = size - 1;
@@ -172,12 +177,15 @@ export function createBreadcrumbTrail(options: TrailOptions, restore?: TrailSnap
     along(distance) {
       if (!finite(distance) || distance < 0) fail('distance must be finite and nonnegative');
       if (segment === 0) return null;
+      // Distance 0 (or a point reached inside a run of stationary crumbs) is the newest crumb there.
+      if (distance === 0) return at(0);
       let remaining = distance;
       for (let lag = 0; lag < segment - 1; lag++) {
         const newer = at(lag),
           older = at(lag + 1);
         const length = Math.hypot(newer.x - older.x, newer.y - older.y, newer.z - older.z);
-        if (length > 0 && remaining <= length) {
+        if (length === 0) continue;
+        if (remaining <= length) {
           const f = remaining / length; // 0 at newer, 1 at older
           return Object.freeze({
             x: newer.x + (older.x - newer.x) * f,
@@ -214,7 +222,7 @@ export function createBreadcrumbTrail(options: TrailOptions, restore?: TrailSnap
 /**
  * Optional lag controller for a sample-lag follower, as in classic party followers. Lag counts crumbs behind the
  * newest. When the trail recorded a crumb this tick, a follower closer than `movingLag` waits on its crumb (lag
- * grows by one) and one at `movingLag` steps forward with the leader. When nothing was recorded (the leader is
+ * grows by one), one at `movingLag` steps forward with the leader, and one farther back closes in one crumb. When nothing was recorded (the leader is
  * still) it closes in by one crumb every `catchUpEvery` ticks until `idleLag`. Pure: returns the next lag.
  * `tick` is the caller's fixed-step tick counter.
  */
@@ -239,7 +247,7 @@ export function nextFollowerLag(
   if (!Number.isSafeInteger(catchUpEvery) || catchUpEvery < 1) fail('catchUpEvery must be a positive integer');
   if (idleLag > movingLag) fail('idleLag must not exceed movingLag');
   if (typeof recorded !== 'boolean') fail('recorded must be a boolean');
-  if (recorded) return Math.min(lag + 1, movingLag);
+  if (recorded) return lag > movingLag ? lag - 1 : Math.min(lag + 1, movingLag);
   if (lag > idleLag && tick % catchUpEvery === 0) return lag - 1;
   return lag;
 }
