@@ -1600,3 +1600,8 @@ the one new runtime dependency, approved for this kit only. Core stays physics-f
   one software-GL `play:snap` of an uncommitted fixture.
 - **Not established:** hosted CI, cross-browser bit identity, GPU/physical-device
   performance and memory, and multiplayer acceptance.
+## Optional world change detection candidate — ECS-CHANGE-01, 2026-10-10
+
+`World` gains opt-in per-component change ticks with `added`/`changed` query filters against caller-held cursors (`trackChanges`, `markChanged`, `queryFiltered`, `sinceLastRun`; conservative tick rebasing), bounded queued observers on add, remove, change and despawn (delivered after each system through the runner's new `afterSystem` hook, which the scene runtime and `testScene` use), and disposable cached queries with `query`'s order and mid-iteration rules. Unused, nothing changes. [Guide](world-change-detection.md), [ADR 0141](../adr/0141-optional-world-change-detection.md).
+
+Evidence: headless unit tests, seeded model tests against an independent brute-force reference (thousands of operations per seed including despawn and add/remove during uncached, cached and filtered iteration, with and without rebases), a `testScene` composition test, and a local unofficial microbenchmark (cached iteration about 1.1-2x faster at 1k/10k entities, no gain under 1% churn per pass). Branch candidate: hosted full CI pending; no browser, device or multiplayer acceptance; no built-in system marks changes.

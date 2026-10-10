@@ -9,7 +9,13 @@
  * others still run.
  * - `beforeStep` runs before each fixed step and `beforeFrameLane` before the per-frame lane, so an owner can address
  *   input to the tick that consumes it (STD-SIM-12). They must not throw.
+ * - `afterSystem` runs after each system run (the authored runtime flushes world observers there); an error it throws
+ *   is reported under that system's id like a system error.
+ * - `sinceLastRun` wraps a system with a per-world change cursor: the system sees changes made since its last
+ *   successful run.
  */
+import type {ChangeCursor} from './world-tracking';
+import type {World} from './world';
 export interface SystemSpec<C> {
   id: string;
   /** 'fixed' (default): the fixed-step lane. 'frame': once per frame. */
@@ -43,6 +49,7 @@ export function createSystemRunner<C>(
     after?: () => void;
     beforeStep?: () => void;
     beforeFrameLane?: () => void;
+    afterSystem?: (id: string) => void;
   } = {},
 ): SystemRunner<C> {
   const step = o.step ?? 1 / 60,
@@ -59,16 +66,26 @@ export function createSystemRunner<C>(
   const stats: RunnerStats = {frames: 0, steps: 0, dropped: 0, errors: 0};
   let acc = 0,
     correction = 0;
+  const fail = (s: SystemSpec<C>, error: unknown) => {
+    stats.errors++;
+    try {
+      (o.report ?? ((id, e) => console.error(`system ${id} failed`, e)))(s.id, error);
+    } catch {
+      /* Diagnostics must not interrupt sibling systems or accumulator bookkeeping. */
+    }
+  };
+  const after = o.afterSystem;
   const run = (s: SystemSpec<C>, ctx: C, dt: number) => {
     try {
       s.run(ctx, dt);
     } catch (error) {
-      stats.errors++;
-      try {
-        (o.report ?? ((id, e) => console.error(`system ${id} failed`, e)))(s.id, error);
-      } catch {
-        /* Diagnostics must not interrupt sibling systems or accumulator bookkeeping. */
-      }
+      fail(s, error);
+    }
+    if (!after) return;
+    try {
+      after(s.id);
+    } catch (error) {
+      fail(s, error);
     }
   };
   return {
@@ -118,6 +135,32 @@ export function createSystemRunner<C>(
       for (const s of perFrame) run(s, ctx, dt);
       o.after?.();
       return n;
+    },
+  };
+}
+
+/**
+ * A system that receives a change cursor for `world(ctx)`: changes recorded after its previous successful run pass
+ * `added`/`changed` filters. Its first run on a world sees every tracked component as added and changed (nothing is
+ * missed however late the system first runs). The cursor advances only when `run` returns, so a throwing run sees the
+ * same changes again. One cursor per world (a scene's next visit gets a fresh one); each counts toward `maxCursors`.
+ */
+export function sinceLastRun<C>(spec: {
+  id: string;
+  phase?: 'fixed' | 'frame';
+  world: (ctx: C) => World;
+  run(ctx: C, dt: number, since: ChangeCursor): void;
+}): SystemSpec<C> {
+  const cursors = new WeakMap<World, ChangeCursor>();
+  return {
+    id: spec.id,
+    phase: spec.phase ?? 'fixed',
+    run(ctx, dt) {
+      const world = spec.world(ctx);
+      let cursor = cursors.get(world);
+      if (!cursor) cursors.set(world, (cursor = world.changeCursor({fromStart: true})));
+      spec.run(ctx, dt, cursor);
+      cursor.advance();
     },
   };
 }

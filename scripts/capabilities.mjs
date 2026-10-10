@@ -43,6 +43,17 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'ECS-CHANGE-01',
+    title: 'Optional world change ticks, queued observers and cached queries',
+    docs: 'docs/guides/world-change-detection.md',
+    evidence: [
+      {engine: 'changed'},
+      {engine: 'added'},
+      {engine: 'sinceLastRun'},
+      {path: 'src/core/ecs/world-tracking.ts'},
+    ],
+  },
+  {
     id: 'POOL-01',
     title: 'Optional bounded entity pool with eviction classes',
     docs: 'docs/guides/entity-pool.md',

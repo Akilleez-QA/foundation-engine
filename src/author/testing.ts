@@ -415,6 +415,7 @@ export async function testScene(
     },
     after: () => world.clearEvents(),
     beforeStep: () => captureInterpolation(world),
+    afterSystem: () => void world.flushObservers(), // as the runtime does
   });
   alphaSource = () => runner.alpha;
   try {

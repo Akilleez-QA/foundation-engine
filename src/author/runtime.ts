@@ -1157,6 +1157,8 @@ export async function enterScene(o: {
           captureInterpolation(world);
         },
         beforeFrameLane: pressed.beginFrameLane,
+        // Optional world observers are delivered after each system (a no-op for a world that registers none).
+        afterSystem: () => void world.flushObservers(),
       });
       alphaSource = () => runner.alpha;
       const live =

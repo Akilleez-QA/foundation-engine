@@ -22,6 +22,7 @@ export const coin = defineEntity({ id: 'coin', components: [
 - In a scene: `entities: [coin, [Name({ name: 'player' }), Transform(), Health()]]`.
 - At run time: `ctx.spawn(coin, Transform({ x: 2 }))` and `ctx.world.despawn(e)`.
 - Query: `for (const [e, tr, hp] of ctx.world.query(Transform, Health)) { … }` (spawn order, deterministic). Spawning, despawning, adding or removing components inside the loop is safe: an entity is visited only if it matched when the loop began and still matches when it is reached (never with an `undefined` component); anything spawned or newly matching during the loop appears in the next query.
+- Optional, when a system should only look at what changed: `ctx.world.trackChanges(Health)`, `ctx.world.markChanged(e, Health)` after editing it directly, and a `sinceLastRun` system iterating `ctx.world.queryFiltered(since, [changed(Health)], Health)`; observers (`ctx.world.observe`) and cached queries (`ctx.world.cachedQuery`) are there too. Nothing changes for a world that does not use them ([guide](../guides/world-change-detection.md)).
 
 ## Test
 

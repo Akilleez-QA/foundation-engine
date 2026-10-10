@@ -84,6 +84,22 @@ export {
 } from './testing';
 /** Seeded randomness whose state a simulation can save and restore (rollback, reload, replay). */
 export {createSaveableRng, type SaveableRng, type Rng} from '../core/rng';
+/** Optional world change detection, observers and cached queries (methods on `World`; filters and a system helper). */
+export {
+  added,
+  changed,
+  type ChangeCursor,
+  type ChangeFilter,
+  type CachedQuery,
+  type Observer,
+  type ObserverEvent,
+  type ObserverKind,
+  type ObserverSpec,
+  type FlushReport,
+  type TrackingLimits,
+  type TrackingStats,
+} from '../core/ecs/world-tracking';
+export {sinceLastRun} from '../core/ecs/systems';
 export {effectiveFov, viewRay, pointerOnGround, projectToView} from './view-math';
 export {Mesh, defineMesh, type MeshData, type MeshInput} from './mesh';
 export type {
