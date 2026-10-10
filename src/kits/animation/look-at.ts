@@ -251,23 +251,32 @@ export function createLookAt(options: LookAtOptions) {
      */
     apply(base: readonly JointPose[], state: LookAtState): JointPose[] {
       if (!produced.has(state)) fail('apply takes a state returned by this look-at');
+      if (!Array.isArray(base)) fail('base must be a pose array');
       const byJoint = new Map(state.joints.map(j => [j.joint, j.rotation]));
       const names = new Set<string>();
-      const out = base.map(p => {
-        if (names.has(p.joint)) fail(`base pose repeats joint ${p.joint}`);
-        names.add(p.joint);
-        const d = byJoint.get(p.joint);
-        if (!d) return {joint: p.joint, position: [...p.position] as typeof p.position, rotation: p.rotation};
-        byJoint.delete(p.joint);
-        const b = new Quaternion(...p.rotation);
-        if (![...p.rotation].every(finite) || b.length() < 1e-12) fail(`base rotation of ${p.joint} is invalid`);
-        const r = new Quaternion(...d).multiply(b.normalize());
-        return {
-          joint: p.joint,
-          position: [...p.position] as typeof p.position,
-          rotation: r.toArray() as [number, number, number, number],
-        };
-      });
+      const count = base.length,
+        out: JointPose[] = [];
+      for (let i = 0; i < count; i++) {
+        const p = base[i];
+        if (!p || typeof p !== 'object') fail('base entries must be joint poses');
+        const joint = p.joint,
+          position = p.position,
+          rotationIn = p.rotation;
+        if (names.has(joint)) fail(`base pose repeats joint ${joint}`);
+        names.add(joint);
+        const copyPosition = [position[0], position[1], position[2]] as const;
+        const d = byJoint.get(joint);
+        if (!d) {
+          out.push({joint, position: copyPosition, rotation: rotationIn});
+          continue;
+        }
+        byJoint.delete(joint);
+        const r = [rotationIn[0], rotationIn[1], rotationIn[2], rotationIn[3]] as const;
+        const b = new Quaternion(r[0], r[1], r[2], r[3]);
+        if (!r.every(finite) || b.length() < 1e-12) fail(`base rotation of ${joint} is invalid`);
+        const q = new Quaternion(...d).multiply(b.normalize());
+        out.push({joint, position: copyPosition, rotation: q.toArray() as [number, number, number, number]});
+      }
       if (byJoint.size) fail(`base pose lacks chain joint ${[...byJoint.keys()][0]}`);
       return out;
     },

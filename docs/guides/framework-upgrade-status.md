@@ -1256,5 +1256,5 @@ are unverified. Independent review and hosted integration remain pending.
 `createLookAt` in the animation kit aims a bounded joint chain at a root-frame
 direction with per-joint shares and limits, a front cone, smoothing and a speed cap,
 returning deltas that compose onto pose arrays. Pure; the caller owns targets, clock
-and skeleton. See [ADR 0093](../adr/0093-look-at-constraint.md). Headless tests are in
+and skeleton. See [ADR 0110](../adr/0110-look-at-constraint.md). Headless tests are in
 the upgrade ledger; independent review and full hosted CI remain required.

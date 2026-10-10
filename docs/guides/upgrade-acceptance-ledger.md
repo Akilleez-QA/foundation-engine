@@ -1229,4 +1229,5 @@ of a three-joint hierarchy with rest-derived parent frames; front-cone, null and
 zero-length relaxation with smoothing and the speed cap; parent-frame conjugation and
 composition through `blendPoseLayers`; single-read limits and `apply` refusals; and
 validation. An independent adversarial review found lost residual turn, a yaw flip
-behind the root, double reads and loose `apply` input; all were fixed. No visual, browser or device evidence.
+behind the root, double reads and loose `apply` input; all were fixed and a re-review
+with an external 5,000-chain fuzz (not checked in) was clean. No visual, browser or device evidence.

@@ -1,4 +1,4 @@
-# ADR 0093: bounded look-at constraint in the animation kit
+# ADR 0110: bounded look-at constraint in the animation kit
 
 - **Status:** Proposed
 - **Date:** 2026-10-09
@@ -17,8 +17,9 @@ per-joint yaw-then-pitch rotations do not compose to the intended aim).
 
 Add `createLookAt` to the animation kit: a pure helper over a 1–8 joint chain. Each
 joint has a share and yaw/pitch limits; overflow flows to later joints; per-joint
-deltas are steps between cumulative aims so the composed chain aims exactly; a front
-cone, exponential smoothing and an angular-speed cap bound motion; optional parent
+deltas are steps between cumulative aims and any residual is back-filled so the
+composed chain aims exactly; a front cone of at most π/2 (yaw fading near vertical),
+exponential smoothing and a speed cap in yaw/pitch space bound motion; optional parent
 frames conjugate deltas into each joint's parent space. `apply` multiplies deltas onto
 a base pose array. Target selection, clock and skeleton stay with the caller.
 

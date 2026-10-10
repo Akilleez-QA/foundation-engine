@@ -78,4 +78,4 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0085](0085-atomic-cell-batches-and-occupancy.md) | Atomic cell batches and immutable occupancy | Procgen / Spatial | Proposed |
 
-| [0093](0093-look-at-constraint.md) | Bounded look-at constraint in the animation kit | Optional kits / Animation | Proposed |
+| [0110](0110-look-at-constraint.md) | Bounded look-at constraint in the animation kit | Optional kits / Animation | Proposed |

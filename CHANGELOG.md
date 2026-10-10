@@ -7,7 +7,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
-- **Look-at constraint (`createLookAt` in `@kits/animation`):** aims a 1–8 joint chain at a root-frame direction with per-joint shares and yaw/pitch limits, overflow to later joints and back-fill so the chain aims exactly, a front cone, exponential smoothing and an angular-speed cap; returns parent-frame deltas and composes onto pose arrays. Pure and bounded. See [ADR 0093](docs/adr/0093-look-at-constraint.md).
+- **Look-at constraint (`createLookAt` in `@kits/animation`):** aims a 1–8 joint chain at a root-frame direction with per-joint shares and yaw/pitch limits, overflow to later joints and back-fill so the chain aims exactly, a front cone, exponential smoothing and a speed cap in yaw/pitch space; returns parent-frame deltas and composes onto pose arrays. Pure and bounded. See [ADR 0110](docs/adr/0110-look-at-constraint.md).
 
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
