@@ -1222,9 +1222,13 @@ are unverified. Independent review and hosted integration remain pending.
 
 ## Camera director — candidate (2026-10-09)
 
-Branch `feat/camera-director` from `a6211bd3`. Seven new headless tests: ladder order,
+Branch `feat/camera-director` from `a6211bd3`. Eight new headless tests: ladder order,
 stickiness and yawed boxes; string rig band clamping and blending; rail, close-up and
 orbit shot poses; transition sizing, deceleration and exact arrival on a moving goal;
 support carry; letterbox easing; and a scene where the director system blends into a
 volume's setting, stops rewriting at rest and returns from a scripted override to the
-live gameplay pose. No browser, visual or device evidence.
+live gameplay pose; plus per-world stickiness, carry about the pre-move pivot,
+validation and frozen poses. An independent adversarial review found shared sticky
+state across worlds, a wrong default carry pivot, unvalidated heading, overstated
+docs, mutable returned poses and rare ulp redraws; all were fixed. No browser,
+visual or device evidence.

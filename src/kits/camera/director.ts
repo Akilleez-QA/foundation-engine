@@ -2,8 +2,8 @@
  * Camera director: which camera setting applies (a priority ladder over creator overrides, authored trigger volumes
  * and a fallback), the rigs that turn a setting into a pose (string, rail, shot move, close-up), and how the view moves
  * between poses (a transition schedule sized by how far the pose changes, which arrives exactly on time while still
- * tracking a moving goal). Also: carrying the camera with a moving support, pushing and popping a gameplay view around
- * scripted shots, and a letterbox amount. Pure helpers plus one optional frame system; the camera kit's existing
+ * tracking a moving goal). Also: carrying the camera with a moving support, returning from scripted shots to the live
+ * gameplay pose, and a letterbox amount. Pure helpers plus one optional frame system; the camera kit's existing
  * `cameraSystem` is untouched.
  */
 import {defineSystem, Transform, type SceneContext, type SystemDefinition, type Vec3} from '../../author';
@@ -23,6 +23,19 @@ const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const scale = (a: Vec3, k: number): Vec3 => [a[0] * k, a[1] * k, a[2] * k];
 const length = (a: Vec3) => Math.hypot(a[0], a[1], a[2]);
 const lerp = (a: Vec3, b: Vec3, t: number): Vec3 => add(a, scale(sub(b, a), t));
+const FOV = (f: unknown, what: string): number => {
+  if (!finite(f) || f <= 1 || f >= 170) fail(`${what} fov must be within (1, 170) degrees`);
+  return f;
+};
+/** A deeply frozen pose with validated finite coordinates. */
+const freezePose = (position: Vec3, target: Vec3, fov: number): CameraPose => {
+  if (![...position, ...target].every(finite)) fail('pose coordinates must be finite');
+  return Object.freeze({
+    position: Object.freeze<Vec3>([position[0], position[1], position[2]]) as Vec3,
+    target: Object.freeze<Vec3>([target[0], target[1], target[2]]) as Vec3,
+    fov: FOV(fov, 'pose'),
+  });
+};
 
 export interface CameraPose {
   readonly position: Vec3;
@@ -35,7 +48,8 @@ export interface CameraPose {
 
 export type VolumeShape =
   | {readonly kind: 'box'; readonly center: Vec3; readonly half: Vec3; readonly yaw?: number}
-  | {readonly kind: 'cylinder'; readonly center: Vec3; readonly radius: number; readonly height: number};
+  /** A vertical cylinder standing on `base` (its bottom centre), `height` tall. */
+  | {readonly kind: 'cylinder'; readonly base: Vec3; readonly radius: number; readonly height: number};
 export interface CameraVolume {
   readonly id: string;
   readonly shape: VolumeShape;
@@ -67,7 +81,7 @@ function compileShape(s: VolumeShape, id: string): Shape {
     };
   }
   if (s.kind === 'cylinder') {
-    const c = vec(s.center, `${id} center`),
+    const c = vec(s.base, `${id} base`),
       r = s.radius,
       height = s.height;
     if (!finite(r) || r <= 0 || !finite(height) || height <= 0) fail(`${id}: radius and height must be positive`);
@@ -122,26 +136,45 @@ export function createCameraVolumes(input: {
     if (typeof setting !== 'string' || !setting) fail(`${id}: setting must be a name`);
     volumes.push({id, priority, setting, shape: compileShape(shape, id)});
   }
-  let current: (typeof volumes)[number] | null = null;
+  type Volume = (typeof volumes)[number];
+  const shared = {},
+    currents = new WeakMap<object, Volume | null>();
+  const settingNames = Object.freeze([...new Set([fallback, ...volumes.map(v => v.setting)])]);
   return {
+    /** Every setting name this ladder can select from its volumes or fallback (overrides add their own). */
+    settings: settingNames,
+    /**
+     * `key` scopes the sticky "current volume" state (for example per world); the default key is shared by all callers
+     * that omit it.
+     */
     resolve(
       subject: Vec3,
       overrides: readonly {readonly id: string; readonly setting: string}[] = [],
+      key: object = shared,
     ): CameraSelection {
       const p = vec(subject, 'subject');
-      for (const o of overrides)
-        if (o && typeof o.setting === 'string' && o.setting)
-          return Object.freeze({setting: o.setting, source: String(o.id), kind: 'override'});
-      let best: (typeof volumes)[number] | null = null;
+      if (!Array.isArray(overrides) || overrides.length > 64) fail('overrides must be an array of at most 64');
+      const count = overrides.length;
+      for (let i = 0; i < count; i++) {
+        const o = overrides[i];
+        if (!o || typeof o !== 'object') fail('an override must be an object');
+        const id: unknown = o.id,
+          setting: unknown = o.setting;
+        if (typeof id !== 'string' || !id || typeof setting !== 'string' || !setting)
+          fail('an override needs an id and a setting name');
+        return Object.freeze({setting, source: id, kind: 'override'});
+      }
+      const current = currents.get(key) ?? null;
+      let best: Volume | null = null;
       for (const v of volumes) if (v.shape.inside(p, 0) && (!best || v.priority < best.priority)) best = v;
       if (current && current.shape.inside(p, pad) && (!best || best.priority >= current.priority)) best = current;
-      current = best;
+      currents.set(key, best);
       return best
         ? Object.freeze({setting: best.setting, source: best.id, kind: 'volume'})
         : Object.freeze({setting: fallback, source: 'fallback', kind: 'fallback'});
     },
-    reset(): void {
-      current = null;
+    reset(key: object = shared): void {
+      currents.delete(key);
     },
   };
 }
@@ -162,7 +195,24 @@ export interface StringRig {
   readonly fov?: readonly [number, number];
 }
 export function stringPose(rig: StringRig, subject: Vec3, previousEye: Vec3 | null, heading = 0): CameraPose {
-  if (!finite(rig.min) || !finite(rig.max) || rig.min <= 0 || rig.max < rig.min) fail('string rig needs 0 < min ≤ max');
+  const min: unknown = rig.min,
+    max: unknown = rig.max,
+    heightIn = rig.height,
+    lookIn = rig.look,
+    fovIn = rig.fov;
+  if (!finite(min) || !finite(max) || min <= 0 || max < min) fail('string rig needs 0 < min ≤ max');
+  if (!finite(heading)) fail('heading must be finite');
+  const pair = (r: unknown, what: string): [number, number] | undefined => {
+    if (r === undefined) return undefined;
+    if (!Array.isArray(r) || r.length !== 2) fail(`string rig ${what} is [near, far]`);
+    const a: unknown = r[0],
+      b: unknown = r[1];
+    if (!finite(a) || !finite(b)) fail(`string rig ${what} must be finite`);
+    return [a, b];
+  };
+  const heightPair = pair(heightIn, 'height'),
+    lookPair = pair(lookIn, 'look'),
+    fovPair = pair(fovIn, 'fov');
   const s = vec(subject, 'subject');
   let dx: number, dz: number;
   if (previousEye) {
@@ -170,8 +220,8 @@ export function stringPose(rig: StringRig, subject: Vec3, previousEye: Vec3 | nu
     dx = e[0] - s[0];
     dz = e[2] - s[2];
   } else {
-    dx = -Math.sin(heading) * rig.max;
-    dz = -Math.cos(heading) * rig.max;
+    dx = -Math.sin(heading) * max;
+    dz = -Math.cos(heading) * max;
   }
   let d = Math.hypot(dx, dz);
   if (d < 1e-9) {
@@ -179,18 +229,13 @@ export function stringPose(rig: StringRig, subject: Vec3, previousEye: Vec3 | nu
     dz = -Math.cos(heading);
     d = 1;
   }
-  const clamped = Math.min(rig.max, Math.max(rig.min, d)),
-    t = rig.max === rig.min ? 1 : (clamped - rig.min) / (rig.max - rig.min);
-  const mix = (r: readonly [number, number] | undefined, dflt: number) => (r ? r[0] + (r[1] - r[0]) * t : dflt);
-  const h = mix(rig.height, 0),
-    look = mix(rig.look, 0),
-    fov = mix(rig.fov, 50);
-  if (![h, look, fov].every(finite)) fail('string rig values must be finite');
-  return Object.freeze({
-    position: [s[0] + (dx / d) * clamped, s[1] + h, s[2] + (dz / d) * clamped] as Vec3,
-    target: [s[0], s[1] + look, s[2]] as Vec3,
-    fov,
-  });
+  const clamped = Math.min(max, Math.max(min, d)),
+    t = max === min ? 1 : (clamped - min) / (max - min);
+  const mix = (r: [number, number] | undefined, dflt: number) => (r ? r[0] + (r[1] - r[0]) * t : dflt);
+  // Inside the band the eye stays exactly where it was horizontally (no recomputation churn).
+  const x = d === clamped && previousEye ? s[0] + dx : s[0] + (dx / d) * clamped,
+    z = d === clamped && previousEye ? s[2] + dz : s[2] + (dz / d) * clamped;
+  return freezePose([x, s[1] + mix(heightPair, 0), z], [s[0], s[1] + mix(lookPair, 0), s[2]], mix(fovPair, 50));
 }
 
 /**
@@ -231,17 +276,14 @@ export function railPose(rig: RailRig, subject: Vec3): CameraPose {
   const height = rig.height ?? 0,
     look = rig.look ?? 0,
     fov = rig.fov ?? 50;
-  if (![height, look, fov].every(finite)) fail('rail values must be finite');
-  return Object.freeze({
-    position: [best[0], best[1] + height, best[2]] as Vec3,
-    target: [s[0], s[1] + look, s[2]] as Vec3,
-    fov,
-  });
+  if (![height, look].every(finite)) fail('rail values must be finite');
+  return freezePose([best[0], best[1] + height, best[2]], [s[0], s[1] + look, s[2]], fov);
 }
 
 /**
  * Close-up (inspection) pose: orbit `subject` (a center and bounding radius) at `yaw`/`pitch` (radians; pitch clamped
- * to ±1.5) at the distance that fits the sphere in the vertical field of view with `margin` (≥ 1).
+ * to ±1.5) at the distance that fits the sphere in the vertical field of view with `margin` (≥ 1). A narrow (portrait)
+ * view can still crop the subject horizontally; widen `margin` or the fov there.
  */
 export function closeUpPose(
   subject: {readonly center: Vec3; readonly radius: number},
@@ -258,21 +300,19 @@ export function closeUpPose(
   if (!finite(margin) || margin < 1 || margin > 10) fail('margin must be within [1, 10]');
   const p = Math.max(-1.5, Math.min(1.5, pitch)),
     d = (r * margin) / Math.sin(((fov / 2) * Math.PI) / 180);
-  return Object.freeze({
-    position: [
-      c[0] + Math.sin(yaw) * Math.cos(p) * d,
-      c[1] + Math.sin(p) * d,
-      c[2] + Math.cos(yaw) * Math.cos(p) * d,
-    ] as Vec3,
-    target: c,
+  return freezePose(
+    [c[0] + Math.sin(yaw) * Math.cos(p) * d, c[1] + Math.sin(p) * d, c[2] + Math.cos(yaw) * Math.cos(p) * d],
+    c,
     fov,
-  });
+  );
 }
 
 /**
- * Shot move: from pose `from` to pose `to` over `ticks`, either straight (`linear`) or around the destination's look
- * target (`orbit`: distance, yaw and pitch interpolated so the camera swings rather than cutting through the subject),
- * with smoothstep easing. Evaluate with the elapsed tick (for example a sequence cue's `elapsed`).
+ * Shot move: from pose `from` to pose `to` over `ticks`, either straight (`linear`) or around the moving look target
+ * (`orbit`: the look target is interpolated, and distance, yaw and pitch about it are interpolated so the camera swings
+ * rather than cutting through the subject), with smoothstep easing; it returns exactly `to` at the end. Evaluate with the
+ * elapsed tick (for example a sequence cue's `elapsed`). With an eye straight above or below its target, the orbit's
+ * starting yaw is arbitrary (0).
  */
 export function shotPose(
   from: CameraPose,
@@ -287,10 +327,13 @@ export function shotPose(
     t = t0 * t0 * (3 - 2 * t0);
   const a = {position: vec(from.position, 'from position'), target: vec(from.target, 'from target'), fov: from.fov},
     b = {position: vec(to.position, 'to position'), target: vec(to.target, 'to target'), fov: to.fov};
-  if (!finite(a.fov) || !finite(b.fov)) fail('fov must be finite');
+  FOV(a.fov, 'from');
+  FOV(b.fov, 'to');
+  if (path !== 'linear' && path !== 'orbit') fail('path is linear or orbit');
+  if (t >= 1) return freezePose(b.position, b.target, b.fov);
   const target = lerp(a.target, b.target, t),
     fov = a.fov + (b.fov - a.fov) * t;
-  if (path === 'linear') return Object.freeze({position: lerp(a.position, b.position, t), target, fov});
+  if (path === 'linear') return freezePose(lerp(a.position, b.position, t), target, fov);
   const sph = (eye: Vec3, at: Vec3) => {
     const o = sub(eye, at),
       r = length(o);
@@ -303,18 +346,14 @@ export function shotPose(
   const r = sa.r + (sb.r - sa.r) * t,
     yaw = sa.yaw + dyaw * t,
     pitch = sa.pitch + (sb.pitch - sa.pitch) * t;
-  return Object.freeze({
-    position: add(target, [
-      Math.sin(yaw) * Math.cos(pitch) * r,
-      Math.sin(pitch) * r,
-      Math.cos(yaw) * Math.cos(pitch) * r,
-    ]),
+  return freezePose(
+    add(target, [Math.sin(yaw) * Math.cos(pitch) * r, Math.sin(pitch) * r, Math.cos(yaw) * Math.cos(pitch) * r]),
     target,
     fov,
-  });
+  );
 }
 
-// ---------------------------------------------------------------- transitions, carry, view stack, letterbox
+// ---------------------------------------------------------------- transitions, carry, letterbox
 
 /**
  * Transition schedule between camera goals. `begin(from, to)` sizes the transition from how far the pose changes:
@@ -349,13 +388,9 @@ export function createCameraTransition(
   let current: CameraPose | null = null,
     remaining = 0;
   const copy = (p: CameraPose, what: string): CameraPose => {
-    const f = p.fov;
-    if (!finite(f)) fail(`${what} fov must be finite`);
-    return Object.freeze({
-      position: vec(p.position, `${what} position`),
-      target: vec(p.target, `${what} target`),
-      fov: f,
-    });
+    if (!p || typeof p !== 'object') fail(`${what} must be a pose`);
+    const f: unknown = p.fov;
+    return freezePose(vec(p.position, `${what} position`), vec(p.target, `${what} target`), FOV(f, what));
   };
   return {
     /** Start moving from `from` (usually the pose on screen) toward goals like `to`; returns the tick count (0 = cut). */
@@ -380,16 +415,17 @@ export function createCameraTransition(
       current =
         remaining === 0
           ? g
-          : Object.freeze({
-              position: lerp(current.position, g.position, w),
-              target: lerp(current.target, g.target, w),
-              fov: current.fov + (g.fov - current.fov) * w,
-            });
+          : freezePose(
+              lerp(current.position, g.position, w),
+              lerp(current.target, g.target, w),
+              current.fov + (g.fov - current.fov) * w,
+            );
       return current;
     },
     /**
-     * Carry the in-progress pose with a moving support: translate by `delta` and rotate about `pivot` by `yaw` radians,
-     * so riding a moving or turning platform does not make the camera lag or swing.
+     * Carry the in-progress pose with a moving support: rotate about `pivot` (the support point BEFORE this frame's
+     * move) by `yaw` radians (positive matches three.js rotation.y), then translate by `delta`, so riding a moving or
+     * turning platform does not make the camera lag or swing.
      */
     carry(delta: Vec3, yaw = 0, pivot: Vec3 = [0, 0, 0]): void {
       if (!current) return;
@@ -403,7 +439,7 @@ export function createCameraTransition(
           s = Math.sin(yaw);
         return [pv[0] + x * c + z * s + d[0], p[1] + d[1], pv[2] - x * s + z * c + d[2]];
       };
-      current = Object.freeze({position: turn(current.position), target: turn(current.target), fov: current.fov});
+      current = freezePose(turn(current.position), turn(current.target), current.fov);
     },
     get remaining() {
       return remaining;
@@ -451,7 +487,9 @@ export type CameraSettingPose = (ctx: SceneContext, subject: Vec3, shown: Camera
  * A frame system composing the above: resolve the setting for the named subject, ask the creator's rig for that
  * setting's goal pose, run a sized transition when the setting changes, and write `ctx.view.camera` only when it moves.
  * `overrides(ctx)` supplies the top of the priority ladder (for example a scripted shot or a player state); `carry(ctx)`
- * may return the subject's support motion this frame.
+ * may return the subject's support motion this frame (pivot defaults to the subject before that motion). Ladder
+ * stickiness and transitions are kept per world. Every volume and fallback setting must have a rig (checked when the
+ * system is built); an override setting without a rig throws in its frame.
  */
 export function cameraDirectorSystem(o: {
   readonly volumes: ReturnType<typeof createCameraVolumes>;
@@ -462,6 +500,10 @@ export function cameraDirectorSystem(o: {
   readonly transition?: Parameters<typeof createCameraTransition>[0];
 }): SystemDefinition {
   const transitions = new WeakMap<object, {t: CameraTransition; setting: string | null}>();
+  for (const name of o.volumes.settings)
+    if (!Object.hasOwn(o.settings, name)) fail(`no rig for setting ${name} used by the volumes or fallback`);
+  // Rewrites below this size are treated as no movement, so floating-point noise never forces a redraw.
+  const epsilon = 1e-9;
   return defineSystem({
     id: 'camera-director',
     phase: 'frame',
@@ -470,7 +512,7 @@ export function cameraDirectorSystem(o: {
         tr = e === undefined ? undefined : ctx.world.get(e, Transform);
       if (!tr) return;
       const subject: Vec3 = [tr.x, tr.y, tr.z];
-      const sel = o.volumes.resolve(subject, o.overrides?.(ctx) ?? []);
+      const sel = o.volumes.resolve(subject, o.overrides?.(ctx) ?? [], ctx.world);
       const rig = Object.hasOwn(o.settings, sel.setting) ? o.settings[sel.setting] : undefined;
       if (!rig) fail(`no rig for setting ${sel.setting}`);
       let state = transitions.get(ctx.world);
@@ -479,9 +521,12 @@ export function cameraDirectorSystem(o: {
         transitions.set(ctx.world, state);
       }
       const cam = ctx.view.camera;
-      const shown: CameraPose = {position: cam.position, target: cam.target, fov: cam.fov};
+      const shown: CameraPose = freezePose(cam.position, cam.target, cam.fov);
       const support = o.carry?.(ctx);
-      if (support) state.t.carry(support.delta, support.yaw ?? 0, support.pivot ?? subject);
+      if (support) {
+        const delta = vec(support.delta, 'carry delta');
+        state.t.carry(delta, support.yaw ?? 0, support.pivot ?? sub(subject, delta));
+      }
       const goal = rig(ctx, subject, state.t.pose ?? shown);
       if (state.setting !== sel.setting) {
         if (state.setting !== null) state.t.begin(state.t.pose ?? shown, goal);
@@ -489,9 +534,9 @@ export function cameraDirectorSystem(o: {
       }
       const next = state.t.step(goal);
       if (
-        next.position.some((v, i) => v !== cam.position[i]) ||
-        next.target.some((v, i) => v !== cam.target[i]) ||
-        next.fov !== cam.fov
+        next.position.some((v, i) => Math.abs(v - cam.position[i]!) > epsilon) ||
+        next.target.some((v, i) => Math.abs(v - cam.target[i]!) > epsilon) ||
+        Math.abs(next.fov - cam.fov) > epsilon
       ) {
         cam.position = [...next.position];
         cam.target = [...next.target];

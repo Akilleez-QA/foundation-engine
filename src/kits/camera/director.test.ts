@@ -24,7 +24,7 @@ test('the ladder prefers overrides, then the lowest-priority containing volume, 
       {id: 'hall', shape: {kind: 'box', center: [0, 0, 0], half: [5, 3, 5]}, priority: 10, setting: 'hall'},
       {
         id: 'alcove',
-        shape: {kind: 'cylinder', center: [4, -1, 0], radius: 2, height: 4},
+        shape: {kind: 'cylinder', base: [4, -1, 0], radius: 2, height: 4},
         priority: 1,
         setting: 'tight',
       },
@@ -177,4 +177,42 @@ test('the director system switches settings by volume, blends between rigs and r
   player().x = 30;
   t.run(1);
   assert.deepEqual(t.ctx.view.camera.position, [30, 3, -6], 'back on the live gameplay pose after the shot');
+});
+
+test('review fixes: per-world stickiness, carry pivot before the move, validation and frozen poses', async () => {
+  const v = createCameraVolumes({
+    fallback: 'f',
+    stickiness: 1,
+    volumes: [
+      {id: 'a', shape: {kind: 'box', center: [0, 0, 0], half: [2, 2, 2]}, priority: 5, setting: 'a'},
+      {id: 'b', shape: {kind: 'box', center: [4, 0, 0], half: [1.5, 2, 2]}, priority: 5, setting: 'b'},
+    ],
+  });
+  const w1 = {},
+    w2 = {};
+  assert.equal(v.resolve([0, 0, 0], [], w1).setting, 'a');
+  assert.equal(v.resolve([2.7, 0, 0], [], w2).setting, 'b', 'another world does not inherit stickiness');
+  assert.equal(v.resolve([2.7, 0, 0], [], w1).setting, 'a', 'the same world keeps its sticky volume');
+  assert.throws(() => v.resolve([0, 0, 0], [{id: 'x', setting: ''}]), RangeError);
+  const t = createCameraTransition();
+  t.begin(pose([0, 0, -5], [0, 0, 0]), pose([10, 0, 0], [0, 0, 0]));
+  // Subject moved from the origin to x=1 while its support turned a quarter: the camera keeps its offset, rotated.
+  t.carry([1, 0, 0], Math.PI / 2, [0, 0, 0]);
+  const p = t.pose!;
+  close(p.position[0], 1 - 5, 1e-9);
+  close(p.position[2], 0, 1e-9);
+  assert.ok(Object.isFrozen(p.position));
+  assert.throws(() => stringPose({min: 2, max: 6, height: [1, 3]}, [0, 0, 0], [0, 0, 0], Number.NaN), RangeError);
+  assert.throws(
+    () => shotPose(pose([0, 0, 1], [0, 0, 0]), pose([1, 0, 0], [0, 0, 0]), 1, 2, 'curvy' as never),
+    RangeError,
+  );
+  assert.deepEqual(
+    shotPose(pose([0, 0, 10], [0, 0, 0]), pose([10, 0, 0], [0, 0, 0]), 10, 10, 'orbit').position,
+    [10, 0, 0],
+  );
+  assert.throws(
+    () => cameraDirectorSystem({volumes: v, settings: {a: () => pose([0, 0, 1], [0, 0, 0])}}),
+    /no rig for setting/,
+  );
 });
