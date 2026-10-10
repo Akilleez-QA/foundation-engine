@@ -77,7 +77,7 @@ export function createUpdateTiers(limits: UpdateTierLimits) {
       entries.set(id, {policy, slot, near: true, owed: 0, due: 0});
       return 'tracked';
     },
-    /** Stop tracking. Owed time is discarded (the entity is gone); it is not counted in `droppedSeconds`. */
+    /** Stop tracking. Owed time is discarded (the entity is gone). */
     untrack(id: number): boolean {
       checkId(id);
       const e = entries.get(id);

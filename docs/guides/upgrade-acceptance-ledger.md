@@ -1215,7 +1215,8 @@ independent adversarial review also fuzzed placements (300 seeds against a refer
 model) and tiers in an external harness that is not checked in; its findings (time
 dropped when `dt × slots` exceeded the catch-up cap, half-applied steps after a
 throwing callback, default exit radius above the bound, sparse definitions, status
-after dispose, undocumented cost and ordering) were fixed. Tests: spawn/despawn
+after dispose, undocumented cost and ordering) were fixed, and a re-review of the fixed head (placement
+fuzz plus 300-seed tier fuzz with varying steps) was clean. Tests: spawn/despawn
 with enter/exit hysteresis in definition order; `never`/`visit`/`leave` policies,
 persistence of `never` only and revival; deterministic caps with deferred counts
 and retry after `returned`; validation of definitions, limits, observers and
