@@ -40,6 +40,8 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 
 The optional [assignments](../../src/kits/assignments/README.md) candidate supplies exclusive actor claims, weighted target capacity and atomic transfer refusal. Two headless service/worksite fixtures and route-owner composition tests exercise it; no playable template consumer or browser/device acceptance is claimed. [Guide](../guides/assignments.md).
 
+The optional [board-traversal](../../src/kits/board-traversal/README.md) candidate rides a board over a creator ground query: push, carve, charged ollies, landings judged by board angle, grinds on authored rail snapshots with balance, manuals and bails, with bounded sub-steps and rail checks, transactional steps and deterministic snapshot/restore; `arcade` and `sim-lite` presets. Headless tests with ECS (character-kit walls), terrain and rollback consumers only; no template consumer or browser/device acceptance is claimed.
+
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.
 
 
