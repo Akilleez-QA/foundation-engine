@@ -68,6 +68,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | ASSET-OPTIMIZE | Model optimisation (npm run asset:optimize) | [#135](https://github.com/Akilleez-QA/foundation-engine/pull/135) |  |
 | SHOWCASE | The showcase template | [#128](https://github.com/Akilleez-QA/foundation-engine/pull/128) | [README.md](../templates/showcase/README.md) |
 | POSE-TO-POSE | Pose-to-pose rigging and animation pipeline | [#142](https://github.com/Akilleez-QA/foundation-engine/pull/142) | [animate-pose-to-pose.md](recipes/animate-pose-to-pose.md) |
+| PHYSICS | Rigid-body physics (optional adapter kit over a lazily loaded WebAssembly library) |  | [physics-adapter.md](guides/physics-adapter.md) |
 
 ## Not shipped yet
 
@@ -77,7 +78,6 @@ Tracked so that a correct "not yet" in the docs is recognised. A row moves up wh
 |---|---|---|---|
 | PIPELINE-01 | Worker render pipelining |  | [README.md](verification/render-pipelining-20261010/README.md) |
 | WEBGPU | WebGPU render backend |  | [render-backend.md](guides/render-backend.md) |
-| PHYSICS | Rigid-body physics |  |  |
 
 ## Kits
 
@@ -119,6 +119,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/navigation`
 - `@kits/network`
 - `@kits/objectives`
+- `@kits/physics`
 - `@kits/playout`
 - `@kits/population`
 - `@kits/procgen`

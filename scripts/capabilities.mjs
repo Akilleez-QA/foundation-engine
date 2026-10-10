@@ -491,8 +491,13 @@ export const FEATURES = [
   },
   {
     id: 'PHYSICS',
-    title: 'Rigid-body physics',
-    evidence: [{kit: 'physics'}],
+    title: 'Rigid-body physics (optional adapter kit over a lazily loaded WebAssembly library)',
+    docs: 'docs/guides/physics-adapter.md',
+    evidence: [
+      {kit: 'physics', export: 'scenePhysics'},
+      {kit: 'physics', export: 'createPhysicsWorld'},
+      {path: 'src/kits/physics/snapshot.test.ts'},
+    ],
   },
 ];
 

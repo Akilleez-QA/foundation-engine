@@ -1133,3 +1133,22 @@ work, deferred dispose, metatable copies, strict UTF-8, pre-call argument checks
 headless Chromium runs of a fixture game through the development server and a production-mode build (VM chunk and
 binary fetched lazily, no page errors). Not established: hosted full CI on this branch, physical devices,
 long-session memory behaviour, or any template consumer. Stock-game first-load JavaScript is unchanged.
+
+## Optional physics adapter kit candidate (2026-10-09)
+
+`@kits/physics` (ADR 0121, [guide](physics-adapter.md)) adapts one lazily loaded
+WebAssembly library: `@dimforge/rapier3d-deterministic-compat` 0.21.0, Apache-2.0,
+the one new runtime dependency, approved for this kit only. Core stays physics-free.
+
+- **Bundle:** stock first-load JS is unchanged at 175.6 KiB. The library is a dynamic
+  chunk of 4,366,824 bytes (1,658,896 bytes `gzip -9`) that a consuming game must list
+  in its own `largeChunkAllow`. No budget changed.
+- **Runtime contracts:** configured admission, event, query, snapshot and debug-vertex
+  limits; refusals and drops are counted; disposal is exactly once per visit.
+- **Candidate evidence:** 35 focused Node tests in `src/kits/physics` (plus one
+  character-kit motion test): lifecycle, refusals, `Transform` bound validation,
+  ordering, order-independent query truncation, snapshot determinism, forged-snapshot
+  refusal, the rollback sync test and two-peer session, and the character adapter. Also
+  one software-GL `play:snap` of an uncommitted fixture.
+- **Not established:** hosted CI, cross-browser bit identity, GPU/physical-device
+  performance and memory, and multiplayer acceptance.

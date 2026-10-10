@@ -55,6 +55,7 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 
 | [grid-step](../../src/kits/grid-step/README.md) | Tile-to-tile actors: facing, classified bumps, ledges, conveyor/ice tiles, reservations while moving, follower lines, snapshots; creator tile rules | None yet; headless tests only |
 | [spatial-audio](../../src/kits/spatial-audio/README.md) | Logical sound sources: virtual tracking, importance ranking with HRTF for the sounds that matter, class distance curves with a hard cutoff, budgeted occlusion driving the smoothed filter | None yet; implemented, candidate (AUD-02, PR #55, [recipe](../recipes/3d-sound-for-shooters.md)) |
+| [physics](../../src/kits/physics/README.md) | Optional rigid bodies, colliders, ordered bounded collision events, queries, rollback snapshots and a slope/step character adapter over a lazily loaded WebAssembly library (ADR 0121) | None yet; candidate with Node tests and one software-GL fixture snapshot ([guide](../guides/physics-adapter.md)) |
 
 The optional [scripting](../../src/kits/scripting/README.md) candidate runs sandboxed Lua 5.4 scripts with capability-scoped host functions, deterministic per-call instruction budgets, a memory cap, fixed-tick timers and save/restore of each script's `state`; its VM loads lazily. Headless unit, rollback sync-test and scene consumer tests plus headless Chromium fixture runs only; no template consumer or device acceptance is claimed. [Guide](../guides/scripting.md).
 

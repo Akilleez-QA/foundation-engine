@@ -15,14 +15,30 @@ export const ACCEL_TIME = 0.15,
   REVERSAL = (150 * Math.PI) / 180;
 const wrap = (a: number, m: ScalarMath) => m.atan2(m.sin(a), m.cos(a));
 
-/** `math` evaluates lengths (platformMath by default; dmath for results identical in every engine). */
-export function createMotion(options: {speed: number; accelTime?: number; stopTime?: number; math?: ScalarMath}) {
+/**
+ * `math` evaluates lengths (platformMath by default; dmath for results identical in every engine). `velocity` starts
+ * the integrator at a saved planar velocity (m/s) instead of rest, so a restored simulation (rollback, reload) resumes
+ * the same acceleration ramp. Omitted: at rest, as before.
+ */
+export function createMotion(options: {
+  speed: number;
+  accelTime?: number;
+  stopTime?: number;
+  math?: ScalarMath;
+  velocity?: Vec;
+}) {
   let speed = options.speed;
   const m = options.math ?? platformMath;
   const accelTime = options.accelTime ?? ACCEL_TIME,
     stopTime = options.stopTime ?? STOP_TIME;
   let vx = 0,
     vz = 0;
+  if (options.velocity) {
+    const {x, z} = options.velocity;
+    if (!Number.isFinite(x) || !Number.isFinite(z)) throw new RangeError('createMotion: velocity must be finite');
+    vx = x;
+    vz = z;
+  }
   return {
     get velocity(): Vec {
       return {x: vx, z: vz};
