@@ -1214,10 +1214,14 @@ is implied.
 The existing stage pool now retires logical view ownership despite cleanup errors
 and rolls back failed setup. Cleanup preserves original causes and still attempts
 independent retirement work. Surviving sibling leases are not swept or forced lost;
-uncertain slots refuse new sharing until their last sibling leaves. Borrowed canvas
-attachment rollback and once-only underlying renderer disposal are exercised.
+only a failed release cleanup makes a slot uncertain, and an uncertain slot refuses
+new sharing until its last sibling leaves. A new lease makes the drawing view reset
+its GL state cache. Borrowed canvas attachment rollback and once-only underlying
+renderer disposal are exercised.
 See [render backend](render-backend.md#stage-setup-and-retirement-failures).
-`npm run check -- --base 6fab99a7` passed typecheck, applicable lints and 238
-tests in 30 render test files, including 22 focused stage tests. Independent
-review and full hosted integration remain pending. Logical cleanup is not proof
+Independent review fixed over-broad uncertainty after clean setup rollback and a
+stale drawer state cache after new leases; both have discriminating tests that fail
+before the fix. `npm run check -- --base cbaf8060` passed typecheck, applicable lints
+and 241 tests in 30 render test files.
+Full hosted integration remains pending. Logical cleanup is not proof
 of successful GPU reclamation or physical-device acceptance.

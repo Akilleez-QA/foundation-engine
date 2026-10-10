@@ -1245,8 +1245,12 @@ integration; no physical memory or device evidence is implied.
 The existing stage pool now retires logical view ownership despite cleanup errors
 and rolls back failed setup. Cleanup preserves original causes and still attempts
 independent retirement work. Surviving sibling leases are not swept or forced lost;
-uncertain slots refuse new sharing until their last sibling leaves. Borrowed canvas
-attachment rollback and once-only underlying renderer disposal are exercised.
+only a failed release cleanup makes a slot uncertain, and an uncertain slot refuses
+new sharing until its last sibling leaves. A new lease makes the drawing view reset
+its GL state cache. Borrowed canvas attachment rollback and once-only underlying
+renderer disposal are exercised.
 See [render backend](render-backend.md#stage-setup-and-retirement-failures).
-Affected checks and independent review precede hosted integration; logical cleanup
-is not proof of successful GPU reclamation or physical-device acceptance.
+Independent review found and fixed over-broad uncertainty after clean setup rollback
+and a stale drawer state cache after new leases. Hosted full CI is the integration
+gate; logical cleanup is not proof of successful GPU reclamation or physical-device
+acceptance.
