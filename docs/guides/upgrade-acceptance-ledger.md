@@ -1219,3 +1219,9 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Contact kit — candidate (2026-10-09)
+
+- **Scope:** `src/kits/contact` (ADR 0100).
+- **Evidence:** `contact.test.ts` covers the lifecycle, sensing, exact shapes, exits, bounded admission, ordering, snapshots and a pickup consumer that removes bodies during dispatch.
+- **Not established:** template or browser consumers and hosted CI.

@@ -54,6 +54,13 @@
       ]
     },
     {
+      "id": "CONTACT-01",
+      "title": "Layered contact volumes with deterministic bounded enter/stay/exit pair events",
+      "shipped": true,
+      "docs": "src/kits/contact/README.md",
+      "evidence": ["@kits/contact exports createContactLayer", "src/kits/contact/contact.test.ts exists"]
+    },
+    {
       "id": "VIS-01",
       "title": "Tone mapping and exposure per scene (view.output)",
       "shipped": true,
@@ -522,6 +529,7 @@
         "pickPart"
       ]
     },
+    {"name": "contact", "exports": ["CONTACT_LIMITS", "contact", "createContactLayer"]},
     {"name": "control", "exports": ["control", "createControl"]},
     {"name": "dialogue", "exports": ["DIALOGUE_LIMITS", "createDialogue", "dialogue"]},
     {"name": "equipment", "exports": ["createEquipment", "equipment"]},

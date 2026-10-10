@@ -91,6 +91,12 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'CONTACT-01',
+    title: 'Layered contact volumes with deterministic bounded enter/stay/exit pair events',
+    docs: 'src/kits/contact/README.md',
+    evidence: [{kit: 'contact', export: 'createContactLayer'}, {path: 'src/kits/contact/contact.test.ts'}],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,

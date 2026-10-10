@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Optional contact kit** (`@kits/contact`): vertical-cylinder, sphere and box contact volumes with layer and mask bits and exact overlap tests. Each update reports deterministic enter, stay and exit events. Pair and per-body bounds give existing contacts priority. Intangible or removed bodies produce exits, and snapshots support saves and rollback. See [ADR 0100](docs/adr/0100-contact-layer.md).
+
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.
