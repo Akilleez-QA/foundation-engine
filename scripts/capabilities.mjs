@@ -124,6 +124,15 @@ export const FEATURES = [
     evidence: [{path: 'src/platform/render/worker-renderer.ts'}],
   },
   {
+    id: 'RETRO-01',
+    title: 'Optional retro software-raster look (low resolution, palette, ordered dither)',
+    docs: 'docs/guides/retro-look.md',
+    evidence: [
+      {kit: 'retro', export: 'sceneRetro'},
+      {kit: 'retro', export: 'retroReference'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',

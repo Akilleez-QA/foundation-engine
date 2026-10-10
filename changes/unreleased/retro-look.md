@@ -1,0 +1,1 @@
+- Optional retro look (`@kits/retro`, with `@kits/three`): draw a scene at low resolution with optional wide pixels, quantised to a creator palette or per-channel levels with ordered dithering, keeping the engine's lighting and budgets. See [ADR 0132](docs/adr/0132-optional-retro-look.md).

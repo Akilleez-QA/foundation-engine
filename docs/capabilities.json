@@ -85,6 +85,13 @@
       "evidence": ["src/platform/render/worker-renderer.ts exists"]
     },
     {
+      "id": "RETRO-01",
+      "title": "Optional retro software-raster look (low resolution, palette, ordered dither)",
+      "shipped": true,
+      "docs": "docs/guides/retro-look.md",
+      "evidence": ["@kits/retro exports sceneRetro", "@kits/retro exports retroReference"]
+    },
+    {
       "id": "NAV-FIELD-01",
       "title": "Optional incremental shared navigation distance fields",
       "shipped": true,
@@ -1125,6 +1132,23 @@
         "resourceProductionSystem",
         "resources",
         "sampleDeposit"
+      ]
+    },
+    {
+      "name": "retro",
+      "exports": [
+        "RETRO_LIMITS",
+        "bayerMatrix",
+        "buildPaletteLut",
+        "ditherThreshold",
+        "installRetro",
+        "nearestPaletteIndex",
+        "paletteSpread",
+        "resolveRetroLook",
+        "retro",
+        "retroReference",
+        "retroTargetSize",
+        "sceneRetro"
       ]
     },
     {"name": "rewind", "exports": ["chooseRewindTime", "createRewindHistory"]},

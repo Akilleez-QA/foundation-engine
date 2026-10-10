@@ -131,3 +131,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0130](0130-optional-streaming-queue.md) | Optional on-demand streaming queue | Optional kits / Assets | Proposed |
 
 | [0131](0131-defer-worker-render-pipelining.md) | Defer worker render pipelining until a measured need | Render / Frame loop / Workers | Accepted (not built) |
+
+| [0132](0132-optional-retro-look.md) | Optional retro software-raster look | Optional kits / Rendering | Proposed |
