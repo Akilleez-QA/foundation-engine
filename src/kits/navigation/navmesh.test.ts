@@ -36,6 +36,8 @@ test('locate finds the polygon under a point, honouring height', () => {
   assert.equal(locate(mesh, [0.5, 0, 1.5]), null, 'the missing corner of the L');
   assert.equal(locate(mesh, [0.5, 5, 0.5]), null, 'too far above');
   assert.equal(locate(mesh, [0.5, 5, 0.5], 10), 0);
+  assert.equal(locate(mesh, [-1e-16, 0, 0.5]), 0, 'a rounding error below the minimum is still on the mesh');
+  assert.equal(locate(mesh, [-0.01, 0, 0.5]), null);
 });
 
 test('the funnel pulls the corridor tight around the inner corner, with radius clearance', () => {

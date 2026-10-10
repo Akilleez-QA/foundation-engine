@@ -186,7 +186,7 @@ function inside(mesh: NavMesh, p: number, x: number, z: number): boolean {
     const a = mesh.vertices[poly[k]!]!,
       b = mesh.vertices[poly[(k + 1) % poly.length]!]!;
     const len2 = (b[0] - a[0]) ** 2 + (b[2] - a[2]) ** 2;
-    if (cross(a[0], a[2], b[0], b[2], x, z) < -1e-9 * Math.max(1, len2)) return false;
+    if (cross(a[0], a[2], b[0], b[2], x, z) < -1e-9 * len2) return false;
   }
   return true;
 }
@@ -210,9 +210,13 @@ export function locate(mesh: NavMesh, position: MeshPoint, maxHeight = 2): numbe
   const m = meshOf(mesh),
     p = point(position, 'position');
   if (!finite(maxHeight) || maxHeight < 0) fail('maxHeight must be ≥ 0');
-  const cx = Math.floor((p[0] - m.minX) / m.cell),
-    cz = Math.floor((p[2] - m.minZ) / m.cell);
-  if (cx < 0 || cz < 0 || cx >= m.cols) return null;
+  // A point a rounding error below the mesh minimum (walkMesh can produce one on a boundary) still maps to cell 0.
+  const fx = (p[0] - m.minX) / m.cell,
+    fz = (p[2] - m.minZ) / m.cell;
+  if (fx < -1e-9 || fz < -1e-9) return null;
+  const cx = Math.max(0, Math.floor(fx)),
+    cz = Math.max(0, Math.floor(fz));
+  if (cx >= m.cols) return null;
   let best: number | null = null,
     bestDy = Infinity;
   for (const poly of m.grid.get(cz * m.cols + cx) ?? []) {
@@ -286,13 +290,12 @@ export function findStraightPath(
     g = point(goal, 'goal');
   if (!finite(radius) || radius < 0) fail('radius must be ≥ 0');
   if (!Array.isArray(path) || path.length < 1 || path.length > NAVMESH_LIMITS.polygons)
-    fail('corridor must be 1-16,384 polygons');
-  const ids0 = path.map((p, i) => {
+    fail(`corridor must be 1-${NAVMESH_LIMITS.polygons} polygons`);
+  const ids = path.map((p, i) => {
     if (typeof p !== 'number' || !Number.isSafeInteger(p) || p < 0 || p >= mesh.polygons.length)
       fail(`corridor ${i} is not a polygon`);
     return p;
   });
-  const ids = ids0;
   if (!inside(mesh, ids[0]!, s[0], s[2])) return Object.freeze({status: 'off-corridor', which: 'start'});
   if (!inside(mesh, ids[ids.length - 1]!, g[0], g[2])) return Object.freeze({status: 'off-corridor', which: 'goal'});
   // Portals as [left, right] seen walking from one polygon to the next, then the goal as a zero-width portal.
