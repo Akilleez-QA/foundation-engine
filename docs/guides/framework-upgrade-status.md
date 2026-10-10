@@ -1589,3 +1589,13 @@ review rounds with all findings fixed; hosted CI remains required.
 `@kits/numeric` is an independently implemented pure kit: fixed-point words (2–32 bits in a number, up to 128 bits in a bigint) with creator-chosen rounding and overflow, binary-angle sin/cos/atan2 tables built from `dmath`, and strict reduced-precision float (`f32` = `Math.fround`; `pc24` = 24-bit significands with the double exponent range). It composes with `dmath`, `@kits/rollback` and `@kits/replay` and installs no clock, persistence owner or registration. [Kit README](../../src/kits/numeric/README.md), [ADR 0099](../adr/0099-strict-numeric-modes.md).
 
 Evidence: 16 focused headless tests (exhaustive Q4.4 and seeded 32/48/64/128-bit comparisons with an independent BigInt oracle under every rounding/overflow pair; exact ties-to-even oracle for 2–25-bit significands including subnormal-range results; trig error bounds; 704 committed golden vectors; a fixed-point simulation through the rollback sync test and replay digests). An independent adversarial review found five defects (a fracBits-0 wrap rounding error in mulAdd/lerp, pc24 products below 2^-1021, and three edge cases), each fixed with a regression test. The golden vectors and three lockstep workload digests were identical in Chromium 141 and Node 26.8.1 through the extended `npm run test:dmath-browser` (local run). This is a branch candidate: hosted full CI, other browsers, a playable template consumer and physical-device acceptance remain pending.
+
+## Cell and portal culling — candidate (2026-10-09)
+
+Optional `@kits/cells`: creator cells (boxes) and portals (planar convex polygons with
+open state), a bounded flood from the camera's cells narrowing a screen rectangle per
+portal with conservative eye-plane handling, a depth-bounded PVS bit table, and a
+culler that writes visibility only for targets that flip, through engine components
+or three.js objects. See [ADR 0145](../adr/0145-cell-portal-culling.md). Headless tests
+in the ledger; independent review and hosted CI remain required. Hardware occlusion
+queries are out of scope.

@@ -65,6 +65,8 @@ The optional [scripting](../../src/kits/scripting/README.md) candidate runs sand
 
 The optional [numeric](../../src/kits/numeric/README.md) candidate supplies strict deterministic number formats for lockstep, rollback and replay: fixed-point words with chosen rounding and overflow, binary-angle trigonometry and strict reduced-precision float. Headless oracle and golden tests plus a Chromium/Node vector comparison; no template consumer or device acceptance is claimed.
 
+| [cells](../../src/kits/cells/README.md) | Cell-and-portal render culling: rooms and doorways, screen-rectangle narrowing, a conservative PVS bit table, render-on-change visibility for entities or three.js objects; pure helpers | None yet; implemented, candidate (CELLS-01, [guide](../guides/cell-culling.md)); headless tests only |
+
 The optional [assignments](../../src/kits/assignments/README.md) candidate supplies exclusive actor claims, weighted target capacity and atomic transfer refusal. Two headless service/worksite fixtures and route-owner composition tests exercise it; no playable template consumer or browser/device acceptance is claimed. [Guide](../guides/assignments.md).
 
 The optional [region-activation](../../src/kits/region-activation/README.md) candidate decides which grid regions a game simulates from observer positions, with release hysteresis, linger, pins, per-update transition budgets and epochs for stale loads. Headless model and ECS/chunk-store consumer tests only; no template consumer or browser/device acceptance is claimed. [Guide](../guides/region-activation.md).

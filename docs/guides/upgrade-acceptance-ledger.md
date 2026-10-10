@@ -1727,3 +1727,25 @@ is flush. No game, browser or device evidence.
 `@kits/numeric` is an independently implemented pure kit: fixed-point words (2–32 bits in a number, up to 128 bits in a bigint) with creator-chosen rounding and overflow, binary-angle sin/cos/atan2 tables built from `dmath`, and strict reduced-precision float (`f32` = `Math.fround`; `pc24` = 24-bit significands with the double exponent range). It composes with `dmath`, `@kits/rollback` and `@kits/replay` and installs no clock, persistence owner or registration. [Kit README](../../src/kits/numeric/README.md), [ADR 0099](../adr/0099-strict-numeric-modes.md).
 
 Evidence: 16 focused headless tests (exhaustive Q4.4 and seeded 32/48/64/128-bit comparisons with an independent BigInt oracle under every rounding/overflow pair; exact ties-to-even oracle for 2–25-bit significands including subnormal-range results; trig error bounds; 704 committed golden vectors; a fixed-point simulation through the rollback sync test and replay digests). An independent adversarial review found five defects (a fracBits-0 wrap rounding error in mulAdd/lerp, pc24 products below 2^-1021, and three edge cases), each fixed with a regression test. The golden vectors and three lockstep workload digests were identical in Chromium 141 and Node 26.8.1 through the extended `npm run test:dmath-browser` (local run). This is a branch candidate: hosted full CI, other browsers, a playable template consumer and physical-device acceptance remain pending.
+
+## Cell and portal culling — candidate (2026-10-09)
+
+Branch `feat/cell-culling` from `9345d07b`. Twenty-four new headless tests: graph
+refusals; corridor narrowing; a cell reached through a narrow then a wider portal;
+closed portals and revisions; portals behind or crossing the eye plane; a camera on
+or within tolerance of a portal plane; outside fallbacks; a four-cell cycle; depth
+horizon and overflow fallbacks; the PVS alone; unchanged-camera reuse; determinism;
+render-on-change application, restore, reentrancy and throwing-sink recovery; a
+composition with the real `World`/`Shape` and three.js meshes, with the view-projection
+helper matched against the three.js camera. A seeded comparison of 960 cameras on 24
+generated multi-level grids against an independent ray-marching reference found no
+hidden visible cell; deliberately weakened variants (near-plane clipping, a shrunk
+rectangle, first-visit-only traversal) each failed it. Local headless probe, not a
+device budget: 95 % of 768 objects culled on average on an 8 x 8 fixture. No browser,
+GPU, draw-call, frame-time or device evidence.
+An independent review of `7a59f93b` found culler restore gaps (targets left unknown by
+`resync` or a throwing sink stayed hidden after remove/dispose; a sink throwing during
+dispose ended disposal early) and a three.js snippet using the local camera position;
+both were fixed with a seeded culler model fuzz, a reference test with wide, asymmetric
+and parented three.js cameras on portal planes and corners, and documented orthographic
+and near-plane limits.

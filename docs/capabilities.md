@@ -26,6 +26,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | NAV-FIELD-01 | Optional incremental shared navigation distance fields |  | [README.md](../src/kits/navigation/README.md) |
 | WORK-01 | Optional bounded fair work roster |  | [README.md](../src/kits/work-roster/README.md) |
 | VOLUME-01 | Optional bounded sphere and capsule overlap, sweep and headroom queries |  | [README.md](../src/kits/volume-query/README.md) |
+| CELLS-01 | Optional cell and portal render culling with a conservative PVS |  | [cell-culling.md](guides/cell-culling.md) |
 | ACTIVATION-01 | Optional bounded region activation from observer positions |  | [region-activation.md](guides/region-activation.md) |
 | CADENCE-01 | Optional bounded per-member update cadence |  | [update-cadence.md](guides/update-cadence.md) |
 | ASG-01 | Optional bounded service and worksite assignment ownership |  | [assignments.md](guides/assignments.md) |
@@ -100,6 +101,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/camera`
 - `@kits/capabilities`
 - `@kits/car-handling`
+- `@kits/cells`
 - `@kits/chalkboard`
 - `@kits/character`
 - `@kits/combat`

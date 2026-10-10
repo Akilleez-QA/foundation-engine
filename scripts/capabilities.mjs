@@ -181,6 +181,17 @@ export const FEATURES = [
     evidence: [{kit: 'volume-query', export: 'sweepVolume'}, {path: 'src/kits/volume-query/oracle.test.ts'}],
   },
   {
+    id: 'CELLS-01',
+    title: 'Optional cell and portal render culling with a conservative PVS',
+    docs: 'docs/guides/cell-culling.md',
+    evidence: [
+      {kit: 'cells', export: 'createCellView'},
+      {kit: 'cells', export: 'buildCellPvs'},
+      {kit: 'cells', export: 'createCellCuller'},
+      {path: 'src/kits/cells/reference.test.ts'},
+    ],
+  },
+  {
     id: 'ACTIVATION-01',
     title: 'Optional bounded region activation from observer positions',
     docs: 'docs/guides/region-activation.md',

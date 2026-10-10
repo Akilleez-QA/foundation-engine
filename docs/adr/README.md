@@ -165,3 +165,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0115](0115-traversal-helpers.md) | Ledge, ladder and pushable traversal helpers | Optional kits / Locomotion | Proposed |
 
 | [0099](0099-strict-numeric-modes.md) | Optional strict numeric modes (fixed point, binary angles, reduced precision) | Optional kits / Time and determinism | Proposed |
+
+| [0145](0145-cell-portal-culling.md) | Optional cell and portal render culling | Optional kits / Rendering scale | Proposed |

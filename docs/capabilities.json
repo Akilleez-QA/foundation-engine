@@ -146,6 +146,18 @@
       "evidence": ["@kits/volume-query exports sweepVolume", "src/kits/volume-query/oracle.test.ts exists"]
     },
     {
+      "id": "CELLS-01",
+      "title": "Optional cell and portal render culling with a conservative PVS",
+      "shipped": true,
+      "docs": "docs/guides/cell-culling.md",
+      "evidence": [
+        "@kits/cells exports createCellView",
+        "@kits/cells exports buildCellPvs",
+        "@kits/cells exports createCellCuller",
+        "src/kits/cells/reference.test.ts exists"
+      ]
+    },
+    {
       "id": "ACTIVATION-01",
       "title": "Optional bounded region activation from observer positions",
       "shipped": true,
@@ -921,6 +933,26 @@
         "planeGround",
         "sampledGround",
         "validateCarConfig"
+      ]
+    },
+    {
+      "name": "cells",
+      "exports": [
+        "CELL_CEILING",
+        "OBJECT_CEILING",
+        "PORTAL_CEILING",
+        "PORTAL_VERTEX_CEILING",
+        "PVS_CELL_CEILING",
+        "VISIT_CEILING",
+        "buildCellPvs",
+        "cellCameraFromView",
+        "createCellCuller",
+        "createCellGraph",
+        "createCellView",
+        "createCellViewResult",
+        "createViewCellCamera",
+        "entityVisibility",
+        "objectVisibility"
       ]
     },
     {"name": "chalkboard", "exports": ["BOARD", "createBoardView", "lengthOf", "pathOf", "tickLabels"]},
