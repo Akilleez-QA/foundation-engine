@@ -1207,3 +1207,15 @@ in 18 asset test files. The independent dimension oracle covers 1517 shapes,
 plus explicit thin/square/odd anchors and model refusal/retry. Independent review
 and full hosted integration remain pending; no physical memory or device evidence
 is implied.
+
+## Optional population kit — candidate (2026-10-09)
+
+Branch `feat/population-kit` from `cbaf8060`. Nine headless tests: spawn/despawn
+with enter/exit hysteresis in definition order; `never`/`visit`/`leave` policies,
+persistence of `never` only and revival; deterministic caps with deferred counts
+and retry after `returned`; validation of definitions, limits, observers and
+forged or edited snapshots; an ECS consumer spawning and removing entities from
+intents with depletion surviving a real save store reload; update tiers for
+always/near/background with conserved background time, hysteresis, capped and
+reported catch-up, slot balance and limits; and a fixed-step runner consumer
+integrating only due entities. No browser, device or performance acceptance.

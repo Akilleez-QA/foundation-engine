@@ -663,6 +663,18 @@
     },
     {"name": "objectives", "exports": ["createObjectiveRun", "createStagedObjectives", "objectives"]},
     {
+      "name": "population",
+      "exports": [
+        "PLACEMENT_LIMITS",
+        "createPlacementField",
+        "createUpdateTiers",
+        "definePlacementSection",
+        "definePlacements",
+        "parsePlacementState",
+        "population"
+      ]
+    },
+    {
       "name": "procgen",
       "exports": [
         "CELLULAR_CELLS_PER_SLICE",

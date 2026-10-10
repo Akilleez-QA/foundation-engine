@@ -1238,3 +1238,13 @@ charging. Cube, array, volume, authored mip and non-RGBA8 descriptor support rem
 explicit accounting limitations. See [asset residency](asset-residency.md).
 Focused and affected checks plus independent review are required before hosted
 integration; no physical memory or device evidence is implied.
+
+## Optional population kit — candidate (2026-10-09)
+
+`@kits/population` (requires `spatial`) adds placement fields that spawn and
+despawn authored placements near observers with bounded per-update work and
+remember destroyed ones (persisted `never` depletion through a strict save
+section), and update tiers that freeze or round-robin far entities with conserved,
+capped time. No owner is installed. See [the guide](population.md) and
+[ADR 0092](../adr/0092-population-placements-and-tiers.md). Headless tests are in the
+upgrade ledger; independent review and full hosted CI remain required.

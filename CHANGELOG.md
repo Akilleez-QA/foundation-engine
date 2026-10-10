@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Optional population kit (`@kits/population`, requires `spatial`):** authored placements that spawn near observers with hysteresis and bounded per-update work, remember destroyed placements (`never` depletion persisted through a strict save section, `visit`, `leave`), and update tiers that run near entities every step, freeze far ones or round-robin them with conserved, capped time. No owner is installed. See [the guide](docs/guides/population.md) and [ADR 0092](docs/adr/0092-population-placements-and-tiers.md).
+
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.
