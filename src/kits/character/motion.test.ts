@@ -158,3 +158,16 @@ test('motion: dmath facing, speed and solids agree with Math within the kit tole
   ])
     assert.equal(insideSolid(pt, hex, 0, dmath), insideSolid(pt, hex));
 });
+
+test('a motion started at a saved velocity continues exactly as the uninterrupted one', () => {
+  const live = createMotion({speed: 3});
+  for (let i = 0; i < 4; i++) live.step({x: 1, z: 0.5}, 1 / 60);
+  const resumed = createMotion({speed: 3, velocity: live.velocity});
+  for (let i = 0; i < 20; i++) {
+    const a = live.step({x: -0.3, z: 1}, 1 / 60),
+      b = resumed.step({x: -0.3, z: 1}, 1 / 60);
+    assert.ok(Object.is(a.x, b.x) && Object.is(a.z, b.z));
+  }
+  assert.deepEqual(createMotion({speed: 3}).velocity, {x: 0, z: 0});
+  assert.throws(() => createMotion({speed: 3, velocity: {x: Number.NaN, z: 0}}), RangeError);
+});
