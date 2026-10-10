@@ -1,5 +1,5 @@
-import {FormulaError, isFormulaName, type RandomSource} from './expression';
-import {evaluateSheet, type FormulaResult, type FormulaSheet} from './sheet';
+import {captureArray, FormulaError, isFormulaName, type RandomSource} from './expression';
+import {evaluateSheet, isFormulaSheet, type FormulaResult, type FormulaSheet} from './sheet';
 
 /**
  * Modifier stacking. Each stage collects contributions and combines them by its rule, then applies the combined term:
@@ -45,21 +45,43 @@ const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFi
 export function defineStacking(stages: readonly StackingStageInput[], maxContributions = 256): Stacking {
   if (!Number.isSafeInteger(maxContributions) || maxContributions < 1 || maxContributions > 4096)
     throw new FormulaError('maxContributions must be an integer in 1..4096');
-  if (!Array.isArray(stages) || stages.length > 32) throw new FormulaError('a stacking order has at most 32 stages');
+  const list = captureArray(stages, 32, 'stacking stages');
   const seen = new Set<string>();
-  const out = stages.map((s): StackingStage => {
+  const out = list.map((entry): StackingStage => {
+    const s = fields(entry, ['id', 'apply', 'combine', 'min', 'max'], 'stage');
     if (!isFormulaName(s.id) || seen.has(s.id)) throw new FormulaError(`invalid or duplicate stage ${String(s.id)}`);
-    seen.add(s.id);
+    const id = s.id;
+    seen.add(id);
     if (s.apply !== 'add' && s.apply !== 'multiply')
-      throw new FormulaError(`stage ${s.id}: apply must be add or multiply`);
-    if (!['sum', 'max', 'min', 'product'].includes(s.combine)) throw new FormulaError(`stage ${s.id}: invalid combine`);
-    if (s.apply === 'add' && s.combine === 'product') throw new FormulaError(`stage ${s.id}: product needs multiply`);
+      throw new FormulaError(`stage ${id}: apply must be add or multiply`);
+    if (s.combine !== 'sum' && s.combine !== 'max' && s.combine !== 'min' && s.combine !== 'product')
+      throw new FormulaError(`stage ${id}: invalid combine`);
+    if (s.apply === 'add' && s.combine === 'product') throw new FormulaError(`stage ${id}: product needs multiply`);
     const min = s.min ?? -Number.MAX_VALUE,
       max = s.max ?? Number.MAX_VALUE;
-    if (!finite(min) || !finite(max) || min > max) throw new FormulaError(`stage ${s.id}: invalid bounds`);
-    return Object.freeze({id: s.id, apply: s.apply, combine: s.combine, min, max});
+    if (!finite(min) || !finite(max) || min > max) throw new FormulaError(`stage ${id}: invalid bounds`);
+    return Object.freeze({id, apply: s.apply, combine: s.combine, min, max});
   });
-  return Object.freeze({stages: Object.freeze(out), maxContributions});
+  const stacking: Stacking = Object.freeze({stages: Object.freeze(out), maxContributions});
+  STACKINGS.add(stacking);
+  return stacking;
+}
+const STACKINGS = new WeakSet<object>();
+
+/** Read the listed own data fields once; other keys, accessors and non-plain objects are refused. */
+function fields(value: unknown, allowed: readonly string[], what: string): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new FormulaError(`${what} must be a record`);
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) throw new FormulaError(`${what} must be plain data`);
+  const out: Record<string, unknown> = Object.create(null);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !allowed.includes(key))
+      throw new FormulaError(`${what} has unexpected field ${String(key)}`);
+    const d = Object.getOwnPropertyDescriptor(value, key)!;
+    if (!('value' in d)) throw new FormulaError(`${what} has an accessor`);
+    if (d.value !== undefined) out[key] = d.value;
+  }
+  return out;
 }
 
 /** Apply contributions to a value through the stacking order. Unknown stages and non-finite values throw. */
@@ -68,13 +90,13 @@ export function applyStacking(
   value: number,
   contributions: readonly Contribution[],
 ): {readonly value: number; readonly stages: readonly StageTrace[]} {
+  if (!STACKINGS.has(stacking)) throw new FormulaError('apply a stacking order from defineStacking');
   if (!finite(value)) throw new FormulaError('stacking value must be finite');
-  if (!Array.isArray(contributions) || contributions.length > stacking.maxContributions)
-    throw new FormulaError('too many contributions');
+  const list = captureArray(contributions, stacking.maxContributions, 'contributions');
   const byStage = new Map<string, {source: string; value: number; index: number}[]>();
   for (const s of stacking.stages) byStage.set(s.id, []);
-  contributions.forEach((c, index) => {
-    const {stage, value: v, source} = c;
+  list.forEach((entry, index) => {
+    const {stage, value: v, source} = fields(entry, ['stage', 'value', 'source'], 'contribution');
     const rows = typeof stage === 'string' ? byStage.get(stage) : undefined;
     if (!rows) throw new FormulaError(`unknown stage ${String(stage)}`);
     if (!finite(v)) throw new FormulaError('contribution value must be finite');
@@ -87,7 +109,8 @@ export function applyStacking(
   for (const stage of stacking.stages) {
     const rows = byStage
       .get(stage.id)!
-      .sort((a, b) => (a.source < b.source ? -1 : a.source > b.source ? 1 : a.index - b.index));
+      // Source, then value: the same multiset of rows always combines in the same order.
+      .sort((a, b) => (a.source < b.source ? -1 : a.source > b.source ? 1 : a.value - b.value || a.index - b.index));
     const before = current;
     let term = 0;
     if (rows.length) {
@@ -144,7 +167,7 @@ export interface DamageModel {
     readonly criticalStep: string | null;
     readonly stacking: Stacking;
   };
-  /** Order: sheet → miss check → stacking stages → resistance (immunity) → rounding → minimum/maximum. */
+  /** Order: sheet → miss check → immunity → stacking stages → resistance → rounding → minimum/maximum. */
   resolve(request: DamageRequest, random?: RandomSource): DamageResult;
 }
 
@@ -158,6 +181,9 @@ const ROUND = {
 
 export function createDamageModel(input: DamageModelInput): DamageModel {
   const sheet = input.sheet;
+  if (!isFormulaSheet(sheet)) throw new FormulaError('a damage model needs a sheet from defineFormulaSheet');
+  if (input.stacking !== undefined && !STACKINGS.has(input.stacking))
+    throw new FormulaError('a damage model needs a stacking order from defineStacking');
   const ids = new Set(sheet.steps.map(s => s.id));
   const step = (name: string | undefined, what: string): string | null => {
     if (name === undefined) return null;
@@ -174,6 +200,8 @@ export function createDamageModel(input: DamageModelInput): DamageModel {
     maximum = input.maximum ?? Number.MAX_VALUE;
   if (!finite(minResist) || !finite(maxResist) || minResist > maxResist || (immuneAt !== null && !finite(immuneAt)))
     throw new FormulaError('invalid resistance bounds');
+  if (immuneAt !== null && immuneAt <= minResist)
+    throw new FormulaError('immuneAt must be above the minimum resistance (or null for no immunity)');
   if (!finite(minimum) || !finite(maximum) || minimum > maximum) throw new FormulaError('invalid minimum/maximum');
   const config = Object.freeze({
     sheet,
@@ -203,20 +231,13 @@ export function createDamageModel(input: DamageModelInput): DamageModel {
           stages: empty,
           sheet: result,
         });
-      const stacked = applyStacking(config.stacking, base, request.contributions ?? []);
       const supplied = request.resistance ?? 0;
       if (!finite(supplied)) throw new FormulaError('resistance must be finite');
       const resisted = Math.min(maxResist, Math.max(minResist, supplied));
+      // Immunity is decided before stacking, so an immune target never fails on modifier arithmetic.
       if (immuneAt !== null && supplied >= immuneAt)
-        return Object.freeze({
-          kind: 'immune',
-          amount: 0,
-          critical,
-          base,
-          resisted,
-          stages: stacked.stages,
-          sheet: result,
-        });
+        return Object.freeze({kind: 'immune', amount: 0, critical, base, resisted, stages: empty, sheet: result});
+      const stacked = applyStacking(config.stacking, base, request.contributions ?? []);
       const after = stacked.value * (1 - resisted);
       if (!finite(after)) throw new FormulaError('resistance overflowed');
       const amount = Math.min(maximum, Math.max(minimum, ROUND[rounding](after)));

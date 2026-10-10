@@ -18,6 +18,8 @@ export function parseFormula(text: string, maxLength = 4096): Expr {
   const tokens = tokenize(text);
   let index = 0;
   let depth = 0;
+  // Parenthesised groups keep their own node: `(a + b) + c` is not flattened into `a + b + c`.
+  const wrapped = new WeakSet<object>();
   const peek = () => tokens[index];
   const take = () => tokens[index++]!;
   const accept = (value: string) => {
@@ -44,7 +46,14 @@ export function parseFormula(text: string, maxLength = 4096): Expr {
       const t = peek();
       if (!t || t.kind !== 'symbol' || !Object.hasOwn(table, t.value)) return left;
       index++;
-      left = [table[t.value]!, left, next()];
+      const op = table[t.value]!;
+      const right = next();
+      // Same-operator runs of associative operators become one variadic node (≤ 64 arguments), left to right, so long
+      // sums stay shallow; evaluation order is unchanged.
+      if (typeof left === 'object' && VARIADIC.has(op) && left[0] === op && !wrapped.has(left) && left.length < 65) {
+        const flattened: [string, ...Expr[]] = [op, ...left.slice(1), right];
+        left = flattened;
+      } else left = [op, left, right];
     }
   };
   const or = (): Expr => binary(and, {'||': 'or'});
@@ -104,6 +113,7 @@ export function parseFormula(text: string, maxLength = 4096): Expr {
       if (accept('(')) {
         const inner = or();
         expect(')');
+        if (typeof inner === 'object') wrapped.add(inner);
         return inner;
       }
       throw new FormulaError(`unexpected "${t.value}" at ${t.at}`);
@@ -113,6 +123,7 @@ export function parseFormula(text: string, maxLength = 4096): Expr {
   return result;
 }
 
+const VARIADIC = new Set(['add', 'mul', 'and', 'or']);
 interface Token {
   kind: 'number' | 'name' | 'symbol';
   value: string;
@@ -128,15 +139,18 @@ function tokenize(text: string): Token[] {
       i++;
       continue;
     }
-    const number = /^(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/.exec(text.slice(i, i + 64));
+    const number = /^(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/.exec(text.slice(i, i + 65));
+    if (number && number[0].length > 64) throw new FormulaError(`number literal too long at ${i}`);
     if (number) {
       const value = Number(number[0]);
       if (!Number.isFinite(value)) throw new FormulaError(`number out of range at ${i}`);
+      if (value === 0 && /[1-9]/.test(number[0].split(/[eE]/)[0]!))
+        throw new FormulaError(`number underflows to zero at ${i}`);
       tokens.push({kind: 'number', value: number[0], at: i});
       i += number[0].length;
       continue;
     }
-    const name = /^[A-Za-z_][A-Za-z0-9_.]*/.exec(text.slice(i, i + 65));
+    const name = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/.exec(text.slice(i, i + 65));
     if (name) {
       if (name[0].length > 64) throw new FormulaError(`name too long at ${i}`);
       tokens.push({kind: 'name', value: name[0], at: i});

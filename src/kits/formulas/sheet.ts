@@ -1,4 +1,5 @@
 import {
+  captureArray,
   compileExpression,
   DEFAULT_EXPRESSION_LIMITS,
   evaluateExpression,
@@ -84,9 +85,9 @@ export function defineFormulaSheet(input: FormulaSheetInput): FormulaSheet {
   };
   const maxSteps = limit(limits.maxSteps, 64, 1024, 'maxSteps');
   const maxInputs = limit(limits.maxInputs, 64, 1024, 'maxInputs');
-  if (!Array.isArray(raw.inputs) || raw.inputs.length > maxInputs) throw new FormulaError('inputs exceed maxInputs');
-  if (!Array.isArray(raw.steps) || raw.steps.length < 1 || raw.steps.length > maxSteps)
-    throw new FormulaError(`a sheet needs 1..${maxSteps} steps`);
+  const inputList = captureArray(raw.inputs, maxInputs, 'inputs');
+  const stepList = captureArray(raw.steps, maxSteps, 'steps');
+  if (stepList.length < 1) throw new FormulaError(`a sheet needs 1..${maxSteps} steps`);
   const known = new Set<string>();
   const claim = (name: unknown, what: string): string => {
     if (!isFormulaName(name)) throw new FormulaError(`invalid ${what} name ${JSON.stringify(name)}`);
@@ -94,8 +95,8 @@ export function defineFormulaSheet(input: FormulaSheetInput): FormulaSheet {
     known.add(name);
     return name;
   };
-  const inputs = Object.freeze((raw.inputs as unknown[]).map(n => claim(n, 'input')));
-  const constants: Record<string, number> = {};
+  const inputs = Object.freeze(inputList.map(n => claim(n, 'input')));
+  const constants: Record<string, number> = Object.create(null);
   const constRaw = raw.constants === undefined ? {} : plainRecord(raw.constants, 'constants');
   if (Object.keys(constRaw).length > maxInputs) throw new FormulaError('constants exceed maxInputs');
   for (const key of Object.keys(constRaw).sort()) {
@@ -106,7 +107,7 @@ export function defineFormulaSheet(input: FormulaSheetInput): FormulaSheet {
   const steps: FormulaStep[] = [];
   let maxDraws = 0,
     nodes = 0;
-  for (const entry of raw.steps as unknown[]) {
+  for (const entry of stepList) {
     const step = plainRecord(entry, 'step');
     if (!isFormulaName(step.id)) throw new FormulaError(`invalid step name ${JSON.stringify(step.id)}`);
     const id = step.id;
@@ -124,14 +125,20 @@ export function defineFormulaSheet(input: FormulaSheetInput): FormulaSheet {
     nodes += compiled.nodes;
     steps.push(Object.freeze({id, compiled}));
   }
-  return Object.freeze({
+  const sheet: FormulaSheet = Object.freeze({
     inputs,
     constants: Object.freeze(constants),
     steps: Object.freeze(steps),
     maxDraws,
     nodes,
   });
+  SHEETS.add(sheet);
+  return sheet;
 }
+const SHEETS = new WeakSet<object>();
+/** True for a sheet returned by `defineFormulaSheet`; hand-built sheets are refused by evaluation. */
+export const isFormulaSheet = (value: unknown): value is FormulaSheet =>
+  typeof value === 'object' && value !== null && SHEETS.has(value);
 
 /**
  * Evaluate every step in order. Inputs must be finite numbers for exactly the declared names. A failing step throws
@@ -143,6 +150,7 @@ export function evaluateSheet(
   inputs: Readonly<Record<string, number>>,
   options: {readonly random?: RandomSource; readonly trace?: boolean} = {},
 ): FormulaResult {
+  if (!isFormulaSheet(sheet)) throw new FormulaError('evaluate a sheet from defineFormulaSheet');
   const supplied = plainRecord(inputs, 'inputs');
   const keys = Object.keys(supplied);
   if (keys.length !== sheet.inputs.length) throw new FormulaError('inputs must match the sheet exactly');
@@ -165,12 +173,12 @@ export function evaluateSheet(
     if (v === undefined) throw new FormulaError(`unknown name ${name}`);
     return v;
   };
-  const out: Record<string, number> = {};
+  const out: Record<string, number> = Object.create(null);
   const trace: FormulaTraceRow[] = [];
   let last = 0;
   for (const step of sheet.steps) {
     const before = draws;
-    last = evaluateExpression(step.compiled.expr, scope, counted);
+    last = evaluateExpression(step.compiled, scope, counted);
     values.set(step.id, last);
     out[step.id] = last;
     if (options.trace) trace.push(Object.freeze({id: step.id, value: last, draws: draws - before}));

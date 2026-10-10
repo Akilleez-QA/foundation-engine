@@ -14,6 +14,8 @@ import {
   parseFormula,
 } from './index';
 
+const ev = (expr: unknown, s: (name: string) => number, random?: () => number) =>
+  evaluateExpression(compileExpression(expr), s, random);
 const scope = (values: Record<string, number>) => (name: string) => {
   const v = values[name];
   if (v === undefined) throw new Error(name);
@@ -23,17 +25,17 @@ const scope = (values: Record<string, number>) => (name: string) => {
 test('text and JSON forms compile to the same data and evaluate with precedence', () => {
   const parsed = parseFormula('a + b * c ^ 2 // 3 - -d');
   assert.deepEqual(parsed, ['sub', ['add', 'a', ['idiv', ['mul', 'b', ['pow', 'c', 2]], 3]], ['neg', 'd']]);
-  const value = evaluateExpression(compileExpression(parsed).expr, scope({a: 1, b: 2, c: 3, d: 4}));
+  const value = evaluateExpression(compileExpression(parsed), scope({a: 1, b: 2, c: 3, d: 4}));
   assert.equal(value, 1 + Math.trunc((2 * 9) / 3) + 4);
   assert.deepEqual(parseFormula('max(1, x) >= 2 && !y || z'), [
     'or',
     ['and', ['ge', ['max', 1, 'x'], 2], ['not', 'y']],
     'z',
   ]);
-  assert.equal(evaluateExpression(parseFormula('-7 // 2'), scope({})), -3, 'idiv truncates toward zero');
-  assert.equal(evaluateExpression(parseFormula('-7 % 3'), scope({})), -1, 'mod keeps the dividend sign');
-  assert.equal(evaluateExpression(parseFormula('round(-2.5)'), scope({})), -3, 'round is half away from zero');
-  assert.equal(evaluateExpression(parseFormula('clamp(9, 0, 5)'), scope({})), 5);
+  assert.equal(ev(parseFormula('-7 // 2'), scope({})), -3, 'idiv truncates toward zero');
+  assert.equal(ev(parseFormula('-7 % 3'), scope({})), -1, 'mod keeps the dividend sign');
+  assert.equal(ev(parseFormula('round(-2.5)'), scope({})), -3, 'round is half away from zero');
+  assert.equal(ev(parseFormula('clamp(9, 0, 5)'), scope({})), 5);
 });
 
 test('compile refuses unknown operators, bad arity, limits and non-data input', () => {
@@ -59,8 +61,7 @@ test('compile refuses unknown operators, bad arity, limits and non-data input', 
 });
 
 test('evaluation refuses non-finite and undefined arithmetic', () => {
-  const run = (text: string, values: Record<string, number> = {}) =>
-    evaluateExpression(parseFormula(text), scope(values));
+  const run = (text: string, values: Record<string, number> = {}) => ev(parseFormula(text), scope(values));
   assert.throws(() => run('1 / 0'), /division by zero/);
   assert.throws(() => run('1 // 0'), /division by zero/);
   assert.throws(() => run('1 % 0'), /modulo/);
@@ -70,8 +71,8 @@ test('evaluation refuses non-finite and undefined arithmetic', () => {
   assert.throws(() => run('x * x', {x: 1e200}), /non-finite/);
   assert.throws(() => run('clamp(1, 5, 0)'), /lower bound/);
   assert.throws(() => run('roll(6)'), /random source/);
-  assert.throws(() => evaluateExpression(['roll', 6], scope({}), () => 1), /\[0, 1\)/);
-  assert.throws(() => evaluateExpression(['roll', 1.5], scope({}), () => 0), /integer side/);
+  assert.throws(() => ev(['roll', 6], scope({}), () => 1), /\[0, 1\)/);
+  assert.throws(() => ev(['roll', 1.5], scope({}), () => 0), /integer side/);
 });
 
 test('sheets validate names and order, and evaluate deterministically with a seeded stream', () => {
@@ -174,7 +175,7 @@ test('stacking stages apply in declared order with their combine rules and bound
         {stage: 'x', value: 1, source: 'a'},
         {stage: 'x', value: 1, source: 'b'},
       ]),
-    /too many/,
+    /more than 1/,
   );
   const negative = applyStacking(defineStacking([{id: 'm', apply: 'multiply', combine: 'sum'}]), 10, [
     {stage: 'm', value: -3, source: 'curse'},
@@ -237,7 +238,7 @@ function referenceJade(c: Record<string, number>): number {
 
 test('named preset reproduces its documented arithmetic across many inputs', () => {
   const sheet = defineFormulaSheet(formulaPresets.jadeCocoonDamage);
-  const model = createDamageModel({sheet, hitStep: 'hit', criticalStep: 'crit', minimum: -1e9});
+  const model = createDamageModel({sheet, hitStep: 'hit', criticalStep: 'crit', minimum: -Number.MAX_VALUE});
   const rng = createRng('jade-reference');
   for (let i = 0; i < 2000; i++) {
     const c = {
@@ -252,7 +253,7 @@ test('named preset reproduces its documented arithmetic across many inputs', () 
       parity: rng.int(0, 1000),
       element: rng.int(0, 5),
       affinity: rng.int(0, 200),
-      modifier: rng.int(-2, 64),
+      modifier: rng.int(-8, 64),
       magic: rng.int(0, 1),
       sleep: rng.int(0, 1),
       hitRoll: rng.int(0, 32767),
@@ -272,4 +273,54 @@ test('every preset compiles and evaluates to a finite amount', () => {
     const result = evaluateSheet(sheet, inputs, {random: createRng(name).next});
     assert.ok(Number.isFinite(result.value), name);
   }
+});
+
+test('review hardening: long chains, reserved names, unbranded data, zero sign, frozen presets', () => {
+  const terms = Array.from({length: 200}, (_, i) => `a${i}`);
+  const chain = parseFormula(terms.join(' + '));
+  const compiled = compileExpression(chain);
+  assert.ok(compiled.nodes < 210, 'same-operator runs are flattened');
+  const values = Object.fromEntries(terms.map((t, i) => [t, i]));
+  assert.equal(evaluateExpression(compiled, scope(values)), (199 * 200) / 2);
+  assert.deepEqual(parseFormula('(a + b) + c'), ['add', ['add', 'a', 'b'], 'c'], 'groups are kept');
+  assert.throws(() => compileExpression('__proto__'), /invalid variable/);
+  assert.throws(() => compileExpression('a.constructor'), /invalid variable/);
+  assert.throws(() => compileExpression('a..b'), /invalid variable/);
+  assert.throws(
+    () => defineFormulaSheet(JSON.parse('{"inputs":[],"constants":{"__proto__":5},"steps":[{"id":"x","expr":1}]}')),
+    /invalid constant/,
+  );
+  assert.throws(() => parseFormula('1e-400'), /underflows/);
+  assert.throws(() => evaluateExpression({expr: ['min'], variables: [], maxDraws: 0, nodes: 1}, scope({})), /compiled/);
+  const sheet = defineFormulaSheet({inputs: ['x'], steps: [{id: 'y', expr: 'x'}]});
+  assert.throws(() => evaluateSheet({...sheet}, {x: 1}), /defineFormulaSheet/);
+  assert.throws(() => applyStacking({stages: [], maxContributions: 1e9}, 1, []), /defineStacking/);
+  assert.throws(() => evaluateExpression(compileExpression('x'), () => Number.NaN), /finite/);
+  for (const text of ['-1 * 0', 'trunc(-0.5)', 'round(-0.4)', '-1 // 2', '-4 % 2', 'ceil(-0.5)'])
+    assert.ok(Object.is(ev(parseFormula(text), scope({})), 0), `${text} is +0`);
+  assert.throws(() => {
+    (formulaPresets.arcadeSubtract.constants as {minimum: number}).minimum = 99;
+  }, TypeError);
+  const rpg = createDamageModel({sheet: defineFormulaSheet(formulaPresets.collectibleRpg)});
+  const immune = rpg.resolve(
+    {inputs: {level: 50, power: 90, attack: 80, defense: 60, critRate: 0, bonus: 0}},
+    createRng('x').next,
+  );
+  assert.equal(immune.amount, 0, 'a zero bonus stays zero');
+});
+
+test('review hardening: same-source stacking order, immunity first, immuneAt bounds', () => {
+  const stacking = defineStacking([{id: 's', apply: 'add', combine: 'sum'}]);
+  const rows = [0.1, 0.2, 0.3].map(value => ({stage: 's', value, source: 'a'}));
+  const forward = applyStacking(stacking, 0, rows).value;
+  const backward = applyStacking(stacking, 0, [...rows].reverse()).value;
+  assert.ok(Object.is(forward, backward));
+  const huge = defineStacking([{id: 'm', apply: 'multiply', combine: 'product'}]);
+  const sheet = defineFormulaSheet({inputs: ['x'], steps: [{id: 'amount', expr: 'x'}]});
+  const model = createDamageModel({sheet, stacking: huge});
+  const many = Array.from({length: 200}, (_, i) => ({stage: 'm', value: 1e10, source: `s${i}`}));
+  assert.equal(model.resolve({inputs: {x: 1}, contributions: many, resistance: 1}).kind, 'immune');
+  assert.throws(() => model.resolve({inputs: {x: 1}, contributions: many}), /overflowed/);
+  assert.throws(() => createDamageModel({sheet, resistance: {min: -1, immuneAt: -2}}), /immuneAt/);
+  assert.throws(() => defineStacking([{id: 'x', apply: 'add', combine: 'sum', extra: 1} as never]), /unexpected field/);
 });

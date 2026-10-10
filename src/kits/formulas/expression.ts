@@ -3,8 +3,9 @@ import {dmath} from '../../core/dmath';
 /**
  * Data-defined arithmetic. An expression is JSON: a finite number, a variable name, or an array whose first element is
  * an operator name and whose remaining elements are expressions: `['mul', 'attack', ['add', 'level', 3]]`.
- * Evaluation uses only correctly rounded IEEE operations and the engine's deterministic `dmath`, so the same inputs
- * and random draws give the same bits in every conforming JavaScript engine.
+ * Evaluation uses correctly rounded IEEE arithmetic, `Math.sqrt` (formally implementation-approximated, in practice the
+ * correctly rounded IEEE square root that the engine's dmath golden vectors check) and the deterministic `dmath`
+ * `pow`/`exp`/`log`, so the same inputs and random draws give the same bits in conforming engines.
  */
 export type Expr = number | string | readonly [string, ...Expr[]];
 
@@ -26,10 +27,21 @@ export class FormulaError extends Error {
   }
 }
 
-const NAME = /^[A-Za-z_][A-Za-z0-9_.]{0,63}$/;
-/** A variable name: a letter or underscore, then letters, digits, `_` or `.`; at most 64 characters. */
+const NAME = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/;
+const RESERVED = new Set(['__proto__', 'constructor', 'prototype']);
+/**
+ * A variable name: dot-separated segments of a letter or underscore then letters, digits or `_`; at most 64
+ * characters; not an operator name and not `__proto__`, `constructor` or `prototype`.
+ */
 export function isFormulaName(value: unknown): value is string {
-  return typeof value === 'string' && NAME.test(value) && !Object.hasOwn(OPERATORS, value);
+  return (
+    typeof value === 'string' &&
+    value.length <= 64 &&
+    NAME.test(value) &&
+    !RESERVED.has(value) &&
+    !value.split('.').some(part => RESERVED.has(part)) &&
+    !Object.hasOwn(OPERATORS, value)
+  );
 }
 
 type Arity = readonly [min: number, max: number];
@@ -68,6 +80,10 @@ const OPERATORS: Readonly<Record<string, Arity>> = Object.freeze({
   roll: [1, 1],
   chance: [1, 1],
 });
+const COMPILED = new WeakSet<object>();
+/** True for an expression returned by `compileExpression` (hand-built objects are refused by evaluation). */
+export const isCompiledExpression = (value: unknown): value is CompiledExpression =>
+  typeof value === 'object' && value !== null && COMPILED.has(value);
 export const FORMULA_OPERATORS: readonly string[] = Object.freeze(Object.keys(OPERATORS));
 
 /** A validated, frozen expression with the variables it reads and the most random draws one evaluation can take. */
@@ -76,6 +92,23 @@ export interface CompiledExpression {
   readonly variables: readonly string[];
   readonly maxDraws: number;
   readonly nodes: number;
+}
+
+/** Capture a plain dense data array of at most `max` entries without calling its methods or accessors. */
+export function captureArray(value: unknown, max: number, what: string): unknown[] {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype)
+    throw new FormulaError(`${what} must be an array`);
+  const length: unknown = Object.getOwnPropertyDescriptor(value, 'length')?.value;
+  if (typeof length !== 'number' || !Number.isSafeInteger(length) || length > max)
+    throw new FormulaError(`${what} has more than ${max} entries`);
+  if (Reflect.ownKeys(value).length !== length + 1) throw new FormulaError(`${what} must be a dense data array`);
+  const out: unknown[] = [];
+  for (let i = 0; i < length; i++) {
+    const d = Object.getOwnPropertyDescriptor(value, String(i));
+    if (!d || !('value' in d)) throw new FormulaError(`${what} must hold data, not accessors`);
+    out.push(d.value);
+  }
+  return out;
 }
 
 function denseArray(value: unknown): unknown[] {
@@ -135,12 +168,14 @@ export function compileExpression(
     return {expr: Object.freeze([op, ...args]) as Expr, draws: draws + branchDraws};
   };
   const result = walk(input, 1);
-  return Object.freeze({
+  const compiled: CompiledExpression = Object.freeze({
     expr: result.expr,
     variables: Object.freeze([...variables].sort()),
     maxDraws: result.draws,
     nodes,
   });
+  COMPILED.add(compiled);
+  return compiled;
 }
 
 function bound(value: unknown, maximum: number, name: string): number {
@@ -171,13 +206,29 @@ const draw = (random: RandomSource): number => {
  * root or logarithm of a negative number and non-integer powers of negative numbers throw. `if`, `and` and `or`
  * short-circuit, so only the branch taken draws random numbers; evaluation order is left to right.
  */
-export function evaluateExpression(expr: Expr, scope: Scope, random?: RandomSource): number {
+export function evaluateExpression(compiled: CompiledExpression, scope: Scope, random?: RandomSource): number {
+  if (!isCompiledExpression(compiled)) throw new FormulaError('evaluate a compiled expression (compileExpression)');
+  if (typeof scope !== 'function') throw new FormulaError('scope must be a function');
+  return evaluateNode(compiled.expr, scope, random);
+}
+
+function evaluateNode(expr: Expr, scope: Scope, random?: RandomSource): number {
+  const value = evaluateOperator(expr, scope, random);
+  // One canonical zero: -0 never leaks out of an operator.
+  return value === 0 ? 0 : value;
+}
+
+function evaluateOperator(expr: Expr, scope: Scope, random?: RandomSource): number {
   if (typeof expr === 'number') return expr;
-  if (typeof expr === 'string') return scope(expr);
+  if (typeof expr === 'string') {
+    const value = scope(expr);
+    if (typeof value !== 'number' || !Number.isFinite(value)) throw new FormulaError(`${expr} is not a finite number`);
+    return value;
+  }
   const op = expr[0];
   const args = expr.slice(1) as Expr[];
-  const at = (i: number) => evaluateExpression(args[i]!, scope, random);
-  const all = () => args.map(arg => evaluateExpression(arg, scope, random));
+  const at = (i: number) => evaluateNode(args[i]!, scope, random);
+  const all = () => args.map(arg => evaluateNode(arg, scope, random));
   switch (op) {
     case 'add':
       return finiteResult(
@@ -210,7 +261,7 @@ export function evaluateExpression(expr: Expr, scope: Scope, random?: RandomSour
       return finiteResult(a % b, op);
     }
     case 'neg':
-      return -at(0) + 0;
+      return -at(0);
     case 'abs':
       return Math.abs(at(0));
     case 'min':

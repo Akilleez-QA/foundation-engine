@@ -5,7 +5,15 @@ import type {FormulaSheetInput} from './sheet';
  * `defineFormulaSheet`. Generic archetypes come first; named presets reproduce one published game's arithmetic as
  * documented by a clean-room reconstruction and say what is and is not reproduced.
  */
-export const formulaPresets = Object.freeze({
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === 'object') {
+    for (const key of Reflect.ownKeys(value)) deepFreeze((value as Record<PropertyKey, unknown>)[key]);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+export const formulaPresets = deepFreeze({
   /** Arcade: attack minus defense, never below a floor. */
   arcadeSubtract: Object.freeze({
     inputs: ['attack', 'defense'],
@@ -29,7 +37,8 @@ export const formulaPresets = Object.freeze({
   /**
    * Collectible-RPG archetype: level-scaled integer damage with a critical chance that doubles the level term and a
    * uniform 217–255 / 255 variance. Inputs: level, power (move strength), attack, defense, critRate (0–1),
-   * bonus (a multiplier such as same-type and effectiveness, e.g. 1.5 × 2).
+   * bonus (one combined multiplier such as same-type × effectiveness, floored once; games that floor after each
+   * factor need one step per factor). `roll(n)` draws an integer in 0..n−1.
    */
   collectibleRpg: Object.freeze({
     inputs: ['level', 'power', 'attack', 'defense', 'critRate', 'bonus'],
@@ -39,17 +48,25 @@ export const formulaPresets = Object.freeze({
       {id: 'levelTerm', expr: {text: '(2 * level * (1 + crit)) // 5 + 2'}},
       {id: 'raw', expr: {text: '((levelTerm * power * attack) // max(defense, 1)) // 50 + 2'}},
       {id: 'scaled', expr: {text: 'floor(raw * bonus)'}},
-      {id: 'amount', expr: {text: 'max(1, (scaled * (varianceLow + roll(varianceSpan))) // varianceScale)'}},
+      // A zero bonus (an immunity) stays zero; otherwise a landed hit deals at least 1.
+      {
+        id: 'amount',
+        expr: {text: 'if(scaled == 0, 0, max(1, (scaled * (varianceLow + roll(varianceSpan))) // varianceScale))'},
+      },
     ],
   }) satisfies FormulaSheetInput,
 
   /**
-   * Named: Jade Cocoon (1998) ordinary HP damage, transcribed from the arithmetic a community clean-room reconstruction
-   * recovered from the original executable. Inputs are the game's already-processed combat stats; `magic` and
-   * `sleep` are 0/1. `hitRoll` and `critRoll` are the raw draws of the game's own generator (supply them to reproduce a
-   * recorded fight; drawing them from another generator gives the same rules but not the original random stream).
-   * Reproduced: hit check, attack/defense ratio, critical ×7×0.25, elemental affinity, modifier, 1/32 scale, the
-   * minimum of 1 and the parity bonus. Not reproduced: drain, reflection, status application and 32-bit overflow.
+   * Named: Jade Cocoon (1998) ordinary HP damage, transcribed from the arithmetic that the community reconstruction
+   * github.com/phoenixfire808/jade-cocoon-rust-engine (revision 91b5741, `src/retail.rs`, function `damage`) recovered
+   * from the original executable. No code was copied; this is the same arithmetic written as formula data. Inputs are
+   * the game's already-processed combat stats; `magic` and `sleep` are 0/1; `parity` is a non-negative integer
+   * (an unsigned value in the original). `hitRoll` and `critRoll` are the raw draws of the game's own generator:
+   * supply them to reproduce a recorded fight; drawing them from another generator keeps the rules, not the stream.
+   * Reproduced: hit check, attack/defense ratio, critical ×7×0.25, elemental affinity, modifier, 1/32 scale, a zero
+   * result raised to 1 and the parity bonus. A negative `modifier` yields a negative amount as in the original; to
+   * keep it, create the model with `minimum: -Number.MAX_VALUE` (the model's default minimum is 0). Not reproduced:
+   * drain, reflection, status application and 32-bit integer overflow.
    * Use `hitStep: 'hit'` and `criticalStep: 'crit'` with `createDamageModel`.
    */
   jadeCocoonDamage: Object.freeze({
