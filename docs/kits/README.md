@@ -40,6 +40,8 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 
 The optional [assignments](../../src/kits/assignments/README.md) candidate supplies exclusive actor claims, weighted target capacity and atomic transfer refusal. Two headless service/worksite fixtures and route-owner composition tests exercise it; no playable template consumer or browser/device acceptance is claimed. [Guide](../guides/assignments.md).
 
+The optional [car-handling](../../src/kits/car-handling/README.md) candidate steps a car on ray-cast wheels against a creator ground query (suspension, tyre slip and grip, drive, brake and steering curves, handbrake drifts, downforce, air control, upside-down reset) with bounded sub-steps, transactional steps and deterministic snapshot/restore; `arcade` and `sim-lite` presets. Headless tests with ECS, terrain and rollback consumers only; no template consumer or browser/device acceptance is claimed.
+
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.
 
 

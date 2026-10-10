@@ -43,6 +43,16 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'CAR-01',
+    title: 'Optional car handling on ray-cast wheels',
+    docs: 'src/kits/car-handling/README.md',
+    evidence: [
+      {kit: 'car-handling', export: 'createCarHandling'},
+      {kit: 'car-handling', export: 'carHandlingSystem'},
+      {path: 'src/kits/car-handling/car.test.ts'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',
