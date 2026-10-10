@@ -11,6 +11,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 
 | ID | Feature | PR | Docs |
 |---|---|---|---|
+| ECS-CHANGE-01 | Optional world change ticks, queued observers and cached queries |  | [world-change-detection.md](guides/world-change-detection.md) |
 | POOL-01 | Optional bounded entity pool with eviction classes |  | [entity-pool.md](guides/entity-pool.md) |
 | FORMULA-DATA-01 | Spreadsheet import for formula sheets and lookup tables (npm run formulas:import) |  | [README.md](../src/kits/formulas/README.md) |
 | FORMULA-01 | Optional data-defined stat and damage formulas with stacking stages |  | [README.md](../src/kits/formulas/README.md) |
@@ -231,8 +232,10 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `Transform`
 - `UI_OCCLUSION_LIMITS`
 - `World`
+- `added`
 - `audibleGain`
 - `burst`
+- `changed`
 - `createAudioTimeline`
 - `createDependencyBudget`
 - `createDependencyLease`
@@ -276,6 +279,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `sceneScatter`
 - `sceneShadows`
 - `shapeParser`
+- `sinceLastRun`
 - `skyGradientAt`
 - `testScene`
 - `validateBlobShadow`
