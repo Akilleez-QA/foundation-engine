@@ -43,6 +43,15 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'POOL-01',
+    title: 'Optional bounded entity pool with eviction classes',
+    docs: 'docs/guides/entity-pool.md',
+    evidence: [
+      {kit: 'entity-pool', export: 'createEntityPool'},
+      {kit: 'entity-pool', export: 'spawnPooled'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',

@@ -11,6 +11,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 
 | ID | Feature | PR | Docs |
 |---|---|---|---|
+| POOL-01 | Optional bounded entity pool with eviction classes |  | [entity-pool.md](guides/entity-pool.md) |
 | NAV-FIELD-01 | Optional incremental shared navigation distance fields |  | [README.md](../src/kits/navigation/README.md) |
 | WORK-01 | Optional bounded fair work roster |  | [README.md](../src/kits/work-roster/README.md) |
 | VOLUME-01 | Optional bounded sphere and capsule overlap, sweep and headroom queries |  | [README.md](../src/kits/volume-query/README.md) |
@@ -78,6 +79,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/concept-explorer`
 - `@kits/control`
 - `@kits/dialogue`
+- `@kits/entity-pool`
 - `@kits/equipment`
 - `@kits/explore`
 - `@kits/frames`
