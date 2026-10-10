@@ -1192,3 +1192,14 @@ can refresh its existing one-credit view on ping. Defaults remain unchanged; no
 new timer or protocol owner. See [the contract](multiplayer-session.md#optional-host-liveness).
 Focused unit and real loopback acceptance is recorded in the upgrade ledger;
 independent review and full hosted integration CI remain required.
+
+## Model clip transitions — candidate (2026-10-09)
+
+Optional `Model.transition` (seconds, default 0) eases skinned-model clip changes,
+revision restarts and returns to the bind pose from the displayed pose instead of
+cutting. The existing scene model owner keeps playback; no new system or mixer.
+Bounded to 512 animated nodes per model; larger rigs cut and report. See
+[ADR 0087](../adr/0087-model-clip-transitions.md) and
+[the model recipe](../recipes/load-a-model.md). Focused headless tests against the
+real three.js mixer are recorded in the upgrade ledger; independent review and full
+hosted integration CI remain required. No browser, visual or device acceptance.

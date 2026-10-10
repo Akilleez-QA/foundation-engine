@@ -1158,3 +1158,15 @@ confirmed-state rollback, then reconnects after old-peer retirement without
 resending its uncertain action. Independent review and full hosted integration CI
 are pending. No new browser,
 WAN, physical-device, scalability or full-CI acceptance is claimed.
+
+## Model clip transitions — candidate (2026-10-09)
+
+Branch `feat/model-clip-transition` from `db1f7a85`. `npm run check` passed: typecheck,
+format, lints and 376 affected tests in 61 files, including eight new
+`scene-model-transition` tests (default cut unchanged, continuity on the switching
+frame and smoothstep progress, a node only the old clip drove easing back and not left
+part-way after an interrupting switch, same-clip revision restart, pause holding the
+blend without redraw reports, pose overrides over a blend, unknown-clip and validation
+refusal, node-budget cut with one report) and the existing 21 scene model tests.
+Evidence is headless; no browser, visual-quality, physical-device or full-CI
+acceptance is claimed. Morph-target and material tracks still cut.
