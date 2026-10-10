@@ -6,6 +6,7 @@ export {
   createCadence,
   createCadenceResult,
   CADENCE_CEILING,
+  MAX_CADENCE_TICK,
   type Cadence,
   type CadenceLimits,
   type CadenceSnapshot,

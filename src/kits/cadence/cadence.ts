@@ -9,8 +9,8 @@
  *
  * The caller owns the tick (a fixed-step counter), what serving means, the period policy (by distance, state or
  * importance; jitter via `ctx.random()` and `setPeriod`), and persistence (`snapshot`/`restore` through its own save
- * section). Nothing here schedules, calls back or reads a clock. All tables are allocated at construction; a
- * steady-state `take` allocates nothing.
+ * section). Nothing here schedules, calls back or reads a clock. Typed tables are allocated at construction (the id
+ * map and free list are bounded by maxMembers); a steady-state `take` performs no table growth.
  */
 
 export interface CadenceLimits {
@@ -66,6 +66,8 @@ export interface CadenceSnapshot {
     readonly period: number;
     readonly due: number;
     readonly last: number;
+    /** The member's phase key: due ticks are congruent to `phase mod period`. */
+    readonly phase: number;
   }[];
 }
 
@@ -78,16 +80,17 @@ export interface CadenceStats {
 export interface Cadence {
   readonly limits: CadenceLimits;
   /**
-   * Add a member with a period. Its first due tick is `now + offset`, where offset is `phase` (0..period-1) when
-   * given, otherwise `id mod period` (a deterministic spread); an offset of 0 means `now + period`. The first due
-   * tick is therefore always in `now+1 .. now+period`, where `now` is the tick of the latest take.
+   * Add a member with a period. Its due ticks are the ticks congruent to `phase mod period`, where `phase` defaults
+   * to the id (a deterministic spread that survives period changes). The first due tick is the next such tick after
+   * `now` (the tick of the latest take), so it lies in `now+1 .. now+period`.
    */
   add(id: number, period: number, phase?: number): 'added' | 'duplicate' | 'saturated' | 'closed';
   remove(id: number): 'removed' | 'absent' | 'closed';
   has(id: number): boolean;
   /**
-   * Change a member's period. Its next due tick becomes `last + period`, or the current tick if that has passed
-   * (it is then due at the next take).
+   * Change a member's period. The same period is a no-op. A member that is already due stays due. Otherwise its next
+   * due tick is the first tick after its last serve congruent to `phase mod period`, or, if that has passed, the
+   * first such tick after `now` (missed occurrences are skipped, as in `take`). The phase spread is preserved.
    */
   setPeriod(id: number, period: number): 'set' | 'absent' | 'closed';
   /** Return due members at tick `now` (a nondecreasing safe integer) into `out` and reschedule them. */
@@ -103,6 +106,9 @@ export interface Cadence {
 const KEYS = ['maxMembers', 'maxDuePerTake', 'maxPeriod'] as const;
 const positive = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n > 0;
 const tick = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
+/** Largest accepted tick: leaves room for a full period of arithmetic above it. */
+export const MAX_CADENCE_TICK = Number.MAX_SAFE_INTEGER - 2 * CADENCE_CEILING.period;
+const now_ = (n: unknown): n is number => tick(n) && n <= MAX_CADENCE_TICK;
 
 export function createCadence(input: CadenceLimits): Cadence {
   if (input === null || typeof input !== 'object') throw new TypeError('cadence: limits must be an object');
@@ -126,6 +132,7 @@ export function createCadence(input: CadenceLimits): Cadence {
     periodOf = new Float64Array(maxMembers),
     dueOf = new Float64Array(maxMembers),
     lastOf = new Float64Array(maxMembers),
+    phaseOf = new Float64Array(maxMembers),
     heapPos = new Int32Array(maxMembers),
     heap = new Int32Array(maxMembers);
   let size = 0;
@@ -190,12 +197,18 @@ export function createCadence(input: CadenceLimits): Cadence {
     for (const b of [out.ids, out.elapsed, out.late])
       if (!(b instanceof Float64Array) || b.length < maxDuePerTake)
         throw new TypeError('cadence: result buffers must be Float64Arrays of at least maxDuePerTake');
+    if (
+      out.ids.buffer === out.elapsed.buffer ||
+      out.ids.buffer === out.late.buffer ||
+      out.elapsed.buffer === out.late.buffer
+    )
+      throw new TypeError('cadence: result buffers must not share memory');
   }
-  /** The first tick on `due + k*period` (k >= 1) that is after `t`. */
-  function nextAfter(due: number, period: number, t: number): number {
-    if (due > t) return due;
-    const k = Math.floor((t - due) / period) + 1;
-    return due + k * period;
+  /** The first tick after `t` congruent to `phase` modulo `period`. */
+  function gridAfter(t: number, period: number, phase: number): number {
+    const base = t + 1,
+      d = ((((phase % period) - (base % period)) % period) + period) % period;
+    return base + d;
   }
 
   const owner: Cadence = {
@@ -209,12 +222,13 @@ export function createCadence(input: CadenceLimits): Cadence {
       if (slotOf.has(id)) return 'duplicate';
       const slot = free.pop();
       if (slot === undefined) return 'saturated';
-      const offset = phase ?? id % period;
+      const key = phase ?? id;
       slotOf.set(id, slot);
       idOf[slot] = id;
       periodOf[slot] = period;
+      phaseOf[slot] = key;
       lastOf[slot] = now;
-      dueOf[slot] = now + (offset === 0 ? period : offset);
+      dueOf[slot] = gridAfter(now, period, key);
       insert(slot);
       return 'added';
     },
@@ -238,14 +252,18 @@ export function createCadence(input: CadenceLimits): Cadence {
       if (closed) return 'closed';
       const slot = slotOf.get(id);
       if (slot === undefined) return 'absent';
+      if (periodOf[slot] === period) return 'set';
       periodOf[slot] = period;
-      dueOf[slot] = Math.max(lastOf[slot]! + period, now);
+      if (dueOf[slot]! <= now) return 'set'; // already due: stays due, served first
+      // The first grid tick after the last serve; if that has passed, the next one after now (no catch-up burst).
+      const next = gridAfter(lastOf[slot]!, period, phaseOf[slot]!);
+      dueOf[slot] = next > now ? next : gridAfter(now, period, phaseOf[slot]!);
       up(heapPos[slot]!);
       down(heapPos[slot]!);
       return 'set';
     },
     take(t, out) {
-      if (!tick(t)) throw new RangeError('cadence: now must be a nonnegative safe integer');
+      if (!now_(t)) throw new RangeError(`cadence: now must be a safe integer in 0..${MAX_CADENCE_TICK}`);
       checkResult(out);
       if (closed) {
         out.status = 'closed';
@@ -263,7 +281,7 @@ export function createCadence(input: CadenceLimits): Cadence {
         out.late[n] = t - dueOf[slot]!;
         n++;
         lastOf[slot] = t;
-        dueOf[slot] = nextAfter(dueOf[slot]!, periodOf[slot]!, t);
+        dueOf[slot] = gridAfter(t, periodOf[slot]!, phaseOf[slot]!);
         down(0);
       }
       out.count = n;
@@ -274,26 +292,36 @@ export function createCadence(input: CadenceLimits): Cadence {
     snapshot() {
       const members = [];
       for (const [id, slot] of slotOf)
-        members.push(Object.freeze({id, period: periodOf[slot]!, due: dueOf[slot]!, last: lastOf[slot]!}));
+        members.push(
+          Object.freeze({id, period: periodOf[slot]!, due: dueOf[slot]!, last: lastOf[slot]!, phase: phaseOf[slot]!}),
+        );
       members.sort((a, b) => a.id - b.id);
       return Object.freeze({now, members: Object.freeze(members)});
     },
     restore(snapshot) {
-      if (!snapshot || typeof snapshot !== 'object' || !Array.isArray(snapshot.members) || !tick(snapshot.now))
-        throw new TypeError('cadence: malformed snapshot');
+      if (!snapshot || typeof snapshot !== 'object') throw new TypeError('cadence: malformed snapshot');
       const t = snapshot.now,
         members = snapshot.members;
+      if (!now_(t) || !Array.isArray(members)) throw new TypeError('cadence: malformed snapshot');
       if (members.length > maxMembers) throw new RangeError('cadence: snapshot exceeds maxMembers');
+      // Read every field exactly once into plain values, validate, then apply.
+      const rows: [number, number, number, number, number][] = [];
       const seen = new Set<number>();
       for (const m of members) {
         if (!m || typeof m !== 'object') throw new TypeError('cadence: malformed snapshot member');
-        const {id, period, due, last} = m;
+        const id = m.id,
+          period = m.period,
+          due = m.due,
+          last = m.last,
+          phase = m.phase;
         if (!tick(id) || seen.has(id))
           throw new TypeError('cadence: snapshot ids must be distinct nonnegative safe integers');
         seen.add(id);
         if (!positive(period) || period > maxPeriod) throw new RangeError('cadence: snapshot period out of range');
-        if (!tick(last) || last > t || !tick(due) || due < last)
-          throw new RangeError('cadence: snapshot due/last must satisfy last <= now and due >= last');
+        if (!tick(phase)) throw new RangeError('cadence: snapshot phase must be a nonnegative safe integer');
+        if (!tick(last) || last > t || !tick(due) || due <= last || due > t + period)
+          throw new RangeError('cadence: snapshot must satisfy last <= now and last < due <= now + period');
+        rows.push([id, period, due, last, phase]);
       }
       if (closed) return 'closed';
       slotOf.clear();
@@ -301,13 +329,14 @@ export function createCadence(input: CadenceLimits): Cadence {
       for (let i = maxMembers - 1; i >= 0; i--) free.push(i);
       size = 0;
       now = t;
-      for (const m of members) {
+      for (const [id, period, due, last, phase] of rows) {
         const slot = free.pop()!;
-        slotOf.set(m.id, slot);
-        idOf[slot] = m.id;
-        periodOf[slot] = m.period;
-        dueOf[slot] = m.due;
-        lastOf[slot] = m.last;
+        slotOf.set(id, slot);
+        idOf[slot] = id;
+        periodOf[slot] = period;
+        dueOf[slot] = due;
+        lastOf[slot] = last;
+        phaseOf[slot] = phase;
         insert(slot);
       }
       return 'restored';

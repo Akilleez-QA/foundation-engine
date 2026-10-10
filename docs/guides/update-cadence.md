@@ -20,7 +20,7 @@ optional and installs nothing.
 
 `maxDuePerTake` bounds the work of one step. A `deferred` status means more members were due than the budget allowed;
 they are served first next time and their `late` grows. If it persists, lengthen periods or raise the budget with
-the author's agreement. Periods are spread by id at `add` so a batch spawned together does not wake together.
+the author's agreement. Phases default to the id, so a batch spawned together, or switched to a new period together, does not wake together.
 
 ## Evidence and limits
 

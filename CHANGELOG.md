@@ -7,7 +7,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
-- Optional update cadence (`@kits/cadence`): run members at their own integer periods on the caller's tick, spread by id, bounded per take with deferral, elapsed ticks and saveable state. Periods and jitter stay creator policy. See [ADR 0090](docs/adr/0090-optional-update-cadence.md).
+- Optional update cadence (`@kits/cadence`): run members at their own integer periods on the caller's tick, spread by id, bounded per take with deferral, elapsed ticks and saveable state. Periods and jitter stay creator policy. See [ADR 0096](docs/adr/0096-optional-update-cadence.md).
 
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 

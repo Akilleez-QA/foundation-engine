@@ -84,9 +84,11 @@ test('setPeriod, remove, saturation and disposal', () => {
   assert.equal(cad.add(7, 3), 'saturated');
   cad.take(4, out);
   assert.deepEqual(ids(out), [6]);
-  assert.equal(cad.setPeriod(5, 2), 'set', 'last 0 + 2 has passed: due now');
-  cad.take(4, out);
+  assert.equal(cad.setPeriod(5, 2), 'set', 'tick 1 (after last 0, odd) has passed: the next odd tick after 4');
+  assert.deepEqual(ids(cad.take(4, out)), []);
+  cad.take(5, out);
   assert.deepEqual(ids(out), [5]);
+  assert.deepEqual(col(out.late, out), [0]);
   assert.equal(cad.setPeriod(8, 2), 'absent');
   assert.equal(cad.remove(6), 'removed');
   assert.equal(cad.remove(6), 'absent');
@@ -118,9 +120,9 @@ test('snapshot and restore continue the exact schedule; malformed snapshots chan
   c.cad.add(1, 2);
   for (const bad of [
     {now: -1, members: []},
-    {now: 5, members: [{id: 1, period: 2, due: 6, last: 6}]},
-    {now: 5, members: [{id: 1, period: 2, due: 3, last: 4}]},
-    {now: 5, members: [{id: 1, period: 101, due: 6, last: 4}]},
+    {now: 5, members: [{id: 1, period: 2, due: 6, last: 6, phase: 0}]},
+    {now: 5, members: [{id: 1, period: 2, due: 3, last: 4, phase: 0}]},
+    {now: 5, members: [{id: 1, period: 101, due: 6, last: 4, phase: 0}]},
     {
       now: 5,
       members: [
@@ -128,7 +130,8 @@ test('snapshot and restore continue the exact schedule; malformed snapshots chan
         {id: 1, period: 2, due: 6, last: 4},
       ],
     },
-    {now: 5, members: Array.from({length: 9}, (_, id) => ({id, period: 2, due: 6, last: 4}))},
+    {now: 5, members: Array.from({length: 9}, (_, id) => ({id, period: 2, due: 6, last: 4, phase: 0}))},
+    {now: 5, members: [{id: 1, period: 2, due: 1e15, last: 0, phase: 0}]},
   ])
     assert.throws(() => c.cad.restore(bad as never));
   assert.equal(c.cad.has(1), true, 'refused restores keep the old state');
@@ -139,7 +142,13 @@ test('a 4,000-step randomised run matches a brute-force scan model', () => {
   const l: CadenceLimits = {maxMembers: 24, maxDuePerTake: 5, maxPeriod: 17};
   const cad = createCadence(l),
     out = createCadenceResult(l);
-  type M = {period: number; due: number; last: number};
+  type M = {period: number; key: number; due: number; last: number};
+  // Spec by enumeration: the first tick after t congruent to key mod period.
+  const grid = (t: number, period: number, key: number) => {
+    let u = t + 1;
+    while (u % period !== key % period) u++;
+    return u;
+  };
   const ref = new Map<number, M>();
   let now = 0;
   const rand = mulberry32(42);
@@ -151,8 +160,8 @@ test('a 4,000-step randomised run matches a brute-force scan model', () => {
       const phase = rand() < 0.5 ? Math.floor(rand() * period) : undefined;
       const r = cad.add(id, period, phase);
       if (r === 'added') {
-        const off = phase ?? id % period;
-        ref.set(id, {period, due: now + (off === 0 ? period : off), last: now});
+        const key = phase ?? id;
+        ref.set(id, {period, key, due: grid(now, period, key), last: now});
       } else assert.equal(r, ref.has(id) ? 'duplicate' : 'saturated');
     } else if (op < 0.3) {
       assert.equal(cad.remove(id), ref.delete(id) ? 'removed' : 'absent');
@@ -160,12 +169,15 @@ test('a 4,000-step randomised run matches a brute-force scan model', () => {
       const period = 1 + Math.floor(rand() * l.maxPeriod);
       const m = ref.get(id);
       assert.equal(cad.setPeriod(id, period), m ? 'set' : 'absent');
-      if (m) {
+      if (m && m.period !== period) {
         m.period = period;
-        m.due = Math.max(m.last + period, now);
+        if (m.due > now) {
+          const next = grid(m.last, period, m.key);
+          m.due = next > now ? next : grid(now, period, m.key);
+        }
       }
     } else {
-      now += Math.floor(rand() * 4);
+      now += rand() < 0.05 ? 20 + Math.floor(rand() * 60) : Math.floor(rand() * 4);
       cad.take(now, out);
       const due = [...ref.entries()].filter(([, m]) => m.due <= now).sort((x, y) => x[1].due - y[1].due || x[0] - y[0]);
       const served = due.slice(0, l.maxDuePerTake);
@@ -185,8 +197,30 @@ test('a 4,000-step randomised run matches a brute-force scan model', () => {
       assert.equal(out.status, due.length > served.length ? 'deferred' : 'complete');
       for (const [, m] of served) {
         m.last = now;
-        while (m.due <= now) m.due += m.period;
+        m.due = grid(now, m.period, m.key);
+      }
+      if (step % 500 === 0) {
+        // Mid-run snapshot round trip through JSON must be invisible.
+        const copy = createCadence(l);
+        copy.restore(JSON.parse(JSON.stringify(cad.snapshot())));
+        assert.deepEqual(copy.snapshot(), cad.snapshot());
       }
     }
   }
+});
+
+test('period changes keep the phase spread; the same period is a no-op; aliasing is refused', () => {
+  const {cad, out} = setup();
+  for (let id = 0; id < 8; id++) cad.add(id, 8);
+  for (let id = 0; id < 8; id++) cad.setPeriod(id, 8);
+  const counts: number[] = [];
+  for (let t = 1; t <= 16; t++) counts.push(cad.take(t, out).count);
+  assert.deepEqual(counts, Array(16).fill(1), 'one member per tick, unchanged');
+  for (let id = 0; id < 8; id++) cad.setPeriod(id, 4); // a whole population changes band at once
+  const after: number[] = [];
+  for (let t = 17; t <= 24; t++) after.push(cad.take(t, out).count);
+  assert.deepEqual(after, Array(8).fill(2), 'still spread: two per tick at period 4');
+  const aliased = {...out, late: out.ids};
+  assert.throws(() => cad.take(25, aliased), /must not share memory/);
+  assert.throws(() => cad.take(Number.MAX_SAFE_INTEGER, out), RangeError);
 });

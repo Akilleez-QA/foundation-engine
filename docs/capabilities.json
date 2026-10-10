@@ -474,7 +474,7 @@
     {"name": "assignments", "exports": ["createAssignments"]},
     {"name": "audio-mixer", "exports": ["audioMixer", "createCueMixer", "createDucking"]},
     {"name": "authoring", "exports": ["authoredReference", "createAuthoredDocument", "createAuthoringSession"]},
-    {"name": "cadence", "exports": ["CADENCE_CEILING", "createCadence", "createCadenceResult"]},
+    {"name": "cadence", "exports": ["CADENCE_CEILING", "MAX_CADENCE_TICK", "createCadence", "createCadenceResult"]},
     {"name": "camera", "exports": ["camera", "cameraPose", "cameraSystem", "clearCamera"]},
     {
       "name": "capabilities",
