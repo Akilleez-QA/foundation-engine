@@ -86,6 +86,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/navigation`
 - `@kits/network`
 - `@kits/objectives`
+- `@kits/population`
 - `@kits/procgen`
 - `@kits/replay`
 - `@kits/resources`

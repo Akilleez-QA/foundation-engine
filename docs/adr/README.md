@@ -93,3 +93,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0098](0098-bounded-volume-queries.md) | Bounded optional volume queries | Optional composition / Spatial queries | Proposed |
 
 | [0091](0091-bounded-cue-sequences.md) | Bounded cue sequences as an optional kit | Optional kits / Scripting | Proposed |
+
+| [0092](0092-population-placements-and-tiers.md) | Placements with persistent depletion and update tiers | Optional kits / Simulation scale | Proposed |

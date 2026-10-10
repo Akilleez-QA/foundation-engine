@@ -1368,3 +1368,13 @@ owner; the creator's fixed-step system, camera, audio-mixer and dialogue kits ke
 theirs. See [the guide](sequences.md) and [ADR 0091](../adr/0091-bounded-cue-sequences.md).
 Headless tests are recorded in the upgrade ledger; independent review and full
 hosted CI remain required.
+
+## Optional population kit — candidate (2026-10-09)
+
+`@kits/population` (requires `spatial`) adds placement fields that spawn and
+despawn authored placements near observers with bounded per-update work and
+remember destroyed ones (persisted `never` depletion through a strict save
+section), and update tiers that freeze or round-robin far entities with conserved
+time. No owner is installed. See [the guide](population.md) and
+[ADR 0092](../adr/0092-population-placements-and-tiers.md). Headless tests are in the
+upgrade ledger; independent review and full hosted CI remain required.

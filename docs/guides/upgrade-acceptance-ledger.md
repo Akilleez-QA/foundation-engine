@@ -1364,3 +1364,22 @@ drives the sequence, the camera kit follows cue alpha and the audio-mixer plays 
 cue once, with skip landing the effect and playing nothing; unambiguous effect ids,
 the `settled` signal and -0 normalisation; and arrays copied without iteration. No
 browser, device or template evidence.
+
+## Optional population kit — candidate (2026-10-09)
+
+Branch `feat/population-kit` from `cbaf8060`. Eleven checked-in headless tests. An
+independent adversarial review also fuzzed placements (300 seeds against a reference
+model) and tiers in an external harness that is not checked in; its findings (time
+dropped when `dt × slots` exceeded the catch-up cap, half-applied steps after a
+throwing callback, default exit radius above the bound, sparse definitions, status
+after dispose, undocumented cost and ordering) were fixed, and a re-review of the fixed head (placement
+fuzz plus 300-seed tier fuzz with varying steps) was clean. Tests: spawn/despawn
+with enter/exit hysteresis in definition order; `never`/`visit`/`leave` policies,
+persistence of `never` only and revival; deterministic caps with deferred counts
+and retry after `returned`; validation of definitions, limits, observers and
+forged or edited snapshots; an ECS consumer spawning and removing entities from
+intents with depletion surviving a real save store reload; update tiers for
+always/near/background with conserved background time, hysteresis, owed-time
+delivery and refusal of oversized steps, unchanged state after a throwing callback,
+slot balance and limits; sparse definitions, bounded default exit and dispose; and a fixed-step runner consumer
+integrating only due entities. No browser, device or performance acceptance.
