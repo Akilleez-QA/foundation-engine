@@ -5,7 +5,8 @@
 // yaw, root motion, exp/log/pow) with dmath and with the browser's own Math. This Node process computes the same.
 //
 // Proves: dmath's bits in this Chromium equal the committed hex vectors and Node's, and the deterministic workload's
-// per-tick digest is identical in both engines. Reports (does not assert) how many Math.* results differ between
+// per-tick digest is identical in both engines; the numeric kit's (src/kits/numeric) fixed-point, binary-angle and
+// reduced-precision vectors and lockstep workload digests equal the committed numeric.golden.json in both engines. Reports (does not assert) how many Math.* results differ between
 // the two engines, which is why the module exists. It does not prove other browsers, physical devices or a full
 // scene replay. Run with `node --import tsx`.
 import assert from 'node:assert/strict';
@@ -20,6 +21,7 @@ import {diagnosticReport} from './diagnostic-report.mjs';
 import {dmath, platformMath} from '../../src/core/dmath.ts';
 import {computeGolden} from '../../src/core/dmath-vectors.ts';
 import {characterRun, timings} from '../../tools/dmath-bench/workload.ts';
+import {computeNumericGolden, computeWorkloadDigests} from '../../src/kits/numeric/vectors.ts';
 
 const out = resolve(process.argv[2] ?? 'playtest/dmath');
 mkdirSync(out, {recursive: true});
@@ -95,6 +97,25 @@ try {
       equal: web.character.platform.digest === nodePlat.digest,
     },
   };
+  const numeric = JSON.parse(readFileSync(resolve(ROOT, 'src/kits/numeric/numeric.golden.json'), 'utf8'));
+  assert.deepEqual(web.numeric.cases, numeric.cases, 'Chromium numeric-kit vectors equal the committed golden file');
+  assert.deepEqual(
+    web.numeric.workload,
+    numeric.workload,
+    'Chromium numeric-kit workload digests equal the committed ones',
+  );
+  assert.deepEqual(computeNumericGolden(), numeric.cases, 'Node numeric-kit vectors equal the committed golden file');
+  assert.deepEqual(
+    computeWorkloadDigests(),
+    numeric.workload,
+    'Node numeric-kit workload digests equal the committed ones',
+  );
+  report.numeric = {
+    cases: Object.values(numeric.cases).reduce((n, rows) => n + rows.length, 0),
+    workload: numeric.workload,
+    chromiumEqualsCommitted: true,
+    nodeEqualsCommitted: true,
+  };
   report.timings = {chromium: web.timings, node: timings(() => performance.now())};
   assert.deepEqual(report.errors, []);
   report.passed = true;
@@ -110,5 +131,8 @@ console.log(
 );
 console.log(
   `Math.* results that differ between the two engines on the same inputs: ${JSON.stringify(report.golden.mathDiffersBetweenEngines)}; platform-math workload digests ${report.character.platform.equal ? 'equal' : 'differ'}`,
+);
+console.log(
+  `numeric kit: ${report.numeric.cases} golden vectors and ${Object.keys(report.numeric.workload).length} lockstep workload digests identical in Chromium and Node`,
 );
 console.log(`evidence: ${resolve(out, 'report.json')}`);

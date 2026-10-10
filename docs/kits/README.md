@@ -63,6 +63,8 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 
 The optional [scripting](../../src/kits/scripting/README.md) candidate runs sandboxed Lua 5.4 scripts with capability-scoped host functions, deterministic per-call instruction budgets, a memory cap, fixed-tick timers and save/restore of each script's `state`; its VM loads lazily. Headless unit, rollback sync-test and scene consumer tests plus headless Chromium fixture runs only; no template consumer or device acceptance is claimed. [Guide](../guides/scripting.md).
 
+The optional [numeric](../../src/kits/numeric/README.md) candidate supplies strict deterministic number formats for lockstep, rollback and replay: fixed-point words with chosen rounding and overflow, binary-angle trigonometry and strict reduced-precision float. Headless oracle and golden tests plus a Chromium/Node vector comparison; no template consumer or device acceptance is claimed.
+
 The optional [assignments](../../src/kits/assignments/README.md) candidate supplies exclusive actor claims, weighted target capacity and atomic transfer refusal. Two headless service/worksite fixtures and route-owner composition tests exercise it; no playable template consumer or browser/device acceptance is claimed. [Guide](../guides/assignments.md).
 
 The optional [region-activation](../../src/kits/region-activation/README.md) candidate decides which grid regions a game simulates from observer positions, with release hysteresis, linger, pins, per-update transition budgets and epochs for stale loads. Headless model and ECS/chunk-store consumer tests only; no template consumer or browser/device acceptance is claimed. [Guide](../guides/region-activation.md).

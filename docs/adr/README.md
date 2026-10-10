@@ -163,3 +163,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0101](0101-optional-cellular-wasm.md) | Explicit cellular WASM job with per-job fixed memory and existing worker ownership | Procgen / Workers | Proposed |
 
 | [0115](0115-traversal-helpers.md) | Ledge, ladder and pushable traversal helpers | Optional kits / Locomotion | Proposed |
+
+| [0099](0099-strict-numeric-modes.md) | Optional strict numeric modes (fixed point, binary angles, reduced precision) | Optional kits / Time and determinism | Proposed |
