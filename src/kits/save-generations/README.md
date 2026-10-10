@@ -1,0 +1,53 @@
+# kits/save-generations
+
+Optional **coherent multi-key saves**. A generation is a complete set of named string payloads (for example several
+large JSON documents that together describe one world state). Each generation is written to the one of two
+alternating slots that does not hold the newest valid generation, and a checksummed commit record is written last.
+Load returns the newest generation whose record and every listed key verify, otherwise the older one, and never a
+mix of two generations. It runs on the save store's existing `StoragePort` (or any port with `get`, `set` and
+`remove`, synchronous or asynchronous). It is a candidate: see [ADR 0116](../../../docs/adr/0116-save-generations.md).
+
+```ts
+import { createSaveGenerations } from '@kits/save-generations';
+// `port` is the same Web Storage port the game's save store uses (or another backend's adapter).
+const world = createSaveGenerations({ port, namespace: 'my-game', name: 'world' });
+const loaded = await world.load();          // once, at boot: 'loaded' | 'recovered' | 'empty' | 'corrupt' | ...
+if (loaded.snapshot) restore(loaded.snapshot.entries);
+// At a flush point (never inside a frame):
+const result = await world.commit({ terrain: JSON.stringify(t), actors: JSON.stringify(a) }, { signal });
+if (result.status !== 'committed') report(result.status, result.reason); // previous generation still authoritative
+```
+
+## Protocol
+
+Keys: `<namespace>-gen|<name>|<slot>|<key>` for payloads and `<namespace>-gen|<name>|<slot>#commit` for the
+record. Every payload is stored as `<generation>|<payload>`. The record is `<crc32 hex>|<json>` where the JSON names
+the format, save, slot, generation and every key with its stored length and CRC-32; the leading CRC covers the JSON.
+The record is therefore a checksum over the whole multi-key payload.
+
+A commit (1) scans both slots and requires the newest valid record to be the one this owner last loaded or committed,
+(2) removes the target slot's record, so the slot stops being valid before any of its keys change, (3) writes every
+key, (4) writes the record (the commit point), and (5) removes keys of the overwritten generation that the new one
+does not list. The generation is one more than the highest readable record; the counter is bounded (a safe integer)
+and refuses at the ceiling instead of wrapping.
+
+Load reads both records, verifies the higher generation (ties: slot `a`), falls back to the other, then re-reads the
+record it relied on and retries the whole scan if it changed (another writer), up to `maxLoadAttempts`.
+
+| Contract | Definition |
+|---|---|
+| Creator-owned semantics | What each key holds and how payloads are encoded, which state belongs in one generation, when to commit (flush points), what to do on `recovered`, `corrupt` or `conflict`, and any merge policy between tabs |
+| Inputs and outputs | `createSaveGenerations({port, name, namespace?, ...limits})`. `load()` → `{status, snapshot, slots, reason}`; `commit(entries, {signal?})` → `{status, snapshot, writes, leftovers, reason}`; `current()` → the last loaded or committed snapshot; `busy()`; `close()`. Snapshots `{generation, slot, entries}` and results are frozen; entries are sorted by key. Slot reports say `verified`, `unchecked` (older slot not read), `absent`, `torn` (keys without a record; needs `port.keys`) or `invalid` with a reason |
+| Owner | One owner object per (port, namespace, name) is the only writer in a tab: a second owner on the same port object throws until the first `close()`s. It owns only keys under `<namespace>-gen|<name>|`, which sit inside the save store's reset prefixes, so `SaveStore.resetAll()` clears them and `usage()` counts them. It does not create a store, a chunk database, a timer or a system |
+| Bounds | `maxKeys` 16 (1-256) per generation; `maxKeyChars` 262,144 (at most 2,000,000) per payload; `maxTotalChars` 1,048,576 (at most 4,000,000) per generation, so up to twice that on disk across both slots plus records; `maxLoadAttempts` 3 (1-8). Key names match `[a-z0-9][a-z0-9._-]{0,47}`; save names are lower kebab-case up to 32 characters. A commit reads at most both generations and writes one generation, the record and the sweep; memory holds one snapshot |
+| Overload | Oversized entries return `too-large` before any write. A commit or load while another operation of the same owner is in flight returns `busy`; nothing is queued. Read `current()` for a coherent snapshot while a commit runs |
+| Cancellation | `signal.aborted` (an `AbortSignal` works) is checked before every write; once aborted the commit returns `cancelled` and the record is never written. `close()` stops an in-flight commit the same way (`closed`). Either leaves the previous generation authoritative and the target slot torn |
+| Failure and recovery | A throwing write (quota, blocked storage) returns `failed`; a throwing read returns `unavailable`; the previous generation stays authoritative and the owner keeps working. A crash at any point before the record leaves the target slot torn and load returns the previous generation (`recovered`). A damaged record, a missing key, a key from another generation, a record copied from the other slot or a flipped byte make that slot `invalid`; load falls back. With no valid slot: `corrupt` if anything is damaged, `empty` only when neither slot has a record (no save was ever committed, a first commit never completed, or both records were removed). Another tab's commit makes this owner's next commit return `conflict` until it loads again; a reader that keeps seeing its record change returns `contended`. After a corrupt load a commit is allowed; it writes over an undamaged slot when there is one, so damaged bytes stay as evidence until the next commit |
+| Evidence | Headless only. `generations.test.ts` (11 tests): limits, one writer per port, `not-loaded`, alternation and sweep, empty generations, size refusals, `busy` with a coherent `current()`, cancellation, close mid-commit, cross-tab `conflict`, the counter ceiling. `faults.test.ts` (9 tests): a fault-injecting port that dies at every mutation index of multi-key commits (1, 3 and 6 keys; 0-3 earlier generations; synchronous and asynchronous ports) with recovery commits afterwards, throwing writes and the memory quota, throwing reads, every single-character flip of the newest record and payloads, dropped and stale keys, damage to the older or both slots, a racing writer (`contended`) and a 400-round seeded randomised fault sequence. `consumers.test.ts` (3 tests): the save store's port beside a live `SaveStore` (usage, `resetAll`, sections untouched) and the chunk port over the IndexedDB-shaped test double (one transaction per key) with a quota fault at every put, a connection closed mid-commit and corrupted stored rows |
+| Limits | Not a lock across tabs: two tabs can both start a commit, and a commit can be lost (one tab sees `conflict`), though coherence holds because every key must match the record. CRC-32 detects accidental damage, not deliberate tampering. Each commit rewrites every key of the generation (no partial updates). It does not make save store sections atomic (STD-SAV-16 remains Provisional) and is not wired into `SaveStore`, export, import or migration; payload versioning is the creator's. The chunk store already commits several keys in one IndexedDB transaction, so this protocol adds most where the backend has no multi-key atomicity (Web Storage). `fake-idb` is a test double, not a conformance implementation; no real browser IndexedDB or Web Storage, power loss, private mode or physical-device evidence exists |
+
+## Cost (headless, not a device budget)
+
+No per-frame work. A commit costs one verification of the newest generation (one read and one CRC-32 per key),
+`keys + 2` writes plus the sweep, and one CRC-32 per written key. A load reads both records and normally one
+generation. Web Storage calls are synchronous on the main thread: commit at flush points, never inside a frame.

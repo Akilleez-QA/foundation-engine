@@ -160,6 +160,15 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'SAVE-GEN-01',
+    title: 'Optional coherent multi-key save generations',
+    docs: 'src/kits/save-generations/README.md',
+    evidence: [
+      {kit: 'save-generations', export: 'createSaveGenerations'},
+      {path: 'src/kits/save-generations/faults.test.ts'},
+    ],
+  },
+  {
     id: 'CADENCE-01',
     title: 'Optional bounded per-member update cadence',
     docs: 'docs/guides/update-cadence.md',

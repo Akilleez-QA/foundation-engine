@@ -123,6 +123,16 @@
       ]
     },
     {
+      "id": "SAVE-GEN-01",
+      "title": "Optional coherent multi-key save generations",
+      "shipped": true,
+      "docs": "src/kits/save-generations/README.md",
+      "evidence": [
+        "@kits/save-generations exports createSaveGenerations",
+        "src/kits/save-generations/faults.test.ts exists"
+      ]
+    },
+    {
       "id": "CADENCE-01",
       "title": "Optional bounded per-member update cadence",
       "shipped": true,
@@ -1177,6 +1187,7 @@
         "rollbackChecksum"
       ]
     },
+    {"name": "save-generations", "exports": ["GENERATION_CEILING", "createSaveGenerations"]},
     {
       "name": "sequence",
       "exports": [

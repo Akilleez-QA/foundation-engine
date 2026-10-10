@@ -64,6 +64,8 @@ The optional [entity-pool](../../src/kits/entity-pool/README.md) candidate keeps
 
 The optional [streaming](../../src/kits/streaming/README.md) candidate ranks play-time load requests under concurrency and byte budgets, with cancellation, retry and preemption, through ports onto the existing lease caches and model owner. Headless unit and consumer tests only; no template consumer or browser/device acceptance is claimed. [Guide](../guides/streaming-queue.md).
 
+The optional [save-generations](../../src/kits/save-generations/README.md) candidate commits a whole set of save keys to the older of two alternating slots with a checksummed commit record written last, so load returns one complete generation or the previous one, never a mix. One writer per save, on the save store's existing storage port. Headless fault-injection tests only (including the IndexedDB-shaped test double); no real browser storage, template consumer or device acceptance is claimed. [ADR 0116](../adr/0116-save-generations.md).
+
 The optional [retro](../../src/kits/retro/README.md) candidate draws a scene at low resolution with wide pixels, a creator palette or levels and ordered dithering through `@kits/three`. Headless tests, a software-GL screenshot and a GPU bench of the showcase courtyard; no template uses it and no device acceptance is claimed. [Guide](../guides/retro-look.md).
 
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.

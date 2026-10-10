@@ -86,7 +86,9 @@ immediate flush. Catch and report the error, then re-read `get()` and `status()`
 never infer that storage or memory reverted. One coherent creator document belongs
 in one section envelope. Multiple sections are not atomic, and concurrent writers
 have no compare-and-swap isolation; without a creator merge policy the later write
-can replace the whole envelope. The authoring workflow assumes one writer.
+can replace the whole envelope. The authoring workflow assumes one writer. The optional
+[save-generations](../../src/kits/save-generations/README.md) candidate (ADR 0116) is a separate multi-key protocol
+with its own owner; it does not make sections atomic.
 
 ## 5. Test the same save path
 
