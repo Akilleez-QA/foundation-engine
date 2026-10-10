@@ -117,7 +117,7 @@ const name = (v: unknown, what: string): string => {
 const scalar = (v: unknown, what: string): BlackboardValue => {
   if (v === undefined) return null;
   if (!isBlackboardValue(v)) throw new BehaviorError(`${what} must be a finite number, string ≤ 1024, boolean or null`);
-  return v;
+  return v === 0 ? 0 : v;
 };
 
 const FIELDS: Record<NodeInput['type'], readonly string[]> = {
@@ -218,7 +218,7 @@ export function defineBehaviorTree(root: NodeInput, limits: {maxNodes?: number; 
       case 'timeout':
       case 'cooldown':
       case 'wait':
-        node.ticks = int(n.ticks, type === 'cooldown' ? 0 : 1, MAX_TICKS, `${type} ticks`);
+        node.ticks = int(n.ticks, 1, MAX_TICKS, `${type} ticks`);
         break;
       case 'guard':
       case 'condition':

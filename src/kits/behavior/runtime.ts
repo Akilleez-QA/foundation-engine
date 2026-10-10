@@ -63,6 +63,7 @@ interface Memory {
 }
 
 const STATUSES = new Set<unknown>(['success', 'failure', 'running']);
+const MAX_NOW = 2 ** 52;
 
 /**
  * One agent's running tree. Each tick visits every node at most once (decorators that repeat run their child once
@@ -101,7 +102,7 @@ export function createBehavior(
     if (!isBehaviorName(key)) throw new BehaviorError(`invalid blackboard key ${JSON.stringify(key)}`);
     if (!isBlackboardValue(value)) throw new BehaviorError(`invalid blackboard value for ${key}`);
     if (!board.has(key) && board.size >= maxKeys) throw new BehaviorError('blackboard is full');
-    board.set(key, value);
+    board.set(key, value === 0 ? 0 : value); // one zero: -0 is stored as 0
   };
   for (const [k, v] of Object.entries(options.blackboard ?? {})) setKey(blackboard, k, v);
   let memory = new Map<number, Memory>();
@@ -119,6 +120,11 @@ export function createBehavior(
     }
   };
 
+  /** Reads outside a tick only: inside one they would show stale, pre-tick state. */
+  const idle = () => {
+    if (busy) throw new BehaviorError('reentrant call from a handler (use the leaf context)');
+  };
+
   // One tick's working state.
   interface Tick {
     now: number;
@@ -127,7 +133,14 @@ export function createBehavior(
     board: Map<string, BlackboardValue>;
     mem: Map<number, Memory>;
     cool: Map<number, number>;
+    /** Abort handlers to call after the tick commits, so a rolled-back tick never stops work it then resumes. */
+    aborts: {handler: (ctx: LeafContext) => void; node: FlatNode}[];
+    /** Contexts work only while their tick (or the abort phase) runs. */
+    live: boolean;
   }
+  const alive = (t: Tick) => {
+    if (!t.live) throw new BehaviorError('a leaf context is used outside its tick');
+  };
   const context = (t: Tick, n: FlatNode, first: boolean): LeafContext =>
     Object.freeze({
       agent,
@@ -136,10 +149,11 @@ export function createBehavior(
       name: n.name,
       args: n.args,
       first,
-      get: (key: string) => t.board.get(key),
-      set: (key: string, value: BlackboardValue) => setKey(t.board, key, value),
-      delete: (key: string) => t.board.delete(key),
+      get: (key: string) => (alive(t), t.board.get(key)),
+      set: (key: string, value: BlackboardValue) => (alive(t), setKey(t.board, key, value)),
+      delete: (key: string) => (alive(t), t.board.delete(key)),
       random: () => {
+        alive(t);
         if (!t.random) throw new BehaviorError('this tick has no random source');
         const u = t.random();
         if (typeof u !== 'number' || !Number.isFinite(u) || u < 0 || u >= 1)
@@ -156,7 +170,8 @@ export function createBehavior(
     if (!m) return;
     const n = nodes[index]!;
     for (const child of n.children) abort(t, child);
-    if (n.type === 'action') actions.get(n.handler!)!.abort?.(context(t, n, false));
+    const handler = n.type === 'action' ? actions.get(n.handler!)!.abort : undefined;
+    if (handler) t.aborts.push({handler, node: n});
     t.mem.delete(index);
     record(t, n, 'aborted');
   };
@@ -227,7 +242,7 @@ export function createBehavior(
       case 'selector':
       case 'shuffle': {
         const stop = n.type === 'sequence' ? 'failure' : 'success';
-        if (n.type === 'shuffle' && !m.order) m.order = order(t, n);
+        if (n.type === 'shuffle' && !m.order) m.order = n.children.length > 1 ? order(t, n) : [0];
         const previous = first ? null : m.cursor;
         for (let c = n.reactive ? 0 : m.cursor; c < n.children.length; c++) {
           const child = n.children[m.order ? m.order[c]! : c]!;
@@ -246,17 +261,23 @@ export function createBehavior(
       }
       case 'parallel': {
         if (!m.results) m.results = n.children.map(() => 0);
-        n.children.forEach((child, c) => {
-          if (m.results![c] !== 0) return;
-          const s = run(t, child);
-          if (s !== 'running') m.results![c] = s === 'success' ? 1 : 2;
-        });
-        const succ = m.results.filter(r => r === 1).length,
-          fail = m.results.filter(r => r === 2).length,
-          all = n.children.length;
-        if (n.fail === 'any' ? fail > 0 : fail === all) return finish(t, n, 'failure');
-        if (n.succeed === 'any' ? succ > 0 : succ === all) return finish(t, n, 'success');
-        if (succ + fail === all) return finish(t, n, 'failure');
+        const all = n.children.length;
+        // Decide after each child: once the policy is met, later children are not started this tick.
+        const decide = (): BehaviorStatus | null => {
+          const succ = m!.results!.filter(r => r === 1).length,
+            fail = m!.results!.filter(r => r === 2).length;
+          if (n.fail === 'any' ? fail > 0 : fail === all) return 'failure';
+          if (n.succeed === 'any' ? succ > 0 : succ === all) return 'success';
+          if (succ + fail === all) return 'failure';
+          return null;
+        };
+        for (let c = 0; c < all; c++) {
+          if (m.results[c] !== 0) continue;
+          const s = run(t, n.children[c]!);
+          if (s !== 'running') m.results[c] = s === 'success' ? 1 : 2;
+          const decided = decide();
+          if (decided) return finish(t, n, decided);
+        }
         return finish(t, n, 'running');
       }
       case 'invert': {
@@ -288,7 +309,7 @@ export function createBehavior(
       }
       case 'cooldown': {
         const s = run(t, n.children[0]!);
-        if (s !== 'running') t.cool.set(index, t.now + n.ticks);
+        if (s !== 'running') t.cool.set(index, t.now + n.ticks + 1);
         return finish(t, n, s);
       }
       case 'guard': {
@@ -318,7 +339,8 @@ export function createBehavior(
   };
 
   const begin = (now: number, random?: () => number, trace = false): Tick => {
-    if (!Number.isSafeInteger(now) || now < 0) throw new BehaviorError('now must be a non-negative integer tick');
+    if (!Number.isSafeInteger(now) || now < 0 || now > MAX_NOW)
+      throw new BehaviorError('now must be an integer tick in 0..2^52');
     if (lastNow !== null && now < lastNow) throw new BehaviorError('time went backwards');
     if (random !== undefined && typeof random !== 'function') throw new BehaviorError('random must be a function');
     return {
@@ -330,7 +352,24 @@ export function createBehavior(
         [...memory].map(([k, m]) => [k, {...m, order: m.order && [...m.order], results: m.results && [...m.results]}]),
       ),
       cool: new Map(cooldowns),
+      aborts: [],
+      live: true,
     };
+  };
+  /** After a commit: run the queued abort handlers against the live blackboard; rethrow the first error after all. */
+  const runAborts = (t: Tick) => {
+    t.live = false;
+    if (!t.aborts.length) return;
+    const phase: Tick = {...t, board: blackboard, live: true};
+    let failure: unknown = null;
+    for (const {handler, node} of t.aborts)
+      try {
+        handler(context(phase, node, false));
+      } catch (error) {
+        failure ??= error;
+      }
+    phase.live = false;
+    if (failure !== null) throw failure;
   };
   const commit = (t: Tick) => {
     blackboard = t.board;
@@ -349,9 +388,16 @@ export function createBehavior(
       trace?: boolean;
     }): Readonly<{status: BehaviorStatus; trace: readonly TraceRow[] | null}> {
       return guarded(() => {
+        if (!o || typeof o !== 'object') throw new BehaviorError('tick takes {now, random?, trace?}');
         const t = begin(o.now, o.random, o.trace === true);
-        const status = run(t, 0);
+        let status: BehaviorStatus;
+        try {
+          status = run(t, 0);
+        } finally {
+          t.live = false;
+        }
         commit(t);
+        runAborts(t);
         return Object.freeze({status, trace: t.trace && Object.freeze(t.trace)});
       });
     },
@@ -360,15 +406,19 @@ export function createBehavior(
       return guarded(() => {
         const t = begin(now, undefined, true);
         abort(t, 0);
+        t.live = false;
         commit(t);
+        runAborts(t);
         return Object.freeze(t.trace!);
       });
     },
     /** Running node indices, root first: the resume chain a save carries. */
     running(): readonly number[] {
+      idle();
       return Object.freeze([...memory.keys()].sort((a, b) => a - b));
     },
     get(key: string): BlackboardValue | undefined {
+      idle();
       return blackboard.get(key);
     },
     /** Write the blackboard from outside a tick (sensors, orders). */
@@ -379,9 +429,11 @@ export function createBehavior(
       return guarded(() => blackboard.delete(key));
     },
     blackboard(): Readonly<Record<string, BlackboardValue>> {
+      idle();
       return Object.freeze(Object.fromEntries([...blackboard].sort(([a], [b]) => (a < b ? -1 : 1))));
     },
     snapshot(): BehaviorSnapshot {
+      idle();
       return Object.freeze({
         version: 1 as const,
         signature: tree.signature,
@@ -437,7 +489,9 @@ function fields(v: unknown, names: readonly string[], what: string): Record<stri
   return out;
 }
 function items(v: unknown, max: number, what: string): unknown[] {
-  if (!Array.isArray(v) || v.length > max) throw new BehaviorError(`${what} must be an array of at most ${max}`);
+  if (!Array.isArray(v) || Object.getPrototypeOf(v) !== Array.prototype || v.length > max)
+    throw new BehaviorError(`${what} must be an array of at most ${max}`);
+  if (Reflect.ownKeys(v).length !== v.length + 1) throw new BehaviorError(`${what} must be dense data`);
   const out: unknown[] = [];
   for (let i = 0; i < v.length; i++) {
     const d = Object.getOwnPropertyDescriptor(v, String(i));
@@ -494,6 +548,38 @@ function parseSnapshot(raw: unknown, tree: BehaviorTree, agent: string, maxKeys:
   for (const index of memory.keys())
     if (index !== 0 && !memory.has(parent.get(index)!))
       throw new BehaviorError('running nodes must form ancestor chains');
+  // Only states a tick can leave behind: each remembered node's remembered children match its kind.
+  const COMPOSITE = new Set(['sequence', 'selector', 'shuffle']);
+  const ONE_CHILD = new Set(['invert', 'succeed', 'fail', 'timeout', 'cooldown', 'guard']);
+  const LEAF = new Set(['action', 'wait']);
+  for (const [index, m] of memory) {
+    const n = nodes[index]!;
+    const kept = n.children.filter(c => memory.has(c));
+    const wrong = (why: string) => new BehaviorError(`node ${index} (${n.type}): ${why}`);
+    if (!COMPOSITE.has(n.type) && m.cursor !== 0) throw wrong('cursor without a composite');
+    if (n.type !== 'repeat' && n.type !== 'retry' && m.count !== 0) throw wrong('count without repeat or retry');
+    if (n.type === 'parallel' && !m.results) throw wrong('a running parallel needs its results');
+    if (COMPOSITE.has(n.type)) {
+      const expected = n.children[m.order ? m.order[m.cursor]! : m.cursor]!;
+      if (kept.length !== 1 || kept[0] !== expected) throw wrong('exactly the child at the cursor must be running');
+    } else if (n.type === 'parallel') {
+      const pending = n.children.filter((_, c) => m.results![c] === 0);
+      if (!pending.length || kept.length !== pending.length || kept.some(c => !pending.includes(c)))
+        throw wrong('the running children must be exactly the pending ones');
+      const succ = m.results!.filter(r => r === 1).length,
+        fail = m.results!.filter(r => r === 2).length;
+      if (
+        (n.fail === 'any' ? fail > 0 : fail === n.children.length) ||
+        (n.succeed === 'any' ? succ > 0 : succ === n.children.length)
+      )
+        throw wrong('a decided parallel cannot be running');
+    } else if (ONE_CHILD.has(n.type)) {
+      if (kept.length !== 1) throw wrong('its child must be running');
+    } else if (n.type === 'repeat' || n.type === 'retry') {
+      if (kept.length > 1) throw wrong('one child at most');
+      if (n.times !== null && m.count >= n.times) throw wrong('count reached its limit');
+    } else if (!LEAF.has(n.type)) throw wrong('this node kind never stays running');
+  }
   const cooldowns = new Map<number, number>();
   for (const e of items(s.cooldowns, nodes.length, 'cooldowns')) {
     const c = fields(e, ['node', 'until'], 'cooldown');

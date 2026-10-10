@@ -37,12 +37,15 @@ const {status, trace} = agent.tick({now: tickCount, random: ctx.random, trace: d
 ## Nodes
 
 Composites: `sequence`, `selector` (resume at the running child; `reactive: true` restarts from the first child each
-tick and aborts a running child that a higher-priority child pre-empts), `parallel` (`succeed` / `fail`: `all` or
-`any`; failure wins a tie; all children finished without meeting `succeed` is failure), `shuffle` (a selector whose
+tick; when a higher-priority child pre-empts a running one, the new child is ticked first and the old one is aborted
+after it, in the same tick), `parallel` (`succeed` / `fail`: `all` or
+`any`; the policy is checked after each child, so once it is decided no later child starts that tick; failure wins a
+tie; all children finished without meeting `succeed` is failure), `shuffle` (a selector whose
 order is drawn from the tick's random source at activation, optionally weighted). Decorators: `invert`, `succeed`,
-`fail`, `repeat` (`times`, or `null` = until the child fails, then success; one child run per tick), `retry`
-(`times`; one attempt per tick), `timeout` (`ticks` since activation, then abort the child and fail), `cooldown`
-(fails for `ticks` after its child finishes), `guard` (a condition checked every tick; false aborts the child and
+`fail`, `repeat` (`times`, or `null` = until the child fails, then success; one child run per tick, so a finished
+run leaves a `running` gap tick before the next), `retry` (`times` is the total number of attempts, one per tick),
+`timeout` (`ticks` since activation, then abort the child and fail), `cooldown` (after its child finishes on tick
+T, fails without ticking the child on ticks T+1 … T+`ticks`; `ticks` ≥ 1), `guard` (a condition checked every tick; false aborts the child and
 fails). Leaves: `action` (handler returns `success` / `failure` / `running`; optional `abort`), `condition`
 (handler returns a boolean), `wait` (`ticks`), `set` (write a blackboard key), `check` (compare a blackboard key:
 `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `exists`, `missing`). Any node may have a `name` for traces; leaves may carry
@@ -50,21 +53,26 @@ one scalar `args` value.
 
 ## Runtime
 
-- `tick({now, random?, trace?})`: `now` is a non-negative integer tick that never decreases (the kit does not
+- `tick({now, random?, trace?})`: `now` is an integer tick in 0..2^52 that never decreases (the kit does not
   read clocks). Each node is visited at most once per tick, so the work is bounded by the tree size plus handler
   cost. Handlers see `ctx.first` (true when the leaf starts, false when it resumes), `ctx.get/set/delete` on the
   blackboard and `ctx.random()` (the tick's source; `ctx.random` from the scene gives replayable runs).
 - Memory and blackboard changes of a tick publish only when it completes. A throwing handler restores both and
-  rethrows; side effects the handlers already made (including abort handlers) are theirs. Calling the runtime from
-  inside a handler throws (no reentry).
+  rethrows; side effects the handlers already made are theirs. Abort handlers are queued during the tick and called
+  only after it commits (against the committed blackboard), so a rolled-back tick never stops work that it then
+  resumes; if an abort handler throws, the others still run and the first error is rethrown after the commit.
+  Calling the runtime (including its reads) from inside a handler throws: use the leaf context. A context only works
+  during its own tick or abort phase; a stashed context throws afterwards.
 - `abort(now)` stops everything running (scene exit, despawn, new orders), calling abort handlers depth-first.
 - `set/get/delete/blackboard()` let sensors and orders write the blackboard between ticks. Values are JSON
-  scalars (finite numbers, strings ≤ 1,024, booleans, null); keys are names; at most `maxKeys` (default 256).
+  scalars (finite numbers, -0 stored as 0, strings ≤ 1,024, booleans, null); keys are names; at most `maxKeys` (default 256).
 - `running()` lists the remembered nodes (the resume chain). `trace` lists every node completed, still running or
   aborted this tick, in completion order.
 - `snapshot()` / `restore(raw)`: plain data with the tree signature, agent, clock, blackboard, per-node memory
-  (cursor, counts, activation tick, shuffle order, parallel results) and cooldowns. Restore validates all of it,
-  including that remembered nodes form ancestor chains, before replacing anything. Handlers keep any state of their
+  (cursor, counts, activation tick, shuffle order, parallel results) and cooldowns. Restore validates all of it
+  before replacing anything, including that it is a state a tick can leave: remembered nodes form ancestor chains,
+  a composite remembers exactly the child at its cursor, a running parallel remembers exactly its pending children
+  and is undecided, decorators remember their child, only actions and waits stay running as leaves. Handlers keep any state of their
   own in the blackboard or in the game's own saved state.
 
 ## Bounds and cost

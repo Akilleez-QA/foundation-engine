@@ -126,9 +126,10 @@ test('decorators: repeat, retry, timeout, cooldown, guard, invert, wait and para
     'running',
     'failure',
   ]);
-  assert.deepEqual(run({type: 'cooldown', ticks: 2, child: {type: 'wait', ticks: 1}}, 5), [
+  assert.deepEqual(run({type: 'cooldown', ticks: 2, child: {type: 'wait', ticks: 1}}, 6), [
     'running',
     'success',
+    'failure',
     'failure',
     'running',
     'success',
@@ -314,4 +315,120 @@ test('snapshot and restore resume mid-run identically; mismatched snapshots are 
   const orphan = structuredClone(saved);
   orphan.memory = orphan.memory.filter((m: {node: number}) => m.node !== 0);
   if (orphan.memory.length) assert.throws(() => make([]).restore(orphan), /ancestor chains/);
+});
+
+test('review: abort handlers run after commit, so a rolled-back tick never resurrects aborted work', () => {
+  const log: string[] = [];
+  let boom = false;
+  const tree = defineBehaviorTree({
+    type: 'parallel',
+    children: [
+      {
+        type: 'selector',
+        reactive: true,
+        children: [
+          {type: 'check', key: 'go', op: 'eq', value: true},
+          {type: 'action', action: 'move'},
+        ],
+      },
+      {type: 'action', action: 'risky'},
+    ],
+  });
+  const bt = createBehavior(
+    tree,
+    {
+      actions: {
+        move: {tick: ctx => (log.push(`move first=${ctx.first}`), 'running'), abort: () => log.push('move abort')},
+        risky: () => {
+          if (boom) throw new Error('boom');
+          return 'running';
+        },
+      },
+    },
+    {agent: 'a'},
+  );
+  bt.tick({now: 0});
+  bt.set('go', true);
+  boom = true;
+  assert.throws(() => bt.tick({now: 1}), /boom/);
+  assert.deepEqual(log, ['move first=true'], 'no abort handler ran for the rolled-back tick');
+  bt.set('go', false);
+  boom = false;
+  bt.tick({now: 2});
+  assert.deepEqual(log, ['move first=true', 'move first=false']);
+});
+
+test('review: parallel stops at its decision; contexts die with their tick; reads inside a tick throw', () => {
+  const log: string[] = [];
+  let stash: {set(k: string, v: number): void} | null = null;
+  const bt = createBehavior(
+    defineBehaviorTree({
+      type: 'parallel',
+      succeed: 'any',
+      children: [
+        {type: 'action', action: 'quick'},
+        {type: 'action', action: 'slow'},
+      ],
+    }),
+    {
+      actions: {
+        quick: ctx => ((stash = ctx), 'success'),
+        slow: () => (log.push('slow'), 'running'),
+      },
+    },
+    {agent: 'a'},
+  );
+  assert.equal(bt.tick({now: 0}).status, 'success');
+  assert.deepEqual(log, [], 'a decided parallel starts no later child');
+  assert.throws(() => stash!.set('leak', 1), /outside its tick/);
+  const reader = createBehavior(
+    defineBehaviorTree({type: 'action', action: 'r'}),
+    {actions: {r: () => (reader.snapshot(), 'success')}},
+    {agent: 'a'},
+  );
+  assert.throws(() => reader.tick({now: 0}), /reentrant/);
+  assert.throws(() => bt.tick(null as never), /tick takes/);
+});
+
+test('review: restore refuses states no tick can produce', () => {
+  const tree = defineBehaviorTree({
+    type: 'sequence',
+    children: [
+      {type: 'wait', ticks: 5},
+      {
+        type: 'parallel',
+        children: [
+          {type: 'wait', ticks: 3},
+          {type: 'wait', ticks: 4},
+        ],
+      },
+    ],
+  });
+  const bt = createBehavior(tree, {}, {agent: 'a'});
+  bt.tick({now: 0});
+  const saved = JSON.parse(JSON.stringify(bt.snapshot()));
+  const fresh = () => createBehavior(tree, {}, {agent: 'a'});
+  const tamper = (
+    f: (s: {
+      memory: {node: number; cursor: number; results: number[] | null; count: number; since: number; order: null}[];
+    }) => void,
+  ) => {
+    const copy = structuredClone(saved);
+    f(copy);
+    return copy;
+  };
+  assert.doesNotThrow(() => fresh().restore(saved));
+  assert.throws(
+    () =>
+      fresh().restore(
+        tamper(s => s.memory.push({node: 2, cursor: 0, count: 0, since: 0, order: null, results: [0, 0]})),
+      ),
+    /cursor/,
+  );
+  assert.throws(() => fresh().restore(tamper(s => (s.memory[0]!.cursor = 1))), /cursor/);
+  bt.tick({now: 5});
+  const par = JSON.parse(JSON.stringify(bt.snapshot()));
+  const p = par.memory.find((m: {node: number}) => m.node === 2);
+  p.results = null;
+  assert.throws(() => fresh().restore(par), /results/);
 });
