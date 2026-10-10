@@ -157,8 +157,9 @@ test('snapshots restore identical future events and are validated', () => {
   assert.deepEqual(d.update(), c.update());
   for (const bad of [
     {...snap, v: 2},
-    {...snap, pairs: [{a: 2, b: 1, aSenses: true, bSenses: true}]},
-    {...snap, pairs: [{a: 1, b: 9, aSenses: true, bSenses: true}]},
+    {...snap, pairs: [{...snap.pairs[0], a: 2, b: 1}]},
+    {...snap, pairs: [{...snap.pairs[0], ai: 99}]},
+    {...snap, incarnations: -1},
     {...snap, bodies: [{...snap.bodies[0], layer: -1}]},
   ])
     assert.throws(() => d.restore(bad), RangeError);
@@ -212,4 +213,63 @@ test('composition: a fixed-step scene collects pickups exactly once and dispatch
   const t = await testScene(scene);
   t.run(1);
   assert.deepEqual(collected, [1, 2, 3]);
+});
+
+test('review regressions: departures snapshot and replay; reused ids are new bodies; undone departures are moves', () => {
+  const make = () => {
+    const c = createContactLayer({maxBodies: 8, maxPairs: 8});
+    c.set(1, body(0, 1, 1, {kind: 'sphere', radius: 1}));
+    c.set(2, body(0.5, 1, 1, {kind: 'sphere', radius: 1}));
+    c.update();
+    return c;
+  };
+  // A snapshot between a removal and the next update restores and replays the same exit.
+  for (const depart of [
+    (c: ReturnType<typeof make>) => c.remove(2),
+    (c: ReturnType<typeof make>) => c.setEnabled(2, false),
+    (c: ReturnType<typeof make>) => c.set(2, {...body(0.5, 1, 1, {kind: 'sphere', radius: 1}), enabled: false}),
+  ]) {
+    const c = make();
+    depart(c);
+    const copy = createContactLayer({maxBodies: 8, maxPairs: 8});
+    copy.restore(JSON.parse(JSON.stringify(c.snapshot())));
+    const expected = c.update();
+    assert.deepEqual(copy.update(), expected);
+    assert.deepEqual(
+      expected.events.map(e => [e.kind, e.removed]),
+      [['exit', true]],
+    );
+  }
+  // Reusing an id within one step is a new body: the old pair exits (removed) and the new one enters.
+  const reuse = make();
+  reuse.remove(2);
+  reuse.set(2, body(0.5, 1, 1, {kind: 'sphere', radius: 1}));
+  assert.deepEqual(
+    reuse.update().events.map(e => [e.kind, e.removed ?? null]),
+    [
+      ['exit', true],
+      ['enter', null],
+    ],
+  );
+  // Disable then re-enable then move apart within a step: an ordinary exit, not a removal.
+  const undo = make();
+  undo.setEnabled(2, false);
+  undo.setEnabled(2, true);
+  undo.move(2, [10, 0, 0]);
+  assert.deepEqual(
+    undo.update().events.map(e => [e.kind, e.removed]),
+    [['exit', false]],
+  );
+  // Mass removal is linear: 2000 overlapping bodies removed without scanning pairs per removal.
+  const big = createContactLayer({maxBodies: 4096, maxPairs: 1 << 20});
+  for (let i = 0; i < 2000; i++)
+    big.set(i, body((i % 50) * 0.01, 1, 1, {kind: 'sphere', radius: 0.2}, Math.floor(i / 50)));
+  big.update();
+  const t0 = performance.now();
+  for (let i = 0; i < 2000; i++) big.remove(i);
+  assert.ok(performance.now() - t0 < 200, 'removal does not scan current pairs');
+  assert.equal(
+    big.update().events.every(e => e.kind === 'exit' && e.removed),
+    true,
+  );
 });

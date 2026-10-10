@@ -6,7 +6,7 @@
 
 ## Context
 
-Pickups, hurtboxes, trigger zones, interaction prompts and sensors all need to know which simple volumes overlap, and when that starts or stops. Independent decompilations show the common shapes of this mechanism:
+Pickups, hurtboxes, trigger zones, interaction prompts and sensors all need to know which simple volumes overlap, and when that starts or stops. Classic action games show the common shapes of this mechanism:
 
 - cylinder hitboxes with interaction-type bit sets and a fixed per-object contact list;
 - a deferred touch list dispatched after the step, which must survive one handler destroying another participant.
@@ -22,7 +22,7 @@ Add an optional `@kits/contact`:
 - a sort-and-sweep broad phase, deterministic in id order;
 - each update emits frozen events: exits, then enters, then stays;
 - admission is bounded, and existing contacts keep priority;
-- intangibility and removal produce explicit exits;
+- intangibility and removal produce explicit exits, and a re-added id is a new body;
 - snapshots are validated on restore.
 
 There is no physics response, clock, ECS binding or callback.

@@ -49,7 +49,7 @@ export interface ContactOptions {
   readonly maxBodies: number;
   /** Simultaneous pairs, 1 to 1,048,576. Pairs already in contact keep priority over new ones. */
   readonly maxPairs: number;
-  /** Optional simultaneous pairs per body (like a fixed collided-object list), 1 to 1024. */
+  /** Simultaneous pairs per body (like a fixed collided-object list), 1 to 1024. Default 1024: always enforced. */
   readonly maxPerBody?: number;
 }
 
@@ -71,6 +71,8 @@ interface Body {
   enabled: boolean;
   minX: number;
   maxX: number;
+  /** Increments each time this id is added anew (first add, or after a removal). */
+  incarnation: number;
 }
 
 interface Pair {
@@ -78,6 +80,9 @@ interface Pair {
   readonly b: number;
   aSenses: boolean;
   bSenses: boolean;
+  /** Incarnations of a and b when the pair formed: a re-added id is a new body. */
+  readonly ai: number;
+  readonly bi: number;
 }
 
 const fail = (message: string): never => {
@@ -90,7 +95,8 @@ const bits = (v: unknown, what: string): number =>
   Number.isSafeInteger(v) && (v as number) >= 0 && (v as number) <= 0xffffffff
     ? (v as number)
     : fail(`${what} must be an unsigned 32-bit integer`);
-const pairKey = (a: number, b: number) => `${a}:${b}`;
+const pairKey = (p: {readonly a: number; readonly b: number; readonly ai: number; readonly bi: number}) =>
+  `${p.a}:${p.ai}:${p.b}:${p.bi}`;
 
 function vec(v: unknown, what: string): [number, number, number] {
   if (!Array.isArray(v) || v.length !== 3) return fail(`${what} must be [x, y, z]`);
@@ -148,8 +154,12 @@ export function createContactLayer(options: ContactOptions) {
     fail('maxPerBody must be an integer from 1 to 1024');
   const bodies = new Map<number, Body>();
   let current = new Map<string, Pair>();
-  /** Pairs whose body was removed or disabled since the last update. */
-  const departed = new Set<string>();
+  /** Incarnation counter; persisted in snapshots so restored layers replay identically. */
+  let incarnations = 0;
+  const nextIncarnation = () => {
+    if (incarnations >= Number.MAX_SAFE_INTEGER) fail('incarnations exhausted');
+    return ++incarnations;
+  };
   let busy = false;
   const guarded = <T>(fn: () => T): T => {
     if (busy) fail('reentrant call');
@@ -191,6 +201,7 @@ export function createContactLayer(options: ContactOptions) {
               : fail('enabled must be a boolean'),
       minX: 0,
       maxX: 0,
+      incarnation: 0,
     };
     if (shape.kind === 'cylinder') {
       body.kind = 'cylinder';
@@ -212,10 +223,6 @@ export function createContactLayer(options: ContactOptions) {
     return body;
   }
 
-  const departAll = (id: number) => {
-    for (const [k, p] of current) if (p.a === id || p.b === id) departed.add(k);
-  };
-
   return {
     get size() {
       return bodies.size;
@@ -227,8 +234,8 @@ export function createContactLayer(options: ContactOptions) {
         const body = capture(id, input);
         if (!bodies.has(id) && bodies.size >= maxBodies) fail('body capacity reached');
         const was = bodies.get(id);
+        body.incarnation = was ? was.incarnation : nextIncarnation();
         bodies.set(id, body);
-        if (was?.enabled && !body.enabled) departAll(id);
       });
     },
     /** Move a body without re-validating its shape. */
@@ -248,16 +255,13 @@ export function createContactLayer(options: ContactOptions) {
       guarded(() => {
         const b = bodies.get(id) ?? fail(`unknown body ${id}`);
         if (typeof enabled !== 'boolean') fail('enabled must be a boolean');
-        if (b.enabled && !enabled) departAll(id);
         b.enabled = enabled;
       });
     },
     /** Remove a body; its pairs exit (with `removed: true`) on the next update. */
     remove(id: number): boolean {
       return guarded(() => {
-        if (!bodies.delete(id)) return false;
-        departAll(id);
-        return true;
+        return bodies.delete(id);
       });
     },
     has(id: number): boolean {
@@ -279,7 +283,14 @@ export function createContactLayer(options: ContactOptions) {
             if (!pSenses && !qSenses) continue;
             if (!overlaps(p, q)) continue;
             const [a, b] = p.id < q.id ? [p, q] : [q, p];
-            found.push({a: a.id, b: b.id, aSenses: a === p ? pSenses : qSenses, bSenses: a === p ? qSenses : pSenses});
+            found.push({
+              a: a.id,
+              b: b.id,
+              aSenses: a === p ? pSenses : qSenses,
+              bSenses: a === p ? qSenses : pSenses,
+              ai: a.incarnation,
+              bi: b.incarnation,
+            });
           }
         }
         found.sort((p, q) => p.a - q.a || p.b - q.b);
@@ -296,10 +307,16 @@ export function createContactLayer(options: ContactOptions) {
           }
           perBody.set(pair.a, na + 1);
           perBody.set(pair.b, nb + 1);
-          next.set(pairKey(pair.a, pair.b), pair);
+          next.set(pairKey(pair), pair);
         };
-        for (const pair of found) if (current.has(pairKey(pair.a, pair.b))) admit(pair);
-        for (const pair of found) if (!current.has(pairKey(pair.a, pair.b))) admit(pair);
+        for (const pair of found) if (current.has(pairKey(pair))) admit(pair);
+        for (const pair of found) if (!current.has(pairKey(pair))) admit(pair);
+        /** A pair ends 'removed' when a body is gone, disabled, or is a new incarnation of its id. */
+        const departed = (p: Pair) => {
+          const a = bodies.get(p.a),
+            b = bodies.get(p.b);
+          return !a || !b || !a.enabled || !b.enabled || a.incarnation !== p.ai || b.incarnation !== p.bi;
+        };
         const exits: ContactEvent[] = [],
           enters: ContactEvent[] = [],
           stays: ContactEvent[] = [];
@@ -312,7 +329,7 @@ export function createContactLayer(options: ContactOptions) {
                 b: p.b,
                 aSenses: p.aSenses,
                 bSenses: p.bSenses,
-                removed: departed.has(k),
+                removed: departed(p),
               }) as ContactEvent,
             );
         for (const [k, p] of next) {
@@ -328,7 +345,6 @@ export function createContactLayer(options: ContactOptions) {
         const order = (p: ContactEvent, q: ContactEvent) => p.a - q.a || p.b - q.b;
         exits.sort(order);
         current = next;
-        departed.clear();
         return Object.freeze({events: Object.freeze([...exits, ...enters, ...stays]), refused, pairs: next.size});
       });
     },
@@ -352,12 +368,18 @@ export function createContactLayer(options: ContactOptions) {
               layer: b.layer,
               mask: b.mask,
               enabled: b.enabled,
+              incarnation: b.incarnation,
             })),
         ),
+        incarnations,
         pairs: Object.freeze([...current.values()].sort((p, q) => p.a - q.a || p.b - q.b).map(p => ({...p}))),
       });
     },
-    /** Replace all state from a snapshot; validated before any change. Pending departures are dropped. */
+    /**
+     * Replace all state from a snapshot taken at any point (including between a removal and the next update);
+     * validated before any change. Restored pairs are trusted as the last update's result: a pair that no longer
+     * overlaps or senses simply exits on the next update.
+     */
     restore(snapshot: ContactSnapshot): void {
       guarded(() => {
         if (typeof snapshot !== 'object' || snapshot === null || snapshot.v !== 1) fail('snapshot must be v1');
@@ -367,6 +389,8 @@ export function createContactLayer(options: ContactOptions) {
         const nb = (list as unknown[]).length,
           np = (pairList as unknown[]).length;
         if (nb > maxBodies || np > maxPairs) fail('snapshot exceeds the configured bounds');
+        const counter = snapshot.incarnations;
+        if (!Number.isSafeInteger(counter) || counter < 0) fail('snapshot incarnations must be a nonnegative integer');
         const nextBodies = new Map<number, Body>();
         for (let i = 0; i < nb; i++) {
           const item: unknown = (list as unknown[])[i];
@@ -374,13 +398,15 @@ export function createContactLayer(options: ContactOptions) {
           const r: Record<string, unknown> = {...item};
           const id = r.id;
           if (!Number.isSafeInteger(id) || (id as number) < 0 || nextBodies.has(id as number)) fail('invalid body id');
-          nextBodies.set(
+          const body = capture(
             id as number,
-            capture(
-              id as number,
-              {shape: r.shape, position: r.position, layer: r.layer, mask: r.mask, enabled: r.enabled} as BodyInput,
-            ),
+            {shape: r.shape, position: r.position, layer: r.layer, mask: r.mask, enabled: r.enabled} as BodyInput,
           );
+          const inc = r.incarnation;
+          if (!Number.isSafeInteger(inc) || (inc as number) < 1 || (inc as number) > counter)
+            fail('body incarnation must be from 1 to the snapshot counter');
+          body.incarnation = inc as number;
+          nextBodies.set(id as number, body);
         }
         const nextPairs = new Map<string, Pair>();
         const perBody = new Map<number, number>();
@@ -392,11 +418,13 @@ export function createContactLayer(options: ContactOptions) {
             b = r.b;
           if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || (a as number) >= (b as number))
             fail('pair ids must be ordered');
-          const pa = nextBodies.get(a as number),
-            pb = nextBodies.get(b as number);
-          if (!pa || !pb || !pa.enabled || !pb.enabled) fail('pairs must join enabled snapshot bodies');
+          const ai = r.ai,
+            bi = r.bi;
+          for (const inc of [ai, bi])
+            if (!Number.isSafeInteger(inc) || (inc as number) < 1 || (inc as number) > counter)
+              fail('pair incarnations must be from 1 to the snapshot counter');
           if (typeof r.aSenses !== 'boolean' || typeof r.bSenses !== 'boolean') fail('pair senses must be booleans');
-          const k = pairKey(a as number, b as number);
+          const k = pairKey({a: a as number, b: b as number, ai: ai as number, bi: bi as number});
           if (nextPairs.has(k)) fail('duplicate pair');
           for (const id of [a as number, b as number]) {
             const n = (perBody.get(id) ?? 0) + 1;
@@ -408,12 +436,14 @@ export function createContactLayer(options: ContactOptions) {
             b: b as number,
             aSenses: r.aSenses as boolean,
             bSenses: r.bSenses as boolean,
+            ai: ai as number,
+            bi: bi as number,
           });
         }
         bodies.clear();
         for (const [id, b] of nextBodies) bodies.set(id, b);
         current = nextPairs;
-        departed.clear();
+        incarnations = counter;
       });
     },
     /** Ids currently in contact with `id`, ascending. */
@@ -430,11 +460,15 @@ export function createContactLayer(options: ContactOptions) {
 export type ContactLayer = ReturnType<typeof createContactLayer>;
 export interface ContactSnapshot {
   readonly v: 1;
-  readonly bodies: readonly (BodyInput & {readonly id: number})[];
+  /** The layer's incarnation counter. */
+  readonly incarnations: number;
+  readonly bodies: readonly (BodyInput & {readonly id: number; readonly incarnation: number})[];
   readonly pairs: readonly {
     readonly a: number;
     readonly b: number;
     readonly aSenses: boolean;
     readonly bSenses: boolean;
+    readonly ai: number;
+    readonly bi: number;
   }[];
 }

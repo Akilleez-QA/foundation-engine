@@ -33,21 +33,28 @@ contacts.setEnabled(player, false);   // intangible (e.g. invulnerability frames
 - **Overlap is exact and strict.** Touching surfaces are not a contact.
   - Cylinders need overlapping height and horizontal circles.
   - Spheres and boxes use true distance; box corners are not treated as spheres.
-- **Exits.** When a body is removed or disabled, its pairs exit on the next update with `removed: true`.
-- **Snapshots.** `snapshot()` / `restore()` save and restore bodies and current pairs for saves and rollback. After
-  a restore, the next update reports the same events as the original layer would have.
+- **Identity.** A body keeps its identity while it stays registered: disabling and re-enabling it, moving it,
+  or replacing its shape with `set()` all keep it. An id that is removed and then added again, even within one
+  step, is a new body. Its old pairs exit and new ones enter.
+- **Exits.** A pair exits with `removed: true` when, at the next update, one of its bodies is gone, disabled or a
+  new incarnation of its id. Otherwise the exit is an ordinary separation with `removed: false`.
+- **Snapshots.** `snapshot()` / `restore()` save and restore bodies, current pairs and incarnation counters for
+  saves and rollback. A snapshot taken at any point, including between a removal and the next update, restores, and
+  the next update then reports the same events as the original layer. Restored pairs are trusted as the last
+  update's result. A pair that no longer overlaps or senses simply exits on the next update. The snapshot object
+  is frozen at the top level; its nested values are detached copies.
 
 ## Ownership, bounds and overload
 
-- **Limits:** `maxBodies` 1–65536 and `maxPairs` 1–1,048,576. `maxPerBody` (1–1024) is an optional cap on
-  simultaneous contacts per body, like a fixed per-object collision list.
+- **Limits:** `maxBodies` 1–65536 and `maxPairs` 1–1,048,576. `maxPerBody` (1–1024, default 1024 and always
+  enforced) caps simultaneous contacts per body, like a fixed per-object collision list.
 - **Admission when a bound is reached:**
   - Pairs already in contact keep priority. A newcomer never displaces an existing contact.
   - New pairs are admitted in `(a, b)` order.
   - The rest are refused and produce no events. `update().refused` counts them.
   - Results do not depend on insertion order.
 - **Cost.** `update()` sorts enabled bodies along x and sweeps them: O(n log n + candidate pairs). It allocates
-  its event list.
+  its event list. `set`, `move`, `setEnabled` and `remove` are O(1). `touching(id)` is O(current pairs).
 - **Reentrancy.** Calling back into the layer during an operation throws.
 - **Validation.** Malformed input throws `RangeError` before any change. Fields are copied once.
 - **Events.** Events are frozen values; dispatch is the creator's. A handler that removes a body cannot corrupt
@@ -73,6 +80,8 @@ contacts.setEnabled(player, false);   // intangible (e.g. invulnerability frames
 - event grouping order;
 - snapshot replay and validation;
 - input validation;
+- independent review regressions: snapshots between a departure and the next update, id reuse within a step,
+  undone departures and linear mass removal;
 - a `testScene` pickup consumer that collects each pickup exactly once while removing bodies during dispatch.
 
 The tests are headless only. No template uses the kit yet.
