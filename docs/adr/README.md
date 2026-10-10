@@ -75,3 +75,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0083](0083-portable-timed-contribution-checkpoints.md) | Portable timed contribution checkpoints through the existing owner | Capabilities / Persistence | Proposed |
 
 | [0084](0084-persisted-recurring-phase.md) | Persisted recurring phase with explicit bounded catch-up | Optional composition / Time / Persistence | Proposed |
+
+| [0088](0088-camera-support-framing.md) | Support-anchored vertical camera framing | Camera kit | Proposed |

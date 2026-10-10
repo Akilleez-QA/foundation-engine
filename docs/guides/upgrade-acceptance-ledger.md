@@ -1158,3 +1158,13 @@ confirmed-state rollback, then reconnects after old-peer retirement without
 resending its uncertain action. Independent review and full hosted integration CI
 are pending. No new browser,
 WAN, physical-device, scalability or full-CI acceptance is claimed.
+
+## Camera support framing — candidate (2026-10-09)
+
+Branch `feat/camera-support-anchor` from `db1f7a85`. Six new `support.test.ts` scene
+tests (unchanged poses without a query, jumps over level support leaving position
+and target exactly still, weights and limit including falls beyond the limit, null
+support and query arguments, orbit plus smoothing convergence, construction and
+per-frame refusal without publication) and the existing camera tests pass under
+`npm run check`. Evidence is headless; no browser, visual-quality, physical-device
+or full-CI acceptance is claimed.

@@ -86,6 +86,42 @@ export function cameraPose(mode: CameraMode, t: Target, o: CameraOptions = {}): 
   }
 }
 
+/**
+ * Optional support-anchored vertical framing. `support` returns the height of whatever the target stands on or over
+ * (ground, water, a platform), or null when there is none. The pose's position and look target then move by
+ * clamp((support - target.y) * weight, ±limit), so a jump or a short drop does not bob the view while a lasting
+ * change of support level is followed. Weights 0 leave that point on the target's own height.
+ */
+export interface SupportFraming {
+  support?: (ctx: SceneContext, target: {x: number; y: number; z: number}) => number | null;
+  /** Share in [0, 1] of the support offset applied to the camera position (default 1). */
+  supportWeight?: number;
+  /** Share in [0, 1] applied to the look target (default: `supportWeight`). */
+  supportTargetWeight?: number;
+  /** Largest vertical shift in world units, (0, 1e6] (default 2). */
+  supportLimit?: number;
+}
+/** Validated offset function for support framing, or undefined when it is off. */
+export function supportOffsets(
+  o: SupportFraming,
+): ((support: number | null, y: number) => {position: number; target: number} | null) | undefined {
+  const weight = o.supportWeight ?? 1,
+    targetWeight = o.supportTargetWeight ?? weight,
+    limit = o.supportLimit ?? 2;
+  if (![weight, targetWeight].every(w => Number.isFinite(w) && w >= 0 && w <= 1))
+    throw new RangeError('camera: support weights must be within [0, 1]');
+  if (!Number.isFinite(limit) || limit <= 0 || limit > 1e6)
+    throw new RangeError('camera: support limit must be within (0, 1e6]');
+  if (!o.support) return undefined;
+  return (support, y) => {
+    if (support === null) return null;
+    if (!Number.isFinite(support)) throw new RangeError('camera: support height must be finite or null');
+    const gap = support - y,
+      clamp = (v: number) => Math.min(limit, Math.max(-limit, v));
+    return {position: clamp(gap * weight), target: clamp(gap * targetWeight)};
+  };
+}
+
 /** A frame system that eases `ctx.view.camera` to the mode's pose around the named target. */
 export function cameraSystem(
   mode: CameraMode,
@@ -98,12 +134,13 @@ export function cameraSystem(
     clearancePadding?: number;
     teleportDistance?: number;
     resetRevision?: (ctx: SceneContext) => number;
-  } = {},
+  } & SupportFraming = {},
 ): SystemDefinition {
   const previous = new WeakMap<object, Vec3>();
   const revisions = new WeakMap<object, number>();
   if (o.teleportDistance !== undefined && (!Number.isFinite(o.teleportDistance) || o.teleportDistance <= 0))
     throw new RangeError('camera: teleport distance must be positive');
+  const anchor = supportOffsets(o);
   return defineSystem({
     id: `camera-${mode}`,
     phase: 'frame',
@@ -118,10 +155,15 @@ export function cameraSystem(
         previous.delete(ctx.world);
         return;
       }
-      const pose = cameraPose(mode, tr ? {x: tr.x, y: tr.y, z: tr.z, heading: tr.ry} : {x: 0, y: 0, z: 0, heading: 0}, {
-        ...o,
-        ...o.options?.(ctx),
-      });
+      // Support framing moves the whole pose to the anchored height (every mode is linear in the target height),
+      // then shifts the look target by the difference of the two weights.
+      const offset = anchor && tr ? anchor(o.support!(ctx, {x: tr.x, y: tr.y, z: tr.z}), tr.y) : null;
+      const pose = cameraPose(
+        mode,
+        tr ? {x: tr.x, y: tr.y + (offset?.position ?? 0), z: tr.z, heading: tr.ry} : {x: 0, y: 0, z: 0, heading: 0},
+        {...o, ...o.options?.(ctx)},
+      );
+      if (offset && offset.target !== offset.position) pose.target[1] += offset.target - offset.position;
       const old = revisionChanged ? undefined : previous.get(ctx.world);
       const discontinuity =
         old &&

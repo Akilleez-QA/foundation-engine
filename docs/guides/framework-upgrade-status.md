@@ -1192,3 +1192,12 @@ can refresh its existing one-credit view on ping. Defaults remain unchanged; no
 new timer or protocol owner. See [the contract](multiplayer-session.md#optional-host-liveness).
 Focused unit and real loopback acceptance is recorded in the upgrade ledger;
 independent review and full hosted integration CI remain required.
+
+## Camera support framing — candidate (2026-10-09)
+
+Optional `support` query on the existing `cameraSystem` anchors vertical framing to
+the creator-defined support height (scaled, clamped), so jumps do not bob the view.
+Defaults unchanged; no new owner. See [ADR 0088](../adr/0088-camera-support-framing.md)
+and [the camera kit README](../../src/kits/camera/README.md). Headless scene tests
+are recorded in the upgrade ledger; independent review and full hosted CI remain
+required. No browser, visual or device acceptance.
