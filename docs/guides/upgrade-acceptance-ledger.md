@@ -1537,3 +1537,21 @@ Evidence: focused headless tests compare OBJ, PLY and BVH results with three.js'
 `npm run dupes` (`tools/dupes/`) is an independently implemented read-only scan: exact duplicates with git blob ids, GLBs with identical mesh data (values, any layout), similar PNGs (128-bit difference hash) and similar text (MinHash with banding), over a game's `public/` folder, any paths, or across two trees. Unreadable or uncomparable content is skipped with a reason. [README](../../tools/dupes/README.md), [ADR 0134](../adr/0134-duplicate-detector.md).
 
 Evidence: focused headless tests (blob ids equal `git hash-object`; geometry, image and text matches and non-matches; the PNG decoder against a real renderer; a decompression bomb refused; large families and look-alike images grouped within bounds; CLI statuses). An independent adversarial review found thirteen defects, each fixed with a regression test. A local run over the templates found seven exact groups (including textures shared by two templates) and eight similar-image groups. Not part of `npm run check`; hosted full CI pending.
+
+## Differential shadow runner — candidate (2026-10-10)
+
+`createShadowRunner` in `@kits/replay` (`shadow.ts`) runs two implementations of one deterministic step in lockstep
+over the rollback kit's `save`/`load`/`step` ports with the same inputs (any step-addressed source, or a replay log
+through `replayInputs`), compares canonical state digests (`hashText`) after every step and reports the first
+`state`, `threw`, `unreadable` or `anchor-mismatch` divergence with the step, input, up to `maxDiffPaths` differing
+paths (`listDifferences`, sharing `explainDivergence`'s search) and the last agreeing state. A bounded ring of snapshot
+anchors allows replay from the nearest anchor. Bounded by `maxSteps` (`over-budget`), `maxAnchors`, state bytes, nodes
+and depth; cancellable by `cancel()`, an `AbortSignal` or caller-sized `run(slice)`. [Kit
+README](../../src/kits/replay/README.md#differential-shadow-runner-and-snapshot-anchors-shadowts), [ADR
+0118](../adr/0118-shadow-runner.md).
+
+Evidence: implemented with 13 headless node tests (agreement, an off-by-one at step 37 and a summation-order change
+found at their exact step and path, replay from the nearest anchor and from the last agreeing state, composition with
+a recorded and reopened replay log and the rollback kit's test simulation, thrown steps, saves and loads, anchor
+mismatch, every bound, abort, cancel and slices) and `npm run check` on the branch. Independent review and hosted CI
+remain required. No browser, dev-surface or device evidence; not integrated.

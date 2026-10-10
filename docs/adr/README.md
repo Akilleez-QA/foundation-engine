@@ -112,6 +112,8 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0112](0112-camera-director.md) | Optional camera director helpers | Camera kit | Proposed |
 
+| [0118](0118-shadow-runner.md) | Differential shadow runner with snapshot anchors | Optional kits / Replay | Proposed |
+
 | [0124](0124-data-defined-formulas.md) | Data-defined stat and damage formulas | Optional kits / Rules | Proposed |
 
 | [0135](0135-formula-data-import.md) | Spreadsheet import for formula sheets and lookup tables | Optional kits / Rules / Tooling | Proposed |

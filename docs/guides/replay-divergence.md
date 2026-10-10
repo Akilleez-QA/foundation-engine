@@ -187,6 +187,18 @@ to `maxChars`. Nothing runs when no replay session is active, and production bui
 never call `replay.digest`. A scene definition's `replay` field and anything the game
 imports from `@kits/replay` are game code and are bundled with it.
 
+## Compare two implementations step by step (shadow runner)
+
+`createShadowRunner` runs two implementations of one deterministic step (reference and optimised, old and new) in
+lockstep from the same state with the same inputs, compares canonical state digests after every step and stops at the
+first divergence with the step, its input, up to `maxDiffPaths` differing paths and the last agreeing state. Periodic
+anchors (both sides' saved states at agreeing boundaries, a bounded ring) let a divergence be replayed from the nearest
+anchor rather than from the first step; a restore that does not reproduce its anchor is reported as `anchor-mismatch`.
+Sides use the rollback kit's `save`/`load`/`step` ports; inputs can come from an opened replay log through
+`replayInputs`. Inputs, owner, bounds, overload, cancellation, recovery, limits and evidence are in the
+[kit README](../../src/kits/replay/README.md#differential-shadow-runner-and-snapshot-anchors-shadowts) and
+[ADR 0118](../adr/0118-shadow-runner.md). Headless tests only.
+
 ## Owner, bounds and overload
 
 The caller owns recorders, traces, players and agreement checks. A test or tool

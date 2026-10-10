@@ -44,31 +44,51 @@ interface Diff {
 
 const kindOf = (v: Json) => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v);
 
-function firstDiff(a: Json, b: Json, path: Step[]): Diff | null {
-  if (kindOf(a) !== kindOf(b)) return {path, kind: 'type', a, b};
-  if (a === null || typeof a !== 'object') return a === b ? null : {path, kind: 'value', a, b};
+/**
+ * Depth-first walk in canonical order (array elements, then a length difference; sorted union of keys). Appends each
+ * difference to `out` and stops once `out` holds `max`. A container whose kinds differ is one difference (not walked).
+ */
+function collectDiffs(a: Json, b: Json, path: Step[], out: Diff[], max: number): void {
+  if (out.length >= max) return;
+  if (kindOf(a) !== kindOf(b)) {
+    out.push({path, kind: 'type', a, b});
+    return;
+  }
+  if (a === null || typeof a !== 'object') {
+    if (a !== b) out.push({path, kind: 'value', a, b});
+    return;
+  }
   if (Array.isArray(a)) {
     const y = b as readonly Json[];
-    for (let i = 0; i < Math.min(a.length, y.length); i++) {
-      const d = firstDiff(a[i]!, y[i]!, [...path, i]);
-      if (d) return d;
-    } // i < both lengths
-    if (a.length === y.length) return null;
-    const i = Math.min(a.length, y.length);
-    return a.length > y.length
-      ? {path: [...path, i], kind: 'removed', a: a[i], b: undefined}
-      : {path: [...path, i], kind: 'added', a: undefined, b: y[i]};
+    const shared = Math.min(a.length, y.length);
+    for (let i = 0; i < shared && out.length < max; i++) collectDiffs(a[i]!, y[i]!, [...path, i], out, max); // i < both lengths
+    for (let i = shared; i < a.length && out.length < max; i++)
+      out.push({path: [...path, i], kind: 'removed', a: a[i], b: undefined});
+    for (let i = shared; i < y.length && out.length < max; i++)
+      out.push({path: [...path, i], kind: 'added', a: undefined, b: y[i]});
+    return;
   }
   const x = a as {readonly [k: string]: Json},
     y = b as {readonly [k: string]: Json};
   for (const k of [...new Set([...Object.keys(x), ...Object.keys(y)])].sort()) {
-    if (!Object.hasOwn(y, k)) return {path: [...path, k], kind: 'removed', a: x[k], b: undefined};
-    if (!Object.hasOwn(x, k)) return {path: [...path, k], kind: 'added', a: undefined, b: y[k]};
-    const d = firstDiff(x[k]!, y[k]!, [...path, k]); // own key of both (checked above)
-    if (d) return d;
+    if (out.length >= max) return;
+    if (!Object.hasOwn(y, k)) out.push({path: [...path, k], kind: 'removed', a: x[k], b: undefined});
+    else if (!Object.hasOwn(x, k)) out.push({path: [...path, k], kind: 'added', a: undefined, b: y[k]});
+    else collectDiffs(x[k]!, y[k]!, [...path, k], out, max); // own key of both (checked above)
   }
-  return null;
 }
+function firstDiff(a: Json, b: Json, path: Step[]): Diff | null {
+  const out: Diff[] = [];
+  collectDiffs(a, b, path, out, 1);
+  return out[0] ?? null;
+}
+
+const previewer = (max: number) => (v: Json | undefined) => {
+  if (v === undefined) return null;
+  const s: string | undefined = JSON.stringify(v);
+  if (typeof s !== 'string') return null;
+  return s.length > max ? `${s.slice(0, Math.max(0, max - 1))}…` : s;
+};
 
 const pathText = (path: readonly Step[]) =>
   path
@@ -123,13 +143,7 @@ function explain(
   }
   const d = firstDiff(x, y, []);
   if (!d) return Object.freeze({status: 'unavailable', tick, reason: 'no-difference'});
-  const max = options.maxValueChars ?? 160;
-  const preview = (v: Json | undefined) => {
-    if (v === undefined) return null;
-    const s: string | undefined = JSON.stringify(v);
-    if (typeof s !== 'string') return null;
-    return s.length > max ? `${s.slice(0, Math.max(0, max - 1))}…` : s;
-  };
+  const preview = previewer(options.maxValueChars ?? 160);
   let kind: DivergenceKind = d.kind,
     entity: number | null = null,
     component: string | null = null,
@@ -178,4 +192,53 @@ function explain(
     a: preview(kind === 'entity-set' ? at(x, rowPath) : d.a),
     b: preview(kind === 'entity-set' ? at(y, rowPath) : d.b),
   });
+}
+
+export interface DifferenceListOptions {
+  /** Most differences listed: an integer in [1, 1024] (default 16). Later differences set `truncated`. */
+  readonly maxPaths?: number;
+  /** Parse limits for each text (default as `explainDivergence`). */
+  readonly limits?: JsonLimits;
+  /** Longest value preview, in UTF-16 code units (default 160). */
+  readonly maxValueChars?: number;
+}
+/** One differing path. `a` and `b` are bounded JSON previews; null when the value is absent on that side. */
+export type StateDifference = Readonly<{
+  path: string;
+  kind: Exclude<DivergenceKind, 'entity-set'>;
+  a: string | null;
+  b: string | null;
+}>;
+export type DifferenceList =
+  | Readonly<{status: 'listed'; differences: readonly StateDifference[]; truncated: boolean}>
+  | Readonly<{status: 'unavailable'; reason: 'detail-unreadable' | 'no-difference'}>;
+
+/**
+ * List up to `maxPaths` differing paths between two JSON texts, in the same depth-first canonical order as
+ * `explainDivergence` (so the first entry is its first difference). Generic: no entity or resource translation. Never
+ * throws for text it cannot read. O(text size) plus at most `maxPaths` previews.
+ */
+export function listDifferences(a: string, b: string, options: DifferenceListOptions = {}): DifferenceList {
+  const maxPaths = options.maxPaths ?? 16,
+    maxValueChars = options.maxValueChars ?? 160;
+  if (!Number.isSafeInteger(maxPaths) || maxPaths < 1 || maxPaths > 1024)
+    throw RangeError('replay explain: maxPaths must be an integer in [1, 1024]');
+  if (!Number.isSafeInteger(maxValueChars) || maxValueChars < 1)
+    throw RangeError('replay explain: maxValueChars must be a positive integer');
+  let x: Json, y: Json;
+  try {
+    x = captureJson(a, options.limits ?? LIMITS).value as Json;
+    y = captureJson(b, options.limits ?? LIMITS).value as Json;
+  } catch {
+    return Object.freeze({status: 'unavailable', reason: 'detail-unreadable'});
+  }
+  // One extra difference tells a full list from a truncated one.
+  const out: Diff[] = [];
+  collectDiffs(x, y, [], out, maxPaths + 1);
+  if (out.length === 0) return Object.freeze({status: 'unavailable', reason: 'no-difference'});
+  const preview = previewer(maxValueChars);
+  const differences = out
+    .slice(0, maxPaths)
+    .map(d => Object.freeze({path: pathText(d.path), kind: d.kind, a: preview(d.a), b: preview(d.b)}));
+  return Object.freeze({status: 'listed', differences: Object.freeze(differences), truncated: out.length > maxPaths});
 }

@@ -49,8 +49,35 @@ export {
   SELECTION_LIMITS,
 } from './state';
 export type {WorldSelection, ReplayDigestInput, DigestCoverage, DigestCoverageTracker} from './state';
-export {explainDivergence} from './explain';
-export type {DivergenceExplanation, DivergenceExplainOptions, DivergenceKind} from './explain';
+export {explainDivergence, listDifferences} from './explain';
+export type {
+  DivergenceExplanation,
+  DivergenceExplainOptions,
+  DivergenceKind,
+  DifferenceList,
+  DifferenceListOptions,
+  StateDifference,
+} from './explain';
+export {
+  createShadowRunner,
+  captureShadowLimits,
+  nearestAnchor,
+  replayInputs,
+  SHADOW_DEFAULTS,
+  SHADOW_LIMIT_RANGES,
+} from './shadow';
+export type {
+  ShadowSide,
+  ShadowInputs,
+  ShadowLimits,
+  ShadowAnchor,
+  ShadowSideName,
+  ShadowDivergence,
+  ShadowStatus,
+  ShadowReport,
+  ShadowRunner,
+  ShadowOptions,
+} from './shadow';
 export type {SceneInputSpec, SceneTickFacts, SceneInputTap, SceneRunOptions, SceneReplayResult} from './scene';
 export {checkPredictionAgreement} from './agreement';
 export type {AgreementHost, AgreementOptions, AgreementReport} from './agreement';
