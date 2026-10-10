@@ -1219,3 +1219,9 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Ballistics kit — candidate (2026-10-09)
+
+- **Scope:** `src/kits/ballistics`, pure solves and evaluation (ADR 0097).
+- **Evidence:** `ballistics.test.ts` covers exact landing for every solve, the constraint of each mode, the 45-degree range boundary, vertical shots, unreachable cases, lead convergence and validation.
+- **Not established:** template or browser consumers and hosted CI.
