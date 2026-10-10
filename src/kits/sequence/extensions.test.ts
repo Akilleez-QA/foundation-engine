@@ -230,6 +230,11 @@ test('the arbiter lets one event claim the stage, by priority, with cooldown and
   arb.tick();
   assert.equal(arb.offer('trigger', 'door'), 'offered');
   assert.throws(() => arb.offer('nope', 'x'), RangeError);
+  const quick = createEventArbiter<string>({sources: [{id: 'a'}]});
+  quick.tick();
+  quick.offer('a', 'x');
+  quick.release(quick.resolve()!);
+  assert.equal(quick.offer('a', 'y'), 'offered', 'cooldown 0 allows the release tick');
   assert.throws(() => createEventArbiter({sources: [{id: 'a'}, {id: 'a'}]}), RangeError);
 });
 

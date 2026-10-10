@@ -219,7 +219,10 @@ export function createSequenceGraph(
     get status() {
       return status;
     },
-    /** True when the graph ended because `maxSteps` was reached rather than by a `null` choice or a final node. */
+    /**
+     * True when the graph ended because `maxSteps` was reached rather than by a `null` choice or a final node. Session
+     * only: it is not part of the snapshot.
+     */
     get limited() {
       return limited;
     },

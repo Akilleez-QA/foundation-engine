@@ -83,8 +83,8 @@ export function createEventArbiter<T = unknown>(input: {readonly sources: readon
     release(claim: Claim<T>): 'released' | 'stale' {
       if (!held || claim !== held) return 'stale';
       const i = index(claim.source);
-      // Offers are refused for the `cooldown` ticks after the release tick.
-      until[i] = tick + cooldown[i]! + 1;
+      // Offers are refused for the `cooldown` ticks after the release tick (and the rest of that tick when c > 0).
+      until[i] = cooldown[i]! > 0 ? tick + cooldown[i]! + 1 : tick;
       held = null;
       return 'released';
     },

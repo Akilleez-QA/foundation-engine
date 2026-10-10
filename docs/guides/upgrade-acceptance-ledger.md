@@ -1241,4 +1241,5 @@ stale release and cooldown; plus settle-gated offers and single finish on a dire
 released branch cue. An independent adversarial review (external 3,000-graph fuzz, not
 checked in) found no duplicate effect but found wedging at the step bound, prototype
 names accepted as defaults, an overstated skip claim, unsettled offers, re-reads and
-documentation gaps; all were fixed. The 12 #249 tests still pass. No browser or device evidence.
+documentation gaps; all were fixed, and a re-review with a 3,000-graph fuzz was clean.
+The 12 #249 tests still pass. No browser or device evidence.

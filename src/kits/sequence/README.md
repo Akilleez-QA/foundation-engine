@@ -64,7 +64,7 @@ branch cue depends on (track predecessors and barriers, transitively) and abando
 parallel cues, even ones that time alone would have completed first. A node without a
 branch is skipped whole, and `skip` stops with `partial` at a node that is not
 skippable. `maxSteps` (default 64, max 1,024) bounds loops: reaching it ends the graph
-and sets `limited`, never throwing with effects in hand. Ticks left over when a node
+and sets `limited` (session only, not saved), never throwing with effects in hand. Ticks left over when a node
 changes are not carried into the next node. Snapshots (`parseSequenceGraphState`)
 hold the node, step and current run; step 0 must be the start node.
 
