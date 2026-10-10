@@ -1,4 +1,4 @@
-# ADR 0098: data-defined stat and damage formulas
+# ADR 0120: data-defined stat and damage formulas
 
 - **Status:** Proposed (candidate implementation)
 - **Date:** 2026-10-09
