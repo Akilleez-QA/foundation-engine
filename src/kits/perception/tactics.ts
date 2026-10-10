@@ -17,8 +17,11 @@ export interface SquadReport {
 
 /**
  * Shared squad knowledge: the newest report per target (ties: higher confidence, then reporter id). `share` copies an
- * agent's suspicious-or-alerted targets in; `inform` turns fresh reports into `report` stimuli for a member, scaled by
- * confidence and by age (fading to 0 at `maxAge`), skipping what the member reported itself.
+ * agent's suspicious-or-alerted targets that it perceived directly (sight or sound), with the time of that perception,
+ * so reports never refresh themselves through re-sharing. `inform` turns fresh reports into `report` stimuli for a
+ * member, scaled by confidence and by age (fading to 0 at `maxAge`), skipping what the member reported itself; reports
+ * act as a rate in awareness, so calling it every update is independent of the update rate. A full board first drops
+ * reports older than `maxAge` relative to the incoming one.
  */
 export function createSquadKnowledge(options: {readonly maxTargets?: number; readonly maxAge?: number} = {}) {
   const maxTargets = options.maxTargets ?? 64,
@@ -52,6 +55,8 @@ export function createSquadKnowledge(options: {readonly maxTargets?: number; rea
       });
       const old = reports.get(target);
       if (old && !better(copy, old)) return 'older';
+      if (!old && reports.size >= maxTargets)
+        for (const [k, r] of reports) if (time - r.time >= maxAge) reports.delete(k);
       if (!old && reports.size >= maxTargets) return 'full';
       reports.set(target, copy);
       return 'stored';
@@ -62,10 +67,11 @@ export function createSquadKnowledge(options: {readonly maxTargets?: number; rea
       for (const t of awareness.targets())
         if (
           t.level !== 'unaware' &&
+          t.lastDirect !== null &&
           api.report({
             target: t.target,
             position: t.lastKnown,
-            time: t.lastStimulus,
+            time: t.lastDirect,
             confidence: t.awareness,
             reporter,
           }) === 'stored'
@@ -96,6 +102,7 @@ export function createSquadKnowledge(options: {readonly maxTargets?: number; rea
     },
     /** Drop reports older than maxAge. */
     expire(now: number): number {
+      if (!finite(now)) fail('now must be finite');
       let n = 0;
       for (const [k, r] of reports)
         if (now - r.time >= maxAge) {
@@ -166,12 +173,18 @@ export function chooseCover(
   return null;
 }
 
-/** Exclusive cover claims per agent; a stale release (another agent's) is refused. */
+/** Exclusive cover claims: one point per agent, one agent per point. `release(agent)` frees that agent's claim. */
 export function createCoverReservations() {
   const byPoint = new Map<string, string>(),
     byAgent = new Map<string, string>();
+  const name = (v: unknown, what: string): string => {
+    if (typeof v !== 'string' || !v || v.length > 256) fail(`${what} must be a name`);
+    return v;
+  };
   return {
-    claim(agent: string, point: string): 'claimed' | 'taken' {
+    claim(agentIn: string, pointIn: string): 'claimed' | 'taken' {
+      const agent = name(agentIn, 'agent'),
+        point = name(pointIn, 'point');
       const holder = byPoint.get(point);
       if (holder !== undefined && holder !== agent) return 'taken';
       const previous = byAgent.get(agent);
@@ -180,7 +193,8 @@ export function createCoverReservations() {
       byAgent.set(agent, point);
       return 'claimed';
     },
-    release(agent: string): boolean {
+    release(agentIn: string): boolean {
+      const agent = name(agentIn, 'agent');
       const point = byAgent.get(agent);
       if (point === undefined) return false;
       byAgent.delete(agent);
@@ -211,7 +225,7 @@ export interface UtilityOption<I> {
  * Utility choice: each option scores the product of its considerations, compensated for their count so options with
  * more considerations are not penalised (score + (1 − score) × (1 − 1/n) × score), times its weight. The current choice
  * gets `momentum` (a [0, 1] bonus fraction) to avoid dithering. Highest score wins, ties by declaration order; below
- * `minScore` nothing is chosen. Considerations outside [0, 1] throw. A behaviour tree action can write the choice to
+ * `minScore`, or when every score is 0, nothing is chosen. Considerations outside [0, 1] throw. A behaviour tree action can write the choice to
  * its blackboard.
  */
 export function chooseUtility<I>(

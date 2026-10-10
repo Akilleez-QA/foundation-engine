@@ -8,7 +8,7 @@ system can use. Each think step:
    `hearingStrength` for the sounds your game emits, optionally with a navigation
    distance so sound goes around walls.
 2. Feed them to the agent's `createAwareness()` with the current time. Awareness rises
-   while a target is seen, jumps when it is heard or reported, and decays otherwise.
+   while a target is seen or reported, jumps once for each sound, and decays otherwise.
    Levels move between unaware, suspicious and alerted with hysteresis, so agents do
    not flicker.
 3. Write `awareness.facts()` into your blackboard (a behaviour tree runtime's `set`
@@ -16,8 +16,8 @@ system can use. Each think step:
 
 Squads share what they know: `share` puts a member's suspicious or alerted targets on
 the squad board, and `inform` gives the others fading report stimuli. For combat
-positions, `chooseCover` finds the nearest unreserved point your line-of-sight query
-says is hidden from the threat. For choosing between actions or weapons, `chooseUtility`
+positions, `chooseCover` finds the nearest (or, with `prefer: 'away'`, the farthest from the
+threat) unreserved point your line-of-sight query says is hidden from the threat. For choosing between actions or weapons, `chooseUtility`
 scores options from considerations in [0, 1], with momentum so choices do not dither.
 
 See [the kit README](../../src/kits/perception/README.md) for every bound and rule.

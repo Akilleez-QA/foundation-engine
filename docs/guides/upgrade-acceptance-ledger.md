@@ -1222,10 +1222,14 @@ are unverified. Independent review and hosted integration remain pending.
 
 ## Perception kit — candidate (2026-10-09)
 
-Branch `feat/perception-kit` from `a6211bd3`. Seven headless tests: sight range, cone,
+Branch `feat/perception-kit` from `a6211bd3`. Eight headless tests: sight range, cone,
 peripheral falloff, near radius and occlusion queried only when needed; hearing
 falloff, path distance, unreachable and attenuation; awareness growth, impulses, decay,
 hysteretic levels and blackboard facts; forgetting and full-memory replacement; squad
 sharing, older-report refusal, fading inform and expiry; cover band, reservations and
-bounded checks; utility compensation, momentum and refusal of invalid considerations.
+bounded checks; utility compensation, momentum and refusal of invalid considerations;
+and the review fixes (no rumour loop through re-sharing, report gain independent of the
+update rate, atomic updates, sight priority for last-known positions, forgetting with
+no decay). An independent adversarial review found those squad and awareness defects
+and several smaller issues; all were fixed.
 No game, browser or device evidence.

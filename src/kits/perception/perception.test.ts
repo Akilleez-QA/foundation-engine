@@ -116,11 +116,63 @@ test('squad knowledge shares the newest reports and informs members with fading 
   assert.equal(stimuli.length, 1);
   close(stimuli[0]!.strength, 1 * (1 - 5 / 10));
   assert.deepEqual(squad.inform('scout', 6), [], 'no echo of your own report');
-  const guard = createAwareness({reportImpulse: 0.5});
+  const guard = createAwareness({reportRate: 0.5});
+  guard.update(5);
   guard.update(6, stimuli);
-  close(guard.recall('p')!.awareness, 0.25);
+  close(guard.recall('p')!.awareness, 0.25, 1e-9, 'rate 0.5 × confidence 0.5 × 1 s');
   assert.deepEqual(guard.recall('p')!.lastKnown, [5, 0, 5]);
+  assert.equal(guard.recall('p')!.lastDirect, null, 'known only from a report');
   assert.equal(squad.expire(20), 1);
+  assert.throws(() => squad.expire(Number.NaN), RangeError);
+});
+
+test('review fixes: no rumour loop, rate-independent reports, atomic updates, sight priority, forgetting', () => {
+  // Re-sharing reported knowledge never refreshes it.
+  const squad = createSquadKnowledge({maxAge: 5});
+  const a = createAwareness({sightRate: 10, reportRate: 2, decay: 0.05}),
+    b = createAwareness({reportRate: 2, decay: 0.05});
+  a.update(0);
+  b.update(0);
+  a.update(1, [{target: 'p', kind: 'sight', strength: 1, position: [1, 0, 1]}]);
+  for (let t = 2; t <= 30; t++) {
+    squad.share('a', a);
+    squad.share('b', b);
+    a.update(t, squad.inform('a', t));
+    b.update(t, squad.inform('b', t));
+  }
+  assert.equal(squad.recall('p')!.time, 1, 'the report keeps its original perception time');
+  assert.deepEqual(squad.inform('b', 30), [], 'and expires');
+  // Report gain does not depend on how often inform is called.
+  const once = (hz: number) => {
+    const s = createSquadKnowledge({maxAge: 100});
+    s.report({target: 'q', position: [0, 0, 0], time: 0, confidence: 0.5, reporter: 'x'});
+    const m = createAwareness({reportRate: 0.5, decay: 0});
+    m.update(0);
+    for (let i = 1; i <= hz; i++) m.update(i / hz, s.inform('m', 0));
+    return m.recall('q')!.awareness;
+  };
+  close(once(1), once(60), 1e-9);
+  // A failed update leaves time and memory unchanged.
+  const c = createAwareness({decay: 0.1, soundImpulse: 0.4});
+  c.update(0, [{target: 's', kind: 'sound', strength: 1, position: [0, 0, 0]}]);
+  assert.throws(() => c.update(10, [{target: 's', kind: 'bad' as never, strength: 1, position: [0, 0, 0]}]));
+  c.update(2);
+  close(c.recall('s')!.awareness, 0.2);
+  // Several identical sights do not add up; sight wins the last-known position over a report.
+  const d = createAwareness({sightRate: 2});
+  d.update(0);
+  d.update(0.1, [
+    {target: 'r', kind: 'sight', strength: 1, position: [1, 1, 1]},
+    {target: 'r', kind: 'sight', strength: 1, position: [1, 1, 1]},
+    {target: 'r', kind: 'report', strength: 1, position: [9, 9, 9]},
+  ]);
+  assert.deepEqual(d.recall('r')!.lastKnown, [1, 1, 1]);
+  close(d.recall('r')!.awareness, 0.2 + 0.5 * 0.1, 1e-9);
+  // With no decay, an unaware target is still forgotten after forgetAfter.
+  const e = createAwareness({decay: 0, forgetAfter: 1});
+  e.update(0, [{target: 'w', kind: 'sound', strength: 0.1, position: [0, 0, 0]}]);
+  e.update(2);
+  assert.equal(e.recall('w'), null);
 });
 
 test('cover: nearest protected point inside the band, skipping reserved points, with bounded checks', () => {

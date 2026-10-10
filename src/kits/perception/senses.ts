@@ -30,10 +30,10 @@ export interface SightSpec {
 }
 
 /**
- * Sight strength of `target` for an eye at `position` looking along `forward`: 0 outside range or cone (unless within
- * `near`) or when `clear(eye, target)` reports an obstruction; otherwise (1 − d/range) × angle factor, where the angle
- * factor falls linearly from 1 at the centre to `edge` at the cone boundary. `clear` is called at most once, and only
- * for targets inside range and cone.
+ * Sight strength of `target` for an eye at `position` looking along `forward`: 0 at or beyond range, outside the cone
+ * (unless within `near`, where it is noticed at `edge` strength) or when `clear(eye, target)` reports an obstruction;
+ * otherwise (1 − d/range) × angle factor, where the angle factor falls linearly from 1 at the centre to `edge` at the
+ * cone boundary. `clear` is called at most once, and only when the result would otherwise be above 0.
  */
 export function sightStrength(
   spec: SightSpec,
@@ -52,11 +52,11 @@ export function sightStrength(
   const p = vec(eye.position, 'eye position'),
     f = vec(eye.forward, 'eye forward'),
     t = vec(target, 'target');
-  const d: Vec3 = [t[0] - p[0], t[1] - p[1], t[2] - p[2]];
-  const dist = Math.hypot(d[0], d[1], d[2]);
-  if (dist > range) return 0;
   const flen = Math.hypot(f[0], f[1], f[2]);
   if (flen < 1e-12) fail('eye forward must be nonzero');
+  const d: Vec3 = [t[0] - p[0], t[1] - p[1], t[2] - p[2]];
+  const dist = Math.hypot(d[0], d[1], d[2]);
+  if (dist >= range) return 0;
   let angle = 0;
   if (dist > 1e-12) {
     const cos = (d[0] * f[0] + d[1] * f[1] + d[2] * f[2]) / (dist * flen);
@@ -65,9 +65,10 @@ export function sightStrength(
   const half = fov / 2;
   const inCone = angle <= half;
   if (!inCone && dist > near) return 0;
-  if (!clear(p, t)) return 0;
   const angleFactor = inCone ? 1 - (1 - edge) * (half > 0 ? angle / half : 0) : edge;
-  return Math.max(0, 1 - dist / range) * angleFactor;
+  if (angleFactor <= 0) return 0;
+  if (!clear(p, t)) return 0;
+  return (1 - dist / range) * angleFactor;
 }
 
 export interface Sound {
@@ -94,10 +95,12 @@ export function hearingStrength(
     loud: unknown = sound.loudness;
   if (!finite(loud) || loud <= 0 || loud > 1e6) fail('sound loudness must be within (0, 1e6]');
   const straight = Math.hypot(s[0] - l[0], s[1] - l[1], s[2] - l[2]);
-  if (straight > loud) return 0; // a path is never shorter than the straight line
-  const d = options.distance ? options.distance(s, l) : straight;
-  if (d === null) return 0;
-  if (!finite(d) || d < 0) fail('distance must return a nonnegative finite number or null');
+  if (straight >= loud) return 0; // a path is never shorter than the straight line
+  const raw = options.distance ? options.distance(s, l) : straight;
+  if (raw === null) return 0;
+  if (!finite(raw) || raw < 0) fail('distance must return a nonnegative finite number or null');
+  // A path cannot be shorter than the straight line; a shorter answer is treated as the straight distance.
+  const d = Math.max(raw, straight);
   if (d >= loud) return 0;
   const a = options.attenuation ? options.attenuation(s, l) : 1;
   if (!finite(a) || a < 0 || a > 1) fail('attenuation must return a number within [0, 1]');
