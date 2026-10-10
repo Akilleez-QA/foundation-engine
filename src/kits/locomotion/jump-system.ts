@@ -6,7 +6,7 @@
 import {defineSystem, Transform, type Entity, type SceneContext, type SystemDefinition, type World} from '../../author';
 import {areaOf, slide} from '../character';
 import {createJumpFeel, type JumpFeel, type JumpFeelConfig} from './jump';
-import type {Platforms} from './platforms';
+import {wrapYaw, type Platforms} from './platforms';
 
 /**
  * What an actor keeps from a platform it leaves (by jumping or moving off its footprint), after Godot's
@@ -36,9 +36,15 @@ export interface JumpSystemOptions {
   /**
    * Moving platforms (MV-02). Run `platformSystem(platforms)` earlier in the same fixed lane. A supported actor rides
    * its platform's exact displacement each tick; platforms are one-way in their own frame and may pick up an actor
-   * they overtake. Horizontal carry and inherited motion slide against `Walls` and `Solid`s.
+   * they overtake. Horizontal carry and inherited motion slide against `Walls` and `Solid`s. A turning platform carries
+   * the actor about its pivot by the tick's yaw change.
    */
   platforms?: Platforms;
+  /**
+   * Whether a turning platform also turns the actor's facing (`Transform.ry`) by the same yaw change. Default true;
+   * false keeps facing with another owner (for example a camera-relative controller).
+   */
+  carryFacing?: boolean | undefined;
   /** What leaving a platform keeps. Default 'add-velocity'. */
   onLeave?: PlatformLeave | undefined;
   /** Body radius for sliding carried motion against walls and solids (m), (0, 10]. Default 0.35. */
@@ -55,6 +61,7 @@ interface Body {
   cx: number;
   cy: number;
   cz: number;
+  cyaw: number;
 }
 const bodies = new WeakMap<World, Map<Entity, Body>>();
 const EPS = 1e-9;
@@ -83,7 +90,9 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
     snap = length('snapDistance', o.snapDistance, 10);
   const leave = o.onLeave ?? 'add-velocity',
     platforms = o.platforms,
-    radius = o.radius ?? 0.35;
+    radius = o.radius ?? 0.35,
+    carryFacing = o.carryFacing ?? true;
+  if (typeof carryFacing !== 'boolean') throw new RangeError('jump: carryFacing must be a boolean');
   if (leave !== 'add-velocity' && leave !== 'add-upward' && leave !== 'none')
     throw new RangeError('jump: onLeave must be add-velocity, add-upward or none');
   if (!Number.isFinite(radius) || radius <= 0 || radius > 10)
@@ -125,13 +134,23 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
       if (!body)
         byWorld.set(
           e,
-          (body = {feel: createJumpFeel(o.config), supported: false, vx: 0, vz: 0, carrier: null, cx: 0, cy: 0, cz: 0}),
+          (body = {
+            feel: createJumpFeel(o.config),
+            supported: false,
+            vx: 0,
+            vz: 0,
+            carrier: null,
+            cx: 0,
+            cy: 0,
+            cz: 0,
+            cyaw: 0,
+          }),
         );
       // The tick is a transaction. Controller and adapter state are saved first and restored if any query (ground,
       // platforms, the `when` predicate, input) or limit check throws; the Transform is written only by the last
       // statement of a tick that succeeded. A failed tick therefore leaves the actor exactly as if it had not run.
       const b = body,
-        {supported, vx, vz, carrier, cx, cy, cz} = b;
+        {supported, vx, vz, carrier, cx, cy, cz, cyaw} = b;
       b.feel.save();
       try {
         tick(ctx, dt, tr, b);
@@ -144,11 +163,12 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
         b.cx = cx;
         b.cy = cy;
         b.cz = cz;
+        b.cyaw = cyaw;
         throw error;
       }
     },
   });
-  function tick(ctx: SceneContext, dt: number, tr: {x: number; y: number; z: number}, body: Body) {
+  function tick(ctx: SceneContext, dt: number, tr: {x: number; y: number; z: number; ry: number}, body: Body) {
     const active = !o.when || o.when(ctx);
     // The stock runtime's press latch shows each press to exactly one fixed tick (STD-SIM-12), even across frames
     // that run no tick, so the press edge is used as given. An inactive tick drops any pending press.
@@ -157,7 +177,8 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
     const feet0 = tr.y - offset;
     let x = tr.x,
       z = tr.z,
-      feet = feet0;
+      feet = feet0,
+      turn = 0; // yaw change of the carry applied to the actor this tick (published to facing with carryFacing)
 
     // ---- Ride. State written below before a later query throws is rolled back by the caller's transaction.
     let ride: {
@@ -165,6 +186,7 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
       dx: number;
       dy: number;
       dz: number;
+      dyaw: number;
       vx: number;
       vy: number;
       vz: number;
@@ -172,6 +194,7 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
       px: number;
       py: number;
       pz: number;
+      pyaw: number;
     } | null = null;
     let left: {vx: number; vy: number; vz: number} | null = null; // a carrier left this tick by moving off it
     if (platforms && body.carrier === null && body.feel.vy <= 0) {
@@ -184,31 +207,38 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
         body.cx = p.x - d.dx;
         body.cy = p.y - d.dy;
         body.cz = p.z - d.dz;
+        body.cyaw = (p.yaw ?? 0) - (d.dyaw ?? 0);
       }
     }
     if (body.carrier !== null) {
       const id = body.carrier,
         p = platforms?.pose(id) ?? null,
         d = platforms?.delta(id) ?? null,
-        v = platforms?.velocity(id) ?? null;
+        c = platforms?.carry(id, x, z) ?? null;
       // The platform must have moved continuously since the actor last moved with it: frozen (no advance since), or
-      // exactly one advance by `delta`. A cut, a restart, a removal and re-add, or an actor moved vertically by
-      // another owner is a discontinuity, and the actor detaches with no velocity.
+      // exactly one advance by `delta` (position and yaw). A cut, a restart, a removal and re-add, or an actor moved
+      // vertically by another owner is a discontinuity, and the actor detaches with no velocity.
+      const yaw = p?.yaw ?? 0,
+        dyaw = d?.dyaw ?? 0;
       const still =
         p !== null &&
         Math.abs(p.x - body.cx) <= EPS &&
         Math.abs(p.y - body.cy) <= EPS &&
-        Math.abs(p.z - body.cz) <= EPS;
+        Math.abs(p.z - body.cz) <= EPS &&
+        Math.abs(wrapYaw(yaw - body.cyaw)) <= EPS;
       const stepped =
         p !== null &&
         d !== null &&
         Math.abs(body.cx + d.dx - p.x) <= EPS &&
         Math.abs(body.cy + d.dy - p.y) <= EPS &&
-        Math.abs(body.cz + d.dz - p.z) <= EPS;
+        Math.abs(body.cz + d.dz - p.z) <= EPS &&
+        Math.abs(wrapYaw(yaw - body.cyaw - dyaw)) <= EPS;
       const attached = Math.abs(feet - body.cy) <= EPS;
-      if (p && v && (still || stepped) && attached) {
-        const m = still ? {dx: 0, dy: 0, dz: 0} : d!,
-          vel = still ? {dx: 0, dy: 0, dz: 0} : v;
+      if (p && c && (still || stepped) && attached) {
+        // The actor's own displacement this tick: the carry of the point it stands on (pivot motion plus the turn
+        // about the previous pivot), re-derived from the two path samples every tick, so nothing accumulates.
+        const m = still ? {dx: 0, dy: 0, dz: 0, dyaw: 0} : c,
+          vel = still ? {dx: 0, dy: 0, dz: 0} : {dx: c.vx, dy: c.vy, dz: c.vz};
         const moved = slideBy(ctx.world, {x, z}, m.dx, m.dz),
           top = platforms!.supportOn(id, moved.x, moved.z);
         if (top !== null)
@@ -217,6 +247,7 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
             dx: moved.x - x,
             dy: m.dy,
             dz: moved.z - z,
+            dyaw: m.dyaw,
             vx: vel.dx,
             vy: vel.dy,
             vz: vel.dz,
@@ -224,11 +255,13 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
             px: p.x,
             py: p.y,
             pz: p.z,
+            pyaw: yaw,
           };
         else {
           left = {vx: vel.dx, vy: vel.dy, vz: vel.dz};
           x = moved.x;
           z = moved.z;
+          turn = m.dyaw;
         }
       }
     } else if (active && !body.supported && (body.vx || body.vz)) {
@@ -244,12 +277,14 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
       if (carrier) {
         x += carrier.dx;
         z += carrier.dz;
+        turn = carrier.dyaw;
         feet = carrier.top;
         body.cx = carrier.px;
         body.cy = carrier.py;
         body.cz = carrier.pz;
+        body.cyaw = carrier.pyaw;
       }
-      publish(ctx, tr, x, z, feet);
+      publish(ctx, tr, x, z, feet, turn);
       return;
     }
 
@@ -280,6 +315,7 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
       // Carried: end on the carrier's top unless static ground, or another platform overtaking it, is higher.
       x = rx;
       z = rz;
+      turn = ride!.dyaw;
       next = rideTop;
       top = Math.max(feet0, rideTop);
     } else {
@@ -288,6 +324,7 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
       if (riding && leave === 'add-velocity') {
         x = rx;
         z = rz;
+        turn = ride!.dyaw;
       }
       const base = onStatic ? under! : feet;
       next = base + r.dy;
@@ -321,6 +358,7 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
       body.cx = ride!.px;
       body.cy = ride!.py;
       body.cz = ride!.pz;
+      body.cyaw = ride!.pyaw;
     } else if (caught && caughtPose && caught.height >= (land ?? -Infinity)) {
       next = caught.height;
       body.carrier = caught.id;
@@ -328,27 +366,38 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
       body.cx = caughtPose.x;
       body.cy = caughtPose.y;
       body.cz = caughtPose.z;
+      body.cyaw = caughtPose.yaw ?? 0;
       if (body.feel.vy > 0) body.feel.setVelocity(0);
     } else if (land !== null) {
       next = land;
       body.supported = true;
     }
     if (body.supported || body.carrier !== null) body.vx = body.vz = 0;
-    publish(ctx, tr, x, z, next);
+    publish(ctx, tr, x, z, next, turn);
   }
-  function publish(ctx: SceneContext, tr: {x: number; y: number; z: number}, x: number, z: number, feet: number) {
-    const y = feet + offset;
-    if (x === tr.x && z === tr.z && y === tr.y) return;
+  function publish(
+    ctx: SceneContext,
+    tr: {x: number; y: number; z: number; ry: number},
+    x: number,
+    z: number,
+    feet: number,
+    turn: number,
+  ) {
+    const y = feet + offset,
+      ry = carryFacing && turn !== 0 ? tr.ry + turn : tr.ry;
+    if (x === tr.x && z === tr.z && y === tr.y && ry === tr.ry) return;
     tr.x = x;
     tr.z = z;
     tr.y = y;
+    tr.ry = ry;
     ctx.world.touch();
   }
 }
 
 /**
  * Advance `platforms` by each fixed tick and publish their poses to named entities (`bind: { platformId: 'name' }`,
- * Transform x/y/z = top-centre pose). Put it before the movers and `jumpSystem` in the same fixed lane.
+ * Transform x/y/z = top-centre pose, and ry = yaw for a turning platform). Put it before the movers and `jumpSystem`
+ * in the same fixed lane.
  */
 export function platformSystem(
   platforms: Platforms,
@@ -364,10 +413,13 @@ export function platformSystem(
         const p = platforms.pose(id),
           e = ctx.named(name),
           tr = e === undefined ? undefined : ctx.world.get(e, Transform);
-        if (!p || !tr || (tr.x === p.x && tr.y === p.y && tr.z === p.z)) continue;
+        if (!p || !tr) continue;
+        const ry = p.yaw ?? tr.ry;
+        if (tr.x === p.x && tr.y === p.y && tr.z === p.z && tr.ry === ry) continue;
         tr.x = p.x;
         tr.y = p.y;
         tr.z = p.z;
+        tr.ry = ry;
         ctx.world.touch();
       }
     },

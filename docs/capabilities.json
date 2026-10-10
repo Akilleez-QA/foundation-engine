@@ -966,7 +966,8 @@
         "jumpSystem",
         "locomotion",
         "platformSystem",
-        "resetJump"
+        "resetJump",
+        "wrapYaw"
       ]
     },
     {"name": "market", "exports": ["createMarket", "market"]},

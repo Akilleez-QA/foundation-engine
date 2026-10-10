@@ -29,6 +29,12 @@ platforms.add('ferry', { halfX: 1.5, halfZ: 1, path: t => ({ x: 3 * Math.sin(0.5
 discontinuously needs `platforms.cut(id)` before the jump. Otherwise the speed check
 refuses the step. Riders of a cut platform detach; they do not jump with it.
 
+A turning platform (a carousel, a rotating bridge) also returns `yaw` in radians, for
+example `t => ({ x: 0, y: 1, z: 0, yaw: 0.8 * t })`. Riders turn with it about its centre,
+and their facing turns too unless `jumpSystem({ carryFacing: false })`. Fast turns need
+`createPlatforms({ maxTurnRate })`. See
+[turning platforms](../../src/kits/locomotion/README.md#turning-platforms).
+
 A registry created at module level keeps its time across scene visits. Restart it when
 the scene is entered, so every visit and every `?seed=` replay starts from the same poses:
 

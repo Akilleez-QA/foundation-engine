@@ -104,21 +104,24 @@ no browser, device or template consumer yet.
 Recipe: [add moving platforms](../../../docs/recipes/add-moving-platforms.md). Status:
 integrated through batch PR #64 (PR #53; `main` `3b449fa`).
 
-`createPlatforms({ maxPlatforms?, maxSpeed? })` is a pure, bounded registry of moving
-support surfaces. Each platform is an axis-aligned footprint (`halfX`, `halfZ`). Its
-top-centre pose is a creator function of simulation time, `path(t)`.
+`createPlatforms({ maxPlatforms?, maxSpeed?, maxTurnRate? })` is a pure, bounded registry
+of moving support surfaces. Each platform is a rectangular footprint (`halfX`, `halfZ`).
+Its top-centre pose is a creator function of simulation time, `path(t)`; a path that also
+returns `yaw` turns the footprint (see [Turning platforms](#turning-platforms)).
 
 `platformSystem(platforms, { bind? })` advances the registry once per fixed tick. It can
 also write each pose to a named entity's Transform for rendering. Run it before
-`jumpSystem` in the same fixed lane. `jumpSystem({ …, platforms, onLeave?, radius? })`
-rides, leaves and catches platforms.
+`jumpSystem` in the same fixed lane. `jumpSystem({ …, platforms, onLeave?, radius?,
+carryFacing? })` rides, leaves and catches platforms.
 
 | Input | Bounds | Default |
 |---|---|---|
 | `maxPlatforms` | integer [1, 1024] | 64 |
 | `maxSpeed` | (0, 1000] m/s | 100 |
 | `halfX`, `halfZ` | (0, 1000] m | required |
-| `path(t)` | finite x, y, z within ±1e7 | required |
+| `path(t)` | finite x, y, z within ±1e7; optional `yaw` within ±1e6 rad | required |
+| `maxTurnRate` | (0, 1000] rad/s | 2π |
+| `carryFacing` | boolean | true |
 | `onLeave` | `'add-velocity'`, `'add-upward'`, `'none'` | `'add-velocity'` |
 | `radius` (carried motion vs walls) | (0, 10] m | 0.35 |
 
@@ -186,8 +189,8 @@ its current top.
 - `resetJump` clears the carrier and inherited motion.
 
 **Limitations.**
-- Footprints are axis-aligned boxes tested at the actor's centre: no rotation, slopes or
-  side pushing.
+- Footprints are rectangles (axis-aligned, or turned about the vertical axis) tested at
+  the actor's centre: no pitch or roll, slopes or side pushing.
 - Inherited velocity is the platform's mean over its last tick: exact for linear paths,
   otherwise within one tick of curvature.
 - A platform is not a `Solid`, and static ground higher than `stepHeight` does not block
@@ -215,3 +218,76 @@ its current top.
 
 Identical arcs at aligned times run at 30, 60, 120 and 240 Hz. The boost policy is
 checked at 120 Hz. There is no browser, template or device evidence.
+
+### Turning platforms
+
+A path may also return `yaw` (radians, the `Transform.ry` sense). The platform then turns
+about the vertical axis through its top-centre pose, which is the pivot. The decision is
+recorded in [ADR 0160](../../../docs/adr/0160-turning-platform-carry.md).
+
+**Inputs and outputs.**
+- A path returns yaw on every sample or on none; mixing throws. Without yaw, `pose`,
+  `delta` and `velocity` keep their unturned shape and values bit for bit.
+- With yaw, `pose` adds `yaw`, and `delta` and `velocity` add `dyaw` (rad, rad/s).
+- `carry(id, x, z)` reports how a point rigidly attached to the platform moved in the last
+  `advance`: displacement, yaw change and mean velocity. The point is turned about the
+  previous pivot by the tick's yaw change, then moved with the pivot.
+- `wrapYaw(a)` is the shortest equivalent turn, in [−π, π].
+- `platformSystem`'s `bind` also writes `Transform.ry` for a turning platform.
+
+**Riding.**
+- `jumpSystem` moves a carried actor by `carry` of its own position. That includes
+  tangential motion, still sliding against `Walls` and `Solid`s.
+- With `carryFacing` (default true), the actor's `Transform.ry` gains the same yaw
+  change. Set it false when another owner, such as a camera-relative controller, owns
+  facing.
+- The turn is applied on every tick whose carry is applied: riding, a paused ride, a
+  jump tick with `add-velocity`, and the tick that moves off the footprint.
+- Each tick's carry is computed from the two path samples and the actor's current
+  position; no platform-local position is stored. Another owner may therefore move the
+  actor across the platform, and nothing accumulates. Rounding stays below 1e-9 m over
+  10,000 ticks at 60 Hz in the tests.
+- Footprint tests (`supportOn`, `catch`, `standing`) use the oriented rectangle. An
+  unturned platform keeps the axis-aligned test unchanged.
+- A cut, a restart or any yaw change other than the reported `dyaw` detaches the rider
+  with no velocity, as for position.
+
+**Leaving.** `add-velocity` keeps the mean velocity of the carried point over the last
+tick. That is the pivot's velocity plus the tangential part, ω × r as a chord. Its speed
+is 2·r·sin(ω·dt/2)/dt, within ω·r·(ω·dt)²/24 of ω·r. The actor keeps no spin in the air;
+facing stops turning.
+
+**Bounds and overload.**
+- Each tick uses the shortest turn between samples, so a path may wrap its yaw across ±π.
+- A turn above `maxTurnRate · dt` throws, and nothing moves.
+- `advance(dt)` throws when `maxTurnRate · dt ≥ π` while a turning platform exists. A
+  half turn per tick cannot be told apart from the opposite turn. The default 2π rad/s
+  allows every accepted tick (up to 0.25 s).
+- A path that breaks its own declared rate by more than a half turn per tick can still
+  alias to a smaller turn; samples alone cannot detect that.
+- `maxSpeed` is checked at each footprint corner (pivot motion plus the corner's chord),
+  so it bounds the carry of every point on the platform. A large, slowly turning
+  platform may need a higher `maxSpeed`.
+- `cut(id)` accepts a yaw discontinuity once, with `dyaw` 0.
+- Keep `|yaw|` modest, or wrap it, for long sessions. The bound is ±1e6, and the 1e-9
+  continuity checks lose meaning near it.
+
+**Limitations.**
+- Only yaw: platforms do not pitch or roll.
+- The actor's facing grows without wrapping, as with `applyRootMotion`.
+- Turning carry is tested headless only: no browser, template or device evidence.
+
+**Evidence** (`platform-yaw.test.ts`, 10 tests):
+- unturned results are unchanged bit for bit;
+- yaw wrap;
+- oriented footprint corners for support, catch and standing;
+- turn, corner-speed, mixed-yaw and cut bounds;
+- a rider on a spinning disc keeps its radius and turns its facing, identical at 30, 60
+  and 120 Hz;
+- 10,000 ticks of a wrapped spinning disc stay within 1e-9 m;
+- combined translation and rotation;
+- a rider kept on a turned bar;
+- the tangential leave velocity and its direction;
+- cut and restart detach.
+
+The MV-02 tests run unchanged.

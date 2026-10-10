@@ -85,7 +85,9 @@ export {
 } from './jump-system';
 export {
   createPlatforms,
+  wrapYaw,
   type Platforms,
+  type PlatformCarry,
   type PlatformDef,
   type PlatformPose,
   type PlatformDelta,
