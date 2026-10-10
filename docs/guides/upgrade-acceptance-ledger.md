@@ -1222,8 +1222,11 @@ are unverified. Independent review and hosted integration remain pending.
 
 ## Look-at constraint — candidate (2026-10-09)
 
-Branch `feat/look-at-constraint` from `a6211bd3`. Five headless tests: exact aim of the
-composed two-joint chain and share split; limits with overflow to the next joint;
-front-cone, null and zero-length relaxation with smoothing and the speed cap; parent
-frame conjugation and composition onto a base pose through `blendPoseLayers`; and
-validation of configuration and inputs. No visual, browser or device evidence.
+Branch `feat/look-at-constraint` from `a6211bd3`. Nine headless tests: exact aim of the
+composed chain and share split; limits with overflow; a 500-chain random check that
+joint parts add up to the clamped aim; no yaw flip behind or straight above; exact aim
+of a three-joint hierarchy with rest-derived parent frames; front-cone, null and
+zero-length relaxation with smoothing and the speed cap; parent-frame conjugation and
+composition through `blendPoseLayers`; single-read limits and `apply` refusals; and
+validation. An independent adversarial review found lost residual turn, a yaw flip
+behind the root, double reads and loose `apply` input; all were fixed. No visual, browser or device evidence.
