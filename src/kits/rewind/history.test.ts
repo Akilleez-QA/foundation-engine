@@ -245,3 +245,57 @@ test('composition: an authoritative hit test against what the observer saw, live
   assert.equal(hit?.id, 'mover');
   assert.deepEqual(live.get('mover'), [1, 0, 0]);
 });
+
+test('a jump inside one step replaces the sample and is never blended across', () => {
+  const h = make();
+  h.record('a', 0, [0, 0]);
+  h.record('a', 1, [1, 0]);
+  assert.equal(h.record('a', 1, [100, 0], {discontinuity: true}), 'replaced');
+  assert.equal(h.record('a', 2, [101, 0]), 'recorded');
+  assert.deepEqual(at(h, 'a', 1.5).values, [100.5, 0]);
+  assert.equal(at(h, 'a', 0.5).status, 'discontinuous');
+  assert.equal(h.stats().samples, 3);
+});
+
+test('trim forgets a subject that was not recorded within the window', () => {
+  const h = make({maxRewind: 1});
+  h.record('gone', 0.1, [6, 0]);
+  for (const t of [0, 1, 2, 3]) h.record('kept', t, [t, 0]);
+  h.trim(99);
+  assert.equal(at(h, 'gone', 98.9).status, 'absent');
+  assert.equal(at(h, 'kept', 98.9).status, 'absent');
+  h.record('kept', 99, [9, 0]);
+  h.trim(99.5);
+  assert.equal(at(h, 'kept', 99.2).status, 'current');
+  assert.deepEqual(h.stats().subjects, 1);
+});
+
+test('values are read once; extreme times and windows are refused', () => {
+  const h = make();
+  let reads = 0;
+  const tricky = {
+    length: 2,
+    get 0() {
+      reads++;
+      return reads > 1 ? Number.NaN : 1;
+    },
+    1: 2,
+  };
+  assert.equal(h.record('a', 0, tricky), 'recorded');
+  assert.deepEqual(at(h, 'a', 0).values, [1, 2]);
+  h.record('b', -1e308, [0, 0]);
+  assert.throws(() => h.record('b', 1e308, [0, 0]), RangeError);
+  assert.throws(() => chooseRewindTime({now: -1e308, maxRewind: 1e308, behind: 1e308}), RangeError);
+});
+
+test('a blend that writes only some entries yields the earlier sample for the rest', () => {
+  const h = createRewindHistory({
+    limits: {width: 2, maxSubjects: 1, maxSamples: 4, maxRewind: 1},
+    blend: (from, to, t, out) => {
+      out[0] = from[0]! + (to[0]! - from[0]!) * t;
+    },
+  });
+  h.record('a', 0, [0, 111]);
+  h.record('a', 1, [10, 111]);
+  assert.deepEqual(at(h, 'a', 0.5).values, [5, 111]);
+});

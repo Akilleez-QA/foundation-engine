@@ -24,12 +24,13 @@ for (const [entity, t] of world.query(Transform, Hittable)) history.record(entit
 history.trim(simTime);
 ```
 
-Size `maxSamples` as at least `record rate * maxRewind + 2` (here 60 Hz × 0.5 s +
-2 = 32). Too small a ring is reported by `stats().evicted` and older queries then
+Size `maxSamples` as at least `ceil(record rate * maxRewind) + 3` when you record
+then trim each step (here 60 Hz × 0.5 s + 3 = 33). Too small a ring is reported by `stats().evicted` and older queries then
 answer `before-history`.
 
 Mark jumps: the first record after a teleport, respawn or correction passes
-`{discontinuity: true}`. Call `remove(entity)` when the subject stops existing.
+`{discontinuity: true}` (at the same time as the pre-jump record it replaces it).
+A subject not recorded for `maxRewind` is forgotten by `trim`. Call `remove(entity)` when the subject stops existing.
 
 ## 2. Carry the sender's view time in the command
 
@@ -56,8 +57,10 @@ const out = new Float64Array(3);
 const targets = [];
 for (const id of candidates) {
   const r = history.sample(id, when.time, out);
-  if (r.status === 'exact' || r.status === 'interpolated' || r.status === 'current')
-    targets.push({id: String(id), from: [out[0], out[1], out[2]], to: [out[0], out[1], out[2]], radius: 0.5});
+  if (r.status === 'exact' || r.status === 'interpolated' || r.status === 'current') {
+    const p: [number, number, number] = [out[0]!, out[1]!, out[2]!];
+    targets.push({id: String(id), from: p, to: p, radius: 0.5});
+  }
 }
 const hit = sweep(command.from, command.to, command.radius, targets); // @kits/combat
 ```

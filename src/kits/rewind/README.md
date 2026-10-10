@@ -48,6 +48,10 @@ const r = history.sample(targetId, when.time, out); // exact | interpolated | cu
 - **`record(subject, time, values, {discontinuity?})`** stores `width` finite
   numbers. Per subject, time must increase: an equal time is `unchanged` (the
   stored sample is kept), an older one is `out-of-order`; neither stores anything.
+  An equal time **with** `discontinuity` is `replaced`: the newest sample takes
+  the new values and is cut from its predecessor, so a jump inside one step (record
+  before, jump, record after at the same time) is never blended across. Values are
+  read once; a time whose difference from the newest sample is not finite throws.
   A new subject beyond `maxSubjects` is `saturated` and counted in `stats().refused`.
   Invalid subject, time or values throw before any change (they are host bugs).
 - **`sample(subject, time, out)`** writes into `out` only for `exact`,
@@ -65,8 +69,10 @@ const r = history.sample(targetId, when.time, out); // exact | interpolated | cu
   `maxSkew`) must be valid or it throws; the claim never throws.
 - **`trim(now)`** drops samples older than `now - maxRewind`, keeping the newest
   older sample as a bracket so a query exactly at the window edge interpolates,
-  unless a discontinuity separates that bracket from the window. It returns the
-  number dropped. `remove`, `clear`, `dispose` and `stats` complete the surface.
+  unless a discontinuity separates that bracket from the window. A subject whose
+  newest sample is older than `now - maxRewind` is forgotten entirely (it then
+  answers `absent`), so a subject that stopped being recorded without `remove`
+  cannot stay hittable at a stale position. It returns the number dropped. `remove`, `clear`, `dispose` and `stats` complete the surface.
 
 ## Bounds and overload
 
@@ -76,7 +82,9 @@ Memory is fixed by limits: per subject, `maxSamples * (width + 1)` doubles plus
 `maxSubjects * maxSamples * (width + 1)` at most 16,777,216 numbers (construction
 throws above it). A full ring overwrites its oldest sample and counts
 `stats().evicted`: if the record rate times `maxRewind` exceeds `maxSamples`,
-older queries become `before-history`. Size `maxSamples` from the record rate.
+older queries become `before-history`. With `record` then `trim` each step, size
+`maxSamples` at least `ceil(record rate * maxRewind) + 3` (the window, the edge
+bracket and the incoming sample).
 A query walks back from the newest sample: O(samples newer than the target).
 `trim` is O(subjects + dropped samples). Nothing grows with session length.
 
@@ -93,7 +101,8 @@ There is no asynchronous work to cancel. `remove` retires one subject, `clear`
 all, `dispose` the whole history (later records report `retired`). The creator's
 `blend` is trusted code run synchronously inside `sample`; calls back into the
 same history from it throw, and a non-finite blend result throws without writing
-`out`. After an exception the history's stored samples are unchanged.
+`out`. Entries a blend leaves unwritten take the earlier sample's value. After an
+exception the history's stored samples are unchanged.
 
 ## Determinism and security
 
@@ -106,8 +115,8 @@ it. That trade-off, the cap and whether to rewind at all are creator decisions.
 
 ## Evidence and limits
 
-Thirteen headless unit tests cover exact, interpolated and current answers, no
-extrapolation, ordering, discontinuities, ring eviction, trim brackets, subject
+Seventeen headless unit tests cover exact, interpolated and current answers, no
+extrapolation, ordering, discontinuities (including a jump inside one step), ring eviction, trim brackets, subject
 capacity, removal and re-addition, creator blend (including reentry and
 non-finite results), limit validation, disposal, time choice and a composition
 with `@kits/combat` `sweep` in which a live-state test misses and the rewound test

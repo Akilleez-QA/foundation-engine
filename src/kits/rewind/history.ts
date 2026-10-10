@@ -37,7 +37,7 @@ export interface RewindOptions {
   readonly blend?: RewindBlend;
 }
 
-export type RewindRecordStatus = 'recorded' | 'unchanged' | 'out-of-order' | 'saturated' | 'retired';
+export type RewindRecordStatus = 'recorded' | 'replaced' | 'unchanged' | 'out-of-order' | 'saturated' | 'retired';
 
 export type RewindSampleResult =
   | {readonly status: 'exact' | 'current'; readonly time: number}
@@ -61,7 +61,9 @@ export interface RewindHistory {
    * Appends a sample at `time`. `discontinuity: true` marks that the subject did not travel continuously from its
    * previous sample (teleport, respawn, a new life): queries never blend across it and refuse to look past it.
    * A subject's first sample has no predecessor, so looking before it reports `before-history`.
-   * Equal time is `unchanged` (the stored sample is kept); older time is `out-of-order`; both store nothing.
+   * Equal time is `unchanged` (the stored sample is kept), except with `discontinuity`: then the newest sample's values
+   * are `replaced` and it is cut from its predecessor (a jump inside one step). Older time is `out-of-order` and stores
+   * nothing. Times must differ from the newest sample by a finite amount.
    */
   record(
     subject: RewindSubject,
@@ -74,7 +76,10 @@ export interface RewindHistory {
    * (time at or after the newest sample: the newest sample, never extrapolated) and `interpolated`.
    */
   sample(subject: RewindSubject, time: number, out: Float64Array): RewindSampleResult;
-  /** Drops samples older than `now - maxRewind`, keeping one bracketing sample. Returns how many were dropped. */
+  /**
+   * Drops samples older than `now - maxRewind`, keeping one bracketing sample, and forgets subjects whose newest sample
+   * is older than that (they were not recorded within the window). Returns how many samples were dropped.
+   */
   trim(now: number): number;
   /** Forgets one subject (it no longer exists). */
   remove(subject: RewindSubject): boolean;
@@ -146,6 +151,7 @@ export function createRewindHistory(options: RewindOptions): RewindHistory {
   const from = new Float64Array(width);
   const to = new Float64Array(width);
   const mixed = new Float64Array(width);
+  const incoming = new Float64Array(width);
   let samples = 0;
   let evicted = 0;
   let trimmed = 0;
@@ -173,16 +179,29 @@ export function createRewindHistory(options: RewindOptions): RewindHistory {
     checkSubject(subject);
     checkTime(time, 'time');
     if (!values || values.length !== width) throw new TypeError(`rewind: values must have length ${width}`);
-    for (let i = 0; i < width; i++)
-      if (typeof values[i] !== 'number' || !Number.isFinite(get(values, i)))
-        throw new TypeError('rewind: values must be finite numbers');
-    if (disposed) return 'retired';
+    // Read each value exactly once into scratch, then validate the copy.
+    for (let i = 0; i < width; i++) {
+      const v: unknown = values[i];
+      if (typeof v !== 'number' || !Number.isFinite(v)) throw new TypeError('rewind: values must be finite numbers');
+      incoming[i] = v;
+    }
+    const discontinuity = opts?.discontinuity === true;
     let track = tracks.get(subject);
     if (track && track.count > 0) {
       const newest = get(track.times, slot(track, track.count - 1));
-      if (time === newest) return 'unchanged';
+      if (!Number.isFinite(time - newest)) throw new RangeError('rewind: time is too far from the newest sample');
+      if (disposed) return 'retired';
+      if (time === newest) {
+        if (!discontinuity) return 'unchanged';
+        // A jump inside one step: the post-jump state replaces the sample and is cut from its predecessor.
+        const s = slot(track, track.count - 1);
+        track.breaks[s] = 1;
+        for (let i = 0; i < width; i++) track.values[s * width + i] = get(incoming, i);
+        return 'replaced';
+      }
       if (time < newest) return 'out-of-order';
     }
+    if (disposed) return 'retired';
     if (!track) {
       if (tracks.size >= maxSubjects) {
         refused++;
@@ -205,8 +224,8 @@ export function createRewindHistory(options: RewindOptions): RewindHistory {
     }
     const s = slot(track, track.count);
     track.times[s] = time;
-    track.breaks[s] = track.count === 0 || opts?.discontinuity === true ? 1 : 0;
-    for (let i = 0; i < width; i++) track.values[s * width + i] = get(values, i);
+    track.breaks[s] = track.count === 0 || discontinuity ? 1 : 0;
+    for (let i = 0; i < width; i++) track.values[s * width + i] = get(incoming, i);
     track.count++;
     samples++;
     return 'recorded';
@@ -244,6 +263,7 @@ export function createRewindHistory(options: RewindOptions): RewindHistory {
         for (let i = 0; i < width; i++) {
           from[i] = get(track.values, s * width + i);
           to[i] = get(track.values, upper * width + i);
+          mixed[i] = from[i]!; // a blend that leaves an entry unwritten yields the earlier sample, not stale scratch
         }
         busy = true;
         try {
@@ -267,7 +287,13 @@ export function createRewindHistory(options: RewindOptions): RewindHistory {
     if (disposed) return 0;
     const cutoff = now - maxRewind;
     let dropped = 0;
-    for (const track of tracks.values()) {
+    for (const [subject, track] of tracks) {
+      // A subject not recorded within the window has no history worth answering from: forget it.
+      if (track.count > 0 && get(track.times, slot(track, track.count - 1)) < cutoff) {
+        dropped += track.count;
+        tracks.delete(subject);
+        continue;
+      }
       // Keep the newest sample older than the cutoff: it brackets queries at the cutoff itself.
       while (track.count >= 2 && get(track.times, slot(track, 1)) <= cutoff) {
         track.start = (track.start + 1) % maxSamples;
@@ -358,6 +384,8 @@ export function chooseRewindTime(request: RewindTimeRequest): RewindTime {
     throw new RangeError('rewind: maxSkew must be a nonnegative finite number');
   if (maxSkew !== undefined && behind === undefined) throw new RangeError('rewind: maxSkew requires behind');
   const estimate = behind === undefined ? undefined : now - behind;
+  if (!Number.isFinite(now - maxRewind) || (estimate !== undefined && !Number.isFinite(estimate)))
+    throw new RangeError('rewind: now, maxRewind and behind must keep the window finite');
   let time: number;
   let basis: RewindTime['basis'];
   if (typeof claimed === 'number' && Number.isFinite(claimed)) {
