@@ -149,8 +149,8 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
   if (maxRecipients * maxInFlight * Math.min(maxItems, maxRelevant) > 1 << 24)
     throw new RangeError('replication: maxRecipients * maxInFlight * items exceeds 2^24');
   const epochBase = options.epochBase ?? 0;
-  if (!Number.isSafeInteger(epochBase) || epochBase < 0)
-    throw new RangeError('replication: epochBase must be a nonnegative safe integer');
+  if (!Number.isSafeInteger(epochBase) || epochBase < 0 || epochBase > Number.MAX_SAFE_INTEGER - 2 ** 32)
+    throw new RangeError('replication: epochBase must be an integer 0..2^53 - 2^33');
   const frozenLimits = Object.freeze({maxEntities, maxRecipients, maxRelevant, maxInFlight, maxItems});
   const width = schema.count;
   const all = (1 << width) - 1;
@@ -230,6 +230,8 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
       if (disposed) return 'retired';
       if (recipients.has(recipient)) return 'duplicate';
       if (recipients.size >= maxRecipients) return 'saturated';
+      // Epochs and sequences must stay exact; far beyond any practical session count, refuse instead of wrapping.
+      if (epochs >= Number.MAX_SAFE_INTEGER - 1 || nextSequence >= Number.MAX_SAFE_INTEGER - 1) return 'saturated';
       recipients.set(recipient, {
         entries: new Map(),
         flights: new Map(),
@@ -328,6 +330,7 @@ export function createReplicationSchedule(options: ReplicationOptions): Replicat
         }
         candidates = collect(false);
       }
+      if (nextSequence >= Number.MAX_SAFE_INTEGER) return empty('retired');
       const seq = nextSequence;
       // One queue: accumulated priority, then removals before creations before updates, then id. Deterministic, and
       // every kind gains priority while waiting, so sustained churn of one kind cannot starve another.

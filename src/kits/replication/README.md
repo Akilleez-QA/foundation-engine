@@ -64,7 +64,7 @@ replica.read(id, out);
   packet. Each recipient has an `epoch` that is new every time its id is added
   (above the optional `epochBase`; a schedule recreated for the same clients, such
   as after a host restart, must pass a base above every earlier epoch or clients
-  must discard their replicas); the first packet of an epoch is sent even if empty (and
+  must discard their replicas; `epochBase` is at most 2^53 - 2^33); the first packet of an epoch is sent even if empty (and
   resent if lost), so a client that reuses its replica discards the previous
   session's state. `held` means only minimum intervals kept items back. `now` is the creator's time (any unit),
   non-decreasing per recipient.
@@ -141,7 +141,7 @@ malformed packets; and a composition in which `@kits/spatial` interest sets driv
 two moving recipients over a link that drops 20 % of packets, duplicates 5 % and
 reorders them. After a lossless settling period both replicas equal the
 authority's quantized state for exactly their relevant sets. Over that run the
-replication packets totalled 48,306 characters against 547,046 for complete views
+replication packets totalled 52,771 characters against 557,712 for complete views
 of the same relevant sets. A randomized convergence test (40 seeds x 1,500
 operations: set, delete, relevance changes, builds at random budgets, duplicated,
 reordered and late delivery after declared loss, lost acknowledgments, in-flight
@@ -156,5 +156,5 @@ a huge sequence would freeze an id.
 
 Not established: transport, acknowledgment protocol and loss timing (creator
 choices), binary encoding (packets are JSON with integer fields), bandwidth
-estimation, client presentation (an optional playout kit is proposed separately),
+estimation, client presentation (an optional playout kit is proposed in PR #245),
 browser, WAN or device behaviour.
