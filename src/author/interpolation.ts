@@ -32,12 +32,14 @@ export interface TransformPose {
  *   its Transform.
  * - `teleport`: a distance; a step that moves the entity farther than this is drawn without blending. 0 (default)
  *   disables the check.
- * The `previous*` and `captured` fields are written by the runtime before each fixed step; do not set them.
+ * The `previous*`, `captured` and `capturedRevision` fields are written by the runtime before each fixed step; do
+ * not set them, and spawn with `Interpolated({revision, teleport})` rather than copying another entity's value.
  */
 export const Interpolated = component('interpolated', {
   revision: 0,
   teleport: 0,
-  captured: -1,
+  captured: false,
+  capturedRevision: 0,
   previousX: 0,
   previousY: 0,
   previousZ: 0,
@@ -63,7 +65,7 @@ export function captureInterpolation(world: World): void {
       Number.isFinite(tr.rz) &&
       Number.isFinite(tr.scale);
     if (!finite || !Number.isSafeInteger(it.revision)) {
-      it.captured = -1;
+      it.captured = false;
       continue;
     }
     it.previousX = tr.x;
@@ -73,8 +75,8 @@ export function captureInterpolation(world: World): void {
     it.previousRy = tr.ry;
     it.previousRz = tr.rz;
     it.previousScale = tr.scale;
-    // Never -1 for a valid capture, so a revision of -1 cannot be mistaken for "captured".
-    it.captured = it.revision === -1 ? -2 : it.revision;
+    it.capturedRevision = it.revision;
+    it.captured = true;
   }
 }
 
@@ -96,8 +98,7 @@ function angle(from: number, to: number, alpha: number): number {
  * approximation for combined rotations.
  */
 export function presentTransform(tr: TransformPose, it: InterpolatedData | undefined, alpha: number): TransformPose {
-  if (!it || it.captured === -1) return tr;
-  if ((it.revision === -1 ? -2 : it.revision) !== it.captured) return tr;
+  if (!it || it.captured !== true || it.revision !== it.capturedRevision) return tr;
   if (!(alpha >= 0 && alpha <= 1)) return tr;
   const dx = tr.x - it.previousX,
     dy = tr.y - it.previousY,
@@ -113,7 +114,15 @@ export function presentTransform(tr: TransformPose, it: InterpolatedData | undef
     rz: angle(it.previousRz, tr.rz, alpha),
     scale: it.previousScale + (tr.scale - it.previousScale) * alpha,
   };
-  return Object.values(pose).every(Number.isFinite) ? pose : tr;
+  return Number.isFinite(pose.x) &&
+    Number.isFinite(pose.y) &&
+    Number.isFinite(pose.z) &&
+    Number.isFinite(pose.rx) &&
+    Number.isFinite(pose.ry) &&
+    Number.isFinite(pose.rz) &&
+    Number.isFinite(pose.scale)
+    ? pose
+    : tr;
 }
 
 /** Convenience for systems and kits: the drawn pose of `entity`, or undefined when it has no Transform. */

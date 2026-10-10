@@ -1230,5 +1230,11 @@ are unverified. Independent review and hosted integration remain pending.
   uniform per-frame motion at 144 Hz against whole-step jumps without opt-in, a lag under one step,
   revision snapping, the ±π seam and the camera following the drawn pose. Entities that do not opt in
   are unchanged.
-- **Not established:** browser runtime drawing (the runtime paths were changed without a browser run),
-  physical high-refresh displays, template adoption and hosted CI.
+- **Browser smoke (local, not committed):** the arcade template's ball and blocks were temporarily opted in
+  and run through `play:snap`. It reported no page errors, rendered while moving, and stayed within the
+  budget (5 draws, 761 triangles). Headless Chromium runs at 60 Hz, so `alpha` stays near 0. This shows
+  the runtime paths run; it does not show smoothness.
+- **Review:** the independent review found one major issue (point and spot lights were drawn at the latest
+  step) and several minor ones: the alpha contract in fixed systems, camera snapping guidance, negative
+  revision aliasing, and the dev teleport tool. All are fixed or documented.
+- **Not established:** physical high-refresh displays, template adoption and hosted CI.

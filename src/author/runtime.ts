@@ -1027,7 +1027,7 @@ export async function enterScene(o: {
             }
         if (lightRig) {
           lightSlots.sync(world);
-          if (lightRig.apply(world, lightSlots)) dirty = true;
+          if (lightRig.apply(world, lightSlots, present)) dirty = true;
         } else if (world.version !== lastVersion && (world.first(PointLight) || world.first(SpotLight)))
           lightSlots.sync(world);
         if (world.version !== lastVersion) {
@@ -1115,6 +1115,9 @@ export async function enterScene(o: {
           if (!tr) return false;
           tr.x = x;
           tr.z = z;
+          // A placement, not a move: draw it there at once rather than sliding (render interpolation).
+          const interpolated = world.get(e!, Interpolated);
+          if (interpolated) interpolated.revision++;
           world.touch();
           actx.invalidate();
           return true;
@@ -1284,7 +1287,7 @@ export async function enterScene(o: {
             pressed.endFrame();
             gestures.pointer.pressed = false;
             sync(f.dt);
-            // Drawn at the latest fixed step, like Shape meshes (sync above), so particles never trail their emitter.
+            // Drawn at the latest fixed step, like Shape meshes (sync above), so particles never trail a non-interpolated emitter (an `Interpolated` emitter is drawn up to one step behind them).
             // Written only in a frame where a fixed step ran (60 Hz: on a 120/144 Hz display other frames redraw nothing
             // for particles) and while particles are (or were just) live.
             if (steps > 0 && particles?.interpolate(1)) dirty = true;

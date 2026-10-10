@@ -12,7 +12,7 @@ test('presentTransform blends the captured and current pose and returns the Tran
   assert.equal(presentTransform(tr, undefined, 0.5), tr, 'no Interpolated: unchanged object');
   const it = Interpolated().value;
   assert.equal(presentTransform(tr, it, 0.5), tr, 'nothing captured yet');
-  Object.assign(it, {captured: 0, previousX: 6, previousRy: 0.1, previousScale: 1});
+  Object.assign(it, {captured: true, capturedRevision: 0, previousX: 6, previousRy: 0.1, previousScale: 1});
   const mid = presentTransform(tr, it, 0.25);
   assert.equal(mid.x, 7);
   assert.ok(Math.abs(mid.ry - 0.2) < 1e-12);
@@ -25,7 +25,7 @@ test('presentTransform blends the captured and current pose and returns the Tran
 });
 
 test('rotations blend along the shorter arc, including across the ±π seam', () => {
-  const it = {...Interpolated().value, captured: 0, previousRy: 3.0};
+  const it = {...Interpolated().value, captured: true, capturedRevision: 0, previousRy: 3.0};
   const blended = presentTransform(pose(0, -3.0), it, 0.5).ry;
   // The shorter way from 3.0 to -3.0 passes through π (distance 2π - 6 ≈ 0.283), not through 0.
   assert.ok(Math.abs(blended - (3.0 + (2 * Math.PI - 6) / 2)) < 1e-12, String(blended));
@@ -97,4 +97,14 @@ test('a revision change snaps a placed entity instead of sliding it across the s
   runner.frame({}, 1 / 60);
   const after = presentedTransform(world, e, runner.alpha)!.x;
   assert.ok(after >= 100 && after <= 101, String(after));
+});
+
+test('negative revisions snap like any other change', () => {
+  const world = new World();
+  const e = world.spawn(Transform(), Interpolated({revision: -2}));
+  captureInterpolation(world);
+  const tr = world.get(e, Transform)!;
+  tr.x = 100;
+  world.get(e, Interpolated)!.revision = -1;
+  assert.equal(presentedTransform(world, e, 0.5)!.x, 100);
 });

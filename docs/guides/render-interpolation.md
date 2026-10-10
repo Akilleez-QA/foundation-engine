@@ -23,7 +23,8 @@ entities: [[Name({ name: 'player' }), Transform(), Shape({ kind: 'capsule' }), I
   - The built-in drawing (`Shape`, `Mesh`, `Model`) draws opted-in entities at
     `presentTransform(transform, interpolated, alpha)`.
   - `cameraSystem` follows an opted-in target at that same drawn pose, so the camera and the
-    character it follows move together.
+    entity it follows move together.
+  - Point and spot lights held by an opted-in entity are placed at the drawn pose.
 - **For creator frame systems:** `presentedTransform(world, entity, ctx.time.alpha)` returns the same pose.
 - **Simulation state is unchanged.** `Transform` is never written by interpolation. Fixed systems,
   collision, saves, replay digests and networking keep reading the simulation's own values.
@@ -53,12 +54,29 @@ captures the same way.
   - At a whole 60 Hz frame rate `alpha` stays 0, so motion is smooth but one step behind.
 - **Cost:**
   - Per fixed step: one 7-number copy per opted-in entity.
-  - Per drawn frame: one blend per drawn opted-in entity.
+  - Per sync (update and render each sync once) and per camera read: one blend and one small pose
+    object per opted-in entity.
+  - Every drawn entity pays one extra component lookup per sync.
   - On high-refresh displays an opted-in moving entity changes every frame, so those frames redraw.
     That redraw is the point of the feature.
-  - Entities without `Interpolated` pay nothing and behave exactly as before.
+  - Entities without `Interpolated` are drawn exactly as before (same values, no allocation).
 
 ## Limits
+
+- **`ctx.time.alpha` in fixed systems:** it is meaningful only in frame systems and drawing. During
+  fixed steps it can exceed 1, so do not read it there.
+- **Camera snapping:** `cameraSystem` compares consecutive drawn targets, and a blended jump arrives
+  over several frames. Set `Interpolated.teleport` no higher than the camera's `teleportDistance`, and
+  on a cut bump `Interpolated.revision` together with the camera's `resetRevision`.
+- **Sockets:** `ctx.modelSocket` reports the drawn root's sockets, which depend on `alpha`. Do not use
+  them as simulation input.
+- **Platforms:** a rider and the platform it stands on should both opt in, or one is drawn sliding
+  against the other.
+- **Spawning:** create the component with `Interpolated({ revision, teleport })`. Never copy another
+  entity's value, because its captured fields would carry over.
+- **Tools:** the dev `teleport` tool bumps `revision`. Your own placement code should do the same.
+- **Pictures:** where an opted-in entity is drawn depends on frame timing, so screenshots of such a
+  scene can differ by up to one step between runs.
 
 - **Particles:** emitters are still drawn at the latest step.
 - **Model attachments and pose links:** they follow their parent model's drawn root.
