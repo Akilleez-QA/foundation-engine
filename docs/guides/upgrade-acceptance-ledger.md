@@ -1537,3 +1537,15 @@ Evidence: focused headless tests compare OBJ, PLY and BVH results with three.js'
 `npm run dupes` (`tools/dupes/`) is an independently implemented read-only scan: exact duplicates with git blob ids, GLBs with identical mesh data (values, any layout), similar PNGs (128-bit difference hash) and similar text (MinHash with banding), over a game's `public/` folder, any paths, or across two trees. Unreadable or uncomparable content is skipped with a reason. [README](../../tools/dupes/README.md), [ADR 0134](../adr/0134-duplicate-detector.md).
 
 Evidence: focused headless tests (blob ids equal `git hash-object`; geometry, image and text matches and non-matches; the PNG decoder against a real renderer; a decompression bomb refused; large families and look-alike images grouped within bounds; CLI statuses). An independent adversarial review found thirteen defects, each fixed with a regression test. A local run over the templates found seven exact groups (including textures shared by two templates) and eight similar-image groups. Not part of `npm run check`; hosted full CI pending.
+
+## Camera director rigs — candidate (2026-10-09)
+
+Branch `feat/camera-director-rigs` from the camera director head `8749f5bb`. Four
+headless tests: look-ahead lead, catch-up on stop and on reversal; area hold, pan
+timing from the on-screen pose and keeping the last area outside every area; eased
+bounds with fast rate, snap, clamping and edges that never cross; and the rigs
+composed as a director setting in a scene. An independent adversarial review found
+the look-ahead's world speed was twice the documented bound; that is fixed with a
+world-space chase and a test of the world focus speed. It also found sparse area lists,
+non-object options, dead crossing code and naming drift, all fixed. No browser,
+visual or device evidence.
