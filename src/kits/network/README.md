@@ -426,6 +426,21 @@ instantiate them. There is no default database, simulation or transport ownershi
   explicit settlement/recovery and current authorization.
 - [Prediction](../../../docs/guides/prediction.md): captured wire-equivalent inputs,
   bounded pure reducer replay, coherent baselines and explicit control lifetime.
+- [Prediction presentation](../../../docs/guides/prediction-presentation.md) (ADR 0142):
+  optional `createPredictionSmoothing` and `createPredictedEvents`. They compose with
+  `createPrediction` by comparing `read()` snapshots around each push or reconcile, and
+  never change its state or defaults. Smoothing keeps a fixed-width offset (width at
+  most 64) over a creator projection. The offset decays by half-life or linearly, capped
+  per component per millisecond, with elapsed time clamped per call and supplied by the
+  caller. A correction beyond the snap distance clears it and raises a one-shot
+  discontinuity flag. Event deduplication keeps a bounded identity table (creator key
+  plus tick, at most 65,536 entries). It emits each identity once across
+  re-simulations and confirmations, cancels mispredictions once at replay end or
+  settlement, and expires entries at settlement. Under overload it drops or forgets
+  (reported in `read()`) rather than emitting twice. Reentrant callbacks return `busy`;
+  `dispose` retires either helper. Neither owns a clock, loop, effect or transport.
+  Evidence is headless only: seeded randomized tests over the real reconciliation path,
+  not device, browser or multiplayer acceptance.
 - [SQLite tooling adapter](../../../tools/authority-workbench/README.md): optional
   server-side example, outside browser builds, with its own Node requirement.
 

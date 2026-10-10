@@ -1536,3 +1536,79 @@ the one new runtime dependency, approved for this kit only. Core stays physics-f
   one software-GL `play:snap` of an uncommitted fixture.
 - **Not established:** hosted CI, cross-browser bit identity, GPU/physical-device
   performance and memory, and multiplayer acceptance.
+
+## Legacy format decoders candidate — ASSET-LEGACY, 2026-10-09
+
+Seven kinds added to `npm run convert` (stacked on the ASSET-CONVERT candidate): `archive`, `frames`, `planar`, `tim`, `vag`, `director`, `cinepak`. Independent implementations from documented format facts; PNG/WAV output with `.meta.json` sidecars and provenance receipts; decompressors bounded by declared sizes. [README](../../tools/convert/README.md#legacy-formats), [ADR 0136](../adr/0136-legacy-format-decoders.md).
+
+Evidence: headless tests with fixtures built by test-side encoders (exact value checks for every kind), mutation fuzzing of every fixture and bomb tests; with ffmpeg installed, Cinepak frames match an independent decoder within one colour level and the truncated ADPCM prediction matches sample for sample. An independent adversarial review found two resource amplifications and several smaller deviations, each fixed with a regression test. No real game data was used or committed; hosted full CI pending.
+
+## Perception kit — candidate (2026-10-09)
+
+Optional `@kits/perception`: sight/hearing strengths over creator queries, awareness
+with alert levels and blackboard facts, squad knowledge, cover selection and utility
+scoring. See [the guide](perception.md) and [ADR 0113](../adr/0113-perception-kit.md).
+
+## Navigation meshes, funnel and avoidance — candidate (2026-10-09)
+
+Navigation kit extension: convex-polygon navigation meshes with a locator, polygon graphs
+for the existing incremental search, funnel string-pulling with clearance, surface
+movement and reciprocal-velocity avoidance. See [ADR 0114](../adr/0114-navmesh-funnel-avoidance.md).
+Headless tests in the ledger; independent review and hosted CI remain required.
+
+## 2026-10-08 — Optional cellular WASM candidate (GEN-03)
+
+Candidate branch: `feat/cellular-wasm`, based on `e7e42706`. Adds an explicit
+`prepareCellularGridWasm` choice; JavaScript remains the default. The original
+Rust kernel performs smoothing only, reusing seeded generation, WorkerHost,
+validation and resource publication. Each active job owns fixed linear memory;
+compiled modules alone are shared. A bounded fixed scratch charge is captured
+by the generic generator adapter.
+
+Focused checks cover exact JavaScript parity, ABI bounds, concurrency, cancellation
+and recovery. The isolated desktop Chromium check exercised two actual module
+workers, 40,960 compared cells, JS fallback, supersession, owner loss, refusal and
+zero terminal reservations. A full hosted candidate gate and physical-device
+timing/thermal acceptance are not established by those checks. This is candidate
+implementation evidence, not a claim of integration or deployment.
+
+Contract, reproduction and verification:
+[cellular WASM](cellular-wasm.md), [ADR 0101](../adr/0101-optional-cellular-wasm.md).
+
+## Traversal helpers — candidate (2026-10-09)
+
+Locomotion kit extension: ledge detection, ladders and pushable blocks over creator
+cast, ground and box-sweep queries. The volume-query kit's sphere sweep can back the
+cast and ground queries through a documented adapter, which a test exercises; it has no
+box body, so the box sweep needs the creator's own collision. See
+[ADR 0115](../adr/0115-traversal-helpers.md). Headless tests in the ledger; independent
+review rounds with all findings fixed; hosted CI remains required.
+
+## Optional strict numeric modes candidate — NUM-01, 2026-10-09
+
+`@kits/numeric` is an independently implemented pure kit: fixed-point words (2–32 bits in a number, up to 128 bits in a bigint) with creator-chosen rounding and overflow, binary-angle sin/cos/atan2 tables built from `dmath`, and strict reduced-precision float (`f32` = `Math.fround`; `pc24` = 24-bit significands with the double exponent range). It composes with `dmath`, `@kits/rollback` and `@kits/replay` and installs no clock, persistence owner or registration. [Kit README](../../src/kits/numeric/README.md), [ADR 0099](../adr/0099-strict-numeric-modes.md).
+
+Evidence: 16 focused headless tests (exhaustive Q4.4 and seeded 32/48/64/128-bit comparisons with an independent BigInt oracle under every rounding/overflow pair; exact ties-to-even oracle for 2–25-bit significands including subnormal-range results; trig error bounds; 704 committed golden vectors; a fixed-point simulation through the rollback sync test and replay digests). An independent adversarial review found five defects (a fracBits-0 wrap rounding error in mulAdd/lerp, pc24 products below 2^-1021, and three edge cases), each fixed with a regression test. The golden vectors and three lockstep workload digests were identical in Chromium 141 and Node 26.8.1 through the extended `npm run test:dmath-browser` (local run). This is a branch candidate: hosted full CI, other browsers, a playable template consumer and physical-device acceptance remain pending.
+
+## Cell and portal culling — candidate (2026-10-09)
+
+Optional `@kits/cells`: creator cells (boxes) and portals (planar convex polygons with
+open state), a bounded flood from the camera's cells narrowing a screen rectangle per
+portal with conservative eye-plane handling, a depth-bounded PVS bit table, and a
+culler that writes visibility only for targets that flip, through engine components
+or three.js objects. See [ADR 0145](../adr/0145-cell-portal-culling.md). Headless tests
+in the ledger; independent review and hosted CI remain required. Hardware occlusion
+queries are out of scope.
+
+## Optional prediction presentation — candidate (2026-10-09)
+
+[Prediction presentation](prediction-presentation.md) adds two optional helpers to
+`@kits/network`: `createPredictionSmoothing` (a bounded, decaying presentation offset
+with a snap threshold and a one-shot discontinuity flag) and `createPredictedEvents`
+(an exactly-once emit and cancel ledger keyed by creator event key and tick). They
+compose with `createPrediction` through `read()` snapshots and leave its defaults
+unchanged. Evidence is headless: 23 unit tests on the real reconciliation path,
+including seeded randomized bound and exactly-once runs. These are implemented and
+checked on branch `feat/prediction-presentation`, not integrated. Independent review,
+hosted CI, device or browser review of smoothing and multiplayer acceptance remain
+outstanding. See ADR 0142.

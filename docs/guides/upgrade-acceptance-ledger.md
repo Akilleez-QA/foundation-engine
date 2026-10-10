@@ -1223,6 +1223,12 @@ retain compatibility fallback and remain an explicit accounting gap. See
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
 
+## Contact kit — candidate (2026-10-09)
+
+- **Scope:** `src/kits/contact` (ADR 0100).
+- **Evidence:** `contact.test.ts` covers the lifecycle, sensing, exact shapes, exits, bounded admission, ordering, snapshots and a pickup consumer that removes bodies during dispatch.
+- **Not established:** template or browser consumers and hosted CI.
+
 ## Optional bounded work roster candidate
 
 The [work roster](../../src/kits/work-roster/README.md) supplies finite admission, fair
@@ -1470,6 +1476,16 @@ docs, mutable returned poses and rare ulp redraws; all were fixed and the re-rev
 clean. No browser,
 visual or device evidence.
 
+## Audio extras — candidate (2026-10-09)
+
+- **Scope:**
+  - `ctx.view.listener` (author view and runtime listener sync);
+  - `CueVoice.setRate` (platform output);
+  - in `@kits/audio-mixer`: `blendListener`, `dopplerRate`, `createRetrigger`, `createInstanceLimits`,
+    `createMusicClock` and `createMusicDirector` (ADR 0153).
+- **Evidence:** `src/kits/audio-mixer/extras.test.ts` and the `setRate` test in `src/platform/audio/spatial.test.ts`.
+- **Not established:** a browser listening test of the listener override and rate ramps, device evidence, and hosted CI.
+
 ## Data-defined formulas (FORMULA-01) — candidate, 2026-10-09
 
 Optional `formulas` kit ([contract](../../src/kits/formulas/README.md), [ADR 0124](../adr/0124-data-defined-formulas.md)): validated JSON/text expressions, ordered sheets, stacking stages and a damage model; deterministic arithmetic and caller-supplied randomness. Evidence: eleven focused headless tests (parsing, refusal, ordering, seeded/restored streams, stacking, damage pipeline, 2,000-case named-preset transcription check, review-hardening cases); one independent adversarial review with its findings addressed. Candidate only; no game integration, browser, full CI or device acceptance claimed.
@@ -1538,6 +1554,12 @@ Evidence: focused headless tests compare OBJ, PLY and BVH results with three.js'
 
 Evidence: focused headless tests (blob ids equal `git hash-object`; geometry, image and text matches and non-matches; the PNG decoder against a real renderer; a decompression bomb refused; large families and look-alike images grouped within bounds; CLI statuses). An independent adversarial review found thirteen defects, each fixed with a regression test. A local run over the templates found seven exact groups (including textures shared by two templates) and eight similar-image groups. Not part of `npm run check`; hosted full CI pending.
 
+## Companion recovery — candidate (2026-10-10)
+
+- **Scope:** `createCompanionRecovery` in `src/kits/breadcrumbs/recovery.ts` (ADR 0155).
+- **Evidence:** `recovery.test.ts` (6 tests, including a `testScene` pit recovery).
+- **Not established:** template or browser consumers and hosted CI.
+
 ## Camera director rigs — candidate (2026-10-09)
 
 Branch `feat/camera-director-rigs` from the camera director head `8749f5bb`. Four
@@ -1600,3 +1622,166 @@ the one new runtime dependency, approved for this kit only. Core stays physics-f
   one software-GL `play:snap` of an uncommitted fixture.
 - **Not established:** hosted CI, cross-browser bit identity, GPU/physical-device
   performance and memory, and multiplayer acceptance.
+
+## Legacy format decoders candidate — ASSET-LEGACY, 2026-10-09
+
+Seven kinds added to `npm run convert` (stacked on the ASSET-CONVERT candidate): `archive`, `frames`, `planar`, `tim`, `vag`, `director`, `cinepak`. Independent implementations from documented format facts; PNG/WAV output with `.meta.json` sidecars and provenance receipts; decompressors bounded by declared sizes. [README](../../tools/convert/README.md#legacy-formats), [ADR 0136](../adr/0136-legacy-format-decoders.md).
+
+Evidence: headless tests with fixtures built by test-side encoders (exact value checks for every kind), mutation fuzzing of every fixture and bomb tests; with ffmpeg installed, Cinepak frames match an independent decoder within one colour level and the truncated ADPCM prediction matches sample for sample. An independent adversarial review found two resource amplifications and several smaller deviations, each fixed with a regression test. No real game data was used or committed; hosted full CI pending.
+
+## Perception kit — candidate (2026-10-09)
+
+Branch `feat/perception-kit` from `a6211bd3`. Nine headless tests: sight range, cone,
+peripheral falloff, near radius and occlusion queried only when needed; hearing
+falloff, path distance, unreachable and attenuation; awareness growth, impulses, decay,
+hysteretic levels and blackboard facts; forgetting and full-memory replacement; squad
+sharing, older-report refusal, fading inform and expiry; cover band, reservations and
+bounded checks; utility compensation, momentum and refusal of invalid considerations;
+and the review fixes (no rumour loop through re-sharing, report gain independent of the
+update rate, atomic updates, sight priority for last-known positions, forgetting with
+no decay). An independent adversarial review found those squad and awareness defects
+and several smaller issues; all were fixed. Its re-review found a gap-credit effect,
+relayed report data shared as direct perception, report positions overriding direct
+ones and uncounted evictions; these are fixed (a `maxStep` credit cap, direct-only
+position and strength for sharing, report positions only when newer than direct perception,
+eviction counting) and covered by a ninth test.
+No game, browser or device evidence.
+
+## Medium volumes kit — candidate (2026-10-09)
+
+- **Scope:** `src/kits/media` (ADR 0152).
+- **Evidence:** `media.test.ts` covers probe selection and seams, hysteresis, the under state, event order, the
+  accelerations, snapshots and a `testScene` floating-body consumer.
+- **Not established:** template or browser consumers and hosted CI.
+
+## Navigation meshes, funnel and avoidance — candidate (2026-10-09)
+
+Branch `feat/navmesh-funnel-avoidance` from `9345d07b`. Nine headless tests: point
+location with height; a funnel tight around an inner corner, radius clearance,
+too-narrow and broken corridors; a straight strip with no extra corners; moving
+across edges, stopping and sliding; sloped heights; mesh validation; two agents
+passing head-on without overlap; and eight agents swapping across a circle while
+keeping apart and arriving; plus review fixes. An independent adversarial review
+(external fuzz of about 5,600 meshes against a brute-force shortest path, not checked
+in) found the funnel optimal, but found a polygon limit beyond the graph's node budget,
+a neighbour hash that missed large agents, reversed winding wording, duplicate
+corners, silent truncation and unchecked preconditions; all were fixed. A re-review
+(the same fuzz plus 1.6M chained boundary moves) was clean apart from low items, now
+fixed: a point a rounding error below the mesh minimum was unlocatable, the corridor
+limit message was stale, and the inside tolerance was not uniform on tiny polygons.
+No game, browser or device evidence.
+
+## 2026-10-08 — Optional cellular WASM candidate (GEN-03)
+
+Candidate branch: `feat/cellular-wasm`, based on `e7e42706`. Adds an explicit
+`prepareCellularGridWasm` choice; JavaScript remains the default. The original
+Rust kernel performs smoothing only, reusing seeded generation, WorkerHost,
+validation and resource publication. Each active job owns fixed linear memory;
+compiled modules alone are shared. A bounded fixed scratch charge is captured
+by the generic generator adapter.
+
+Focused checks cover exact JavaScript parity, ABI bounds, concurrency, cancellation
+and recovery. The isolated desktop Chromium check exercised two actual module
+workers, 40,960 compared cells, JS fallback, supersession, owner loss, refusal and
+zero terminal reservations. A full hosted candidate gate and physical-device
+timing/thermal acceptance are not established by those checks. This is candidate
+implementation evidence, not a claim of integration or deployment.
+
+Contract, reproduction and verification:
+[cellular WASM](cellular-wasm.md), [ADR 0101](../adr/0101-optional-cellular-wasm.md).
+
+## Traversal helpers — candidate (2026-10-09)
+
+Branch `feat/traversal-helpers` from `9345d07b`. Seven headless tests over a sampled
+box world and the real volume-query kit:
+- ledges:
+  - a ledge found with climb height, edge, top and wall normal; plus no-wall, too-high,
+    too-low and no-headroom;
+  - a low ceiling at any maxClimb; knee-high ledges; tops just above minClimb and low
+    curbs met at their upper edge;
+  - thin fences (no top) and tall walls (too high), with and without a ceiling;
+  - a 45° approach landing on the face; a 70° approach reported as oblique; a
+    straight-up normal refused; gentle ramps of 2–30° never read as ledges; a body
+    pressed flush against a tall wall gets too-high;
+  - the same ledge through a `defineVolumeSet` adapter;
+- ladders: attach facing rules, vertical reach, zero-facing and NaN refusal, climbing
+  to a top exit, bottom exit and top standing point;
+- pushables:
+  - acceleration, speed cap, blocking with sliding on the other axis;
+  - friction that always resists (including under a tiny push), the static threshold,
+    dt 0 with no change and no sweep;
+  - grid pushes to the next line strictly ahead, the same for nearly equal positions,
+    in both directions, and with a half-cell grid offset.
+
+An independent adversarial review found that:
+- a low ceiling made reachable ledges too high;
+- oblique approaches gave the wrong edge;
+- ladders attached from metres away vertically, or with a zero facing;
+- any push disabled friction;
+- grid pushes left blocks off the grid;
+- the volume-query compatibility claim was overstated.
+
+The re-review found that:
+- low walls just above minClimb were refused, because their edge normal points up;
+- grid pushes jumped 0.5 or 1.5 cells depending on rounding;
+- a ceiling could change the failure reason;
+- narrow tops were missed;
+- a straight-up normal produced NaN queries;
+- dt 0 still capped the speed.
+
+A third round confirmed those fixes, then found that the edge-contact rule took gentle
+ramps for ledges, that a body flush against a tall wall got no-top, and that `origin`
+was validated only in snap mode. These are fixed too: an edge contact now needs a level
+top and a drop in front of it, the deciding cast starts slightly back from the wall, and
+`origin` is validated in every mode. A narrow re-review confirmed these fixes and found
+one low issue: the backed-off start could land in a wall just behind the body, giving
+no-top instead of too-high. That is fixed: the start backs off only as far as the body
+is flush. No game, browser or device evidence.
+
+## Optional strict numeric modes candidate — NUM-01, 2026-10-09
+
+`@kits/numeric` is an independently implemented pure kit: fixed-point words (2–32 bits in a number, up to 128 bits in a bigint) with creator-chosen rounding and overflow, binary-angle sin/cos/atan2 tables built from `dmath`, and strict reduced-precision float (`f32` = `Math.fround`; `pc24` = 24-bit significands with the double exponent range). It composes with `dmath`, `@kits/rollback` and `@kits/replay` and installs no clock, persistence owner or registration. [Kit README](../../src/kits/numeric/README.md), [ADR 0099](../adr/0099-strict-numeric-modes.md).
+
+Evidence: 16 focused headless tests (exhaustive Q4.4 and seeded 32/48/64/128-bit comparisons with an independent BigInt oracle under every rounding/overflow pair; exact ties-to-even oracle for 2–25-bit significands including subnormal-range results; trig error bounds; 704 committed golden vectors; a fixed-point simulation through the rollback sync test and replay digests). An independent adversarial review found five defects (a fracBits-0 wrap rounding error in mulAdd/lerp, pc24 products below 2^-1021, and three edge cases), each fixed with a regression test. The golden vectors and three lockstep workload digests were identical in Chromium 141 and Node 26.8.1 through the extended `npm run test:dmath-browser` (local run). This is a branch candidate: hosted full CI, other browsers, a playable template consumer and physical-device acceptance remain pending.
+
+## Cell and portal culling — candidate (2026-10-09)
+
+Branch `feat/cell-culling` from `9345d07b`. Twenty-four new headless tests: graph
+refusals; corridor narrowing; a cell reached through a narrow then a wider portal;
+closed portals and revisions; portals behind or crossing the eye plane; a camera on
+or within tolerance of a portal plane; outside fallbacks; a four-cell cycle; depth
+horizon and overflow fallbacks; the PVS alone; unchanged-camera reuse; determinism;
+render-on-change application, restore, reentrancy and throwing-sink recovery; a
+composition with the real `World`/`Shape` and three.js meshes, with the view-projection
+helper matched against the three.js camera. A seeded comparison of 960 cameras on 24
+generated multi-level grids against an independent ray-marching reference found no
+hidden visible cell; deliberately weakened variants (near-plane clipping, a shrunk
+rectangle, first-visit-only traversal) each failed it. Local headless probe, not a
+device budget: 95 % of 768 objects culled on average on an 8 x 8 fixture. No browser,
+GPU, draw-call, frame-time or device evidence.
+An independent review of `7a59f93b` found culler restore gaps (targets left unknown by
+`resync` or a throwing sink stayed hidden after remove/dispose; a sink throwing during
+dispose ended disposal early) and a three.js snippet using the local camera position;
+both were fixed with a seeded culler model fuzz, a reference test with wide, asymmetric
+and parented three.js cameras on portal planes and corners, and documented orthographic
+and near-plane limits.
+
+## Optional prediction presentation — candidate (2026-10-09)
+
+[Prediction presentation](prediction-presentation.md) adds two optional helpers to
+`@kits/network`: `createPredictionSmoothing` (a bounded, decaying presentation offset
+with a snap threshold and a one-shot discontinuity flag) and `createPredictedEvents`
+(an exactly-once emit and cancel ledger keyed by creator event key and tick). They
+compose with `createPrediction` through `read()` snapshots and leave its defaults
+unchanged. Evidence is headless: 23 unit tests on the real reconciliation path,
+including seeded randomized bound and exactly-once runs. These are implemented and
+checked on branch `feat/prediction-presentation`, not integrated. Independent review,
+hosted CI, device or browser review of smoothing and multiplayer acceptance remain
+outstanding. See ADR 0142.
+
+## Presentation kit — candidate (2026-10-09)
+
+- **Scope:** `src/kits/presentation` (ADR 0154).
+- **Evidence:** `presentation.test.ts`. It covers transitions, the input lock, CSS, the day clock, curves, weather,
+  the roll-up and a `testScene` door composition.
+- **Not established:** browser or device appearance, template adoption and hosted CI.

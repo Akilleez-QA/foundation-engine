@@ -542,16 +542,52 @@ export async function enterScene(o: {
       let lastCamera = '',
         lastVersion = -1,
         dirty = true;
+      let lastListener = '';
       const syncListener = () => {
         if (actx.signal.aborted || !s.app.has('platform.audio') || actx.coverage() !== 'top') return;
         const forward = new T.Vector3();
         camera.getWorldDirection(forward);
         const up = new T.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-        s.audio.setListener(
+        // An optional creator listener (e.g. at the player's head) replaces the camera position; the camera's
+        // orientation is kept unless the creator supplies its own. Invalid values are reported and ignored.
+        const cameraPose = [
           camera.position.toArray() as [number, number, number],
           forward.toArray() as [number, number, number],
           up.toArray() as [number, number, number],
-        );
+        ] as const;
+        const override = validListener(viewState.listener);
+        if (viewState.listener === undefined) listenerReported = false;
+        try {
+          s.audio.setListener(
+            override?.position ?? cameraPose[0],
+            override?.forward ?? cameraPose[1],
+            override?.up ?? cameraPose[2],
+          );
+          if (override) listenerReported = false;
+        } catch (error) {
+          // The output refuses degenerate orientations (forward parallel to up): report once, keep the creator's
+          // position and use the camera's orientation.
+          if (!override) throw error;
+          reportListener('view.listener orientation is degenerate (forward parallel to up)');
+          s.audio.setListener(override.position, cameraPose[1], cameraPose[2]);
+        }
+      };
+      let listenerReported = false;
+      const reportListener = (message: string) => {
+        if (listenerReported) return;
+        listenerReported = true;
+        s.log.error(`${scene.id}: ${message}; hearing from the camera`);
+      };
+      const validListener = (l: ViewState['listener']) => {
+        if (l === undefined) return undefined;
+        const ok = (v: unknown) =>
+          Array.isArray(v) &&
+          v.length === 3 &&
+          v.every(n => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) <= 1e9);
+        const okDir = (v: unknown) => v === undefined || (ok(v) && Math.hypot(...(v as number[])) > 0);
+        if (typeof l === 'object' && l !== null && ok(l.position) && okDir(l.forward) && okDir(l.up)) return l;
+        reportListener('view.listener must be {position, forward?, up?} with finite vectors (|v| <= 1e9)');
+        return undefined;
       };
       actx.own(
         appLayers(doc).onChange(() => {
@@ -1003,7 +1039,15 @@ export async function enterScene(o: {
             if (actx.signal.aborted) return;
           }
         const cam = viewState.camera,
+          listenerKey = viewState.listener
+            ? `${viewState.listener.position}|${viewState.listener.forward}|${viewState.listener.up}`
+            : '',
           key = `${cam.position},${cam.target},${cam.fov},${cam.minWidthFov},${cam.mask},${camera.aspect},${viewState.background}`;
+        // A listener-only change re-sends the listener without touching the camera or redrawing.
+        if (key === lastCamera && listenerKey !== lastListener) {
+          syncListener();
+          lastListener = listenerKey;
+        }
         if (key !== lastCamera) {
           camera.layers.mask = validateRenderMask(cam.mask ?? 1);
           camera.position.set(...cam.position);
@@ -1016,6 +1060,7 @@ export async function enterScene(o: {
           if (!environment) three.background = new T.Color(viewState.background);
           syncListener();
           lastCamera = key;
+          lastListener = listenerKey;
           dirty = true;
         }
         if (viewState.environment) {

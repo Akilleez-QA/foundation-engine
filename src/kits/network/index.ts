@@ -64,6 +64,29 @@ export type {
   PredictionValue,
   PredictionRefusal,
 } from './prediction-types';
+export {createPredictionSmoothing, MAX_SMOOTHING_WIDTH, MAX_SMOOTHING_ELAPSED_MS} from './prediction-smoothing';
+export type {
+  PredictionSmoothing,
+  PredictionSmoothingOptions,
+  PredictionSmoothingDecay,
+  PredictionSmoothingCorrection,
+  PredictionSmoothingPresent,
+  PredictionSmoothingRefusal,
+  PredictionSmoothingState,
+} from './prediction-smoothing';
+export {createPredictedEvents, MAX_PREDICTED_EVENT_ENTRIES, MAX_PREDICTED_EVENT_KEY_LENGTH} from './predicted-events';
+export type {
+  PredictedEvents,
+  PredictedEventsOptions,
+  PredictedEventsLimits,
+  PredictedEventIdentity,
+  PredictedEventResult,
+  PredictedEventCancellation,
+  PredictedEventRefusal,
+  PredictedEventDrop,
+  PredictedEventsUpdate,
+  PredictedEventsState,
+} from './predicted-events';
 export {createRetrySchedule} from './retry-schedule';
 export type {
   RetrySchedule,

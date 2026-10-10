@@ -53,6 +53,8 @@ scripts/fixtures/compatibility/
 src/core/save/fixtures/
 # - Deterministic maths golden vectors: `npm run dmath:golden` compares the file text exactly.
 src/core/dmath.golden.json
+# - Numeric kit golden vectors: `npm run numeric:golden` compares the file text exactly.
+src/kits/numeric/numeric.golden.json
 
 # Recorded verification evidence is an archived output, not source.
 docs/verification/

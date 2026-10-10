@@ -22,9 +22,11 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | RETRO-01 | Optional retro software-raster look (low resolution, palette, ordered dither) |  | [retro-look.md](guides/retro-look.md) |
 | CAR-01 | Optional car handling on ray-cast wheels |  | [README.md](../src/kits/car-handling/README.md) |
 | BOARD-01 | Optional board traversal with authored rails |  | [README.md](../src/kits/board-traversal/README.md) |
+| NUM-01 | Optional strict numeric modes: fixed point, binary angles and reduced-precision float |  | [README.md](../src/kits/numeric/README.md) |
 | NAV-FIELD-01 | Optional incremental shared navigation distance fields |  | [README.md](../src/kits/navigation/README.md) |
 | WORK-01 | Optional bounded fair work roster |  | [README.md](../src/kits/work-roster/README.md) |
 | VOLUME-01 | Optional bounded sphere and capsule overlap, sweep and headroom queries |  | [README.md](../src/kits/volume-query/README.md) |
+| CELLS-01 | Optional cell and portal render culling with a conservative PVS |  | [cell-culling.md](guides/cell-culling.md) |
 | ACTIVATION-01 | Optional bounded region activation from observer positions |  | [region-activation.md](guides/region-activation.md) |
 | CADENCE-01 | Optional bounded per-member update cadence |  | [update-cadence.md](guides/update-cadence.md) |
 | ASG-01 | Optional bounded service and worksite assignment ownership |  | [assignments.md](guides/assignments.md) |
@@ -34,6 +36,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | NW-DELTA | Acknowledged-baseline deltas for complete network views |  | [README.md](../src/kits/network/README.md) |
 | PLAYOUT-01 | Remote clock offset and adaptive playout buffers |  | [README.md](../src/kits/playout/README.md) |
 | REPL-01 | Per-recipient quantized replication under a byte budget |  | [README.md](../src/kits/replication/README.md) |
+| NW-PRESENT | Optional prediction correction smoothing and exactly-once predicted events |  | [prediction-presentation.md](guides/prediction-presentation.md) |
 | VISIBILITY-01 | Bounded source-owned visibility and explored history |  | [README.md](../src/kits/visibility/README.md) |
 | GEN-WEIGHTED | Bounded eligible weighted choice with separately committed recent history |  | [weighted-choice.md](guides/weighted-choice.md) |
 | CAP-EFFECT-CHECKPOINT | Portable timed contribution checkpoints |  | [timed-effects.md](guides/timed-effects.md) |
@@ -42,6 +45,10 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | BALLISTICS-01 | Drag-free ballistic launch solves, evaluation and arc samples |  | [README.md](../src/kits/ballistics/README.md) |
 | BREADCRUMBS-01 | Bounded leader trails with exact lag and path-distance retracing |  | [README.md](../src/kits/breadcrumbs/README.md) |
 | GRID-STEP-01 | Grid-step actor movement with classified bumps, ledges, forced tiles and follower lines |  | [README.md](../src/kits/grid-step/README.md) |
+| MEDIA-01 | Medium volumes with hysteresis state tracking and buoyancy, drag and current accelerations |  | [README.md](../src/kits/media/README.md) |
+| AUDIO-EXTRAS-01 | Character listener blend, Doppler, retrigger pitch, instance limits and quantized adaptive music |  | [README.md](../src/kits/audio-mixer/README.md) |
+| PRESENTATION-01 | Screen transitions with input lock, time-of-day curves, weather blending and HUD roll-ups |  | [README.md](../src/kits/presentation/README.md) |
+| COMPANION-RECOVERY-01 | Companion catch-up and safe teleport recovery on breadcrumb trails |  | [README.md](../src/kits/breadcrumbs/README.md) |
 | VIS-01 | Tone mapping and exposure per scene (view.output) | [#124](https://github.com/Akilleez-QA/foundation-engine/pull/124) | [scene-look.md](guides/scene-look.md) |
 | VIS-02 | Point and spot lights in fixed per-scene slots | [#138](https://github.com/Akilleez-QA/foundation-engine/pull/138) | [scene-look.md](guides/scene-look.md) |
 | VIS-03 | Shadows from the sun, local lights and shapes | [#148](https://github.com/Akilleez-QA/foundation-engine/pull/148) | [scene-look.md](guides/scene-look.md) |
@@ -58,11 +65,13 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | GEN-01 | Seeded hierarchical generation (deriveSeed) |  | [README.md](kits/README.md) |
 | GRID-01 | Atomic sparse cell batches and bounded immutable occupancy queries |  | [cell-occupancy.md](guides/cell-occupancy.md) |
 | SCRIPT-01 | Optional sandboxed Lua scripts with capability-scoped host functions and deterministic per-call budgets |  | [scripting.md](guides/scripting.md) |
+| GEN-03 | Optional bounded cellular Rust/WASM worker kernel |  | [cellular-wasm.md](guides/cellular-wasm.md) |
 | GEN-02 | Bounded binary record store for large edited worlds | [#56](https://github.com/Akilleez-QA/foundation-engine/pull/56) | [store-large-world-records.md](recipes/store-large-world-records.md) |
 | MP-01 | Newcomer shared session (LAN/loopback) and npm run host | [#61](https://github.com/Akilleez-QA/foundation-engine/pull/61) | [multiplayer-session.md](guides/multiplayer-session.md) |
 | KTX2 | KTX2 (Basis Universal) model textures | [#146](https://github.com/Akilleez-QA/foundation-engine/pull/146) | [compressed-textures.md](guides/compressed-textures.md) |
 | DX-03 | Asset provenance records and npm run disclosure | [#137](https://github.com/Akilleez-QA/foundation-engine/pull/137) | [asset-provenance.md](guides/asset-provenance.md) |
 | ASSET-VERIFY | Model contracts (npm run asset:verify) | [#126](https://github.com/Akilleez-QA/foundation-engine/pull/126) | [model-contracts.md](guides/model-contracts.md) |
+| ASSET-LEGACY | Legacy game and multimedia format decoders in npm run convert |  | [README.md](../tools/convert/README.md) |
 | ASSET-CONVERT | Offline converters to glTF and PNG with provenance receipts (npm run convert) |  | [README.md](../tools/convert/README.md) |
 | DUPES-01 | Duplicate and near-duplicate detector (npm run dupes) |  | [README.md](../tools/dupes/README.md) |
 | ASSET-OPTIMIZE | Model optimisation (npm run asset:optimize) | [#135](https://github.com/Akilleez-QA/foundation-engine/pull/135) |  |
@@ -96,10 +105,12 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/camera`
 - `@kits/capabilities`
 - `@kits/car-handling`
+- `@kits/cells`
 - `@kits/chalkboard`
 - `@kits/character`
 - `@kits/combat`
 - `@kits/concept-explorer`
+- `@kits/contact`
 - `@kits/control`
 - `@kits/dialogue`
 - `@kits/economy`
@@ -116,12 +127,16 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/learn`
 - `@kits/locomotion`
 - `@kits/market`
+- `@kits/media`
 - `@kits/navigation`
 - `@kits/network`
+- `@kits/numeric`
 - `@kits/objectives`
+- `@kits/perception`
 - `@kits/physics`
 - `@kits/playout`
 - `@kits/population`
+- `@kits/presentation`
 - `@kits/procgen`
 - `@kits/region-activation`
 - `@kits/replay`
@@ -340,6 +355,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `new`
 - `new-game`
 - `new-lab`
+- `numeric:golden`
 - `package:pure`
 - `perf:baseline`
 - `perf:bundle`

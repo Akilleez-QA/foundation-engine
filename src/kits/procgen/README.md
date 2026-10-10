@@ -309,3 +309,9 @@ No director, scheduler or new persistence owner is installed.
 See [the bounded cell occupancy guide](../../../docs/guides/cell-occupancy.md) for
 atomic sparse batches and immutable point, rectangle and segment queries, with
 explicit outside/contact semantics and separate persistence/publication owners.
+
+## Optional cellular compute backend
+
+See [cellular WASM workers](../../../docs/guides/cellular-wasm.md) for
+`prepareCellularGridWasm`, its per-job fixed memory, unchanged seeded output,
+JavaScript fallback and browser acceptance boundaries. The existing JavaScript job remains the default.

@@ -114,6 +114,17 @@
       ]
     },
     {
+      "id": "NUM-01",
+      "title": "Optional strict numeric modes: fixed point, binary angles and reduced-precision float",
+      "shipped": true,
+      "docs": "src/kits/numeric/README.md",
+      "evidence": [
+        "@kits/numeric exports createFixed",
+        "@kits/numeric exports createPrecision",
+        "src/kits/numeric/numeric.golden.json exists"
+      ]
+    },
+    {
       "id": "NAV-FIELD-01",
       "title": "Optional incremental shared navigation distance fields",
       "shipped": true,
@@ -133,6 +144,18 @@
       "shipped": true,
       "docs": "src/kits/volume-query/README.md",
       "evidence": ["@kits/volume-query exports sweepVolume", "src/kits/volume-query/oracle.test.ts exists"]
+    },
+    {
+      "id": "CELLS-01",
+      "title": "Optional cell and portal render culling with a conservative PVS",
+      "shipped": true,
+      "docs": "docs/guides/cell-culling.md",
+      "evidence": [
+        "@kits/cells exports createCellView",
+        "@kits/cells exports buildCellPvs",
+        "@kits/cells exports createCellCuller",
+        "src/kits/cells/reference.test.ts exists"
+      ]
     },
     {
       "id": "ACTIVATION-01",
@@ -201,6 +224,18 @@
       "evidence": [
         "@kits/replication exports createReplicationSchedule",
         "src/kits/replication/replication.test.ts exists"
+      ]
+    },
+    {
+      "id": "NW-PRESENT",
+      "title": "Optional prediction correction smoothing and exactly-once predicted events",
+      "shipped": true,
+      "docs": "docs/guides/prediction-presentation.md",
+      "evidence": [
+        "@kits/network exports createPredictionSmoothing",
+        "@kits/network exports createPredictedEvents",
+        "src/kits/network/prediction-smoothing.test.ts exists",
+        "src/kits/network/predicted-events.test.ts exists"
       ]
     },
     {
@@ -277,6 +312,47 @@
       "shipped": true,
       "docs": "src/kits/grid-step/README.md",
       "evidence": ["@kits/grid-step exports createGridStepper", "src/kits/grid-step/grid-step.test.ts exists"]
+    },
+    {
+      "id": "MEDIA-01",
+      "title": "Medium volumes with hysteresis state tracking and buoyancy, drag and current accelerations",
+      "shipped": true,
+      "docs": "src/kits/media/README.md",
+      "evidence": [
+        "@kits/media exports createMediumVolumes",
+        "@kits/media exports createMediumTracker",
+        "src/kits/media/media.test.ts exists"
+      ]
+    },
+    {
+      "id": "AUDIO-EXTRAS-01",
+      "title": "Character listener blend, Doppler, retrigger pitch, instance limits and quantized adaptive music",
+      "shipped": true,
+      "docs": "src/kits/audio-mixer/README.md",
+      "evidence": [
+        "@kits/audio-mixer exports blendListener",
+        "@kits/audio-mixer exports dopplerRate",
+        "@kits/audio-mixer exports createMusicDirector",
+        "src/kits/audio-mixer/extras.test.ts exists"
+      ]
+    },
+    {
+      "id": "PRESENTATION-01",
+      "title": "Screen transitions with input lock, time-of-day curves, weather blending and HUD roll-ups",
+      "shipped": true,
+      "docs": "src/kits/presentation/README.md",
+      "evidence": [
+        "@kits/presentation exports createScreenTransition",
+        "@kits/presentation exports createWeatherDirector",
+        "src/kits/presentation/presentation.test.ts exists"
+      ]
+    },
+    {
+      "id": "COMPANION-RECOVERY-01",
+      "title": "Companion catch-up and safe teleport recovery on breadcrumb trails",
+      "shipped": true,
+      "docs": "src/kits/breadcrumbs/README.md",
+      "evidence": ["@kits/breadcrumbs exports createCompanionRecovery", "src/kits/breadcrumbs/recovery.test.ts exists"]
     },
     {
       "id": "VIS-01",
@@ -410,6 +486,13 @@
       "evidence": ["@kits/scripting exports loadScriptVm", "@kits/scripting exports createScriptHost"]
     },
     {
+      "id": "GEN-03",
+      "title": "Optional bounded cellular Rust/WASM worker kernel",
+      "shipped": true,
+      "docs": "docs/guides/cellular-wasm.md",
+      "evidence": ["@kits/procgen exports prepareCellularGridWasm"]
+    },
+    {
       "id": "GEN-02",
       "title": "Bounded binary record store for large edited worlds",
       "shipped": true,
@@ -448,6 +531,13 @@
       "pr": 126,
       "docs": "docs/guides/model-contracts.md",
       "evidence": ["npm run asset:verify"]
+    },
+    {
+      "id": "ASSET-LEGACY",
+      "title": "Legacy game and multimedia format decoders in npm run convert",
+      "shipped": true,
+      "docs": "tools/convert/README.md",
+      "evidence": ["tools/convert/legacy.mjs exists", "tools/convert/legacy.test.mjs exists"]
     },
     {
       "id": "ASSET-CONVERT",
@@ -780,7 +870,20 @@
       ]
     },
     {"name": "assignments", "exports": ["createAssignments"]},
-    {"name": "audio-mixer", "exports": ["audioMixer", "createCueMixer", "createDucking"]},
+    {
+      "name": "audio-mixer",
+      "exports": [
+        "audioMixer",
+        "blendListener",
+        "createCueMixer",
+        "createDucking",
+        "createInstanceLimits",
+        "createMusicClock",
+        "createMusicDirector",
+        "createRetrigger",
+        "dopplerRate"
+      ]
+    },
     {"name": "authoring", "exports": ["authoredReference", "createAuthoredDocument", "createAuthoringSession"]},
     {
       "name": "ballistics",
@@ -828,7 +931,10 @@
         "validateBoardConfig"
       ]
     },
-    {"name": "breadcrumbs", "exports": ["TRAIL_LIMITS", "breadcrumbs", "createBreadcrumbTrail", "nextFollowerLag"]},
+    {
+      "name": "breadcrumbs",
+      "exports": ["TRAIL_LIMITS", "breadcrumbs", "createBreadcrumbTrail", "createCompanionRecovery", "nextFollowerLag"]
+    },
     {"name": "cadence", "exports": ["CADENCE_CEILING", "MAX_CADENCE_TICK", "createCadence", "createCadenceResult"]},
     {
       "name": "camera",
@@ -887,6 +993,26 @@
         "validateCarConfig"
       ]
     },
+    {
+      "name": "cells",
+      "exports": [
+        "CELL_CEILING",
+        "OBJECT_CEILING",
+        "PORTAL_CEILING",
+        "PORTAL_VERTEX_CEILING",
+        "PVS_CELL_CEILING",
+        "VISIT_CEILING",
+        "buildCellPvs",
+        "cellCameraFromView",
+        "createCellCuller",
+        "createCellGraph",
+        "createCellView",
+        "createCellViewResult",
+        "createViewCellCamera",
+        "entityVisibility",
+        "objectVisibility"
+      ]
+    },
     {"name": "chalkboard", "exports": ["BOARD", "createBoardView", "lengthOf", "pathOf", "tickLabels"]},
     {
       "name": "character",
@@ -922,6 +1048,7 @@
         "pickPart"
       ]
     },
+    {"name": "contact", "exports": ["CONTACT_LIMITS", "contact", "createContactLayer"]},
     {"name": "control", "exports": ["control", "createControl"]},
     {"name": "dialogue", "exports": ["DIALOGUE_LIMITS", "createDialogue", "dialogue"]},
     {
@@ -1053,19 +1180,29 @@
       "exports": [
         "applyRootMotion",
         "createJumpFeel",
+        "createLadders",
         "createPlatforms",
         "deriveJump",
+        "findLedge",
         "jumpStateCount",
         "jumpSystem",
         "locomotion",
         "platformSystem",
+        "pushStep",
         "resetJump"
       ]
     },
     {"name": "market", "exports": ["createMarket", "market"]},
     {
+      "name": "media",
+      "exports": ["MEDIUM_LIMITS", "createMediumTracker", "createMediumVolumes", "media", "mediumAcceleration"]
+    },
+    {
       "name": "navigation",
       "exports": [
+        "NAVMESH_LIMITS",
+        "corridor",
+        "createAvoidance",
         "createDistanceField",
         "createLifetimeRouteQueue",
         "createNavigationGraph",
@@ -1075,8 +1212,13 @@
         "createRouteFollower",
         "createRouteQueue",
         "crossPortal",
+        "defineNavMesh",
         "definePortal",
-        "navigation"
+        "findStraightPath",
+        "locate",
+        "navMeshGraph",
+        "navigation",
+        "walkMesh"
       ]
     },
     {
@@ -1095,7 +1237,11 @@
         "MAX_DRAIN_WINDOW_MS",
         "MAX_INTEGRITY_RULES",
         "MAX_INTEGRITY_WEIGHT",
+        "MAX_PREDICTED_EVENT_ENTRIES",
+        "MAX_PREDICTED_EVENT_KEY_LENGTH",
         "MAX_SESSION_PLAYERS",
+        "MAX_SMOOTHING_ELAPSED_MS",
+        "MAX_SMOOTHING_WIDTH",
         "SESSION_CLOSE_CODES",
         "SESSION_PROTOCOL_VERSION",
         "SESSION_SELF_ENTITY",
@@ -1110,7 +1256,9 @@
         "createDurableAuthority",
         "createIntegrity",
         "createNetworkIntake",
+        "createPredictedEvents",
         "createPrediction",
+        "createPredictionSmoothing",
         "createRateAdmission",
         "createRetrySchedule",
         "createSession",
@@ -1130,7 +1278,24 @@
         "sessionViewLimits"
       ]
     },
+    {
+      "name": "numeric",
+      "exports": ["createFixed", "createFixedTrig", "createPrecision", "createWideFixed", "f32", "numeric", "pc24"]
+    },
     {"name": "objectives", "exports": ["createObjectiveRun", "createStagedObjectives", "objectives"]},
+    {
+      "name": "perception",
+      "exports": [
+        "chooseCover",
+        "chooseUtility",
+        "createAwareness",
+        "createCoverReservations",
+        "createSquadKnowledge",
+        "hearingStrength",
+        "perception",
+        "sightStrength"
+      ]
+    },
     {
       "name": "physics",
       "exports": [
@@ -1168,6 +1333,21 @@
       ]
     },
     {
+      "name": "presentation",
+      "exports": [
+        "createCycleCurve",
+        "createDayClock",
+        "createRollup",
+        "createScreenTransition",
+        "createWeatherDirector",
+        "lockedInput",
+        "mountTransitionOverlay",
+        "presentation",
+        "rgbToHex",
+        "transitionCss"
+      ]
+    },
+    {
       "name": "procgen",
       "exports": [
         "CELLULAR_CELLS_PER_SLICE",
@@ -1182,6 +1362,7 @@
         "baselineChecksum",
         "cellularGenerator",
         "cellularGridJob",
+        "cellularWasmGridJob",
         "chooseWeighted",
         "chunkDatabaseDeleting",
         "createCellEdits",
@@ -1198,6 +1379,7 @@
         "parseGenerationSeed",
         "parseGridParameters",
         "prepareCellularGrid",
+        "prepareCellularGridWasm",
         "procgen"
       ]
     },
@@ -1502,6 +1684,7 @@
     "new",
     "new-game",
     "new-lab",
+    "numeric:golden",
     "package:pure",
     "perf:baseline",
     "perf:bundle",

@@ -54,10 +54,20 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [breadcrumbs](../../src/kits/breadcrumbs/README.md) | Leader path ring with exact crumb-lag and path-distance retracing, segment cuts, snapshots and a wait/keep-pace/catch-up lag controller; pure helpers | None yet; headless tests only |
 
 | [grid-step](../../src/kits/grid-step/README.md) | Tile-to-tile actors: facing, classified bumps, ledges, conveyor/ice tiles, reservations while moving, follower lines, snapshots; creator tile rules | None yet; headless tests only |
+
+| [contact](../../src/kits/contact/README.md) | Layered contact volumes (cylinder, sphere, box): exact overlap, deterministic enter/stay/exit events, bounded admission, intangibility, snapshots | None yet; headless tests only |
+
+| [media](../../src/kits/media/README.md) | Water, mud and other medium volumes: depth and submersion probes, dry/wade/swim/under tracking with hysteresis and events, buoyancy, drag and current accelerations; pure helpers | None yet; headless tests only |
+
+| [presentation](../../src/kits/presentation/README.md) | Screen transitions (fade/wipe/iris) with an input lock, day clock and cyclic lighting curves, a blending weather director, HUD roll-up counters; pure helpers | None yet; headless tests only |
 | [spatial-audio](../../src/kits/spatial-audio/README.md) | Logical sound sources: virtual tracking, importance ranking with HRTF for the sounds that matter, class distance curves with a hard cutoff, budgeted occlusion driving the smoothed filter | None yet; implemented, candidate (AUD-02, PR #55, [recipe](../recipes/3d-sound-for-shooters.md)) |
 | [physics](../../src/kits/physics/README.md) | Optional rigid bodies, colliders, ordered bounded collision events, queries, rollback snapshots and a slope/step character adapter over a lazily loaded WebAssembly library (ADR 0121) | None yet; candidate with Node tests and one software-GL fixture snapshot ([guide](../guides/physics-adapter.md)) |
 
 The optional [scripting](../../src/kits/scripting/README.md) candidate runs sandboxed Lua 5.4 scripts with capability-scoped host functions, deterministic per-call instruction budgets, a memory cap, fixed-tick timers and save/restore of each script's `state`; its VM loads lazily. Headless unit, rollback sync-test and scene consumer tests plus headless Chromium fixture runs only; no template consumer or device acceptance is claimed. [Guide](../guides/scripting.md).
+
+The optional [numeric](../../src/kits/numeric/README.md) candidate supplies strict deterministic number formats for lockstep, rollback and replay: fixed-point words with chosen rounding and overflow, binary-angle trigonometry and strict reduced-precision float. Headless oracle and golden tests plus a Chromium/Node vector comparison; no template consumer or device acceptance is claimed.
+
+| [cells](../../src/kits/cells/README.md) | Cell-and-portal render culling: rooms and doorways, screen-rectangle narrowing, a conservative PVS bit table, render-on-change visibility for entities or three.js objects; pure helpers | None yet; implemented, candidate (CELLS-01, [guide](../guides/cell-culling.md)); headless tests only |
 
 The optional [assignments](../../src/kits/assignments/README.md) candidate supplies exclusive actor claims, weighted target capacity and atomic transfer refusal. Two headless service/worksite fixtures and route-owner composition tests exercise it; no playable template consumer or browser/device acceptance is claimed. [Guide](../guides/assignments.md).
 

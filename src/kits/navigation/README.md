@@ -183,3 +183,28 @@ maximum-node publication and immutability; and compose real activity lifetimes
 with entity exit choices and service claims. A logical-work comparison includes
 a negative control where one short route costs less than a complete field. These
 are headless contract checks, not browser, physical performance or movement acceptance.
+
+## Navigation meshes, funnel paths and local avoidance
+
+For continuous walkable surfaces, author a mesh of convex polygons (from a level
+editor or an offline navmesh generator) and query it here. Generation is tooling, not
+part of the kit.
+
+```ts
+import { defineNavMesh, navMeshGraph, createPathSearch, corridor, findStraightPath, locate, walkMesh, createAvoidance } from '@kits/navigation';
+const mesh = defineNavMesh({ vertices, polygons });         // validate once
+const graph = navMeshGraph(mesh);                           // reuse for every request
+const from = locate(mesh, start)!, to = locate(mesh, goal)!;
+const search = createPathSearch(graph, `p${from}`, `p${to}`); // the same incremental search
+// ... step(budget) until arrived, then:
+const straight = findStraightPath(mesh, corridor(result.path), start, goal, agentRadius);
+```
+
+| Contract | Definition |
+|---|---|
+| Mesh | `defineNavMesh({vertices, polygons, cellSize?})` takes 3–65,536 vertices and 1–8,192 strictly convex, planar polygons of 3–16 vertex indices, counter-clockwise in (x, z) coordinates (positive (b − a) × (c − a) with x first and z second, as in the terrain kit). Vertices at the same position must share an index to connect; T-junctions do not connect, and polygons overlapping along an edge are refused. Each edge is shared by at most two polygons, and shared edges become portals. A uniform locator grid is built once (at most about 4 million cell entries). Invalid meshes throw `RangeError`. |
+| Locate | `locate(mesh, point, maxHeight = 2)` returns the polygon containing the point's x/z whose surface is nearest its height within `maxHeight`, or null. |
+| Routing | `navMeshGraph(mesh)` returns a `NavigationGraph` whose nodes are `p<index>` and whose edge costs are centroid → shared-edge midpoint → centroid. Plan with the existing `createPathSearch` and queues (bounded steps, cancellation), then turn the path back into polygons with `corridor(path)`. A mesh with more than 65,536 portal edges is refused with `RangeError`, because the navigation graph admits no more. |
+| Funnel | `findStraightPath(mesh, corridor, start, goal, radius)` string-pulls through the corridor's portals in x/z and returns corner waypoints including both ends. A positive `radius` shrinks each portal from both ends, so corners keep that clearance from walls; this approximates a disc's path and can add corners near tight turns. Corner heights are interpolated along their portal edge, and the ends keep the caller's points. Consecutive duplicate corners are removed. It returns `too-narrow` when a portal is narrower than 2 × radius, `off-corridor` when start or goal is outside the first or last polygon, `broken` for non-adjacent polygons, and `too-many-corners` above 1,024. |
+| Walk | `walkMesh(mesh, polygon, from, [dx, dz], slide = true)` moves across shared edges and stops at the first boundary edge. With `slide`, the remaining motion continues once along that edge. `from` must lie in the start polygon. It returns the end position on the end polygon's plane, the end polygon, whether a boundary was hit, and `truncated` when the 256-crossing bound stopped the move early. |
+| Avoidance | `createAvoidance({horizon, neighborRadius, maxNeighbors, directions, weight, maxAgents})` gives local avoidance in x/z among up to 4,096 agents. Each step, every agent picks from its preferred velocity, a stop and a fan of directions × three speeds. The chosen candidate minimises the distance to the preferred velocity plus weight / time-to-collision, using the reciprocal relative velocity (2·candidate − own − other) so both agents share the swerve. Overlapping agents prefer moving apart, and coincident agents part along x in id order. Neighbours are the nearest `maxNeighbors` within range (ties by id), found through a uniform hash sized for the largest radius. Results are deterministic and capped at each agent's max speed. Cost is O(agents × nearby agents × samples): with everyone packed in one cell, that grows quadratically. Dense crowds with large agents can deadlock or fail to arrive; this is local avoidance, not a crowd planner. Static walls are not considered: run the result through `walkMesh` or character collision. |

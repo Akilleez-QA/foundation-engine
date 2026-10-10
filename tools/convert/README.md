@@ -57,6 +57,44 @@ output that belongs to another file is never overwritten; record that one in
 `assets.provenance.json`. A receipt is a record of what was converted, not proof of
 rights: converting a file does not change its licence.
 
+## Legacy formats
+
+Kinds for data from 1990s games and multimedia tools, written independently from what community reconstructions and
+emulators document about each format (no code from them is included; see ADR 0136). They read files the creator owns or
+may use; nothing here circumvents encryption or copy protection, and a converted file keeps the licence of its source.
+
+| Kind | Input | Output |
+|---|---|---|
+| `archive` | Game data archives (often `.dat`) in two layouts: big-endian with the directory first and LZSS-packed members, or little-endian with the directory and a size trailer at the end and zlib-packed members | `--list` prints the members; `--member <name>` extracts one (names are case-insensitive, `/` or `\`) |
+| `frames` | Palette sprite frame sets (often `.frm`): up to six directions of frames with centres and per-frame shifts | an indexed PNG sprite sheet (one row per distinct direction) plus `<name>.meta.json` with fps, action frame, centres and every frame rectangle and shift; needs `--palette` (`--six-bit` for a 768-byte 0–63 VGA palette, whose unmapped entries above 63 become transparent) |
+| `planar` | 320 × 200 planar screens with an embedded 12-bit palette and LZ77 packing (often `.piv`) | an indexed PNG (colour 0 transparent) |
+| `tim` | Console texture images (`.tim`): 4- and 8-bit indexed with colour-table rows, 15-bit and 24-bit direct | PNG; `--clut-row <n>` picks a colour-table row, `--opaque` keeps the all-zero colour black instead of transparent; `.meta.json` keeps the frame-buffer position and the raw 16-bit colour words |
+| `vag` | Console ADPCM sound (`.vag` with its header, or headerless with `--rate`) | 16-bit mono WAV plus `.meta.json` with the loop points; `--prediction rounded` (default: the hardware model emulators use) or `truncated` (what common software decoders output; the two differ by a few least significant bits) |
+| `director` | Bitmap cast members of multimedia-authoring movies (`RIFX`/`XFIR`, often `.dir`/`.dxr`/`.cxt`), both cast record layouts, 1/2/4/8-bit, packed rows | `--list` prints the members; `--member <n>` writes an indexed PNG with the member's own colour table (or `--palette`), plus `.meta.json` with the registration point and the palette used |
+| `cinepak` | Cinepak video in QuickTime movies (`.mov`) | `--frame <n>` writes that frame as RGBA PNG, decoded forward from the nearest earlier key frame |
+
+```sh
+npm run convert -- archive master.dat --list
+npm run convert -- archive master.dat art/hero.frm --member art\critters\hero.frm --no-provenance
+npm run convert -- frames art/hero.frm game/public/sprites/hero.png --palette color.pal --six-bit --author … --licence …
+npm run convert -- vag voice.vag game/public/sounds/voice.wav --author … --licence …
+```
+
+Bounds: declared sizes are checked before anything is decompressed and every decompressor stops at the declared
+output size (zlib members are inflated with an exact output cap, LZSS refuses data beyond it, LZ77 output is capped);
+images are limited to 2^24 pixels, TIM blocks to the 1024 × 512 frame buffer, archives to 65,536 members, Cinepak to
+32 strips and 4,096 frames decoded back to a key frame; a Director row pitch may exceed its pixels by at most 16 bytes,
+and an LZSS size larger than its input can encode is refused before allocating. Malformed input is refused with the
+reason; mutation fuzzing of every fixture produces only errors. An independent adversarial review found two resource
+amplifications (Cinepak walk-back across thousands of frames, an unbounded Director row pitch) and several smaller
+deviations (LZSS reading past a block, name normalisation, CLI sidecar and argument handling); each is fixed with a
+regression test.
+
+Not covered: the authoring tool's built-in system palettes (a member without a colour table in its movie needs
+`--palette`, or comes out on a grey ramp with a warning in its metadata), shared TIM colour tables referenced from
+another file, compressed Director files (`FGDM`/Afterburner), sound and script cast members, other QuickTime codecs,
+audio tracks, and archive formats other than the two layouts above.
+
 ## Contract
 
 - Owner: the creator's command. The tool reads the input and the files it names,
@@ -96,7 +134,12 @@ found ten defects (two silently invalid GLBs, file embedding through `../` textu
 paths, PLY colours guessed from values, memory amplification from small BVH and PCX
 headers, ignored BMP colour masks, AI-origin receipts failing the provenance check,
 float32 key-time collapse and several edge cases); each is fixed with a regression
-test. Not claimed: OBJ features beyond the
+test. Legacy formats: `tools/convert/legacy.test.mjs` builds every fixture with an encoder written for the test (no game
+data) and checks the decoded values exactly; mutation fuzzing (400 mutants per format) yields only errors; the bomb
+tests check declared-size caps. Where ffmpeg is installed, two oracle tests compare with an independent implementation:
+Cinepak movies encoded by ffmpeg decode within 1 colour level of ffmpeg's own decoder on all 12 frames (inter frames
+included), and the `truncated` ADPCM prediction equals ffmpeg's decoder sample for sample on 400 random frames.
+Not claimed:
 table (curves, line elements, per-face groups), PLY with other vertex layouts, BVH
 files with several roots, PCX/BMP variants outside the table, visual review of real
 creator assets.

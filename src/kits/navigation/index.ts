@@ -39,3 +39,17 @@ export {
   type FieldPhase,
   type FieldSearch,
 } from './field';
+export {
+  corridor,
+  defineNavMesh,
+  findStraightPath,
+  locate,
+  navMeshGraph,
+  walkMesh,
+  NAVMESH_LIMITS,
+  type MeshPoint,
+  type NavMesh,
+  type NavMeshInput,
+  type StraightPath,
+} from './navmesh';
+export {createAvoidance, type Avoidance, type AvoidanceAgent, type AvoidanceOptions} from './avoidance';

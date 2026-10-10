@@ -229,6 +229,81 @@ test('GEN-01 bounds refuse before admission: cells, parameters, versions, regist
   assert.equal(r.scratch, 64 * 10 + (4 * 6 + 4096) * 8 + 4096);
 });
 
+test('GEN-01 fixed scratch declarations are bounded, captured and charged once per job', () => {
+  const generator = {
+    version: 1,
+    maxValue: 1,
+    scratchBytesPerCell: 8,
+    validate: () => true,
+    *generate() {},
+  };
+  const maxFixed = 64 * 1024 * 1024;
+  for (const scratchFixedBytes of [NaN, Infinity, -Infinity, 1.5, -1, maxFixed + 1, Number.MAX_SAFE_INTEGER + 1])
+    assert.throws(
+      () => createGridGenerationJob('job.test.fixed-invalid', {...generator, scratchFixedBytes}),
+      /invalid registration/,
+      String(scratchFixedBytes),
+    );
+  const baseline = createGridGenerationJob('job.test.fixed-default', generator),
+    zero = createGridGenerationJob('job.test.fixed-zero', {...generator, scratchFixedBytes: 0}),
+    mutable = {...generator, scratchFixedBytes: maxFixed},
+    fixed = createGridGenerationJob('job.test.fixed', mutable);
+  mutable.scratchFixedBytes = 0;
+  mutable.scratchBytesPerCell = 64;
+  for (const cellsX of [1, 8, 24]) {
+    const input = {...recipe, cellsX, parameters: 'null'},
+      expected = baseline.reservation(input);
+    assert.deepEqual(zero.reservation(input), expected);
+    assert.deepEqual(fixed.reservation(input), {...expected, scratch: expected.scratch + maxFixed});
+  }
+});
+
+test('GEN-01 fixed scratch refuses oversized work before generator allocation and admits the exact budget', async () => {
+  let allocations = 0;
+  const scratchFixedBytes = 64 * 1024,
+    fixed = createGridGenerationJob('job.test.fixed-admission', {
+      version: 1,
+      maxValue: 1,
+      scratchFixedBytes,
+      validate: () => true,
+      *generate() {
+        allocations++;
+        const scratch = new Uint8Array(scratchFixedBytes);
+        assert.equal(scratch.byteLength, scratchFixedBytes);
+      },
+    }),
+    input = {...recipe, cellsX: 1, cellsY: 1, cellsZ: 1, parameters: 'null'},
+    bytes = fixed.reservation(input),
+    total = bytes.input + bytes.output + bytes.scratch,
+    fake = fakeWorkerFactory();
+  for (const createWorker of [null, fake.create]) {
+    const host = createWorkerHost({
+      createWorker,
+      profile: {maxSlots: 1, maxPending: 2, maxReservedBytes: total - 1},
+    });
+    try {
+      assert.deepEqual(await fixed.prepare(host, owner(), input, signal()), {status: 'oversized'});
+      assert.equal(allocations, 0);
+      assert.equal(fake.workers.length, 0);
+      assert.equal(host.stats().reservedBytes, 0);
+      assert.equal(host.stats().pending + host.stats().running, 0);
+    } finally {
+      host.dispose();
+    }
+  }
+  const host = createWorkerHost({
+    createWorker: null,
+    profile: {maxSlots: 1, maxPending: 2, maxReservedBytes: total},
+  });
+  try {
+    assert.equal((await fixed.prepare(host, owner(), input, signal())).status, 'done');
+    assert.equal(allocations, 1);
+    assert.equal(host.stats().reservedBytes, 0);
+  } finally {
+    host.dispose();
+  }
+});
+
 test('GEN-01 runaway and out-of-range generators fail without publishing and release reservations', async () => {
   let finals = 0;
   const forever = createGridGenerationJob(

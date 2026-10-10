@@ -153,6 +153,16 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'NUM-01',
+    title: 'Optional strict numeric modes: fixed point, binary angles and reduced-precision float',
+    docs: 'src/kits/numeric/README.md',
+    evidence: [
+      {kit: 'numeric', export: 'createFixed'},
+      {kit: 'numeric', export: 'createPrecision'},
+      {path: 'src/kits/numeric/numeric.golden.json'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',
@@ -169,6 +179,17 @@ export const FEATURES = [
     title: 'Optional bounded sphere and capsule overlap, sweep and headroom queries',
     docs: 'src/kits/volume-query/README.md',
     evidence: [{kit: 'volume-query', export: 'sweepVolume'}, {path: 'src/kits/volume-query/oracle.test.ts'}],
+  },
+  {
+    id: 'CELLS-01',
+    title: 'Optional cell and portal render culling with a conservative PVS',
+    docs: 'docs/guides/cell-culling.md',
+    evidence: [
+      {kit: 'cells', export: 'createCellView'},
+      {kit: 'cells', export: 'buildCellPvs'},
+      {kit: 'cells', export: 'createCellCuller'},
+      {path: 'src/kits/cells/reference.test.ts'},
+    ],
   },
   {
     id: 'ACTIVATION-01',
@@ -234,6 +255,17 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'NW-PRESENT',
+    title: 'Optional prediction correction smoothing and exactly-once predicted events',
+    docs: 'docs/guides/prediction-presentation.md',
+    evidence: [
+      {kit: 'network', export: 'createPredictionSmoothing'},
+      {kit: 'network', export: 'createPredictedEvents'},
+      {path: 'src/kits/network/prediction-smoothing.test.ts'},
+      {path: 'src/kits/network/predicted-events.test.ts'},
+    ],
+  },
+  {
     id: 'VISIBILITY-01',
     title: 'Bounded source-owned visibility and explored history',
     docs: 'src/kits/visibility/README.md',
@@ -258,6 +290,11 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'CONTACT-01',
+    title: 'Layered contact volumes with deterministic bounded enter/stay/exit pair events',
+    docs: 'src/kits/contact/README.md',
+    evidence: [{kit: 'contact', export: 'createContactLayer'}, {path: 'src/kits/contact/contact.test.ts'}],
+
     id: 'CAP-ACTION-PHASES',
     title: 'Creator-authored action phase windows, once-only marks and per-range claims',
     docs: 'docs/guides/action-phases.md',
@@ -298,6 +335,46 @@ export const FEATURES = [
     title: 'Grid-step actor movement with classified bumps, ledges, forced tiles and follower lines',
     docs: 'src/kits/grid-step/README.md',
     evidence: [{kit: 'grid-step', export: 'createGridStepper'}, {path: 'src/kits/grid-step/grid-step.test.ts'}],
+  },
+  {
+    id: 'MEDIA-01',
+    title: 'Medium volumes with hysteresis state tracking and buoyancy, drag and current accelerations',
+    docs: 'src/kits/media/README.md',
+    evidence: [
+      {kit: 'media', export: 'createMediumVolumes'},
+      {kit: 'media', export: 'createMediumTracker'},
+      {path: 'src/kits/media/media.test.ts'},
+    ],
+  },
+  {
+    id: 'AUDIO-EXTRAS-01',
+    title: 'Character listener blend, Doppler, retrigger pitch, instance limits and quantized adaptive music',
+    docs: 'src/kits/audio-mixer/README.md',
+    evidence: [
+      {kit: 'audio-mixer', export: 'blendListener'},
+      {kit: 'audio-mixer', export: 'dopplerRate'},
+      {kit: 'audio-mixer', export: 'createMusicDirector'},
+      {path: 'src/kits/audio-mixer/extras.test.ts'},
+    ],
+  },
+  {
+    id: 'PRESENTATION-01',
+    title: 'Screen transitions with input lock, time-of-day curves, weather blending and HUD roll-ups',
+    docs: 'src/kits/presentation/README.md',
+    evidence: [
+      {kit: 'presentation', export: 'createScreenTransition'},
+      {kit: 'presentation', export: 'createWeatherDirector'},
+      {path: 'src/kits/presentation/presentation.test.ts'},
+    ],
+  },
+  {
+    id: 'COMPANION-RECOVERY-01',
+    title: 'Companion catch-up and safe teleport recovery on breadcrumb trails',
+    docs: 'src/kits/breadcrumbs/README.md',
+    evidence: [
+      {kit: 'breadcrumbs', export: 'createCompanionRecovery'},
+      {path: 'src/kits/breadcrumbs/recovery.test.ts'},
+    ],
   },
   {
     id: 'VIS-01',
@@ -413,6 +490,12 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'GEN-03',
+    title: 'Optional bounded cellular Rust/WASM worker kernel',
+    docs: 'docs/guides/cellular-wasm.md',
+    evidence: [{kit: 'procgen', export: 'prepareCellularGridWasm'}],
+  },
+  {
     id: 'GEN-02',
     title: 'Bounded binary record store for large edited worlds',
     pr: 56,
@@ -450,6 +533,12 @@ export const FEATURES = [
     pr: 126,
     docs: 'docs/guides/model-contracts.md',
     evidence: [{script: 'asset:verify'}],
+  },
+  {
+    id: 'ASSET-LEGACY',
+    title: 'Legacy game and multimedia format decoders in npm run convert',
+    docs: 'tools/convert/README.md',
+    evidence: [{path: 'tools/convert/legacy.mjs'}, {path: 'tools/convert/legacy.test.mjs'}],
   },
   {
     id: 'ASSET-CONVERT',

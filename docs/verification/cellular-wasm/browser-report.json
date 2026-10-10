@@ -1,0 +1,190 @@
+{
+  "baseRevision": "e7e427063ea3d1a036c8e64c854abe4d202e40be",
+  "dirtyWorktree": true,
+  "source": {
+    "algorithm": "sha256",
+    "framing": "UTF-8 path byte length:path:file byte length:raw file bytes",
+    "digest": "b5ce90239e2fc3964592f0eb0d981f5d4802fd11bdfc1dbeb030a413f6632dc6",
+    "files": [
+      {
+        "path": "scripts/play/cellular-wasm-check.mjs",
+        "bytes": 5048,
+        "sha256": "1a40db4b8bd11e907fd4042c9f2ecc608097055a726f1777da1d5ebbd3e751df"
+      },
+      {
+        "path": "scripts/play/fixtures/cellular-wasm-entry.mjs",
+        "bytes": 6552,
+        "sha256": "c9ce8178b9bd5cfecb9419e9bce6bd0b184d68056bd7fbab97ce8b3d274cb81d"
+      },
+      {
+        "path": "src/core/rng.ts",
+        "bytes": 6467,
+        "sha256": "d51256e7b7d2e6931d47d0724943bd040d6de3475b75332423ffb875e9fd0fd9"
+      },
+      {
+        "path": "src/kits/procgen/cellular-wasm-bytes.ts",
+        "bytes": 3118,
+        "sha256": "c280da76e85ad23a4a1de800a3ea730ad66c017bdfadbb5648ac0da51cc15c22"
+      },
+      {
+        "path": "src/kits/procgen/cellular-wasm.ts",
+        "bytes": 4454,
+        "sha256": "83419a3603e5b3f9f69d7abf363a7b6f1c92aff7f68d022862743015615bdf7b"
+      },
+      {
+        "path": "src/kits/procgen/cellular.ts",
+        "bytes": 3278,
+        "sha256": "768bb683d504538b0c205f2d2ff06b581858e8ae0600f510296b727cf5521d0d"
+      },
+      {
+        "path": "src/kits/procgen/grid-job.ts",
+        "bytes": 18659,
+        "sha256": "ff10aefbc721449eb7769759bcba9a3cd613ba58e3f2790912f2bc954e2b4ffa"
+      },
+      {
+        "path": "src/kits/procgen/workers/cellular-wasm.job.ts",
+        "bytes": 97,
+        "sha256": "6bb9f4ec1801652d00aef65a649b5f5cf904298962abc227f9e69b1f78d56d3b"
+      },
+      {
+        "path": "src/platform/workers/host.ts",
+        "bytes": 21040,
+        "sha256": "9594cf6441bbe1bb667729b5622d2ed8fdd30834589b9306618d43c572f5cce8"
+      },
+      {
+        "path": "src/platform/workers/job-rows.ts",
+        "bytes": 1873,
+        "sha256": "f7a4beabcd3d5d76a5d9692b119ed22bd550891ec01f9b0e80561dd1f9c0da6d"
+      },
+      {
+        "path": "src/platform/workers/job.ts",
+        "bytes": 7622,
+        "sha256": "e3d330e50ff1bae696e480948064a68ee79ebd389b6e395a5fa7c069d120b3f2"
+      },
+      {
+        "path": "src/platform/workers/pool-sizing.ts",
+        "bytes": 2448,
+        "sha256": "d4f1913e33557edc5aa715ee88241fe2f729f88fe76370e802718a3bcdc9ec7f"
+      },
+      {
+        "path": "src/platform/workers/worker-entry.ts",
+        "bytes": 269,
+        "sha256": "1f76a0a1c0ecfce1d5e9d0ce13c7a5d17177300b2b72c0bd3aab46d582d39a97"
+      },
+      {
+        "path": "src/platform/workers/worker-runtime.ts",
+        "bytes": 2954,
+        "sha256": "c98b3a0fd9203cf81ac71969b20f26cffe506308c7a34d6dc8fe537adfc42476"
+      }
+    ]
+  },
+  "environment": {
+    "node": "v26.8.1",
+    "platform": "linux",
+    "architecture": "x64",
+    "tempDirectory": "/home/akilleez/Work/foundation-compiler-tools/rust/tmp",
+    "browserVersion": "141.0.7390.37",
+    "browserExecutable": {
+      "path": "/home/akilleez/.cache/ms-playwright/chromium-1194/chrome-linux/chrome",
+      "source": "playwright"
+    },
+    "launchArguments": [
+      "--mute-audio",
+      "--no-first-run",
+      "--no-default-browser-check",
+      "--disable-extensions",
+      "--disable-background-networking",
+      "--enable-automation",
+      "--ignore-gpu-blocklist",
+      "--window-size=800,600",
+      "--use-angle=swiftshader",
+      "--enable-unsafe-swiftshader"
+    ]
+  },
+  "passed": true,
+  "errors": [],
+  "workerUrls": [
+    "http://127.0.0.1:41777/src/platform/workers/worker-entry.ts?worker_file&type=module",
+    "http://127.0.0.1:41777/src/platform/workers/worker-entry.ts?worker_file&type=module"
+  ],
+  "limitations": [
+    "Isolated Chromium acceptance; timer progress proves task scheduling, not a physical-device latency or throughput guarantee."
+  ],
+  "result": {
+    "concurrentRunning": 2,
+    "workerTicks": 15,
+    "completion": {
+      "workers": 2,
+      "running": 0,
+      "pending": 0,
+      "reservedBytes": 0,
+      "peakRunning": 2,
+      "peakReservedBytes": 451856,
+      "workersAvailable": true
+    },
+    "fallbackTicks": 11,
+    "fallback": {
+      "workers": 0,
+      "running": 0,
+      "pending": 0,
+      "reservedBytes": 0,
+      "peakRunning": 1,
+      "peakReservedBytes": 225928,
+      "workersAvailable": false
+    },
+    "runningAtAbort": 1,
+    "cancelled": "cancelled",
+    "afterCancel": {
+      "workers": 2,
+      "running": 0,
+      "pending": 0,
+      "reservedBytes": 0,
+      "peakRunning": 2,
+      "peakReservedBytes": 1749694,
+      "workersAvailable": true
+    },
+    "recovery": "done",
+    "superseded": "superseded",
+    "stale": "superseded",
+    "ownerAborted": "cancelled",
+    "afterOwnerAbort": {
+      "workers": 2,
+      "running": 0,
+      "pending": 0,
+      "reservedBytes": 0,
+      "peakRunning": 2,
+      "peakReservedBytes": 1975622,
+      "workersAvailable": true
+    },
+    "disposed": "cancelled",
+    "afterDispose": {
+      "workers": 0,
+      "running": 0,
+      "pending": 0,
+      "reservedBytes": 0,
+      "peakRunning": 1,
+      "peakReservedBytes": 1749694,
+      "workersAvailable": true
+    },
+    "tinyBudget": "oversized",
+    "tiny": {
+      "workers": 0,
+      "running": 0,
+      "pending": 0,
+      "reservedBytes": 0,
+      "peakRunning": 0,
+      "peakReservedBytes": 0,
+      "workersAvailable": true
+    },
+    "bitExactCells": 40960,
+    "final": {
+      "workers": 2,
+      "running": 0,
+      "pending": 0,
+      "reservedBytes": 0,
+      "peakRunning": 2,
+      "peakReservedBytes": 1975622,
+      "workersAvailable": true
+    }
+  }
+}

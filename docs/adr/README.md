@@ -80,6 +80,8 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0085](0085-atomic-cell-batches-and-occupancy.md) | Atomic cell batches and immutable occupancy | Procgen / Spatial | Proposed |
 
+| [0151](0151-contact-layer.md) | Optional contact layer and touch events | Optional kits | Proposed |
+
 | [0086](0086-bounded-work-roster.md) | Bounded optional work roster | Optional composition | Proposed |
 
 | [0087](0087-rewind-history.md) | Optional bounded rewind history | Optional kits / Network authority | Proposed |
@@ -112,6 +114,8 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0112](0112-camera-director.md) | Optional camera director helpers | Camera kit | Proposed |
 
+| [0153](0153-audio-listener-and-adaptive-music.md) | Listener placement, voice rate and adaptive music | Author view / Platform audio / Optional kits | Proposed |
+
 | [0124](0124-data-defined-formulas.md) | Data-defined stat and damage formulas | Optional kits / Rules | Proposed |
 
 | [0135](0135-formula-data-import.md) | Spreadsheet import for formula sheets and lookup tables | Optional kits / Rules / Tooling | Proposed |
@@ -138,6 +142,8 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0134](0134-duplicate-detector.md) | Duplicate and near-duplicate detection as a read-only repo tool | Tooling / Assets | Proposed |
 
+| [0155](0155-companion-recovery.md) | Companion recovery on breadcrumb trails | Optional kits | Proposed |
+
 | [0140](0140-optional-car-handling.md) | Optional car handling on ray-cast wheels | Optional kits / Simulation | Proposed |
 
 | [0141](0141-optional-board-traversal.md) | Optional board traversal with authored rails | Optional kits / Simulation | Proposed |
@@ -147,3 +153,25 @@ Each file records one decision: its context, the decision and its consequences (
 | [0120](0120-optional-sandboxed-script-runtime.md) | Optional sandboxed script runtime (amends 0005 for creators who opt in) | Optional kits / Content | Proposed |
 
 | [0121](0121-optional-physics-adapter-kit.md) | Optional physics adapter kit over a lazily loaded WebAssembly library; amends the no-physics stance only for creators who opt in | Optional kits / Simulation / Dependencies | Proposed |
+
+| [0130](0130-offline-format-converters.md) | Offline format converters with provenance receipts | Tooling / Assets | Proposed |
+
+| [0136](0136-legacy-format-decoders.md) | Legacy game and multimedia format decoders in the converter toolchain | Tooling / Assets | Proposed |
+
+| [0113](0113-perception-kit.md) | Optional perception kit feeding a blackboard | Optional kits / AI | Proposed |
+
+| [0152](0152-medium-volumes.md) | Optional medium volumes | Optional kits | Proposed |
+
+| [0114](0114-navmesh-funnel-avoidance.md) | Navigation mesh queries, funnel paths and local avoidance | Optional kits / Navigation | Proposed |
+
+| [0101](0101-optional-cellular-wasm.md) | Explicit cellular WASM job with per-job fixed memory and existing worker ownership | Procgen / Workers | Proposed |
+
+| [0115](0115-traversal-helpers.md) | Ledge, ladder and pushable traversal helpers | Optional kits / Locomotion | Proposed |
+
+| [0099](0099-strict-numeric-modes.md) | Optional strict numeric modes (fixed point, binary angles, reduced precision) | Optional kits / Time and determinism | Proposed |
+
+| [0145](0145-cell-portal-culling.md) | Optional cell and portal render culling | Optional kits / Rendering scale | Proposed |
+
+| [0142](0142-prediction-presentation.md) | Optional prediction correction smoothing and predicted-event deduplication | Network kit / Prediction presentation | Proposed |
+
+| [0154](0154-presentation-kit.md) | Optional presentation kit | Optional kits | Proposed |

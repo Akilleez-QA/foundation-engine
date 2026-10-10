@@ -81,6 +81,11 @@ export interface GridGenerator {
   readonly maxValue: number;
   /** Declared extra working bytes per cell for byte admission (accounting only, not measured). Default 0, max 64. */
   readonly scratchBytesPerCell?: number;
+  /**
+   * Declared extra working bytes per job for byte admission (accounting only, not measured).
+   * Nonnegative safe integer, default 0, max 64 MiB.
+   */
+  readonly scratchFixedBytes?: number;
   readonly validate: (parameters: GridParameter) => boolean;
   /**
    * Optional upper bound on the yields `generate` makes for these dimensions and parameters. Checked against
@@ -220,13 +225,15 @@ function cellsOf(cellsX: number, cellsY: number, cellsZ: number, values: Uint16A
 /** Registers one generator under one job id. Import the result in the worker file and in the caller (fallback). */
 export function createGridGenerationJob(id: string, generator: GridGenerator, limits: Partial<GridLimits> = {}) {
   const {version, maxValue, validate, generate, slices: declareSlices} = generator,
-    scratchPerCell = generator.scratchBytesPerCell ?? 0;
+    scratchPerCell = generator.scratchBytesPerCell ?? 0,
+    scratchFixed = generator.scratchFixedBytes ?? 0;
   if (
     typeof id !== 'string' ||
     !/^job\.[\w.-]{1,200}$/.test(id) ||
     !int(version, 0, Number.MAX_SAFE_INTEGER) ||
     !int(maxValue, 0, 65535) ||
     !int(scratchPerCell, 0, 64) ||
+    !int(scratchFixed, 0, 64 * 1024 * 1024) ||
     typeof validate !== 'function' ||
     typeof generate !== 'function' ||
     (declareSlices !== undefined && typeof declareSlices !== 'function')
@@ -364,7 +371,11 @@ export function createGridGenerationJob(id: string, generator: GridGenerator, li
   const reservation = (recipe: GridRecipe) => {
     const count = recipe.cellsX * recipe.cellsY * recipe.cellsZ,
       params = recipe.parameters.length * 6 + 4096;
-    return {input: params, output: count * 2 + 4096, scratch: count * (2 + scratchPerCell) + params * 8 + 4096};
+    return {
+      input: params,
+      output: count * 2 + 4096,
+      scratch: count * (2 + scratchPerCell) + scratchFixed + params * 8 + 4096,
+    };
   };
   return Object.freeze({
     kind,
