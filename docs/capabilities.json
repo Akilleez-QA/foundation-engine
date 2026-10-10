@@ -779,6 +779,9 @@
     {
       "name": "navigation",
       "exports": [
+        "NAVMESH_LIMITS",
+        "corridor",
+        "createAvoidance",
         "createDistanceField",
         "createLifetimeRouteQueue",
         "createNavigationGraph",
@@ -788,8 +791,13 @@
         "createRouteFollower",
         "createRouteQueue",
         "crossPortal",
+        "defineNavMesh",
         "definePortal",
-        "navigation"
+        "findStraightPath",
+        "locate",
+        "navMeshGraph",
+        "navigation",
+        "walkMesh"
       ]
     },
     {

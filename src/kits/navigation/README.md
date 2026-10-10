@@ -183,3 +183,28 @@ maximum-node publication and immutability; and compose real activity lifetimes
 with entity exit choices and service claims. A logical-work comparison includes
 a negative control where one short route costs less than a complete field. These
 are headless contract checks, not browser, physical performance or movement acceptance.
+
+## Navigation meshes, funnel paths and local avoidance
+
+For continuous walkable surfaces, author a mesh of convex polygons (from a level
+editor or an offline navmesh generator) and query it here. Generation is tooling, not
+part of the kit.
+
+```ts
+import { defineNavMesh, navMeshGraph, createPathSearch, corridor, findStraightPath, locate, walkMesh, createAvoidance } from '@kits/navigation';
+const mesh = defineNavMesh({ vertices, polygons });         // validate once
+const graph = navMeshGraph(mesh);                           // reuse for every request
+const from = locate(mesh, start)!, to = locate(mesh, goal)!;
+const search = createPathSearch(graph, `p${from}`, `p${to}`); // the same incremental search
+// ... step(budget) until arrived, then:
+const straight = findStraightPath(mesh, corridor(result.path), start, goal, agentRadius);
+```
+
+| Contract | Definition |
+|---|---|
+| Mesh | `defineNavMesh({vertices, polygons, cellSize?})` takes 3–65,536 vertices and 1–16,384 strictly convex polygons of 3–16 vertex indices, counter-clockwise seen from above (+y). Each edge is shared by at most two polygons, and shared edges become portals. A uniform locator grid is built once (at most about 4 million cell entries). Invalid meshes throw `RangeError`. |
+| Locate | `locate(mesh, point, maxHeight = 2)` returns the polygon containing the point's x/z whose surface is nearest its height within `maxHeight`, or null. |
+| Routing | `navMeshGraph(mesh)` returns a `NavigationGraph` whose nodes are `p<index>` and whose edge costs are centroid → shared-edge midpoint → centroid. Plan with the existing `createPathSearch` and queues (bounded steps, cancellation), then turn the path back into polygons with `corridor(path)`. |
+| Funnel | `findStraightPath(mesh, corridor, start, goal, radius)` string-pulls through the corridor's portals in x/z and returns corner waypoints including both ends. A positive `radius` shrinks each portal from both ends, so corners keep that clearance from walls; this approximates a disc's path and can add corners near tight turns. It returns `too-narrow` when a portal is narrower than 2 × radius, `broken` for non-adjacent polygons, and at most 1,024 corners. |
+| Walk | `walkMesh(mesh, polygon, from, [dx, dz], slide = true)` moves across shared edges and stops at the first boundary edge. With `slide`, the remaining motion continues once along that edge. It returns the end position on the end polygon's plane, the end polygon, and whether a boundary was hit. At most 256 crossings. |
+| Avoidance | `createAvoidance({horizon, neighborRadius, maxNeighbors, directions, weight, maxAgents})` gives local avoidance in x/z among up to 4,096 agents. Each step, every agent picks from its preferred velocity, a stop and a fan of directions × three speeds. The chosen candidate minimises the distance to the preferred velocity plus weight / time-to-collision, using the reciprocal relative velocity (2·candidate − own − other) so both agents share the swerve. Overlapping agents prefer moving apart. Neighbours are the nearest `maxNeighbors` within range (ties by id), found through a uniform hash. Results are deterministic and capped at each agent's max speed. Static walls are not considered: run the result through `walkMesh` or character collision. |

@@ -1469,3 +1469,12 @@ state across worlds, a wrong default carry pivot, unvalidated heading, overstate
 docs, mutable returned poses and rare ulp redraws; all were fixed and the re-review was
 clean. No browser,
 visual or device evidence.
+
+## Navigation meshes, funnel and avoidance — candidate (2026-10-09)
+
+Branch `feat/navmesh-funnel-avoidance` from `a6211bd3`. Eight headless tests: point
+location with height; a funnel tight around an inner corner, radius clearance,
+too-narrow and broken corridors; a straight strip with no extra corners; moving
+across edges, stopping and sliding; sloped heights; mesh validation; two agents
+passing head-on without overlap; and eight agents swapping across a circle while
+keeping apart and arriving. No game, browser or device evidence.

@@ -1428,3 +1428,10 @@ pose-sized transitions landing on moving goals (including the scripted-shot retu
 support carry, letterbox amount and an optional director system. See
 [ADR 0112](../adr/0112-camera-director.md). Headless tests in the ledger; independent
 review and hosted CI remain required.
+
+## Navigation meshes, funnel and avoidance — candidate (2026-10-09)
+
+Navigation kit extension: convex-polygon navigation meshes with a locator, polygon graphs
+for the existing incremental search, funnel string-pulling with clearance, surface
+movement and reciprocal-velocity avoidance. See [ADR 0114](../adr/0114-navmesh-funnel-avoidance.md).
+Headless tests in the ledger; independent review and hosted CI remain required.
