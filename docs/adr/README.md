@@ -78,4 +78,4 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0085](0085-atomic-cell-batches-and-occupancy.md) | Atomic cell batches and immutable occupancy | Procgen / Spatial | Proposed |
 
-| [0100](0100-optional-board-traversal.md) | Optional board traversal with authored rails | Optional kits / Simulation | Proposed |
+| [0141](0141-optional-board-traversal.md) | Optional board traversal with authored rails | Optional kits / Simulation | Proposed |

@@ -7,7 +7,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
-- Optional board traversal (`@kits/board-traversal`): push, coast, brake and carve along the ground, charged ollies, board spin, landings judged by board angle (clean, sketchy, switched, bail), grinds on authored rail snapshots with balance, manuals and bails; one-way ground, rail and wall ports, bounded sub-steps and rail checks, transactional steps, `dmath` determinism and JSON-exact snapshot/restore, with `arcade` and `sim-lite` presets. See [ADR 0100](docs/adr/0100-optional-board-traversal.md).
+- Optional board traversal (`@kits/board-traversal`): push, coast, brake and carve along the ground, charged ollies, board spin, landings judged by board angle (clean, sketchy, switched, bail), grinds on authored rail snapshots with balance, manuals and bails; one-way ground, rail and wall ports, bounded sub-steps and rail checks, transactional steps, `dmath` determinism and JSON-exact snapshot/restore, with `arcade` and `sim-lite` presets. See [ADR 0141](docs/adr/0141-optional-board-traversal.md).
 
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 

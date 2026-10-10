@@ -1,4 +1,4 @@
-# ADR 0100: optional board traversal with authored rails
+# ADR 0141: optional board traversal with authored rails
 
 - Status: Proposed for this implementation; integration is gated by full CI.
 - Date: 2026-10-09
