@@ -126,7 +126,7 @@ It serves tests, demos and attract mode. `timelineFromHistory(history, {from?, t
 converts recorded frames into a timeline.
 
 ```ts
-import { createInputPlayback, timelineFromHistory } from '@kits/input-history';
+import { createInputPlayback, inputPlaybackSystem, timelineFromHistory } from '@kits/input-history';
 
 // A test: the scene's systems see the timeline as ctx.input.
 const playback = createInputPlayback({ events: [
@@ -134,12 +134,16 @@ const playback = createInputPlayback({ events: [
   { tick: 30, action: 'jump', kind: 'tap' },
   { t: 1.5, action: 'move', kind: 'axis', value: 0 },     // seconds, rounded to the tick
 ] });
-const t = await testScene(scene, { input: playback.source }); // call playback.step() once per fixed tick
+// inputPlaybackSystem steps it once per fixed tick; list it before every system that reads input.
+const t = await testScene(
+  defineScene({ id: 'demo', title: 'Demo', systems: [inputPlaybackSystem(playback), ...mySystems] }),
+  { input: playback.source },
+);
 
 // Attract mode: loop, and stop when the user touches anything.
 const demo = createInputPlayback({ ...timelineFromHistory(recorded), loop: true, watch: ['move', 'jump', 'menu'] });
 defineSystem({ id: 'my-game-attract', run(ctx) {
-  if (demo.step(ctx.input).status === 'cancelled') ctx.scene.goto('title');
+  if (demo.step(ctx.input).status === 'cancelled') ctx.scene.goto('title'); // the raw ctx.input, never a view
   const input = demo.over(ctx.input);  // scripted while playing, live afterwards
   // ... the game's normal logic reads `input`
 } });
@@ -149,7 +153,7 @@ defineSystem({ id: 'my-game-attract', run(ctx) {
 |---|---|
 | `press` | Pressed on its tick, held until `release`. |
 | `release` | Released. In the same tick as its press, the action is a tap. |
-| `tap` | Pressed and held for its tick only. |
+| `tap` | Pressed for its tick and never held: `pressed` true, `held` false, exactly as a real press released within one tick reads (checked against `testScene`'s `press`). |
 | `axis` | `value` in [−1, 1] from its tick until changed. |
 
 An action is either a button or an axis. Events may come in any order; within one
@@ -158,26 +162,47 @@ tick they apply in the given order. `step(live?)` makes the next tick current. G
 pressed, or |axis| > `deadzone` (default 0.2), and the pointer (`watchPointer`,
 default true). Any of these cancels with reason `'input'`.
 
+`live` must be the raw live input (`ctx.input`). Passing the playback's own `source` or
+an `over()` view throws `RangeError`: it would read the script as user input and cancel
+itself.
+
+**Stepping:**
+- Call `step` once per fixed tick, before any system reads the scripted input.
+- `inputPlaybackSystem(playback, {id?, watchLive?})` is that system: list it first in the
+  scene's `systems`, which run in list order in the fixed lane.
+- `watchLive: true` passes `ctx.input` as the live input to watch. Leave it false in a
+  test where `ctx.input` is the playback itself.
+- `over(live)` caches one view per live source, so it does not allocate per call.
+
 **Ending:**
 - Cancelling or finishing releases every scripted action.
 - `over(live)` switches to the live input on the same tick, so the touch that ended
   the demo is not lost.
-- After the last tick, `loop: true` restarts at tick 0 with everything released;
-  otherwise the status is `'finished'`.
+- After the last tick, `loop: true` takes one rest step (tick −1, everything released)
+  and then plays tick 0 again. A loop of `length` ticks therefore takes `length + 1`
+  steps, and an action held across the wrap shows a release and a fresh press, as a
+  recording of the same session would. Otherwise the status is `'finished'`.
 - `cancel(reason)` ends playback (idempotent); `restart()` returns to `'ready'`.
 - Scripted presses have no `pressedAt` timestamp (null), as in the replay kit.
 - The scripted pointer is idle.
 
 **Converter:**
 - Played one tick per recorded frame and sampled with `sampleActions`, a converted
-  history records the same cleaned held masks and edges again (tested in a `testScene`
-  round trip).
+  history records the same cleaned held masks and press/release edges again. This is
+  tested under all five opposite policies and in a `testScene` round trip. Raw-input
+  bookkeeping (such as the latest raw press of an action that lost an opposite pair)
+  can differ, because the timeline holds cleaned input.
 - Actions held at `from` become presses at tick 0.
 - Consumption marks are game decisions and are not part of the timeline.
+- The result carries `maxEvents` (its event count), so
+  `createInputPlayback(timelineFromHistory(h))` accepts more than the default 4096. A
+  range with more than 65,536 edges throws `RangeError`; convert a shorter range.
 
 **Bounds and overload:**
 - `maxEvents` is 1–65,536 (default 4096). A timeline is at most 216,000 ticks (an hour
-  at 60 Hz), with at most 64 distinct actions and 64 watched ids.
+  at 60 Hz), with at most 64 distinct actions and 64 distinct watched ids (duplicates count once).
+- Event fields are read once into locals, and the list is walked by index over its
+  captured length.
 - A malformed or oversized timeline throws `RangeError` at construction, never mid-play.
 - A step applies only that tick's events, so per-tick work is that tick's events plus
   the watched actions.
@@ -191,7 +216,7 @@ mode, so it never replaces `ctx.input` in a live visit. A scene opts in by readi
 
 ## Evidence (this candidate)
 
-**Checked (`src/kits/input-history/*.test.ts`, 23 tests):**
+**Checked (`src/kits/input-history/*.test.ts`, 28 tests):**
 - Option bounds.
 - Contiguity refusals, exact edges, taps and baselines.
 - Buffer windows: consumption, the start-of-history rule and refusal of evicted windows.
@@ -205,14 +230,28 @@ mode, so it never replaces `ctx.input` in a live visit. A scene opts in by readi
   - 13 tampered or foreign snapshots refused, with the history left unchanged.
 - Rollback sync-test integration, with negative controls for an unsaved history and an unsaved random word.
 - A `testScene` fixed-lane consumer showing a one-tick tap recorded once.
-- Scripted playback (`playback.test.ts`, 6 tests):
+- Scripted playback (`playback.test.ts`, 11 tests):
   - option bounds;
   - press, release, tap, same-tick tap, axis and seconds-to-tick semantics, tick by tick;
-  - deterministic loops;
+  - a scripted tap reading exactly like a real `testScene` press;
+  - deterministic loops with a rest step, recorded as a release and a fresh press at the wrap;
   - cancellation by held, pressed, axis and pointer input, with the deadzone and unwatched actions;
-  - a recorded `testScene` session (opposites, taps) converted and played back through `testScene({input})`, giving an identical snapshot;
+  - a recorded `testScene` session (opposites, taps) converted and played back through `testScene({input})` with `inputPlaybackSystem`, giving identical cleaned masks and edges;
+  - seeded round trips under all five opposite policies;
+  - the conversion bound and the carried `maxEvents`;
+  - refusal of its own source or view as live input, a cached view, and deduplicated watch ids;
+  - each event field read once, and indexed walking of the event list;
   - an attract-mode scene ended by a real press, after which live input drives it.
 - Review regressions: opposites held across `reset` report no false edges under all five policies; frames before the first record are outside every window; an explicit frame on an empty history throws.
+- An independent review of the first playback candidate (`92665854`) found these issues, each now fixed with a regression test:
+  - taps read as held;
+  - a looping held action was re-pressed without a release;
+  - event fields were read twice;
+  - conversions could exceed `maxEvents`;
+  - the round-trip claim went beyond what was tested;
+  - the stepping order was undocumented;
+  - stepping with its own view cancelled the playback;
+  - the watch bound counted duplicates.
 - Mutation checks each fail the suite: a greedy predecessor, a gap off by one, sequences ignoring consumption, and `last` behaving as `first`.
 
 **Not established:**

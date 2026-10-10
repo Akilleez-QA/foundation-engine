@@ -10,7 +10,7 @@
  *
  * Owns no clock, device, timer or global service: the caller decides when a tick happens.
  */
-import type {InputSource, InputState} from '../../author';
+import {defineSystem, type InputSource, type InputState, type SystemDefinition} from '../../author';
 import type {InputHistory} from './types';
 
 export const PLAYBACK_LIMITS = Object.freeze({
@@ -34,13 +34,17 @@ export type PlaybackEvent = (
 export interface PlaybackOptions {
   /**
    * Events in any order; within one tick they apply in the given order. `press` holds until `release`; `tap` is
-   * pressed and held for its tick only; `axis` sets a value in [-1, 1] until changed. An action is either a button
-   * or an axis, never both. A `press` and `release` in the same tick is a tap.
+   * pressed for its tick and never held (as a real press released within one tick reads: `pressed` true, `held`
+   * false); `axis` sets a value in [-1, 1] until changed. An action is either a button or an axis, never both. A
+   * `press` and `release` in the same tick is a tap.
    */
   readonly events: readonly PlaybackEvent[];
   /** Ticks in the timeline, at least the last event's tick + 1 (default exactly that), at most 216,000. */
   readonly length?: number;
-  /** Start again from tick 0 (all released) after the last tick (default false). */
+  /**
+   * Start again after the last tick (default false). The wrap is one rest step (tick -1, everything released), then
+   * tick 0: a loop of `length` ticks takes `length + 1` steps, and a held action shows a release before its re-press.
+   */
   readonly loop?: boolean;
   /** Seconds per tick for events given in `t` (default 1/60, the fixed step). */
   readonly step?: number;
@@ -57,7 +61,7 @@ export interface PlaybackOptions {
 export type PlaybackStatus = 'ready' | 'playing' | 'finished' | 'cancelled';
 export type PlaybackStep = Readonly<{
   status: PlaybackStatus;
-  /** The tick now current (-1 before the first step; the last played tick after the end). */
+  /** The tick now current (-1 before the first step and on a loop's rest step; the last played tick after the end). */
   tick: number;
   /** Completed loops. */
   loops: number;
@@ -70,12 +74,14 @@ export interface InputPlayback {
   readonly source: InputSource;
   /**
    * Scripted while ready or playing, `live` once finished or cancelled (the cancelling input reaches systems on the
-   * same tick). `describe` always reads `live`.
+   * same tick). `describe` always reads `live`. One view per live source, cached (no allocation per call).
    */
   over(live: InputSource): InputState;
   /**
    * Advance one tick. With `live`, any watched live input first cancels playback (status 'cancelled', reason
    * 'input', every scripted action released). After the last tick: loop, or 'finished' with everything released.
+   * `live` must be the raw live input (`ctx.input`); passing this playback's own `source` or an `over()` view throws
+   * RangeError (it would read the script as user input and cancel itself).
    */
   step(live?: InputSource): PlaybackStep;
   /** End playback now (idempotent), releasing every scripted action. */
@@ -111,36 +117,41 @@ export function createInputPlayback(options: PlaybackOptions): InputPlayback {
   if (!finite(step) || step <= 0 || step > 1) fail('step must be in (0, 1] seconds');
   const input = options.events;
   if (!Array.isArray(input)) fail('events must be an array');
-  if (input.length > maxEvents) fail(`${input.length} events exceed maxEvents ${maxEvents}`);
+  const count = input.length;
+  if (count > maxEvents) fail(`${count} events exceed maxEvents ${maxEvents}`);
   const kindOf = new Map<string, 'button' | 'axis'>();
-  const compiled: Compiled[] = input.map((e: PlaybackEvent, i) => {
+  const compiled: Compiled[] = [];
+  // Each field is read once into a local and only the locals are validated and used (a getter or proxy cannot
+  // answer differently between the check and the use); the list is walked by index over its captured length.
+  for (let i = 0; i < count; i++) {
+    const e: unknown = input[i];
     if (e === null || typeof e !== 'object') fail(`event ${i} must be an object`);
-    if (!validId(e.action)) fail(`event ${i}: action must be 1..64 characters`);
-    let tick: number;
-    if (e.tick !== undefined) {
-      if (e.t !== undefined) fail(`event ${i}: give tick or t, not both`);
-      tick = e.tick;
+    const {action, kind, tick: tickIn, t, value: valueIn} = e as Record<string, unknown>;
+    if (!validId(action)) fail(`event ${i}: action must be 1..64 characters`);
+    let tick: unknown;
+    if (tickIn !== undefined) {
+      if (t !== undefined) fail(`event ${i}: give tick or t, not both`);
+      tick = tickIn;
     } else {
-      if (!finite(e.t) || e.t < 0) fail(`event ${i}: t must be finite and >= 0`);
-      tick = Math.round(e.t / step);
+      if (!finite(t) || t < 0) fail(`event ${i}: t must be finite and >= 0`);
+      tick = Math.round(t / step);
     }
-    if (!Number.isSafeInteger(tick) || tick < 0 || tick >= PLAYBACK_LIMITS.ticks)
+    if (!Number.isSafeInteger(tick) || (tick as number) < 0 || (tick as number) >= PLAYBACK_LIMITS.ticks)
       fail(`event ${i}: tick must be an integer in 0..${PLAYBACK_LIMITS.ticks - 1}`);
-    const kind = e.kind;
     if (kind !== 'press' && kind !== 'release' && kind !== 'tap' && kind !== 'axis')
       fail(`event ${i}: unknown kind '${String(kind)}'`);
     let value = 0;
-    if (e.kind === 'axis') {
-      value = e.value;
-      if (!finite(value) || value < -1 || value > 1) fail(`event ${i}: axis value must be in [-1, 1]`);
+    if (kind === 'axis') {
+      if (!finite(valueIn) || valueIn < -1 || valueIn > 1) fail(`event ${i}: axis value must be in [-1, 1]`);
+      value = valueIn;
     }
     const role = kind === 'axis' ? 'axis' : 'button';
-    const known = kindOf.get(e.action);
-    if (known && known !== role) fail(`action '${e.action}' is used as both a button and an axis`);
-    kindOf.set(e.action, role);
+    const known = kindOf.get(action);
+    if (known && known !== role) fail(`action '${action}' is used as both a button and an axis`);
+    kindOf.set(action, role);
     if (kindOf.size > PLAYBACK_LIMITS.actions) fail('more than 64 distinct actions');
-    return Object.freeze({tick, action: e.action, kind, value});
-  });
+    compiled.push(Object.freeze({tick: tick as number, action, kind, value}));
+  }
   // Stable by tick: within a tick the given order is kept.
   const events = compiled.map((e, i) => ({e, i})).sort((a, b) => a.e.tick - b.e.tick || a.i - b.i);
   const ordered = Object.freeze(events.map(x => x.e));
@@ -150,10 +161,17 @@ export function createInputPlayback(options: PlaybackOptions): InputPlayback {
     fail(`length must be an integer in ${Math.max(1, lastTick + 1)}..${PLAYBACK_LIMITS.ticks}`);
   const loop = options.loop ?? false;
   if (typeof loop !== 'boolean') fail('loop must be a boolean');
-  const watchIn = options.watch ?? [...kindOf.keys()];
-  if (!Array.isArray(watchIn) || watchIn.length > PLAYBACK_LIMITS.actions || !watchIn.every(validId))
-    fail('watch must be at most 64 action ids');
-  const watch = Object.freeze([...new Set(watchIn)]);
+  const watchIn: unknown = options.watch ?? [...kindOf.keys()];
+  if (!Array.isArray(watchIn)) fail('watch must be an array of action ids');
+  const watchCount = watchIn.length,
+    watchSet = new Set<string>();
+  for (let i = 0; i < watchCount; i++) {
+    const id: unknown = watchIn[i];
+    if (!validId(id)) fail('watch ids must be 1..64 characters');
+    watchSet.add(id);
+    if (watchSet.size > PLAYBACK_LIMITS.actions) fail('watch must name at most 64 distinct action ids');
+  }
+  const watch = Object.freeze([...watchSet]);
   const deadzone = options.deadzone ?? 0.2;
   if (!finite(deadzone) || deadzone < 0 || deadzone >= 1) fail('deadzone must be in [0, 1)');
   const watchPointer = options.watchPointer ?? true;
@@ -161,7 +179,6 @@ export function createInputPlayback(options: PlaybackOptions): InputPlayback {
 
   const held = new Set<string>(),
     pressed = new Set<string>(),
-    tapped = new Set<string>(),
     axes = new Map<string, number>();
   let status: PlaybackStatus = 'ready',
     tick = -1,
@@ -176,7 +193,6 @@ export function createInputPlayback(options: PlaybackOptions): InputPlayback {
   function clear() {
     held.clear();
     pressed.clear();
-    tapped.clear();
     axes.clear();
   }
   function end(to: 'finished' | 'cancelled', why: string | null): PlaybackStep {
@@ -198,16 +214,22 @@ export function createInputPlayback(options: PlaybackOptions): InputPlayback {
     describe: () => null,
     pressed: (id: string) => pressed.has(id),
     pressedAt: () => null,
-    held: (id: string) => held.has(id) || tapped.has(id),
+    held: (id: string) => held.has(id),
     axis: (id: string) => axes.get(id) ?? 0,
     pointer: IDLE_POINTER,
   });
+
+  // Views are cached per live source (no allocation per call) and remembered so `step` can refuse them.
+  const views = new WeakMap<InputSource, InputState>();
+  const own = new WeakSet<InputSource>([source]);
 
   return Object.freeze({
     source,
     length,
     over(live: InputSource): InputState {
-      return Object.freeze({
+      const cached = views.get(live);
+      if (cached) return cached;
+      const view: InputState = Object.freeze({
         describe: (id: string) => live.describe(id),
         pressed: (id: string) => (playing() ? source.pressed(id) : live.pressed(id)),
         pressedAt: (id: string) => (playing() ? null : (live.pressedAt?.(id) ?? null)),
@@ -217,33 +239,35 @@ export function createInputPlayback(options: PlaybackOptions): InputPlayback {
           return playing() ? IDLE_POINTER : live.pointer;
         },
       });
+      views.set(live, view);
+      own.add(view);
+      return view;
     },
     step(live?: InputSource): PlaybackStep {
       if (!playing()) return current;
+      if (live !== undefined && own.has(live))
+        fail("step(live) needs the raw live input (ctx.input), not this playback's own source or over() view");
       if (live && liveActive(live)) return end('cancelled', 'input');
-      let at = tick + 1;
-      if (at >= length) {
-        if (!loop) {
-          tick = length - 1;
-          return end('finished', null);
-        }
-        at = 0;
+      pressed.clear();
+      if (tick === length - 1) {
+        if (!loop) return end('finished', null);
+        // The wrap is one rest tick with everything released, so an action held at the end and pressed again at
+        // tick 0 shows a release and a fresh press, as a recording of the same session would.
+        clear();
         loops++;
         next = 0;
-        clear();
+        tick = -1;
+        status = 'playing';
+        return (current = snapshot());
       }
-      pressed.clear();
-      tapped.clear();
+      const at = tick + 1;
       for (; next < ordered.length && ordered[next]!.tick === at; next++) {
         const e = ordered[next]!;
         if (e.kind === 'axis') axes.set(e.action, e.value);
-        else if (e.kind === 'release') {
-          if (pressed.has(e.action)) tapped.add(e.action); // pressed and released in one tick: a tap
-          held.delete(e.action);
-        } else {
-          if (!held.has(e.action) && !tapped.has(e.action)) pressed.add(e.action);
+        else if (e.kind === 'release') held.delete(e.action);
+        else {
+          if (!held.has(e.action)) pressed.add(e.action);
           if (e.kind === 'press') held.add(e.action);
-          else tapped.add(e.action);
         }
       }
       tick = at;
@@ -270,13 +294,17 @@ export function createInputPlayback(options: PlaybackOptions): InputPlayback {
 /**
  * Convert retained input-history frames into a playback timeline (tick 0 = `from`, default the oldest retained
  * frame; `to` default the latest). Actions already held at `from` become presses at tick 0. Played back one tick per
- * recorded frame and sampled with `sampleActions`, it records the same cleaned held masks again. Consumption marks
- * are game decisions and are not part of the timeline.
+ * recorded frame and sampled with `sampleActions`, it records the same cleaned held masks and press/release edges
+ * again (raw-input bookkeeping such as the latest raw press of a losing opposite action may differ). Consumption
+ * marks are game decisions and are not part of the timeline.
+ *
+ * The result carries `maxEvents` (the event count, at least 1), so `createInputPlayback(timelineFromHistory(h))`
+ * accepts it. A window with more than `PLAYBACK_LIMITS.events` edges throws RangeError: convert a shorter range.
  */
 export function timelineFromHistory(
   history: InputHistory,
   range: {from?: number; to?: number} = {},
-): {events: PlaybackEvent[]; length: number} {
+): {events: PlaybackEvent[]; length: number; maxEvents: number} {
   if (history.latest() < 0) fail('the history is empty');
   const from = range.from ?? history.oldest(),
     to = range.to ?? history.latest();
@@ -289,7 +317,28 @@ export function timelineFromHistory(
       const tick = f - from;
       if (f === from ? history.held(action, f) : history.pressed(action, f)) events.push({tick, action, kind: 'press'});
       else if (f !== from && history.released(action, f)) events.push({tick, action, kind: 'release'});
+      if (events.length > PLAYBACK_LIMITS.events)
+        fail(`frames ${from}..${to} hold more than ${PLAYBACK_LIMITS.events} edges; convert a shorter range`);
     }
   }
-  return {events, length: to - from + 1};
+  return {events, length: to - from + 1, maxEvents: Math.max(1, events.length)};
+}
+
+/**
+ * A fixed-lane system that advances `playback` one tick per fixed tick. List it in the scene's `systems` before every
+ * system that reads the scripted input (systems run in list order), so they all see the same tick. With
+ * `watchLive: true` it passes `ctx.input` to `step` as the live input to watch; leave it false (the default) when
+ * `ctx.input` is the playback itself, as in `testScene(scene, { input: playback.source })`.
+ */
+export function inputPlaybackSystem(
+  playback: Pick<InputPlayback, 'step'>,
+  o: {id?: string; watchLive?: boolean} = {},
+): SystemDefinition {
+  const watchLive = o.watchLive ?? false;
+  return defineSystem({
+    id: o.id ?? 'input-history-playback',
+    run(ctx) {
+      playback.step(watchLive ? ctx.input : undefined);
+    },
+  });
 }

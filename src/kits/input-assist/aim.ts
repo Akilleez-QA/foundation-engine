@@ -5,12 +5,13 @@
  * for this frame, then asks `evaluate` for the assisted delta. Three independent effects, each with a strength in
  * [0, 1] where 0 is an exact identity:
  *
- * - selection: the candidate inside the aim cone (half angle and range, measured to the target's bounding sphere)
- *   with the highest priority, then the lowest score (angle and distance, divided by weight), then the smallest id;
+ * - selection: the candidate inside the aim cone (the half angle is measured to the target's bounding sphere, the
+ *   range to its centre) with the highest priority, then the lowest score (angle and distance, divided by weight), then the smallest id;
  *   an optional stickiness favours the previous frame's target;
  * - friction: the raw delta is scaled down while the reticle is over or near any candidate in range;
  * - magnetism: the aim (after the scaled raw delta) is pulled toward the selected target's centre at a rate per
- *   second, scaled by how much aim input the user is giving this frame; it never passes the target.
+ *   second, scaled by how much aim input the user is giving this frame; it never passes the target in yaw/pitch
+ *   space (each component moves toward the target's and stops at it).
  *
  * Angles follow the camera kit: yaw about +Y with yaw 0 looking along +Z, pitch up, direction
  * `(sin yaw cos pitch, sin pitch, cos yaw cos pitch)`. Time is an input (`dt`); nothing reads a clock, a device or
@@ -85,6 +86,8 @@ export interface AimFrame {
   readonly origin: Vec3;
   /** Current aim, radians. */
   readonly yaw: number;
+  /** Within [-π/2, π/2] (RangeError otherwise; ignored in planar mode). The output delta is not clamped: the caller
+   *  clamps the resulting pitch to its own limits. */
   readonly pitch: number;
   /** Raw aim change this frame from the aim actions, radians. */
   readonly delta: Readonly<{yaw: number; pitch: number}>;
@@ -123,10 +126,14 @@ function inRange(value: unknown, name: string, lo: number, hi: number, loOpen = 
     fail(`${name} must be in ${loOpen ? '(' : '['}${lo}, ${hi}] (got ${String(value)})`);
   return value;
 }
-const isVec = (v: unknown): v is Vec3 => Array.isArray(v) && v.length === 3 && v.every(finite);
+/** Read a vector's three components once into a fresh tuple, then validate the copy. */
 function vec(v: unknown, name: string): Vec3 {
-  if (!isVec(v)) fail(`${name} must be three finite numbers`);
-  return v;
+  if (!Array.isArray(v) || v.length !== 3) fail(`${name} must be three finite numbers`);
+  const x: unknown = v[0],
+    y: unknown = v[1],
+    z: unknown = v[2];
+  if (!finite(x) || !finite(y) || !finite(z)) fail(`${name} must be three finite numbers`);
+  return [x, y, z];
 }
 
 /** Unit direction of a yaw and pitch (the camera kit's convention). */
@@ -173,20 +180,22 @@ export function createAimAssist(options: AimAssistOptions): AimAssist {
 
   function evaluate(frame: AimFrame): AimResult {
     if (frame === null || typeof frame !== 'object') fail('frame must be an object');
-    const [ox, oy, oz] = vec(frame.origin, 'origin');
-    const yaw = frame.yaw,
-      pitch = planar ? 0 : frame.pitch;
-    if (!finite(yaw) || !finite(frame.pitch)) fail('yaw and pitch must be finite');
-    const d = frame.delta;
-    if (d === null || typeof d !== 'object' || !finite(d.yaw) || !finite(d.pitch)) fail('delta must be finite');
-    const rawYaw = d.yaw,
-      rawPitch = d.pitch;
-    if (!finite(frame.dt) || frame.dt < 0) fail('dt must be finite and >= 0');
-    const dt = Math.min(frame.dt, AIM_ASSIST_LIMITS.maxDt);
-    const list = frame.candidates;
+    // Every field is read once into a local; only the locals are validated and used.
+    const {origin, yaw, pitch: pitchIn, delta: d, dt: dtIn, candidates: list, previous: previousIn} = frame;
+    const [ox, oy, oz] = vec(origin, 'origin');
+    if (!finite(yaw) || !finite(pitchIn)) fail('yaw and pitch must be finite');
+    if (!planar && Math.abs(pitchIn) > Math.PI / 2) fail('pitch must be within [-π/2, π/2]');
+    const pitch = planar ? 0 : pitchIn;
+    if (d === null || typeof d !== 'object') fail('delta must be finite');
+    const rawYaw: unknown = d.yaw,
+      rawPitch: unknown = d.pitch;
+    if (!finite(rawYaw) || !finite(rawPitch)) fail('delta must be finite');
+    if (!finite(dtIn) || dtIn < 0) fail('dt must be finite and >= 0');
+    const dt = Math.min(dtIn, AIM_ASSIST_LIMITS.maxDt);
     if (!Array.isArray(list)) fail('candidates must be an array');
-    if (list.length > maxCandidates) fail(`${list.length} candidates exceed maxCandidates ${maxCandidates}`);
-    const previous = frame.previous ?? null;
+    const count = list.length;
+    if (count > maxCandidates) fail(`${count} candidates exceed maxCandidates ${maxCandidates}`);
+    const previous = previousIn ?? null;
 
     // Forward and per-candidate geometry. Angles to a candidate are measured to its bounding sphere's edge.
     const cp = m.cos(pitch);
@@ -196,21 +205,21 @@ export function createAimAssist(options: AimAssistOptions): AimAssist {
     const seen = new Set<string>();
     let best: {id: string; priority: number; score: number; x: number; y: number; z: number} | null = null;
     let nearestEdge = Infinity;
-    for (const c of list) {
+    for (let i = 0; i < count; i++) {
+      const c: unknown = list[i];
       if (c === null || typeof c !== 'object') fail('candidate must be an object');
-      const id = c.id;
+      const {id, position, radius, weight: weightIn, priority: priorityIn} = c as Record<string, unknown>;
       if (typeof id !== 'string' || id.length < 1 || id.length > AIM_ASSIST_LIMITS.idLength)
         fail('candidate id must be 1..64 characters');
       if (seen.has(id)) fail(`duplicate candidate id '${id}'`);
       seen.add(id);
-      const [px, py, pz] = vec(c.position, `candidate '${id}' position`);
-      const radius = c.radius;
+      const [px, py, pz] = vec(position, `candidate '${id}' position`);
       if (!finite(radius) || radius < 0) fail(`candidate '${id}' radius must be finite and >= 0`);
-      const weight = c.weight ?? 1;
+      const weight = weightIn ?? 1;
       if (!finite(weight) || weight <= 0 || weight > AIM_ASSIST_LIMITS.weight)
         fail(`candidate '${id}' weight must be in (0, 100]`);
-      const priority = c.priority ?? 0;
-      if (!Number.isInteger(priority) || Math.abs(priority) > AIM_ASSIST_LIMITS.priority)
+      const priority = priorityIn ?? 0;
+      if (!finite(priority) || !Number.isInteger(priority) || Math.abs(priority) > AIM_ASSIST_LIMITS.priority)
         fail(`candidate '${id}' priority must be an integer in [-1000, 1000]`);
       const dx = px - ox,
         dy = planar ? 0 : py - oy,
@@ -227,8 +236,11 @@ export function createAimAssist(options: AimAssistOptions): AimAssist {
         const s = radius / dist;
         edge = Math.max(0, centre - m.atan2(s, m.sqrt(1 - s * s)));
       }
+      // A candidate centred exactly on the origin has no direction: it neither slows nor attracts aim. With the origin
+      // inside a candidate's sphere (0 < dist <= radius) its edge angle is 0: full friction, and it may be selected.
+      if (dist === 0) continue;
       if (edge < nearestEdge) nearestEdge = edge;
-      if (edge > cone || dist === 0) continue;
+      if (edge > cone) continue;
       let score = ((angleWeight * edge) / cone + (distanceWeight * dist) / range) / weight;
       if (id === previous) score *= 1 - stickiness;
       if (

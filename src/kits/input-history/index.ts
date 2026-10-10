@@ -7,7 +7,7 @@ import {defineKit, type KitDefinition} from '../../author';
 import type {InputHistory} from './types';
 
 export {createInputHistory, INPUT_HISTORY_LIMITS} from './history';
-export {createInputPlayback, timelineFromHistory, PLAYBACK_LIMITS} from './playback';
+export {createInputPlayback, inputPlaybackSystem, timelineFromHistory, PLAYBACK_LIMITS} from './playback';
 export type {InputPlayback, PlaybackEvent, PlaybackOptions, PlaybackStatus, PlaybackStep} from './playback';
 export type {
   OppositePolicy,

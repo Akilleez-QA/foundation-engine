@@ -32,8 +32,8 @@ into the action layer.
      carries last frame's target. It selects in a cone (priority, then a weighted
      angle/distance score, then id) with optional stickiness, applies friction near
      any candidate in range, and adds magnetism. The pull is limited per second,
-     scaled by aim-input activity, and never passes the target. Zero strengths are an
-     exact identity.
+     scaled by aim-input activity, and never passes the target in yaw/pitch space.
+     Zero strengths are an exact identity.
    - `createFlickDetector(options)` is an O(1) state machine. A flick leaves the
      centre, crosses a threshold within a time limit, and (by default) returns within
      a hold limit. The detector re-arms only after returning inside a smaller radius,
@@ -42,12 +42,15 @@ into the action layer.
 2. **Scripted playback in `@kits/input-history`, next to the recorder.**
    - `createInputPlayback` compiles a bounded timeline (press, release, tap, axis, at
      ticks or seconds). Each `step(live?)` advances one tick into an `InputSource`.
+     A tap reads pressed and not held, as a real sub-tick press does. A loop wraps
+     through one rest step with everything released. `inputPlaybackSystem` steps it
+     first in the fixed lane.
    - Given the live input, `step` cancels on watched actions or a pointer touch. It can
      loop, and it releases everything when it ends.
    - `over(live)` gives systems a full `InputState`: scripted while playing, live
      afterwards.
-   - `timelineFromHistory` converts recorded frames, so a recorded session plays back
-     and records again unchanged.
+   - `timelineFromHistory` converts recorded frames. Played back, they record the same
+     cleaned held masks and edges again; raw-input bookkeeping can differ.
 
 Playback never replaces `ctx.input` in a live visit; a scene opts in by reading
 `over(ctx.input)`, and a test passes `playback.source` to `testScene`. The replay
@@ -77,12 +80,33 @@ pointer movement or a creator source.
 ## Evidence
 
 The evidence is headless only:
-- **Aim assist and flicks:** 16 tests, including seeded identity and no-overshoot
+- **Aim assist and flicks:** 18 tests, including seeded identity and no-overshoot
   checks, frame-rate independence at 30, 60 and 120 Hz, all 8 flick directions,
   rejection of slow drags and held pushes, and `testScene` consumers.
-- **Playback:** 6 tests, including a recorded `testScene` session that plays back
-  through `testScene({ input })` to an identical history snapshot, and an attract
-  scene ended by a real press.
+- **Playback:** 11 tests, including:
+  - a recorded `testScene` session played back through `testScene({ input })` to
+    identical cleaned masks and edges;
+  - seeded round trips under all five opposite policies;
+  - a scripted tap compared with a real `testScene` press;
+  - an attract scene ended by a real press.
 
-There is no browser, device or feel acceptance. Independent review and hosted CI are
-still required.
+## Review
+
+An independent review of `92665854` reported 16 findings, all addressed with fixes,
+regression tests or documentation:
+- taps read as held;
+- a loop re-pressed a held action without a release;
+- getters read twice and an iterator bypass of the candidate bound;
+- conversions that could exceed `maxEvents`;
+- a round-trip claim beyond the evidence;
+- undocumented stepping order, and self-cancelling through the playback's own view;
+- the yaw/pitch pull caveat;
+- no pitch range check;
+- friction from a candidate centred on the origin;
+- a header that misdescribed the range;
+- −0 directions and an angle of −π;
+- an undocumented infinite speed;
+- the watch bound counting duplicates, and per-call `over` allocation.
+
+There is no browser, device or feel acceptance. Hosted CI and a re-review of the fixes
+are still required.

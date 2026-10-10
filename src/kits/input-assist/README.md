@@ -52,9 +52,9 @@ pitch, for top-down or twin-stick aim; the raw pitch delta passes through unchan
 
 | Part | Behaviour |
 |---|---|
-| Selection | A candidate qualifies when it is within `range` and its bounding sphere reaches into the cone (angle to the sphere's edge ≤ `coneHalfAngle`). The order is highest `priority` first, then lowest score, then smallest `id` (code units). Score = `(angleWeight·edge/cone + distanceWeight·dist/range) / weight`. `previous`'s score is multiplied by `1 − stickiness`. |
+| Selection | A candidate qualifies when its centre is within `range` and its bounding sphere reaches into the cone (angle to the sphere's edge ≤ `coneHalfAngle`). A candidate centred exactly on the origin has no direction and is ignored; with the origin inside a sphere the edge angle is 0. The order is highest `priority` first, then lowest score, then smallest `id` (code units). Score = `(angleWeight·edge/cone + distanceWeight·dist/range) / weight`. `previous`'s score is multiplied by `1 − stickiness`. |
 | Friction | Uses the smallest edge angle over every candidate in range, inside the cone or not. Scale = `1 − friction·(1 − frictionFloor)·(1 − edge/frictionMargin)`, clamped to the margin. Over a target (edge 0) the raw delta is scaled by `1 − friction·(1 − frictionFloor)`. Beyond the margin it is untouched. `frictionFloor > 0`, so aim can always leave. |
-| Magnetism | The aim after the scaled raw delta moves toward the selected target's centre. It moves along the yaw/pitch offset by at most `magnetism·pullRate·activity·dt` and never past the target (fraction ≤ 1 of the offset). `activity = max(idlePull, min(1, inputSpeed / fullInputSpeed))`, where `inputSpeed` is the raw angular speed. With no aim input and `idlePull` 0, aim never moves. |
+| Magnetism | The aim after the scaled raw delta moves toward the selected target's centre. It moves along the yaw/pitch offset by at most `magnetism·pullRate·activity·dt` and never past the target **in yaw/pitch space**: each component moves toward the target's and stops at it (fraction ≤ 1 of the offset). `activity = max(idlePull, min(1, inputSpeed / fullInputSpeed))`, where `inputSpeed` is the raw angular speed. With no aim input and `idlePull` 0, aim never moves. |
 | Identity | With `friction` 0 and either `magnetism` 0 or no selected target, `delta` is exactly the raw delta (same numbers, no arithmetic). |
 
 The result is frozen: `delta`, `target`, `friction` (the scale), `pull` and `activity`.
@@ -69,12 +69,19 @@ The helper is stateless; the caller carries `previous`. `math: 'deterministic'` 
 - `dt` is clamped to 0.25 s, so a hitch cannot snap aim across the screen.
 - Candidate ids are 1–64 characters and unique. `weight` is in (0, 100], `priority` an
   integer in [−1000, 1000], and `radius` ≥ 0.
-- Any non-finite value throws `RangeError`.
+- Any non-finite value throws `RangeError`, and so does a `pitch` outside [−π/2, π/2]
+  (planar mode ignores pitch). The output delta is not clamped; the caller clamps its
+  resulting pitch.
+- Frame and candidate fields are each read once into locals, and the candidate list is
+  walked by index over its captured length, so a getter, proxy or custom iterator
+  cannot pass validation and then change the answer.
 - Work is O(candidates). The only allocations are a `Set` for duplicate ids and the result.
 
 **Limits:**
 - Pull works in yaw/pitch space and is weighted by `cos(pitch)`. Near straight up or
-  down it is less uniform.
+  down it is less uniform, and at high pitch a straight yaw/pitch step can briefly
+  increase the true angle to the target before closing it (it is not a great-circle
+  step). "Never overshoots" is guaranteed per yaw and pitch component.
 - There is no line-of-sight test (the caller filters candidates), no target-velocity
   tracking ("rotational" assist that follows a moving target), no input-direction
   gating (pulling only when aiming toward a target) and no per-device tuning. The
@@ -111,6 +118,10 @@ A flick reports:
 - `dir4` and `dir8` indices into `FLICK_DIRECTIONS_4` and `FLICK_DIRECTIONS_8`;
 - the peak `magnitude`, `speed`, and the `start`, `crossed` and report times `t`.
 
+`angle` is in (−π, π]: a peak at y = −0 to the left reads π, and −0 reads 0; `dir4` and
+`dir8` are never −0. `speed` is `Infinity` when the centre sample and the crossing
+share a timestamp; clamp it before use.
+
 | Option | Default | Range |
 |---|---|---|
 | `centreRadius` | 0.3 | (0, threshold) |
@@ -136,7 +147,7 @@ or survives its owner.
 
 ## Evidence (this candidate)
 
-Checked (headless, `src/kits/input-assist/*.test.ts`, 16 tests):
+Checked (headless, `src/kits/input-assist/*.test.ts`, 18 tests):
 - option and frame refusals;
 - an exact identity at zero strengths over 500 seeded frames in three configurations;
 - selection by cone and range to the bounding sphere, priority, weight, stickiness and
@@ -151,9 +162,21 @@ Checked (headless, `src/kits/input-assist/*.test.ts`, 16 tests):
 - non-flicks: a slow drag, a held push, under-threshold, sparse samples;
 - cross mode; re-arm hysteresis; stale and invalid refusals; bounded history; the same
   classification at 30, 60 and 120 Hz;
-- two `testScene` consumers reading axis actions in a fixed system.
+- two `testScene` consumers reading axis actions in a fixed system;
+- review regressions (below).
+
+An independent review of the first candidate (`92665854`) found these issues, each now fixed with a regression
+test:
+- frame fields read twice, so a getter could change between check and use;
+- the candidate bound could be bypassed through a custom iterator;
+- no pitch range check;
+- a candidate centred on the origin applied friction;
+- −0 direction indices, and an angle of −π for a peak at y = −0.
+
+It also found the yaw/pitch pull caveat (now documented above) and a header that said range was measured to the
+sphere (it is centre distance; now corrected).
 
 Not established:
 - tuning or feel on any device, physical sticks, touch or mice;
 - browser or device runs and a template consumer;
-- independent review and hosted CI.
+- hosted CI, and a re-review of the fixes.

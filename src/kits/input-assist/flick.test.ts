@@ -228,3 +228,33 @@ test('FLICK in a scene: a fixed system samples the stick axis actions with the s
   assert.deepEqual(seen, [6]);
   t.dispose();
 });
+
+test('FLICK review regressions: no -0 directions; a peak at y = -0 to the left reads π', () => {
+  const d = createFlickDetector({confirm: 'cross'});
+  const right = feed(d, [
+    [0, 0],
+    [1, -0],
+  ])[0]!;
+  assert.ok(Object.is(right.angle, 0) && Object.is(right.dir4, 0) && Object.is(right.dir8, 0));
+  const left = feed(
+    d,
+    [
+      [0, 0],
+      [-1, -0],
+    ],
+    60,
+    1,
+  )[0]!;
+  assert.equal(left.angle, Math.PI);
+  assert.equal(FLICK_DIRECTIONS_8[left.dir8], 'left');
+  const slightlyBelow = feed(
+    d,
+    [
+      [0, 0],
+      [1, -0.01],
+    ],
+    60,
+    2,
+  )[0]!;
+  assert.ok(Object.is(slightlyBelow.dir8, 0) && Object.is(slightlyBelow.dir4, 0), 'a rounded -0 sector is 0');
+});

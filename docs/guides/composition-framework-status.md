@@ -1107,7 +1107,7 @@ Evidence: focused headless tests (blob ids equal `git hash-object`; geometry, im
 `@kits/input-assist` adds `createAimAssist`, a pure and stateless evaluator over one frame's aim action values:
 - cone selection by priority, weighted angle and distance score, stickiness and id;
 - friction near any candidate in range;
-- magnetism limited per second, scaled by aim-input activity and never passing the target;
+- magnetism limited per second, scaled by aim-input activity and never passing the target in yaw/pitch space;
 - zero strengths are an exact identity; at most 256 candidates per evaluation.
 
 It also adds `createFlickDetector`, an O(1) state machine with time limits, re-arm hysteresis, 4- and 8-way
@@ -1115,15 +1115,19 @@ directions and a bounded flick history.
 
 `@kits/input-history` adds `createInputPlayback`, a bounded timeline (press, release, tap, axis at ticks or seconds)
 played one tick per `step` into an `InputSource`. It can loop, cancels on watched live input or a pointer touch, and
-`over(ctx.input)` switches to live input on the same tick. `timelineFromHistory` converts a recording, so it plays
-back and records again unchanged. Playback never replaces `ctx.input` in a live visit.
+`over(ctx.input)` switches to live input on the same tick. A tap reads pressed and not held, a loop wraps through a
+released rest step, and `inputPlaybackSystem` steps it first in the fixed lane. `timelineFromHistory` converts a
+recording; played back, it records the same cleaned masks and edges. Playback never replaces `ctx.input` in a live
+visit.
 [Input assist README](../../src/kits/input-assist/README.md), [playback](../../src/kits/input-history/README.md#scripted-playback),
 [ADR 0119](../adr/0119-input-assist.md).
 
 Status: implemented, with headless tests:
-- 16 input-assist tests: seeded identity and no-overshoot checks, frame-rate independence at 30, 60 and 120 Hz,
+- 18 input-assist tests: seeded identity and no-overshoot checks, frame-rate independence at 30, 60 and 120 Hz,
   8-way flicks, slow drags and held pushes rejected, `testScene` consumers;
-- 6 playback tests, including a recorded `testScene` session played back through `testScene({ input })` to an
-  identical history snapshot, and an attract scene ended by a real press.
+- 11 playback tests, including a recorded `testScene` session played back to identical cleaned masks and edges,
+  round trips under all five opposite policies, a tap compared with a real `testScene` press, and an attract scene
+  ended by a real press.
 
-Independent review and hosted CI are still required. There is no browser, device, feel or template evidence.
+An independent review of `92665854` reported 16 findings, all fixed with regression tests or documented (see
+[ADR 0119](../adr/0119-input-assist.md#review)). Hosted CI and a re-review of the fixes are still required. There is no browser, device, feel or template evidence.

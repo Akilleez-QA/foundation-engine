@@ -69,7 +69,10 @@ export interface Flick {
   /** Quantised direction: index into FLICK_DIRECTIONS_4 / FLICK_DIRECTIONS_8. */
   readonly dir4: number;
   readonly dir8: number;
-  /** Peak magnitude of the excursion, and peak / (crossed - start) in magnitude units per second (Infinity at 0 s). */
+  /**
+   * Peak magnitude of the excursion, and peak / (crossed - start) in magnitude units per second. `speed` is Infinity
+   * when the centre sample and the crossing share a timestamp (two samples with equal times); clamp it before use.
+   */
   readonly magnitude: number;
   readonly speed: number;
 }
@@ -143,11 +146,12 @@ export function createFlickDetector(options: FlickOptions = {}): FlickDetector {
   const history: Flick[] = [];
 
   const quantise = (angle: number, ways: number) => {
-    const i = Math.round(angle / ((2 * Math.PI) / ways)) % ways;
-    return i < 0 ? i + ways : i;
+    // (+ ways) % ways maps negative sectors and a rounded -0 to 0..ways-1 (never -0).
+    return (Math.round(angle / ((2 * Math.PI) / ways)) + ways) % ways;
   };
   function report(t: number): FlickSampleResult {
-    const angle = m.atan2(peakY, peakX),
+    const raw = m.atan2(peakY, peakX);
+    const angle = raw === -Math.PI ? Math.PI : raw + 0, // (-π, π]: a peak at y = -0 reads π, and -0 reads 0
       span = crossAt - centreAt;
     const flick: Flick = Object.freeze({
       n: ++count,

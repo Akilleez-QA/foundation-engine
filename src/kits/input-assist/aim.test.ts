@@ -261,3 +261,34 @@ test('AIM in a scene: a fixed system reads the aim axis action (never a device) 
   assert.equal(aim.yaw, settled, 'input released: magnetism stops');
   t.dispose();
 });
+
+test('AIM review regressions: fields read once, indexed candidates, pitch range, and a centred candidate', () => {
+  const a = createAimAssist({...base, friction: 1, maxCandidates: 1});
+  // A getter that would pass validation and then change is read once.
+  let reads = 0;
+  const f = {
+    ...frame({c: [at('t', 0, 0, 10)]}),
+    get dt() {
+      reads++;
+      return reads === 1 ? 1 / 60 : Number.NaN;
+    },
+  };
+  assert.equal(a.evaluate(f).target, 't');
+  assert.equal(reads, 1);
+  // A list whose iterator yields more than its length cannot slip past maxCandidates.
+  const list: AimCandidate[] = [at('only', 0.5, 0, 10, 0)];
+  Object.defineProperty(list, Symbol.iterator, {
+    value: function* () {
+      yield* [at('only', 0.5, 0, 10, 0), at('hidden', 0, 0, 10, 1)];
+    },
+  });
+  const r = a.evaluate(frame({dy: 0.01, c: list}));
+  assert.equal(r.target, null, 'only the indexed candidate (outside the cone) was considered');
+  assert.equal(r.friction, 1);
+  // Pitch beyond straight up or down is refused (planar mode ignores pitch).
+  assert.throws(() => a.evaluate(frame({pitch: 1.6})), RangeError);
+  assert.equal(createAimAssist({...base, planar: true}).evaluate(frame({pitch: 3})).target, null);
+  // A candidate centred on the origin neither slows nor attracts; one with the origin inside its sphere slows fully.
+  assert.equal(a.evaluate(frame({dy: 0.01, c: [{id: 'c', position: [0, 0, 0], radius: 1}]})).friction, 1);
+  assert.equal(a.evaluate(frame({dy: 0.01, c: [{id: 'c', position: [0, 0, -0.5], radius: 1}]})).friction, 0.25);
+});
