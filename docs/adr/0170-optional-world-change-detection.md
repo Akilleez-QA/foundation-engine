@@ -1,4 +1,4 @@
-# ADR 0141: optional world change detection, observers and cached queries
+# ADR 0170: optional world change detection, observers and cached queries
 
 - Status: Proposed for this implementation; integration is gated by full CI.
 - **Tracking:** [Issue #303](https://github.com/Akilleez-QA/foundation-engine/issues/303)
