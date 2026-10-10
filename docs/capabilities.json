@@ -467,7 +467,7 @@
     {"name": "assignments", "exports": ["createAssignments"]},
     {"name": "audio-mixer", "exports": ["audioMixer", "createCueMixer", "createDucking"]},
     {"name": "authoring", "exports": ["authoredReference", "createAuthoredDocument", "createAuthoringSession"]},
-    {"name": "camera", "exports": ["camera", "cameraPose", "cameraSystem", "clearCamera"]},
+    {"name": "camera", "exports": ["CAMERA_MIN_DISTANCE", "camera", "cameraPose", "cameraSystem", "clearCamera"]},
     {
       "name": "capabilities",
       "exports": [

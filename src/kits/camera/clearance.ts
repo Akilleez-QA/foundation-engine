@@ -6,12 +6,30 @@ export interface Pose {
 
 /** Return distance to first obstruction along this finite segment, or null when clear. */
 export type CameraObstruction = (from: Vec3, to: Vec3) => number | null;
-/** Resolve after smoothing. Five parallel rays approximate a camera footprint; this is not a swept sphere. */
-export function clearCamera(pose: Pose, obstruction: CameraObstruction, radius = 0.15, padding = 0.1): Pose {
+/** Default closest approach to the target after clearance, in world units. */
+export const CAMERA_MIN_DISTANCE = 0.05;
+/**
+ * Resolve after smoothing. Five parallel rays approximate a camera footprint; this is not a swept sphere.
+ * The result never comes closer to the target than `minDistance` (or the requested distance, if shorter),
+ * so the view keeps a defined direction even when an obstruction touches the target. The floor wins over
+ * the obstruction: inside it the camera may sit within geometry the creator should fade or hide.
+ */
+export function clearCamera(
+  pose: Pose,
+  obstruction: CameraObstruction,
+  radius = 0.15,
+  padding = 0.1,
+  minDistance = CAMERA_MIN_DISTANCE,
+): Pose {
   if (pose.position.length !== 3 || pose.target.length !== 3)
     throw new RangeError('camera: expected three coordinates');
   pose = {position: [...pose.position], target: [...pose.target]};
-  if (![...pose.position, ...pose.target, radius, padding].every(Number.isFinite) || radius < 0 || padding < 0)
+  if (
+    ![...pose.position, ...pose.target, radius, padding, minDistance].every(Number.isFinite) ||
+    radius < 0 ||
+    padding < 0 ||
+    minDistance <= 0
+  )
     throw new RangeError('camera: invalid clearance input');
   // Every Vec3 here has three coordinates (checked above), so each map index i is in range.
   const d = pose.position.map((v, i) => v - pose.target[i]!) as Vec3;
@@ -44,5 +62,8 @@ export function clearCamera(pose: Pose, obstruction: CameraObstruction, radius =
       throw new RangeError('camera: obstruction distance outside segment');
     safe = Math.min(safe, Math.max(0, hit - padding));
   }
-  return {target: [...pose.target], position: pose.target.map((v, i) => v + direction[i]! * safe) as Vec3};
+  if (safe === length) return {target: [...pose.target], position: [...pose.position]};
+  const distance = Math.max(safe, Math.min(minDistance, length));
+  if (distance === length) return {target: [...pose.target], position: [...pose.position]};
+  return {target: [...pose.target], position: pose.target.map((v, i) => v + direction[i]! * distance) as Vec3};
 }

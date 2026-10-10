@@ -24,7 +24,7 @@ import {
 } from '../../author';
 
 import {clearCamera, type CameraObstruction, type Pose} from './clearance';
-export {clearCamera, type CameraObstruction, type Pose} from './clearance';
+export {CAMERA_MIN_DISTANCE, clearCamera, type CameraObstruction, type Pose} from './clearance';
 
 export type CameraMode = 'follow' | 'orbit' | 'first-person' | 'top-down' | 'side-scroll' | 'fixed';
 export interface CameraOptions {
@@ -96,6 +96,8 @@ export function cameraSystem(
     obstruction?: CameraObstruction;
     clearanceRadius?: number;
     clearancePadding?: number;
+    /** Closest approach to the target after clearance (default `CAMERA_MIN_DISTANCE`, 0.05). */
+    clearanceMinDistance?: number;
     teleportDistance?: number;
     resetRevision?: (ctx: SceneContext) => number;
   } = {},
@@ -137,7 +139,7 @@ export function cameraSystem(
       };
       const eased = {position: ease(cam.position, pose.position), target: ease(cam.target, pose.target)};
       const {position, target} = o.obstruction
-        ? clearCamera(eased, o.obstruction, o.clearanceRadius, o.clearancePadding)
+        ? clearCamera(eased, o.obstruction, o.clearanceRadius, o.clearancePadding, o.clearanceMinDistance)
         : eased;
       if (position.some((v, i) => v !== cam.position[i]) || target.some((v, i) => v !== cam.target[i])) {
         cam.position = position;
