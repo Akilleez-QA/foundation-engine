@@ -72,6 +72,23 @@ test('composes with the core GameClock: wakes at windowEnd through clock.schedul
   assert.equal(skipped.final.dayIndex, 2);
 });
 
+test('the README wake recipe terminates on the core GameClock with non-dyadic boundaries (review C1 repro)', () => {
+  const s = defineSchedule(defineScheduleCalendar({dayLength: 1.1, epoch: 0.3}), {
+    id: 'c1',
+    idle: {id: 'home', anchor: 'house', activity: 'rest'},
+    variants: [{id: 'v', windows: [{id: 'work', start: 0.2, end: 0.7, anchor: 'field', activity: 'work'}]}],
+  });
+  const {clock, driver} = createClock({realNow: () => 0, state: {ut: 0.31, lastRealMs: 0}});
+  let wakes = 0;
+  const follow = () => {
+    assert.ok(++wakes < 1000, 'no wake loop');
+    clock.schedule(schedulePlacement(s, clock.ut).windowEnd, follow);
+  };
+  follow();
+  for (let k = 0; k < 40; k++) driver.advance(0.25);
+  assert.ok(clock.ut >= 10 && wakes >= 20 && wakes <= 35, `ut ${clock.ut}, wakes ${wakes}`);
+});
+
 test('composes with the itinerary kit: each scheduled window becomes an order the itinerary controller runs', () => {
   const s = defineSchedule(calendar, farmer);
   const route = createItinerary({maxOrders: 4, maxTextLength: 32, tags: ['visit']});
@@ -93,7 +110,7 @@ test('composes with the itinerary kit: each scheduled window becomes an order th
       ticket = route.begin();
       assert.ok(ticket);
       assert.equal(ticket.order.destination.id, p.entry.anchor);
-      assert.ok(ticket.order.value <= p.windowEnd - ut + 1);
+      assert.equal(ticket.order.value, Math.ceil(p.windowEnd), 'absolute deadline, never stale');
     }
     // Movement adapter: a travel window arrives when its progress completes; a stationary one at once.
     if (ticket && (!p.travel || p.progress > 0.9) && route.check(ticket)) {
@@ -159,7 +176,13 @@ test('composes with region activation: a dormant actor appears at its scheduled 
     regions.update(out);
     for (let k = 0; k < out.activatedCount; k++) {
       const region = out.activated[k]!;
-      for (const actor of [1, 2]) {
+      // Candidates come from the roster's anchor index: only actors whose schedule names an anchor in this region.
+      const candidates = new Set(
+        Object.keys(anchors)
+          .filter(a => regions.regionAt(anchors[a]!.x, anchors[a]!.y) === region)
+          .flatMap(a => roster.actorsMentioning(a)),
+      );
+      for (const actor of candidates) {
         if (live.has(actor)) continue;
         const p = roster.placement(actor, ut)!; // O(variants + log windows) per dormant actor
         const at = positionOf(p);
@@ -200,6 +223,56 @@ test('composes with region activation: a dormant actor appears at its scheduled 
     skipped.transitions.map(t => t.entry.id),
     ['plough'],
   );
+  assert.deepEqual(roster.actorsMentioning('tavern'), [1, 2]);
+  assert.deepEqual(roster.actorsMentioning('well'), [1]);
+  regions.dispose();
+  roster.dispose();
+});
+
+test('region stays active: a dormant actor scheduled into it appears through a clock wake at its windowEnd', () => {
+  const limits: RegionActivationLimits = {
+    cellSize: 10,
+    minX: 0,
+    minY: 0,
+    maxX: 50,
+    maxY: 10,
+    maxRegions: 5,
+    activateRadius: 1,
+    releaseRadius: 2,
+    lingerUpdates: 0,
+    maxObservers: 1,
+    maxActive: 5,
+    maxPins: 1,
+    maxActivationsPerUpdate: 5,
+    maxDeactivationsPerUpdate: 5,
+    maxCellsPerObserver: 9,
+  };
+  const regions = createRegionActivation(limits);
+  const out = createRegionUpdateResult(limits);
+  const roster = createScheduleRoster({maxActors: 4});
+  roster.assign(7, defineSchedule(calendar, farmer));
+  const {clock, driver} = createClock({realNow: () => 0, state: {ut: h(5), lastRealMs: 0}});
+  // The observer stands in the field all day: region 2 activates once and never changes again.
+  regions.addObserver(0, 25, 5);
+  regions.update(out);
+  assert.deepEqual([...out.activated.subarray(0, out.activatedCount)], [2]);
+  const spawned: {ut: number; entry: string}[] = [];
+  // The caller schedules windowEnd wakes for every dormant actor (roster.actors() enumerates them); region
+  // activation alone never reports a region that is already active.
+  const wake = (actor: number) => {
+    const p = roster.placement(actor, clock.ut)!;
+    const a = anchors[p.entry.anchor]!;
+    if (!p.travel && regions.isActive(regions.regionAt(a.x, a.y))) spawned.push({ut: clock.ut, entry: p.entry.id});
+    else clock.schedule(p.windowEnd, () => wake(actor));
+  };
+  for (const actor of roster.actors()) wake(actor);
+  clock.requestWarp({owner: 'test', rate: 100, mode: 'rails'});
+  for (let k = 0; k < 2000 && spawned.length === 0; k++) {
+    driver.advance(0.25);
+    regions.update(out);
+    assert.equal(out.activatedCount, 0, 'the region never re-activates');
+  }
+  assert.deepEqual(spawned, [{ut: h(7), entry: 'plough'}]);
   regions.dispose();
   roster.dispose();
 });

@@ -11,6 +11,7 @@ import {
   SCHEDULE_LIMITS,
   type Schedule,
   type ScheduleInput,
+  type SchedulePlacement,
   type ScheduleWindowInput,
 } from './index';
 
@@ -312,10 +313,18 @@ test('roster bounds actors, replaces, refuses foreign schedules and closes', () 
   assert.equal(roster.assign(2, s), 'replaced');
   assert.throws(() => roster.assign(-1, s), TypeError);
   assert.throws(() => roster.assign(4, {...s}), TypeError);
+  const fake = Object.freeze({...s, shortestSegment: Number.NaN});
+  assert.throws(() => roster.assign(4, fake), TypeError, 'a hand-built frozen schedule is refused');
+  assert.throws(() => schedulePlacement(fake, 0), TypeError);
+  assert.throws(() => scheduleCatchUp(fake, 0, 1), TypeError);
+  assert.deepEqual(roster.actors(), [1, 2]);
+  assert.deepEqual(roster.actorsMentioning('tavern'), [1, 2]);
+  assert.deepEqual(roster.actorsMentioning('nowhere'), []);
   assert.equal(roster.placement(1, at(1, 9))?.entry.id, 'bake');
   assert.equal(roster.placement(3, at(1, 9)), null);
   assert.equal(roster.catchUp(1, at(1, 9), at(1, 13))?.transitions.length, 2);
   assert.equal(roster.unassign(2), 'removed');
+  assert.deepEqual(roster.actorsMentioning('tavern'), [1]);
   assert.equal(roster.unassign(2), 'absent');
   roster.dispose();
   roster.dispose();
@@ -324,11 +333,142 @@ test('roster bounds actors, replaces, refuses foreign schedules and closes', () 
   assert.equal(roster.size, 0);
 });
 
-test('itinerary order helper validates and points at the placement anchor with the remaining window time', () => {
+test('itinerary order helper gives an absolute deadline and refuses what the itinerary would reject', () => {
   const s = defineSchedule(cal, baker);
   const p = schedulePlacement(s, at(1, 6.5));
   const order = scheduleItineraryOrder(p, {tag: 'visit', generation: 3});
-  assert.deepEqual(order, {tag: 'visit', destination: {id: 'bakery', generation: 3}, value: 2});
+  assert.deepEqual(order, {tag: 'visit', destination: {id: 'bakery', generation: 3}, value: at(1, 8)});
+  // The same window evaluated later gives the same deadline: the value does not go stale.
+  assert.equal(scheduleItineraryOrder(schedulePlacement(s, at(1, 7.9)), {tag: 'visit', generation: 3}).value, at(1, 8));
   assert.throws(() => scheduleItineraryOrder(p, {tag: '', generation: 0}), RangeError);
   assert.throws(() => scheduleItineraryOrder(p, {tag: 'visit', generation: -1}), RangeError);
+  assert.throws(() => scheduleItineraryOrder(p, {tag: 'visit', generation: 0, maxTextLength: 5}), /maxTextLength/);
+  const early = defineSchedule(defineScheduleCalendar({dayLength: 24, cycleDays: 7}), baker);
+  assert.throws(() => scheduleItineraryOrder(schedulePlacement(early, -30), {tag: 'visit', generation: 0}), RangeError);
+});
+
+/** Walk a clock-style follow loop (wake at windowEnd) and record occupant changes the way catch-up defines them. */
+function follow(s: Schedule, from: number, to: number) {
+  const key = (p: SchedulePlacement) => (p.idle ? `idle:${p.entry.id}` : `${p.dayIndex}:${p.entry.id}`);
+  let p = schedulePlacement(s, from);
+  let prev = key(p);
+  const changes: [number, string][] = [];
+  for (let steps = 0; p.windowEnd <= to; steps++) {
+    assert.ok(steps < 100000, 'follow loop bounded');
+    const next = schedulePlacement(s, p.windowEnd);
+    assert.ok(next.windowEnd > p.windowEnd, `strict progress at ${p.windowEnd}`);
+    assert.ok(next.windowStart <= next.time && next.time < next.windowEnd);
+    const k = key(next);
+    if (k !== prev) changes.push([next.time, next.entry.id]);
+    prev = k;
+    p = next;
+  }
+  return changes;
+}
+
+test('C1 regression: non-dyadic boundaries make strict progress and catch-up agrees with placement', () => {
+  // Reported repros: a wake at windowEnd returned the same occupant at the same time, and a transition's entry
+  // disagreed with the placement at that instant.
+  const c1 = defineScheduleCalendar({dayLength: 1.1, epoch: 0.3});
+  const a = defineSchedule(c1, {
+    id: 'a',
+    idle: {id: 'home', anchor: 'h', activity: 'x'},
+    variants: [{id: 'v', windows: [w('work', 0.2, 0.7, 'p')]}],
+  });
+  assert.ok(follow(a, 0.31, 6).length > 8);
+  const b = defineSchedule(c1, {
+    id: 'b',
+    idle: {id: 'home', anchor: 'h', activity: 'x'},
+    variants: [{id: 'v', windows: [w('work', 0.7, 1.1, 'p')]}],
+  });
+  const r = scheduleCatchUp(b, 3.5, 4.3);
+  for (const t of r.transitions) assert.equal(schedulePlacement(b, t.at).entry.id, t.entry.id);
+  assert.ok(r.transitions.length > 0);
+  assert.deepEqual(r.final, schedulePlacement(b, 4.3));
+});
+
+test('C1 fuzz: decimal day lengths, epochs and bounds, near zero and near 1e15', () => {
+  const rnd = mulberry32(0x5eed);
+  const dec = (n: number, places: number) => Math.round(rnd() * n * 10 ** places) / 10 ** places;
+  let checked = 0;
+  for (let trial = 0; trial < 400; trial++) {
+    const large = trial % 4 === 3;
+    const dayLength = large ? 3000 + dec(90000, 3) : 1 + dec(30, 3);
+    const unit = large ? 2 : dayLength / 50; // segments stay resolvable at the chosen magnitude
+    const epoch = large ? dec(1e6, 3) - 5e5 : dec(10, 3) - 5;
+    const c = defineScheduleCalendar({dayLength, epoch, cycleDays: 1 + Math.floor(rnd() * 3)});
+    let n = 0;
+    const variants = Array.from({length: 1 + Math.floor(rnd() * 3)}, (_, v) => {
+      const windows: ScheduleWindowInput[] = [];
+      let t = rnd() < 0.3 ? 0 : unit + dec(dayLength / 4, 3);
+      while (t + unit < dayLength && windows.length < 5) {
+        const end = Math.min(dayLength, t + unit + dec(dayLength / 4, 3));
+        if (dayLength - end > 0 && dayLength - end < unit) break;
+        windows.push(w(`w${n++}`, t, end, 'p'));
+        t = rnd() < 0.4 ? end : end + unit + dec(dayLength / 6, 3);
+      }
+      return {id: `v${v}`, ...(rnd() < 0.5 ? {days: [Math.floor(rnd() * c.cycleDays)]} : {}), windows};
+    });
+    const s = defineSchedule(c, {id: 's', idle: {id: 'idle', anchor: 'h', activity: 'x'}, variants});
+    const base = large ? (rnd() < 0.5 ? 1 : -1) * (1e15 - 1e6 - dayLength * 20) : dec(20, 3) - 10;
+    const from = base + dec(dayLength, 3);
+    const to = from + dec(dayLength * 6, 3);
+    const changes = follow(s, from, to);
+    const got = scheduleCatchUp(s, from, to, undefined, {maxTransitions: 4096});
+    assert.deepEqual(
+      got.transitions.map(t => [t.at, t.entry.id]),
+      changes,
+      `trial ${trial}`,
+    );
+    for (const t of got.transitions) assert.equal(schedulePlacement(s, t.at).entry, t.entry);
+    checked += changes.length;
+  }
+  assert.ok(checked > 1500, `exercised ${checked} transitions`);
+});
+
+test('times too large to resolve a schedule are refused, not silently merged', () => {
+  const fine = defineSchedule(defineScheduleCalendar({dayLength: 1.1, epoch: 0.3}), {
+    id: 'fine',
+    idle: {id: 'home', anchor: 'h', activity: 'x'},
+    variants: [{id: 'v', windows: [w('work', 0.2, 0.7, 'p')]}],
+  });
+  assert.equal(fine.shortestSegment, 0.2);
+  assert.throws(() => schedulePlacement(fine, 1e15), /too far from 0/);
+  assert.throws(() => scheduleCatchUp(fine, 0, 1e15), /too far from 0/);
+  assert.equal(schedulePlacement(fine, 1e12).schedule, 'fine');
+  const coarse = defineSchedule(defineScheduleCalendar({dayLength: 86400, cycleDays: 7}), baker);
+  assert.equal(schedulePlacement(coarse, 1e15 - 1).schedule, 'baker');
+});
+
+test('flag sources are validated before use, after times, and a Proxy around a Set is documented as refused', () => {
+  const plainSchedule = defineSchedule(cal, {id: 'p', idle: {id: 'i', anchor: 'a', activity: 'x'}, variants: []});
+  assert.throws(() => schedulePlacement(plainSchedule, 0, 'yes' as never), TypeError);
+  let reads = 0;
+  const s = defineSchedule(cal, baker);
+  assert.throws(() => schedulePlacement(s, Number.NaN, () => (reads++, true)), RangeError);
+  assert.throws(() => scheduleCatchUp(s, 0, Number.NaN, () => (reads++, true)), RangeError);
+  assert.equal(reads, 0, 'times are validated before any flag is read');
+  assert.throws(() => schedulePlacement(s, 0, new Proxy(new Set<string>(), {})), TypeError);
+  const real = new Set(['festival']);
+  assert.equal(
+    schedulePlacement(s, at(2, 11), f => real.has(f)).variant,
+    'holiday',
+    'wrap other sources in a predicate',
+  );
+});
+
+test('catch-up worst case stays bounded: 366-day pattern, 4,096 transitions, span 1e15', () => {
+  const year = defineScheduleCalendar({dayLength: 86400, cycleDays: 366});
+  const rare = defineSchedule(year, {
+    id: 'rare',
+    idle: {id: 'home', anchor: 'h', activity: 'x'},
+    variants: [{id: 'v', days: [365], windows: [w('fair', 3600, 7200, 'square')]}],
+  });
+  const started = performance.now();
+  const r = scheduleCatchUp(rare, -9e14, 9e14, undefined, {maxTransitions: 4096});
+  const ms = performance.now() - started;
+  assert.equal(r.transitions.length, 4096);
+  assert.equal(r.truncated, true);
+  for (let k = 1; k < r.transitions.length; k++) assert.ok(r.transitions[k]!.at > r.transitions[k - 1]!.at);
+  assert.ok(ms < 200, `took ${ms.toFixed(1)} ms`);
 });
