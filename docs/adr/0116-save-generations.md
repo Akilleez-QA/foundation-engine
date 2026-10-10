@@ -28,17 +28,26 @@ Add an optional kit, `@kits/save-generations`, layered on the existing port seam
   generation: it removes that slot's commit record first, writes every key (each value prefixed with its generation),
   then writes the record last. The record lists each key with its stored length and CRC-32 and carries a CRC-32 of
   itself, so it is a checksum over the whole multi-key payload. A slot is valid only when its record parses, names
-  this save and slot, and every listed key is present and verifies. Load verifies the higher generation, falls back to
+  this namespace, save and slot, and every listed key is present, well-formed and verifies. Load verifies the higher generation, falls back to
   the older, and re-reads the record it relied on (retrying a bounded number of times) so a concurrent writer cannot
   hand it a mix. The counter is a bounded safe integer that refuses at the ceiling instead of wrapping.
 - **One writer and recovery owner.** One owner object per port, namespace and save; a second owner on the same
   port object throws. Its operations are exclusive: a second commit or a load during a commit returns `busy`,
-  nothing is queued. `current()` gives readers the last loaded or committed generation as one frozen snapshot. A
-  commit refuses with `conflict` when the disk no longer holds the generation the owner last saw (another tab).
+  nothing is queued, and `close()` releases the claim only when an in-flight operation settles. `current()` gives
+  readers the last loaded or committed generation as one frozen snapshot. A commit refuses with `conflict` when the
+  disk no longer holds the generation the owner last saw (another tab). After writing its record, a commit reads the
+  slots back as a loader would and reports `committed` only if its generation is then the newest fully valid one;
+  otherwise `lost` (or `unconfirmed` if the read-back threw), and the owner does not adopt it. `committed` is true at
+  that moment, not a lock: owners on different port objects are not excluded and a later writer can supersede it.
+  The post-commit sweep removes only keys of older generations named by the slot's previous record or under its
+  prefix, and is skipped once the owner is stopped.
 - **Statuses, never silent loss.** Load: `loaded`, `recovered` (the other slot torn or invalid), `empty` (no record
   in either slot), `corrupt` (nothing valid, something damaged), `unavailable`, `contended`. Commit: `committed`,
-  `busy`, `not-loaded`, `conflict`, `too-large`, `exhausted`, `cancelled`, `failed`, `unavailable`, `closed`; every
-  status except `committed` leaves the previous generation authoritative.
+  `lost`, `unconfirmed`, `busy`, `not-loaded`, `conflict`, `too-large`, `exhausted`, `cancelled`, `failed`, `unavailable`, `closed`; every
+  status except `committed`, `lost` and `unconfirmed` leaves the previous generation authoritative without writing
+  a record.
+- **Inputs.** Each entry value is read once; payloads must be well-formed text, because a lone surrogate encodes to
+  U+FFFD and could not be told apart by the UTF-8 checksum (`RangeError` at commit, `invalid` when stored).
 - **Bounds.** Keys per generation (16, at most 256), characters per payload (262,144, at most 2,000,000) and per
   generation (1,048,576, at most 4,000,000), load attempts (3, at most 8). Oversized input is refused before any write.
 - **Cancellation.** A signal checked before every write, and `close()`; the record is never written after either.
@@ -62,6 +71,14 @@ Web Storage, which has no multi-key atomicity.
   randomised fault sequence, a live `SaveStore` sharing the port, and runs over the IndexedDB-shaped test double
   through the chunk port (quota at every put, a connection closed mid-commit, corrupted rows). The double is not a
   browser: real IndexedDB, real Web Storage, power loss and physical devices are unverified.
-- Not a cross-tab lock: a commit can be lost to another tab's (reported as `conflict`), though load stays coherent.
+- An independent review of the first implementation found that racing owners could both report `committed`, that
+  `close()` released the claim mid-commit and its sweep could remove a successor's keys, that values were read
+  several times, that lone surrogates were indistinguishable and that the record lacked the namespace. All were fixed
+  with regression tests, including a two-owner race and a seeded fuzz of racing asynchronous owners that replays the
+  mutation log and checks every `committed` result was the head at some moment.
+- Not a cross-writer lock: racing commits mostly end `lost` or `conflict`; a confirmed commit can be superseded later,
+  and the sweep's read-then-remove has a small window against another writer. Loads stay coherent. Ports without
+  `keys()` can leave unnamed keys of an interrupted commit until a reset. Bound ceilings can exceed a browser's Web
+  Storage quota (refused at runtime as `failed`). A save store must not use the namespace `<namespace>-gen`.
   CRC-32 detects accidental damage, not tampering. Every commit rewrites the whole generation; two slots double the
   stored size. Payload versioning, export and import remain the creator's.

@@ -7,8 +7,11 @@
  * itself checksummed, so a slot is valid only when its record parses and every listed key is present and verifies.
  * Load picks the newest fully valid slot and otherwise the older one; it never returns keys from two generations.
  *
- * One owner object per port and save is the only writer: a commit while another operation is in flight is refused
- * (`busy`), never queued. Runs on any `get`/`set`/`remove` port, synchronous (the save store's `StoragePort`) or
+ * One owner object per port object and save writes: a commit while another operation is in flight is refused
+ * (`busy`), never queued. After writing its record a commit reads the slots back and reports `committed` only if its
+ * generation is the newest valid one at that moment (`lost` otherwise). Owners on different port objects (other
+ * tabs, or a second `browserPort()` call) are not excluded: that read-back and the `conflict` check keep loads
+ * coherent, but they are not a lock. Runs on any `get`/`set`/`remove` port, synchronous (the save store's `StoragePort`) or
  * asynchronous. Time and randomness are not used.
  */
 import {crc32} from '../../core/save/chunk-store';
@@ -58,15 +61,21 @@ export interface LoadResult {
   readonly reason: string | null;
 }
 /**
- * `committed`: the new generation is authoritative. Every other status leaves the previous authoritative generation
- * on disk unchanged: `busy` (another operation of this owner in flight), `not-loaded` (call `load` first),
- * `conflict` (the disk no longer holds the generation this owner last saw: another writer), `too-large` (a bound was
- * exceeded; nothing written), `exhausted` (the generation counter reached its ceiling), `cancelled` (the signal was
- * aborted before the commit record was written), `failed` (a write threw: quota, blocked storage), `unavailable`
- * (reading the current state threw), `closed`.
+ * `committed`: the record was written and a read-back, as a loader would do it, found this generation as the newest
+ * fully valid one at that moment. It is not a lock: another writer can supersede it afterwards. Other statuses:
+ * `lost` (the record was written but by the read-back another writer had replaced a key or the record, or committed
+ * a newer generation; this owner does not adopt it), `unconfirmed` (the record was written but the read-back threw;
+ * load again to learn the head). Every remaining status leaves the previous authoritative generation on disk
+ * unchanged as far as this owner is concerned: `busy` (another operation of this owner in flight), `not-loaded`
+ * (call `load` first), `conflict` (the disk no longer holds the generation this owner last saw: another writer),
+ * `too-large` (a bound was exceeded; nothing written), `exhausted` (the generation counter reached its ceiling),
+ * `cancelled` (the signal was aborted before the commit record was written), `failed` (a write threw: quota, blocked
+ * storage), `unavailable` (reading the current state threw), `closed`.
  */
 export type CommitStatus =
   | 'committed'
+  | 'lost'
+  | 'unconfirmed'
   | 'busy'
   | 'not-loaded'
   | 'conflict'
@@ -82,7 +91,11 @@ export interface CommitResult {
   readonly snapshot: GenerationSnapshot | null;
   /** Port writes and removals issued by this call. */
   readonly writes: number;
-  /** Stale keys of the overwritten slot that could not be removed after the commit (harmless; swept later). */
+  /**
+   * Stale keys of the overwritten slot left after the commit: removal failed, the owner was stopped, or the key holds
+   * a generation that is not older than this one (another writer's). Harmless; swept by a later commit to that slot
+   * when the port lists keys or the slot's record names them.
+   */
   readonly leftovers: number;
   readonly reason: string | null;
 }
@@ -115,7 +128,10 @@ export interface SaveGenerations {
   /** The generation this owner last loaded or committed: one coherent snapshot, never a mix. */
   current(): GenerationSnapshot | null;
   busy(): boolean;
-  /** Releases the writer claim. Idempotent; an in-flight commit stops before its next write. */
+  /**
+   * Stops this owner. Idempotent. An in-flight commit stops before its next write (and skips its sweep); the writer
+   * claim is released only when that operation settles.
+   */
   close(): void;
   readonly limits: Readonly<Required<GenerationLimits>>;
   /** The key prefix of this save, for diagnostics. */
@@ -128,6 +144,8 @@ const KEY = /^[a-z0-9][a-z0-9._-]{0,47}$/;
 const SLOTS: readonly GenerationSlot[] = ['a', 'b'];
 const encoder = new TextEncoder();
 const checksum = (s: string) => crc32(encoder.encode(s));
+/** A lone surrogate would encode to U+FFFD and collide with other strings under the UTF-8 checksum. */
+const ILL_FORMED = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 const hex = (n: number) => n.toString(16).padStart(8, '0');
 
 function fail(message: string): never {
@@ -203,9 +221,9 @@ export function createSaveGenerations(options: SaveGenerationsOptions): SaveGene
     } catch {
       return 'record does not parse';
     }
-    const r = json as {f?: unknown; n?: unknown; s?: unknown; g?: unknown; k?: unknown};
+    const r = json as {f?: unknown; ns?: unknown; n?: unknown; s?: unknown; g?: unknown; k?: unknown};
     if (r === null || typeof r !== 'object' || r.f !== 1) return 'record format unknown';
-    if (r.n !== name || r.s !== slot) return 'record belongs to another save or slot';
+    if (r.ns !== namespace || r.n !== name || r.s !== slot) return 'record belongs to another save or slot';
     const g = r.g;
     if (typeof g !== 'number' || !Number.isSafeInteger(g) || g < 1) return 'record generation invalid';
     if (!Array.isArray(r.k) || r.k.length > maxKeys) return 'record key list invalid';
@@ -255,6 +273,7 @@ export function createSaveGenerations(options: SaveGenerationsOptions): SaveGene
       const value = await port.get(dataKey(read.slot, k));
       if (value === null) return `key '${k}' missing`;
       if (value.length !== len || !value.startsWith(head)) return `key '${k}' from another generation`;
+      if (ILL_FORMED.test(value)) return `key '${k}' is not well-formed text`;
       if (checksum(value) !== crc) return `key '${k}' checksum mismatch`;
       out[k] = value.slice(head.length);
     }
@@ -316,21 +335,31 @@ export function createSaveGenerations(options: SaveGenerationsOptions): SaveGene
   /** Contract checks on the caller's entries; size bounds are reported, not thrown. */
   function entriesOf(entries: Readonly<Record<string, string>>): [string, string][] | string {
     if (entries === null || typeof entries !== 'object' || Array.isArray(entries)) fail('entries must be an object');
-    const list = Object.keys(entries).sort();
-    for (const k of list) {
+    // Each value is read exactly once; the copy is what gets validated and written (getters cannot change it later).
+    const names = Object.keys(entries).sort(),
+      list: [string, string][] = [];
+    for (const k of names) {
       if (!KEY.test(k)) fail(`key '${k}' must match ${KEY}`);
-      if (typeof entries[k] !== 'string') fail(`key '${k}' must hold a string`);
+      const value: unknown = entries[k];
+      if (typeof value !== 'string') fail(`key '${k}' must hold a string`);
+      list.push([k, value]);
     }
     if (list.length > maxKeys) return `${list.length} keys exceed maxKeys ${maxKeys}`;
     let total = 0;
-    for (const k of list) {
-      const n = entries[k]!.length;
+    for (const [k, value] of list) {
+      const n = value.length;
       if (n > maxKeyChars) return `key '${k}' has ${n} characters, above maxKeyChars ${maxKeyChars}`;
       total += n;
     }
     if (total > maxTotalChars) return `${total} characters exceed maxTotalChars ${maxTotalChars}`;
-    return list.map(k => [k, entries[k]!]);
+    for (const [k, value] of list) if (ILL_FORMED.test(value)) fail(`key '${k}' holds a lone surrogate`);
+    return list;
   }
+
+  const settle = () => {
+    inFlight = false;
+    if (closed) claimed.delete(prefix);
+  };
 
   return {
     limits: Object.freeze({maxKeys, maxKeyChars, maxTotalChars, maxLoadAttempts}),
@@ -340,7 +369,8 @@ export function createSaveGenerations(options: SaveGenerationsOptions): SaveGene
     close() {
       if (closed) return;
       closed = true;
-      claimed.delete(prefix);
+      // The claim is held until an in-flight operation settles, so no successor writes beside it.
+      if (!inFlight) claimed.delete(prefix);
     },
     async load() {
       if (closed) return loadResult('closed', null, Object.freeze([]), null);
@@ -356,7 +386,7 @@ export function createSaveGenerations(options: SaveGenerationsOptions): SaveGene
       } catch (e) {
         return loadResult('unavailable', null, Object.freeze([]), errorText(e));
       } finally {
-        inFlight = false;
+        settle();
       }
     },
     async commit(entries, commitOptions = {}) {
@@ -387,12 +417,13 @@ export function createSaveGenerations(options: SaveGenerationsOptions): SaveGene
             ? 'b'
             : 'a'
           : (SLOTS.find(slot => s.reads.find(r => r.slot === slot)!.report.state !== 'invalid') ?? 'a');
-        const previousKeys = new Set(s.reads.find(r => r.slot === target)!.manifest?.keys.map(k => k[0]) ?? []);
+        const previousKeys = s.reads.find(r => r.slot === target)!.manifest?.keys.map(k => k[0]) ?? [];
         const stop = () => closed || !!signal?.aborted;
         if (stop()) return commitResult(closed ? 'closed' : 'cancelled', 0, 0, null);
         const head = `${generation}|`,
           manifest: [string, number, number][] = [],
           out: Record<string, string> = {};
+        let record: string;
         try {
           // 1. The slot stops being a valid generation before any of its keys change.
           await port.remove(recordKey(target));
@@ -406,26 +437,56 @@ export function createSaveGenerations(options: SaveGenerationsOptions): SaveGene
             out[k] = payload;
           }
           if (stop()) return commitResult(closed ? 'closed' : 'cancelled', writes, 0, 'stopped before the record');
-          // 2. The record goes last: only now is the new generation valid.
-          const body = JSON.stringify({f: 1, n: name, s: target, g: generation, k: manifest});
-          const record = `${hex(checksum(body))}|${body}`;
+          // 2. The record goes last: only now can the new generation be valid.
+          const body = JSON.stringify({f: 1, ns: namespace, n: name, s: target, g: generation, k: manifest});
+          record = `${hex(checksum(body))}|${body}`;
           await port.set(recordKey(target), record);
           writes++;
-          known = {snapshot: Object.freeze({generation, slot: target, entries: Object.freeze(out)}), record};
         } catch (e) {
           return commitResult('failed', writes, 0, errorText(e));
         }
-        // 3. Sweep keys of the overwritten generation that the new one does not list (failures are harmless).
-        let leftovers = 0;
-        const written = new Set(list.map(([k]) => dataKey(target, k)));
-        const stale = new Set([...previousKeys].map(k => dataKey(target, k)).filter(k => !written.has(k)));
+        // 3. Confirm: read back as a loader would. Another writer may have overwritten a key, replaced the record or
+        // committed a newer generation in the other slot; then this generation is not the head and is not adopted.
+        let confirm: Scan;
         try {
-          for (const k of (await residue(target)) ?? []) if (!written.has(k)) stale.add(k);
+          confirm = await scan();
+        } catch (e) {
+          return commitResult('unconfirmed', writes, 0, errorText(e));
+        }
+        if (confirm.chosen?.record !== record) {
+          const reason =
+            confirm.status === 'contended'
+              ? 'commit records kept changing during confirmation'
+              : 'another writer replaced or superseded this generation before it was confirmed';
+          return commitResult('lost', writes, 0, reason);
+        }
+        known = {snapshot: Object.freeze({generation, slot: target, entries: Object.freeze(out)}), record};
+        // 4. Sweep the overwritten generation's keys that the new one does not list. Only keys named by the slot's
+        // previous record or found under its prefix, and only while their stored generation is older than ours, so a
+        // newer writer's keys are never removed. Stopped owners skip it; failures are harmless leftovers.
+        const written = new Set(list.map(([k]) => dataKey(target, k)));
+        const candidates = new Set(previousKeys.map(k => dataKey(target, k)).filter(k => !written.has(k)));
+        let leftovers = 0;
+        if (stop()) return commitResult('committed', writes, candidates.size, 'stopped before the sweep');
+        try {
+          for (const k of (await residue(target)) ?? []) if (!written.has(k)) candidates.add(k);
         } catch {
           /* listing failed: sweep what the old record named */
         }
-        for (const k of [...stale].sort()) {
+        for (const k of [...candidates].sort()) {
+          if (stop()) {
+            leftovers++;
+            continue;
+          }
           try {
+            const value = await port.get(k);
+            if (value === null) continue;
+            const bar = value.indexOf('|'),
+              stored = bar > 0 ? Number(value.slice(0, bar)) : NaN;
+            if (!(Number.isSafeInteger(stored) && stored < generation)) {
+              leftovers++;
+              continue;
+            }
             await port.remove(k);
             writes++;
           } catch {
@@ -434,7 +495,7 @@ export function createSaveGenerations(options: SaveGenerationsOptions): SaveGene
         }
         return commitResult('committed', writes, leftovers, null);
       } finally {
-        inFlight = false;
+        settle();
       }
     },
   };

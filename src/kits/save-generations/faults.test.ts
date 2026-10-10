@@ -309,3 +309,102 @@ test('randomised fault sequence: every reload is exactly the last committed or t
   }
   assert.ok(committed > 100 && failures > 50, `${committed} generations committed, ${failures} failed`);
 });
+
+/** An asynchronous port with seeded delays (a number of microtask turns) that logs every mutation in order. */
+function racingPort(inner: StoragePort, log: [string, string | null][], delay: () => number): GenerationPort {
+  const wait = async () => {
+    for (let i = delay(); i > 0; i--) await Promise.resolve();
+  };
+  return {
+    async get(k) {
+      await wait();
+      return inner.get(k);
+    },
+    async set(k, v) {
+      await wait();
+      inner.set(k, v);
+      log.push([k, v]);
+    },
+    async remove(k) {
+      await wait();
+      inner.remove(k);
+      log.push([k, null]);
+    },
+    async keys() {
+      await wait();
+      return inner.keys();
+    },
+  };
+}
+
+test('review repro: two owners on different port objects racing one commit each never both stay authoritative', async () => {
+  const backend = new MemoryBackend(),
+    log: [string, string | null][] = [];
+  let tick = 0;
+  const a = createSaveGenerations({port: racingPort(backend.port(1), log, () => tick++ % 3), name: 'run'});
+  const b = createSaveGenerations({port: racingPort(backend.port(2), log, () => tick++ % 2), name: 'run'});
+  await a.load();
+  await b.load();
+  const [ra, rb] = await Promise.all([a.commit({k: 'from-a', j: 'a'}), b.commit({k: 'from-b', j: 'b'})]);
+  const statuses = [ra.status, rb.status].sort();
+  assert.ok(statuses.filter(s => s === 'committed').length <= 1, statuses.join());
+  const final = await reload(backend, 9);
+  const winner = [ra, rb].find(r => r.status === 'committed');
+  if (winner) assert.deepEqual(final.snapshot!.entries, winner.snapshot!.entries);
+  else assert.notEqual(final.status, 'loaded'); // nobody confirmed: nothing new may be adopted silently
+  for (const r of [ra, rb]) assert.ok(['committed', 'lost', 'conflict'].includes(r.status), r.status);
+});
+
+test('review fuzz: racing async writers — every committed result was the head at some moment after its record', async () => {
+  let seed = 0xfeed;
+  const rand = (n: number) => {
+    seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+    return (seed >>> 8) % n;
+  };
+  const backend = new MemoryBackend();
+  let committedTotal = 0,
+    lostTotal = 0;
+  for (let round = 0; round < 120; round++) {
+    const log: [string, string | null][] = [],
+      start = new Map(backend.data);
+    const owners = Array.from({length: 2 + rand(3)}, (_, i) =>
+      createSaveGenerations({port: racingPort(backend.port(100 + i), log, () => rand(4)), name: 'run'}),
+    );
+    for (const o of owners) await o.load();
+    const prior = owners[0]!.current();
+    const results = await Promise.all(
+      owners.map((o, i) => {
+        const entries: Record<string, string> = {};
+        for (let k = 0; k <= rand(3); k++) entries[`k${k}`] = `r${round}-o${i}-k${k}`;
+        return o.commit(entries);
+      }),
+    );
+    for (const o of owners) o.close();
+    // replay the round's mutations; a load of each intermediate state shows which generation was the head then
+    const state = new MemoryBackend();
+    for (const [k, v] of start) state.data.set(k, v);
+    const heads: (string | null)[] = [];
+    for (const [k, v] of log) {
+      if (v === null) state.data.delete(k);
+      else state.data.set(k, v);
+      const snap = (await createSaveGenerations({port: state.port(), name: 'run'}).load()).snapshot;
+      heads.push(snap ? JSON.stringify(snap) : null);
+    }
+    for (const r of results) {
+      assert.ok(['committed', 'lost', 'conflict', 'unconfirmed'].includes(r.status), r.status);
+      if (r.status === 'committed') {
+        committedTotal++;
+        assert.ok(heads.includes(JSON.stringify(r.snapshot)), `round ${round}: committed but never the head`);
+      }
+      if (r.status === 'lost') lostTotal++;
+    }
+    // whatever a fresh load returns now was reported committed by someone, or is the generation before the round
+    const final = (await reload(backend, 999)).snapshot;
+    const claimed = results.filter(r => r.status === 'committed').map(r => JSON.stringify(r.snapshot));
+    assert.ok(
+      claimed.includes(JSON.stringify(final)) || JSON.stringify(final) === JSON.stringify(prior),
+      `round ${round}: final head was never reported committed`,
+    );
+  }
+  assert.ok(committedTotal > 40 && lostTotal > 0, `${committedTotal} committed, ${lostTotal} lost`);
+});

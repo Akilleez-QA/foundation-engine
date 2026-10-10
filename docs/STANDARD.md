@@ -435,7 +435,7 @@ A game adds its own domain systems (for example an economy or a world model) wit
 - **STD-SAV-13.** No storage work runs inside a frame. High-frequency sections MUST declare lazy flush.
 - **STD-SAV-14.** Export, import and reset MUST be generated from the registered sections. Device sections are never exported.
 - **STD-SAV-15.** A profile holds many players in its roster. Switching players flushes, re-resolves handles and emits an event.
-- **STD-SAV-16.** **Provisional.** State that must stay coherent MUST be kept in one physical envelope. Batching groups one flush and MUST NOT be relied on as atomicity. [ADR 0052; candidate multi-key protocol with headless evidence only: ADR 0116]
+- **STD-SAV-16.** **Provisional.** State that must stay coherent MUST be kept in one physical envelope. Batching groups one flush and MUST NOT be relied on as atomicity. [ADR 0052; candidate multi-key protocol, reviewed once, headless evidence only: ADR 0116]
 
 ### 8.3 Settings and flags
 
