@@ -78,6 +78,16 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'BT-01',
+    title: 'Optional deterministic resumable behaviour trees with blackboard and saveable state',
+    docs: 'src/kits/behavior/README.md',
+    evidence: [
+      {kit: 'behavior', export: 'defineBehaviorTree'},
+      {kit: 'behavior', export: 'createBehavior'},
+      {path: 'src/kits/behavior/behavior.test.ts'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',

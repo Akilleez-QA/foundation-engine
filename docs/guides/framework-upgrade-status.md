@@ -1443,3 +1443,7 @@ Evidence: focused headless tests (RFC 4180 parsing, sheet import equal to the ha
 ## Status effects (STATUS-01) — candidate, 2026-10-09
 
 Optional `status` kit ([contract](../../src/kits/status/README.md), [ADR 0121](../adr/0121-status-effects.md)): stacks, fixed-clock durations, decay, periodic pulses, threshold transforms/triggers, exclusive groups, immunities, snapshot/restore. Evidence: twelve focused headless tests in `src/kits/status/status.test.ts`; an independent adversarial review (5 major, 9 minor, 3 nits) whose findings were addressed in the second commit (transform dry-run, bounds parity between live state and restore, sealed rules, partial-loss events, advance without copying, restore expiry bounds, reserved after-immunity keys). Candidate only; no game integration, browser, full CI or device acceptance claimed.
+
+## Behaviour trees (BT-01) — candidate, 2026-10-09
+
+Optional `behavior` kit ([contract](../../src/kits/behavior/README.md), [ADR 0122](../adr/0122-behaviour-trees.md)): data trees, bounded deterministic tick, blackboard, decorators, resume and abort, validated snapshots, trace. Evidence: eleven focused headless tests in `src/kits/behavior/behavior.test.ts`; an independent adversarial review (2 major, 6 minor, 5 nits) whose findings were addressed in the second commit (abort handlers after commit, restore accepts only reachable states, cooldown length, parallel early decision, live contexts, guarded reads). Candidate only; no game integration, browser, full CI or device acceptance claimed.

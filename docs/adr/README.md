@@ -117,3 +117,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0132](0132-formula-data-import.md) | Spreadsheet import for formula sheets and lookup tables | Optional kits / Rules / Tooling | Proposed |
 
 | [0121](0121-status-effects.md) | Status effects with transforms on the fixed clock | Optional kits / Rules | Proposed |
+
+| [0122](0122-behaviour-trees.md) | Deterministic resumable behaviour trees | Optional kits / Rules | Proposed |
