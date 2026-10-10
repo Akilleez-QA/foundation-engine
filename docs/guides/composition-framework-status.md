@@ -880,3 +880,9 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Optional entity pool candidate — POOL-01, 2026-10-09
+
+`@kits/entity-pool` is an independently implemented pure helper that keeps pooled members under a creator member-count and cost cap. Creator classes carry a priority, cost, class cap and eviction order (oldest, newest, lowest score); only `evictable` classes lose members, and only to higher-priority requests, lowest priority first; `replaceOwn` lets a class recycle its own members. Admission is atomic with a bounded eviction plan and reported refusals (`class-full`, `capacity`, `eviction-limit`); pins protect members; `sweep` recovers members destroyed elsewhere. A `World` adapter spawns only on admission, despawns evicted entities and emits one world event per eviction. No system, clock, persistence owner or registration is added; placement memory across saves stays with its owner. [Guide](entity-pool.md), [ADR 0097](../adr/0097-optional-entity-pool-eviction-classes.md).
+
+Evidence: 8 focused headless tests (6 unit tests including a 6,000-operation comparison with an independent one-victim-at-a-time model covering every refusal reason, plus a World fixed-step consumer under a triangle-cost cap with eviction events and an owner-recovery consumer). A local headless micro-measurement is recorded in the kit README as an order-of-magnitude indication only. This is a branch candidate: hosted full CI, a playable template consumer, browser behaviour and physical-device acceptance remain pending.

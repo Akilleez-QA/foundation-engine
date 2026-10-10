@@ -40,6 +40,8 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 
 The optional [assignments](../../src/kits/assignments/README.md) candidate supplies exclusive actor claims, weighted target capacity and atomic transfer refusal. Two headless service/worksite fixtures and route-owner composition tests exercise it; no playable template consumer or browser/device acceptance is claimed. [Guide](../guides/assignments.md).
 
+The optional [entity-pool](../../src/kits/entity-pool/README.md) candidate keeps pooled entities under a creator count and cost cap, evicting expendable classes first in a deterministic order, with pins, atomic refusal and World eviction events. Headless model and World consumer tests only; no template consumer or browser/device acceptance is claimed. [Guide](../guides/entity-pool.md).
+
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.
 
 
