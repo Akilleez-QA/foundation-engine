@@ -75,6 +75,13 @@
       "evidence": ["@kits/network exports createViewDeltaEncoder", "src/kits/network/view-delta.test.ts exists"]
     },
     {
+      "id": "PLAYOUT-01",
+      "title": "Remote clock offset and adaptive playout buffers",
+      "shipped": true,
+      "docs": "src/kits/playout/README.md",
+      "evidence": ["@kits/playout exports createPlayout", "src/kits/playout/playout.test.ts exists"]
+    },
+    {
       "id": "VISIBILITY-01",
       "title": "Bounded source-owned visibility and explored history",
       "shipped": true,
@@ -793,6 +800,7 @@
       ]
     },
     {"name": "objectives", "exports": ["createObjectiveRun", "createStagedObjectives", "objectives"]},
+    {"name": "playout", "exports": ["createClockOffset", "createPlayout"]},
     {
       "name": "population",
       "exports": [

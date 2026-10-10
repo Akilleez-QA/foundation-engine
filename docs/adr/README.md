@@ -99,3 +99,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0092](0092-population-placements-and-tiers.md) | Placements with persistent depletion and update tiers | Optional kits / Simulation scale | Proposed |
 
 | [0095](0095-optional-region-activation.md) | Optional region activation from observer positions | Optional kits / Simulation scale | Proposed |
+
+| [0093](0093-remote-playout.md) | Optional remote playout and clock offset | Optional kits / Network presentation | Proposed |

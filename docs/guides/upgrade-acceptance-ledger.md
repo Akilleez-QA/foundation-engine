@@ -1414,3 +1414,7 @@ Evidence: 10 focused headless tests (8 unit tests including a 4,000-step compari
   step) and several minor ones: the alpha contract in fixed systems, camera snapping guidance, negative
   revision aliasing, and the dev teleport tool. All are fixed or documented.
 - **Not established:** physical high-refresh displays, template adoption and hosted CI.
+
+## Remote playout — PLAYOUT-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/playout/README.md), [guide](remote-playout.md), [decision](../adr/0093-remote-playout.md). Optional pure clock-offset estimation (minimum round trip in a bounded window, bounded slew, snap threshold) and per-subject playout buffers that present authoritative views behind the estimated clock with an adaptive bounded delay, interpolation, capped extrapolation, discontinuity holds and non-decreasing render time. Evidence: eight focused headless tests including a 20-second jittered composition with the real view receiver (presented error below 1e-14, per-frame step deviation 1.1 ms of motion against 84 ms when presenting the newest view). Candidate only; protocol, WAN, browser, physical-device and full-CI acceptance are not claimed here.
