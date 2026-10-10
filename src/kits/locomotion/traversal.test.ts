@@ -49,7 +49,15 @@ function world(boxes: readonly (readonly number[])[]) {
         ];
         const c = [0, 1, 2].map(k => Math.max(box[k]!, Math.min(box[k + 3]!, q[k]!)));
         const n = [q[0] - c[0]!, q[1] - c[1]!, q[2] - c[2]!];
-        const len = Math.hypot(n[0]!, n[1]!, n[2]!) || 1;
+        // Starting inside a box has no separating direction: report the hit facing back along the cast.
+        const len0 = Math.hypot(n[0]!, n[1]!, n[2]!);
+        if (len0 === 0) {
+          const dl = Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]) || 1;
+          n[0] = -(to[0] - from[0]) / dl;
+          n[1] = dl === 1 && to[1] === from[1] && to[0] === from[0] && to[2] === from[2] ? 1 : -(to[1] - from[1]) / dl;
+          n[2] = -(to[2] - from[2]) / dl;
+        }
+        const len = Math.hypot(n[0]!, n[1]!, n[2]!);
         return {
           hit: true,
           fraction: Math.max(0, (i - 1) / steps),
@@ -152,7 +160,7 @@ test('ledges: low ceilings, low ledges and oblique approaches', () => {
   assert.equal(diag.status, 'ledge');
   if (diag.status === 'ledge') {
     assert.ok(Math.abs(diag.edge[0] - 1) < 0.02, `edge on the face, x=${diag.edge[0]}`);
-    assert.ok(Math.abs(diag.top[0] - 1.6) < 0.02, `top past the face along the normal, x=${diag.top[0]}`);
+    assert.ok(Math.abs(diag.top[0] - 1.315) < 0.02, `top past the face along the normal, x=${diag.top[0]}`);
   }
   // At 70° the approach is too oblique and says so.
   const a = (70 * Math.PI) / 180;
@@ -220,6 +228,60 @@ test('ledges through the volume-query kit: a real sphere sweep and ground probe 
   assert.equal(findLedge({...q, maxClimb: 1}, cast, ground).status, 'too-high');
 });
 
+test('ledges: low walls just above minClimb meet the sphere at their edge, and thin or roofed walls report why', () => {
+  const q = {
+    position: [0, 0, 0] as TraversalVec3,
+    facing: [1, 0] as [number, number],
+    height: 1.8,
+    radius: 0.3,
+    reach: 2.5,
+    maxClimb: 2,
+  };
+  const boxes = (...extra: {id: string; center: TraversalVec3; halfExtents: TraversalVec3}[]) =>
+    volumeQueries(
+      defineVolumeSet({
+        revision: 0,
+        maxColliders: 1 + extra.length,
+        colliders: [
+          {id: 'floor', kind: 'box', center: [0, -1, 0], halfExtents: [20, 1, 20]},
+          ...extra.map(e => ({...e, kind: 'box' as const})),
+        ],
+      }),
+    );
+  // Tops just above minClimb, and low curbs with minClimb 0, are ledges: the sphere meets their upper edge.
+  for (const [minClimb, top] of [
+    [0.3, 0.35],
+    [0.3, 0.45],
+    [0, 0.05],
+    [0, 0.2],
+  ] as const) {
+    const {cast, ground} = boxes({id: 'b', center: [3, top / 2, 0], halfExtents: [1, top / 2, 5]});
+    const r = findLedge({...q, minClimb}, cast, ground);
+    assert.equal(r.status, 'ledge', `top ${top}, minClimb ${minClimb}`);
+    if (r.status === 'ledge') {
+      assert.ok(Math.abs(r.climb - top) < 1e-6);
+      assert.ok(Math.abs(r.edge[0] - 2) < 1e-3, `edge at the face, x=${r.edge[0]}`);
+      assert.deepEqual(r.normal, [-1, 0, 0]);
+    }
+  }
+  // A wall no higher than minClimb is not seen.
+  const lowWall = boxes({id: 'b', center: [3, 0.1, 0], halfExtents: [1, 0.1, 5]});
+  assert.equal(findLedge({...q, minClimb: 0.3}, lowWall.cast, lowWall.ground).status, 'no-wall');
+  // A thin fence has no top to stand on, with or without a ceiling overhead.
+  const fence = {id: 'fence', center: [2.05, 0.6, 0] as TraversalVec3, halfExtents: [0.05, 0.6, 5] as TraversalVec3};
+  const ceiling = {id: 'roof', center: [0, 2.55, 0] as TraversalVec3, halfExtents: [20, 0.25, 20] as TraversalVec3};
+  for (const world of [boxes(fence), boxes(fence, ceiling)])
+    for (const minClimb of [0, 0.5])
+      assert.equal(findLedge({...q, minClimb}, world.cast, world.ground).status, 'no-top');
+  // A wall taller than maxClimb is too high, ceiling or not.
+  const tall = {id: 'tall', center: [3, 1.5, 0] as TraversalVec3, halfExtents: [1, 1.5, 5] as TraversalVec3};
+  for (const world of [boxes(tall), boxes(tall, {...ceiling, center: [0, 3.75, 0]})])
+    assert.equal(findLedge({...q, maxClimb: 1, minClimb: 0.5}, world.cast, world.ground).status, 'too-high');
+  // A floor-like normal (straight up) is not a wall, even with wallSlope 1.
+  const up: SphereCast = () => ({hit: true, fraction: 0.5, normal: [0, 1, 0]});
+  assert.equal(findLedge({...q, wallSlope: 1}, up, () => 0).status, 'not-a-wall');
+});
+
 test('ladders: attach when facing in, climb with exits at both ends, and stand off the top', () => {
   const ladders = createLadders([{id: 'l', bottom: [0, 0, 0], top: [0, 4, 0], outward: [0, -1], offset: 0.4}]);
   assert.equal(ladders.attach([0, 0, -0.5], [0, -1]), null, 'facing away');
@@ -284,6 +346,22 @@ test('pushables: force accelerates, friction stops, walls block per axis, and gr
     {half, mass: 1, force: [1, 0], dt: 0.1, sweep: w.sweep, snap: 1},
   );
   assert.deepEqual(offGrid.state.position, [1, 0.5, 0]);
+  // Grid pushes go to the next line strictly ahead, the same for nearly equal positions and in both directions.
+  const open = world([]);
+  const gridPush = (x: number, fx: number, origin = 0) =>
+    pushStep(
+      {position: [x, 0.5, 0], velocity: [0, 0]},
+      {half, mass: 1, force: [fx, 0], dt: 0.1, sweep: open.sweep, snap: 1, origin},
+    ).state.position[0];
+  assert.equal(gridPush(0.5, 1), 1);
+  assert.equal(gridPush(2.5, 1), 3);
+  assert.equal(gridPush(2.4999999999, 1), 3);
+  assert.equal(gridPush(0.5, -1), 0);
+  assert.equal(gridPush(3 - 1e-12, 1), 4, 'within rounding of a line counts as on it');
+  // With the grid offset by half a cell, blocks stay centred in cells.
+  assert.equal(gridPush(0.5, 1, 0.5), 1.5);
+  assert.equal(gridPush(0.5, -1, 0.5), -0.5);
+  assert.equal(gridPush(2.4999999999, 1, 0.5), 3.5);
 });
 
 test('pushables: friction always resists, a weak push never starts the block, and dt 0 changes nothing', () => {
@@ -303,7 +381,7 @@ test('pushables: friction always resists, a weak push never starts the block, an
   // dt 0 never sweeps and never reports a block.
   const still = pushStep(
     {position: [0, 0.5, 0], velocity: [3, 0]},
-    {half, mass: 1, force: [0, 0], dt: 0, sweep: () => 0, maxSpeed: 5},
+    {half, mass: 1, force: [0, 0], dt: 0, sweep: () => 0},
   );
   assert.equal(still.blocked, false);
   assert.deepEqual(still.state.velocity, [3, 0]);

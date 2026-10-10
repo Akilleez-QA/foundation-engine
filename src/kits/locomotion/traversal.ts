@@ -74,15 +74,16 @@ export type LedgeResult =
   | {readonly status: 'no-wall' | 'not-a-wall' | 'oblique' | 'no-top' | 'too-low' | 'too-high' | 'no-headroom'};
 
 /**
- * Look for a ledge ahead: a near-vertical wall within `reach` facing the body, a walkable top just past the wall face
- * within [minClimb, maxClimb] above the feet, open space from the body over the edge at the top height, and headroom
- * for the whole body on top. Uses four creator queries at most (wall cast, ground probe, clearance cast, headroom
- * cast; or wall cast, ground probe and one disambiguating cast). The wall cast runs at `minClimb + radius` above the feet (at most `height − radius`), so a wall lower than
- * that reports `no-wall`; `too-low` remains for a top found under `minClimb` (for example a top sloping down). Steps
- * past the face follow the wall normal, not the facing, so oblique approaches find the same edge. When the probe
- * finds a top below the wall cast, one more cast at the probe start height tells a wall too tall (`too-high`) from a
- * top sloping down (`too-low`). Tops are assumed
- * near flat: a top rising away from the edge can report `no-headroom`.
+ * Look for a ledge ahead: a near-vertical wall (or the upper edge of a low one) within `reach` facing the body, a
+ * walkable top just past the contact within [minClimb, maxClimb] above the feet, open space from the body over the
+ * edge at the top height, and headroom for the whole body on top. Uses four creator queries at most (wall cast, ground
+ * probe, then clearance and headroom casts, or one cast that tells a too-tall wall from a missing top).
+ *
+ * The wall cast runs at `minClimb + radius + skin` above the feet (at most `height − radius`); walls whose top is at
+ * or below `minClimb` read as `no-wall`, and the sphere meeting a lower wall's upper edge counts as the edge. Steps past
+ * the contact follow the wall normal, not the facing, so oblique approaches find the same edge. Tops must be at least
+ * `radius + skin` deep and near flat: a narrower top reads as `no-top`, and a top rising away from the edge can read as
+ * `no-headroom`.
  */
 export function findLedge(q: LedgeQuery, cast: SphereCast, ground: GroundProbe): LedgeResult {
   if (!q || typeof q !== 'object') fail('query must be an object');
@@ -111,32 +112,42 @@ export function findLedge(q: LedgeQuery, cast: SphereCast, ground: GroundProbe):
   const castY = p[1] + Math.min(height - radius, minClimb + radius + skin);
   const wall = castOnce(cast, [p[0], castY, p[2]], [p[0] + fx * reach, castY, p[2] + fz * reach], radius);
   if (!wall) return Object.freeze({status: 'no-wall'});
-  if (Math.abs(wall.normal[1]) > wallSlope) return Object.freeze({status: 'not-a-wall'});
-  // The wall's horizontal outward normal; the body must face into it (this also rejects back faces).
-  const nl = Math.hypot(wall.normal[0], wall.normal[2]);
-  const nx = wall.normal[0] / nl,
-    nz = wall.normal[2] / nl;
+  // The hit's horizontal part. A near-vertical normal is a wall face; an upward normal with a horizontal part is the
+  // sphere meeting the upper edge of a wall lower than the cast, which is still a ledge edge. Downward (an overhang),
+  // straight-up (a floor) and other steep normals are not walls.
+  const [wnx, wny, wnz] = wall.normal;
+  const nl = Math.hypot(wnx, wnz);
+  const edgeContact = wny > wallSlope;
+  if (nl < 1e-6 || (Math.abs(wny) > wallSlope && !edgeContact)) return Object.freeze({status: 'not-a-wall'});
+  const nx = wnx / nl,
+    nz = wnz / nl;
+  // The body must face into the wall (this also rejects back faces).
   if (-(fx * nx + fz * nz) < minFacing) return Object.freeze({status: 'oblique'});
-  // Contact on the face: the sphere centre at the hit, minus the normal times the radius.
+  // Contact point: the sphere centre at the hit minus the normal times the radius (on the face or the edge).
   const dist = wall.fraction * reach;
-  const cx = p[0] + fx * dist - nx * radius,
-    cz = p[2] + fz * dist - nz * radius;
-  // 2. The top surface a body radius past the face, searched down from the highest climbable height.
-  const tx = cx - nx * radius * 2,
-    tz = cz - nz * radius * 2;
+  const cx = p[0] + fx * dist - wnx * radius,
+    cz = p[2] + fz * dist - wnz * radius,
+    contactY = castY - wny * radius;
+  // 2. The top surface just past the face (radius + skin, along the wall normal), searched down from the highest
+  // climbable height.
+  const past = radius + skin;
+  const tx = cx - nx * past,
+    tz = cz - nz * past;
   const topY: unknown = ground(tx, tz, p[1] + maxClimb + radius, maxClimb + radius);
   if (topY === null) return Object.freeze({status: 'no-top'});
   if (!finite(topY)) fail('ground must return a finite height or null');
   const climb = topY - p[1];
-  if (climb < minClimb) {
-    // The wall stands at least as high as the wall cast, yet the probe found a top below it: either the wall reaches
-    // above the probe start (too high), or the top slopes down past the edge (too low).
+  if (topY < contactY - skin || climb > maxClimb) {
+    // The probe missed the wall's top: it found a surface below the contact, or one above maxClimb (which can also be
+    // a ceiling the probe started in). Either the wall reaches above the probe start (too high), or the top is
+    // narrower than the probe offset or slopes away (no top). A hit ahead at the probe start height that is not
+    // ceiling-like (moving into it, normal not pointing down) means the wall continues up there.
     const startY = p[1] + maxClimb + radius;
-    return Object.freeze({
-      status: castOnce(cast, [p[0], startY, p[2]], [tx, startY, tz], radius) ? 'too-high' : 'too-low',
-    });
+    const above = castOnce(cast, [p[0], startY, p[2]], [tx, startY, tz], radius);
+    const wallAbove = above !== null && above.fraction > 0 && above.normal[1] >= -wallSlope;
+    return Object.freeze({status: wallAbove ? 'too-high' : 'no-top'});
   }
-  if (climb > maxClimb) return Object.freeze({status: 'too-high'});
+  if (climb < minClimb) return Object.freeze({status: 'too-low'});
   // 3. Open space from the body over the edge at the top height: if the wall continues above the found top, the probe
   // found something other than the ledge top.
   const overY = topY + radius + skin;
@@ -148,7 +159,7 @@ export function findLedge(q: LedgeQuery, cast: SphereCast, ground: GroundProbe):
     status: 'ledge',
     edge: frozen([cx, topY, cz]),
     top: frozen([tx, topY, tz]),
-    normal: wall.normal,
+    normal: edgeContact ? frozen([nx, 0, nz]) : wall.normal,
     climb,
   });
 }
@@ -317,10 +328,11 @@ export interface PushableState {
  * kinetic friction (`friction`, units per second²) always opposes the motion, so a push weaker than friction × mass
  * never starts it (a static threshold) and a released block slows to rest. Speed is capped by `maxSpeed`, and the move
  * is limited by the creator's `sweep`: each axis is resolved separately, larger displacement first, and a hit stops
- * that axis so the block slides along walls.
+ * that axis so the block slides along walls. At dt 0 nothing changes and nothing is swept.
  *
- * With `snap`, each call is one grid push: the block moves from its nearest grid line to the next one (multiples of
- * the cell size) along the dominant push axis, or stays and reports `blocked`. The caller edge-triggers grid pushes
+ * With `snap`, each call is one grid push: the block moves to the next grid line strictly ahead (`origin + k × snap`)
+ * along the dominant push axis, or stays and reports `blocked`; put `origin` at half a cell to keep blocks centred in
+ * cells. The caller edge-triggers grid pushes
  * (one per press or per its own cooldown); `mass`, `friction`, `maxSpeed` and `dt` are unused in that mode.
  */
 export function pushStep(
@@ -335,6 +347,8 @@ export function pushStep(
     readonly maxSpeed?: number;
     /** Cell size for grid pushing, (0, 1e3]. */
     readonly snap?: number;
+    /** Grid offset for snap: grid lines sit at `origin + k × snap` on each axis, finite. Default 0. */
+    readonly origin?: number;
   },
 ): {readonly state: PushableState; readonly blocked: boolean} {
   if (!state || typeof state !== 'object') fail('state must be an object');
@@ -370,12 +384,18 @@ export function pushStep(
     if (fx === 0 && fz === 0) return result(pos, [0, 0], false);
     const axis = Math.abs(fx) >= Math.abs(fz) ? 0 : 2;
     const dir = Math.sign(axis === 0 ? fx : fz);
-    const target = Math.round(pos[axis] / cell) * cell + dir * cell;
+    const originIn: unknown = options.origin ?? 0;
+    if (!finite(originIn) || Math.abs(originIn) > 1e9) fail('origin must be finite');
+    // The next grid line strictly ahead in the push direction; a position within rounding of a line counts as on it.
+    const u = (pos[axis] - originIn) / cell;
+    const k = dir > 0 ? Math.floor(u + 1e-9) + 1 : Math.ceil(u - 1e-9) - 1;
+    const target = originIn + k * cell;
     const move = target - pos[axis];
     const d: TraversalVec3 = axis === 0 ? [move, 0, 0] : [0, 0, move];
     if (sweep(pos, d) < 1) return result(pos, [0, 0], true);
     return result([pos[0] + d[0], pos[1], pos[2] + d[2]], [0, 0], false);
   }
+  if (dt === 0) return result(pos, [vx, vz], false);
   // Accelerate by the push, then apply kinetic friction against the resulting motion, then cap speed.
   vx += (fx / mass) * dt;
   vz += (fz / mass) * dt;

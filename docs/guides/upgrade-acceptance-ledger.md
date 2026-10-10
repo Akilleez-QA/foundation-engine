@@ -1472,25 +1472,40 @@ visual or device evidence.
 
 ## Traversal helpers — candidate (2026-10-09)
 
-Branch `feat/traversal-helpers` from `9345d07b`. Six headless tests over a sampled
-box-world query and the real volume-query kit:
-- ledges: found with climb height, edge, top and wall normal; plus no-wall, too-high,
-  too-low and no-headroom; a low ceiling at any maxClimb; knee-high ledges; tall walls;
-  a 45° approach landing on the face; a 70° approach reported as oblique; and the same
-  ledge through a `defineVolumeSet` adapter;
+Branch `feat/traversal-helpers` from `9345d07b`. Seven headless tests over a sampled
+box world and the real volume-query kit:
+- ledges:
+  - a ledge found with climb height, edge, top and wall normal; plus no-wall, too-high,
+    too-low and no-headroom;
+  - a low ceiling at any maxClimb; knee-high ledges; tops just above minClimb and low
+    curbs met at their upper edge;
+  - thin fences (no top) and tall walls (too high), with and without a ceiling;
+  - a 45° approach landing on the face; a 70° approach reported as oblique; a
+    straight-up normal refused;
+  - the same ledge through a `defineVolumeSet` adapter;
 - ladders: attach facing rules, vertical reach, zero-facing and NaN refusal, climbing
   to a top exit, bottom exit and top standing point;
-- pushables: acceleration, speed cap, blocking with sliding on the other axis, friction
-  that always resists (including under a tiny push), the static threshold, dt 0 with no
-  sweep, and grid pushes to the next grid line from off-grid positions.
+- pushables:
+  - acceleration, speed cap, blocking with sliding on the other axis;
+  - friction that always resists (including under a tiny push), the static threshold,
+    dt 0 with no change and no sweep;
+  - grid pushes to the next line strictly ahead, the same for nearly equal positions,
+    in both directions, and with a half-cell grid offset.
 
 An independent adversarial review found that:
 - a low ceiling made reachable ledges too high;
-- oblique approaches gave the wrong edge, or missed the ledge;
+- oblique approaches gave the wrong edge;
 - ladders attached from metres away vertically, or with a zero facing;
 - any push disabled friction;
 - grid pushes left blocks off the grid;
-- the volume-query compatibility claim was overstated;
-- several smaller validation gaps existed.
+- the volume-query compatibility claim was overstated.
 
-All are fixed. No game, browser or device evidence.
+The re-review found that:
+- low walls just above minClimb were refused, because their edge normal points up;
+- grid pushes jumped 0.5 or 1.5 cells depending on rounding;
+- a ceiling could change the failure reason;
+- narrow tops were missed;
+- a straight-up normal produced NaN queries;
+- dt 0 still capped the speed.
+
+All are fixed; a final re-review is pending. No game, browser or device evidence.
