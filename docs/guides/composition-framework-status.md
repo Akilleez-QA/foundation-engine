@@ -880,3 +880,11 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Look-at constraint — candidate (2026-10-09)
+
+`createLookAt` in the animation kit aims a bounded joint chain at a root-frame
+direction with per-joint shares and limits, a front cone, smoothing and a speed cap,
+returning deltas that compose onto pose arrays. Pure; the caller owns targets, clock
+and skeleton. See [ADR 0093](../adr/0093-look-at-constraint.md). Headless tests are in
+the upgrade ledger; independent review and full hosted CI remain required.

@@ -1219,3 +1219,11 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Look-at constraint — candidate (2026-10-09)
+
+Branch `feat/look-at-constraint` from `a6211bd3`. Five headless tests: exact aim of the
+composed two-joint chain and share split; limits with overflow to the next joint;
+front-cone, null and zero-length relaxation with smoothing and the speed cap; parent
+frame conjugation and composition onto a base pose through `blendPoseLayers`; and
+validation of configuration and inputs. No visual, browser or device evidence.

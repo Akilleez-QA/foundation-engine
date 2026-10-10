@@ -16,3 +16,11 @@ export {
 } from './pose-clip';
 export {createRootMotion, type RootKey, type RootClip, type RootDelta} from './root-motion';
 export {blendPoseLayers, solveTwoBone, type PoseLayer} from './pose-layers';
+export {
+  createLookAt,
+  type LookAt,
+  type LookAtJoint,
+  type LookAtJointOutput,
+  type LookAtOptions,
+  type LookAtState,
+} from './look-at';
