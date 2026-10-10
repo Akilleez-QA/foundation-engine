@@ -13,6 +13,7 @@
 // candidates for a person to judge: identical bytes may be deliberate (a shared licence file), and a near match is
 // an estimate.
 import {existsSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
 import {basename, isAbsolute, join, relative, resolve} from 'node:path';
 import {DEFAULTS, scan} from './scan.mjs';
 
@@ -124,7 +125,7 @@ export async function run(argv, cwd = process.cwd()) {
   return {report, text: lines.join('\n'), status};
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname)) {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const {text, status} = await run(process.argv.slice(2));
     console.log(text);
