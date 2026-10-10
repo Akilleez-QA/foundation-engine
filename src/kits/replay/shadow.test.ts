@@ -702,3 +702,101 @@ test('SHADOW difference lists reject invalid limits and preview bounds', () => {
   assert.throws(() => listDifferences('1', '2', {maxValueChars: 5000}), RangeError);
   assert.equal(listDifferences('1', '2', {maxValueChars: 4096}).status, 'listed');
 });
+
+test('SHADOW verifyAnchors marks a later divergence caused by a restore that lost hidden state', () => {
+  const log = recording(40);
+  // The same implementation on both sides; side b's load rebuilds itself and loses a counter kept outside save.
+  const hidden = (losesOnLoad: boolean): ShadowSide & ToyPorts => {
+    const p = toyPorts();
+    let counter = 0;
+    const inner = p.step;
+    const load = p.load;
+    return Object.assign(p, {
+      step: (inputs: readonly string[], step: number) => {
+        inner(inputs, step);
+        counter++;
+        p.state.hits = counter;
+      },
+      load: (text: string) => {
+        load(text);
+        if (losesOnLoad) counter = 0;
+      },
+    });
+  };
+  const off = createShadowRunner({a: hidden(false), b: hidden(true), inputs: from(log), limits: {anchorEvery: 10}});
+  assert.equal(off.run().status, 'agree');
+  const on = createShadowRunner({
+    a: hidden(false),
+    b: hidden(true),
+    inputs: from(log),
+    limits: {anchorEvery: 10, verifyAnchors: true},
+  }).run();
+  // The restore at 10 passes its digest check (the counter is not saved); the live run then differs at step 10.
+  const d = stateOf(on.divergence);
+  assert.equal(on.status, 'diverged');
+  assert.equal(d.step, 10);
+  assert.equal(d.verifiedAnchor, 10);
+  assert.equal(must(d.differences[0]).path, 'hits');
+  // Without the option no restore happened, so there is nothing to mark.
+  const plain = createShadowRunner({
+    a: toyPorts(),
+    b: toyPorts(2, offByOneAt(5)),
+    inputs: from(log),
+  }).run();
+  assert.equal(stateOf(plain.divergence).verifiedAnchor, null);
+});
+
+test('SHADOW verifyAnchors also checks the starting boundary', () => {
+  const log = recording(3);
+  const overwriting = () => {
+    const p = toyPorts();
+    p.load = () => {
+      p.state = {...p.state, x: [999, 999]};
+    };
+    return p;
+  };
+  const r = createShadowRunner({
+    a: toyPorts(),
+    b: overwriting(),
+    inputs: from(log),
+    limits: {anchorEvery: 1000, verifyAnchors: true},
+  }).run();
+  const m = r.divergence as Extract<ShadowDivergence, {kind: 'anchor-mismatch'}>;
+  assert.deepEqual([r.status, m.kind, m.step, m.side, r.steps], ['diverged', 'anchor-mismatch', 0, 'b', 0]);
+  assert.equal(m.a, m.expected);
+  // Off by default: the same sides agree, because load is never called.
+  const quiet = createShadowRunner({a: toyPorts(), b: overwriting(), inputs: from(log), limits: {anchorEvery: 1000}});
+  assert.equal(quiet.run().status, 'agree');
+});
+
+test('SHADOW cancellation from inside the input source stops before that step', () => {
+  const log = recording(30);
+  const a = toyPorts(),
+    b = toyPorts();
+  let runner: ReturnType<typeof createShadowRunner>;
+  runner = createShadowRunner({
+    a,
+    b,
+    inputs: step => {
+      if (step === 12) runner.cancel();
+      return log[step];
+    },
+  });
+  const r = runner.run();
+  assert.deepEqual([r.status, r.reason, r.steps, r.next], ['cancelled', 'cancelled', 12, 12]);
+  assert.equal(a.calls.step, 12);
+  assert.equal(b.calls.step, 12);
+  const controller = new AbortController();
+  const c = toyPorts();
+  const aborted = createShadowRunner({
+    a: c,
+    b: toyPorts(),
+    inputs: step => {
+      if (step === 4) controller.abort();
+      return log[step];
+    },
+    signal: controller.signal,
+  }).run();
+  assert.deepEqual([aborted.status, aborted.reason, aborted.steps], ['cancelled', 'aborted', 4]);
+  assert.equal(c.calls.step, 4);
+});

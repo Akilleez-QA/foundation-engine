@@ -51,8 +51,13 @@ export interface ShadowLimits {
   readonly state?: JsonLimits;
   /** Longest value preview in a difference: [1, 4096]. Default 160. */
   readonly maxValueChars?: number;
-  /** Also restore every anchor into both sides as it is taken and check each reproduces it (default false). Costs a
-   *  `load` and a re-read per side per anchor; a mismatch ends the run early as `anchor-mismatch`. */
+  /**
+   * Also restore every anchor (the starting boundary included) into both live sides as it is taken and check each
+   * reproduces its digest (default false). Costs a `load` and a re-read per side per anchor. A visible mismatch ends
+   * the run there as `anchor-mismatch`. A restore that passes the check but loses state outside `save` changes the
+   * live run instead: the run continues and the difference appears at a later step as an ordinary divergence whose
+   * `verifiedAnchor` names that restore. Compare with a run without this option to tell the two apart.
+   */
   readonly verifyAnchors?: boolean;
 }
 
@@ -97,6 +102,9 @@ export type ShadowDivergence =
        *  canonical parse does not see. */
       unavailable: 'detail-unreadable' | 'no-difference' | null;
       lastAgreed: ShadowAnchor | null;
+      /** With `verifyAnchors`: the step of the newest anchor restored into the live sides before this divergence (a
+       *  restore that loses state outside `save` shows up later as this divergence), else null. */
+      verifiedAnchor: number | null;
       anchor: ShadowAnchor | null;
     }>
   /** A side threw in `phase` while producing the state after step `step` (`load`: restoring the anchor at `step`). */
@@ -108,6 +116,9 @@ export type ShadowDivergence =
       phase: 'step' | 'save' | 'view' | 'load';
       message: string;
       lastAgreed: ShadowAnchor | null;
+      /** With `verifyAnchors`: the step of the newest anchor restored into the live sides before this divergence (a
+       *  restore that loses state outside `save` shows up later as this divergence), else null. */
+      verifiedAnchor: number | null;
       anchor: ShadowAnchor | null;
     }>
   /** A side's saved text is not a string or exceeds `state.maxBytes`, or its compared text (the view, else the saved
@@ -119,6 +130,9 @@ export type ShadowDivergence =
       side: ShadowSideName;
       reason: 'not-string' | 'over-limit-or-not-json';
       lastAgreed: ShadowAnchor | null;
+      /** With `verifyAnchors`: the step of the newest anchor restored into the live sides before this divergence (a
+       *  restore that loses state outside `save` shows up later as this divergence), else null. */
+      verifiedAnchor: number | null;
       anchor: ShadowAnchor | null;
     }>
   /**
@@ -156,7 +170,8 @@ export interface ShadowRunner {
   /**
    * Stop; the report keeps its progress and the anchors stay readable. Idempotent. Called (or the signal aborted)
    * from inside a side during a step, it takes effect after that step's comparison: a divergence found by that step
-   * wins (status 'diverged', reason null); otherwise the step counts and the status becomes 'cancelled'.
+   * wins (status 'diverged', reason null); otherwise the step counts and the status becomes 'cancelled'. Called
+   * from inside the input source, it takes effect before that step: nothing is stepped with the source's answer.
    */
   cancel(): void;
 }
@@ -344,7 +359,12 @@ export function createShadowRunner(options: ShadowOptions): ShadowRunner {
     }
   };
   /** Divergence context, built only when a divergence is reported. */
-  const context = (at: number) => ({lastAgreed: last && anchorOf(last), anchor: nearestAnchor(ring, at)});
+  let verified: number | null = null;
+  const context = (at: number) => ({
+    lastAgreed: last && anchorOf(last),
+    anchor: nearestAnchor(ring, at),
+    verifiedAnchor: verified,
+  });
 
   const report = (): ShadowReport =>
     Object.freeze({status, from, next, steps: next - from, anchorsTaken, anchorsEvicted, divergence, reason});
@@ -496,9 +516,11 @@ export function createShadowRunner(options: ShadowOptions): ShadowRunner {
     last = g;
     if (g.step !== from && g.step % limits.anchorEvery !== 0) return null;
     const anchor = anchorOf(g);
-    if (limits.verifyAnchors && g.step !== from) {
+    // The starting boundary is verified too, unless it was just restored from the `from` anchor (already checked).
+    if (limits.verifyAnchors && !(start && g.step === from)) {
       const restored = restore(anchor, null);
       if (!Array.isArray(restored)) return restored as ShadowReport;
+      verified = g.step;
     }
     keep(anchor);
     return null;
@@ -564,6 +586,8 @@ export function createShadowRunner(options: ShadowOptions): ShadowRunner {
         reason = `inputs-threw: ${messageOf(e)}`;
         return report();
       }
+      // A cancellation requested by the source itself applies before anything is stepped with its answer.
+      if (pendingCancel || signal?.aborted) return settle();
       if (supplied === undefined) {
         status = 'agree';
         return report();

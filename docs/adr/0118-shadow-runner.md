@@ -39,7 +39,9 @@ inputs, digests and explanations:
 - Anchors are both sides' saved states at agreeing boundaries (the first boundary and every `anchorEvery`), held in a
   ring of `maxAnchors` that evicts the oldest. A runner started `from` an anchor loads it into both sides and verifies
   each side's digest against it before stepping; `verifyAnchors` (default off) does the same for every anchor as it is
-  taken. The check sees only what `save`/`view` return, so it finds an incomplete `load`, not state kept outside
+  taken, the starting boundary included. Those restores go into the live sides: a restore that matches but loses
+  state outside `save` shows up later as an ordinary divergence carrying `verifiedAnchor`, not as a stop at the
+  anchor. The check sees only what `save`/`view` return, so it finds an incomplete `load`, not state kept outside
   `save` (the rollback sync test looks for that). `nearestAnchor` picks the newest retained anchor at or before a step.
 - Cancellation from inside a side during a step takes effect after that step's comparison and never hides its
   divergence.
@@ -73,3 +75,9 @@ per-step equality by 64-bit digest; `listDifferences` swallowing invalid limits;
 plus unclear `unreadable` wording. All were fixed in the following commit with regression tests (inputs read once,
 `verifyAnchors`, the cancellation rule, read-once fields and functions, both digests, exact canonical comparison,
 `RangeError` for invalid diff options, node and depth bounds) and the documentation corrected.
+
+A re-review of the fixes (`91cb955d`) verified all ten and found three leftovers: documentation said a
+`verifyAnchors` restore that loses hidden state stops at the anchor, when it actually perturbs the live run and shows
+up at a later step; the starting boundary was never verified; and `cancel()` from inside the input source still ran
+that step. Fixed with `verifiedAnchor` on divergences, verification of the starting boundary and a cancellation
+check right after the source returns, each with a regression test, and the documentation corrected.

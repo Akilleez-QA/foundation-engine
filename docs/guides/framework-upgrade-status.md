@@ -1499,8 +1499,10 @@ rollback sync test). Bounded by `maxSteps` (`over-budget`), `maxAnchors`, state 
 README](../../src/kits/replay/README.md#differential-shadow-runner-and-snapshot-anchors-shadowts), [ADR
 0118](../adr/0118-shadow-runner.md).
 
-Evidence: implemented with 19 headless node tests and `npm run check` on the branch. An independent review of the
+Evidence: implemented with 22 headless node tests and `npm run check` on the branch. An independent review of the
 first candidate (`c755328b`) found ten issues, from inputs re-read after validation (high) and an anchor-check
-overclaim in the docs to lesser read-once, bounds and wording defects; all were fixed with regression tests and the
-documentation corrected (see the ADR's review section). Hosted CI and a re-review of the fixes remain required. No
-browser, dev-surface or device evidence; not integrated.
+overclaim in the docs to lesser read-once, bounds and wording defects; all were fixed with regression tests. A
+re-review (`91cb955d`) verified those fixes and found three leftovers (`verifyAnchors` restores perturbing the live
+run without a marker and documented as stopping at the anchor, an unverified starting boundary, cancellation from the
+input source applied one step late); all were fixed with regression tests (see the ADR's review section). Hosted CI
+remains required. No browser, dev-surface or device evidence; not integrated.

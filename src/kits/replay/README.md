@@ -104,13 +104,17 @@ createShadowRunner({ a: freshReference, b: freshCandidate, inputs, from: report.
   or over the state bounds; a saved text is not parsed when there is a view); `anchor-mismatch` (after
   `load(anchor.a|b)` a side's compared state does not have the anchor's digest, usually an incomplete `load`; both
   sides' restored digests are reported). Every kind except `anchor-mismatch` carries the step's inputs, `lastAgreed`
-  (the agreeing state just before the step, itself usable as `from`) and the nearest retained `anchor`.
+  (the agreeing state just before the step, itself usable as `from`), the nearest retained `anchor` and
+  `verifiedAnchor`.
 - **What anchors can and cannot show.** The anchor check sees only what `save`/`view` return. State kept outside
   `save` (a hidden counter, a cache, an unseeded random source) is invisible to it, and reproducing a divergence from an
   anchor assumes `save` and `load` are complete. Use the rollback kit's sync test (`createRollbackSyncTest`) to look for
-  hidden state. `verifyAnchors: true` restores every anchor into both sides as it is taken and reports an incomplete
-  `load` there (default off: it costs a `load` and a re-read per side per anchor, and a broken `load` then perturbs the
-  live run, which stops at that anchor).
+  hidden state. `verifyAnchors: true` (default off) restores every anchor, the starting boundary included, into both
+  live sides as it is taken; it costs a `load` and a re-read per side per anchor. A restore whose compared state does
+  not match ends the run at that anchor as `anchor-mismatch`. A restore that matches but loses state outside `save`
+  changes the live run instead: the run continues, and the difference appears at a later step as an ordinary
+  divergence whose `verifiedAnchor` names the step of that restore (it is null without the option). Run again without
+  the option to tell such a restore defect from an implementation difference.
 - **Owner.** The caller owns the runner, both sides and the input source. Nothing is global or scheduled; no clock is
   read. The runner never disposes the sides.
 - **Bounds (defaults; ranges in `SHADOW_LIMIT_RANGES`).** `maxSteps` 100,000 per runner; `anchorEvery` 256 (an anchor
@@ -129,7 +133,8 @@ createShadowRunner({ a: freshReference, b: freshCandidate, inputs, from: report.
   `slice` steps so the caller can spread work across frames or ticks. Outside a step, cancellation is immediate. From
   inside a side during a step (a side calling `cancel()` or aborting the signal), it takes effect after that step's
   comparison: if the step diverged, the status is `diverged` with reason null; otherwise the step counts and the status
-  is `cancelled`. Progress and anchors stay readable. A side that calls `step` re-entrantly is reported as `threw`.
+  is `cancelled`. From inside the input source, it takes effect before that step: nothing is stepped with the
+  source's answer. Progress and anchors stay readable. A side that calls `step` re-entrantly is reported as `threw`.
 - **Recovery.** A finished runner is final. Replay from `divergence.anchor` or `divergence.lastAgreed` with fresh
   sides; `nearestAnchor(anchors, step)` picks the newest retained anchor at or before a step, so a long log can be
   bisected from anchors rather than from the start.
@@ -140,11 +145,12 @@ createShadowRunner({ a: freshReference, b: freshCandidate, inputs, from: report.
   in memory and only as the newest `maxAnchors`; there is no anchor file format. Side callbacks are not sandboxed and
   have no CPU deadline. `listDifferences` is generic JSON paths, without the entity and component naming of
   `explainDivergence`.
-- **Evidence.** 19 headless node tests (`shadow.test.ts`): equal implementations agree; an off-by-one at step 37 and a
+- **Evidence.** 22 headless node tests (`shadow.test.ts`): equal implementations agree; an off-by-one at step 37 and a
   floating-point summation-order change are reported at exactly their step and path; replay from the nearest anchor
   and from the last agreeing state reproduces the same divergence; composition with a recorded and reopened replay log
   and the rollback kit's test simulation and ports; thrown steps, saves and loads; anchor mismatch at restore and with
-  `verifyAnchors`; the step budget, anchor ring, diff-path cap and state bytes, nodes and depth; inputs read once
+  `verifyAnchors` (including the starting boundary, and a restore that loses hidden state marked by
+  `verifiedAnchor`); the step budget, anchor ring, diff-path cap and state bytes, nodes and depth; inputs read once
   (getter and Proxy) and UTF-8 input bytes; fields and functions read once; abort, cancel (including from inside a
-  step) and slices; invalid configuration. An independent review of the first version found ten issues, all fixed with
-  these regression tests (see [ADR 0118](../../../docs/adr/0118-shadow-runner.md)). No browser or device evidence.
+  step or the input source) and slices; invalid configuration. An independent review of the first version found ten
+  issues and a re-review three more, all fixed with these regression tests (see [ADR 0118](../../../docs/adr/0118-shadow-runner.md)). No browser or device evidence.
