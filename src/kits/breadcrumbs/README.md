@@ -73,17 +73,20 @@ The `kind` of the result:
   point at the given `landing` distances behind the newest crumb. A follower is stranded in either case:
   - it is beyond `teleportDistance` (reason `distance`);
   - it has stayed beyond `catchUpDistance` for `stuckSeconds` without progress (reason `stuck`), for example walking
-    into a wall or falling into a pit. Progress means either advancing `minProgress` toward where it was heading
-    when the window began, or the gap closing by `minProgress` from its largest value in the window. A follower that
-    is chasing, including one a faster leader is pulling away from, is therefore never stuck; only
-    `teleportDistance` recovers it. Choose `minProgress` (default 0.25, must be positive) larger than any jitter a
-    blocked follower makes against a wall.
+    into a wall or falling into a pit. Progress means advancing `minProgress` toward where it was heading when the
+    window began (the window begins when it falls out of catch-up range); being pushed back moves the reference
+    point back without restarting the clock. A chasing follower, including one a faster leader is pulling away from,
+    is therefore never stuck, and only `teleportDistance` recovers it. Sideways sliding along a wall or a leader
+    idling in place does not count as progress. A follower detouring around an obstacle for longer than
+    `stuckSeconds` without advancing counts as stuck and is put back behind the leader. Choose `minProgress`
+    (default 0.25, must be positive) larger than any back-and-forth a blocked follower makes along its heading.
 
-  Landing points never cross a segment cut. Repeated points (the trail clamps to its oldest crumb) are skipped, as
+  Landing points never cross a segment cut. Repeated points (the trail clamps to its oldest crumb) are tried once, as
   are points no closer to the desired point than the follower, or still beyond `teleportDistance` from it, so a
   recovery never lands in place or loops. `canLand` must return `true` exactly; anything else, or a throw, refuses.
   A `cooldown` (default 2 s) separates the teleports of one follower; `remove(id)` forgets it, cooldown included.
-  A landing distance of 0 is the newest crumb, on the leader.
+  A landing distance of 0 is the newest crumb, on the leader. Stuck recovery needs a landing distance that lands
+  closer to the desired point than the follower, so include one near the follow spacing.
 - **`stranded`:** stranded, but no landing point is allowed yet (or the cooldown is running). It keeps the boost.
   Try again later.
 

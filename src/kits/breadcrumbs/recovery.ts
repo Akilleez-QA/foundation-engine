@@ -92,8 +92,6 @@ export function createCompanionRecovery(trail: BreadcrumbTrail, options: Recover
     windowStart: number;
     anchor: RecoveryVec3 | null;
     toward: RecoveryVec3;
-    /** Largest distance to the desired point seen in this window. */
-    farthest: number;
     lastTeleport: number;
     lastNow: number;
   }
@@ -102,7 +100,6 @@ export function createCompanionRecovery(trail: BreadcrumbTrail, options: Recover
     f.windowStart = now;
     f.anchor = position;
     const gap = distance(position, desired);
-    f.farthest = gap;
     f.toward =
       gap > 0
         ? [(desired[0] - position[0]) / gap, (desired[1] - position[1]) / gap, (desired[2] - position[2]) / gap]
@@ -131,7 +128,7 @@ export function createCompanionRecovery(trail: BreadcrumbTrail, options: Recover
       let f = followers.get(id);
       if (!f) {
         if (followers.size >= maxFollowers) fail('follower capacity reached');
-        f = {windowStart: now, anchor: null, toward: [0, 0, 0], farthest: 0, lastTeleport: -Infinity, lastNow: now};
+        f = {windowStart: now, anchor: null, toward: [0, 0, 0], lastTeleport: -Infinity, lastNow: now};
         followers.set(id, f);
       }
       if (now < f.lastNow) fail('now must be nondecreasing per follower');
@@ -141,17 +138,26 @@ export function createCompanionRecovery(trail: BreadcrumbTrail, options: Recover
         return Object.freeze({kind: 'follow', boost: 1});
       }
       const d = distance(position, desired);
-      // A chasing follower (even one a faster leader pulls away from) is never "stuck"; one against a wall is.
+      // Progress is the follower's own advance toward where it was heading when the window began, so a chasing
+      // follower (even one a faster leader pulls away from) is never "stuck"; one against a wall is.
+      // The window starts afresh whenever the follower is within catch-up range, so it begins at the step the follower
+      // falls behind.
       if (d <= catchUpDistance || f.anchor === null) restart(f, now, position, desired);
       else {
         const moved =
           (position[0] - f.anchor[0]) * f.toward[0] +
           (position[1] - f.anchor[1]) * f.toward[1] +
           (position[2] - f.anchor[2]) * f.toward[2];
-        f.farthest = Math.max(f.farthest, d);
-        // Progress is either the follower's own advance toward where it was heading, or the gap closing by
-        // `minProgress` from the largest gap in this window (catching up after a sprint).
-        if (moved >= minProgress || f.farthest - d >= minProgress) restart(f, now, position, desired);
+        if (moved >= minProgress) restart(f, now, position, desired);
+        else if (moved < 0) {
+          // Pushed back (knockback, a sprinting leader dragging the window): measure the next advance from here,
+          // keeping the window's start time so a blocked follower is still caught.
+          f.anchor = [
+            f.anchor[0] + moved * f.toward[0],
+            f.anchor[1] + moved * f.toward[1],
+            f.anchor[2] + moved * f.toward[2],
+          ];
+        }
       }
       const stuck = d > catchUpDistance && now - f.windowStart >= stuckSeconds;
       const far = d > teleportDistance;
@@ -161,14 +167,14 @@ export function createCompanionRecovery(trail: BreadcrumbTrail, options: Recover
       }
       const reason = far ? 'distance' : 'stuck';
       if (now - f.lastTeleport >= cooldown) {
-        let previous: Crumb | null = null;
+        const tried: Crumb[] = [];
         for (const behind of landing) {
           const point = trail.along(behind);
           if (!point) break;
           // Skip repeats (the trail clamps to its oldest crumb) and points that would not help: no closer to the
           // desired point than the follower already is, or still beyond the teleport distance from it.
-          const same = previous !== null && previous.x === point.x && previous.y === point.y && previous.z === point.z;
-          previous = point;
+          const same = tried.some(p => p.x === point.x && p.y === point.y && p.z === point.z);
+          tried.push(point);
           const gap = distance([point.x, point.y, point.z], desired);
           if (same || gap >= d || gap > teleportDistance) continue;
           let ok = false;

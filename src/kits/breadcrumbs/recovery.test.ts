@@ -174,3 +174,25 @@ test('review regressions: a follower closing in after a sprint, or outrun, is ne
   assert.equal(loop.update(4, {position: [0, 0, 50], desired: [28, 0, 0], now: 0}).kind, 'stranded');
   assert.throws(() => createCompanionRecovery(trail, {...o, minProgress: 0}), RangeError);
 });
+
+test('second review: sideways dither and a fidgeting leader cannot hide a blocked follower; knockback is not stuck', () => {
+  const trail = straightTrail(30);
+  const o = {catchUpDistance: 2, teleportDistance: 10, landing: [3, 5, 8], stuckSeconds: 2, cooldown: 1};
+  const dither = createCompanionRecovery(trail, o);
+  let first = '';
+  for (let i = 0; i <= 30 && first !== 'teleport'; i++)
+    first = dither.update(1, {position: [20, 0, i % 2 ? 2 : 0], desired: [25, 0, 0], now: i / 10}).kind;
+  assert.equal(first, 'teleport', 'sliding sideways against a wall is still stuck');
+  const fidget = createCompanionRecovery(trail, o);
+  first = '';
+  for (let i = 0; i <= 30 && first !== 'teleport'; i++)
+    first = fidget.update(2, {position: [20, 0, 0], desired: [27.5 + 0.5 * Math.sin(i), 0, 0], now: i / 10}).kind;
+  assert.equal(first, 'teleport', 'a leader idling in place does not reset the window');
+  const knock = createCompanionRecovery(trail, o);
+  const kinds: string[] = [];
+  kinds.push(knock.update(3, {position: [24, 0, 0], desired: [27, 0, 0], now: 0}).kind);
+  kinds.push(knock.update(3, {position: [20, 0, 0], desired: [27, 0, 0], now: 0.1}).kind); // knocked back 4 m
+  for (let i = 0; i < 40; i++)
+    kinds.push(knock.update(3, {position: [20 + i * 0.1, 0, 0], desired: [27, 0, 0], now: 0.2 + i / 10}).kind);
+  assert.ok(!kinds.includes('teleport'), 'recovering from a knockback is progress');
+});
