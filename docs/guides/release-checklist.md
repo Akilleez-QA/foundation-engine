@@ -48,6 +48,7 @@ Do not change this workflow to execute unreviewed contributions through `pull_re
 
 ## Before making a release
 
+- Fold the unreleased changelog fragments: `npm run changelog -- --fold` moves every file in `changes/unreleased/` into CHANGELOG.md's Unreleased section (newest first) and deletes them; then give the section its version heading.
 - Confirm the selected GPL-3.0-only license, package metadata and third-party notices agree, including bundled sample assets.
 - Record the exact source commit/tree and successful complete hosted CI run (or equivalent `npm run gate:ci` result), including all template gates. Record fresh Node 22.18+ install/build evidence separately. Focused checks and an earlier head's pass do not establish acceptance of the release candidate.
 - Check the repository and release archive for credentials, private configuration and machine-specific paths. Ignoring local credential files prevents accidental additions; it does not replace review or remove historical material.

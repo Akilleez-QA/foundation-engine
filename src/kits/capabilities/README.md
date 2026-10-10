@@ -6,6 +6,8 @@
 
 `createActionRuns` adds optional bounded action timing and revision-checked completion/cancellation. Feed it time from the existing scene system; the creator owns every consequence and publication rule. See [action runs](../../../docs/guides/action-runs.md) for identity, expiry, retry and integration limits.
 
+`createActionPhases` adds optional, pure action timelines: creator-authored half-open windows, once-only marks delivered across any step size, once-per-range claims, handover suppression and non-throwing restore of plain states. It owns no clock or effect. See [action phases](../../../docs/guides/action-phases.md).
+
 `previewRevocation` and revision-checked `revoke` provide optional respec/removal
 inside the existing possession owner. The creator explicitly selects reject or
 cascade for dependents, and include or retain for tutorial/migration dependents.

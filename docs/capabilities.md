@@ -11,22 +11,35 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 
 | ID | Feature | PR | Docs |
 |---|---|---|---|
+| POOL-01 | Optional bounded entity pool with eviction classes |  | [entity-pool.md](guides/entity-pool.md) |
 | NAV-FIELD-01 | Optional incremental shared navigation distance fields |  | [README.md](../src/kits/navigation/README.md) |
+| WORK-01 | Optional bounded fair work roster |  | [README.md](../src/kits/work-roster/README.md) |
+| VOLUME-01 | Optional bounded sphere and capsule overlap, sweep and headroom queries |  | [README.md](../src/kits/volume-query/README.md) |
+| ACTIVATION-01 | Optional bounded region activation from observer positions |  | [region-activation.md](guides/region-activation.md) |
+| CADENCE-01 | Optional bounded per-member update cadence |  | [update-cadence.md](guides/update-cadence.md) |
 | ASG-01 | Optional bounded service and worksite assignment ownership |  | [assignments.md](guides/assignments.md) |
 | ITINERARY-01 | Bounded editable destination itineraries with owned completion attempts |  | [README.md](../src/kits/itinerary/README.md) |
 | ALN-01 | Planar interaction preparation with bounded proposals and exact-ticket acknowledgment |  | [README.md](../src/kits/alignment/README.md) |
+| REWIND-01 | Bounded rewind history for judging remote commands against past state |  | [README.md](../src/kits/rewind/README.md) |
+| NW-DELTA | Acknowledged-baseline deltas for complete network views |  | [README.md](../src/kits/network/README.md) |
+| PLAYOUT-01 | Remote clock offset and adaptive playout buffers |  | [README.md](../src/kits/playout/README.md) |
+| REPL-01 | Per-recipient quantized replication under a byte budget |  | [README.md](../src/kits/replication/README.md) |
 | VISIBILITY-01 | Bounded source-owned visibility and explored history |  | [README.md](../src/kits/visibility/README.md) |
 | GEN-WEIGHTED | Bounded eligible weighted choice with separately committed recent history |  | [weighted-choice.md](guides/weighted-choice.md) |
 | CAP-EFFECT-CHECKPOINT | Portable timed contribution checkpoints |  | [timed-effects.md](guides/timed-effects.md) |
-| CONTACT-01 | Layered contact volumes with deterministic bounded enter/stay/exit pair events |  | [README.md](../src/kits/contact/README.md) |
+| CAP-ACTION-PHASES | Creator-authored action phase windows, once-only marks and per-range claims |  | [action-phases.md](guides/action-phases.md) |
+| RENDER-INTERP | Opt-in render interpolation of fixed-step Transforms |  | [render-interpolation.md](guides/render-interpolation.md) |
 | VIS-01 | Tone mapping and exposure per scene (view.output) | [#124](https://github.com/Akilleez-QA/foundation-engine/pull/124) | [scene-look.md](guides/scene-look.md) |
 | VIS-02 | Point and spot lights in fixed per-scene slots | [#138](https://github.com/Akilleez-QA/foundation-engine/pull/138) | [scene-look.md](guides/scene-look.md) |
 | VIS-03 | Shadows from the sun, local lights and shapes | [#148](https://github.com/Akilleez-QA/foundation-engine/pull/148) | [scene-look.md](guides/scene-look.md) |
 | VIS-04 | Material options (shading, double side, alpha cut-out, vertex colours) and Material on Mesh and Model | [#127](https://github.com/Akilleez-QA/foundation-engine/pull/127) | [give-a-shape-a-material.md](recipes/give-a-shape-a-material.md) |
 | VIS-05 | Gradient sky, discs, stars and exponential haze | [#150](https://github.com/Akilleez-QA/foundation-engine/pull/150) | [scene-look.md](guides/scene-look.md) |
 | VIS-06 | Instanced scatter of a Shape or Mesh (one draw per scatter) | [#144](https://github.com/Akilleez-QA/foundation-engine/pull/144) | [scatter.md](guides/scatter.md) |
+| VIS-10 | Blob (contact) shadows: one instanced draw of soft ground ellipses where no real shadow reaches |  | [blob-shadows.md](guides/blob-shadows.md) |
 | VIS-09 | Opt-in full three.js kit (@kits/three) | [#136](https://github.com/Akilleez-QA/foundation-engine/pull/136) |  |
+| VIS-11 | Procedural interior reflection environment (reflection kind interior) | [#183](https://github.com/Akilleez-QA/foundation-engine/pull/183) | [scene-look.md](guides/scene-look.md) |
 | POST-01 | Post-processing (bloom, vignette, grade): a consumer of the post.mode quality knob | [#161](https://github.com/Akilleez-QA/foundation-engine/pull/161) | [post-processing.md](guides/post-processing.md) |
+| POST-02 | Post grade lookup tables (.cube, view.post.grade.lut) and an HDR ceiling before bloom (view.post.ceiling) | [#179](https://github.com/Akilleez-QA/foundation-engine/pull/179) | [post-processing.md](guides/post-processing.md) |
 | FX-01 | Particle emitters | [#63](https://github.com/Akilleez-QA/foundation-engine/pull/63) | [particles.md](guides/particles.md) |
 | FX-01a | Flipbook (sprite-sheet) particles and npm run fx:pack | [#141](https://github.com/Akilleez-QA/foundation-engine/pull/141) | [particles.md](guides/particles.md) |
 | GEN-01 | Seeded hierarchical generation (deriveSeed) |  | [README.md](kits/README.md) |
@@ -53,11 +66,68 @@ Tracked so that a correct "not yet" in the docs is recognised. A row moves up wh
 
 Each kit's value exports are listed in [capabilities.json](capabilities.json).
 
-`@kits/alignment`, `@kits/animation`, `@kits/assignments`, `@kits/audio-mixer`, `@kits/authoring`, `@kits/camera`, `@kits/capabilities`, `@kits/chalkboard`, `@kits/character`, `@kits/combat`, `@kits/concept-explorer`, `@kits/contact`, `@kits/control`, `@kits/dialogue`, `@kits/equipment`, `@kits/explore`, `@kits/frames`, `@kits/housing`, `@kits/input-history`, `@kits/inventory`, `@kits/itinerary`, `@kits/learn`, `@kits/locomotion`, `@kits/market`, `@kits/navigation`, `@kits/network`, `@kits/objectives`, `@kits/procgen`, `@kits/replay`, `@kits/resources`, `@kits/rollback`, `@kits/space`, `@kits/spatial`, `@kits/spatial-audio`, `@kits/terrain`, `@kits/three`, `@kits/turns`, `@kits/ui`, `@kits/vehicles`, `@kits/visibility`
+- `@kits/alignment`
+- `@kits/animation`
+- `@kits/assignments`
+- `@kits/audio-mixer`
+- `@kits/authoring`
+- `@kits/cadence`
+- `@kits/camera`
+- `@kits/capabilities`
+- `@kits/chalkboard`
+- `@kits/character`
+- `@kits/combat`
+- `@kits/concept-explorer`
+- `@kits/contact`
+- `@kits/control`
+- `@kits/dialogue`
+- `@kits/entity-pool`
+- `@kits/equipment`
+- `@kits/explore`
+- `@kits/frames`
+- `@kits/housing`
+- `@kits/input-history`
+- `@kits/inventory`
+- `@kits/itinerary`
+- `@kits/learn`
+- `@kits/locomotion`
+- `@kits/market`
+- `@kits/navigation`
+- `@kits/network`
+- `@kits/objectives`
+- `@kits/playout`
+- `@kits/population`
+- `@kits/procgen`
+- `@kits/region-activation`
+- `@kits/replay`
+- `@kits/replication`
+- `@kits/resources`
+- `@kits/rewind`
+- `@kits/rollback`
+- `@kits/sequence`
+- `@kits/space`
+- `@kits/spatial`
+- `@kits/spatial-audio`
+- `@kits/terrain`
+- `@kits/three`
+- `@kits/turns`
+- `@kits/ui`
+- `@kits/vehicles`
+- `@kits/visibility`
+- `@kits/volume-query`
+- `@kits/work-roster`
 
 ## Templates
 
-`arcade`, `blank`, `expedition`, `explorer`, `learn`, `mechanics`, `shared-world`, `showcase`, `terrain`
+- `arcade`
+- `blank`
+- `expedition`
+- `explorer`
+- `learn`
+- `mechanics`
+- `shared-world`
+- `showcase`
+- `terrain`
 
 ## Quality knobs
 
@@ -67,7 +137,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 | `resolution.scale` | registry only |
 | `resolution.max-pixel-ratio` | registry only |
 | `resolution.antialias` | `src/author/runtime.ts` |
-| `shadows.quality` | `src/platform/render/shadow-cascades.ts`, `src/platform/render/shadows.ts` |
+| `shadows.quality` | `src/author/runtime.ts`, `src/platform/render/shadow-cascades.ts`, `src/platform/render/shadows.ts` |
 | `textures.max-size` | registry only |
 | `textures.anisotropy` | `src/author/runtime.ts` |
 | `textures.canvas-budget-mib` | `src/platform/assets/painted-surfaces.ts` |
@@ -82,8 +152,220 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 
 ## `@engine` value exports
 
-`BUILT_IN_CUES`, `EMITTER_DEFAULTS`, `Emitter`, `LIGHT_LIMITS`, `LOCAL_LIGHT_CAPS`, `MATERIAL_DEFAULTS`, `MATERIAL_LIMITS`, `MATERIAL_SHADINGS`, `MAX_CALIBRATION_MS`, `MUSIC_START_MARGIN`, `Material`, `Mesh`, `Model`, `ModelAttachment`, `ModelPoseLink`, `NO_CALIBRATION`, `Name`, `OUTPUT_DEFAULTS`, `OUTPUT_LIMITS`, `PARTICLE_LIMITS`, `PLAY_LATE_MS`, `POINT_LIGHT_DEFAULTS`, `POST_DEFAULTS`, `POST_LIMITS`, `PointLight`, `RenderMask`, `SCATTER_DEFAULTS`, `SCATTER_LIMITS`, `SCENE_LIGHT_DEFAULTS`, `SCENE_SCATTER_LIMITS`, `SHADOWED_LIGHT_CAPS`, `SKY_LIMITS`, `SPOT_LIGHT_DEFAULTS`, `Scatter`, `Shadow`, `Shape`, `SpotLight`, `TIER`, `TONE_MAPPINGS`, `Transform`, `UI_OCCLUSION_LIMITS`, `World`, `audibleGain`, `burst`, `createAudioTimeline`, `createDependencyBudget`, `createDependencyLease`, `createSaveableRng`, `createTestSaves`, `createTestWorkerHost`, `defineAsset`, `defineBuild`, `defineComponent`, `defineEmitter`, `defineEntity`, `defineEnvironment`, `defineGame`, `defineInput`, `defineKit`, `defineMaterial`, `defineMesh`, `defineMode`, `defineSaveSection`, `defineScatter`, `defineScene`, `defineSystem`, `distanceGain`, `dmath`, `effectiveFov`, `estimateOffset`, `hazeColor`, `measureUiOcclusion`, `musicBudgets`, `platformMath`, `pointerOnGround`, `projectToView`, `scalarMath`, `sceneLights`, `sceneParticles`, `sceneScatter`, `sceneShadows`, `shapeParser`, `skyGradientAt`, `testScene`, `validateCalibration`, `validateEmitter`, `validateMaterial`, `validateModel`, `validatePlayOptions`, `validatePointLight`, `validatePost`, `validateRenderMask`, `validateScatter`, `validateSceneOutput`, `validateSky`, `validateSpotLight`, `viewRay`
+- `BLOB_SHADOW_DEFAULTS`
+- `BLOB_SHADOW_LIMITS`
+- `BUILT_IN_CUES`
+- `BlobShadow`
+- `EMITTER_DEFAULTS`
+- `Emitter`
+- `INTERIOR_REFLECTION_LIMITS`
+- `Interpolated`
+- `LIGHT_LIMITS`
+- `LOCAL_LIGHT_CAPS`
+- `LUT_SIZE_LIMITS`
+- `MATERIAL_DEFAULTS`
+- `MATERIAL_LIMITS`
+- `MATERIAL_SHADINGS`
+- `MAX_CALIBRATION_MS`
+- `MAX_MODEL_TRANSITION`
+- `MUSIC_START_MARGIN`
+- `Material`
+- `Mesh`
+- `Model`
+- `ModelAttachment`
+- `ModelPoseLink`
+- `NO_CALIBRATION`
+- `Name`
+- `OUTPUT_DEFAULTS`
+- `OUTPUT_LIMITS`
+- `PARTICLE_LIMITS`
+- `PLAY_LATE_MS`
+- `POINT_LIGHT_DEFAULTS`
+- `POST_DEFAULTS`
+- `POST_LIMITS`
+- `PointLight`
+- `RenderMask`
+- `SCATTER_DEFAULTS`
+- `SCATTER_LIMITS`
+- `SCENE_BLOB_SHADOW_LIMITS`
+- `SCENE_LIGHT_DEFAULTS`
+- `SCENE_SCATTER_LIMITS`
+- `SHADOWED_LIGHT_CAPS`
+- `SKY_LIMITS`
+- `SPOT_LIGHT_DEFAULTS`
+- `Scatter`
+- `Shadow`
+- `Shape`
+- `SpotLight`
+- `TIER`
+- `TONE_MAPPINGS`
+- `Transform`
+- `UI_OCCLUSION_LIMITS`
+- `World`
+- `audibleGain`
+- `burst`
+- `createAudioTimeline`
+- `createDependencyBudget`
+- `createDependencyLease`
+- `createSaveableRng`
+- `createTestSaves`
+- `createTestWorkerHost`
+- `cubeLutText`
+- `defineAsset`
+- `defineBuild`
+- `defineComponent`
+- `defineEmitter`
+- `defineEntity`
+- `defineEnvironment`
+- `defineGame`
+- `defineInput`
+- `defineKit`
+- `defineMaterial`
+- `defineMesh`
+- `defineMode`
+- `defineSaveSection`
+- `defineScatter`
+- `defineScene`
+- `defineSystem`
+- `distanceGain`
+- `dmath`
+- `effectiveFov`
+- `estimateOffset`
+- `hazeColor`
+- `measureUiOcclusion`
+- `musicBudgets`
+- `parseCubeLut`
+- `platformMath`
+- `pointerOnGround`
+- `presentTransform`
+- `presentedTransform`
+- `projectToView`
+- `scalarMath`
+- `sceneBlobShadows`
+- `sceneLights`
+- `sceneParticles`
+- `sceneScatter`
+- `sceneShadows`
+- `shapeParser`
+- `skyGradientAt`
+- `testScene`
+- `validateBlobShadow`
+- `validateCalibration`
+- `validateEmitter`
+- `validateInteriorReflection`
+- `validateMaterial`
+- `validateModel`
+- `validatePlayOptions`
+- `validatePointLight`
+- `validatePost`
+- `validateRenderMask`
+- `validateScatter`
+- `validateSceneOutput`
+- `validateSky`
+- `validateSpotLight`
+- `viewRay`
 
 ## npm scripts
 
-`asset:optimize`, `asset:verify`, `bench`, `bench:dmath`, `bench:ref`, `bench:spatial`, `build`, `capabilities`, `check`, `content:publish`, `deploy:production`, `dev`, `disclosure`, `dmath:golden`, `faults:network`, `format`, `format:check`, `fx:pack`, `gate`, `gate:ci`, `gate:templates`, `generate`, `host`, `host:interest`, `lab`, `lint`, `lint:arch`, `lint:brief`, `lint:budgets`, `lint:css`, `lint:docs-claims`, `lint:game`, `lint:generic`, `lint:layers`, `lint:provenance`, `lint:types`, `new`, `new-game`, `new-lab`, `package:pure`, `perf:baseline`, `perf:bundle`, `perf:check`, `perf:derive`, `play`, `play:criteria`, `play:playtests`, `play:script`, `play:snap`, `preview`, `probe:network`, `quality:guard`, `strings`, `test`, `test:action-workbench-browser`, `test:appearance-browser`, `test:audio-browser`, `test:authoring-browser`, `test:authority-workbench-browser`, `test:blender-export-browser`, `test:capture-browser`, `test:crafting-workbench-browser`, `test:creator-journey-browser`, `test:custody-composition-browser`, `test:diagnostics-browser`, `test:dmath-browser`, `test:first-use-browser`, `test:first-use-browser:production`, `test:framework-browser`, `test:ktx2-browser`, `test:lights-browser`, `test:material-browser`, `test:material-options-browser`, `test:model-attachment-browser`, `test:model-preview-browser`, `test:network-probe`, `test:network-workbench-browser`, `test:objective-workbench-browser`, `test:output-browser`, `test:particle-browser`, `test:pose-to-pose-browser`, `test:post-browser`, `test:progression-workbench-browser`, `test:regional-surface-browser`, `test:replay-browser`, `test:replication-load`, `test:replication-workbench-browser`, `test:scatter-browser`, `test:session-browser`, `test:shadows-browser`, `test:sky-browser`, `test:sound-browser`, `test:stage-journal-browser`, `test:subpath-browser`, `test:three-kit-browser`, `test:ui-browser`, `test:weighted-appearance-browser`, `typecheck`
+- `asset:optimize`
+- `asset:verify`
+- `bench`
+- `bench:dmath`
+- `bench:ref`
+- `bench:spatial`
+- `build`
+- `capabilities`
+- `changelog`
+- `check`
+- `content:publish`
+- `deploy:production`
+- `dev`
+- `disclosure`
+- `dmath:golden`
+- `faults:network`
+- `format`
+- `format:check`
+- `fx:pack`
+- `gate`
+- `gate:ci`
+- `gate:templates`
+- `generate`
+- `host`
+- `host:interest`
+- `lab`
+- `lint`
+- `lint:arch`
+- `lint:brief`
+- `lint:budgets`
+- `lint:changelog`
+- `lint:css`
+- `lint:docs-claims`
+- `lint:game`
+- `lint:generic`
+- `lint:layers`
+- `lint:provenance`
+- `lint:types`
+- `new`
+- `new-game`
+- `new-lab`
+- `package:pure`
+- `perf:baseline`
+- `perf:bundle`
+- `perf:check`
+- `perf:derive`
+- `play`
+- `play:criteria`
+- `play:playtests`
+- `play:script`
+- `play:snap`
+- `preview`
+- `probe:network`
+- `quality:guard`
+- `strings`
+- `test`
+- `test:action-workbench-browser`
+- `test:appearance-browser`
+- `test:audio-browser`
+- `test:authoring-browser`
+- `test:authority-workbench-browser`
+- `test:blender-export-browser`
+- `test:blob-shadows-browser`
+- `test:capture-browser`
+- `test:crafting-workbench-browser`
+- `test:creator-journey-browser`
+- `test:custody-composition-browser`
+- `test:diagnostics-browser`
+- `test:dmath-browser`
+- `test:first-use-browser`
+- `test:first-use-browser:production`
+- `test:framework-browser`
+- `test:interior-reflection-browser`
+- `test:ktx2-browser`
+- `test:lights-browser`
+- `test:material-browser`
+- `test:material-options-browser`
+- `test:model-attachment-browser`
+- `test:model-preview-browser`
+- `test:network-probe`
+- `test:network-workbench-browser`
+- `test:objective-workbench-browser`
+- `test:output-browser`
+- `test:particle-browser`
+- `test:pose-to-pose-browser`
+- `test:post-browser`
+- `test:progression-workbench-browser`
+- `test:regional-surface-browser`
+- `test:replay-browser`
+- `test:replication-load`
+- `test:replication-workbench-browser`
+- `test:scatter-browser`
+- `test:session-browser`
+- `test:shadows-browser`
+- `test:sky-browser`
+- `test:sound-browser`
+- `test:stage-journal-browser`
+- `test:subpath-browser`
+- `test:three-kit-browser`
+- `test:ui-browser`
+- `test:weighted-appearance-browser`
+- `typecheck`

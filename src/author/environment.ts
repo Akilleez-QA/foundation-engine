@@ -1,11 +1,14 @@
 import type {CubeSpec} from '../platform/assets/cube';
 import {validateSky, type Sky} from './sky';
+import {validateInteriorReflection, type InteriorReflection} from './interior-reflection';
 type Vec3 = [number, number, number];
 /** Independent visual background, illumination and depth haze. Colors use packed sRGB. */
 export interface EnvironmentState {
   background: number;
   cube?: CubeSpec;
-  reflection?: CubeSpec;
+  /** What glossy and metal surfaces reflect: six cube faces, or a procedural interior (`{ kind: 'interior', … }`) built once
+   *  from data (walls, floor, ceiling, up to 8 lights). Without it they reflect nothing but the lights. */
+  reflection?: CubeSpec | InteriorReflection;
   ambient: {sky: number; ground: number; intensity: number};
   /** The sun. `shadow` (VIS-03) makes it cast shadows in a scene with `sceneShadows()`: `extent` is the half-size in
    *  metres (0…200] of the square around the world origin that receives them, `softness` their edge. */
@@ -110,5 +113,8 @@ export function defineEnvironment(input: EnvironmentState): EnvironmentState {
     validateSky(e.sky);
     if (e.cube) throw Error('environment: sky and cube are both backgrounds; choose one');
   }
+  const reflection: unknown = e.reflection;
+  if (reflection !== undefined && typeof reflection === 'object' && reflection !== null && 'kind' in reflection)
+    validateInteriorReflection(reflection as InteriorReflection);
   return e;
 }

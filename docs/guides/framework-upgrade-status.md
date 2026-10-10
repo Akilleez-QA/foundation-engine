@@ -701,6 +701,16 @@ failure is reported once and the visit draws direct; a WebGPU visit reports no i
 bloom beside an emissive box at full only, a still scene draws no frame, release audit at the author-API baseline);
 `quality:guard` identical for the blank and explorer templates. No reference-GPU cost, physical-device or
 visual-quality acceptance; the stock shell does not install the Graphics screen, so the live knob is unit-tested only.
+**Grade tools (POST-02, 2026-10-04): integrated (PR #179 via combined integration PR #253).** `grade.lut`
+(a `.cube` 3D lookup table under `public/`, strength 0 to 1) and `ceiling` (an opt-in HDR clamp, 1 to 65504) in the same
+combined pass, no extra post draw. Owner: the visit's post seam (fetch with the visit signal after the chunk, 4 parsed
+tables per page, one half-float 3D texture per visit). Overload: a file over 8 MiB or a side over 65 is refused.
+Cancellation: a file change or the visit's end aborts the fetch. Recovery: a failed table is reported once per file per
+visit and post draws without it. Evidence: unit tests (reader and writer, settings, pipeline variants and texture
+lifetime, the seam's fetch, cache, cancellation and failure) and `npm run test:post-browser` (`grade-post`, full and
+basic, software GL). Not reproduced in a browser: the ceiling's NaN and infinity paths. The table is not in the probe's
+`textureMiB`. No reference-GPU, physical-device or visual-quality acceptance.
+
 See the [guide](post-processing.md).
 
 ## Three.js escape hatch (VIS-09) — implemented, candidate
@@ -780,6 +790,20 @@ while an opted-in scene prepares. Bounds: 65,536 copies per scatter; 32 scatters
 change or freed capacity, never per frame. Cancellation: leaving disposes instance buffers and returns geometry and
 surfaces. Recovery: CPU-side buffers re-upload after context loss; a failed chunk load is reported and the visit draws
 without scatters. Determinism: a derived stream per scatter, never `ctx.random()`. See the [guide](scatter.md).
+
+## Blob shadows — VIS-10, integrated (PR #184 via #253)
+
+New author component `BlobShadow` with `validateBlobShadow`, `BLOB_SHADOW_DEFAULTS`/`BLOB_SHADOW_LIMITS`, and the
+per-scene opt-in `sceneBlobShadows({ max, ground, crossfade, distance })` (`SCENE_BLOB_SHADOW_LIMITS`); platform layer
+`createBlobShadowLayer`; dev `engine.blobShadows()` counters (capacity, candidates, drawn, dropped, draws, uploads).
+Owner: the scene visit; the drawing is a lazy chunk loaded while an opted-in scene prepares. Inputs: entity `Transform`
+x, z, `ry` and scale, the scene's `sceneShadows` flags, the environment sun's `shadow.extent` and the live
+`shadows.quality` knob. Bounds: `max` 64 by default (1…1024), allocated once. Overload: the nearest `max` to the camera
+are drawn, the rest counted in `dropped` and reported once per visit at info level. Cancellation: leaving disposes the
+mesh, material and instance buffers. Recovery: CPU-side buffers re-upload after context loss; a failed chunk load is
+reported and the visit draws without blobs. Cost: +1 draw and +2 triangles per blob on every preset, no shadow pass, no
+texture. Browser acceptance (`npm run test:blob-shadows-browser`) passed 2026-10-05 in local software GL on the reference and low presets (7 candidates, 4 drawn in 1 draw, +8 triangles, 1 dropped; shadows off 4 drawn, 3 dropped; idle 0 frames; a move uploads once; disposed on exit). See the
+[guide](blob-shadows.md).
 
 ## Game sound files — DX P1-10, integrated in v0.2.0
 
@@ -1027,6 +1051,12 @@ Optional, per-scene visual capabilities on `@engine` data (the [scene look guide
   sun-like discs and stars from one CPU-generated texture on an unlit sphere (no custom shader, backend-neutral);
   `haze` gains `{ kind: 'exp2', density }` and `color: 'sky'`. Evidence: unit tests and `npm run test:sky-browser`
   (desktop headless Chromium, software GL). No physical-device evidence.
+- **Interior reflection (VIS-11), integrated (PR #183 via #253).** `defineEnvironment({ reflection:
+  { kind: 'interior', size, eyeHeight, wall, floor, ceiling, lights } })`: a procedural box interior with at most 8 glowing
+  spheres, validated at definition, built once per distinct interior (keyed by its data) as one 512 x 256 half-float
+  equirectangular texture in a lazy chunk, prefiltered once by the renderer, disposed on change, clear or exit. Owner:
+  the visit's reflection binding (`author/scene-cubes.ts`). No per-frame cost and not tiered, like cube reflections.
+  Evidence: unit tests (`interior-reflection.test.ts`). `npm run test:interior-reflection-browser` passed 2026-10-05 in local software GL on the reference and low presets (mirror sphere centre 255,255,255, rim 8,8,8; relit after one change; draws 1/1; idle 0). No physical-device, GPU prefilter time or visual-quality evidence.
 
 ## Asset provenance and AI disclosure — DX-03, implemented
 
@@ -1250,3 +1280,151 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Optional bounded work roster candidate
+
+The [work roster](../../src/kits/work-roster/README.md) supplies finite admission, fair
+visit batches and exact registration membership, with no scheduler or payload owner.
+Two headless consumers use the existing fixed runner for World observations and
+revision-checked inspections. An independent array model covers 10,000 churn operations.
+These are candidate headless contracts; hosted combined CI and physical-device
+timing/native-memory acceptance are not implied. Creator result revisions and
+consumer cleanup remain explicit; runtime tickets are not saved. See ADR 0086.
+
+## Shared-stage retirement recovery — candidate (2026-10-09)
+
+The existing stage pool now retires logical view ownership despite cleanup errors
+and rolls back failed setup. Cleanup preserves original causes and still attempts
+independent retirement work. Surviving sibling leases are not swept or forced lost;
+only a failed release cleanup makes a slot uncertain, and an uncertain slot refuses
+new sharing until its last sibling leaves. A new lease makes the drawing view reset
+its GL state cache. Borrowed canvas attachment rollback and once-only underlying
+renderer disposal are exercised.
+See [render backend](render-backend.md#stage-setup-and-retirement-failures).
+Independent review found and fixed over-broad uncertainty after clean setup rollback
+and a stale drawer state cache after new leases. Hosted full CI is the integration
+gate; logical cleanup is not proof of successful GPU reclamation or physical-device
+acceptance.
+
+## Rewind history — REWIND-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/rewind/README.md), [guide](rewind-history.md), [decision](../adr/0087-rewind-history.md). Optional pure per-subject sample rings with time-addressed, never-extrapolating queries that respect creator-marked discontinuities, plus a pure time choice that clamps an untrusted claimed view time to a creator cap. Hosts record from their existing fixed step and query from existing command dispatch; nothing moves or restores live state. Evidence: 17 focused headless tests including a composition with `@kits/combat` `sweep`, and one local micro-measurement. Candidate only; latency estimation, protocol, multiplayer, browser and physical-device acceptance and full CI are not claimed here.
+
+## View deltas — NW-DELTA candidate, 2026-10-09
+
+[Contract](../../src/kits/network/README.md#optional-acknowledged-baseline-view-deltas), [guide](network-views.md#optional-acknowledged-baseline-deltas), [decision](../adr/0088-view-deltas.md). Optional encoder/decoder around the existing complete-view publisher and receiver: entity-level deltas against the last acknowledged adopted frame, each proven to rebuild the publisher's exact bytes before it is sent, with complete-frame fallback and `adopted: false` recovery. Evidence: 14 focused headless tests with a real publisher and receiver, hostile frames, and one local length measurement (9.1 % of complete length at 4 of 64 entities changing). Candidate only; WAN, browser, physical-device and full-CI acceptance are not claimed here.
+
+## Model clip transitions — candidate (2026-10-09)
+
+Optional `Model.transition` (seconds, default 0) eases skinned-model clip changes,
+revision restarts and returns to the bind pose from the displayed pose instead of
+cutting. The existing scene model owner keeps playback; no new system or mixer.
+Bounded to 512 animated nodes per model; larger rigs cut and report. See
+[ADR 0089](../adr/0089-model-clip-transitions.md) and
+[the model recipe](../recipes/load-a-model.md). Focused headless tests against the
+real three.js mixer are recorded in the upgrade ledger; independent review and full
+hosted integration CI remain required. No browser, visual or device acceptance.
+
+## Camera support framing — candidate (2026-10-09)
+
+Optional `support` query on the existing `cameraSystem` anchors vertical framing to
+the creator-defined support height (scaled, clamped), so jumps do not bob the view.
+Defaults unchanged; no new owner. See [ADR 0090](../adr/0090-camera-support-framing.md)
+and [the camera kit README](../../src/kits/camera/README.md). Headless scene tests
+are recorded in the upgrade ledger; independent review and full hosted CI remain
+required. No browser, visual or device acceptance.
+
+## Optional action phases — candidate (2026-10-09)
+
+`createActionPhases` in the existing capabilities kit adds creator-authored action
+windows, once-only marks and per-range claims over plain, fingerprinted caller states.
+It installs no clock, effect or persistence owner, and no template uses it. See
+[action phases](action-phases.md), [issue #229](https://github.com/Akilleez-QA/foundation-engine/issues/229)
+and ADR 0097. The evidence is headless unit and composition tests recorded in the upgrade ledger.
+Independent review findings were addressed before publication. Full hosted CI and
+integration remain required.
+
+## Optional bounded volume queries — candidate (2026-10-09)
+
+The [volume query kit](../../src/kits/volume-query/README.md) answers overlap,
+fixed-orientation sweep and capsule headroom for a sphere or capsule body against
+an immutable snapshot of static spheres, capsules and oriented boxes. It installs
+no physics world, controller, clock or dependency; results carry the creator's
+snapshot revision and existing owners (portal crossing, alignment, camera
+obstruction, creator systems) apply effects. Evaluation and iteration ceilings
+report `over-budget` or `unresolved`, never clear. Evidence is headless: sampled
+and closed-form oracles, ray/endpoint/centre-ray discriminators, a portal consumer
+and a fixed-runner body-height consumer. Meshes, heightfields, moving colliders,
+rotation during motion, depenetration and device timing are not covered. Independent
+review found and fixed two defects (PR #237, head before this note `7c9680ab`); affected
+check passed 18 tests. Full hosted CI remains required. See ADR 0098.
+
+## Optional cue sequences — candidate (2026-10-09)
+
+`@kits/sequence` runs creator-defined multi-track cue lists on caller ticks with
+barriers, holds, exactly-once effect intents, skip, cancellation, a bounded
+per-call transition budget and validated save-section snapshots. It installs no
+owner; the creator's fixed-step system, camera, audio-mixer and dialogue kits keep
+theirs. See [the guide](sequences.md) and [ADR 0091](../adr/0091-bounded-cue-sequences.md).
+Headless tests are recorded in the upgrade ledger; independent review and full
+hosted CI remain required.
+
+## Sequence cast, branches and arbitration — candidate (2026-10-09)
+
+Builds on the cue sequence kit (#249): cast binding with driven channels and a
+settle-aware freeze gate, branching sequence graphs, and a one-claim event arbiter.
+Pure helpers; see [ADR 0111](../adr/0111-sequence-cast-branches-arbitration.md) and
+[the guide](sequences.md). Headless tests are in the ledger; independent review and
+hosted CI remain required.
+
+## Optional population kit — candidate (2026-10-09)
+
+`@kits/population` (requires `spatial`) adds placement fields that spawn and
+despawn authored placements near observers with bounded per-update work and
+remember destroyed ones (persisted `never` depletion through a strict save
+section), and update tiers that freeze or round-robin far entities with conserved
+time. No owner is installed. See [the guide](population.md) and
+[ADR 0092](../adr/0092-population-placements-and-tiers.md). Headless tests are in the
+upgrade ledger; independent review and full hosted CI remain required.
+
+## Optional region activation candidate — ACTIVATION-01, 2026-10-09
+
+`@kits/region-activation` is an independently implemented pure helper that decides which uniform grid regions a game simulates from observer positions. It provides activate/release radius hysteresis, update-count linger with cancel-on-return, refcounted pins, per-update activation (nearest first) and deactivation budgets, a hard `maxActive` refusal, per-region epochs for refusing stale asynchronous loads and `dormantFor` for creator catch-up rules. ECS systems, the chunk store and worker host keep their responsibilities; no loader, scheduler, persistence or registration is added. [Guide](region-activation.md), [ADR 0095](../adr/0095-optional-region-activation.md).
+
+Evidence: 13 focused headless tests (11 unit tests including a 3,000-step brute-force model comparison asserting statuses and counters and 2,000 non-dyadic boundary-geometry trials, plus an ECS fixed-step gating consumer and a chunk-store load/save consumer with epoch refusal). An independent adversarial review found an off-grid query crash, boundary rounding in the scan range, unasserted statuses and index-ordered deactivation starvation; all were fixed with regression tests before publication. A local headless micro-measurement is recorded in the kit README as an order-of-magnitude indication only. This is a branch candidate: hosted full CI, a playable template consumer, browser behaviour and physical-device acceptance remain pending.
+
+## Optional update cadence candidate — CADENCE-01, 2026-10-09
+
+`@kits/cadence` is an independently implemented pure helper that runs members at their own integer periods on the caller's tick. It spreads start phases by id (or explicit phase), returns at most `maxDuePerTake` due members earliest-due-first with elapsed and lateness ticks, defers the rest instead of dropping them, reschedules on each member's phase grid without burst catch-up, and offers JSON-safe snapshot/restore. The fixed-step runner, clock and interest sets keep their responsibilities; no clock, callback, persistence owner or registration is added. [Guide](update-cadence.md), [ADR 0096](../adr/0096-optional-update-cadence.md).
+
+Evidence: 10 focused headless tests (8 unit tests including a 4,000-step comparison with an independent enumeration model with large gaps and mid-run snapshot round trips, plus an ECS fixed-step consumer with distance-banded periods and an interest-set refresh consumer). An independent adversarial review found that period changes discarded the phase spread, plus result-buffer aliasing, tick overflow near 2^53 and weak snapshot invariants; all were fixed with regression tests before publication. A local headless micro-measurement is recorded in the kit README as an order-of-magnitude indication only. This is a branch candidate: hosted full CI, a playable template consumer, browser behaviour and physical-device acceptance remain pending.
+
+## Remote playout — PLAYOUT-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/playout/README.md), [guide](remote-playout.md), [decision](../adr/0093-remote-playout.md). Optional pure clock-offset estimation (minimum round trip in a bounded window, bounded slew, snap threshold) and per-subject playout buffers that present authoritative views behind the estimated clock with an adaptive bounded delay, interpolation, capped extrapolation, discontinuity holds and non-decreasing render time. Evidence: eight focused headless tests including a 20-second jittered composition with the real view receiver (presented error below 1e-14, per-frame step deviation 1.1 ms of motion against 84 ms when presenting the newest view). Candidate only; protocol, WAN, browser, physical-device and full-CI acceptance are not claimed here.
+
+## Optional entity pool candidate — POOL-01, 2026-10-09
+
+`@kits/entity-pool` is an independently implemented pure helper that keeps pooled members under a creator member-count and cost cap. Creator classes carry a priority, cost, class cap and eviction order (oldest, newest, lowest score); only `evictable` classes lose members, and only to higher-priority requests, lowest priority first; `replaceOwn` lets a class recycle its own members. Admission is atomic with a bounded eviction plan and reported refusals (`class-full`, `capacity`, `eviction-limit`); pins protect members; `sweep` recovers members destroyed elsewhere. A `World` adapter spawns only on admission, despawns evicted entities and emits one world event per eviction. No system, clock, persistence owner or registration is added; placement memory across saves stays with its owner. [Guide](entity-pool.md), [ADR 0100](../adr/0100-optional-entity-pool-eviction-classes.md).
+
+Evidence: 10 focused headless tests (8 unit tests including a 6,000-operation comparison with an independent one-victim-at-a-time model with give-back covering every refusal reason, plus a World fixed-step consumer under a triangle-cost cap with eviction events and an owner-recovery consumer). An independent adversarial review found re-entrant `sweep` corruption, unbounded sweep rescans, over-eviction of cheap classes, eager per-class heap memory and smaller validation gaps; all were fixed with regression tests before publication. A local headless micro-measurement is recorded in the kit README as an order-of-magnitude indication only. This is a branch candidate: hosted full CI, a playable template consumer, browser behaviour and physical-device acceptance remain pending.
+
+## Replication schedule — REPL-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/replication/README.md), [guide](replication-schedule.md), [decision](../adr/0094-replication-schedule.md). Optional quantized field schema, per-recipient byte-budgeted packets (removals, creations, field-mask updates) ranked in one queue by accumulated weighted priority with per-entry minimum interval, per-recipient epochs, loss/acknowledgment recovery, and an order-safe replica with tombstones. Addresses the interest sets limits (starvation rotation, per-entity cadence, delta encoding). Evidence: thirteen focused headless tests including a lossy, duplicating, reordering composition with interest sets that converges exactly and a randomized 40-seed convergence test (52,771 vs 557,712 characters for complete views of the same sets). Candidate only; transport, WAN, browser, physical-device and full-CI acceptance are not claimed here.
+
+## Look-at constraint — candidate (2026-10-09)
+
+`createLookAt` in the animation kit aims a bounded joint chain at a root-frame
+direction with per-joint shares and limits, a front cone, smoothing and a speed cap,
+returning deltas that compose onto pose arrays. Pure; the caller owns targets, clock
+and skeleton. See [ADR 0110](../adr/0110-look-at-constraint.md). Headless tests are in
+the upgrade ledger; independent review and full hosted CI remain required.
+
+## Camera director — candidate (2026-10-09)
+
+Optional camera-kit helpers: volume priority ladder, string/rail/close-up/shot rigs,
+pose-sized transitions landing on moving goals (including the scripted-shot return),
+support carry, letterbox amount and an optional director system. See
+[ADR 0112](../adr/0112-camera-director.md). Headless tests in the ledger; independent
+review and hosted CI remain required.

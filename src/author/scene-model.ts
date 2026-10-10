@@ -12,7 +12,15 @@ import type {ModelLibrary, ModelTemplate} from '../platform/assets/models';
 import type {AssetLease} from '../platform/assets/lease-cache';
 import {isAbortError} from '../platform/assets/lease-cache';
 import {Model, validateModel, type ModelData, type ModelSocketPose} from './model';
+import {
+  animatedNodes,
+  createClipTransitions,
+  MAX_TRANSITION_NODES,
+  type ClipTransition,
+  type ClipTransitions,
+} from './scene-model-transition';
 import {Transform} from './defs';
+import type {TransformPose} from './interpolation';
 import type {ModelLooks} from './model-looks';
 interface Slot {
   rig?: ModelRigCapture;
@@ -27,6 +35,9 @@ interface Slot {
   mixer?: T.AnimationMixer;
   action?: T.AnimationAction | undefined;
   animationKey?: string;
+  /** Built on the first requested transition; null when the rig exceeds the node budget (changes then cut). */
+  transitions?: ClipTransitions | null;
+  fade?: ClipTransition | undefined;
   nodes?: Map<string, T.Object3D | null>;
   failed?: boolean;
   mask?: number;
@@ -49,6 +60,8 @@ export function createSceneModels(o: {
   mask?(entity: Entity): number;
   /** Draws an entity's `Material` over its instance's own materials (model-looks.ts); absent, models keep theirs. */
   looks?: Pick<ModelLooks, 'sync' | 'release'> | undefined;
+  /** The pose to draw for an entity (render interpolation); absent, models are drawn at their Transform. */
+  present?(entity: Entity, tr: TransformPose): TransformPose;
 }) {
   const slots = new Map<Entity, Slot>();
   let closed = false,
@@ -159,7 +172,7 @@ export function createSceneModels(o: {
         retire(e, slot);
         return;
       }
-      pose(e, slot, current, tr);
+      pose(e, slot, current, o.present ? o.present(e, tr) : tr);
       if (o.world.has(e, ModelAttachment) || o.world.has(e, ModelPoseLink)) {
         slot.root.visible = false;
         slot.root.matrixAutoUpdate = false;
@@ -355,7 +368,7 @@ export function createSceneModels(o: {
           }
           const slot = slots.get(e);
           if (!slot?.ready) continue;
-          changed = pose(e, slot, data, tr) || changed;
+          changed = pose(e, slot, data, o.present ? o.present(e, tr) : tr) || changed;
           changed = applyMask(slot, e) || changed;
           if (!live(e, slot)) continue;
           if (o.looks?.sync(e, slot.instance!)) changed = true;
@@ -367,8 +380,24 @@ export function createSceneModels(o: {
             node.quaternion.copy(rest.quaternion);
           }
           slot.overrides!.clear();
-          const key = `${data.clip}|${data.revision}|${data.loop}`;
-          if (key !== slot.animationKey) {
+          const key = `${data.clip}|${data.revision}|${data.loop}`,
+            keyChanged = key !== slot.animationKey,
+            transition = data.transition ?? 0;
+          let from: ReturnType<ClipTransitions['captureFrom']> | undefined;
+          // Never blend in a model's first clip: there is no displayed pose to leave yet.
+          if (keyChanged && transition > 0 && slot.animationKey !== undefined) {
+            if (slot.transitions === undefined) {
+              const nodes = animatedNodes(slot.instance!, slot.lease!.value.animations);
+              slot.transitions = nodes && createClipTransitions(nodes);
+              if (!nodes) report(Error(`model: more than ${MAX_TRANSITION_NODES} animated nodes; clip changes cut`));
+            }
+            // The displayed pose, including a transition still in progress, is where the next one starts.
+            from = slot.transitions?.captureFrom();
+          }
+          // Return nodes to the running transition's base so nothing is blended twice or left part-way.
+          slot.fade?.restore();
+          if (keyChanged) slot.fade = undefined;
+          if (keyChanged) {
             slot.mixer!.stopAllAction();
             slot.action = undefined;
             if (data.clip) {
@@ -388,17 +417,29 @@ export function createSceneModels(o: {
             }
             slot.animationKey = key;
             slot.mixer!.update(0);
+            if (from) slot.fade = slot.transitions!.start(from, transition);
             changed = true;
           }
+          let advanced = false;
           if (slot.action) {
-            slot.action.paused = !data.playing;
+            // A finished one-shot clip stays clamped: the mixer pauses it at the end, and un-pausing it would
+            // re-finish it (and report a change) on every playing frame. `revision` restarts it.
+            const finished = !data.loop && slot.action.time >= slot.action.getClip().duration;
+            slot.action.paused = !data.playing || finished;
             slot.action.timeScale = data.speed;
             if (data.playing && data.speed > 0 && dt > 0 && slot.action.isRunning()) {
               slot.mixer!.update(dt);
+              advanced = true;
               changed = true;
             }
           }
-          if (hadOverrides) slot.mixer!.update(0);
+          if (hadOverrides || (slot.fade && !advanced)) slot.mixer!.update(0);
+          if (slot.fade) {
+            // Presentation time: the blend completes even while clip playback is paused, so a paused model that
+            // switches to another clip or the bind pose still arrives there. Clip speed does not scale it.
+            if (!slot.fade.blend(dt)) slot.fade = undefined;
+            if (dt > 0) changed = true;
+          }
           const poseKey = JSON.stringify(data.pose);
           changed = slot.poseKey !== poseKey || changed;
           slot.poseKey = poseKey;

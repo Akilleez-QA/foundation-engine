@@ -71,3 +71,17 @@ test('a spot aims along its forward axis, or at its target', () => {
   assert.deepEqual(spot.target.position.toArray(), [3, 0, 0]);
   rig.dispose();
 });
+
+test('lights on an interpolated entity follow its drawn pose', () => {
+  const scene = new T.Scene(),
+    world = new World();
+  const slots = createLightSlots({slots: {point: 1, spot: 0}, enabled: true, report: () => {}});
+  const rig = createSceneLightRig(scene, {point: 1, spot: 0});
+  world.spawn(Transform({x: 4, y: 1, z: 0}), PointLight({intensity: 2}));
+  slots.sync(world);
+  assert.equal(
+    rig.apply(world, slots, (_e, tr) => ({...tr, x: tr.x - 1})),
+    true,
+  );
+  assert.deepEqual(rig.lights.points[0]!.position.toArray(), [3, 1, 0]);
+});

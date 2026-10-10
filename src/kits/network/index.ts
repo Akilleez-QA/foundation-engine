@@ -15,6 +15,14 @@ export type {
 } from './types';
 export {createViewReceiver} from './view-receiver';
 export {createViewPublisher} from './view-publisher';
+export {createViewDeltaEncoder, createViewDeltaDecoder} from './view-delta';
+export type {
+  ViewDeltaFrame,
+  ViewDeltaEncoder,
+  ViewDeltaEncoderState,
+  ViewDeltaDecoder,
+  ViewDeltaDecodeResult,
+} from './view-delta';
 export type {
   ViewLimits,
   ViewEntity,

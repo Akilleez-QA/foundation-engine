@@ -12,7 +12,8 @@
  *  - `off`: the scene draws straight to the canvas as it does without post. Tone mapping still comes from the scene's
  *    renderer output setting, so exposure is kept; bloom, vignette and grade are not drawn.
  *  - `basic`: one scene target (half-float, MSAA when `resolution.antialias` is on) and one combined fullscreen pass:
- *    tone map, grade, vignette and sRGB output. 1 post draw.
+ *    HDR ceiling (when asked for), tone map, grade, lookup table (when asked for), vignette and sRGB output.
+ *    1 post draw.
  *  - `full`: `basic` plus a half-resolution bloom chain of 5 mips: 1 threshold pass, 4 downsamples and 4 upsamples
  *    before the combined pass. 10 post draws.
  *
@@ -48,19 +49,42 @@ export interface PostGrade {
   gain?: RGB;
   /** 0 grey to 2 vivid. Default 1. */
   saturation?: number;
+  /** A 3D lookup table applied after lift, gain and saturation (lut.ts). Default none. */
+  lut?: PostLut;
+}
+/** A `.cube` lookup table under the game's `public/` folder, blended with the ungraded picture by `strength`. */
+export interface PostLut {
+  /** A path relative to `public/` ending in `.cube`, for example `'luts/night.cube'`. */
+  file: string;
+  /** 0 (no change) to 1 (the table's colours). Default 1. */
+  strength?: number;
 }
 /** What a scene asks of post-processing. Every field is optional; `bloom: false` turns the glow off even at `full`. */
 export interface PostSettings {
   bloom?: PostBloom | false;
   vignette?: PostVignette;
   grade?: PostGrade;
+  /**
+   * A ceiling on the linear HDR picture before bloom and tone mapping (1 to 65504; default none). Every pixel brighter
+   * than it is scaled down to it with its hue kept, an infinite channel is clipped and a NaN pixel becomes black, so one
+   * over-range specular pixel cannot bloom into a disc. Drawn at `basic` and `full`.
+   */
+  ceiling?: number;
+}
+
+/** A resolved lookup table request. */
+export interface PostLutResolved {
+  readonly file: string;
+  readonly strength: number;
 }
 
 /** Validated settings with every default filled in. */
 export interface PostResolved {
   readonly bloom: Readonly<Required<PostBloom>> | null;
   readonly vignette: Readonly<Required<PostVignette>>;
-  readonly grade: Readonly<{lift: RGB; gain: RGB; saturation: number}>;
+  readonly grade: Readonly<{lift: RGB; gain: RGB; saturation: number; lut: PostLutResolved | null}>;
+  /** The HDR ceiling, or null for none. */
+  readonly ceiling: number | null;
 }
 
 /** What a backend draws this frame: null is `off` (direct rendering). */
@@ -71,7 +95,9 @@ export interface PostPlan extends PostResolved {
 export const POST_DEFAULTS = Object.freeze({
   bloom: Object.freeze({strength: 0.6, threshold: 1, radius: 0.5}),
   vignette: Object.freeze({amount: 0}),
-  grade: Object.freeze({lift: [0, 0, 0] as RGB, gain: [1, 1, 1] as RGB, saturation: 1}),
+  grade: Object.freeze({lift: [0, 0, 0] as RGB, gain: [1, 1, 1] as RGB, saturation: 1, lut: null}),
+  lut: Object.freeze({strength: 1}),
+  ceiling: null,
 });
 
 /** Inclusive bounds of every number (a data error outside them, naming the field). */
@@ -83,17 +109,22 @@ export const POST_LIMITS = Object.freeze({
   lift: [-0.5, 0.5],
   gain: [0, 4],
   saturation: [0, 2],
+  lutStrength: [0, 1],
+  ceiling: [1, 65504],
 } as const);
+/** Longest accepted lookup table path. */
+export const LUT_FILE_MAX = 256;
 
 /** Bloom chain depth (mips at half resolution and below) and the post draws each tier issues. */
 export const BLOOM_MIPS = 5;
 export const POST_DRAWS: Readonly<Record<PostMode, number>> = {off: 0, basic: 1, full: 2 * BLOOM_MIPS};
 
 const KEYS = {
-  post: ['bloom', 'vignette', 'grade'],
+  post: ['bloom', 'vignette', 'grade', 'ceiling'],
   bloom: ['strength', 'threshold', 'radius'],
   vignette: ['amount'],
-  grade: ['lift', 'gain', 'saturation'],
+  grade: ['lift', 'gain', 'saturation', 'lut'],
+  lut: ['file', 'strength'],
 } as const;
 
 const fail = (where: string, field: string, why: string): never => {
@@ -104,13 +135,35 @@ const record = (v: unknown, where: string, keys: readonly string[]): Record<stri
   for (const k of Object.keys(v)) if (!keys.includes(k)) fail(where, k, `is unknown (expected ${keys.join(', ')})`);
   return v as Record<string, unknown>;
 };
-const num = (o: Record<string, unknown>, where: string, field: keyof typeof POST_LIMITS, fallback: number) => {
-  const v = o[field];
+const num = (
+  o: Record<string, unknown>,
+  where: string,
+  field: keyof typeof POST_LIMITS,
+  fallback: number,
+  key: string = field,
+) => {
+  const v = o[key];
   if (v === undefined) return fallback;
   const [min, max] = POST_LIMITS[field];
   if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max)
-    fail(where, field, `must be a number from ${min} to ${max}`);
+    fail(where, key, `must be a number from ${min} to ${max}`);
   return v as number;
+};
+/** A relative path under `public/` to a `.cube` file: no scheme, no `..`, no backslash, no query. */
+const lutFile = (v: unknown, where: string): string => {
+  if (
+    typeof v !== 'string' ||
+    !v ||
+    v.length > LUT_FILE_MAX ||
+    !/^[A-Za-z0-9_][A-Za-z0-9_./-]*\.cube$/.test(v) ||
+    v.split('/').some(part => part === '..' || part === '.' || part === '')
+  )
+    fail(
+      where,
+      'file',
+      `must be a path under public/ ending in .cube (letters, digits, _ . - /; no .., at most ${LUT_FILE_MAX} characters)`,
+    );
+  return v as string;
 };
 const rgb = (o: Record<string, unknown>, where: string, field: 'lift' | 'gain', fallback: RGB): RGB => {
   const v = o[field];
@@ -138,6 +191,14 @@ export function resolvePost(settings: PostSettings, where = 'view.post'): PostRe
   }
   const v = o.vignette === undefined ? {} : record(o.vignette, `${where}.vignette`, KEYS.vignette);
   const g = o.grade === undefined ? {} : record(o.grade, `${where}.grade`, KEYS.grade);
+  let lut: PostLutResolved | null = null;
+  if (g.lut !== undefined) {
+    const l = record(g.lut, `${where}.grade.lut`, KEYS.lut);
+    const strength = num(l, `${where}.grade.lut`, 'lutStrength', POST_DEFAULTS.lut.strength, 'strength');
+    const file = lutFile(l.file, `${where}.grade.lut`);
+    // Strength 0 draws the same picture as no table: nothing is loaded for it.
+    lut = strength > 0 ? Object.freeze({file, strength}) : null;
+  }
   return Object.freeze({
     bloom,
     vignette: Object.freeze({amount: num(v, `${where}.vignette`, 'amount', POST_DEFAULTS.vignette.amount)}),
@@ -145,7 +206,9 @@ export function resolvePost(settings: PostSettings, where = 'view.post'): PostRe
       lift: rgb(g, `${where}.grade`, 'lift', POST_DEFAULTS.grade.lift),
       gain: rgb(g, `${where}.grade`, 'gain', POST_DEFAULTS.grade.gain),
       saturation: num(g, `${where}.grade`, 'saturation', POST_DEFAULTS.grade.saturation),
+      lut,
     }),
+    ceiling: o.ceiling === undefined ? null : num(o, where, 'ceiling', 0),
   });
 }
 

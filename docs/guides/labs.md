@@ -96,3 +96,13 @@ The first line after the lab card's heading is its status; `npm run lab` lists i
 | Template | `templates/<name>/game` | A starting game for authors (`npm run new-game`); ratcheted budgets. |
 | Tool fixture | `tools/<name>/game` | The test game of a pipeline tool or diagnostic (pose-to-pose, blender-export). |
 | Game | `game/` | The author's game; uses only what graduated. |
+
+## Lessons from labs
+
+What a lab learns is worth keeping even when nothing graduates. Practices learned in labs, written generically with
+what the engine does and does not provide:
+
+- [Character pipeline lessons](character-pipeline-lessons.md): retargeting, foot contact, skin weights and LOD,
+  resampling and loops, clip QA.
+- [Crowd and night rendering lessons](crowd-and-night-rendering-lessons.md): what a character costs, animation
+  cadence, inertialized transitions, wet and graded night looks, measuring.

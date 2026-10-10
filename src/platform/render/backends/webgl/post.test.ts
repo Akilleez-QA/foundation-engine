@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as T from 'three';
 import {createWebGLPost, postUnsupported} from './post';
 import {postPlan, resolvePost, type PostPlan} from '../../post/settings';
+import {cubeLutText, parseCubeLut} from '../../post/lut';
 
 /** A renderer stand-in: records each draw's target and material; no GPU. */
 function fakeRenderer(o: {width?: number; height?: number; maxSamples?: number} = {}) {
@@ -168,4 +169,68 @@ test('a context without a float colour buffer is refused with a reason', () => {
   assert.equal(postUnsupported(has(['EXT_color_buffer_float'])), null);
   assert.equal(postUnsupported(has(['EXT_color_buffer_half_float'])), null);
   assert.match(postUnsupported(has([]))!, /half-float/);
+});
+
+/** The defines and uniforms of each fullscreen pass drawn, in order. */
+function passes(f: ReturnType<typeof fakeRenderer>) {
+  const seen: {defines: Record<string, unknown>; uniforms: Record<string, T.IUniform>}[] = [];
+  const render = f.renderer.render.bind(f.renderer);
+  f.renderer.render = (s: T.Object3D, c: T.Camera) => {
+    if (s instanceof T.Mesh) {
+      const m = s.material as T.ShaderMaterial;
+      seen.push({defines: {...m.defines}, uniforms: m.uniforms});
+    }
+    render(s, c);
+  };
+  return seen;
+}
+
+test('a lookup table draws in the same combined pass: one 3D texture per table, released when no longer asked for', () => {
+  const f = fakeRenderer();
+  const seen = passes(f);
+  const post = createWebGLPost(f.renderer, {samples: () => 0});
+  const lut = parseCubeLut(cubeLutText((r, g, b) => [b, g, r], {size: 5}));
+  const withLut = plan('basic', {grade: {lut: {file: 'luts/a.cube', strength: 0.75}}});
+  post.render(scene, camera, withLut, null);
+  assert.equal(seen.at(-1)!.defines.LUT, undefined, 'not loaded yet: no table');
+  post.render(scene, camera, withLut, lut);
+  const u = seen.at(-1)!.uniforms;
+  assert.equal(seen.at(-1)!.defines.LUT, 1);
+  assert.equal(post.stats().draws, 2, 'still one post draw per frame');
+  const texture = u.lut!.value as T.Data3DTexture;
+  assert.ok(texture instanceof T.Data3DTexture);
+  assert.deepEqual([texture.image.width, texture.image.depth, texture.type], [5, 5, T.HalfFloatType]);
+  assert.equal(u.lutStrength!.value, 0.75);
+  assert.deepEqual((u.lutMap!.value as T.Vector2).toArray(), [4 / 5, 0.5 / 5]);
+  assert.equal(post.stats().lutBytes, 5 ** 3 * 8);
+  let disposed = 0;
+  texture.addEventListener('dispose', () => disposed++);
+  post.render(scene, camera, withLut, lut);
+  assert.equal(seen.at(-1)!.uniforms.lut!.value, texture, 'the same table keeps its texture');
+  post.render(scene, camera, plan('basic'), lut);
+  assert.equal(seen.at(-1)!.defines.LUT, undefined, 'the plan no longer asks for it');
+  assert.equal(disposed, 1);
+  assert.equal(post.stats().lutBytes, 0);
+  post.render(scene, camera, withLut, lut);
+  const again = seen.at(-1)!.uniforms.lut!.value as T.Data3DTexture;
+  let disposedAgain = 0;
+  again.addEventListener('dispose', () => disposedAgain++);
+  post.dispose();
+  assert.equal(disposedAgain, 1, 'dispose releases the table texture');
+});
+
+test('the HDR ceiling switches the threshold and combined passes to their clamped variants', () => {
+  const f = fakeRenderer();
+  const seen = passes(f);
+  const post = createWebGLPost(f.renderer, {samples: () => 0});
+  post.render(scene, camera, plan('full', {ceiling: 24}));
+  assert.equal(seen.length, 10);
+  assert.equal(seen[0]!.defines.CEILING, 1, 'the threshold pass clamps each tap');
+  assert.equal(seen[0]!.uniforms.ceiling!.value, 24);
+  assert.deepEqual(seen.at(-1)!.defines, {BLOOM: 1, CEILING: 1});
+  assert.equal(seen.at(-1)!.uniforms.ceiling!.value, 24);
+  post.render(scene, camera, plan('full'));
+  assert.equal(seen[10]!.defines.CEILING, undefined, 'without a ceiling the passes are unchanged');
+  assert.deepEqual(seen.at(-1)!.defines, {BLOOM: 1});
+  post.dispose();
 });

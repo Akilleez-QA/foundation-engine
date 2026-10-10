@@ -1,4 +1,4 @@
-# ADR 0100: optional contact layer and touch events
+# ADR 0151: optional contact layer and touch events
 
 - **Status:** Proposed
 - **Date:** 2026-10-09

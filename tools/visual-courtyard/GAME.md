@@ -24,3 +24,4 @@
 | --- | --- | --- |
 | 2026-10-03 | Fixture ported from the visual-capability trial; the lit courtyard and the still lantern scene use @kits/three. | `npm run test:three-kit-browser` (browser.mjs). No template budget changed. |
 | 2026-10-04 | Post-processing scenes: `courtyard-post` (tone mapping, bloom, vignette, grade through `view.post`) and the still `glow-post`. | `npm run test:post-browser` (post-browser.mjs). No template budget changed. |
+| 2026-10-04 | Still `grade-post` scene: a 3D lookup table and an HDR ceiling through `view.post`, chosen by the `look` parameter; `tools/make-luts.ts` generates its table. | `npm run test:post-browser` (post-browser.mjs). No template budget changed. |
