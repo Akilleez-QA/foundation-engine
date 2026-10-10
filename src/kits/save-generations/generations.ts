@@ -441,11 +441,12 @@ export function createSaveGenerations(options: SaveGenerationsOptions): SaveGene
           }
           if (stop()) return commitResult(closed ? 'closed' : 'cancelled', writes, 0, 'stopped before the record');
           // 2. Narrowing check: if another writer that targeted the same slot already landed a fully valid record
-          // there, it wins; writing ours over it would leave its keys under our record (an invalid slot). An invalid
-          // record there (keys mixed by the race) is overwritten. This narrows the race but does not close it: a
-          // record that lands between this check and our write still invalidates the slot.
+          // of the same or a newer generation there, it wins; writing ours over it would leave its keys under our
+          // record (an invalid slot). An older valid record there is the fallback a commit normally overwrites, and
+          // an invalid record (keys mixed by the race) is overwritten too. This narrows the race but does not close
+          // it: a record that lands between this check and our write still invalidates the slot.
           const there = await readSlot(target);
-          if (there.manifest && typeof (await verify(there)) !== 'string')
+          if (there.manifest && there.manifest.generation >= generation && typeof (await verify(there)) !== 'string')
             return commitResult('lost', writes, 0, 'another writer committed a valid generation into this slot first');
           // 3. The record goes last: only now can the new generation be valid.
           const body = JSON.stringify({f: 1, ns: namespace, n: name, s: target, g: generation, k: manifest});

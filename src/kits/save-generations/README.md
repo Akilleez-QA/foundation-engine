@@ -52,6 +52,6 @@ record it relied on and retries the whole scan if it changed (another writer), u
 ## Cost (headless, not a device budget)
 
 No per-frame work. A commit costs two verifications of the newest generation (before writing, and the read-back that confirms it; one
-read and one CRC-32 per key each) plus one check of the target slot before its record,
+read and one CRC-32 per key each) plus one check of the target slot before its record (when that slot has no record, the check lists the port's keys once to report residue; a read that throws during the check returns `failed`),
 `keys + 2` writes plus the sweep (one read per swept key), and one CRC-32 per written key. A load reads both records and normally one
 generation. Web Storage calls are synchronous on the main thread: commit at flush points, never inside a frame.
