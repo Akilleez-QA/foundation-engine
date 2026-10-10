@@ -54,6 +54,16 @@
       ]
     },
     {
+      "id": "CAP-ACTION-PHASES",
+      "title": "Creator-authored action phase windows, once-only marks and per-range claims",
+      "shipped": true,
+      "docs": "docs/guides/action-phases.md",
+      "evidence": [
+        "@kits/capabilities exports createActionPhases",
+        "src/kits/capabilities/action-phases.test.ts exists"
+      ]
+    },
+    {
       "id": "VIS-01",
       "title": "Tone mapping and exposure per scene (view.output)",
       "shipped": true,
@@ -472,6 +482,7 @@
       "name": "capabilities",
       "exports": [
         "capabilities",
+        "createActionPhases",
         "createActionRuns",
         "createCapabilities",
         "createModifiers",
