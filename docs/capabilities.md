@@ -23,6 +23,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | REWIND-01 | Bounded rewind history for judging remote commands against past state |  | [README.md](../src/kits/rewind/README.md) |
 | NW-DELTA | Acknowledged-baseline deltas for complete network views |  | [README.md](../src/kits/network/README.md) |
 | PLAYOUT-01 | Remote clock offset and adaptive playout buffers |  | [README.md](../src/kits/playout/README.md) |
+| REPL-01 | Per-recipient quantized replication under a byte budget |  | [README.md](../src/kits/replication/README.md) |
 | VISIBILITY-01 | Bounded source-owned visibility and explored history |  | [README.md](../src/kits/visibility/README.md) |
 | GEN-WEIGHTED | Bounded eligible weighted choice with separately committed recent history |  | [weighted-choice.md](guides/weighted-choice.md) |
 | CAP-EFFECT-CHECKPOINT | Portable timed contribution checkpoints |  | [timed-effects.md](guides/timed-effects.md) |
@@ -98,6 +99,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/procgen`
 - `@kits/region-activation`
 - `@kits/replay`
+- `@kits/replication`
 - `@kits/resources`
 - `@kits/rewind`
 - `@kits/rollback`

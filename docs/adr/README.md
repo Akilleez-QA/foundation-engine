@@ -105,3 +105,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0093](0093-remote-playout.md) | Optional remote playout and clock offset | Optional kits / Network presentation | Proposed |
 
 | [0100](0100-optional-entity-pool-eviction-classes.md) | Optional entity pool with eviction classes | Optional kits / Simulation scale | Proposed |
+
+| [0094](0094-replication-schedule.md) | Optional per-recipient replication schedule | Optional kits / Network | Proposed |

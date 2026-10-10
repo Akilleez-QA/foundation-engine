@@ -89,6 +89,16 @@
       "evidence": ["@kits/playout exports createPlayout", "src/kits/playout/playout.test.ts exists"]
     },
     {
+      "id": "REPL-01",
+      "title": "Per-recipient quantized replication under a byte budget",
+      "shipped": true,
+      "docs": "src/kits/replication/README.md",
+      "evidence": [
+        "@kits/replication exports createReplicationSchedule",
+        "src/kits/replication/replication.test.ts exists"
+      ]
+    },
+    {
       "id": "VISIBILITY-01",
       "title": "Bounded source-owned visibility and explored history",
       "shipped": true,
@@ -902,6 +912,10 @@
         "worldDigest",
         "worldDigestText"
       ]
+    },
+    {
+      "name": "replication",
+      "exports": ["MAX_FIELDS", "createReplica", "createReplicationSchedule", "defineFieldSchema"]
     },
     {
       "name": "resources",
