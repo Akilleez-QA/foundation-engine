@@ -52,6 +52,16 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'FORMULA-01',
+    title: 'Optional data-defined stat and damage formulas with stacking stages',
+    docs: 'src/kits/formulas/README.md',
+    evidence: [
+      {kit: 'formulas', export: 'defineFormulaSheet'},
+      {kit: 'formulas', export: 'createDamageModel'},
+      {path: 'src/kits/formulas/formulas.test.ts'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',

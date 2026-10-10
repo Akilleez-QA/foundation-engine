@@ -1469,3 +1469,7 @@ state across worlds, a wrong default carry pivot, unvalidated heading, overstate
 docs, mutable returned poses and rare ulp redraws; all were fixed and the re-review was
 clean. No browser,
 visual or device evidence.
+
+## Data-defined formulas (FORMULA-01) — candidate, 2026-10-09
+
+Optional `formulas` kit ([contract](../../src/kits/formulas/README.md), [ADR 0120](../adr/0120-data-defined-formulas.md)): validated JSON/text expressions, ordered sheets, stacking stages and a damage model; deterministic arithmetic and caller-supplied randomness. Evidence: eleven focused headless tests (parsing, refusal, ordering, seeded/restored streams, stacking, damage pipeline, 2,000-case named-preset transcription check, review-hardening cases); one independent adversarial review with its findings addressed. Candidate only; no game integration, browser, full CI or device acceptance claimed.

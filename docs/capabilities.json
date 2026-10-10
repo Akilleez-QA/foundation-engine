@@ -9,6 +9,17 @@
       "evidence": ["@kits/entity-pool exports createEntityPool", "@kits/entity-pool exports spawnPooled"]
     },
     {
+      "id": "FORMULA-01",
+      "title": "Optional data-defined stat and damage formulas with stacking stages",
+      "shipped": true,
+      "docs": "src/kits/formulas/README.md",
+      "evidence": [
+        "@kits/formulas exports defineFormulaSheet",
+        "@kits/formulas exports createDamageModel",
+        "src/kits/formulas/formulas.test.ts exists"
+      ]
+    },
+    {
       "id": "NAV-FIELD-01",
       "title": "Optional incremental shared navigation distance fields",
       "shipped": true,
@@ -708,6 +719,25 @@
     {
       "name": "explore",
       "exports": ["Interactable", "explore", "exploreSystem", "interact", "nearest", "progress", "usedCount"]
+    },
+    {
+      "name": "formulas",
+      "exports": [
+        "DEFAULT_EXPRESSION_LIMITS",
+        "FORMULA_OPERATORS",
+        "FormulaError",
+        "applyStacking",
+        "compileExpression",
+        "createDamageModel",
+        "defineFormulaSheet",
+        "defineStacking",
+        "evaluateExpression",
+        "evaluateSheet",
+        "formulaPresets",
+        "formulas",
+        "isFormulaName",
+        "parseFormula"
+      ]
     },
     {
       "name": "frames",
