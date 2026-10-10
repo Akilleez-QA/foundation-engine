@@ -16,7 +16,7 @@ placements defer work deterministically instead of growing a frame.
 lane, then simulate each entity with `tiers.due(entity)` seconds (skip it at 0).
 Near entities run every step; far `near` entities freeze; far `background`
 entities share round-robin slots and receive their accumulated time when their slot
-comes up, capped by `maxCatchUp`.
+comes up; a step with `dt × slots` above `maxCatchUp` is refused, so no time is dropped.
 
 Both helpers are pure: your systems keep ownership of entities, simulation and
 saves. See [the kit README](../../src/kits/population/README.md) for every bound,

@@ -153,3 +153,15 @@ test('an ECS consumer spawns entities from intents and depletion survives a real
   s2.dispose();
   assert.throws(() => section.section.parse({state: {...first.field.snapshot(), depleted: ['guard-b']}}), RangeError);
 });
+
+test('sparse definitions are refused, large radii get a bounded default exit, dispose leaves nothing live', () => {
+  const sparse: PlacementInput[] = [];
+  sparse[1] = {id: 'a', x: 0, z: 0, kind: 'k'};
+  assert.throws(() => definePlacements({id: 's', placements: sparse}), RangeError);
+  const f = createPlacementField(set, {enterRadius: 9e5});
+  f.update([{x: 0, z: 0}]);
+  assert.equal(f.status('crate-a'), 'live');
+  f.dispose();
+  assert.equal(f.status('crate-a'), 'dormant');
+  assert.deepEqual(f.live(), []);
+});

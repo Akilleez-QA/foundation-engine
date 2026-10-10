@@ -30,8 +30,8 @@ test('always runs every step, near freezes when far, background round-robins wit
   assert.equal(tiers.due(99), 0.1, 'untracked entities get the full step');
 });
 
-test('hysteresis keeps an entity near until the far radius and catch-up is capped and reported', () => {
-  const tiers = createUpdateTiers({nearRadius: 10, farRadius: 15, slots: 4, maxCatchUp: 0.25});
+test('hysteresis keeps an entity near until the far radius; returning near delivers owed time; large steps are refused', () => {
+  const tiers = createUpdateTiers({nearRadius: 10, farRadius: 15, slots: 4, maxCatchUp: 0.5});
   let x = 9;
   tiers.track(7, 'background');
   tiers.step(0.1, () => ({x, z: 0}), [{x: 0, z: 0}]);
@@ -40,11 +40,33 @@ test('hysteresis keeps an entity near until the far radius and catch-up is cappe
   tiers.step(0.1, () => ({x, z: 0}), [{x: 0, z: 0}]);
   assert.equal(tiers.due(7), 0.1, 'still near inside the far radius');
   x = 50;
-  for (let i = 0; i < 2; i++) tiers.step(1, () => ({x, z: 0}), [{x: 0, z: 0}]);
+  // Steps 2 and 3 are not slot 0: time is owed.
+  for (let i = 0; i < 2; i++) tiers.step(0.1, () => ({x, z: 0}), [{x: 0, z: 0}]);
+  assert.equal(tiers.due(7), 0);
   x = 0;
   tiers.step(0.1, () => ({x, z: 0}), [{x: 0, z: 0}]);
-  assert.equal(tiers.due(7), 0.25, 'returning near delivers capped catch-up');
-  assert.ok(tiers.stats().droppedSeconds > 0);
+  assert.ok(Math.abs(tiers.due(7) - 0.3) < 1e-12, 'returning near delivers owed time with the step');
+  assert.throws(() => tiers.step(0.2, () => null, []), /maxCatchUp/);
+});
+
+test('a throwing position callback leaves the tiers unchanged', () => {
+  const tiers = createUpdateTiers({nearRadius: 1, slots: 1});
+  tiers.track(1, 'background');
+  tiers.track(2, 'background');
+  tiers.step(0.1, () => null, []);
+  const before = tiers.stats();
+  assert.throws(() =>
+    tiers.step(
+      0.1,
+      id => {
+        if (id === 2) throw Error('no position');
+        return null;
+      },
+      [],
+    ),
+  );
+  assert.deepEqual(tiers.stats(), before);
+  assert.equal(tiers.due(2), 0.1);
 });
 
 test('slots balance on track and untrack, limits are enforced, invalid input refused', () => {
@@ -56,7 +78,7 @@ test('slots balance on track and untrack, limits are enforced, invalid input ref
   assert.equal(tiers.track(4, 'always'), 'full');
   let ran = 0;
   for (let i = 0; i < 2; i++) {
-    tiers.step(1, () => null, []);
+    tiers.step(0.5, () => null, []);
     ran += [1, 2, 3].filter(id => tiers.due(id) > 0).length;
   }
   assert.equal(ran, 3, 'each background entity ran once per two-slot cycle');
@@ -66,7 +88,7 @@ test('slots balance on track and untrack, limits are enforced, invalid input ref
   assert.throws(() => createUpdateTiers({nearRadius: 5, farRadius: 4}), RangeError);
   assert.throws(() => createUpdateTiers({nearRadius: 5, slots: 65}), RangeError);
   assert.throws(() => tiers.step(Number.NaN, () => null, []), RangeError);
-  assert.throws(() => tiers.step(1, () => ({x: Number.NaN, z: 0}), [{x: 0, z: 0}]), RangeError);
+  assert.throws(() => tiers.step(0.5, () => ({x: Number.NaN, z: 0}), [{x: 0, z: 0}]), RangeError);
   assert.throws(() => tiers.track(-1, 'near'), RangeError);
 });
 

@@ -3,8 +3,9 @@
  *
  * `always` entities get every step. `near` entities run only while an observer is near (enter radius, with an exit
  * radius for hysteresis) and are frozen otherwise. `background` entities run every step while near; while far they
- * are split across round-robin slots and each runs once per cycle with the time it accumulated (capped), so long
- * running simulation stays time-consistent at a fraction of the cost. Pure: the caller's systems ask `due(id)`.
+ * are split across round-robin slots and each runs once per cycle with the time it accumulated, so long running
+ * simulation stays time-consistent at a fraction of the cost. A step whose `dt × slots` exceeds `maxCatchUp` is
+ * refused, so no single delivery exceeds that bound and no time is dropped. Pure: the caller's systems ask `due(id)`.
  */
 export type UpdatePolicy = 'always' | 'near' | 'background';
 export interface UpdateTierLimits {
@@ -15,7 +16,7 @@ export interface UpdateTierLimits {
   readonly slots?: number;
   /** Default 4,096, at most 65,536. */
   readonly maxTracked?: number;
-  /** Most seconds delivered to one entity in one step after a far stretch (default 1, at most 60). */
+  /** Largest time one delivery may carry: steps with `dt × slots` above it are refused (default 1, at most 60). */
   readonly maxCatchUp?: number;
 }
 export interface TierStats {
@@ -24,8 +25,6 @@ export interface TierStats {
   /** Entities simulated this step (near, always, or their background slot came up). */
   readonly active: number;
   readonly frozen: number;
-  /** Seconds discarded by the catch-up cap since creation. */
-  readonly droppedSeconds: number;
 }
 
 function fail(message: string): never {
@@ -34,7 +33,7 @@ function fail(message: string): never {
 
 export function createUpdateTiers(limits: UpdateTierLimits) {
   const near = limits.nearRadius,
-    far = limits.farRadius ?? near * 1.25,
+    far = limits.farRadius ?? Math.min(1e6, near * 1.25),
     slots = limits.slots ?? 4,
     maxTracked = limits.maxTracked ?? 4096,
     maxCatchUp = limits.maxCatchUp ?? 1;
@@ -59,8 +58,7 @@ export function createUpdateTiers(limits: UpdateTierLimits) {
   let steps = 0,
     stepDt = 0,
     active = 0,
-    frozen = 0,
-    dropped = 0;
+    frozen = 0;
   const checkId = (id: number) => {
     if (!Number.isSafeInteger(id) || id < 0) fail('ids must be nonnegative safe integers');
   };
@@ -74,10 +72,12 @@ export function createUpdateTiers(limits: UpdateTierLimits) {
       let slot = 0;
       for (let s = 1; s < slots; s++) if (population[s]! < population[slot]!) slot = s;
       if (policy === 'background') population[slot]!++;
-      // A newly tracked entity counts as near until the next step decides, so it is never frozen before it is seen.
+      // A newly tracked entity starts near (so its first decided step is not frozen by hysteresis) and is first
+      // simulated by the next `step`; its `due` is 0 until then.
       entries.set(id, {policy, slot, near: true, owed: 0, due: 0});
       return 'tracked';
     },
+    /** Stop tracking. Owed time is discarded (the entity is gone); it is not counted in `droppedSeconds`. */
     untrack(id: number): boolean {
       checkId(id);
       const e = entries.get(id);
@@ -104,46 +104,53 @@ export function createUpdateTiers(limits: UpdateTierLimits) {
           fail('observer coordinates must be finite');
         return {x, z};
       });
+      if (dt * slots > maxCatchUp) fail('dt × slots must not exceed maxCatchUp, or round-robin time would be dropped');
+      // Read every position before changing anything: a throwing or invalid callback leaves the tiers untouched.
+      // The callback must not track or untrack; entries are captured first.
+      const list = [...entries];
+      const positions = list.map(([id, e]) => {
+        if (e.policy === 'always') return null;
+        const p = position(id);
+        if (p === null) return null;
+        if (typeof p !== 'object') fail('positions must be finite or null');
+        const x = p.x,
+          z = p.z;
+        if (!Number.isFinite(x) || !Number.isFinite(z)) fail('positions must be finite or null');
+        return {x, z};
+      });
       const slot = steps % slots;
       steps++;
       stepDt = dt;
       active = 0;
       frozen = 0;
-      const deliver = (e: Entry, seconds: number) => {
-        if (seconds > maxCatchUp) {
-          dropped += seconds - maxCatchUp;
-          seconds = maxCatchUp;
-        }
-        e.due = seconds;
+      const deliver = (e: Entry) => {
+        // Owed time is below (slots - 1) × dt, so a delivery never exceeds slots × dt ≤ maxCatchUp.
+        e.due = e.owed + dt;
         e.owed = 0;
         active++;
       };
-      for (const [id, e] of entries) {
+      list.forEach(([, e], k) => {
         if (e.policy === 'always') {
           e.due = dt;
           active++;
-          continue;
+          return;
         }
-        const p = position(id);
-        if (p !== null && (typeof p !== 'object' || !Number.isFinite(p.x) || !Number.isFinite(p.z)))
-          fail('positions must be finite or null');
+        const p = positions[k]!;
         const r = e.near ? far : near;
         e.near = p !== null && observers.some(o => (o.x - p.x) ** 2 + (o.z - p.z) ** 2 <= r * r);
-        if (e.near) deliver(e, e.owed + dt);
+        if (e.near) deliver(e);
         else if (e.policy === 'near') {
           e.due = 0;
           e.owed = 0;
           frozen++;
-        } else {
+        } else if (e.slot === slot) deliver(e);
+        else {
           e.owed += dt;
-          if (e.slot === slot) deliver(e, e.owed);
-          else {
-            e.due = 0;
-            frozen++;
-          }
+          e.due = 0;
+          frozen++;
         }
-      }
-      return Object.freeze({steps, tracked: entries.size, active, frozen, droppedSeconds: dropped});
+      });
+      return Object.freeze({steps, tracked: entries.size, active, frozen});
     },
     /** Seconds to simulate `id` this step: 0 means skip it. An untracked id gets the full step. */
     due(id: number): number {
@@ -155,7 +162,7 @@ export function createUpdateTiers(limits: UpdateTierLimits) {
       return entries.get(id)?.policy ?? null;
     },
     stats(): TierStats {
-      return Object.freeze({steps, tracked: entries.size, active, frozen, droppedSeconds: dropped});
+      return Object.freeze({steps, tracked: entries.size, active, frozen});
     },
   };
 }

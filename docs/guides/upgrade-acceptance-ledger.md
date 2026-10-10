@@ -1210,12 +1210,18 @@ is implied.
 
 ## Optional population kit — candidate (2026-10-09)
 
-Branch `feat/population-kit` from `cbaf8060`. Nine headless tests: spawn/despawn
+Branch `feat/population-kit` from `cbaf8060`. Eleven checked-in headless tests. An
+independent adversarial review also fuzzed placements (300 seeds against a reference
+model) and tiers in an external harness that is not checked in; its findings (time
+dropped when `dt × slots` exceeded the catch-up cap, half-applied steps after a
+throwing callback, default exit radius above the bound, sparse definitions, status
+after dispose, undocumented cost and ordering) were fixed. Tests: spawn/despawn
 with enter/exit hysteresis in definition order; `never`/`visit`/`leave` policies,
 persistence of `never` only and revival; deterministic caps with deferred counts
 and retry after `returned`; validation of definitions, limits, observers and
 forged or edited snapshots; an ECS consumer spawning and removing entities from
 intents with depletion surviving a real save store reload; update tiers for
-always/near/background with conserved background time, hysteresis, capped and
-reported catch-up, slot balance and limits; and a fixed-step runner consumer
+always/near/background with conserved background time, hysteresis, owed-time
+delivery and refusal of oversized steps, unchanged state after a throwing callback,
+slot balance and limits; sparse definitions, bounded default exit and dispose; and a fixed-step runner consumer
 integrating only due entities. No browser, device or performance acceptance.

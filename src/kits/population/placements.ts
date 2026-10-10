@@ -77,7 +77,10 @@ export function definePlacements(input: {
   if (!Array.isArray(list) || list.length < 1 || list.length > PLACEMENT_LIMITS.placements)
     fail(`a definition has 1-${PLACEMENT_LIMITS.placements} placements`);
   const seen = new Set<string>();
-  const placements = (list as readonly PlacementInput[]).map(p => {
+  const n0 = (list as readonly PlacementInput[]).length;
+  const placements: Placement[] = [];
+  for (let k = 0; k < n0; k++) {
+    const p = (list as readonly PlacementInput[])[k];
     if (!p || typeof p !== 'object') fail('a placement must be an object');
     const pid = p.id,
       x = p.x,
@@ -91,8 +94,8 @@ export function definePlacements(input: {
     if (!isText(kind, PLACEMENT_LIMITS.kindLength)) fail(`placement ${pid}: kind must be 1-64 characters`);
     if (respawn !== 'never' && respawn !== 'visit' && respawn !== 'leave')
       fail(`placement ${pid}: respawn is never, visit or leave`);
-    return Object.freeze({id: pid, x: x === 0 ? 0 : x, z: z === 0 ? 0 : z, kind, respawn});
-  });
+    placements.push(Object.freeze({id: pid, x: x === 0 ? 0 : x, z: z === 0 ? 0 : z, kind, respawn}));
+  }
   return Object.freeze({
     id,
     placements: Object.freeze(placements),
@@ -174,7 +177,7 @@ export function createPlacementField(
 ) {
   if (!set || typeof set.fingerprint !== 'string') fail('use definePlacements for the set');
   const enter = limits.enterRadius,
-    exit = limits.exitRadius ?? enter * 1.25,
+    exit = limits.exitRadius ?? Math.min(1e6, enter * 1.25),
     maxLive = limits.maxLive ?? 256,
     maxSpawns = limits.maxSpawnsPerUpdate ?? 16,
     maxDespawns = limits.maxDespawnsPerUpdate ?? 64;
@@ -342,6 +345,8 @@ export function createPlacementField(
     dispose(): void {
       if (closed) return;
       closed = true;
+      for (const i of live) status[i] = DORMANT;
+      for (const i of waiting) status[i] = DORMANT;
       live.clear();
       waiting.clear();
       grid.dispose();
