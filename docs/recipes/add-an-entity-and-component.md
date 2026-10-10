@@ -21,7 +21,7 @@ export const coin = defineEntity({ id: 'coin', components: [
 
 - In a scene: `entities: [coin, [Name({ name: 'player' }), Transform(), Health()]]`.
 - At run time: `ctx.spawn(coin, Transform({ x: 2 }))` and `ctx.world.despawn(e)`.
-- Query: `for (const [e, tr, hp] of ctx.world.query(Transform, Health)) { … }` (spawn order, deterministic).
+- Query: `for (const [e, tr, hp] of ctx.world.query(Transform, Health)) { … }` (spawn order, deterministic). Spawning, despawning, adding or removing components inside the loop is safe. An entity is visited only if it matched when the loop began and still matches when it is reached, so changes made during the pass show up in the next query.
 
 ## Test
 

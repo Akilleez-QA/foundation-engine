@@ -116,19 +116,29 @@ export class World {
     this.version++;
   }
 
-  /** Entities with every listed component, in spawn order, with their live component values. */
+  /**
+   * Entities with every listed component, in spawn order, with their live component values.
+   *
+   * Changes made while iterating are safe and order-independent: an entity is yielded only if it
+   * matched when the query began and still matches when it is reached. An entity despawned, or one
+   * that lost a listed component, earlier in the same pass is skipped (never yielded with a missing
+   * value); one that is spawned or starts matching during the pass appears in the next query.
+   */
   *query<Q extends readonly ComponentType<object>[]>(...types: Q): Generator<[Entity, ...Values<Q>]> {
     if (!types.length) {
-      for (const e of this.alive) yield queryRow<Q>([e]);
+      const order = [...this.alive];
+      for (const e of order) if (this.alive.has(e)) yield queryRow<Q>([e]);
       return;
     }
     const stores = types.map(t => this.stores.get(t.id));
     if (stores.some(s => !s)) return;
-    const [first, ...rest] = [...(stores as Map<Entity, object>[])].sort((a, b) => a.size - b.size);
-    const order = [...first!.keys()].sort((a, b) => a - b); // types.length > 0, so `stores` (and `first`) exist
+    const all = stores as Map<Entity, object>[];
+    const [first, ...rest] = [...all].sort((a, b) => a.size - b.size);
+    // types.length > 0, so `first` exists. Candidates are fixed when the query begins.
+    const order = [...first!.keys()].filter(e => rest.every(s => s.has(e))).sort((a, b) => a - b);
     for (const e of order) {
-      if (!rest.every(s => s.has(e))) continue;
-      yield queryRow<Q>([e, ...stores.map(s => s!.get(e))]);
+      if (!all.every(s => s.has(e))) continue;
+      yield queryRow<Q>([e, ...all.map(s => s.get(e))]);
     }
   }
   /** The first entity with every listed component, or undefined. */

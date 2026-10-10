@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **World queries are safe to mutate during iteration.** A single-component `query` could yield an entity that an earlier row of the same pass had despawned, with an `undefined` component value. A multi-component query's result depended on which component store was smallest when a component was added mid-pass. A query with no component types visited entities spawned during the pass. Now every query shape visits only entities that matched when it began and still match when reached. Cost: one extra membership check per candidate row.
+
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.

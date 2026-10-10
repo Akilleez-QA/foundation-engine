@@ -1207,3 +1207,14 @@ in 18 asset test files. The independent dimension oracle covers 1517 shapes,
 plus explicit thin/square/odd anchors and model refusal/retry. Independent review
 and full hosted integration remain pending; no physical memory or device evidence
 is implied.
+
+## World query mutation consistency — candidate (2026-10-09)
+
+- **Scope:** owner repair in `src/core/ecs/world.ts` `query`. Previously a single-component query yielded
+  `[entity, undefined]` for an entity despawned earlier in the same pass. Multi-component results for an
+  entity gaining a component mid-pass depended on which store was smallest. The untyped query
+  visited entities spawned mid-pass.
+- **Evidence:** a new `src/core/ecs/ecs.test.ts` case fails on the previous implementation and passes on
+  the candidate. A local microbenchmark (10,000 entities, node) measured a 0.12 ms single-component and
+  0.09 ms pair query increase. This is not a device or frame-budget claim.
+- **Not established:** template or browser frame measurements; hosted CI.
