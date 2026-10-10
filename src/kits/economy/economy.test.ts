@@ -202,3 +202,40 @@ test('snapshot and restore continue identically; mismatched or inconsistent snap
   started.progress += 1;
   assert.throws(() => createEconomy(rules).restore(bad), /paid does not match/);
 });
+
+test('review: two reclaimers emptying one pool in a tick; reserved names; unlock bounds; fresh queue states', () => {
+  const rules = defineEconomyRules({resources: [{id: 'm', capacity: 100}], items: [{id: 'x', cost: {m: 10}, work: 1}]});
+  const eco = createEconomy(rules);
+  eco.addPool('p', {amounts: {m: 10}, work: 1});
+  eco.setReclaimer('a', 'p');
+  eco.setReclaimer('b', 'p');
+  const out = eco.advance(1);
+  assert.deepEqual(out.reports[0]!.reclaimed, {m: 10});
+  assert.deepEqual(
+    out.events.map(e => e.kind),
+    ['pool-exhausted', 'reclaimer-released', 'reclaimer-released'],
+  );
+  assert.equal(eco.setReclaimer('a', null), false);
+  assert.throws(
+    () => defineEconomyRules({resources: [{id: 'constructor', capacity: 1}], items: []}),
+    /invalid resource id/,
+  );
+  const gated = defineEconomyRules({
+    resources: [{id: 'm', capacity: 100}],
+    items: [
+      {id: 'a', cost: {}, work: 1, grants: ['u1', 'u2']},
+      {id: 'b', cost: {}, work: 1, requires: ['u3']},
+    ],
+  });
+  assert.throws(() => createEconomy(gated, {maxUnlocks: 2}), /maxUnlocks/);
+  const g = createEconomy(gated, {maxUnlocks: 3});
+  assert.throws(() => g.adjustUnlock('elsewhere', 1), /not required or granted/);
+  const up = createEconomy(rules);
+  up.setQueue('q');
+  up.enqueue('q', 'x');
+  up.advance(1);
+  assert.equal(up.queue('q')!.state, 'waiting');
+  up.deposit({m: 10});
+  assert.equal(up.queue('q')!.state, 'building', 'a deposit refreshes queue states');
+  assert.throws(() => up.enqueue('q', 'x', null as never), /record/);
+});

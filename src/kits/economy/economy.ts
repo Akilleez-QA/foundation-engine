@@ -32,13 +32,13 @@ export interface EconomyOptions {
   readonly maxAdvance?: number;
 }
 
-export type QueueState = 'idle' | 'blocked' | 'waiting' | 'building' | 'paused';
+export type QueueState = 'idle' | 'blocked' | 'waiting' | 'building' | 'stalled' | 'paused';
 export interface QueueView {
   readonly id: string;
   readonly rate: number;
   readonly state: QueueState;
   readonly entries: readonly Readonly<{item: string; repeat: boolean}>[];
-  /** Head progress in work units (item work × 1,000 when complete). */
+  /** Head progress in work units (it completes at item work × 1,000, then resets for the next entry). */
   readonly progress: number;
   readonly paid: Amounts;
 }
@@ -75,6 +75,8 @@ interface Pool {
   expiresAt: number | null;
 }
 interface State {
+  /** Cached capacities; null after a copy or a storage change. */
+  caps: Map<string, number> | null;
   now: number;
   stock: Record<string, number>;
   sources: Map<string, {kind: 'income' | 'storage'; amounts: Amounts}>;
@@ -119,6 +121,7 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
   };
 
   let state: State = {
+    caps: null,
     now: 0,
     stock: Object.fromEntries(rules.resources.map(r => [r.id, r.initial])),
     sources: new Map(),
@@ -127,12 +130,20 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
     pools: new Map(),
     reclaimers: new Map(),
   };
+  const baseCapacity = new Map(rules.resources.map(r => [r.id, r.capacity]));
+  /** Capacity per resource, computed once per state copy (sources only change outside ticks). */
   const capacity = (s: State, r: string) => {
-    let cap = rules.resources.find(x => x.id === r)!.capacity;
-    for (const src of s.sources.values()) if (src.kind === 'storage') cap += src.amounts[r] ?? 0;
-    return Math.min(cap, Number.MAX_SAFE_INTEGER);
+    if (!s.caps) {
+      const caps = new Map(baseCapacity);
+      for (const src of s.sources.values())
+        if (src.kind === 'storage')
+          for (const res of Object.keys(src.amounts)) caps.set(res, caps.get(res)! + src.amounts[res]!);
+      s.caps = caps;
+    }
+    return Math.min(s.caps.get(r)!, Number.MAX_SAFE_INTEGER);
   };
   const copy = (s: State): State => ({
+    caps: null,
     now: s.now,
     stock: {...s.stock},
     sources: new Map(s.sources),
@@ -156,10 +167,16 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
     s.stock[r]! += added;
     return n - added;
   };
+  const ruleUnlocks = new Set(rules.items.flatMap(i => [...i.requires, ...i.grants]));
+  if (ruleUnlocks.size > maxUnlocks)
+    throw new EconomyError(`maxUnlocks (${maxUnlocks}) is below the ${ruleUnlocks.size} unlock ids the rules use`);
+  const refreshAll = (s: State) => {
+    for (const q of s.queues.values()) refreshState(s, q);
+  };
   const prerequisitesMet = (s: State, it: Item) => it.requires.every(u => (s.unlocks.get(u) ?? 0) > 0);
   const grant = (s: State, it: Item) => {
+    // Unlock ids are limited to the rules' ids and maxUnlocks covers them, so a grant always fits.
     for (const u of it.grants) {
-      if (!s.unlocks.has(u) && s.unlocks.size >= maxUnlocks) throw new EconomyError('unlock capacity');
       s.unlocks.set(u, (s.unlocks.get(u) ?? 0) + 1);
     }
   };
@@ -217,8 +234,10 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
     }
     // 2. Reclaim, in reclaimer id order; extraction stops at free storage.
     for (const k of sorted(s.reclaimers)) {
-      const rc = s.reclaimers.get(k)!;
-      const pool = s.pools.get(rc.pool)!;
+      // A pool emptied earlier this tick has already released its other reclaimers.
+      const rc = s.reclaimers.get(k);
+      const pool = rc && s.pools.get(rc.pool);
+      if (!rc || !pool) continue;
       const total = pool.work * RATE_ONE;
       let target = Math.min(total, pool.done + rc.rate);
       for (const r of Object.keys(pool.total)) {
@@ -303,7 +322,7 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
       let num = 1,
         den = 1;
       for (const r of Object.keys(demand).sort())
-        if (demand[r]! > s.stock[r]! && s.stock[r]! * den < num * demand[r]!) {
+        if (demand[r]! > s.stock[r]! && big(s.stock[r]!) * big(den) < big(num) * big(demand[r]!)) {
           num = s.stock[r]!;
           den = demand[r]!;
         }
@@ -321,6 +340,7 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
           add(spent, r, n);
         }
         a.dp = dp;
+        if (dp === 0) a.q.state = 'stalled';
       }
     }
     for (const a of active) {
@@ -335,6 +355,9 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
       a.q.started = false;
       refreshState(s, a.q);
     }
+    // Queues that did not build this tick see the tick's final stock and unlocks.
+    const built = new Set(active.map(a => a.q));
+    for (const q of s.queues.values()) if (!built.has(q)) refreshState(s, q);
     const freeze = (r: Record<string, number>) => Object.freeze(r);
     return Object.freeze({
       tick: s.now,
@@ -366,6 +389,7 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
           const n = deposit(s, r, parsed[r]!);
           if (n) lost[r] = n;
         }
+        refreshAll(s);
         return Object.freeze(lost);
       });
     },
@@ -375,6 +399,7 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
       if (!Object.keys(parsed).every(r => state.stock[r]! >= parsed[r]!)) return false;
       transact(s => {
         for (const r of Object.keys(parsed)) s.stock[r]! -= parsed[r]!;
+        refreshAll(s);
       });
       return true;
     },
@@ -391,7 +416,10 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
     },
     removeSource(key: string): boolean {
       if (!state.sources.has(key)) return false;
-      transact(s => s.sources.delete(key));
+      transact(s => {
+        s.sources.delete(key);
+        s.caps = null;
+      });
       return true;
     },
     /** Create or re-rate a queue. Rate 0 pauses it (power off) and keeps its progress. */
@@ -418,8 +446,9 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
      * Append `count` entries of an item. Refused (false) when the queue is unknown or would exceed its length. The
      * prerequisites are checked when an entry starts, not here (`canBuild` tells the UI).
      */
-    enqueue(queue: string, itemId: string, o2: {count?: number; repeat?: boolean} = {}): boolean {
+    enqueue(queue: string, itemId: string, opts: {count?: number; repeat?: boolean} = {}): boolean {
       const it = item(itemId);
+      const o2 = plain(opts, 'enqueue options');
       const count = amount(o2.count ?? 1, 'count', 1, 256);
       const repeat = o2.repeat ?? false;
       if (typeof repeat !== 'boolean') throw new EconomyError('repeat must be boolean');
@@ -466,11 +495,10 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
     /** Change an unlock count (a granting building was destroyed: -1). Counts never go below zero. */
     adjustUnlock(unlock: string, delta: number): number {
       const u = id(unlock, 'unlock id');
-      amount(Math.abs(delta), 'delta', 0, 1_000_000);
-      if (!Number.isInteger(delta)) throw new EconomyError('delta must be an integer');
+      if (!ruleUnlocks.has(u)) throw new EconomyError(`unlock ${u} is not required or granted by any item`);
+      if (typeof delta !== 'number' || !Number.isSafeInteger(delta) || Math.abs(delta) > 1_000_000)
+        throw new EconomyError('delta must be an integer in -1,000,000..1,000,000');
       const next = Math.max(0, (state.unlocks.get(u) ?? 0) + delta);
-      if (!state.unlocks.has(u) && next > 0 && state.unlocks.size >= maxUnlocks)
-        throw new EconomyError('unlock capacity');
       transact(s => {
         if (next === 0) s.unlocks.delete(u);
         else s.unlocks.set(u, next);
@@ -479,8 +507,9 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
       return next;
     },
     /** Add a reclaimable pool (a wreck, a resource feature): `work` ticks at rate 1,000; optional decay tick count. */
-    addPool(pool: string, o3: {amounts: Amounts; work: number; decayTicks?: number}): boolean {
+    addPool(pool: string, opts: {amounts: Amounts; work: number; decayTicks?: number}): boolean {
       const k = id(pool, 'pool id');
+      const o3 = plain(opts, 'pool options');
       const total = amounts(o3.amounts, known, 'pool amounts');
       if (!Object.keys(total).length) throw new EconomyError('a pool needs some amount');
       const work = amount(o3.work, 'pool work', 1, 1e9);
@@ -533,10 +562,10 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
         }),
       );
     },
-    /** Assign a reclaimer to a pool at a per-mille rate (replacing its previous assignment); rate 0 or no pool releases. */
+    /** Assign a reclaimer to a pool at a per-mille rate (replacing its previous assignment); null pool or rate 0 releases. */
     setReclaimer(reclaimer: string, pool: string | null, rate = RATE_ONE): boolean {
       const k = id(reclaimer, 'reclaimer id');
-      if (pool === null) {
+      if (pool === null || rate === 0) {
         if (!state.reclaimers.has(k)) return false;
         transact(s => s.reclaimers.delete(k));
         return true;
@@ -638,6 +667,8 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
     transact(s => {
       if (Object.keys(parsed).length) s.sources.set(k, {kind, amounts: parsed});
       else s.sources.delete(k);
+      s.caps = null;
+      refreshAll(s);
     });
     return true;
   }
@@ -665,6 +696,7 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
     if (s.version !== 1) throw new EconomyError('unsupported snapshot version');
     if (s.signature !== rules.signature) throw new EconomyError('snapshot was saved with different rules');
     const next: State = {
+      caps: null,
       now: amount(s.now, 'now', 0, 2 ** 50),
       stock: {},
       sources: new Map(),
@@ -689,6 +721,7 @@ export function createEconomy(rules: EconomyRules, options: EconomyOptions = {})
     for (const e of list(s.unlocks, maxUnlocks, 'unlocks')) {
       const pair = list(e, 2, 'unlock');
       const u = id(pair[0], 'unlock id');
+      if (!ruleUnlocks.has(u)) throw new EconomyError(`unknown unlock ${u}`);
       if (pair.length !== 2 || next.unlocks.has(u)) throw new EconomyError('invalid unlock');
       next.unlocks.set(u, amount(pair[1], 'unlock count', 1, Number.MAX_SAFE_INTEGER));
     }

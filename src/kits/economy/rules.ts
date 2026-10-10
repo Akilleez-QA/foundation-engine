@@ -53,7 +53,9 @@ export interface EconomyRules {
 }
 
 const ID = /^[A-Za-z0-9_.:-]{1,64}$/;
-export const isEconomyId = (v: unknown): v is string => typeof v === 'string' && ID.test(v);
+/** Ids: 1–64 of `A-Z a-z 0-9 _ . : -`, never a name `Object.prototype` defines (`constructor`, `__proto__`, …). */
+export const isEconomyId = (v: unknown): v is string =>
+  typeof v === 'string' && ID.test(v) && !(v in Object.prototype) && v !== '__proto__';
 /** Largest amount, rate or work value: comfortably inside exact integer arithmetic. */
 export const MAX_AMOUNT = 1e12;
 export const MAX_WORK = 1e9;
