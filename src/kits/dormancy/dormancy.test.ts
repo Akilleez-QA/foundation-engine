@@ -1,11 +1,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createDormancy, DORMANCY_CEILING, type DormancyStepInput, type ViewVolume} from './index';
+import {cameraPose} from '../camera/index';
+import {dmath} from '../../core/dmath';
 
 const ahead = (z: number, extra: Partial<ViewVolume> = {}): ViewVolume => ({
   x: 0,
   z,
-  yaw: 0,
+  yaw: Math.PI, // engine camera convention: yaw π looks toward +z
   far: 20,
   halfWidth: 5,
   ...extra,
@@ -75,8 +77,8 @@ test('degenerate or non-finite view volumes throw; the volume is a forward frust
     [{x: 0, z: 10, y: 9}, ahead(0, {y: 0, up: 4, down: 1}), false],
     [{x: 0, z: 10, y: -1}, ahead(0, {y: 0, up: 4, down: 1}), true],
     [{x: 0, z: 10}, ahead(0, {y: 100, up: 1, down: 1}), true], // no height: vertical test skipped
-    [{x: 10, z: 0}, ahead(0, {yaw: Math.PI / 2}), true], // yaw +90° looks toward +x
-    [{x: 0, z: 10}, ahead(0, {yaw: Math.PI / 2}), false],
+    [{x: 10, z: 0}, ahead(0, {yaw: -Math.PI / 2}), true], // yaw −90° looks toward +x
+    [{x: 0, z: 10}, ahead(0, {yaw: -Math.PI / 2}), false],
     [{x: 1, z: 10}, ahead(0, {halfWidth: 0, spread: 0.2}), true],
   ];
   for (const [p, v, expect] of cases) {
@@ -285,4 +287,71 @@ test('always policy, policy changes, hide, initial state and a radius growing th
   assert.equal(d.setPolicy(42, 'zone'), false);
   assert.equal(d.setZones(42, []), false);
   assert.equal(d.state(42), null);
+});
+
+test('review H1: the view follows the engine camera convention; an orbit camera keeps its target awake', () => {
+  for (const yaw of [0, 0.7, Math.PI / 2, 2.5, -1.2]) {
+    const pose = cameraPose('orbit', {x: 3, y: 0, z: -4, heading: 0}, {yaw, distance: 8, pitch: 0.6});
+    const [cx, , cz] = pose.position;
+    const view: ViewVolume = {x: cx, z: cz, yaw, far: 20, halfWidth: 2};
+    const d = createDormancy({maxEntities: 2, minAwakeSteps: 0});
+    d.track(1, {policy: 'view'}); // the orbit target
+    d.track(2, {policy: 'view'}); // as far behind the camera as the target is ahead
+    const at = new Map([
+      [1, {x: 3, z: -4}],
+      [2, {x: 2 * cx - 3, z: 2 * cz + 4}],
+    ]);
+    d.step({views: [view], position: id => at.get(id) ?? null});
+    assert.equal(d.isAwake(1), true, `orbit target awake at yaw ${yaw}`);
+    assert.equal(d.isAwake(2), false, `behind the orbit camera dormant at yaw ${yaw}`);
+  }
+});
+
+test('review M1: a queued entity jittering at the wake edge keeps its place and wakes within maxWakeLatency', () => {
+  const d = createDormancy({maxEntities: 40, maxWakesPerStep: 2, wakeMargin: 0, sleepMargin: 5, minAwakeSteps: 0});
+  // 39 entities inside the view and one at the side edge (halfWidth 10), alternating just inside and just outside.
+  for (let id = 0; id < 40; id++) d.track(id, {policy: 'view'});
+  let wokeAt = -1;
+  for (let t = 0; t < 2000 && wokeAt < 0; t++) {
+    const edge = t % 2 === 0 ? 9.999 : 10.001;
+    const s = d.step({
+      views: [ahead(0, {halfWidth: 10})],
+      position: id => (id === 39 ? {x: edge, z: 10} : {x: 0, z: 10}),
+    });
+    assert.equal(s.withdrawn, 0, 'no withdrawal inside the sleep volume');
+    if (s.woke.includes(39)) wokeAt = t;
+  }
+  assert.ok(wokeAt >= 0 && wokeAt <= d.limits.maxWakeLatency, `woke at step ${wokeAt}`);
+  // A real withdrawal (beyond the sleep volume) still leaves the queue.
+  const w = createDormancy({maxEntities: 4, maxWakesPerStep: 1, sleepMargin: 5, minAwakeSteps: 0});
+  for (const id of [1, 2]) w.track(id, {policy: 'view'});
+  w.step({views: [ahead(0)], position: () => ({x: 0, z: 10})});
+  assert.equal(w.state(2), 'queued');
+  assert.equal(w.step({views: [ahead(0)], position: id => (id === 2 ? {x: 11, z: 10} : {x: 0, z: 10})}).withdrawn, 1);
+});
+
+test('review M2: radius and margins are conservative against a slanted frustum side', () => {
+  // halfWidth 0, spread 1: the side is the line s = f. A point d away along the side's outward normal from (10, 10).
+  const probe = (dist: number) => {
+    const d = createDormancy({maxEntities: 1, minAwakeSteps: 0});
+    d.track(1, {policy: 'view', radius: 1});
+    const s = 10 + dist / Math.SQRT2,
+      f = 10 - dist / Math.SQRT2;
+    d.step({views: [ahead(0, {halfWidth: 0, spread: 1})], position: () => ({x: s, z: f})});
+    return d.isAwake(1);
+  };
+  assert.equal(probe(0.95), true, 'within the radius of the slanted side');
+  assert.equal(probe(1.05), false, 'beyond the radius of the slanted side');
+});
+
+test('review L3/L5: sparse view arrays are refused; deterministic math is accepted and malformed math refused', () => {
+  const d = createDormancy({maxEntities: 1, math: dmath});
+  d.track(1, {policy: 'view'});
+  const sparse: ViewVolume[] = [];
+  sparse[1] = ahead(0);
+  assert.throws(() => d.step({views: sparse, position: () => ({x: 0, z: 10})}), /holes/);
+  assert.equal(d.stats().steps, 0);
+  d.step({views: [ahead(0)], position: () => ({x: 0, z: 10})});
+  assert.equal(d.isAwake(1), true);
+  assert.throws(() => createDormancy({math: {} as typeof dmath}), RangeError);
 });

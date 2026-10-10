@@ -10,10 +10,14 @@
  * one stays awake until it leaves the volume grown by the wider `sleepMargin`; and minimum dwell ticks keep an entity
  * awake (or dormant) for a number of steps after each transition. Wakes per step are bounded: entities that want to
  * wake beyond the budget wait in a first-in-first-out queue (ties in track order), so the wait is bounded by
- * `maxWakeLatency` steps. Sleeps are not budgeted (they reduce work).
+ * `maxWakeLatency` steps while they keep wanting (a queued entity is judged against the wider sleep volume, so the
+ * bound restarts only on a real withdrawal). Sleeps are not budgeted (they reduce work). Two documented exceptions
+ * bypass the budget: `always` entities (including a policy change to `always`) and `initial: 'awake'` tracking.
  *
  * Pure bounded state: no clock, renderer, scheduler, ECS access or randomness. Time is the caller's step count.
  */
+
+import {platformMath, type ScalarMath} from '../../core/dmath';
 
 export type DormancyPolicy = 'always' | 'zone' | 'view' | 'zone-or-view';
 
@@ -36,6 +40,11 @@ export interface DormancyLimits {
   readonly minAwakeSteps?: number;
   /** Steps an entity stays dormant after sleeping before it may queue to wake. Default 0, 0-10,000. */
   readonly minDormantSteps?: number;
+  /**
+   * Evaluates the view trigonometry (sin, cos, sqrt). Default `platformMath`; pass the engine's `dmath` for view
+   * membership identical in every JavaScript engine.
+   */
+  readonly math?: ScalarMath;
 }
 
 /** Hard ceilings of this implementation. */
@@ -51,8 +60,8 @@ export const DORMANCY_CEILING = Object.freeze({
 });
 
 /**
- * A camera-relative view volume. The camera sits at (x, z) looking along yaw (0 looks toward +z, positive turns
- * toward +x). In front, a frustum in plan view reaches `far` with half width `halfWidth + spread × forward distance`;
+ * A camera-relative view volume. The camera sits at (x, z) looking along −(sin yaw, cos yaw), the engine camera
+ * convention (an orbit pose at yaw 0 sits on +z of its target and looks toward −z). In front, a frustum in plan view reaches `far` with half width `halfWidth + spread × forward distance`;
  * behind, a box of half width `halfWidth` reaches `behind`. With `y` set, `up` and `down` bound heights relative to
  * it (entities without a height skip the vertical test).
  */
@@ -167,13 +176,15 @@ interface View {
   behind: number;
   halfWidth: number;
   spread: number;
+  /** sqrt(1 + spread²): a margin perpendicular to a slanted side, measured along the lateral axis. */
+  lateral: number;
   vertical: boolean;
   y: number;
   up: number;
   down: number;
 }
 
-function readView(v: ViewVolume): View {
+function readView(v: ViewVolume, math: ScalarMath): View {
   if (v === null || typeof v !== 'object') fail('a view volume must be an object');
   const {x, z, yaw, far, halfWidth} = v;
   const behind = v.behind ?? 0,
@@ -198,8 +209,9 @@ function readView(v: ViewVolume): View {
   return {
     x,
     z,
-    sin: Math.sin(yaw),
-    cos: Math.cos(yaw),
+    sin: math.sin(yaw),
+    cos: math.cos(yaw),
+    lateral: math.sqrt(1 + spread * spread),
     far,
     behind,
     halfWidth,
@@ -211,14 +223,19 @@ function readView(v: ViewVolume): View {
   };
 }
 
-/** Whether a point lies inside a view volume grown by `m` along the camera's axes. */
+/**
+ * Whether a point lies inside a view volume grown by `m`. Engine camera convention: a view at `yaw` looks along
+ * −(sin yaw, cos yaw), as the camera kit's orbit pose and the character kit's rig yaw do. Forward and vertical
+ * margins are along the camera's axes; the lateral margin is scaled by sqrt(1 + spread²) so it is at least `m`
+ * perpendicular to a slanted side (conservative: it also widens the box behind).
+ */
 function inside(v: View, px: number, py: number | undefined, pz: number, m: number): boolean {
   const dx = px - v.x,
     dz = pz - v.z;
-  const f = dx * v.sin + dz * v.cos,
+  const f = -(dx * v.sin + dz * v.cos),
     s = dx * v.cos - dz * v.sin;
   if (f < -v.behind - m || f > v.far + m) return false;
-  const w = v.halfWidth + v.spread * Math.min(Math.max(f, 0), v.far) + m;
+  const w = v.halfWidth + v.spread * Math.min(Math.max(f, 0), v.far) + m * v.lateral;
   if (s < -w || s > w) return false;
   if (v.vertical && py !== undefined) {
     const dy = py - v.y;
@@ -236,7 +253,16 @@ export function createDormancy(limits: DormancyLimits = {}) {
     wakeMargin = limits.wakeMargin ?? 0,
     sleepMargin = limits.sleepMargin ?? wakeMargin,
     minAwakeSteps = limits.minAwakeSteps ?? 8,
-    minDormantSteps = limits.minDormantSteps ?? 0;
+    minDormantSteps = limits.minDormantSteps ?? 0,
+    math = limits.math ?? platformMath;
+  if (
+    math === null ||
+    typeof math !== 'object' ||
+    typeof math.sin !== 'function' ||
+    typeof math.cos !== 'function' ||
+    typeof math.sqrt !== 'function'
+  )
+    fail('math must provide sin, cos and sqrt');
   const C = DORMANCY_CEILING;
   if (!isInt(zones, 1, C.zones)) fail(`zones must be an integer in [1, ${C.zones}]`);
   if (!isInt(maxEntities, 1, C.entities)) fail(`maxEntities must be an integer in [1, ${C.entities}]`);
@@ -267,7 +293,8 @@ export function createDormancy(limits: DormancyLimits = {}) {
   const entries = new Map<number, Entry>();
   /** Wake queue: insertion order is queue order; the value is the step it was queued on. */
   const queue = new Map<number, number>();
-  const zoneStamp = new Float64Array(zones);
+  // Generation stamps: 4 bytes per zone. On wrap the table is cleared, so a stale stamp never matches.
+  const zoneStamp = new Uint32Array(zones);
   let steps = 0,
     zoneGen = 0,
     awakeCount = 0,
@@ -284,9 +311,10 @@ export function createDormancy(limits: DormancyLimits = {}) {
   const readZones = (input: readonly number[] | undefined): readonly number[] => {
     if (input === undefined) return Object.freeze([]);
     if (!Array.isArray(input)) fail('zones must be an array');
-    if (input.length > maxZonesPerEntity) fail(`an entity belongs to at most ${maxZonesPerEntity} zones`);
+    const n = input.length;
+    if (n > maxZonesPerEntity) fail(`an entity belongs to at most ${maxZonesPerEntity} zones`);
     const out: number[] = [];
-    for (let k = 0; k < input.length; k++) {
+    for (let k = 0; k < n; k++) {
       const r: unknown = input[k];
       if (!isInt(r, 0, zones - 1)) fail(`unknown zone id ${String(r)}: zone ids are integers in [0, ${zones - 1}]`);
       out.push(r);
@@ -378,13 +406,23 @@ export function createDormancy(limits: DormancyLimits = {}) {
           fail(`unknown active zone id ${String(r)}: zone ids are integers in [0, ${zones - 1}]`);
         active.push(r);
       }
-      if (!Array.isArray(viewsIn) || viewsIn.length > maxViews) fail(`at most ${maxViews} view volumes`);
-      const views = viewsIn.map(readView);
+      if (!Array.isArray(viewsIn)) fail('views must be an array');
+      const viewCount = viewsIn.length;
+      if (viewCount > maxViews) fail(`at most ${maxViews} view volumes`);
+      const views: View[] = [];
+      for (let k = 0; k < viewCount; k++) {
+        if (!(k in viewsIn)) fail('views must not have holes');
+        views.push(readView(viewsIn[k]!, math));
+      }
       if (position !== undefined && typeof position !== 'function') fail('position must be a function');
       const list = [...entries];
       // Zone wants first (no callbacks), then positions only where the view decides.
       const stamp = steps + 1;
       // Every attempt gets a fresh zone generation, so stamps left by a refused step (a throwing callback) never count.
+      if (zoneGen === 0xffffffff) {
+        zoneStamp.fill(0);
+        zoneGen = 0;
+      }
       const gen = ++zoneGen;
       for (const r of active) zoneStamp[r] = gen;
       const zoneWant = list.map(
@@ -434,7 +472,9 @@ export function createDormancy(limits: DormancyLimits = {}) {
           } else e.steps++;
           return;
         }
-        const margin = (e.awake ? sleepMargin : wakeMargin) + e.radius;
+        // Awake and already-queued entities are judged against the wider sleep volume: jitter at the wake edge then
+        // neither sleeps an awake entity nor withdraws a queued one (which would send it to the back of the queue).
+        const margin = (e.awake || queue.has(id) ? sleepMargin : wakeMargin) + e.radius;
         const p = positions[k];
         const want =
           zoneWant[k]! || (p !== null && p !== undefined && views.some(v => inside(v, p.x, p.y, p.z, margin)));

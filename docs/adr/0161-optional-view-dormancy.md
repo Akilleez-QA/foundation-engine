@@ -24,11 +24,15 @@ Add a small kit, `@kits/dormancy`, that consumes those owners instead of extendi
 
 - Zones are integer ids supplied per step (`activeZones`). Region-activation region indices are used directly, so no
   second region registry, geometry or observer table exists. Authored zone numbers work the same way.
-- The view volume (plan-view frustum ahead, box behind, optional height band) is the new signal.
+- The view volume (plan-view frustum ahead, box behind, optional height band) is the new signal. It uses the engine
+  camera yaw convention (looking along −(sin yaw, cos yaw), as the camera kit's orbit pose does).
 - Per-entity policy `always`, `zone`, `view`, `zone-or-view`; per-entity bounding radius and a `hide` flag.
 - Hysteresis: separate wake and sleep margins plus minimum awake and dormant dwell in steps.
 - Wakes are budgeted per step; overflow waits in one first-in-first-out queue with a computed maximum latency
-  (`floor((maxEntities - 1) / maxWakesPerStep)` steps), reported as deferred counts; sleeps are not budgeted.
+  (`floor((maxEntities - 1) / maxWakesPerStep)` steps while the entity keeps wanting; queued entities are judged
+  against the sleep volume, so the bound restarts only on a real withdrawal), reported as deferred counts; sleeps are
+  not budgeted. Exceptions that bypass the budget: `always` entities (including a policy change to `always`) and
+  `initial: 'awake'` tracking.
 - Output per step: frozen `woke` (with dormant duration) and `slept` lists, deferred, withdrawn and oldest-wait counts.
 - `dormantAsFar` feeds dormancy into population tiers through the tiers' existing position callback (a dormant entity
   reads as far), so tiers stay the single owner of simulated time.
@@ -40,7 +44,8 @@ removes members permanently, which dormancy must not do; visibility cell sets ca
 creator, so no dependency is taken.
 
 Inputs/outputs, owner, bounds, overload, cancellation, failure and recovery are tabled in the kit README: the caller
-owns the instance and steps it once per fixed step; `zones` up to 4,194,304, `maxEntities` up to 65,536, up to 16
+owns the instance and steps it once per fixed step; `zones` up to 4,194,304 (4-byte generation stamps, 16 MiB at the
+ceiling), `maxEntities` up to 65,536, up to 16
 zones per entity, up to 8 views, dwell up to 10,000 steps; unknown zone ids, degenerate volumes and malformed input
 throw `RangeError` before any change; a throwing position callback leaves state untouched; untracking a queued entity
 cancels its wake and is counted.
@@ -54,12 +59,19 @@ cancels its wake and is counted.
 - A priority queue by distance or visibility: rejected for now; FIFO gives a simple, provable latency bound and stable
   order. A creator who needs nearest-first can order `track` calls or lower the budget's latency.
 - Consequences: a dormant `background`-tier entity still receives conserved round-robin slices through `dormantAsFar`;
-  a creator wanting strict no-update pairs dormancy with `near` tiers or checks `isAwake`. Margins are along camera
-  axes, not Euclidean, and pitch is not modelled. Hiding is a reported flag; no renderer is touched.
+  a creator wanting strict no-update pairs dormancy with `near` tiers or checks `isAwake`. Forward and vertical
+  margins are along camera axes; the lateral margin is scaled by sqrt(1 + spread²) to stay conservative on slanted
+  sides; pitch is not modelled. Membership is deterministic across engines only with `limits.math = dmath`. Hiding is a reported flag; no renderer is touched.
 
 ## Evidence
 
-Twelve headless tests (10 unit, 2 composition with real population tiers and real region-activation objects),
+Sixteen headless tests (14 unit, 2 composition with real population tiers and real region-activation objects),
 including an oscillating camera that flickers without hysteresis and does not with it, a deterministic budgeted
-drain, and a 2,000-step churn run within the latency bound. No browser, template or physical-device evidence;
-independent review and hosted CI remain required.
+drain, a 2,000-step churn run within the latency bound, and an orbit pose from the camera kit keeping its target
+awake.
+
+Independent review of the first revision found a yaw convention reversed relative to the engine camera, unbounded
+starvation for queued entities jittering at the wake edge (they were withdrawn and re-queued at the back), a radius
+that was not conservative on slanted sides, undocumented budget exceptions, and smaller input, memory and
+determinism items. All were fixed with regression tests that fail on the previous code; the zone stamp wrap is not
+exercised by a test. No browser, template or physical-device evidence; hosted CI remains required.

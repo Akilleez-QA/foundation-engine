@@ -21,7 +21,7 @@ test('composition: dormancy feeds real population update tiers through dormantAs
   tiers.track(2, 'near');
   tiers.track(3, 'background');
   for (const id of [1, 2, 3]) dormancy.track(id, {policy: 'view'});
-  const view: ViewVolume = {x: 0, z: 0, yaw: 0, far: 40, halfWidth: 10};
+  const view: ViewVolume = {x: 0, z: 0, yaw: Math.PI, far: 40, halfWidth: 10}; // looks toward +z
   const position = (id: number) => pos.get(id) ?? null;
   let simulated3 = 0;
   for (let t = 0; t < 5; t++) {
@@ -33,7 +33,7 @@ test('composition: dormancy feeds real population update tiers through dormantAs
   }
   assert.ok(Math.abs(simulated3 - 0.5) < 1e-9, 'a dormant background-tier entity keeps round-robin time, conserved');
   // Turning the camera around wakes entity 2; the tiers deliver it on that same step.
-  const back: ViewVolume = {...view, yaw: Math.PI};
+  const back: ViewVolume = {...view, yaw: 0};
   const s = dormancy.step({views: [back], position});
   assert.deepEqual(s.woke, [2, 3]);
   assert.deepEqual(s.slept, [1]);
