@@ -227,6 +227,13 @@ test('review regressions: stale keys, intensity ladder, due changes, read-only n
     initial: 'calm',
   });
   assert.equal(director.setIntensity(0.1, 0), null, 'a state without minIntensity never joins the ladder');
+  const ladder = createMusicDirector({
+    clock,
+    stems: ['a'],
+    states: {calm: {stems: {a: 1}}, combat: {stems: {a: 0.5}, minIntensity: 0.6}},
+    initial: 'calm',
+  });
+  assert.equal(ladder.setIntensity(0.1, 0), null, 'below every rung nothing changes');
   director.request('combat', 0.5); // due at 2
   assert.equal(director.request('calm', 2.5)?.at, 4, 'the due change started first; calm is scheduled after it');
   assert.equal(director.state, 'combat');

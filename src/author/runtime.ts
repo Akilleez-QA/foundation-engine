@@ -556,17 +556,20 @@ export async function enterScene(o: {
           up.toArray() as [number, number, number],
         ] as const;
         const override = validListener(viewState.listener);
+        if (viewState.listener === undefined) listenerReported = false;
         try {
           s.audio.setListener(
             override?.position ?? cameraPose[0],
             override?.forward ?? cameraPose[1],
             override?.up ?? cameraPose[2],
           );
+          if (override) listenerReported = false;
         } catch (error) {
-          // The output refuses degenerate orientations (forward parallel to up, overflow): report once, use the camera.
+          // The output refuses degenerate orientations (forward parallel to up): report once, keep the creator's
+          // position and use the camera's orientation.
           if (!override) throw error;
-          reportListener('view.listener orientation is degenerate (forward parallel to up, or too large)');
-          s.audio.setListener(...cameraPose);
+          reportListener('view.listener orientation is degenerate (forward parallel to up)');
+          s.audio.setListener(override.position, cameraPose[1], cameraPose[2]);
         }
       };
       let listenerReported = false;
@@ -582,10 +585,7 @@ export async function enterScene(o: {
           v.length === 3 &&
           v.every(n => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) <= 1e9);
         const okDir = (v: unknown) => v === undefined || (ok(v) && Math.hypot(...(v as number[])) > 0);
-        if (typeof l === 'object' && l !== null && ok(l.position) && okDir(l.forward) && okDir(l.up)) {
-          listenerReported = false;
-          return l;
-        }
+        if (typeof l === 'object' && l !== null && ok(l.position) && okDir(l.forward) && okDir(l.up)) return l;
         reportListener('view.listener must be {position, forward?, up?} with finite vectors (|v| <= 1e9)');
         return undefined;
       };

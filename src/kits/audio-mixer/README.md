@@ -28,7 +28,8 @@ These are optional helpers (`extras.ts`). Each is pure or caller-owned.
   camera (`blend` 0) to the character (1); its orientation comes from the camera, so left and right match what the
   player sees. Assign the pose to `ctx.view.listener`, the optional author field the runtime now sends to the audio
   output in place of the camera position. A listener-only change re-sends the listener without redrawing. Invalid or
-  degenerate values (forward parallel to up, non-finite or larger than 1e9) are reported once and the camera is used. Pass the same position to spatial-audio `pump` so that audibility and
+  degenerate values are reported once: non-finite or larger than 1e9 values fall back to the camera, and a forward
+  parallel to up keeps the creator position with the camera's orientation. Pass the same position to spatial-audio `pump` so that audibility and
   panning agree. A camera looking straight down still gets a valid frame.
 - **`dopplerRate({source, sourceVelocity, listener, listenerVelocity?, speedOfSound?, factor?, min?, max?})`** returns
   `(c + v_l·n) / (c − v_s·n)`.
@@ -65,7 +66,9 @@ audio-context seconds or a song's `songTime`. It provides:
   cancels the pending change.
 - **Intensity.** Only states that declare a `minIntensity` form the intensity ladder; others (victory, menu) are
   reached by `request`. `setIntensity(x, now)` picks the ladder state with the highest `minIntensity` not above
-  `x`. A state is left downward only once `x` falls below its own `minIntensity` minus `hysteresis`.
+  `x`; below every rung nothing changes. A state is left downward only once `x` falls below its own
+  `minIntensity` minus `hysteresis`. A state reached by `request` (off the ladder) is left on the next
+  `setIntensity` that selects a rung, so stop calling `setIntensity` while a manual state should hold.
 - **Pumping.** Every call (`pump`, `request`, `setIntensity`) first starts a pending change whose boundary has
   passed, so a later request never delays or cancels a change that is already due. `named(now)` is a read-only view.
   `pump(now)` then returns the stem gains to apply now, faded linearly over `fadeBeats` from the gains heard at the boundary, together with the `started` and

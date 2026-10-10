@@ -225,6 +225,7 @@ export function createInstanceLimits(options: {
       if (!voice || voice.ended) return;
       const list = prune(key);
       const limit = limits.get(key) ?? defaultLimit;
+      if (!live.has(key) && live.size >= maxKeys) for (const other of [...live.keys()]) prune(other);
       if (list.length >= limit || (!live.has(key) && live.size >= maxKeys)) {
         voice.stop();
         refused++;

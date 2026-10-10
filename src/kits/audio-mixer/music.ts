@@ -205,8 +205,10 @@ export function createMusicDirector(options: MusicDirectorOptions) {
       advance(check(now));
       const target = pending?.state ?? current;
       const targetMin = states.get(target)!.minIntensity;
-      let choice = byIntensity[0]![0];
+      let choice: string | null = null;
       for (const [name, st] of byIntensity) if (st.minIntensity <= intensity) choice = name;
+      // Below every rung: no ladder state applies, so nothing changes.
+      if (choice === null) return null;
       // Stay in the current target while intensity is within its hysteresis band below it.
       const chosenMin = states.get(choice)!.minIntensity;
       // A target outside the intensity ladder (NaN) is left as soon as intensity selects a ladder state.
