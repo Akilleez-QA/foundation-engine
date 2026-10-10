@@ -17,6 +17,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | STATUS-01 | Optional stacked status effects with transforms, immunities and save/restore |  | [README.md](../src/kits/status/README.md) |
 | BT-01 | Optional deterministic resumable behaviour trees with blackboard and saveable state |  | [README.md](../src/kits/behavior/README.md) |
 | ECON-01 | Optional flow economy with production queues, prerequisites and reclaim |  | [README.md](../src/kits/economy/README.md) |
+| INV-RULES-01 | Optional slot, stack and key-item rules over the inventory ledger |  | [README.md](../src/kits/inventory/README.md) |
 | NAV-FIELD-01 | Optional incremental shared navigation distance fields |  | [README.md](../src/kits/navigation/README.md) |
 | WORK-01 | Optional bounded fair work roster |  | [README.md](../src/kits/work-roster/README.md) |
 | VOLUME-01 | Optional bounded sphere and capsule overlap, sweep and headroom queries |  | [README.md](../src/kits/volume-query/README.md) |

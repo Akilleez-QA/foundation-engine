@@ -60,6 +60,17 @@
       ]
     },
     {
+      "id": "INV-RULES-01",
+      "title": "Optional slot, stack and key-item rules over the inventory ledger",
+      "shipped": true,
+      "docs": "src/kits/inventory/README.md",
+      "evidence": [
+        "@kits/inventory exports createRuledInventory",
+        "@kits/inventory exports inventoryPresets",
+        "src/kits/inventory/rules.test.ts exists"
+      ]
+    },
+    {
       "id": "NAV-FIELD-01",
       "title": "Optional incremental shared navigation distance fields",
       "shipped": true,
@@ -837,7 +848,10 @@
         "createCheckpointInventory",
         "createInventoryLedger",
         "createRetirementInventory",
+        "createRuledInventory",
+        "defineInventoryRules",
         "inventory",
+        "inventoryPresets",
         "parseDimensionalStock",
         "prepareStockChange",
         "prepareStockTransfers",
