@@ -1197,7 +1197,7 @@ independent review and full hosted integration CI remain required.
 
 Optional `support` query on the existing `cameraSystem` anchors vertical framing to
 the creator-defined support height (scaled, clamped), so jumps do not bob the view.
-Defaults unchanged; no new owner. See [ADR 0088](../adr/0088-camera-support-framing.md)
+Defaults unchanged; no new owner. See [ADR 0090](../adr/0090-camera-support-framing.md)
 and [the camera kit README](../../src/kits/camera/README.md). Headless scene tests
 are recorded in the upgrade ledger; independent review and full hosted CI remain
 required. No browser, visual or device acceptance.

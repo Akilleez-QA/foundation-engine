@@ -76,4 +76,4 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0084](0084-persisted-recurring-phase.md) | Persisted recurring phase with explicit bounded catch-up | Optional composition / Time / Persistence | Proposed |
 
-| [0088](0088-camera-support-framing.md) | Support-anchored vertical camera framing | Camera kit | Proposed |
+| [0090](0090-camera-support-framing.md) | Support-anchored vertical camera framing | Camera kit | Proposed |

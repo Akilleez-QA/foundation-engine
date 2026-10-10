@@ -1,4 +1,4 @@
-# ADR 0088: support-anchored vertical camera framing
+# ADR 0090: support-anchored vertical camera framing
 
 - **Status:** Proposed
 - **Date:** 2026-10-09
