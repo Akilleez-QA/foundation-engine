@@ -197,7 +197,7 @@ test('hierarchical parent frames from the rest pose make the posed end joint aim
 
 test('limits are read once, apply refuses foreign states, duplicates and invalid rotations', () => {
   let reads = 0;
-  const yaw = [0, 0.5] as unknown as [number, number];
+  const yaw: [number, number] = [0, 0.5];
   Object.defineProperty(yaw, 0, {get: () => (reads++ === 0 ? -0.5 : -3)});
   const look = createLookAt({joints: [{joint: 'head', share: 1, yaw, pitch: [-0.2, 0.2]}]});
   assert.deepEqual(look.limits.yaw, [-0.5, 0.5]);
