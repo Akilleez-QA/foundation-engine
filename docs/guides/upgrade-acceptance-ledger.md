@@ -1455,3 +1455,17 @@ composition through `blendPoseLayers`; single-read limits and `apply` refusals; 
 validation. An independent adversarial review found lost residual turn, a yaw flip
 behind the root, double reads and loose `apply` input; all were fixed and a re-review
 with an external 5,000-chain fuzz (not checked in) was clean. No visual, browser or device evidence.
+
+## Camera director — candidate (2026-10-09)
+
+Branch `feat/camera-director` from `a6211bd3`. Eight new headless tests: ladder order,
+stickiness and yawed boxes; string rig band clamping and blending; rail, close-up and
+orbit shot poses; transition sizing, deceleration and exact arrival on a moving goal;
+support carry; letterbox easing; and a scene where the director system blends into a
+volume's setting, stops rewriting at rest and returns from a scripted override to the
+live gameplay pose; plus per-world stickiness, carry about the pre-move pivot,
+validation and frozen poses. An independent adversarial review found shared sticky
+state across worlds, a wrong default carry pivot, unvalidated heading, overstated
+docs, mutable returned poses and rare ulp redraws; all were fixed and the re-review was
+clean. No browser,
+visual or device evidence.

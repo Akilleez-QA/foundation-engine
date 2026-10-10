@@ -222,3 +222,21 @@ export function cameraSystem(
 export function camera(): KitDefinition {
   return defineKit({id: 'camera'});
 }
+export {
+  cameraDirectorSystem,
+  closeUpPose,
+  createCameraTransition,
+  createCameraVolumes,
+  createLetterbox,
+  railPose,
+  shotPose,
+  stringPose,
+  type CameraPose,
+  type CameraSelection,
+  type CameraSettingPose,
+  type CameraTransition,
+  type CameraVolume,
+  type RailRig,
+  type StringRig,
+  type VolumeShape,
+} from './director';

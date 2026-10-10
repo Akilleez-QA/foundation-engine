@@ -109,3 +109,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0094](0094-replication-schedule.md) | Optional per-recipient replication schedule | Optional kits / Network | Proposed |
 
 | [0110](0110-look-at-constraint.md) | Bounded look-at constraint in the animation kit | Optional kits / Animation | Proposed |
+
+| [0112](0112-camera-director.md) | Optional camera director helpers | Camera kit | Proposed |

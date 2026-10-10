@@ -619,7 +619,22 @@
     {"name": "cadence", "exports": ["CADENCE_CEILING", "MAX_CADENCE_TICK", "createCadence", "createCadenceResult"]},
     {
       "name": "camera",
-      "exports": ["CAMERA_MIN_DISTANCE", "camera", "cameraPose", "cameraSystem", "clearCamera", "supportHeights"]
+      "exports": [
+        "CAMERA_MIN_DISTANCE",
+        "camera",
+        "cameraDirectorSystem",
+        "cameraPose",
+        "cameraSystem",
+        "clearCamera",
+        "closeUpPose",
+        "createCameraTransition",
+        "createCameraVolumes",
+        "createLetterbox",
+        "railPose",
+        "shotPose",
+        "stringPose",
+        "supportHeights"
+      ]
     },
     {
       "name": "capabilities",

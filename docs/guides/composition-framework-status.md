@@ -1036,3 +1036,11 @@ direction with per-joint shares and limits, a front cone, smoothing and a speed 
 returning deltas that compose onto pose arrays. Pure; the caller owns targets, clock
 and skeleton. See [ADR 0110](../adr/0110-look-at-constraint.md). Headless tests are in
 the upgrade ledger; independent review and full hosted CI remain required.
+
+## Camera director — candidate (2026-10-09)
+
+Optional camera-kit helpers: volume priority ladder, string/rail/close-up/shot rigs,
+pose-sized transitions landing on moving goals (including the scripted-shot return),
+support carry, letterbox amount and an optional director system. See
+[ADR 0112](../adr/0112-camera-director.md). Headless tests in the ledger; independent
+review and hosted CI remain required.
