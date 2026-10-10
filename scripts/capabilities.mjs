@@ -228,6 +228,17 @@ export const FEATURES = [
     evidence: [{engine: 'Interpolated'}, {engine: 'presentTransform'}, {path: 'src/author/interpolation.test.ts'}],
   },
   {
+    id: 'BALLISTICS-01',
+    title: 'Drag-free ballistic launch solves, evaluation and arc samples',
+    docs: 'src/kits/ballistics/README.md',
+    evidence: [
+      {kit: 'ballistics', export: 'solveByLaunchSpeed'},
+      {kit: 'ballistics', export: 'solveLead'},
+      {kit: 'ballistics', export: 'samplePoints'},
+      {path: 'src/kits/ballistics/ballistics.test.ts'},
+    ],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,

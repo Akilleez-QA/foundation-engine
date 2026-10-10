@@ -1496,3 +1496,9 @@ Optional `economy` kit ([contract](../../src/kits/economy/README.md), [ADR 0123]
 ## Inventory rule presets (INV-RULES-01) — candidate, 2026-10-09
 
 Inventory kit extension ([contract](../../src/kits/inventory/README.md#optional-slot-stack-and-key-item-rules), [ADR 0124](../adr/0124-inventory-rule-presets.md)): slots, stack sizes with spill, key items, ownership caps and placement checked before the existing ledger applies an operation; ledger `contents(container)` read. Evidence: six focused headless tests in `src/kits/inventory/rules.test.ts`; an independent adversarial review (1 blocker, 4 major, 5 minor, 3 nits) whose findings were addressed in the second commit (idempotent retries, key items through reservations, commit projection, content-independent capacities, preset described as an approximation, reserved names). Candidate only; no game integration, browser, full CI or device acceptance claimed.
+
+## Ballistics kit — candidate (2026-10-09)
+
+- **Scope:** `src/kits/ballistics`, pure solves and evaluation (ADR 0097).
+- **Evidence:** `ballistics.test.ts` covers exact landing for every solve, the constraint of each mode, the 45-degree range boundary, vertical shots, unreachable cases, lead convergence and validation.
+- **Not established:** template or browser consumers and hosted CI.

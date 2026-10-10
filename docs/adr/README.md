@@ -123,3 +123,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0123](0123-flow-economy-and-production.md) | Flow economy, production queues and reclaim | Optional kits / Rules | Proposed |
 
 | [0124](0124-inventory-rule-presets.md) | Slot, stack and key-item rules over the inventory ledger | Optional kits / Inventory | Proposed |
+
+| [0097](0097-ballistic-trajectories.md) | Optional ballistic trajectory solves | Optional kits | Proposed |

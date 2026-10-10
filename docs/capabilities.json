@@ -206,6 +206,18 @@
       ]
     },
     {
+      "id": "BALLISTICS-01",
+      "title": "Drag-free ballistic launch solves, evaluation and arc samples",
+      "shipped": true,
+      "docs": "src/kits/ballistics/README.md",
+      "evidence": [
+        "@kits/ballistics exports solveByLaunchSpeed",
+        "@kits/ballistics exports solveLead",
+        "@kits/ballistics exports samplePoints",
+        "src/kits/ballistics/ballistics.test.ts exists"
+      ]
+    },
+    {
       "id": "VIS-01",
       "title": "Tone mapping and exposure per scene (view.output)",
       "shipped": true,
@@ -678,6 +690,24 @@
     {"name": "assignments", "exports": ["createAssignments"]},
     {"name": "audio-mixer", "exports": ["audioMixer", "createCueMixer", "createDucking"]},
     {"name": "authoring", "exports": ["authoredReference", "createAuthoredDocument", "createAuthoringSession"]},
+    {
+      "name": "ballistics",
+      "exports": [
+        "BALLISTIC_LIMITS",
+        "apex",
+        "ballistics",
+        "positionAt",
+        "samplePoints",
+        "solveByApexHeight",
+        "solveByDuration",
+        "solveByHorizontalSpeed",
+        "solveByLaunchSpeed",
+        "solveByVerticalSpeed",
+        "solveLead",
+        "timeAtHeight",
+        "velocityAt"
+      ]
+    },
     {
       "name": "behavior",
       "exports": [
