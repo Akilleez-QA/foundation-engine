@@ -193,8 +193,8 @@ export type MediumVolumes = ReturnType<typeof createMediumVolumes>;
 /**
  * Per-actor medium state with hysteresis and enter/exit/state events. `under` (head below the surface) also has
  * hysteresis: entered at headDepth >= hysteresis, left below headDepth < -hysteresis.
- * A state needs `depth >= threshold + hysteresis` to deepen and `depth < threshold - hysteresis` to shallow;
- * `under` means the whole body is below the surface (submerged >= 1).
+ * A wade/swim threshold needs `depth >= threshold + hysteresis` to deepen and `depth < threshold - hysteresis` to
+ * shallow.
  */
 export function createMediumTracker(volumes: MediumVolumes, options: TrackerOptions) {
   if (typeof options !== 'object' || options === null) fail('options must be an object');
@@ -274,25 +274,43 @@ export function createMediumTracker(volumes: MediumVolumes, options: TrackerOpti
     },
     snapshot(): {
       readonly v: 1;
-      readonly actors: readonly {readonly actor: number; readonly state: MediumState; readonly volume: number | null}[];
+      readonly actors: readonly {
+        readonly actor: number;
+        readonly state: MediumState;
+        readonly volume: number | null;
+        readonly kind?: string | undefined;
+      }[];
     } {
       return Object.freeze({
         v: 1 as const,
         actors: Object.freeze(
-          [...actors.entries()].sort((a, b) => a[0] - b[0]).map(([actor, r]) => Object.freeze({actor, ...r})),
+          [...actors.entries()]
+            .sort((a, b) => a[0] - b[0])
+            .map(([actor, r]) =>
+              Object.freeze(
+                r.kind === undefined
+                  ? {actor, state: r.state, volume: r.volume}
+                  : {actor, state: r.state, volume: r.volume, kind: r.kind},
+              ),
+            ),
         ),
       });
     },
     restore(snapshot: {
       readonly v: 1;
-      readonly actors: readonly {readonly actor: number; readonly state: MediumState; readonly volume: number | null}[];
+      readonly actors: readonly {
+        readonly actor: number;
+        readonly state: MediumState;
+        readonly volume: number | null;
+        readonly kind?: string | undefined;
+      }[];
     }): void {
       if (typeof snapshot !== 'object' || snapshot === null || snapshot.v !== 1) fail('snapshot must be v1');
       const list: unknown = snapshot.actors;
       if (!Array.isArray(list)) return fail('snapshot actors must be an array');
       const count = list.length;
       if (count > maxActors) fail('snapshot exceeds maxActors');
-      const next = new Map<number, {state: MediumState; volume: number | null}>();
+      const next = new Map<number, {state: MediumState; volume: number | null; kind?: string | undefined}>();
       for (let i = 0; i < count; i++) {
         const item: unknown = list[i];
         if (typeof item !== 'object' || item === null) return fail('snapshot actor must be an object');
@@ -305,7 +323,14 @@ export function createMediumTracker(volumes: MediumVolumes, options: TrackerOpti
         if (typeof state !== 'string' || !Object.hasOwn(rank, state)) fail('invalid state');
         if (volume !== null && (!Number.isSafeInteger(volume) || (volume as number) < 0)) fail('invalid volume id');
         if (state !== 'dry' && volume === null) fail('a wet state needs a volume');
-        next.set(actor as number, {state: state as MediumState, volume: volume as number | null});
+        const kind = r.kind;
+        if (kind !== undefined && (typeof kind !== 'string' || kind.length < 1 || kind.length > 64))
+          fail('invalid kind');
+        next.set(actor as number, {
+          state: state as MediumState,
+          volume: volume as number | null,
+          kind: kind as string | undefined,
+        });
       }
       actors.clear();
       for (const [k, v] of next) actors.set(k, v);

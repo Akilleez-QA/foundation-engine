@@ -193,3 +193,14 @@ test('review regressions: rounding never hides under, depth respects the floor, 
     ['exit', 'enter'],
   );
 });
+
+test('snapshots carry the medium kind, so a kind change replays identically after restore', () => {
+  const v = createMediumVolumes({maxVolumes: 1});
+  v.set(1, pool());
+  const a = createMediumTracker(v, {maxActors: 1, wadeDepth: 0.4, swimDepth: 1.2});
+  a.update(1, at(5, -1));
+  const b = createMediumTracker(v, {maxActors: 1, wadeDepth: 0.4, swimDepth: 1.2});
+  b.restore(JSON.parse(JSON.stringify(a.snapshot())));
+  v.set(1, pool({kind: 'lava'}));
+  assert.deepEqual(b.update(1, at(5, -1)), a.update(1, at(5, -1)));
+});
