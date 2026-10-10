@@ -1472,9 +1472,14 @@ visual or device evidence.
 
 ## Navigation meshes, funnel and avoidance — candidate (2026-10-09)
 
-Branch `feat/navmesh-funnel-avoidance` from `a6211bd3`. Eight headless tests: point
+Branch `feat/navmesh-funnel-avoidance` from `a6211bd3`. Nine headless tests: point
 location with height; a funnel tight around an inner corner, radius clearance,
 too-narrow and broken corridors; a straight strip with no extra corners; moving
 across edges, stopping and sliding; sloped heights; mesh validation; two agents
 passing head-on without overlap; and eight agents swapping across a circle while
-keeping apart and arriving. No game, browser or device evidence.
+keeping apart and arriving; plus review fixes. An independent adversarial review
+(external fuzz of about 5,600 meshes against a brute-force shortest path, not checked
+in) found the funnel optimal, but found a polygon limit beyond the graph's node budget,
+a neighbour hash that missed large agents, reversed winding wording, duplicate
+corners, silent truncation and unchecked preconditions; all were fixed. No game,
+browser or device evidence.

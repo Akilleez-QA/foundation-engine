@@ -29,7 +29,8 @@ Extend the navigation kit with pure helpers:
 
 ## Consequences
 
-Meshes are authored or generated elsewhere and must be convex and counter-clockwise.
+Meshes are authored or generated elsewhere and must be convex, planar and
+counter-clockwise in (x, z) coordinates, at most 8,192 polygons.
 The radius clearance is the portal-shrinking approximation. Avoidance ignores static
 walls, so callers clamp the result with `walkMesh` or collision; it is not
 guaranteed collision-free in dense crowds. Evidence is headless tests; no game, browser

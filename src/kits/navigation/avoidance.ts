@@ -114,7 +114,10 @@ export function createAvoidance(options: AvoidanceOptions = {}) {
         });
       }
       // Uniform hash for neighbour search.
-      const cell = neighborRadius,
+      // A neighbour counts when the gap between discs is within range, so centres can be up to
+      // neighborRadius + 2 × the largest radius apart: size cells for that so the 3×3 scan never misses one.
+      const maxRadius = agents.reduce((m, a) => Math.max(m, a.r), 0);
+      const cell = neighborRadius + 2 * maxRadius,
         hash = new Map<string, number[]>();
       const key = (x: number, z: number) => `${Math.floor(x / cell)},${Math.floor(z / cell)}`;
       agents.forEach((a, i) => {
@@ -158,8 +161,9 @@ export function createAvoidance(options: AvoidanceOptions = {}) {
               const dist = Math.hypot(px, pz);
               if (dist < r) {
                 // Already overlapping: prefer candidates that move apart.
-                const away = dist > 0 ? -(c[0] * px + c[1] * pz) / dist : 0;
-                overlapPenalty += (r - dist) * 10 - away;
+                // Coincident agents separate along x in id order so they never stay stacked.
+                const away = dist > 0 ? -(c[0] * px + c[1] * pz) / dist : a.id < b.id ? -c[0] : c[0];
+                overlapPenalty += (r - dist) * 10 - 2 * away;
                 continue;
               }
               // B's offset from A closes at the reciprocal relative velocity: it moves by −(2c − vA − vB) per second.

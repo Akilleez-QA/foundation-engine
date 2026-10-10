@@ -80,9 +80,14 @@ test('a zig-zag corridor yields one corner per turn and no corner on straight st
 
 test('walkMesh crosses shared edges, stops at the boundary and slides along it', () => {
   const mesh = lMesh();
-  assert.deepEqual(walkMesh(mesh, 0, [0.5, 0, 0.5], [1, 1]), {position: [1.5, 0, 1.5], polygon: 2, blocked: false});
+  assert.deepEqual(walkMesh(mesh, 0, [0.5, 0, 0.5], [1, 1]), {
+    position: [1.5, 0, 1.5],
+    polygon: 2,
+    blocked: false,
+    truncated: false,
+  });
   const wall = walkMesh(mesh, 0, [0.5, 0, 0.5], [0, 2]);
-  assert.deepEqual(wall, {position: [0.5, 0, 1], polygon: 0, blocked: true});
+  assert.deepEqual(wall, {position: [0.5, 0, 1], polygon: 0, blocked: true, truncated: false});
   const slide = walkMesh(mesh, 0, [0.5, 0, 0.5], [2, 0.2]);
   assert.equal(slide.blocked, true);
   assert.equal(slide.polygon, 1);
@@ -100,7 +105,7 @@ test('heights follow sloped polygons', () => {
 
 test('mesh validation refuses non-convex, clockwise, bad indices and over-shared edges', () => {
   const v = [V(0, 0), V(1, 0), V(1, 1), V(0, 1)];
-  assert.throws(() => defineNavMesh({vertices: v, polygons: [[0, 3, 2, 1]]}), /counter-clockwise/);
+  assert.throws(() => defineNavMesh({vertices: v, polygons: [[0, 3, 2, 1]]}), /counter-clockwise in \(x, z\)/);
   assert.throws(() => defineNavMesh({vertices: v, polygons: [[0, 1, 9]]}), RangeError);
   assert.throws(() => defineNavMesh({vertices: v, polygons: [[0, 1, 1, 2]]}), RangeError);
   assert.throws(
@@ -183,4 +188,60 @@ test('avoidance: eight agents swapping across a circle keep apart and arrive', (
   assert.ok(closest > 0.6 * 0.8, `close calls stay near the combined radius: ${closest}`);
   const arrived = agents.filter(a => Math.hypot(a.goal[0] - a.position[0], a.goal[1] - a.position[1]) < 0.5).length;
   assert.ok(arrived >= 7, `arrived ${arrived}/8`);
+});
+
+test('review fixes: corridor ends, duplicate corners, truncation, overlap, limits and large-radius neighbours', () => {
+  // Square split into four triangles around its centre (1, 1).
+  const fan = defineNavMesh({
+    vertices: [V(0, 0), V(2, 0), V(2, 2), V(0, 2), V(1, 1)],
+    polygons: [
+      [0, 1, 4],
+      [1, 2, 4],
+      [2, 3, 4],
+      [3, 0, 4],
+    ],
+  });
+  const r = findStraightPath(fan, [3, 0, 1, 2], [0.1, 0, 1], [1, 0, 1.9]);
+  assert.equal(r.status, 'ok');
+  if (r.status === 'ok')
+    for (let i = 1; i < r.points.length; i++)
+      assert.ok(
+        Math.hypot(r.points[i]![0] - r.points[i - 1]![0], r.points[i]![2] - r.points[i - 1]![2]) > 0,
+        'no repeated corner',
+      );
+  assert.deepEqual(findStraightPath(fan, [0, 1], [5, 0, 5], [1.9, 0, 1]), {status: 'off-corridor', which: 'start'});
+  const mesh = lMesh();
+  assert.throws(() => walkMesh(mesh, 0, [5, 0, 5], [1, 0]), /inside the start polygon/);
+  const vertices: MeshPoint[] = [];
+  for (let x = 0; x <= 300; x++) vertices.push(V(x, 0), V(x, 1));
+  const strip = defineNavMesh({
+    vertices,
+    polygons: Array.from({length: 300}, (_, i) => [2 * i, 2 * i + 2, 2 * i + 3, 2 * i + 1]),
+  });
+  const long = walkMesh(strip, 0, [0.5, 0, 0.5], [299, 0]);
+  assert.equal(long.truncated, true);
+  assert.throws(
+    () =>
+      defineNavMesh({
+        vertices: [V(0, 0), V(1, 0), V(0, 1), V(1, 1)],
+        polygons: [
+          [0, 1, 2],
+          [0, 1, 3],
+        ],
+      }),
+    /overlap/,
+  );
+  assert.throws(() => corridor(['p01']), RangeError);
+  // Big agents with a small range still see each other.
+  const avoid = createAvoidance({neighborRadius: 1});
+  const [va] = avoid.step([
+    {id: 'a', position: [0, 0], velocity: [1, 0], preferred: [1, 0], radius: 3, maxSpeed: 1},
+    {id: 'b', position: [7, 0], velocity: [-1, 0], preferred: [-1, 0], radius: 3, maxSpeed: 1},
+  ]);
+  assert.notDeepEqual(va, [1, 0], 'swerves instead of driving straight on');
+  const [s1, s2] = createAvoidance().step([
+    {id: 'a', position: [0, 0], velocity: [0, 0], preferred: [0, 0], radius: 0.5, maxSpeed: 1},
+    {id: 'b', position: [0, 0], velocity: [0, 0], preferred: [0, 0], radius: 0.5, maxSpeed: 1},
+  ]);
+  assert.ok(s1![0] < 0 && s2![0] > 0, 'coincident agents part along x by id');
 });

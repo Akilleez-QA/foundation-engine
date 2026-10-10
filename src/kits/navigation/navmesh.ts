@@ -11,7 +11,10 @@ export type MeshPoint = readonly [number, number, number];
 export interface NavMeshInput {
   /** 3-65,536 vertices [x, y, z]; y is up. */
   readonly vertices: readonly MeshPoint[];
-  /** 1-16,384 convex polygons of 3-16 vertex indices, counter-clockwise seen from above (+y). */
+  /**
+   * 1-8,192 strictly convex, planar polygons of 3-16 vertex indices, counter-clockwise in (x, z) coordinates (positive (b − a) × (c − a) with x as the first axis and z as the second, as in the terrain kit). Vertices at the same position must share
+   * an index to connect; T-junctions do not connect.
+   */
   readonly polygons: readonly (readonly number[])[];
   /** Grid cell size for point location, (0, 1e6]. Default: about the mean polygon size. */
   readonly cellSize?: number;
@@ -23,7 +26,13 @@ export interface NavMesh {
   readonly neighbors: readonly (readonly number[])[];
   readonly centroids: readonly MeshPoint[];
 }
-export const NAVMESH_LIMITS = Object.freeze({vertices: 65536, polygons: 16384, polygonVertices: 16, corners: 1024});
+export const NAVMESH_LIMITS = Object.freeze({
+  vertices: 65536,
+  polygons: 8192,
+  edges: 65536,
+  polygonVertices: 16,
+  corners: 1024,
+});
 
 function fail(message: string): never {
   throw new RangeError(`navmesh: ${message}`);
@@ -35,7 +44,7 @@ const point = (v: unknown, what: string): MeshPoint => {
   if (!p.every(finite) || p.some(c => Math.abs(c) > 1e7)) fail(`${what} must be finite within ±1e7`);
   return p;
 };
-/** Twice the signed area of (a, b, c) in the x/z plane; positive for counter-clockwise seen from above. */
+/** Twice the signed area of (a, b, c) in (x, z) coordinates; positive for the accepted winding. */
 const cross = (ax: number, az: number, bx: number, bz: number, cx: number, cz: number) =>
   (bx - ax) * (cz - az) - (bz - az) * (cx - ax);
 
@@ -59,7 +68,7 @@ export function defineNavMesh(input: NavMeshInput): NavMesh {
   const vIn = input.vertices,
     pIn = input.polygons;
   if (!Array.isArray(vIn) || vIn.length < 3 || vIn.length > NAVMESH_LIMITS.vertices) fail('3-65,536 vertices');
-  if (!Array.isArray(pIn) || pIn.length < 1 || pIn.length > NAVMESH_LIMITS.polygons) fail('1-16,384 polygons');
+  if (!Array.isArray(pIn) || pIn.length < 1 || pIn.length > NAVMESH_LIMITS.polygons) fail('1-8,192 polygons');
   const nv = vIn.length,
     np = pIn.length;
   const vertices: MeshPoint[] = [];
@@ -82,7 +91,7 @@ export function defineNavMesh(input: NavMeshInput): NavMesh {
         b = vertices[poly[(k + 1) % n]!]!,
         c = vertices[poly[(k + 2) % n]!]!;
       if (cross(a[0], a[2], b[0], b[2], c[0], c[2]) <= 0)
-        fail(`polygon ${p} must be strictly convex and counter-clockwise seen from above`);
+        fail(`polygon ${p} must be strictly convex and counter-clockwise in (x, z)`);
     }
     polygons.push(poly);
   }
@@ -93,6 +102,7 @@ export function defineNavMesh(input: NavMeshInput): NavMesh {
       const w = poly[(e + 1) % poly.length]!;
       const key = v < w ? `${v}:${w}` : `${w}:${v}`;
       const list = edges.get(key) ?? [];
+      if (list.some(o => polygons[o.p]![o.e] === v)) fail(`polygons ${list[0]!.p} and ${p} overlap along edge ${key}`);
       list.push({p, e});
       if (list.length > 2) fail(`edge ${key} is shared by more than two polygons`);
       edges.set(key, list);
@@ -175,7 +185,8 @@ function inside(mesh: NavMesh, p: number, x: number, z: number): boolean {
   for (let k = 0; k < poly.length; k++) {
     const a = mesh.vertices[poly[k]!]!,
       b = mesh.vertices[poly[(k + 1) % poly.length]!]!;
-    if (cross(a[0], a[2], b[0], b[2], x, z) < -1e-9) return false;
+    const len2 = (b[0] - a[0]) ** 2 + (b[2] - a[2]) ** 2;
+    if (cross(a[0], a[2], b[0], b[2], x, z) < -1e-9 * Math.max(1, len2)) return false;
   }
   return true;
 }
@@ -222,6 +233,9 @@ export function locate(mesh: NavMesh, position: MeshPoint, maxHeight = 2): numbe
  */
 export function navMeshGraph(mesh: NavMesh): NavigationGraph {
   meshOf(mesh);
+  const edges = mesh.neighbors.reduce((n, list) => n + list.filter(q => q >= 0).length, 0);
+  if (edges > NAVMESH_LIMITS.edges)
+    fail(`mesh has ${edges} portal edges; the navigation graph admits ${NAVMESH_LIMITS.edges}`);
   const dist = (a: MeshPoint, b: MeshPoint) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
   return createNavigationGraph(
     mesh.polygons.map((poly, p) => ({
@@ -239,7 +253,7 @@ export function navMeshGraph(mesh: NavMesh): NavigationGraph {
 /** Polygon indices for a path of `navMeshGraph` node ids. */
 export function corridor(path: readonly string[]): number[] {
   return path.map(id => {
-    const m = /^p(\d+)$/.exec(id);
+    const m = /^p(0|[1-9]\d{0,4})$/.exec(id);
     if (!m) fail(`not a navmesh node id: ${id}`);
     return Number(m[1]);
   });
@@ -248,13 +262,17 @@ export function corridor(path: readonly string[]): number[] {
 export type StraightPath =
   | {readonly status: 'ok'; readonly points: readonly MeshPoint[]}
   | {readonly status: 'too-narrow'; readonly portal: number}
-  | {readonly status: 'broken'; readonly at: number};
+  | {readonly status: 'broken'; readonly at: number}
+  | {readonly status: 'off-corridor'; readonly which: 'start' | 'goal'}
+  | {readonly status: 'too-many-corners'};
 
 /**
  * Funnel (string-pulling) over a polygon corridor from `start` to `goal`: the shortest path through the corridor's
- * portals in x/z, as corner waypoints including both ends, with heights on the polygons' planes. `radius` shrinks each
- * portal from both ends; a portal narrower than 2 × radius returns `too-narrow`. Consecutive corridor polygons must be
- * neighbours (`broken` otherwise). At most 1,024 corners.
+ * portals in x/z, as corner waypoints including both ends: corners take heights interpolated along their portal edge,
+ * the ends keep the caller's points. `radius` shrinks each portal from both ends (an approximation of a disc's path);
+ * a portal narrower than 2 × radius returns `too-narrow`. Start and goal must lie in the first and last polygons
+ * (`off-corridor` otherwise); consecutive polygons must be neighbours (`broken`). Consecutive duplicate corners are
+ * removed; more than 1,024 corners returns `too-many-corners`.
  */
 export function findStraightPath(
   mesh: NavMesh,
@@ -269,11 +287,14 @@ export function findStraightPath(
   if (!finite(radius) || radius < 0) fail('radius must be ≥ 0');
   if (!Array.isArray(path) || path.length < 1 || path.length > NAVMESH_LIMITS.polygons)
     fail('corridor must be 1-16,384 polygons');
-  const ids = path.map((p, i) => {
+  const ids0 = path.map((p, i) => {
     if (typeof p !== 'number' || !Number.isSafeInteger(p) || p < 0 || p >= mesh.polygons.length)
       fail(`corridor ${i} is not a polygon`);
     return p;
   });
+  const ids = ids0;
+  if (!inside(mesh, ids[0]!, s[0], s[2])) return Object.freeze({status: 'off-corridor', which: 'start'});
+  if (!inside(mesh, ids[ids.length - 1]!, g[0], g[2])) return Object.freeze({status: 'off-corridor', which: 'goal'});
   // Portals as [left, right] seen walking from one polygon to the next, then the goal as a zero-width portal.
   const portals: [MeshPoint, MeshPoint][] = [];
   for (let i = 0; i + 1 < ids.length; i++) {
@@ -293,8 +314,10 @@ export function findStraightPath(
       if (w <= 2 * radius) return Object.freeze({status: 'too-narrow', portal: i});
       const ux = dx / w,
         uz = dz / w;
-      right = [right[0] + ux * radius, right[1], right[2] + uz * radius];
-      left = [left[0] - ux * radius, left[1], left[2] - uz * radius];
+      const k = radius / w,
+        dy = left[1] - right[1];
+      right = [right[0] + ux * radius, right[1] + dy * k, right[2] + uz * radius];
+      left = [left[0] - ux * radius, left[1] - dy * k, left[2] - uz * radius];
     }
     portals.push([left, right]);
   }
@@ -317,8 +340,8 @@ export function findStraightPath(
         rightIndex = i;
       } else {
         // Right crossed over left: left becomes a corner.
-        points.push(left);
-        if (points.length > NAVMESH_LIMITS.corners) fail('path has too many corners');
+        if (!same(points[points.length - 1]!, left)) points.push(left);
+        if (points.length > NAVMESH_LIMITS.corners) return Object.freeze({status: 'too-many-corners'});
         apex = left;
         apexIndex = leftIndex;
         left = apex;
@@ -334,8 +357,8 @@ export function findStraightPath(
         left = pl;
         leftIndex = i;
       } else {
-        points.push(right);
-        if (points.length > NAVMESH_LIMITS.corners) fail('path has too many corners');
+        if (!same(points[points.length - 1]!, right)) points.push(right);
+        if (points.length > NAVMESH_LIMITS.corners) return Object.freeze({status: 'too-many-corners'});
         apex = right;
         apexIndex = rightIndex;
         left = apex;
@@ -348,7 +371,6 @@ export function findStraightPath(
     }
   }
   if (!same(points[points.length - 1]!, g)) points.push(g);
-  // Corner heights: keep authored vertex heights; the ends keep the caller's points.
   return Object.freeze({
     status: 'ok',
     points: Object.freeze(points.map(p => Object.freeze([p[0], p[1], p[2]]) as MeshPoint)),
@@ -358,7 +380,8 @@ export function findStraightPath(
 /**
  * Move from `from` (inside polygon `start`) by `delta` in x/z across shared edges, stopping at the first boundary edge
  * (with `slide`, the remaining motion continues along that edge once). Returns the end point (height on the end
- * polygon's plane), the end polygon and whether a boundary was hit. At most 256 polygon crossings.
+ * polygon's plane), the end polygon, whether a boundary was hit, and `truncated` when the 256-crossing bound stopped the
+ * move early. `from` must lie in `start`. Moving exactly along a shared edge stays in the polygon it starts in.
  */
 export function walkMesh(
   mesh: NavMesh,
@@ -366,20 +389,33 @@ export function walkMesh(
   from: MeshPoint,
   delta: readonly [number, number],
   slide = true,
-): {readonly position: MeshPoint; readonly polygon: number; readonly blocked: boolean} {
+): {
+  readonly position: MeshPoint;
+  readonly polygon: number;
+  readonly blocked: boolean;
+  readonly truncated: boolean;
+} {
   meshOf(mesh);
   if (!Number.isSafeInteger(start) || start < 0 || start >= mesh.polygons.length) fail('start must be a polygon index');
   const f = point(from, 'from');
-  if (!Array.isArray(delta) || delta.length !== 2 || !finite(delta[0]) || !finite(delta[1]))
-    fail('delta must be [dx, dz]');
+  if (!Array.isArray(delta) || delta.length !== 2) fail('delta must be [dx, dz]');
+  const d0: unknown = delta[0],
+    d1: unknown = delta[1];
+  if (!finite(d0) || !finite(d1)) fail('delta must be finite');
+  if (!inside(mesh, start, f[0], f[2])) fail('from must lie inside the start polygon');
+  let truncated = false;
   let x = f[0],
     z = f[2],
-    dx = delta[0],
-    dz = delta[1],
+    dx = d0,
+    dz = d1,
     poly = start,
     blocked = false,
     slid = !slide;
-  for (let step = 0; step < 256 && (dx !== 0 || dz !== 0); step++) {
+  for (let step = 0; dx !== 0 || dz !== 0; step++) {
+    if (step >= 256) {
+      truncated = true;
+      break;
+    }
     const verts = mesh.polygons[poly]!;
     // Earliest exit edge along the move.
     let tExit = 1,
@@ -426,5 +462,5 @@ export function walkMesh(
     dz = ez * along;
   }
   const y = heightAt(mesh, poly, x, z);
-  return Object.freeze({position: Object.freeze([x, y, z]) as MeshPoint, polygon: poly, blocked});
+  return Object.freeze({position: Object.freeze([x, y, z]) as MeshPoint, polygon: poly, blocked, truncated});
 }
