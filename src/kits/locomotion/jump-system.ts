@@ -110,14 +110,23 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
    * needing more than 1,024 sub-steps (over 512 radii in one tick) is refused: the tick throws and is rolled back.
    */
   const slideBy = (world: World, from: {x: number; z: number}, dx: number, dz: number) => {
-    if (!dx && !dz) return {x: from.x, z: from.z};
+    if (!dx && !dz) return {x: from.x, z: from.z, blocked: false};
     const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / (radius / 2)));
     if (steps > MAX_SLIDE_STEPS)
       throw new RangeError(`jump: carried motion of ${Math.hypot(dx, dz).toFixed(3)} m in one tick exceeds 512 radii`);
     const area = areaOf(world, radius);
-    let p = {x: from.x, z: from.z};
-    for (let i = 0; i < steps; i++) p = slide(area, p, {x: dx / steps, z: dz / steps});
-    return p;
+    const sx = dx / steps,
+      sz = dz / steps;
+    let p = {x: from.x, z: from.z},
+      blocked = false;
+    for (let i = 0; i < steps; i++) {
+      const next = slide(area, p, {x: sx, z: sz});
+      // `slide` returns its whole candidate (p + step, the same arithmetic) unless a wall or solid deflected it, so
+      // this flag reports real deflection: no tolerance on summed positions, which drift with steps and magnitude.
+      if (next.x !== p.x + sx || next.z !== p.z + sz) blocked = true;
+      p = next;
+    }
+    return {x: p.x, z: p.z, blocked};
   };
   const clampBoost = (v: number) => Math.max(-1000, Math.min(1000, v));
   return defineSystem({
@@ -243,8 +252,7 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
           top = platforms!.supportOn(id, moved.x, moved.z);
         // Facing turns only with a carry the walls let through in full: an actor held back by a wall (or by the
         // default ±1e6 walls) keeps its facing instead of spinning in place.
-        const whole = Math.abs(moved.x - (x + m.dx)) <= EPS && Math.abs(moved.z - (z + m.dz)) <= EPS,
-          dyawCarried = whole ? m.dyaw : 0;
+        const dyawCarried = moved.blocked ? 0 : m.dyaw;
         if (top !== null)
           ride = {
             id,

@@ -40,6 +40,7 @@ interface SpinOptions {
   each?: (t: number, p: Platforms) => void;
   bind?: boolean;
   extra?: unknown[][];
+  radius?: number;
 }
 /** The real fixed-step runner at `hz` (one tick per frame): platform system, jump adapter, probe. */
 async function spin(hz: number, seconds: number, o: SpinOptions) {
@@ -82,6 +83,7 @@ async function spin(hz: number, seconds: number, o: SpinOptions) {
         platforms,
         onLeave: o.onLeave,
         carryFacing: o.carryFacing,
+        radius: o.radius,
       }),
       {
         id: 'probe',
@@ -412,4 +414,30 @@ test('MV-02 turning review L2-L4: single reads, actionable turn-rate errors and 
   for (const a of [NaN, Infinity, -Infinity, 2e9]) assert.throws(() => wrapYaw(a), RangeError);
   assert.equal(wrapYaw(Math.PI), -Math.PI, 'the range is [−π, π)');
   assert.equal(wrapYaw(-Math.PI), -Math.PI);
+});
+
+test('MV-02 turning re-review: an unobstructed carry far from the origin with a small radius always turns facing', async () => {
+  // Hundreds of sub-steps at large coordinates round differently from the one-shot carry; only a real deflection by
+  // a wall or solid may stop the turn.
+  const wrapped = (a: number) => a - TAU * Math.floor((a + Math.PI) / TAU);
+  for (const [X, radius, r] of [
+    [1e5, 0.01, 20],
+    [9e5, 0.02, 9],
+  ] as const) {
+    const {out} = await spin(60, 10, {
+      path: t => ({x: X, y: 1, z: 0, yaw: wrapped(6 * t)}),
+      halfX: r + 1,
+      halfZ: r + 1,
+      start: {x: X + r, y: 1, z: 0, ry: 0},
+      radius,
+      maxSpeed: 1000,
+    });
+    assert.equal(out.length, 600);
+    for (const s of out) {
+      assert.equal(s.y, 1, `X=${X}: still riding at ${s.t}`);
+      assert.ok(Math.abs(wrapYaw(s.ry - 6 * s.t)) < 1e-9, `X=${X}: facing followed the deck at ${s.t}: ${s.ry}`);
+    }
+    const last = must(out[out.length - 1]);
+    assert.ok(Math.abs(last.ry - 60) < 1e-9, `X=${X}: no tick skipped (${last.ry} rad of 60)`);
+  }
 });

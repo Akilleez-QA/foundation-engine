@@ -79,3 +79,8 @@ issues. It found:
 - documentation inaccuracies.
 
 All were fixed with regression tests or documented.
+
+A re-review of `10c506bd` found the first wall fix compared summed sub-step positions with
+a tolerance. Unobstructed carries with many sub-steps far from the origin then read as
+blocked. The slide now reports real deflection per sub-step, with a regression test. A
+blocked tick's facing lag is permanent.

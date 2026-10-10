@@ -255,9 +255,14 @@ recorded in [ADR 0160](../../../docs/adr/0160-turning-platform-carry.md).
   facing.
 - The turn is applied on every tick whose carry is applied in full: riding, a paused
   ride, a jump tick with `add-velocity`, and the tick that moves off the footprint.
-- When `Walls` or `Solid`s hold back any part of the carry (by more than 1e-9 m), facing
-  does not turn that tick. The actor is pushed along the wall without spinning in place.
-  This also covers the default walls at ±1e6 m.
+- When a wall or solid deflects any sub-step of the carry, facing does not turn that
+  tick. The actor is pushed along the wall without spinning in place; this also covers
+  the default walls at ±1e6 m.
+- Deflection is reported by the slide itself, with no tolerance on summed positions. An
+  unobstructed carry therefore always turns, however many sub-steps it needs and however
+  far from the origin it is.
+- The facing lag from a blocked tick is permanent: facing is not re-synced to the
+  platform afterwards.
 - Facing is written only when it turns, so a facing owned elsewhere (even NaN) never
   forces a write while the actor is still.
 - Each tick's carry is computed from the two path samples and the actor's current
@@ -300,7 +305,8 @@ facing stops turning.
 - Behaviour change for every carried actor, turning or not: a carried actor whose
   `Transform` x or z is not finite now makes the tick throw, and the tick is rolled back.
   This includes a paused (`when` false) tick. Before, the non-finite position passed
-  through. `standing` and `supportOn` with a NaN coordinate now find no platform.
+  through. `standing` now finds no platform for a NaN coordinate (`supportOn` already
+  did).
 
 **Review.** An independent review of `ec1adde2` found no critical or high issues. It
 found:
@@ -311,9 +317,15 @@ found:
 - `wrapYaw` had no domain check;
 - three documentation inaccuracies.
 
+A re-review of `10c506bd` checked 500 identity fuzz scenarios (all clean) and confirmed
+the other fixes. It found that the first M1 fix compared summed sub-step positions with a
+1e-9 m tolerance, so unobstructed carries far from the origin with a small radius read as
+blocked (up to 479 of 600 ticks). Deflection is now flagged by the slide itself, and a
+regression test covers |X| up to 9e5 m with radii of 0.01 and 0.02 m.
+
 Each is fixed with a regression test or documented here.
 
-**Evidence** (`platform-yaw.test.ts`, 13 tests):
+**Evidence** (`platform-yaw.test.ts`, 14 tests):
 - unturned results are unchanged bit for bit;
 - yaw wrap;
 - oriented footprint corners for support, catch and standing;
@@ -327,6 +339,7 @@ Each is fixed with a regression test or documented here.
 - cut and restart detach;
 - facing kept against a blocking wall;
 - no write for a still rider with NaN facing;
-- a single yaw read, the actionable turn-rate error and the `wrapYaw` domain.
+- a single yaw read, the actionable turn-rate error and the `wrapYaw` domain;
+- unobstructed facing far from the origin with hundreds of sub-steps.
 
 The MV-02 tests run unchanged.
