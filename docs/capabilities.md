@@ -11,6 +11,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 
 | ID | Feature | PR | Docs |
 |---|---|---|---|
+| STATUS-01 | Optional stacked status effects with transforms, immunities and save/restore |  | [README.md](../src/kits/status/README.md) |
 | NAV-FIELD-01 | Optional incremental shared navigation distance fields |  | [README.md](../src/kits/navigation/README.md) |
 | ASG-01 | Optional bounded service and worksite assignment ownership |  | [assignments.md](guides/assignments.md) |
 | ITINERARY-01 | Bounded editable destination itineraries with owned completion attempts |  | [README.md](../src/kits/itinerary/README.md) |
@@ -52,7 +53,7 @@ Tracked so that a correct "not yet" in the docs is recognised. A row moves up wh
 
 Each kit's value exports are listed in [capabilities.json](capabilities.json).
 
-`@kits/alignment`, `@kits/animation`, `@kits/assignments`, `@kits/audio-mixer`, `@kits/authoring`, `@kits/camera`, `@kits/capabilities`, `@kits/chalkboard`, `@kits/character`, `@kits/combat`, `@kits/concept-explorer`, `@kits/control`, `@kits/dialogue`, `@kits/equipment`, `@kits/explore`, `@kits/frames`, `@kits/housing`, `@kits/input-history`, `@kits/inventory`, `@kits/itinerary`, `@kits/learn`, `@kits/locomotion`, `@kits/market`, `@kits/navigation`, `@kits/network`, `@kits/objectives`, `@kits/procgen`, `@kits/replay`, `@kits/resources`, `@kits/rollback`, `@kits/space`, `@kits/spatial`, `@kits/spatial-audio`, `@kits/terrain`, `@kits/three`, `@kits/turns`, `@kits/ui`, `@kits/vehicles`, `@kits/visibility`
+`@kits/alignment`, `@kits/animation`, `@kits/assignments`, `@kits/audio-mixer`, `@kits/authoring`, `@kits/camera`, `@kits/capabilities`, `@kits/chalkboard`, `@kits/character`, `@kits/combat`, `@kits/concept-explorer`, `@kits/control`, `@kits/dialogue`, `@kits/equipment`, `@kits/explore`, `@kits/frames`, `@kits/housing`, `@kits/input-history`, `@kits/inventory`, `@kits/itinerary`, `@kits/learn`, `@kits/locomotion`, `@kits/market`, `@kits/navigation`, `@kits/network`, `@kits/objectives`, `@kits/procgen`, `@kits/replay`, `@kits/resources`, `@kits/rollback`, `@kits/space`, `@kits/spatial`, `@kits/spatial-audio`, `@kits/status`, `@kits/terrain`, `@kits/three`, `@kits/turns`, `@kits/ui`, `@kits/vehicles`, `@kits/visibility`
 
 ## Templates
 

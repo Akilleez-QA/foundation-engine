@@ -43,6 +43,16 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'STATUS-01',
+    title: 'Optional stacked status effects with transforms, immunities and save/restore',
+    docs: 'src/kits/status/README.md',
+    evidence: [
+      {kit: 'status', export: 'createStatusEffects'},
+      {kit: 'status', export: 'defineStatusRules'},
+      {path: 'src/kits/status/status.test.ts'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',

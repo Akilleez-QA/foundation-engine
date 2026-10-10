@@ -1250,3 +1250,7 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Status effects (STATUS-01) — candidate, 2026-10-09
+
+Optional `status` kit ([contract](../../src/kits/status/README.md), [ADR 0121](../adr/0121-status-effects.md)): stacks, fixed-clock durations, decay, periodic pulses, threshold transforms/triggers, exclusive groups, immunities, snapshot/restore. Evidence: focused headless tests in `src/kits/status/status.test.ts` and an independent adversarial review. Candidate only; no game integration, browser, full CI or device acceptance claimed.
