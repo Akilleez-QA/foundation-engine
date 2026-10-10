@@ -613,6 +613,9 @@ export interface Quality {
   stats(): FrameStats;
   /** Fed by the one frame loop. */
   frame(sample: FrameSample & {draws: number; triangles: number}): void;
+  /** One measured GPU frame time in ms from an optional GPU timer (gpu-timer.ts), delivered frames after the frame it
+   *  measured. `stats().gpuMs` is the median of the last 120; it stays undefined until one arrives. Never governs. */
+  gpuFrame(ms: number): void;
   subscribe(fn: (change: QualityChange) => void, signal?: AbortSignal): () => void;
 }
 
@@ -719,6 +722,7 @@ export function createQuality(options: QualityOptions = {}): Quality {
   };
 
   const intervals: number[] = [];
+  const gpuTimes: number[] = [];
   let lastDraws = 0,
     lastTriangles = 0;
 
@@ -787,7 +791,9 @@ export function createQuality(options: QualityOptions = {}): Quality {
     },
     knobs: () => registry.list(),
     stats() {
-      if (!intervals.length) return {p50Ms: 0, p95Ms: 0, fps: 0, draws: lastDraws, triangles: lastTriangles};
+      const gpu: {gpuMs?: number} = {};
+      if (gpuTimes.length) gpu.gpuMs = [...gpuTimes].sort((a, b) => a - b)[Math.floor(gpuTimes.length / 2)]!;
+      if (!intervals.length) return {p50Ms: 0, p95Ms: 0, fps: 0, draws: lastDraws, triangles: lastTriangles, ...gpu};
       const s = [...intervals].sort((a, b) => a - b),
         at = (f: number) => s[Math.min(s.length - 1, Math.floor(s.length * f))]!; // s is non-empty; index clamped below s.length
       const mean = s.reduce((a, b) => a + b, 0) / s.length;
@@ -797,7 +803,13 @@ export function createQuality(options: QualityOptions = {}): Quality {
         fps: mean > 0 ? 1000 / mean : 0,
         draws: lastDraws,
         triangles: lastTriangles,
+        ...gpu,
       };
+    },
+    gpuFrame(ms) {
+      if (!Number.isFinite(ms) || ms < 0) return;
+      gpuTimes.push(ms);
+      if (gpuTimes.length > STATS_FRAMES) gpuTimes.shift();
     },
     frame(sample) {
       if (sample.rendered && !sample.hidden && sample.intervalMs > 0) {

@@ -62,3 +62,6 @@ additional automated CI marker check. The exact-head gate passed 1,390 tests and
 production fingerprint; all four diagnostic browser scripts passed locally.
 This guide does not claim an external viewer import, physical-device performance
 or a general system/worker causal profiler.
+
+Per-frame counter tracks and frame markers (`engine.counterTrace()`) share this process, thread and timebase;
+`mergeTraceExports` combines them with this export ([GPU timing and counter tracks](gpu-timing.md)).

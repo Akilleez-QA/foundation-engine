@@ -43,6 +43,16 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'GPU-TIMING-01',
+    title: 'Optional measured GPU frame time (timer queries) and per-frame counter trace tracks',
+    docs: 'docs/guides/gpu-timing.md',
+    evidence: [
+      {kit: 'three', export: 'createGpuTimer'},
+      {path: 'src/platform/render/gpu-timer.ts'},
+      {path: 'src/dev/counter-trace.ts'},
+    ],
+  },
+  {
     id: 'POOL-01',
     title: 'Optional bounded entity pool with eviction classes',
     docs: 'docs/guides/entity-pool.md',

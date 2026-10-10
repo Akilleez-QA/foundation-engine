@@ -71,6 +71,7 @@ import type {SceneHandle} from './play';
 import {TEST_API} from '../core/env';
 import {monotonicNow} from '../core/clock';
 import {createSystemTiming} from './system-timing';
+import {createGpuTimer, type GpuTimer} from '../platform/render/gpu-timer';
 import {openSceneTickTap, type SceneTickTap} from './scene-tick-tap';
 import {createSceneEntityInspector} from './entity-inspection';
 import {actionOf, sceneId} from './ids';
@@ -1136,6 +1137,11 @@ export async function enterScene(o: {
       sync();
 
       const timing = TEST_API ? createSystemTiming(body.systems, visit, actx.signal) : undefined;
+      let gpuTimer: GpuTimer | null = null;
+      actx.own(() => {
+        gpuTimer?.dispose();
+        gpuTimer = null;
+      });
       const fixedSystems = timing?.systems ?? body.systems;
       // The engine's particle step runs after the scene's own fixed systems, inside the replay tap's tick.
       const stepped = particles
@@ -1183,6 +1189,21 @@ export async function enterScene(o: {
         },
       };
       if (TEST_API) handle.systemTrace = timing!.start;
+      // Dev/test only: measured GPU time of this visit's draws (gpu-timer.ts). Off until asked; replaced on each call.
+      if (TEST_API)
+        handle.gpuTiming = (options = {}, onResult) => {
+          if (actx.signal.aborted || actx.leaving()) return null;
+          const next = createGpuTimer(renderer.getContext(), {
+            ...options,
+            onResult(frame, ms) {
+              s.quality.gpuFrame(ms);
+              onResult?.(frame, ms);
+            },
+          });
+          gpuTimer?.dispose();
+          gpuTimer = next;
+          return next;
+        };
       // Dev/test only: one real draw of the current picture, so play:snap can measure a still on-demand scene.
       if (TEST_API)
         handle.redraw = () => {
@@ -1356,12 +1377,25 @@ export async function enterScene(o: {
             else throw error;
           }
         },
-        render() {
+        render(f: FrameInfo) {
           if (programFailed) return false;
           try {
             sync();
             if (actx.leaving() || actx.signal.aborted || !programsPrepared || !dirty) return false;
-            if (!drawOverride() && !post.render(three, camera)) renderer.render(three, camera);
+            // Off (production, and dev/test until asked): one null check. On: the draw is wrapped in one query.
+            let timed = false;
+            if (gpuTimer) {
+              if (gpuTimer.status === 'disposed') gpuTimer = null;
+              else {
+                gpuTimer.poll();
+                timed = gpuTimer.begin(f.frame);
+              }
+            }
+            try {
+              if (!drawOverride() && !post.render(three, camera)) renderer.render(three, camera);
+            } finally {
+              if (timed) gpuTimer?.end();
+            }
           } catch (error) {
             if (!(error instanceof ProgramLinkError || error instanceof FrameReadinessError)) throw error;
             failPrograms(error);
@@ -1392,6 +1426,7 @@ export async function enterScene(o: {
         },
         contextRestored() {
           dirty = true;
+          gpuTimer?.contextRestored();
           let pending: Promise<void>;
           try {
             pending = preparePrograms();

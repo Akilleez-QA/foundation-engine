@@ -124,3 +124,29 @@ test('engine.dispose retires the app through App.dispose once, reports what is l
   assert.throws(() => api.clock.step(16), /disposed/);
   assert.deepEqual(api.entities({expectedEpoch: 0}), {status: 'unavailable'});
 });
+
+test('counter trace API: holds the loop sampler slot until disposed; invalid bounds keep the live capture', async () => {
+  const {appLoop} = await import('../platform/ui/runtime');
+  const app = createApp([], {mode: 'test', log() {}});
+  const booted = app.boot();
+  const api = createTestApi(app, booted);
+  await api.ready();
+  assert.equal(api.gpuTiming(), null, 'no running scene: nothing to measure');
+  const first = api.counterTrace({gpu: true});
+  try {
+    assert.equal(first.gpu, null, 'GPU time asked without a scene: no timer, reported null');
+    assert.equal(appLoop().hasSampler, true);
+    assert.throws(() => api.counterTrace({capacity: 0}), RangeError);
+    assert.equal(first.snapshot().disposed, false, 'invalid replacement leaves the capture installed');
+    const next = api.counterTrace({capacity: 8});
+    assert.equal(first.snapshot().disposed, true, 'a replacement disposes the previous capture');
+    assert.equal(appLoop().hasSampler, true);
+    first.dispose(); // stale disposal cannot detach the replacement
+    assert.equal(appLoop().hasSampler, true);
+    next.dispose();
+    assert.equal(appLoop().hasSampler, false, 'disposal frees the one sampler slot');
+  } finally {
+    first.dispose();
+    app.dispose();
+  }
+});

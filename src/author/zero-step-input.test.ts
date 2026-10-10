@@ -20,7 +20,7 @@ const runnerLine = slice('      const fixedSystems = ', '\n      const live =');
 // The whole sceneInput(...) call, whether it sits on one line or Prettier wraps its arguments.
 const liveInputLine = slice('      const liveInput = sceneInput(', ');\n') + ');';
 const inputLine = slice('        input: tap ? tap.input : liveInput,', '\n');
-const update = slice('        update(f: FrameInfo) {', '        render() {');
+const update = slice('        update(f: FrameInfo) {', '        render(f: FrameInfo) {');
 const STEP = 1 / 60;
 type GestureOptions = {press(): void; canceled(): void};
 type ReaderContext = {input: {pressed(action: string): boolean; pointer: {pressed: boolean}}};

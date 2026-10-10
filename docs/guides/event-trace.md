@@ -122,3 +122,6 @@ cover deterministic timing, invalid clocks, overwritten endpoints, interrupted
 capture, reentrant clock callbacks, option ownership and detached export mutation.
 Production-content exclusion is inspected separately at the validated build head;
 there is no new automated production-marker guard in this command.
+
+To line these intervals up with per-frame counters (GPU time, draws, queue depths) in one viewer file, merge the
+exports with a counter trace: see [GPU timing and counter tracks](gpu-timing.md).

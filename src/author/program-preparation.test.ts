@@ -19,8 +19,8 @@ const restore = source.slice(
   find('        contextRestored() {'),
   find('\n      };\n    },', find('        contextRestored() {')),
 );
-const draw = source.slice(find('        render() {'), find('        activate() {'));
-const step = source.slice(find('        update(f: FrameInfo) {'), find('        render() {'));
+const draw = source.slice(find('        render(f: FrameInfo) {'), find('        activate() {'));
+const step = source.slice(find('        update(f: FrameInfo) {'), find('        render(f: FrameInfo) {'));
 // The runtime's own arrival callback (it runs the scene's enter()), cut from the enterActivity call: the last
 // property, on one line or several, up to the call's closing `});`.
 const arriveAt = find('    arrive: () =>'),
@@ -61,7 +61,7 @@ function fixture(
     directRenders = 0,
     lost = false;
   const run = ts.transpile(
-    `const POST_WAIT_MS=4000;const drawOverride=()=>false;let dirty=true,frame=0,t=0,calm=false,frameMs=0,steps=0;const pressed={clear(){},endFrame(){}},gestures={sync(){},pointer:{pressed:false}},runner={frame(){steps++;},alpha:0},ctx={},particles={interpolate:()=>false};const three={},camera={},visit={current:()=>true};let arrived=false,activityStart,tapArrive,ctxRef=ctx,enteredAt=-1;scene.enter=()=>{enteredAt=steps;};${prepare}\nreturn {ready,state:()=>programsPrepared,steps:()=>steps,redraw:()=>{dirty=true;},enteredAt:()=>enteredAt,${arrival},${step}${draw}${restore}};`,
+    `const POST_WAIT_MS=4000;const drawOverride=()=>false;let gpuTimer=null,dirty=true,frame=0,t=0,calm=false,frameMs=0,steps=0;const pressed={clear(){},endFrame(){}},gestures={sync(){},pointer:{pressed:false}},runner={frame(){steps++;},alpha:0},ctx={},particles={interpolate:()=>false};const three={},camera={},visit={current:()=>true};let arrived=false,activityStart,tapArrive,ctxRef=ctx,enteredAt=-1;scene.enter=()=>{enteredAt=steps;};${prepare}\nreturn {ready,state:()=>programsPrepared,steps:()=>steps,redraw:()=>{dirty=true;},enteredAt:()=>enteredAt,${arrival},${step}${draw}${restore}};`,
     {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None},
   );
   const api = new Function(

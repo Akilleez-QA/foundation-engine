@@ -1600,3 +1600,22 @@ the one new runtime dependency, approved for this kit only. Core stays physics-f
   one software-GL `play:snap` of an uncommitted fixture.
 - **Not established:** hosted CI, cross-browser bit identity, GPU/physical-device
   performance and memory, and multiplayer acceptance.
+
+## Measured GPU time and counter tracks candidate (2026-10-10)
+
+Optional GPU timer queries (`src/platform/render/gpu-timer.ts`, ADR 0172,
+[guide](gpu-timing.md)) populate `quality.stats().gpuMs`. A dev/test counter trace
+(`src/dev/counter-trace.ts`, `engine.counterTrace()`) exports per-frame counters and
+frame markers as Chrome Trace Event JSON. Nothing is created unless asked for: the
+stock draw path adds one null check, and `@kits/three` re-exports the timer for creators.
+
+- **Runtime contracts:** a bounded query ring (1..16) with non-blocking readback; busy,
+  nested, disjoint, abandoned, invalid and dropped results are counted; loss and
+  restore go through the scene's existing `contextRestored` hook; disposal deletes owned
+  queries only on a live context. The counter ring is bounded, with drop counts and
+  late attribution by frame.
+- **Candidate evidence:** focused Node tests with a fake WebGL2 context and a
+  composition with the real `FrameLoop`. Local and unofficial only.
+- **Not established:** any browser or physical-device GPU measurement (headless CI
+  usually lacks the extension), timing of shadow-cache and other pool-role passes, and
+  WebGPU timestamps.

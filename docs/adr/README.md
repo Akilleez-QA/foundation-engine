@@ -147,3 +147,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0120](0120-optional-sandboxed-script-runtime.md) | Optional sandboxed script runtime (amends 0005 for creators who opt in) | Optional kits / Content | Proposed |
 
 | [0121](0121-optional-physics-adapter-kit.md) | Optional physics adapter kit over a lazily loaded WebAssembly library; amends the no-physics stance only for creators who opt in | Optional kits / Simulation / Dependencies | Proposed |
+
+| [0172](0172-measured-gpu-time-and-counter-tracks.md) | Optional measured GPU time and per-frame counter trace tracks | Platform / Render / Diagnostics | Proposed |

@@ -6,6 +6,7 @@ import type {SceneModelRequest, SceneModelResult} from './model-inspection';
  */
 import type {LightStats} from './light-slots';
 import type {SystemTimingOptions, SystemTimingCapture} from './system-timing';
+import type {GpuTimer, GpuTimerOptions} from '../platform/render/gpu-timer';
 import type {EntityMetadataRequest, EntityMetadataPage} from '../core/ecs/world';
 import type {BuildBrief} from './build';
 import type {GameDefinition} from './defs';
@@ -21,6 +22,9 @@ export interface SceneHandle {
   state(): SceneState;
   /** Optional synchronous system capture, owned by this scene visit. */
   systemTrace?(options?: SystemTimingOptions): SystemTimingCapture | null;
+  /** Dev/test only: measure this visit's draws with GPU timer queries (gpu-timer.ts), replacing the previous timer;
+   *  results also feed `quality.stats().gpuMs`. Null when the visit is ending. The caller may dispose it. */
+  gpuTiming?(options?: GpuTimerOptions, onResult?: (frame: number, gpuMs: number) => void): GpuTimer | null;
   /** Optional metadata inspection; stock runtime supplies it only in dev/test builds. */
   entities?(request: SceneEntitiesRequest): SceneEntitiesResult;
   /** Optional on-demand adopted-model diagnostics, installed by stock dev/test runtime only. */

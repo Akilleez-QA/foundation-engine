@@ -136,7 +136,9 @@ Limitations:
   Under vsync, work-time drift is usually the more sensitive signal.
 - Drift is a proxy. Content changes, background load or a power mode can produce it as well as throttling.
 - The device profile and the evidence class are operator labels that the recorder cannot verify.
-- The recorder records no temperature, clock speed, battery or power state, and no GPU timer queries.
+- The recorder records no temperature, clock speed, battery or power state, and no GPU time. Measured GPU time is a
+  separate opt-in diagnostic ([GPU timing](gpu-timing.md): `engine.gpuTiming()`, or `engine.counterTrace({gpu: true})`
+  for per-frame tracks). Both use the loop's one sampler slot, so a counter trace cannot run beside this recorder.
 - Draws and triangles appear only when the caller supplies counters. The stock app has no production-free
   per-frame draw source; the browser check reuses the bench's WebGL probe.
 - Window classes never reach `steady`, so this output is not baseline gate evidence. It is manual evidence.

@@ -712,3 +712,16 @@ test('authored startup preset is unsaved, skips detection, and yields to saved o
   assert.equal(createQuality({initialPreset: 'low', pinned: 'high', store, signals}).preset, 'high');
   assert.throws(() => createQuality({initialPreset: 'invalid' as never}), /authored quality/);
 });
+
+test('quality stats: gpuMs stays undefined until a measured GPU frame arrives, then is the bounded median', () => {
+  const q = createQuality({pinned: 'reference', devicePixelRatio: () => 1});
+  assert.equal('gpuMs' in q.stats(), false, 'no GPU timer: gpuMs is absent, never zero');
+  q.gpuFrame(Number.NaN);
+  q.gpuFrame(-1);
+  assert.equal(q.stats().gpuMs, undefined, 'invalid samples are ignored');
+  for (const ms of [3, 1, 2]) q.gpuFrame(ms);
+  assert.equal(q.stats().gpuMs, 2);
+  for (let i = 0; i < 200; i++) q.gpuFrame(9);
+  assert.equal(q.stats().gpuMs, 9, 'only the last 120 count');
+  assert.equal(q.preset, 'reference', 'GPU time never moves the governor or the preset');
+});

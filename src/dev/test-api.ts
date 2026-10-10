@@ -22,6 +22,8 @@ import type {SceneModelRequest, SceneModelResult} from '../author/model-inspecti
  *                               or null when it has none
  *   engine.particles()          the running scene's particle counters (emitters, live, spawned, draws), or null
  *   engine.events(fn)           tap every bus event (returns an unsubscribe)
+ *   engine.gpuTiming(o?)        measure the running scene's draws with GPU timer queries (ADR 0172), or null
+ *   engine.counterTrace(o?)     per-frame counter tracks and frame markers on the one loop, Chrome trace export
  *   engine.sessionRecorder(o?)  start the local sustained-session recorder on the one loop (PERF-01); replaces the last
  *   engine.currentSession()     that recorder (or the `?session-record` auto-start), or null
  *   engine.save.export()        the active player's profile file
@@ -45,6 +47,28 @@ import {createEventTrace, type EventTrace, type EventTraceOptions} from './event
 import type {ReplayDev, ReplayDevRequest, ReplayDevState, ReplayStart} from './replay';
 import {createSessionRecorder, type SessionRecorderOptions} from '../platform/perf/session-recorder';
 import {startSessionRecording, type SessionRecording} from './session-recording';
+import type {GpuTimer, GpuTimerOptions} from '../platform/render/gpu-timer';
+import {
+  counterSampler,
+  createCounterTrace,
+  type CounterTrace,
+  type CounterTraceOptions,
+  type CounterValues,
+} from './counter-trace';
+
+/** `engine.counterTrace()` options: the ring's bounds, extra per-frame sources and optional GPU time. */
+export interface CounterTraceRequest extends CounterTraceOptions {
+  /** Extra values per frame (renderer counters, queue depths, jobs in flight) read from existing owners' stats. */
+  sources?: () => CounterValues;
+  /** Also measure the running scene's GPU time; each result is attributed to the frame it measured (`gpuMs`). */
+  gpu?: boolean | GpuTimerOptions;
+}
+/** A running counter capture. `dispose()` detaches it from the loop and stops the GPU timer it started. */
+export interface CounterCapture extends CounterTrace {
+  /** The GPU timer this capture started, or null (not asked, no running scene). Its `status` says when GPU time is
+   *  unavailable on this browser. */
+  readonly gpu: GpuTimer | null;
+}
 
 export interface EngineState {
   scene: {scene: string | null; state: string | null; epoch: number; hash: string} | undefined;
@@ -93,6 +117,12 @@ export interface EngineTestApi {
   /** The running scene's particle counters (FX-01: emitters, live, spawned, draws), or null without a scene. */
   particles(): ReturnType<NonNullable<SceneHandle['particles']>> | null;
   events(fn: (name: string, payload: unknown) => void): () => void;
+  /** Measure the running scene's draws with GPU timer queries, replacing its previous timer; also feeds
+   *  `quality.stats().gpuMs`. Null without a running scene. `status: 'unavailable'` where the browser lacks the extension. */
+  gpuTiming(options?: GpuTimerOptions): GpuTimer | null;
+  /** Start per-frame counter tracks on the one loop's sampler slot (throws while a session recorder holds it); replaces
+   *  this API instance's previous capture. Caller disposes when finished. */
+  counterTrace(options?: CounterTraceRequest): CounterCapture;
   /** Start a bounded current-visit system capture; replaces that visit's capture and ends on visit abort. */
   systemTrace(options?: SystemTimingOptions): SystemTimingCapture | null;
   /** Start a bounded scalar capture; replaces this API instance's previous capture. Caller disposes when finished. */
@@ -131,6 +161,7 @@ const codeOf = (key: string) =>
 
 export function createTestApi(app: App, booted: Promise<BootReport>): EngineTestApi {
   let trace: EventTrace | undefined;
+  let counters: CounterCapture | undefined;
   let replay: ReplayDev | undefined;
   const idle: ReplayDevState = Object.freeze({
     status: 'idle',
@@ -222,6 +253,38 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
       return running?.particles?.() ?? null;
     },
     events: fn => app.events.tap((k, p) => fn(k, p)),
+    gpuTiming(options) {
+      const running = app.services.app.has('feature.game') ? app.services.play?.current() : null;
+      return running?.gpuTiming?.(options) ?? null;
+    },
+    counterTrace(options = {}) {
+      const {sources, gpu, ...bounds} = options;
+      const next = createCounterTrace(bounds); // invalid bounds throw before the previous capture is touched
+      counters?.dispose();
+      counters = undefined;
+      const loop = appLoop();
+      const detach = loop.attachSampler(counterSampler(next, {frameNumber: () => loop.stats.frames, sources}));
+      let timer: GpuTimer | null = null;
+      if (gpu) {
+        const running = app.services.app.has('feature.game') ? app.services.play?.current() : null;
+        timer =
+          running?.gpuTiming?.(gpu === true ? {} : gpu, (frame, ms) => {
+            next.sample(frame, 'gpuMs', ms);
+          }) ?? null;
+      }
+      const capture: CounterCapture = {
+        ...next,
+        gpu: timer,
+        dispose() {
+          detach();
+          timer?.dispose();
+          next.dispose();
+          if (counters === capture) counters = undefined;
+        },
+      };
+      counters = capture;
+      return capture;
+    },
     systemTrace(options) {
       const running = app.services.app.has('feature.game') ? app.services.play?.current() : null;
       return running?.systemTrace?.(options) ?? null;
@@ -295,6 +358,7 @@ export function createTestApi(app: App, booted: Promise<BootReport>): EngineTest
         replay?.stop('app-disposed');
         trace?.dispose();
         trace = undefined;
+        counters?.dispose();
         app.dispose();
       }
       const pool = rendererPoolStats() ?? null;

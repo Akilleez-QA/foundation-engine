@@ -11,6 +11,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 
 | ID | Feature | PR | Docs |
 |---|---|---|---|
+| GPU-TIMING-01 | Optional measured GPU frame time (timer queries) and per-frame counter trace tracks |  | [gpu-timing.md](guides/gpu-timing.md) |
 | POOL-01 | Optional bounded entity pool with eviction classes |  | [entity-pool.md](guides/entity-pool.md) |
 | FORMULA-DATA-01 | Spreadsheet import for formula sheets and lookup tables (npm run formulas:import) |  | [README.md](../src/kits/formulas/README.md) |
 | FORMULA-01 | Optional data-defined stat and damage formulas with stacking stages |  | [README.md](../src/kits/formulas/README.md) |

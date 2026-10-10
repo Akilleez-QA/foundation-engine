@@ -100,6 +100,16 @@ and 8 textures). A refused entity stays undrawn and is reported once.
   `replay.digest`), never the three.js scene. Visuals driven only by the kit (an animation mixer, a shader's time) are
   not part of a replay unless the game keeps them in state.
 
+## Measured GPU time (optional)
+
+`createGpuTimer(renderer.getContext(), {capacity, maxResults, maxPendingPolls, onResult})` is the platform's GPU timer
+(ADR 0172, [guide](../../../docs/guides/gpu-timing.md)) for a creator who draws through `setRenderOverride` or wants
+to time a pass of their own. Call `poll()` and `begin(frame)` before the draw and `end()` after it; results arrive a
+few frames later through `onResult(frame, gpuMs)` or `take()`. It never waits on the GPU. Where the browser lacks
+`EXT_disjoint_timer_query_webgl2`, `status` is `unavailable` and nothing is measured. Only one timer may be open on a
+context at a time: do not wrap a draw the engine is already timing (`engine.gpuTiming()` in dev/test builds). Dispose
+it with `own(timer)`. Nothing is timed unless you create one.
+
 ## Limitations
 
 - WebGL2 only. A `ShaderMaterial` or `onBeforeCompile` will not run on a future WebGPU backend; the kit does not yet

@@ -8,6 +8,7 @@
  *                                                             requestRender, onFrame, onBeforeRender, onResize,
  *                                                             setRenderOverride, own
  *   customObject({ create, update, dispose }) + ThreeObject   the convenience path: an object per entity
+ *   createGpuTimer(renderer.getContext(), options)            optional measured GPU time around your own draws
  *
  * Prefer the engine's own data (`@engine`: environment, materials, particles) where it can say what you want: it keeps
  * quality tiers, backends and upgrades the engine's problem. This kit is the full-power path for everything else.
@@ -38,6 +39,15 @@ export {
   type CustomObjectLimits,
   type CustomObjectStats,
 } from './custom-object';
+
+export {
+  createGpuTimer,
+  type GpuTimer,
+  type GpuTimerOptions,
+  type GpuTimerResult,
+  type GpuTimerStats,
+  type GpuTimerStatus,
+} from '../../platform/render/gpu-timer';
 
 /** The kit: list it in `defineGame({ kits })` to opt the game into three.js. */
 export function three(): KitDefinition {
