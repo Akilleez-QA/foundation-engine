@@ -106,6 +106,9 @@ export function createPredictedEvents(options: PredictedEventsOptions): Predicte
   let replayFrom: number | null = null,
     settledThrough = -1,
     forgottenThrough = -1;
+  /** `observe` binding: the prediction epoch and the identities its last confirmed state recorded. */
+  let boundEpoch: string | null = null;
+  let lastConfirmed = new Set<string>();
   let emitted = 0,
     cancelled = 0,
     suppressed = 0,
@@ -268,26 +271,58 @@ export function createPredictedEvents(options: PredictedEventsOptions): Predicte
             cancelled: Object.freeze([...cancel]),
             dropped: drops,
           });
-        if (after?.status !== 'ready' || !after.predicted || !after.confirmed || before?.epoch !== after.epoch)
+        if (after?.status !== 'ready' || !after.predicted || !after.confirmed) {
+          boundEpoch = null; // the next owner rebinds from a clean ledger
           return update('discontinuity', cancelPendingNow());
-        const floor = after.confirmed.processedThrough;
-        const reconciled = after.correction !== null && after.correction !== before.correction;
+        }
+        const sameOwner = before?.status === 'ready' && !!before.confirmed && before.epoch === after.epoch;
+        const anchor = sameOwner ? before : after;
+        const rebind = boundEpoch !== after.epoch || !sameOwner;
+        const discontinuous = !sameOwner || (boundEpoch !== null && boundEpoch !== after.epoch);
+        // A revision change is a reconcile even when a later push already cleared `correction`.
+        const reconciled = anchor.confirmed!.revision !== after.confirmed.revision;
+        // Extract everything before mutating, so a failing creator callback publishes nothing partial.
         const predictedEvents = extract(after.predicted.value);
-        const confirmedEvents = reconciled && predictedEvents ? extract(after.confirmed.state.value) : none;
+        const anchorEvents = rebind && predictedEvents ? extract(anchor.confirmed!.state.value) : none;
+        const confirmedEvents =
+          reconciled && predictedEvents && anchorEvents ? extract(after.confirmed.state.value) : none;
         if (status !== 'ready') return refuse();
-        if (!predictedEvents || !confirmedEvents) return update('events-invalid', cancelPendingNow());
+        if (!predictedEvents || !anchorEvents || !confirmedEvents) return update('events-invalid', cancelPendingNow());
+        let cancel: PredictedEventIdentity[] = [];
+        if (rebind) {
+          // A new owner, or this ledger's first observation, starts clean at the anchor's confirmed prefix.
+          cancel = cancelPendingNow();
+          table.clear();
+          settledThrough = anchor.confirmed!.processedThrough;
+          forgottenThrough = -1;
+          lastConfirmed = new Set(anchorEvents.map(e => id(e.key, e.tick)));
+          boundEpoch = after.epoch;
+        }
+        const outcome = discontinuous ? 'discontinuity' : 'observed';
         if (!reconciled) {
           for (const e of predictedEvents)
-            if (e.tick > Math.max(floor, settledThrough)) record(e, predictNow(e.key, e.tick));
-          return update(out.length || drops ? 'observed' : 'unchanged', none);
+            if (e.tick > Math.max(after.confirmed.processedThrough, settledThrough))
+              record(e, predictNow(e.key, e.tick));
+          return update(rebind || out.length || drops ? outcome : 'unchanged', cancel);
         }
-        for (const e of confirmedEvents)
+        const floor = after.confirmed.processedThrough;
+        const confirmedNow = new Set<string>();
+        for (const e of confirmedEvents) {
+          const identity = id(e.key, e.tick);
+          confirmedNow.add(identity);
           if (e.tick > settledThrough && e.tick <= floor) record(e, confirmNow(e.key, e.tick));
+          else if (e.tick <= settledThrough && !lastConfirmed.has(identity)) {
+            // A new authority event at an already settled tick: reported as late, never emitted.
+            dropped.late++;
+            drops++;
+          }
+        }
+        lastConfirmed = confirmedNow;
         replayFrom = floor + 1;
         for (const entry of table.values()) if (entry.tick >= replayFrom) entry.seen = false;
         for (const e of predictedEvents) if (e.tick > floor) record(e, predictNow(e.key, e.tick));
-        const cancel = [...endReplayNow(), ...settleNow(floor)];
-        return update('observed', cancel);
+        cancel = [...cancel, ...endReplayNow(), ...settleNow(floor)];
+        return update(outcome, cancel);
       });
     },
     read() {
@@ -310,6 +345,7 @@ export function createPredictedEvents(options: PredictedEventsOptions): Predicte
     dispose() {
       status = 'retired';
       table.clear();
+      lastConfirmed.clear();
       replayFrom = null;
     },
   });

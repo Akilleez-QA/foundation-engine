@@ -21,7 +21,7 @@ export interface PredictionSmoothingOptions {
   readonly decay: PredictionSmoothingDecay;
   /** Largest elapsed time honoured by one `advance` call, (0, MAX_SMOOTHING_ELAPSED_MS]. */
   readonly maxElapsedMs: number;
-  /** Components whose magnitude falls to or below this after decay become exactly zero. */
+  /** A component at or below this after decay becomes exactly zero, if that stays within the step allowance. */
   readonly settle: number;
 }
 
@@ -160,6 +160,12 @@ export function createPredictionSmoothing(options: PredictionSmoothingOptions): 
           return Object.freeze({status: 'discontinuity', reason});
         }
         const fresh = after.correction !== null && after.correction !== before.correction;
+        const revised = before.confirmed?.revision !== after.confirmed?.revision;
+        if (revised && !fresh) {
+          // A reconcile happened but a later push cleared its correction: the jump is unknown.
+          clear('missed-correction');
+          return Object.freeze({status: 'discontinuity', reason: 'missed-correction'});
+        }
         if (!fresh || !after.correction!.changed) return Object.freeze({status: 'unchanged'});
         return correctNow(beforeValue.value, afterValue.value);
       });
@@ -177,9 +183,11 @@ export function createPredictionSmoothing(options: PredictionSmoothingOptions): 
         const magnitude = Math.abs(value);
         if (magnitude === 0) return;
         const wanted = kind === 'half-life' ? magnitude * (1 - keep) : magnitude;
-        const step = Math.min(wanted, at(maxRate, i) * dt, magnitude);
+        const allowance = at(maxRate, i) * dt;
+        const step = Math.min(wanted, allowance, magnitude);
         const rest = magnitude - step;
-        offset[i] = rest <= settle ? 0 : Math.sign(value) * rest;
+        // Settling to zero is itself a step, so it happens only within this call's allowance.
+        offset[i] = rest <= settle && magnitude <= allowance ? 0 : Math.sign(value) * rest;
       });
       return Object.freeze({status: 'advanced' as const, settled: offset.every(o => o === 0)});
     },

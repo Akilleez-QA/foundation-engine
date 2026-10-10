@@ -215,11 +215,16 @@ test('prediction smoothing: invalid projections and reentrant callbacks fail clo
   assert.deepEqual(d.read().offset, [0, 0]);
 });
 
-function boundedRun(seed: number) {
+function boundedRun(seed: number, extra: Partial<PredictionSmoothingOptions> = {}) {
   const rnd = mulberry32(seed);
   const p = prediction();
   const rate = [0.02, 0.05];
-  const s = smoothing({maxRatePerMs: rate, snapDistance: [4, 6], decay: {kind: 'half-life', halfLifeMs: 120}});
+  const s = smoothing({
+    maxRatePerMs: rate,
+    snapDistance: [4, 6],
+    decay: {kind: 'half-life', halfLifeMs: 120},
+    ...extra,
+  });
   const authority = {x: 0, y: 0};
   let processed = 0,
     revision = 0;
@@ -280,11 +285,46 @@ function boundedRun(seed: number) {
 
 test('prediction smoothing: seeded randomized reconcile never steps presentation beyond the bound except at snaps', () => {
   for (const seed of [1, 7, 42, 1234, 99991]) {
-    const {counts} = boundedRun(seed);
-    assert.ok(counts.smoothed > 5 && counts.snapped > 0, JSON.stringify(counts));
+    for (const extra of [{}, {settle: 3.5}, {settle: 3.9, decay: {kind: 'linear'} as const}]) {
+      const {counts} = boundedRun(seed, extra);
+      assert.ok(counts.smoothed > 5 && counts.snapped > 0, JSON.stringify(counts));
+    }
   }
 });
 
 test('prediction smoothing: identical inputs give identical presentation (no clock)', () => {
   assert.deepEqual(boundedRun(5).trace, boundedRun(5).trace);
+});
+
+test('prediction smoothing: a large settle threshold never zeroes beyond the step allowance (review P6)', () => {
+  const s = smoothing({
+    width: 1,
+    project: v => [point(v).x],
+    snapDistance: 10,
+    maxRatePerMs: 0.001,
+    decay: {kind: 'linear'},
+    settle: 4,
+  });
+  s.correct({x: 3, y: 0}, {x: 0, y: 0});
+  assert.deepEqual(values(s, {x: 0, y: 0}).values, [3]);
+  s.advance(0);
+  assert.deepEqual(values(s, {x: 0, y: 0}).values, [3]);
+  s.advance(50); // allowance 0.05: moves 0.05, cannot jump to zero
+  assert.ok(near(values(s, {x: 0, y: 0}).values, 0, 2.95));
+  const h = smoothing({width: 1, project: v => [point(v).x], snapDistance: 10, maxRatePerMs: 1, settle: 4});
+  h.correct({x: 3, y: 0}, {x: 0, y: 0});
+  h.advance(5); // allowance 5 covers the whole offset: settling to zero is allowed
+  assert.deepEqual(h.read().offset, [0]);
+});
+
+test('prediction smoothing: a reconcile whose correction a later push cleared is a discontinuity (review P7)', () => {
+  const p = prediction();
+  const s = smoothing();
+  p.push('{"x":1,"y":0}');
+  values(s, p.read().predicted?.value);
+  const before = p.read();
+  p.reconcile({epoch: 'control-1', revision: 1, processedThrough: 1, stateJson: '{"x":3,"y":0}'});
+  p.push('{"x":1,"y":0}');
+  assert.deepEqual(s.observe(before, p.read()), {status: 'discontinuity', reason: 'missed-correction'});
+  assert.equal(values(s, p.read().predicted?.value).discontinuity, true);
 });

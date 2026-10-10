@@ -19,9 +19,11 @@ for (const e of update.emitted) startEffect(e.key, e.tick); // creator code
 for (const c of update.cancelled) stopEffect(c.key, c.tick); // creator code
 ```
 
-A reconcile is recognised by a fresh `correction` object. Duplicate, obsolete and foreign
-baselines publish none, so they change nothing. Call `observe` around each call; if a push
-happens after a reconcile without an `observe` in between, the pair shows only the push.
+A reconcile is recognised by a change of confirmed revision. Duplicate, obsolete and
+foreign baselines change nothing. Call `observe` around each call. If a reconcile and a
+later push share one pair, the push has cleared `correction`. Event deduplication still
+confirms, replays and settles. Smoothing cannot know the size of the jump, so it reports a
+`missed-correction` discontinuity.
 
 ## Correction smoothing (`createPredictionSmoothing`)
 
@@ -36,8 +38,8 @@ every snap distance). Every bound is checked at construction; an invalid choice 
 `project(state) + offset` does not jump. `advance(elapsedMs)` decays each component
 towards zero: half-life decay multiplies it by `2^(-dt / halfLifeMs)`; linear decay moves
 it at `maxRatePerMs`. Either way one step moves a component at most
-`maxRatePerMs * min(elapsedMs, maxElapsedMs)`, and a magnitude at or below `settle`
-becomes exactly zero. `present(state)` returns `{values, discontinuity}`.
+`maxRatePerMs * min(elapsedMs, maxElapsedMs)`. A remaining magnitude at or below `settle`
+becomes exactly zero only when that whole move fits within the same step allowance. `present(state)` returns `{values, discontinuity}`.
 
 **Snap and discontinuity.** If any component of the accumulated offset would exceed its
 `snapDistance`, the correction snaps: the offset is cleared and the next `present`
@@ -65,7 +67,8 @@ retires the helper and the outer call returns `retired`. An invalid elapsed time
 ## Predicted-event deduplication (`createPredictedEvents`)
 
 **Identity.** An event is a creator `key` (1..`maxKeyLength` characters, at most 256)
-plus a non-negative integer `tick`. With `observe`, the tick is the prediction's input
+plus a non-negative integer `tick`. The same key twice at the same tick is one event; use
+distinct keys (for example `"impact:2"`) for repeated effects within one tick. With `observe`, the tick is the prediction's input
 sequence and `eventsOf(state)` lists the events a state records. A reducer typically
 keeps a short, bounded log of `[tick, key]` entries in its state.
 
@@ -84,14 +87,23 @@ unavailable.
 **Composition.** `observe(before, after)` does this for one prediction step. On a push it
 predicts events above the confirmed prefix. On a reconcile it confirms events in the
 confirmed state up to `processedThrough`, re-predicts events above it as a replay and
-settles through `processedThrough`. If the prediction is unavailable or replaced, it
-cancels pending predictions (`discontinuity`); an invalid `eventsOf` result does the same
-(`events-invalid`). The confirmed state's log must cover every tick since the previous
+settles through `processedThrough`. If the prediction becomes unavailable, it cancels
+pending predictions (`discontinuity`). The first observation, and any new owner (a
+different epoch), starts a clean ledger at that owner's confirmed prefix: pending
+predictions are cancelled, and confirmed entries and watermarks are cleared. A pair
+spanning two owners is reported as `discontinuity`. An invalid `eventsOf` result cancels
+pending predictions (`events-invalid`). The confirmed state's log must cover every tick since the previous
 settled prefix; size the log for the largest gap (at most the prediction's `maxPending`).
+Exactly-once applies to events at ticks of this client's input sequence above the settled
+prefix. Suppose the authority later adds an event at an already settled tick (a new
+revision with the same `processedThrough`). That event is not emitted. It is counted in
+`read().dropped.late` and in the update's `dropped` count.
 
 **Bounds and overload.** `maxEntries` (at most 65,536) bounds retained identities;
 `maxEventsPerObserve` bounds one `eventsOf` list. When full, a new prediction is dropped
-(`capacity`): it is not emitted, and its confirmation, if any, emits it later. A
+(`capacity`): it is not emitted. Its confirmation emits it later, unless its tick is at or
+below `forgottenThrough` or already settled; then the loss is counted as `forgotten` or
+`late`. A
 confirmation of an unknown identity when full is emitted once without being recorded,
 and the tick becomes `forgottenThrough`. Later unknown identities at or below that tick
 are dropped (`forgotten`). Overload can therefore lose an effect, which is reported in

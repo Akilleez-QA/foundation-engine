@@ -1477,7 +1477,7 @@ visual or device evidence.
 with a snap threshold and a one-shot discontinuity flag) and `createPredictedEvents`
 (an exactly-once emit and cancel ledger keyed by creator event key and tick). They
 compose with `createPrediction` through `read()` snapshots and leave its defaults
-unchanged. Evidence is headless: 18 unit tests on the real reconciliation path,
+unchanged. Evidence is headless: 23 unit tests on the real reconciliation path,
 including seeded randomized bound and exactly-once runs. These are implemented and
 checked on branch `feat/prediction-presentation`, not integrated. Independent review,
 hosted CI, device or browser review of smoothing and multiplayer acceptance remain

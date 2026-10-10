@@ -353,3 +353,84 @@ test('predicted events: seeded randomized real prediction with reordered and dup
     assert.ok(e.read().cancelled > 3, JSON.stringify(e.read()));
   }
 });
+
+const hitAt = (tick: number, ...keys: string[]) => keys.map(key => [tick, key] as [number, string]);
+test('predicted events: a replacement owner starts from a clean ledger, losing nothing (review P1)', () => {
+  const e = createPredictedEvents({limits, eventsOf});
+  const p = clientPrediction();
+  let before = p.read();
+  p.push('3');
+  assert.equal(e.observe(before, p.read()).status, 'observed');
+  before = p.read();
+  p.reconcile({
+    epoch: 'control-1',
+    revision: 1,
+    processedThrough: 1,
+    stateJson: JSON.stringify({t: 1, log: hitAt(1, 'hit')}),
+  });
+  e.observe(before, p.read());
+  assert.equal(e.read().settledThrough, 1);
+  const old = p.read();
+  p.invalidate('lost');
+  assert.equal(e.observe(old, p.read()).status, 'discontinuity');
+  // The replacement owner restarts its sequence; its tick-1 event must emit, not drop as late.
+  const q = clientPrediction('control-2');
+  before = q.read();
+  q.push('3');
+  const update = e.observe(before, q.read());
+  assert.ok('emitted' in update);
+  assert.deepEqual(update.emitted, [{key: 'hit', tick: 1, origin: 'predicted'}]);
+  // A pair spanning two owners is a discontinuity that rebinds to the newer owner.
+  const r = clientPrediction('control-3');
+  r.push('3');
+  const spanning = e.observe(q.read(), r.read());
+  assert.ok('emitted' in spanning && spanning.status === 'discontinuity');
+  assert.deepEqual(spanning.cancelled, [{key: 'hit', tick: 1}]);
+  assert.deepEqual(spanning.emitted, [{key: 'hit', tick: 1, origin: 'predicted'}]);
+});
+
+test('predicted events: a new authority event at a settled tick is reported late, never lost silently (review P2)', () => {
+  const e = createPredictedEvents({limits, eventsOf});
+  const p = clientPrediction();
+  const reconcile = (revision: number, through: number, log: [number, string][]) => {
+    const before = p.read();
+    p.reconcile({
+      epoch: 'control-1',
+      revision,
+      processedThrough: through,
+      stateJson: JSON.stringify({t: through, log}),
+    });
+    return e.observe(before, p.read());
+  };
+  const before = p.read();
+  p.push('1');
+  e.observe(before, p.read());
+  reconcile(1, 1, []);
+  const bumped = reconcile(2, 1, hitAt(1, 'other'));
+  assert.ok('dropped' in bumped && bumped.dropped === 1 && bumped.emitted.length === 0);
+  assert.equal(e.read().dropped.late, 1);
+  // The same settled identity seen again is not counted twice.
+  const again = reconcile(3, 1, hitAt(1, 'other'));
+  assert.ok('dropped' in again && again.dropped === 0);
+});
+
+test('predicted events: a reconcile observed together with a later push still confirms and cancels (review P3)', () => {
+  const e = createPredictedEvents({limits, eventsOf});
+  const p = clientPrediction();
+  let before = p.read();
+  p.push('3'); // predicts hit@1
+  e.observe(before, p.read());
+  before = p.read();
+  p.reconcile({
+    epoch: 'control-1',
+    revision: 1,
+    processedThrough: 1,
+    stateJson: JSON.stringify({t: 1, log: hitAt(1, 'burst')}),
+  });
+  p.push('1'); // clears correction
+  const update = e.observe(before, p.read());
+  assert.ok('cancelled' in update);
+  assert.deepEqual(update.cancelled, [{key: 'hit', tick: 1}]);
+  assert.deepEqual(update.emitted, [{key: 'burst', tick: 1, origin: 'authority'}]);
+  assert.equal(e.read().predicted, 0);
+});
