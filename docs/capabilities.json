@@ -109,6 +109,17 @@
       ]
     },
     {
+      "id": "RENDER-INTERP",
+      "title": "Opt-in render interpolation of fixed-step Transforms",
+      "shipped": true,
+      "docs": "docs/guides/render-interpolation.md",
+      "evidence": [
+        "@engine exports Interpolated",
+        "@engine exports presentTransform",
+        "src/author/interpolation.test.ts exists"
+      ]
+    },
+    {
       "id": "VIS-01",
       "title": "Tone mapping and exposure per scene (view.output)",
       "shipped": true,
@@ -314,6 +325,7 @@
       "EMITTER_DEFAULTS",
       "Emitter",
       "INTERIOR_REFLECTION_LIMITS",
+      "Interpolated",
       "LIGHT_LIMITS",
       "LOCAL_LIGHT_CAPS",
       "LUT_SIZE_LIMITS",
@@ -391,6 +403,8 @@
       "parseCubeLut",
       "platformMath",
       "pointerOnGround",
+      "presentTransform",
+      "presentedTransform",
       "projectToView",
       "scalarMath",
       "sceneBlobShadows",
@@ -461,6 +475,7 @@
       "InteriorLight",
       "InteriorReflection",
       "InteriorSurface",
+      "InterpolatedData",
       "KitDefinition",
       "LightRefusal",
       "LightReportLevel",
@@ -548,6 +563,7 @@
       "TimelineEvent",
       "TimelineSource",
       "ToneMappingName",
+      "TransformPose",
       "UiOcclusionReport",
       "Vec3",
       "ViewState"

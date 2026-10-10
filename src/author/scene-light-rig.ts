@@ -14,12 +14,13 @@
  * shadow the same way. This module is a lazy chunk: only scenes with `sceneLights()` or `sceneShadows()` load it.
  */
 import * as T from 'three';
-import type {World} from '../core/ecs/world';
+import type {Entity, World} from '../core/ecs/world';
 import {createLightRig, type LightDef} from '../platform/render/light-rig';
 import {liveShadowMap, type LiveShadowMap} from '../platform/render/quality-runtime';
 import {scheduleShadows} from '../platform/render/shadows';
 import type {ShadowMapRequest} from '../platform/render/quality';
 import {Transform} from './defs';
+import type {TransformPose} from './interpolation';
 import {pointLightKey, spotLightKey, type SceneLightLimits} from './lights';
 import type {LightSlots} from './light-slots';
 
@@ -69,13 +70,15 @@ export function createSceneLightRig(
     /** The visit's lights, for tests and the dev handle: fixed for the visit. */
     lights: {points, spots} as const,
     /** Copy this frame's slot holders onto the rig; true when anything drawn changed. */
-    apply(world: World, holders: LightSlots): boolean {
+    /** `present` gives the drawn pose of an entity (render interpolation); absent, lights use the Transform. */
+    apply(world: World, holders: LightSlots, present?: (entity: Entity, tr: TransformPose) => TransformPose): boolean {
       if (disposed) return false;
       let changed = false;
       for (let i = 0; i < points.length; i++) {
         const light = points[i]!,
           held = holders.point(world, i),
-          tr = held ? world.get(held.entity, Transform) : undefined;
+          latest = held ? world.get(held.entity, Transform) : undefined,
+          tr = held && latest && present ? present(held.entity, latest) : latest;
         const sig = held && tr ? `${held.entity}|${tr.x},${tr.y},${tr.z}|${pointLightKey(held.data)}` : '';
         if (sig === pointSig[i]) continue;
         pointSig[i] = sig;
@@ -94,7 +97,8 @@ export function createSceneLightRig(
       for (let i = 0; i < spots.length; i++) {
         const light = spots[i]!,
           held = holders.spot(world, i),
-          tr = held ? world.get(held.entity, Transform) : undefined;
+          latest = held ? world.get(held.entity, Transform) : undefined,
+          tr = held && latest && present ? present(held.entity, latest) : latest;
         const sig =
           held && tr
             ? `${held.entity}|${tr.x},${tr.y},${tr.z},${tr.rx},${tr.ry},${tr.rz}|${spotLightKey(held.data)}`

@@ -171,6 +171,12 @@ export interface SceneContext {
     readonly calm: boolean;
     /** This frame's timestamp in page monotonic milliseconds (`performance.now()` timebase; 0-based in testScene). */
     readonly now: number;
+    /**
+     * Fraction of the next fixed step already elapsed after this frame's steps, in [0, 1) for frame systems and
+     * drawing. Presentation only: `presentTransform` blends opted-in (`Interpolated`) entities by it. During fixed
+     * steps it is not meaningful (it can exceed 1); do not read it there.
+     */
+    readonly alpha: number;
   };
   readonly view: ViewState;
   readonly brief: BuildBrief;

@@ -1395,3 +1395,22 @@ Evidence: 13 focused headless tests (11 unit tests including a 3,000-step brute-
 `@kits/cadence` is an independently implemented pure helper that runs members at their own integer periods on the caller's tick. It spreads start phases by id (or explicit phase), returns at most `maxDuePerTake` due members earliest-due-first with elapsed and lateness ticks, defers the rest instead of dropping them, reschedules on each member's phase grid without burst catch-up, and offers JSON-safe snapshot/restore. The fixed-step runner, clock and interest sets keep their responsibilities; no clock, callback, persistence owner or registration is added. [Guide](update-cadence.md), [ADR 0096](../adr/0096-optional-update-cadence.md).
 
 Evidence: 10 focused headless tests (8 unit tests including a 4,000-step comparison with an independent enumeration model with large gaps and mid-run snapshot round trips, plus an ECS fixed-step consumer with distance-banded periods and an interest-set refresh consumer). An independent adversarial review found that period changes discarded the phase spread, plus result-buffer aliasing, tick overflow near 2^53 and weak snapshot invariants; all were fixed with regression tests before publication. A local headless micro-measurement is recorded in the kit README as an order-of-magnitude indication only. This is a branch candidate: hosted full CI, a playable template consumer, browser behaviour and physical-device acceptance remain pending.
+
+## Optional render interpolation — candidate (2026-10-09)
+
+- **Scope:** `src/author/interpolation.ts` adds the `Interpolated` component, `presentTransform` and
+  `presentedTransform`, and `ctx.time.alpha`. Runtime capture runs in the runner's `beforeStep`. Shape,
+  Mesh and Model drawing and `cameraSystem` use the drawn pose for opted-in entities. This is the "next
+  slice" named for MV-02.
+- **Evidence:** `src/author/interpolation.test.ts` and `src/kits/camera/interpolation.test.ts`. They show
+  uniform per-frame motion at 144 Hz against whole-step jumps without opt-in, a lag under one step,
+  revision snapping, the ±π seam and the camera following the drawn pose. Entities that do not opt in
+  are unchanged.
+- **Browser smoke (local, not committed):** the arcade template's ball and blocks were temporarily opted in
+  and run through `play:snap`. It reported no page errors, rendered while moving, and stayed within the
+  budget (5 draws, 761 triangles). Headless Chromium runs at 60 Hz, so `alpha` stays near 0. This shows
+  the runtime paths run; it does not show smoothness.
+- **Review:** the independent review found one major issue (point and spot lights were drawn at the latest
+  step) and several minor ones: the alpha contract in fixed systems, camera snapping guidance, negative
+  revision aliasing, and the dev teleport tool. All are fixed or documented.
+- **Not established:** physical high-refresh displays, template adoption and hosted CI.
