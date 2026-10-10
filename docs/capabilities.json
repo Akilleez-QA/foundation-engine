@@ -99,6 +99,18 @@
       ]
     },
     {
+      "id": "NW-PRESENT",
+      "title": "Optional prediction correction smoothing and exactly-once predicted events",
+      "shipped": true,
+      "docs": "docs/guides/prediction-presentation.md",
+      "evidence": [
+        "@kits/network exports createPredictionSmoothing",
+        "@kits/network exports createPredictedEvents",
+        "src/kits/network/prediction-smoothing.test.ts exists",
+        "src/kits/network/predicted-events.test.ts exists"
+      ]
+    },
+    {
       "id": "VISIBILITY-01",
       "title": "Bounded source-owned visibility and explored history",
       "shipped": true,
@@ -808,7 +820,11 @@
         "MAX_DRAIN_WINDOW_MS",
         "MAX_INTEGRITY_RULES",
         "MAX_INTEGRITY_WEIGHT",
+        "MAX_PREDICTED_EVENT_ENTRIES",
+        "MAX_PREDICTED_EVENT_KEY_LENGTH",
         "MAX_SESSION_PLAYERS",
+        "MAX_SMOOTHING_ELAPSED_MS",
+        "MAX_SMOOTHING_WIDTH",
         "SESSION_CLOSE_CODES",
         "SESSION_PROTOCOL_VERSION",
         "SESSION_SELF_ENTITY",
@@ -823,7 +839,9 @@
         "createDurableAuthority",
         "createIntegrity",
         "createNetworkIntake",
+        "createPredictedEvents",
         "createPrediction",
+        "createPredictionSmoothing",
         "createRateAdmission",
         "createRetrySchedule",
         "createSession",

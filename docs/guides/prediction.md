@@ -2,7 +2,9 @@
 
 This optional helper predicts finite creator-defined data by replaying captured
 inputs through a pure reducer. It supplies no physics, simulation clock, smoothing,
-ECS mutation or accepted gameplay effects. Creators may omit it or use a maintained
+ECS mutation or accepted gameplay effects. Optional correction smoothing and
+predicted-event deduplication compose with it without changing it; see
+[prediction presentation](prediction-presentation.md). Creators may omit it or use a maintained
 networking framework's existing prediction owner. Do not layer two prediction owners
 over the same state. The native diagnostic passed on clean `8317c69`; see
 [acceptance evidence](../verification/authority-20261001/README.md). NW-03 is integrated on private `main` by merge `b6fb4a3` (PR #123 in the private development history). Exact head `883f4ad` passed all seven template gates: 2,018 tests, 129 performance checks, zero enforced breaches/regressions/inconclusive results and four advisory heap warnings. Combined main tests (2,018) and build passed.

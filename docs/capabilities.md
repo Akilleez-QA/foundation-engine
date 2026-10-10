@@ -24,6 +24,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | NW-DELTA | Acknowledged-baseline deltas for complete network views |  | [README.md](../src/kits/network/README.md) |
 | PLAYOUT-01 | Remote clock offset and adaptive playout buffers |  | [README.md](../src/kits/playout/README.md) |
 | REPL-01 | Per-recipient quantized replication under a byte budget |  | [README.md](../src/kits/replication/README.md) |
+| NW-PRESENT | Optional prediction correction smoothing and exactly-once predicted events |  | [prediction-presentation.md](guides/prediction-presentation.md) |
 | VISIBILITY-01 | Bounded source-owned visibility and explored history |  | [README.md](../src/kits/visibility/README.md) |
 | GEN-WEIGHTED | Bounded eligible weighted choice with separately committed recent history |  | [weighted-choice.md](guides/weighted-choice.md) |
 | CAP-EFFECT-CHECKPOINT | Portable timed contribution checkpoints |  | [timed-effects.md](guides/timed-effects.md) |

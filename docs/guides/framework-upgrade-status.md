@@ -1428,3 +1428,16 @@ pose-sized transitions landing on moving goals (including the scripted-shot retu
 support carry, letterbox amount and an optional director system. See
 [ADR 0112](../adr/0112-camera-director.md). Headless tests in the ledger; independent
 review and hosted CI remain required.
+
+## Optional prediction presentation — candidate (2026-10-09)
+
+[Prediction presentation](prediction-presentation.md) adds two optional helpers to
+`@kits/network`: `createPredictionSmoothing` (a bounded, decaying presentation offset
+with a snap threshold and a one-shot discontinuity flag) and `createPredictedEvents`
+(an exactly-once emit and cancel ledger keyed by creator event key and tick). They
+compose with `createPrediction` through `read()` snapshots and leave its defaults
+unchanged. Evidence is headless: 18 unit tests on the real reconciliation path,
+including seeded randomized bound and exactly-once runs. These are implemented and
+checked on branch `feat/prediction-presentation`, not integrated. Independent review,
+hosted CI, device or browser review of smoothing and multiplayer acceptance remain
+outstanding. See ADR 0142.
