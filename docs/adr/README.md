@@ -152,7 +152,7 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0130](0130-offline-format-converters.md) | Offline format converters with provenance receipts | Tooling / Assets | Proposed |
 
-| [0133](0133-legacy-format-decoders.md) | Legacy game and multimedia format decoders in the converter toolchain | Tooling / Assets | Proposed |
+| [0136](0136-legacy-format-decoders.md) | Legacy game and multimedia format decoders in the converter toolchain | Tooling / Assets | Proposed |
 
 | [0113](0113-perception-kit.md) | Optional perception kit feeding a blackboard | Optional kits / AI | Proposed |
 
@@ -160,4 +160,4 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0114](0114-navmesh-funnel-avoidance.md) | Navigation mesh queries, funnel paths and local avoidance | Optional kits / Navigation | Proposed |
 
-| [0080](0080-optional-cellular-wasm.md) | Explicit cellular WASM job with per-job fixed memory and existing worker ownership | Procgen / Workers | Proposed |
+| [0101](0101-optional-cellular-wasm.md) | Explicit cellular WASM job with per-job fixed memory and existing worker ownership | Procgen / Workers | Proposed |

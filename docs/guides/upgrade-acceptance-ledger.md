@@ -1609,7 +1609,7 @@ the one new runtime dependency, approved for this kit only. Core stays physics-f
 
 ## Legacy format decoders candidate — ASSET-LEGACY, 2026-10-09
 
-Seven kinds added to `npm run convert` (stacked on the ASSET-CONVERT candidate): `archive`, `frames`, `planar`, `tim`, `vag`, `director`, `cinepak`. Independent implementations from documented format facts; PNG/WAV output with `.meta.json` sidecars and provenance receipts; decompressors bounded by declared sizes. [README](../../tools/convert/README.md#legacy-formats), [ADR 0133](../adr/0133-legacy-format-decoders.md).
+Seven kinds added to `npm run convert` (stacked on the ASSET-CONVERT candidate): `archive`, `frames`, `planar`, `tim`, `vag`, `director`, `cinepak`. Independent implementations from documented format facts; PNG/WAV output with `.meta.json` sidecars and provenance receipts; decompressors bounded by declared sizes. [README](../../tools/convert/README.md#legacy-formats), [ADR 0136](../adr/0136-legacy-format-decoders.md).
 
 Evidence: headless tests with fixtures built by test-side encoders (exact value checks for every kind), mutation fuzzing of every fixture and bomb tests; with ffmpeg installed, Cinepak frames match an independent decoder within one colour level and the truncated ADPCM prediction matches sample for sample. An independent adversarial review found two resource amplifications and several smaller deviations, each fixed with a regression test. No real game data was used or committed; hosted full CI pending.
 
@@ -1672,4 +1672,4 @@ timing/thermal acceptance are not established by those checks. This is candidate
 implementation evidence, not a claim of integration or deployment.
 
 Contract, reproduction and verification:
-[cellular WASM](cellular-wasm.md), [ADR 0080](../adr/0080-optional-cellular-wasm.md).
+[cellular WASM](cellular-wasm.md), [ADR 0101](../adr/0101-optional-cellular-wasm.md).

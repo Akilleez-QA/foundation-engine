@@ -1,4 +1,4 @@
-# ADR 0133: legacy game and multimedia format decoders in the converter toolchain
+# ADR 0136: legacy game and multimedia format decoders in the converter toolchain
 
 - Status: Proposed for this implementation; depends on ADR 0130 (offline converters); integration is gated by full CI.
 - Date: 2026-10-09

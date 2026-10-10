@@ -60,7 +60,7 @@ rights: converting a file does not change its licence.
 ## Legacy formats
 
 Kinds for data from 1990s games and multimedia tools, written independently from what community reconstructions and
-emulators document about each format (no code from them is included; see ADR 0133). They read files the creator owns or
+emulators document about each format (no code from them is included; see ADR 0136). They read files the creator owns or
 may use; nothing here circumvents encryption or copy protection, and a converted file keeps the licence of its source.
 
 | Kind | Input | Output |

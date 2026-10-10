@@ -1,4 +1,4 @@
-# ADR 0080: Optional cellular WASM worker kernel
+# ADR 0101: Optional cellular WASM worker kernel
 
 - **Status:** Proposed
 - **Date:** 2026-10-08
