@@ -348,6 +348,13 @@
       ]
     },
     {
+      "id": "COMPANION-RECOVERY-01",
+      "title": "Companion catch-up and safe teleport recovery on breadcrumb trails",
+      "shipped": true,
+      "docs": "src/kits/breadcrumbs/README.md",
+      "evidence": ["@kits/breadcrumbs exports createCompanionRecovery", "src/kits/breadcrumbs/recovery.test.ts exists"]
+    },
+    {
       "id": "VIS-01",
       "title": "Tone mapping and exposure per scene (view.output)",
       "shipped": true,
@@ -924,7 +931,10 @@
         "validateBoardConfig"
       ]
     },
-    {"name": "breadcrumbs", "exports": ["TRAIL_LIMITS", "breadcrumbs", "createBreadcrumbTrail", "nextFollowerLag"]},
+    {
+      "name": "breadcrumbs",
+      "exports": ["TRAIL_LIMITS", "breadcrumbs", "createBreadcrumbTrail", "createCompanionRecovery", "nextFollowerLag"]
+    },
     {"name": "cadence", "exports": ["CADENCE_CEILING", "MAX_CADENCE_TICK", "createCadence", "createCadenceResult"]},
     {
       "name": "camera",

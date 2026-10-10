@@ -1554,6 +1554,12 @@ Evidence: focused headless tests compare OBJ, PLY and BVH results with three.js'
 
 Evidence: focused headless tests (blob ids equal `git hash-object`; geometry, image and text matches and non-matches; the PNG decoder against a real renderer; a decompression bomb refused; large families and look-alike images grouped within bounds; CLI statuses). An independent adversarial review found thirteen defects, each fixed with a regression test. A local run over the templates found seven exact groups (including textures shared by two templates) and eight similar-image groups. Not part of `npm run check`; hosted full CI pending.
 
+## Companion recovery — candidate (2026-10-10)
+
+- **Scope:** `createCompanionRecovery` in `src/kits/breadcrumbs/recovery.ts` (ADR 0155).
+- **Evidence:** `recovery.test.ts` (6 tests, including a `testScene` pit recovery).
+- **Not established:** template or browser consumers and hosted CI.
+
 ## Camera director rigs — candidate (2026-10-09)
 
 Branch `feat/camera-director-rigs` from the camera director head `8749f5bb`. Four

@@ -46,6 +46,60 @@ trail.cut();
     `movingLag` steps forward with the leader, and one farther back closes in one crumb per tick.
   - While nothing is recorded, it closes in one crumb every `catchUpEvery` ticks down to `idleLag`.
 
+## Companion recovery
+
+`createCompanionRecovery(trail, options)` decides, once per fixed step for each follower, whether a companion that
+retraces the trail has fallen behind or is stranded.
+
+```ts
+const recovery = createCompanionRecovery(trail, { catchUpDistance: 2, teleportDistance: 12, landing: [3, 5, 8], stuckSeconds: 3 });
+const want = trail.along(spacing);
+const d = recovery.update(buddy, {
+  position: [tr.x, tr.y, tr.z],
+  desired: want && [want.x, want.y, want.z],
+  now: ctx.time.t,
+  canLand: p => free(p) && !onScreen(p),   // land somewhere safe and out of view
+});
+if (d.kind === 'teleport') place(buddy, d.to);
+else move(buddy, toward(want), speed * (d.kind === 'follow' ? 1 : d.boost));
+```
+
+The `kind` of the result:
+
+- **`follow`:** within `catchUpDistance` of the desired point.
+- **`catch-up`:** farther away. `boost` rises linearly from 1 at `catchUpDistance` to `maxBoost` (default 2) at
+  `teleportDistance`.
+- **`teleport`:** the follower is stranded, and a landing point passed `canLand`. The landing point is the first trail
+  point at the given `landing` distances behind the newest crumb. A follower is stranded in either case:
+  - it is beyond `teleportDistance` (reason `distance`);
+  - it has stayed beyond `catchUpDistance` for `stuckSeconds` without progress (reason `stuck`), for example walking
+    into a wall or falling into a pit. Progress means advancing `minProgress` toward where it was heading when the
+    window began (the window begins when it falls out of catch-up range); being pushed back moves the reference
+    point back without restarting the clock. A chasing follower, including one a faster leader is pulling away from,
+    is therefore never stuck, and only `teleportDistance` recovers it. Sideways sliding along a wall or a leader
+    idling in place does not count as progress. A follower detouring around an obstacle for longer than
+    `stuckSeconds` without advancing counts as stuck and is put back behind the leader. Choose `minProgress`
+    (default 0.25, must be positive) larger than any back-and-forth a blocked follower makes along its heading.
+
+  Landing points never cross a segment cut. Repeated points (the trail clamps to its oldest crumb) are tried once, as
+  are points no closer to the desired point than the follower, or still beyond `teleportDistance` from it, so a
+  recovery never lands in place or loops. `canLand` must return `true` exactly; anything else, or a throw, refuses.
+  A `cooldown` (default 2 s) separates the teleports of one follower; `remove(id)` forgets it, cooldown included.
+  A landing distance of 0 is the newest crumb, on the leader. Stuck recovery needs a landing distance that lands
+  closer to the desired point than the follower, so include one near the follow spacing.
+- **`stranded`:** stranded, but no landing point is allowed yet (or the cooldown is running). It keeps the boost.
+  Try again later.
+
+Bounds and failure:
+
+- At most `maxFollowers` followers (default 16) and 32 landing distances.
+- Time must not go backwards for a follower.
+- Malformed input throws `RangeError`.
+- `remove(id)` forgets a follower.
+
+The kit does not choose visibility or placement. `canLand` is where the creator checks collision, camera view and
+area.
+
 ## Owner, bounds and failure
 
 - The caller owns the trail and calls `record` from its fixed-step system, so replays are identical.
@@ -65,6 +119,8 @@ trail.cut();
 - One trail per leader. Several followers share it at different lags or distances.
 
 ## Evidence
+
+`recovery.test.ts` covers follow, catch-up boost, distance and stuck teleports, the landing order with `canLand`, cooldown, refusals (including a throwing `canLand` and an empty trail), validation, and a `testScene` companion that falls into a pit and is put back on the trail behind the leader.
 
 `breadcrumbs.test.ts` covers:
 
