@@ -111,3 +111,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0110](0110-look-at-constraint.md) | Bounded look-at constraint in the animation kit | Optional kits / Animation | Proposed |
 
 | [0112](0112-camera-director.md) | Optional camera director helpers | Camera kit | Proposed |
+
+| [0145](0145-cell-portal-culling.md) | Optional cell and portal render culling | Optional kits / Rendering scale | Proposed |

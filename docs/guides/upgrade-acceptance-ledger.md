@@ -1469,3 +1469,19 @@ state across worlds, a wrong default carry pivot, unvalidated heading, overstate
 docs, mutable returned poses and rare ulp redraws; all were fixed and the re-review was
 clean. No browser,
 visual or device evidence.
+
+## Cell and portal culling — candidate (2026-10-09)
+
+Branch `feat/cell-culling` from `9345d07b`. Nineteen new headless tests: graph
+refusals; corridor narrowing; a cell reached through a narrow then a wider portal;
+closed portals and revisions; portals behind or crossing the eye plane; a camera on
+or within tolerance of a portal plane; outside fallbacks; a four-cell cycle; depth
+horizon and overflow fallbacks; the PVS alone; unchanged-camera reuse; determinism;
+render-on-change application, restore, reentrancy and throwing-sink recovery; a
+composition with the real `World`/`Shape` and three.js meshes, with the view-projection
+helper matched against the three.js camera. A seeded comparison of 960 cameras on 24
+generated multi-level grids against an independent ray-marching reference found no
+hidden visible cell; deliberately weakened variants (near-plane clipping, a shrunk
+rectangle, first-visit-only traversal) each failed it. Local headless probe, not a
+device budget: 95 % of 768 objects culled on average on an 8 x 8 fixture. No browser,
+GPU, draw-call, frame-time or device evidence.

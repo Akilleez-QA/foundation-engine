@@ -1428,3 +1428,13 @@ pose-sized transitions landing on moving goals (including the scripted-shot retu
 support carry, letterbox amount and an optional director system. See
 [ADR 0112](../adr/0112-camera-director.md). Headless tests in the ledger; independent
 review and hosted CI remain required.
+
+## Cell and portal culling — candidate (2026-10-09)
+
+Optional `@kits/cells`: creator cells (boxes) and portals (planar convex polygons with
+open state), a bounded flood from the camera's cells narrowing a screen rectangle per
+portal with conservative eye-plane handling, a depth-bounded PVS bit table, and a
+culler that writes visibility only for targets that flip, through engine components
+or three.js objects. See [ADR 0145](../adr/0145-cell-portal-culling.md). Headless tests
+in the ledger; independent review and hosted CI remain required. Hardware occlusion
+queries are out of scope.
