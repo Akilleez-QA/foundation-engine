@@ -959,3 +959,18 @@ Defaults unchanged; no new owner. See [ADR 0090](../adr/0090-camera-support-fram
 and [the camera kit README](../../src/kits/camera/README.md). Headless scene tests
 are recorded in the upgrade ledger; independent review and full hosted CI remain
 required. No browser, visual or device acceptance.
+
+## Optional bounded volume queries — candidate (2026-10-09)
+
+The [volume query kit](../../src/kits/volume-query/README.md) answers overlap,
+fixed-orientation sweep and capsule headroom for a sphere or capsule body against
+an immutable snapshot of static spheres, capsules and oriented boxes. It installs
+no physics world, controller, clock or dependency; results carry the creator's
+snapshot revision and existing owners (portal crossing, alignment, camera
+obstruction, creator systems) apply effects. Evaluation and iteration ceilings
+report `over-budget` or `unresolved`, never clear. Evidence is headless: sampled
+and closed-form oracles, ray/endpoint/centre-ray discriminators, a portal consumer
+and a fixed-runner body-height consumer. Meshes, heightfields, moving colliders,
+rotation during motion, depenetration and device timing are not covered. Independent
+review found and fixed two defects (PR #237, head before this note `7c9680ab`); affected
+check passed 18 tests. Full hosted CI remains required. See ADR 0087.

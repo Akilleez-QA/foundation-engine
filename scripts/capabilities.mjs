@@ -55,6 +55,12 @@ export const FEATURES = [
     evidence: [{kit: 'work-roster', export: 'createWorkRoster'}, {path: 'src/kits/work-roster/consumers.test.ts'}],
   },
   {
+    id: 'VOLUME-01',
+    title: 'Optional bounded sphere and capsule overlap, sweep and headroom queries',
+    docs: 'src/kits/volume-query/README.md',
+    evidence: [{kit: 'volume-query', export: 'sweepVolume'}, {path: 'src/kits/volume-query/oracle.test.ts'}],
+  },
+  {
     id: 'ASG-01',
     title: 'Optional bounded service and worksite assignment ownership',
     docs: 'docs/guides/assignments.md',

@@ -16,6 +16,13 @@
       "evidence": ["@kits/work-roster exports createWorkRoster", "src/kits/work-roster/consumers.test.ts exists"]
     },
     {
+      "id": "VOLUME-01",
+      "title": "Optional bounded sphere and capsule overlap, sweep and headroom queries",
+      "shipped": true,
+      "docs": "src/kits/volume-query/README.md",
+      "evidence": ["@kits/volume-query exports sweepVolume", "src/kits/volume-query/oracle.test.ts exists"]
+    },
+    {
       "id": "ASG-01",
       "title": "Optional bounded service and worksite assignment ownership",
       "shipped": true,
@@ -935,6 +942,18 @@
       "exports": ["VehicleRider", "boardVehicle", "createVehicles", "exitVehicle", "vehicleRiderSystem", "vehicles"]
     },
     {"name": "visibility", "exports": ["createVisibility"]},
+    {
+      "name": "volume-query",
+      "exports": [
+        "VOLUME_MAX_COLLIDERS",
+        "VOLUME_MAX_EXTENT",
+        "VOLUME_MAX_ID_LENGTH",
+        "defineVolumeSet",
+        "headroom",
+        "overlapVolume",
+        "sweepVolume"
+      ]
+    },
     {"name": "work-roster", "exports": ["WORK_ROSTER_MAX_ENTRIES", "WORK_ROSTER_MAX_ID_LENGTH", "createWorkRoster"]}
   ],
   "knobs": [
