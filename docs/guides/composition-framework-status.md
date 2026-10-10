@@ -880,3 +880,10 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Perception kit — candidate (2026-10-09)
+
+Optional `@kits/perception`: sight/hearing strengths over creator queries, awareness
+with alert levels and blackboard facts, squad knowledge, cover selection and utility
+scoring. See [the guide](perception.md) and [ADR 0113](../adr/0113-perception-kit.md).
+Headless tests in the ledger; independent review and hosted CI remain required.

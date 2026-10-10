@@ -1219,3 +1219,13 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Perception kit — candidate (2026-10-09)
+
+Branch `feat/perception-kit` from `a6211bd3`. Seven headless tests: sight range, cone,
+peripheral falloff, near radius and occlusion queried only when needed; hearing
+falloff, path distance, unreachable and attenuation; awareness growth, impulses, decay,
+hysteretic levels and blackboard facts; forgetting and full-memory replacement; squad
+sharing, older-report refusal, fading inform and expiry; cover band, reservations and
+bounded checks; utility compensation, momentum and refusal of invalid considerations.
+No game, browser or device evidence.
