@@ -141,3 +141,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0140](0140-optional-car-handling.md) | Optional car handling on ray-cast wheels | Optional kits / Simulation | Proposed |
 
 | [0141](0141-optional-board-traversal.md) | Optional board traversal with authored rails | Optional kits / Simulation | Proposed |
+
+| [0099](0099-grid-step-movement.md) | Optional grid-step actor movement | Optional kits | Proposed |

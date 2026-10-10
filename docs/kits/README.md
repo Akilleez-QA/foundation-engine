@@ -52,6 +52,8 @@ Optional genre kits, chosen per game in `defineGame({ kits })` and imported as `
 | [ballistics](../../src/kits/ballistics/README.md) | Drag-free trajectory solves (duration, speeds, apex, low/high arcs, moving-target lead), evaluation and arc samples; pure helpers | None yet; headless tests only |
 
 | [breadcrumbs](../../src/kits/breadcrumbs/README.md) | Leader path ring with exact crumb-lag and path-distance retracing, segment cuts, snapshots and a wait/keep-pace/catch-up lag controller; pure helpers | None yet; headless tests only |
+
+| [grid-step](../../src/kits/grid-step/README.md) | Tile-to-tile actors: facing, classified bumps, ledges, conveyor/ice tiles, reservations while moving, follower lines, snapshots; creator tile rules | None yet; headless tests only |
 | [spatial-audio](../../src/kits/spatial-audio/README.md) | Logical sound sources: virtual tracking, importance ranking with HRTF for the sounds that matter, class distance curves with a hard cutoff, budgeted occlusion driving the smoothed filter | None yet; implemented, candidate (AUD-02, PR #55, [recipe](../recipes/3d-sound-for-shooters.md)) |
 
 The optional [assignments](../../src/kits/assignments/README.md) candidate supplies exclusive actor claims, weighted target capacity and atomic transfer refusal. Two headless service/worksite fixtures and route-owner composition tests exercise it; no playable template consumer or browser/device acceptance is claimed. [Guide](../guides/assignments.md).
