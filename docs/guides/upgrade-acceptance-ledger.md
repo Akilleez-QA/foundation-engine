@@ -1501,4 +1501,9 @@ Inventory kit extension ([contract](../../src/kits/inventory/README.md#optional-
 
 - **Scope:** `src/kits/ballistics`, pure solves and evaluation (ADR 0097).
 - **Evidence:** `ballistics.test.ts` covers exact landing for every solve, the constraint of each mode, the 45-degree range boundary, vertical shots, unreachable cases, lead convergence and validation.
+
+## Breadcrumbs kit — candidate (2026-10-09)
+
+- **Scope:** `src/kits/breadcrumbs` (ADR 0098).
+- **Evidence:** `breadcrumbs.test.ts` covers lag exactness, ring bounds, the moved policy, corner retracing, cuts, snapshots, validation, the lag controller and a `testScene` polyline-retracing consumer.
 - **Not established:** template or browser consumers and hosted CI.

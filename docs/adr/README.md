@@ -125,3 +125,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0124](0124-inventory-rule-presets.md) | Slot, stack and key-item rules over the inventory ledger | Optional kits / Inventory | Proposed |
 
 | [0097](0097-ballistic-trajectories.md) | Optional ballistic trajectory solves | Optional kits | Proposed |
+
+| [0098](0098-breadcrumb-trails.md) | Optional breadcrumb trails for followers | Optional kits | Proposed |

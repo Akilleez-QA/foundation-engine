@@ -239,6 +239,16 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'BREADCRUMBS-01',
+    title: 'Bounded leader trails with exact lag and path-distance retracing',
+    docs: 'src/kits/breadcrumbs/README.md',
+    evidence: [
+      {kit: 'breadcrumbs', export: 'createBreadcrumbTrail'},
+      {kit: 'breadcrumbs', export: 'nextFollowerLag'},
+      {path: 'src/kits/breadcrumbs/breadcrumbs.test.ts'},
+    ],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,

@@ -218,6 +218,17 @@
       ]
     },
     {
+      "id": "BREADCRUMBS-01",
+      "title": "Bounded leader trails with exact lag and path-distance retracing",
+      "shipped": true,
+      "docs": "src/kits/breadcrumbs/README.md",
+      "evidence": [
+        "@kits/breadcrumbs exports createBreadcrumbTrail",
+        "@kits/breadcrumbs exports nextFollowerLag",
+        "src/kits/breadcrumbs/breadcrumbs.test.ts exists"
+      ]
+    },
+    {
       "id": "VIS-01",
       "title": "Tone mapping and exposure per scene (view.output)",
       "shipped": true,
@@ -719,6 +730,7 @@
         "isBlackboardValue"
       ]
     },
+    {"name": "breadcrumbs", "exports": ["TRAIL_LIMITS", "breadcrumbs", "createBreadcrumbTrail", "nextFollowerLag"]},
     {"name": "cadence", "exports": ["CADENCE_CEILING", "MAX_CADENCE_TICK", "createCadence", "createCadenceResult"]},
     {
       "name": "camera",
