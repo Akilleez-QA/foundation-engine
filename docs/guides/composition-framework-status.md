@@ -880,3 +880,10 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+
+## Offline format converters candidate — ASSET-CONVERT, 2026-10-09
+
+`npm run convert` (`tools/convert/`) is an independently implemented offline toolchain: OBJ/MTL, PLY and BVH (bone-map retargeting that folds unmapped joints) to GLB, and PCX, BMP and raw palette images to indexed or RGBA PNG. Each conversion writes a provenance receipt (output and input hashes, tool, options) that `lint:provenance` accepts; failures write nothing. The runtime model loader is unchanged. [README](../../tools/convert/README.md), [ADR 0130](../adr/0130-offline-format-converters.md).
+
+Evidence: focused headless tests compare OBJ, PLY and BVH results with three.js's own loaders as oracles, check folded joints keep world positions, check palette and index preservation for PCX/BMP/RLE8, validate every GLB with the glTF validator and GLTFLoader, and run a converted file's receipt through the provenance check. An independent adversarial review found ten defects (including silently invalid GLBs, file embedding through `../` texture paths and memory amplification from small headers), each fixed with a regression test. This is a branch candidate: hosted full CI and review of real creator assets in a game remain pending; rest-pose retargeting is not implemented.

@@ -187,6 +187,13 @@
       "evidence": ["npm run asset:verify"]
     },
     {
+      "id": "ASSET-CONVERT",
+      "title": "Offline converters to glTF and PNG with provenance receipts (npm run convert)",
+      "shipped": true,
+      "docs": "tools/convert/README.md",
+      "evidence": ["npm run convert", "tools/convert/bvh.mjs exists", "tools/convert/convert.test.mjs exists"]
+    },
+    {
       "id": "ASSET-OPTIMIZE",
       "title": "Model optimisation (npm run asset:optimize)",
       "shipped": true,
@@ -885,6 +892,7 @@
     "capabilities",
     "check",
     "content:publish",
+    "convert",
     "deploy:production",
     "dev",
     "disclosure",

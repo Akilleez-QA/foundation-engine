@@ -214,6 +214,12 @@ export const FEATURES = [
     evidence: [{script: 'asset:verify'}],
   },
   {
+    id: 'ASSET-CONVERT',
+    title: 'Offline converters to glTF and PNG with provenance receipts (npm run convert)',
+    docs: 'tools/convert/README.md',
+    evidence: [{script: 'convert'}, {path: 'tools/convert/bvh.mjs'}, {path: 'tools/convert/convert.test.mjs'}],
+  },
+  {
     id: 'ASSET-OPTIMIZE',
     title: 'Model optimisation (npm run asset:optimize)',
     pr: 135,
