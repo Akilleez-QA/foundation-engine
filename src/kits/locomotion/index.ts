@@ -91,3 +91,17 @@ export {
   type PlatformDelta,
   type PlatformsOptions,
 } from './platforms';
+export {
+  createLadders,
+  findLedge,
+  pushStep,
+  type BoxSweep,
+  type GroundProbe,
+  type Ladder,
+  type LadderGrip,
+  type LedgeQuery,
+  type LedgeResult,
+  type PushableState,
+  type SphereCast,
+  type TraversalVec3,
+} from './traversal';

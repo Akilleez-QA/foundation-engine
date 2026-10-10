@@ -1190,3 +1190,12 @@ implementation evidence, not a claim of integration or deployment.
 
 Contract, reproduction and verification:
 [cellular WASM](cellular-wasm.md), [ADR 0101](../adr/0101-optional-cellular-wasm.md).
+
+## Traversal helpers — candidate (2026-10-09)
+
+Locomotion kit extension: ledge detection, ladders and pushable blocks over creator
+cast, ground and box-sweep queries. The volume-query kit's sphere sweep can back the
+cast and ground queries through a documented adapter, which a test exercises; it has no
+box body, so the box sweep needs the creator's own collision. See
+[ADR 0115](../adr/0115-traversal-helpers.md). Headless tests in the ledger; independent
+review rounds with all findings fixed; hosted CI remains required.

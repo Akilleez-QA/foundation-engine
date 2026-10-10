@@ -1673,3 +1673,51 @@ implementation evidence, not a claim of integration or deployment.
 
 Contract, reproduction and verification:
 [cellular WASM](cellular-wasm.md), [ADR 0101](../adr/0101-optional-cellular-wasm.md).
+
+## Traversal helpers — candidate (2026-10-09)
+
+Branch `feat/traversal-helpers` from `9345d07b`. Seven headless tests over a sampled
+box world and the real volume-query kit:
+- ledges:
+  - a ledge found with climb height, edge, top and wall normal; plus no-wall, too-high,
+    too-low and no-headroom;
+  - a low ceiling at any maxClimb; knee-high ledges; tops just above minClimb and low
+    curbs met at their upper edge;
+  - thin fences (no top) and tall walls (too high), with and without a ceiling;
+  - a 45° approach landing on the face; a 70° approach reported as oblique; a
+    straight-up normal refused; gentle ramps of 2–30° never read as ledges; a body
+    pressed flush against a tall wall gets too-high;
+  - the same ledge through a `defineVolumeSet` adapter;
+- ladders: attach facing rules, vertical reach, zero-facing and NaN refusal, climbing
+  to a top exit, bottom exit and top standing point;
+- pushables:
+  - acceleration, speed cap, blocking with sliding on the other axis;
+  - friction that always resists (including under a tiny push), the static threshold,
+    dt 0 with no change and no sweep;
+  - grid pushes to the next line strictly ahead, the same for nearly equal positions,
+    in both directions, and with a half-cell grid offset.
+
+An independent adversarial review found that:
+- a low ceiling made reachable ledges too high;
+- oblique approaches gave the wrong edge;
+- ladders attached from metres away vertically, or with a zero facing;
+- any push disabled friction;
+- grid pushes left blocks off the grid;
+- the volume-query compatibility claim was overstated.
+
+The re-review found that:
+- low walls just above minClimb were refused, because their edge normal points up;
+- grid pushes jumped 0.5 or 1.5 cells depending on rounding;
+- a ceiling could change the failure reason;
+- narrow tops were missed;
+- a straight-up normal produced NaN queries;
+- dt 0 still capped the speed.
+
+A third round confirmed those fixes, then found that the edge-contact rule took gentle
+ramps for ledges, that a body flush against a tall wall got no-top, and that `origin`
+was validated only in snap mode. These are fixed too: an edge contact now needs a level
+top and a drop in front of it, the deciding cast starts slightly back from the wall, and
+`origin` is validated in every mode. A narrow re-review confirmed these fixes and found
+one low issue: the backed-off start could land in a wall just behind the body, giving
+no-top instead of too-high. That is fixed: the start backs off only as far as the body
+is flush. No game, browser or device evidence.

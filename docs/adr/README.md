@@ -161,3 +161,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0114](0114-navmesh-funnel-avoidance.md) | Navigation mesh queries, funnel paths and local avoidance | Optional kits / Navigation | Proposed |
 
 | [0101](0101-optional-cellular-wasm.md) | Explicit cellular WASM job with per-job fixed memory and existing worker ownership | Procgen / Workers | Proposed |
+
+| [0115](0115-traversal-helpers.md) | Ledge, ladder and pushable traversal helpers | Optional kits / Locomotion | Proposed |
