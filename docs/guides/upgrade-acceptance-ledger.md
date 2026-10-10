@@ -1343,3 +1343,129 @@ and a fixed-runner body-height consumer. Meshes, heightfields, moving colliders,
 rotation during motion, depenetration and device timing are not covered. Independent
 review found and fixed two defects (PR #237, head before this note `7c9680ab`); affected
 check passed 18 tests. Full hosted CI remains required. See ADR 0098.
+
+## Optional cue sequences — candidate (2026-10-09)
+
+Branch `feat/sequence-kit` from `cbaf8060`. Twelve checked-in headless tests. An
+independent adversarial review also fuzzed about 30,000 runs against its own reference
+model in an external harness that is not checked in; its findings (effect-id
+collisions across definitions, session handling at reload, a `settled` signal for
+budget-stopped work, single-read array copies, documentation) were fixed and a
+re-review of the fixed head was clean. The checked-in tests cover: parallel tracks,
+cross-track barriers and held cues with exact ticks; one large advance equal to
+many small ones and to a one-transition budget (identical event order, owed ticks
+drained); skip landing each remaining gameplay effect once, dropping presentation
+effects and producing no presentation events, refused when not skippable; cancel;
+a budget-stopped snapshot restored through JSON to the same future; refusal of an
+edited definition, another session and twelve forged or inconsistent states;
+definition validation and isolation; a real save store round trip across a fresh
+store composed with the dialogue kit; and a scene in which a fixed-step system
+drives the sequence, the camera kit follows cue alpha and the audio-mixer plays a
+cue once, with skip landing the effect and playing nothing; unambiguous effect ids,
+the `settled` signal and -0 normalisation; and arrays copied without iteration. No
+browser, device or template evidence.
+
+## Sequence cast, branches and arbitration — candidate (2026-10-09)
+
+Branch `feat/sequence-extensions` from the #249 head `b58a0f02`. Seven new headless tests:
+cast binding, refusal, channel ownership, settle-aware freeze and release; an ECS
+consumer whose bystander is frozen while the cast member is driven; branch offer,
+choose and abandonment of later effects; graph snapshots mid-node and at a branch,
+skip following defaults and landing only what choosing would have; graph validation
+and step-bounded loops that end with `limited`; and arbiter priority, held refusals,
+stale release and cooldown; plus settle-gated offers and single finish on a directly
+released branch cue. An independent adversarial review (external 3,000-graph fuzz, not
+checked in) found no duplicate effect but found wedging at the step bound, prototype
+names accepted as defaults, an overstated skip claim, unsettled offers, re-reads and
+documentation gaps; all were fixed, and a re-review with a 3,000-graph fuzz was clean.
+The 12 #249 tests still pass. No browser or device evidence.
+
+## Optional population kit — candidate (2026-10-09)
+
+Branch `feat/population-kit` from `cbaf8060`. Eleven checked-in headless tests. An
+independent adversarial review also fuzzed placements (300 seeds against a reference
+model) and tiers in an external harness that is not checked in; its findings (time
+dropped when `dt × slots` exceeded the catch-up cap, half-applied steps after a
+throwing callback, default exit radius above the bound, sparse definitions, status
+after dispose, undocumented cost and ordering) were fixed, and a re-review of the fixed head (placement
+fuzz plus 300-seed tier fuzz with varying steps) was clean. Tests: spawn/despawn
+with enter/exit hysteresis in definition order; `never`/`visit`/`leave` policies,
+persistence of `never` only and revival; deterministic caps with deferred counts
+and retry after `returned`; validation of definitions, limits, observers and
+forged or edited snapshots; an ECS consumer spawning and removing entities from
+intents with depletion surviving a real save store reload; update tiers for
+always/near/background with conserved background time, hysteresis, owed-time
+delivery and refusal of oversized steps, unchanged state after a throwing callback,
+slot balance and limits; sparse definitions, bounded default exit and dispose; and a fixed-step runner consumer
+integrating only due entities. No browser, device or performance acceptance.
+
+## Optional region activation candidate — ACTIVATION-01, 2026-10-09
+
+`@kits/region-activation` is an independently implemented pure helper that decides which uniform grid regions a game simulates from observer positions. It provides activate/release radius hysteresis, update-count linger with cancel-on-return, refcounted pins, per-update activation (nearest first) and deactivation budgets, a hard `maxActive` refusal, per-region epochs for refusing stale asynchronous loads and `dormantFor` for creator catch-up rules. ECS systems, the chunk store and worker host keep their responsibilities; no loader, scheduler, persistence or registration is added. [Guide](region-activation.md), [ADR 0095](../adr/0095-optional-region-activation.md).
+
+Evidence: 13 focused headless tests (11 unit tests including a 3,000-step brute-force model comparison asserting statuses and counters and 2,000 non-dyadic boundary-geometry trials, plus an ECS fixed-step gating consumer and a chunk-store load/save consumer with epoch refusal). An independent adversarial review found an off-grid query crash, boundary rounding in the scan range, unasserted statuses and index-ordered deactivation starvation; all were fixed with regression tests before publication. A local headless micro-measurement is recorded in the kit README as an order-of-magnitude indication only. This is a branch candidate: hosted full CI, a playable template consumer, browser behaviour and physical-device acceptance remain pending.
+
+## Optional update cadence candidate — CADENCE-01, 2026-10-09
+
+`@kits/cadence` is an independently implemented pure helper that runs members at their own integer periods on the caller's tick. It spreads start phases by id (or explicit phase), returns at most `maxDuePerTake` due members earliest-due-first with elapsed and lateness ticks, defers the rest instead of dropping them, reschedules on each member's phase grid without burst catch-up, and offers JSON-safe snapshot/restore. The fixed-step runner, clock and interest sets keep their responsibilities; no clock, callback, persistence owner or registration is added. [Guide](update-cadence.md), [ADR 0096](../adr/0096-optional-update-cadence.md).
+
+Evidence: 10 focused headless tests (8 unit tests including a 4,000-step comparison with an independent enumeration model with large gaps and mid-run snapshot round trips, plus an ECS fixed-step consumer with distance-banded periods and an interest-set refresh consumer). An independent adversarial review found that period changes discarded the phase spread, plus result-buffer aliasing, tick overflow near 2^53 and weak snapshot invariants; all were fixed with regression tests before publication. A local headless micro-measurement is recorded in the kit README as an order-of-magnitude indication only. This is a branch candidate: hosted full CI, a playable template consumer, browser behaviour and physical-device acceptance remain pending.
+
+## Optional render interpolation — candidate (2026-10-09)
+
+- **Scope:** `src/author/interpolation.ts` adds the `Interpolated` component, `presentTransform` and
+  `presentedTransform`, and `ctx.time.alpha`. Runtime capture runs in the runner's `beforeStep`. Shape,
+  Mesh and Model drawing and `cameraSystem` use the drawn pose for opted-in entities. This is the "next
+  slice" named for MV-02.
+- **Evidence:** `src/author/interpolation.test.ts` and `src/kits/camera/interpolation.test.ts`. They show
+  uniform per-frame motion at 144 Hz against whole-step jumps without opt-in, a lag under one step,
+  revision snapping, the ±π seam and the camera following the drawn pose. Entities that do not opt in
+  are unchanged.
+- **Browser smoke (local, not committed):** the arcade template's ball and blocks were temporarily opted in
+  and run through `play:snap`. It reported no page errors, rendered while moving, and stayed within the
+  budget (5 draws, 761 triangles). Headless Chromium runs at 60 Hz, so `alpha` stays near 0. This shows
+  the runtime paths run; it does not show smoothness.
+- **Review:** the independent review found one major issue (point and spot lights were drawn at the latest
+  step) and several minor ones: the alpha contract in fixed systems, camera snapping guidance, negative
+  revision aliasing, and the dev teleport tool. All are fixed or documented.
+- **Not established:** physical high-refresh displays, template adoption and hosted CI.
+
+## Remote playout — PLAYOUT-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/playout/README.md), [guide](remote-playout.md), [decision](../adr/0093-remote-playout.md). Optional pure clock-offset estimation (minimum round trip in a bounded window, bounded slew, snap threshold) and per-subject playout buffers that present authoritative views behind the estimated clock with an adaptive bounded delay, interpolation, capped extrapolation, discontinuity holds and non-decreasing render time. Evidence: eight focused headless tests including a 20-second jittered composition with the real view receiver (presented error below 1e-14, per-frame step deviation 1.1 ms of motion against 84 ms when presenting the newest view). Candidate only; protocol, WAN, browser, physical-device and full-CI acceptance are not claimed here.
+
+## Optional entity pool candidate — POOL-01, 2026-10-09
+
+`@kits/entity-pool` is an independently implemented pure helper that keeps pooled members under a creator member-count and cost cap. Creator classes carry a priority, cost, class cap and eviction order (oldest, newest, lowest score); only `evictable` classes lose members, and only to higher-priority requests, lowest priority first; `replaceOwn` lets a class recycle its own members. Admission is atomic with a bounded eviction plan and reported refusals (`class-full`, `capacity`, `eviction-limit`); pins protect members; `sweep` recovers members destroyed elsewhere. A `World` adapter spawns only on admission, despawns evicted entities and emits one world event per eviction. No system, clock, persistence owner or registration is added; placement memory across saves stays with its owner. [Guide](entity-pool.md), [ADR 0100](../adr/0100-optional-entity-pool-eviction-classes.md).
+
+Evidence: 10 focused headless tests (8 unit tests including a 6,000-operation comparison with an independent one-victim-at-a-time model with give-back covering every refusal reason, plus a World fixed-step consumer under a triangle-cost cap with eviction events and an owner-recovery consumer). An independent adversarial review found re-entrant `sweep` corruption, unbounded sweep rescans, over-eviction of cheap classes, eager per-class heap memory and smaller validation gaps; all were fixed with regression tests before publication. A local headless micro-measurement is recorded in the kit README as an order-of-magnitude indication only. This is a branch candidate: hosted full CI, a playable template consumer, browser behaviour and physical-device acceptance remain pending.
+
+## Replication schedule — REPL-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/replication/README.md), [guide](replication-schedule.md), [decision](../adr/0094-replication-schedule.md). Optional quantized field schema, per-recipient byte-budgeted packets (removals, creations, field-mask updates) ranked in one queue by accumulated weighted priority with per-entry minimum interval, per-recipient epochs, loss/acknowledgment recovery, and an order-safe replica with tombstones. Addresses the interest sets limits (starvation rotation, per-entity cadence, delta encoding). Evidence: thirteen focused headless tests including a lossy, duplicating, reordering composition with interest sets that converges exactly and a randomized 40-seed convergence test (52,771 vs 557,712 characters for complete views of the same sets). Candidate only; transport, WAN, browser, physical-device and full-CI acceptance are not claimed here.
+
+## Look-at constraint — candidate (2026-10-09)
+
+Branch `feat/look-at-constraint` from `a6211bd3`. Nine headless tests: exact aim of the
+composed chain and share split; limits with overflow; a 500-chain random check that
+joint parts add up to the clamped aim; no yaw flip behind or straight above; exact aim
+of a three-joint hierarchy with rest-derived parent frames; front-cone, null and
+zero-length relaxation with smoothing and the speed cap; parent-frame conjugation and
+composition through `blendPoseLayers`; single-read limits and `apply` refusals; and
+validation. An independent adversarial review found lost residual turn, a yaw flip
+behind the root, double reads and loose `apply` input; all were fixed and a re-review
+with an external 5,000-chain fuzz (not checked in) was clean. No visual, browser or device evidence.
+
+## Camera director — candidate (2026-10-09)
+
+Branch `feat/camera-director` from `a6211bd3`. Eight new headless tests: ladder order,
+stickiness and yawed boxes; string rig band clamping and blending; rail, close-up and
+orbit shot poses; transition sizing, deceleration and exact arrival on a moving goal;
+support carry; letterbox easing; and a scene where the director system blends into a
+volume's setting, stops rewriting at rest and returns from a scripted override to the
+live gameplay pose; plus per-world stickiness, carry about the pre-move pivot,
+validation and frozen poses. An independent adversarial review found shared sticky
+state across worlds, a wrong default carry pivot, unvalidated heading, overstated
+docs, mutable returned poses and rare ulp redraws; all were fixed and the re-review was
+clean. No browser,
+visual or device evidence.

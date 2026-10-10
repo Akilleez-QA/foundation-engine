@@ -20,6 +20,7 @@ import {
   type ClipTransitions,
 } from './scene-model-transition';
 import {Transform} from './defs';
+import type {TransformPose} from './interpolation';
 import type {ModelLooks} from './model-looks';
 interface Slot {
   rig?: ModelRigCapture;
@@ -59,6 +60,8 @@ export function createSceneModels(o: {
   mask?(entity: Entity): number;
   /** Draws an entity's `Material` over its instance's own materials (model-looks.ts); absent, models keep theirs. */
   looks?: Pick<ModelLooks, 'sync' | 'release'> | undefined;
+  /** The pose to draw for an entity (render interpolation); absent, models are drawn at their Transform. */
+  present?(entity: Entity, tr: TransformPose): TransformPose;
 }) {
   const slots = new Map<Entity, Slot>();
   let closed = false,
@@ -169,7 +172,7 @@ export function createSceneModels(o: {
         retire(e, slot);
         return;
       }
-      pose(e, slot, current, tr);
+      pose(e, slot, current, o.present ? o.present(e, tr) : tr);
       if (o.world.has(e, ModelAttachment) || o.world.has(e, ModelPoseLink)) {
         slot.root.visible = false;
         slot.root.matrixAutoUpdate = false;
@@ -365,7 +368,7 @@ export function createSceneModels(o: {
           }
           const slot = slots.get(e);
           if (!slot?.ready) continue;
-          changed = pose(e, slot, data, tr) || changed;
+          changed = pose(e, slot, data, o.present ? o.present(e, tr) : tr) || changed;
           changed = applyMask(slot, e) || changed;
           if (!live(e, slot)) continue;
           if (o.looks?.sync(e, slot.instance!)) changed = true;

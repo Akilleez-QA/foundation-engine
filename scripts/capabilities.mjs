@@ -43,6 +43,15 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'POOL-01',
+    title: 'Optional bounded entity pool with eviction classes',
+    docs: 'docs/guides/entity-pool.md',
+    evidence: [
+      {kit: 'entity-pool', export: 'createEntityPool'},
+      {kit: 'entity-pool', export: 'spawnPooled'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',
@@ -59,6 +68,24 @@ export const FEATURES = [
     title: 'Optional bounded sphere and capsule overlap, sweep and headroom queries',
     docs: 'src/kits/volume-query/README.md',
     evidence: [{kit: 'volume-query', export: 'sweepVolume'}, {path: 'src/kits/volume-query/oracle.test.ts'}],
+  },
+  {
+    id: 'ACTIVATION-01',
+    title: 'Optional bounded region activation from observer positions',
+    docs: 'docs/guides/region-activation.md',
+    evidence: [
+      {kit: 'region-activation', export: 'createRegionActivation'},
+      {kit: 'region-activation', export: 'createRegionUpdateResult'},
+    ],
+  },
+  {
+    id: 'CADENCE-01',
+    title: 'Optional bounded per-member update cadence',
+    docs: 'docs/guides/update-cadence.md',
+    evidence: [
+      {kit: 'cadence', export: 'createCadence'},
+      {kit: 'cadence', export: 'createCadenceResult'},
+    ],
   },
   {
     id: 'ASG-01',
@@ -89,6 +116,21 @@ export const FEATURES = [
     title: 'Acknowledged-baseline deltas for complete network views',
     docs: 'src/kits/network/README.md',
     evidence: [{kit: 'network', export: 'createViewDeltaEncoder'}, {path: 'src/kits/network/view-delta.test.ts'}],
+  },
+  {
+    id: 'PLAYOUT-01',
+    title: 'Remote clock offset and adaptive playout buffers',
+    docs: 'src/kits/playout/README.md',
+    evidence: [{kit: 'playout', export: 'createPlayout'}, {path: 'src/kits/playout/playout.test.ts'}],
+  },
+  {
+    id: 'REPL-01',
+    title: 'Per-recipient quantized replication under a byte budget',
+    docs: 'src/kits/replication/README.md',
+    evidence: [
+      {kit: 'replication', export: 'createReplicationSchedule'},
+      {path: 'src/kits/replication/replication.test.ts'},
+    ],
   },
   {
     id: 'VISIBILITY-01',
@@ -122,6 +164,12 @@ export const FEATURES = [
       {kit: 'capabilities', export: 'createActionPhases'},
       {path: 'src/kits/capabilities/action-phases.test.ts'},
     ],
+  },
+  {
+    id: 'RENDER-INTERP',
+    title: 'Opt-in render interpolation of fixed-step Transforms',
+    docs: 'docs/guides/render-interpolation.md',
+    evidence: [{engine: 'Interpolated'}, {engine: 'presentTransform'}, {path: 'src/author/interpolation.test.ts'}],
   },
   {
     id: 'VIS-01',

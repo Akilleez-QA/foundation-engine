@@ -17,6 +17,8 @@ import {
   defineKit,
   defineSystem,
   Transform,
+  Interpolated,
+  presentTransform,
   type KitDefinition,
   type SceneContext,
   type SystemDefinition,
@@ -164,7 +166,9 @@ export function cameraSystem(
         throw Error('camera: reset revision must be an integer');
       const revisionChanged = revision !== undefined && revisions.get(ctx.world) !== revision;
       const e = ctx.named(o.target ?? 'player'),
-        tr = e === undefined ? undefined : ctx.world.get(e, Transform);
+        latest = e === undefined ? undefined : ctx.world.get(e, Transform),
+        // An `Interpolated` target is followed where it is drawn, not where the latest step left it.
+        tr = latest && presentTransform(latest, ctx.world.get(e!, Interpolated), ctx.time.alpha);
       if (!tr && mode !== 'fixed') {
         previous.delete(ctx.world);
         return;
@@ -218,3 +222,21 @@ export function cameraSystem(
 export function camera(): KitDefinition {
   return defineKit({id: 'camera'});
 }
+export {
+  cameraDirectorSystem,
+  closeUpPose,
+  createCameraTransition,
+  createCameraVolumes,
+  createLetterbox,
+  railPose,
+  shotPose,
+  stringPose,
+  type CameraPose,
+  type CameraSelection,
+  type CameraSettingPose,
+  type CameraTransition,
+  type CameraVolume,
+  type RailRig,
+  type StringRig,
+  type VolumeShape,
+} from './director';

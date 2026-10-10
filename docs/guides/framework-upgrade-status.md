@@ -1358,3 +1358,73 @@ and a fixed-runner body-height consumer. Meshes, heightfields, moving colliders,
 rotation during motion, depenetration and device timing are not covered. Independent
 review found and fixed two defects (PR #237, head before this note `7c9680ab`); affected
 check passed 18 tests. Full hosted CI remains required. See ADR 0098.
+
+## Optional cue sequences — candidate (2026-10-09)
+
+`@kits/sequence` runs creator-defined multi-track cue lists on caller ticks with
+barriers, holds, exactly-once effect intents, skip, cancellation, a bounded
+per-call transition budget and validated save-section snapshots. It installs no
+owner; the creator's fixed-step system, camera, audio-mixer and dialogue kits keep
+theirs. See [the guide](sequences.md) and [ADR 0091](../adr/0091-bounded-cue-sequences.md).
+Headless tests are recorded in the upgrade ledger; independent review and full
+hosted CI remain required.
+
+## Sequence cast, branches and arbitration — candidate (2026-10-09)
+
+Builds on the cue sequence kit (#249): cast binding with driven channels and a
+settle-aware freeze gate, branching sequence graphs, and a one-claim event arbiter.
+Pure helpers; see [ADR 0111](../adr/0111-sequence-cast-branches-arbitration.md) and
+[the guide](sequences.md). Headless tests are in the ledger; independent review and
+hosted CI remain required.
+
+## Optional population kit — candidate (2026-10-09)
+
+`@kits/population` (requires `spatial`) adds placement fields that spawn and
+despawn authored placements near observers with bounded per-update work and
+remember destroyed ones (persisted `never` depletion through a strict save
+section), and update tiers that freeze or round-robin far entities with conserved
+time. No owner is installed. See [the guide](population.md) and
+[ADR 0092](../adr/0092-population-placements-and-tiers.md). Headless tests are in the
+upgrade ledger; independent review and full hosted CI remain required.
+
+## Optional region activation candidate — ACTIVATION-01, 2026-10-09
+
+`@kits/region-activation` is an independently implemented pure helper that decides which uniform grid regions a game simulates from observer positions. It provides activate/release radius hysteresis, update-count linger with cancel-on-return, refcounted pins, per-update activation (nearest first) and deactivation budgets, a hard `maxActive` refusal, per-region epochs for refusing stale asynchronous loads and `dormantFor` for creator catch-up rules. ECS systems, the chunk store and worker host keep their responsibilities; no loader, scheduler, persistence or registration is added. [Guide](region-activation.md), [ADR 0095](../adr/0095-optional-region-activation.md).
+
+Evidence: 13 focused headless tests (11 unit tests including a 3,000-step brute-force model comparison asserting statuses and counters and 2,000 non-dyadic boundary-geometry trials, plus an ECS fixed-step gating consumer and a chunk-store load/save consumer with epoch refusal). An independent adversarial review found an off-grid query crash, boundary rounding in the scan range, unasserted statuses and index-ordered deactivation starvation; all were fixed with regression tests before publication. A local headless micro-measurement is recorded in the kit README as an order-of-magnitude indication only. This is a branch candidate: hosted full CI, a playable template consumer, browser behaviour and physical-device acceptance remain pending.
+
+## Optional update cadence candidate — CADENCE-01, 2026-10-09
+
+`@kits/cadence` is an independently implemented pure helper that runs members at their own integer periods on the caller's tick. It spreads start phases by id (or explicit phase), returns at most `maxDuePerTake` due members earliest-due-first with elapsed and lateness ticks, defers the rest instead of dropping them, reschedules on each member's phase grid without burst catch-up, and offers JSON-safe snapshot/restore. The fixed-step runner, clock and interest sets keep their responsibilities; no clock, callback, persistence owner or registration is added. [Guide](update-cadence.md), [ADR 0096](../adr/0096-optional-update-cadence.md).
+
+Evidence: 10 focused headless tests (8 unit tests including a 4,000-step comparison with an independent enumeration model with large gaps and mid-run snapshot round trips, plus an ECS fixed-step consumer with distance-banded periods and an interest-set refresh consumer). An independent adversarial review found that period changes discarded the phase spread, plus result-buffer aliasing, tick overflow near 2^53 and weak snapshot invariants; all were fixed with regression tests before publication. A local headless micro-measurement is recorded in the kit README as an order-of-magnitude indication only. This is a branch candidate: hosted full CI, a playable template consumer, browser behaviour and physical-device acceptance remain pending.
+
+## Remote playout — PLAYOUT-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/playout/README.md), [guide](remote-playout.md), [decision](../adr/0093-remote-playout.md). Optional pure clock-offset estimation (minimum round trip in a bounded window, bounded slew, snap threshold) and per-subject playout buffers that present authoritative views behind the estimated clock with an adaptive bounded delay, interpolation, capped extrapolation, discontinuity holds and non-decreasing render time. Evidence: eight focused headless tests including a 20-second jittered composition with the real view receiver (presented error below 1e-14, per-frame step deviation 1.1 ms of motion against 84 ms when presenting the newest view). Candidate only; protocol, WAN, browser, physical-device and full-CI acceptance are not claimed here.
+
+## Optional entity pool candidate — POOL-01, 2026-10-09
+
+`@kits/entity-pool` is an independently implemented pure helper that keeps pooled members under a creator member-count and cost cap. Creator classes carry a priority, cost, class cap and eviction order (oldest, newest, lowest score); only `evictable` classes lose members, and only to higher-priority requests, lowest priority first; `replaceOwn` lets a class recycle its own members. Admission is atomic with a bounded eviction plan and reported refusals (`class-full`, `capacity`, `eviction-limit`); pins protect members; `sweep` recovers members destroyed elsewhere. A `World` adapter spawns only on admission, despawns evicted entities and emits one world event per eviction. No system, clock, persistence owner or registration is added; placement memory across saves stays with its owner. [Guide](entity-pool.md), [ADR 0100](../adr/0100-optional-entity-pool-eviction-classes.md).
+
+Evidence: 10 focused headless tests (8 unit tests including a 6,000-operation comparison with an independent one-victim-at-a-time model with give-back covering every refusal reason, plus a World fixed-step consumer under a triangle-cost cap with eviction events and an owner-recovery consumer). An independent adversarial review found re-entrant `sweep` corruption, unbounded sweep rescans, over-eviction of cheap classes, eager per-class heap memory and smaller validation gaps; all were fixed with regression tests before publication. A local headless micro-measurement is recorded in the kit README as an order-of-magnitude indication only. This is a branch candidate: hosted full CI, a playable template consumer, browser behaviour and physical-device acceptance remain pending.
+
+## Replication schedule — REPL-01 candidate, 2026-10-09
+
+[Contract](../../src/kits/replication/README.md), [guide](replication-schedule.md), [decision](../adr/0094-replication-schedule.md). Optional quantized field schema, per-recipient byte-budgeted packets (removals, creations, field-mask updates) ranked in one queue by accumulated weighted priority with per-entry minimum interval, per-recipient epochs, loss/acknowledgment recovery, and an order-safe replica with tombstones. Addresses the interest sets limits (starvation rotation, per-entity cadence, delta encoding). Evidence: thirteen focused headless tests including a lossy, duplicating, reordering composition with interest sets that converges exactly and a randomized 40-seed convergence test (52,771 vs 557,712 characters for complete views of the same sets). Candidate only; transport, WAN, browser, physical-device and full-CI acceptance are not claimed here.
+
+## Look-at constraint — candidate (2026-10-09)
+
+`createLookAt` in the animation kit aims a bounded joint chain at a root-frame
+direction with per-joint shares and limits, a front cone, smoothing and a speed cap,
+returning deltas that compose onto pose arrays. Pure; the caller owns targets, clock
+and skeleton. See [ADR 0110](../adr/0110-look-at-constraint.md). Headless tests are in
+the upgrade ledger; independent review and full hosted CI remain required.
+
+## Camera director — candidate (2026-10-09)
+
+Optional camera-kit helpers: volume priority ladder, string/rail/close-up/shot rigs,
+pose-sized transitions landing on moving goals (including the scripted-shot return),
+support carry, letterbox amount and an optional director system. See
+[ADR 0112](../adr/0112-camera-director.md). Headless tests in the ledger; independent
+review and hosted CI remain required.

@@ -88,3 +88,39 @@ reports whether an offset remains.
   is exactly continuous when the outgoing and incoming rotations share an axis
   and first-order otherwise. Large offsets are not overshoot-limited; long
   `blendTime` with a fast outgoing pose can carry a joint past both poses.
+
+## Look-at constraint
+
+`createLookAt({ joints, ignoreBeyond?, smoothing?, maxSpeed? })` aims a chain of 1–8
+joints (root-most first, for example spine, neck, head) at a direction given in the
+chain's root frame (+Z forward, +Y up). Each joint has a `share` of the turn it tries
+to take first and its own yaw/pitch limits within ±π/2; remaining turn flows to the
+next joint, and anything the last joint cannot take is handed back to earlier joints
+with headroom, so the parts always add up to the clamped aim. The limits bound each
+joint's share of the root-frame yaw and pitch, not its own local Euler angles. An optional
+`parentFrame` quaternion gives the joint's parent rest orientation relative to the
+root when it is not aligned: the product of the rest rotations of the joints above it
+(derive it from the bind or rest pose). With an animated base pose the frames are
+stale and the aim is approximate. Per-joint deltas are steps between cumulative aims, so
+the composed chain points exactly at the clamped aim.
+
+`update(dt, direction | null)` returns frozen state `{yaw, pitch, engaged, joints}`.
+Targets outside a front cone (`ignoreBeyond`, default and maximum π/2, so nothing
+behind the root flips yaw between its limits), null or zero-length targets relax the
+chain to rest; yaw fades out as the direction becomes vertical. Motion is an
+exponential approach (`smoothing`, default 0.15 s; 0 means no easing) capped by
+`maxSpeed` (default 6 per second, measured in yaw/pitch parameter space); `reset()`
+jumps to rest. `apply(base, state)` multiplies each joint's delta onto a base pose
+array (`delta × base`); it accepts only states this instance returned and refuses a
+base that repeats a joint, lacks a chain joint or has an invalid chain rotation.
+
+Composition: run it after whatever produces the base pose, such as `createPoseSampler`,
+`blendPoseLayers` or a pose transition, and before writing the pose. For a glTF
+`Model`, write `state.joints[i].rotation × restRotation` into `Model.pose` only for
+joints the playing clip does not animate (pose overrides replace the clip value for
+that node); otherwise sample the pose array yourself. The caller owns target
+selection (which target, when to switch or stop), the clock and the skeleton.
+Configuration arrays are read once; validation throws `RangeError` before any state changes. Cost: O(joints) per update
+with small per-call allocations; no renderer work. Not provided: eye vergence, roll,
+full-body IK, aim offsets for non-forward axes (rotate the target into the joint
+frame first), or automatic idle glances.

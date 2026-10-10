@@ -25,6 +25,7 @@ import {createRng, deriveSeed} from '../core/rng';
  * `hold`, `axis`) and saves live in memory. `ctx.text` reads the English strings of `game` (the key itself without one). What a test sees is what a player's frame computes, minus the drawing.
  */
 import {createSystemRunner} from '../core/ecs/systems';
+import {captureInterpolation} from './interpolation';
 import {World, type ComponentType, type Entity} from '../core/ecs/world';
 import type {Services} from '../core/services';
 import {parseMessage, renderMessage} from '../core/i18n/format';
@@ -201,6 +202,7 @@ export async function testScene(
   let r = (o.seed ?? 1) >>> 0,
     frame = 0,
     t = 0;
+  let alphaSource = () => 0;
   const ctx: SceneContext = {
     world,
     state: world.resources,
@@ -226,7 +228,7 @@ export async function testScene(
           pointer: {x: 0, y: 0, down: false, pressed: false},
         },
     get time() {
-      return {t, frame, calm: o.calm ?? false, now: t * 1000};
+      return {t, frame, calm: o.calm ?? false, now: t * 1000, alpha: alphaSource()};
     },
     view: {
       camera: {
@@ -412,7 +414,9 @@ export async function testScene(
       failures.push({id, error});
     },
     after: () => world.clearEvents(),
+    beforeStep: () => captureInterpolation(world),
   });
+  alphaSource = () => runner.alpha;
   try {
     await scene.prepare?.(ctx, new AbortController().signal);
     scene.enter?.(ctx);
