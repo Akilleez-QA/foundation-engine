@@ -25,7 +25,7 @@ const base: RegionActivationLimits = {
   maxPins: 4,
   maxActivationsPerUpdate: 40,
   maxDeactivationsPerUpdate: 40,
-  maxCellsPerObserver: 16,
+  maxCellsPerObserver: 36,
 };
 function setup(o: Partial<RegionActivationLimits> = {}) {
   const limits = {...base, ...o};
@@ -45,7 +45,7 @@ test('limits are validated before construction; unknown keys and oversized scans
   assert.throws(() => createRegionActivation({...base, lingerUpdates: -1}), RangeError);
   assert.throws(() => createRegionActivation({...base, maxActive: 101}), RangeError);
   assert.throws(() => createRegionActivation({...base, maxActivationsPerUpdate: 41}), RangeError);
-  assert.throws(() => createRegionActivation({...base, maxCellsPerObserver: 15}), /can touch 16/);
+  assert.throws(() => createRegionActivation({...base, maxCellsPerObserver: 35}), /can touch 36/);
   assert.throws(() => createRegionActivation({...base, extra: 1} as RegionActivationLimits), /unknown limit 'extra'/);
   assert.throws(() => createRegionUpdateResult({maxActivationsPerUpdate: 0, maxDeactivationsPerUpdate: 1}), RangeError);
   const {acts, out} = setup();
@@ -144,7 +144,7 @@ test('pins keep regions active and wake dormant ones before any observer-wanted 
   assert.deepEqual(deactivated(out), [99]);
 });
 
-test('budgets defer nearest-first activations and lowest-index deactivations; maxActive saturates', () => {
+test('budgets defer nearest-first activations and longest-unkept deactivations; maxActive saturates', () => {
   const {acts, out} = setup({
     activateRadius: 12,
     releaseRadius: 12,
@@ -251,6 +251,7 @@ function referenceModel(l: RegionActivationLimits) {
         state[i] = 'l';
         if (++unkept[i] > l.lingerUpdates) due.push(i);
       }
+      due.sort((a, b) => unkept[b] - unkept[a] || a - b); // longest unkept first
       const off = due.slice(0, l.maxDeactivationsPerUpdate);
       for (const i of off) {
         state[i] = 'd';
@@ -273,12 +274,20 @@ function referenceModel(l: RegionActivationLimits) {
         unkept[i] = 0;
         epoch[i]++;
       }
+      const room = l.maxActive - active;
+      const status =
+        wanted.length > on.length && room < Math.min(l.maxActivationsPerUpdate, wanted.length)
+          ? 'saturated'
+          : wanted.length > on.length || due.length > off.length
+            ? 'deferred'
+            : 'complete';
       return {
         on: on.map(([, i]) => i),
         off,
         dormantFor,
         deferredOn: wanted.length - on.length,
         deferredOff: due.length - off.length,
+        status,
       };
     },
   };
@@ -295,7 +304,7 @@ test('a 3,000-step randomised run matches an independent brute-force model', () 
     maxPins: 3,
     maxActivationsPerUpdate: 4,
     maxDeactivationsPerUpdate: 3,
-    maxCellsPerObserver: 25,
+    maxCellsPerObserver: 36,
   };
   const acts = createRegionActivation(limits),
     out = createRegionUpdateResult(limits),
@@ -340,6 +349,9 @@ test('a 3,000-step randomised run matches an independent brute-force model', () 
       assert.deepEqual([...out.dormantFor.subarray(0, out.activatedCount)], want.dormantFor);
       assert.equal(out.deferredActivations, want.deferredOn);
       assert.equal(out.deferredDeactivations, want.deferredOff);
+      assert.equal(out.status, want.status, `status at step ${step}`);
+      assert.equal(acts.stats.active, ref.state.filter(x => x !== 'd').length);
+      assert.equal(acts.stats.lingering, ref.state.filter(x => x === 'l').length);
       for (let i = 0; i < 100; i++) {
         const s = ref.state[i];
         assert.equal(
@@ -352,4 +364,88 @@ test('a 3,000-step randomised run matches an independent brute-force model', () 
     }
   }
   assert.ok(actives(acts).length <= limits.maxActive);
+});
+
+test('off-grid positions are "no region": gating queries do not throw', () => {
+  const {acts, out} = setup();
+  acts.addObserver(1, 150, -40); // far off-grid
+  acts.update(out);
+  assert.equal(out.activatedCount, 0);
+  const r = acts.regionAt(150, 5);
+  assert.equal(r, -1);
+  assert.equal(acts.isActive(r), false);
+  assert.equal(acts.stateOf(r), 'dormant');
+  assert.equal(acts.epochOf(r), -1);
+  assert.throws(() => acts.isActive(-2), RangeError);
+});
+
+test('the grid extent covers the last partial column; enumeration and aliasing guard', () => {
+  const l = {...base, maxX: 95, maxY: 95};
+  const acts = createRegionActivation(l),
+    out = createRegionUpdateResult(l);
+  assert.equal(acts.regionAt(99, 50), 59, 'inside the last column even though x > maxX');
+  assert.equal(acts.regionAt(100.5, 50), -1);
+  acts.addObserver(1, 99, 55);
+  acts.update(out);
+  const list = new Int32Array(8);
+  const n = acts.activeRegions(list);
+  assert.deepEqual(
+    [...list.subarray(0, n)].sort((a, b) => a - b),
+    activated(out).sort((a, b) => a - b),
+  );
+  const shared = createRegionUpdateResult(l);
+  const aliased = {...shared, deactivated: shared.activated};
+  assert.throws(() => acts.update(aliased), /must not share memory/);
+  assert.throws(() => Reflect.apply(acts.activeRegions, acts, [[]]), TypeError);
+});
+
+test('non-dyadic geometry at exact radius boundaries matches the exact distance rule', () => {
+  const rand = mulberry32(7);
+  for (let trial = 0; trial < 2000; trial++) {
+    const cellSize = [0.7, 1.1, 0.3, 3.3][trial % 4]!,
+      minX = Math.round((rand() * 200 - 100) * 10) / 10,
+      minY = Math.round((rand() * 200 - 100) * 10) / 10;
+    const radius = [0, cellSize, 2 * cellSize, 1.4][Math.floor(rand() * 4)]!;
+    const l: RegionActivationLimits = {
+      ...base,
+      cellSize,
+      minX,
+      minY,
+      maxX: minX + cellSize * 8,
+      maxY: minY + cellSize * 8,
+      maxRegions: 100,
+      activateRadius: radius,
+      releaseRadius: radius,
+      maxActive: 1,
+      maxActivationsPerUpdate: 1,
+      maxDeactivationsPerUpdate: 1,
+      maxCellsPerObserver: 100,
+    };
+    // Size the budgets to the grid (8 or 9 regions per axis, depending on rounding) so nothing is deferred.
+    const probe = createRegionActivation(l),
+      all = probe.columns * probe.rows;
+    Object.assign(l, {maxActive: all, maxActivationsPerUpdate: all, maxDeactivationsPerUpdate: all});
+    const acts = createRegionActivation(l),
+      out = createRegionUpdateResult(l);
+    const c = Math.floor(rand() * 8),
+      r = Math.floor(rand() * 8);
+    // Observer exactly a radius outside a region edge (plus a random offset along the edge).
+    const x = minX + c * cellSize + (rand() < 0.5 ? -radius : cellSize + radius),
+      y = minY + r * cellSize + rand() * cellSize;
+    acts.addObserver(1, x, y);
+    acts.update(out);
+    const want: number[] = [];
+    for (let i = 0; i < acts.columns * acts.rows; i++) {
+      const x0 = minX + (i % acts.columns) * cellSize,
+        y0 = minY + Math.floor(i / acts.columns) * cellSize;
+      const dx = Math.max(x0 - x, 0, x - (x0 + cellSize)),
+        dy = Math.max(y0 - y, 0, y - (y0 + cellSize));
+      if (dx * dx + dy * dy <= radius * radius) want.push(i);
+    }
+    assert.deepEqual(
+      activated(out).sort((a, b) => a - b),
+      want,
+      `trial ${trial}`,
+    );
+  }
 });

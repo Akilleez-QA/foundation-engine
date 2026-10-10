@@ -32,5 +32,5 @@ observer positions and pins.
 
 ## Evidence
 
-Eight unit tests including a 3,000-step comparison with an independent brute-force model, and two consumer tests
+Eleven unit tests including a 3,000-step brute-force model comparison and 2,000 non-dyadic boundary-geometry trials, and two consumer tests
 (ECS fixed-step gating with catch-up; chunk-store load/save with epoch refusal of a late load). Headless only.

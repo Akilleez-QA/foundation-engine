@@ -13,9 +13,10 @@ Region activation decides **whether** a region runs. It does not decide what a r
   choice.
 - Content and saves: load a region's records from the [chunk store](../recipes/store-large-world-records.md) when it
   activates and write them when it deactivates. Capture `epochOf(region)` when a load starts and drop the result if
-  the epoch changed or the region is no longer active.
+  the epoch changed or the region is no longer active. Order a region's load after its own pending save (keep the
+  write's promise per region key and await it before reading), or a quick return can read the previous record.
 - Catch-up: `dormantFor` is the number of updates since the region last deactivated. Apply a bounded creator rule
-  (age a corpse, grow crops, advance a timer by whole periods) instead of replaying every missed step.
+  (advance growth, decay or timers by whole periods) instead of replaying every missed step.
 - Interest and replication: [interest sets](interest-sets.md) decide what each connection is sent; region activation
   decides what the host simulates. They are independent and can share observer positions.
 - Terrain residency and rendering keep their own owners; region activation is not a streaming system.
@@ -23,7 +24,7 @@ Region activation decides **whether** a region runs. It does not decide what a r
 ## Choosing limits
 
 `activateRadius <= releaseRadius` gives hysteresis so an observer moving along a border does not toggle regions every
-step. `lingerUpdates` adds time hysteresis. Pins express keep-alive needs such as a scripted event, a region another
+step. `lingerUpdates` adds time hysteresis. Pins express keep-alive needs (they rank first but are subject to `maxActive`) such as a scripted event, a region another
 system is working in, or always-on areas; release them when the need ends. Per-update budgets spread expensive
 transitions (loading, spawning) over several updates; a `deferred` status is normal under motion, `saturated` means
 `maxActive` is too small for your observers.

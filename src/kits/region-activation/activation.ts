@@ -4,8 +4,9 @@
  * A uniform grid of rectangular regions covers the creator's plane. Observers (players, cameras, sensors) activate
  * dormant regions near them and keep active regions alive while they stay within a wider release radius. A region
  * that nobody keeps lingers for a configured number of updates (an observer returning cancels the release), then
- * becomes dormant. Pins keep a chosen region active regardless of observers. Each `update` applies a bounded number
- * of activations and deactivations, nearest-first and index-ordered respectively, and reports the rest as deferred.
+ * becomes dormant. Pins keep a chosen region active without observers, subject to `maxActive`. Each `update` applies
+ * a bounded number of activations (pins, then nearest first) and deactivations (longest unkept first), and reports
+ * the rest as deferred.
  *
  * The caller owns what a region means: which entities it ticks, what it loads or saves on a transition, how a
  * dormant region catches up (`dormantFor`), and when to call `update`. Nothing here schedules, loads, saves, calls
@@ -68,7 +69,7 @@ export interface RegionUpdateResult {
   /** For each activated region: updates since it last deactivated, or -1 if it was never active. */
   readonly dormantFor: Float64Array;
   activatedCount: number;
-  /** Regions deactivated by this update, ascending index. */
+  /** Regions deactivated by this update, longest unkept first, ties by ascending index. */
   readonly deactivated: Int32Array;
   deactivatedCount: number;
   /** Wanted activations not applied (budget or `maxActive`). */
@@ -120,7 +121,11 @@ export interface RegionActivation {
   readonly limits: RegionActivationLimits;
   readonly columns: number;
   readonly rows: number;
-  /** Region index containing a point (inclusive rectangle), or -1 outside. Throws for non-finite coordinates. */
+  /**
+   * Region index containing a point, or -1 outside the grid extent (`minX .. minX + columns * cellSize`, likewise for
+   * y; the last column/row may reach past maxX/maxY). Throws for non-finite coordinates. Queries accept -1 as "no
+   * region": `isActive(-1)` is false, `stateOf(-1)` dormant, `epochOf(-1)` -1.
+   */
   regionAt(x: number, y: number): number;
   /** Region index of a column/row, or -1 outside the grid. */
   regionIndex(column: number, row: number): number;
@@ -129,6 +134,8 @@ export interface RegionActivation {
   isActive(region: number): boolean;
   /** Advances on every activation and deactivation of the region; compare it to reject stale asynchronous work. */
   epochOf(region: number): number;
+  /** Copy up to `out.length` active or lingering region indices (unordered) into `out`; returns the count. */
+  activeRegions(out: Int32Array): number;
   addObserver(id: number, x: number, y: number): 'added' | 'duplicate' | 'saturated' | 'closed';
   moveObserver(id: number, x: number, y: number): 'moved' | 'absent' | 'closed';
   /** Forget an observer; regions it kept start lingering at the next update. */
@@ -137,7 +144,10 @@ export interface RegionActivation {
   unpin(pin: RegionPin): 'unpinned' | 'absent' | 'closed';
   /** Recompute wanted and kept regions and apply bounded transitions into `out`. */
   update(out: RegionUpdateResult): RegionUpdateResult;
-  /** Terminal and idempotent: every later call reports `closed` (queries report dormant / -1). */
+  /**
+   * Terminal and idempotent: later mutating calls and updates report `closed`; queries report dormant, false, -1 or
+   * zero. Grid addressing (`regionAt`, `regionIndex`) keeps working. Tables are released with the owner object.
+   */
   dispose(): void;
   readonly stats: RegionActivationStats;
 }
@@ -213,6 +223,9 @@ export function createRegionActivation(input: RegionActivationLimits): RegionAct
   if (!Number.isSafeInteger(columns) || !Number.isSafeInteger(rows) || columns * rows > maxRegions)
     throw new RangeError(`region activation: ${columns} x ${rows} regions exceed maxRegions ${maxRegions}`);
   const regions = columns * rows;
+  // The grid extent: the last column/row may reach past maxX/maxY when the size is not a multiple of cellSize.
+  const gridMaxX = minX + columns * cellSize,
+    gridMaxY = minY + rows * cellSize;
   if (!finite(activateRadius) || activateRadius < 0)
     throw new RangeError('region activation: activateRadius must be finite and >= 0');
   if (!finite(releaseRadius) || releaseRadius < activateRadius || !Number.isFinite(releaseRadius * releaseRadius))
@@ -240,11 +253,13 @@ export function createRegionActivation(input: RegionActivationLimits): RegionAct
     throw new RangeError(
       `region activation: maxCellsPerObserver must be a positive safe integer <= ${REGION_CEILING.cellsPerObserver}`,
     );
-  // Worst case regions a release-radius square can touch at any alignment.
-  const span = Math.floor((2 * releaseRadius) / cellSize) + 2;
-  if (span * span > maxCellsPerObserver)
+  // Worst case regions one scan visits: the release square widened by one region on each side (so rounding in the
+  // column/row division can never exclude a region the exact distance test admits), clamped to the grid.
+  const span = Math.floor((2 * releaseRadius) / cellSize) + 4,
+    scanCells = Math.min(span, columns) * Math.min(span, rows);
+  if (scanCells > maxCellsPerObserver)
     throw new RangeError(
-      `region activation: releaseRadius ${releaseRadius} can touch ${span * span} regions, above maxCellsPerObserver ${maxCellsPerObserver}`,
+      `region activation: releaseRadius ${releaseRadius} can touch ${scanCells} regions, above maxCellsPerObserver ${maxCellsPerObserver}`,
     );
   const activate2 = activateRadius * activateRadius,
     release2 = releaseRadius * releaseRadius;
@@ -256,6 +271,7 @@ export function createRegionActivation(input: RegionActivationLimits): RegionAct
     wantStamp = new Float64Array(regions),
     wantDist = new Float64Array(regions),
     pinCount = new Int32Array(regions),
+    pinnedPos = new Int32Array(regions).fill(-1),
     epoch = new Float64Array(regions),
     lastDeactivated = new Float64Array(regions).fill(-1),
     activePos = new Int32Array(regions).fill(-1);
@@ -263,7 +279,7 @@ export function createRegionActivation(input: RegionActivationLimits): RegionAct
   let activeCount = 0,
     lingeringCount = 0;
   // Candidates: distinct dormant regions wanted this update.
-  const candidateCap = Math.min(regions, maxObservers * span * span + maxPins);
+  const candidateCap = Math.min(regions, maxObservers * scanCells + maxPins);
   const candidates = new Int32Array(candidateCap);
   // Bounded top-k selections.
   const pickA = new Int32Array(maxActivationsPerUpdate),
@@ -278,6 +294,9 @@ export function createRegionActivation(input: RegionActivationLimits): RegionAct
     oy = new Float64Array(maxObservers),
     slotUsed = new Uint8Array(maxObservers);
   const pins = new Map<RegionPin, number>();
+  // Distinct pinned regions, iterated by update without allocation.
+  const pinned = new Int32Array(Math.min(regions, maxPins));
+  let pinnedCount = 0;
   let gen = 0,
     updates = 0,
     closed = false;
@@ -294,6 +313,10 @@ export function createRegionActivation(input: RegionActivationLimits): RegionAct
     const r = Math.floor((y - minY) / cellSize);
     return r >= rows ? rows - 1 : r;
   }
+  /** Region i (unkept u) is deactivated before region k. */
+  function dueBefore(u: number, i: number, k: number): boolean {
+    return u > unkept[k]! || (u === unkept[k] && i < k);
+  }
   function addActive(region: number): void {
     activePos[region] = activeCount;
     activeList[activeCount++] = region;
@@ -308,11 +331,10 @@ export function createRegionActivation(input: RegionActivationLimits): RegionAct
 
   /** Stamp kept/wanted regions around one point. */
   function scan(x: number, y: number): void {
-    // Regions whose closed rectangle can be within releaseRadius: right edge >= x - r and left edge <= x + r.
-    const c0 = Math.max(0, Math.ceil((x - releaseRadius - minX) / cellSize) - 1),
-      c1 = Math.min(columns - 1, Math.floor((x + releaseRadius - minX) / cellSize)),
-      r0 = Math.max(0, Math.ceil((y - releaseRadius - minY) / cellSize) - 1),
-      r1 = Math.min(rows - 1, Math.floor((y + releaseRadius - minY) / cellSize));
+    const c0 = Math.max(0, Math.floor((x - releaseRadius - minX) / cellSize) - 1),
+      c1 = Math.min(columns - 1, Math.floor((x + releaseRadius - minX) / cellSize) + 1),
+      r0 = Math.max(0, Math.floor((y - releaseRadius - minY) / cellSize) - 1),
+      r1 = Math.min(rows - 1, Math.floor((y + releaseRadius - minY) / cellSize) + 1);
     for (let r = r0; r <= r1; r++) {
       const cy0 = minY + r * cellSize,
         dy = Math.max(cy0 - y, 0, y - (cy0 + cellSize));
@@ -357,6 +379,12 @@ export function createRegionActivation(input: RegionActivationLimits): RegionAct
       out.deactivated.length < maxDeactivationsPerUpdate
     )
       throw new TypeError('region activation: result buffers are too small for these limits');
+    if (
+      out.activated.buffer === out.deactivated.buffer ||
+      out.dormantFor.buffer === out.activated.buffer ||
+      out.dormantFor.buffer === out.deactivated.buffer
+    )
+      throw new TypeError('region activation: result buffers must not share memory');
   }
 
   const owner: RegionActivation = {
@@ -365,7 +393,7 @@ export function createRegionActivation(input: RegionActivationLimits): RegionAct
     rows,
     regionAt(x, y) {
       checkPoint(x, y);
-      if (x < minX || x > maxX || y < minY || y > maxY) return -1;
+      if (x < minX || x > gridMaxX || y < minY || y > gridMaxY) return -1;
       return row(y) * columns + column(x);
     },
     regionIndex(c, r) {
@@ -374,18 +402,28 @@ export function createRegionActivation(input: RegionActivationLimits): RegionAct
       return c < 0 || r < 0 || c >= columns || r >= rows ? -1 : r * columns + c;
     },
     stateOf(region) {
+      if (region === -1) return 'dormant';
       checkRegion(region);
       if (closed) return 'dormant';
       const s = state[region];
       return s === ACTIVE ? 'active' : s === LINGERING ? 'lingering' : 'dormant';
     },
     isActive(region) {
+      if (region === -1) return false;
       checkRegion(region);
       return !closed && state[region] !== DORMANT;
     },
     epochOf(region) {
+      if (region === -1) return -1;
       checkRegion(region);
-      return epoch[region]!;
+      return closed ? -1 : epoch[region]!;
+    },
+    activeRegions(out) {
+      if (!(out instanceof Int32Array)) throw new TypeError('region activation: out must be an Int32Array');
+      if (closed) return 0;
+      const n = Math.min(activeCount, out.length);
+      for (let k = 0; k < n; k++) out[k] = activeList[k]!;
+      return n;
     },
     addObserver(id, x, y) {
       checkId(id);
@@ -426,7 +464,10 @@ export function createRegionActivation(input: RegionActivationLimits): RegionAct
       if (pins.size >= maxPins) return {status: 'saturated'};
       const handle: RegionPin = Object.freeze({region});
       pins.set(handle, region);
-      pinCount[region]!++;
+      if (pinCount[region]!++ === 0) {
+        pinnedPos[region] = pinnedCount;
+        pinned[pinnedCount++] = region;
+      }
       return {status: 'pinned', pin: handle};
     },
     unpin(handle) {
@@ -434,7 +475,13 @@ export function createRegionActivation(input: RegionActivationLimits): RegionAct
       const region = pins.get(handle);
       if (region === undefined) return 'absent';
       pins.delete(handle);
-      pinCount[region]!--;
+      if (--pinCount[region]! === 0) {
+        const at = pinnedPos[region]!,
+          last = pinned[--pinnedCount]!;
+        pinned[at] = last;
+        pinnedPos[last] = at;
+        pinnedPos[region] = -1;
+      }
       return 'unpinned';
     },
     update(out) {
@@ -445,7 +492,8 @@ export function createRegionActivation(input: RegionActivationLimits): RegionAct
       candidateCount = 0;
       // 1. Stamp kept and wanted regions.
       for (let s = 0; s < maxObservers; s++) if (slotUsed[s]) scan(ox[s]!, oy[s]!);
-      for (const region of pins.values()) {
+      for (let p = 0; p < pinnedCount; p++) {
+        const region = pinned[p]!;
         if (state[region] !== DORMANT) keepStamp[region] = gen;
         else want(region, -1); // pins rank before every observer
       }
@@ -466,10 +514,11 @@ export function createRegionActivation(input: RegionActivationLimits): RegionAct
         }
         if (++unkept[i]! <= lingerUpdates) continue;
         due++;
-        // Bounded insertion keeping the smallest indices.
-        if (pickedD === maxDeactivationsPerUpdate && pickD[pickedD - 1]! < i) continue;
+        // Bounded insertion: longest unkept first (no region waits forever), ties by ascending index.
+        const u = unkept[i]!;
+        if (pickedD === maxDeactivationsPerUpdate && !dueBefore(u, i, pickD[pickedD - 1]!)) continue;
         let j = pickedD < maxDeactivationsPerUpdate ? pickedD++ : pickedD - 1;
-        while (j > 0 && pickD[j - 1]! > i) {
+        while (j > 0 && dueBefore(u, i, pickD[j - 1]!)) {
           pickD[j] = pickD[j - 1]!;
           j--;
         }

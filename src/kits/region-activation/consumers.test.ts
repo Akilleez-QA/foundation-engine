@@ -21,7 +21,7 @@ const limits: RegionActivationLimits = {
   maxPins: 2,
   maxActivationsPerUpdate: 4,
   maxDeactivationsPerUpdate: 4,
-  maxCellsPerObserver: 9,
+  maxCellsPerObserver: 25,
 };
 
 test('consumer 1: a fixed-step system ticks only creatures in active regions and catches up dormant time on wake', () => {
