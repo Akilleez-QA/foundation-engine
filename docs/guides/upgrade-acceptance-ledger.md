@@ -1219,3 +1219,12 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Camera director — candidate (2026-10-09)
+
+Branch `feat/camera-director` from `a6211bd3`. Seven new headless tests: ladder order,
+stickiness and yawed boxes; string rig band clamping and blending; rail, close-up and
+orbit shot poses; transition sizing, deceleration and exact arrival on a moving goal;
+support carry; letterbox easing; and a scene where the director system blends into a
+volume's setting, stops rewriting at rest and returns from a scripted override to the
+live gameplay pose. No browser, visual or device evidence.

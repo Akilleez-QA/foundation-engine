@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Camera director (optional, camera kit):** priority ladder over creator overrides and authored box/cylinder trigger volumes with stickiness; string, rail, close-up and shot-move rigs; transitions sized by pose change that land exactly on a moving goal, including the return from scripted shots; moving-support carry; a letterbox amount; and an optional `cameraDirectorSystem`. `cameraSystem` is unchanged. See [ADR 0112](docs/adr/0112-camera-director.md).
+
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.

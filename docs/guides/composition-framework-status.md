@@ -880,3 +880,11 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Camera director — candidate (2026-10-09)
+
+Optional camera-kit helpers: volume priority ladder, string/rail/close-up/shot rigs,
+pose-sized transitions landing on moving goals (including the scripted-shot return),
+support carry, letterbox amount and an optional director system. See
+[ADR 0112](../adr/0112-camera-director.md). Headless tests in the ledger; independent
+review and hosted CI remain required.
