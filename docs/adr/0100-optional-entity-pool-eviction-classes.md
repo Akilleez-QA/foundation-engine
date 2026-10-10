@@ -1,4 +1,4 @@
-# ADR 0097: optional entity pool with eviction classes
+# ADR 0100: optional entity pool with eviction classes
 
 - Status: Proposed for this implementation; integration is gated by full CI.
 - Date: 2026-10-09
