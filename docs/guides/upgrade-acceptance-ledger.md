@@ -1219,3 +1219,7 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+## Behaviour trees (BT-01) — candidate, 2026-10-09
+
+Optional `behavior` kit ([contract](../../src/kits/behavior/README.md), [ADR 0122](../adr/0122-behaviour-trees.md)): data trees, bounded deterministic tick, blackboard, decorators, resume and abort, validated snapshots, trace. Evidence: focused headless tests in `src/kits/behavior/behavior.test.ts` and an independent adversarial review. Candidate only; no game integration, browser, full CI or device acceptance claimed.

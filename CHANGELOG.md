@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- Optional `behavior` kit: data-defined behaviour trees with a bounded deterministic tick, blackboard, composites (including reactive and weighted shuffle), decorators (repeat, retry, timeout, cooldown, guard), running-node resume, abort handlers, saveable mid-run state and a per-tick trace. See [ADR 0122](docs/adr/0122-behaviour-trees.md).
+
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.
