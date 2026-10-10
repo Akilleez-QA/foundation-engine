@@ -78,6 +78,13 @@
       "evidence": ["@kits/streaming exports createStreamQueue", "@kits/streaming exports leasePort"]
     },
     {
+      "id": "PIPELINE-01",
+      "title": "Worker render pipelining",
+      "shipped": false,
+      "docs": "docs/verification/render-pipelining-20261010/README.md",
+      "evidence": ["src/platform/render/worker-renderer.ts exists"]
+    },
+    {
       "id": "NAV-FIELD-01",
       "title": "Optional incremental shared navigation distance fields",
       "shipped": true,

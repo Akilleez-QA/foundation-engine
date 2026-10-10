@@ -68,6 +68,7 @@ Tracked so that a correct "not yet" in the docs is recognised. A row moves up wh
 
 | ID | Feature | PR | Docs |
 |---|---|---|---|
+| PIPELINE-01 | Worker render pipelining |  | [README.md](verification/render-pipelining-20261010/README.md) |
 | WEBGPU | WebGPU render backend |  | [render-backend.md](guides/render-backend.md) |
 | PHYSICS | Rigid-body physics |  |  |
 
