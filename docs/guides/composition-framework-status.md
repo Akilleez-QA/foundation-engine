@@ -822,3 +822,18 @@ can refresh its existing one-credit view on ping. Defaults remain unchanged; no
 new timer or protocol owner. See [the contract](multiplayer-session.md#optional-host-liveness).
 Focused unit and real loopback acceptance is recorded in the upgrade ledger;
 independent review and full hosted integration CI remain required.
+
+
+## Optional bounded volume queries — candidate (2026-10-09)
+
+The [volume query kit](../../src/kits/volume-query/README.md) answers overlap,
+fixed-orientation sweep and capsule headroom for a sphere or capsule body against
+an immutable snapshot of static spheres, capsules and oriented boxes. It installs
+no physics world, controller, clock or dependency; results carry the creator's
+snapshot revision and existing owners (portal crossing, alignment, camera
+obstruction, creator systems) apply effects. Evaluation and iteration ceilings
+report `over-budget` or `unresolved`, never clear. Evidence is headless: sampled
+and closed-form oracles, ray/endpoint/centre-ray discriminators, a portal consumer
+and a fixed-runner body-height consumer. Meshes, heightfields, moving colliders,
+rotation during motion, depenetration and device timing are not covered. Independent
+review and full hosted CI remain required. See ADR 0087.

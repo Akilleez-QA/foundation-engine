@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- **Optional volume queries:** `@kits/volume-query` checks sphere and capsule bodies against an immutable snapshot of static spheres, capsules and oriented boxes: overlap, fixed-orientation sweep with a conservative first contact, and capsule headroom. Creator-configured evaluation and iteration ceilings refuse rather than claim clear. No physics world, controller or dependency. See [ADR 0087](docs/adr/0087-bounded-volume-queries.md).
+
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.
