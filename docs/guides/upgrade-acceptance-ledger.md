@@ -1343,3 +1343,24 @@ and a fixed-runner body-height consumer. Meshes, heightfields, moving colliders,
 rotation during motion, depenetration and device timing are not covered. Independent
 review found and fixed two defects (PR #237, head before this note `7c9680ab`); affected
 check passed 18 tests. Full hosted CI remains required. See ADR 0098.
+
+## Optional cue sequences — candidate (2026-10-09)
+
+Branch `feat/sequence-kit` from `cbaf8060`. Twelve checked-in headless tests. An
+independent adversarial review also fuzzed about 30,000 runs against its own reference
+model in an external harness that is not checked in; its findings (effect-id
+collisions across definitions, session handling at reload, a `settled` signal for
+budget-stopped work, single-read array copies, documentation) were fixed and a
+re-review of the fixed head was clean. The checked-in tests cover: parallel tracks,
+cross-track barriers and held cues with exact ticks; one large advance equal to
+many small ones and to a one-transition budget (identical event order, owed ticks
+drained); skip landing each remaining gameplay effect once, dropping presentation
+effects and producing no presentation events, refused when not skippable; cancel;
+a budget-stopped snapshot restored through JSON to the same future; refusal of an
+edited definition, another session and twelve forged or inconsistent states;
+definition validation and isolation; a real save store round trip across a fresh
+store composed with the dialogue kit; and a scene in which a fixed-step system
+drives the sequence, the camera kit follows cue alpha and the audio-mixer plays a
+cue once, with skip landing the effect and playing nothing; unambiguous effect ids,
+the `settled` signal and -0 normalisation; and arrays copied without iteration. No
+browser, device or template evidence.

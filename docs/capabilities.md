@@ -91,6 +91,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/resources`
 - `@kits/rewind`
 - `@kits/rollback`
+- `@kits/sequence`
 - `@kits/space`
 - `@kits/spatial`
 - `@kits/spatial-audio`

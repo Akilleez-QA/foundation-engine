@@ -91,3 +91,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0097](0097-action-phase-windows.md) | Optional action phase windows, once-only marks and per-range claims | Optional kits / Capabilities | Proposed |
 
 | [0098](0098-bounded-volume-queries.md) | Bounded optional volume queries | Optional composition / Spatial queries | Proposed |
+
+| [0091](0091-bounded-cue-sequences.md) | Bounded cue sequences as an optional kit | Optional kits / Scripting | Proposed |
