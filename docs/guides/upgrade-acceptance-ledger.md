@@ -1749,3 +1749,16 @@ dispose ended disposal early) and a three.js snippet using the local camera posi
 both were fixed with a seeded culler model fuzz, a reference test with wide, asymmetric
 and parented three.js cameras on portal planes and corners, and documented orthographic
 and near-plane limits.
+
+## Optional prediction presentation — candidate (2026-10-09)
+
+[Prediction presentation](prediction-presentation.md) adds two optional helpers to
+`@kits/network`: `createPredictionSmoothing` (a bounded, decaying presentation offset
+with a snap threshold and a one-shot discontinuity flag) and `createPredictedEvents`
+(an exactly-once emit and cancel ledger keyed by creator event key and tick). They
+compose with `createPrediction` through `read()` snapshots and leave its defaults
+unchanged. Evidence is headless: 23 unit tests on the real reconciliation path,
+including seeded randomized bound and exactly-once runs. These are implemented and
+checked on branch `feat/prediction-presentation`, not integrated. Independent review,
+hosted CI, device or browser review of smoothing and multiplayer acceptance remain
+outstanding. See ADR 0142.

@@ -255,6 +255,17 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'NW-PRESENT',
+    title: 'Optional prediction correction smoothing and exactly-once predicted events',
+    docs: 'docs/guides/prediction-presentation.md',
+    evidence: [
+      {kit: 'network', export: 'createPredictionSmoothing'},
+      {kit: 'network', export: 'createPredictedEvents'},
+      {path: 'src/kits/network/prediction-smoothing.test.ts'},
+      {path: 'src/kits/network/predicted-events.test.ts'},
+    ],
+  },
+  {
     id: 'VISIBILITY-01',
     title: 'Bounded source-owned visibility and explored history',
     docs: 'src/kits/visibility/README.md',

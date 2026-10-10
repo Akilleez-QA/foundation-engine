@@ -1215,3 +1215,16 @@ culler that writes visibility only for targets that flip, through engine compone
 or three.js objects. See [ADR 0145](../adr/0145-cell-portal-culling.md). Headless tests
 in the ledger; independent review and hosted CI remain required. Hardware occlusion
 queries are out of scope.
+
+## Optional prediction presentation — candidate (2026-10-09)
+
+[Prediction presentation](prediction-presentation.md) adds two optional helpers to
+`@kits/network`: `createPredictionSmoothing` (a bounded, decaying presentation offset
+with a snap threshold and a one-shot discontinuity flag) and `createPredictedEvents`
+(an exactly-once emit and cancel ledger keyed by creator event key and tick). They
+compose with `createPrediction` through `read()` snapshots and leave its defaults
+unchanged. Evidence is headless: 23 unit tests on the real reconciliation path,
+including seeded randomized bound and exactly-once runs. These are implemented and
+checked on branch `feat/prediction-presentation`, not integrated. Independent review,
+hosted CI, device or browser review of smoothing and multiplayer acceptance remain
+outstanding. See ADR 0142.
