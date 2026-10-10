@@ -355,3 +355,26 @@ test('review L3/L5: sparse view arrays are refused; deterministic math is accept
   assert.equal(d.isAwake(1), true);
   assert.throws(() => createDormancy({math: {} as typeof dmath}), RangeError);
 });
+
+test('re-review: the box behind takes the plain lateral margin; math is captured and non-finite results are refused', () => {
+  // spread 100, halfWidth 1, behind 5, margin 1: a point 50 to the side and 3 behind stays dormant (the slanted-side
+  // factor of about 100 would otherwise widen the box behind to about 101).
+  const d = createDormancy({maxEntities: 1, wakeMargin: 1, minAwakeSteps: 0});
+  d.track(1, {policy: 'view'});
+  d.step({views: [ahead(0, {halfWidth: 1, spread: 100, behind: 5})], position: () => ({x: 50, z: -3})});
+  assert.equal(d.isAwake(1), false);
+  d.step({views: [ahead(0, {halfWidth: 1, spread: 100, behind: 5})], position: () => ({x: 1.9, z: -3})});
+  assert.equal(d.isAwake(1), true, 'within the plain margin of the box side');
+
+  const math = {...dmath};
+  const m = createDormancy({maxEntities: 1, math});
+  m.track(1, {policy: 'view'});
+  math.sin = () => Number.NaN; // a later change to the caller's object is not seen
+  m.step({views: [ahead(0)], position: () => ({x: 0, z: 10})});
+  assert.equal(m.isAwake(1), true);
+  const bad = createDormancy({maxEntities: 1, math: {...dmath, cos: () => Number.POSITIVE_INFINITY}});
+  bad.track(1, {policy: 'view'});
+  assert.throws(() => bad.step({views: [ahead(0)], position: () => ({x: 0, z: 10})}), RangeError);
+  assert.equal(bad.stats().steps, 0);
+  assert.equal(bad.state(1), 'dormant');
+});

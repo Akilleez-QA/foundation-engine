@@ -6,8 +6,9 @@
  * while inside a camera-relative view volume) or `zone-or-view` (either). Zone ids are small integers the creator
  * assigns (for example region indices from the region-activation kit, or authored zone numbers); the active zones are
  * an input each step. A view volume is a plan-view frustum in front of a camera plus a box behind it, with optional
- * vertical bounds. Hysteresis has two parts: a dormant entity wakes inside the volume grown by `wakeMargin`, an awake
- * one stays awake until it leaves the volume grown by the wider `sleepMargin`; and minimum dwell ticks keep an entity
+ * vertical bounds. Hysteresis has two parts: a dormant entity queues to wake inside the wake volume (grown by
+ * `wakeMargin`) and stays queued while inside the sleep volume; an awake one stays awake until it leaves the sleep
+ * volume (grown by the wider `sleepMargin`); and minimum dwell ticks keep an entity
  * awake (or dormant) for a number of steps after each transition. Wakes per step are bounded: entities that want to
  * wake beyond the budget wait in a first-in-first-out queue (ties in track order), so the wait is bounded by
  * `maxWakeLatency` steps while they keep wanting (a queued entity is judged against the wider sleep volume, so the
@@ -32,9 +33,12 @@ export interface DormancyLimits {
   readonly maxWakesPerStep?: number;
   /** View volumes per step (split views, a second camera). Default 2, 1-8. */
   readonly maxViews?: number;
-  /** A dormant entity wakes inside the volume grown by this distance. Default 0, within [0, 1e6]. */
+  /** A dormant entity queues to wake inside the volume grown by this distance. Default 0, within [0, 1e6]. */
   readonly wakeMargin?: number;
-  /** An awake entity stays awake inside the volume grown by this distance. Default wakeMargin; >= wakeMargin. */
+  /**
+   * An awake entity stays awake, and a queued one stays queued, inside the volume grown by this distance. Default
+   * wakeMargin; >= wakeMargin.
+   */
   readonly sleepMargin?: number;
   /** Steps an entity stays awake after waking before it may sleep. Default 8, 0-10,000. */
   readonly minAwakeSteps?: number;
@@ -184,7 +188,13 @@ interface View {
   down: number;
 }
 
-function readView(v: ViewVolume, math: ScalarMath): View {
+interface Trig {
+  readonly sin: (x: number) => number;
+  readonly cos: (x: number) => number;
+  readonly sqrt: (x: number) => number;
+}
+
+function readView(v: ViewVolume, math: Trig): View {
   if (v === null || typeof v !== 'object') fail('a view volume must be an object');
   const {x, z, yaw, far, halfWidth} = v;
   const behind = v.behind ?? 0,
@@ -206,12 +216,17 @@ function readView(v: ViewVolume, math: ScalarMath): View {
     if (!isNum(up, 0, E) || !isNum(down, 0, E)) fail('a view with y needs up and down within [0, 1e7]');
     if (up + down === 0) fail('degenerate view volume: up and down are both 0');
   } else if (up !== undefined || down !== undefined) fail('view up and down need y');
+  const sin = math.sin(yaw),
+    cos = math.cos(yaw),
+    lateral = math.sqrt(1 + spread * spread);
+  if (!Number.isFinite(sin) || !Number.isFinite(cos) || !Number.isFinite(lateral))
+    fail('the math functions returned a non-finite value for this view');
   return {
     x,
     z,
-    sin: math.sin(yaw),
-    cos: math.cos(yaw),
-    lateral: math.sqrt(1 + spread * spread),
+    sin,
+    cos,
+    lateral,
     far,
     behind,
     halfWidth,
@@ -226,8 +241,8 @@ function readView(v: ViewVolume, math: ScalarMath): View {
 /**
  * Whether a point lies inside a view volume grown by `m`. Engine camera convention: a view at `yaw` looks along
  * −(sin yaw, cos yaw), as the camera kit's orbit pose and the character kit's rig yaw do. Forward and vertical
- * margins are along the camera's axes; the lateral margin is scaled by sqrt(1 + spread²) so it is at least `m`
- * perpendicular to a slanted side (conservative: it also widens the box behind).
+ * margins are along the camera's axes; ahead of the camera the lateral margin is scaled by sqrt(1 + spread²) so it is at
+ * least `m` perpendicular to a slanted side; the box behind takes the plain margin.
  */
 function inside(v: View, px: number, py: number | undefined, pz: number, m: number): boolean {
   const dx = px - v.x,
@@ -235,7 +250,10 @@ function inside(v: View, px: number, py: number | undefined, pz: number, m: numb
   const f = -(dx * v.sin + dz * v.cos),
     s = dx * v.cos - dz * v.sin;
   if (f < -v.behind - m || f > v.far + m) return false;
-  const w = v.halfWidth + v.spread * Math.min(Math.max(f, 0), v.far) + m * v.lateral;
+  // Ahead, the sides slant: scale the margin so it is at least `m` perpendicular to them. Behind, the box's sides are
+  // parallel to the view axis and take the plain margin.
+  const lat = f > 0 ? m * v.lateral : m;
+  const w = v.halfWidth + v.spread * Math.min(Math.max(f, 0), v.far) + lat;
   if (s < -w || s > w) return false;
   if (v.vertical && py !== undefined) {
     const dy = py - v.y;
@@ -263,6 +281,8 @@ export function createDormancy(limits: DormancyLimits = {}) {
     typeof math.sqrt !== 'function'
   )
     fail('math must provide sin, cos and sqrt');
+  // Captured once: later changes to the caller's math object do not affect this instance.
+  const trig: Trig = Object.freeze({sin: math.sin, cos: math.cos, sqrt: math.sqrt});
   const C = DORMANCY_CEILING;
   if (!isInt(zones, 1, C.zones)) fail(`zones must be an integer in [1, ${C.zones}]`);
   if (!isInt(maxEntities, 1, C.entities)) fail(`maxEntities must be an integer in [1, ${C.entities}]`);
@@ -412,7 +432,7 @@ export function createDormancy(limits: DormancyLimits = {}) {
       const views: View[] = [];
       for (let k = 0; k < viewCount; k++) {
         if (!(k in viewsIn)) fail('views must not have holes');
-        views.push(readView(viewsIn[k]!, math));
+        views.push(readView(viewsIn[k]!, trig));
       }
       if (position !== undefined && typeof position !== 'function') fail('position must be a function');
       const list = [...entries];
