@@ -40,6 +40,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | VISIBILITY-01 | Bounded source-owned visibility and explored history |  | [README.md](../src/kits/visibility/README.md) |
 | GEN-WEIGHTED | Bounded eligible weighted choice with separately committed recent history |  | [weighted-choice.md](guides/weighted-choice.md) |
 | CAP-EFFECT-CHECKPOINT | Portable timed contribution checkpoints |  | [timed-effects.md](guides/timed-effects.md) |
+| CONTACT-01 | Layered contact volumes with deterministic bounded enter/stay/exit pair events |  | [README.md](../src/kits/contact/README.md) |
 | CAP-ACTION-PHASES | Creator-authored action phase windows, once-only marks and per-range claims |  | [action-phases.md](guides/action-phases.md) |
 | RENDER-INTERP | Opt-in render interpolation of fixed-step Transforms |  | [render-interpolation.md](guides/render-interpolation.md) |
 | BALLISTICS-01 | Drag-free ballistic launch solves, evaluation and arc samples |  | [README.md](../src/kits/ballistics/README.md) |

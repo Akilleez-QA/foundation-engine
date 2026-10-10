@@ -263,6 +263,13 @@
       ]
     },
     {
+      "id": "CONTACT-01",
+      "title": "Layered contact volumes with deterministic bounded enter/stay/exit pair events",
+      "shipped": true,
+      "docs": "src/kits/contact/README.md",
+      "evidence": ["@kits/contact exports createContactLayer", "src/kits/contact/contact.test.ts exists"]
+    },
+    {
       "id": "CAP-ACTION-PHASES",
       "title": "Creator-authored action phase windows, once-only marks and per-range claims",
       "shipped": true,
