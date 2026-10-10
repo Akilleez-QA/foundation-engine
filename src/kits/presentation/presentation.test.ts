@@ -56,6 +56,8 @@ test('transition CSS: fade opacity, hard-edged wipe, iris closing on its centre'
     {color: 'transparent'},
     {color: '#12345'},
     {color: 'rgb(,,,%)'},
+    {color: '#00000000'},
+    {color: 'rgba(0,0,0,0)'},
     {center: [2, 0]},
     {coverSeconds: -1},
     {kind: 'spin'},
@@ -219,6 +221,9 @@ test('review regressions: style changes keep coverage, weather re-requests do no
   w.set('storm', 0, 20);
   for (let i = 1; i <= 1260; i++) w.set('storm', i / 60, 20);
   assert.equal(w.sample(21).named['fog'], 1);
+  w.set('clear', 21, 10);
+  w.set('clear', 22, 0);
+  assert.equal(w.sample(22).named['fog'], 0, 'seconds 0 finishes the blend');
   const proto = createWeatherDirector({params: ['toString'], states: {a: {}}, initial: 'a'});
   assert.deepEqual(proto.sample(0).values, [0]);
   const ac = new AbortController();

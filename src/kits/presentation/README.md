@@ -42,7 +42,8 @@ const input = lockedInput(ctx.input, () => transition.peek().locked);
   - `wipe`: a hard-edged linear gradient from a chosen side.
   - `iris`: a circle closing on `center`, for example the player's projected position.
 - **Colour:** `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, comma `rgb()`/`rgba()`, or a named colour. Values that would
-  not cover (`transparent`, `inherit`, ...) and anything else (such as `url(...)`) are refused.
+  not cover (`transparent`, `inherit`, zero alpha) and anything else (such as `url(...)`) are refused. Named colours
+  are not checked against the CSS list: a misspelt name makes the cover invisible.
 - **Input lock:** `lockedInput(input, locked)` reads neutral while `locked()` is true: nothing pressed or held, axes
   at 0, pointer up and centred. Presses during the lock are dropped, not deferred.
 
@@ -72,7 +73,8 @@ const w = weather.sample(ctx.time.t).named;                  // feed haze densit
 
 - **States:** each named state gives a value for each parameter. Blends use smoothstep.
 - **Retargeting:** changing state mid-blend starts from the values currently shown, with no jump. Setting the state
-  it is already heading to does nothing, so a system may request the zone's weather every frame.
+  it is already heading to does nothing, so a system may request the zone's weather every frame; with `seconds` 0 it
+  finishes the current blend at once.
 - **`progress`:** reports how far the current blend has gone.
 
 ## HUD roll-up

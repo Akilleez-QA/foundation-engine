@@ -193,7 +193,15 @@ export function createWeatherDirector(options: WeatherDirectorOptions) {
       if (!states.has(state)) fail(`unknown weather state ${state}`);
       if (!finite(seconds) || seconds < 0 || seconds > 3600) fail('seconds must be in [0, 3600]');
       const t = time(now);
-      if (state === target) return; // already heading there: re-requesting each frame never restarts the blend
+      if (state === target) {
+        // Already heading there: re-requesting each frame never restarts the blend; seconds 0 finishes it now.
+        if (seconds === 0) {
+          from = states.get(target)!.slice();
+          start = t;
+          duration = 0;
+        }
+        return;
+      }
       from = valuesAt(t).values;
       target = state;
       start = t;

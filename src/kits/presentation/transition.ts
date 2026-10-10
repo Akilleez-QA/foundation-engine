@@ -35,7 +35,7 @@ const fail = (message: string): never => {
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const NAMED = /^[a-zA-Z]{3,20}$/;
 const COLOR =
-  /^(#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|rgba?\(\s*\d{1,3}(?:\s*,\s*\d{1,3}){2}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\))$/;
+  /^(#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|rgba?\(\s*\d{1,3}(?:\s*,\s*\d{1,3}){2}(?:\s*,\s*(?:0|1|1\.0+|0?\.\d+))?\s*\))$/;
 /** Named colours that would not cover the view. */
 const NON_COVERING = new Set(['transparent', 'inherit', 'initial', 'unset', 'revert', 'currentcolor']);
 
@@ -48,8 +48,12 @@ function captureStyle(input: TransitionStyle): Required<TransitionStyle> {
     if (!finite(v) || v < 0 || v > 30) fail(`${k} must be in [0, 30]`);
   }
   const color = r.color ?? '#000';
+  const zeroAlpha =
+    typeof color === 'string' &&
+    (/^#(?:[0-9a-fA-F]{3}0|[0-9a-fA-F]{6}00)$/.test(color) || /,\s*(?:0|0?\.0+)\s*\)$/.test(color));
   if (
     typeof color !== 'string' ||
+    zeroAlpha ||
     !(COLOR.test(color) || (NAMED.test(color) && !NON_COVERING.has(color.toLowerCase())))
   )
     fail('color must be #rgb/#rrggbb(aa), rgb()/rgba() with commas, or a named colour that covers');
