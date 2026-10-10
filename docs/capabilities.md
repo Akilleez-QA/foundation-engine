@@ -18,6 +18,7 @@ acceptance (see the [acceptance ledger](guides/upgrade-acceptance-ledger.md)).
 | BT-01 | Optional deterministic resumable behaviour trees with blackboard and saveable state |  | [README.md](../src/kits/behavior/README.md) |
 | ECON-01 | Optional flow economy with production queues, prerequisites and reclaim |  | [README.md](../src/kits/economy/README.md) |
 | INV-RULES-01 | Optional slot, stack and key-item rules over the inventory ledger |  | [README.md](../src/kits/inventory/README.md) |
+| STREAM-01 | Optional on-demand streaming queue with byte and concurrency budgets |  | [streaming-queue.md](guides/streaming-queue.md) |
 | NAV-FIELD-01 | Optional incremental shared navigation distance fields |  | [README.md](../src/kits/navigation/README.md) |
 | WORK-01 | Optional bounded fair work roster |  | [README.md](../src/kits/work-roster/README.md) |
 | VOLUME-01 | Optional bounded sphere and capsule overlap, sweep and headroom queries |  | [README.md](../src/kits/volume-query/README.md) |
@@ -121,6 +122,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `@kits/spatial`
 - `@kits/spatial-audio`
 - `@kits/status`
+- `@kits/streaming`
 - `@kits/terrain`
 - `@kits/three`
 - `@kits/turns`

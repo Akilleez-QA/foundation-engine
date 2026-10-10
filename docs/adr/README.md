@@ -127,3 +127,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0097](0097-ballistic-trajectories.md) | Optional ballistic trajectory solves | Optional kits | Proposed |
 
 | [0098](0098-breadcrumb-trails.md) | Optional breadcrumb trails for followers | Optional kits | Proposed |
+
+| [0130](0130-optional-streaming-queue.md) | Optional on-demand streaming queue | Optional kits / Assets | Proposed |

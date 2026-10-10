@@ -71,6 +71,13 @@
       ]
     },
     {
+      "id": "STREAM-01",
+      "title": "Optional on-demand streaming queue with byte and concurrency budgets",
+      "shipped": true,
+      "docs": "docs/guides/streaming-queue.md",
+      "evidence": ["@kits/streaming exports createStreamQueue", "@kits/streaming exports leasePort"]
+    },
+    {
       "id": "NAV-FIELD-01",
       "title": "Optional incremental shared navigation distance fields",
       "shipped": true,
@@ -1174,6 +1181,10 @@
     {
       "name": "status",
       "exports": ["StatusError", "createStatusEffects", "defineStatusRules", "isStatusId", "status", "statusPresets"]
+    },
+    {
+      "name": "streaming",
+      "exports": ["STREAM_CEILING", "createStreamQueue", "createStreamResult", "leasePort", "modelPort", "promisePort"]
     },
     {
       "name": "terrain",

@@ -62,6 +62,8 @@ The optional [cadence](../../src/kits/cadence/README.md) candidate runs members 
 
 The optional [entity-pool](../../src/kits/entity-pool/README.md) candidate keeps pooled entities under a creator count and cost cap, evicting expendable classes first in a deterministic order, with pins, atomic refusal and World eviction events. Headless model and World consumer tests only; no template consumer or browser/device acceptance is claimed. [Guide](../guides/entity-pool.md).
 
+The optional [streaming](../../src/kits/streaming/README.md) candidate ranks play-time load requests under concurrency and byte budgets, with cancellation, retry and preemption, through ports onto the existing lease caches and model owner. Headless unit and consumer tests only; no template consumer or browser/device acceptance is claimed. [Guide](../guides/streaming-queue.md).
+
 These are optional mechanisms with documented limits, not finished game content. See the [implementation and acceptance evidence](../../templates/expedition/UPGRADE-STATUS.md), each kit's README and its consuming template. Local transaction guarantees do not imply distributed authority.
 
 

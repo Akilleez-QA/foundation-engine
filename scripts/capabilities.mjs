@@ -108,6 +108,15 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'STREAM-01',
+    title: 'Optional on-demand streaming queue with byte and concurrency budgets',
+    docs: 'docs/guides/streaming-queue.md',
+    evidence: [
+      {kit: 'streaming', export: 'createStreamQueue'},
+      {kit: 'streaming', export: 'leasePort'},
+    ],
+  },
+  {
     id: 'NAV-FIELD-01',
     title: 'Optional incremental shared navigation distance fields',
     docs: 'src/kits/navigation/README.md',
