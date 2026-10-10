@@ -44,8 +44,9 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
 export const FEATURES = [
   {
     id: 'PIPELINE-01',
-    title: 'Worker render pipelining (deferred: not built; see ADR 0099)',
+    title: 'Worker render pipelining',
     docs: 'docs/verification/render-pipelining-20261010/README.md',
+    // The module a worker renderer would add (ADR 0099 names it); its presence flips this row.
     evidence: [{path: 'src/platform/render/worker-renderer.ts'}],
   },
   {

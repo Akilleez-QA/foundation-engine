@@ -3,7 +3,7 @@
   "features": [
     {
       "id": "PIPELINE-01",
-      "title": "Worker render pipelining (deferred: not built; see ADR 0099)",
+      "title": "Worker render pipelining",
       "shipped": false,
       "docs": "docs/verification/render-pipelining-20261010/README.md",
       "evidence": ["src/platform/render/worker-renderer.ts exists"]
