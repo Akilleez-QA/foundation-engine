@@ -143,3 +143,34 @@ test('composition: a companion that falls into a pit is recovered behind the lea
   assert.equal(buddy.y, 0, 'back on the trail');
   assert.ok(leader.x - buddy.x > 0 && leader.x - buddy.x < 5, 'behind the leader, within reach');
 });
+
+test('review regressions: a follower closing in after a sprint, or outrun, is never stuck; landings that help only', () => {
+  const trail = straightTrail(30);
+  const o = {catchUpDistance: 2, teleportDistance: 10, landing: [3, 5, 8], stuckSeconds: 2, cooldown: 1};
+  // Was close, the leader sprinted, the follower closes steadily.
+  const r = createCompanionRecovery(trail, o);
+  const kinds: string[] = [];
+  kinds.push(r.update(1, {position: [27, 0, 0], desired: [28, 0, 0], now: 0}).kind);
+  for (let i = 0; i <= 40; i++)
+    kinds.push(r.update(1, {position: [22 + i * 0.1, 0, 0], desired: [28, 0, 0], now: 1 + i / 10}).kind);
+  assert.ok(!kinds.includes('teleport'), kinds.join());
+  // Outrun: the follower runs at full speed but the gap grows (still within teleportDistance).
+  const outrun = createCompanionRecovery(trail, o);
+  let last = '';
+  for (let i = 0; i <= 30; i++)
+    last = outrun.update(2, {position: [i * 0.2, 0, 0], desired: [3 + i * 0.4, 0, 0], now: i / 10}).kind;
+  assert.equal(last, 'catch-up');
+  // Landing points that would not help are skipped: the oldest crumb repeated, or no closer than the follower.
+  const short = straightTrail(2);
+  const tried: number[] = [];
+  const s = createCompanionRecovery(short, {...o, landing: [3, 5, 8]});
+  let d = s.update(3, {position: [0, 0, 0], desired: [2, 0, 0], now: 0, canLand: p => (tried.push(p.x), true)});
+  for (let i = 1; i <= 25; i++)
+    d = s.update(3, {position: [0, 0, 0], desired: [5, 0, 0], now: i / 10, canLand: p => (tried.push(p.x), true)});
+  assert.equal(d.kind, 'stranded', 'teleporting onto its own position never helps');
+  assert.deepEqual(tried, []);
+  // A landing beyond the teleport distance from the desired point would loop: refused.
+  const loop = createCompanionRecovery(trail, {...o, landing: [25]});
+  assert.equal(loop.update(4, {position: [0, 0, 50], desired: [28, 0, 0], now: 0}).kind, 'stranded');
+  assert.throws(() => createCompanionRecovery(trail, {...o, minProgress: 0}), RangeError);
+});

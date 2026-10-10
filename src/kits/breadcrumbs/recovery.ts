@@ -75,7 +75,7 @@ export function createCompanionRecovery(trail: BreadcrumbTrail, options: Recover
     fail('teleportDistance must exceed catchUpDistance');
   if (!finite(maxBoost) || maxBoost < 1 || maxBoost > 10) fail('maxBoost must be in [1, 10]');
   if (!finite(stuckSeconds) || stuckSeconds <= 0 || stuckSeconds > 600) fail('stuckSeconds must be in (0, 600]');
-  if (!finite(minProgress) || minProgress < 0) fail('minProgress must be nonnegative');
+  if (!finite(minProgress) || minProgress <= 0) fail('minProgress must be positive');
   if (!finite(cooldown) || cooldown < 0 || cooldown > 600) fail('cooldown must be in [0, 600]');
   if (!Number.isSafeInteger(maxFollowers) || maxFollowers < 1 || maxFollowers > 1024)
     fail('maxFollowers must be 1-1024');
@@ -84,11 +84,30 @@ export function createCompanionRecovery(trail: BreadcrumbTrail, options: Recover
     fail('landing must list 1-32 trail distances');
   const landing = landingInput.map(d => (finite(d) && d >= 0 ? d : fail('landing distances must be nonnegative')));
 
-  /** Per follower: progress window start (time, distance) and last teleport time. */
-  const followers = new Map<
-    number,
-    {windowStart: number; windowDistance: number; lastTeleport: number; lastNow: number}
-  >();
+  /**
+   * Per follower: the progress window (start time, the follower's position then and the unit direction toward its
+   * desired point then) and the last teleport time.
+   */
+  interface Follower {
+    windowStart: number;
+    anchor: RecoveryVec3 | null;
+    toward: RecoveryVec3;
+    /** Largest distance to the desired point seen in this window. */
+    farthest: number;
+    lastTeleport: number;
+    lastNow: number;
+  }
+  const followers = new Map<number, Follower>();
+  const restart = (f: Follower, now: number, position: RecoveryVec3, desired: RecoveryVec3) => {
+    f.windowStart = now;
+    f.anchor = position;
+    const gap = distance(position, desired);
+    f.farthest = gap;
+    f.toward =
+      gap > 0
+        ? [(desired[0] - position[0]) / gap, (desired[1] - position[1]) / gap, (desired[2] - position[2]) / gap]
+        : [0, 0, 0];
+  };
   const boostFor = (d: number) =>
     d <= catchUpDistance
       ? 1
@@ -112,21 +131,27 @@ export function createCompanionRecovery(trail: BreadcrumbTrail, options: Recover
       let f = followers.get(id);
       if (!f) {
         if (followers.size >= maxFollowers) fail('follower capacity reached');
-        f = {windowStart: now, windowDistance: Infinity, lastTeleport: -Infinity, lastNow: now};
+        f = {windowStart: now, anchor: null, toward: [0, 0, 0], farthest: 0, lastTeleport: -Infinity, lastNow: now};
         followers.set(id, f);
       }
       if (now < f.lastNow) fail('now must be nondecreasing per follower');
       f.lastNow = now;
       if (!desired) {
-        f.windowStart = now;
-        f.windowDistance = Infinity;
+        f.anchor = null;
         return Object.freeze({kind: 'follow', boost: 1});
       }
       const d = distance(position, desired);
-      // Progress window: restart whenever the follower is close enough or has closed `minProgress` since it began.
-      if (d <= catchUpDistance || d <= f.windowDistance - minProgress || f.windowDistance === Infinity) {
-        f.windowStart = now;
-        f.windowDistance = d;
+      // A chasing follower (even one a faster leader pulls away from) is never "stuck"; one against a wall is.
+      if (d <= catchUpDistance || f.anchor === null) restart(f, now, position, desired);
+      else {
+        const moved =
+          (position[0] - f.anchor[0]) * f.toward[0] +
+          (position[1] - f.anchor[1]) * f.toward[1] +
+          (position[2] - f.anchor[2]) * f.toward[2];
+        f.farthest = Math.max(f.farthest, d);
+        // Progress is either the follower's own advance toward where it was heading, or the gap closing by
+        // `minProgress` from the largest gap in this window (catching up after a sprint).
+        if (moved >= minProgress || f.farthest - d >= minProgress) restart(f, now, position, desired);
       }
       const stuck = d > catchUpDistance && now - f.windowStart >= stuckSeconds;
       const far = d > teleportDistance;
@@ -136,9 +161,16 @@ export function createCompanionRecovery(trail: BreadcrumbTrail, options: Recover
       }
       const reason = far ? 'distance' : 'stuck';
       if (now - f.lastTeleport >= cooldown) {
+        let previous: Crumb | null = null;
         for (const behind of landing) {
           const point = trail.along(behind);
           if (!point) break;
+          // Skip repeats (the trail clamps to its oldest crumb) and points that would not help: no closer to the
+          // desired point than the follower already is, or still beyond the teleport distance from it.
+          const same = previous !== null && previous.x === point.x && previous.y === point.y && previous.z === point.z;
+          previous = point;
+          const gap = distance([point.x, point.y, point.z], desired);
+          if (same || gap >= d || gap > teleportDistance) continue;
           let ok = false;
           try {
             ok = canLand(point) === true;
@@ -147,8 +179,7 @@ export function createCompanionRecovery(trail: BreadcrumbTrail, options: Recover
           }
           if (ok) {
             f.lastTeleport = now;
-            f.windowStart = now;
-            f.windowDistance = Infinity;
+            f.anchor = null;
             return Object.freeze({kind: 'teleport', to: point, reason});
           }
         }
