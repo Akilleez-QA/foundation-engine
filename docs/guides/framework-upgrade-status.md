@@ -1313,3 +1313,14 @@ acceptance.
 ## View deltas — NW-DELTA candidate, 2026-10-09
 
 [Contract](../../src/kits/network/README.md#optional-acknowledged-baseline-view-deltas), [guide](network-views.md#optional-acknowledged-baseline-deltas), [decision](../adr/0088-view-deltas.md). Optional encoder/decoder around the existing complete-view publisher and receiver: entity-level deltas against the last acknowledged adopted frame, each proven to rebuild the publisher's exact bytes before it is sent, with complete-frame fallback and `adopted: false` recovery. Evidence: 14 focused headless tests with a real publisher and receiver, hostile frames, and one local length measurement (9.1 % of complete length at 4 of 64 entities changing). Candidate only; WAN, browser, physical-device and full-CI acceptance are not claimed here.
+
+## Model clip transitions — candidate (2026-10-09)
+
+Optional `Model.transition` (seconds, default 0) eases skinned-model clip changes,
+revision restarts and returns to the bind pose from the displayed pose instead of
+cutting. The existing scene model owner keeps playback; no new system or mixer.
+Bounded to 512 animated nodes per model; larger rigs cut and report. See
+[ADR 0089](../adr/0089-model-clip-transitions.md) and
+[the model recipe](../recipes/load-a-model.md). Focused headless tests against the
+real three.js mixer are recorded in the upgrade ledger; independent review and full
+hosted integration CI remain required. No browser, visual or device acceptance.

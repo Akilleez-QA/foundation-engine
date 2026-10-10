@@ -230,7 +230,7 @@ export {
 } from '../platform/render/post/settings';
 export {cubeLutText, parseCubeLut, LUT_SIZE_LIMITS, type CubeLut} from '../platform/render/post/lut';
 
-export {Model, validateModel, type ModelData, type ModelSocketPose} from './model';
+export {Model, validateModel, MAX_MODEL_TRANSITION, type ModelData, type ModelSocketPose} from './model';
 export {RenderMask, validateRenderMask} from './render-mask';
 export {
   createDependencyLease,

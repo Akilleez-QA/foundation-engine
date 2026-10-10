@@ -149,6 +149,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `MATERIAL_LIMITS`
 - `MATERIAL_SHADINGS`
 - `MAX_CALIBRATION_MS`
+- `MAX_MODEL_TRANSITION`
 - `MUSIC_START_MARGIN`
 - `Material`
 - `Mesh`

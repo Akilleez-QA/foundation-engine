@@ -83,3 +83,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0087](0087-rewind-history.md) | Optional bounded rewind history | Optional kits / Network authority | Proposed |
 
 | [0088](0088-view-deltas.md) | Optional acknowledged-baseline view deltas | Network | Proposed |
+
+| [0089](0089-model-clip-transitions.md) | Model clip transitions through the existing model owner | Author API / Animation presentation | Proposed |

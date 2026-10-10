@@ -14,6 +14,11 @@ export interface ModelData {
   speed: number;
   /** Increment to restart playback, including replaying the same clip. */
   revision: number;
+  /**
+   * Seconds to blend from the displayed pose into a newly selected clip, restart or bind pose; 0 (default) cuts.
+   * At most `MAX_MODEL_TRANSITION`. Presentation only: it never changes timing, markers or the actor transform.
+   */
+  transition?: number;
   /** Explicit local pose overrides applied after the skeletal clip. */
   pose: readonly ModelJointPose[];
 }
@@ -25,8 +30,11 @@ export const Model = defineComponent<ModelData>('model', {
   loop: true,
   speed: 1,
   revision: 0,
+  transition: 0,
   pose: [],
 });
+/** Longest accepted `Model.transition`, in seconds. */
+export const MAX_MODEL_TRANSITION = 2;
 export interface ModelSocketPose {
   readonly name: string;
   readonly matrix: readonly number[];
@@ -43,7 +51,9 @@ export function validateModel(data: ModelData): void {
     data.speed < 0 ||
     data.speed > 16 ||
     !Number.isSafeInteger(data.revision) ||
-    data.revision < 0
+    data.revision < 0 ||
+    (data.transition !== undefined &&
+      (!Number.isFinite(data.transition) || data.transition < 0 || data.transition > MAX_MODEL_TRANSITION))
   )
     throw Error('model: invalid definition');
   if (

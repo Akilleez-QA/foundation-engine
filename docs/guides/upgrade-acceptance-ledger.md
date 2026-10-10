@@ -1280,3 +1280,20 @@ of successful GPU reclamation or physical-device acceptance.
 ## View deltas — NW-DELTA candidate, 2026-10-09
 
 [Contract](../../src/kits/network/README.md#optional-acknowledged-baseline-view-deltas), [guide](network-views.md#optional-acknowledged-baseline-deltas), [decision](../adr/0088-view-deltas.md). Optional encoder/decoder around the existing complete-view publisher and receiver: entity-level deltas against the last acknowledged adopted frame, each proven to rebuild the publisher's exact bytes before it is sent, with complete-frame fallback and `adopted: false` recovery. Evidence: 14 focused headless tests with a real publisher and receiver, hostile frames, and one local length measurement (9.1 % of complete length at 4 of 64 entities changing). Candidate only; WAN, browser, physical-device and full-CI acceptance are not claimed here.
+
+## Model clip transitions — candidate (2026-10-09)
+
+Branch `feat/model-clip-transition` from `db1f7a85`. `npm run check` passed: typecheck,
+format, lints and 380 affected tests, including ten new
+`scene-model-transition` tests (default cut unchanged, continuity on the switching
+frame and smoothstep progress for position and scale, a node only the old clip drove
+easing back and not left part-way after an interrupting switch, same-clip revision
+restart, completion while playback is paused with redraws reported only while moving,
+a cut in the middle of a transition, despawn mid-transition, pose overrides over a
+blend, unknown-clip and validation refusal, node-budget cut with one report) and the
+existing 21 scene model tests. An independent adversarial review found no blend,
+restore or buffer defect; its findings (a paused model never reaching a new pose,
+undocumented override and object-path limits, an unexported bound) were fixed before
+publication.
+Evidence is headless; no browser, visual-quality, physical-device or full-CI
+acceptance is claimed. Morph-target and material tracks still cut.

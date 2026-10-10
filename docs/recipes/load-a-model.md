@@ -70,9 +70,10 @@ The `pause` system reads the `turn` action from the `blank` template; in another
 | `loop` | `true` | `false` plays once and holds the last frame; a held clip is still (no redraw) even while `playing` stays `true` |
 | `speed` | `1` | playback rate, 0 to 16 |
 | `revision` | `0` | add one to restart the clip from the beginning (also when the clip name is unchanged) |
+| `transition` | `0` | seconds (0 to 2) to ease from the pose on screen into a new `clip`, a `revision` restart or the bind pose; `0` cuts |
 | `visible` | `true` | hide without unloading |
 
-Systems change these fields in place: switch `clip` to change animation, flip `playing`, or bump `revision` to replay. The clip names are the animation (action) names stored in the GLB; a name that does not match exactly one clip logs `model: unknown or ambiguous clip <name>` in the browser console. Size and turn the model with the entity's `Transform` (`scale`, `ry`).
+Systems change these fields in place: switch `clip` to change animation, flip `playing`, or bump `revision` to replay. With `transition` above zero, a change starts from whatever the model is showing (including a blend still in progress) and eases into the new clip, which plays from its first frame meanwhile. The blend runs on presentation time, so it also completes while `playing` is `false` (a paused model switched to the bind pose still gets there). It is presentation only: markers, the actor's `Transform` and game timing never wait for it. The first clip after a model loads, an unknown clip, `pose` overrides, object-path tracks (such as `.bones[name]`) and morph-target or material tracks still change at once, and a model whose clips animate more than 512 nodes cuts and logs `model: more than 512 animated nodes`. The clip names are the animation (action) names stored in the GLB; a name that does not match exactly one clip logs `model: unknown or ambiguous clip <name>` in the browser console. Size and turn the model with the entity's `Transform` (`scale`, `ry`).
 
 `ctx.modelState(entity).status` reports `'loading'`, `'ready'` or `'failed'` if a system needs to wait for the model.
 
