@@ -52,13 +52,13 @@ const phases = createActionPhases({
   }],
 });
 
-let state = phases.start('swing');               // plain, frozen: {timeline, position, marks, claims}
+let state = phases.start('swing');               // plain, frozen: {timeline, definition, position, marks, claims}
 const step = phases.advance(state, 1);           // one fixed tick; pass 0 for a frozen (hit-stop) actor
 for (const mark of step.marks) { /* charge the cost named by mark.id once */ }
 state = step.state;
 if (phases.isOpen(state, 'cancel:attack')) { /* consume the buffered press; start the follow-up */ }
 const contact = phases.claim(state, 'contact');  // once per open range
-if (contact.kind === 'claimed') { state = contact.state; /* resolve the consequence */ }
+if (contact.kind === 'claimed') { state = contact.state; /* resolve, e.g. id `${serial}:${contact.range}` */ }
 ```
 
 | Call | Result |
@@ -66,12 +66,16 @@ if (contact.kind === 'claimed') { state = contact.state; /* resolve the conseque
 | `start(id)` | A fresh state at position 0 with no marks delivered and nothing claimed. |
 | `advance(state, delta)` | Moves forward by `delta` (finite, `>= 0`), clamped at `length`. It returns the new state and every mark that became due, ordered by position and then declaration. `endedNow` is true only on the step that reaches the end. |
 | `isOpen(state, window)` / `open(state)` | Window membership is `from <= position < to`. A window may have several ranges. Nothing is open at the end position. |
-| `claim(state, window)` | `claimed` with a new state and the flattened range index. The other results are `already-claimed` (this range was claimed before) and `closed`. |
+| `claim(state, window)` | `claimed` with a new state and the flattened range index, `already-claimed` with the unchanged state and the same index, or `closed`. Ranges within one window may touch but not overlap. |
+| `openRange(state, window)` | The flattened index of the open range, or `-1`. Use it with an action serial and target to build per-target identities for a consequence owner. |
 | `pending(state)` | Marks not yet delivered or suppressed. |
 | `suppress(state, ids)` | Retires marks without delivering them. Use it for a handover whose costs were settled elsewhere. |
-| `restore(data)` | Validates saved or rollback data against the current definitions and returns `restored` or `invalid` with a reason. It never throws. |
+| `restore(data)` | Reads each field once and validates it against the current definitions, returning `restored` or `invalid` with a reason. It never throws. States from a changed definition, and states no step sequence could produce (a mark left undelivered behind the position, a claim on a range not yet started), are invalid. `-0` is normalized. |
 
 Every result is frozen. States hold primitive values only, so `JSON.stringify` round-trips them.
+Mark and claim bits are positional (declaration order). Each state therefore carries a
+`definition` fingerprint of its timeline's length, windows, ranges and marks; any edit to
+those invalidates older states rather than silently reinterpreting their bits.
 Advancing the same state twice gives equal results. That is the rollback contract: store the
 state with the actor and replay from it.
 
@@ -83,33 +87,42 @@ of 30 or thirty steps of 1). Fractional steps in seconds work, but floating-poin
 land a hair before a boundary. The creator decides how render time maps to ticks. Hit-stop
 is a zero step. Play-rate is a scaled step.
 
+In the usual advance-then-query loop, position 0 is observed only before the first step.
+A `[0, 4)` window is then seen on ticks at positions 1, 2 and 3. Query before advancing
+when the first position should count, as the per-request example in the tests does.
+
 ## Ownership, bounds and overload
 
 - The caller owns each state value. The helper owns only the immutable definitions it
   captured at creation, reading each input field once.
 - Per timeline: at most 32 marks and 32 window ranges in total (bit sets), ids of 1–256
-  characters, `0 <= from < to <= length`, `0 <= at <= length`, positive finite length.
+  UTF-16 code units, non-overlapping ranges within each window, `0 <= from < to <= length`, `0 <= at <= length`, positive finite length.
   Timeline count defaults to 256, with a maximum of 4,096.
-- Malformed definitions throw `RangeError` at creation. No partial set is created.
+- Malformed definitions, including non-object entries and array holes, throw `RangeError`
+  at creation. No partial set is created. A throwing input getter propagates its own error.
+- `suppress` accepts at most 32 ids per call.
 - `advance` and the queries visit at most 32 marks or ranges. Results allocate only their own records.
-- An invalid delta, a nonfinite position sum, an unknown timeline, window or mark, or a
-  state whose bits do not fit its timeline throws `RangeError` before any result is produced.
+- Every operation reads a state's fields exactly once and validates that copy. An invalid
+  delta, a nonfinite position sum, an unknown timeline, window or mark, or a state that
+  `restore` would reject throws `RangeError` before any result is produced.
 
 ## Cancellation and recovery
 
 To cancel an action, drop or replace its state. Marks not yet delivered then never fire.
 `suppress` covers the explicit handover case. A restore that fails leaves the caller's
 current state untouched, and the caller chooses a fallback such as idle. Changing a
-definition between save and load can make old states invalid (bits beyond the new count,
-positions past the new length). `restore` reports this; it does not migrate. Migration
-is a creator decision.
+definition between save and load makes old states invalid through the fingerprint;
+`restore` reports this and does not migrate. Migration (for example restarting the
+action, or mapping by mark id) is a creator decision.
 
 ## Limits
 
 - This is not a combat system. It has no damage, stamina, priority, hit-reaction or
   move-selection rules, and no target or contact geometry.
 - One state covers one action instance. Per-target "hit once" bookkeeping across many
-  targets belongs to the consequence owner (for example `createShots` identities).
+  targets belongs to the consequence owner (for example `createShots` identities built from
+  the action serial, `openRange` and the target).
+- The fingerprint is a 32-bit hash plus length: it detects edits, it is not a security check.
 - Marks are facts for the caller. Applying a cost and recording the delivered mark must
   happen in the same state transition as the consequence.
 - There is no network replication or server authority.
@@ -127,10 +140,14 @@ is a creator decision.
 - suppression;
 - capture-once definitions;
 - the 32-bit bound;
-- invalid steps;
-- hostile and changing getters during restore;
+- invalid steps and position overflow;
+- hostile and changing getters in restore and advance (one read per field);
+- definition fingerprints (reordered or moved marks reject old saves);
+- unreachable and `-0` states;
+- overlap rejection and malformed entries;
 - integer partition independence;
-- a composition with input-history buffering and consumption, per-request cancel windows,
+- per-request cancel windows (evade earlier than a follow-up attack);
+- a composition with input-history buffering and consumption, a cancel window,
   once-only costs, once-per-range contact through `resolveAction`, handover suppression and
   replay of a restored state.
 

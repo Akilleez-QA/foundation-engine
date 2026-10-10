@@ -4,6 +4,12 @@ import {createActionPhases, type PhaseState, type PhaseTimelineInput} from './ac
 import {createInputHistory} from '../input-history';
 import {resolveAction} from '../combat';
 import {must} from '../../testing/must';
+import type {PhaseRestore} from './action-phases';
+
+const restoredState = (result: PhaseRestore): PhaseState => {
+  if (result.kind !== 'restored') throw new Error(`expected restored, got ${result.reason}`);
+  return result.state;
+};
 
 // Example creator data in integer ticks. These numbers are fixtures, not engine defaults.
 const swing = (): PhaseTimelineInput => ({
@@ -114,7 +120,12 @@ test('claims succeed once per open range; a later range can be claimed separatel
   assert.equal(c1.kind, 'claimed');
   if (c1.kind !== 'claimed') return;
   assert.equal(c1.range, 4, 'flattened declaration index of the first contact range');
-  assert.deepEqual(phases.claim(c1.state, 'contact'), {kind: 'already-claimed'});
+  const again = phases.claim(c1.state, 'contact');
+  assert.equal(again.kind, 'already-claimed');
+  if (again.kind === 'already-claimed')
+    assert.equal(again.range, 4, 'range identity stays available for per-target ids');
+  assert.equal(phases.openRange(c1.state, 'contact'), 4);
+  assert.equal(phases.openRange(s0, 'contact'), -1);
   assert.equal(phases.claim(s1, 'contact').kind, 'claimed', 'the unclaimed earlier value is unchanged');
   const s2 = phases.advance(c1.state, 10).state;
   const c2 = phases.claim(s2, 'contact');
@@ -162,6 +173,35 @@ test('definitions are captured once, validated before use and bounded', () => {
       ],
     },
     {id: 't', length: 5, marks: [{id: 'm', at: 6}]},
+    {
+      id: 't',
+      length: 30,
+      windows: [
+        {
+          id: 'w',
+          ranges: [
+            [10, 20],
+            [15, 25],
+          ],
+        },
+      ],
+    },
+    {
+      id: 't',
+      length: 30,
+      windows: [
+        {
+          id: 'w',
+          ranges: [
+            [10, 20],
+            [10, 20],
+          ],
+        },
+      ],
+    },
+    null as never,
+    {id: 't', length: 5, windows: [null as never]},
+    {id: 't', length: 5, marks: [null as never]},
     {id: 't', length: 5, marks: [{id: 'm', at: NaN}]},
     {
       id: 't',
@@ -175,6 +215,27 @@ test('definitions are captured once, validated before use and bounded', () => {
     {id: 't', length: 99, marks: Array.from({length: 33}, (_, i) => ({id: `m${i}`, at: i}))},
   ];
   for (const timeline of bad) assert.throws(() => createActionPhases({timelines: [timeline]}), RangeError);
+  // eslint-disable-next-line no-sparse-arrays
+  assert.throws(() => createActionPhases({timelines: [, {id: 'a', length: 1}] as never}), RangeError);
+  assert.throws(() => createActionPhases(null as never), RangeError);
+  // Touching ranges in one window are separate ranges, not an overlap.
+  createActionPhases({
+    timelines: [
+      {
+        id: 't',
+        length: 30,
+        windows: [
+          {
+            id: 'w',
+            ranges: [
+              [10, 20],
+              [20, 25],
+            ],
+          },
+        ],
+      },
+    ],
+  });
   assert.throws(
     () =>
       createActionPhases({
@@ -226,41 +287,118 @@ test('definitions are captured once, validated before use and bounded', () => {
 test('invalid steps and foreign states are rejected; restore validates untrusted data without throwing', () => {
   const phases = createActionPhases({timelines: [swing(), {id: 'short', length: 2, marks: [{id: 'm', at: 1}]}]});
   const s = phases.start('swing');
+  const short = phases.start('short');
   for (const delta of [-1, NaN, Infinity]) assert.throws(() => phases.advance(s, delta), RangeError);
-  assert.throws(() => phases.advance({...s, position: Number.MAX_VALUE}, Number.MAX_VALUE), RangeError);
   assert.throws(() => phases.advance({...s, timeline: 'nope'}, 1), RangeError);
+  assert.throws(() => phases.advance({...s, definition: 'x'}, 1), RangeError);
   assert.throws(() => phases.advance({...s, marks: 2 ** 4}, 1), RangeError, 'mark bit beyond 4 marks');
+  const huge = createActionPhases({timelines: [{id: 'h', length: 1e308}]});
+  const far = restoredState(huge.restore({...huge.start('h'), position: 1e308}));
+  assert.throws(() => huge.advance(far, Number.MAX_VALUE), /position overflow/);
   const saved = JSON.parse(JSON.stringify(phases.advance(s, 11).state)) as unknown;
   const restored = phases.restore(saved);
   assert.equal(restored.kind, 'restored');
-  if (restored.kind === 'restored')
-    assert.deepEqual(restored.state, {timeline: 'swing', position: 11, marks: 0b1101, claims: 0});
+  if (restored.kind === 'restored') assert.deepEqual(restored.state, {...s, position: 11, marks: 0b1101, claims: 0});
+  const fixed = {timeline: 'short', definition: short.definition};
   for (const data of [
     null,
     42,
-    {timeline: 'swing', position: 31, marks: 0, claims: 0},
-    {timeline: 'short', position: 1, marks: 2, claims: 0},
-    {timeline: 'short', position: 1, marks: 0, claims: 1},
-    {timeline: 'swing', position: 1, marks: 0.5, claims: 0},
-    {timeline: 'missing', position: 0, marks: 0, claims: 0},
+    {...s, position: 31},
+    {...fixed, position: 1, marks: 2, claims: 0},
+    {...fixed, position: 1, marks: 1, claims: 1},
+    {...fixed, position: 1, marks: 0.5, claims: 0},
+    {...fixed, position: 1, marks: 0, claims: 0}, // undelivered mark behind the position
+    {...s, position: 5, marks: 0b1000, claims: 0b10000}, // claim on a range not yet started
+    {...fixed, definition: 'other', position: 0, marks: 0, claims: 0},
+    {timeline: 'short', position: 0, marks: 0, claims: 0}, // no fingerprint
+    {timeline: 'missing', definition: short.definition, position: 0, marks: 0, claims: 0},
     {
       get timeline(): string {
         throw Error('hostile');
       },
     },
+    new Proxy(
+      {},
+      {
+        get() {
+          throw Error('hostile proxy');
+        },
+      },
+    ),
   ])
     assert.equal(phases.restore(data).kind, 'invalid');
-  // A getter that changes between reads cannot smuggle an unchecked value through restore.
+  // Each field is read exactly once: a changing getter cannot smuggle an unchecked value through.
   let reads = 0;
   const flipping = {
-    timeline: 'short',
+    ...fixed,
     get position() {
-      return reads++ === 0 ? 1 : 99;
+      return reads++ === 0 ? 2 : -50;
     },
-    marks: 0,
+    marks: 1,
     claims: 0,
   };
-  assert.equal(phases.restore(flipping).kind, 'invalid');
+  assert.deepEqual(restoredState(phases.restore(flipping)), {...fixed, position: 2, marks: 1, claims: 0});
+  reads = 0;
+  assert.equal(phases.advance(flipping as never, 0).state.position, 2, 'advance also reads once');
+  const negativeZero = phases.restore({...fixed, position: -0, marks: -0, claims: 0});
+  assert.equal(negativeZero.kind, 'restored');
+  if (negativeZero.kind === 'restored') assert.equal(Object.is(negativeZero.state.position, -0), false);
+});
+
+test('a changed definition invalidates saved states instead of reinterpreting positional bits', () => {
+  const before = createActionPhases({
+    timelines: [
+      {
+        id: 't',
+        length: 10,
+        marks: [
+          {id: 'm', at: 5},
+          {id: 'n', at: 7},
+        ],
+      },
+    ],
+  });
+  const saved = JSON.parse(JSON.stringify(before.advance(before.start('t'), 6).state)) as unknown;
+  const reordered = createActionPhases({
+    timelines: [
+      {
+        id: 't',
+        length: 10,
+        marks: [
+          {id: 'n', at: 7},
+          {id: 'm', at: 5},
+        ],
+      },
+    ],
+  });
+  const result = reordered.restore(saved);
+  assert.equal(result.kind, 'invalid', 'reordering would otherwise deliver m twice');
+  const same = createActionPhases({
+    timelines: [
+      {
+        id: 't',
+        length: 10,
+        marks: [
+          {id: 'm', at: 5},
+          {id: 'n', at: 7},
+        ],
+      },
+    ],
+  });
+  assert.equal(same.restore(saved).kind, 'restored', 'an identical definition in a new owner accepts the save');
+  const moved = createActionPhases({
+    timelines: [
+      {
+        id: 't',
+        length: 10,
+        marks: [
+          {id: 'm', at: 5},
+          {id: 'n', at: 8},
+        ],
+      },
+    ],
+  });
+  assert.equal(moved.restore(saved).kind, 'invalid');
 });
 
 test('composition: buffered input, per-request cancel windows, once-only costs and contact, handover and rollback', () => {
@@ -340,4 +478,31 @@ test('integer tick partitioning does not change delivered marks or final state',
   const ones = run(Array.from({length: 30}, () => 1));
   assert.deepEqual(run([30]), ones);
   assert.deepEqual(run([0, 7, 0, 3, 13, 7]), ones);
+});
+
+test('per-request cancel windows: an evade interrupts earlier than a follow-up attack', () => {
+  const phases = createActionPhases({timelines: [swing()]});
+  const history = createInputHistory({actions: ['attack', 'evade'], capacity: 32});
+  const firstAllowed = (action: 'attack' | 'evade', pressTick: number) => {
+    history.reset();
+    let state = phases.start('swing');
+    for (let tick = 1; tick <= 30; tick++) {
+      history.record(tick, tick === pressTick ? history.mask([action]) : 0);
+      const listening = phases.isOpen(state, 'listen');
+      state = phases.advance(state, 1).state;
+      const press = listening ? history.lastEdge(action, 'press', 12, tick) : -1;
+      if (press >= 0 && phases.isOpen(state, `cancel:${action}`)) {
+        history.consume(action, press);
+        return tick;
+      }
+    }
+    return -1;
+  };
+  assert.equal(firstAllowed('evade', 10), 12);
+  assert.equal(firstAllowed('attack', 10), 18);
+  assert.equal(
+    firstAllowed('attack', 5),
+    -1,
+    'an early press has left the 12-tick buffer before the attack window opens',
+  );
 });
