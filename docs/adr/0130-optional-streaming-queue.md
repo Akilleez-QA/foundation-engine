@@ -1,4 +1,4 @@
-# ADR 0098: optional on-demand streaming queue
+# ADR 0130: optional on-demand streaming queue
 
 - Status: Proposed for this implementation; integration is gated by full CI.
 - Date: 2026-10-09
@@ -34,7 +34,7 @@ estimates.
 
 ## Evidence
 
-Ten unit tests including a randomised run asserting budgets every tick, release-exactly-once and replay of the
+Eleven unit tests including a randomised run asserting budgets every tick, release-exactly-once and replay of the
 event log, and four consumer tests (a real lease cache, a fixed-step model-owner consumer, promise cancellation and a
 throwing late release). An independent adversarial review found two high (a throwing late release could hold a slot
 forever; preemption could cancel loads without freeing enough capacity) and four medium problems; all were fixed with regression

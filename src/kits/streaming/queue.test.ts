@@ -384,16 +384,43 @@ test('review: preemption cancels nothing when it cannot make the head fit, and n
   assert.ok(q2.stats().entries + q2.stats().retiring <= 2);
 });
 
-test('review: bulk cancellation of one key is not quadratic; cancel inside start stops the new work', () => {
+test('review: requests per key are capped, cancelling them from the highest down stays fast, and repeated requeues end', () => {
   const m = manualPort();
-  const limits: StreamLimits = {maxEntries: 4, maxRequests: 200_000, maxConcurrent: 1, maxBytes: 10};
+  const limits: StreamLimits = {maxEntries: 4, maxRequestsPerKey: 4096, maxConcurrent: 1, maxBytes: 100};
   const q = createStreamQueue(m.port, limits);
   const hs: number[] = [];
-  for (let i = 0; i < 100_000; i++) hs.push(q.request('k', {priority: i % 7, bytes: 1}).handle);
+  for (let i = 0; i < 4096; i++) hs.push(q.request('k', {priority: 4096 - i, bytes: 1}).handle);
+  assert.equal(q.request('k', {priority: 0, bytes: 1}).status, 'refused-full', 'the per-key cap');
   const t0 = performance.now();
-  for (const h of hs) q.cancel(h);
-  assert.ok(performance.now() - t0 < 2000, 'cancelling 100,000 requests of one key stays fast');
+  for (const h of hs) q.cancel(h); // highest first: each cancel removes the key's only top request
+  assert.ok(performance.now() - t0 < 2000, 'bounded by the per-key cap');
   assert.equal(q.state('k'), 'absent');
+  // A value that keeps coming back larger than estimated while other loads hold bytes.
+  const g = manualPort();
+  const gl: StreamLimits = {maxEntries: 8, maxConcurrent: 3, maxBytes: 100, maxAttempts: 1};
+  const q2 = createStreamQueue(g.port, gl),
+    o2 = createStreamResult(gl);
+  q2.request('held', {priority: 9, bytes: 40});
+  q2.request('grow', {priority: 5, bytes: 5});
+  const other = q2.request('other', {priority: 1, bytes: 50}).handle;
+  q2.pump(0, o2);
+  g.ready('held', 40);
+  g.ready('grow', 30); // 40 held + 50 running + 30 > 100
+  q2.pump(1, o2);
+  assert.deepEqual(events(o2), ['ready held', 'requeued grow']);
+  q2.cancel(other);
+  g.ready('other', 50);
+  q2.pump(2, o2); // other retires; grow (30) starts beside held (40)
+  assert.equal(q2.state('grow'), 'running');
+  q2.request('other2', {priority: 1, bytes: 30});
+  q2.pump(3, o2);
+  g.ready('grow', 31); // 40 + 30 + 31 > 100 again
+  q2.pump(4, o2);
+  assert.equal(q2.state('grow'), 'failed', 'after the free requeue, requeues spend attempts');
+  assert.match(String(q2.error('grow')), /keeps exceeding/);
+});
+
+test('review: cancel inside start stops the new work', () => {
   let cancels = 0;
   let handle = -1;
   const re = createStreamQueue<string>(

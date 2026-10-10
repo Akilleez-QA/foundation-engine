@@ -7,7 +7,7 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
-- Optional streaming queue (`@kits/streaming`): rank play-time load requests (model assets and the clips they carry, records, sounds) under concurrency and byte budgets, with shared requests, cancellation that holds slots until loads settle, deterministic retry backoff and optional preemption, through ports onto the existing lease caches and model owner. See [ADR 0098](docs/adr/0098-optional-streaming-queue.md).
+- Optional streaming queue (`@kits/streaming`): rank play-time load requests (model assets and the clips they carry, records, sounds) under concurrency and byte budgets, with shared requests, cancellation that holds slots until loads settle, deterministic retry backoff and optional preemption, through ports onto the existing lease caches and model owner. See [ADR 0130](docs/adr/0130-optional-streaming-queue.md).
 
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 

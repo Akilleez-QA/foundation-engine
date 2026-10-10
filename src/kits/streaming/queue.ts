@@ -41,6 +41,8 @@ export interface StreamLimits {
   readonly maxEntries: number;
   /** Live request handles. maxEntries..1,048,576; default 4 × maxEntries (capped). */
   readonly maxRequests?: number;
+  /** Live requests of one key. 1..4,096; default 64. Bounds the rescan when a key's highest request leaves. */
+  readonly maxRequestsPerKey?: number;
   /** Running works, including cancelled works that have not settled. 1..256. */
   readonly maxConcurrent: number;
   /** Byte budget: estimates of running works plus actual bytes of ready values. Positive safe integer. */
@@ -170,6 +172,8 @@ interface Entry<T> {
   /** Bytes charged to the budget: the estimate while running or retiring, actual bytes when ready. */
   charged: number;
   attempts: number;
+  /** Values released for exceeding their estimate under pressure. */
+  requeues: number;
   retryAt: number;
   heapPos: number;
   work?: StreamWork<T> | undefined;
@@ -197,6 +201,8 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
     limits.maxRequests === undefined
       ? Math.min(STREAM_CEILING.requests, maxEntries * 4)
       : intIn(limits.maxRequests, maxEntries, STREAM_CEILING.requests, 'maxRequests');
+  const maxPerKey =
+    limits.maxRequestsPerKey === undefined ? 64 : intIn(limits.maxRequestsPerKey, 1, 4096, 'maxRequestsPerKey');
   const maxConcurrent = intIn(limits.maxConcurrent, 1, STREAM_CEILING.concurrent, 'maxConcurrent');
   const maxBytes = intIn(limits.maxBytes, 1, Number.MAX_SAFE_INTEGER, 'maxBytes');
   const maxStarts =
@@ -401,6 +407,7 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
         estimate: victim.estimate,
         charged: 0,
         attempts: victim.attempts - 1,
+        requeues: victim.requeues,
         retryAt: 0,
         heapPos: -1,
       };
@@ -426,7 +433,11 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
       const est = intIn(o.bytes, 0, Number.MAX_SAFE_INTEGER, 'bytes');
       if (est > maxBytes) return {status: 'refused-bytes', handle: -1};
       let e = entries.get(key);
-      if (handles.size >= maxRequests || (!e && entries.size + countRetiring() >= maxEntries))
+      if (
+        handles.size >= maxRequests ||
+        (e && e.handles.size >= maxPerKey) ||
+        (!e && entries.size + countRetiring() >= maxEntries)
+      )
         return {status: 'refused-full', handle: -1};
       const handle = nextHandle++;
       if (!e) {
@@ -441,6 +452,7 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
           estimate: est,
           charged: 0,
           attempts: 0,
+          requeues: 0,
           retryAt: 0,
           heapPos: -1,
         };
@@ -548,11 +560,19 @@ export function createStreamQueue<T>(port: StreamPort<T>, limits: StreamLimits):
           }
           if (bytes + actual > maxBytes) {
             // Larger than its estimate and does not fit beside what is held now: release it and queue the key
-            // again with its real size, without spending an attempt.
+            // again with its real size (the first time without spending an attempt).
             safeRelease(() => p.release());
             counters.resized++;
             e.estimate = actual;
-            e.attempts--;
+            // The first requeue of a key is free; later ones spend attempts, so a size that keeps growing ends.
+            if (++e.requeues === 1) e.attempts--;
+            else if (e.attempts >= maxAttempts) {
+              e.error = new RangeError('streaming: value keeps exceeding its estimate under the byte budget');
+              e.phase = 'failed';
+              counters.failures++;
+              emit('failed', e.key);
+              continue;
+            }
             enqueue(e);
             emit('requeued', e.key);
             continue;
