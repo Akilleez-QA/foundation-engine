@@ -172,6 +172,16 @@ export const FEATURES = [
     evidence: [{engine: 'Interpolated'}, {engine: 'presentTransform'}, {path: 'src/author/interpolation.test.ts'}],
   },
   {
+    id: 'MEDIA-01',
+    title: 'Medium volumes with hysteresis state tracking and buoyancy, drag and current accelerations',
+    docs: 'src/kits/media/README.md',
+    evidence: [
+      {kit: 'media', export: 'createMediumVolumes'},
+      {kit: 'media', export: 'createMediumTracker'},
+      {path: 'src/kits/media/media.test.ts'},
+    ],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,
