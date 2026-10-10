@@ -21,6 +21,7 @@ test('probes report the winning volume, depth and submerged fraction', () => {
   const p = v.probe(at(5, -0.9));
   assert.equal(p.volume?.id, 1);
   assert.equal(p.depth, 0.9);
+  assert.ok(Math.abs(p.headDepth - -0.9) < 1e-12);
   assert.ok(Math.abs(p.submerged - 0.5) < 1e-12);
   assert.equal(v.probe(at(5, 0.1)).volume, null, 'feet above the surface');
   assert.equal(v.probe(at(5, -5)).volume, null, 'below the floor');
@@ -57,7 +58,9 @@ test('the tracker moves through dry, wade, swim and under with hysteresis and ev
   assert.equal(step(-1.25).state, 'wade');
   assert.equal(step(-1.35).state, 'swim');
   assert.equal(step(-1.15).state, 'swim', 'stays swimming inside the band');
-  assert.equal(step(-2).state, 'under', 'whole body below the surface');
+  assert.equal(step(-1.85).state, 'swim', 'head 5 cm under: below the under hysteresis');
+  assert.equal(step(-2).state, 'under', 'head well below the surface');
+  assert.equal(step(-1.75).state, 'under', 'head 5 cm above the surface stays under (no flicker)');
   assert.equal(step(-1.05).state, 'wade', 'surfacing below swimDepth - hysteresis drops to wading');
   const out = step(1);
   assert.deepEqual(out.events, [
@@ -127,8 +130,7 @@ test('composition: a fixed-step body floats in water and is carried by the curre
   const tracker = createMediumTracker(volumes, {maxActors: 1, wadeDepth: 0.4, swimDepth: 1.2});
   const velocity = [0, 0, 0];
   const states: string[] = [];
-  const g = 9.81,
-    dt = 1 / 60;
+  const g = 9.81;
   const scene = defineScene({
     id: 'float',
     title: 'Float',
@@ -136,7 +138,7 @@ test('composition: a fixed-step body floats in water and is carried by the curre
     systems: [
       defineSystem({
         id: 'body',
-        run(ctx) {
+        run(ctx, dt) {
           const tr = ctx.world.get(ctx.named('swimmer')!, Transform)!;
           const r = tracker.update(0, {x: tr.x, y: tr.y, z: tr.z, height: 1.8});
           states.push(r.state);
@@ -158,4 +160,36 @@ test('composition: a fixed-step body floats in water and is carried by the curre
   assert.ok(Math.abs(tr.y - -1.8 / 1.1) < 0.05, String(tr.y));
   assert.ok(tr.x > 5, 'carried downstream by the current');
   assert.ok(states.includes('swim') && states[0] === 'dry');
+});
+
+test('review regressions: rounding never hides under, depth respects the floor, forged inputs are refused', () => {
+  const v = createMediumVolumes({maxVolumes: 2});
+  v.set(1, pool());
+  const t = createMediumTracker(v, {maxActors: 4, wadeDepth: 0.4, swimDepth: 1.2, hysteresis: 0.01});
+  const inside = v.probe({x: 5, y: -0.9215695970793438, z: 5, height: 0.15510798520702754});
+  assert.equal(inside.submerged, 1);
+  assert.equal(t.update(1, {x: 5, y: -0.9215695970793438, z: 5, height: 0.15510798520702754}).state, 'under');
+  // A thin layer far above the feet: depth is the medium thickness the body is in, not surface - feet.
+  v.set(2, pool({minX: 20, maxX: 30, floor: -3.1, surface: -3}));
+  const thin = v.probe({x: 25, y: -10, z: 5, height: 7.05});
+  assert.ok(Math.abs(thin.depth - 0.1) < 1e-9);
+  assert.equal(t.update(2, {x: 25, y: -10, z: 5, height: 7.05}).state, 'dry');
+  assert.throws(() => t.restore({v: 1, actors: [{actor: 1, state: 'toString' as never, volume: 1}]}), RangeError);
+  assert.throws(
+    () =>
+      mediumAcceleration({
+        probe: {...inside, volume: {...inside.volume!, drag: NaN}},
+        velocity: [0, 0, 0],
+        gravity: 9.81,
+      }),
+    RangeError,
+  );
+  // Replacing a volume's kind under the same id is reported as leaving one medium and entering another.
+  const kinds = createMediumTracker(v, {maxActors: 1, wadeDepth: 0.4, swimDepth: 1.2});
+  kinds.update(5, at(5, -1));
+  v.set(1, pool({kind: 'lava'}));
+  assert.deepEqual(
+    kinds.update(5, at(5, -1)).events.map(e => e.kind),
+    ['exit', 'enter'],
+  );
 });

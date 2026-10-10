@@ -39,8 +39,10 @@ export type MediumState = 'dry' | 'wade' | 'swim' | 'under';
 export interface Probe {
   /** The winning volume containing the point horizontally and vertically overlapping the body, or null. */
   readonly volume: Volume | null;
-  /** surface - feet (negative above the surface). 0 when no volume. */
+  /** How deep the body stands in the medium: surface - max(feet, floor). 0 when no volume. */
   readonly depth: number;
+  /** surface - head (positive when the head is below the surface). 0 when no volume. */
+  readonly headDepth: number;
   /** Fraction of the body height inside the medium, 0..1. */
   readonly submerged: number;
 }
@@ -145,27 +147,30 @@ export function createMediumVolumes(options: {readonly maxVolumes: number}) {
       )
         best = v;
     }
-    if (!best) return Object.freeze({volume: null, depth: 0, submerged: 0});
+    if (!best) return Object.freeze({volume: null, depth: 0, headDepth: 0, submerged: 0});
     const top = Math.min(s.y + s.height, best.surface),
       bottom = Math.max(s.y, best.floor);
     return Object.freeze({
       volume: best,
-      depth: best.surface - s.y,
-      submerged: Math.min(1, Math.max(0, (top - bottom) / s.height)),
+      depth: best.surface - bottom,
+      headDepth: best.surface - (s.y + s.height),
+      // Exactly 1 whenever the whole body is inside, regardless of rounding in the division.
+      submerged:
+        s.y + s.height <= best.surface && s.y >= best.floor ? 1 : Math.min(1, Math.max(0, (top - bottom) / s.height)),
     });
   };
   return {
     get size() {
       return volumes.size;
     },
-    /** Increments on every accepted change, so a tracker can tell volumes moved. */
+    /** Increments on every accepted change (for creator caches; the tracker re-probes every update). */
     get revision() {
       return revision;
     },
     /** Add or replace a volume (moving platforms, tides: call again with new heights). */
     set(id: number, input: VolumeInput): Volume {
       if (!Number.isSafeInteger(id) || id < 0) fail('id must be a nonnegative integer');
-      const v = captureVolume(id, input);
+      const v = captureVolume(id + 0, input);
       if (!volumes.has(id) && volumes.size >= maxVolumes) fail('volume capacity reached');
       volumes.set(id, v);
       revision++;
@@ -186,7 +191,8 @@ export function createMediumVolumes(options: {readonly maxVolumes: number}) {
 export type MediumVolumes = ReturnType<typeof createMediumVolumes>;
 
 /**
- * Per-actor medium state with hysteresis and enter/exit/state events, in actor-id order per update batch.
+ * Per-actor medium state with hysteresis and enter/exit/state events. `under` (head below the surface) also has
+ * hysteresis: entered at headDepth >= hysteresis, left below headDepth < -hysteresis.
  * A state needs `depth >= threshold + hysteresis` to deepen and `depth < threshold - hysteresis` to shallow;
  * `under` means the whole body is below the surface (submerged >= 1).
  */
@@ -200,7 +206,7 @@ export function createMediumTracker(volumes: MediumVolumes, options: TrackerOpti
     fail('0 < wadeDepth < swimDepth is required');
   if (!finite(hysteresis) || hysteresis < 0 || hysteresis * 2 >= swimDepth - wadeDepth || hysteresis >= wadeDepth)
     fail('hysteresis must be nonnegative and smaller than the gaps between thresholds');
-  const actors = new Map<number, {state: MediumState; volume: number | null}>();
+  const actors = new Map<number, {state: MediumState; volume: number | null; kind?: string | undefined}>();
   const rank: Record<MediumState, number> = {dry: 0, wade: 1, swim: 2, under: 3};
   const levels: readonly MediumState[] = ['dry', 'wade', 'swim'];
   /**
@@ -209,7 +215,7 @@ export function createMediumTracker(volumes: MediumVolumes, options: TrackerOpti
    */
   const classify = (p: Probe, previous: MediumState): MediumState => {
     if (!p.volume) return 'dry';
-    if (p.submerged >= 1) return 'under';
+    if (previous === 'under' ? p.headDepth >= -hysteresis : p.headDepth >= hysteresis) return 'under';
     const prev = Math.min(rank[previous], 2);
     let level = 0;
     for (const [threshold, at] of [
@@ -242,13 +248,15 @@ export function createMediumTracker(volumes: MediumVolumes, options: TrackerOpti
       const state = classify(p, record.state);
       const events: MediumEvent[] = [];
       const volume = p.volume?.id ?? null;
-      if (volume !== record.volume) {
+      const kind = p.volume?.kind;
+      if (volume !== record.volume || (volume !== null && record.kind !== undefined && kind !== record.kind)) {
         if (record.volume !== null) events.push(Object.freeze({kind: 'exit', actor, volume: record.volume}));
         if (volume !== null) events.push(Object.freeze({kind: 'enter', actor, volume}));
       }
       if (state !== record.state) events.push(Object.freeze({kind: 'state', actor, from: record.state, to: state}));
       record.state = state;
       record.volume = volume;
+      record.kind = kind;
       actors.set(actor, record);
       return Object.freeze({state, probe: p, events: Object.freeze(events)});
     },
@@ -279,10 +287,10 @@ export function createMediumTracker(volumes: MediumVolumes, options: TrackerOpti
       readonly v: 1;
       readonly actors: readonly {readonly actor: number; readonly state: MediumState; readonly volume: number | null}[];
     }): void {
-      if (typeof snapshot !== 'object' || snapshot === null || snapshot.v !== 1 || !Array.isArray(snapshot.actors))
-        fail('snapshot must be v1');
-      const list = snapshot.actors,
-        count = list.length;
+      if (typeof snapshot !== 'object' || snapshot === null || snapshot.v !== 1) fail('snapshot must be v1');
+      const list: unknown = snapshot.actors;
+      if (!Array.isArray(list)) return fail('snapshot actors must be an array');
+      const count = list.length;
       if (count > maxActors) fail('snapshot exceeds maxActors');
       const next = new Map<number, {state: MediumState; volume: number | null}>();
       for (let i = 0; i < count; i++) {
@@ -294,7 +302,7 @@ export function createMediumTracker(volumes: MediumVolumes, options: TrackerOpti
           volume = r.volume;
         if (!Number.isSafeInteger(actor) || (actor as number) < 0 || next.has(actor as number))
           fail('invalid actor id');
-        if (typeof state !== 'string' || !(state in rank)) fail('invalid state');
+        if (typeof state !== 'string' || !Object.hasOwn(rank, state)) fail('invalid state');
         if (volume !== null && (!Number.isSafeInteger(volume) || (volume as number) < 0)) fail('invalid volume id');
         if (state !== 'dry' && volume === null) fail('a wet state needs a volume');
         next.set(actor as number, {state: state as MediumState, volume: volume as number | null});
@@ -323,12 +331,16 @@ export function mediumAcceleration(input: {
   if (!finite(g) || g < 0) fail('gravity must be finite and nonnegative');
   const vol = probe?.volume;
   if (!vol) return Object.freeze([0, 0, 0]) as MediumVec3;
+  const {drag, density} = vol;
+  if (!finite(drag) || drag < 0 || !finite(density) || density < 0)
+    fail('probe volume drag and density must be finite and nonnegative');
+  const current = vec(vol.current, 'probe volume current');
   const f = probe.submerged;
   if (!finite(f) || f < 0 || f > 1) fail('probe.submerged must be in [0, 1]');
-  const k = vol.drag * f;
+  const k = drag * f;
   return Object.freeze([
-    -k * (v[0] - vol.current[0]),
-    g * vol.density * f - k * (v[1] - vol.current[1]),
-    -k * (v[2] - vol.current[2]),
+    -k * (v[0] - current[0]),
+    g * density * f - k * (v[1] - current[1]),
+    -k * (v[2] - current[2]),
   ]) as MediumVec3;
 }

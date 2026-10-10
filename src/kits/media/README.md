@@ -16,14 +16,14 @@ import { createMediumVolumes, createMediumTracker, mediumAcceleration } from '@k
 
 const water = createMediumVolumes({ maxVolumes: 32 });
 water.set(1, { minX: 0, maxX: 40, minZ: 0, maxZ: 25, floor: -6, surface: 0, kind: 'water', density: 1.05, drag: 1.2 });
-water.set(2, { ...river, kind: 'water', current: [2, 0, 0], priority: 1 });   // a flowing channel inside the lake
+water.set(2, { minX: 10, maxX: 14, minZ: 0, maxZ: 25, floor: -2, surface: 0, kind: 'water', current: [2, 0, 0], priority: 1 }); // a channel
 const tracker = createMediumTracker(water, { maxActors: 64, wadeDepth: 0.4, swimDepth: 1.2, hysteresis: 0.05 });
 
 // fixed-step system, before your own movement integration:
 const r = tracker.update(player, { x: tr.x, y: tr.y, z: tr.z, height: 1.8 });   // feet position
 for (const e of r.events) { /* splash on enter, switch controls on state 'swim', drown timer on 'under' */ }
 const a = mediumAcceleration({ probe: r.probe, velocity, gravity: 9.81 });
-velocity = add(velocity, scale(add(a, [0, -9.81, 0]), dt));
+// velocity += (a + [0, -9.81, 0]) * dt; then move the body with your controller
 // tides or a draining pool: water.set(1, { ...pool, surface: tideHeight }) every step
 ```
 
@@ -37,22 +37,26 @@ velocity = add(velocity, scale(add(a, [0, -9.81, 0]), dt));
   - `density`, `drag`, `current`: inputs to the acceleration helper.
   - `enabled`: switches the volume on or off.
   - Calling `set()` again replaces a volume. Use this for moving water, tides and drained pools. `revision` counts
-    every change.
+    every change for creator caches; the tracker re-probes on every update. Replacing a volume's `kind` under the
+    same id is reported as an exit and an enter.
 - **Probe.** `probe({x, y, z, height})` returns the winning volume around a body whose feet are at `(x, y, z)`,
   together with:
-  - `depth`: `surface - feet`;
+  - `depth`: `surface - max(feet, floor)`, how deep the body stands in the medium;
+  - `headDepth`: `surface - head`, positive when the head is below the surface;
   - `submerged`: the fraction of the body's height inside the medium, from 0 to 1.
 - **Tracker.**
   - The states:
     - `wade` starts at `depth >= wadeDepth`.
     - `swim` starts at `depth >= swimDepth`.
-    - `under` means the whole body is below the surface.
+    - `under` means the head is below the surface. It has its own hysteresis: entered at `headDepth >= hysteresis`
+      and left once `headDepth < -hysteresis`.
   - Each threshold has hysteresis. An actor crosses upward only at `threshold + hysteresis` and back only below
     `threshold - hysteresis`, so an actor bobbing at a boundary does not flicker.
   - Entering or leaving a volume is reported separately from state changes. An actor moving between volumes gets
     an `exit` before the `enter`.
   - `remove(actor)` reports a final `exit`.
-  - `snapshot()` / `restore()` save the per-actor state.
+  - `snapshot()` / `restore()` save the per-actor state. Restore trusts volume ids; a stale id produces an exit on
+    the next update.
 - **`mediumAcceleration`.** Pure. Buoyancy is `gravity * density * submerged`, acting upward; a fully submerged body
   with density 1 is neutral. Drag is `-drag * submerged * (velocity - current)`. Outside a medium the result is
   zero. The creator adds its own gravity and controls.
@@ -67,7 +71,8 @@ velocity = add(velocity, scale(add(a, [0, -9.81, 0]), dt));
 - **Cost.**
   - A probe is O(volumes); a creator with many volumes can pre-filter with `@kits/spatial`.
   - `update` is one probe.
-- **Failure.** Malformed input throws `RangeError` before any change. Every input field is copied once.
+- **Failure.** Malformed input throws `RangeError` before any change, including forged probe volumes passed to
+  `mediumAcceleration`. Every input field is copied once.
 
 ## Composition
 
@@ -89,8 +94,9 @@ velocity = add(velocity, scale(add(a, [0, -9.81, 0]), dt));
 `media.test.ts` covers:
 
 - probe selection: edges, flush seams, priority, surface tie-break and disabled volumes;
-- tracker states with hysteresis in both directions;
-- `under`;
+- tracker states with hysteresis in both directions, including `under` at the surface;
+- review regressions: rounding never hides `under`, depth respects the floor, forged inputs are refused, and a
+  replaced volume kind is reported;
 - enter, exit and state ordering, including moving between volumes and removal;
 - buoyancy, drag and current values;
 - snapshot replay and validation;
