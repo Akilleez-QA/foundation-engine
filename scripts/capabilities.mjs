@@ -43,6 +43,12 @@ const REPO = 'https://github.com/Akilleez-QA/foundation-engine';
  */
 export const FEATURES = [
   {
+    id: 'NAV-FIELD-01',
+    title: 'Optional incremental shared navigation distance fields',
+    docs: 'src/kits/navigation/README.md',
+    evidence: [{kit: 'navigation', export: 'createDistanceField'}, {path: 'src/kits/navigation/field.test.ts'}],
+  },
+  {
     id: 'ASG-01',
     title: 'Optional bounded service and worksite assignment ownership',
     docs: 'docs/guides/assignments.md',
@@ -158,6 +164,15 @@ export const FEATURES = [
     title: 'Seeded hierarchical generation (deriveSeed)',
     docs: 'docs/kits/README.md',
     evidence: [{kit: 'procgen', export: 'deriveSeed'}],
+  },
+  {
+    id: 'GRID-01',
+    title: 'Atomic sparse cell batches and bounded immutable occupancy queries',
+    docs: 'docs/guides/cell-occupancy.md',
+    evidence: [
+      {kit: 'spatial', export: 'createOccupancy'},
+      {kit: 'procgen', export: 'CELL_BATCH_CEILING'},
+    ],
   },
   {
     id: 'GEN-02',

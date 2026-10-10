@@ -88,3 +88,19 @@ This includes orientation changes that emit window resize; it does not claim
 visual-viewport-only events or physical-device acceptance. Already emitted discrete
 actions are not undone. Existing blur, pagehide and pointer cancellation remain
 unchanged. See the [regression receipt](../../../docs/verification/input-resize-20261001/README.md).
+
+## Editable focus and held keyboard input
+
+The document dispatcher retires prior keyboard holds, repeats and undrained keyboard
+actions when focus enters a text input, textarea, select or editable content. Rows
+with `inText: true` remain allowed. Controller, touch and pointer actions retain
+their own policies; this does not change the owner epoch or globally cancel input.
+Retired key repeats cannot resume gameplay after focus leaves; key release or a
+fresh nonrepeat press rearms that key, matching the existing lost-keyup recovery.
+The focus event keeps native editing behavior. Synchronous focus during an action
+handler cannot publish that action as a new stale hold.
+
+The bridge observes focus transitions and exposed composed event targets. Changing
+editability while focus stays put, and hidden targets inside closed shadow roots,
+are not covered. Node regressions exercise the bridge and selective retirement;
+physical keyboard, assistive technology and device acceptance remain unverified.

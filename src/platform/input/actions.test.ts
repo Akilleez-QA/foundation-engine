@@ -173,6 +173,72 @@ function world(extraRows: InputActionDef[] = []) {
 }
 const ids = (events: ActionEvent[]) => events.map(e => `${e.action}:${e.phase}`);
 
+test('editable focus retires only prior non-text keyboard work, including released queued actions', () => {
+  const w = world([
+    {
+      id: 'test.typing',
+      label: 'typing',
+      scope: 'global',
+      kind: 'hold',
+      inText: true,
+      defaults: {keys: ['t'], pad: ['b']},
+    },
+  ]);
+  try {
+    w.input.keyDown(key('w'));
+    w.input.keyUp(key('w')); // The undrained press and release must also retire.
+    w.input.keyDown(key('a'));
+    w.input.pad('ls-left', true); // Same action, independent device.
+    w.input.keyDown(key('t'));
+    const touch = ownActionSource(w.input, ['core.move-right'], 'touch');
+
+    touch.set(['core.move-right']);
+    w.input.activate('core.interact');
+    const epoch = w.input.epoch;
+    const field = w.doc.createElement('input');
+    w.input.focusEntered(field);
+    assert.equal(w.input.epoch, epoch);
+    assert.equal(w.input.held('core.move-up'), false);
+    assert.equal(w.input.held('core.move-left'), true, 'the pad hold survives');
+    assert.equal(w.input.held('test.typing'), true);
+    assert.equal(w.input.held('core.move-right'), true);
+    assert.deepEqual(ids(w.input.drain('home#1')), [
+      'core.move-left:press',
+      'test.typing:press',
+      'core.move-right:press',
+      'core.interact:press',
+    ]);
+    w.input.pad('ls-left', false);
+    assert.equal(w.input.held('core.move-left'), false);
+    w.input.keyDown(key('a', {repeat: true}));
+    assert.equal(w.input.held('core.move-left'), false, 'old repeat cannot resume after leaving the field');
+    w.input.keyUp(key('a'));
+    w.input.keyDown(key('a'));
+    assert.equal(w.input.held('core.move-left'), true);
+  } finally {
+    w.fake.restore();
+  }
+});
+
+test('editable focus inside a keyboard handler cannot publish a stale hold or fallback, but inText survives', () => {
+  for (const inText of [false, true]) {
+    const w = world([
+      {id: 'test.focus', label: 'focus', scope: 'global', kind: 'hold', inText, defaults: {keys: ['f'], pad: ['b']}},
+    ]);
+    try {
+      w.input.onAction('test.focus', () => {
+        w.input.focusEntered(w.doc.createElement('textarea'));
+        return false;
+      });
+      w.input.keyDown(key('f'));
+      assert.equal(w.input.held('test.focus'), inText);
+      assert.deepEqual(ids(w.input.drain('home#1')), inText ? ['test.focus:press'] : []);
+    } finally {
+      w.fake.restore();
+    }
+  }
+});
+
 test('targeted action descriptions snapshot remaps without exposing mutable bindings or discovering hidden rows', () => {
   const hidden: InputActionDef = {
     id: 'debug.inspect',

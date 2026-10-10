@@ -187,7 +187,7 @@ test('KTX2 textures are transcoded for the bound renderer and counted at their t
 });
 
 test('texture bytes: RGBA8 images, compressed levels, the uncompressed fallback and compressed cube faces', () => {
-  assert.equal(textureBytes({image: {width: 64, height: 64}} as T.Texture), 21845);
+  assert.equal(textureBytes({image: {width: 64, height: 64}} as T.Texture), 21844);
   assert.equal(textureBytes(new T.CompressedTexture(bc7Levels(), 64, 64, T.RGBA_BPTC_Format)), BC7_BYTES);
   // The uncompressed fallback: RGBA8 levels in a CompressedTexture, as KTX2Loader's transcoder returns them.
   const rgba = levelSides(64).map(side => ({data: new Uint8Array(side * side * 4), width: side, height: side}));

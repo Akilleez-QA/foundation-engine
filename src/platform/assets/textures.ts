@@ -128,7 +128,7 @@ const isImageBitmap = (image: unknown): image is ImageBitmap =>
 
 const defaultLoadImage = (url: string): Promise<TextureImage> => new T.ImageLoader().loadAsync(url);
 
-/** Mipmapped RGBA8 for an image; the exact level bytes for a compressed (KTX2) texture (texture-bytes.ts). */
+/** Full-chain RGBA8 estimate for an ordinary 2D image; compressed level bytes for KTX2 (texture-bytes.ts). */
 export {textureBytes};
 
 /** The cache key: asset id and variant, plus the sampler and colour space when they are not the defaults. */

@@ -80,3 +80,9 @@ const r = interest.update(connectionId, out);        // 'complete' | 'over-budge
 | Failure and recovery | Malformed input or an undersized, frozen or non-`Float64Array` result throws before any change |
 | Evidence | `interest.test.ts` (9 tests, including a 3,000-step randomised comparison with an independent reference model covering tiers, hold, budget, observer motion and removal); `tools/interest-host/host.test.mjs` (6 tests: real NW-02 receivers, per-connection disclosure, no frames for hidden activity while scans are complete, hysteresis, credit coalescing, budget, despawn, no leaked observer slots on duplicate sessions or refused publishers); `tools/spatial-bench` interest cases at 1,000 and 10,000 entities with a work-count test |
 | Limits | Distance only: no occlusion, line of sight or team sharing (compose those in the creator's projection). No priority accumulation or starvation rotation for dropped ids, no per-entity update frequency, no delta encoding. Ranking is deterministic, but which ids an `incomplete` scan saw depends on grid history. Entity id reuse is the creator's: carry an incarnation in the view, as the reference host does. No browser, worker or physical-device evidence |
+
+## Atomic edits and occupancy
+
+See [the bounded cell occupancy guide](../../../docs/guides/cell-occupancy.md) for
+atomic sparse batches and immutable point, rectangle and segment queries, with
+explicit outside/contact semantics and separate persistence/publication owners.

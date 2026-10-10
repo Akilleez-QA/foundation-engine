@@ -128,3 +128,58 @@ no-op/stale changes, owner loss, ticket reuse and disposal are exercised. This p
 that consumer's ticket discipline, not universal collision/render atomicity, browser
 integration or physical-device performance. Existing `crossPortal` checks remain
 necessary immediately before crossing even when no dependency notification arrives.
+
+## Shared distance fields
+
+`createDistanceField(graph, goals)` incrementally prepares distances to any supplied
+goal for many origins. It borrows the same immutable directed `NavigationGraph` as
+route searches. No kit registration, scheduler, worker, movement policy or cache is
+required. Goals must be a nonempty array of distinct existing node IDs, no longer
+than the admitted node count; malformed goals are rejected before construction.
+
+Call `step(maxWork)` from an existing system. The allowance is a nonnegative safe
+integer; zero does nothing and invalid values leave construction unchanged. The
+result is `pending`, `cancelled`, or `complete` with an immutable `field`. `phase`
+reports index, reverse, seed, search, publish, or terminal. Cancellation releases
+pending scratch state; it never exposes partial labels. Completed data survives
+cancellation as an immutable snapshot. Terminal steps consume zero work.
+
+`field.graph` identifies its admitted snapshot; `field.goals` is frozen and sorted.
+`field.get(id)` returns null for unknown IDs, `{status: 'unreachable'}` for nodes
+with no route, `{status: 'goal', distance: 0, rank}`, or
+`{status: 'reachable', distance, next, rank}`. Each next hop follows an original
+outgoing edge and has a smaller settlement rank. This terminates even on zero-cost
+cycles, where strict distance descent would fail. Equal-cost ties use canonical
+node order and never rewrite settled successors. Arbitrary alternate equal-cost
+neighbors do not inherit this termination guarantee.
+
+Graph admission retains the existing 8192-node/65536-edge limits. Unprepared graphs
+pay the existing synchronous validation/copy/sort cost; node lookup, typed-array
+allocation and goal validation/sorting are also synchronous O(V + G log G). The
+index phase creates incoming-edge buckets. Reverse-edge construction, goal seeding,
+node selections, edge examinations and final output rows each consume logical work.
+Heap operations within a unit cost O(log V), with at most V heap entries; retained
+construction/output storage is O(V + E). No user callback runs inside stepping.
+Logical work does not bound milliseconds, garbage collection, string bytes or
+caller-retained completed fields. The creator caps concurrent requests and results.
+
+Costs use JavaScript numbers, adding each original edge cost to the settled suffix
+distance. A nonfinite sum cancels construction and throws RangeError. Reverse
+addition order can differ from forward route searches for arbitrary floating-point
+weights: no bit-identical cost or tie equivalence is promised. Small integer costs
+are useful where exact comparison is required. No relaxation epsilon or negative
+edge support is added.
+
+The creator retains the current graph/goal request record and visit lifetime.
+Before adopting a completed field, require that exact record to remain current and
+that its visit is still live; cancel pending construction on replacement. A completed
+old snapshot is not current authority. `createRouteDependencies` is route-specific
+and does not accept fields. Destination capacity, reservations, actual arrival and
+changes to which goals are eligible remain separate creator responsibilities.
+
+Tests compare directed multi-goal fields with an independent dense-relaxation oracle,
+including zero cycles and disconnection; verify slicing, cancellation, overflow,
+maximum-node publication and immutability; and compose real activity lifetimes
+with entity exit choices and service claims. A logical-work comparison includes
+a negative control where one short route costs less than a complete field. These
+are headless contract checks, not browser, physical performance or movement acceptance.

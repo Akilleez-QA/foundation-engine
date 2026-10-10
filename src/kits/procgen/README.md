@@ -303,3 +303,9 @@ chooseWeighted and createChoiceHistory reuse the existing seeded RNG for bounded
 eligible selection and separately committed per-label recency. See the
 [contract, bounds and continuation evidence](../../../docs/guides/weighted-choice.md).
 No director, scheduler or new persistence owner is installed.
+
+## Atomic edits and occupancy
+
+See [the bounded cell occupancy guide](../../../docs/guides/cell-occupancy.md) for
+atomic sparse batches and immutable point, rectangle and segment queries, with
+explicit outside/contact semantics and separate persistence/publication owners.

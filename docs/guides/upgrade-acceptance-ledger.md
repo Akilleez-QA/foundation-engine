@@ -1158,3 +1158,52 @@ confirmed-state rollback, then reconnects after old-peer retirement without
 resending its uncertain action. Independent review and full hosted integration CI
 are pending. No new browser,
 WAN, physical-device, scalability or full-CI acceptance is claimed.
+
+
+## Editable-focus keyboard retirement candidate (2026-10-09)
+
+The existing document input bridge selectively retires prior non-inText keyboard
+work when editable focus begins, including queued actions and reentrant press
+completion. Explicit text actions and non-keyboard sources retain their policies;
+no new owner or global cancellation is introduced. See the input README for
+recovery and focus-event limitations. Dispatcher and bridge regressions cover
+selectivity, stale repeats, fresh presses and listener retirement. This is a
+candidate; full hosted integration and physical-device acceptance remain separate.
+
+
+## Atomic cell batches and occupancy candidate (2026-10-09)
+
+Optional procgen batch edits and immutable spatial point/rectangle/segment queries
+reuse existing storage and lifetime owners. See [contract and evidence](cell-occupancy.md)
+and ADR0085. Configured limits and exact contact ordering are runtime contracts;
+focused geometric, persistence and consumer tests are candidate evidence. Hosted
+full CI, browser/GPU and physical-device acceptance are not established here.
+No new scheduler, material policy or whole-engine completion claim.
+
+
+## Shared navigation distance-field candidate (2026-10-09)
+
+The optional navigation helper prepares immutable multi-goal distances and acyclic
+next hops over existing directed weighted graphs. Reverse adjacency, search and
+output publication are incrementally budgeted; graph admission and storage setup
+remain explicit synchronous preparation. It installs no scheduler or movement
+policy. Independent integer-graph oracles and two activity-lifetime compositions
+exercise cancellation and stale publication; floating accumulation order is
+documented separately from forward route parity. See the navigation README.
+Full hosted integration and physical-performance acceptance remain separate.
+
+
+## Ordinary image mip accounting correction — candidate (2026-10-09)
+
+Ordinary 2D image estimates now sum the full RGBA8 mip chain using integer
+dimensions with independent axis clamping. Thin images no longer use the
+undercharging four-thirds approximation. The existing model owner refuses an
+over-budget thin image, retires its resources, and permits a valid retry.
+Compressed accounting is unchanged; no-mip images retain conservative full-chain
+charging. Cube, array, volume, authored mip and non-RGBA8 descriptor support remain
+explicit accounting limitations. See [asset residency](asset-residency.md).
+`npm run check -- --base origin/main` passed all applicable checks and 164 tests
+in 18 asset test files. The independent dimension oracle covers 1517 shapes,
+plus explicit thin/square/odd anchors and model refusal/retry. Independent review
+and full hosted integration remain pending; no physical memory or device evidence
+is implied.
