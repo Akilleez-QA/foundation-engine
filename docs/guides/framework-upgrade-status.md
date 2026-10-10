@@ -1250,3 +1250,10 @@ retain compatibility fallback and remain an explicit accounting gap. See
 [asset residency](asset-residency.md). Headless arithmetic and model lifecycle
 regressions cover the corrected domain; physical allocation and device acceptance
 are unverified. Independent review and hosted integration remain pending.
+
+
+## Duplicate detector candidate — DUPES-01, 2026-10-09
+
+`npm run dupes` (`tools/dupes/`) is an independently implemented read-only scan: exact duplicates with git blob ids, GLBs with identical mesh data (values, any layout), similar PNGs (128-bit difference hash) and similar text (MinHash with banding), over a game's `public/` folder, any paths, or across two trees. Unreadable or uncomparable content is skipped with a reason. [README](../../tools/dupes/README.md), [ADR 0131](../adr/0131-duplicate-detector.md).
+
+Evidence: focused headless tests (blob ids equal `git hash-object`; geometry, image and text matches and non-matches; the PNG decoder against a real renderer; a decompression bomb refused; large families and look-alike images grouped within bounds; CLI statuses). An independent adversarial review found thirteen defects, each fixed with a regression test. A local run over the templates found seven exact groups (including textures shared by two templates) and eight similar-image groups. Not part of `npm run check`; hosted full CI pending.

@@ -7,6 +7,8 @@ Every new framework below is optional: a game that does not use it is unchanged.
 
 ## Unreleased
 
+- Duplicate detector (`npm run dupes`): exact duplicates with git blob ids, GLBs with identical mesh data, similar PNGs and similar source or data files, in a game's assets, any folders, or across two trees (`--against`). Read-only; `--fail-on` for scripted checks. See [ADR 0131](docs/adr/0131-duplicate-detector.md) and [tools/dupes](tools/dupes/README.md).
+
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.

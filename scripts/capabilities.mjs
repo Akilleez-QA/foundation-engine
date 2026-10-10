@@ -214,6 +214,12 @@ export const FEATURES = [
     evidence: [{script: 'asset:verify'}],
   },
   {
+    id: 'DUPES-01',
+    title: 'Duplicate and near-duplicate detector (npm run dupes)',
+    docs: 'tools/dupes/README.md',
+    evidence: [{script: 'dupes'}, {path: 'tools/dupes/scan.mjs'}, {path: 'tools/dupes/dupes.test.mjs'}],
+  },
+  {
     id: 'ASSET-OPTIMIZE',
     title: 'Model optimisation (npm run asset:optimize)',
     pr: 135,
