@@ -459,8 +459,10 @@
     {
       "name": "animation",
       "exports": [
+        "MAX_INERTIAL_BLEND",
         "animation",
         "blendPoseLayers",
+        "createInertializer",
         "createMarkerTrack",
         "createPoseSampler",
         "createRootMotion",

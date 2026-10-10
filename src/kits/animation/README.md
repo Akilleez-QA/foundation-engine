@@ -20,7 +20,7 @@ Optional `animation()` kit. Provides explicit presentation contracts without tak
 
 The kit separates pose priority from event priority, guards listener initialization against races, and validates named attachments across skeleton LODs with explicit update ownership. Each contract is implemented and tested independently.
 
-No renderer objects, draws, triangles or timers. Marker advance is O(marker count + emitted events log emitted events), bounded emissions; attachment sampling uses constant-size matrix operations. Stored attachment count is bounded; asset clip/LOD definition size is caller-controlled. Skeletal playback and skinning belong to the model adapter; collision belongs to the locomotion adapter. Bounded pose blending, authored root-motion sampling and analytic IK are described below.
+No renderer objects, draws, triangles or timers. Marker advance is O(marker count + emitted events log emitted events), bounded emissions; attachment sampling uses constant-size matrix operations. Stored attachment count is bounded; asset clip/LOD definition size is caller-controlled. Skeletal playback and skinning belong to the model adapter; collision belongs to the locomotion adapter. Bounded pose blending, inertialized pose transitions, authored root-motion sampling and analytic IK are described below.
 
 `createPoseSampler` adds bounded immutable local-joint clip evaluation (128 tracks, 4,096 total keys), binary-search key selection, clamped/looped time, linear translation and shortest-arc quaternion interpolation. It returns joint poses for the application's rig adapter and never overwrites simulation movement. `gaitPhase` derives a normalized phase from actual travelled distance so blocked movement does not continue advancing steps. The sampler evaluates clips; it does not import glTF, perform skinning or move entities.
 
@@ -42,3 +42,49 @@ The diagnostic model consumes both through author `Model.pose` overrides after
 its real glTF clip. Removing an override restores the underlying clip/bind pose.
 Per-transform priority blending keeps masks separate from locomotion authority;
 the IK solver is independently implemented mathematics.
+
+## Inertialized pose transitions
+
+`createInertializer(joints)` hides a pose-source switch without a crossfade.
+Inputs are the kit's `JointPose` arrays (local translation + quaternion per
+joint) listed in exactly the constructor's joint order. `switchTo({ from, to,
+blendTime, fromPrevious?, toPrevious?, dt? })` records, per joint, the offset
+from the incoming pose to the outgoing pose: the position difference, the
+rotation difference as a shortest-hemisphere angle-axis vector, and (when the
+previous frames and `dt` are given) their velocity difference.
+`sample(target, elapsed)` returns the incoming pose plus that offset decayed by
+a quintic over `blendTime`: position and velocity match the outgoing pose at the
+switch, and the offset reaches zero with zero velocity and acceleration at the
+end. Omitting a previous pose treats that source as at rest. `blending(elapsed)`
+reports whether an offset remains.
+
+- **Owner**: the caller owns the clock (`elapsed` seconds since its last
+  switch), the incoming pose source and where the output is applied. The
+  inertializer owns only its offset state and one preallocated output buffer,
+  reused by every `sample`; copy it to keep a result.
+- **Bounds**: 1–128 unique joints; finite positions and rotations within ±1e6,
+  non-zero quaternions; `blendTime` in `[0, MAX_INERTIAL_BLEND]` (2 s); `dt`
+  in `[1e-4, 1]` and required with a previous pose. Zero `blendTime` switches
+  immediately.
+- **Overload / invalid input**: a missing, reordered or extra joint, a
+  non-finite value, a zero quaternion or an out-of-range time throws an
+  `inertialize:` error before any state changes; nothing is clamped or skipped.
+- **Cancellation**: a new `switchTo` replaces the offset in progress. For a
+  re-switch, pass the last sampled output as `from` (the live buffer is
+  accepted) and the output before it as `fromPrevious`, so the new blend starts
+  from what was shown. `reset()` drops the offset.
+- **Recovery**: after a refused call the previous blend is intact; after
+  `reset()` or the blend end, samples equal the normalized target.
+- **Cost**: O(joints) arithmetic per switch or sample, no allocation after
+  construction, no randomness; identical inputs give identical outputs.
+- **Evidence**: `inertialize.test.ts` checks position and angular-velocity
+  continuity at the switch, convergence and zero end velocity, shortest-path
+  rotation for a sign-flipped quaternion, velocity-preserving re-switch,
+  zero-time switch, bounds refusal with state preserved, and determinism.
+- **Limitations**: pose-level only; it is not wired to the `Model` component or
+  glTF playback, and has no browser, device or visual-quality evidence.
+  Velocities are finite differences supplied by the caller. Rotation offsets
+  are applied in the parent frame (`exp(offset) · target`), so angular velocity
+  is exactly continuous when the outgoing and incoming rotations share an axis
+  and first-order otherwise. Large offsets are not overshoot-limited; long
+  `blendTime` with a fast outgoing pose can carry a joint past both poses.
