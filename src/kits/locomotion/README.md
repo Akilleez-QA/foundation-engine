@@ -122,6 +122,10 @@ carryFacing? })` rides, leaves and catches platforms.
 | `path(t)` | finite x, y, z within ±1e7; optional `yaw` within ±1e6 rad | required |
 | `maxTurnRate` | (0, 1000] rad/s | 2π |
 | `carryFacing` | boolean | true |
+
+`maxTurnRate · dt` must stay below π while any turning platform exists. Otherwise every
+`advance(dt)` throws, and the error names the largest accepted rate for that step. For
+example, at a 0.2 s step the rate must be below 15.708 rad/s.
 | `onLeave` | `'add-velocity'`, `'add-upward'`, `'none'` | `'add-velocity'` |
 | `radius` (carried motion vs walls) | (0, 10] m | 0.35 |
 
@@ -228,12 +232,20 @@ recorded in [ADR 0160](../../../docs/adr/0160-turning-platform-carry.md).
 **Inputs and outputs.**
 - A path returns yaw on every sample or on none; mixing throws. Without yaw, `pose`,
   `delta` and `velocity` keep their unturned shape and values bit for bit.
-- With yaw, `pose` adds `yaw`, and `delta` and `velocity` add `dyaw` (rad, rad/s).
+- With yaw, `pose` adds `yaw`. `delta` adds `dyaw`, the tick's shortest turn in rad,
+  within [−π, π). `velocity` adds `dyaw` divided by the tick, in rad/s (at most
+  `maxTurnRate`).
 - `carry(id, x, z)` reports how a point rigidly attached to the platform moved in the last
   `advance`: displacement, yaw change and mean velocity. The point is turned about the
   previous pivot by the tick's yaw change, then moved with the pivot.
-- `wrapYaw(a)` is the shortest equivalent turn, in [−π, π].
-- `platformSystem`'s `bind` also writes `Transform.ry` for a turning platform.
+- `wrapYaw(a)` is the shortest equivalent turn, in [−π, π) up to rounding (π maps to −π).
+  Its input must be finite with |a| ≤ 1e9, or it throws a `RangeError`.
+- `platformSystem`'s `bind` also writes `Transform.ry` for a turning platform, replacing
+  any rotation set on that entity. For a mesh with a base rotation, bind a parent entity
+  and rotate a child, or bake the offset into the path's yaw.
+- A camera riding a turning platform can use the camera director's
+  `carry(delta, yaw, pivot)` with this platform's `delta`, `dyaw` and previous pivot
+  (`pose` minus `delta`).
 
 **Riding.**
 - `jumpSystem` moves a carried actor by `carry` of its own position. That includes
@@ -241,12 +253,21 @@ recorded in [ADR 0160](../../../docs/adr/0160-turning-platform-carry.md).
 - With `carryFacing` (default true), the actor's `Transform.ry` gains the same yaw
   change. Set it false when another owner, such as a camera-relative controller, owns
   facing.
-- The turn is applied on every tick whose carry is applied: riding, a paused ride, a
-  jump tick with `add-velocity`, and the tick that moves off the footprint.
+- The turn is applied on every tick whose carry is applied in full: riding, a paused
+  ride, a jump tick with `add-velocity`, and the tick that moves off the footprint.
+- When `Walls` or `Solid`s hold back any part of the carry (by more than 1e-9 m), facing
+  does not turn that tick. The actor is pushed along the wall without spinning in place.
+  This also covers the default walls at ±1e6 m.
+- Facing is written only when it turns, so a facing owned elsewhere (even NaN) never
+  forces a write while the actor is still.
 - Each tick's carry is computed from the two path samples and the actor's current
   position; no platform-local position is stored. Another owner may therefore move the
-  actor across the platform, and nothing accumulates. Rounding stays below 1e-9 m over
-  10,000 ticks at 60 Hz in the tests.
+  actor across the platform, and no error compounds.
+- Rounding is per tick, of the order of the coordinates' last bit. In the tests the
+  rider stays within 1e-9 m of its ideal circle (r = 2.5 m) over 10,000 ticks at 60 Hz.
+  The measured 1.2e-10 m includes the test's own accumulated tick times. A reviewer
+  estimated about 1e-9 m relative to the platform pose over 1e6 ticks at r ≈ 100 m; that
+  is not tested.
 - Footprint tests (`supportOn`, `catch`, `standing`) use the oriented rectangle. An
   unturned platform keeps the axis-aligned test unchanged.
 - A cut, a restart or any yaw change other than the reported `dyaw` detaches the rider
@@ -276,8 +297,23 @@ facing stops turning.
 - Only yaw: platforms do not pitch or roll.
 - The actor's facing grows without wrapping, as with `applyRootMotion`.
 - Turning carry is tested headless only: no browser, template or device evidence.
+- Behaviour change for every carried actor, turning or not: a carried actor whose
+  `Transform` x or z is not finite now makes the tick throw, and the tick is rolled back.
+  This includes a paused (`when` false) tick. Before, the non-finite position passed
+  through. `standing` and `supportOn` with a NaN coordinate now find no platform.
 
-**Evidence** (`platform-yaw.test.ts`, 10 tests):
+**Review.** An independent review of `ec1adde2` found no critical or high issues. It
+found:
+- facing turned while walls blocked the carry;
+- a NaN facing forced a write every tick;
+- the yaw getter was read twice when a platform was added;
+- the turn-rate error did not say what to change;
+- `wrapYaw` had no domain check;
+- three documentation inaccuracies.
+
+Each is fixed with a regression test or documented here.
+
+**Evidence** (`platform-yaw.test.ts`, 13 tests):
 - unturned results are unchanged bit for bit;
 - yaw wrap;
 - oriented footprint corners for support, catch and standing;
@@ -288,6 +324,9 @@ facing stops turning.
 - combined translation and rotation;
 - a rider kept on a turned bar;
 - the tangential leave velocity and its direction;
-- cut and restart detach.
+- cut and restart detach;
+- facing kept against a blocking wall;
+- no write for a still rider with NaN facing;
+- a single yaw read, the actionable turn-rate error and the `wrapYaw` domain.
 
 The MV-02 tests run unchanged.

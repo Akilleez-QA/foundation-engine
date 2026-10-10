@@ -35,7 +35,9 @@ Extend the two existing owners; add no new one.
 - **Rider.** `jumpSystem` moves a carried actor by the `carry` of its current position.
   It records the platform yaw it last moved with, for the same continuity check as
   position: a cut, a restart or any unexplained turn detaches the actor with no velocity.
-  It adds the yaw change to `Transform.ry` when `carryFacing` is true (the default).
+  It adds the yaw change to `Transform.ry` when `carryFacing` is true (the default),
+  but only on ticks whose carry walls and solids let through in full. A blocked actor
+  slides without spinning in place.
   Leaving with `add-velocity` keeps the carried point's mean velocity (pivot plus ω × r as
   a chord), the convention MV-02 already uses for translation.
 - **Exact per-tick delta, not a stored local position.** Each tick's carry is computed
@@ -50,7 +52,7 @@ Extend the two existing owners; add no new one.
   platform exists, because a half turn per tick is ambiguous. `maxSpeed` is checked at
   every footprint corner (pivot motion plus the corner's chord), which bounds the carry of
   every point on the platform and keeps the existing slide sub-step limit meaningful.
-  `|yaw|` is at most 1e6.
+  `|yaw|` is at most 1e6. `wrapYaw` accepts finite |a| ≤ 1e9 and returns [−π, π).
 - **Overload, cancellation and recovery** are unchanged. A refused `advance` moves
   nothing. A throwing adapter tick is rolled back, now including the stored carrier yaw
   and the facing. `cut`, `restart`, `remove` and `resetJump` behave as before.
@@ -63,3 +65,17 @@ keeps no spin in the air, and facing is not wrapped. A path that breaks its decl
 rate by more than a half turn per tick can alias, because samples alone cannot detect
 that. Evidence is headless only: unit tests at 30, 60 and 120 Hz and a 10,000-tick drift
 run. There is no browser, template or device acceptance.
+
+A carried actor with a non-finite x or z now makes the tick throw and roll back, where the
+non-finite position used to pass through. `bind` overwrites `ry` on turning platforms.
+
+An independent review of the first candidate (`ec1adde2`) found no critical or high
+issues. It found:
+- facing turned while walls blocked the carry;
+- a NaN facing forced a write every tick;
+- a double getter read;
+- an unhelpful turn-rate error;
+- `wrapYaw` had no domain;
+- documentation inaccuracies.
+
+All were fixed with regression tests or documented.

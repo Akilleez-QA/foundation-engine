@@ -241,13 +241,17 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
           vel = still ? {dx: 0, dy: 0, dz: 0} : {dx: c.vx, dy: c.vy, dz: c.vz};
         const moved = slideBy(ctx.world, {x, z}, m.dx, m.dz),
           top = platforms!.supportOn(id, moved.x, moved.z);
+        // Facing turns only with a carry the walls let through in full: an actor held back by a wall (or by the
+        // default ±1e6 walls) keeps its facing instead of spinning in place.
+        const whole = Math.abs(moved.x - (x + m.dx)) <= EPS && Math.abs(moved.z - (z + m.dz)) <= EPS,
+          dyawCarried = whole ? m.dyaw : 0;
         if (top !== null)
           ride = {
             id,
             dx: moved.x - x,
             dy: m.dy,
             dz: moved.z - z,
-            dyaw: m.dyaw,
+            dyaw: dyawCarried,
             vx: vel.dx,
             vy: vel.dy,
             vz: vel.dz,
@@ -261,7 +265,7 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
           left = {vx: vel.dx, vy: vel.dy, vz: vel.dz};
           x = moved.x;
           z = moved.z;
-          turn = m.dyaw;
+          turn = dyawCarried;
         }
       }
     } else if (active && !body.supported && (body.vx || body.vz)) {
@@ -384,12 +388,13 @@ export function jumpSystem(o: JumpSystemOptions): SystemDefinition {
     turn: number,
   ) {
     const y = feet + offset,
-      ry = carryFacing && turn !== 0 ? tr.ry + turn : tr.ry;
-    if (x === tr.x && z === tr.z && y === tr.y && ry === tr.ry) return;
+      turned = carryFacing && turn !== 0;
+    // Facing is compared only when it turns, so a facing owned elsewhere (even NaN) never forces a write.
+    if (x === tr.x && z === tr.z && y === tr.y && !turned) return;
     tr.x = x;
     tr.z = z;
     tr.y = y;
-    tr.ry = ry;
+    if (turned) tr.ry += turn;
     ctx.world.touch();
   }
 }

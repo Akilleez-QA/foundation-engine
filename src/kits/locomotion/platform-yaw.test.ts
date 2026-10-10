@@ -5,6 +5,7 @@ import {createSystemRunner} from '../../core/ecs/systems';
 import {jumpSystem, platformSystem, type PlatformLeave} from './jump-system';
 import {createPlatforms, wrapYaw, type PlatformDef, type Platforms} from './platforms';
 import {must} from '../../testing/must';
+import {Walls} from '../character';
 
 const jump = {height: 1.5, timeToApex: 0.35, coyoteTime: 0.1, bufferTime: 0, releaseGravityScale: 1};
 const TAU = 2 * Math.PI;
@@ -24,6 +25,7 @@ interface Sample {
   py: number;
   pz: number;
   yaw: number;
+  version: number;
 }
 interface SpinOptions {
   path: PlatformDef['path'];
@@ -37,6 +39,7 @@ interface SpinOptions {
   maxTurnRate?: number;
   each?: (t: number, p: Platforms) => void;
   bind?: boolean;
+  extra?: unknown[][];
 }
 /** The real fixed-step runner at `hz` (one tick per frame): platform system, jump adapter, probe. */
 async function spin(hz: number, seconds: number, o: SpinOptions) {
@@ -47,7 +50,8 @@ async function spin(hz: number, seconds: number, o: SpinOptions) {
       entities: [
         [Name({name: 'player'}), Transform(o.start)],
         [Name({name: 'disc'}), Transform({})],
-      ],
+        ...(o.extra ?? []),
+      ] as never,
     }),
     {},
   );
@@ -83,7 +87,18 @@ async function spin(hz: number, seconds: number, o: SpinOptions) {
         id: 'probe',
         run() {
           const p = platforms.pose('deck') ?? {x: NaN, y: NaN, z: NaN, yaw: NaN};
-          out.push({t: now + 1 / hz, x: tr.x, y: tr.y, z: tr.z, ry: tr.ry, px: p.x, py: p.y, pz: p.z, yaw: p.yaw ?? 0});
+          out.push({
+            t: now + 1 / hz,
+            x: tr.x,
+            y: tr.y,
+            z: tr.z,
+            ry: tr.ry,
+            px: p.x,
+            py: p.y,
+            pz: p.z,
+            yaw: p.yaw ?? 0,
+            version: t.world.version,
+          });
           o.each?.(now + 1 / hz, platforms);
         },
       },
@@ -344,4 +359,57 @@ test('MV-02 turning: a cut or a restart of a turning platform detaches the rider
       `${kind}: the rider was neither swung nor teleported, and fell`,
     );
   }
+});
+
+test('MV-02 turning review M1: facing does not turn while a wall holds back the carry', async () => {
+  // The disc turns the rider at (2, 0) towards −z; a wall at z = −0.35 (the body radius) blocks that motion.
+  const w = 1,
+    ry0 = 0.5;
+  const {out} = await spin(60, 0.5, {
+    path: t => ({x: 0, y: 1, z: 0, yaw: w * t}),
+    start: {x: 2, y: 1, z: 0, ry: ry0},
+    extra: [[Walls({minX: -100, maxX: 100, minZ: -0.35, maxZ: 100})]],
+  });
+  for (const s of out) {
+    assert.equal(s.ry, ry0, `facing kept at ${s.t} while the carry is blocked`);
+    assert.equal(s.z, 0, 'held at the wall');
+  }
+  // Without the wall the same rider turns.
+  const free = await spin(60, 0.5, {path: t => ({x: 0, y: 1, z: 0, yaw: w * t}), start: {x: 2, y: 1, z: 0, ry: ry0}});
+  assert.ok(Math.abs(must(free.out[free.out.length - 1]).ry - (ry0 + 0.5 * w)) < 1e-12);
+});
+
+test('MV-02 turning review L1: a facing owned elsewhere (even NaN) never forces a write on an unturned ride', async () => {
+  const {out} = await spin(60, 0.5, {path: () => ({x: 0, y: 1, z: 0}), start: {x: 1, y: 1, z: 0, ry: NaN}});
+  const first = must(out[0]).version;
+  assert.ok(
+    out.every(s => s.version === first && Number.isNaN(s.ry)),
+    'a still rider with NaN facing is never re-published',
+  );
+});
+
+test('MV-02 turning review L2-L4: single reads, actionable turn-rate errors and the wrapYaw domain', () => {
+  let reads = 0;
+  const p = createPlatforms();
+  p.add('disc', {
+    halfX: 1,
+    halfZ: 1,
+    path: () => ({
+      x: 0,
+      y: 0,
+      z: 0,
+      get yaw() {
+        reads++;
+        return reads === 1 ? 0 : NaN;
+      },
+    }),
+  });
+  assert.equal(reads, 1, 'yaw is read once per sample');
+  assert.equal(p.pose('disc')!.yaw, 0);
+  const fast = createPlatforms({maxTurnRate: 20});
+  fast.add('disc', {halfX: 1, halfZ: 1, path: t => ({x: 0, y: 0, z: 0, yaw: t})});
+  assert.throws(() => fast.advance(0.2), /lower maxTurnRate below 15\.708 rad\/s or use a shorter fixed step/);
+  for (const a of [NaN, Infinity, -Infinity, 2e9]) assert.throws(() => wrapYaw(a), RangeError);
+  assert.equal(wrapYaw(Math.PI), -Math.PI, 'the range is [−π, π)');
+  assert.equal(wrapYaw(-Math.PI), -Math.PI);
 });

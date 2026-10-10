@@ -45,7 +45,10 @@ export interface PlatformDelta {
   readonly dx: number;
   readonly dy: number;
   readonly dz: number;
-  /** Turning platforms only: the yaw change (rad, or rad/s from `velocity`), the shortest turn, within ±π. */
+  /**
+   * Turning platforms only: from `delta`, the tick's shortest turn in rad (within [−π, π)); from `velocity`, that turn
+   * divided by the tick, in rad/s (bounded by `maxTurnRate`).
+   */
   readonly dyaw?: number;
 }
 /** How a point rigidly attached to a platform moved during the last `advance`. */
@@ -81,31 +84,40 @@ interface Sample {
   y: number;
   z: number;
   yaw: number;
+  /** Whether the sample carried a yaw (read once). */
+  turning: boolean;
 }
 const EPS = 1e-9;
 const ID = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const TAU = 2 * Math.PI;
 
-/** The shortest turn equivalent to `a` radians, within [−π, π]. Exact (returns `a`) when |a| < π. */
+/**
+ * The shortest turn equivalent to `a` radians, in [−π, π) up to rounding (π maps to −π). Exact (returns `a`) when
+ * |a| < π. Domain: finite |a| ≤ 1e9 (beyond it a turn is below the input's own precision); anything else throws.
+ */
 export function wrapYaw(a: number): number {
+  if (typeof a !== 'number' || !Number.isFinite(a) || Math.abs(a) > 1e9)
+    throw new RangeError('platforms: wrapYaw needs a finite angle within ±1e9');
   return a - TAU * Math.round(a / TAU);
 }
 
-/** Read one path sample. `turning` (when known) requires yaw to be present or absent consistently. */
+/**
+ * Read one path sample: every field is read exactly once into locals, so a getter-backed pose cannot change between
+ * validation and use. `turning` (when known) requires yaw to be present or absent consistently.
+ */
 function sample(p: PlatformPose | null | undefined, id: string, turning?: boolean): Sample {
-  if (
-    !p ||
-    typeof p !== 'object' ||
-    ![p.x, p.y, p.z].every(v => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 1e7)
-  ) {
+  if (!p || typeof p !== 'object') throw new RangeError(`platforms: ${id} path must return finite x, y, z within ±1e7`);
+  const x = p.x,
+    y = p.y,
+    z = p.z,
+    yaw = p.yaw;
+  if (![x, y, z].every(v => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 1e7))
     throw new RangeError(`platforms: ${id} path must return finite x, y, z within ±1e7`);
-  }
-  const yaw = p.yaw;
   if (yaw !== undefined && (typeof yaw !== 'number' || !Number.isFinite(yaw) || Math.abs(yaw) > 1e6))
     throw new RangeError(`platforms: ${id} path yaw must be finite within ±1e6`);
   if (turning !== undefined && turning !== (yaw !== undefined))
     throw new RangeError(`platforms: ${id} path must return yaw on every sample or on none`);
-  return {x: p.x, y: p.y, z: p.z, yaw: yaw ?? 0};
+  return {x, y, z, yaw: yaw ?? 0, turning: yaw !== undefined};
 }
 
 /**
@@ -178,12 +190,11 @@ export function createPlatforms(o: PlatformsOptions = {}) {
       ) {
         throw new RangeError('platforms: a platform needs halfX and halfZ within (0, 1000] and a path function');
       }
-      const first = def.path(t),
-        p = sample(first, id);
+      const p = sample(def.path(t), id);
       entries.set(id, {
         def: {halfX: def.halfX, halfZ: def.halfZ, path: def.path},
         order: order++,
-        turning: first.yaw !== undefined,
+        turning: p.turning,
         cut: false,
         px: p.x,
         py: p.y,
@@ -226,7 +237,8 @@ export function createPlatforms(o: PlatformsOptions = {}) {
         if (!e.cut && e.turning) {
           if (maxTurnRate * dt >= Math.PI)
             throw new RangeError(
-              `platforms: dt ${dt} is too long for maxTurnRate ${maxTurnRate}: a half turn per tick`,
+              `platforms: dt ${dt} is too long for maxTurnRate ${maxTurnRate}: a half turn per tick is ambiguous; ` +
+                `lower maxTurnRate below ${(Math.PI / dt).toFixed(3)} rad/s or use a shorter fixed step`,
             );
           const dyaw = wrapYaw(p.yaw - e.yaw);
           if (Math.abs(dyaw) > maxTurnRate * dt + EPS)
