@@ -1207,3 +1207,17 @@ in 18 asset test files. The independent dimension oracle covers 1517 shapes,
 plus explicit thin/square/odd anchors and model refusal/retry. Independent review
 and full hosted integration remain pending; no physical memory or device evidence
 is implied.
+
+## World query iteration under mutation — candidate (2026-10-09)
+
+- **Scope:** owner repair of `World.query` in `src/core/ecs/world.ts`. Before: a single-component query yielded
+  `[entity, undefined]` after an earlier row despawned the entity or removed its component; a multi-component query
+  did the same when the removed component was in the smallest store; an entity gaining a component mid-pass was
+  visited or not depending on store sizes; the untyped query visited entities spawned mid-pass.
+- **Contract:** candidates are fixed when iteration begins; each is yielded only if it still has every listed
+  component when reached, with its current values. Spawned or newly matching entities wait for the next query.
+- **Evidence:** `src/core/ecs/query-iteration.test.ts` (8 cases: despawn and removal before, at and after the cursor
+  for one and two components, re-add before reach, spawn and gain mid-pass, untyped query); 5 fail on the previous
+  implementation, all pass on the candidate. Local Node microbenchmark, 10,000 entities: typed queries no slower,
+  untyped query within run-to-run noise. Not a frame-budget or device claim.
+- **Not established:** template or browser frame measurements; hosted CI.

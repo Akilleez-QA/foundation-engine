@@ -5,7 +5,8 @@
  *   initialiser for spawning: `Health({ hp: 5 })` (missing fields take the defaults).
  * - An entity is a number. `spawn(...inits)` creates one; `add`, `remove`, `get`, `has` and `despawn` change it.
  * - `query(A, B)` iterates the entities that have every listed component, yielding `[entity, a, b]` with the live
- *   component objects (mutate them in place). Iteration order is spawn order, so runs are deterministic.
+ *   component objects (mutate them in place). Iteration order is spawn order, so runs are deterministic. Spawning,
+ *   despawning, adding and removing while iterating are safe; see `query` for which entities are then visited.
  * - `resources` hold world-wide state (score, lives, the phase of a round); `emit`/`read` pass events inside one frame.
  * - `version` counts structural changes and every `touch`: a renderer skips work while it has not moved.
  */
@@ -116,19 +117,39 @@ export class World {
     this.version++;
   }
 
-  /** Entities with every listed component, in spawn order, with their live component values. */
+  /**
+   * Entities with every listed component, in spawn order, with their live component values.
+   *
+   * Changes made while iterating are safe. The candidates are the entities that match when iteration begins; each is
+   * yielded only if, when reached, it still has every listed component (a despawned entity, or one that lost a
+   * component, is skipped and never yielded with `undefined`), with the values it holds at that moment. Entities
+   * spawned, or that start matching, after iteration begins are not visited; the next query sees them.
+   */
   *query<Q extends readonly ComponentType<object>[]>(...types: Q): Generator<[Entity, ...Values<Q>]> {
     if (!types.length) {
-      for (const e of this.alive) yield queryRow<Q>([e]);
+      // `alive` holds ids in ascending insertion order, and deleted entries are skipped by Set iteration.
+      const end = this.next;
+      for (const e of this.alive) {
+        if (e >= end) return;
+        yield queryRow<Q>([e]);
+      }
       return;
     }
     const stores = types.map(t => this.stores.get(t.id));
     if (stores.some(s => !s)) return;
-    const [first, ...rest] = [...(stores as Map<Entity, object>[])].sort((a, b) => a.size - b.size);
-    const order = [...first!.keys()].sort((a, b) => a - b); // types.length > 0, so `stores` (and `first`) exist
-    for (const e of order) {
-      if (!rest.every(s => s.has(e))) continue;
-      yield queryRow<Q>([e, ...stores.map(s => s!.get(e))]);
+    const live = stores as Map<Entity, object>[];
+    const [first, ...rest] = [...live].sort((a, b) => a.size - b.size);
+    let order = [...first!.keys()]; // types.length > 0, so `first` exists
+    if (rest.length) order = order.filter(e => rest.every(s => s.has(e)));
+    order.sort((a, b) => a - b);
+    next: for (const e of order) {
+      const row: unknown[] = [e];
+      for (const s of live) {
+        const value = s.get(e); // component values are objects, so undefined means removed or despawned
+        if (value === undefined) continue next;
+        row.push(value);
+      }
+      yield queryRow<Q>(row);
     }
   }
   /** The first entity with every listed component, or undefined. */
