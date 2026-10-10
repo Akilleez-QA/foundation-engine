@@ -209,6 +209,10 @@ test('review: sweep tolerates re-entrant callbacks and bounds its work', () => {
     0,
   );
   assert.equal(q.has(9), true, 'a member admitted during the callback survives');
+  const same = createEntityPool(limits);
+  same.admit(5, 'a', out);
+  same.sweep(id => (same.release(id), same.admit(id, 'a', out), false), 1);
+  assert.equal(same.has(5), true, 'a release and re-admission of the same id inside the callback is kept');
   const r = createEntityPool(limits);
   r.admit(1, 'a', out);
   r.admit(2, 'a', out);

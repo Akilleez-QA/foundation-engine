@@ -510,8 +510,10 @@ export function createEntityPool(limits: EntityPoolLimits): EntityPool {
         scanned++;
         if (!slotUsed[s]) continue;
         checks++;
-        const id = slotId[s]!;
-        if (alive(id) || closed || !slotUsed[s] || slotId[s] !== id) continue;
+        const id = slotId[s]!,
+          admittedAt = slotSeq[s]!;
+        // Same slot, id and admission: not released (or released and re-admitted) by the callback.
+        if (alive(id) || closed || !slotUsed[s] || slotId[s] !== id || slotSeq[s] !== admittedAt) continue;
         classes[slotClass[s]!]!.released++;
         removeSlot(s);
         released++;
