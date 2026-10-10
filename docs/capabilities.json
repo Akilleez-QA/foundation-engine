@@ -250,6 +250,17 @@
       ]
     },
     {
+      "id": "PRESENTATION-01",
+      "title": "Screen transitions with input lock, time-of-day curves, weather blending and HUD roll-ups",
+      "shipped": true,
+      "docs": "src/kits/presentation/README.md",
+      "evidence": [
+        "@kits/presentation exports createScreenTransition",
+        "@kits/presentation exports createWeatherDirector",
+        "src/kits/presentation/presentation.test.ts exists"
+      ]
+    },
+    {
       "id": "VIS-01",
       "title": "Tone mapping and exposure per scene (view.output)",
       "shipped": true,
@@ -1049,6 +1060,21 @@
         "definePlacements",
         "parsePlacementState",
         "population"
+      ]
+    },
+    {
+      "name": "presentation",
+      "exports": [
+        "createCycleCurve",
+        "createDayClock",
+        "createRollup",
+        "createScreenTransition",
+        "createWeatherDirector",
+        "lockedInput",
+        "mountTransitionOverlay",
+        "presentation",
+        "rgbToHex",
+        "transitionCss"
       ]
     },
     {

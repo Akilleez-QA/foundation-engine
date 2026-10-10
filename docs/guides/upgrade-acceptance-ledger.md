@@ -1537,3 +1537,10 @@ Evidence: focused headless tests compare OBJ, PLY and BVH results with three.js'
 `npm run dupes` (`tools/dupes/`) is an independently implemented read-only scan: exact duplicates with git blob ids, GLBs with identical mesh data (values, any layout), similar PNGs (128-bit difference hash) and similar text (MinHash with banding), over a game's `public/` folder, any paths, or across two trees. Unreadable or uncomparable content is skipped with a reason. [README](../../tools/dupes/README.md), [ADR 0134](../adr/0134-duplicate-detector.md).
 
 Evidence: focused headless tests (blob ids equal `git hash-object`; geometry, image and text matches and non-matches; the PNG decoder against a real renderer; a decompression bomb refused; large families and look-alike images grouped within bounds; CLI statuses). An independent adversarial review found thirteen defects, each fixed with a regression test. A local run over the templates found seven exact groups (including textures shared by two templates) and eight similar-image groups. Not part of `npm run check`; hosted full CI pending.
+
+## Presentation kit — candidate (2026-10-09)
+
+- **Scope:** `src/kits/presentation` (ADR 0154).
+- **Evidence:** `presentation.test.ts`. It covers transitions, the input lock, CSS, the day clock, curves, weather,
+  the roll-up and a `testScene` door composition.
+- **Not established:** browser or device appearance, template adoption and hosted CI.

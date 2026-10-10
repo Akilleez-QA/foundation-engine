@@ -274,6 +274,16 @@ export const FEATURES = [
     ],
   },
   {
+    id: 'PRESENTATION-01',
+    title: 'Screen transitions with input lock, time-of-day curves, weather blending and HUD roll-ups',
+    docs: 'src/kits/presentation/README.md',
+    evidence: [
+      {kit: 'presentation', export: 'createScreenTransition'},
+      {kit: 'presentation', export: 'createWeatherDirector'},
+      {path: 'src/kits/presentation/presentation.test.ts'},
+    ],
+  },
+  {
     id: 'VIS-01',
     title: 'Tone mapping and exposure per scene (view.output)',
     pr: 124,
