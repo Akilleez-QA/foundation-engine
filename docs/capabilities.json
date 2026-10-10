@@ -33,6 +33,13 @@
       ]
     },
     {
+      "id": "CADENCE-01",
+      "title": "Optional bounded per-member update cadence",
+      "shipped": true,
+      "docs": "docs/guides/update-cadence.md",
+      "evidence": ["@kits/cadence exports createCadence", "@kits/cadence exports createCadenceResult"]
+    },
+    {
       "id": "ASG-01",
       "title": "Optional bounded service and worksite assignment ownership",
       "shipped": true,
@@ -568,6 +575,7 @@
     {"name": "assignments", "exports": ["createAssignments"]},
     {"name": "audio-mixer", "exports": ["audioMixer", "createCueMixer", "createDucking"]},
     {"name": "authoring", "exports": ["authoredReference", "createAuthoredDocument", "createAuthoringSession"]},
+    {"name": "cadence", "exports": ["CADENCE_CEILING", "MAX_CADENCE_TICK", "createCadence", "createCadenceResult"]},
     {
       "name": "camera",
       "exports": ["CAMERA_MIN_DISTANCE", "camera", "cameraPose", "cameraSystem", "clearCamera", "supportHeights"]
