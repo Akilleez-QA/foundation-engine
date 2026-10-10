@@ -277,6 +277,38 @@ test('ledges: low walls just above minClimb meet the sphere at their edge, and t
   const tall = {id: 'tall', center: [3, 1.5, 0] as TraversalVec3, halfExtents: [1, 1.5, 5] as TraversalVec3};
   for (const world of [boxes(tall), boxes(tall, {...ceiling, center: [0, 3.75, 0]})])
     assert.equal(findLedge({...q, maxClimb: 1, minClimb: 0.5}, world.cast, world.ground).status, 'too-high');
+  // Walkable ramps are slopes, not wall edges, at any minClimb.
+  for (const deg of [2, 10, 20, 30]) {
+    const t = (deg * Math.PI) / 180,
+      c = Math.cos(t),
+      sn = Math.sin(t);
+    // A long box rotated about z whose top face starts at x = 1, y = 0 and rises away from the body.
+    const corner = [-5 * c - 0.5 * sn, -5 * sn + 0.5 * c];
+    const ramp = volumeQueries(
+      defineVolumeSet({
+        revision: 0,
+        maxColliders: 2,
+        colliders: [
+          {id: 'floor', kind: 'box', center: [0, -1, 0], halfExtents: [20, 1, 20]},
+          {
+            id: 'ramp',
+            kind: 'box',
+            center: [1 - corner[0]!, -corner[1]!, 0],
+            halfExtents: [5, 0.5, 5],
+            rotation: [0, 0, Math.sin(t / 2), Math.cos(t / 2)],
+          },
+        ],
+      }),
+    );
+    // A shallow ramp may stay under the wall cast within reach (no wall); a steeper one is hit but is not a wall.
+    for (const minClimb of [0, 0.3]) {
+      const status = findLedge({...q, minClimb}, ramp.cast, ramp.ground).status;
+      assert.ok(status === 'not-a-wall' || status === 'no-wall', `${deg}° ramp, minClimb ${minClimb}: ${status}`);
+    }
+  }
+  // A body pressed flush against a tall wall still reads it as too high.
+  const flush = boxes({id: 'tall', center: [1.3, 1.5, 0], halfExtents: [1, 1.5, 5]});
+  assert.equal(findLedge({...q, maxClimb: 1}, flush.cast, flush.ground).status, 'too-high');
   // A floor-like normal (straight up) is not a wall, even with wallSlope 1.
   const up: SphereCast = () => ({hit: true, fraction: 0.5, normal: [0, 1, 0]});
   assert.equal(findLedge({...q, wallSlope: 1}, up, () => 0).status, 'not-a-wall');
@@ -362,6 +394,11 @@ test('pushables: force accelerates, friction stops, walls block per axis, and gr
   assert.equal(gridPush(0.5, 1, 0.5), 1.5);
   assert.equal(gridPush(0.5, -1, 0.5), -0.5);
   assert.equal(gridPush(2.4999999999, 1, 0.5), 3.5);
+  assert.throws(
+    () => pushStep(state, {half, mass: 1, force: [0, 0], dt: 0.1, sweep: open.sweep, origin: Number.NaN}),
+    RangeError,
+    'origin is validated without snap too',
+  );
 });
 
 test('pushables: friction always resists, a weak push never starts the block, and dt 0 changes nothing', () => {

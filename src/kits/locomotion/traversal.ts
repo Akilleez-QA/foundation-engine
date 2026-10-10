@@ -76,11 +76,13 @@ export type LedgeResult =
 /**
  * Look for a ledge ahead: a near-vertical wall (or the upper edge of a low one) within `reach` facing the body, a
  * walkable top just past the contact within [minClimb, maxClimb] above the feet, open space from the body over the
- * edge at the top height, and headroom for the whole body on top. Uses four creator queries at most (wall cast, ground
- * probe, then clearance and headroom casts, or one cast that tells a too-tall wall from a missing top).
+ * edge at the top height, and headroom for the whole body on top. Uses five creator queries at most (wall cast, ground
+ * probe, a second probe in front of an edge contact, then clearance and headroom casts, or one cast that tells a
+ * too-tall wall from a missing top).
  *
  * The wall cast runs at `minClimb + radius + skin` above the feet (at most `height − radius`); walls whose top is at
- * or below `minClimb` read as `no-wall`, and the sphere meeting a lower wall's upper edge counts as the edge. Steps past
+ * or below `minClimb` read as `no-wall`, and the sphere meeting a lower wall's upper edge counts as the edge when the
+ * top is level with the contact and the surface drops in front of it (a ramp reads as `not-a-wall`). Steps past
  * the contact follow the wall normal, not the facing, so oblique approaches find the same edge. Tops must be at least
  * `radius + skin` deep and near flat: a narrower top reads as `no-top`, and a top rising away from the edge can read as
  * `no-headroom`.
@@ -136,6 +138,16 @@ export function findLedge(q: LedgeQuery, cast: SphereCast, ground: GroundProbe):
   const topY: unknown = ground(tx, tz, p[1] + maxClimb + radius, maxClimb + radius);
   if (topY === null) return Object.freeze({status: 'no-top'});
   if (!finite(topY)) fail('ground must return a finite height or null');
+  if (edgeContact) {
+    // An upward contact is a wall's upper edge only when the top is level with it and the surface drops in front of
+    // it; otherwise it is a slope (a ramp is walked, not climbed).
+    if (Math.abs(topY - contactY) > skin) return Object.freeze({status: 'not-a-wall'});
+    const front: unknown = ground(cx + nx * skin, cz + nz * skin, contactY, contactY - p[1] + radius);
+    if (front !== null && (!finite(front) || front > contactY - skin)) {
+      if (!finite(front)) fail('ground must return a finite height or null');
+      return Object.freeze({status: 'not-a-wall'});
+    }
+  }
   const climb = topY - p[1];
   if (topY < contactY - skin || climb > maxClimb) {
     // The probe missed the wall's top: it found a surface below the contact, or one above maxClimb (which can also be
@@ -143,7 +155,10 @@ export function findLedge(q: LedgeQuery, cast: SphereCast, ground: GroundProbe):
     // narrower than the probe offset or slopes away (no top). A hit ahead at the probe start height that is not
     // ceiling-like (moving into it, normal not pointing down) means the wall continues up there.
     const startY = p[1] + maxClimb + radius;
-    const above = castOnce(cast, [p[0], startY, p[2]], [tx, startY, tz], radius);
+    // Start backed off from the wall a little, so a body pressed flush against it still sees the wall ahead.
+    const bx = p[0] + nx * skin * 2,
+      bz = p[2] + nz * skin * 2;
+    const above = castOnce(cast, [bx, startY, bz], [tx, startY, tz], radius);
     const wallAbove = above !== null && above.fraction > 0 && above.normal[1] >= -wallSlope;
     return Object.freeze({status: wallAbove ? 'too-high' : 'no-top'});
   }
@@ -362,7 +377,9 @@ export function pushStep(
     friction: unknown = options.friction ?? 8,
     maxSpeed: unknown = options.maxSpeed ?? 2,
     snapIn: unknown = options.snap,
-    sweepFn = options.sweep;
+    sweepFn = options.sweep,
+    originIn: unknown = options.origin ?? 0;
+  if (!finite(originIn) || Math.abs(originIn) > 1e9) fail('origin must be finite, |origin| ≤ 1e9');
   if (!finite(dtIn) || dtIn < 0 || dtIn > 1) fail('dt must be within [0, 1]');
   const dt: number = dtIn;
   if (!finite(friction) || friction < 0 || !finite(maxSpeed) || maxSpeed <= 0) fail('friction ≥ 0 and maxSpeed > 0');
@@ -384,8 +401,6 @@ export function pushStep(
     if (fx === 0 && fz === 0) return result(pos, [0, 0], false);
     const axis = Math.abs(fx) >= Math.abs(fz) ? 0 : 2;
     const dir = Math.sign(axis === 0 ? fx : fz);
-    const originIn: unknown = options.origin ?? 0;
-    if (!finite(originIn) || Math.abs(originIn) > 1e9) fail('origin must be finite');
     // The next grid line strictly ahead in the push direction; a position within rounding of a line counts as on it.
     const u = (pos[axis] - originIn) / cell;
     const k = dir > 0 ? Math.floor(u + 1e-9) + 1 : Math.ceil(u - 1e-9) - 1;

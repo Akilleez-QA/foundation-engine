@@ -256,13 +256,13 @@ const ground: GroundProbe = (x, z, fromY, maxDrop) => {
 The volume-query kit has no box body, so `BoxSweep` needs the creator's own
 collision (or a sphere or capsule approximation).
 
-- **`findLedge(query, cast, ground)`** makes at most four queries:
+- **`findLedge(query, cast, ground)`** makes at most five queries:
   1. **Wall cast.** It runs at `minClimb + radius + skin` above the feet, capped at `height − radius`, and looks for a wall within `reach`.
-     - A near-vertical face counts (`|normal.y| ≤ wallSlope`). So does the sphere meeting the upper edge of a wall lower than the cast (an upward normal with a horizontal part). A wall whose top is at or below `minClimb` reads as `no-wall`.
+     - A near-vertical face counts (`|normal.y| ≤ wallSlope`). So does the sphere meeting the upper edge of a wall lower than the cast (an upward normal with a horizontal part), but only when the top is level with the contact and a second ground probe just in front of it finds a drop. Otherwise it is a slope: a walkable ramp reads as `not-a-wall` (or `no-wall` when it stays under the cast). A wall whose top is at or below `minClimb` reads as `no-wall`.
      - Floors, overhangs and other steep normals read as `not-a-wall`.
      - The body must face into the wall within `minFacing` (default within 60°). Otherwise the result is `oblique`, which also rejects back faces.
   2. **Ground probe.** It looks for the top surface `radius + skin` past the contact, along the wall normal, so oblique approaches find the same edge.
-     - It may find a surface below the contact, or one above `maxClimb`, which can also be a ceiling the probe started in. Either way it missed the wall's top. One cast at the probe start height then decides between `too-high` (a wall continues there) and `no-top` (the top is too narrow, slopes away, or a ceiling hides it).
+     - It may find a surface below the contact, or one above `maxClimb`, which can also be a ceiling the probe started in. Either way it missed the wall's top. One cast at the probe start height, started slightly back from the wall so a body pressed flush against it still sees the wall, then decides between `too-high` (a wall continues there) and `no-top` (the top is too narrow, slopes away, or a ceiling hides it).
   3. **Clearance cast.** It checks for open space from the body over the edge at the top height.
   4. **Headroom cast.** It checks room for the body standing on top.
 
@@ -287,7 +287,7 @@ collision (or a sphere or capsule approximation).
   - At dt 0 nothing changes and nothing is swept.
   - Each horizontal axis is swept separately, larger displacement first, so a block slides along a wall instead of sticking. A blocked axis stops.
   - With `snap`, each call is one grid push, or nothing when blocked. The block moves along the dominant axis to the next grid line strictly ahead, at `origin + k × snap`. A position within rounding of a line counts as on it.
-    - Set `origin` to half a cell to keep blocks centred in cells.
+    - Set `origin` to half a cell to keep blocks centred in cells. `origin` is validated in every mode.
     - The caller edge-triggers grid pushes. `mass`, `friction`, `maxSpeed` and `dt` are unused in this mode.
 
 Bounds and failure:

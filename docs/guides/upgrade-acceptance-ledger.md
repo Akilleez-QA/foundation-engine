@@ -1481,7 +1481,8 @@ box world and the real volume-query kit:
     curbs met at their upper edge;
   - thin fences (no top) and tall walls (too high), with and without a ceiling;
   - a 45° approach landing on the face; a 70° approach reported as oblique; a
-    straight-up normal refused;
+    straight-up normal refused; gentle ramps of 2–30° never read as ledges; a body
+    pressed flush against a tall wall gets too-high;
   - the same ledge through a `defineVolumeSet` adapter;
 - ladders: attach facing rules, vertical reach, zero-facing and NaN refusal, climbing
   to a top exit, bottom exit and top standing point;
@@ -1508,4 +1509,8 @@ The re-review found that:
 - a straight-up normal produced NaN queries;
 - dt 0 still capped the speed.
 
-All are fixed; a final re-review is pending. No game, browser or device evidence.
+A third round confirmed those fixes, then found that the edge-contact rule took walkable
+ramps for ledges, that a body flush against a tall wall got no-top, and that `origin`
+was validated only in snap mode. These are fixed too: an edge contact now needs a level
+top and a drop in front of it, the deciding cast starts slightly back from the wall, and
+`origin` is validated in every mode. No independent check of these last fixes yet. No game, browser or device evidence.
