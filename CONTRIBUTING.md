@@ -166,8 +166,9 @@ Maintainers review and integrate changes; submission does not guarantee acceptan
 
 ## Release-facing documentation
 
-Keep notable API, compatibility and workflow changes in [CHANGELOG.md](CHANGELOG.md).
-Use Unreleased until a release exists. Follow [GOVERNANCE.md](GOVERNANCE.md) and
+Record notable API, compatibility and workflow changes as a fragment in
+[changes/unreleased/](changes/unreleased/README.md) (one file per change, so parallel pull requests do not conflict);
+they are folded into [CHANGELOG.md](CHANGELOG.md) at release time. Do not add new entries to CHANGELOG.md directly. Follow [GOVERNANCE.md](GOVERNANCE.md) and
 [release readiness](docs/guides/release-checklist.md). Private integration, a version
 field and green CI do not publish source or establish device support.
 See [SUPPORT.md](SUPPORT.md) for help channels.
