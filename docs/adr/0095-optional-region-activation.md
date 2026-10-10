@@ -2,7 +2,7 @@
 
 - Status: Proposed for this implementation; integration is gated by full CI.
 - Date: 2026-10-09
-- Discussion: issue linked from the pull request
+- Discussion: [#242](https://github.com/Akilleez-QA/foundation-engine/issues/242)
 - Area: Optional kits / simulation scale
 
 ## Context
