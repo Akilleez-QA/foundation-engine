@@ -1228,3 +1228,16 @@ including seeded randomized bound and exactly-once runs. These are implemented a
 checked on branch `feat/prediction-presentation`, not integrated. Independent review,
 hosted CI, device or browser review of smoothing and multiplayer acceptance remain
 outstanding. See ADR 0142.
+
+
+## Volume query invocation isolation (2026-10-11)
+
+Volume queries capture each body per invocation, preserving outer geometry when input getters
+run nested queries on the same or another snapshot. Public APIs, geometry, result ownership
+and evaluation limits are unchanged; there is no new scheduler or movement policy.
+The nested-input regressions cover query and snapshot fields, exception recovery and the
+blocked-sweep case. The regression fails on the preceding implementation; focused geometry
+and consumer suite passes 21 tests. The affected check passes typecheck, all lints and tests.
+An initial check used an incomplete dependency tree; repeating with dependencies matching
+the lockfile removed that environment failure. Hosted CI and supported-device performance
+remain separate acceptance evidence.

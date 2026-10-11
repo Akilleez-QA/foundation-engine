@@ -106,14 +106,18 @@ Work is bounded and counted: each query first rejects colliders outside the swep
 body's bounds at no evaluation cost, then performs at most `maxEvaluations` pair
 distance evaluations. A box evaluation is one slab test, two point-box distances
 and twelve segment distances; the others are one segment distance. A query
-allocates its result and does not allocate per evaluation. There is no acceleration
+allocates a constant-size body capture and its result, and does not allocate per evaluation. There is no acceleration
 structure: with many colliders, build smaller snapshots from an existing index
 (for example the spatial kit's grid) for the region a query needs. Native time is
 not bounded by these counts and has not been measured on devices.
 
 Queries are synchronous and run to completion; there is nothing to cancel
-mid-call. Spread work across ticks by issuing fewer queries. No callback runs, so
-nothing can reenter or change the snapshot during a query.
+mid-call. Spread work across ticks by issuing fewer queries. Reading creator input
+properties can invoke getters, including nested queries. Each invocation owns its
+captured body; nested queries on the same or another snapshot cannot replace it.
+All creator property reads finish before the numeric kernel phase, which reads only
+owned primitive data. Getter exceptions propagate without poisoning later calls.
+Caller getter work and recursion are outside the query evaluation bound.
 
 Not provided: depenetration, moving or deforming colliders (build a new snapshot
 with a new revision), triangle meshes, heightfields, convex hulls, rotation during
