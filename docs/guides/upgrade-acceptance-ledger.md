@@ -1785,3 +1785,15 @@ outstanding. See ADR 0142.
 - **Evidence:** `presentation.test.ts`. It covers transitions, the input lock, CSS, the day clock, curves, weather,
   the roll-up and a `testScene` door composition.
 - **Not established:** browser or device appearance, template adoption and hosted CI.
+
+
+## Volume query invocation isolation (2026-10-11)
+
+Volume queries capture each body per invocation, preserving outer geometry when input getters
+run nested queries on the same or another snapshot. Public APIs, geometry, result ownership
+and evaluation limits are unchanged; there is no new scheduler or movement policy.
+The nested-input regressions cover query and snapshot fields, exception recovery and the
+blocked-sweep case. The regression fails on the preceding implementation; focused geometry
+and consumer suite passes 21 tests. The affected check passes its lints and tests; local
+typecheck is unavailable because the installed dependency tree lacks the declared scripting
+dependency. Hosted CI and supported-device performance remain separate acceptance evidence.

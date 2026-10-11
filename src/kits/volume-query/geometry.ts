@@ -2,6 +2,8 @@
  * kits/volume-query/geometry: exact distances between the cores of rounded convex primitives. A sphere is a point and
  * a capsule a segment, each grown by a radius; a box is an oriented box with no rounding. Pure and allocation-free:
  * each kernel returns the core distance and writes the difference (body point minus collider point) into `GAP`.
+ * Query callers finish reading creator properties before entering these kernels. Only owned primitive numeric data
+ * reaches this phase: no caller callback runs between writing and consuming GAP or LOCAL.
  * Only +, -, *, / and sqrt are used, so results are IEEE-754 reproducible across conforming engines.
  */
 import {sqrt} from '../../core/dmath';

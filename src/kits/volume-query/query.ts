@@ -297,9 +297,9 @@ function options(o: VolumeQueryOptions | undefined): Options {
   };
 }
 
-// The captured body core segment and radius. Queries are synchronous and never reenter, so one buffer suffices.
-const BODY = new Float64Array(7);
-function captureBody(body: VolumeBody): void {
+// Caller properties can run nested queries. Each invocation owns its captured core segment and radius.
+type CapturedBody = readonly [number, number, number, number, number, number, number];
+function captureBody(body: VolumeBody): CapturedBody {
   if (!body || typeof body !== 'object') fail('invalid body');
   const kind = body.kind;
   if (kind !== 'sphere' && kind !== 'capsule') fail('invalid body kind');
@@ -307,25 +307,20 @@ function captureBody(body: VolumeBody): void {
   if (!size(radius)) fail('invalid body radius');
   const a = vec(kind === 'sphere' ? (body as {center: unknown}).center : (body as {a: unknown}).a, 'body point'),
     b = kind === 'sphere' ? a : vec((body as {b: unknown}).b, 'body point');
-  BODY[0] = a[0];
-  BODY[1] = a[1];
-  BODY[2] = a[2];
-  BODY[3] = b[0];
-  BODY[4] = b[1];
-  BODY[5] = b[2];
-  BODY[6] = radius;
+  return [a[0], a[1], a[2], b[0], b[1], b[2], radius];
 }
 
-/** Core distance between the body translated by (ox, oy, oz) and collider `slot`; the difference lands in GAP. */
-function core(data: Float64Array, slot: number, ox: number, oy: number, oz: number): number {
+/** Core distance to collider `slot`; GAP is consumed before the next kernel call. All arguments here are owned
+ * numeric data: caller accessors have finished, so this numeric phase cannot reenter through query inputs. */
+function core(body: CapturedBody, data: Float64Array, slot: number, ox: number, oy: number, oz: number): number {
   const at = slot * STRIDE,
     p = at + PARAMS;
-  const ax = BODY[0]! + ox,
-    ay = BODY[1]! + oy,
-    az = BODY[2]! + oz,
-    bx = BODY[3]! + ox,
-    by = BODY[4]! + oy,
-    bz = BODY[5]! + oz;
+  const ax = body[0]! + ox,
+    ay = body[1]! + oy,
+    az = body[2]! + oz,
+    bx = body[3]! + ox,
+    by = body[4]! + oy,
+    bz = body[5]! + oz;
   if (data[at] === BOX) return segmentBox(ax, ay, az, bx, by, bz, data, p);
   return segmentSegment(
     ax,
@@ -346,11 +341,19 @@ const rounding = (data: Float64Array, slot: number) =>
   data[slot * STRIDE] === BOX ? 0 : data[slot * STRIDE + PARAMS + 6]!;
 
 /** Whether collider `slot` can come within `reach` of the body swept by (dx, dy, dz). */
-function nearSwept(data: Float64Array, slot: number, dx: number, dy: number, dz: number, reach: number): boolean {
+function nearSwept(
+  body: CapturedBody,
+  data: Float64Array,
+  slot: number,
+  dx: number,
+  dy: number,
+  dz: number,
+  reach: number,
+): boolean {
   const at = slot * STRIDE;
   for (let k = 0; k < 3; k++) {
-    const a = BODY[k]!,
-      b = BODY[k + 3]!,
+    const a = body[k]!,
+      b = body[k + 3]!,
       d = k === 0 ? dx : k === 1 ? dy : dz;
     const lo = Math.min(a, b) + Math.min(0, d) - reach,
       hi = Math.max(a, b) + Math.max(0, d) + reach;
@@ -363,14 +366,15 @@ function nearSwept(data: Float64Array, slot: number, dx: number, dy: number, dz:
 export function overlapVolume(set: VolumeSet, body: VolumeBody, o?: VolumeQueryOptions): VolumeOverlapResult {
   const s = store(set),
     opt = options(o);
-  captureBody(body);
+  const captured = captureBody(body);
   const ids: string[] = [];
   let evaluations = 0,
     found = 0;
   // Pad by the largest tolerance so rounding at the bound edge never skips a candidate.
-  const reach = BODY[6]! + opt.margin + 0.01;
+  const reach = captured[6]! + opt.margin + 0.01;
   for (let slot = 0; slot < s.ids.length; slot++) {
-    if ((s.data[slot * STRIDE + 1]! & opt.mask) >>> 0 === 0 || !nearSwept(s.data, slot, 0, 0, 0, reach)) continue;
+    if ((s.data[slot * STRIDE + 1]! & opt.mask) >>> 0 === 0 || !nearSwept(captured, s.data, slot, 0, 0, 0, reach))
+      continue;
     if (evaluations >= opt.maxEvaluations)
       return Object.freeze({
         status: 'over-budget',
@@ -380,7 +384,7 @@ export function overlapVolume(set: VolumeSet, body: VolumeBody, o?: VolumeQueryO
         evaluations,
       });
     evaluations++;
-    const separation = core(s.data, slot, 0, 0, 0) - BODY[6]! - rounding(s.data, slot);
+    const separation = core(captured, s.data, slot, 0, 0, 0) - captured[6]! - rounding(s.data, slot);
     if (separation < opt.margin) {
       found++;
       if (ids.length < opt.maxResults) ids.push(s.ids[slot]!);
@@ -408,13 +412,13 @@ export function sweepVolume(
 ): VolumeSweepResult {
   const s = store(set),
     opt = options(o);
-  captureBody(body);
+  const captured = captureBody(body);
   const d = vec(displacement, 'displacement'),
     dx = d[0],
     dy = d[1],
     dz = d[2];
   const length = sqrt(dx * dx + dy * dy + dz * dz),
-    radius = BODY[6]!,
+    radius = captured[6]!,
     tol = opt.tolerance,
     reach = radius + opt.margin + tol;
   const data = s.data,
@@ -430,12 +434,13 @@ export function sweepVolume(
   const penetrated: string[] = [];
   let penetrations = 0;
   for (let slot = 0; slot < s.ids.length; slot++) {
-    if ((data[slot * STRIDE + 1]! & opt.mask) >>> 0 === 0 || !nearSwept(data, slot, dx, dy, dz, reach)) continue;
+    if ((data[slot * STRIDE + 1]! & opt.mask) >>> 0 === 0 || !nearSwept(captured, data, slot, dx, dy, dz, reach))
+      continue;
     const rr = radius + rounding(data, slot);
     if (evaluations >= opt.maxEvaluations)
       return Object.freeze({status: 'over-budget', revision, fraction: 0, evaluations});
     evaluations++;
-    let dist = core(data, slot, 0, 0, 0),
+    let dist = core(captured, data, slot, 0, 0, 0),
       gap = dist - rr;
     if (gap < 0) {
       penetrations++;
@@ -478,7 +483,7 @@ export function sweepVolume(
       let next = t + (gap - floor) / -slope;
       evaluations++;
       iterations++;
-      dist = core(data, slot, dx * next, dy * next, dz * next);
+      dist = core(captured, data, slot, dx * next, dy * next, dz * next);
       let nextGap = dist - rr;
       if (nextGap < floor - tol) {
         next = t + (gap - floor) / length;
@@ -491,7 +496,7 @@ export function sweepVolume(
           return Object.freeze({status: 'over-budget', revision, fraction: 0, evaluations});
         evaluations++;
         iterations++;
-        dist = core(data, slot, dx * next, dy * next, dz * next);
+        dist = core(captured, data, slot, dx * next, dy * next, dz * next);
         nextGap = dist - rr;
       }
       t = next;
