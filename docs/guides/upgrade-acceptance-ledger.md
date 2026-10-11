@@ -1794,6 +1794,7 @@ run nested queries on the same or another snapshot. Public APIs, geometry, resul
 and evaluation limits are unchanged; there is no new scheduler or movement policy.
 The nested-input regressions cover query and snapshot fields, exception recovery and the
 blocked-sweep case. The regression fails on the preceding implementation; focused geometry
-and consumer suite passes 21 tests. The affected check passes its lints and tests; local
-typecheck is unavailable because the installed dependency tree lacks the declared scripting
-dependency. Hosted CI and supported-device performance remain separate acceptance evidence.
+and consumer suite passes 21 tests. The affected check passes typecheck, all lints and tests.
+An initial check used an incomplete dependency tree; repeating with dependencies matching
+the lockfile removed that environment failure. Hosted CI and supported-device performance
+remain separate acceptance evidence.
