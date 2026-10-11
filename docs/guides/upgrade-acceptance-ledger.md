@@ -1798,3 +1798,14 @@ and consumer suite passes 21 tests. The affected check passes typecheck, all lin
 An initial check used an incomplete dependency tree; repeating with dependencies matching
 the lockfile removed that environment failure. Hosted CI and supported-device performance
 remain separate acceptance evidence.
+
+### Contact update scratch bounds (2026-10-11)
+
+The optional contact owner now indexes captured x intervals and streams one neighbor row in id order,
+retaining O(n + maxPairs) logical update storage instead of every overlapping pair. Continuing contacts,
+per-body admission, exact refusal counts, event ordering and version-1 snapshot semantics are preserved.
+Scheduling and effects remain creator-owned. Dense overlap work remains quadratic and dense row sorting
+can be O(n² log n); this is not a CPU deadline or heap-byte budget. See the [contact contract](../../src/kits/contact/README.md).
+Focused evidence includes an independent bounded materialize-all oracle, mixed-shape restoration histories,
+sparse visit counts and dense row-capacity checks. Full hosted CI and physical-device performance are not
+established by these headless checks; integration acceptance remains pending for this candidate.

@@ -53,10 +53,23 @@ contacts.setEnabled(player, false);   // intangible (e.g. invulnerability frames
   - New pairs are admitted in `(a, b)` order.
   - The rest are refused and produce no events. `update().refused` counts them.
   - Results do not depend on insertion order.
-- **Cost.** `update()` sorts enabled bodies along x and sweeps them: O(n log n + candidate pairs). It allocates
-  its event list. `set`, `move`, `setEnabled` and `remove` are O(1). `touching(id)` lists contacts as of the last update and is O(current pairs).
+- **Temporary storage.** `update()` uses O(n + p) logical storage, where n is enabled bodies and p is
+  `maxPairs`: an update-local x-interval index, one reusable neighbor row of at most n−1 body references,
+  and admitted pairs/events. Refused overlaps are counted without retaining Pair objects. The index uses
+  fewer than 4n numeric slots for n>0 (two for an empty layer). Output has at most 2p events, including exits.
+  These are logical record bounds, not JavaScript heap-byte or garbage-collection guarantees.
+- **Cost.** Continuing identities are checked first; new pairs stream in id order from per-body interval
+  queries. Building the index and body order costs O(n log n); continuing-pair ordering costs O(p log p).
+  Each row is sorted by id, adding O(k log k) for its k x-candidates, with O(n) worst-case tree visits per row.
+  Dense scenes still require quadratic overlap work to return an exact refusal count, even when `maxPairs`
+  is one; pair admission is not a CPU deadline. `set`, `move`, `setEnabled` and `remove` are O(1).
+  `touching(id)` lists contacts as of the last update and is O(current pairs).
 - **Reentrancy.** Calling back into the layer during an operation throws.
 - **Validation.** Malformed input throws `RangeError` before any change. Fields are copied once.
+- **Publication and recovery.** Update computes a detached candidate and freezes its complete report before
+  replacing the current contacts. A recoverable exception before publication leaves the last contacts intact;
+  the creator can retry. This is not recovery from fatal VM memory exhaustion. Update is synchronous, with no
+  async job or cancellation owner; callers choose when to run it on their existing fixed-step host.
 - **Events.** Events are frozen values; dispatch is the creator's. A handler that removes a body cannot corrupt
   the list. Check `has(id)` before acting on a body an earlier handler may have removed.
 
@@ -65,7 +78,7 @@ contacts.setEnabled(player, false);   // intangible (e.g. invulnerability frames
 - **Positions are sampled per update, with no swept or time-of-impact test.** A fast body can pass through a thin
   volume between steps. Use `@kits/combat` `sweep` or a volume query for that.
 - **Boxes are axis-aligned and cylinders are vertical.**
-- **One sweep axis.** Thousands of bodies spread along y and z but stacked in x degrade toward O(n²).
+- **One index axis.** Bodies spread along y and z but stacked in x can all remain candidates. Sorting dense rows can cost O(n² log n).
 - **No physics response.** Contacts are facts. Pushing apart, damage and pickup are creator effects.
 
 ## Evidence
@@ -85,3 +98,9 @@ contacts.setEnabled(player, false);   // intangible (e.g. invulnerability frames
 - a `testScene` pickup consumer that collects each pickup exactly once while removing bodies during dispatch.
 
 The tests are headless only. No template uses the kit yet.
+
+`contact-bounds.test.ts` additionally compares all 1,024 five-body sensing graphs under three degree
+limits to an independent materialize-all oracle, plus mixed-shape mutation/restore histories, continuing
+priority, recycled identities, and floating-point interval ties. Internal index tests distinguish a bounded
+neighbor row from the dense overlap count and count sparse-tree visits with shuffled ids. These are logical
+algorithm checks, not physical-device timing or heap measurements.
