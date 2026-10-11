@@ -107,7 +107,7 @@ export interface GenerationLimits {
   readonly maxKeys?: number;
   /** Characters per payload (default 262,144, at most 2,000,000). */
   readonly maxKeyChars?: number;
-  /** Characters of all payloads of one generation (default 1,048,576, at most 4,000,000). Two slots hold twice this. */
+  /** Characters of all payloads of one generation (default 1,048,576, at most 4,000,000). The two live slots hold twice this, excluding records and leftover keys. */
   readonly maxTotalChars?: number;
   /** Read passes before load reports `contended` (default 3, 1-8). */
   readonly maxLoadAttempts?: number;
@@ -451,6 +451,7 @@ export function createSaveGenerations(options: SaveGenerationsOptions): SaveGene
           // 3. The record goes last: only now can the new generation be valid.
           const body = JSON.stringify({f: 1, ns: namespace, n: name, s: target, g: generation, k: manifest});
           record = `${hex(checksum(body))}|${body}`;
+          if (stop()) return commitResult(closed ? 'closed' : 'cancelled', writes, 0, 'stopped before the record');
           await port.set(recordKey(target), record);
           writes++;
         } catch (e) {
@@ -495,6 +496,10 @@ export function createSaveGenerations(options: SaveGenerationsOptions): SaveGene
             const bar = value.indexOf('|'),
               stored = bar > 0 ? Number(value.slice(0, bar)) : NaN;
             if (!(Number.isSafeInteger(stored) && stored < generation)) {
+              leftovers++;
+              continue;
+            }
+            if (stop()) {
               leftovers++;
               continue;
             }

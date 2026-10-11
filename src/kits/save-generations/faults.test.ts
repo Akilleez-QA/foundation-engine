@@ -498,3 +498,65 @@ test('re-review: the narrowing check makes a writer stand down when a valid gene
   assert.equal(loaded.status, 'loaded');
   assert.deepEqual(loaded.snapshot!.entries, {k: 'from-x'}); // X's confirmed generation survives
 });
+
+for (const stop of ['abort', 'close'] as const) {
+  test(`${stop} during the held pre-record read prevents publication`, async () => {
+    const backend = new MemoryBackend();
+    const seed = fresh(backend, 0);
+    await seed.load();
+    await seed.commit({x: 'old'});
+    seed.close();
+    // Load and the initial scan read b's record first; the third read is
+    // the narrowing check after the candidate payload has been written.
+    const check = heldPort(
+      backend.port(1),
+      (key, count) => key === 'game-gen|run|b#commit' && count === 3,
+      () => false,
+    );
+    const writer = createSaveGenerations({port: check.port, name: 'run'});
+    await writer.load();
+    const signal = {aborted: false};
+    const pending = writer.commit({x: 'new'}, {signal});
+    await check.waiting;
+    if (stop === 'abort') signal.aborted = true;
+    else writer.close();
+    const mutations = backend.writes;
+    check.release();
+    const result = await pending;
+    assert.equal(result.status, stop === 'abort' ? 'cancelled' : 'closed');
+    assert.equal(backend.writes, mutations);
+    assert.equal(backend.data.has('game-gen|run|b#commit'), false);
+    assert.deepEqual((await reload(backend, 2)).snapshot?.entries, {x: 'old'});
+    writer.close();
+  });
+
+  test(`${stop} during a held sweep read prevents the next removal`, async () => {
+    const backend = new MemoryBackend();
+    const seed = fresh(backend, 0);
+    await seed.load();
+    await seed.commit({x: 'one', stale: 'retained'});
+    await seed.commit({x: 'two'});
+    seed.close();
+    const held = heldPort(
+      backend.port(1),
+      key => key === 'game-gen|run|a|stale',
+      () => false,
+    );
+    const owner = createSaveGenerations({port: held.port, name: 'run'});
+    await owner.load();
+    const signal = {aborted: false};
+    const pending = owner.commit({x: 'three'}, {signal});
+    await held.waiting;
+    if (stop === 'abort') signal.aborted = true;
+    else owner.close();
+    const mutations = backend.writes;
+    held.release();
+    const result = await pending;
+    assert.equal(result.status, 'committed'); // publication preceded the stop
+    assert.equal(result.leftovers, 1);
+    assert.equal(backend.writes, mutations);
+    assert.equal(backend.data.get('game-gen|run|a|stale'), '1|retained');
+    assert.deepEqual((await reload(backend, 2)).snapshot?.entries, {x: 'three'});
+    owner.close();
+  });
+}

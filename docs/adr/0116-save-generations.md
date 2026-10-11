@@ -54,7 +54,7 @@ Add an optional kit, `@kits/save-generations`, layered on the existing port seam
   U+FFFD and could not be told apart by the UTF-8 checksum (`RangeError` at commit, `invalid` when stored).
 - **Bounds.** Keys per generation (16, at most 256), characters per payload (262,144, at most 2,000,000) and per
   generation (1,048,576, at most 4,000,000), load attempts (3, at most 8). Oversized input is refused before any write.
-- **Cancellation.** A signal checked before every write, and `close()`; the record is never written after either.
+- **Cancellation.** A signal checked before every write, and `close()`; a stop before the record write is issued prevents publication, including when it arrives during the preceding asynchronous read. A stop during a sweep read prevents the next removal. Already-issued port operations cannot be withdrawn.
 - **Composition.** Keys live under `<namespace>-gen|<name>|`, inside the save store's reset prefixes, so
   `resetAll()` clears them and `usage()` counts them (STD-SAV-10). The kit uses the chunk store's CRC-32 and the save
   store's namespace validation rather than its own.
@@ -88,5 +88,4 @@ Web Storage, which has no multi-key atomicity.
   and the sweep's read-then-remove has a small window against another writer. Loads stay coherent. Ports without
   `keys()` can leave unnamed keys of an interrupted commit until a reset. Bound ceilings can exceed a browser's Web
   Storage quota (refused at runtime as `failed`). A save store must not use the namespace `<namespace>-gen`.
-  CRC-32 detects accidental damage, not tampering. Every commit rewrites the whole generation; two slots double the
-  stored size. Payload versioning, export and import remain the creator's.
+  CRC-32 detects accidental damage, not tampering. Every commit rewrites the whole generation; two live slots double the payload budget, excluding records and leftover keys. Interrupted commits can leave keys beyond that budget; temporary memory includes previous, candidate and verification representations. Payload versioning, export and import remain the creator's.

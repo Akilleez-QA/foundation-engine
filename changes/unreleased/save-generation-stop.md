@@ -1,0 +1,1 @@
+- **Save generation cancellation.** Recheck abort and close after asynchronous reads before publishing a generation or removing a stale key. Held-read regressions preserve the previous generation before publication and retain leftovers when stopped during cleanup. Clarify that payload limits exclude leftover keys and do not measure total heap usage.
