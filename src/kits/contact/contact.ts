@@ -1,3 +1,5 @@
+import {contactIntervalsOverlap, createContactIndex} from './contact-index';
+
 /**
  * Contact layer: simple volumes with layer and mask bits, exact overlap tests, and per-update enter/stay/exit pair
  * events in a deterministic order, with bounded pair and per-body admission. Pure owner of its bodies; the creator
@@ -270,47 +272,56 @@ export function createContactLayer(options: ContactOptions) {
     /** Find overlapping pairs and report what changed since the previous update. */
     update(): ContactUpdate {
       return guarded(() => {
-        // Sort-and-sweep on x over enabled bodies; ties by id, so the candidate order never depends on insertion.
-        const live = [...bodies.values()].filter(b => b.enabled).sort((p, q) => p.minX - q.minX || p.id - q.id);
-        const found: Pair[] = [];
-        for (let i = 0; i < live.length; i++) {
-          const p = live[i]!;
-          for (let j = i + 1; j < live.length; j++) {
-            const q = live[j]!;
-            if (q.minX >= p.maxX) break;
-            const pSenses = (p.mask & q.layer) !== 0,
-              qSenses = (q.mask & p.layer) !== 0;
-            if (!pSenses && !qSenses) continue;
-            if (!overlaps(p, q)) continue;
-            const [a, b] = p.id < q.id ? [p, q] : [q, p];
-            found.push({
-              a: a.id,
-              b: b.id,
-              aSenses: a === p ? pSenses : qSenses,
-              bSenses: a === p ? qSenses : pSenses,
-              ai: a.incarnation,
-              bi: b.incarnation,
-            });
-          }
-        }
-        found.sort((p, q) => p.a - q.a || p.b - q.b);
-        // Admission: continuing pairs first, then new ones, each in (a, b) order, within both bounds.
+        const live = [...bodies.values()].filter(b => b.enabled).sort((p, q) => p.id - q.id);
+        const index = createContactIndex(live);
         const next = new Map<string, Pair>();
         const perBody = new Map<number, number>();
-        let refused = 0;
-        const admit = (pair: Pair) => {
-          const na = perBody.get(pair.a) ?? 0,
-            nb = perBody.get(pair.b) ?? 0;
-          if (next.size >= maxPairs || na >= maxPerBody || nb >= maxPerBody) {
-            refused++;
-            return;
-          }
-          perBody.set(pair.a, na + 1);
-          perBody.set(pair.b, nb + 1);
-          next.set(pairKey(pair), pair);
+        const sensedOverlap = (a: Body, b: Body) =>
+          ((a.mask & b.layer) !== 0 || (b.mask & a.layer) !== 0) && overlaps(a, b);
+        const admit = (a: Body, b: Body) => {
+          const na = perBody.get(a.id) ?? 0,
+            nb = perBody.get(b.id) ?? 0;
+          if (next.size >= maxPairs || na >= maxPerBody || nb >= maxPerBody) return;
+          const key = `${a.id}:${a.incarnation}:${b.id}:${b.incarnation}`;
+          if (next.has(key)) return;
+          perBody.set(a.id, na + 1);
+          perBody.set(b.id, nb + 1);
+          next.set(key, {
+            a: a.id,
+            b: b.id,
+            ai: a.incarnation,
+            bi: b.incarnation,
+            aSenses: (a.mask & b.layer) !== 0,
+            bSenses: (b.mask & a.layer) !== 0,
+          });
         };
-        for (const pair of found) if (current.has(pairKey(pair))) admit(pair);
-        for (const pair of found) if (!current.has(pairKey(pair))) admit(pair);
+        // Continuing identities first. Refresh sensing without mutating published pair records.
+        for (const pair of [...current.values()].sort((p, q) => p.a - q.a || p.b - q.b)) {
+          const a = bodies.get(pair.a),
+            b = bodies.get(pair.b);
+          if (
+            a?.enabled &&
+            b?.enabled &&
+            a.incarnation === pair.ai &&
+            b.incarnation === pair.bi &&
+            contactIntervalsOverlap(a, b) &&
+            sensedOverlap(a, b)
+          )
+            admit(a, b);
+        }
+        // Enumerate in admission order, retaining only one row of body references, never all overlaps.
+        // Exact refusal accounting still visits every candidate after admission fills up.
+        let totalOverlap = 0;
+        const row: Body[] = [];
+        for (const a of live) {
+          index.row(a, row);
+          for (const b of row) {
+            if (!sensedOverlap(a, b)) continue;
+            totalOverlap++;
+            admit(a, b);
+          }
+        }
+        const refused = totalOverlap - next.size;
         /** A pair ends 'removed' when a body is gone, disabled, or is a new incarnation of its id. */
         const departed = (p: Pair) => {
           const a = bodies.get(p.a),
@@ -344,8 +355,13 @@ export function createContactLayer(options: ContactOptions) {
         }
         const order = (p: ContactEvent, q: ContactEvent) => p.a - q.a || p.b - q.b;
         exits.sort(order);
+        const result = Object.freeze({
+          events: Object.freeze([...exits, ...enters, ...stays]),
+          refused,
+          pairs: next.size,
+        });
         current = next;
-        return Object.freeze({events: Object.freeze([...exits, ...enters, ...stays]), refused, pairs: next.size});
+        return result;
       });
     },
     /** Plain detached state (bodies in id order and current pairs) for saves and rollback. */
