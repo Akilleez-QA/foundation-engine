@@ -9,6 +9,11 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/Akilleez-QA/foundation-engine/ci.yml?branch=main)](https://github.com/Akilleez-QA/foundation-engine/actions/workflows/ci.yml?query=branch%3Amain)
 [![GPL-3.0-only](https://img.shields.io/static/v1?label=license&message=GPL-3.0-only&color=blue)](LICENSE)
 [![Node.js >= 22.18](https://img.shields.io/static/v1?label=node&message=%3E%3D22.18&color=brightgreen)](package.json)
+[![Latest release](https://img.shields.io/github/v/release/Akilleez-QA/foundation-engine)](https://github.com/Akilleez-QA/foundation-engine/releases/latest)
+[![three.js 0.186](https://img.shields.io/static/v1?label=three.js&message=0.186&color=black&logo=threedotjs)](package.json)
+[![TypeScript 6](https://img.shields.io/static/v1?label=TypeScript&message=6&color=3178C6&logo=typescript&logoColor=white)](tsconfig.json)
+
+> **Make browser games of any genre with an agent, and keep them correct.** Source-distributed TypeScript and three.js with explicit contracts, automated checks and per-game acceptance.
 
 A layered TypeScript and three.js engine for browser games of any genre, with explicit engineering contracts, automated checks and application-specific acceptance requirements.
 
@@ -18,7 +23,13 @@ A layered TypeScript and three.js engine for browser games of any genre, with ex
 - **[Contribute to the engine](CONTRIBUTING.md)**: reproduce a problem, find the relevant contract and submit a focused change. Keep your own game on its own branch.
 - **[Explore the templates](#templates)** or [browse task recipes](docs/recipes/README.md). Foundation is distributed as source and tooling, not an npm library or visual editor.
 
-Try the arcade example without creating a game: after cloning and running `npm ci`, run `npm run play -- --game templates/arcade/game`. Steer with the arrow keys and press Space after a collision to restart. This runs locally; no hosted demo is required.
+Try the arcade example without creating a game (steer with the arrow keys, press Space after a collision to restart). It runs locally and needs no hosted demo:
+
+```sh
+git clone https://github.com/Akilleez-QA/foundation-engine.git && cd foundation-engine
+npm ci
+npm run play -- --game templates/arcade/game
+```
 
 ## What's new in 0.2.0
 
