@@ -9,6 +9,7 @@ Source code and assets are not copied into this repository.
 - [Terrain, navigation, animation and diagnostics](TOOLING-LANDSCAPE.md)
 - [Open-source tooling priorities](OPEN-SOURCE-TOOLING.md)
 - [Game UI/UX research and implementation priorities](GAME-UI-UX.md)
+- [Secondary motion from skeleton motion (skelebones, partwise motion matching)](secondary-motion-matching.md)
 
 ## Research coverage
 
