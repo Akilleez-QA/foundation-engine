@@ -12,6 +12,7 @@ Source code and assets are not copied into this repository.
 - [Secondary motion from skeleton motion (skelebones, partwise motion matching)](secondary-motion-matching.md)
 - [Generative multi-player world models (hierarchical communication)](multiplayer-world-models.md)
 - [Feed-forward 3D Gaussian splatting](feed-forward-gaussian-splatting.md)
+- [Streaming diffusion rendering of semantic frames](streaming-diffusion-render.md)
 
 ## Research coverage
 
