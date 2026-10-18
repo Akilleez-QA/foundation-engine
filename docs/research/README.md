@@ -11,6 +11,7 @@ Source code and assets are not copied into this repository.
 - [Game UI/UX research and implementation priorities](GAME-UI-UX.md)
 - [Secondary motion from skeleton motion (skelebones, partwise motion matching)](secondary-motion-matching.md)
 - [Generative multi-player world models (hierarchical communication)](multiplayer-world-models.md)
+- [Feed-forward 3D Gaussian splatting](feed-forward-gaussian-splatting.md)
 
 ## Research coverage
 
