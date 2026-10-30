@@ -188,3 +188,7 @@ Brand assets, palette and copy-paste banners: [docs/brand.md](docs/brand.md).
 The [editable itinerary lab](tools/itinerary-lab/README.md) is a headless prototype
 for preserving active tasks across bounded list edits. It now exercises the optional
 [public itinerary helper candidate](src/kits/itinerary/README.md).
+
+## Commercial licensing
+
+This project is available under the GNU General Public License v3.0 only (GPL-3.0-only). If you want to use it in a product or service under different terms, commercial licenses are available from Refrigeration.AI. Contact craig@nh3.biz.
