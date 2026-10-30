@@ -28,7 +28,7 @@ A layered TypeScript and three.js engine for browser games of any genre, with ex
 
 ## Choose your starting point
 
-- **[Make a game](docs/guides/getting-started.md)**: clone, run the arcade template, change its player colour, check it and build a static site. Git, Node.js 22.18+ and npm are required; an AI account is optional.
+- **[Make a game](docs/guides/getting-started.md)**: clone, run the arcade template, change its player color, check it and build a static site. Git, Node.js 22.18+ and npm are required; an AI account is optional.
 - **[Contribute to the engine](CONTRIBUTING.md)**: reproduce a problem, find the relevant contract and submit a focused change. Keep your own game on its own branch.
 - **[Explore the templates](#templates)** or [browse task recipes](docs/recipes/README.md). Foundation is distributed as source and tooling, not an npm library or visual editor.
 
@@ -174,10 +174,6 @@ links require maintainer access and are not public review evidence. Included rep
 retain their stated scope. Mobile layout and physical-device acceptance are still
 in progress; see the acceptance ledger before making support claims.
 
-## Licence
-
-Copyright © 2026 Refrigeration.AI and contributors. Engine code is licensed under **GPL-3.0-only**; see [LICENSE](LICENSE). Third-party packages and designated assets retain the licenses recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
 See [GOVERNANCE.md](GOVERNANCE.md), [SUPPORT.md](SUPPORT.md) and [CHANGELOG.md](CHANGELOG.md).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development and contribution guidance, [SECURITY.md](SECURITY.md) for vulnerability reporting, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for participation expectations. Repository visibility and publication are separate release steps.
@@ -203,6 +199,6 @@ The [editable itinerary lab](tools/itinerary-lab/README.md) is a headless protot
 for preserving active tasks across bounded list edits. It now exercises the optional
 [public itinerary helper candidate](src/kits/itinerary/README.md).
 
-## Commercial licensing
+## License
 
 This project is available under the GNU General Public License v3.0 only (GPL-3.0-only). If you want to use it to create a product or service under different terms, commercial licenses are available from Refrigeration.AI. Contact craig@nh3.biz.
