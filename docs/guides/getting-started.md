@@ -180,7 +180,7 @@ Open the printed origin followed by `/my-game/` (keep the trailing slash), then 
 
 ## With a coding agent
 
-Run Claude Code, Codex or another agent in the repository folder. It reads [AGENTS.md](../../AGENTS.md) (Claude Code through `CLAUDE.md`) and the skills in `.claude/skills/`. Say what you want to make; the **new-game** skill interviews you, fills the brief and plans a small first slice. [Working with your agent](working-with-your-agent.md) explains the rounds. For a game of your own, the agent works on your branch in this checkout; the worktree, gate and release rules in AGENTS.md are for contributions to the engine itself.
+Run Claude Code, Codex or another agent in the repository folder. It reads [AGENTS.md](../../AGENTS.md) and the [recipes](../recipes/README.md). Say what you want to make; the agent fills the brief with you and plans a small first slice. [Working with your agent](working-with-your-agent.md) explains the rounds. For a game of your own, the agent works on your branch in this checkout; the worktree, gate and release rules in AGENTS.md are for contributions to the engine itself.
 
 ## When something goes wrong
 

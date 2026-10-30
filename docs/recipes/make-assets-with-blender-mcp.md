@@ -43,7 +43,7 @@ The [model contracts guide](../guides/model-contracts.md) lists every key. The l
 
 With the server registered and Blender started with `--online-mode`, ask the agent to build the model. **Build it at the target polycount from the start.** Take the triangle budget from step 1 and model to it: primitives with few segments, bevels only where the silhouette needs them. The same applies to AI generators: ask for the target count (a low-poly or quad tier) instead of decimating a dense mesh afterwards. Decimation is a last resort, and `asset:optimize` never does it. **Use quads for anything that will be rigged or deform**, so the edge loops bend cleanly. **Use triangles freely for static props.** The GLB stores triangles either way; this is about the topology you author.
 
-The [blender-asset skill](../../.claude/skills/blender-asset/SKILL.md) is the agent's checklist for this step: plan the parts and their contacts, use one rebuild-from-scratch script, measure after every change, and know the Blender 5.x API changes. Useful habits:
+The agent's checklist for this step: plan the parts and their contacts, use one rebuild-from-scratch script, measure after every change, and know the Blender 5.x API changes. Useful habits:
 
 - It writes geometry and materials with `execute_blender_code`, and looks up the Blender API with the server's offline documentation search instead of guessing it.
 - It looks after **every** change, with `get_screenshot_of_area_as_image` or `render_thumbnail_to_path`, and reads sizes with `get_object_detail_summary`. An agent that chains several blind operations drifts. Look at the screenshots yourself too.
@@ -106,7 +106,7 @@ npm run check
 npm run play:snap -- --scene <scene>     # add --mobile when phones are targets
 ```
 
-Look at the screenshots yourself first. Then compare the probe's draws and triangles with the scene's budget row. If it is over budget, recover in the [fix-budget](../../.claude/skills/fix-budget/SKILL.md) order (simplify, instance, bake, LOD) and measure again. Raise a budget only with the creator's agreement and a `Perf-Budget:` trailer.
+Look at the screenshots yourself first. Then compare the probe's draws and triangles with the scene's budget row. If it is over budget, recover in order (simplify, instance, bake, LOD) and measure again. Raise a budget only with the creator's agreement and a `Perf-Budget:` trailer.
 
 ## Licence and provenance
 
