@@ -1,0 +1,1 @@
+- **Documentation.** Add a project notice while retaining copyright and third-party notices.
