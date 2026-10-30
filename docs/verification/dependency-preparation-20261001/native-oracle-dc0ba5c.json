@@ -1,0 +1,15 @@
+{
+  "revision": "dc0ba5ce73d25d8fd8731a22dcb28f490fee976e",
+  "limitations": [
+    "Bounded scheduled-task oracle, not frame-time or physical-device acceptance"
+  ],
+  "result": {
+    "observed": {
+      "acquired": 1,
+      "finished": false
+    },
+    "total": 256,
+    "scope": "Actual scheduled task interleaving; not a frame-time or physical-device guarantee"
+  },
+  "status": "PASS"
+}

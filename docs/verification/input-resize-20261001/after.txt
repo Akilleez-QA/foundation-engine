@@ -1,0 +1,34 @@
+✔ scene pointer cancels on every lifecycle interruption and requires a fresh down (2.774889ms)
+✔ scene pointer ignores secondary fingers and non-primary buttons (0.557569ms)
+✔ blocking emits once per transition, disposal prevents future input (0.166631ms)
+✔ pointer controls independently capture non-primary touch and release without disturbing another contact (2.833749ms)
+✔ cancel clears contact ownership and old movement cannot rearm; selectors cannot publish after owner changes (0.448585ms)
+✔ capture failure and non-touch pointers do not activate a touch control (0.383033ms)
+✔ selector-triggered owner abort does not activate its returned selection (0.287987ms)
+✔ pointer control retires resize contacts and requires a fresh gesture (0.392922ms)
+✔ pointer control retires blur contacts and requires a fresh gesture (0.235679ms)
+✔ pointer control retires pagehide contacts and requires a fresh gesture (0.234827ms)
+✔ pointer control retires pointercancel contacts and requires a fresh gesture (0.285612ms)
+✔ a tap is ≤ 12 px for a mouse and ≤ 16 px for touch, and a 1.2 s slow poke still counts (1.700518ms)
+✔ a drag never becomes a tap, even when it returns to its start (0.243123ms)
+✔ look drag uses clientX/Y differences after the slop, at the configured radians per px (0.242461ms)
+✔ only the primary mouse button moves or looks; other buttons are ignored and side buttons cannot navigate (0.216643ms)
+✔ two fingers pinch as log-ratio zoom notches after a 20 px latch; spreading zooms in (0.277447ms)
+✔ lifting one pinch finger hands over to a one-finger drag with no jump and no tap (0.175347ms)
+✔ a third finger never breaks the first two (0.185896ms)
+✔ every drag ends on cancel, lost capture, a buttonless move, blur, pagehide and hidden (0.888044ms)
+✔ outside gameplay the surface takes no gestures, and fingers down across a context change stay ignored (0.224257ms)
+✔ device notes: touch on a finger, keyboard-mouse on a click, and hover moves reported for the dwell tracker (0.186848ms)
+✔ pinch is symmetric: spreading then translating both fingers returns to the start zoom (0.175928ms)
+✔ coincident pinch contacts never produce a non-finite zoom (0.627409ms)
+✔ losing one pinch finger to lost capture, blur or a hidden page leaves no phantom pinch (0.377864ms)
+✔ capture is released when a missed mouse release ends the drag (0.178813ms)
+✔ resize retires every captured pinch contact; stale events cannot resume and a fresh tap works (0.23042ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 83.79875

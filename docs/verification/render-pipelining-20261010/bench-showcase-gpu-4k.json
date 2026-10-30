@@ -1,0 +1,410 @@
+{
+ "schema": 1,
+ "sha": "a6211bd364074020a96e08c03881842cf2169530",
+ "dirty": false,
+ "harness": "gpu",
+ "viewport": {
+  "width": 3840,
+  "height": 2160,
+  "dpr": 1
+ },
+ "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4080/PCIe/SSE2, OpenGL ES 3.2)",
+ "browser": "Chromium 141.0.7390.37",
+ "when": "2026-10-10T00:45:54.390Z",
+ "loadAverage": 6.91,
+ "descriptor": "79bb05c5b068188e87c0bcec964f62e32895946c729c728002bf00acf3139838",
+ "experiment": {
+  "schema": 1,
+  "harness": "gpu",
+  "browser": "Chromium 141.0.7390.37",
+  "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4080/PCIe/SSE2, OpenGL ES 3.2)",
+  "viewport": {
+   "width": 3840,
+   "height": 2160,
+   "dpr": 1
+  },
+  "quality": "reference (pinned)",
+  "calm": false,
+  "execution": {
+   "launchArguments": [
+    "--mute-audio",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-extensions",
+    "--disable-background-networking",
+    "--enable-automation",
+    "--ignore-gpu-blocklist",
+    "--window-size=3840,2160",
+    "--use-gl=angle",
+    "--use-angle=gl-egl"
+   ]
+  },
+  "locale": "en-US",
+  "clock": "wall",
+  "comparisonPolicy": "strict-taxonomy-v1",
+  "route": [
+   "courtyard",
+   "garden"
+  ],
+  "routes": {
+   "courtyard": "#scene/courtyard",
+   "garden": "#scene/garden"
+  },
+  "active": [
+   "courtyard",
+   "garden"
+  ],
+  "keys": [
+   "ArrowUp",
+   "ArrowLeft"
+  ],
+  "activeRestart": {},
+  "activeKeys": {},
+  "window": {
+   "resample": 3,
+   "settleMs": 1500,
+   "quietMs": 1000,
+   "quietTimeoutMs": 30000,
+   "minMs": 2000,
+   "maxMs": {
+    "swiftshader": 6000,
+    "gpu": 4000
+   },
+   "frames": 120,
+   "activeMs": 4000,
+   "enterTimeoutMs": 60000
+  },
+  "network": "hermetic",
+  "classificationVersion": 3,
+  "readinessVersion": 1,
+  "helpers": {
+   "scripts/perf/bench-browser.mjs": "547fc0b3bbe08d53f8ef1b9cf304c3e9dd95a23ce0183e8222edd8dc7c78e9f3",
+   "scripts/perf/network.mjs": "a0c8e3cf6d80412f7f7136d8f739f516a595d0a6293e05dc76fb40207d0fa287",
+   "scripts/perf/probe-inject.mjs": "aec577325bd57bf73597db37e9a3f2135fe4ac92bc3d5ee34a5b83f73c576a7e",
+   "scripts/perf/bench.mjs": "1796d377dc34fa50d5ec02420e35fb328cf5a4c4195b5af674774bc72ece6d94",
+   "scripts/perf/active-restart.mjs": "048fee4d8e7bb93b07030eaea9e5f5cd60ac592c27be48c1bdd65f09b920f7e6",
+   "scripts/perf/build.mjs": "8d1a24ea638103ad0f3856b0742ac2eb9eaf468eb52419206f5b19d6c2143e87",
+   "src/platform/perf/window-class.ts": "69f16b7fd9ebada998b235d3f1acddf21ba3c320124c5caab992874de11789ee"
+  }
+ },
+ "build": {
+  "digest": "d54c5b0117e2c77800507174b15dfd749748e24af03ae24923668edce05d17f6",
+  "files": 60
+ },
+ "startup": {
+  "appReadyMs": 742,
+  "transferredMB": 0.32,
+  "jsKB": 280,
+  "heapMB": 11.1,
+  "textureMiB": 115.2,
+  "canvasMiB": 0,
+  "liveContexts": 1,
+  "networkQuiet": 1
+ },
+ "samples": [
+  {
+   "id": "courtyard",
+   "scene": "courtyard",
+   "mode": "idle",
+   "hash": "#scene/courtyard",
+   "classification": {
+    "kind": "steady",
+    "version": 3,
+    "reasons": [],
+    "comparable": true
+   },
+   "windowMs": 2012,
+   "frames": 121,
+   "renderedFrames": 121,
+   "renderedFrameRatio": 1,
+   "drawsPerRenderedFrame": 34,
+   "drawsMaxFrame": 34,
+   "trisPerRenderedFrame": 21781,
+   "offscreenDrawsPerRenderedFrame": 0,
+   "postDrawsPerRenderedFrame": 10,
+   "shadowPassDrawsMax": 7,
+   "shadowCasters": 7,
+   "shadowPassesMax": 1,
+   "taskMsPerFrame": 0.6,
+   "frameMsP95": 16.8,
+   "frameMsMax": 16.8,
+   "frameMs": 16.8,
+   "layouts": 0,
+   "heapMB": 11.5,
+   "textureMiB": 115.2,
+   "canvasMiB": 0,
+   "canvases": 0,
+   "liveContexts": 1,
+   "submission": {
+    "useProgram": 14,
+    "programsCreated": 0,
+    "programLookups": null,
+    "uniformCalls": 94,
+    "bindVertexArray": 27,
+    "bufferSubData": 24,
+    "textureUploads": 0,
+    "shadowDueRatio": 0
+   },
+   "uploads": {
+    "initial": 0,
+    "recurring": 0,
+    "firstUse": 0,
+    "unknown": 0,
+    "bytes": 0
+   },
+   "topTextures": [
+    "3840x2113 x1 = 61.9 MiB",
+    "2048x2048 x2 = 32.0 MiB",
+    "1920x1057 x1 = 15.5 MiB",
+    "960x528 x1 = 3.9 MiB",
+    "480x264 x1 = 1.0 MiB",
+    "512x256 x1 = 0.5 MiB"
+   ]
+  },
+  {
+   "id": "courtyard:active",
+   "scene": "courtyard",
+   "mode": "active",
+   "hash": "#scene/courtyard",
+   "classification": {
+    "kind": "steady",
+    "version": 3,
+    "reasons": [],
+    "comparable": true
+   },
+   "windowMs": 4002,
+   "frames": 241,
+   "renderedFrames": 241,
+   "renderedFrameRatio": 1,
+   "drawsPerRenderedFrame": 38,
+   "drawsMaxFrame": 41,
+   "trisPerRenderedFrame": 26683,
+   "offscreenDrawsPerRenderedFrame": 5,
+   "postDrawsPerRenderedFrame": 10,
+   "shadowPassDrawsMax": 7,
+   "shadowCasters": 7,
+   "shadowPassesMax": 1,
+   "taskMsPerFrame": 0.64,
+   "frameMsP95": 16.7,
+   "frameMsMax": 16.8,
+   "frameMs": 16.7,
+   "layouts": 0,
+   "heapMB": 11.7,
+   "textureMiB": 115.2,
+   "canvasMiB": 0,
+   "canvases": 0,
+   "liveContexts": 1,
+   "submission": {
+    "useProgram": 14.8,
+    "programsCreated": 0,
+    "programLookups": null,
+    "uniformCalls": 157.1,
+    "bindVertexArray": 32.5,
+    "bufferSubData": 24,
+    "textureUploads": 0,
+    "shadowDueRatio": 0.78
+   },
+   "uploads": {
+    "initial": 0,
+    "recurring": 0,
+    "firstUse": 0,
+    "unknown": 0,
+    "bytes": 0
+   },
+   "heldKeys": [
+    "ArrowUp",
+    "ArrowLeft"
+   ],
+   "heldKeysDrive": true,
+   "heldKeysSource": "bindings",
+   "heldKeyActions": [
+    "game.character-z.neg",
+    "game.character-x.neg"
+   ]
+  },
+  {
+   "id": "garden",
+   "scene": "garden",
+   "mode": "idle",
+   "hash": "#scene/garden",
+   "classification": {
+    "kind": "steady",
+    "version": 3,
+    "reasons": [],
+    "comparable": true
+   },
+   "windowMs": 2002,
+   "frames": 121,
+   "renderedFrames": 121,
+   "renderedFrameRatio": 1,
+   "drawsPerRenderedFrame": 10,
+   "drawsMaxFrame": 10,
+   "trisPerRenderedFrame": 9646,
+   "offscreenDrawsPerRenderedFrame": 0,
+   "postDrawsPerRenderedFrame": 0,
+   "shadowPassDrawsMax": 0,
+   "shadowCasters": 0,
+   "shadowPassesMax": 0,
+   "taskMsPerFrame": 0.35,
+   "frameMsP95": 16.7,
+   "frameMsMax": 16.8,
+   "frameMs": 16.7,
+   "layouts": 0,
+   "heapMB": 9.7,
+   "textureMiB": 0.1,
+   "canvasMiB": 0,
+   "canvases": 0,
+   "liveContexts": 1,
+   "submission": {
+    "useProgram": 7,
+    "programsCreated": 0,
+    "programLookups": null,
+    "uniformCalls": 6,
+    "bindVertexArray": 10,
+    "bufferSubData": 3,
+    "textureUploads": 0,
+    "shadowDueRatio": 0
+   },
+   "uploads": {
+    "initial": 0,
+    "recurring": 0,
+    "firstUse": 0,
+    "unknown": 0,
+    "bytes": 0
+   },
+   "enterMs": 248,
+   "enterMB": 0.02,
+   "networkQuiet": true,
+   "topTextures": [
+    "128x128 x1 = 0.1 MiB",
+    "1x256 x1 = 0.0 MiB",
+    "16x16 x1 = 0.0 MiB",
+    "1x1 x4 = 0.0 MiB"
+   ]
+  },
+  {
+   "id": "garden:active",
+   "scene": "garden",
+   "mode": "active",
+   "hash": "#scene/garden",
+   "classification": {
+    "kind": "steady",
+    "version": 3,
+    "reasons": [],
+    "comparable": true
+   },
+   "windowMs": 4002,
+   "frames": 241,
+   "renderedFrames": 241,
+   "renderedFrameRatio": 1,
+   "drawsPerRenderedFrame": 10,
+   "drawsMaxFrame": 10,
+   "trisPerRenderedFrame": 9674,
+   "offscreenDrawsPerRenderedFrame": 0,
+   "postDrawsPerRenderedFrame": 0,
+   "shadowPassDrawsMax": 0,
+   "shadowCasters": 0,
+   "shadowPassesMax": 0,
+   "taskMsPerFrame": 0.54,
+   "frameMsP95": 16.7,
+   "frameMsMax": 16.8,
+   "frameMs": 16.7,
+   "layouts": 0,
+   "heapMB": 9.8,
+   "textureMiB": 0.1,
+   "canvasMiB": 0,
+   "canvases": 0,
+   "liveContexts": 1,
+   "submission": {
+    "useProgram": 7,
+    "programsCreated": 0,
+    "programLookups": null,
+    "uniformCalls": 13.2,
+    "bindVertexArray": 10,
+    "bufferSubData": 3,
+    "textureUploads": 0,
+    "shadowDueRatio": 0
+   },
+   "uploads": {
+    "initial": 0,
+    "recurring": 0,
+    "firstUse": 0,
+    "unknown": 0,
+    "bytes": 0
+   },
+   "heldKeys": [
+    "ArrowUp",
+    "ArrowLeft"
+   ],
+   "heldKeysDrive": true,
+   "heldKeysSource": "bindings",
+   "heldKeyActions": [
+    "game.character-z.neg",
+    "game.character-x.neg"
+   ]
+  }
+ ],
+ "afterTour": {
+  "textureMiB": 115.2,
+  "canvasMiB": 0,
+  "heapMB": 11.7,
+  "liveContexts": 1
+ },
+ "chunks": {
+  "Bone": 0.1,
+  "Data3DTexture": 0.4,
+  "DataTexture": 0.3,
+  "DirectionalLight": 6.6,
+  "FileLoader": 2.5,
+  "GLTFLoader": 60.2,
+  "ImageLoader": 1.1,
+  "InstancedBufferAttribute": 0.4,
+  "InstancedMesh": 2.9,
+  "Loader": 2,
+  "PerspectiveCamera": 99.3,
+  "PointLight": 2.2,
+  "PropertyBinding": 19.9,
+  "Texture": 32.5,
+  "action-gamepad": 3,
+  "basis_transcoder": 56.2,
+  "boot-failure": 0.4,
+  "cellular.job": 8,
+  "clock": 0.1,
+  "compact-shell": 2.2,
+  "cube": 1.6,
+  "decode-image.job": 0.6,
+  "defs": 40,
+  "host": 7.2,
+  "index": 210.3,
+  "lease-cache": 8,
+  "meshopt_decoder.module": 25.9,
+  "model-ktx2": 60.8,
+  "model-playback": 13.8,
+  "models": 9.8,
+  "patch": 3.5,
+  "patch.job": 0.2,
+  "post": 6,
+  "recipe": 4,
+  "recipe.job": 3.2,
+  "region.job": 5.8,
+  "registry": 3.7,
+  "runtime": 438.9,
+  "scene-light-rig": 3.9,
+  "scene-model-chunk": 25.5,
+  "scene-particles": 3.8,
+  "scene-scatter": 5.9,
+  "scene-sky": 3.1,
+  "settings": 2.4,
+  "shadow-cascades": 26.1,
+  "shadows": 24.7,
+  "surface": 8.7,
+  "texture-bytes": 1.2,
+  "textures": 2.4,
+  "tiers": 0.1,
+  "worker-entry": 2.4
+ },
+ "network": {
+  "mode": "hermetic",
+  "external": {}
+ }
+}

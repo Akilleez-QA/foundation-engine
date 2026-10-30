@@ -1,0 +1,298 @@
+{
+  "revision": "81e84babbb1bf10ac990beddef93244cd8e3635d",
+  "workingTreeDirty": true,
+  "passed": false,
+  "cases": [
+    {
+      "template": "mechanics",
+      "scene": "lab",
+      "profile": {
+        "id": "compact",
+        "width": 320,
+        "height": 568
+      },
+      "controls": [
+        {
+          "label": "Ride the platform",
+          "font": 16,
+          "x": 24,
+          "y": 496,
+          "width": 145.84375,
+          "height": 48,
+          "right": 169.84375,
+          "bottom": 544,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "mechanics-lab-compact.png"
+    },
+    {
+      "template": "mechanics",
+      "scene": "lab",
+      "profile": {
+        "id": "phone-portrait",
+        "width": 390,
+        "height": 844
+      },
+      "controls": [
+        {
+          "label": "Ride the platform",
+          "font": 16,
+          "x": 24,
+          "y": 772,
+          "width": 145.84375,
+          "height": 48,
+          "right": 169.84375,
+          "bottom": 820,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "mechanics-lab-phone-portrait.png"
+    },
+    {
+      "template": "mechanics",
+      "scene": "lab",
+      "profile": {
+        "id": "phone-landscape",
+        "width": 844,
+        "height": 390
+      },
+      "controls": [
+        {
+          "label": "Ride the platform",
+          "font": 16,
+          "x": 24,
+          "y": 318,
+          "width": 145.84375,
+          "height": 48,
+          "right": 169.84375,
+          "bottom": 366,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "mechanics-lab-phone-landscape.png"
+    },
+    {
+      "template": "mechanics",
+      "scene": "lab",
+      "profile": {
+        "id": "tablet",
+        "width": 820,
+        "height": 1180
+      },
+      "controls": [
+        {
+          "label": "Ride the platform",
+          "font": 16,
+          "x": 24,
+          "y": 1108,
+          "width": 145.84375,
+          "height": 48,
+          "right": 169.84375,
+          "bottom": 1156,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "mechanics-lab-tablet.png"
+    },
+    {
+      "template": "expedition",
+      "scene": "field",
+      "profile": {
+        "id": "compact",
+        "width": 320,
+        "height": 568
+      },
+      "controls": [
+        {
+          "label": "Begin survey",
+          "font": 16,
+          "x": 24,
+          "y": 496,
+          "width": 116.5,
+          "height": 48,
+          "right": 140.5,
+          "bottom": 544,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Guided pace",
+          "font": 16,
+          "x": 148.5,
+          "y": 496,
+          "width": 114.734375,
+          "height": 48,
+          "right": 263.234375,
+          "bottom": 544,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "expedition-field-compact.png"
+    },
+    {
+      "template": "expedition",
+      "scene": "field",
+      "profile": {
+        "id": "phone-portrait",
+        "width": 390,
+        "height": 844
+      },
+      "controls": [
+        {
+          "label": "Begin survey",
+          "font": 16,
+          "x": 24,
+          "y": 772,
+          "width": 116.5,
+          "height": 48,
+          "right": 140.5,
+          "bottom": 820,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Guided pace",
+          "font": 16,
+          "x": 148.5,
+          "y": 772,
+          "width": 114.734375,
+          "height": 48,
+          "right": 263.234375,
+          "bottom": 820,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "expedition-field-phone-portrait.png"
+    },
+    {
+      "template": "expedition",
+      "scene": "field",
+      "profile": {
+        "id": "phone-landscape",
+        "width": 844,
+        "height": 390
+      },
+      "controls": [
+        {
+          "label": "Begin survey",
+          "font": 16,
+          "x": 24,
+          "y": 318,
+          "width": 116.5,
+          "height": 48,
+          "right": 140.5,
+          "bottom": 366,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Guided pace",
+          "font": 16,
+          "x": 148.5,
+          "y": 318,
+          "width": 114.734375,
+          "height": 48,
+          "right": 263.234375,
+          "bottom": 366,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "expedition-field-phone-landscape.png"
+    },
+    {
+      "template": "expedition",
+      "scene": "field",
+      "profile": {
+        "id": "tablet",
+        "width": 820,
+        "height": 1180
+      },
+      "controls": [
+        {
+          "label": "Begin survey",
+          "font": 16,
+          "x": 24,
+          "y": 1108,
+          "width": 116.5,
+          "height": 48,
+          "right": 140.5,
+          "bottom": 1156,
+          "hit": true,
+          "disabled": false
+        },
+        {
+          "label": "Guided pace",
+          "font": 16,
+          "x": 148.5,
+          "y": 1108,
+          "width": 114.734375,
+          "height": 48,
+          "right": 263.234375,
+          "bottom": 1156,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": true,
+      "screenshot": "expedition-field-tablet.png"
+    },
+    {
+      "template": "expedition",
+      "scene": "shelter",
+      "profile": {
+        "id": "compact",
+        "width": 320,
+        "height": 568
+      },
+      "controls": [
+        {
+          "label": "Return to field",
+          "font": 13.3333,
+          "x": 24,
+          "y": 496,
+          "width": 110.984375,
+          "height": 48,
+          "right": 134.984375,
+          "bottom": 544,
+          "hit": true,
+          "disabled": false
+        }
+      ],
+      "errors": [],
+      "passed": false
+    }
+  ],
+  "limitations": [
+    "Chromium touch emulation, not physical phone/tablet/controller acceptance.",
+    "Only primary controls in these authored routes; no complete accessibility, essential-world visibility or sustained-hardware certification."
+  ],
+  "failures": [
+    {
+      "stage": "scenario",
+      "error": "AssertionError [ERR_ASSERTION]: expedition/shelter/compact: primary text below 16 CSS px"
+    }
+  ]
+}

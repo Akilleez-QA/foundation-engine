@@ -1,0 +1,176 @@
+{
+  "poses": {
+    "body-twist": {
+      "bones": {
+        "body": {
+          "rotation": [
+            0.976296,
+            0.0,
+            0.0,
+            0.21644
+          ]
+        },
+        "head": {
+          "rotation": [
+            0.984808,
+            -0.0,
+            -0.014421,
+            -0.173048
+          ]
+        }
+      },
+      "source": {
+        "author": "agent",
+        "kind": "json",
+        "note": "No user was present: the agent authored this pose with author_poses.py."
+      }
+    },
+    "legs-high": {
+      "bones": {
+        "leg1_lower.L": {
+          "rotation": [
+            0.985875,
+            0.001426,
+            -0.003983,
+            0.167432
+          ]
+        },
+        "leg1_lower.R": {
+          "rotation": [
+            0.985875,
+            0.001426,
+            0.003983,
+            -0.167432
+          ]
+        },
+        "leg1_upper.L": {
+          "rotation": [
+            0.938532,
+            0.239918,
+            -0.014466,
+            0.247766
+          ]
+        },
+        "leg1_upper.R": {
+          "rotation": [
+            0.938532,
+            0.239918,
+            0.014466,
+            -0.247766
+          ]
+        },
+        "leg2_lower.L": {
+          "rotation": [
+            0.98387,
+            -0.056569,
+            0.0,
+            0.169706
+          ]
+        },
+        "leg2_lower.R": {
+          "rotation": [
+            0.98387,
+            -0.056569,
+            -0.0,
+            -0.169706
+          ]
+        },
+        "leg2_upper.L": {
+          "rotation": [
+            0.929682,
+            0.302866,
+            -0.0,
+            0.209677
+          ]
+        },
+        "leg2_upper.R": {
+          "rotation": [
+            0.929682,
+            0.302866,
+            0.0,
+            -0.209677
+          ]
+        },
+        "leg3_lower.L": {
+          "rotation": [
+            0.986324,
+            -0.104789,
+            0.004332,
+            0.127147
+          ]
+        },
+        "leg3_lower.R": {
+          "rotation": [
+            0.986324,
+            -0.104789,
+            -0.004332,
+            -0.127147
+          ]
+        },
+        "leg3_upper.L": {
+          "rotation": [
+            0.940514,
+            0.314156,
+            0.015651,
+            0.128432
+          ]
+        },
+        "leg3_upper.R": {
+          "rotation": [
+            0.940514,
+            0.314156,
+            -0.015651,
+            -0.128432
+          ]
+        }
+      },
+      "source": {
+        "author": "agent",
+        "kind": "json",
+        "note": "No user was present: the agent authored this pose with author_poses.py."
+      }
+    },
+    "tail-curl": {
+      "bones": {
+        "stinger": {
+          "rotation": [
+            0.965926,
+            0.258819,
+            0.0,
+            -0.0
+          ]
+        },
+        "tail.1": {
+          "rotation": [
+            0.939693,
+            -0.34202,
+            -0.0,
+            0.0
+          ]
+        },
+        "tail.2": {
+          "rotation": [
+            0.939693,
+            -0.34202,
+            -0.0,
+            0.0
+          ]
+        },
+        "tail.3": {
+          "rotation": [
+            0.939693,
+            -0.34202,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "source": {
+        "author": "agent",
+        "kind": "json",
+        "note": "No user was present: the agent authored this pose with author_poses.py."
+      }
+    }
+  },
+  "schema": 1
+}

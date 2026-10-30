@@ -1,0 +1,63 @@
+{
+  "name": "terrain-revision",
+  "steps": [
+    {
+      "step": {
+        "teleport": [
+          -5,
+          -4
+        ]
+      },
+      "ok": true
+    },
+    {
+      "step": {
+        "wait": 100
+      }
+    },
+    {
+      "step": {
+        "snap": "before"
+      },
+      "file": "playtest/latest/terrain-revision/01-before.png"
+    },
+    {
+      "step": {
+        "press": "r"
+      }
+    },
+    {
+      "step": {
+        "waitUntil": {
+          "path": "world.state.terrain.epoch",
+          "equals": 2
+        },
+        "ms": 3000
+      },
+      "ok": true,
+      "got": 2,
+      "expect": {
+        "path": "world.state.terrain.epoch",
+        "equals": 2
+      }
+    },
+    {
+      "step": {
+        "expect": {
+          "path": "world.state.terrain.navigationEpoch",
+          "equals": 2
+        }
+      },
+      "ok": true,
+      "got": 2
+    },
+    {
+      "step": {
+        "snap": "after"
+      },
+      "file": "playtest/latest/terrain-revision/02-after.png"
+    }
+  ],
+  "pass": true,
+  "errors": []
+}

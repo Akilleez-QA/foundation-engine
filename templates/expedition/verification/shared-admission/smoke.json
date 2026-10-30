@@ -1,0 +1,157 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "cycles": 5,
+  "samples": [
+    {
+      "visit": 0,
+      "scene": "field",
+      "epoch": 1,
+      "ownership": {
+        "ready": true,
+        "state": "ready",
+        "open": true,
+        "pinnedBytes": 208,
+        "sharedPinnedBytes": 208,
+        "sharedOwners": 1
+      }
+    },
+    {
+      "visit": 1,
+      "scene": "shelter",
+      "epoch": 2,
+      "ownership": {
+        "contactReady": true,
+        "status": "ready",
+        "sharedPinnedBytes": 208,
+        "sharedOwners": 1
+      }
+    },
+    {
+      "visit": 1,
+      "scene": "field",
+      "epoch": 3,
+      "ownership": {
+        "ready": true,
+        "state": "ready",
+        "open": true,
+        "pinnedBytes": 208,
+        "sharedPinnedBytes": 208,
+        "sharedOwners": 1
+      }
+    },
+    {
+      "visit": 2,
+      "scene": "shelter",
+      "epoch": 4,
+      "ownership": {
+        "contactReady": true,
+        "status": "ready",
+        "sharedPinnedBytes": 208,
+        "sharedOwners": 1
+      }
+    },
+    {
+      "visit": 2,
+      "scene": "field",
+      "epoch": 5,
+      "ownership": {
+        "ready": true,
+        "state": "ready",
+        "open": true,
+        "pinnedBytes": 208,
+        "sharedPinnedBytes": 208,
+        "sharedOwners": 1
+      }
+    },
+    {
+      "visit": 3,
+      "scene": "shelter",
+      "epoch": 6,
+      "ownership": {
+        "contactReady": true,
+        "status": "ready",
+        "sharedPinnedBytes": 208,
+        "sharedOwners": 1
+      }
+    },
+    {
+      "visit": 3,
+      "scene": "field",
+      "epoch": 7,
+      "ownership": {
+        "ready": true,
+        "state": "ready",
+        "open": true,
+        "pinnedBytes": 208,
+        "sharedPinnedBytes": 208,
+        "sharedOwners": 1
+      }
+    },
+    {
+      "visit": 4,
+      "scene": "shelter",
+      "epoch": 8,
+      "ownership": {
+        "contactReady": true,
+        "status": "ready",
+        "sharedPinnedBytes": 208,
+        "sharedOwners": 1
+      }
+    },
+    {
+      "visit": 4,
+      "scene": "field",
+      "epoch": 9,
+      "ownership": {
+        "ready": true,
+        "state": "ready",
+        "open": true,
+        "pinnedBytes": 208,
+        "sharedPinnedBytes": 208,
+        "sharedOwners": 1
+      }
+    },
+    {
+      "visit": 5,
+      "scene": "shelter",
+      "epoch": 10,
+      "ownership": {
+        "contactReady": true,
+        "status": "ready",
+        "sharedPinnedBytes": 208,
+        "sharedOwners": 1
+      }
+    },
+    {
+      "visit": 5,
+      "scene": "field",
+      "epoch": 11,
+      "ownership": {
+        "ready": true,
+        "state": "ready",
+        "open": true,
+        "pinnedBytes": 208,
+        "sharedPinnedBytes": 208,
+        "sharedOwners": 1
+      }
+    }
+  ],
+  "errors": [],
+  "browser": "152.0.7977.82",
+  "launchArguments": [
+    "--mute-audio",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-extensions",
+    "--disable-background-networking",
+    "--enable-automation",
+    "--ignore-gpu-blocklist",
+    "--window-size=390,844",
+    "--use-angle=swiftshader",
+    "--enable-unsafe-swiftshader"
+  ],
+  "passed": true
+}

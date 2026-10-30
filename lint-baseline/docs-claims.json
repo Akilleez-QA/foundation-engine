@@ -1,0 +1,4 @@
+{
+  "comment": "Known stale 'not here yet' claims in pages another change is rewriting (scripts/lint/docs-claims.mjs). Counts only fall: node scripts/lint/docs-claims.mjs --lower drops entries that no longer match.",
+  "entries": []
+}

@@ -1,0 +1,17 @@
+{
+  "name": "best-reload",
+  "description": "S4 in a browser: the best score is still there after the page reloads.",
+  "scene": "play",
+  "seed": 5,
+  "steps": [
+    {"expect": {"path": "world.state.best", "equals": 0}},
+    {"waitUntil": {"path": "world.state.phase", "equals": "over"}, "ms": 40000},
+    {"expect": {"path": "world.state.best", "atLeast": 1}},
+    {"snap": "before-reload"},
+    {"reload": true},
+    {"expect": {"path": "world.state.phase", "equals": "playing"}},
+    {"expect": {"path": "world.state.score", "equals": 0}},
+    {"expect": {"path": "world.state.best", "atLeast": 1}},
+    {"snap": "after-reload"}
+  ]
+}

@@ -1,0 +1,14 @@
+npm notice run foundation-engine@0.1.0 check
+npm notice run node scripts/check.mjs
+ok   generate (0.1 s)
+FAIL typecheck (4.1 s)
+     src/platform/assets/dependency-preparation.test.ts(36,193): error TS2322: Type 'Promise<unknown>' is not assignable to type 'Promise<DependencyValue<unknown>>'.
+       Type 'unknown' is not assignable to type 'DependencyValue<unknown>'.
+     npm notice run foundation-engine@0.1.0 npx
+     npm notice run 'tsc' --noEmit
+ok   lint:layers (0.1 s)
+ok   lint:generic (0.1 s)
+ok   lint:brief (0.4 s)
+ok   lint:budgets (0.1 s)
+ok   tests (29 file(s)) (1.4 s)
+check: FAIL (typecheck) in 6 s · game templates/blank/game

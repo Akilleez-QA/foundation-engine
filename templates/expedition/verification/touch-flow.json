@@ -1,0 +1,36 @@
+{
+  "stopped": {
+    "status": "stopped",
+    "collected": 0,
+    "badges": 0,
+    "search": null,
+    "pace": 2.1450000000000005,
+    "equipment": [
+      "cap-1",
+      "boots-1"
+    ]
+  },
+  "before": {
+    "status": "idle",
+    "collected": 3,
+    "badges": 1,
+    "search": null,
+    "pace": 2.1450000000000005,
+    "equipment": [
+      "cap-1",
+      "boots-1"
+    ]
+  },
+  "after": {
+    "status": "idle",
+    "collected": 3,
+    "badges": 1,
+    "search": null,
+    "pace": 2.1450000000000005,
+    "equipment": [
+      "cap-1",
+      "boots-1"
+    ]
+  },
+  "errors": []
+}

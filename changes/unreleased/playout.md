@@ -1,0 +1,1 @@
+- **Optional remote playout.** `@kits/playout` estimates an authority's clock from round trips and presents remote views a bounded, adaptive delay in the past with interpolation, capped extrapolation and discontinuity holds. Protocol and presented fields remain creator-owned; evidence is headless tests. See [ADR 0093](docs/adr/0093-remote-playout.md).

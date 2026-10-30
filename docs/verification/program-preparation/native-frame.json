@@ -1,0 +1,11 @@
+{
+  "cancellation": "retired",
+  "pixel": [
+    255,
+    0,
+    0,
+    255
+  ],
+  "ready": "ready",
+  "scope": "preceding GPU command completion; diagnostic readback, not display presentation or performance"
+}

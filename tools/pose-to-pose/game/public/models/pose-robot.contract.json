@@ -1,0 +1,21 @@
+{
+  "$comment": "The robot example's static contract (npm run asset:verify). Its clips are checked against examples/robot/animations.json by validate.mjs.",
+  "schema": 1,
+  "units": "metres",
+  "up": "+Y",
+  "size": {"min": [1.4, 1.6, 0.25], "max": [1.5, 1.68, 0.35]},
+  "pivot": {"at": "any", "node": "root"},
+  "limits": {"fileBytes": 262144, "triangles": 400, "vertices": 800, "materials": 3, "textures": 0, "textureBytes": 0, "animations": 4},
+  "materials": {
+    "properties": ["name", "doubleSided", "pbrMetallicRoughness"],
+    "pbr": ["baseColorFactor", "metallicFactor", "roughnessFactor"],
+    "expected": [{"name": "body"}, {"name": "team"}, {"name": "visor"}]
+  },
+  "nodes": ["root", "foot.L", "foot.R", "hand.R"],
+  "clips": ["wave", "walk", "walk_turn_left", "walk_turn_right"],
+  "skin": {"joints": 24, "influences": 4, "root": "root"},
+  "provenance": {
+    "required": ["licence", "author", "source", "tool", "generator", "sha256", "review"],
+    "licences": ["GPL-3.0-only"]
+  }
+}

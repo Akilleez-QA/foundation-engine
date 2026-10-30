@@ -1,0 +1,1 @@
+- **Optional status effects.** Optional `status` kit: stacked status effects on the fixed clock with refresh/extend/keep/independent timers, decay, periodic pulses, thresholds that transform or trigger, exclusive groups, immunities and validated save/restore. Bounded per owner; consequences stay with the game. See [ADR 0125](docs/adr/0125-status-effects.md).

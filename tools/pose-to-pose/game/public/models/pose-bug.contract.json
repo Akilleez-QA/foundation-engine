@@ -1,0 +1,21 @@
+{
+  "$comment": "The creature example's static contract (npm run asset:verify). Rigid parts follow bones; its clips are checked against examples/bug/animations.json by validate.mjs.",
+  "schema": 1,
+  "units": "metres",
+  "up": "+Y",
+  "size": {"min": [0.6, 0.5, 0.6], "max": [0.75, 0.65, 0.75]},
+  "pivot": {"at": "any", "node": "root"},
+  "limits": {"fileBytes": 196608, "triangles": 400, "vertices": 1200, "primitives": 19, "materials": 3, "textures": 0, "textureBytes": 0, "animations": 2},
+  "materials": {
+    "properties": ["name", "doubleSided", "pbrMetallicRoughness"],
+    "pbr": ["baseColorFactor", "metallicFactor", "roughnessFactor"],
+    "expected": [{"name": "shell"}, {"name": "team"}, {"name": "stinger"}]
+  },
+  "nodes": ["root", "body", "stinger", "leg1_tip.L", "leg1_tip.R"],
+  "clips": ["scuttle", "strike"],
+  "skin": {"joints": 25, "influences": 4, "root": "root"},
+  "provenance": {
+    "required": ["licence", "author", "source", "tool", "generator", "sha256", "review"],
+    "licences": ["GPL-3.0-only"]
+  }
+}

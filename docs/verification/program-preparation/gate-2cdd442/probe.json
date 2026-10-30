@@ -1,0 +1,161 @@
+{
+  "scene": "garden",
+  "when": "2026-10-02T02:03:35.307Z",
+  "views": {
+    "desktop": {
+      "screenshot": "<worktree>/playtest/latest/garden-desktop.png",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "still": {
+        "ms": 606,
+        "renders": 26,
+        "drawsPerFrame": 10,
+        "trisPerFrame": 1306,
+        "frameMsP95": 16.7,
+        "fps": 60,
+        "heapMiB": 13.5
+      },
+      "moving": {
+        "ms": 1217,
+        "renders": 73,
+        "drawsPerFrame": 10,
+        "trisPerFrame": 1306,
+        "frameMsP95": 16.8,
+        "fps": 60,
+        "heapMiB": 13.6
+      },
+      "state": {
+        "scene": {
+          "scene": "scene.garden",
+          "state": "active",
+          "epoch": 1,
+          "hash": "#scene/garden"
+        },
+        "world": {
+          "scene": "garden",
+          "entities": 11,
+          "state": {
+            "exploreReady": true,
+            "near": null
+          },
+          "named": {
+            "player": {
+              "x": 0,
+              "y": 0.7,
+              "z": 1.767
+            }
+          },
+          "frame": 149
+        },
+        "game": {
+          "id": "explorer",
+          "genre": "explorer",
+          "policy": "default",
+          "modes": [
+            "play"
+          ],
+          "minimum": "phone"
+        }
+      },
+      "budget": {
+        "scene": "garden",
+        "status": "within budget",
+        "rows": [
+          {
+            "metric": "draws",
+            "measured": 10,
+            "budget": 10,
+            "ok": true
+          },
+          {
+            "metric": "triangles",
+            "measured": 1306,
+            "budget": 10000,
+            "ok": true
+          }
+        ]
+      }
+    },
+    "mobile": {
+      "screenshot": "<worktree>/playtest/latest/garden-mobile.png",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "mobile": true
+      },
+      "still": {
+        "ms": 607,
+        "renders": 29,
+        "drawsPerFrame": 10,
+        "trisPerFrame": 1306,
+        "frameMsP95": 16.7,
+        "fps": 60,
+        "heapMiB": 13.5
+      },
+      "moving": {
+        "ms": 1217,
+        "renders": 73,
+        "drawsPerFrame": 10,
+        "trisPerFrame": 1306,
+        "frameMsP95": 16.8,
+        "fps": 60,
+        "heapMiB": 13.8
+      },
+      "state": {
+        "scene": {
+          "scene": "scene.garden",
+          "state": "active",
+          "epoch": 1,
+          "hash": "#scene/garden"
+        },
+        "world": {
+          "scene": "garden",
+          "entities": 11,
+          "state": {
+            "exploreReady": true,
+            "near": null
+          },
+          "named": {
+            "player": {
+              "x": 0,
+              "y": 0.7,
+              "z": 1.65
+            }
+          },
+          "frame": 147
+        },
+        "game": {
+          "id": "explorer",
+          "genre": "explorer",
+          "policy": "default",
+          "modes": [
+            "play"
+          ],
+          "minimum": "phone"
+        }
+      },
+      "budget": {
+        "scene": "garden",
+        "status": "within budget",
+        "rows": [
+          {
+            "metric": "draws",
+            "measured": 10,
+            "budget": 10,
+            "ok": true
+          },
+          {
+            "metric": "triangles",
+            "measured": 1306,
+            "budget": 10000,
+            "ok": true
+          }
+        ]
+      }
+    }
+  },
+  "errors": [],
+  "console": []
+}

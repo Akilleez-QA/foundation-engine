@@ -1,0 +1,97 @@
+✖ scene pointer cancels on every lifecycle interruption and requires a fresh down (2.692326ms)
+✔ scene pointer ignores secondary fingers and non-primary buttons (0.575222ms)
+✔ blocking emits once per transition, disposal prevents future input (0.180045ms)
+✔ pointer controls independently capture non-primary touch and release without disturbing another contact (2.43693ms)
+✔ cancel clears contact ownership and old movement cannot rearm; selectors cannot publish after owner changes (0.416165ms)
+✔ capture failure and non-touch pointers do not activate a touch control (0.302173ms)
+✔ selector-triggered owner abort does not activate its returned selection (0.292906ms)
+✖ pointer control retires resize contacts and requires a fresh gesture (0.888896ms)
+✔ pointer control retires blur contacts and requires a fresh gesture (0.290752ms)
+✔ pointer control retires pagehide contacts and requires a fresh gesture (0.258431ms)
+✔ pointer control retires pointercancel contacts and requires a fresh gesture (0.224959ms)
+✔ a tap is ≤ 12 px for a mouse and ≤ 16 px for touch, and a 1.2 s slow poke still counts (1.506978ms)
+✔ a drag never becomes a tap, even when it returns to its start (0.168825ms)
+✔ look drag uses clientX/Y differences after the slop, at the configured radians per px (0.223817ms)
+✔ only the primary mouse button moves or looks; other buttons are ignored and side buttons cannot navigate (0.213778ms)
+✔ two fingers pinch as log-ratio zoom notches after a 20 px latch; spreading zooms in (0.251358ms)
+✔ lifting one pinch finger hands over to a one-finger drag with no jump and no tap (0.172101ms)
+✔ a third finger never breaks the first two (0.133309ms)
+✔ every drag ends on cancel, lost capture, a buttonless move, blur, pagehide and hidden (0.658757ms)
+✔ outside gameplay the surface takes no gestures, and fingers down across a context change stay ignored (0.193551ms)
+✔ device notes: touch on a finger, keyboard-mouse on a click, and hover moves reported for the dwell tracker (0.185786ms)
+✔ pinch is symmetric: spreading then translating both fingers returns to the start zoom (0.142526ms)
+✔ coincident pinch contacts never produce a non-finite zoom (0.125313ms)
+✔ losing one pinch finger to lost capture, blur or a hidden page leaves no phantom pinch (0.576434ms)
+✔ capture is released when a missed mouse release ends the drag (0.176289ms)
+✖ resize retires every captured pinch contact; stale events cannot resume and a fresh tap works (0.682281ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 23
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 326.58236
+
+✖ failing tests:
+
+test at src/author/scene-pointer.test.ts:20:1
+✖ scene pointer cancels on every lifecycle interruption and requires a fresh down (2.692326ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  true !== false
+
+      at TestContext.<anonymous> (/REDACTED_HOME/Work/foundation-input-resize/src/author/scene-pointer.test.ts:29:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/platform/input/pointer-control.test.ts:118:3
+✖ pointer control retires resize contacts and requires a fresh gesture (0.888896ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  true !== false
+
+      at TestContext.<anonymous> (/REDACTED_HOME/Work/foundation-input-resize/src/platform/input/pointer-control.test.ts:127:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/platform/input/pointer.test.ts:97:1
+✖ resize retires every captured pinch contact; stale events cannot resume and a fresh tap works (0.682281ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  true !== false
+
+      at TestContext.<anonymous> (/REDACTED_HOME/Work/foundation-input-resize/src/platform/input/pointer.test.ts:104:9)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

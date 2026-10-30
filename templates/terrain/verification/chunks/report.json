@@ -1,0 +1,107 @@
+{
+  "name": "terrain-chunks",
+  "steps": [
+    {
+      "step": {
+        "expect": {
+          "path": "world.state.terrain.tiles",
+          "equals": 4
+        }
+      },
+      "ok": true,
+      "got": 4
+    },
+    {
+      "step": {
+        "teleport": [
+          -10,
+          -10
+        ]
+      },
+      "ok": true
+    },
+    {
+      "step": {
+        "wait": 300
+      }
+    },
+    {
+      "step": {
+        "expect": {
+          "path": "world.state.terrain.strides",
+          "equals": [
+            1,
+            2,
+            2,
+            1
+          ]
+        }
+      },
+      "ok": true,
+      "got": [
+        1,
+        2,
+        2,
+        1
+      ]
+    },
+    {
+      "step": {
+        "snap": "near-northwest"
+      },
+      "file": "playtest/latest/terrain-chunks/01-near-northwest.png"
+    },
+    {
+      "step": {
+        "teleport": [
+          10,
+          10
+        ]
+      },
+      "ok": true
+    },
+    {
+      "step": {
+        "wait": 300
+      }
+    },
+    {
+      "step": {
+        "expect": {
+          "path": "world.state.terrain.strides",
+          "equals": [
+            2,
+            2,
+            2,
+            1
+          ]
+        }
+      },
+      "ok": true,
+      "got": [
+        2,
+        2,
+        2,
+        1
+      ]
+    },
+    {
+      "step": {
+        "expect": {
+          "path": "world.state.terrain.builds",
+          "equals": 3
+        }
+      },
+      "ok": true,
+      "got": 3
+    },
+    {
+      "step": {
+        "snap": "near-southeast"
+      },
+      "file": "playtest/latest/terrain-chunks/02-near-southeast.png"
+    }
+  ],
+  "pass": true,
+  "errors": []
+}

@@ -1,0 +1,43 @@
+[
+  {
+    "view": "desktop",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "measured": {
+      "maxDraws": 8,
+      "maxTris": 1220
+    },
+    "panel": {
+      "width": 344,
+      "height": 117.1875,
+      "within": true
+    },
+    "errors": [],
+    "complete": true,
+    "restart": true,
+    "reload": true
+  },
+  {
+    "view": "phone",
+    "viewport": {
+      "width": 390,
+      "height": 844,
+      "mobile": true
+    },
+    "measured": {
+      "maxDraws": 8,
+      "maxTris": 1220
+    },
+    "panel": {
+      "width": 344,
+      "height": 117.1875,
+      "within": true
+    },
+    "errors": [],
+    "complete": true,
+    "restart": true,
+    "reload": true
+  }
+]

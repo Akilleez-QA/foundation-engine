@@ -1,0 +1,41 @@
+{
+  "backend": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 4080/PCIe/SSE2, OpenGL ES 3.2)",
+  "khr": true,
+  "results": [
+    {
+      "details": {
+        "pixel": [
+          255,
+          0,
+          0,
+          255
+        ],
+        "readback": "diagnostic only, not performance"
+      },
+      "name": "valid red draw without success logs",
+      "passed": true
+    },
+    {
+      "details": [
+        "",
+        "ERROR: 0:57: 'INVALID' : syntax error\n\u0000"
+      ],
+      "name": "late malformed shader",
+      "passed": true
+    },
+    {
+      "name": "full diagnostics callback and typed failure",
+      "passed": true
+    },
+    {
+      "details": "Types of varying 'value' differ between VERTEX and FRAGMENT shaders.\nFRAGMENT varying value does not match any VERTEX varying\n\u0000",
+      "name": "compiled shaders with incompatible varyings fail linkage",
+      "passed": true
+    },
+    {
+      "name": "unlinked old epoch cannot relink",
+      "passed": true
+    }
+  ],
+  "scope": "Native shader correctness, not timing or actual context-loss acceptance"
+}

@@ -1,0 +1,43 @@
+# Finite crafting sessions
+
+`tools/crafting-workbench/runtime-controller.mjs` is an optional creator-owned composition of dimensional stock, crafting experiments, powered industry, authored documents and SaveStore. It is not an engine-wide economy service. The accompanying recipe editor is an independent save section; edits and undo cannot rewrite captured runtime recipes or reverse accepted production.
+
+`createRuntimeController({saveHandle,readPersisted,saveBuild,resume?})` requires the actual author save handle, a synchronous raw-envelope read and the exact SaveStore build string. `preview({id,payload})` returns an authentic candidate or refusal. `commit(candidate)` attempts its exact full-envelope write but leaves the previously accepted view unchanged. `retry()` never recalculates work or spends more materials. `acknowledge()` publishes only after saved status and matching physical readback. `cancel(candidate)` discards only an unattempted proposal; cancelling a production session is a separate accepted command. `dispose()` retires publication authority. Fresh absent storage is explicitly non-durable, while missing previously observed data, corrupt/newer data or observed external replacement blocks recovery.
+
+The section is `crafting.runtime`, under namespace `crafting-workbench`. Compose its key-specific `createRuntimeStoragePort` with the recipe guard before supplying storage to SaveStore. Observed divergence remains latched even if external bytes later return to their original value; autonomous flush/disposal cannot overwrite that conflict. The synchronous guard is not distributed compare-and-swap. The selected sample has no legacy storage metadata. Raw envelope intake and complete wrapper preflight enforce 262144 UTF-8 bytes and 262144 UTF-16 code units; the accepted document independently enforces 262144 UTF-8 bytes, 32768 nodes and depth 24. These are distinct ceilings, not interchangeable size measurements.
+
+A begin command captures the complete canonical recipe and selected source/batch/slot quantities. The real crafting evaluator first validates the pre-transfer stock. The same detached candidate then moves aggregated units into a session holding container. Original source provenance remains in the experiment and source container definitions remain available for reconstruction. Two sessions can hold independent allocations, but cannot spend each other's custody.
+
+Phases are reserved → experimenting → locked → assigned → working → completed, with explicit cancellation before completion. Experiment commands use the captured attribute, point and effect rules; no random reroll is supplied. Lock reconstructs a conserved primary/scrap plan. Assignment exclusively claims a machine's input before transfer from holding. The consumer blocks unrelated transfers from both holding and assigned input, while the industry kit protects work/installed ports. A completion records the exact machine and cycle. Output-capacity blockage retains protected work until a later distinct accepted step can complete. An exact repeated command is a receipt lookup, not another elapsed interval.
+
+Cancellation before assignment returns exact aggregated units to their original containers. After assignment it first cancels industry work on the detached candidate, then returns original inputs. Any destination failure refuses the entire candidate. Completed output cannot be converted back into original inputs through cancellation.
+
+`repeat` is an explicit new paid session referring to a completed session. New selections must match the pinned slot/batch totals, though source-container provenance may differ. It reserves fresh stock, reconstructs the pinned experiment steps and exact plan, and starts locked. It reuses the plan's output identities; the old selection is never an unlimited input grant.
+
+Accepted commands:
+
+| Payload kind | Required fields beyond `kind` |
+| --- | --- |
+| `begin` | `recipe`, `selections`, `pointBudget` |
+| `repeat` | completed `session`, fresh `selections` |
+| `experiment` | `session`, `attribute`, `points`, `effectPermille` |
+| `lock`, `cancel-session` | `session` |
+| `assign` | `session`, machine `m-a` or `m-b` |
+| `step` | `session`, integer `ticks`, allocated `power` |
+| `transfer` | `from`, `to`, `batch`, integer `quantity` |
+| `resize` | unclaimed `container`, `mass`, `volume` capacity |
+| `advance` | monotonic accepted `time` |
+| `harvest` | `spawn`, captured `incarnation`, `container`, `quantity` |
+| `replace-spawn` | `spawn`, `seed`, `cellSize`, `expiresAt`, `reserve`, `grade` |
+
+Current spawn records carry immutable sampling facts and monotonic incarnations. Dimensional deposit remaining is the sole mutable reserve counter. Accepted clock and captured incarnation gate harvest. Replacement creates a new batch identity; referenced historical batches remain even when no current position holds them. Survey uses a separate consumer lifetime and never confers collection authority.
+
+Joint bounds are two live and 16 retained sessions, two machines, four current spawns,16 batches,16 plans,32 containers,64 positions,32 changes per stock operation and 64 command receipts. Recipe bounds are four slots, eight selections, four attributes with 16 weights each, eight steps,16 points and eight output properties. Every ceiling is subject to aggregate stock/document/storage admission: sixteen independent two-output plans do not necessarily fit 16 total batches. Capacity refuses new work without publishing partial transfers. Retained terminal identities are not evicted to enable replay.
+
+The focused tests use real `authorSaveHandle` and SaveStore, not a replacement-return mock. They independently check weighted sample values, exact mass conservation, provenance across split containers, two-session contention, cancellation failure, same-version changed recipes, pinned repetition, output blockage, spawn replacement/expiry, pending retry, recovery refusal, latched storage conflict and joint bounds. Run `node --import tsx --test tools/crafting-workbench/runtime-controller.test.mjs`. Native browser integration and physical-device acceptance are separate evidence; this guide does not claim them from these focused tests.
+
+Recovery admission reserves an executable path for every live session: explicitly resize original source containers only where their current contents plus returned inputs require it, then cancel each session. Each proposed accepted state is checked against that detached path, including intermediate receipt, document node/byte and complete SaveStore wrapper limits with the configured build metadata. Synthetic recovery command IDs occupy the maximum 96 UTF-16 units using worst-case JSON escapes; no exact receipts are evicted. Ordinary commands can therefore refuse before the nominal history or byte ceiling. These checks do not resize real creator capacities automatically. When cancellation reports destination capacity, the creator can deliberately issue the required native `resize` commands, then `cancel-session`. This sample chooses that explicit capacity-repair route; a different application may select another bounded recovery policy.
+
+Machine work and installed-port capacities are protected while a live session claims the machine or it is active. An idle released machine can be resized, with normal stock occupancy checks, so a prior zero-capacity configuration can be repaired after cancellation. Pinned repetition compares plan inputs canonically by batch, permitting equivalent paid selections relocated among allowed sources.
+
+For controller-only scene retirement, `dispose()` returns an authentic, one-use continuation token. Pass it as `resume` when constructing the next controller against the same local SaveStore. The scene owns this token and clears its reference after passing it to the next controller. Unattempted previews are discarded on retirement; old candidate handles and callbacks remain retired. Disposal does not undo an attempted write. The token preserves the previously accepted document and exact attempted candidate, including a write that completes between exit and reentry. Reentry still requires explicit acknowledgment to publish the candidate. The token carries no persistence claim and does not survive a full page reload; cold reload reads physically stored state. Recreating against dirty in-memory SaveStore data without the token refuses editing and projects only the physically accepted state. An invalid, already consumed or build-mismatched token refuses recovery. An observed conflict remains a refusal, and consuming a token does not clear storage guards.

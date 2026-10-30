@@ -1,0 +1,8 @@
+{
+  "rule": "unknown-cast",
+  "folder": "scripts",
+  "count": 1,
+  "files": {
+    "scripts/perf/derive-budgets.test.ts": 1
+  }
+}

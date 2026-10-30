@@ -1,0 +1,53 @@
+{
+  "$comment": "The metre-block sample's acceptance contract. Strict by design: exact bounds, exact materials, box-corner vertices, a gold top and a pinned decoded hash. tools/blender-export/verify.mjs also requires semanticSha256 to equal its own EXPECTED_SEMANTIC_SHA256, so editing this file alone cannot loosen the sample.",
+  "schema": 1,
+  "units": "metres",
+  "up": "+Y",
+  "tolerance": 1e-6,
+  "bounds": {"min": [-0.5, 0, -0.5], "max": [0.5, 1, 0.5]},
+  "pivot": {"at": "base-centre", "node": "metre-block"},
+  "limits": {
+    "fileBytes": 65536,
+    "triangles": 12,
+    "vertices": 24,
+    "primitives": 2,
+    "materials": 2,
+    "textures": 0,
+    "textureBytes": 0,
+    "animations": 0,
+    "cameras": 0
+  },
+  "nodeTransforms": "forbidden",
+  "extensions": [],
+  "materials": {
+    "properties": ["doubleSided", "name", "pbrMetallicRoughness"],
+    "required": ["doubleSided", "name", "pbrMetallicRoughness"],
+    "pbr": ["baseColorFactor", "metallicFactor"],
+    "requiredPbr": ["baseColorFactor", "metallicFactor"],
+    "alphaModes": ["OPAQUE"],
+    "expected": [
+      {"name": "body-blue", "baseColorFactor": [0.04, 0.35, 0.8, 1], "metallicFactor": 0, "roughnessFactor": 1, "doubleSided": true},
+      {"name": "top-gold", "baseColorFactor": [0.9, 0.5, 0.03, 1], "metallicFactor": 0, "roughnessFactor": 1, "doubleSided": true}
+    ]
+  },
+  "lattice": {"name": "box corners", "x": [-0.5, 0.5], "y": [0, 1], "z": [-0.5, 0.5]},
+  "faces": [{"name": "the box top", "axis": "y", "at": 1, "material": "top-gold", "triangles": 2}],
+  "semanticSha256": "2b74ca47d75e1fde93ab35ad467f0e20374902b116c32b72ab29143fd00dd901",
+  "provenance": {
+    "required": ["licence", "author", "source", "tool", "generator", "sourceSha256", "sha256"],
+    "licences": ["GPL-3.0-only"],
+    "equals": {
+      "schema": 1,
+      "licence": "GPL-3.0-only",
+      "author": "Foundation Engine contributors",
+      "source": "tools/blender-export/export.py",
+      "units": "metres",
+      "up": "+Y",
+      "pivot": "base centre",
+      "bounds": [[-0.5, 0, -0.5], [0.5, 1, 0.5]],
+      "triangles": 12,
+      "materials": 2,
+      "textures": 0
+    }
+  }
+}

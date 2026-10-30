@@ -1,0 +1,1 @@
+- **Optional update cadence.** `@kits/cadence`: run members at their own integer periods on the caller's tick, spread by id, bounded per take with deferral, elapsed ticks and saveable state. Periods and jitter stay creator policy. See [ADR 0096](docs/adr/0096-optional-update-cadence.md).

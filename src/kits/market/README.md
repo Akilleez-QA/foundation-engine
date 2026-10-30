@@ -1,0 +1,5 @@
+# Market
+
+Local settlement validates quote revision, expiry, stock, integer credits and receipt admission before committing. Ownership of purchased goods becomes a durable buyer claim; full bags do not cause a second charge. Retry payloads must match their stable purchase ID. Expiry uses an ordered deadline cursor and a caller-specified work budget; paid claims survive listing expiry.
+
+Store the entire snapshot. `collect` marks a claim consumed, so destination inventory and the market snapshot must be committed in one application-owned envelope. Do not independently save them or call an external inventory grant after persisting collection. This kit supplies no database transaction, authentication, taxes, network transport, arbitrary stock editing, or live vendor discovery. The caller supplies trusted offers and verifies seller custody when constructing them. It cannot mint listings from player input without that validation. Receipt retention is bounded and saturates explicitly; archive/reconciliation is an application policy.

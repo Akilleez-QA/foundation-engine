@@ -1,0 +1,32 @@
+{
+  "rule": "unknown-cast",
+  "folder": "src/kits",
+  "count": 56,
+  "files": {
+    "src/kits/authoring/session.test.ts": 2,
+    "src/kits/capabilities/progression-allocation.test.ts": 1,
+    "src/kits/capabilities/progression.test.ts": 1,
+    "src/kits/character/appearance.test.ts": 1,
+    "src/kits/control/control.test.ts": 1,
+    "src/kits/equipment/adversarial.test.ts": 1,
+    "src/kits/inventory/retirement.test.ts": 2,
+    "src/kits/learn/layout.test.ts": 4,
+    "src/kits/locomotion/jump-system.test.ts": 1,
+    "src/kits/locomotion/jump.test.ts": 1,
+    "src/kits/navigation/lifetimes.test.ts": 1,
+    "src/kits/network/rate-admission.test.ts": 1,
+    "src/kits/network/retry-schedule.test.ts": 3,
+    "src/kits/network/session.test.ts": 1,
+    "src/kits/resources/industry-candidate.test.ts": 1,
+    "src/kits/resources/production-exchange.test.ts": 3,
+    "src/kits/rollback/session.test.ts": 4,
+    "src/kits/rollback/sync-test.test.ts": 1,
+    "src/kits/spatial/spatial.test.ts": 1,
+    "src/kits/terrain/recipe.test.ts": 1,
+    "src/kits/turns/adversarial.test.ts": 8,
+    "src/kits/turns/authority.test.ts": 2,
+    "src/kits/turns/turns.test.ts": 1,
+    "src/kits/ui/touch-button.test.ts": 4,
+    "src/kits/ui/ui.test.ts": 9
+  }
+}

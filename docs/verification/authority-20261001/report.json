@@ -1,0 +1,2370 @@
+{
+  "revision": "8317c69e01b5bf64891aa9ec3353fe68b218585f",
+  "workingTreeDirty": false,
+  "passed": true,
+  "errors": [],
+  "consoleErrors": [],
+  "screenshots": [
+    "/tmp/foundation-authority-browser-clean/01-predicted.png",
+    "/tmp/foundation-authority-browser-clean/02-visible-correction.png",
+    "/tmp/foundation-authority-browser-clean/03-exact-retry.png",
+    "/tmp/foundation-authority-browser-clean/04-restarted-after-commit-before-reply.png",
+    "/tmp/foundation-authority-browser-clean/05-retired-control.png",
+    "/tmp/foundation-authority-browser-clean/06-explicit-shared-scale.png",
+    "/tmp/foundation-authority-browser-clean/07-invalid-baseline-recovery.png"
+  ],
+  "observations": [
+    {
+      "label": "01-predicted",
+      "host": {
+        "status": "ready",
+        "checkpoint": {
+          "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+          "revision": 0,
+          "schema": "numeric-total-v1",
+          "state": 0,
+          "streams": [],
+          "version": 1
+        },
+        "lastConfirmed": {
+          "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+          "revision": 0,
+          "schema": "numeric-total-v1",
+          "state": 0,
+          "streams": [],
+          "version": 1
+        },
+        "metrics": {
+          "commits": 0,
+          "commands": 0,
+          "sent": 4,
+          "refused": 0
+        },
+        "commitResponseHeld": false,
+        "peers": [
+          {
+            "principal": "a",
+            "session": "YClreTZg0JYcEYDx6sxQermIsThCHylb",
+            "epoch": "tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV",
+            "dirty": false
+          },
+          {
+            "principal": "b",
+            "session": "gI2oO3LtXH28Q1f65qdnkywZmoO_A73c",
+            "epoch": "ow9l5Gqmohix7OBXfphXmER2ZhPCojxd",
+            "dirty": false
+          }
+        ]
+      },
+      "physical": {
+        "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+        "revision": 0,
+        "schema": "numeric-total-v1",
+        "state": 0,
+        "streams": [],
+        "version": 1
+      },
+      "clients": {
+        "a": {
+          "principal": "a",
+          "session": "YClreTZg0JYcEYDx6sxQermIsThCHylb",
+          "epoch": "tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV",
+          "eligible": true,
+          "status": "Input predicted",
+          "frames": 38,
+          "rendered": 6,
+          "prediction": {
+            "status": "ready",
+            "epoch": "tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV",
+            "confirmed": {
+              "revision": 0,
+              "processedThrough": 0,
+              "state": {
+                "value": 0,
+                "json": "0",
+                "bytes": 1
+              }
+            },
+            "predicted": {
+              "value": 5,
+              "json": "5",
+              "bytes": 1
+            },
+            "pending": [
+              {
+                "value": {
+                  "add": 2
+                },
+                "json": "{\"add\":2}",
+                "bytes": 9,
+                "sequence": 1
+              },
+              {
+                "value": {
+                  "add": 3
+                },
+                "json": "{\"add\":3}",
+                "bytes": 9,
+                "sequence": 2
+              }
+            ],
+            "pendingBytes": 18,
+            "issuedThrough": 2,
+            "correction": null,
+            "reason": null
+          },
+          "lastResult": null,
+          "baselines": {
+            "reconciled": 0,
+            "duplicate": 0,
+            "obsolete": 0,
+            "foreign": 0
+          },
+          "timings": {
+            "count": 1,
+            "totalMs": 0.3999999985098839,
+            "maxMs": 0.3999999985098839
+          },
+          "transport": {
+            "state": "open",
+            "reason": null,
+            "queuedMessages": 0,
+            "queuedBytes": 0,
+            "receivedMessages": 2,
+            "receivedBytes": 297,
+            "sentMessages": 1,
+            "sentBytes": 64,
+            "refusedSends": 0,
+            "limits": {
+              "maxMessageBytes": 4096,
+              "maxQueuedMessages": 8,
+              "maxQueuedBytes": 32768,
+              "maxBufferedBytes": 4096
+            },
+            "capabilities": {
+              "ordered": true,
+              "reliable": true,
+              "text": true,
+              "binary": false,
+              "incomingBackpressure": false
+            }
+          }
+        },
+        "b": {
+          "principal": "b",
+          "session": "gI2oO3LtXH28Q1f65qdnkywZmoO_A73c",
+          "epoch": "ow9l5Gqmohix7OBXfphXmER2ZhPCojxd",
+          "eligible": true,
+          "status": "Trusted baseline adopted",
+          "frames": 16,
+          "rendered": 4,
+          "prediction": {
+            "status": "ready",
+            "epoch": "ow9l5Gqmohix7OBXfphXmER2ZhPCojxd",
+            "confirmed": {
+              "revision": 0,
+              "processedThrough": 0,
+              "state": {
+                "value": 0,
+                "json": "0",
+                "bytes": 1
+              }
+            },
+            "predicted": {
+              "value": 0,
+              "json": "0",
+              "bytes": 1
+            },
+            "pending": [],
+            "pendingBytes": 0,
+            "issuedThrough": 0,
+            "correction": null,
+            "reason": null
+          },
+          "lastResult": null,
+          "baselines": {
+            "reconciled": 0,
+            "duplicate": 0,
+            "obsolete": 0,
+            "foreign": 0
+          },
+          "timings": {
+            "count": 1,
+            "totalMs": 0.3999999985098839,
+            "maxMs": 0.3999999985098839
+          },
+          "transport": {
+            "state": "open",
+            "reason": null,
+            "queuedMessages": 0,
+            "queuedBytes": 0,
+            "receivedMessages": 2,
+            "receivedBytes": 297,
+            "sentMessages": 1,
+            "sentBytes": 64,
+            "refusedSends": 0,
+            "limits": {
+              "maxMessageBytes": 4096,
+              "maxQueuedMessages": 8,
+              "maxQueuedBytes": 32768,
+              "maxBufferedBytes": 4096
+            },
+            "capabilities": {
+              "ordered": true,
+              "reliable": true,
+              "text": true,
+              "binary": false,
+              "incomingBackpressure": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "label": "02-visible-correction",
+      "host": {
+        "status": "ready",
+        "checkpoint": {
+          "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+          "revision": 2,
+          "schema": "numeric-total-v1",
+          "state": 3,
+          "streams": [
+            {
+              "id": "a",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 2
+                  },
+                  "result": {
+                    "value": 2
+                  },
+                  "revision": 1,
+                  "sequence": 1
+                }
+              ],
+              "through": 1
+            },
+            {
+              "id": "operator",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 3
+                  },
+                  "revision": 2,
+                  "sequence": 1
+                }
+              ],
+              "through": 1
+            }
+          ],
+          "version": 1
+        },
+        "lastConfirmed": {
+          "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+          "revision": 2,
+          "schema": "numeric-total-v1",
+          "state": 3,
+          "streams": [
+            {
+              "id": "a",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 2
+                  },
+                  "result": {
+                    "value": 2
+                  },
+                  "revision": 1,
+                  "sequence": 1
+                }
+              ],
+              "through": 1
+            },
+            {
+              "id": "operator",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 3
+                  },
+                  "revision": 2,
+                  "sequence": 1
+                }
+              ],
+              "through": 1
+            }
+          ],
+          "version": 1
+        },
+        "metrics": {
+          "commits": 2,
+          "commands": 1,
+          "sent": 9,
+          "refused": 0
+        },
+        "commitResponseHeld": false,
+        "peers": [
+          {
+            "principal": "a",
+            "session": "YClreTZg0JYcEYDx6sxQermIsThCHylb",
+            "epoch": "tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV",
+            "dirty": false
+          },
+          {
+            "principal": "b",
+            "session": "gI2oO3LtXH28Q1f65qdnkywZmoO_A73c",
+            "epoch": "ow9l5Gqmohix7OBXfphXmER2ZhPCojxd",
+            "dirty": false
+          }
+        ]
+      },
+      "physical": {
+        "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+        "revision": 2,
+        "schema": "numeric-total-v1",
+        "state": 3,
+        "streams": [
+          {
+            "id": "a",
+            "receipts": [
+              {
+                "input": {
+                  "add": 2
+                },
+                "result": {
+                  "value": 2
+                },
+                "revision": 1,
+                "sequence": 1
+              }
+            ],
+            "through": 1
+          },
+          {
+            "id": "operator",
+            "receipts": [
+              {
+                "input": {
+                  "add": 1
+                },
+                "result": {
+                  "value": 3
+                },
+                "revision": 2,
+                "sequence": 1
+              }
+            ],
+            "through": 1
+          }
+        ],
+        "version": 1
+      },
+      "clients": {
+        "a": {
+          "principal": "a",
+          "session": "YClreTZg0JYcEYDx6sxQermIsThCHylb",
+          "epoch": "tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV",
+          "eligible": true,
+          "status": "Baseline reconciled",
+          "frames": 46,
+          "rendered": 8,
+          "prediction": {
+            "status": "ready",
+            "epoch": "tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV",
+            "confirmed": {
+              "revision": 2,
+              "processedThrough": 1,
+              "state": {
+                "value": 3,
+                "json": "3",
+                "bytes": 1
+              }
+            },
+            "predicted": {
+              "value": 6,
+              "json": "6",
+              "bytes": 1
+            },
+            "pending": [
+              {
+                "value": {
+                  "add": 3
+                },
+                "json": "{\"add\":3}",
+                "bytes": 9,
+                "sequence": 2
+              }
+            ],
+            "pendingBytes": 9,
+            "issuedThrough": 2,
+            "correction": {
+              "changed": true,
+              "replayed": 1
+            },
+            "reason": null
+          },
+          "lastResult": {
+            "sequence": 1,
+            "status": "committed",
+            "revision": 1
+          },
+          "baselines": {
+            "reconciled": 2,
+            "duplicate": 0,
+            "obsolete": 0,
+            "foreign": 0
+          },
+          "timings": {
+            "count": 3,
+            "totalMs": 0.6999999955296516,
+            "maxMs": 0.3999999985098839
+          },
+          "transport": {
+            "state": "open",
+            "reason": null,
+            "queuedMessages": 0,
+            "queuedBytes": 0,
+            "receivedMessages": 5,
+            "receivedBytes": 810,
+            "sentMessages": 2,
+            "sentBytes": 215,
+            "refusedSends": 0,
+            "limits": {
+              "maxMessageBytes": 4096,
+              "maxQueuedMessages": 8,
+              "maxQueuedBytes": 32768,
+              "maxBufferedBytes": 4096
+            },
+            "capabilities": {
+              "ordered": true,
+              "reliable": true,
+              "text": true,
+              "binary": false,
+              "incomingBackpressure": false
+            }
+          }
+        },
+        "b": {
+          "principal": "b",
+          "session": "gI2oO3LtXH28Q1f65qdnkywZmoO_A73c",
+          "epoch": "ow9l5Gqmohix7OBXfphXmER2ZhPCojxd",
+          "eligible": true,
+          "status": "Baseline reconciled",
+          "frames": 24,
+          "rendered": 6,
+          "prediction": {
+            "status": "ready",
+            "epoch": "ow9l5Gqmohix7OBXfphXmER2ZhPCojxd",
+            "confirmed": {
+              "revision": 2,
+              "processedThrough": 0,
+              "state": {
+                "value": 3,
+                "json": "3",
+                "bytes": 1
+              }
+            },
+            "predicted": {
+              "value": 3,
+              "json": "3",
+              "bytes": 1
+            },
+            "pending": [],
+            "pendingBytes": 0,
+            "issuedThrough": 0,
+            "correction": {
+              "changed": true,
+              "replayed": 0
+            },
+            "reason": null
+          },
+          "lastResult": null,
+          "baselines": {
+            "reconciled": 2,
+            "duplicate": 0,
+            "obsolete": 0,
+            "foreign": 0
+          },
+          "timings": {
+            "count": 3,
+            "totalMs": 0.5999999940395355,
+            "maxMs": 0.3999999985098839
+          },
+          "transport": {
+            "state": "open",
+            "reason": null,
+            "queuedMessages": 0,
+            "queuedBytes": 0,
+            "receivedMessages": 4,
+            "receivedBytes": 623,
+            "sentMessages": 1,
+            "sentBytes": 64,
+            "refusedSends": 0,
+            "limits": {
+              "maxMessageBytes": 4096,
+              "maxQueuedMessages": 8,
+              "maxQueuedBytes": 32768,
+              "maxBufferedBytes": 4096
+            },
+            "capabilities": {
+              "ordered": true,
+              "reliable": true,
+              "text": true,
+              "binary": false,
+              "incomingBackpressure": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "label": "03-exact-retry",
+      "host": {
+        "status": "ready",
+        "checkpoint": {
+          "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+          "revision": 3,
+          "schema": "numeric-total-v1",
+          "state": 6,
+          "streams": [
+            {
+              "id": "a",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 2
+                  },
+                  "result": {
+                    "value": 2
+                  },
+                  "revision": 1,
+                  "sequence": 1
+                },
+                {
+                  "input": {
+                    "add": 3
+                  },
+                  "result": {
+                    "value": 6
+                  },
+                  "revision": 3,
+                  "sequence": 2
+                }
+              ],
+              "through": 2
+            },
+            {
+              "id": "operator",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 3
+                  },
+                  "revision": 2,
+                  "sequence": 1
+                }
+              ],
+              "through": 1
+            }
+          ],
+          "version": 1
+        },
+        "lastConfirmed": {
+          "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+          "revision": 3,
+          "schema": "numeric-total-v1",
+          "state": 6,
+          "streams": [
+            {
+              "id": "a",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 2
+                  },
+                  "result": {
+                    "value": 2
+                  },
+                  "revision": 1,
+                  "sequence": 1
+                },
+                {
+                  "input": {
+                    "add": 3
+                  },
+                  "result": {
+                    "value": 6
+                  },
+                  "revision": 3,
+                  "sequence": 2
+                }
+              ],
+              "through": 2
+            },
+            {
+              "id": "operator",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 3
+                  },
+                  "revision": 2,
+                  "sequence": 1
+                }
+              ],
+              "through": 1
+            }
+          ],
+          "version": 1
+        },
+        "metrics": {
+          "commits": 3,
+          "commands": 3,
+          "sent": 17,
+          "refused": 0
+        },
+        "commitResponseHeld": false,
+        "peers": [
+          {
+            "principal": "a",
+            "session": "YClreTZg0JYcEYDx6sxQermIsThCHylb",
+            "epoch": "tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV",
+            "dirty": false
+          },
+          {
+            "principal": "b",
+            "session": "gI2oO3LtXH28Q1f65qdnkywZmoO_A73c",
+            "epoch": "ow9l5Gqmohix7OBXfphXmER2ZhPCojxd",
+            "dirty": false
+          }
+        ]
+      },
+      "physical": {
+        "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+        "revision": 3,
+        "schema": "numeric-total-v1",
+        "state": 6,
+        "streams": [
+          {
+            "id": "a",
+            "receipts": [
+              {
+                "input": {
+                  "add": 2
+                },
+                "result": {
+                  "value": 2
+                },
+                "revision": 1,
+                "sequence": 1
+              },
+              {
+                "input": {
+                  "add": 3
+                },
+                "result": {
+                  "value": 6
+                },
+                "revision": 3,
+                "sequence": 2
+              }
+            ],
+            "through": 2
+          },
+          {
+            "id": "operator",
+            "receipts": [
+              {
+                "input": {
+                  "add": 1
+                },
+                "result": {
+                  "value": 3
+                },
+                "revision": 2,
+                "sequence": 1
+              }
+            ],
+            "through": 1
+          }
+        ],
+        "version": 1
+      },
+      "clients": {
+        "a": {
+          "principal": "a",
+          "session": "YClreTZg0JYcEYDx6sxQermIsThCHylb",
+          "epoch": "tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV",
+          "eligible": true,
+          "status": "Baseline duplicate",
+          "frames": 58,
+          "rendered": 9,
+          "prediction": {
+            "status": "ready",
+            "epoch": "tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV",
+            "confirmed": {
+              "revision": 3,
+              "processedThrough": 2,
+              "state": {
+                "value": 6,
+                "json": "6",
+                "bytes": 1
+              }
+            },
+            "predicted": {
+              "value": 6,
+              "json": "6",
+              "bytes": 1
+            },
+            "pending": [],
+            "pendingBytes": 0,
+            "issuedThrough": 2,
+            "correction": {
+              "changed": false,
+              "replayed": 0
+            },
+            "reason": null
+          },
+          "lastResult": {
+            "sequence": 2,
+            "status": "duplicate",
+            "revision": 3
+          },
+          "baselines": {
+            "reconciled": 3,
+            "duplicate": 2,
+            "obsolete": 1,
+            "foreign": 0
+          },
+          "timings": {
+            "count": 7,
+            "totalMs": 0.8999999910593033,
+            "maxMs": 0.3999999985098839
+          },
+          "transport": {
+            "state": "open",
+            "reason": null,
+            "queuedMessages": 0,
+            "queuedBytes": 0,
+            "receivedMessages": 11,
+            "receivedBytes": 1836,
+            "sentMessages": 4,
+            "sentBytes": 517,
+            "refusedSends": 0,
+            "limits": {
+              "maxMessageBytes": 4096,
+              "maxQueuedMessages": 8,
+              "maxQueuedBytes": 32768,
+              "maxBufferedBytes": 4096
+            },
+            "capabilities": {
+              "ordered": true,
+              "reliable": true,
+              "text": true,
+              "binary": false,
+              "incomingBackpressure": false
+            }
+          }
+        },
+        "b": {
+          "principal": "b",
+          "session": "gI2oO3LtXH28Q1f65qdnkywZmoO_A73c",
+          "epoch": "ow9l5Gqmohix7OBXfphXmER2ZhPCojxd",
+          "eligible": true,
+          "status": "Baseline duplicate",
+          "frames": 36,
+          "rendered": 7,
+          "prediction": {
+            "status": "ready",
+            "epoch": "ow9l5Gqmohix7OBXfphXmER2ZhPCojxd",
+            "confirmed": {
+              "revision": 3,
+              "processedThrough": 0,
+              "state": {
+                "value": 6,
+                "json": "6",
+                "bytes": 1
+              }
+            },
+            "predicted": {
+              "value": 6,
+              "json": "6",
+              "bytes": 1
+            },
+            "pending": [],
+            "pendingBytes": 0,
+            "issuedThrough": 0,
+            "correction": {
+              "changed": true,
+              "replayed": 0
+            },
+            "reason": null
+          },
+          "lastResult": null,
+          "baselines": {
+            "reconciled": 3,
+            "duplicate": 1,
+            "obsolete": 0,
+            "foreign": 0
+          },
+          "timings": {
+            "count": 5,
+            "totalMs": 0.7999999895691872,
+            "maxMs": 0.3999999985098839
+          },
+          "transport": {
+            "state": "open",
+            "reason": null,
+            "queuedMessages": 0,
+            "queuedBytes": 0,
+            "receivedMessages": 6,
+            "receivedBytes": 949,
+            "sentMessages": 1,
+            "sentBytes": 64,
+            "refusedSends": 0,
+            "limits": {
+              "maxMessageBytes": 4096,
+              "maxQueuedMessages": 8,
+              "maxQueuedBytes": 32768,
+              "maxBufferedBytes": 4096
+            },
+            "capabilities": {
+              "ordered": true,
+              "reliable": true,
+              "text": true,
+              "binary": false,
+              "incomingBackpressure": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "label": "04-restarted-after-commit-before-reply",
+      "host": {
+        "status": "ready",
+        "checkpoint": {
+          "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+          "revision": 4,
+          "schema": "numeric-total-v1",
+          "state": 7,
+          "streams": [
+            {
+              "id": "a",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 2
+                  },
+                  "result": {
+                    "value": 2
+                  },
+                  "revision": 1,
+                  "sequence": 1
+                },
+                {
+                  "input": {
+                    "add": 3
+                  },
+                  "result": {
+                    "value": 6
+                  },
+                  "revision": 3,
+                  "sequence": 2
+                },
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 7
+                  },
+                  "revision": 4,
+                  "sequence": 3
+                }
+              ],
+              "through": 3
+            },
+            {
+              "id": "operator",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 3
+                  },
+                  "revision": 2,
+                  "sequence": 1
+                }
+              ],
+              "through": 1
+            }
+          ],
+          "version": 1
+        },
+        "lastConfirmed": {
+          "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+          "revision": 4,
+          "schema": "numeric-total-v1",
+          "state": 7,
+          "streams": [
+            {
+              "id": "a",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 2
+                  },
+                  "result": {
+                    "value": 2
+                  },
+                  "revision": 1,
+                  "sequence": 1
+                },
+                {
+                  "input": {
+                    "add": 3
+                  },
+                  "result": {
+                    "value": 6
+                  },
+                  "revision": 3,
+                  "sequence": 2
+                },
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 7
+                  },
+                  "revision": 4,
+                  "sequence": 3
+                }
+              ],
+              "through": 3
+            },
+            {
+              "id": "operator",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 3
+                  },
+                  "revision": 2,
+                  "sequence": 1
+                }
+              ],
+              "through": 1
+            }
+          ],
+          "version": 1
+        },
+        "metrics": {
+          "commits": 0,
+          "commands": 0,
+          "sent": 4,
+          "refused": 0
+        },
+        "commitResponseHeld": false,
+        "peers": [
+          {
+            "principal": "a",
+            "session": "YaDhnhzcG4AnvBAxu39XKSGUA3ZyY4Ql",
+            "epoch": "rV9j_2UEPMdMVXs38e1xW-JJ8dEhCyJ5",
+            "dirty": false
+          },
+          {
+            "principal": "b",
+            "session": "edlGNoapPkqw6DzSYIjHt-IpPMn0otjN",
+            "epoch": "hysafzEFElPFLIRR0PDo6y-amCjDimoM",
+            "dirty": false
+          }
+        ]
+      },
+      "physical": {
+        "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+        "revision": 4,
+        "schema": "numeric-total-v1",
+        "state": 7,
+        "streams": [
+          {
+            "id": "a",
+            "receipts": [
+              {
+                "input": {
+                  "add": 2
+                },
+                "result": {
+                  "value": 2
+                },
+                "revision": 1,
+                "sequence": 1
+              },
+              {
+                "input": {
+                  "add": 3
+                },
+                "result": {
+                  "value": 6
+                },
+                "revision": 3,
+                "sequence": 2
+              },
+              {
+                "input": {
+                  "add": 1
+                },
+                "result": {
+                  "value": 7
+                },
+                "revision": 4,
+                "sequence": 3
+              }
+            ],
+            "through": 3
+          },
+          {
+            "id": "operator",
+            "receipts": [
+              {
+                "input": {
+                  "add": 1
+                },
+                "result": {
+                  "value": 3
+                },
+                "revision": 2,
+                "sequence": 1
+              }
+            ],
+            "through": 1
+          }
+        ],
+        "version": 1
+      },
+      "clients": {
+        "a": {
+          "principal": "a",
+          "session": "YaDhnhzcG4AnvBAxu39XKSGUA3ZyY4Ql",
+          "epoch": "rV9j_2UEPMdMVXs38e1xW-JJ8dEhCyJ5",
+          "eligible": true,
+          "status": "Trusted baseline adopted",
+          "frames": 82,
+          "rendered": 12,
+          "prediction": {
+            "status": "ready",
+            "epoch": "rV9j_2UEPMdMVXs38e1xW-JJ8dEhCyJ5",
+            "confirmed": {
+              "revision": 4,
+              "processedThrough": 3,
+              "state": {
+                "value": 7,
+                "json": "7",
+                "bytes": 1
+              }
+            },
+            "predicted": {
+              "value": 7,
+              "json": "7",
+              "bytes": 1
+            },
+            "pending": [],
+            "pendingBytes": 0,
+            "issuedThrough": 3,
+            "correction": null,
+            "reason": null
+          },
+          "lastResult": null,
+          "baselines": {
+            "reconciled": 3,
+            "duplicate": 2,
+            "obsolete": 1,
+            "foreign": 0
+          },
+          "timings": {
+            "count": 8,
+            "totalMs": 0.8999999910593033,
+            "maxMs": 0.3999999985098839
+          },
+          "transport": {
+            "state": "open",
+            "reason": null,
+            "queuedMessages": 0,
+            "queuedBytes": 0,
+            "receivedMessages": 2,
+            "receivedBytes": 297,
+            "sentMessages": 1,
+            "sentBytes": 64,
+            "refusedSends": 0,
+            "limits": {
+              "maxMessageBytes": 4096,
+              "maxQueuedMessages": 8,
+              "maxQueuedBytes": 32768,
+              "maxBufferedBytes": 4096
+            },
+            "capabilities": {
+              "ordered": true,
+              "reliable": true,
+              "text": true,
+              "binary": false,
+              "incomingBackpressure": false
+            }
+          }
+        },
+        "b": {
+          "principal": "b",
+          "session": "edlGNoapPkqw6DzSYIjHt-IpPMn0otjN",
+          "epoch": "hysafzEFElPFLIRR0PDo6y-amCjDimoM",
+          "eligible": true,
+          "status": "Trusted baseline adopted",
+          "frames": 60,
+          "rendered": 9,
+          "prediction": {
+            "status": "ready",
+            "epoch": "hysafzEFElPFLIRR0PDo6y-amCjDimoM",
+            "confirmed": {
+              "revision": 4,
+              "processedThrough": 0,
+              "state": {
+                "value": 7,
+                "json": "7",
+                "bytes": 1
+              }
+            },
+            "predicted": {
+              "value": 7,
+              "json": "7",
+              "bytes": 1
+            },
+            "pending": [],
+            "pendingBytes": 0,
+            "issuedThrough": 0,
+            "correction": null,
+            "reason": null
+          },
+          "lastResult": null,
+          "baselines": {
+            "reconciled": 3,
+            "duplicate": 1,
+            "obsolete": 0,
+            "foreign": 0
+          },
+          "timings": {
+            "count": 6,
+            "totalMs": 0.7999999895691872,
+            "maxMs": 0.3999999985098839
+          },
+          "transport": {
+            "state": "open",
+            "reason": null,
+            "queuedMessages": 0,
+            "queuedBytes": 0,
+            "receivedMessages": 2,
+            "receivedBytes": 297,
+            "sentMessages": 1,
+            "sentBytes": 64,
+            "refusedSends": 0,
+            "limits": {
+              "maxMessageBytes": 4096,
+              "maxQueuedMessages": 8,
+              "maxQueuedBytes": 32768,
+              "maxBufferedBytes": 4096
+            },
+            "capabilities": {
+              "ordered": true,
+              "reliable": true,
+              "text": true,
+              "binary": false,
+              "incomingBackpressure": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "label": "05-retired-control",
+      "host": {
+        "status": "ready",
+        "checkpoint": {
+          "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+          "revision": 4,
+          "schema": "numeric-total-v1",
+          "state": 7,
+          "streams": [
+            {
+              "id": "a",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 2
+                  },
+                  "result": {
+                    "value": 2
+                  },
+                  "revision": 1,
+                  "sequence": 1
+                },
+                {
+                  "input": {
+                    "add": 3
+                  },
+                  "result": {
+                    "value": 6
+                  },
+                  "revision": 3,
+                  "sequence": 2
+                },
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 7
+                  },
+                  "revision": 4,
+                  "sequence": 3
+                }
+              ],
+              "through": 3
+            },
+            {
+              "id": "operator",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 3
+                  },
+                  "revision": 2,
+                  "sequence": 1
+                }
+              ],
+              "through": 1
+            }
+          ],
+          "version": 1
+        },
+        "lastConfirmed": {
+          "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+          "revision": 4,
+          "schema": "numeric-total-v1",
+          "state": 7,
+          "streams": [
+            {
+              "id": "a",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 2
+                  },
+                  "result": {
+                    "value": 2
+                  },
+                  "revision": 1,
+                  "sequence": 1
+                },
+                {
+                  "input": {
+                    "add": 3
+                  },
+                  "result": {
+                    "value": 6
+                  },
+                  "revision": 3,
+                  "sequence": 2
+                },
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 7
+                  },
+                  "revision": 4,
+                  "sequence": 3
+                }
+              ],
+              "through": 3
+            },
+            {
+              "id": "operator",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 3
+                  },
+                  "revision": 2,
+                  "sequence": 1
+                }
+              ],
+              "through": 1
+            }
+          ],
+          "version": 1
+        },
+        "metrics": {
+          "commits": 0,
+          "commands": 0,
+          "sent": 8,
+          "refused": 0
+        },
+        "commitResponseHeld": false,
+        "peers": [
+          {
+            "principal": "b",
+            "session": "edlGNoapPkqw6DzSYIjHt-IpPMn0otjN",
+            "epoch": "hysafzEFElPFLIRR0PDo6y-amCjDimoM",
+            "dirty": false
+          },
+          {
+            "principal": "a",
+            "session": "lDlVCMAXA9rfbSF4_LJKzoUU3EdR3Lu1",
+            "epoch": "nGYnIHciMn6Nt38E8SpGcghuCdob0W1F",
+            "dirty": false
+          }
+        ]
+      },
+      "physical": {
+        "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+        "revision": 4,
+        "schema": "numeric-total-v1",
+        "state": 7,
+        "streams": [
+          {
+            "id": "a",
+            "receipts": [
+              {
+                "input": {
+                  "add": 2
+                },
+                "result": {
+                  "value": 2
+                },
+                "revision": 1,
+                "sequence": 1
+              },
+              {
+                "input": {
+                  "add": 3
+                },
+                "result": {
+                  "value": 6
+                },
+                "revision": 3,
+                "sequence": 2
+              },
+              {
+                "input": {
+                  "add": 1
+                },
+                "result": {
+                  "value": 7
+                },
+                "revision": 4,
+                "sequence": 3
+              }
+            ],
+            "through": 3
+          },
+          {
+            "id": "operator",
+            "receipts": [
+              {
+                "input": {
+                  "add": 1
+                },
+                "result": {
+                  "value": 3
+                },
+                "revision": 2,
+                "sequence": 1
+              }
+            ],
+            "through": 1
+          }
+        ],
+        "version": 1
+      },
+      "clients": {
+        "a": {
+          "principal": "a",
+          "session": "lDlVCMAXA9rfbSF4_LJKzoUU3EdR3Lu1",
+          "epoch": "nGYnIHciMn6Nt38E8SpGcghuCdob0W1F",
+          "eligible": true,
+          "status": "Trusted baseline adopted",
+          "frames": 110,
+          "rendered": 20,
+          "prediction": {
+            "status": "ready",
+            "epoch": "nGYnIHciMn6Nt38E8SpGcghuCdob0W1F",
+            "confirmed": {
+              "revision": 4,
+              "processedThrough": 3,
+              "state": {
+                "value": 7,
+                "json": "7",
+                "bytes": 1
+              }
+            },
+            "predicted": {
+              "value": 7,
+              "json": "7",
+              "bytes": 1
+            },
+            "pending": [],
+            "pendingBytes": 0,
+            "issuedThrough": 3,
+            "correction": null,
+            "reason": null
+          },
+          "lastResult": null,
+          "baselines": {
+            "reconciled": 3,
+            "duplicate": 2,
+            "obsolete": 1,
+            "foreign": 0
+          },
+          "timings": {
+            "count": 10,
+            "totalMs": 0.9999999925494194,
+            "maxMs": 0.3999999985098839
+          },
+          "transport": {
+            "state": "open",
+            "reason": null,
+            "queuedMessages": 0,
+            "queuedBytes": 0,
+            "receivedMessages": 2,
+            "receivedBytes": 297,
+            "sentMessages": 1,
+            "sentBytes": 64,
+            "refusedSends": 0,
+            "limits": {
+              "maxMessageBytes": 4096,
+              "maxQueuedMessages": 8,
+              "maxQueuedBytes": 32768,
+              "maxBufferedBytes": 4096
+            },
+            "capabilities": {
+              "ordered": true,
+              "reliable": true,
+              "text": true,
+              "binary": false,
+              "incomingBackpressure": false
+            }
+          }
+        },
+        "b": {
+          "principal": "b",
+          "session": "edlGNoapPkqw6DzSYIjHt-IpPMn0otjN",
+          "epoch": "hysafzEFElPFLIRR0PDo6y-amCjDimoM",
+          "eligible": true,
+          "status": "Trusted baseline adopted",
+          "frames": 96,
+          "rendered": 9,
+          "prediction": {
+            "status": "ready",
+            "epoch": "hysafzEFElPFLIRR0PDo6y-amCjDimoM",
+            "confirmed": {
+              "revision": 4,
+              "processedThrough": 0,
+              "state": {
+                "value": 7,
+                "json": "7",
+                "bytes": 1
+              }
+            },
+            "predicted": {
+              "value": 7,
+              "json": "7",
+              "bytes": 1
+            },
+            "pending": [],
+            "pendingBytes": 0,
+            "issuedThrough": 0,
+            "correction": null,
+            "reason": null
+          },
+          "lastResult": null,
+          "baselines": {
+            "reconciled": 3,
+            "duplicate": 1,
+            "obsolete": 0,
+            "foreign": 0
+          },
+          "timings": {
+            "count": 6,
+            "totalMs": 0.7999999895691872,
+            "maxMs": 0.3999999985098839
+          },
+          "transport": {
+            "state": "open",
+            "reason": null,
+            "queuedMessages": 0,
+            "queuedBytes": 0,
+            "receivedMessages": 2,
+            "receivedBytes": 297,
+            "sentMessages": 1,
+            "sentBytes": 64,
+            "refusedSends": 0,
+            "limits": {
+              "maxMessageBytes": 4096,
+              "maxQueuedMessages": 8,
+              "maxQueuedBytes": 32768,
+              "maxBufferedBytes": 4096
+            },
+            "capabilities": {
+              "ordered": true,
+              "reliable": true,
+              "text": true,
+              "binary": false,
+              "incomingBackpressure": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "label": "06-explicit-shared-scale",
+      "host": {
+        "status": "ready",
+        "checkpoint": {
+          "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+          "revision": 5,
+          "schema": "numeric-total-v1",
+          "state": 17,
+          "streams": [
+            {
+              "id": "a",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 2
+                  },
+                  "result": {
+                    "value": 2
+                  },
+                  "revision": 1,
+                  "sequence": 1
+                },
+                {
+                  "input": {
+                    "add": 3
+                  },
+                  "result": {
+                    "value": 6
+                  },
+                  "revision": 3,
+                  "sequence": 2
+                },
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 7
+                  },
+                  "revision": 4,
+                  "sequence": 3
+                }
+              ],
+              "through": 3
+            },
+            {
+              "id": "operator",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 3
+                  },
+                  "revision": 2,
+                  "sequence": 1
+                },
+                {
+                  "input": {
+                    "add": 10
+                  },
+                  "result": {
+                    "value": 17
+                  },
+                  "revision": 5,
+                  "sequence": 2
+                }
+              ],
+              "through": 2
+            }
+          ],
+          "version": 1
+        },
+        "lastConfirmed": {
+          "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+          "revision": 5,
+          "schema": "numeric-total-v1",
+          "state": 17,
+          "streams": [
+            {
+              "id": "a",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 2
+                  },
+                  "result": {
+                    "value": 2
+                  },
+                  "revision": 1,
+                  "sequence": 1
+                },
+                {
+                  "input": {
+                    "add": 3
+                  },
+                  "result": {
+                    "value": 6
+                  },
+                  "revision": 3,
+                  "sequence": 2
+                },
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 7
+                  },
+                  "revision": 4,
+                  "sequence": 3
+                }
+              ],
+              "through": 3
+            },
+            {
+              "id": "operator",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 3
+                  },
+                  "revision": 2,
+                  "sequence": 1
+                },
+                {
+                  "input": {
+                    "add": 10
+                  },
+                  "result": {
+                    "value": 17
+                  },
+                  "revision": 5,
+                  "sequence": 2
+                }
+              ],
+              "through": 2
+            }
+          ],
+          "version": 1
+        },
+        "metrics": {
+          "commits": 1,
+          "commands": 0,
+          "sent": 10,
+          "refused": 0
+        },
+        "commitResponseHeld": false,
+        "peers": [
+          {
+            "principal": "b",
+            "session": "edlGNoapPkqw6DzSYIjHt-IpPMn0otjN",
+            "epoch": "hysafzEFElPFLIRR0PDo6y-amCjDimoM",
+            "dirty": false
+          },
+          {
+            "principal": "a",
+            "session": "lDlVCMAXA9rfbSF4_LJKzoUU3EdR3Lu1",
+            "epoch": "nGYnIHciMn6Nt38E8SpGcghuCdob0W1F",
+            "dirty": false
+          }
+        ]
+      },
+      "physical": {
+        "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+        "revision": 5,
+        "schema": "numeric-total-v1",
+        "state": 17,
+        "streams": [
+          {
+            "id": "a",
+            "receipts": [
+              {
+                "input": {
+                  "add": 2
+                },
+                "result": {
+                  "value": 2
+                },
+                "revision": 1,
+                "sequence": 1
+              },
+              {
+                "input": {
+                  "add": 3
+                },
+                "result": {
+                  "value": 6
+                },
+                "revision": 3,
+                "sequence": 2
+              },
+              {
+                "input": {
+                  "add": 1
+                },
+                "result": {
+                  "value": 7
+                },
+                "revision": 4,
+                "sequence": 3
+              }
+            ],
+            "through": 3
+          },
+          {
+            "id": "operator",
+            "receipts": [
+              {
+                "input": {
+                  "add": 1
+                },
+                "result": {
+                  "value": 3
+                },
+                "revision": 2,
+                "sequence": 1
+              },
+              {
+                "input": {
+                  "add": 10
+                },
+                "result": {
+                  "value": 17
+                },
+                "revision": 5,
+                "sequence": 2
+              }
+            ],
+            "through": 2
+          }
+        ],
+        "version": 1
+      },
+      "clients": {
+        "a": {
+          "principal": "a",
+          "session": "lDlVCMAXA9rfbSF4_LJKzoUU3EdR3Lu1",
+          "epoch": "nGYnIHciMn6Nt38E8SpGcghuCdob0W1F",
+          "eligible": true,
+          "status": "Input predicted",
+          "frames": 117,
+          "rendered": 22,
+          "prediction": {
+            "status": "ready",
+            "epoch": "nGYnIHciMn6Nt38E8SpGcghuCdob0W1F",
+            "confirmed": {
+              "revision": 5,
+              "processedThrough": 3,
+              "state": {
+                "value": 17,
+                "json": "17",
+                "bytes": 2
+              }
+            },
+            "predicted": {
+              "value": 19,
+              "json": "19",
+              "bytes": 2
+            },
+            "pending": [
+              {
+                "value": {
+                  "add": 2
+                },
+                "json": "{\"add\":2}",
+                "bytes": 9,
+                "sequence": 4
+              }
+            ],
+            "pendingBytes": 9,
+            "issuedThrough": 4,
+            "correction": null,
+            "reason": null
+          },
+          "lastResult": null,
+          "baselines": {
+            "reconciled": 4,
+            "duplicate": 2,
+            "obsolete": 1,
+            "foreign": 0
+          },
+          "timings": {
+            "count": 11,
+            "totalMs": 1.0999999940395355,
+            "maxMs": 0.3999999985098839
+          },
+          "transport": {
+            "state": "open",
+            "reason": null,
+            "queuedMessages": 0,
+            "queuedBytes": 0,
+            "receivedMessages": 3,
+            "receivedBytes": 461,
+            "sentMessages": 1,
+            "sentBytes": 64,
+            "refusedSends": 0,
+            "limits": {
+              "maxMessageBytes": 4096,
+              "maxQueuedMessages": 8,
+              "maxQueuedBytes": 32768,
+              "maxBufferedBytes": 4096
+            },
+            "capabilities": {
+              "ordered": true,
+              "reliable": true,
+              "text": true,
+              "binary": false,
+              "incomingBackpressure": false
+            }
+          }
+        },
+        "b": {
+          "principal": "b",
+          "session": "edlGNoapPkqw6DzSYIjHt-IpPMn0otjN",
+          "epoch": "hysafzEFElPFLIRR0PDo6y-amCjDimoM",
+          "eligible": true,
+          "status": "Baseline reconciled",
+          "frames": 103,
+          "rendered": 10,
+          "prediction": {
+            "status": "ready",
+            "epoch": "hysafzEFElPFLIRR0PDo6y-amCjDimoM",
+            "confirmed": {
+              "revision": 5,
+              "processedThrough": 0,
+              "state": {
+                "value": 17,
+                "json": "17",
+                "bytes": 2
+              }
+            },
+            "predicted": {
+              "value": 17,
+              "json": "17",
+              "bytes": 2
+            },
+            "pending": [],
+            "pendingBytes": 0,
+            "issuedThrough": 0,
+            "correction": {
+              "changed": true,
+              "replayed": 0
+            },
+            "reason": null
+          },
+          "lastResult": null,
+          "baselines": {
+            "reconciled": 4,
+            "duplicate": 1,
+            "obsolete": 0,
+            "foreign": 0
+          },
+          "timings": {
+            "count": 7,
+            "totalMs": 0.8999999910593033,
+            "maxMs": 0.3999999985098839
+          },
+          "transport": {
+            "state": "open",
+            "reason": null,
+            "queuedMessages": 0,
+            "queuedBytes": 0,
+            "receivedMessages": 3,
+            "receivedBytes": 461,
+            "sentMessages": 1,
+            "sentBytes": 64,
+            "refusedSends": 0,
+            "limits": {
+              "maxMessageBytes": 4096,
+              "maxQueuedMessages": 8,
+              "maxQueuedBytes": 32768,
+              "maxBufferedBytes": 4096
+            },
+            "capabilities": {
+              "ordered": true,
+              "reliable": true,
+              "text": true,
+              "binary": false,
+              "incomingBackpressure": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "label": "07-invalid-baseline-recovery",
+      "host": {
+        "status": "ready",
+        "checkpoint": {
+          "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+          "revision": 5,
+          "schema": "numeric-total-v1",
+          "state": 17,
+          "streams": [
+            {
+              "id": "a",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 2
+                  },
+                  "result": {
+                    "value": 2
+                  },
+                  "revision": 1,
+                  "sequence": 1
+                },
+                {
+                  "input": {
+                    "add": 3
+                  },
+                  "result": {
+                    "value": 6
+                  },
+                  "revision": 3,
+                  "sequence": 2
+                },
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 7
+                  },
+                  "revision": 4,
+                  "sequence": 3
+                }
+              ],
+              "through": 3
+            },
+            {
+              "id": "operator",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 3
+                  },
+                  "revision": 2,
+                  "sequence": 1
+                },
+                {
+                  "input": {
+                    "add": 10
+                  },
+                  "result": {
+                    "value": 17
+                  },
+                  "revision": 5,
+                  "sequence": 2
+                }
+              ],
+              "through": 2
+            }
+          ],
+          "version": 1
+        },
+        "lastConfirmed": {
+          "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+          "revision": 5,
+          "schema": "numeric-total-v1",
+          "state": 17,
+          "streams": [
+            {
+              "id": "a",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 2
+                  },
+                  "result": {
+                    "value": 2
+                  },
+                  "revision": 1,
+                  "sequence": 1
+                },
+                {
+                  "input": {
+                    "add": 3
+                  },
+                  "result": {
+                    "value": 6
+                  },
+                  "revision": 3,
+                  "sequence": 2
+                },
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 7
+                  },
+                  "revision": 4,
+                  "sequence": 3
+                }
+              ],
+              "through": 3
+            },
+            {
+              "id": "operator",
+              "receipts": [
+                {
+                  "input": {
+                    "add": 1
+                  },
+                  "result": {
+                    "value": 3
+                  },
+                  "revision": 2,
+                  "sequence": 1
+                },
+                {
+                  "input": {
+                    "add": 10
+                  },
+                  "result": {
+                    "value": 17
+                  },
+                  "revision": 5,
+                  "sequence": 2
+                }
+              ],
+              "through": 2
+            }
+          ],
+          "version": 1
+        },
+        "metrics": {
+          "commits": 1,
+          "commands": 0,
+          "sent": 14,
+          "refused": 0
+        },
+        "commitResponseHeld": false,
+        "peers": [
+          {
+            "principal": "b",
+            "session": "edlGNoapPkqw6DzSYIjHt-IpPMn0otjN",
+            "epoch": "hysafzEFElPFLIRR0PDo6y-amCjDimoM",
+            "dirty": false
+          },
+          {
+            "principal": "a",
+            "session": "8_8C16PtnKJy3A8Lmz1I4sarOIcOeKth",
+            "epoch": "XFea7HHErpea9hkaSI5Dt6GxjxYbFIWj",
+            "dirty": false
+          }
+        ]
+      },
+      "physical": {
+        "lineage": "lHlzKoEnCO4EkY9AmAZsKbBHczarJS9r",
+        "revision": 5,
+        "schema": "numeric-total-v1",
+        "state": 17,
+        "streams": [
+          {
+            "id": "a",
+            "receipts": [
+              {
+                "input": {
+                  "add": 2
+                },
+                "result": {
+                  "value": 2
+                },
+                "revision": 1,
+                "sequence": 1
+              },
+              {
+                "input": {
+                  "add": 3
+                },
+                "result": {
+                  "value": 6
+                },
+                "revision": 3,
+                "sequence": 2
+              },
+              {
+                "input": {
+                  "add": 1
+                },
+                "result": {
+                  "value": 7
+                },
+                "revision": 4,
+                "sequence": 3
+              }
+            ],
+            "through": 3
+          },
+          {
+            "id": "operator",
+            "receipts": [
+              {
+                "input": {
+                  "add": 1
+                },
+                "result": {
+                  "value": 3
+                },
+                "revision": 2,
+                "sequence": 1
+              },
+              {
+                "input": {
+                  "add": 10
+                },
+                "result": {
+                  "value": 17
+                },
+                "revision": 5,
+                "sequence": 2
+              }
+            ],
+            "through": 2
+          }
+        ],
+        "version": 1
+      },
+      "clients": {
+        "a": {
+          "principal": "a",
+          "session": "8_8C16PtnKJy3A8Lmz1I4sarOIcOeKth",
+          "epoch": "XFea7HHErpea9hkaSI5Dt6GxjxYbFIWj",
+          "eligible": true,
+          "status": "Trusted baseline adopted",
+          "frames": 132,
+          "rendered": 24,
+          "prediction": {
+            "status": "ready",
+            "epoch": "XFea7HHErpea9hkaSI5Dt6GxjxYbFIWj",
+            "confirmed": {
+              "revision": 5,
+              "processedThrough": 3,
+              "state": {
+                "value": 17,
+                "json": "17",
+                "bytes": 2
+              }
+            },
+            "predicted": {
+              "value": 17,
+              "json": "17",
+              "bytes": 2
+            },
+            "pending": [],
+            "pendingBytes": 0,
+            "issuedThrough": 3,
+            "correction": null,
+            "reason": null
+          },
+          "lastResult": null,
+          "baselines": {
+            "reconciled": 4,
+            "duplicate": 2,
+            "obsolete": 1,
+            "foreign": 0
+          },
+          "timings": {
+            "count": 12,
+            "totalMs": 1.1999999955296516,
+            "maxMs": 0.3999999985098839
+          },
+          "transport": {
+            "state": "open",
+            "reason": null,
+            "queuedMessages": 0,
+            "queuedBytes": 0,
+            "receivedMessages": 2,
+            "receivedBytes": 298,
+            "sentMessages": 1,
+            "sentBytes": 64,
+            "refusedSends": 0,
+            "limits": {
+              "maxMessageBytes": 4096,
+              "maxQueuedMessages": 8,
+              "maxQueuedBytes": 32768,
+              "maxBufferedBytes": 4096
+            },
+            "capabilities": {
+              "ordered": true,
+              "reliable": true,
+              "text": true,
+              "binary": false,
+              "incomingBackpressure": false
+            }
+          }
+        },
+        "b": {
+          "principal": "b",
+          "session": "edlGNoapPkqw6DzSYIjHt-IpPMn0otjN",
+          "epoch": "hysafzEFElPFLIRR0PDo6y-amCjDimoM",
+          "eligible": true,
+          "status": "Baseline reconciled",
+          "frames": 118,
+          "rendered": 10,
+          "prediction": {
+            "status": "ready",
+            "epoch": "hysafzEFElPFLIRR0PDo6y-amCjDimoM",
+            "confirmed": {
+              "revision": 5,
+              "processedThrough": 0,
+              "state": {
+                "value": 17,
+                "json": "17",
+                "bytes": 2
+              }
+            },
+            "predicted": {
+              "value": 17,
+              "json": "17",
+              "bytes": 2
+            },
+            "pending": [],
+            "pendingBytes": 0,
+            "issuedThrough": 0,
+            "correction": {
+              "changed": true,
+              "replayed": 0
+            },
+            "reason": null
+          },
+          "lastResult": null,
+          "baselines": {
+            "reconciled": 4,
+            "duplicate": 1,
+            "obsolete": 0,
+            "foreign": 0
+          },
+          "timings": {
+            "count": 7,
+            "totalMs": 0.8999999910593033,
+            "maxMs": 0.3999999985098839
+          },
+          "transport": {
+            "state": "open",
+            "reason": null,
+            "queuedMessages": 0,
+            "queuedBytes": 0,
+            "receivedMessages": 3,
+            "receivedBytes": 461,
+            "sentMessages": 1,
+            "sentBytes": 64,
+            "refusedSends": 0,
+            "limits": {
+              "maxMessageBytes": 4096,
+              "maxQueuedMessages": 8,
+              "maxQueuedBytes": 32768,
+              "maxBufferedBytes": 4096
+            },
+            "capabilities": {
+              "ordered": true,
+              "reliable": true,
+              "text": true,
+              "binary": false,
+              "incomingBackpressure": false
+            }
+          }
+        }
+      }
+    }
+  ],
+  "wire": {
+    "a": [
+      "{\"type\":\"connected\"}",
+      "{\"v\":1,\"type\":\"authenticated\",\"principal\":\"a\",\"session\":\"YClreTZg0JYcEYDx6sxQermIsThCHylb\",\"epoch\":\"tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"YClreTZg0JYcEYDx6sxQermIsThCHylb\",\"epoch\":\"tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV\",\"revision\":0,\"processedThrough\":0,\"stateJson\":\"0\"}",
+      "{\"v\":1,\"type\":\"result\",\"session\":\"YClreTZg0JYcEYDx6sxQermIsThCHylb\",\"epoch\":\"tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV\",\"sequence\":1,\"status\":\"committed\",\"revision\":1,\"resultJson\":\"{\\\"value\\\":2}\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"YClreTZg0JYcEYDx6sxQermIsThCHylb\",\"epoch\":\"tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV\",\"revision\":1,\"processedThrough\":1,\"stateJson\":\"2\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"YClreTZg0JYcEYDx6sxQermIsThCHylb\",\"epoch\":\"tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV\",\"revision\":2,\"processedThrough\":1,\"stateJson\":\"3\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"YClreTZg0JYcEYDx6sxQermIsThCHylb\",\"epoch\":\"tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV\",\"revision\":2,\"processedThrough\":1,\"stateJson\":\"3\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"YClreTZg0JYcEYDx6sxQermIsThCHylb\",\"epoch\":\"tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV\",\"revision\":1,\"processedThrough\":1,\"stateJson\":\"2\"}",
+      "{\"v\":1,\"type\":\"result\",\"session\":\"YClreTZg0JYcEYDx6sxQermIsThCHylb\",\"epoch\":\"tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV\",\"sequence\":2,\"status\":\"committed\",\"revision\":3,\"resultJson\":\"{\\\"value\\\":6}\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"YClreTZg0JYcEYDx6sxQermIsThCHylb\",\"epoch\":\"tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV\",\"revision\":3,\"processedThrough\":2,\"stateJson\":\"6\"}",
+      "{\"v\":1,\"type\":\"result\",\"session\":\"YClreTZg0JYcEYDx6sxQermIsThCHylb\",\"epoch\":\"tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV\",\"sequence\":2,\"status\":\"duplicate\",\"revision\":3,\"resultJson\":\"{\\\"value\\\":6}\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"YClreTZg0JYcEYDx6sxQermIsThCHylb\",\"epoch\":\"tLfXGM2lHD1WSFL7dXwREvRMPoshfQzV\",\"revision\":3,\"processedThrough\":2,\"stateJson\":\"6\"}",
+      "{\"v\":1,\"type\":\"authenticated\",\"principal\":\"a\",\"session\":\"YaDhnhzcG4AnvBAxu39XKSGUA3ZyY4Ql\",\"epoch\":\"rV9j_2UEPMdMVXs38e1xW-JJ8dEhCyJ5\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"YaDhnhzcG4AnvBAxu39XKSGUA3ZyY4Ql\",\"epoch\":\"rV9j_2UEPMdMVXs38e1xW-JJ8dEhCyJ5\",\"revision\":4,\"processedThrough\":3,\"stateJson\":\"7\"}",
+      "{\"v\":1,\"type\":\"authenticated\",\"principal\":\"a\",\"session\":\"DAFypmrUPQxxOcYNxRkFKu08yeyA8ZEB\",\"epoch\":\"eJSNqI_AUlVfV9G0A89sNWEgYKIMWFAj\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"DAFypmrUPQxxOcYNxRkFKu08yeyA8ZEB\",\"epoch\":\"eJSNqI_AUlVfV9G0A89sNWEgYKIMWFAj\",\"revision\":4,\"processedThrough\":3,\"stateJson\":\"7\"}",
+      "{\"v\":1,\"type\":\"authenticated\",\"principal\":\"a\",\"session\":\"lDlVCMAXA9rfbSF4_LJKzoUU3EdR3Lu1\",\"epoch\":\"nGYnIHciMn6Nt38E8SpGcghuCdob0W1F\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"lDlVCMAXA9rfbSF4_LJKzoUU3EdR3Lu1\",\"epoch\":\"nGYnIHciMn6Nt38E8SpGcghuCdob0W1F\",\"revision\":4,\"processedThrough\":3,\"stateJson\":\"7\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"lDlVCMAXA9rfbSF4_LJKzoUU3EdR3Lu1\",\"epoch\":\"nGYnIHciMn6Nt38E8SpGcghuCdob0W1F\",\"revision\":5,\"processedThrough\":3,\"stateJson\":\"17\"}",
+      "{\"v\":1,\"type\":\"authenticated\",\"principal\":\"a\",\"session\":\"b5_IvVEX0U3ASKtiq9wdzhcUpJm5G0C3\",\"epoch\":\"pDwPT0AiOfPYfaC5G-cStsReHmcjD-ae\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"b5_IvVEX0U3ASKtiq9wdzhcUpJm5G0C3\",\"epoch\":\"pDwPT0AiOfPYfaC5G-cStsReHmcjD-ae\",\"revision\":5,\"processedThrough\":6,\"stateJson\":\"17\"}",
+      "{\"v\":1,\"type\":\"authenticated\",\"principal\":\"a\",\"session\":\"8_8C16PtnKJy3A8Lmz1I4sarOIcOeKth\",\"epoch\":\"XFea7HHErpea9hkaSI5Dt6GxjxYbFIWj\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"8_8C16PtnKJy3A8Lmz1I4sarOIcOeKth\",\"epoch\":\"XFea7HHErpea9hkaSI5Dt6GxjxYbFIWj\",\"revision\":5,\"processedThrough\":3,\"stateJson\":\"17\"}"
+    ],
+    "b": [
+      "{\"type\":\"connected\"}",
+      "{\"v\":1,\"type\":\"authenticated\",\"principal\":\"b\",\"session\":\"gI2oO3LtXH28Q1f65qdnkywZmoO_A73c\",\"epoch\":\"ow9l5Gqmohix7OBXfphXmER2ZhPCojxd\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"gI2oO3LtXH28Q1f65qdnkywZmoO_A73c\",\"epoch\":\"ow9l5Gqmohix7OBXfphXmER2ZhPCojxd\",\"revision\":0,\"processedThrough\":0,\"stateJson\":\"0\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"gI2oO3LtXH28Q1f65qdnkywZmoO_A73c\",\"epoch\":\"ow9l5Gqmohix7OBXfphXmER2ZhPCojxd\",\"revision\":1,\"processedThrough\":0,\"stateJson\":\"2\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"gI2oO3LtXH28Q1f65qdnkywZmoO_A73c\",\"epoch\":\"ow9l5Gqmohix7OBXfphXmER2ZhPCojxd\",\"revision\":2,\"processedThrough\":0,\"stateJson\":\"3\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"gI2oO3LtXH28Q1f65qdnkywZmoO_A73c\",\"epoch\":\"ow9l5Gqmohix7OBXfphXmER2ZhPCojxd\",\"revision\":3,\"processedThrough\":0,\"stateJson\":\"6\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"gI2oO3LtXH28Q1f65qdnkywZmoO_A73c\",\"epoch\":\"ow9l5Gqmohix7OBXfphXmER2ZhPCojxd\",\"revision\":3,\"processedThrough\":0,\"stateJson\":\"6\"}",
+      "{\"v\":1,\"type\":\"authenticated\",\"principal\":\"b\",\"session\":\"edlGNoapPkqw6DzSYIjHt-IpPMn0otjN\",\"epoch\":\"hysafzEFElPFLIRR0PDo6y-amCjDimoM\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"edlGNoapPkqw6DzSYIjHt-IpPMn0otjN\",\"epoch\":\"hysafzEFElPFLIRR0PDo6y-amCjDimoM\",\"revision\":4,\"processedThrough\":0,\"stateJson\":\"7\"}",
+      "{\"v\":1,\"type\":\"baseline\",\"session\":\"edlGNoapPkqw6DzSYIjHt-IpPMn0otjN\",\"epoch\":\"hysafzEFElPFLIRR0PDo6y-amCjDimoM\",\"revision\":5,\"processedThrough\":0,\"stateJson\":\"17\"}"
+    ]
+  },
+  "limitations": [
+    "Two desktop Chromium contexts and separate loopback host; no WAN, physical-device, production identity or scale certification.",
+    "SIGKILL and independent SQLite readback cover process crashes, not physical power loss. Marker positions share an explicit dynamic scale; exact numeric values remain visible."
+  ],
+  "failures": []
+}

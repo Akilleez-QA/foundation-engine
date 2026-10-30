@@ -1,0 +1,48 @@
+{
+  "release": "v0.2.0",
+  "revision": "071e3c2a2c9a99440088c8315aa0a1f099e0e841",
+  "kind": "released-template-consumer",
+  "retainedWith": "git show v0.2.0:templates/arcade/game/<file> > <file>",
+  "files": [
+    {
+      "file": "game.ts",
+      "sourcePath": "templates/arcade/game/game.ts",
+      "sha256": "74e85710ff9c62caae13b8a4190ed434fb161fe9475a3448e5805afc06843d28"
+    },
+    {
+      "file": "best.ts",
+      "sourcePath": "templates/arcade/game/best.ts",
+      "sha256": "d614d156d414bb636b8cd90e9a93f4b9590e64a910b4d6f96d6a9bf28cdf75a4"
+    },
+    {
+      "file": "components.ts",
+      "sourcePath": "templates/arcade/game/components.ts",
+      "sha256": "4d14c1578a9175747c700db812072235d4c83e5a8925affa183a81fe30dbb885"
+    },
+    {
+      "file": "play.ts",
+      "sourcePath": "templates/arcade/game/play.ts",
+      "sha256": "dfdb6ac11db0e63f1a481761417e70fc01512b6c2a28b5d38a98bcf051ad7856"
+    },
+    {
+      "file": "restart.ts",
+      "sourcePath": "templates/arcade/game/restart.ts",
+      "sha256": "e3e32e5d665894dc59cfbf2ea25689b538c7df854afa691f9739872de466fb42"
+    },
+    {
+      "file": "steer.ts",
+      "sourcePath": "templates/arcade/game/steer.ts",
+      "sha256": "cd746fe772c3c93f60868d5516d32042df4b145ae4ebb45ccba9783612e46f7c"
+    },
+    {
+      "file": "build.brief.ts",
+      "sourcePath": "templates/arcade/game/build.brief.ts",
+      "sha256": "3dc27e323b1095cf8816029c412bfdc4b51d458d26d8bdf52566c7402a6214d2"
+    },
+    {
+      "file": "play.test.ts",
+      "sourcePath": "templates/arcade/game/play.test.ts",
+      "sha256": "6855e1f4be13d0fb1425f74de11bea1c7bd0c0e6b9a685f7565844aecaee26d0"
+    }
+  ]
+}

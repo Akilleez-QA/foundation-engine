@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "note": "Declared desktop acceptance caps for this diagnostic, not measured performance certification. No existing template budget changes.",
+  "app": {
+    "firstLoadJsKiB": 1024
+  },
+  "scenes": {
+    "main": {
+      "scene": "scene.main",
+      "route": "#scene/main",
+      "budget": {
+        "draws": 23,
+        "triangles": 728,
+        "textureMiB": 0,
+        "heapMiB": 64,
+        "contexts": 1
+      }
+    }
+  }
+}

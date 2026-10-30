@@ -1,0 +1,21 @@
+{
+  "revision": "c0e73c9b40975f7ed47c178edf84552742d2396a",
+  "kind": "public-source-snapshot-not-release",
+  "files": [
+    {
+      "file": "main.ts",
+      "sourcePath": "templates/blank/game/main.ts",
+      "sha256": "030f863f8add8b633784957dcdea125fa1ca67fd8cbbd2e067db7f237cec41be"
+    },
+    {
+      "file": "turn.ts",
+      "sourcePath": "templates/blank/game/turn.ts",
+      "sha256": "ecdecaefd989dc85fbb07f255f0eeefa93413423c5dccd9b2652b8bf268f383d"
+    },
+    {
+      "file": "main.test.ts",
+      "sourcePath": "templates/blank/game/main.test.ts",
+      "sha256": "aebf7c3bc46060904e3d9f11a2afc2a052a0c978f863eb62e8af4db796ac38ba"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "kind": "released-save-envelopes",
+  "release": "v0.2.0",
+  "revision": "071e3c2a2c9a99440088c8315aa0a1f099e0e841",
+  "generator": "src/core/save/fixtures/v0.2.0/generate.mjs",
+  "generatorSha256": "7d83ecdeff68e914f732ff45d102c9796722aeae5733dcf43c6e75b4f5d57a48",
+  "node": "v22.23.3",
+  "files": [
+    {
+      "file": "arcade-run-best.json",
+      "key": "arcade|p:1|run.best",
+      "what": "arcade template best score (player scope)",
+      "sha256": "8d05b786695f4fc001c60e6c14876fda8418180b8eef5fad082f9e6486479e36"
+    },
+    {
+      "file": "arcade-settings-values.json",
+      "key": "arcade|device|settings.values",
+      "what": "device settings (device scope, never exported)",
+      "sha256": "c46d932e6ee21cf61e0665df4b3c209b23b12d991f3d49cf9d463488e3da5a6c"
+    },
+    {
+      "file": "arcade-profile-export.json",
+      "key": null,
+      "what": "profile export, format engine-profile v2",
+      "sha256": "7f360af64350ec13eafa6fe537f8b789964d739f30fd43e4ab02941d9c027038"
+    },
+    {
+      "file": "explorer-explore-progress.json",
+      "key": "explorer|p:1|explore.progress",
+      "what": "explore kit progress (player scope)",
+      "sha256": "2777d6237d80c9c65ffdc0d3861c539bc61b226146bae575fc6e830161939723"
+    }
+  ]
+}

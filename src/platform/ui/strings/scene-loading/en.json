@@ -1,0 +1,7 @@
+{
+  "engine.scene-loading.going-to": "Going to {scene}…",
+  "engine.scene-loading.check-connection": "Check the connection and try again.",
+  "engine.scene-loading.try-again": "Try again",
+  "engine.scene-loading.go-back": "Go back",
+  "engine.scene-loading.could-not-open": "{scene} could not open."
+}

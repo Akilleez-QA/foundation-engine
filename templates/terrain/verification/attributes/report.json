@@ -1,0 +1,96 @@
+[
+  {
+    "name": "desktop",
+    "terrain": {
+      "tiles": 4,
+      "builds": 9,
+      "publications": 1,
+      "closed": false,
+      "epoch": 2,
+      "navigationEpoch": 2,
+      "strides": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "maxError": 0.35
+    },
+    "worker": {
+      "workers": 1,
+      "running": 0,
+      "pending": 0,
+      "reservedBytes": 0,
+      "peakRunning": 1,
+      "peakReservedBytes": 212888,
+      "workersAvailable": true
+    },
+    "scatter": 14,
+    "active": {
+      "ms": 913,
+      "renders": 33,
+      "drawsPerFrame": 7,
+      "trisPerFrame": 5092,
+      "frameMsP95": 16.8,
+      "fps": 60,
+      "heapMiB": 15.1
+    },
+    "idle": {
+      "ms": 616,
+      "renders": 0,
+      "drawsPerFrame": 0,
+      "trisPerFrame": 0,
+      "frameMsP95": 16.8,
+      "fps": 60,
+      "heapMiB": 16.2
+    },
+    "errors": []
+  },
+  {
+    "name": "phone",
+    "terrain": {
+      "tiles": 4,
+      "builds": 10,
+      "publications": 1,
+      "closed": false,
+      "epoch": 2,
+      "navigationEpoch": 2,
+      "strides": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "maxError": 0.35
+    },
+    "worker": {
+      "workers": 1,
+      "running": 0,
+      "pending": 0,
+      "reservedBytes": 0,
+      "peakRunning": 1,
+      "peakReservedBytes": 212888,
+      "workersAvailable": true
+    },
+    "scatter": 14,
+    "active": {
+      "ms": 917,
+      "renders": 41,
+      "drawsPerFrame": 7,
+      "trisPerFrame": 5092,
+      "frameMsP95": 16.8,
+      "fps": 60,
+      "heapMiB": 15.5
+    },
+    "idle": {
+      "ms": 616,
+      "renders": 0,
+      "drawsPerFrame": 0,
+      "trisPerFrame": 0,
+      "frameMsP95": 16.7,
+      "fps": 60,
+      "heapMiB": 16.6
+    },
+    "errors": []
+  }
+]

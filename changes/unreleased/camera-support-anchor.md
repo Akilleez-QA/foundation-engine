@@ -1,0 +1,1 @@
+- **Camera support framing:** optional `support` query on `cameraSystem` keeps the camera and look target on the height of what the target stands on, scaled by creator weights and clamped to a limit, so jumps do not bob the view while level changes and long falls are followed. Without `support`, poses are unchanged. See [ADR 0090](docs/adr/0090-camera-support-framing.md).

@@ -1,0 +1,15 @@
+{
+  "name": "pose-robot",
+  "kind": "humanoid",
+  "build": "build_robot.py",
+  "landmarks": "landmarks.json",
+  "author": "author_poses.py",
+  "poses": "poses.json",
+  "testPoses": "testposes.json",
+  "definition": "animations.json",
+  "sheets": [
+    {"clip": "wave", "view": "front", "every": 3},
+    {"clip": "walk", "view": "side", "every": 2},
+    {"clip": "walk_turn_left", "view": "three-quarter", "every": 4}
+  ]
+}

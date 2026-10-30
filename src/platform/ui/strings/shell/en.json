@@ -1,0 +1,9 @@
+{
+  "engine.shell.close": "Close settings",
+  "engine.shell.menu": "Settings",
+  "engine.shell.sound-on": "Sound: on",
+  "engine.shell.sound-off": "Sound: off",
+  "engine.shell.boot-failed": "The game could not start.",
+  "engine.shell.boot-failed-text": "Nothing was saved or lost. Reloading usually fixes it.",
+  "engine.shell.boot-retry": "Reload"
+}
