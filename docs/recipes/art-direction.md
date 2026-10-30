@@ -749,8 +749,7 @@ and the rule "budgets only fall" applies to them from the commit that started th
   Do not keep a template scene's id for a different scene to inherit its looser numbers, and do not drop a row and
   re-add it under another id to dodge a raise.
 - **Redesigning a kept scene** (same id, a different look or more content) may need more draws, triangles or texture
-  memory than the template measured. Recover first (simplify, instance, bake; the
-  [fix-budget skill](../../.claude/skills/fix-budget/SKILL.md)). If it still needs more, it is a raise: agree it with
+  memory than the template measured. Recover first (simplify, instance, bake, LOD). If it still needs more, it is a raise: agree it with
   the author, commit it with one `Perf-Budget: <scene>.<metric> <old> -> <new>: <reason>` trailer per number, the reason
   naming the requirement and the measurement ("the creator asked for a shadowed sun; measured 42.3 MiB, the 2048 map
   is 32"), anywhere in the commit message, and add a GAME.md changelog row. Raise to the measurement plus headroom,
