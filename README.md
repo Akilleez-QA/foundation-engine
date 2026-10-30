@@ -189,6 +189,12 @@ The [editable itinerary lab](tools/itinerary-lab/README.md) is a headless protot
 for preserving active tasks across bounded list edits. It now exercises the optional
 [public itinerary helper candidate](src/kits/itinerary/README.md).
 
+## Used by Cstack
+
+Cstack template (private, Refrigeration.AI) lists Foundation Engine as a related
+project and an unimplemented sibling domain. Its inspected source includes no
+Foundation Engine runtime dependency, vendored engine path or version/commit pin.
+
 ## Commercial licensing
 
 This project is available under the GNU General Public License v3.0 only (GPL-3.0-only). If you want to use it in a product or service under different terms, commercial licenses are available from Refrigeration.AI. Contact craig@nh3.biz.
