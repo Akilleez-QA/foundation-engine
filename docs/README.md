@@ -39,3 +39,7 @@ Start with one route; the rest is reference.
 
 - [Brand](brand.md): logo, palette, ASCII banners and asset licence.
 - [Provenance](PROVENANCE.md): where this engine came from.
+
+## Architecture
+
+- [Architecture overview](architecture/architecture.md): components, ownership, data flow and ADRs.
