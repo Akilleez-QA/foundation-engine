@@ -44,7 +44,7 @@ Draws are per rendered frame from `npm run play:snap -- --scene <id>` (software 
 
 **First edit.** In `game/world.ts`, in `player`, change the hat (the `cone` shape) from `color: P.roof` to `color: P.accent`. You should see a yellow hat on the player in the courtyard, and the 11 tests still pass. To recolour lantern light, edit `palette.lantern` in `game/look.ts`, but keep it warm: `game/forms.test.ts` checks that baked light warms the stone.
 
-**The garden is at its draw budget.** One more separate visible entity in the garden makes `npm run play:snap` report OVER BUDGET. Add new scenery to an existing bake in `game/garden-scenery.ts` instead (one draw for all of it), or follow the [fix-budget skill](../../.claude/skills/fix-budget/SKILL.md). Raising the budget is the author's decision; it needs a `Perf-Budget:` commit trailer ([add a budget](../../docs/recipes/add-a-budget.md)).
+**The garden is at its draw budget.** One more separate visible entity in the garden makes `npm run play:snap` report OVER BUDGET. Add new scenery to an existing bake in `game/garden-scenery.ts` instead (one draw for all of it), or recover in order: simplify, instance, bake, LOD. Raising the budget is the author's decision; it needs a `Perf-Budget:` commit trailer ([add a budget](../../docs/recipes/add-a-budget.md)).
 
 ## What to change first
 
