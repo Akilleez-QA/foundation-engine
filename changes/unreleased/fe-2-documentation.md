@@ -1,0 +1,1 @@
+- **Documentation.** Apply the public license, release and runtime badge styling.

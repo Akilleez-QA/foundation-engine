@@ -6,9 +6,9 @@
   </picture>
 </h1>
 
-[![CI](https://img.shields.io/github/actions/workflow/status/Akilleez-QA/foundation-engine/ci.yml?branch=main)](https://github.com/Akilleez-QA/foundation-engine/actions/workflows/ci.yml?query=branch%3Amain)
-[![GPL-3.0-only](https://img.shields.io/static/v1?label=license&message=GPL-3.0-only&color=blue)](LICENSE)
-[![Node.js >= 22.18](https://img.shields.io/static/v1?label=node&message=%3E%3D22.18&color=brightgreen)](package.json)
+[![License](https://img.shields.io/static/v1?label=license&message=GPL-3.0-only&color=2400FF&style=flat-square&labelColor=000000)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/Akilleez-QA/foundation-engine?style=flat-square&labelColor=000000&color=FF0000)](https://github.com/Akilleez-QA/foundation-engine/releases)
+[![Node.js](https://img.shields.io/github/package-json/node/v/Akilleez-QA/foundation-engine?style=flat-square&labelColor=000000&color=6E61FF)](package.json)
 
 A layered TypeScript and three.js engine for browser games of any genre, with explicit engineering contracts, automated checks and application-specific acceptance requirements.
 
