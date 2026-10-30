@@ -39,3 +39,8 @@ Start with one route; the rest is reference.
 
 - [Brand](brand.md): logo, palette, ASCII banners and asset licence.
 - [Provenance](PROVENANCE.md): where this engine came from.
+
+## Verification and configuration
+
+- [Verification matrix](verification/verification-matrix.md): selected requirements and local evidence.
+- [Configuration management](configuration/configuration-management.md): baselines, pins and release control.
