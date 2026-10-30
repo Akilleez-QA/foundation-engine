@@ -39,3 +39,7 @@ Start with one route; the rest is reference.
 
 - [Brand](brand.md): logo, palette, ASCII banners and asset licence.
 - [Provenance](PROVENANCE.md): where this engine came from.
+
+## Requirements
+
+- [Requirements register](requirements/requirements.md): stock obligations and verification methods.

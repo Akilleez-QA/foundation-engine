@@ -1,0 +1,1 @@
+- **Documentation.** Consolidate the README license section and use US spelling.
