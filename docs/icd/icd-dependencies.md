@@ -29,7 +29,8 @@ Configuration rules are in [configuration management](../configuration/configura
 
 `schemas/read-only-tools.json` pins `foundation-engine-tools/1`, with Draft
 2020-12 `inputSchema` and `outputSchema` per tool. The stdio bridge is implemented
-by `python3 -B tools/foundation_engine_bridge.py`; run `npm ci` first.
+by `python3 -B tools/foundation_engine_bridge.py`. It requires Python 3 and
+`schemas/read-only-tools.json` only; Node and `npm ci` are not required.
 
 | Tool | Existing TypeScript owner | Input mapping | Successful output |
 |---|---|---|---|

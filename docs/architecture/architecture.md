@@ -72,7 +72,9 @@ ownership of validation; the JSON schemas describe their serializable subset.
 No scheduler, cache, registry, persistence owner or runtime dependency is added.
 See [ADR 0078](../adr/0078-foundation-contract-baseline.md) and the
 [ICD](../icd/icd-dependencies.md#read-only-tool-contract-version-020).
-The stdio bridge owns bounded, sequential request admission and schema validation;
-`scripts/foundation-bridge-call.ts` invokes the existing TypeScript validators.
-Each call uses a fresh Node process; no runtime state is retained or mutated.
+The stdio bridge owns bounded, sequential request admission and schema validation.
+It computes each result from the pinned schema alone and needs only Python 3 and
+`schemas/read-only-tools.json`; no Node process is started and no state is retained.
+`scripts/foundation-contract.test.ts` and `scripts/foundation-bridge.test.mjs` verify
+that bridge results equal the TypeScript validators for the same inputs.
 The ICD specifies framing, bounds, shutdown and recovery.

@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {readFileSync} from 'node:fs';
+import {copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import test from 'node:test';
+import {validateRenderMask} from '../src/author/render-mask.ts';
+import {validateSceneOutput} from '../src/author/scene-output.ts';
 
 const contract = JSON.parse(readFileSync('schemas/read-only-tools.json', 'utf8'));
 const request = (method, params = {}, id = 1) => ({jsonrpc: '2.0', id, method, params});
@@ -85,4 +89,42 @@ test('bridge rejects malformed, duplicate, numeric and bounded-frame violations'
   assert.equal(run(['x'.repeat(65538)]).status, 2);
   assert.equal(run([init], '').status, 2);
   assert.equal(run([], '\n', ['--root', '/']).status, 2);
+});
+
+test('bridge results equal the TypeScript validators', () => {
+  const cases = [
+    ['validate_render_mask', {mask: 0}, a => validateRenderMask(a.mask)],
+    ['validate_render_mask', {mask: 4294967295}, a => validateRenderMask(a.mask)],
+    ...[{}, {toneMapping: 'aces'}, {exposure: 0.25}, {toneMapping: 'neutral', exposure: 16}].map(output => [
+      'validate_scene_output',
+      {output},
+      a => validateSceneOutput(a.output),
+    ]),
+    ['validate_scene_output', {}, a => validateSceneOutput(a.output)],
+  ];
+  const {replies} = run([init, ...cases.map(([name, args]) => call(name, args))]);
+  cases.forEach(([, args, expected], i) => assert.deepEqual(replies[i + 1].result.structuredContent, expected(args)));
+});
+
+test('bridge answers a read-only call from the bridge and schema alone, without Node on PATH', () => {
+  const root = mkdtempSync(join(tmpdir(), 'foundation-bridge-alone-'));
+  try {
+    for (const dir of ['tools', 'schemas', 'bin']) mkdirSync(join(root, dir));
+    copyFileSync('tools/foundation_engine_bridge.py', join(root, 'tools/foundation_engine_bridge.py'));
+    copyFileSync('schemas/read-only-tools.json', join(root, 'schemas/read-only-tools.json'));
+    const python = spawnSync('python3', ['-c', 'import sys; print(sys.executable)'], {encoding: 'utf8'}).stdout.trim();
+    symlinkSync(python, join(root, 'bin/python3'));
+    const proc = spawnSync(join(root, 'bin/python3'), ['-B', join(root, 'tools/foundation_engine_bridge.py')], {
+      cwd: root,
+      env: {PATH: join(root, 'bin')},
+      input: [init, call('validate_render_mask', {mask: 1})].map(f => JSON.stringify(f)).join('\n') + '\n',
+      encoding: 'utf8',
+      timeout: 30000,
+    });
+    assert.equal(proc.status, 0);
+    const replies = proc.stdout.trim().split('\n').map(JSON.parse);
+    assert.deepEqual(replies[1].result, {isError: false, structuredContent: 1});
+  } finally {
+    rmSync(root, {recursive: true, force: true});
+  }
 });

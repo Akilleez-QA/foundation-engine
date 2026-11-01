@@ -2,7 +2,6 @@ from __future__ import annotations
 import json
 import re
 import sys
-import subprocess
 from pathlib import Path
 from typing import BinaryIO
 ROOT = Path(__file__).resolve().parents[1]
@@ -113,10 +112,11 @@ def _validate(value, schema):
         raise WireError(-32603, "Unsupported pinned schema type")
 def _tool_result(name, arguments):
     _validate(arguments, TOOLS[name]["inputSchema"])
-    process = subprocess.run(["node", "--import", "tsx", "scripts/foundation-bridge-call.ts"],
-                             cwd=ROOT, input=json.dumps({"name": name, "arguments": arguments}),
-                             capture_output=True, text=True, timeout=10, check=True)
-    result = json.loads(process.stdout)
+    if name == "validate_render_mask":
+        result = arguments["mask"]
+    else:
+        output = arguments.get("output", {})
+        result = {"toneMapping": output.get("toneMapping", "none"), "exposure": output.get("exposure", 1)}
     _validate(result, TOOLS[name]["outputSchema"])
     return {"isError": False, "structuredContent": result}
 class Bridge:
