@@ -73,8 +73,7 @@ choices. Framework availability does not establish application acceptance.
 [Foundation Math](https://github.com/Akilleez-QA/foundation-math) is a related
 Foundation project for mathematical kernels and physics research tools.
 The [interface control record](docs/icd/icd-dependencies.md) documents external
-dependencies and the static read-only tool contract. It records no implemented
-bridge or runtime interface to another Akilleez-QA repository.
+dependencies, the pinned read-only tool schemas and the transport scope.
 
 ## Layout
 
