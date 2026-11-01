@@ -67,4 +67,6 @@ The generator follows the GPL-3.0 Foundation Refrigeration convention at
 [3fe90a9](https://github.com/Akilleez-QA/foundation-refrigeration/blob/3fe90a939f85aeb4e4aa6913b0993374e115f176/tools/build_manifest.py),
 adapted to Git-tracked membership, compact encoding, package version and check mode.
 The tool inventory version is pinned to `package.json`; schema changes require
-source mapping, regression evidence and review. Transport is not yet implemented.
+source mapping, regression evidence and review. Transport is implemented by `tools/foundation_engine_bridge.py`, adapted from
+Foundation Refrigeration `4bd3311b31766c00083c582a8c4f99467501df7f`; protocol
+identity is `foundation-engine-jsonrpc/1`. Stage bridge and test sources before regenerating.

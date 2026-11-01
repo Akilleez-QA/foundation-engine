@@ -72,5 +72,7 @@ ownership of validation; the JSON schemas describe their serializable subset.
 No scheduler, cache, registry, persistence owner or runtime dependency is added.
 See [ADR 0078](../adr/0078-foundation-contract-baseline.md) and the
 [ICD](../icd/icd-dependencies.md#read-only-tool-contract-version-020).
-A stdio bridge is planned separately; dispatch, framing and error recovery remain
-unimplemented and unverified. This baseline grants no runtime mutation capability.
+The stdio bridge owns bounded, sequential request admission and schema validation;
+`scripts/foundation-bridge-call.ts` invokes the existing TypeScript validators.
+Each call uses a fresh Node process; no runtime state is retained or mutated.
+The ICD specifies framing, bounds, shutdown and recovery.

@@ -1,0 +1,1 @@
+- **Read-only Foundation stdio bridge.** Add schema validation and sibling-compatible bounded JSON-RPC framing for the two pinned validators.
