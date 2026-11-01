@@ -43,3 +43,7 @@ Start with one route; the rest is reference.
 ## Requirements
 
 - [Requirements register](requirements/requirements.md): stock obligations and verification methods.
+
+## Architecture
+
+- [Architecture overview](architecture/architecture.md): components, ownership, data flow and ADRs.
