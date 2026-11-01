@@ -59,7 +59,7 @@ export function fragments(root = ROOT) {
     .sort((a, b) => b.added - a.added || a.name.localeCompare(b.name));
 }
 
-const UNRELEASED = /^## Unreleased\n\n((?:(?!^- |^## ).*\n)*)/m;
+const UNRELEASED = /^## (?:Unreleased|\[Unreleased\])\n\n((?:(?!^- |^## ).*\n)*)/m;
 
 /** CHANGELOG.md text with the fragment bullets inserted at the top of Unreleased (after its introduction). */
 export function folded(changelog, entries) {
@@ -75,7 +75,7 @@ export function folded(changelog, entries) {
 /** The Unreleased section as it will read once folded. */
 export function preview(changelog, entries) {
   const text = folded(changelog, entries);
-  const start = text.indexOf('## Unreleased');
+  const start = text.search(/^## (?:Unreleased|\[Unreleased\])$/m);
   const next = text.indexOf('\n## ', start + 1);
   return text.slice(start, next < 0 ? undefined : next + 1);
 }
