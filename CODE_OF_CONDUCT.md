@@ -10,6 +10,9 @@ In Foundation Engine issues, pull requests, reviews, and other project-managed s
 
 Maintainers may edit or remove disruptive contributions, lock discussions, or restrict participation. Any action should consider the context and severity of the behavior. No response timeline or formal appeal process is promised by this document.
 
-To report a conduct problem, contact the maintainer [@Akilleez-QA](https://github.com/Akilleez-QA) privately, or use this repository's private reporting: open the Security tab and choose **Report a vulnerability** (<https://github.com/Akilleez-QA/foundation-engine/security/advisories/new>). Say that the report is about conduct. That report stays visible only to you and the maintainers. Do not open a public issue or pull request for it, and do not include personal or sensitive details in any public place. GitHub's own reporting and blocking tools remain available for platform abuse.
+To report platform abuse, use [GitHub's reporting tools](https://docs.github.com/en/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam).
+Do not publish personal or sensitive information in an issue or pull request.
+This repository does not publish a dedicated private conduct-reporting channel.
+Use [SECURITY.md](SECURITY.md) for software vulnerability reports.
 
 This policy covers project-managed spaces; it does not claim authority over unrelated communities.
