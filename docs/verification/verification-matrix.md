@@ -34,3 +34,23 @@ extensions or every standard clause. Documentation-only `npm run check` can sele
 no tests. Full integration CI, browser behavior, physical devices and sustained
 performance were not verified by this documentation pass. Existing broader evidence
 and its limitations remain in the [acceptance ledger](../guides/upgrade-acceptance-ledger.md).
+
+## Foundation contract verification
+
+These methods cover the new baseline; earlier results above remain historical.
+
+| Requirement | Method | Test file or command | Evidence scope |
+|---|---|---|---|
+| REQ-FND-001 | A, T | `python3 -B tools/build_manifest.py --check`; `node --test scripts/source-manifest.test.mjs` | Passed locally (1 test): byte drift, deterministic output and newly tracked membership; hosted CI unverified. |
+| REQ-FND-002 | T, I | `node --import tsx --test scripts/foundation-contract.test.ts`; ICD mapping | Passed locally (1 test): native bounds, defaults, enum pins and rejection cases; no transport execution. |
+| REQ-FND-003 | I | Inspect `schemas/read-only-tools.json`, architecture and ADR 0078 | Static contract only; stdio bridge planned, not implemented or accepted. |
+
+Local baseline run, 2026-11-01: Arch Linux, Python 3.14.8, Node 22.23.4 and
+26.13.0, system Chromium 149.0.7827.55 with software GL. All 34 browser work steps,
+both template shards (nine templates with phone smoke), the Node-current work
+steps and all 11 additional `test:*` scripts passed in separate local runs.
+Parallel source suites experienced process `SIGKILL`s; retries used eight-CPU or
+two-CPU affinity, with unchanged assertions and budgets. Each complete source pass
+ran 4,196 tests. Ubuntu browser dependency installation failed (`apt-get` absent);
+installed Chromium supplied the local browser runs. These combined local results
+are not a hosted CI run, independent review or physical-device acceptance.

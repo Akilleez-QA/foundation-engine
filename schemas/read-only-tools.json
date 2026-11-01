@@ -1,0 +1,52 @@
+{
+  "schema": "foundation-engine-tools/1",
+  "version": "0.2.0",
+  "tools": [
+    {
+      "name": "validate_render_mask",
+      "description": "Validate an unsigned 32-bit render mask without changing engine state. Maps mask to validateRenderMask(mask).",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {"mask": {"type": "integer", "minimum": 0, "maximum": 4294967295}},
+        "required": ["mask"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      }
+    },
+    {
+      "name": "validate_scene_output",
+      "description": "Validate scene output and fill defaults without changing engine state. Maps output to validateSceneOutput(output).",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "output": {
+            "type": "object",
+            "properties": {
+              "toneMapping": {"enum": ["none", "aces", "agx", "neutral"]},
+              "exposure": {"type": "number", "exclusiveMinimum": 0, "maximum": 16}
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "toneMapping": {"enum": ["none", "aces", "agx", "neutral"]},
+          "exposure": {"type": "number", "exclusiveMinimum": 0, "maximum": 16}
+        },
+        "required": ["toneMapping", "exposure"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

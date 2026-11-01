@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import test from 'node:test';
+
+test('source manifest detects changed bytes and newly tracked files, excluding local artifacts', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'foundation-manifest-'));
+  mkdirSync(join(cwd, 'tools'));
+  copyFileSync('tools/build_manifest.py', join(cwd, 'tools/build_manifest.py'));
+  const run = (command, args) => spawnSync(command, args, {cwd, encoding: 'utf8'});
+  const generate = (...args) => run('python3', ['-B', 'tools/build_manifest.py', ...args]);
+  assert.equal(run('git', ['init', '-q']).status, 0);
+  writeFileSync(join(cwd, 'package.json'), '{"version":"0.2.0"}\n');
+  writeFileSync(join(cwd, 'untracked.txt'), 'local artifact');
+  writeFileSync(join(cwd, 'PR_BODY.md'), 'local review notes');
+  assert.equal(run('git', ['add', 'tools', 'package.json']).status, 0);
+  assert.equal(generate().status, 0);
+  const bytes = readFileSync(join(cwd, 'SOURCE-MANIFEST.json'), 'utf8');
+  const manifest = JSON.parse(bytes);
+  assert.equal(manifest.schema, 'foundation-engine-source-manifest/1');
+  assert.deepEqual(Object.keys(manifest.files), ['package.json', 'tools/build_manifest.py']);
+  assert.equal(manifest.files['package.json'], createHash('sha256').update('{"version":"0.2.0"}\n').digest('hex'));
+  assert.equal(generate('--check').status, 0);
+  assert.equal(generate().status, 0);
+  assert.equal(readFileSync(join(cwd, 'SOURCE-MANIFEST.json'), 'utf8'), bytes);
+  writeFileSync(join(cwd, 'package.json'), '{"version":"0.3.0"}\n');
+  assert.notEqual(generate('--check').status, 0);
+  assert.equal(generate().status, 0);
+  assert.equal(run('git', ['add', 'untracked.txt']).status, 0);
+  assert.notEqual(generate('--check').status, 0);
+  assert.equal(generate('--invalid').status, 1);
+});

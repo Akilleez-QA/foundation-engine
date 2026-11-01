@@ -47,3 +47,24 @@ Record source commit, compared base, selected game, commands, results and missin
 acceptance evidence together. The [verification matrix](../verification/verification-matrix.md)
 covers the selected stock requirements. It does not certify a release, a deployment
 or physical devices. Revalidate combined changes after integration changes the base.
+
+## Source manifest and schema pins
+
+Stage intended source files with `git add`, then run
+`python3 -B tools/build_manifest.py` and stage `SOURCE-MANIFEST.json`.
+`python3 -B tools/build_manifest.py --check` compares bytes without rewriting and
+fails on changed, missing or newly tracked files. Untracked artifacts are excluded;
+review `git status --short` for omitted source before committing. `PR_BODY.md` is
+local review material and excluded even if accidentally staged.
+
+The manifest uses `foundation-engine-source-manifest/1`, package version from
+`package.json`, and a sorted `files` path-to-SHA-256 map. Compact JSON keeps this
+large repository's baseline within the small-change line limit; its hash is not a
+signature or proof of correctness. The standalone `manifest.yml` CI job checks it
+without npm dependencies; `gate:ci` covers `ci.yml`, so run this check separately.
+
+The generator follows the GPL-3.0 Foundation Refrigeration convention at
+[3fe90a9](https://github.com/Akilleez-QA/foundation-refrigeration/blob/3fe90a939f85aeb4e4aa6913b0993374e115f176/tools/build_manifest.py),
+adapted to Git-tracked membership, compact encoding, package version and check mode.
+The tool inventory version is pinned to `package.json`; schema changes require
+source mapping, regression evidence and review. Transport is not yet implemented.

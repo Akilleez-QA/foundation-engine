@@ -69,3 +69,5 @@ src/kits/animation/effect-lifecycle-recipe.test.ts
 
 # Files staged for deletion are not formatted.
 TODELETE/
+
+SOURCE-MANIFEST.json

@@ -175,3 +175,5 @@ Each file records one decision: its context, the decision and its consequences (
 | [0142](0142-prediction-presentation.md) | Optional prediction correction smoothing and predicted-event deduplication | Network kit / Prediction presentation | Proposed |
 
 | [0154](0154-presentation-kit.md) | Optional presentation kit | Optional kits | Proposed |
+
+- [0078 — Source identity and read-only tool schema baseline](0078-foundation-contract-baseline.md) — Proposed.
