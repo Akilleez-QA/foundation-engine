@@ -56,7 +56,7 @@ choices. Framework availability does not establish application acceptance.
 - Hosted accounts, matchmaking and public Internet multiplayer infrastructure.
   The network kit and shared-world template provide local-session building blocks;
   see [two players in one world](docs/recipes/two-players-one-world.md).
-- A published npm library or visual editor. Games build to static output for a
+- A published npm library. Games build to static output for a
   creator-selected host; see [sharing a build](docs/recipes/share-your-build.md).
 
 ## Documentation
