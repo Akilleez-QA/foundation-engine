@@ -23,7 +23,7 @@ Choose where each model comes from:
 | The model is… | Make it with | Then |
 | --- | --- | --- |
 | A simple form the engine can draw (a crate, a pillar, a gem) | A procedural `Shape` or `defineMesh` in code | No rig needed |
-| A hard-surface prop or a creature you can describe in parts | Blender, through the [blender-asset skill](../../.claude/skills/blender-asset/SKILL.md): one rebuild script, parts named `asset_part` | Pose to pose, with `--kind rigid` for jointed parts or `--kind humanoid` |
+| A hard-surface prop or a creature you can describe in parts | Blender, through the [Blender MCP recipe](make-assets-with-blender-mcp.md): one rebuild script, parts named `asset_part` | Pose to pose, with `--kind rigid` for jointed parts or `--kind humanoid` |
 | An organic character from an image or a prompt | An AI generator, then Blender cleanup | Pose to pose, after the checks below |
 
 For generated or imported meshes:

@@ -6,7 +6,7 @@
 // the nouns of the game the engine was extracted from. Genre patterns live in kits (src/kits/, docs/kits/) and
 // templates, which this check does not scan.
 //
-// Scanned: src/core, src/platform, src/author, src/domain, src/app, src/dev, src/features, src/testing, README.md, AGENTS.md, CLAUDE.md, docs/ (except docs/kits/).
+// Scanned: src/core, src/platform, src/author, src/domain, src/app, src/dev, src/features, src/testing, README.md, AGENTS.md, docs/ (except docs/kits/).
 // A hit is allowed only by the ALLOW list below: an idiom ("in place", "room for"), or a documented opt-in (the
 // brief's `kids` flag and the kid-safe policy). Adding to ALLOW is a design decision: say why next to the entry.
 import {existsSync, readdirSync, readFileSync, statSync} from 'node:fs';
@@ -25,7 +25,6 @@ export const SCANNED = [
   'src/testing',
   'README.md',
   'AGENTS.md',
-  'CLAUDE.md',
   'docs',
 ];
 export const SKIPPED = ['docs/kits'];

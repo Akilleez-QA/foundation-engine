@@ -218,8 +218,7 @@ GLSL runs on the WebGL2 backend only; a future WebGPU backend will not draw it.
   visit. The render target, the drawing-buffer size and the pixel ratio are the engine's: they are restored after your
   hooks run, and dev builds report it. Resize composers in `onResize`.
 - **Budgets are honest.** `play:snap` and the gate measure draws, triangles, textures and heap from the real renderer,
-  whatever made them. Over budget: recover first (fewer lights and passes, smaller maps), as the
-  [fix-budget skill](../../.claude/skills/fix-budget/SKILL.md) says.
+  whatever made them. Over budget: recover first (fewer lights and passes, smaller maps), then simplify, instance, bake and LOD.
 - **Replays.** Replays and determinism checks compare game state, not the three.js scene. Visuals the kit drives are not
   part of a replay unless the game keeps them in state.
 - **Game state stays in systems.** Read the world in a hook if you need to; change game state in systems, so a replay

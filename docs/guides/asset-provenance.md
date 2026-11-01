@@ -23,7 +23,7 @@ Checked kinds: models (`.glb`, `.gltf`), textures and images (`.png`, `.jpg`, `.
 
 | Field | Required | Meaning |
 |---|---|---|
-| `origin` | always | `hand` (a person made it, by hand or with a script they wrote), `agent-blender` (an AI agent built it by driving Blender, for example through the Blender MCP server and the [blender-asset skill](../../.claude/skills/blender-asset/SKILL.md)), `ai-generator` (an AI model or service generated it: 3D, image, texture, sound, voice), `library` (taken from a library or another author) |
+| `origin` | always | `hand` (a person made it, by hand or with a script they wrote), `agent-blender` (an AI agent built it by driving Blender, for example through the Blender MCP server and the [Blender MCP recipe](../recipes/make-assets-with-blender-mcp.md)), `ai-generator` (an AI model or service generated it: 3D, image, texture, sound, voice), `library` (taken from a library or another author) |
 | `author` | always | Who made it; for a library asset, the original author as its licence asks to be credited |
 | `licence` | always | The asset's own licence, SPDX where one exists (`CC0-1.0`, `CC-BY-4.0`, `GPL-3.0-only`) |
 | `source` | always | The script that made it, the library page, or the generator job |

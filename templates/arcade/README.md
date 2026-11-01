@@ -39,7 +39,7 @@ Draws are per rendered frame from `npm run play:snap -- --scene <id>` (software 
 
 **First edit.** In `game/components.ts`, in the `ball` definition, replace `color: 0xffcc33` with `color: 0x66ddff`. You should see a cyan ball; steering, scoring and restart still work, and the 5 tests still pass.
 
-**Budget.** With blocks falling, `play` peaks close to its 10 draws. A new always-visible entity (a second lane stripe, a scenery prop) costs one draw at every moment, so check `npm run play:snap` with blocks on screen, and see the [fix-budget skill](../../.claude/skills/fix-budget/SKILL.md) if it says OVER BUDGET.
+**Budget.** With blocks falling, `play` peaks close to its 10 draws. A new always-visible entity (a second lane stripe, a scenery prop) costs one draw at every moment, so check `npm run play:snap` with blocks on screen. If it says OVER BUDGET, recover in order: simplify, instance, bake, LOD.
 
 ## What to change first
 

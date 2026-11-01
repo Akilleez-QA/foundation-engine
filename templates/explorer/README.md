@@ -37,7 +37,7 @@ Draws are per rendered frame from `npm run play:snap -- --scene <id>` (software 
 
 **First edit.** In `game/garden.ts`, find the bench (the `Interactable` with `id: 'bench'`) and replace `color: 0xb08a5a` with `color: 0xd2453a`. You should see a red bench; walking to it and pressing E still counts it, and the 3 tests still pass. Recolouring or moving an entity costs no draws.
 
-**The garden is at its draw budget.** The ground, three hedges, the shed and its door, the bench, the lamp post, the lamp and the player are 10 draws, and the budget is 10. One more visible entity in `garden.ts` makes `npm run play:snap` report `OVER BUDGET (draws 11 > 10 …)` and fail. To add something to the garden, first make room: replace or remove an entity instead of adding one, or put the new thing in the shed (5 of 10). The [fix-budget skill](../../.claude/skills/fix-budget/SKILL.md) lists the recoveries in order (simplify, instance, bake, LOD). Raising the garden's budget is the author's decision; it needs a `Perf-Budget:` commit trailer ([add a budget](../../docs/recipes/add-a-budget.md)).
+**The garden is at its draw budget.** The ground, three hedges, the shed and its door, the bench, the lamp post, the lamp and the player are 10 draws, and the budget is 10. One more visible entity in `garden.ts` makes `npm run play:snap` report `OVER BUDGET (draws 11 > 10 …)` and fail. To add something to the garden, first make room: replace or remove an entity instead of adding one, or put the new thing in the shed (5 of 10). Recover in order: simplify, instance, bake, LOD. Raising the garden's budget is the author's decision; it needs a `Perf-Budget:` commit trailer ([add a budget](../../docs/recipes/add-a-budget.md)).
 
 ## What to change first
 
