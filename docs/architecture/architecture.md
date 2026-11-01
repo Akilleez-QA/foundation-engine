@@ -63,3 +63,14 @@ Configured resource limits, overload behavior, cancellation and recovery belong 
 the owning framework contract. This overview does not introduce another scheduler,
 cache or persistence owner. Passing static checks or Node tests does not establish
 browser behavior, sustained hardware performance or supported-device acceptance.
+
+## Foundation contract boundary
+
+The source manifest and read-only tool inventory are build-time artifacts owned by
+repository tooling, outside the running engine. Existing author validators retain
+ownership of validation; the JSON schemas describe their serializable subset.
+No scheduler, cache, registry, persistence owner or runtime dependency is added.
+See [ADR 0078](../adr/0078-foundation-contract-baseline.md) and the
+[ICD](../icd/icd-dependencies.md#read-only-tool-contract-version-020).
+A stdio bridge is planned separately; dispatch, framing and error recovery remain
+unimplemented and unverified. This baseline grants no runtime mutation capability.

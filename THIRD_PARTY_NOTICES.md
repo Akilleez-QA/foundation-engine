@@ -845,3 +845,11 @@ confirm rights to the project contributions and retain third-party notices for
 the specific source and binary release they distribute. Do not interpret this
 file as legal certification or a blanket claim that no third-party material has
 ever entered repository history.
+
+## Foundation source manifest convention
+
+`tools/build_manifest.py` adapts the GPL-3.0 generator from Foundation Refrigeration,
+revision `3fe90a939f85aeb4e4aa6913b0993374e115f176`, by Akilleez-QA:
+https://github.com/Akilleez-QA/foundation-refrigeration/blob/3fe90a939f85aeb4e4aa6913b0993374e115f176/tools/build_manifest.py.
+Its license is retained under this repository's GPL-3.0-only license; changes are
+tracked membership, compact encoding, package version selection and check mode.

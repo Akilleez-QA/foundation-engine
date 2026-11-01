@@ -1,0 +1,1 @@
+- **Foundation contract baseline.** Pin read-only validation tool schemas and a generated SHA-256 source manifest, with a CI drift check; the stdio bridge remains planned.
