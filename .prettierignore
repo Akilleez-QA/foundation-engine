@@ -66,3 +66,6 @@ src/author/test-a-scene-recipe.test.ts
 src/author/material-options-recipe.test.ts
 src/author/scatter-recipe.test.ts
 src/kits/animation/effect-lifecycle-recipe.test.ts
+
+# Files staged for deletion are not formatted.
+TODELETE/
