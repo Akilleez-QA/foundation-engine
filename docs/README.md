@@ -48,6 +48,10 @@ Start with one route; the rest is reference.
 
 - [Architecture overview](architecture/architecture.md): components, ownership, data flow and ADRs.
 
+## Interface control
+
+- [Interface control](icd/icd-dependencies.md): external dependencies, consumers and their pins.
+
 ## Verification and configuration
 
 - [Verification matrix](verification/verification-matrix.md): selected requirements and local evidence.
