@@ -1,9 +1,10 @@
-<p align="center"><img src="assets/brand/social-preview.png" alt="Foundation Engine" width="100%"></p>
+<p align="center"><img src=".github/assets/social-preview.png" alt="Foundation Engine" width="100%"></p>
 
 # Foundation Engine
 
-Foundation Engine: a genre-neutral TypeScript and Three.js engine for browser games.
+A malleable TypeScript and three.js framework for browser games, with optional kits and explicit quality, performance and lifecycle contracts.
 
+[![CI](https://img.shields.io/github/actions/workflow/status/Akilleez-QA/foundation-engine/ci.yml?branch=main&style=flat-square&labelColor=000000)](https://github.com/Akilleez-QA/foundation-engine/actions/workflows/ci.yml)
 [![License](https://img.shields.io/static/v1?label=license&message=GPL-3.0-only&color=2400FF&style=flat-square&labelColor=000000)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/Akilleez-QA/foundation-engine?style=flat-square&labelColor=000000&color=FF0000)](https://github.com/Akilleez-QA/foundation-engine/releases)
 [![Node.js](https://img.shields.io/github/package-json/node/v/Akilleez-QA/foundation-engine?style=flat-square&labelColor=000000&color=6E61FF)](package.json)
@@ -58,14 +59,6 @@ choices. Framework availability does not establish application acceptance.
 - A published npm library or visual editor. Games build to static output for a
   creator-selected host; see [sharing a build](docs/recipes/share-your-build.md).
 
-## Measured
-
-CI: local only for this documentation pass. `npm ci`, `npm run check` and
-`npm run lint` passed locally on the license documentation candidate `37dc4a5`.
-The focused check selected no tests; these results do not establish full CI,
-browser performance or physical-device acceptance. No performance measurements
-were taken for this README.
-
 ## Documentation
 
 - [Documentation index](docs/README.md): routes through guides, standards and recipes.
@@ -79,9 +72,9 @@ were taken for this README.
 
 [Foundation Math](https://github.com/Akilleez-QA/foundation-math) is a related
 Foundation project for mathematical kernels and physics research tools.
-[Cstack](https://github.com/Akilleez-QA/cstack) is listed as a host in this
-repository's project-family record; this checkout does not establish a pinned
-Cstack interface or prove a deployed integration.
+The [interface control record](docs/icd/icd-dependencies.md) documents external
+dependencies and the static read-only tool contract. It records no implemented
+bridge or runtime interface to another Akilleez-QA repository.
 
 ## Layout
 
@@ -109,10 +102,6 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md), [governance](GOVERNANCE.md) and the
 Use [SECURITY.md](SECURITY.md) for vulnerability reporting.
 [Third-party notices](THIRD_PARTY_NOTICES.md) preserve dependency and asset terms.
 
-## License
-
-This project is available under the GNU General Public License v3.0 only (GPL-3.0-only). If you want to use it to create a product or service under different terms, commercial licenses are available from Refrigeration.AI. Contact craig@nh3.biz.
-
 ## Brand
 
 ```text
@@ -129,3 +118,7 @@ This project is available under the GNU General Public License v3.0 only (GPL-3.
 ```
 
 Brand assets, palette and copy-paste banners: [docs/brand.md](docs/brand.md).
+
+## License
+
+This project is available under the GNU General Public License v3.0 only (GPL-3.0-only). If you want to use it to create a product or service under different terms, commercial licenses are available from Refrigeration.AI. Contact craig@nh3.biz.
