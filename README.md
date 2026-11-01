@@ -112,3 +112,20 @@ Use [SECURITY.md](SECURITY.md) for vulnerability reporting.
 ## License
 
 This project is available under the GNU General Public License v3.0 only (GPL-3.0-only). If you want to use it to create a product or service under different terms, commercial licenses are available from Refrigeration.AI. Contact craig@nh3.biz.
+
+## Brand
+
+```text
+ 88"""" o8""8o 88  88 88o 88 88""8o o8""8o ""88"" "88" o8""8o 88o 88
+ 88ooo  88  88 88  88 88"888 88  88 88oo88   88    88  88  88 88"888
+ 88     88  88 88  88 88  88 88  88 88  88   88    88  88  88 88  88
+ 88      8888   8888  88  88 88888  88  88   88   8888  8888  88  88
+
+           [####]            88"""" 88o 88 o8"""" "88" 88o 88 88""""
+        [====][====]         88ooo  88"888 88 ooo  88  88"888 88ooo
+     [====][====][====]      88     88  88 88  88  88  88  88 88
+  [====][====][====][====]   888888 88  88  88888 8888 88  88 888888
+ [#################################################################]
+```
+
+Brand assets, palette and copy-paste banners: [docs/brand.md](docs/brand.md).
