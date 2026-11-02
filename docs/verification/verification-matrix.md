@@ -43,7 +43,7 @@ These methods cover the new baseline; earlier results above remain historical.
 |---|---|---|---|
 | REQ-FND-001 | A, T | `python3 -B tools/build_manifest.py --check`; `node --test scripts/source-manifest.test.mjs` | Passed locally (1 test): byte drift, deterministic output and newly tracked membership; hosted CI unverified. |
 | REQ-FND-002 | T, I | `node --import tsx --test scripts/foundation-contract.test.ts`; ICD mapping | Passed locally (1 test): native bounds, defaults, enum pins and rejection cases; no transport execution. |
-| REQ-FND-003 | I | Inspect `schemas/read-only-tools.json`, architecture and ADR 0078 | Static contract only; stdio bridge planned, not implemented or accepted. |
+| REQ-FND-003 | T | `node --test scripts/foundation-bridge.test.mjs` | Passed locally: 6 tests covering handshake, inventory, both tools, defaults, schema rejection, unknown tools, framing limits and recovery. Hosted CI unverified. |
 
 Local baseline run, 2026-11-01: Arch Linux, Python 3.14.8, Node 22.23.4 and
 26.13.0, system Chromium 149.0.7827.55 with software GL. All 34 browser work steps,

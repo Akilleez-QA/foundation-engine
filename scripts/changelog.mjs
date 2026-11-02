@@ -35,7 +35,7 @@ export function fragmentProblems(name, text) {
 }
 
 /** When git first saw `file` (seconds), or now for a file git has not committed. */
-function addedAt(root, file) {
+function addedAt(root, file, now) {
   try {
     const t = execFileSync('git', ['log', '--diff-filter=A', '--format=%ct', '-1', '--', file], {
       cwd: root,
@@ -46,16 +46,17 @@ function addedAt(root, file) {
   } catch {
     /* not a git checkout: every fragment counts as new */
   }
-  return Math.floor(Date.now() / 1000);
+  return now;
 }
 
 /** The fragments, newest first: `{name, text, added}`. README.md is the folder's guide, not an entry. */
 export function fragments(root = ROOT) {
   const dir = join(root, DIR);
   if (!existsSync(dir)) return [];
+  const now = Math.floor(Date.now() / 1000);
   return readdirSync(dir)
     .filter(n => n.endsWith('.md') && n !== 'README.md')
-    .map(name => ({name, text: readFileSync(join(dir, name), 'utf8'), added: addedAt(root, join(DIR, name))}))
+    .map(name => ({name, text: readFileSync(join(dir, name), 'utf8'), added: addedAt(root, join(DIR, name), now)}))
     .sort((a, b) => b.added - a.added || a.name.localeCompare(b.name));
 }
 
