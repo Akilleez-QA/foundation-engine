@@ -853,3 +853,9 @@ revision `3fe90a939f85aeb4e4aa6913b0993374e115f176`, by Akilleez-QA:
 https://github.com/Akilleez-QA/foundation-refrigeration/blob/3fe90a939f85aeb4e4aa6913b0993374e115f176/tools/build_manifest.py.
 Its license is retained under this repository's GPL-3.0-only license; changes are
 tracked membership, compact encoding, package version selection and check mode.
+
+## Foundation stdio bridge
+
+`tools/foundation_engine_bridge.py` adapts the GPL-3.0-only Foundation Refrigeration
+[bridge server](https://github.com/Akilleez-QA/foundation-refrigeration/blob/4bd3311b31766c00083c582a8c4f99467501df7f/foundation_refrigeration_bridge/server.py).
+Copyright © 2026 Refrigeration.AI. Licensed GPL-3.0-only; see [LICENSE](LICENSE).

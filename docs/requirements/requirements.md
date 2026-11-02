@@ -40,4 +40,4 @@ retire identifiers explicitly when their obligations are removed.
 |---|---|---|---|
 | REQ-FND-001 | The source manifest shall pin SHA-256 bytes for every Git-tracked file except itself and local `PR_BODY.md`. | Reproducible source identity, including schemas and tooling. | A: `python3 -B tools/build_manifest.py --check`; T: `node --test scripts/source-manifest.test.mjs`. |
 | REQ-FND-002 | Versioned JSON tool schemas shall describe only existing read-only TypeScript capabilities. | No new runtime authority or mutating operations. | T: `node --import tsx --test scripts/foundation-contract.test.ts`; I: ICD source mapping. |
-| REQ-FND-003 | The contract baseline shall not provide a stdio dispatcher. | Transport and error receipts require a separate implementation and review. | I: architecture and ICD scope inspection. |
+| REQ-FND-003 | The stdio bridge shall mirror sibling framing, initialize before tools, validate pinned inputs and reject unknown tools. | Read-only interoperability without runtime authority. | T: `node --test scripts/foundation-bridge.test.mjs`. |
