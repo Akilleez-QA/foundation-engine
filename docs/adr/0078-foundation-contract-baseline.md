@@ -16,5 +16,5 @@ and the manifest itself are excluded. Work scales with tracked bytes, with no
 runtime queue or cancellation lifecycle. Missing files fail generation; regenerate
 after fixing or staging intended changes. Schema tests compare native constants,
 defaults and rejection boundaries. Manifest mutation tests detect changed bytes and
-new membership. CI checks drift independently. Stdio transport, error receipts and
-runtime admission limits are deferred to a separate change.
+new membership. CI checks drift independently. The follow-on stdio implementation and its admission/error contract are recorded
+in the ICD; the original static baseline remains the first stacked change.
