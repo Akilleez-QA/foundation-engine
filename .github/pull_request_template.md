@@ -1,25 +1,34 @@
-## Problem and resulting behavior
+## Why
 
-Describe the concrete problem, what this changes, and the issue/reproduction if applicable.
+Describe the concrete problem, expected behavior, and reproduction or issue.
 
-## Contract and scope
+## What
 
-Identify the engine layer or optional kit. Explain ownership/cancellation, bounds, and API/save compatibility where relevant. Keep game-specific content separate.
+Describe the resulting behavior and affected layer, kit or documentation.
+Explain ownership, cancellation, bounds and API/save compatibility where relevant.
+Keep the change to one concern, aiming for fewer than 400 changed lines.
 
-## Validation
+## Verification
 
-List commands and results, affected GAME_DIR values, and any checks not run. For visible/runtime changes, include inspected screenshots and measured budget evidence. `npm run check` on a clean tree is not a full regression run; the integration gate remains required.
+Record the head and base SHAs, commands and results, and checks not run.
+Name affected GAME_DIR values. Focused checks are not full regression acceptance.
+For UI/input/camera/quality changes, include inspected screenshots, budget evidence,
+affected device profiles and interaction checks. Separate browser emulation from
+physical-device evidence; name unverified combinations.
+See [device experience policy](../docs/policy/DEVICE-EXPERIENCE.md).
 
-For UI/input/camera/quality changes, include affected phone/tablet/laptop/desktop
-profiles, active-world visibility and touch/keyboard interaction evidence. Separate
-emulation from physical-device measurements and name unverified combinations.
-See docs/policy/DEVICE-EXPERIENCE.md. Standards-only edits do not certify runtime UI.
+## Requirements touched
 
-## Contribution checks
+List REQ IDs from docs/requirements/requirements.md, or explain why none apply.
+Identify relevant contract or acceptance records and any compatibility change.
 
-- [ ] I followed CONTRIBUTING.md, AGENTS.md, and the relevant architecture recipe.
-- [ ] I described systems and patterns instead of external game names or source-project references, while preserving required attribution and reproducible identifiers.
-- [ ] Tests/docs cover the behavior changed, or I explained why they are not applicable.
-- [ ] I did not weaken budgets, tolerances, or tests to make checks pass.
-- [ ] New original contributions are submitted under GPL-3.0-only; third-party material is identified with its license and necessary notices.
+## AI checklist
+
+- [ ] I followed CONTRIBUTING.md, AGENTS.md and the relevant recipe.
+- [ ] I described systems and patterns, preserving required attribution and reproduction identifiers.
+- [ ] I recorded assisted work in commit trailers, or no assisted work was used.
+- [ ] Tests/docs cover the change, or I explained why they do not apply.
+- [ ] I did not weaken budgets, tolerances, tests or expected results to pass checks.
+- [ ] I added no code comments or docstrings except machine-required directives.
+- [ ] New original contributions use GPL-3.0-only; third-party terms are identified.
 - [ ] No secrets or private data are included.
