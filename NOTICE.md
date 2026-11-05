@@ -1,4 +1,4 @@
-Copyright © 2026 Refrigeration.AI.
+Copyright (c) 2026 Refrigeration AI, Inc.
 
 If you want to use it to create a product or service under different terms, commercial licenses are available from Refrigeration.AI. Contact craig@nh3.biz.
 
