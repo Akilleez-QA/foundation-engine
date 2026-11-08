@@ -18,6 +18,12 @@ physical-device acceptance have separate scopes; consult the
 [acceptance ledger](docs/guides/upgrade-acceptance-ledger.md) before claiming support.
 The package is private to prevent accidental npm publication.
 
+Version 0.2.0 is the latest tag (`v0.2.0`). Software classification: a self-assessed
+analog of NASA NPR 7150.2D Class E (general-purpose research software), not
+safety-critical; this is not a NASA compliance determination. See the
+[software management plan](docs/plan/software-management-plan.md) and
+[limitations](docs/guides/limitations.md).
+
 ## Quickstart
 
 Requires Git, npm and the Node range declared in [package.json](package.json).
@@ -60,11 +66,11 @@ choices. Framework availability does not establish application acceptance.
 
 ## Measured
 
-CI: local only for this documentation pass. `npm ci`, `npm run check` and
-`npm run lint` passed locally on the license documentation candidate `37dc4a5`.
-The focused check selected no tests; these results do not establish full CI,
-browser performance or physical-device acceptance. No performance measurements
-were taken for this README.
+Local run on 2026-11-08 at `a9e8cc6` (Arch Linux workstation, Node 22.23.3): `npm test`
+passed 4,204 of 4,204 tests, and the `test:dmath-browser`, `test:subpath-browser` and
+`test:session-browser` checks passed. Template gates and the other browser checks run in
+hosted CI. Details and limits: [test report STR-main-a9e8cc6](docs/verification/reports/STR-main-a9e8cc6.md).
+No performance measurements were taken for this README.
 
 ## Documentation
 
@@ -74,14 +80,24 @@ were taken for this README.
 - [Capabilities](docs/capabilities.md): generated inventory from source.
 - [Device experience](docs/policy/DEVICE-EXPERIENCE.md): separate device and input acceptance.
 - [Changelog](CHANGELOG.md): source changes and release history.
+- Control documents: [plan](docs/plan/software-management-plan.md), [requirements](docs/requirements/requirements.md), [design](docs/architecture/architecture.md), [interfaces](docs/icd/icd-dependencies.md), [test plan](docs/verification/test-plan.md), [verification matrix](docs/verification/verification-matrix.md), [configuration](docs/configuration/configuration-management.md), [releases](docs/releases/README.md) and [assurance record](docs/assurance/assurance-record.md).
 
 ## Related projects
 
-[Foundation Math](https://github.com/Akilleez-QA/foundation-math) is a related
-Foundation project for mathematical kernels and physics research tools.
-[Cstack](https://github.com/Akilleez-QA/cstack) is listed as a host in this
-repository's project-family record; this checkout does not establish a pinned
-Cstack interface or prove a deployed integration.
+Foundation Engine belongs to the Cstack project family. It has no runtime dependency on
+the other repositories and none of them imports it
+([interface control](docs/icd/icd-dependencies.md)).
+
+| Repository | Role |
+|---|---|
+| [Cstack](https://github.com/Akilleez-QA/cstack) | Host: composes the family under one human approver |
+| [EndoForge](https://github.com/Akilleez-QA/endoforge) | Engine: in-isolate workshop for coding agents |
+| [POODO](https://github.com/Akilleez-QA/poodo) | Skill: evidence-first reasoning for agents |
+| [Foundation Math](https://github.com/Akilleez-QA/foundation-math) | Foundation: mathematical kernels and physics research tools |
+| [Foundation Film](https://github.com/Akilleez-QA/foundation-film) | Foundation: film-production acceptance checks |
+| [Foundation Refrigeration](https://github.com/Akilleez-QA/foundation-refrigeration) | Foundation: refrigeration domain data and checks |
+| [Foundation Robotics](https://github.com/Akilleez-QA/foundation-robotics) | Foundation: read-only motion physics checks |
+| [Foundation Template](https://github.com/Akilleez-QA/foundation-template) | Template: a minimal Foundation to copy |
 
 ## Layout
 

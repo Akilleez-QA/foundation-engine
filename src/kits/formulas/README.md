@@ -122,7 +122,7 @@ underflowing to zero. The output keeps `meta`: `source` (default the file name),
 `--author`, `--licence`, `--note`, so a recovered table stays attributable. In code, `parseDelimited`,
 `importFormulaSheet` and `importFormulaTable` do the same without files. Bounds: 4,096 rows, 256 columns,
 4,096-character cells (all adjustable in code), 16 MiB of input. Tables are frozen; the lookups refuse unknown rows
-and columns (a missing type in a chart is a data bug, not zero). [ADR 0132](../../../docs/adr/0132-formula-data-import.md).
+and columns (a missing type in a chart is a data bug, not zero). [ADR 0135](../../../docs/adr/0135-formula-data-import.md).
 
 ## Cost and limitations
 
