@@ -136,4 +136,4 @@ browser scripts are outside this local record.
 
 | Version | Date | Commit | Change | Reviewed in |
 |---|---|---|---|---|
-| 1.0 | 2026-11-08 | `a9e8cc6` | First entry | This PR |
+| 1.0 | 2026-11-08 | `a9e8cc6` | First entry | PR #346 |

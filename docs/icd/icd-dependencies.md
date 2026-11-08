@@ -158,4 +158,4 @@ REQ-SEC-001 and REQ-COMPAT-001. See the [SRS](../requirements/requirements.md).
 |---|---|---|---|---|
 | 1.0 | 2026-11-01 | `aeb0c98` | External interfaces and pins | PR #332 |
 | 1.1 | 2026-11-01 | `70810ba` | Read-only tool contract and bridge | PRs #333, #340, #341 |
-| 2.0 | 2026-11-08 | `a9e8cc6` | Family documentation standard: metadata, Rapier row, bridge client row, generated field table, method, error and limit tables. Removed the stale sentence saying the bridge runs a Node subprocess with a ten-second timeout; since PR #341 it computes results from the schema alone | This PR |
+| 2.0 | 2026-11-08 | `a9e8cc6` | Family documentation standard: metadata, Rapier row, bridge client row, generated field table, method, error and limit tables. Removed the stale sentence saying the bridge runs a Node subprocess with a ten-second timeout; since PR #341 it computes results from the schema alone | PR #346 |

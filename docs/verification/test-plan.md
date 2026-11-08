@@ -212,4 +212,4 @@ Results per run are in the [test reports](reports/README.md).
 
 | Version | Date | Commit | Change | Reviewed in |
 |---|---|---|---|---|
-| 1.0 | 2026-11-08 | `a9e8cc6` | Initial test plan and procedures | This PR |
+| 1.0 | 2026-11-08 | `a9e8cc6` | Initial test plan and procedures | PR #346 |

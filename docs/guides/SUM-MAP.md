@@ -42,4 +42,4 @@ is the reference. This map shows where each user-manual element lives.
 
 | Version | Date | Commit | Change | Reviewed in |
 |---|---|---|---|---|
-| 1.0 | 2026-11-08 | `a9e8cc6` | Initial map | This PR |
+| 1.0 | 2026-11-08 | `a9e8cc6` | Initial map | PR #346 |

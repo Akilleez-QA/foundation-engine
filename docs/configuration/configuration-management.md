@@ -152,4 +152,4 @@ request as the change.
 |---|---|---|---|---|
 | 1.0 | 2026-11-01 | `39cf03b` | Baselines, pins, change and release control | PR #328 |
 | 1.1 | 2026-11-01 | `70810ba` | Source manifest, schema pins and bridge provenance | PRs #333, #340, #341 |
-| 2.0 | 2026-11-08 | `a9e8cc6` | Family documentation standard: metadata, configuration items, baseline digests, generated outputs, status accounting, audits | This PR |
+| 2.0 | 2026-11-08 | `a9e8cc6` | Family documentation standard: metadata, configuration items, baseline digests, generated outputs, status accounting, audits | PR #346 |

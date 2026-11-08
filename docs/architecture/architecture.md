@@ -326,4 +326,4 @@ See [limitations](../guides/limitations.md).
 |---|---|---|---|---|
 | 1.0 | 2026-11-01 | `25575b6` | Components, ownership, data flow and ADR map | PR #327 |
 | 1.1 | 2026-11-01 | `70810ba` | Foundation contract boundary; bridge self-contained | PRs #333, #340, #341 |
-| 2.0 | 2026-11-08 | `a9e8cc6` | Family documentation standard: metadata, numbered component sections with requirement IDs, tooling components, concurrency, decisions, quality attributes, resource use | This PR |
+| 2.0 | 2026-11-08 | `a9e8cc6` | Family documentation standard: metadata, numbered component sections with requirement IDs, tooling components, concurrency, decisions, quality attributes, resource use | PR #346 |

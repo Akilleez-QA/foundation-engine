@@ -162,4 +162,4 @@ unverified; requirement wording does not supply a passing result.
 |---|---|---|---|---|
 | 1.0 | 2026-10-30 | `d91aa7d` | Initial register of eight stock obligations | PR #326 |
 | 1.1 | 2026-11-01 | `d9c7039` | Added REQ-FND-001 to REQ-FND-003 | PR #333 |
-| 2.0 | 2026-11-08 | `a9e8cc6` | Family documentation standard: metadata, seven-field rows, 42 new requirements (53 in total), N/A categories, untested gaps; REQ-BOOT-001 now also cites `src/core/app.test.ts`, which holds the boot-order test | This PR |
+| 2.0 | 2026-11-08 | `a9e8cc6` | Family documentation standard: metadata, seven-field rows, 42 new requirements (53 in total), N/A categories, untested gaps; REQ-BOOT-001 now also cites `src/core/app.test.ts`, which holds the boot-order test | PR #346 |
