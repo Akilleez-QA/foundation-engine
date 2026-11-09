@@ -143,6 +143,20 @@ test('dead links: targets and heading anchors resolve, fragments read from the r
   }
 });
 
+test("dead links: a game started with new-game (root GAME.md and game/) is the creator's and is not link-checked", () => {
+  const root = fixture({
+    'docs/a.md': '# A\n',
+    'templates/blank/GAME.md': '[pure](../../docs/a.md)\n',
+    'GAME.md': '[pure](../../docs/a.md)\n',
+    'game/notes.md': '[gone](nope.md)\n',
+  });
+  try {
+    assert.deepEqual(deadLinks(root), []);
+  } finally {
+    rmSync(root, {recursive: true, force: true});
+  }
+});
+
 test('parseRequirements reads seven-cell rows and ignores other tables', () => {
   const rows = parseRequirements(`| ID | x |\n|---|---|\n${REQ}\n| GAP-001 | gap | src | why |\n`);
   assert.deepEqual(
