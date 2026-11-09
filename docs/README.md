@@ -40,19 +40,36 @@ Start with one route; the rest is reference.
 - [Brand](brand.md): logo, palette, ASCII banners and asset licence.
 - [Provenance](PROVENANCE.md): where this engine came from.
 
-## Requirements
+## Control documents
 
-- [Requirements register](requirements/requirements.md): stock obligations and verification methods.
+Organized after the NASA software documentation guidance (NPR 7150.2D, NASA-STD-8739.8B,
+SWEHB 7.18) as a self-assessed Class E analog. This is not a NASA compliance determination.
+Each document carries a metadata header with its baseline commit; `npm run lint:trace`
+checks the headers, the requirement trace and every relative link.
 
-## Architecture
+| Document | ID | Purpose |
+|---|---|---|
+| [Software management plan](plan/software-management-plan.md) | FENGINE-SMP | Classification, life cycle, assurance, security, maintenance, risks |
+| [Requirements mapping matrix](plan/compliance-matrix.md) | FENGINE-RMM | How each NPR requirement applies, is tailored or is not applicable |
+| [Requirements specification](requirements/requirements.md) | FENGINE-SRS | What the engine and its tooling shall do, plus untested gaps |
+| [Design description](architecture/architecture.md) | FENGINE-SDD | Components, data flow, concurrency, decisions, quality attributes |
+| [Interface control](icd/icd-dependencies.md) | FENGINE-ICD-dependencies | Dependencies, consumers and the read-only stdio bridge |
+| [Data dictionary](data/data-dictionary.md) | FENGINE-DD | Tool fields, environment variables, options, data files, limits |
+| [Test plan and procedures](verification/test-plan.md) | FENGINE-STP | Test levels, environment, CI commands, pass criteria, procedures |
+| [Verification matrix](verification/verification-matrix.md) | FENGINE-VM | Requirement to test to result |
+| [Test reports](verification/reports/README.md) | FENGINE-STR-* | Generated results per baseline or tag |
+| [Configuration management](configuration/configuration-management.md) | FENGINE-SCMP | Configuration items, baselines, digests, generated outputs, releases |
+| [Releases and version descriptions](releases/README.md) | FENGINE-VDD-* | What each tag contains and how to rebuild it |
+| [Assurance record](assurance/assurance-record.md) | FENGINE-SAR | Analyses, audits, scans and review summaries per baseline |
+| [User manual map](guides/SUM-MAP.md) | FENGINE-SUM-MAP | Where each user-manual element lives |
+| [Limitations and safety-relevant use](guides/limitations.md) | none | What the engine does not do |
 
-- [Architecture overview](architecture/architecture.md): components, ownership, data flow and ADRs.
+Dated verification records stay under [verification/](verification/verification-matrix.md#4-earlier-evidence-historical)
+and are not rewritten.
 
-## Interface control
+## Other guides and records
 
-- [Interface control](icd/icd-dependencies.md): external dependencies, consumers and their pins.
-
-## Verification and configuration
-
-- [Verification matrix](verification/verification-matrix.md): selected requirements and local evidence.
-- [Configuration management](configuration/configuration-management.md): baselines, pins and release control.
+- [Predeclared acceptance evidence](guides/acceptance-evidence.md), [dimensional inventory candidates](guides/dimensional-inventory.md), [industrial state candidates](guides/industrial-candidates.md), [ordered industrial transfer batches](guides/industry-transfer-batches.md) and [progression inspection](guides/progression-inspection.md).
+- [Optional pure kit package](guides/pure-package.md) and the [game brief template](guides/GAME.template.md).
+- [Release notes draft for 0.2.0](guides/release-notes-0.2.0.md).
+- Evidence records: [cellular WASM](verification/cellular-wasm/README.md), [indexed geometry](verification/indexed-geometry/README.md) and [lazy scene bodies](verification/lazy-scene-bodies-2026-09-30.md).

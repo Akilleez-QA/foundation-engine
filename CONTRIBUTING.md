@@ -13,7 +13,7 @@ Read [AGENTS.md](AGENTS.md), [the architecture standard](docs/STANDARD.md), and 
 
 ## Set up
 
-Use Git, npm and Node.js 22.18 or later (`.nvmrc` / `.node-version` select Node 22; CI uses Node 22). No paid AI tool, coding agent, deployment credential or private repository is required.
+Use Git, npm and Node.js 22.18 or later (`.nvmrc` / `.node-version` select Node 22; CI uses Node 22, plus Node 26 in the newest-Node job). No paid AI tool, coding agent, deployment credential or private repository is required.
 
 For a contribution without upstream write access, create your own GitHub fork, then clone the canonical repository and add your fork as the push destination. Replace `YOUR-NAME` and `my-change` below:
 
@@ -143,6 +143,21 @@ physical-device acceptance. A configured CI command is not a passed CI result.
 Record failures and missing checks, and update the acceptance entry after the final
 checks and integration. This keeps the documentation useful to the next creator or
 agent without requiring this conversation.
+
+### Control documents and traceability
+
+The control documents in [docs/](docs/README.md#control-documents) (plan, requirements,
+design, interfaces, data dictionary, test plan, verification matrix, configuration
+management and assurance record) follow the project's documentation standard. When a
+change alters behavior, update the [requirements](docs/requirements/requirements.md) and
+the [verification matrix](docs/verification/verification-matrix.md) in the same pull
+request. `npm run lint:trace` (part of `npm run lint` and `npm run check`) fails on a
+requirement without a verification row, a matrix row naming a missing test, a control
+document without its metadata header, or a dead relative link or heading anchor in any
+Markdown file. Test reports and version descriptions are generated with
+`node scripts/docs/reports.mjs`; do not edit them by hand. The
+[pull request template](.github/pull_request_template.md) holds the review record and the
+documentation checklist.
 
 ## Submit a pull request
 

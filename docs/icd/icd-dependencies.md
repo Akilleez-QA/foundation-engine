@@ -1,62 +1,161 @@
-# Interface control: external dependencies and consumers
+# Foundation Engine interface control document: external dependencies, consumers and the read-only bridge
 
-Foundation Engine has no runtime interface to another Akilleez-QA repository.
-Cstack, POODO, Endoforge and the other Foundations do not import it, and it imports none of them.
-This document records the interfaces it does have and where each pin lives.
+| Field | Value |
+|---|---|
+| Document ID | FENGINE-ICD-dependencies |
+| Version | 2.0 |
+| Status | Baselined |
+| Owner | Akilleez-QA |
+| Date | 2026-11-08 |
+| Baseline commit | `a9e8cc6f175b5055b18abf26579ecc432a6ac53b` |
+| Applies to | foundation-engine main at baseline commit |
+| Classification | Self-assessed Class E analog; not safety-critical (see [SMP §1](../plan/software-management-plan.md#1-software-classification-self-assessed)) |
 
-## Interfaces
+> Organized after [NPR 7150.2D](https://nodis3.gsfc.nasa.gov/displayAll.cfm?Internal_ID=N_PR_7150_002D_&page_name=all), [NASA-STD-8739.8B](https://standards.nasa.gov/standard/nasa/nasa-std-87398) and the [NASA Software Engineering Handbook](https://swehb.nasa.gov/display/SWEHBVD/7.18+-+Documentation+Guidance) documentation guidance. This is not a NASA compliance determination or certification. The software classification is a self-assessed analog (Class E, not safety-critical); no NASA authority, independent verification and validation, or hazard analysis is asserted. The document describes the implementation inspected at the baseline commit.
+
+Foundation Engine has no runtime interface to another Akilleez-QA repository. Cstack,
+POODO, EndoForge and the other Foundations do not import it, and it imports none of
+them. This document records the interfaces it does have, where each pin lives, and the
+read-only stdio bridge contract.
+
+## 1. Interfaces
 
 | Counterpart | Direction | Interface | Pinned version | Pin source |
 |---|---|---|---|---|
 | three.js (`three`) | Engine uses | ES module import for rendering | 0.186.1 (range `^0.186.1`) | `package.json`, `package-lock.json` |
-| Wasmoon (`wasmoon`) | Engine uses | Lua runtime in WebAssembly | 1.16.0 | `package.json`, `package-lock.json` |
+| Wasmoon (`wasmoon`) | Optional scripting kit uses | Lua runtime in WebAssembly, loaded by dynamic import | 1.16.0 | `package.json`, `package-lock.json` |
+| Rapier (`@dimforge/rapier3d-deterministic-compat`) | Optional physics kit uses | Deterministic physics in WebAssembly | 0.21.0 | `package.json`, `package-lock.json` |
 | Node.js | Tooling runs on | `npm` scripts, `node --test`, `tsx` | `>=22.18`, development line 22 | `package.json` `engines`, `.node-version` |
-| Python 3 | Tooling uses | Source manifest generation and drift checking, standard library only | Runner-provided interpreter | `tools/build_manifest.py`, `.github/workflows/manifest.yml` |
-| Games and templates | Consume engine | Author API (`defineGame`, kits) selected by `GAME_DIR` or `--game` | Source checkout at a commit or tag | `git rev-parse HEAD`, release tags |
-| Browsers | Run built games | Built output from `vite build` | Evidence per browser run | [Acceptance ledger](../guides/upgrade-acceptance-ledger.md) |
+| Python 3 | Tooling uses | Source manifest generation and drift check; stdio bridge; standard library only | Runner-provided interpreter | `tools/build_manifest.py`, `tools/foundation_engine_bridge.py`, `.github/workflows/manifest.yml` |
+| Games and templates | Consume engine | Author API (`@engine`, `@kits/<name>`) selected by `GAME_DIR` or `--game` | Source checkout at a commit or tag | `git rev-parse HEAD`, release tags |
+| Browsers | Run built games | Static output from `vite build` | Evidence per browser run | [Acceptance ledger](../guides/upgrade-acceptance-ledger.md) |
+| Bridge clients | Call the engine's read-only validators | UTF-8 JSON-RPC 2.0 over stdio (§4) | Protocol `foundation-engine-jsonrpc/1`; inventory `foundation-engine-tools/1` 0.2.0 | `tools/foundation_engine_bridge.py`, `schemas/read-only-tools.json` |
 
-## Change control
+Ownership: the dependency projects own their packages; this repository owns the pins.
+Game authors own their games; the engine owns the author API. A bridge client owns its
+requests; the bridge owns admission, validation and responses.
 
-A change to any pin above goes through `package-lock.json` and `npm ci`, and is listed in [CHANGELOG.md](../../CHANGELOG.md).
-Configuration rules are in [configuration management](../configuration/configuration-management.md).
+## 2. Change control
 
-## Not included
+A change to any pin above goes through `package-lock.json` and `npm ci`, and is listed in
+[CHANGELOG.md](../../CHANGELOG.md). A change to the tool inventory or protocol needs a
+new schema version, source mapping, regression evidence and review. Configuration rules
+are in [configuration management](../configuration/configuration-management.md).
+
+## 3. Not included
 
 - No interface to Cstack ports or adapters.
 - No npm publication; `package.json` sets `private: true`.
+- The bridge is not MCP and offers no batches, cancellation or mutating tools.
 
-## Read-only tool contract, version 0.2.0
+## 4. Read-only tool contract, version 0.2.0
 
-`schemas/read-only-tools.json` pins `foundation-engine-tools/1`, with Draft
-2020-12 `inputSchema` and `outputSchema` per tool. The stdio bridge is implemented
-by `python3 -B tools/foundation_engine_bridge.py`. It requires Python 3 and
-`schemas/read-only-tools.json` only; Node and `npm ci` are not required.
+`schemas/read-only-tools.json` pins `foundation-engine-tools/1`, with Draft 2020-12
+`inputSchema` and `outputSchema` per tool. The bridge is run as
+`python3 -B tools/foundation_engine_bridge.py`. It needs Python 3 and
+`schemas/read-only-tools.json` only; Node and `npm ci` are not needed, and it starts no
+Node process. It accepts no command-line arguments; any argument exits 2.
+
+### 4.1 Tools
 
 | Tool | Existing TypeScript owner | Input mapping | Successful output |
 |---|---|---|---|
-| `validate_render_mask` | `src/author/render-mask.ts`, exported by `@engine` | `{mask}` → `validateRenderMask(mask)`; required unsigned 32-bit integer | The same integer. |
-| `validate_scene_output` | `src/author/scene-output.ts`, exported by `@engine` | `{output?}` → `validateSceneOutput(output)`; omitted output uses defaults | `{toneMapping, exposure}` with defaults `none`, `1`. |
+| `validate_render_mask` | `src/author/render-mask.ts`, exported by `@engine` | `{mask}` → `validateRenderMask(mask)`; required unsigned 32-bit integer | The same integer |
+| `validate_scene_output` | `src/author/scene-output.ts`, exported by `@engine` | `{output?}` → `validateSceneOutput(output)`; omitted output uses defaults | `{toneMapping, exposure}` with defaults `none`, `1` |
 
-All input objects reject unknown keys. Exposure is in `(0,16]`; tone mapping is
-`none`, `aces`, `agx` or `neutral`. The wire subset excludes JavaScript `undefined`
-and nullable property defaults even where the existing validator accepts them.
-Validators are synchronous, allocate no retained state and throw on invalid values;
-they neither render nor modify scenes, files, saves, input, clocks or settings.
+Field table, generated by `node scripts/docs/reports.mjs tools`:
+
+| Tool | Direction | Field | Type | Required | Range |
+|---|---|---|---|---|---|
+| `validate_render_mask` | input | `mask` | integer | yes | >= 0, <= 4294967295 |
+| `validate_render_mask` | output | (result) | integer | yes | >= 0, <= 4294967295 |
+| `validate_scene_output` | input | `output` | object | no | n/a |
+| `validate_scene_output` | input | `output.toneMapping` | string | no | one of `none`, `aces`, `agx`, `neutral` |
+| `validate_scene_output` | input | `output.exposure` | number | no | > 0, <= 16 |
+| `validate_scene_output` | output | `toneMapping` | string | yes | one of `none`, `aces`, `agx`, `neutral` |
+| `validate_scene_output` | output | `exposure` | number | yes | > 0, <= 16 |
+
+All input objects reject unknown keys. The wire subset excludes JavaScript `undefined`
+and nullable property defaults even where the TypeScript validator accepts them. The
+validators are synchronous, keep no state and throw on invalid values; they neither
+render nor modify scenes, files, saves, input, clocks or settings. The bridge computes
+results from the pinned schema; `scripts/foundation-bridge.test.mjs` checks that they
+equal the TypeScript validators for the same inputs.
+
+### 4.2 Framing and methods
+
 The bridge mirrors Foundation Refrigeration at `4bd3311b31766c00083c582a8c4f99467501df7f`:
-UTF-8 JSON-RPC 2.0, one newline-terminated request/response per frame, no batches.
-Initialize with `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"foundation-engine-jsonrpc/1"}}`.
-`tools/list` describes the pinned inventory; `tools/call` takes exactly `{name, arguments}`.
-`ping` is available before initialization. Notifications produce no response.
-Successful calls return `{isError:false, structuredContent:<schema output>}`.
-Errors use `{jsonrpc:"2.0",id,error:{code,message}}`: -32700 malformed JSON,
--32600 envelope, -32601 method, -32602 arguments/unknown tool, -32603 internal,
--32000 initialization state, -32001 protocol mismatch, -32002 resource bound.
-Handshake limits mirror the sibling: 65,536 input bytes, 1,048,576 output bytes,
-32 JSON depth, 4,096 nodes, 1,024 string characters, 24 decimal characters,
-128 ID characters, safe-integer IDs. Exponents, duplicate keys and nonfinite numbers
-are rejected. Oversized or unterminated frames close with exit 2; other errors
-allow another request. Execution is sequential; close stdin to stop, no cancellation.
-Schema validation precedes native TypeScript execution in a fixed Node subprocess
-with a ten-second timeout; failure returns an internal error without child output.
-The schema checker supports only the keywords used by this pinned inventory;
-future schema vocabulary changes require coordinated checker changes. This is not MCP.
+UTF-8 JSON-RPC 2.0, one newline-terminated request and response per frame, no batches.
+Execution is sequential. Close stdin to stop; there is no cancellation.
+
+| Method | Before `initialize` | Params | Result |
+|---|---|---|---|
+| `initialize` | yes | exactly `{"protocolVersion":"foundation-engine-jsonrpc/1"}` | `protocolVersion`, `serverInfo` (`name` `foundation-engine-jsonrpc-bridge`, `version` = inventory version), `capabilities` (`tools: true`), `mcpCompatible: false`, `limits`, `numericProfile`, `methods`, `execution` |
+| `ping` | yes | `{}` or omitted | `{}` |
+| `tools/list` | no | `{}` or omitted | `{"tools": [...]}`, the pinned inventory |
+| `tools/call` | no | exactly `{name, arguments}` | `{"isError": false, "structuredContent": <schema output>}` |
+
+A request without `id` is a notification and gets no response. An `id` must be a string
+of at most 128 characters or a safe integer; `null` is refused.
+
+Example handshake:
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"foundation-engine-jsonrpc/1"}}
+```
+
+### 4.3 Errors
+
+Errors use `{"jsonrpc":"2.0","id":<id or null>,"error":{"code":<code>,"message":<text>}}`.
+
+| Code | Meaning | Session continues | Test coverage |
+|---|---|---|---|
+| -32700 | Malformed JSON; a final frame without a newline closes the session | yes; no for a final frame without newline (exit 2) | `scripts/foundation-bridge.test.mjs` |
+| -32600 | Invalid envelope, batch, extra field or bad `id` | yes | same |
+| -32601 | Unknown method | yes | same |
+| -32602 | Invalid parameters, unknown tool, schema violation | yes | same |
+| -32603 | Internal error or unrepresentable result | yes | none (SRS GAP-001) |
+| -32000 | Initialization state (tools before `initialize`, second `initialize`) | yes | same file |
+| -32001 | Protocol version mismatch | yes | same |
+| -32002 | Resource bound exceeded; an oversized input frame closes the session (exit 2); an oversized output is withheld | yes, except oversized input | input bounds tested; output bound untested (SRS GAP-002) |
+
+### 4.4 Limits
+
+| Limit | Value |
+|---|---|
+| Input frame | 65,536 bytes |
+| Output frame | 1,048,576 bytes |
+| JSON depth | 32 |
+| JSON nodes | 4,096 |
+| String length | 1,024 characters |
+| Decimal literal | 24 characters; no exponent, NaN or Infinity (-32700) |
+| Integer literal | 15 digits (-32002) |
+| `id` string | 128 characters |
+| `id` integer | absolute value at most 9,007,199,254,740,991 |
+
+Duplicate keys are refused. The schema checker supports only the keywords used by this
+pinned inventory; a vocabulary change needs a matching checker change.
+
+## 5. Requirements addressed
+
+REQ-FND-002 (schemas describe only existing read-only capabilities) and REQ-FND-003
+(framing, initialization, validation, unknown tools). Dependency pins support
+REQ-SEC-001 and REQ-COMPAT-001. See the [SRS](../requirements/requirements.md).
+
+## 6. Compatibility checks
+
+- `scripts/foundation-contract.test.ts`: schema pins match the TypeScript validators.
+- `scripts/foundation-bridge.test.mjs`: handshake, inventory, both tools, defaults,
+  schema rejection, unknown tools, framing limits, recovery, and a run with only Python
+  and the schema present.
+- `python3 -B tools/build_manifest.py --check`: the schema and bridge bytes match the
+  source manifest.
+- [Test plan P-3](../verification/test-plan.md#p-3-stdio-bridge-smoke): manual smoke.
+
+## Change history
+
+| Version | Date | Commit | Change | Reviewed in |
+|---|---|---|---|---|
+| 1.0 | 2026-11-01 | `aeb0c98` | External interfaces and pins | PR #332 |
+| 1.1 | 2026-11-01 | `70810ba` | Read-only tool contract and bridge | PRs #333, #340, #341 |
+| 2.0 | 2026-11-08 | `a9e8cc6` | Family documentation standard: metadata, Rapier row, bridge client row, generated field table, method, error and limit tables. Removed the stale sentence saying the bridge runs a Node subprocess with a ten-second timeout; since PR #341 it computes results from the schema alone | PR #346 |
