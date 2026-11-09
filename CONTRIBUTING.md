@@ -146,7 +146,7 @@ agent without requiring this conversation.
 
 ### Control documents and traceability
 
-The control documents in [docs/](docs/README.md#control-documents) (plan, requirements,
+The control documents in [docs/](docs/README.md#engineering-records) (plan, requirements,
 design, interfaces, data dictionary, test plan, verification matrix, configuration
 management and assurance record) follow the project's documentation standard. When a
 change alters behavior, update the [requirements](docs/requirements/requirements.md) and

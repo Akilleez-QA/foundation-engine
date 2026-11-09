@@ -66,4 +66,4 @@ Short, checked how-tos. Start with [getting started](../guides/getting-started.m
 | upgrade a public API consumer | [compatibility and upgrades](../guides/public-compatibility.md) |
 | publish a separately compiled content bundle | [publish content](publish-content.md) |
 
-Something missing? Check the generated [capabilities list](../capabilities.md) first: it is read from the code, so it is current. The README's [Not included](../../README.md#not-included) section lists what the engine does not provide and where to look instead.
+Something missing? Check the generated [capabilities list](../capabilities.md) first: it is read from the code, so it is current. The README's [status and limitations](../../README.md#status-and-limitations) section and the [limitations page](../guides/limitations.md) list what the engine does not provide.

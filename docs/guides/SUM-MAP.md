@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Document ID | FENGINE-SUM-MAP |
-| Version | 1.0 |
+| Version | 1.1 |
 | Status | Baselined |
 | Owner | Akilleez-QA |
 | Date | 2026-11-08 |
@@ -21,9 +21,9 @@ is the reference. This map shows where each user-manual element lives.
 
 | SUM element | Where | Verified how |
 |---|---|---|
-| Application summary and intended users | [README](../../README.md) introduction and Status | Read against the code at the baseline |
-| Inventory (what ships) | [README](../../README.md#what-is-inside) What is inside; [capabilities](../capabilities.md); [VDD-v0.2.0](../releases/VDD-v0.2.0.md) | Capabilities are generated and checked by `npm run lint:docs-claims` |
-| Environment and prerequisites | [README](../../README.md#quickstart) Quickstart; [getting started §1](getting-started.md#1-get-the-code-and-the-tools) | Quickstart commands run at the baseline (assurance record) |
+| Application summary and intended users | [README](../../README.md) introduction, Why and Status and limitations | Read against the code at the baseline |
+| Inventory (what ships) | [README](../../README.md#whats-inside) What's inside; [capabilities](../capabilities.md); [VDD-v0.2.0](../releases/VDD-v0.2.0.md) | Capabilities are generated and checked by `npm run lint:docs-claims` |
+| Environment and prerequisites | [README](../../README.md#install-and-run) Install and run; [getting started §1](getting-started.md#1-get-the-code-and-the-tools) | Quickstart commands run at the baseline (assurance record) |
 | Modes and states of operation | Development (`npm run play`), production build (`npm run build`), test API in development only: [getting started](getting-started.md); [STANDARD §4](../STANDARD.md#4-lifecycle-boot-activities-and-handover) | Inspection |
 | Security and privacy | [SECURITY.md](../../SECURITY.md); [limitations](limitations.md#security-assumptions); [integrity guide](integrity.md) | Inspection |
 | Assistance and problem reporting | [SUPPORT.md](../../SUPPORT.md); issue forms in `.github/ISSUE_TEMPLATE/` | Forms exist at the baseline |
@@ -34,7 +34,7 @@ is the reference. This map shows where each user-manual element lives.
 | Processing procedures | [Cookbook](../recipes/README.md) | Recipes with tests run in `npm test` (for example `scripts/docs/art-direction-recipe.test.mjs`) |
 | Data backup and recovery from errors | [Getting started: when something goes wrong](getting-started.md#when-something-goes-wrong); [add a save section](../recipes/add-a-save-section.md); [limitations: data](limitations.md#data-and-persistence) | Save recovery covered by REQ-SAVE-001 to REQ-SAVE-003 |
 | Messages, errors and exit codes | Bridge errors: [ICD §4.3](../icd/icd-dependencies.md#43-errors); boot validation errors: [ADR 0005](../adr/0005-registries-and-typed-content.md) | Bridge codes tested by `scripts/foundation-bridge.test.mjs` (GAP-001, GAP-002 untested) |
-| Assumptions and limitations | [README Not included](../../README.md#not-included); [limitations](limitations.md) | Inspection |
+| Assumptions and limitations | [README Status and limitations](../../README.md#status-and-limitations); [limitations](limitations.md) | Inspection |
 | Safety-related constraints | [Limitations](limitations.md); [kid-safe profile](../policy/KID-SAFE.md) | Inspection; not safety-critical |
 | Version-specific changes | [CHANGELOG](../../CHANGELOG.md); [releases](../releases/README.md) | VDD generated from the tag |
 
@@ -43,3 +43,4 @@ is the reference. This map shows where each user-manual element lives.
 | Version | Date | Commit | Change | Reviewed in |
 |---|---|---|---|---|
 | 1.0 | 2026-11-08 | `a9e8cc6` | Initial map | PR #346 |
+| 1.1 | 2026-11-08 | `8445d31` | README sections renamed in the reader-first rewrite; links updated | docs/reader-first PR |
