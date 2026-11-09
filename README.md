@@ -28,23 +28,27 @@ budget that the screenshot tool checks. The project also suits coding agents: th
 ## How it works
 
 ```mermaid
-flowchart LR
-  code["Your game in game/<br/>defineGame, defineScene,<br/>defineEntity, defineSystem,<br/>defineInput"]
-  code --> author["Author API (@engine)<br/>turns the definitions into<br/>engine modules at startup"]
+flowchart TD
+  code["Your game in game/<br/>defineScene, defineEntity,<br/>defineSystem, defineInput"]
+  code --> author["Author API (@engine)<br/>builds engine modules<br/>at startup"]
   author --> boot["Engine boot<br/>register, validate, install"]
   boot --> frame
   subgraph frame["Each frame"]
-    direction LR
-    keys["Keys, gamepad,<br/>touch"] --> actions["Named actions<br/>(e.g. turn)"] --> systems["Your systems<br/>update the world"] --> draw["three.js draws,<br/>only if something changed"]
+    direction TB
+    keys["Keys, gamepad, touch"] --> actions["Named actions"]
+    actions --> systems["Your systems<br/>update the world"]
+    systems --> draw["three.js draws<br/>only if something changed"]
   end
-  code -.-> unit["testScene in Node:<br/>press actions, step time,<br/>assert on the world"]
-  code -.-> browser["play:script and play:snap:<br/>a muted headless browser,<br/>screenshots, budget check"]
+  code -.-> unit["Node test: testScene"]
+  code -.-> browser["Headless browser:<br/>play:script, play:snap"]
 ```
 
-Game code imports only `@engine`, optional kits (`@kits/<name>`), its own files and JSON. Systems read named actions,
+When the page loads, the author API turns your definitions into engine modules; there is no separate build step for
+them. Game code imports only `@engine`, optional kits (`@kits/<name>`), its own files and JSON. Systems read named actions,
 never raw keys, so one action can come from a key, a gamepad button or a tap. Randomness comes from a seeded source
-(`ctx.random()`), so a replay gives the same result. The same definitions run three ways: the browser, a fast Node
-test, and a scripted headless browser. The [design description](docs/architecture/architecture.md) has the full
+(`ctx.random()`), so a replay gives the same result. The same definitions run three ways: in the browser, in a fast Node
+test (`testScene` presses actions, steps time and checks the world), and in a scripted headless browser (`play:script`
+and `play:snap` take screenshots and check the budget). The [design description](docs/architecture/architecture.md) has the full
 component map.
 
 ## Example
