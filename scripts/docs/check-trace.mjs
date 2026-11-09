@@ -23,6 +23,7 @@ export const DATA_DICTIONARY = 'docs/data/data-dictionary.md';
 export const TOOL_SCHEMA = 'schemas/read-only-tools.json';
 export const DISCLAIMER = 'This is not a NASA compliance determination or certification.';
 const SKIP_DIRS = new Set(['node_modules', '.git', 'TODELETE', 'dist', 'playtest', 'coverage']);
+const CREATOR_GAME = new Set(['game', 'GAME.md']);
 const REQ_ID = /^REQ-[A-Z0-9]+-\d{3}$/;
 const METHOD = /^[TAID](?:,\s*[TAID])*$/;
 const STATUS = new Set(['Baselined', 'Proposed', 'Deleted']);
@@ -34,6 +35,7 @@ export function markdownFiles(root) {
   const walk = dir => {
     for (const name of readdirSync(join(root, dir))) {
       if (SKIP_DIRS.has(name)) continue;
+      if (!dir && CREATOR_GAME.has(name)) continue;
       const rel = dir ? `${dir}/${name}` : name;
       const st = statSync(join(root, rel));
       if (st.isDirectory()) {

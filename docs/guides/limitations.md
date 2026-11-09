@@ -12,7 +12,7 @@ because the software is not safety-critical
   determinations about the physical world. Its physics and maths kits are for games.
 - Not a published library or hosted service. It is source; `package.json` is
   `private: true`. There are no hosted accounts, matchmaking or public Internet
-  multiplayer infrastructure ([README](../../README.md#not-included)).
+  multiplayer infrastructure ([README](../../README.md#status-and-limitations)).
 - Not a guarantee of device support. Framework checks and CI phone smoke are emulation.
   Phone, tablet, laptop and desktop acceptance are separate, manual, per-game
   activities ([device experience policy](../policy/DEVICE-EXPERIENCE.md)).
