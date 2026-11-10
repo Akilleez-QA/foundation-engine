@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Document ID | FENGINE-SAR |
-| Version | 1.0 |
+| Version | 1.1 |
 | Status | Baselined |
 | Owner | Akilleez-QA |
-| Date | 2026-11-08 |
+| Date | 2026-11-10 |
 | Baseline commit | `a9e8cc6f175b5055b18abf26579ecc432a6ac53b` |
 | Applies to | foundation-engine main at baseline commit |
 | Classification | Self-assessed Class E analog; not safety-critical (see [SMP §1](../plan/software-management-plan.md#1-software-classification-self-assessed)) |
@@ -16,6 +16,34 @@
 This rolling record holds the requirements, design, testing and code-quality analyses
 (SWEHB 5.21, 5.22, 5.23, 5.26), the configuration audit (5.25) and the peer-review
 summary (5.03). Newest entry first.
+
+## Entry 2026-11-10: findings sweep, code commit `4644f3c`
+
+- Analyzed by: the family findings sweep, agent-assisted for the maintainer. Agent analysis is
+  not independent review.
+- Inputs: findings F-5 to F-9 from the 2026-11-08 entry; code commit `4644f3c` on branch
+  `fix/findings-sweep`; `package-lock.json` and the installed license files.
+- F-7 (GAP-001, GAP-002): five tests in `scripts/foundation-bridge.test.mjs` run the bridge
+  with an injected fault. Three cover -32603: an unexpected exception in dispatch, an
+  unsupported pinned schema type, and a result that cannot be written as JSON. Each answers
+  with the request's id, no result and no exception text, and the next request succeeds.
+  Two cover the output bound: a frame of exactly 1,048,576 bytes is sent, a larger one is
+  withheld with -32002 (not -32603), and the session continues. The behavior is now
+  REQ-FND-004 and REQ-FND-005.
+- F-5: ADR 0078 is the render-backend decision, cited by the standard, the code and
+  guides. The foundation-contract record, cited only by the SDD and the ADR index, was
+  renumbered to 0156, the next unused number. Its text is unchanged apart from a note
+  giving the old number.
+- F-6: comparing every notice table row with `package-lock.json` found four stale versions:
+  ws 8.22.0 (lockfile 8.22.1), prettier 3.9.9 (3.9.10), playwright-core 1.56.1 (1.61.1) and
+  `@types/node` 22.20.4 (22.20.5). The declared licenses in the lockfile and the installed
+  license files are unchanged (MIT, MIT, Apache-2.0, MIT). The notices now give the
+  lockfile versions; no other row differs. Draft PR #344 does not edit these lines.
+- Results in the worktree: `npm run --silent format:check` passed; `npm test` passed;
+  `node scripts/docs/check-trace.mjs` reported 55 requirements, 55 traced, 2 untested gaps
+  and 0 problems; `python3 -B tools/build_manifest.py --check` passed.
+- Still open: F-8 (secret scanner flags manifest hashes; open PR #334) and F-9 (v0.2.0 tag),
+  which wait on the maintainer.
 
 ## Entry 2026-11-08: baseline `a9e8cc6` (documentation standard pull request)
 
@@ -118,9 +146,9 @@ The 20 pull requests merged between `v0.2.0` and `a9e8cc6` (#319 to #345, from
 | F-2 | S4 | ICD omitted the Rapier runtime dependency | `docs/icd/icd-dependencies.md` | none | Closed in this PR |
 | F-3 | S4 | Dead ADR links and a duplicate index row; three ADRs not indexed | `docs/adr/README.md`, `src/kits/formulas/README.md` | none | Closed in this PR |
 | F-4 | S4 | Stale README anchor `#not-here-yet-and-workarounds` | `docs/recipes/README.md` | none | Closed in this PR |
-| F-5 | S4 | Two ADRs numbered 0078 | `docs/adr/` | none | Open |
-| F-6 | S4 | Third-party notice versions lag the lockfile | `THIRD_PARTY_NOTICES.md` | PR #344 (draft) touches notices | Open |
-| F-7 | S3 | Bridge -32603 and output-bound paths untested | `tools/foundation_engine_bridge.py` | none | Open (GAP-001, GAP-002) |
+| F-5 | S4 | Two ADRs numbered 0078 | `docs/adr/` | none | Closed in the findings-sweep PR: the foundation-contract record is now [ADR 0156](../adr/0156-foundation-contract-baseline.md) |
+| F-6 | S4 | Third-party notice versions lag the lockfile | `THIRD_PARTY_NOTICES.md` | PR #344 (draft) touches notices | Closed in the findings-sweep PR: ws 8.22.1, prettier 3.9.10, playwright-core 1.61.1 and `@types/node` 22.20.5, licenses rechecked |
+| F-7 | S3 | Bridge -32603 and output-bound paths untested | `tools/foundation_engine_bridge.py` | none | Closed in `4644f3c`: five tests in `scripts/foundation-bridge.test.mjs`; GAP-001 and GAP-002 closed as REQ-FND-004 and REQ-FND-005 |
 | F-8 | S4 | Secret scanner flags manifest hashes | `SOURCE-MANIFEST.json` | PR #334 | Open |
 | F-9 | S4 | v0.2.0 tag lacks a source manifest; tag and changelog dates differ | tag `v0.2.0` | none | Open |
 
@@ -137,3 +165,4 @@ browser scripts are outside this local record.
 | Version | Date | Commit | Change | Reviewed in |
 |---|---|---|---|---|
 | 1.0 | 2026-11-08 | `a9e8cc6` | First entry | PR #346 |
+| 1.1 | 2026-11-10 | `4644f3c` | Findings-sweep entry; F-5, F-6 and F-7 closed | findings-sweep PR |

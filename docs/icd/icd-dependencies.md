@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Document ID | FENGINE-ICD-dependencies |
-| Version | 2.0 |
+| Version | 2.1 |
 | Status | Baselined |
 | Owner | Akilleez-QA |
-| Date | 2026-11-08 |
+| Date | 2026-11-10 |
 | Baseline commit | `a9e8cc6f175b5055b18abf26579ecc432a6ac53b` |
 | Applies to | foundation-engine main at baseline commit |
 | Classification | Self-assessed Class E analog; not safety-critical (see [SMP §1](../plan/software-management-plan.md#1-software-classification-self-assessed)) |
@@ -114,10 +114,10 @@ Errors use `{"jsonrpc":"2.0","id":<id or null>,"error":{"code":<code>,"message":
 | -32600 | Invalid envelope, batch, extra field or bad `id` | yes | same |
 | -32601 | Unknown method | yes | same |
 | -32602 | Invalid parameters, unknown tool, schema violation | yes | same |
-| -32603 | Internal error or unrepresentable result | yes | none (SRS GAP-001) |
+| -32603 | Internal error, unsupported pinned schema type or unrepresentable result; no result and no exception text | yes | same file (REQ-FND-004) |
 | -32000 | Initialization state (tools before `initialize`, second `initialize`) | yes | same file |
 | -32001 | Protocol version mismatch | yes | same |
-| -32002 | Resource bound exceeded; an oversized input frame closes the session (exit 2); an oversized output is withheld | yes, except oversized input | input bounds tested; output bound untested (SRS GAP-002) |
+| -32002 | Resource bound exceeded; an oversized input frame closes the session (exit 2); an oversized output is withheld | yes, except oversized input | same file: input bounds, and the output bound at and one byte past 1,048,576 (REQ-FND-005) |
 
 ### 4.4 Limits
 
@@ -159,3 +159,4 @@ REQ-SEC-001 and REQ-COMPAT-001. See the [SRS](../requirements/requirements.md).
 | 1.0 | 2026-11-01 | `aeb0c98` | External interfaces and pins | PR #332 |
 | 1.1 | 2026-11-01 | `70810ba` | Read-only tool contract and bridge | PRs #333, #340, #341 |
 | 2.0 | 2026-11-08 | `a9e8cc6` | Family documentation standard: metadata, Rapier row, bridge client row, generated field table, method, error and limit tables. Removed the stale sentence saying the bridge runs a Node subprocess with a ten-second timeout; since PR #341 it computes results from the schema alone | PR #346 |
+| 2.1 | 2026-11-10 | `4644f3c` | Error table: -32603 and the output bound are now tested (SRS GAP-001 and GAP-002 closed) | findings-sweep PR |

@@ -6,14 +6,16 @@ does not replace those notices. The original generated diagnostic assets listed
 below are separately dedicated under **CC0-1.0**.
 
 This inventory was checked against `package-lock.json` and installed package
-license files on 2026-10-02, and again for the Prettier addition and the model optimiser on 2026-10-03. It records pinned versions, not semver ranges.
+license files on 2026-10-02, and again for the Prettier addition and the model optimiser on 2026-10-03. On 2026-11-10 the
+versions of ws, prettier, playwright-core and `@types/node` were brought up to the lockfile; their declared licenses
+and installed license files were rechecked and are unchanged. It records pinned versions, not semver ranges.
 Update it when the dependency graph or shipped assets change.
 
 ## Optional network reference host dependency
 
-Added and checked on 2026-10-01: **ws 8.22.0**, MIT, used by the optional Node
+Added and checked on 2026-10-01 at 8.22.0; the lockfile now pins **ws 8.22.1**, MIT (rechecked 2026-11-10), used by the optional Node
 reference host. It is not imported by ordinary player builds or the native browser
-WebSocket adapter. [Pinned source](https://github.com/websockets/ws/tree/8.22.0).
+WebSocket adapter. [Pinned source](https://github.com/websockets/ws/tree/8.22.1).
 Retain `node_modules/ws/LICENSE` when distributing the reference host with this
 package. The installed license credits Einar Otto Stangvik (2011), Arnout Kazemier
 and contributors (2013), and Luigi Pinca and contributors (2016). No optional native
@@ -40,11 +42,11 @@ The brand assets themselves are original work listed in [docs/brand.md](docs/bra
 
 ## Code formatter dependency
 
-Added and checked on 2026-10-03: **prettier 3.9.9**, MIT, an exact-pinned
+Added and checked on 2026-10-03 at 3.9.9; the lockfile now pins **prettier 3.9.10**, MIT (rechecked 2026-11-10), an exact-pinned
 development dependency used only by `npm run format`, `npm run format:check`,
 `npm run check` and the after-edit hook to format the project's own source. It is
 not imported by the engine, templates or player builds and emits no code into them.
-[Pinned source](https://github.com/prettier/prettier/tree/3.9.9). It has no
+[Pinned source](https://github.com/prettier/prettier/tree/3.9.10). It has no
 dependencies of its own in the lockfile; its bundled third-party code is credited in
 the installed `node_modules/prettier/LICENSE`, which begins "Copyright © James Long
 and contributors".
@@ -545,7 +547,7 @@ lockfile metadata only.
 | `@types/micromatch` | 4.0.10 | MIT | Required by dependency graph |
 | `@types/minimatch` | 5.1.2 | MIT | Required by dependency graph |
 | `@types/ndarray` | 1.1.0 | MIT | Required by dependency graph |
-| `@types/node` | 22.20.4 | MIT | Required by dependency graph |
+| `@types/node` | 22.20.5 | MIT | Required by dependency graph |
 | `@types/node` | 20.5.6 | MIT | Required by dependency graph |
 | `@types/prompts` | 2.4.9 | MIT | Required by dependency graph |
 | `@types/stats.js` | 0.17.4 | MIT | Required by dependency graph |
@@ -673,9 +675,9 @@ lockfile metadata only.
 | `picocolors` | 1.1.1 | ISC | Required by dependency graph |
 | `picomatch` | 4.0.7 | MIT | Required by dependency graph |
 | `picomatch` | 2.3.2 | MIT | Required by dependency graph |
-| `playwright-core` | 1.56.1 | Apache-2.0 | Required by dependency graph |
+| `playwright-core` | 1.61.1 | Apache-2.0 | Required by dependency graph |
 | `postcss` | 8.5.28 | MIT | Required by dependency graph |
-| `prettier` | 3.9.9 | MIT | Development only: code formatter |
+| `prettier` | 3.9.10 | MIT | Development only: code formatter |
 | `prompts` | 2.4.2 | MIT | Required by dependency graph |
 | `property-graph` | 4.1.0 | MIT | Required by dependency graph |
 | `punycode` | 2.3.1 | MIT | Required by dependency graph |
@@ -736,7 +738,7 @@ lockfile metadata only.
 | `wrap-ansi` | 9.0.2 | MIT | Required by dependency graph |
 | `wrap-ansi` | 8.1.0 | MIT | Required by dependency graph |
 | `wrap-ansi-cjs` | 7.0.0 | MIT | Required by dependency graph |
-| `ws` | 8.22.0 | MIT | Optional reference host; installed by the locked development graph |
+| `ws` | 8.22.1 | MIT | Optional reference host; installed by the locked development graph |
 
 Retain each distributed package's license files and copyright notices. Relevant
 installed notice paths include:

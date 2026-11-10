@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Document ID | FENGINE-SUM-MAP |
-| Version | 1.1 |
+| Version | 1.2 |
 | Status | Baselined |
 | Owner | Akilleez-QA |
-| Date | 2026-11-08 |
+| Date | 2026-11-10 |
 | Baseline commit | `a9e8cc6f175b5055b18abf26579ecc432a6ac53b` |
 | Applies to | foundation-engine main at baseline commit |
 | Classification | Self-assessed Class E analog; not safety-critical (see [SMP §1](../plan/software-management-plan.md#1-software-classification-self-assessed)) |
@@ -33,7 +33,7 @@ is the reference. This map shows where each user-manual element lives.
 | Conventions (IDs, units, file layout) | [Your game files](../recipes/your-game-files.md); [STANDARD conventions](../STANDARD.md#conventions-of-this-document); [data dictionary](../data/data-dictionary.md) | Inspection |
 | Processing procedures | [Cookbook](../recipes/README.md) | Recipes with tests run in `npm test` (for example `scripts/docs/art-direction-recipe.test.mjs`) |
 | Data backup and recovery from errors | [Getting started: when something goes wrong](getting-started.md#when-something-goes-wrong); [add a save section](../recipes/add-a-save-section.md); [limitations: data](limitations.md#data-and-persistence) | Save recovery covered by REQ-SAVE-001 to REQ-SAVE-003 |
-| Messages, errors and exit codes | Bridge errors: [ICD §4.3](../icd/icd-dependencies.md#43-errors); boot validation errors: [ADR 0005](../adr/0005-registries-and-typed-content.md) | Bridge codes tested by `scripts/foundation-bridge.test.mjs` (GAP-001, GAP-002 untested) |
+| Messages, errors and exit codes | Bridge errors: [ICD §4.3](../icd/icd-dependencies.md#43-errors); boot validation errors: [ADR 0005](../adr/0005-registries-and-typed-content.md) | Bridge codes tested by `scripts/foundation-bridge.test.mjs`, including -32603 and the output bound |
 | Assumptions and limitations | [README Status and limitations](../../README.md#status-and-limitations); [limitations](limitations.md) | Inspection |
 | Safety-related constraints | [Limitations](limitations.md); [kid-safe profile](../policy/KID-SAFE.md) | Inspection; not safety-critical |
 | Version-specific changes | [CHANGELOG](../../CHANGELOG.md); [releases](../releases/README.md) | VDD generated from the tag |
@@ -44,3 +44,4 @@ is the reference. This map shows where each user-manual element lives.
 |---|---|---|---|---|
 | 1.0 | 2026-11-08 | `a9e8cc6` | Initial map | PR #346 |
 | 1.1 | 2026-11-08 | `8445d31` | README sections renamed in the reader-first rewrite; links updated | PR #347 |
+| 1.2 | 2026-11-10 | `4644f3c` | Bridge error codes are all tested now (GAP-001 and GAP-002 closed) | findings-sweep PR |
