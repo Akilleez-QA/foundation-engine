@@ -31,8 +31,20 @@ Derived from the repository tags (`git tag --list`) on 2026-11-08:
 
 Browser clients are untrusted; networked games keep authority on the host. The local
 session host requires a join code and is not hardened as a public Internet service.
-Dependency install scripts run only with a reviewed `allowScripts` entry, and CI runs with
-read-only repository permissions. See the
+Every dependency install script has a reviewed entry in `package.json` `allowScripts`
+(`scripts/install-scripts.test.mjs` checks this). Whether npm enforces that review depends on
+the npm version:
+
+- npm 12 and newer block any dependency install script that `allowScripts` does not approve.
+- npm 11.20.0 (bundled with Node 26.13.0) skips the scripts `allowScripts` denies, but runs
+  unreviewed ones with a warning unless `strict-allow-scripts` is set.
+- npm 10.9.9, bundled with the documented Node 22.23.3 and used by the Node 22 CI jobs, ignores
+  `allowScripts`. `npm ci` there runs every dependency install script, including esbuild's
+  denied `postinstall`, before the review test can flag a new one.
+
+On npm older than 12, use `npm ci --ignore-scripts` if you need install scripts blocked; the
+two reviewed scripts are not needed (see [getting started](docs/guides/getting-started.md)).
+CI runs with read-only repository permissions. See the
 [software management plan](docs/plan/software-management-plan.md#7-security-privacy-and-secure-coding)
 and [limitations](docs/guides/limitations.md#security-assumptions).
 

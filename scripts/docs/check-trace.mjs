@@ -87,10 +87,36 @@ export function parseRequirements(text) {
     }));
 }
 
+export const CURRENT_TRACE = 'Requirement to verification trace';
+const CURRENT_TRACE_HEADING = /^##\s+(?:\d+\.\s+)?Requirement to verification trace\s*$/;
+
+export function matrixSections(text) {
+  const sections = [];
+  let current = {heading: null, current: false, lines: []};
+  sections.push(current);
+  let fenced = false;
+  for (const line of text.split('\n')) {
+    if (/^\s*```/.test(line)) fenced = !fenced;
+    if (!fenced && /^#{1,2}\s/.test(line.trim())) {
+      current = {heading: line.trim(), current: CURRENT_TRACE_HEADING.test(line.trim()), lines: []};
+      sections.push(current);
+    } else current.lines.push(line);
+  }
+  return sections.map(s => ({heading: s.heading, current: s.current, text: s.lines.join('\n')}));
+}
+
 export function parseMatrix(text) {
-  return tableRows(text)
-    .filter(cells => REQ_ID.test(cells[0]))
-    .map(cells => ({id: cells[0], method: cells[1] ?? '', evidence: cells[2] ?? '', result: cells[3] ?? ''}));
+  return matrixSections(text).flatMap(section =>
+    tableRows(section.text)
+      .filter(cells => REQ_ID.test(cells[0]))
+      .map(cells => ({
+        id: cells[0],
+        method: cells[1] ?? '',
+        evidence: cells[2] ?? '',
+        result: cells[3] ?? '',
+        current: section.current,
+      })),
+  );
 }
 
 export function headingAnchors(text) {
@@ -179,6 +205,8 @@ export function checkTrace(root = ROOT) {
   const scripts = readPackageScripts(root);
   const requirements = srs ? parseRequirements(srs) : [];
   const rows = matrix ? parseMatrix(matrix) : [];
+  if (matrix !== null && !matrixSections(matrix).some(s => s.current))
+    errors.push(`${MATRIX}: has no "${CURRENT_TRACE}" section`);
   const ids = new Set();
   for (const r of requirements) {
     if (ids.has(r.id)) errors.push(`${SRS}: ${r.id} is defined twice`);
@@ -207,7 +235,7 @@ export function checkTrace(root = ROOT) {
       errors.push(`${MATRIX}: ${row.id} has no requirement in ${SRS}`);
       continue;
     }
-    traced.add(row.id);
+    if (row.current) traced.add(row.id);
     if (!METHOD.test(row.method)) errors.push(`${MATRIX}: ${row.id} method must be T, A, I or D`);
     const paths = backticked(row.evidence)
       .flatMap(t => t.split(/\s+/))

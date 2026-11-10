@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Document ID | FENGINE-VM |
-| Version | 2.0 |
+| Version | 2.1 |
 | Status | Baselined |
 | Owner | Akilleez-QA |
-| Date | 2026-11-08 |
+| Date | 2026-11-09 |
 | Baseline commit | `a9e8cc6f175b5055b18abf26579ecc432a6ac53b` |
 | Applies to | foundation-engine main at baseline commit |
 | Classification | Self-assessed Class E analog; not safety-critical (see [SMP §1](../plan/software-management-plan.md#1-software-classification-self-assessed)) |
@@ -22,7 +22,9 @@ Commands run from the repository root.
 
 "Last result" names the [test report](reports/README.md) that recorded the run. A
 command listed here is the method; it is not a claim that it passed on every revision.
-`npm run lint:trace` checks that every requirement has a row and every cited file exists.
+`npm run lint:trace` checks that every requirement has a row in §2 and that every cited file
+exists. Only §2 rows count as verification. The historical rows in §4 are still checked for
+known requirement IDs, existing files and valid methods, but they never trace a requirement.
 
 ## 2. Requirement to verification trace
 
@@ -140,3 +142,4 @@ are not a hosted CI run, independent review or physical-device acceptance.
 | 1.0 | 2026-11-01 | `39cf03b` | Selected stock requirements traced to local evidence | PR #328 |
 | 1.1 | 2026-11-01 | `d9c7039` | Foundation contract rows | PR #333 |
 | 2.0 | 2026-11-08 | `a9e8cc6` | One row per SRS requirement (53), last result linked to a test report, backward-trace rule; earlier tables kept as historical | PR #346 |
+| 2.1 | 2026-11-09 | `95a883c` | `lint:trace` counts only §2 rows as verification; §4 rows are checked but trace nothing (backfill review) | PR fixing the 2026-11-09 backfill-review findings |

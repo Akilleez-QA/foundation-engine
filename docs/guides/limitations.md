@@ -26,7 +26,9 @@ because the software is not safety-critical
   a public Internet service.
 - `ENGINE_HOST` makes the development server reachable from the network, including its
   development test API. Leave it unset unless you mean to share the dev server.
-- Dependency install scripts run only with a reviewed `allowScripts` entry.
+- Every dependency install script has a reviewed `allowScripts` entry, but only npm 12 and
+  newer enforce it at install. npm 10.9.9 (bundled with Node 22.23.3) runs them all; see
+  [SECURITY.md](../../SECURITY.md#security-posture).
 
 ## Data and persistence
 
