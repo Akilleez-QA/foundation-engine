@@ -1,9 +1,20 @@
 import assert from 'node:assert/strict';
-import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import {test} from 'node:test';
-import {CONTROL_DOCS, DISCLAIMER, MATRIX, SDD, SRS, checkTrace, deadLinks, parseRequirements} from './check-trace.mjs';
+import {
+  CONTROL_DOCS,
+  DISCLAIMER,
+  MATRIX,
+  ROOT,
+  SDD,
+  SRS,
+  checkTrace,
+  deadLinks,
+  parseMatrix,
+  parseRequirements,
+} from './check-trace.mjs';
 import {changelogSection, parseArgs, schemaFields, tapTotals} from './reports.mjs';
 
 const HEADER = [
@@ -22,6 +33,9 @@ const HEADER = [
   '',
 ].join('\n');
 
+const TRACE = '## 2. Requirement to verification trace\n\n| Requirement | Method | Verification | Last result |\n|---|---|---|---|';
+const HISTORY = '## 4. Earlier evidence (historical)\n\n| Requirement | Method | Test file or command | Result |\n|---|---|---|---|';
+
 const REQ =
   '| REQ-X-001 | The tool shall work. | Because. | `src/a.ts` | SDD §1 | T | Baselined |\n' +
   '| REQ-X-002 | The tool shall stop. | Because. | `src/a.ts` | SDD §1 | I | Baselined |';
@@ -33,7 +47,7 @@ function fixture(overrides = {}) {
     'src/a.ts': 'export {};\n',
     'src/a.test.ts': 'export {};\n',
     [SRS]: `${HEADER}\n${REQ}\n\n## Change history\n`,
-    [MATRIX]: `${HEADER}\n| REQ-X-001 | T | \`src/a.test.ts\` | Pass |\n| REQ-X-002 | I | Inspect \`src/a.ts\` | Inspected |\n\n## Change history\n`,
+    [MATRIX]: `${HEADER}\n${TRACE}\n| REQ-X-001 | T | \`src/a.test.ts\` | Pass |\n| REQ-X-002 | I | Inspect \`src/a.ts\` | Inspected |\n\n## Change history\n`,
     [SDD]: `${HEADER}\nREQ-X-001 and REQ-X-002 live here. [srs](../requirements/requirements.md)\n\n## Change history\n`,
     ...overrides,
   };
@@ -68,14 +82,51 @@ test('check-trace: a complete fixture passes', () => {
 
 test('check-trace: a requirement without a verification row fails', () => {
   const errors = errorsFor({
-    [MATRIX]: `${HEADER}\n| REQ-X-001 | T | \`src/a.test.ts\` | Pass |\n\n## Change history\n`,
+    [MATRIX]: `${HEADER}\n${TRACE}\n| REQ-X-001 | T | \`src/a.test.ts\` | Pass |\n\n## Change history\n`,
   });
   assert.ok(errors.some(e => e.includes('REQ-X-002 has no verification row')));
 });
 
+test('check-trace: a historical row does not satisfy a requirement that lost its current verification row', () => {
+  const errors = errorsFor({
+    [MATRIX]: `${HEADER}\n${TRACE}\n| REQ-X-001 | T | \`src/a.test.ts\` | Pass |\n\n${HISTORY}\n| REQ-X-002 | I | Inspect \`src/a.ts\` | Inspected |\n\n## Change history\n`,
+  });
+  assert.ok(errors.some(e => e.includes('REQ-X-002 has no verification row')));
+});
+
+test('check-trace: historical rows are still checked for unknown requirements and missing files', () => {
+  const errors = errorsFor({
+    [MATRIX]: `${HEADER}\n${TRACE}\n| REQ-X-001 | T | \`src/a.test.ts\` | Pass |\n| REQ-X-002 | I | Inspect \`src/a.ts\` | Inspected |\n\n${HISTORY}\n| REQ-X-009 | T | \`src/a.test.ts\` | Pass |\n| REQ-X-001 | T | \`src/gone.test.ts\` | Pass |\n\n## Change history\n`,
+  });
+  assert.ok(errors.some(e => e.includes('REQ-X-009 has no requirement')));
+  assert.ok(errors.some(e => e.includes('cites missing file src/gone.test.ts')));
+});
+
+test('check-trace: a matrix without its current trace section fails', () => {
+  const errors = errorsFor({
+    [MATRIX]: `${HEADER}\n${HISTORY}\n| REQ-X-001 | T | \`src/a.test.ts\` | Pass |\n| REQ-X-002 | I | Inspect \`src/a.ts\` | Inspected |\n\n## Change history\n`,
+  });
+  assert.ok(errors.some(e => e.includes('has no "Requirement to verification trace" section')));
+  assert.ok(errors.some(e => e.includes('REQ-X-001 has no verification row')));
+  assert.ok(errors.some(e => e.includes('REQ-X-002 has no verification row')));
+});
+
+test('check-trace: removing the current REQ-BOOT-001 row from the repository matrix leaves it untraced', () => {
+  const text = readFileSync(join(ROOT, MATRIX), 'utf8');
+  const removed = text
+    .split('\n')
+    .filter(line => !/^\| REQ-BOOT-001 \| T \| `src\/core\/app\.test\.ts`/.test(line))
+    .join('\n');
+  assert.notEqual(removed, text);
+  const current = rows => new Set(rows.filter(r => r.current).map(r => r.id));
+  assert.ok(current(parseMatrix(text)).has('REQ-BOOT-001'));
+  assert.ok(!current(parseMatrix(removed)).has('REQ-BOOT-001'));
+  assert.ok(parseMatrix(removed).some(r => r.id === 'REQ-BOOT-001' && !r.current));
+});
+
 test('check-trace: a matrix row citing a missing test or npm script fails', () => {
   const errors = errorsFor({
-    [MATRIX]: `${HEADER}\n| REQ-X-001 | T | \`src/gone.test.ts\`; \`npm run lint:none\` | Pass |\n| REQ-X-002 | I | Inspect \`src/a.ts\` | Inspected |\n\n## Change history\n`,
+    [MATRIX]: `${HEADER}\n${TRACE}\n| REQ-X-001 | T | \`src/gone.test.ts\`; \`npm run lint:none\` | Pass |\n| REQ-X-002 | I | Inspect \`src/a.ts\` | Inspected |\n\n## Change history\n`,
   });
   assert.ok(errors.some(e => e.includes('cites missing file src/gone.test.ts')));
   assert.ok(errors.some(e => e.includes('unknown npm script lint:none')));
@@ -83,7 +134,7 @@ test('check-trace: a matrix row citing a missing test or npm script fails', () =
 
 test('check-trace: a test-verified row with no test, and a row with no requirement, fail', () => {
   const errors = errorsFor({
-    [MATRIX]: `${HEADER}\n| REQ-X-001 | T | by hand | Pass |\n| REQ-X-002 | I | Inspect \`src/a.ts\` | Inspected |\n| REQ-X-009 | T | \`src/a.test.ts\` | Pass |\n\n## Change history\n`,
+    [MATRIX]: `${HEADER}\n${TRACE}\n| REQ-X-001 | T | by hand | Pass |\n| REQ-X-002 | I | Inspect \`src/a.ts\` | Inspected |\n| REQ-X-009 | T | \`src/a.test.ts\` | Pass |\n\n## Change history\n`,
   });
   assert.ok(errors.some(e => e.includes('REQ-X-001 is verified by test but names no test file')));
   assert.ok(errors.some(e => e.includes('REQ-X-009 has no requirement')));
