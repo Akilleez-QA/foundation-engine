@@ -1,6 +1,9 @@
-# ADR 0078: Source identity and read-only tool schema baseline
+# ADR 0156: Source identity and read-only tool schema baseline
 
 Status: Proposed
+
+This record was numbered 0078 until 2026-11-10. ADR 0078 already records the creator-selectable render
+backend, so this record took the next unused number. Its content is unchanged.
 
 ## Requirement and decision
 

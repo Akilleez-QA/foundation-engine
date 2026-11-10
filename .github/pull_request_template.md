@@ -15,6 +15,19 @@ profiles, active-world visibility and touch/keyboard interaction evidence. Separ
 emulation from physical-device measurements and name unverified combinations.
 See docs/policy/DEVICE-EXPERIENCE.md. Standards-only edits do not certify runtime UI.
 
+## Requirements, design and interface impact
+
+- Requirements added, changed or deleted (IDs from docs/requirements/requirements.md):
+- Design, interface or data dictionary updated: yes / no / not needed
+- Verification matrix updated: yes / not needed
+
+## Peer review record
+
+- Reviewers: human approver and any agent reviewers (an agent review is not independent)
+- Review type: code / docs / requirements / design
+- Findings: count by severity, with links to resolved threads
+- Outcome: approved / changes requested / re-review
+
 ## Contribution checks
 
 - [ ] I followed CONTRIBUTING.md, AGENTS.md, and the relevant architecture recipe.
@@ -23,3 +36,4 @@ See docs/policy/DEVICE-EXPERIENCE.md. Standards-only edits do not certify runtim
 - [ ] I did not weaken budgets, tolerances, or tests to make checks pass.
 - [ ] New original contributions are submitted under GPL-3.0-only; third-party material is identified with its license and necessary notices.
 - [ ] No secrets or private data are included.
+- [ ] Docs whose source paths this change touches are updated or still accurate, and `npm run lint:trace` passes.

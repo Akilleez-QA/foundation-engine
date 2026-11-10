@@ -106,6 +106,125 @@ test('bridge results equal the TypeScript validators', () => {
   cases.forEach(([, args, expected], i) => assert.deepEqual(replies[i + 1].result.structuredContent, expected(args)));
 });
 
+const runPatched = (patch, frames) => {
+  const harness = [
+    'import sys',
+    "sys.path.insert(0, 'tools')",
+    'import foundation_engine_bridge as b',
+    patch,
+    'raise SystemExit(b.serve(sys.stdin.buffer, sys.stdout.buffer))',
+  ].join('\n');
+  const proc = spawnSync('python3', ['-B', '-c', harness], {
+    input: frames.map(f => JSON.stringify(f)).join('\n') + '\n',
+    encoding: 'utf8',
+    timeout: 30000,
+  });
+  assert.ifError(proc.error);
+  assert.equal(proc.stderr, '');
+  return {status: proc.status, replies: proc.stdout.trim().split('\n').filter(Boolean).map(JSON.parse)};
+};
+const internal = {code: -32603, message: 'Internal bridge error; no evidence result is available'};
+
+test('bridge answers -32603 when dispatch raises an unexpected exception, keeps the id and recovers', () => {
+  const patch = ['def boom(name, arguments):', "    raise RuntimeError('injected')", 'b._tool_result = boom'].join(
+    '\n',
+  );
+  const {status, replies} = runPatched(patch, [
+    init,
+    request('tools/call', {name: 'validate_render_mask', arguments: {mask: 1}}, 'call-7'),
+    request('ping', {}, 8),
+  ]);
+  assert.equal(status, 0);
+  assert.deepEqual(replies[1], {jsonrpc: '2.0', id: 'call-7', error: internal});
+  assert.equal(JSON.stringify(replies[1]).includes('injected'), false);
+  assert.deepEqual(replies[2], {jsonrpc: '2.0', id: 8, result: {}});
+});
+
+test('bridge answers -32603 for an unsupported pinned schema type instead of a result', () => {
+  const patch = "b.TOOLS['validate_render_mask']['outputSchema'] = {'type': 'string'}";
+  const {status, replies} = runPatched(patch, [init, call('validate_render_mask', {mask: 1}), request('ping', {}, 2)]);
+  assert.equal(status, 0);
+  assert.deepEqual(replies[1], {
+    jsonrpc: '2.0',
+    id: 1,
+    error: {code: -32603, message: 'Unsupported pinned schema type'},
+  });
+  assert.equal('result' in replies[1], false);
+  assert.deepEqual(replies[2].result, {});
+});
+
+test('bridge answers -32603 and withholds evidence when a result cannot be represented as JSON', () => {
+  const patch = [
+    'def nan(name, arguments):',
+    "    return {'isError': False, 'structuredContent': float('nan')}",
+    'b._tool_result = nan',
+  ].join('\n');
+  const {status, replies} = runPatched(patch, [
+    init,
+    request('tools/call', {name: 'validate_render_mask', arguments: {mask: 1}}, 5),
+    request('ping', {}, 6),
+  ]);
+  assert.equal(status, 0);
+  assert.deepEqual(replies[1], {
+    jsonrpc: '2.0',
+    id: 5,
+    error: {code: -32603, message: 'Result cannot be represented; evidence withheld'},
+  });
+  assert.deepEqual(replies[2], {jsonrpc: '2.0', id: 6, result: {}});
+});
+
+test('bridge withholds an output frame over 1048576 bytes with -32002 (not -32603) and keeps the session', () => {
+  const patch = [
+    'def big(name, arguments):',
+    "    return {'isError': False, 'structuredContent': ['x' * 1000] * arguments['mask']}",
+    'b._tool_result = big',
+  ].join('\n');
+  const {status, replies} = runPatched(patch, [
+    init,
+    request('tools/call', {name: 'validate_render_mask', arguments: {mask: 1100}}, 'big'),
+    request('tools/call', {name: 'validate_render_mask', arguments: {mask: 1000}}, 'fits'),
+    request('ping', {}, 9),
+  ]);
+  assert.equal(status, 0);
+  assert.deepEqual(replies[1], {
+    jsonrpc: '2.0',
+    id: 'big',
+    error: {code: -32002, message: 'Output frame exceeds bridge byte limit; result withheld'},
+  });
+  assert.equal(replies[2].id, 'fits');
+  assert.equal(replies[2].result.structuredContent.length, 1000);
+  assert.deepEqual(replies[3], {jsonrpc: '2.0', id: 9, result: {}});
+});
+
+test('bridge output bound is exact at 1048576 bytes per frame, newline excluded', () => {
+  const harness = [
+    'import json, sys',
+    "sys.path.insert(0, 'tools')",
+    'import foundation_engine_bridge as b',
+    "base = len(b.encode_response({'jsonrpc': '2.0', 'id': 1, 'result': ''})) - 1",
+    'def frame(n):',
+    "    return b.encode_response({'jsonrpc': '2.0', 'id': 1, 'result': 'x' * n})",
+    'at, over = frame(b.MAX_OUTPUT_BYTES - base), frame(b.MAX_OUTPUT_BYTES - base + 1)',
+    'kept = json.loads(at)',
+    "print(json.dumps([len(at), sorted(kept), kept['id'], kept['result'] == 'x' * len(kept['result']),",
+    "                  len(kept['result']), json.loads(over)]))",
+  ].join('\n');
+  const proc = spawnSync('python3', ['-B', '-c', harness], {encoding: 'utf8', timeout: 30000});
+  assert.ifError(proc.error);
+  assert.equal(proc.status, 0, proc.stderr);
+  const [atLength, atKeys, atId, allX, resultLength, over] = JSON.parse(proc.stdout);
+  assert.equal(atLength, 1048576 + 1);
+  assert.deepEqual(atKeys, ['id', 'jsonrpc', 'result']);
+  assert.equal(atId, 1);
+  assert.equal(allX, true);
+  assert.ok(resultLength > 1048000);
+  assert.deepEqual(over, {
+    jsonrpc: '2.0',
+    id: 1,
+    error: {code: -32002, message: 'Output frame exceeds bridge byte limit; result withheld'},
+  });
+});
+
 test('bridge answers a read-only call from the bridge and schema alone, without Node on PATH', () => {
   const root = mkdtempSync(join(tmpdir(), 'foundation-bridge-alone-'));
   try {
