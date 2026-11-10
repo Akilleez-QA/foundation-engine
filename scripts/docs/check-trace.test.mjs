@@ -33,8 +33,10 @@ const HEADER = [
   '',
 ].join('\n');
 
-const TRACE = '## 2. Requirement to verification trace\n\n| Requirement | Method | Verification | Last result |\n|---|---|---|---|';
-const HISTORY = '## 4. Earlier evidence (historical)\n\n| Requirement | Method | Test file or command | Result |\n|---|---|---|---|';
+const TRACE =
+  '## 2. Requirement to verification trace\n\n| Requirement | Method | Verification | Last result |\n|---|---|---|---|';
+const HISTORY =
+  '## 4. Earlier evidence (historical)\n\n| Requirement | Method | Test file or command | Result |\n|---|---|---|---|';
 
 const REQ =
   '| REQ-X-001 | The tool shall work. | Because. | `src/a.ts` | SDD §1 | T | Baselined |\n' +
