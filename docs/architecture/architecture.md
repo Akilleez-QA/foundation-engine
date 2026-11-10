@@ -205,8 +205,9 @@ requires every expected job to succeed. `manifest.yml` checks the source manifes
 
 `npm run deploy:production` refuses anything but a clean `main` equal to `origin/main`.
 Release notes are one fragment per change in `changes/unreleased/`, folded by
-`npm run changelog -- --fold`. `npm run new-game` refuses bad input before writing. A
-dependency install script runs only with a reviewed `allowScripts` entry.
+`npm run changelog -- --fold`. `npm run new-game` refuses bad input before writing. Every
+dependency install script needs a reviewed `allowScripts` entry; npm 12 and newer enforce it
+at install, older npm does not (see [SECURITY.md](../../SECURITY.md#security-posture)).
 
 ### 3.4 Documentation control
 
