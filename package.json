@@ -15,7 +15,7 @@
     "generate": "node scripts/generate.mjs",
     "typecheck": "node scripts/generate.mjs && tsc --noEmit",
     "test": "node scripts/generate.mjs && tsx --test \"src/**/*.test.ts\" \"game/**/*.test.ts\" \"game/**/*.test.mjs\" \"templates/*/game/**/*.test.ts\" \"templates/*/game/**/*.test.mjs\" \"scripts/**/*.test.mjs\" \"scripts/**/*.test.ts\" \"tools/**/*.test.mjs\" \"tools/**/*.test.ts\" \"labs/*/game/**/*.test.ts\" \"labs/*/game/**/*.test.mjs\"",
-    "lint": "npm run --silent format:check && npm run --silent lint:layers && npm run --silent lint:game && npm run --silent lint:arch && npm run --silent lint:types && npm run --silent lint:css && npm run --silent lint:generic && npm run --silent lint:brief && npm run --silent lint:budgets && npm run --silent lint:provenance && npm run --silent lint:docs-claims && npm run --silent lint:changelog",
+    "lint": "npm run --silent format:check && npm run --silent lint:layers && npm run --silent lint:game && npm run --silent lint:arch && npm run --silent lint:types && npm run --silent lint:css && npm run --silent lint:generic && npm run --silent lint:brief && npm run --silent lint:budgets && npm run --silent lint:provenance && npm run --silent lint:docs-claims && npm run --silent lint:changelog && npm run --silent lint:trace",
     "format": "prettier --write .",
     "format:check": "node scripts/lint/format-check.mjs",
     "lint:layers": "node scripts/lint/layers.mjs",
@@ -27,6 +27,7 @@
     "lint:provenance": "tsx scripts/lint/provenance.ts",
     "lint:docs-claims": "node scripts/lint/docs-claims.mjs",
     "lint:changelog": "node scripts/changelog.mjs --check",
+    "lint:trace": "node scripts/docs/check-trace.mjs",
     "changelog": "node scripts/changelog.mjs",
     "capabilities": "node scripts/capabilities.mjs",
     "disclosure": "tsx scripts/disclosure.ts",
@@ -127,11 +128,11 @@
     "@types/node": "^22.20.5",
     "@types/three": "^0.186.0",
     "playwright-core": "1.61.1",
-    "prettier": "3.9.9",
+    "prettier": "3.9.10",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "vite": "^8.3.2",
-    "ws": "8.22.0"
+    "ws": "8.22.1"
   },
   "repository": {
     "type": "git",

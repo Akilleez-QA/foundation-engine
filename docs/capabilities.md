@@ -351,6 +351,7 @@ Each kit's value exports are listed in [capabilities.json](capabilities.json).
 - `lint:generic`
 - `lint:layers`
 - `lint:provenance`
+- `lint:trace`
 - `lint:types`
 - `new`
 - `new-game`
