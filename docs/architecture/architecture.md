@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Document ID | FENGINE-SDD |
-| Version | 2.0 |
+| Version | 2.1 |
 | Status | Baselined |
 | Owner | Akilleez-QA |
-| Date | 2026-11-08 |
+| Date | 2026-11-09 |
 | Baseline commit | `a9e8cc6f175b5055b18abf26579ecc432a6ac53b` |
 | Applies to | foundation-engine main at baseline commit |
 | Classification | Self-assessed Class E analog; not safety-critical (see [SMP §1](../plan/software-management-plan.md#1-software-classification-self-assessed)) |
@@ -214,7 +214,7 @@ at install, older npm does not (see [SECURITY.md](../../SECURITY.md#security-pos
 `npm run capabilities` generates `docs/capabilities.json` and `docs/capabilities.md`
 from the code. `npm run lint:docs-claims` fails when a scanned page calls a shipped
 feature missing. `npm run lint:trace` (`scripts/docs/check-trace.mjs`) checks the
-requirement trace, control-document headers and every relative Markdown link.
+requirement trace (only matrix §2 rows count), control-document headers and every relative Markdown link.
 `scripts/docs/reports.mjs` generates the version description and test reports.
 
 ## 4. Foundation contract boundary
@@ -328,3 +328,4 @@ See [limitations](../guides/limitations.md).
 | 1.0 | 2026-11-01 | `25575b6` | Components, ownership, data flow and ADR map | PR #327 |
 | 1.1 | 2026-11-01 | `70810ba` | Foundation contract boundary; bridge self-contained | PRs #333, #340, #341 |
 | 2.0 | 2026-11-08 | `a9e8cc6` | Family documentation standard: metadata, numbered component sections with requirement IDs, tooling components, concurrency, decisions, quality attributes, resource use | PR #346 |
+| 2.1 | 2026-11-09 | `95a883c` | §3.3 install-script enforcement qualified by npm version; §3.4 trace check counts only matrix §2 rows | PR fixing the 2026-11-09 backfill-review findings |

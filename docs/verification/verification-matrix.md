@@ -142,4 +142,4 @@ are not a hosted CI run, independent review or physical-device acceptance.
 | 1.0 | 2026-11-01 | `39cf03b` | Selected stock requirements traced to local evidence | PR #328 |
 | 1.1 | 2026-11-01 | `d9c7039` | Foundation contract rows | PR #333 |
 | 2.0 | 2026-11-08 | `a9e8cc6` | One row per SRS requirement (53), last result linked to a test report, backward-trace rule; earlier tables kept as historical | PR #346 |
-| 2.1 | 2026-11-09 | `95a883c` | `lint:trace` counts only §2 rows as verification; §4 rows are checked but trace nothing (backfill review) | PR #PRNUM |
+| 2.1 | 2026-11-09 | `95a883c` | `lint:trace` counts only §2 rows as verification; §4 rows are checked but trace nothing (backfill review) | PR fixing the 2026-11-09 backfill-review findings |

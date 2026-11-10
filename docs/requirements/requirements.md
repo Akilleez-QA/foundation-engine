@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Document ID | FENGINE-SRS |
-| Version | 2.0 |
+| Version | 2.1 |
 | Status | Baselined |
 | Owner | Akilleez-QA |
-| Date | 2026-11-08 |
+| Date | 2026-11-09 |
 | Baseline commit | `a9e8cc6f175b5055b18abf26579ecc432a6ac53b` |
 | Applies to | foundation-engine main at baseline commit |
 | Classification | Self-assessed Class E analog; not safety-critical (see [SMP §1](../plan/software-management-plan.md#1-software-classification-self-assessed)) |
@@ -43,7 +43,7 @@ Each requirement row has:
 
 The [verification matrix](../verification/verification-matrix.md) names the test or
 check for each ID and its last result. `npm run lint:trace` fails when a requirement
-lacks a matrix row, a matrix row cites a file that does not exist, or a requirement is
+lacks a row in the matrix's current trace (§2), a matrix row cites a file that does not exist, or a requirement is
 not allocated to a design section.
 
 ### 1.2 Not applicable requirement categories
@@ -123,7 +123,7 @@ These are verified by the muted browser harness. A Node-only run does not verify
 | REQ-SCAF-001 | `npm run new-game` shall refuse a bad template or id before touching any file. | A typo must not damage an existing game. | `scripts/new-game.mjs` | SDD §3.3 | T | Baselined |
 | REQ-CAP-001 | `docs/capabilities.json` and `docs/capabilities.md` shall match what `npm run capabilities` generates from the code. | The capability list is the source of truth for what ships. | `scripts/capabilities.mjs` | SDD §3.4 | T | Baselined |
 | REQ-DOC-001 | The docs-claims lint shall fail when a scanned page calls a shipped feature missing. | Readers and agents must not be told a shipped feature is impossible. | `scripts/lint/docs-claims.mjs` | SDD §3.4 | T | Baselined |
-| REQ-DOC-002 | The trace check shall fail on a requirement with no verification row, a matrix row citing a missing file, an unallocated requirement, a control document without its metadata header, or a dead relative Markdown link. | Control documents stay traceable and their links stay live. | `scripts/docs/check-trace.mjs` | SDD §3.4 | T | Baselined |
+| REQ-DOC-002 | The trace check shall fail on a requirement with no row in the current verification trace (matrix §2; historical rows do not count), a matrix row citing a missing file, an unallocated requirement, a control document without its metadata header, or a dead relative Markdown link. | Control documents stay traceable and their links stay live. | `scripts/docs/check-trace.mjs` | SDD §3.4 | T | Baselined |
 | REQ-EVID-001 | Acceptance records shall distinguish runtime enforcement, automated checks and manual device evidence. | A software gate cannot certify a physical device. Creator contract, What enforcement proves. | `docs/guides/upgrade-acceptance-ledger.md`, `docs/policy/DEVICE-EXPERIENCE.md` | SDD §3.4 | I | Baselined |
 
 ## 6. Foundation contract requirements
@@ -163,3 +163,4 @@ unverified; requirement wording does not supply a passing result.
 | 1.0 | 2026-10-30 | `d91aa7d` | Initial register of eight stock obligations | PR #326 |
 | 1.1 | 2026-11-01 | `d9c7039` | Added REQ-FND-001 to REQ-FND-003 | PR #333 |
 | 2.0 | 2026-11-08 | `a9e8cc6` | Family documentation standard: metadata, seven-field rows, 42 new requirements (53 in total), N/A categories, untested gaps; REQ-BOOT-001 now also cites `src/core/app.test.ts`, which holds the boot-order test | PR #346 |
+| 2.1 | 2026-11-09 | `95a883c` | REQ-DOC-002: only a row in the matrix's current trace (§2) verifies a requirement | PR fixing the 2026-11-09 backfill-review findings |
