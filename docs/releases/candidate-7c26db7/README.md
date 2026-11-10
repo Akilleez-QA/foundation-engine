@@ -10,7 +10,7 @@ author decides both.
 | Previous release | [v0.2.0](https://github.com/Akilleez-QA/foundation-engine/releases/tag/v0.2.0), tag `071e3c2` |
 | Proposed version | 0.3.0: new optional APIs (`touchButton`, `createTestSaves`, `dmath`, particles, session kit and others) and stricter checks; pre-1.0, so a minor bump. Author decides |
 | Not in this candidate | Anything merged to `main` after `7c26db7` (#122, a test-only deflake, merged during preparation); it belongs to the next version unless the author re-cuts the candidate |
-| Changelog | [0.3.0, proposed](../../../CHANGELOG.md#030--proposed-author-decides) |
+| Changelog | [0.3.0, proposed](../../../CHANGELOG.md#planned-030-not-released) |
 
 ## Contents
 

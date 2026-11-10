@@ -1,16 +1,22 @@
 # Changelog
 
+This log uses [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) categories
+and [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Proposed and
+untagged source baselines are identified separately from published releases.
+
 PR numbers refer to the public repository,
 [github.com/Akilleez-QA/foundation-engine](https://github.com/Akilleez-QA/foundation-engine/pulls).
 Batch PRs #42, #45, #46 and #47 integrate the PRs listed in their titles onto `main`.
 Every new framework below is optional: a game that does not use it is unchanged.
 
-## Unreleased
+## [Unreleased]
 
 Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c26db7/README.md) `7c26db7`
 (#122 onward). None of it is in that candidate. New entries are files in
 [changes/unreleased/](changes/unreleased/README.md), one per change, folded in here at release time;
 `npm run changelog` shows the whole section.
+
+### Changed
 
 - **Optional interaction helpers:** bounded weighted assignment claims, editable itineraries and planar alignment attempts. Creator-owned adapters retain scheduling, movement and effects; no registration is required. Development-only evidence reporting rejects incomplete acceptance results. See [ADR 0080](docs/adr/0080-optional-interaction-ownership.md).
 - Optional visibility contribution helpers preserve overlapping coverage and explored history, refuse stale source calculations, and drain bounded cell changes. Geometry, rendering and disclosure remain creator-owned; evidence is headless fixtures, not game/device acceptance.
@@ -248,7 +254,7 @@ Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c
   extension seam (`SceneExtension`, opaque in `@engine`). Guide: [use three.js directly](docs/recipes/use-three-directly.md);
   browser evidence: `npm run test:three-kit-browser` (the courtyard fixture, software GL only).
 
-### Upgrading
+#### Upgrading
 
 - **Constrained mobile GPUs start on a lighter preset (ADR 0079).** When the brief does not declare
   `quality.tier`, a first run on a mobile GPU family (Mali, Adreno, PowerVR, Xclipse, Immortalis, Maleoon) starts
@@ -269,14 +275,14 @@ Everything merged after the [0.3.0 release candidate](docs/releases/candidate-7c
   post-processing. Desktops, iPhone-class devices, gates and benches are unchanged. *To do:* nothing; declare
   `quality: { tier: 'reference' }` to start every device on it. A declared tier, a saved choice and a pin still win.
 
-## 0.3.0 — proposed; author decides
+### Planned 0.3.0 (not released)
 
 **Proposed, not released.** The version number and date are a proposal; the author decides both, and
 creates any tag or GitHub release. Release candidate: `7c26db7` (the merge of #121, after #108). Evidence, release notes,
 upgrade guide and support matrix: [candidate bundle](docs/releases/candidate-7c26db7/README.md). Covers every
 PR merged after v0.2.0 (`071e3c2`) up to the candidate; later PRs are under Unreleased. `package.json` still says 0.2.0 until the author bumps it with the tag.
 
-### Upgrading from 0.2.0
+#### Upgrading from 0.2.0
 
 Changes a v0.2.0 game or workflow can notice. Each says what changed, who is affected and what to do.
 
@@ -344,7 +350,7 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
   manifests and checked on every test run. See
   [public compatibility](docs/guides/public-compatibility.md#retained-v020-baseline).
 
-### Changes
+#### Changes
 
 - **The gate passes on Node 23 and newer.** Node 23 changed the test runner's default report for piped output
   from TAP (`# tests 4`) to spec (`ℹ tests 4`), so `scripts/compatibility.test.mjs` failed `npm test` and
@@ -461,7 +467,7 @@ Changes a v0.2.0 game or workflow can notice. Each says what changed, who is aff
   [Recipe](docs/recipes/hit-sparks-and-pickups.md), [guide](docs/guides/particles.md),
   `npm run test:particle-browser`. Desktop software-GL evidence only (#63).
 
-### Pull requests in this version
+#### Pull requests in this version
 
 Every PR merged after v0.2.0, by area. Limits for each are in its entry above or in the
 [release notes](docs/releases/candidate-7c26db7/release-notes.md#known-limits).
@@ -476,7 +482,10 @@ Every PR merged after v0.2.0, by area. Limits for each are in its entry above or
 - **Contributing, CI and project:** [#69](https://github.com/Akilleez-QA/foundation-engine/pull/69), [#71](https://github.com/Akilleez-QA/foundation-engine/pull/71), [#80](https://github.com/Akilleez-QA/foundation-engine/pull/80), [#82](https://github.com/Akilleez-QA/foundation-engine/pull/82), [#88](https://github.com/Akilleez-QA/foundation-engine/pull/88), [#93](https://github.com/Akilleez-QA/foundation-engine/pull/93), [#117](https://github.com/Akilleez-QA/foundation-engine/pull/117). Batch merges [#62](https://github.com/Akilleez-QA/foundation-engine/pull/62), [#64](https://github.com/Akilleez-QA/foundation-engine/pull/64), [#65](https://github.com/Akilleez-QA/foundation-engine/pull/65) integrate the PRs
   named in their titles.
 
-## 0.2.0 — 2026-10-03
+## [0.2.0] - 2026-10-30
+
+Published as [v0.2.0](https://github.com/Akilleez-QA/foundation-engine/releases/tag/v0.2.0)
+on 2026-10-30. The source milestone below was recorded on 2026-10-03.
 
 The first release since the source went public: optional networking hardening and
 anti-cheat building blocks, spatial audio and game sound files, textured materials,
@@ -484,7 +493,7 @@ six genre kits, and a newcomer toolchain for the community build day. See
 [Known limits](#known-limits) before making support claims, and the
 [acceptance ledger](docs/guides/upgrade-acceptance-ledger.md) for exact evidence per item.
 
-### Highlights
+### Added
 
 - **Your own textures, materials and sound files.** `Material`/`defineMaterial` give a
   `Shape` a texture, repeat/wrap, roughness, metalness, emission and transparency;
@@ -507,7 +516,7 @@ six genre kits, and a newcomer toolchain for the community build day. See
   (#18, #30, #32, #35, #39).
 - **Current toolchain.** three.js 0.186, TypeScript 6 and Vite 8 (#29, #43, #44).
 
-### Input & feel
+#### Input & feel
 
 - A press is now seen by exactly one fixed tick, including on 120 Hz+ displays and
   frames that run no fixed tick (`createPressLatch`, STD-SIM-12); previously a press
@@ -517,7 +526,7 @@ six genre kits, and a newcomer toolchain for the community build day. See
 - Phone layout for lessons: the board, captions and quiz no longer overlap the
   controls on compact screens; 48 px touch targets and 16 px text (DV-01 work, #9).
 
-### Rendering & assets
+#### Rendering & assets
 
 - Program preparation: shader programs are prepared and link-validated before a
   scene's first frame, with optional submitted-frame readiness and graceful
@@ -535,7 +544,7 @@ six genre kits, and a newcomer toolchain for the community build day. See
   r183 results, and upstream shading changes (multi-scattering energy compensation
   for `MeshStandardMaterial`) slightly alter some pictures (#29).
 
-### Audio
+#### Audio
 
 - Spatial audio voices (AUD-01): `panning: 'HRTF'` with a per-preset HRTF voice
   limit and diagnostics, `distanceModel` with bounded `refDistance`/`maxDistance`/
@@ -548,7 +557,7 @@ six genre kits, and a newcomer toolchain for the community build day. See
   concurrent fetch/decode limits and once-only failure reports; mute, effects
   volume, autoplay unlock and test-browser silence apply unchanged (#37).
 
-### Networking & multiplayer
+#### Networking & multiplayer
 
 - Queue age and submit deadlines (NW-06): optional `maxQueuedAgeMs` shedding and
   `submit(command, { deadlineMs })` that expires only before storage starts (#12).
@@ -570,7 +579,7 @@ six genre kits, and a newcomer toolchain for the community build day. See
   bounded local audit log and an `assertDisclosure` test helper; SECURITY.md links
   the [integrity guide](docs/guides/integrity.md) (#20).
 
-### Genre kits
+#### Genre kits
 
 - **Rollback** (`@kits/rollback`, RB-01): `createRollbackSession` for 2–8 peers with a
   prediction window, input delay, resimulation and confirmed-state checksums, plus
@@ -586,7 +595,7 @@ six genre kits, and a newcomer toolchain for the community build day. See
 - **Rhythm timeline** (AU-01): `createAudioTimeline` uses the audio clock as the
   master timeline, with latency calibration and bounded lookahead scheduling (#31).
 
-### Tooling & DX
+#### Tooling & DX
 
 - `npm run gate:ci` runs the exact CI workflow steps locally (#18).
 - Onboarding: Node.js 22.18+ required and checked with a one-line message (`.nvmrc`,
@@ -610,7 +619,7 @@ six genre kits, and a newcomer toolchain for the community build day. See
 - GitHub Actions updated and major/three-minor dependency upgrades made deliberate
   in Dependabot (#1, #2, #8).
 
-### Docs
+#### Docs
 
 - Getting-started guide, cookbook (models, HUD and buttons, collision and picking,
   camera and lighting, sharing a build), a README per template, "Not here yet" in the
@@ -618,7 +627,7 @@ six genre kits, and a newcomer toolchain for the community build day. See
 - Guides and recipes for every new framework above (in their PRs).
 - Public-repository wording and private-history labels (#6).
 
-### Fixes
+### Fixed
 
 - SQLite multi-process test waits for writers to exit before reading back (first
   public CI failure) (#5).
@@ -630,7 +639,9 @@ six genre kits, and a newcomer toolchain for the community build day. See
 - Mechanics template: `maxDistance: 60` had no audible effect; replaced by
   `cutoffDistance: 60` (#28).
 
-### Known limits
+### Changed
+
+#### Known limits
 
 - **Physical devices:** DV-01 is open. Phone, tablet, laptop and desktop evidence is
   emulated or software-rendered; minimum device profiles are not chosen yet. No
@@ -648,7 +659,11 @@ six genre kits, and a newcomer toolchain for the community build day. See
   guaranteed identical.
 - Native Windows tooling is covered by unit tests, not yet run on Windows hardware.
 
-## 0.1.0 — 2026-10-01 (first public source, untagged)
+## [0.1.0] - 2026-10-01
+
+Untagged source baseline; no release was published.
+
+### Added
 
 The source was published as a one-commit export (`c0e73c9`). No package or GitHub
 Release was published for this version.

@@ -12,7 +12,10 @@ changelog's style: a bold title, then how things behave now, with continuation l
 ```
 
 Links are written as they will read from CHANGELOG.md (relative to the repository root). Do not add new entries to
-CHANGELOG.md's Unreleased section directly.
+CHANGELOG.md's `[Unreleased]` section directly. Entries fold into `Changed`;
+review and group them under Added, Changed, Fixed, Removed or Security at release
+time. Published version headings use `## [x.y.z] - YYYY-MM-DD`; keep proposed
+versions inside Unreleased until a release exists.
 
 - `npm run changelog` prints the Unreleased section as it will read: these fragments, newest first, above the entries
   already in CHANGELOG.md.
