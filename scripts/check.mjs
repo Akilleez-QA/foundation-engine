@@ -191,6 +191,7 @@ if (process.argv[1] && process.argv[1].endsWith('check.mjs')) {
   run('lint:docs-claims', 'node', ['scripts/lint/docs-claims.mjs']);
   // Unreleased changelog entries are one file each in changes/unreleased/ (scripts/changelog.mjs).
   run('lint:changelog', 'node', ['scripts/changelog.mjs', '--check']);
+  run('lint:trace', 'node', ['scripts/docs/check-trace.mjs']);
   const tests = all ? [] : affectedTests(changed);
   if (all) run('tests (complete npm test suite)', npmCommand(['test']));
   else if (tests.length) {

@@ -30,6 +30,23 @@ body:
       description: Commit/version, selected template or GAME_DIR, OS, Node/npm, browser/version, device and input method. Include GPU and viewport for rendering/performance problems.
     validations:
       required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: 'Your rating; maintainers may change it. Definitions: docs/plan/software-management-plan.md, Problem reporting and severity.'
+      options:
+        - 'S1: wrong result presented as valid, save data loss, or security exposure'
+        - 'S2: feature unusable, no workaround'
+        - 'S3: feature degraded, workaround exists'
+        - 'S4: cosmetic or documentation'
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Workaround
+      description: Any way to avoid the problem for now, or "none known". The pull request that fixes it records how the fix was verified.
   - type: textarea
     id: evidence
     attributes:

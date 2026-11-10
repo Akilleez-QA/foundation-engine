@@ -1,34 +1,39 @@
-## Why
+## Problem and resulting behavior
 
-Describe the concrete problem, expected behavior, and reproduction or issue.
+Describe the concrete problem, what this changes, and the issue/reproduction if applicable.
 
-## What
+## Contract and scope
 
-Describe the resulting behavior and affected layer, kit or documentation.
-Explain ownership, cancellation, bounds and API/save compatibility where relevant.
-Keep the change to one concern, aiming for fewer than 400 changed lines.
+Identify the engine layer or optional kit. Explain ownership/cancellation, bounds, and API/save compatibility where relevant. Keep game-specific content separate.
 
-## Verification
+## Validation
 
-Record the head and base SHAs, commands and results, and checks not run.
-Name affected GAME_DIR values. Focused checks are not full regression acceptance.
-For UI/input/camera/quality changes, include inspected screenshots, budget evidence,
-affected device profiles and interaction checks. Separate browser emulation from
-physical-device evidence; name unverified combinations.
-See [device experience policy](../docs/policy/DEVICE-EXPERIENCE.md).
+List commands and results, affected GAME_DIR values, and any checks not run. For visible/runtime changes, include inspected screenshots and measured budget evidence. `npm run check` on a clean tree is not a full regression run; the integration gate remains required.
 
-## Requirements touched
+For UI/input/camera/quality changes, include affected phone/tablet/laptop/desktop
+profiles, active-world visibility and touch/keyboard interaction evidence. Separate
+emulation from physical-device measurements and name unverified combinations.
+See docs/policy/DEVICE-EXPERIENCE.md. Standards-only edits do not certify runtime UI.
 
-List REQ IDs from docs/requirements/requirements.md, or explain why none apply.
-Identify relevant contract or acceptance records and any compatibility change.
+## Requirements, design and interface impact
 
-## AI checklist
+- Requirements added, changed or deleted (IDs from docs/requirements/requirements.md):
+- Design, interface or data dictionary updated: yes / no / not needed
+- Verification matrix updated: yes / not needed
 
-- [ ] I followed CONTRIBUTING.md, AGENTS.md and the relevant recipe.
-- [ ] I described systems and patterns, preserving required attribution and reproduction identifiers.
-- [ ] I recorded assisted work in commit trailers, or no assisted work was used.
-- [ ] Tests/docs cover the change, or I explained why they do not apply.
-- [ ] I did not weaken budgets, tolerances, tests or expected results to pass checks.
-- [ ] I added no code comments or docstrings except machine-required directives.
-- [ ] New original contributions use GPL-3.0-only; third-party terms are identified.
+## Peer review record
+
+- Reviewers: human approver and any agent reviewers (an agent review is not independent)
+- Review type: code / docs / requirements / design
+- Findings: count by severity, with links to resolved threads
+- Outcome: approved / changes requested / re-review
+
+## Contribution checks
+
+- [ ] I followed CONTRIBUTING.md, AGENTS.md, and the relevant architecture recipe.
+- [ ] I described systems and patterns instead of external game names or source-project references, while preserving required attribution and reproducible identifiers.
+- [ ] Tests/docs cover the behavior changed, or I explained why they are not applicable.
+- [ ] I did not weaken budgets, tolerances, or tests to make checks pass.
+- [ ] New original contributions are submitted under GPL-3.0-only; third-party material is identified with its license and necessary notices.
 - [ ] No secrets or private data are included.
+- [ ] Docs whose source paths this change touches are updated or still accurate, and `npm run lint:trace` passes.
