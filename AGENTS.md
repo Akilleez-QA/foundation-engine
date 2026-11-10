@@ -4,19 +4,19 @@ For any coding agent working here, and for people. [docs/STANDARD.md](docs/STAND
 
 ## Making a game? Read this, skip that
 
-Following every "read first" link literally costs about 28k tokens. For work only in `game/`, about 8k is enough before the task's own skill and recipe (sizes at ~4 bytes per token):
+For work only in `game/`, start with the game workflow and its relevant recipe:
 
-- **Read:** this file (17 KB, ~4.3k, already loaded), [getting started](docs/guides/getting-started.md) (9 KB, ~2.3k), your template's `templates/<name>/README.md` (1.5–2.3 KB, ~0.5k) and the [recipes index](docs/recipes/README.md) (3 KB, ~0.7k). Then only the recipe for the task in hand.
+- **Read:** this file, [getting started](docs/guides/getting-started.md), your template's `templates/<name>/README.md`, and the [recipes index](docs/recipes/README.md). Then read the recipe for the task in hand.
 - **What exists:** [docs/capabilities.md](docs/capabilities.md) (and [capabilities.json](docs/capabilities.json)) is generated from the code by `npm run capabilities`: every `@engine` export, kit, quality knob, template, npm script and feature ID (VIS-01, FX-01, MP-01, KTX2 and the rest), marked shipped only when its code is in the tree. It is the source of truth for what exists. When a skill, recipe or README says a feature is missing but the manifest lists it as shipped, believe the manifest, use the feature, and fix the page; `npm run lint:docs-claims` (part of `npm run check`) catches the known phrasings.
-- **Skip unless you change `src/`:** [STANDARD.md](docs/STANDARD.md) (65 KB, ~16k), [CREATOR-CONTRACT.md](docs/CREATOR-CONTRACT.md) (11 KB, ~2.7k), the status ledgers in `docs/guides/` (`composition-framework-status`, `framework-upgrade-status`, `upgrade-acceptance-ledger`; 49–91 KB each), and the sections below on the engine contract, capability documentation and worktree integration.
-- **Looks go through the art-direction recipe.** For anything about how the game looks (palette, light, shadows, sky, glow and bloom, camera framing, the phone view), use the [art-direction recipe](docs/recipes/art-direction.md) (~10k) before dressing a scene. Built-in bloom is `view.post`; `@kits/three` is only for passes beyond it. Reusing the `showcase` template for another game: the recipe's "Making a different game from the showcase" section.
-- **Read when it applies:** [DEVICE-EXPERIENCE.md](docs/policy/DEVICE-EXPERIENCE.md) (22 KB, ~5.4k) for UI, control, camera, framing or quality changes on the brief's devices; [KID-SAFE.md](docs/policy/KID-SAFE.md) when the brief sets `kids: true`; [make assets with Blender through MCP](docs/recipes/make-assets-with-blender-mcp.md) when you make a model. That recipe covers the contract first, a headless `export.py`, `npm run asset:verify`, and licence and provenance. Registering a Blender MCP server is the user's own opt-in; never add `.mcp.json` to the repository.
+- **Skip unless you change `src/`:** [STANDARD.md](docs/STANDARD.md), [CREATOR-CONTRACT.md](docs/CREATOR-CONTRACT.md), the status ledgers in `docs/guides/` (`composition-framework-status`, `framework-upgrade-status`, `upgrade-acceptance-ledger`), and the sections below on the engine contract, capability documentation and worktree integration.
+- **Looks go through the art-direction recipe.** For anything about how the game looks (palette, light, shadows, sky, glow and bloom, camera framing, the phone view), use the [art-direction recipe](docs/recipes/art-direction.md) before dressing a scene. Built-in bloom is `view.post`; `@kits/three` is only for passes beyond it. Reusing the `showcase` template for another game: the recipe's "Making a different game from the showcase" section.
+- **Read when it applies:** [DEVICE-EXPERIENCE.md](docs/policy/DEVICE-EXPERIENCE.md) for UI, control, camera, framing or quality changes on the brief's devices; [KID-SAFE.md](docs/policy/KID-SAFE.md) when the brief sets `kids: true`; [make assets with Blender through MCP](docs/recipes/make-assets-with-blender-mcp.md) when you make a model. That recipe covers the contract first, a headless `export.py`, `npm run asset:verify`, and licence and provenance. Registering a Blender MCP server is the user's own opt-in; never add `.mcp.json` to the repository.
 - **First commands:**
 
   ```sh
   npm ci
   npm run new-game -- --template <name> --id <game-id> --title "<Title>"
-  git switch -c <game-id> && git add game GAME.md && git commit -m "Start <game-id>"
+  git switch -c <game-id> && git add game GAME.md && git commit -m "feat(game): start <game-id>"
   npm run check
   npm run play:snap          # add -- --mobile when phones are targets
   ```
@@ -212,3 +212,23 @@ performance. Standards-only edits do not certify existing template experiences.
 ## Test browsers
 
 Test browsers are isolated and muted. Never change the user's system or application audio. The bench, play scripts and quality guard always launch a fresh Chromium with `--mute-audio` and open the game with `?flags=dev.silent`. A driver of your own launches through `launch()` in `scripts/perf/bench-browser.mjs` (muted, throwaway profile, `ENGINE_CHROMIUM`) or passes `--mute-audio` itself ([getting started](docs/guides/getting-started.md#without-a-browser-window-coding-agents-ci)). Preloading `scripts/silent-browser.cjs` does not mute a browser your script launches: it only adds `--mute-audio` to `AGENT_BROWSER_ARGS`, for agent-browser tools that read it, and turns off the file watcher.
+
+## Public contribution style
+
+Use plain, factual US English and sentence case headings. Keep each pull request
+focused on one concern, aiming for fewer than 400 changed lines. Follow the
+[pull request template](.github/pull_request_template.md), identify affected
+requirement IDs or explain why none apply, and record commands with their results.
+Use Conventional Commits (`type(scope): imperative summary`, at most 72 characters
+in the subject). Assisted commits include an `Assisted-by: <tool>` trailer.
+
+Put design rationale and usage in documentation. Do not add code comments or
+docstrings; machine-required directives and shebangs are exceptions. Do not edit
+expected results to make checks pass. Keep dated reports under `docs/reports/`.
+New guide pages use lowercase kebab-case names and the tutorial, how-to, reference
+or explanation directories under `docs/guides/`.
+
+Do not delete files during cleanup. Move a retirement candidate to top-level
+`TODELETE/`, retaining its original path, in a separate pull request. Record its
+reason and replacement in `TODELETE/README.md` and verify exclusion from builds,
+checks and CI before submitting that retirement change.

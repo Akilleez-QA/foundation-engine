@@ -35,7 +35,7 @@ Here **`origin` is the canonical upstream; `fork` is your personal repository**.
 
 ```sh
 git fetch origin
-git worktree add ../foundation-engine-candidate -b my-change 7c26db7   # the candidate's full or short SHA
+git worktree add ../foundation-engine-candidate -b my-change 7c26db7
 cd ../foundation-engine-candidate
 npm ci
 BUDGET_BASE=7c26db7 npm run check -- --base 7c26db7
@@ -161,11 +161,14 @@ documentation checklist.
 
 ## Submit a pull request
 
+Use a Conventional Commit subject (`type(scope): imperative summary`, at most
+72 characters). For assisted work, include an `Assisted-by: <tool>` commit trailer.
+Keep each pull request to one concern, aiming for fewer than 400 changed lines.
 Commit the focused change and push only your branch to your fork. Replace the example file path with the files you changed:
 
 ```sh
 git add -- path/to/changed-file
-git commit -m "Describe the concrete change"
+git commit -m "docs(scope): describe the concrete change"
 git push -u fork my-change
 ```
 
