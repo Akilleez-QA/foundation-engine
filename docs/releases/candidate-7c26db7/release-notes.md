@@ -3,7 +3,7 @@
 **Status: prepared, not released.** The version number 0.3.0 and the date are proposed; the author decides
 both. No tag, GitHub release, package or deployment exists for this candidate. The candidate is
 `7c26db7efa5634d1e32b2c18a1a2e63451157f89` on `main` (the merge of #121, after #108); its evidence is in the [candidate bundle](README.md). The full list with PR links is
-the [changelog](../../../CHANGELOG.md#030--proposed-author-decides).
+the [changelog](../../../CHANGELOG.md#planned-030-not-released).
 
 Everything below happened after [v0.2.0](https://github.com/Akilleez-QA/foundation-engine/releases/tag/v0.2.0)
 (tag `071e3c2`, PR #49). Every new framework is optional: a game that does not use it is unchanged.

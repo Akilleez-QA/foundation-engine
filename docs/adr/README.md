@@ -48,6 +48,9 @@ Each file records one decision: its context, the decision and its consequences (
 | [0061](0061-ownership-outside-the-architecture.md) | Ownership and authorship are outside the architecture | Process | Accepted |
 | [0062](0062-bounded-worker-admission.md) | Bounded worker admission, physical cancellation and current-owner delivery | Workers | Accepted |
 | [0063](0063-boot-availability-without-data-loss.md) | Successful installation controls executable availability, not stored identity | Kernel | Accepted |
+| [0064](0064-canonical-terrain-surface.md) | Canonical fixed-resolution terrain surfaces | Terrain | Proposed |
+| [0065](0065-owned-optional-systems.md) | Owned optional systems | Optional kits | Proposed |
+| [0066](0066-preparation-and-render-resource-ownership.md) | Preparation and render resource ownership | Rendering / Assets | Proposed |
 | [0067](0067-shared-dependency-admission.md) | Shared dependency admission covers overlapping owners and late cleanup | Assets | Accepted |
 
 | [0068](0068-device-specific-experience-contracts.md) | Separate device layout, input and graphics acceptance | UI / Quality | Accepted |
@@ -154,7 +157,6 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0121](0121-optional-physics-adapter-kit.md) | Optional physics adapter kit over a lazily loaded WebAssembly library; amends the no-physics stance only for creators who opt in | Optional kits / Simulation / Dependencies | Proposed |
 
-| [0130](0130-offline-format-converters.md) | Offline format converters with provenance receipts | Tooling / Assets | Proposed |
 
 | [0136](0136-legacy-format-decoders.md) | Legacy game and multimedia format decoders in the converter toolchain | Tooling / Assets | Proposed |
 
@@ -176,4 +178,4 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0154](0154-presentation-kit.md) | Optional presentation kit | Optional kits | Proposed |
 
-- [0078 — Source identity and read-only tool schema baseline](0078-foundation-contract-baseline.md) — Proposed.
+- [0156 — Source identity and read-only tool schema baseline](0156-foundation-contract-baseline.md) — Proposed. Numbered 0078 until 2026-11-10; 0078 is the render-backend decision.

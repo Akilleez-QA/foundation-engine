@@ -1,13 +1,105 @@
-# Verification matrix
+# Foundation Engine verification matrix
 
-This matrix traces the selected REQ identifiers from the companion requirements
-register prepared on `fem/20261030-fe-5-requirements`. That branch and this branch
-start independently from the same source baseline; integrate both to publish the
-register and its evidence together. No other standard clauses are claimed covered.
+| Field | Value |
+|---|---|
+| Document ID | FENGINE-VM |
+| Version | 2.2 |
+| Status | Baselined |
+| Owner | Akilleez-QA |
+| Date | 2026-11-10 |
+| Baseline commit | `a9e8cc6f175b5055b18abf26579ecc432a6ac53b` |
+| Applies to | foundation-engine main at baseline commit |
+| Classification | Self-assessed Class E analog; not safety-critical (see [SMP §1](../plan/software-management-plan.md#1-software-classification-self-assessed)) |
 
-Evidence baseline: `294dfa96394e208c4d53d78caaeb79f071e28143`. Documentation
-changes on these branches do not change the tested implementation. T = executable
-test, A = automated analysis, I = inspection. Commands run from the repository root.
+> Organized after [NPR 7150.2D](https://nodis3.gsfc.nasa.gov/displayAll.cfm?Internal_ID=N_PR_7150_002D_&page_name=all), [NASA-STD-8739.8B](https://standards.nasa.gov/standard/nasa/nasa-std-87398) and the [NASA Software Engineering Handbook](https://swehb.nasa.gov/display/SWEHBVD/7.18+-+Documentation+Guidance) documentation guidance. This is not a NASA compliance determination or certification. The software classification is a self-assessed analog (Class E, not safety-critical); no NASA authority, independent verification and validation, or hazard analysis is asserted. The document describes the implementation inspected at the baseline commit.
+
+## 1. Purpose
+
+This matrix traces every requirement in the [SRS](../requirements/requirements.md) to
+the test, analysis or inspection that verifies it, and to the last recorded result.
+T = executable test, A = automated analysis, I = inspection, D = demonstration.
+Commands run from the repository root.
+
+"Last result" names the [test report](reports/README.md) that recorded the run. A
+command listed here is the method; it is not a claim that it passed on every revision.
+`npm run lint:trace` checks that every requirement has a row in §2 and that every cited file
+exists. Only §2 rows count as verification. The historical rows in §4 are still checked for
+known requirement IDs, existing files and valid methods, but they never trace a requirement.
+
+## 2. Requirement to verification trace
+
+| Requirement | Method | Verification | Last result |
+|---|---|---|---|
+| REQ-BOOT-001 | T | `src/core/app.test.ts`, `src/core/module.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-BOOT-002 | T | `src/core/app.test.ts` (boot order, cycles, throwing module) | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-BOOT-003 | T | `src/core/app.test.ts` (duplicate owners, services) | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-DATA-001 | T | `src/core/registry.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-PATCH-001 | T | `src/core/patch.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-APP-001 | T | `src/app/registries.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-EVT-001 | T | `src/core/events.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-LOOP-001 | T | `src/core/activity/loop.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-ACT-001 | T | `src/core/activity/activity.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-CLOCK-001 | T | `src/core/clock.test.ts`, `src/core/player-clock.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-ROUTE-001 | T | `src/core/router/handover.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-ROUTE-002 | T | `src/core/router/resolve.test.ts`, `src/core/router/module.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-SAVE-001 | T | `src/core/save/store.test.ts`, `src/core/save/module.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-SAVE-002 | T | `src/core/save/released-v0.2.0.test.ts`, `src/core/save/migration-fixtures.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-SAVE-003 | T | `src/core/save/chunk-store.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-SET-001 | T | `src/core/settings/features.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-I18N-001 | T | `src/core/i18n/i18n.test.ts`, `src/core/i18n/select-ordinal.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-RNG-001 | T | `src/core/rng.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-DMATH-001 | T | `src/core/dmath.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-ECS-001 | T | `src/core/ecs/ecs.test.ts`, `src/core/ecs/query-iteration.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-SIM-001 | T | `src/domain/sim/host.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-INPUT-001 | T | `src/platform/input/keyboard.test.ts`, `src/platform/input/keys.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-INPUT-002 | T | `src/platform/input/index.test.ts`, `src/platform/input/held.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-ASSET-001 | T | `src/platform/assets/lease-cache.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-ASSET-002 | T | `src/platform/assets/manifest.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-ASSET-003 | T | `src/platform/assets/models.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-GAME-001 | A, T | `npm run lint:game`; `scripts/lint/game-rules.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-TPL-001 | T | `src/app/templates.test.ts`, `scripts/lint/brief.test.ts`; `npm run gate:templates` in CI | Node tests pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md); template gate not run locally |
+| REQ-COMPAT-001 | T | `scripts/compatibility.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-ARCH-001 | A, T | `npm run lint:layers`; `npm run lint:arch`; `scripts/lint/layers.test.mjs`, `scripts/lint/architecture.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-PURE-001 | T | `scripts/package-pure.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-DEV-001 | T | `src/dev/replay.test.ts` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-HOST-001 | T | `scripts/host.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-DMATH-002 | T | `npm run test:dmath-browser` (`scripts/play/dmath-check.mjs`) | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) §3 |
+| REQ-SUBPATH-001 | T | `npm run test:subpath-browser` (`scripts/play/subpath-check.mjs`) | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) §3 |
+| REQ-SESSION-001 | T | `npm run test:session-browser` (`scripts/play/session-check.mjs`) | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) §3 |
+| REQ-PERF-001 | A, T | `npm run lint:budgets`; `scripts/perf/budget-ratchet.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-TOOL-001 | T | `scripts/check.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-CI-001 | T | `scripts/ci-results.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-CI-002 | T | `scripts/ci-changes.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-CI-003 | T | `scripts/gate-ci.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-CI-004 | T | `scripts/gate-templates.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-REL-001 | T | `scripts/deploy-production.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-CHG-001 | T | `scripts/changelog.test.mjs`; `npm run lint:changelog` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-SEC-001 | T | `scripts/install-scripts.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-SCAF-001 | T | `scripts/new-game.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-CAP-001 | T | `scripts/capabilities.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-DOC-001 | T | `scripts/lint/docs-claims.test.mjs`; `npm run lint:docs-claims` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-DOC-002 | T | `scripts/docs/check-trace.test.mjs`; `npm run lint:trace` | Pass on this PR's head; recorded in the [assurance record](../assurance/assurance-record.md) |
+| REQ-EVID-001 | I | Inspect `docs/guides/upgrade-acceptance-ledger.md` and `docs/policy/DEVICE-EXPERIENCE.md` for separate runtime, automated and device-evidence scopes | Inspected 2026-11-08 at `a9e8cc6`: explicit unverified device scope present; not device acceptance |
+| REQ-FND-001 | A, T | `python3 -B tools/build_manifest.py --check`; `scripts/source-manifest.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-FND-002 | T, I | `scripts/foundation-contract.test.ts`; inspect the mapping table in `docs/icd/icd-dependencies.md` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-FND-003 | T | `scripts/foundation-bridge.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-FND-004 | T | `scripts/foundation-bridge.test.mjs` ("bridge answers -32603 when dispatch raises an unexpected exception, keeps the id and recovers", "bridge answers -32603 for an unsupported pinned schema type instead of a result", "bridge answers -32603 and withholds evidence when a result cannot be represented as JSON") | Pass locally at `4644f3c` (findings sweep, `npm test`); no generated report yet |
+| REQ-FND-005 | T | `scripts/foundation-bridge.test.mjs` ("bridge withholds an output frame over 1048576 bytes with -32002 (not -32603) and keeps the session", "bridge output bound is exact at 1048576 bytes per frame, newline excluded") | Pass locally at `4644f3c` (findings sweep, `npm test`); no generated report yet |
+
+## 3. Backward trace
+
+Every test file in the repository is supporting evidence for the engine or a kit.
+Only the test files named above trace to an SRS requirement. The others verify
+kit contracts that the [capability inventory](../capabilities.md) lists by feature ID.
+`npm run lint:trace` reports how many test files the matrix cites. Untested behavior is
+listed in [SRS §7](../requirements/requirements.md#7-untested-behavior-requirement-gaps).
+
+## 4. Earlier evidence (historical)
+
+The tables below were recorded by earlier documentation passes. They are kept as
+written and are not current evidence.
+
+### 4.1 Selected stock requirements, evidence baseline `294dfa9`
 
 | Requirement | Method | Test file or command | Result | Source commit |
 |---|---|---|---|---|
@@ -20,8 +112,6 @@ test, A = automated analysis, I = inspection. Commands run from the repository r
 | REQ-PERF-001 | A | `npm run lint:budgets` (included in `npm run lint`) | Passed locally against `origin/main` at this baseline | `294dfa9` |
 | REQ-EVID-001 | I | `git show HEAD:docs/guides/upgrade-acceptance-ledger.md`; `git show HEAD:docs/policy/DEVICE-EXPERIENCE.md` | Inspection found explicit unverified device scope; not device acceptance | `294dfa9` |
 
-## Reproduction and limits
-
 The combined invocation passed all selected tests locally:
 
 ```sh
@@ -29,15 +119,7 @@ node --import tsx --test src/core/module.test.ts src/core/registry.test.ts src/c
 npm run lint
 ```
 
-These results apply to the checked files and configured lint rules, not arbitrary
-extensions or every standard clause. Documentation-only `npm run check` can select
-no tests. Full integration CI, browser behavior, physical devices and sustained
-performance were not verified by this documentation pass. Existing broader evidence
-and its limitations remain in the [acceptance ledger](../guides/upgrade-acceptance-ledger.md).
-
-## Foundation contract verification
-
-These methods cover the new baseline; earlier results above remain historical.
+### 4.2 Foundation contract verification, 2026-11-01
 
 | Requirement | Method | Test file or command | Evidence scope |
 |---|---|---|---|
@@ -54,3 +136,13 @@ two-CPU affinity, with unchanged assertions and budgets. Each complete source pa
 ran 4,196 tests. Ubuntu browser dependency installation failed (`apt-get` absent);
 installed Chromium supplied the local browser runs. These combined local results
 are not a hosted CI run, independent review or physical-device acceptance.
+
+## Change history
+
+| Version | Date | Commit | Change | Reviewed in |
+|---|---|---|---|---|
+| 1.0 | 2026-11-01 | `39cf03b` | Selected stock requirements traced to local evidence | PR #328 |
+| 1.1 | 2026-11-01 | `d9c7039` | Foundation contract rows | PR #333 |
+| 2.0 | 2026-11-08 | `a9e8cc6` | One row per SRS requirement (53), last result linked to a test report, backward-trace rule; earlier tables kept as historical | PR #346 |
+| 2.1 | 2026-11-09 | `95a883c` | `lint:trace` counts only §2 rows as verification; §4 rows are checked but trace nothing (backfill review) | PR fixing the 2026-11-09 backfill-review findings |
+| 2.2 | 2026-11-10 | `4644f3c` | Rows for REQ-FND-004 and REQ-FND-005, the tests that closed GAP-001 and GAP-002 | findings-sweep PR |
