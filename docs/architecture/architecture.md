@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Document ID | FENGINE-SDD |
-| Version | 2.1 |
+| Version | 2.2 |
 | Status | Baselined |
 | Owner | Akilleez-QA |
-| Date | 2026-11-09 |
+| Date | 2026-11-10 |
 | Baseline commit | `a9e8cc6f175b5055b18abf26579ecc432a6ac53b` |
 | Applies to | foundation-engine main at baseline commit |
 | Classification | Self-assessed Class E analog; not safety-critical (see [SMP §1](../plan/software-management-plan.md#1-software-classification-self-assessed)) |
@@ -219,13 +219,13 @@ requirement trace (only matrix §2 rows count), control-document headers and eve
 
 ## 4. Foundation contract boundary
 
-Requirements: REQ-FND-001, REQ-FND-002, REQ-FND-003.
+Requirements: REQ-FND-001, REQ-FND-002, REQ-FND-003, REQ-FND-004, REQ-FND-005.
 
 The source manifest and read-only tool inventory are build-time artifacts owned by
 repository tooling, outside the running engine. Existing author validators keep
 ownership of validation; the JSON schemas describe their serializable subset. No
 scheduler, cache, registry, persistence owner or runtime dependency is added. See
-[ADR 0078 (foundation contract)](../adr/0078-foundation-contract-baseline.md) and the
+[ADR 0156 (foundation contract)](../adr/0156-foundation-contract-baseline.md) and the
 [ICD](../icd/icd-dependencies.md#4-read-only-tool-contract-version-020).
 
 The stdio bridge (`tools/foundation_engine_bridge.py`) owns bounded, sequential request
@@ -329,3 +329,4 @@ See [limitations](../guides/limitations.md).
 | 1.1 | 2026-11-01 | `70810ba` | Foundation contract boundary; bridge self-contained | PRs #333, #340, #341 |
 | 2.0 | 2026-11-08 | `a9e8cc6` | Family documentation standard: metadata, numbered component sections with requirement IDs, tooling components, concurrency, decisions, quality attributes, resource use | PR #346 |
 | 2.1 | 2026-11-09 | `95a883c` | §3.3 install-script enforcement qualified by npm version; §3.4 trace check counts only matrix §2 rows | PR fixing the 2026-11-09 backfill-review findings |
+| 2.2 | 2026-11-10 | `4644f3c` | §4 lists REQ-FND-004 and REQ-FND-005; the foundation-contract ADR is now 0156 (it shared 0078 with the render-backend decision) | findings-sweep PR |

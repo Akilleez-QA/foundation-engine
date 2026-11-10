@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Document ID | FENGINE-VM |
-| Version | 2.1 |
+| Version | 2.2 |
 | Status | Baselined |
 | Owner | Akilleez-QA |
-| Date | 2026-11-09 |
+| Date | 2026-11-10 |
 | Baseline commit | `a9e8cc6f175b5055b18abf26579ecc432a6ac53b` |
 | Applies to | foundation-engine main at baseline commit |
 | Classification | Self-assessed Class E analog; not safety-critical (see [SMP §1](../plan/software-management-plan.md#1-software-classification-self-assessed)) |
@@ -83,6 +83,8 @@ known requirement IDs, existing files and valid methods, but they never trace a 
 | REQ-FND-001 | A, T | `python3 -B tools/build_manifest.py --check`; `scripts/source-manifest.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
 | REQ-FND-002 | T, I | `scripts/foundation-contract.test.ts`; inspect the mapping table in `docs/icd/icd-dependencies.md` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
 | REQ-FND-003 | T | `scripts/foundation-bridge.test.mjs` | Pass, [STR-main-a9e8cc6](reports/STR-main-a9e8cc6.md) |
+| REQ-FND-004 | T | `scripts/foundation-bridge.test.mjs` ("bridge answers -32603 when dispatch raises an unexpected exception, keeps the id and recovers", "bridge answers -32603 for an unsupported pinned schema type instead of a result", "bridge answers -32603 and withholds evidence when a result cannot be represented as JSON") | Pass locally at `4644f3c` (findings sweep, `npm test`); no generated report yet |
+| REQ-FND-005 | T | `scripts/foundation-bridge.test.mjs` ("bridge withholds an output frame over 1048576 bytes with -32002 (not -32603) and keeps the session", "bridge output bound is exact at 1048576 bytes per frame, newline excluded") | Pass locally at `4644f3c` (findings sweep, `npm test`); no generated report yet |
 
 ## 3. Backward trace
 
@@ -143,3 +145,4 @@ are not a hosted CI run, independent review or physical-device acceptance.
 | 1.1 | 2026-11-01 | `d9c7039` | Foundation contract rows | PR #333 |
 | 2.0 | 2026-11-08 | `a9e8cc6` | One row per SRS requirement (53), last result linked to a test report, backward-trace rule; earlier tables kept as historical | PR #346 |
 | 2.1 | 2026-11-09 | `95a883c` | `lint:trace` counts only §2 rows as verification; §4 rows are checked but trace nothing (backfill review) | PR fixing the 2026-11-09 backfill-review findings |
+| 2.2 | 2026-11-10 | `4644f3c` | Rows for REQ-FND-004 and REQ-FND-005, the tests that closed GAP-001 and GAP-002 | findings-sweep PR |

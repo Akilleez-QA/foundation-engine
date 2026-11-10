@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Document ID | FENGINE-SRS |
-| Version | 2.1 |
+| Version | 2.2 |
 | Status | Baselined |
 | Owner | Akilleez-QA |
-| Date | 2026-11-09 |
+| Date | 2026-11-10 |
 | Baseline commit | `a9e8cc6f175b5055b18abf26579ecc432a6ac53b` |
 | Applies to | foundation-engine main at baseline commit |
 | Classification | Self-assessed Class E analog; not safety-critical (see [SMP §1](../plan/software-management-plan.md#1-software-classification-self-assessed)) |
@@ -133,6 +133,8 @@ These are verified by the muted browser harness. A Node-only run does not verify
 | REQ-FND-001 | The source manifest shall pin SHA-256 bytes for every Git-tracked file except itself and local `PR_BODY.md`. | Reproducible source identity, including schemas and tooling. | `tools/build_manifest.py`, `SOURCE-MANIFEST.json` | SDD §4 | A, T | Baselined |
 | REQ-FND-002 | Versioned JSON tool schemas shall describe only existing read-only TypeScript capabilities. | No new runtime authority or mutating operations. | `schemas/read-only-tools.json`, `src/author/render-mask.ts`, `src/author/scene-output.ts` | SDD §4 | T, I | Baselined |
 | REQ-FND-003 | The stdio bridge shall mirror sibling framing, initialize before tools, validate pinned inputs and reject unknown tools. | Read-only interoperability without runtime authority. See [ICD §4](../icd/icd-dependencies.md#4-read-only-tool-contract-version-020). | `tools/foundation_engine_bridge.py` | SDD §4 | T | Baselined |
+| REQ-FND-004 | When dispatch raises an unexpected exception, a pinned schema uses an unsupported type, or a result cannot be represented as JSON, the bridge shall answer error -32603 with the request's id and no result, without the exception text, and the session shall continue. | A defect must not leak internal detail or pass as evidence. See [ICD §4.3](../icd/icd-dependencies.md#43-errors). | `tools/foundation_engine_bridge.py` (`Bridge.dispatch`, `encode_response`) | SDD §4 | T | Baselined |
+| REQ-FND-005 | The bridge shall send a response frame of up to 1,048,576 bytes (newline excluded) and replace a larger one with error -32002 and the same id, withholding the result; the session shall continue. | Bounded output for the host. See [ICD §4.4](../icd/icd-dependencies.md#44-limits). | `tools/foundation_engine_bridge.py` (`encode_response`) | SDD §4 | T | Baselined |
 
 ## 7. Untested behavior (requirement gaps)
 
@@ -142,10 +144,13 @@ test.
 
 | ID | Behavior | Source | Why it is a gap |
 |---|---|---|---|
-| GAP-001 | The bridge answers `-32603 Internal bridge error` when an unexpected exception occurs during dispatch. | `tools/foundation_engine_bridge.py` (`Bridge.dispatch`) | `scripts/foundation-bridge.test.mjs` asserts codes -32700, -32600, -32601, -32602, -32000, -32001 and -32002, but no test triggers -32603. |
-| GAP-002 | The bridge withholds a result larger than 1,048,576 output bytes and answers -32002. | `tools/foundation_engine_bridge.py` (`encode_response`) | The two pinned tools cannot produce such a result, and no test injects one. |
 | GAP-003 | `npm run deploy:production` builds and publishes after the clean-main guard passes. | `scripts/deploy-production.mjs` | `scripts/deploy-production.test.mjs` checks only the guard; the publication step is not exercised. |
 | GAP-004 | Physical-device behavior (phone, tablet, laptop and desktop) of templates. | `docs/policy/DEVICE-EXPERIENCE.md` | CI uses emulated phone smoke only; physical-device acceptance is a manual, per-game activity. |
+
+Closed gaps (findings sweep, commit `4644f3c`). Their IDs are not reused:
+
+- GAP-001 (bridge -32603 on an unexpected exception) is now REQ-FND-004, tested in `scripts/foundation-bridge.test.mjs` by "bridge answers -32603 when dispatch raises an unexpected exception, keeps the id and recovers", "bridge answers -32603 for an unsupported pinned schema type instead of a result" and "bridge answers -32603 and withholds evidence when a result cannot be represented as JSON".
+- GAP-002 (output frames over 1,048,576 bytes withheld with -32002) is now REQ-FND-005, tested in `scripts/foundation-bridge.test.mjs` by "bridge withholds an output frame over 1048576 bytes with -32002 (not -32603) and keeps the session" and "bridge output bound is exact at 1048576 bytes per frame, newline excluded".
 
 ## 8. Change control
 
@@ -164,3 +169,4 @@ unverified; requirement wording does not supply a passing result.
 | 1.1 | 2026-11-01 | `d9c7039` | Added REQ-FND-001 to REQ-FND-003 | PR #333 |
 | 2.0 | 2026-11-08 | `a9e8cc6` | Family documentation standard: metadata, seven-field rows, 42 new requirements (53 in total), N/A categories, untested gaps; REQ-BOOT-001 now also cites `src/core/app.test.ts`, which holds the boot-order test | PR #346 |
 | 2.1 | 2026-11-09 | `95a883c` | REQ-DOC-002: only a row in the matrix's current trace (§2) verifies a requirement | PR fixing the 2026-11-09 backfill-review findings |
+| 2.2 | 2026-11-10 | `4644f3c` | GAP-001 and GAP-002 closed: the bridge's -32603 and output-bound behavior now have tests and are stated as REQ-FND-004 and REQ-FND-005 (55 requirements) | findings-sweep PR |

@@ -178,4 +178,4 @@ Each file records one decision: its context, the decision and its consequences (
 
 | [0154](0154-presentation-kit.md) | Optional presentation kit | Optional kits | Proposed |
 
-- [0078 — Source identity and read-only tool schema baseline](0078-foundation-contract-baseline.md) — Proposed.
+- [0156 — Source identity and read-only tool schema baseline](0156-foundation-contract-baseline.md) — Proposed. Numbered 0078 until 2026-11-10; 0078 is the render-backend decision.
